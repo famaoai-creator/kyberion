@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/onboarding-apply-input.schema.json",
+  "title": "Onboarding apply input",
+  "description": "Validated input accepted by the non-interactive onboarding apply entry point.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["identity"],
+  "properties": {
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "language", "interaction_style", "primary_domain", "vision", "agent_id"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "language": { "type": "string", "minLength": 1 },
+        "interaction_style": {
+          "type": "string",
+          "enum": ["Senior Partner", "Concierge", "Minimalist"]
+        },
+        "primary_domain": { "type": "string", "minLength": 1 },
+        "vision": { "type": "string", "minLength": 1 },
+        "agent_id": { "type": "string", "minLength": 1 },
+        "persona": {
+          "type": "string",
+          "enum": ["sovereign", "ecosystem_architect", "mission_owner", "worker", "analyst"]
+        }
+      }
+    },
+    "tenants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tenant_slug", "display_name", "assigned_role"],
+        "properties": {
+          "tenant_slug": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{1,30}$",
+            "not": { "enum": ["public", "confidential", "personal", "shared"] }
+          },
+          "display_name": { "type": "string", "minLength": 1 },
+          "assigned_role": { "type": "string", "minLength": 1 },
+          "purpose": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "tutorial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["simulate", "apply", "skipped"] },
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "reasoning_backend": { "type": "string", "minLength": 1 }
+  }
+}

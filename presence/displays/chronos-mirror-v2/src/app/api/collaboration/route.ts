@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
+import { normalizeCollaborationLimit } from '../../../lib/collaboration-limit';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
   strictViewerScopeTenantSlugs,
 } from '../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../lib/request-input';
 
 export const dynamic = 'force-dynamic';
+
+let collaborationSnapshotRevision = 0;
+
+function nextCollaborationSnapshotRevision(): number {
+  collaborationSnapshotRevision = Math.max(collaborationSnapshotRevision + 1, Date.now());
+  return collaborationSnapshotRevision;
+}
 
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -17,11 +26,12 @@ export function GET(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
 
-  const rawLimit = Number(req.nextUrl.searchParams.get('limit') || 100);
-  const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(Math.floor(rawLimit), 500)) : 100;
-  const missionId = req.nextUrl.searchParams.get('mission') || undefined;
-  const tenant = req.nextUrl.searchParams.get('tenant') || undefined;
-  const scopeKind = req.nextUrl.searchParams.get('scope_kind') || undefined;
+  const limit = normalizeCollaborationLimit(
+    readChronosOptionalStringParam(req.nextUrl.searchParams.get('limit'))
+  );
+  const missionId = readChronosOptionalStringParam(req.nextUrl.searchParams.get('mission'));
+  const tenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
+  const scopeKind = readChronosOptionalStringParam(req.nextUrl.searchParams.get('scope_kind'));
   const allowedScopeKinds = new Set([
     'system',
     'tenant',
@@ -32,20 +42,24 @@ export function GET(req: NextRequest) {
     'session',
   ]);
   const scopeFilter = {
-    ...(req.nextUrl.searchParams.get('organization')
-      ? { organization_id: req.nextUrl.searchParams.get('organization')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization'))
+      ? {
+          organization_id: readChronosOptionalStringParam(
+            req.nextUrl.searchParams.get('organization')
+          )!,
+        }
       : {}),
-    ...(req.nextUrl.searchParams.get('project')
-      ? { project_id: req.nextUrl.searchParams.get('project')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('project'))
+      ? { project_id: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project'))! }
       : {}),
-    ...(req.nextUrl.searchParams.get('task')
-      ? { task_id: req.nextUrl.searchParams.get('task')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('task'))
+      ? { task_id: readChronosOptionalStringParam(req.nextUrl.searchParams.get('task'))! }
       : {}),
-    ...(req.nextUrl.searchParams.get('session')
-      ? { session_id: req.nextUrl.searchParams.get('session')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('session'))
+      ? { session_id: readChronosOptionalStringParam(req.nextUrl.searchParams.get('session'))! }
       : {}),
     ...(scopeKind && allowedScopeKinds.has(scopeKind)
-      ? { scope_kind: scopeKind as import('@agent/core').EventScopeKind }
+      ? { scope_kind: scopeKind as import('@agent/core/event-scope').EventScopeKind }
       : {}),
   };
   try {
@@ -57,7 +71,10 @@ export function GET(req: NextRequest) {
       scopeFilter,
       limit,
     });
-    return NextResponse.json({ ok: true, projection });
+    return NextResponse.json({
+      ok: true,
+      projection: { ...projection, revision: nextCollaborationSnapshotRevision() },
+    });
   } catch (error) {
     return viewerErrorResponse(error);
   }

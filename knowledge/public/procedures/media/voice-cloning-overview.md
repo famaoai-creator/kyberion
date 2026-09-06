@@ -35,5 +35,4 @@ Give the operator a single entry point for the cloned-voice flow.
 ## Rule of Thumb
 
 - If you are still recording, you are in `tmp`.
-- If the profile is ready for `voice:speak` or `live-voice`, it should already be in the runtime voice-profile store.
-
+- If the profile is ready for `pnpm pipeline speak-with-my-voice` or `live-voice`, it should already be in the runtime voice-profile store.

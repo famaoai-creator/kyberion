@@ -32,6 +32,12 @@ vi.mock('./secure-io.js', async () => {
 });
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const WRITER_LEASE_SCHEMAS = ['writer-lease.schema.json', 'writer-lease-metrics.schema.json'].map(
+  (name) => ({
+    name,
+    content: fs.readFileSync(path.join(REPO_ROOT, 'knowledge/product/schemas', name), 'utf8'),
+  })
+);
 
 let tmpRoot: string;
 let governance: typeof import('./nhi-lifecycle-governance.js');
@@ -94,6 +100,11 @@ beforeAll(async () => {
     path.join(REPO_ROOT, 'knowledge/product/governance/mission-management-config.json'),
     path.join(policyTarget, 'mission-management-config.json')
   );
+  const schemaTarget = path.join(tmpRoot, 'knowledge', 'product', 'schemas');
+  fs.mkdirSync(schemaTarget, { recursive: true });
+  for (const schema of WRITER_LEASE_SCHEMAS) {
+    fs.writeFileSync(path.join(schemaTarget, schema.name), schema.content);
+  }
 
   governance = await import('./nhi-lifecycle-governance.js');
   identity = await import('./agent-identity.js');

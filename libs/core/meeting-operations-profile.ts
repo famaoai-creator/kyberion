@@ -1,7 +1,22 @@
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
 import type { MeetingOperationsBrief } from './src/types/meeting-operations-brief.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import { resolveMeetingEnvironment } from './meeting-environment-policy.js';
+
+const MEETING_OPERATIONS_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/meeting-operations-profile.schema.json'
+);
+
+export function loadMeetingOperationsProfileAtPath(profilePath: string): MeetingOperationsProfile {
+  return defineCatalog<MeetingOperationsProfile>({
+    id: 'meeting-operations-profile',
+    path: assertSafeRepositoryPath(profilePath),
+    schema: MEETING_OPERATIONS_PROFILE_SCHEMA_PATH,
+  }).load();
+}
 
 export type MeetingPurpose =
   | 'planning'
@@ -15,12 +30,7 @@ export type MeetingPurpose =
   | 'default';
 
 export type MeetingRole =
-  | 'planner'
-  | 'facilitator'
-  | 'scribe'
-  | 'executor'
-  | 'decision_maker'
-  | 'tracker';
+  'planner' | 'facilitator' | 'scribe' | 'executor' | 'decision_maker' | 'tracker';
 
 export interface MeetingBriefQuestionSet {
   label: string;

@@ -1,14 +1,14 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
-} from '@agent/core';
-import { checkTypeRatchet } from './check_type_ratchet.js';
+} from '@agent/core/secure-io';
+import { checkTypeRatchet, readTypeRatchetTextFile } from './check_type_ratchet.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('check-type-ratchet');
 
@@ -22,6 +22,23 @@ function writeFixture(relativePath: string, content: string): string {
 }
 
 describe('check_type_ratchet', () => {
+  it('uses the foundation text reader for TypeScript source files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_type_ratchet.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(source).toContain('getRegisteredEnvText, nowIso, readTextFile');
+    expect(source).toContain('readTypeRatchetTextFile(filePath: string)');
+    expect(source).not.toContain('safeReadFile(filePath');
+  });
+
+  it('rejects a directory before reading it as TypeScript source', () => {
+    expect(() => readTypeRatchetTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   afterEach(() => {
     if (safeExistsSync(FIXTURE_DIR)) {
       safeRmSync(FIXTURE_DIR, { recursive: true, force: true });

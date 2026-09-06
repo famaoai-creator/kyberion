@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 
 const mocks = vi.hoisted(() => ({
   ensureAgentRuntime: vi.fn(),
@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   runtimeSupervisor: {
     touch: vi.fn(),
     get: vi.fn(),
+    startSweep: vi.fn(),
   },
   sendOpsAlert: vi.fn(),
   appendSupervisorEvent: vi.fn(),
@@ -34,8 +35,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual<any>('@agent/core');
+vi.mock('@agent/core/agent-runtime-supervisor', async () => {
+  const actual = await vi.importActual<any>('@agent/core/agent-runtime-supervisor');
   return {
     ...actual,
     ensureAgentRuntime: mocks.ensureAgentRuntime,
@@ -47,15 +48,57 @@ vi.mock('@agent/core', async () => {
     refreshAgentRuntime: mocks.refreshAgentRuntime,
     restartAgentRuntime: mocks.restartAgentRuntime,
     stopAgentRuntime: mocks.stopAgentRuntime,
+  };
+});
+
+vi.mock('@agent/core/delegated-task-observability', async () => {
+  const actual = await vi.importActual<any>('@agent/core/delegated-task-observability');
+  return {
+    ...actual,
     enqueueDelegatedTaskInbox: mocks.enqueueDelegatedTaskInbox,
     hasPendingDelegatedTaskInbox: mocks.hasPendingDelegatedTaskInbox,
     loadDelegatedTaskRecord: mocks.loadDelegatedTaskRecord,
     recordDelegatedTaskActivationFailure: mocks.recordDelegatedTaskActivationFailure,
     spawnDelegatedTaskWorkerProcess: mocks.spawnDelegatedTaskWorkerProcess,
-    recordDaemonHeartbeat: mocks.recordDaemonHeartbeat,
-    runtimeSupervisor: mocks.runtimeSupervisor,
-    sendOpsAlert: mocks.sendOpsAlert,
+  };
+});
+
+vi.mock('@agent/core/agent-runtime-events', async () => {
+  const actual = await vi.importActual<any>('@agent/core/agent-runtime-events');
+  return {
+    ...actual,
     appendSupervisorEvent: mocks.appendSupervisorEvent,
+  };
+});
+
+vi.mock('@agent/core/daemon-heartbeat', async () => {
+  const actual = await vi.importActual<any>('@agent/core/daemon-heartbeat');
+  return {
+    ...actual,
+    recordDaemonHeartbeat: mocks.recordDaemonHeartbeat,
+  };
+});
+
+vi.mock('@agent/core/runtime-supervisor', async () => {
+  const actual = await vi.importActual<any>('@agent/core/runtime-supervisor');
+  return {
+    ...actual,
+    runtimeSupervisor: mocks.runtimeSupervisor,
+  };
+});
+
+vi.mock('@agent/core/ops-alert', async () => {
+  const actual = await vi.importActual<any>('@agent/core/ops-alert');
+  return {
+    ...actual,
+    sendOpsAlert: mocks.sendOpsAlert,
+  };
+});
+
+vi.mock('@agent/core/core', async () => {
+  const actual = await vi.importActual<any>('@agent/core/core');
+  return {
+    ...actual,
     logger: mocks.logger,
   };
 });
@@ -328,6 +371,29 @@ describe('agent_runtime_supervisor_daemon', () => {
         payload: { agentId: 'agent-1', prompt: 'healthy', requestedBy: 'test' },
       })
     ).resolves.toMatchObject({ ok: true, result: { text: 'healthy response' } });
+  });
+
+  it('rejects malformed IPC request envelopes before dispatch', async () => {
+    instance = await startAgentRuntimeSupervisorDaemon({ socketPath, lockPath });
+
+    await expect(
+      sendRequest(socketPath, { id: 'invalid-payload', method: 'health', payload: [] })
+    ).resolves.toMatchObject({ ok: false, id: 'invalid' });
+    await expect(
+      sendRequest(socketPath, { id: 'invalid-method', method: 'unknown' })
+    ).resolves.toMatchObject({ ok: false, id: 'invalid' });
+    await expect(
+      sendRequest(
+        socketPath,
+        JSON.parse(
+          '{"id":"unsafe-request","method":"health","payload":{"nested":{"__proto__":{"polluted":true}}}}'
+        )
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      id: 'invalid',
+      error: expect.stringContaining('dangerous JSON key'),
+    });
   });
 
   it('creates a private Unix socket', async () => {

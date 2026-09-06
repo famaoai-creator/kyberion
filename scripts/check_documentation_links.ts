@@ -1,19 +1,39 @@
 import * as path from 'node:path';
+import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DOCUMENT_ROOTS = ['docs', 'knowledge'] as const;
 const MARKDOWN_LINK = /\]\((<[^>]+>|[^)\s]+)(?:\s+['"][^'"]*['"])?\)/gu;
 
+export function readDocumentationTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
+function isRegularFile(filePath: string): boolean {
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function markdownFiles(): string[] {
   const files = DOCUMENT_ROOTS.flatMap((root) =>
     safeExistsSync(pathResolver.rootResolve(root))
-      ? getAllFiles(pathResolver.rootResolve(root)).filter((filePath) => filePath.endsWith('.md'))
+      ? getAllFiles(pathResolver.rootResolve(root)).filter(
+          (filePath) => filePath.endsWith('.md') && isRegularFile(filePath)
+        )
       : []
   );
   for (const name of safeReaddir(pathResolver.rootDir())) {
-    if (name.endsWith('.md')) files.push(pathResolver.rootResolve(name));
+    const filePath = pathResolver.rootResolve(name);
+    if (name.endsWith('.md') && isRegularFile(filePath)) files.push(filePath);
   }
   return [...new Set(files)].sort();
 }
@@ -60,7 +80,7 @@ export function checkDocumentationLinks(files = markdownFiles()): string[] {
   const failures: string[] = [];
   for (const filePath of files) {
     if (isVendoredDocumentation(filePath)) continue;
-    const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+    const source = readDocumentationTextFile(filePath);
     const relativeSource = path.relative(pathResolver.rootDir(), filePath);
     for (const match of source.matchAll(MARKDOWN_LINK)) {
       // Image examples in theme guides are illustrative asset names, not
@@ -107,10 +127,14 @@ export const runCheckDocumentationLinks = defineScript({
   run(context) {
     const failures = checkDocumentationLinks();
     if (failures.length > 0) {
-      for (const failure of failures) console.error(`- ${failure}`);
-      throw new Error(`${failures.length} documentation link violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...failures.map((failure) => `- ${failure}`)].join('\n')
+      );
     }
-    context.print(`[check:documentation-links] OK (${markdownFiles().length} documents)`);
+    const result = `[check:documentation-links] OK (${markdownFiles().length} documents)`;
+    context.print(result);
+    return { failures };
   },
 });
 

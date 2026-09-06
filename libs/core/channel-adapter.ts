@@ -1,4 +1,10 @@
 import type { EventScopeInput } from './event-scope.js';
+import {
+  renderIntentAuthorityLabel,
+  renderIntentOutcomeLabel,
+} from './intent-resolution-contract.js';
+import { t } from './t.js';
+import type { SupportedLocale } from './locale-normalize.js';
 import type {
   SurfaceAsyncChannel,
   SurfaceConversationAttachment,
@@ -9,6 +15,7 @@ export interface ChannelTurnInput {
   text: string;
   channel: string;
   threadTs: string;
+  locale?: SupportedLocale;
   metadata?: Record<string, unknown>;
   attachments?: SurfaceConversationAttachment[];
   scope?: EventScopeInput;
@@ -34,17 +41,18 @@ export interface ChannelThreadContextEntry {
 /** Format provider-neutral recent history for a channel turn. */
 export function formatChannelThreadContext(
   channelLabel: string,
-  entries: readonly ChannelThreadContextEntry[]
+  entries: readonly ChannelThreadContextEntry[],
+  locale: SupportedLocale = 'en'
 ): string | undefined {
   const recent = entries.filter((entry) => entry.text.trim().length > 0).slice(-6);
   if (!recent.length) return undefined;
 
   return [
-    `Recent ${channelLabel} thread context:`,
+    t('bridge:thread_context', { channel: channelLabel }, locale),
     ...recent.map((entry) =>
       entry.role === 'assistant'
-        ? `Assistant: ${entry.text}`
-        : `User (${entry.authorLabel}): ${entry.text}`
+        ? t('bridge:thread_assistant', { text: entry.text }, locale)
+        : t('bridge:thread_user', { author: entry.authorLabel, text: entry.text }, locale)
     ),
   ].join('\n');
 }
@@ -77,7 +85,7 @@ export type ChannelTurnConversation = (
  */
 export function formatChannelTurnText(
   result: SurfaceConversationResult,
-  options: { includeContract?: boolean } = {}
+  options: { includeContract?: boolean; locale?: SupportedLocale } = {}
 ): string {
   const text = result.text.trim();
   const contract = result.intentResolution;
@@ -86,34 +94,44 @@ export function formatChannelTurnText(
     contract?.authority_level === 'approval_required' ||
     contract?.authority_level === 'human_clarification_required' ||
     contract?.outcome_kind === 'approval_ready_plan';
-  if (
-    !text ||
-    !contract ||
-    !includeContract ||
-    !contractNeedsOperatorAttention ||
-    text.includes('Intent:') ||
-    text.includes('Understanding:')
-  ) {
+  if (!text || !contract || !includeContract || !contractNeedsOperatorAttention) {
     return result.text;
   }
-  const japanese = /[ぁ-んァ-ン一-龯]/u.test(text);
-  const labels = japanese
-    ? {
-        understanding: '理解',
-        missingInput: '不足入力',
-        nextAction: '次の操作',
-        consequence: '帰結',
-        outcome: '結果',
-        none: 'なし',
-      }
-    : {
-        understanding: 'Understanding',
-        missingInput: 'Missing input',
-        nextAction: 'Next action',
-        consequence: 'Consequence',
-        outcome: 'Outcome',
-        none: 'none',
-      };
+  const locale =
+    options.locale ?? (/[ぁ-んァ-ン一-龯]/u.test(text) ? ('ja' as const) : ('en' as const));
+  const labels = {
+    understanding: t('bridge:contract_understanding', undefined, locale),
+    missingInput: t('bridge:contract_missing_input', undefined, locale),
+    nextAction: t('bridge:contract_next_action', undefined, locale),
+    authority: t('bridge:contract_authority', undefined, locale),
+    consequence: t('bridge:contract_consequence', undefined, locale),
+    outcome: t('bridge:contract_outcome', undefined, locale),
+    none: t('bridge:contract_none', undefined, locale),
+    authorityValue: renderIntentAuthorityLabel(contract.authority_level, locale),
+    outcomeValue: renderIntentOutcomeLabel(contract.outcome_kind, locale),
+  };
+  const renderedContractLabels = [
+    'Intent',
+    'Understanding',
+    'Missing input',
+    'Next action',
+    'Authority',
+    'Consequence',
+    'Outcome',
+    labels.understanding,
+    labels.missingInput,
+    labels.nextAction,
+    labels.authority,
+    labels.consequence,
+    labels.outcome,
+  ];
+  const renderedLabelCount = renderedContractLabels.filter((label) =>
+    text.includes(`${label}:`)
+  ).length;
+  // Keep the legacy Intent header compatible, while requiring at least two
+  // localized labels so ordinary prose such as "結果: まだです" does not
+  // suppress the shared contract projection.
+  if (text.includes('Intent:') || renderedLabelCount >= 2) return result.text;
   return [
     text,
     '',
@@ -122,8 +140,9 @@ export function formatChannelTurnText(
       contract.missing_inputs.length > 0 ? contract.missing_inputs.join(', ') : labels.none
     }`,
     `${labels.nextAction}: ${contract.next_action.label}`,
+    `${labels.authority}: ${labels.authorityValue}`,
     `${labels.consequence}: ${contract.next_action.consequence}`,
-    `${labels.outcome}: ${contract.outcome_kind}`,
+    `${labels.outcome}: ${labels.outcomeValue}`,
   ].join('\n');
 }
 
@@ -157,7 +176,7 @@ export async function runChannelTurn(
     });
     const deliveredResult = {
       ...result,
-      text: formatChannelTurnText(result),
+      text: formatChannelTurnText(result, { locale: input.locale }),
     };
     const deliveryMessage = {
       text: deliveredResult.text,

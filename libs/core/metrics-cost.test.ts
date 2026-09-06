@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { loadModelCostRegistry, resetModelCostRegistryCache, resolveCostRates } from './metrics.js';
+import {
+  loadModelCostRegistry,
+  _resetModelCostRegistryCacheForTests,
+  resolveCostRates,
+} from './metrics.js';
 
 describe('model-cost registry — data-driven (not source-hardcoded)', () => {
-  beforeEach(() => resetModelCostRegistryCache());
+  beforeEach(() => _resetModelCostRegistryCacheForTests());
 
   it('loads rates from the knowledge-tier JSON registry', () => {
     const reg = loadModelCostRegistry();
-    // claude-haiku-4-5 lives only in the file (not in the built-in fallback) —
-    // its presence proves the registry was read from disk, not hardcoded.
+    // claude-haiku-4-5 lives only in the file — its presence proves the
+    // registry was read from disk, not hardcoded.
     expect(reg.models['claude-haiku-4-5']).toBeDefined();
     expect(reg.models['claude-opus-5']).toEqual({ prompt: 0.005, completion: 0.025 });
     expect(reg.models['claude-opus-4-8']).toEqual({ prompt: 0.005, completion: 0.025 });
@@ -18,7 +22,7 @@ describe('model-cost registry — data-driven (not source-hardcoded)', () => {
 });
 
 describe('resolveCostRates — per-model cost resolution', () => {
-  beforeEach(() => resetModelCostRegistryCache());
+  beforeEach(() => _resetModelCostRegistryCacheForTests());
 
   it('exact-matches a known model id', () => {
     const r = resolveCostRates('gpt-4o');

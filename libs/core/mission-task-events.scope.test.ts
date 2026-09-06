@@ -1,9 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { emitMissionTaskEvent, redactMissionTaskEventForShared } from './mission-task-events.js';
+import {
+  emitMissionTaskEvent,
+  parseMissionTaskEventIdentity,
+  redactMissionTaskEventForShared,
+} from './mission-task-events.js';
 import { redactCollaborationMetadata } from './agent-collaboration-events.js';
 import { normalizeEventScope } from './event-scope.js';
 
 describe('mission task event scope lineage', () => {
+  it('parses only task-event identity rows and rejects unrelated mission data', () => {
+    expect(
+      parseMissionTaskEventIdentity({
+        event_type: 'task_completed',
+        mission_id: 'MSN-1',
+        task_id: 'TASK-1',
+      })
+    ).toEqual({ event_type: 'task_completed', mission_id: 'MSN-1', task_id: 'TASK-1' });
+    expect(parseMissionTaskEventIdentity([])).toBeUndefined();
+    expect(
+      parseMissionTaskEventIdentity({
+        event_type: 'unknown',
+        mission_id: 'MSN-1',
+        task_id: 'TASK-1',
+      })
+    ).toBeUndefined();
+    expect(
+      parseMissionTaskEventIdentity({
+        event_type: 'task_completed',
+        mission_id: 'MSN-1',
+        task_id: '',
+      })
+    ).toBeUndefined();
+  });
+
   it('rejects a caller-supplied tenant that is not authoritative for the mission', () => {
     expect(() =>
       emitMissionTaskEvent({

@@ -1,4 +1,5 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * Intent Snapshot Store — append-only per-mission snapshot persistence
  * plus drift-gate helpers for origin-baseline management.
@@ -10,8 +11,9 @@ import { appendJsonLine } from './foundation/json.js';
 
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { missionEvidenceDir } from './path-resolver.js';
-import { safeReadFile, safeExistsSync, safeMkdir } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { missionEvidenceDir, pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import {
   classifyDrift,
   computeIntentDelta,
@@ -25,6 +27,11 @@ import {
 const SNAPSHOT_FILE = 'intent-snapshots.jsonl';
 const DELTA_FILE = 'intent-deltas.jsonl';
 const SCOPE_CHANGE_FILE = 'intent-scope-changes.jsonl';
+const SNAPSHOT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-snapshot.schema.json');
+const DELTA_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-delta.schema.json');
+const SCOPE_CHANGE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/approved-intent-scope-change.schema.json'
+);
 
 export interface EmitSnapshotParams {
   missionId: string;
@@ -38,39 +45,81 @@ export interface EmitSnapshotParams {
 function snapshotPath(missionId: string): string | null {
   const dir = missionEvidenceDir(missionId);
   if (!dir) return null;
-  return path.join(dir, SNAPSHOT_FILE);
+  return assertSafeRepositoryPath(path.join(dir, SNAPSHOT_FILE), { allowMissingLeaf: true });
 }
 
 function deltaPath(missionId: string): string | null {
   const dir = missionEvidenceDir(missionId);
   if (!dir) return null;
-  return path.join(dir, DELTA_FILE);
+  return assertSafeRepositoryPath(path.join(dir, DELTA_FILE), { allowMissingLeaf: true });
 }
 
 function scopeChangePath(missionId: string): string | null {
   const dir = missionEvidenceDir(missionId);
   if (!dir) return null;
-  return path.join(dir, SCOPE_CHANGE_FILE);
+  return assertSafeRepositoryPath(path.join(dir, SCOPE_CHANGE_FILE), { allowMissingLeaf: true });
 }
 
-function readJsonl<T>(filePath: string): T[] {
+function snapshotCatalog(filePath: string) {
+  return defineCatalog<IntentSnapshot>({
+    id: 'intent-snapshot',
+    path: filePath,
+    schema: SNAPSHOT_SCHEMA_PATH,
+  });
+}
+
+function deltaCatalog(filePath: string) {
+  return defineCatalog<IntentDelta>({
+    id: 'intent-delta',
+    path: filePath,
+    schema: DELTA_SCHEMA_PATH,
+  });
+}
+
+function scopeChangeCatalog(filePath: string) {
+  return defineCatalog<ApprovedIntentScopeChange>({
+    id: 'approved-intent-scope-change',
+    path: filePath,
+    schema: SCOPE_CHANGE_SCHEMA_PATH,
+  });
+}
+
+function readJsonl<T>(
+  filePath: string,
+  catalog: GovernedCatalog<T>,
+  onMalformed: 'throw' | 'skip' = 'throw'
+): T[] {
   if (!safeExistsSync(filePath)) return [];
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return raw
-    .split(/\r?\n/u)
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as T);
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[intent-snapshot-store] persisted record must be a regular file: ${filePath}`);
+  }
+  return readJsonLines<T>(filePath, {
+    onMalformed,
+    map: (value, lineNumber) => catalog.validate(value, `${filePath}:${lineNumber}`),
+  });
 }
 
-function appendJsonl(filePath: string, record: unknown): void {
+function appendJsonl<T>(filePath: string, record: T, catalog: GovernedCatalog<T>): void {
   safeMkdir(path.dirname(filePath), { recursive: true });
-  appendJsonLine(filePath, record);
+  appendJsonLine(filePath, catalog.validate(record, filePath));
 }
 
 export function listSnapshots(missionId: string): IntentSnapshot[] {
   const file = snapshotPath(missionId);
   if (!file) return [];
-  return readJsonl<IntentSnapshot>(file);
+  return readJsonl(file, snapshotCatalog(file));
+}
+
+/** Load report-facing snapshots from an explicit evidence path, skipping bad lines. */
+export function loadIntentSnapshotsAtPath(filePath: string): IntentSnapshot[] {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  return readJsonl(safePath, snapshotCatalog(safePath), 'skip');
+}
+
+/** Load report-facing deltas from an explicit evidence path, skipping bad lines. */
+export function loadIntentDeltasAtPath(filePath: string): IntentDelta[] {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  return readJsonl(safePath, deltaCatalog(safePath), 'skip');
 }
 
 export function latestSnapshot(missionId: string): IntentSnapshot | null {
@@ -96,7 +145,7 @@ function appendScopeChange(missionId: string, record: ApprovedIntentScopeChange)
       `[intent-snapshot-store] mission evidence dir not found for ${missionId} scope change`
     );
   }
-  appendJsonl(filePath, record);
+  appendJsonl(filePath, record, scopeChangeCatalog(filePath));
 }
 
 /**
@@ -113,7 +162,7 @@ export function emitIntentSnapshot(
     mission_id: params.missionId,
     stage: params.stage,
     kind: params.kind || (latestSnapshot(params.missionId) ? 'current' : 'origin'),
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     source: params.source,
     intent: params.intent,
     ...(params.traceRef ? { trace_ref: params.traceRef } : {}),
@@ -127,16 +176,18 @@ export function emitIntentSnapshot(
   }
 
   const previous = latestSnapshot(params.missionId);
-  appendJsonl(snapFile, snapshot);
+  const validatedSnapshot = snapshotCatalog(snapFile).validate(snapshot, snapFile);
+  safeMkdir(path.dirname(snapFile), { recursive: true });
+  appendJsonLine(snapFile, validatedSnapshot);
 
   let delta: IntentDelta | null = null;
   if (previous) {
-    delta = computeIntentDelta(previous, snapshot, thresholds);
+    delta = computeIntentDelta(previous, validatedSnapshot, thresholds);
     const deltaFile = deltaPath(params.missionId);
-    if (deltaFile) appendJsonl(deltaFile, delta);
+    if (deltaFile) appendJsonl(deltaFile, delta, deltaCatalog(deltaFile));
   }
 
-  return { snapshot, delta };
+  return { snapshot: validatedSnapshot, delta };
 }
 
 /**
@@ -155,7 +206,7 @@ export function recordApprovedIntentScopeChange(input: {
   const previousOrigin =
     [...listSnapshots(input.missionId)].reverse().find((snapshot) => snapshot.kind === 'origin') ||
     null;
-  const approvedAt = input.approvedAt || new Date().toISOString();
+  const approvedAt = input.approvedAt || nowIso();
   const { snapshot, delta } = emitIntentSnapshot({
     missionId: input.missionId,
     stage: input.stage || 'scope_change',

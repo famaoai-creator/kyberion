@@ -1,13 +1,12 @@
 import {
   availableHeadlessOperationIds,
-  buildCeoSurfaceSummary,
   createHeadlessEnvelope,
   filterHeadlessManifestForViewer,
-  type CeoSurfaceSummary,
   type HeadlessApiManifest,
   type HeadlessOperationDescriptor,
   type HeadlessResourceDescriptor,
-} from '@agent/core';
+} from '@agent/core/headless-surface-contract';
+import { buildCeoSurfaceSummary, type CeoSurfaceSummary } from '@agent/core/ceo-surface-summary';
 import type { OperatorHomeScopeFilter } from '@agent/core/operator-home-summary';
 import type { A2UIMessage } from '@agent/core/a2ui';
 import {

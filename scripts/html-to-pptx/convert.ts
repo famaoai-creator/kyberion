@@ -17,11 +17,12 @@ import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import { executePipelineFile } from '../run_pipeline.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
-async function main(argv: string[]): Promise<void> {
+type Print = (value: unknown) => void;
+
+async function main(argv: string[], print: Print = () => undefined): Promise<void> {
   const [input, outArg] = argv;
   if (!input) {
-    console.error('usage: convert.ts <input.html> [output.pptx]');
-    throw new ScriptExitError(1, 'input HTML path is required');
+    throw new ScriptExitError(1, 'usage: convert.ts <input.html> [output.pptx]');
   }
   const out = outArg || input.replace(/\.html?$/i, '.pptx');
   const tmp = 'active/shared/tmp/html-to-pptx';
@@ -56,19 +57,24 @@ async function main(argv: string[]): Promise<void> {
     ),
     { mkdir: true, encoding: 'utf8' }
   );
-  const result = await executePipelineFile(pipePath, { quiet: true });
+  const result = await executePipelineFile(pipePath, {
+    quiet: true,
+    // The converter creates this pipeline itself and owns the operator
+    // request that executes it; do not leave the trust decision implicit.
+    trustResolved: true,
+  });
   if (result.status === 'failed') {
     throw new Error(
       `pipeline failed: ${result.results.find((entry) => entry.status === 'failed')?.error || 'unknown error'}`
     );
   }
-  console.error(`[html-to-pptx] wrote ${out}`);
+  print(`[html-to-pptx] wrote ${out}`);
 }
 
 const script = defineScript({
   name: 'media:html-to-pptx',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'convert.ts') ||

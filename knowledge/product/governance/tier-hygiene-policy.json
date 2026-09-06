@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/tier-hygiene-policy.schema.json",
   "version": "1.0.0",
   "description": "Patterns that must NOT appear in public-tier files. The public tier is reusable across organizations — specific company names, customer names, internal URLs, GitHub org slugs, and tenant identifiers belong in knowledge/confidential/{org}/. Allowlisted terms are legitimate industry vocabulary (e.g. 'SBI Model' = Situation-Behavior-Impact feedback framework) or placeholder templates.",
   "scan_paths": [

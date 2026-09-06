@@ -2,10 +2,11 @@ import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -55,7 +56,21 @@ function ensureValidator(): ValidateFunction {
 }
 
 function artifactPath(artifactId: string): string {
-  return `${ARTIFACT_DIR}/${artifactId}.json`;
+  const normalized = String(artifactId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/]/u.test(normalized)) {
+    throw new Error(`[artifact-record] invalid artifact id: ${artifactId}`);
+  }
+  return assertSafeRepositoryPath(`${ARTIFACT_DIR}/${normalized}.json`, {
+    allowMissingLeaf: true,
+  });
+}
+
+function artifactRecordCatalog(filePath: string) {
+  return defineCatalog<ArtifactRecord>({
+    id: 'artifact-record',
+    path: filePath,
+    schema: ARTIFACT_SCHEMA_PATH,
+  });
 }
 
 export function createArtifactRecord(
@@ -74,22 +89,27 @@ export function validateArtifactRecord(value: unknown): value is ArtifactRecord 
 }
 
 export function saveArtifactRecord(record: ArtifactRecord): string {
-  if (!validateArtifactRecord(record)) {
-    const errors = (ensureValidator().errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+  const filePath = artifactPath(record.artifact_id);
+  let canonicalInput: ArtifactRecord;
+  try {
+    canonicalInput = artifactRecordCatalog(filePath).validate(record, filePath);
+  } catch (error) {
+    throw new Error(
+      `Invalid artifact record: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
-    throw new Error(`Invalid artifact record: ${errors.join('; ')}`);
   }
-  if (!safeExistsSync(ARTIFACT_DIR)) safeMkdir(ARTIFACT_DIR, { recursive: true });
-  const deliverableKind = inferDeliverableKind(record.kind);
+  const artifactDir = assertSafeRepositoryPath(ARTIFACT_DIR, { allowMissingLeaf: true });
+  if (!safeExistsSync(artifactDir)) safeMkdir(artifactDir, { recursive: true });
+  const deliverableKind = inferDeliverableKind(canonicalInput.kind);
   const qualityReport = deliverableKind
     ? evaluateDeliverableQuality(deliverableKind, {
-        ...record,
-        text: record.preview_text,
+        ...canonicalInput,
+        text: canonicalInput.preview_text,
       })
     : null;
   const metadata = {
-    ...(record.metadata || {}),
+    ...(canonicalInput.metadata || {}),
     ...(qualityReport
       ? {
           quality_kind: qualityReport.kind,
@@ -100,23 +120,26 @@ export function saveArtifactRecord(record: ArtifactRecord): string {
         }
       : {}),
   };
-  const filePath = artifactPath(record.artifact_id);
-  safeWriteFile(filePath, JSON.stringify({ ...record, metadata }, null, 2));
+  const canonicalRecord = artifactRecordCatalog(filePath).validate(
+    { ...canonicalInput, metadata },
+    filePath
+  );
+  safeWriteFile(filePath, `${JSON.stringify(canonicalRecord, null, 2)}\n`);
   appendArtifactOwnershipRecord(
     createArtifactOwnershipRecord({
-      artifact_id: record.artifact_id,
-      tenant_slug: record.tenant_slug,
-      organization_id: record.organization_id,
-      project_id: record.project_id,
-      mission_id: record.mission_id,
-      task_session_id: record.task_session_id,
-      kind: record.kind,
-      storage_class: record.storage_class,
-      path: record.path,
-      external_ref: record.external_ref,
-      ...(metadata ? { metadata } : {}),
-      evidence_refs: Array.isArray((metadata as any)?.evidence_refs)
-        ? ((metadata as any).evidence_refs as string[])
+      artifact_id: canonicalRecord.artifact_id,
+      tenant_slug: canonicalRecord.tenant_slug,
+      organization_id: canonicalRecord.organization_id,
+      project_id: canonicalRecord.project_id,
+      mission_id: canonicalRecord.mission_id,
+      task_session_id: canonicalRecord.task_session_id,
+      kind: canonicalRecord.kind,
+      storage_class: canonicalRecord.storage_class,
+      path: canonicalRecord.path,
+      external_ref: canonicalRecord.external_ref,
+      ...(canonicalRecord.metadata ? { metadata: canonicalRecord.metadata } : {}),
+      evidence_refs: Array.isArray((canonicalRecord.metadata as any)?.evidence_refs)
+        ? ((canonicalRecord.metadata as any).evidence_refs as string[])
         : [],
     })
   );
@@ -126,14 +149,14 @@ export function saveArtifactRecord(record: ArtifactRecord): string {
 export function loadArtifactRecord(artifactId: string): ArtifactRecord | null {
   const filePath = artifactPath(artifactId);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as ArtifactRecord;
+  const parsed = artifactRecordCatalog(filePath).load();
   return validateArtifactRecord(parsed) ? parsed : null;
 }
 
 export function listArtifactRecords(): ArtifactRecord[] {
-  if (!safeExistsSync(ARTIFACT_DIR)) return [];
-  return safeReaddir(ARTIFACT_DIR)
+  const artifactDir = assertSafeRepositoryPath(ARTIFACT_DIR, { allowMissingLeaf: true });
+  if (!safeExistsSync(artifactDir)) return [];
+  return safeReaddir(artifactDir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => loadArtifactRecord(entry.replace(/\.json$/, '')))
     .filter((record): record is ArtifactRecord => Boolean(record))

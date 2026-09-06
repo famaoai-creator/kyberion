@@ -41,6 +41,23 @@
         },
         "additionalProperties": false
       }
+    },
+    "track_intent_policy_map": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["track_type", "default_lifecycle", "min_confidence_to_autostart"],
+        "properties": {
+          "track_type": { "type": "string", "minLength": 1 },
+          "default_lifecycle": { "type": "string", "minLength": 1 },
+          "min_confidence_to_autostart": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": true

@@ -8,6 +8,7 @@ import {
   narrowSurfaceViewerTenant,
   narrowSurfaceViewerTier,
   resolveSurfaceViewerToken,
+  resolveSurfaceViewerScope,
   resolveSurfaceViewerTierAccess,
 } from './surface-mutation-guard.js';
 
@@ -136,6 +137,86 @@ describe('surface-mutation-guard', () => {
 });
 
 describe('surface viewer scope', () => {
+  it('materializes registered, configured, and loopback viewers through one boundary', () => {
+    const registered = resolveSurfaceViewerScope({
+      token: 'registered-token',
+      registrations: [
+        {
+          token_hash: createHash('sha256').update('registered-token').digest('hex'),
+          role: 'localadmin',
+          tenant_slugs: ['tenant-a'],
+          organization_ids: ['org-a'],
+          project_ids: ['project-a'],
+          label: 'registered viewer',
+        },
+      ],
+      allowPersonalTier: false,
+    });
+    expect(registered).toMatchObject({
+      role: 'localadmin',
+      tenantSlugs: ['tenant-a'],
+      organizationIds: ['org-a'],
+      projectIds: ['project-a'],
+      tierAccess: ['confidential', 'public'],
+      source: 'token',
+      principalId: 'registered viewer',
+    });
+
+    expect(
+      resolveSurfaceViewerScope({
+        token: 'api-token',
+        apiToken: 'api-token',
+        serverTenant: 'tenant-a',
+        allowPersonalTier: false,
+      })
+    ).toMatchObject({ role: 'readonly', tenantSlugs: ['tenant-a'], source: 'token' });
+
+    expect(
+      resolveSurfaceViewerScope({
+        local: true,
+        allowLoopback: true,
+        loopbackRole: 'localadmin',
+        loopbackUsesServerTenant: true,
+        serverTenant: 'tenant-a',
+      })
+    ).toMatchObject({ role: 'localadmin', tenantSlugs: ['tenant-a'], source: 'loopback' });
+  });
+
+  it('rejects unknown tokens and unscoped remote credentials', () => {
+    expect(() => resolveSurfaceViewerScope({ token: 'unknown' })).toThrow('Unknown viewer token');
+    expect(() => resolveSurfaceViewerScope({ token: 'api-token', apiToken: 'api-token' })).toThrow(
+      'Remote viewer access requires server-side tenant scope'
+    );
+  });
+
+  it('rejects personal tier escalation when a surface masks personal data', () => {
+    expect(() =>
+      resolveSurfaceViewerScope({
+        token: 'admin-token',
+        localadminToken: 'admin-token',
+        serverTenant: 'tenant-a',
+        allowPersonalTier: false,
+        registrations: [],
+      })
+    ).not.toThrow();
+    expect(() =>
+      resolveSurfaceViewerScope({
+        token: 'admin-token',
+        localadminToken: 'admin-token',
+        serverTenant: 'tenant-a',
+        allowPersonalTier: false,
+        registrations: [
+          {
+            token_hash: createHash('sha256').update('admin-token').digest('hex'),
+            role: 'localadmin',
+            tenant_slugs: ['tenant-a'],
+            tier_access: ['personal'],
+          },
+        ],
+      })
+    ).toThrow('exceeds the localadmin role policy');
+  });
+
   it('keeps role tier policy and permits only narrower registrations', () => {
     expect(defaultSurfaceViewerTierAccess('readonly')).toEqual(['public', 'confidential']);
     expect(defaultSurfaceViewerTierAccess('localadmin')).toEqual([

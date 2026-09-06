@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/unhandled-intent-registry.schema.json",
+  "title": "Unhandled intent registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "entries"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "miss_type",
+          "utterance_samples",
+          "first_seen",
+          "last_seen",
+          "occurrence_count",
+          "reconciled"
+        ],
+        "properties": {
+          "miss_type": { "enum": ["unrouted", "unrecognized"] },
+          "intent_id": { "type": "string", "minLength": 1 },
+          "shape": { "type": "string", "minLength": 1 },
+          "utterance_samples": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "items": { "type": "string", "minLength": 1, "maxLength": 100 }
+          },
+          "first_seen": { "type": "string", "format": "date-time" },
+          "last_seen": { "type": "string", "format": "date-time" },
+          "occurrence_count": { "type": "integer", "minimum": 1 },
+          "reconciled": { "type": "boolean" },
+          "reconciled_at": { "type": "string", "format": "date-time" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "miss_type": { "const": "unrouted" } } },
+            "then": { "required": ["intent_id"] }
+          }
+        ]
+      }
+    }
+  }
+}

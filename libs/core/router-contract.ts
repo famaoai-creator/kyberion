@@ -3,9 +3,8 @@ import {
   extractSurfaceKnowledgeQuery,
   extractSurfaceWebSearchQuery,
 } from './surface-query.js';
-import { resolveIntentResolutionPacket } from './intent-resolution.js';
+import { resolveIntentResolutionPacket, type IntentResolutionPacket } from './intent-resolution.js';
 import { pathResolver } from './path-resolver.js';
-import { recordConfigFallback } from './config-fallback-registry.js';
 import { recordUnhandledIntent } from './unhandled-intent-registry.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 
@@ -31,32 +30,29 @@ export interface SurfaceIntentResolution {
     | 'inspect_state';
 }
 
-interface IntentRoutingMap {
+export interface SurfaceIntentResolutionOptions {
+  tier?: 'personal' | 'confidential' | 'public';
+  tenantId?: string;
+  packet?: IntentResolutionPacket;
+}
+
+export interface IntentRoutingMap {
   pipeline_intent_map: Record<string, string>;
   mission_intent_action_map: Record<string, NonNullable<SurfaceIntentResolution['missionAction']>>;
   direct_intent_commands: Record<string, { command: string; args: string[] }>;
+  track_intent_policy_map?: Record<
+    string,
+    { track_type: string; default_lifecycle: string; min_confidence_to_autostart: number }
+  >;
 }
-
-const DEFAULT_INTENT_ROUTING_MAP: IntentRoutingMap = {
-  pipeline_intent_map: {},
-  mission_intent_action_map: {},
-  direct_intent_commands: {},
-};
 
 const intentRoutingCatalog = defineCatalog<IntentRoutingMap>({
   id: 'intent-routing-map',
   path: () => pathResolver.knowledge('product/governance/intent-routing-map.json'),
   schema: 'knowledge/product/schemas/intent-routing-map.schema.json',
-  fallback: DEFAULT_INTENT_ROUTING_MAP,
-  onFallback: (error, defaults) =>
-    recordConfigFallback({
-      knowledgePath: 'product/governance/intent-routing-map.json',
-      error,
-      defaults,
-    }),
 });
 
-function loadIntentRoutingMap(): IntentRoutingMap {
+export function loadIntentRoutingMap(): IntentRoutingMap {
   return intentRoutingCatalog.load();
 }
 
@@ -87,8 +83,16 @@ export function resolveDirectIntentCommand(
   return direct_intent_commands[intentId] ?? null;
 }
 
-export function resolveSurfaceIntent(utterance: string): SurfaceIntentResolution {
-  const packet = resolveIntentResolutionPacket(utterance);
+export function resolveSurfaceIntent(
+  utterance: string,
+  options: SurfaceIntentResolutionOptions = {}
+): SurfaceIntentResolution {
+  const packet =
+    options.packet ||
+    resolveIntentResolutionPacket(utterance, {
+      tier: options.tier,
+      tenantId: options.tenantId,
+    });
   const selectedIntentId = packet.selected_intent_id;
   const { pipeline_intent_map, mission_intent_action_map } = loadIntentRoutingMap();
 
@@ -110,7 +114,7 @@ export function resolveSurfaceIntent(utterance: string): SurfaceIntentResolution
   }
 
   if (selectedIntentId === 'live-query') {
-    const queryType = classifySurfaceQueryIntent(utterance);
+    const queryType = classifySurfaceQueryIntent(utterance, { ...options, packet });
     return {
       intentId: selectedIntentId,
       shape: packet.selected_resolution?.shape,

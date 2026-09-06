@@ -4,8 +4,20 @@ import { loadProjectRecord, saveProjectRecord } from './project-registry.js';
 import { saveProjectTrackRecord } from './project-track-registry.js';
 import { saveState, loadState } from './mission-state.js';
 import { reassignMissionToProject } from './project-management.js';
-import { resolveProjectLedgerPath, syncProjectLedger } from './mission-project-ledger.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  resolveProjectLedgerJsonPath,
+  resolveProjectLedgerPath,
+  removeMissionFromProjectLedger,
+  syncProjectLedger,
+} from './mission-project-ledger.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeUnlinkSync,
+} from './secure-io.js';
 import type { MissionState } from './mission-types.js';
 
 const MISSION_ID = 'MSN-PM-TEST-REASSIGN';
@@ -188,5 +200,47 @@ describe('mission Project reassignment', () => {
         dry_run: true,
       })
     ).rejects.toThrow('must match project scope');
+  });
+
+  it('rejects a project ledger path that traverses a symbolic link', () => {
+    const targetPath = pathResolver.sharedTmp(`mission-ledger-target-${process.pid}`);
+    const linkPath = pathResolver.sharedTmp(`mission-ledger-link-${process.pid}`);
+    safeMkdir(targetPath, { recursive: true });
+    safeSymlinkSync(targetPath, linkPath, 'dir');
+    try {
+      expect(() => resolveProjectLedgerPath(linkPath)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeUnlinkSync(linkPath);
+      safeRmSync(targetPath, { force: true, recursive: true });
+    }
+  });
+
+  it('does not treat a directory JSON ledger as a missing ledger', async () => {
+    await saveState(MISSION_ID, fixtureMission());
+    const ledgerJsonPath = resolveProjectLedgerJsonPath(SOURCE_PATH);
+    safeMkdir(ledgerJsonPath, { recursive: true });
+
+    await expect(syncProjectLedger(MISSION_ID, pathResolver.rootDir())).rejects.toThrow(
+      '[PROJECT_MISSION_LEDGER] ledger must be a regular file'
+    );
+  });
+
+  it('does not treat a directory markdown ledger as an existing ledger', async () => {
+    await saveState(MISSION_ID, fixtureMission());
+    const ledgerPath = resolveProjectLedgerPath(SOURCE_PATH);
+    safeMkdir(ledgerPath, { recursive: true });
+
+    await expect(syncProjectLedger(MISSION_ID, pathResolver.rootDir())).rejects.toThrow(
+      '[PROJECT_MISSION_LEDGER] ledger must be a regular file'
+    );
+  });
+
+  it('rejects a directory markdown ledger during removal', () => {
+    const ledgerPath = resolveProjectLedgerPath(SOURCE_PATH);
+    safeMkdir(ledgerPath, { recursive: true });
+
+    expect(() => removeMissionFromProjectLedger(SOURCE_PATH, MISSION_ID)).toThrow(
+      '[PROJECT_MISSION_LEDGER] ledger must be a regular file'
+    );
   });
 });

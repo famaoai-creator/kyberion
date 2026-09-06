@@ -2,106 +2,30 @@
 
 import * as React from 'react';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
+import {
+  parseConciergeSummaryEvent,
+  parseConciergeSummaryResponse,
+  type ConciergeSummary,
+} from '../lib/summary-event';
+import {
+  parseConciergeHygieneResponse,
+  parseConciergeMemoryQueueResponse,
+  parseConciergeResponseStatusResponse,
+  type ConciergeHygieneInquiry,
+  type ConciergeMemoryQueueItem,
+  type ConciergeResponseStatus,
+} from '../lib/concierge-advisory-response';
+import {
+  parseConciergeOutcomePreviewResponse,
+  type ConciergeOutcomePreview,
+} from '../lib/outcome-preview-response';
+import { parseConciergeMutationResponse } from '../lib/mutation-response';
 
-type Summary = {
-  generated_at: string;
-  briefing: {
-    sentence_ja: string;
-    counts: {
-      active_missions: number;
-      pending_approvals: number;
-      unread_outcomes: number;
-      exceptions: number;
-    };
-    next_action_ja?: string;
-  };
-  intent_inbox: Array<{
-    mission_id: string;
-    title: string;
-    status_ja: string;
-    attention_needed: boolean;
-    updated_at?: string;
-    success_condition?: string;
-  }>;
-  approval_queue: Array<{
-    id: string;
-    channel: string;
-    storage_channel: string;
-    title: string;
-    reason: string;
-    requested_at: string;
-    expires_at?: string;
-    mission_id?: string;
-  }>;
-  outcome_feed: Array<{
-    entry_id: string;
-    title: string;
-    summary: string;
-    artifact_paths: string[];
-    mission_id?: string;
-    status: string;
-    updated_at: string;
-  }>;
-  exception_feed: Array<{
-    id: string;
-    title: string;
-    text: string;
-    surface: string;
-    created_at: string;
-  }>;
-};
+type HygieneInquiry = ConciergeHygieneInquiry;
+type MemoryQueueItem = ConciergeMemoryQueueItem;
+type ResponseStatus = ConciergeResponseStatus;
 
-type HygieneInquiry = {
-  mission_id: string;
-  title: string;
-  reason: 'design_missing' | 'ready_not_started' | 'awaiting_gate';
-  age_days: number | null;
-  waiting_since?: string;
-};
-
-type MemoryQueueItem = {
-  id: string;
-  kind: 'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt';
-  summary: string;
-  source: string;
-  source_type: string;
-  sensitivity_tier: 'public' | 'confidential' | 'personal';
-  occurrences: number;
-  queued_at: string;
-};
-
-type ArtifactPreview = {
-  name: string;
-  kind: 'markdown' | 'text' | 'image' | 'other';
-  content?: string;
-  truncated?: boolean;
-  data_uri?: string;
-  missing?: boolean;
-  too_large?: boolean;
-};
-
-type OutcomePreview = {
-  entry_id: string;
-  total: number;
-  shown: number;
-  files: ArtifactPreview[];
-};
-
-type ResponseStatus = {
-  state: 'ready' | 'waiting' | 'queued';
-  label: string;
-  next_action: string;
-  active_count: number;
-  queued_count: number;
-  stale_child_count: number;
-  active_tasks: Array<{
-    delegation_id: string;
-    mission_id?: string;
-    task_id?: string;
-    backend_name?: string;
-    elapsed_seconds: number;
-  }>;
-};
+type OutcomePreview = ConciergeOutcomePreview;
 
 function formatWhen(value: string | undefined, locale: 'en' | 'ja'): string {
   if (!value) return '';
@@ -119,7 +43,7 @@ function formatWhen(value: string | undefined, locale: 'en' | 'ja'): string {
 
 export default function ConciergePage() {
   const { locale, setLocale, t } = useConciergeI18n();
-  const [summary, setSummary] = React.useState<Summary | null>(null);
+  const [summary, setSummary] = React.useState<ConciergeSummary | null>(null);
   const [notice, setNotice] = React.useState<{ text: string; error?: boolean } | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
@@ -128,9 +52,9 @@ export default function ConciergePage() {
   const refresh = React.useCallback(async () => {
     try {
       const response = await fetch('/api/summary', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'summary failed');
-      setSummary(payload.summary);
+      const nextSummary = parseConciergeSummaryResponse(await response.json().catch(() => null));
+      if (!response.ok || !nextSummary) throw new Error('Invalid summary response');
+      setSummary(nextSummary);
       setLoadError(null);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : String(error));
@@ -140,9 +64,9 @@ export default function ConciergePage() {
   const refreshResponseStatus = React.useCallback(async () => {
     try {
       const response = await fetch('/api/response-status', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'response status failed');
-      setResponseStatus(payload.response_status);
+      const parsed = parseConciergeResponseStatusResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid response status response');
+      setResponseStatus(parsed);
     } catch {
       // The response-status panel is advisory; the main concierge remains usable.
     }
@@ -162,9 +86,9 @@ export default function ConciergePage() {
   const refreshHygiene = React.useCallback(async () => {
     try {
       const response = await fetch('/api/hygiene', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'hygiene failed');
-      setHygiene(payload.inquiries as HygieneInquiry[]);
+      const parsed = parseConciergeHygieneResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid hygiene response');
+      setHygiene(parsed);
     } catch {
       // Advisory pane: a failed hygiene fetch never blocks the concierge.
     }
@@ -183,9 +107,9 @@ export default function ConciergePage() {
   const refreshMemoryQueue = React.useCallback(async () => {
     try {
       const response = await fetch('/api/memory-queue', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'memory queue failed');
-      setMemoryQueue(payload.candidates as MemoryQueueItem[]);
+      const parsed = parseConciergeMemoryQueueResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid memory queue response');
+      setMemoryQueue(parsed);
     } catch {
       // Advisory pane: a failed queue fetch never blocks the concierge.
     }
@@ -207,7 +131,9 @@ export default function ConciergePage() {
       source = new EventSource('/api/events');
       source.addEventListener('summary', (event) => {
         try {
-          setSummary(JSON.parse((event as MessageEvent).data) as Summary);
+          const nextSummary = parseConciergeSummaryEvent((event as MessageEvent).data);
+          if (!nextSummary) return;
+          setSummary(nextSummary);
           setLoadError(null);
         } catch {
           // Keep the last good snapshot when one event fails to parse.
@@ -237,7 +163,7 @@ export default function ConciergePage() {
   }, [refresh, refreshResponseStatus, refreshHygiene, refreshMemoryQueue]);
 
   const decideApproval = React.useCallback(
-    async (item: Summary['approval_queue'][number], decision: 'approved' | 'rejected') => {
+    async (item: ConciergeSummary['approval_queue'][number], decision: 'approved' | 'rejected') => {
       setBusyId(item.id);
       try {
         const response = await fetch(`/api/approvals/${encodeURIComponent(item.id)}`, {
@@ -249,8 +175,7 @@ export default function ConciergePage() {
             storageChannel: item.storage_channel,
           }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'approval failed');
+        if (!response.ok) throw new Error('Approval failed');
         setNotice({
           text: t(decision === 'approved' ? 'home.approved_notice' : 'home.rejected_notice', {
             title: item.title,
@@ -271,7 +196,7 @@ export default function ConciergePage() {
 
   const recordOutcomeVerdict = React.useCallback(
     async (
-      item: Summary['outcome_feed'][number],
+      item: ConciergeSummary['outcome_feed'][number],
       status: 'accepted' | 'changes_requested' | 'rejected',
       note = ''
     ) => {
@@ -285,8 +210,7 @@ export default function ConciergePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status, note }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'verdict failed');
+        if (!response.ok) throw new Error('Verdict failed');
         setNotice({
           text: t(
             status === 'accepted'
@@ -320,9 +244,9 @@ export default function ConciergePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ decision, ...(note.trim() ? { note: note.trim() } : {}) }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'hygiene failed');
-        setNotice({ text: payload.result.message });
+        const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
+        if (!response.ok || !parsed?.result?.message) throw new Error('Hygiene action failed');
+        setNotice({ text: parsed.result.message });
         setHygieneConfirm(null);
         setHygieneNote('');
         await refreshHygiene();
@@ -347,9 +271,9 @@ export default function ConciergePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ decision }),
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'memory decision failed');
-        setNotice({ text: payload.result.message });
+        const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
+        if (!response.ok || !parsed?.result?.message) throw new Error('Memory decision failed');
+        setNotice({ text: parsed.result.message });
         setMemoryConfirm(null);
         await refreshMemoryQueue();
       } catch (error) {
@@ -368,7 +292,7 @@ export default function ConciergePage() {
   const [previewBusyId, setPreviewBusyId] = React.useState<string | null>(null);
 
   const togglePreview = React.useCallback(
-    async (item: Summary['outcome_feed'][number]) => {
+    async (item: ConciergeSummary['outcome_feed'][number]) => {
       if (previewId === item.entry_id) {
         setPreviewId(null);
         setPreviewData(null);
@@ -380,9 +304,11 @@ export default function ConciergePage() {
         const response = await fetch(`/api/outcomes/${encodeURIComponent(item.entry_id)}/preview`, {
           cache: 'no-store',
         });
-        const payload = await response.json();
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'preview failed');
-        setPreviewData(payload.preview as OutcomePreview);
+        const parsed = parseConciergeOutcomePreviewResponse(
+          await response.json().catch(() => null)
+        );
+        if (!response.ok || !parsed) throw new Error('Invalid outcome preview response');
+        setPreviewData(parsed);
         setPreviewError(null);
       } catch (error) {
         setPreviewData(null);
@@ -407,7 +333,7 @@ export default function ConciergePage() {
   // CS-04 「今日の伺い」— every item awaiting the human's decision is rendered
   // by one card helper per type; the unified queue and the panes below share
   // these helpers, so the two views can never drift apart.
-  const renderApprovalCard = (item: Summary['approval_queue'][number]) => (
+  const renderApprovalCard = (item: ConciergeSummary['approval_queue'][number]) => (
     <div key={item.id} className="item-card">
       <p className="item-title">{item.title}</p>
       {item.reason ? <p className="item-body">{item.reason}</p> : null}
@@ -587,7 +513,7 @@ export default function ConciergePage() {
     </div>
   );
 
-  const renderExceptionCard = (item: Summary['exception_feed'][number]) => (
+  const renderExceptionCard = (item: ConciergeSummary['exception_feed'][number]) => (
     <div key={item.id} className="item-card">
       <p className="item-title">{item.title}</p>
       {item.text ? <p className="item-body">{item.text}</p> : null}
@@ -597,7 +523,7 @@ export default function ConciergePage() {
     </div>
   );
 
-  const renderOutcomeCard = (item: Summary['outcome_feed'][number]) => (
+  const renderOutcomeCard = (item: ConciergeSummary['outcome_feed'][number]) => (
     <div key={item.entry_id} className="item-card">
       <p className="item-title">
         {item.title}

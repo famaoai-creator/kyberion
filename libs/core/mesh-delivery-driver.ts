@@ -16,6 +16,7 @@ import {
 import type { MeshDeliveryRecord, MeshRequest } from './mesh-hub-contract.js';
 import type { MeshRetryPolicy } from './mesh-message-broker.js';
 import { logger } from './core.js';
+import { nowIso } from './foundation/time.js';
 import { acquireLock, releaseLock } from './src/lock-utils.js';
 
 /**
@@ -150,7 +151,7 @@ export async function runMeshDeliveryPass(
 async function runMeshDeliveryPassUnfenced(
   options: MeshDeliveryPassOptions
 ): Promise<MeshDeliveryPassReport> {
-  const now = options.now || new Date().toISOString();
+  const now = options.now || nowIso();
   const broker: MeshDeliveryBrokerOps = options.broker ?? {
     expireMeshDeliveries,
     claimDueMeshDeliveries,

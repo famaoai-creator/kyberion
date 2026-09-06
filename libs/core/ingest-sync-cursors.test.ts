@@ -51,6 +51,12 @@ describe('ingest-sync-cursors (DA-03 watermark store)', () => {
     expect(() => syncCursorPath(TENANT, '../box', { cursorsDir })).toThrow(/invalid source_system/);
   });
 
+  it('rejects an external cursor directory before it can be written', () => {
+    expect(() => syncCursorPath(TENANT, 'box', { cursorsDir: '/tmp/ingest-cursors' })).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
   it('advanceSyncCursor persists the watermark with last_success_at = now and zero failures', () => {
     const state = advanceSyncCursor(
       TENANT,
@@ -150,6 +156,7 @@ describe('ingest-sync-cursors (DA-03 watermark store)', () => {
     expect(message).not.toMatch(/not valid JSON/);
     expect(message).not.toMatch(/resetSyncCursor/);
     expect(message).toMatch(/watermark is intact/);
+    expect(message).toMatch(/regular file/);
   });
 
   it('fails closed on a shape-invalid state file', () => {
@@ -157,6 +164,26 @@ describe('ingest-sync-cursors (DA-03 watermark store)', () => {
     safeMkdir(path.dirname(file), { recursive: true });
     safeWriteFile(file, JSON.stringify({ tenant_slug: TENANT, source_system: 'jira' }));
     expect(() => readSyncCursor(TENANT, 'jira', { cursorsDir })).toThrow(/invalid cursor state/);
+  });
+
+  it('fails closed when a cursor file contains another tenant or source identity', () => {
+    const file = syncCursorPath(TENANT, 'notion', { cursorsDir });
+    safeMkdir(path.dirname(file), { recursive: true });
+    safeWriteFile(
+      file,
+      JSON.stringify({
+        tenant_slug: 'tenant-other',
+        source_system: 'slack',
+        cursor_kind: 'marker',
+        cursor_value: 'cursor-1',
+        last_synced_at: NOW_1,
+        last_success_at: NOW_1,
+        consecutive_failures: 0,
+      })
+    );
+    expect(() => readSyncCursor(TENANT, 'notion', { cursorsDir })).toThrow(
+      /does not match the requested tenant/
+    );
   });
 
   it('resetSyncCursor removes the state file so the next sync is a full re-fetch', () => {

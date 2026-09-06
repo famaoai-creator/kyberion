@@ -1,15 +1,16 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { getRegisteredEnvBool } from '@agent/core/foundation/env';
 
 const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
 
 /**
- * Mirror of `getRegisteredEnvBool` truthiness for the edge runtime. Middleware
- * cannot import the node-side env registry accessors, so the accepted forms are
- * duplicated here and must stay in sync with `libs/core/foundation/env.ts`.
+ * Keep the middleware decision on the same registered environment accessor as
+ * the route guard. The accessor is edge-safe here because it has no Node-only
+ * dependencies; using it also prevents this boundary from drifting in its
+ * accepted boolean spellings.
  */
 function isTrustProxyEnabled(): boolean {
-  const raw = process.env.KYBERION_TRUST_PROXY;
-  return typeof raw === 'string' && /^(1|true|yes|on)$/i.test(raw);
+  return getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true;
 }
 
 /**

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   buildOperatorRequestLogFromIntentResolution,
   getOperatorLearningDispatchRegistry,
-  resetOperatorLearningDispatchRegistryCache,
+  _resetOperatorLearningDispatchRegistryCacheForTests,
 } from './operator-learning.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 
@@ -15,8 +16,52 @@ describe('operator-learning dispatch registry', () => {
     expect(registry.rules.length).toBeGreaterThan(0);
   });
 
+  it('fails closed when the base registry is missing', () => {
+    const missingPath = pathResolver.sharedTmp('operator-learning-dispatch-registry-missing.json');
+    const originalEnv = process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+    try {
+      process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = missingPath;
+      _resetOperatorLearningDispatchRegistryCacheForTests();
+
+      expect(() => getOperatorLearningDispatchRegistry()).toThrow(
+        'Catalog operator-learning-dispatch-registry is missing'
+      );
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+      } else {
+        process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = originalEnv;
+      }
+      _resetOperatorLearningDispatchRegistryCacheForTests();
+    }
+  });
+
+  it('fails closed when the base registry violates its schema', () => {
+    const invalidPath = pathResolver.sharedTmp('operator-learning-dispatch-registry-invalid.json');
+    const originalEnv = process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+    try {
+      safeWriteFile(invalidPath, '{"version":"1.0.0","rules":[{"rule_id":42}]}\n');
+      process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = invalidPath;
+      _resetOperatorLearningDispatchRegistryCacheForTests();
+
+      expect(() => getOperatorLearningDispatchRegistry()).toThrow(
+        'Invalid catalog operator-learning-dispatch-registry'
+      );
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+      } else {
+        process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = originalEnv;
+      }
+      safeRmSync(invalidPath, { force: true });
+      _resetOperatorLearningDispatchRegistryCacheForTests();
+    }
+  });
+
   it('can be extended through a registry file without code changes', () => {
-    const overridePath = pathResolver.sharedTmp('operator-learning-dispatch-registry-override.json');
+    const overridePath = pathResolver.sharedTmp(
+      'operator-learning-dispatch-registry-override.json'
+    );
     const originalEnv = process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
     const defaultRegistry = JSON.parse(
       safeReadFile(
@@ -49,7 +94,7 @@ describe('operator-learning dispatch registry', () => {
       );
 
       process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = overridePath;
-      resetOperatorLearningDispatchRegistryCache();
+      _resetOperatorLearningDispatchRegistryCacheForTests();
 
       const packet = resolveIntentResolutionPacket('Open OpenAI docs');
       const log = buildOperatorRequestLogFromIntentResolution({
@@ -67,7 +112,25 @@ describe('operator-learning dispatch registry', () => {
       } else {
         process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = originalEnv;
       }
-      resetOperatorLearningDispatchRegistryCache();
+      _resetOperatorLearningDispatchRegistryCacheForTests();
+    }
+  });
+
+  it('rejects a dispatch registry override that traverses a symbolic link', () => {
+    const targetPath = pathResolver.sharedTmp('operator-learning-dispatch-registry-target.json');
+    const linkedPath = pathResolver.sharedTmp('operator-learning-dispatch-registry-linked.json');
+    try {
+      safeWriteFile(targetPath, JSON.stringify({ version: '1.0.0', rules: [] }));
+      fs.symlinkSync(targetPath, linkedPath);
+      process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = linkedPath;
+      _resetOperatorLearningDispatchRegistryCacheForTests();
+
+      expect(() => getOperatorLearningDispatchRegistry()).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(linkedPath, { force: true });
+      safeRmSync(targetPath, { force: true });
+      delete process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+      _resetOperatorLearningDispatchRegistryCacheForTests();
     }
   });
 
@@ -127,9 +190,8 @@ describe('operator-learning dispatch registry', () => {
 
       process.env.KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH =
         confidentialOverlayPath;
-      process.env.KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH =
-        personalOverlayPath;
-      resetOperatorLearningDispatchRegistryCache();
+      process.env.KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = personalOverlayPath;
+      _resetOperatorLearningDispatchRegistryCacheForTests();
 
       const packet = resolveIntentResolutionPacket('Open OpenAI docs');
       const log = buildOperatorRequestLogFromIntentResolution({
@@ -140,7 +202,11 @@ describe('operator-learning dispatch registry', () => {
       });
 
       expect(log.signals.recurring_task_candidate).toEqual(
-        expect.arrayContaining(['personal_navigation', 'confidential_navigation', 'browser_navigation'])
+        expect.arrayContaining([
+          'personal_navigation',
+          'confidential_navigation',
+          'browser_navigation',
+        ])
       );
       expect(log.signals.recurring_task_candidate?.[0]).toBe('personal_navigation');
     } finally {
@@ -156,7 +222,7 @@ describe('operator-learning dispatch registry', () => {
         process.env.KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH =
           originalPersonalEnv;
       }
-      resetOperatorLearningDispatchRegistryCache();
+      _resetOperatorLearningDispatchRegistryCacheForTests();
     }
   });
 });

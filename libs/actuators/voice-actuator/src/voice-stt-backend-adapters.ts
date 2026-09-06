@@ -1,17 +1,14 @@
+import { pcmToWav } from '@agent/core/pcm-wav';
+import { pathResolver } from '@agent/core/path-resolver';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import {
-  pcmToWav,
-  pathResolver,
   registerStreamingSttBridge,
-  safeMkdir,
-  safeRmSync,
-  safeWriteFile,
-  safeExecResult,
-  type AudioChunk,
   type StreamingSpeechToTextBridge,
-} from '@agent/core';
-import { isRecord } from '@agent/core/foundation';
+} from '@agent/core/streaming-stt-bridge';
+import { safeMkdir, safeRmSync, safeWriteFile, safeExecResult } from '@agent/core/secure-io';
+import type { AudioChunk } from '@agent/core/meeting-session-types';
 import * as path from 'node:path';
-import { resolvePythonBin } from './voice-runtime-helpers.js';
+import { parseVoiceSttBridgeResponse, resolvePythonBin } from './voice-runtime-helpers.js';
 
 export interface VoiceLoopbackSttAdapterOptions {
   request_id: string;
@@ -71,19 +68,21 @@ function createFasterWhisperBridge(
             `voice STT backend failed: ${result.stderr || result.error?.message || 'unknown error'}`
           );
         }
-        const response: unknown = JSON.parse(result.stdout);
-        if (!isRecord(response) || response.status !== 'success') {
+        const response = parseVoiceSttBridgeResponse(
+          parseSafeJsonInput(result.stdout, 'voice STT backend response')
+        );
+        if (!response || response.status !== 'success') {
           throw new Error(
-            `voice STT backend returned an error: ${isRecord(response) && typeof response.error === 'string' ? response.error : 'invalid response'}`
+            `voice STT backend returned an error: ${response?.error || 'invalid response'}`
           );
         }
-        const text = typeof response.text === 'string' ? response.text.trim() : '';
+        const text = response.text.trim();
         if (text) {
           yield {
             utterance_id: `${options.request_id}-final`,
             is_final: true,
             text,
-            emitted_at: new Date().toISOString(),
+            emitted_at: nowIso(),
           };
         }
       } finally {
@@ -129,23 +128,21 @@ function createMlxWhisperBridge(
             `voice STT backend failed: ${result.stderr || result.error?.message || 'unknown error'}`
           );
         }
-        const response: unknown = JSON.parse(result.stdout);
-        if (!isRecord(response) || response.status !== 'success') {
+        const response = parseVoiceSttBridgeResponse(
+          parseSafeJsonInput(result.stdout, 'voice STT backend response')
+        );
+        if (!response || response.status !== 'success') {
           throw new Error(
-            `voice STT backend returned an error: ${
-              isRecord(response) && typeof response.error === 'string'
-                ? response.error
-                : 'invalid response'
-            }`
+            `voice STT backend returned an error: ${response?.error || 'invalid response'}`
           );
         }
-        const text = typeof response.text === 'string' ? response.text.trim() : '';
+        const text = response.text.trim();
         if (text) {
           yield {
             utterance_id: `${options.request_id}-final`,
             is_final: true,
             text,
-            emitted_at: new Date().toISOString(),
+            emitted_at: nowIso(),
           };
         }
       } finally {

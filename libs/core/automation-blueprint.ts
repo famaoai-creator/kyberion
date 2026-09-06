@@ -1,7 +1,7 @@
 import * as path from 'node:path';
-import { loadJson, safeLstat, safeReaddir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeReaddir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { validatePipelineAdf } from './pipeline-contract.js';
+import { loadPipelineAdfAtPath } from './pipeline-contract.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import {
   registerScheduledPipeline,
@@ -617,9 +617,8 @@ function validatePipelineRef(pipelineRef: string): string {
 
 function readPipelineAdf(pipelineRef: string): PipelineAdf {
   const ref = validatePipelineRef(pipelineRef);
-  const absolute = pathResolver.rootResolve(ref);
-  const raw = loadJson<unknown>(absolute);
-  const pipeline = validatePipelineAdf(raw);
+  const absolute = assertSafeRepositoryPath(pathResolver.rootResolve(ref));
+  const pipeline = loadPipelineAdfAtPath(absolute);
   const guardrails = validatePipelineGuardrails(pipeline, ref);
   if (!guardrails.ok) {
     const details = guardrails.findings
@@ -657,7 +656,7 @@ export function loadAutomationBlueprint(pipelineRef: string): AutomationBlueprin
 
 /** List valid schedule-backed Blueprints; malformed pipelines are excluded. */
 export function listAutomationBlueprintCatalog(): AutomationBlueprintCatalogEntry[] {
-  const root = pathResolver.rootResolve('pipelines');
+  const root = assertSafeRepositoryPath(pathResolver.rootResolve('pipelines'));
   return collectPipelineRefs(root).flatMap((ref) => {
     try {
       return [loadAutomationBlueprint(ref)];
@@ -768,7 +767,10 @@ export function registerAutomationBlueprint(
   const scheduled: ScheduledPipeline = {
     id: entry.blueprint.blueprint_id,
     name: entry.blueprint.name,
-    pipelinePath: options.pipelinePath || pathResolver.rootResolve(entry.blueprint.pipeline_ref),
+    pipelinePath: assertSafeRepositoryPath(
+      options.pipelinePath || pathResolver.rootResolve(entry.blueprint.pipeline_ref),
+      { allowMissingLeaf: true }
+    ),
     actuator: 'run_pipeline',
     trigger: {
       type: 'cron',

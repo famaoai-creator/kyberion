@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
+import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  buildExecutionEnv,
-  listTenantProfileSlugs,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
+  safeLstat,
   safeRmSync,
   safeWriteFile,
-  secureIo,
-  withExecutionContext,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
+import { parseIngestForm } from '../ingest-input';
+import { parseIngestCliVerdict } from '../ingest-output-parser';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,8 +39,6 @@ const INGEST_RELATIVE = 'dist/scripts/ingest.js';
 const INGEST_TIMEOUT_MS = 60_000;
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 // GUI subset of the CLI formats: slack_thread is not a file-upload format.
-const UPLOAD_FORMATS = ['docx', 'pdf', 'xlsx', 'html', 'markdown', 'text'] as const;
-type UploadFormat = (typeof UPLOAD_FORMATS)[number];
 // Extensions scripts/ingest.ts can infer a format from (EXTENSION_FORMATS).
 const INFERABLE_EXTENSIONS = new Set([
   '.docx',
@@ -66,19 +67,6 @@ function sanitizeFileName(name: string): string {
   return trimmed || `upload-${Date.now().toString(36)}`;
 }
 
-/** Extract the first pretty-printed JSON object the ingest CLI prints after `marker`. */
-function parseJsonAfter(stdout: string, marker: string): Record<string, unknown> | null {
-  const at = stdout.indexOf(marker);
-  if (at < 0) return null;
-  const brace = stdout.indexOf('{', at);
-  if (brace < 0) return null;
-  try {
-    return JSON.parse(stdout.slice(brace)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
 function toDisplayPath(value: unknown): string | undefined {
   const raw = String(value || '').trim();
   if (!raw) return undefined;
@@ -100,15 +88,23 @@ export async function POST(req: NextRequest) {
   let uploadDir: string | null = null;
   try {
     const form = await req.formData();
-    const file = form.get('file');
-    if (!(file instanceof File)) {
-      return NextResponse.json({ ok: false, error: t('api.file_required') }, { status: 400 });
+    const parsedForm = parseIngestForm(form);
+    if (!parsedForm.ok) {
+      const messageKey =
+        parsedForm.field === 'file'
+          ? 'api.file_required'
+          : parsedForm.field === 'tenant'
+            ? 'api.ingest.tenant_invalid'
+            : parsedForm.field === 'format'
+              ? 'api.ingest.format_invalid'
+              : 'api.onboarding_input';
+      return NextResponse.json({ ok: false, error: t(messageKey) }, { status: 400 });
     }
+    const { file, tenant, format, dryRun } = parsedForm.value;
     if (file.size < 1 || file.size > MAX_UPLOAD_BYTES) {
       return NextResponse.json({ ok: false, error: t('api.ingest.file_size') }, { status: 400 });
     }
 
-    const tenant = String(form.get('tenant') || '').trim();
     // Only tenants registered in the tenant registry are valid landings from
     // the GUI. `common` (shared/public namespace) needs a KM-03 steward
     // approval id, which this ceremony does not collect — so it is not offered.
@@ -122,16 +118,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const formatRaw = String(form.get('format') || '').trim();
-    if (formatRaw && !UPLOAD_FORMATS.includes(formatRaw as UploadFormat)) {
-      return NextResponse.json(
-        { ok: false, error: t('api.ingest.format_invalid') },
-        { status: 400 }
-      );
-    }
-    const format = formatRaw as UploadFormat | '';
-    const dryRun = ['1', 'true', 'on'].includes(String(form.get('dry_run') || '').toLowerCase());
-
     const safeName = sanitizeFileName(file.name);
     if (!format && !INFERABLE_EXTENSIONS.has(path.extname(safeName).toLowerCase())) {
       return NextResponse.json(
@@ -141,7 +127,14 @@ export async function POST(req: NextRequest) {
     }
 
     const ingestScript = pathResolver.rootResolve(INGEST_RELATIVE);
-    if (!safeExistsSync(ingestScript)) {
+    let ingestReady = false;
+    try {
+      const safeIngestScript = assertSafeRepositoryPath(ingestScript, { allowMissingLeaf: true });
+      ingestReady = safeExistsSync(safeIngestScript) && safeLstat(safeIngestScript).isFile();
+    } catch {
+      ingestReady = false;
+    }
+    if (!ingestReady) {
       console.error(`[concierge/ingest] ingest build missing: ${ingestScript}`);
       return NextResponse.json({ ok: false, error: t('api.ingest.failed') }, { status: 503 });
     }
@@ -207,7 +200,7 @@ export async function POST(req: NextRequest) {
 
     // Exit code 0 alone is not success: read the ceremony's own verdict lines.
     if (dryRun) {
-      const plan = parseJsonAfter(result.stdout, '[ingest] DRY RUN');
+      const plan = parseIngestCliVerdict(result.stdout, '[ingest] DRY RUN');
       if (!plan || plan.dry_run !== true) {
         return NextResponse.json({ ok: false, error: t('api.ingest.failed') }, { status: 502 });
       }
@@ -230,7 +223,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (result.stdout.includes('[ingest] committed ')) {
-      const asset = parseJsonAfter(result.stdout, '[ingest] committed ');
+      const asset = parseIngestCliVerdict(result.stdout, '[ingest] committed ');
       const summary: IngestSummary = {
         dry_run: false,
         outcome: 'committed',

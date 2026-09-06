@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { safeReadFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   findMissingOpInputContractCoverage,
   findOpInputContractViolations,
@@ -39,5 +41,14 @@ describe('check_op_input_contract_coverage', () => {
         ],
       })
     ).toEqual(['fixture:open: legacy-open input contract is not permitted']);
+  });
+
+  it('keeps coverage warnings behind the injected printer', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_op_input_contract_coverage.ts'))
+    );
+
+    expect(source).toContain('print: (value: unknown) => void');
+    expect(source).not.toContain('console.warn');
   });
 });

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
 import * as secureIo from './secure-io.js';
 import { getFoundationIo } from './foundation/io.js';
 import { withExecutionContext } from './authority.js';
@@ -517,6 +517,25 @@ describe('orchestrator-session — SO-03 mission-ownership claim', () => {
 // ---------------------------------------------------------------------------
 
 describe('orchestrator-session — restart replay', () => {
+  it('rejects an external journal path before reading or writing it', () => {
+    expect(
+      () =>
+        new OrchestratorSessionJournal({
+          journalPath: '/tmp/orchestrator-session-external.jsonl',
+        })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
+  it('fails closed when the orchestrator session journal is replaced by a directory', () => {
+    const journalPath = nextJournalPath();
+    const resolvedJournalPath = pathResolver.rootResolve(journalPath);
+    safeMkdir(resolvedJournalPath, { recursive: true });
+
+    expect(() => new OrchestratorSessionJournal({ journalPath }).restore()).toThrow(
+      'journal must be a regular file'
+    );
+  });
+
   it('a brand-new OrchestratorSessionJournal instance from the same path sees prior sessions, including released ones', () => {
     const journalPath = nextJournalPath();
     const live = new OrchestratorSessionJournal({ journalPath });

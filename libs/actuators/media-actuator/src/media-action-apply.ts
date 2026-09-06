@@ -1,13 +1,15 @@
+import { logger } from '@agent/core/core';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
   safeStat,
   safeExec,
-  pathResolver,
-  retry,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
+import { retry } from '@agent/core/async-utils';
 import {
   filterPptxSlides,
   generateNativeDocx,
@@ -45,11 +47,16 @@ import {
 import {
   cloneJsonValue,
   buildRetryOptions,
-  loadJsonValue,
   loadLayoutTemplateCatalog,
 } from './media-layout-runtime.js';
 import { opCapture, PDF_PYPDF_OPS } from './media-action-capture.js';
 import { renderCompiledProtocol, renderDiagramDocumentBrief } from './media-design-protocol.js';
+
+function resolveMediaRepositoryPath(rootDir: string, value: unknown, resolve: Function): string {
+  return assertSafeRepositoryPath(path.resolve(rootDir, String(resolve(value))), {
+    allowMissingLeaf: true,
+  });
+}
 
 async function opApply(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
@@ -67,7 +74,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       };
     }
     case 'mermaid_render': {
-      const outPath = path.resolve(rootDir, resolve(params.path));
+      const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const source = resolveDiagramSource(rootDir, params, ctx, resolve);
       ensureParentDir(outPath);
 
@@ -101,7 +108,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       break;
     }
     case 'd2_render': {
-      const outPath = path.resolve(rootDir, resolve(params.path));
+      const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const source = resolveDiagramSource(rootDir, params, ctx, resolve);
       ensureParentDir(outPath);
 
@@ -134,7 +141,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
         opName: 'document_diagram_render_from_brief',
       });
       const brief = normalizeDiagramDocumentBrief(rawBrief);
-      const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
+      const outPath = resolveMediaRepositoryPath(
+        rootDir,
+        params.path || params.output_path,
+        resolve
+      );
       await renderDiagramDocumentBrief(rootDir, brief, outPath, params, ctx, resolve);
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Diagram rendered from brief at: ${outPath} (${stats.size} bytes).`);
@@ -151,7 +162,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       assertMediaProtocolLayoutReady(protocol, {
         allowLayoutOverflow: params.allow_layout_overflow === true,
       });
-      const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
+      const outPath = resolveMediaRepositoryPath(
+        rootDir,
+        params.path || params.output_path,
+        resolve
+      );
 
       if (!safeExistsSync(path.dirname(outPath)))
         safeMkdir(path.dirname(outPath), { recursive: true });
@@ -167,8 +182,8 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       };
     }
     case 'pptx_patch': {
-      const sourcePath = path.resolve(rootDir, resolve(params.source));
-      const outPath = path.resolve(rootDir, resolve(params.path));
+      const sourcePath = resolveMediaRepositoryPath(rootDir, params.source, resolve);
+      const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const replacements =
         params.replacements || ctx[params.replacements_from || 'last_replacements'] || {};
 
@@ -182,8 +197,8 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       break;
     }
     case 'pptx_filter_slides': {
-      const sourcePath = path.resolve(rootDir, resolve(params.source));
-      const outPath = path.resolve(rootDir, resolve(params.path));
+      const sourcePath = resolveMediaRepositoryPath(rootDir, params.source, resolve);
+      const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const keepIndices: number[] =
         params.keep_indices || ctx[params.keep_indices_from || 'last_keep_indices'] || [];
 
@@ -199,8 +214,8 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       break;
     }
     case 'pptx_patch_paragraphs': {
-      const sourcePath = path.resolve(rootDir, resolve(params.source));
-      const outPath = path.resolve(rootDir, resolve(params.path));
+      const sourcePath = resolveMediaRepositoryPath(rootDir, params.source, resolve);
+      const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const replacements =
         params.paragraph_replacements ||
         ctx[params.replacements_from || 'last_paragraph_replacements'] ||
@@ -221,7 +236,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const xlsxProtocol = normalizeXlsxDesignProtocol(
         ctx[params.design_from || 'last_xlsx_design']
       );
-      const xlsxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
+      const xlsxOutPath = resolveMediaRepositoryPath(
+        rootDir,
+        params.path || params.output_path,
+        resolve
+      );
       if (!safeExistsSync(path.dirname(xlsxOutPath)))
         safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
       await retry(async () => generateNativeXlsx(xlsxProtocol, xlsxOutPath), buildRetryOptions());
@@ -231,7 +250,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'docx_render': {
       const docxProtocol = ctx[params.design_from || 'last_docx_design'];
-      const docxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
+      const docxOutPath = resolveMediaRepositoryPath(
+        rootDir,
+        params.path || params.output_path,
+        resolve
+      );
       if (!safeExistsSync(path.dirname(docxOutPath)))
         safeMkdir(path.dirname(docxOutPath), { recursive: true });
       await retry(async () => generateNativeDocx(docxProtocol, docxOutPath), buildRetryOptions());
@@ -241,7 +264,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'pdf_render': {
       const pdfProtocol = ctx[params.design_from || 'last_pdf_design'];
-      const pdfOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
+      const pdfOutPath = resolveMediaRepositoryPath(
+        rootDir,
+        params.path || params.output_path,
+        resolve
+      );
       if (!safeExistsSync(path.dirname(pdfOutPath)))
         safeMkdir(path.dirname(pdfOutPath), { recursive: true });
       await retry(
@@ -278,7 +305,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
         loadDocumentCompositionCatalog
       );
       const compiled = compileBriefToDesignProtocol(rootDir, brief);
-      const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
+      const outPath = resolveMediaRepositoryPath(
+        rootDir,
+        params.path || params.output_path,
+        resolve
+      );
       await renderCompiledProtocol(compiled, outPath, params.options);
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Unified document generated at: ${outPath} (${stats.size} bytes).`);
@@ -291,12 +322,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     }
     case 'write_file':
       safeWriteFile(
-        path.resolve(rootDir, resolve(params.path)),
+        resolveMediaRepositoryPath(rootDir, params.path, resolve),
         ctx[params.from] || params.content
       );
       break;
     case 'drawio_write': {
-      const outPath = path.resolve(rootDir, resolve(params.path));
+      const outPath = resolveMediaRepositoryPath(rootDir, params.path, resolve);
       const content = ctx[params.from || 'last_drawio_document'] || resolve(params.content);
       if (typeof content !== 'string' || !content.trim()) {
         throw new Error('drawio_write requires XML content via params.from or params.content');
@@ -340,7 +371,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       if (!tenantSlug) throw new Error('save_brand_to_confidential: tenant_slug is required');
 
-      const confDir = path.resolve(rootDir, `knowledge/confidential/${tenantSlug}/design`);
+      const confDir = resolveMediaRepositoryPath(
+        rootDir,
+        `knowledge/confidential/${tenantSlug}/design`,
+        resolve
+      );
       safeMkdir(confDir, { recursive: true });
 
       // 1. Build and write layout-templates.json
@@ -507,10 +542,14 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       logger.info(`[BRAND_IMPORT] Wrote confidential theme.json for ${tenantSlug}`);
 
       // 3. Update knowledge/confidential/tenants/index.json
-      const registryPath = path.resolve(rootDir, 'knowledge/confidential/tenants/index.json');
+      const registryPath = resolveMediaRepositoryPath(
+        rootDir,
+        'knowledge/confidential/tenants/index.json',
+        resolve
+      );
       let registry: any = { tenants: [] };
       try {
-        registry = loadJsonValue(registryPath);
+        registry = loadTenantDesignOverrideIndex(rootDir);
       } catch {
         /* create new */
       }

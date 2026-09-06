@@ -1,8 +1,60 @@
-import { compileUserIntentFlow, logger, safeUnlinkSync, pathResolver } from '@agent/core';
+import { compileUserIntentFlow } from '@agent/core/intent-contract';
+import { logger } from '@agent/core/core';
+import { safeUnlinkSync } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const CACHE_FILE = pathResolver.shared('runtime/intent-flow-cache.json');
+type Print = (value: unknown) => void;
 
-async function runTrial(trialName: string, inputText: string, clearCacheBefore: boolean) {
+interface BenchmarkResult {
+  trialName: string;
+  inputText: string;
+  llmCalls: number;
+  duration: number;
+  intentId: string;
+  cacheStatus: string;
+}
+
+export function formatBenchmarkTable(results: readonly BenchmarkResult[]): string {
+  const rows = results.map((result) => ({
+    Trial: result.trialName,
+    Input: result.inputText,
+    'LLM Calls': String(result.llmCalls),
+    'Latency (ms)': String(result.duration),
+    'Resolved Intent': result.intentId,
+    'Cache Status': result.cacheStatus,
+  }));
+  const columns = Object.keys(
+    rows[0] ?? {
+      Trial: '',
+      Input: '',
+      'LLM Calls': '',
+      'Latency (ms)': '',
+      'Resolved Intent': '',
+      'Cache Status': '',
+    }
+  );
+  const widths = columns.map((column) =>
+    Math.max(column.length, ...rows.map((row) => String(row[column as keyof typeof row]).length))
+  );
+  const formatRow = (values: readonly string[]) =>
+    values.map((value, index) => value.padEnd(widths[index])).join(' | ');
+  return [
+    formatRow(columns),
+    widths.map((width) => '-'.repeat(width)).join('-+-'),
+    ...rows.map((row) =>
+      formatRow(columns.map((column) => String(row[column as keyof typeof row])))
+    ),
+  ].join('\n');
+}
+
+async function runTrial(
+  trialName: string,
+  inputText: string,
+  clearCacheBefore: boolean,
+  print: Print
+): Promise<BenchmarkResult> {
   if (clearCacheBefore) {
     logger.info(`[${trialName}] Clearing cache at ${CACHE_FILE}...`);
     try {
@@ -177,7 +229,7 @@ async function runTrial(trialName: string, inputText: string, clearCacheBefore: 
     `[${trialName}] Cache Status: ${result.source === 'fallback' ? 'Fallback' : llmCalls === 0 ? 'Cache HIT' : 'Cache MISS'}`
   );
   logger.info(`[${trialName}] Resolved Intent: ${result.intentContract.intent_id}`);
-  console.log('--------------------------------------------------');
+  print('--------------------------------------------------');
 
   return {
     trialName,
@@ -189,7 +241,7 @@ async function runTrial(trialName: string, inputText: string, clearCacheBefore: 
   };
 }
 
-async function main() {
+export async function main(_args: string[] = [], print: Print = () => undefined): Promise<void> {
   logger.info('=== STARTING LEARNING & CACHING EFFICIENCY BENCHMARK ===');
 
   const results = [];
@@ -199,7 +251,8 @@ async function main() {
     await runTrial(
       'Trial 1: Cold Run (Unlearned)',
       'inspect-workspace-surfaces',
-      true // Clear cache before
+      true, // Clear cache before
+      print
     )
   );
 
@@ -208,7 +261,8 @@ async function main() {
     await runTrial(
       'Trial 2: Warm Run (Same Intent - Learned)',
       'inspect-workspace-surfaces',
-      false // Keep cache
+      false, // Keep cache
+      print
     )
   );
 
@@ -217,26 +271,25 @@ async function main() {
     await runTrial(
       'Trial 3: Warm Run 2 (Same Intent - Verification)',
       'inspect-workspace-surfaces',
-      false // Keep cache
+      false, // Keep cache
+      print
     )
   );
 
   logger.info('=== BENCHMARK RESULTS ===');
-  console.table(
-    results.map((r) => ({
-      Trial: r.trialName,
-      Input: r.inputText,
-      'LLM Calls': r.llmCalls,
-      'Latency (ms)': r.duration,
-      'Resolved Intent': r.intentId,
-      'Cache Status': r.cacheStatus,
-    }))
-  );
+  print(formatBenchmarkTable(results));
 
   logger.success('=== BENCHMARK COMPLETED SUCCESSFULLY ===');
 }
 
-main().catch((err) => {
-  logger.error(`Benchmark failed: ${err.message}`);
-  process.exitCode = 1;
+export const runLearningEfficiencyBenchmark = defineScript({
+  name: 'benchmark:learning-efficiency',
+  flags: [],
+  run: ({ argv, print }) => main(argv, print),
 });
+
+if (
+  isDirectScript(import.meta.url, 'benchmark_learning_efficiency.ts') ||
+  isDirectScript(import.meta.url, 'benchmark_learning_efficiency.js')
+)
+  void runLearningEfficiencyBenchmark();

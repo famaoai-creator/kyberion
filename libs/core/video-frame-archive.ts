@@ -1,7 +1,9 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
+  assertSafeRepositoryPath,
   safeExec,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeReaddir,
@@ -9,6 +11,8 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import type { VideoFrame, VideoFormat } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
 
@@ -29,7 +33,7 @@ const DEFAULT_FFMPEG_BIN = 'ffmpeg';
 
 function normalizeFps(frames: VideoFrame[], requested?: number): number {
   if (requested && Number.isFinite(requested) && requested > 0) {
-    return Math.max(1, Math.min(120, Math.round(requested)));
+    return clamp(Math.round(requested), 1, 120);
   }
   if (frames.length < 2) return 30;
   const deltas: number[] = [];
@@ -40,7 +44,7 @@ function normalizeFps(frames: VideoFrame[], requested?: number): number {
   if (deltas.length === 0) return 30;
   const avgDelta = deltas.reduce((total, value) => total + value, 0) / deltas.length;
   if (!Number.isFinite(avgDelta) || avgDelta <= 0) return 30;
-  return Math.max(1, Math.min(120, Math.round(1000 / avgDelta)));
+  return clamp(Math.round(1000 / avgDelta), 1, 120);
 }
 
 function frameFileExtension(format: VideoFormat): 'jpg' | 'png' {
@@ -48,7 +52,7 @@ function frameFileExtension(format: VideoFormat): 'jpg' | 'png' {
 }
 
 function resolveArchiveTempDir(prefix: string): string {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = nowIso().replace(/[:.]/g, '-');
   return pathResolver.sharedTmp(
     path.join('video-frame-archive', `${prefix}-${stamp}-${randomUUID()}`)
   );
@@ -67,6 +71,9 @@ export async function writeVideoFramesToMp4(
   framesStream: AsyncIterable<VideoFrame>,
   options: VideoFrameArchiveOptions = {}
 ): Promise<VideoFrameArchiveResult> {
+  const safeOutputPath = assertSafeRepositoryPath(pathResolver.rootResolve(outputPath), {
+    allowMissingLeaf: true,
+  });
   const frames = await collectFrames(framesStream);
   if (frames.length === 0) {
     throw new Error('[video-frame-archive] no frames provided for mp4 encoding');
@@ -83,19 +90,26 @@ export async function writeVideoFramesToMp4(
 
   const ffmpegBin = options.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
   const fps = normalizeFps(frames, options.fps);
-  const tempDir = resolveArchiveTempDir('encode');
+  const tempDir = assertSafeRepositoryPath(resolveArchiveTempDir('encode'), {
+    allowMissingLeaf: true,
+  });
   const ext = frameFileExtension(firstFormat);
   safeMkdir(tempDir, { recursive: true });
-  safeMkdir(path.dirname(outputPath), { recursive: true });
+  safeMkdir(path.dirname(safeOutputPath), { recursive: true });
 
   try {
     for (let index = 0; index < frames.length; index += 1) {
       const frame = frames[index];
-      const framePath = path.join(tempDir, `frame-${String(index + 1).padStart(6, '0')}.${ext}`);
+      const framePath = assertSafeRepositoryPath(
+        path.join(tempDir, `frame-${String(index + 1).padStart(6, '0')}.${ext}`),
+        { allowMissingLeaf: true }
+      );
       safeWriteFile(framePath, Buffer.from(frame.payload));
     }
 
-    const inputPattern = path.join(tempDir, `frame-%06d.${ext}`);
+    const inputPattern = assertSafeRepositoryPath(path.join(tempDir, `frame-%06d.${ext}`), {
+      allowMissingLeaf: true,
+    });
     safeExec(
       ffmpegBin,
       [
@@ -110,13 +124,13 @@ export async function writeVideoFramesToMp4(
         'yuv420p',
         '-movflags',
         '+faststart',
-        outputPath,
+        safeOutputPath,
       ],
       { env: process.env, timeoutMs: 120_000 }
     );
 
     return {
-      output_path: outputPath,
+      output_path: safeOutputPath,
       frame_count: frames.length,
       fps,
       format: firstFormat,
@@ -132,14 +146,22 @@ export async function* readVideoFramesFromMp4(
   inputPath: string,
   options: VideoFrameArchiveOptions = {}
 ): AsyncIterable<VideoFrame> {
+  const safeInputPath = assertSafeRepositoryPath(pathResolver.rootResolve(inputPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeLstat(safeInputPath).isFile()) {
+    throw new Error(`[VIDEO_FRAME_ARCHIVE_RESOURCE] input must be a regular file: ${inputPath}`);
+  }
   const ffmpegBin = options.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
-  const tempDir = resolveArchiveTempDir('decode');
-  const fps = Math.max(1, Math.min(120, Math.round(options.fps || 30)));
+  const tempDir = assertSafeRepositoryPath(resolveArchiveTempDir('decode'), {
+    allowMissingLeaf: true,
+  });
+  const fps = clamp(Math.round(options.fps || 30), 1, 120);
   safeMkdir(tempDir, { recursive: true });
 
   try {
     const outputPattern = path.join(tempDir, 'frame-%06d.jpg');
-    safeExec(ffmpegBin, ['-y', '-i', inputPath, '-vf', `fps=${fps}`, outputPattern], {
+    safeExec(ffmpegBin, ['-y', '-i', safeInputPath, '-vf', `fps=${fps}`, outputPattern], {
       env: process.env,
       timeoutMs: 120_000,
     });
@@ -149,7 +171,13 @@ export async function* readVideoFramesFromMp4(
       .sort();
     for (let index = 0; index < files.length; index += 1) {
       const file = files[index];
-      const filePath = path.join(tempDir, file);
+      let filePath: string;
+      try {
+        filePath = assertSafeRepositoryPath(path.join(tempDir, file));
+        if (!safeLstat(filePath).isFile()) continue;
+      } catch {
+        continue;
+      }
       const payload = safeReadFile(filePath, { encoding: null });
       const payloadBytes = Buffer.isBuffer(payload)
         ? new Uint8Array(payload)

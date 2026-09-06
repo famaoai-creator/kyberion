@@ -34,9 +34,8 @@
  * distinct manifest path on invalid/unreadable input.
  */
 
-import type { ValidateFunction } from 'ajv';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 const SCHEMA_PATH = 'knowledge/product/schemas/knowledge-slices.schema.json';
@@ -114,18 +113,6 @@ const EMPTY_RESOLUTION: ResolvedKnowledgeSlice = Object.freeze({
   matchedSliceIds: [],
 }) as ResolvedKnowledgeSlice;
 
-let cachedValidator: ValidateFunction | null | undefined;
-
-function getValidator(): ValidateFunction | null {
-  if (cachedValidator !== undefined) return cachedValidator;
-  try {
-    cachedValidator = compileSchema(pathResolver.rootResolve(SCHEMA_PATH));
-  } catch {
-    cachedValidator = null;
-  }
-  return cachedValidator;
-}
-
 const fileCache = new Map<string, KnowledgeSlicesFile | null>();
 const warnedKeys = new Set<string>();
 
@@ -134,6 +121,14 @@ function warnOnce(key: string, message: string): void {
   warnedKeys.add(key);
   // eslint-disable-next-line no-console
   console.warn(message);
+}
+
+function knowledgeSlicesCatalog(filePath: string) {
+  return defineCatalog<KnowledgeSlicesFile>({
+    id: 'knowledge-slices',
+    path: filePath,
+    schema: pathResolver.rootResolve(SCHEMA_PATH),
+  });
 }
 
 /**
@@ -149,25 +144,14 @@ export function loadKnowledgeSlicesFile(
 
   let result: KnowledgeSlicesFile | null = null;
   try {
-    const abs = pathResolver.rootResolve(dataPath);
+    const abs = assertSafeRepositoryPath(pathResolver.rootResolve(dataPath), {
+      allowMissingLeaf: true,
+    });
     if (!safeExistsSync(abs)) {
       fileCache.set(dataPath, null);
       return null;
     }
-    const raw = safeReadFile(abs, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw);
-    const validate = getValidator();
-    if (validate && !validate(parsed)) {
-      warnOnce(
-        `invalid:${dataPath}`,
-        `[knowledge-slices] ${dataPath} failed schema validation; ignoring slice directives (fail-open). ${
-          validate.errors ? JSON.stringify(validate.errors) : ''
-        }`
-      );
-      fileCache.set(dataPath, null);
-      return null;
-    }
-    result = parsed as KnowledgeSlicesFile;
+    result = knowledgeSlicesCatalog(abs).load();
   } catch (error) {
     warnOnce(
       `error:${dataPath}`,

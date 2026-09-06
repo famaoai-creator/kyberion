@@ -68,6 +68,7 @@ describe('voice and browser smoke contract', () => {
     const browserCatalog = read('libs/actuators/browser-actuator/examples/catalog.json');
     const voiceHealth = read('pipelines/voice-health-check.json');
     const packageJson = read('package.json');
+    const testSuite = read('scripts/test_suite.ts');
     const smokePipeline = read('pipelines/ui-voice-browser-smoke.json');
 
     expect(browserCatalog).toContain('test-session-recording');
@@ -79,9 +80,10 @@ describe('voice and browser smoke contract', () => {
     expect(voiceHealth).toContain('system:system_notify');
     expect(voiceHealth).toContain('Voice Health Check');
 
-    expect(packageJson).toContain('test:ui-voice-browser-smoke');
-    expect(packageJson).toContain('tests/voice-browser-smoke-contract.test.ts');
-    expect(packageJson).toContain('libs/actuators/meeting-actuator/src/index.test.ts');
+    expect(packageJson).toContain('scripts/test_suite.ts');
+    expect(testSuite).toContain("'ui-voice-browser-smoke'");
+    expect(testSuite).toContain('tests/voice-browser-smoke-contract.test.ts');
+    expect(testSuite).toContain('libs/actuators/meeting-actuator/src/index.test.ts');
 
     expect(smokePipeline).toContain('presence/displays/presence-studio/server.ts');
     // SX-11: the smoke pipeline dropped the `system:exec node dist/...` wrappers

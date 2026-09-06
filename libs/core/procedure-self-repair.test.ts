@@ -1,10 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import * as secureIo from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+
+vi.mock('./foundation/json.js', () => ({
+  readJson: <T>(filePath: string) =>
+    JSON.parse(String(secureIo.safeReadFile(filePath, { encoding: 'utf8' }))) as T,
+}));
+
 import {
   applyProcedureDelta,
   classifyFailure,
   createProcedureDelta,
   loadProcedureDelta,
+  loadProcedureDeltaAtPath,
   saveProcedureDelta,
   suggestRepairAnchor,
 } from './procedure-self-repair.js';
@@ -20,8 +30,17 @@ function rec(actions: Array<{ action_id: string; op: string }>): BrowserExtensio
     created_at: '2026-06-24T00:00:00.000Z',
     tab: { origin: 'https://x.example', origin_hash: 'h', title: 't' },
     extension: { version: '1.0.0' },
-    actions: actions.map((a) => ({ ...a, summary: a.op, risk: 'low', captured_at: '2026-06-24T00:00:00.000Z' })) as any,
-    risk_summary: { requires_manual_review: true, sensitive_input_omitted: 0, approval_required_count: 0 },
+    actions: actions.map((a) => ({
+      ...a,
+      summary: a.op,
+      risk: 'low',
+      captured_at: '2026-06-24T00:00:00.000Z',
+    })) as any,
+    risk_summary: {
+      requires_manual_review: true,
+      sensitive_input_omitted: 0,
+      approval_required_count: 0,
+    },
     review: { status: 'approved', decisions: [] },
   };
 }
@@ -46,7 +65,7 @@ describe('classifyFailure', () => {
     '"%s" → %s',
     (errorMsg, _step, expected) => {
       expect(classifyFailure(new Error(errorMsg))).toBe(expected);
-    },
+    }
   );
 
   it('uses step summary for classification when error is generic', () => {
@@ -157,9 +176,39 @@ describe('saveProcedureDelta / loadProcedureDelta', () => {
       reason: 'ambiguity',
       created_at: '2026-06-24T00:00:00Z',
     };
-    vi.spyOn(secureIo, 'safeReadFile').mockReturnValue(JSON.stringify(delta));
-    const loaded = loadProcedureDelta('/some/path.json');
-    expect(loaded).toEqual(delta);
+    vi.spyOn(secureIo, 'safeReadFile').mockImplementation((filePath) => {
+      if (String(filePath).includes('procedure-delta.schema.json')) {
+        return fs.readFileSync(
+          path.resolve('knowledge/product/schemas/procedure-delta.schema.json'),
+          'utf8'
+        );
+      }
+      return JSON.stringify(delta);
+    });
+    const filePath = pathResolver.shared('runtime/procedure-deltas/p1/delta.json');
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, '{}');
+    try {
+      const loaded = loadProcedureDelta(filePath);
+      expect(loaded).toEqual(delta);
+      expect(loadProcedureDelta(filePath, 'other')).toBeNull();
+      expect(() => loadProcedureDeltaAtPath(filePath, 'other')).toThrow(
+        'PROCEDURE_DELTA_SCOPE_MISMATCH'
+      );
+    } finally {
+      fs.rmSync(pathResolver.shared('runtime/procedure-deltas/p1'), {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
+  it('rejects a delta path outside the governed delta store', () => {
+    vi.spyOn(secureIo, 'safeReadFile').mockReturnValue('{}');
+    expect(
+      loadProcedureDelta(pathResolver.rootResolve('knowledge/personal/other.json'))
+    ).toBeNull();
+    expect(secureIo.safeReadFile).not.toHaveBeenCalled();
   });
 
   it('returns null when file is missing', () => {
@@ -167,6 +216,18 @@ describe('saveProcedureDelta / loadProcedureDelta', () => {
       throw new Error('ENOENT');
     });
     expect(loadProcedureDelta('/missing.json')).toBeNull();
+  });
+
+  it('rejects a directory at the persisted delta path', () => {
+    const filePath = pathResolver.shared('runtime/procedure-deltas/p1/directory.json');
+    fs.mkdirSync(filePath, { recursive: true });
+    try {
+      expect(() => loadProcedureDeltaAtPath(filePath, 'p1')).toThrow(
+        'delta must be a regular file'
+      );
+    } finally {
+      fs.rmSync(filePath, { recursive: true, force: true });
+    }
   });
 });
 

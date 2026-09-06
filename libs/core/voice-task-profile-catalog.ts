@@ -47,7 +47,6 @@ const catalog = defineCatalog<VoiceTaskProfileCatalog>({
   id: 'voice-task-profile-catalog',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: { version: '1.0.0', profiles: [] },
 });
 
 export function loadVoiceTaskProfileCatalog(): VoiceTaskProfileCatalog {
@@ -99,8 +98,4 @@ export function resolveVoiceTaskDistillTargetKind(input: {
   operation?: string;
 }): VoiceTaskDistillTargetKind {
   return resolveVoiceTaskProfile(input)?.distill_target_kind || 'knowledge_hint';
-}
-
-export function resetVoiceTaskProfileCatalogCache(): void {
-  catalog.reset();
 }

@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "surface-outbox-message.schema.json",
+  "title": "Persisted surface outbox message",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "message_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "surface": {
+      "type": "string",
+      "enum": [
+        "slack",
+        "chronos",
+        "presence",
+        "imessage",
+        "discord",
+        "telegram",
+        "cowork",
+        "cli",
+        "terminal"
+      ]
+    },
+    "correlation_id": { "type": "string", "minLength": 1 },
+    "channel": { "type": "string", "minLength": 1 },
+    "thread_ts": { "type": "string" },
+    "text": { "type": "string" },
+    "source": { "type": "string", "enum": ["surface", "nerve", "system"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "deduplication_key": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "attempt_count": { "type": "integer", "minimum": 0 },
+    "next_attempt_at": { "type": "string", "format": "date-time" },
+    "last_error_kind": {
+      "type": "string",
+      "enum": ["too_long", "bad_format", "forbidden", "not_found", "rate_limited", "transient"]
+    },
+    "last_error": { "type": "string" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope_kind": {
+          "type": "string",
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string" },
+        "organization_id": { "type": "string" },
+        "project_id": { "type": "string" },
+        "mission_id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "session_id": { "type": "string" },
+        "work_shape": { "type": "string" },
+        "customer_stance": { "type": "string" },
+        "viewer_principal": { "type": "string" },
+        "nhi_id": { "type": "string" }
+      },
+      "required": ["scope_kind", "tier"]
+    }
+  },
+  "required": [
+    "message_id",
+    "surface",
+    "correlation_id",
+    "channel",
+    "thread_ts",
+    "text",
+    "source",
+    "created_at"
+  ]
+}

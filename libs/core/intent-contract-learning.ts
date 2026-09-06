@@ -1,15 +1,11 @@
-import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
-import { createAjv } from './foundation/ajv.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
-import { safeMkdir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
-
-const ajv = createAjv();
 
 const MEMORY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/intent-contract-memory.schema.json'
@@ -67,6 +63,11 @@ interface IntentDomainOntologyEntry {
   execution_shape: string;
 }
 
+interface IntentDomainOntologyFile {
+  version: string;
+  intents: IntentDomainOntologyEntry[];
+}
+
 export interface IntentContractSelectionPolicy {
   version: string;
   weights: {
@@ -96,8 +97,6 @@ export interface ContractCandidate {
   source: 'memory' | 'default';
 }
 
-let memoryValidateFn: ValidateFunction | null = null;
-let policyValidateFn: ValidateFunction | null = null;
 const memorySnapshotCache = new Map<string, IntentContractMemoryFile>();
 
 function globalRuntimeMemoryPath(): string {
@@ -108,29 +107,40 @@ function globalRuntimeMemoryPath(): string {
 
 function runtimeMemoryPath(scope?: ScopeContext): string {
   const base = globalRuntimeMemoryPath();
-  if (!scope?.tenant_slug) return base;
-  return `${physicalScopedPath(path.dirname(base), { ...scope, scope_kind: scope.mission_id ? 'mission' : 'tenant' })}/${path.basename(base)}`;
+  const candidate = !scope?.tenant_slug
+    ? base
+    : `${physicalScopedPath(path.dirname(base), { ...scope, scope_kind: scope.mission_id ? 'mission' : 'tenant' })}/${path.basename(base)}`;
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
-function ensureMemoryValidator(): ValidateFunction {
-  if (memoryValidateFn) return memoryValidateFn;
-  memoryValidateFn = compileSchemaFromPath(ajv, MEMORY_SCHEMA_PATH);
-  return memoryValidateFn;
+function defaultMemory(): IntentContractMemoryFile {
+  return { version: '1.0.0', entries: [] };
 }
 
-function ensurePolicyValidator(): ValidateFunction {
-  if (policyValidateFn) return policyValidateFn;
-  policyValidateFn = compileSchemaFromPath(ajv, POLICY_SCHEMA_PATH);
-  return policyValidateFn;
+function memoryCatalog(filePath: string): GovernedCatalog<IntentContractMemoryFile> {
+  return defineCatalog<IntentContractMemoryFile>({
+    id: 'intent-contract-memory',
+    path: filePath,
+    schema: MEMORY_SCHEMA_PATH,
+  });
 }
 
-function parseJson<T>(filePath: string): T {
-  return loadJson<T>(filePath);
-}
+const policyCatalog = defineCatalog<IntentContractSelectionPolicy>({
+  id: 'intent-contract-selection-policy',
+  path: POLICY_PATH,
+  schema: POLICY_SCHEMA_PATH,
+});
+
+const ontologyCatalog = defineCatalog<IntentDomainOntologyFile>({
+  id: 'intent-domain-ontology',
+  path: ONTOLOGY_PATH,
+  schema: pathResolver.knowledge('product/schemas/intent-domain-ontology.schema.json'),
+});
 
 function loadMemoryFile(filePath: string): IntentContractMemoryFile | null {
-  if (!safeExistsSync(filePath)) return null;
-  return validateIntentContractMemory(parseJson<IntentContractMemoryFile>(filePath));
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath)) return null;
+  return memoryCatalog(safePath).load();
 }
 
 function memoryEntryKey(
@@ -139,21 +149,10 @@ function memoryEntryKey(
   return `${entry.intent_id}::${entry.contract_ref.kind}::${entry.contract_ref.ref}`;
 }
 
-function validateIntentContractMemory(memory: IntentContractMemoryFile): IntentContractMemoryFile {
-  const validate = ensureMemoryValidator();
-  if (!validate(memory)) {
-    const errors = (validate.errors || [])
-      .map((e) => `${e.instancePath || '/'} ${e.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid intent-contract-memory: ${errors}`);
-  }
-  return memory;
-}
-
 function loadOntologyByIntentId(): Map<string, IntentDomainOntologyEntry> {
-  const parsed = parseJson<{ intents?: IntentDomainOntologyEntry[] }>(ONTOLOGY_PATH);
+  const parsed = ontologyCatalog.load();
   const mapped = new Map<string, IntentDomainOntologyEntry>();
-  for (const entry of parsed.intents || []) {
+  for (const entry of parsed.intents) {
     if (!entry.intent_id) continue;
     mapped.set(entry.intent_id, entry);
   }
@@ -165,7 +164,7 @@ export function loadIntentContractMemory(): IntentContractMemoryFile {
 }
 
 export function loadIntentContractMemoryStore(scope?: ScopeContext): IntentContractMemoryFile {
-  const fallback: IntentContractMemoryFile = { version: '1.0.0', entries: [] };
+  const fallback = defaultMemory();
   const seed = loadMemoryFile(MEMORY_SEED_PATH) || fallback;
   const runtime = loadMemoryFile(runtimeMemoryPath(scope)) || fallback;
 
@@ -204,23 +203,15 @@ export function saveIntentContractMemory(
   memory: IntentContractMemoryFile,
   scope?: ScopeContext
 ): void {
-  validateIntentContractMemory(memory);
   const filePath = runtimeMemoryPath(scope);
+  const validated = memoryCatalog(filePath).validate(memory, filePath);
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(memory, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
 }
 
 export function loadIntentContractSelectionPolicy(): IntentContractSelectionPolicy {
-  const parsed = parseJson<IntentContractSelectionPolicy>(POLICY_PATH);
-  const validate = ensurePolicyValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((e) => `${e.instancePath || '/'} ${e.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid intent-contract-selection-policy: ${errors}`);
-  }
-  return parsed;
+  return policyCatalog.load();
 }
 
 export function resolveIntentContractMemoryPaths(scope?: ScopeContext): {
@@ -336,7 +327,7 @@ export function recordIntentContractOutcome(input: {
       execution_shape: input.execution_shape,
       success_rate: input.success ? 1 : 0,
       sample_count: 1,
-      last_seen: new Date().toISOString(),
+      last_seen: nowIso(),
       ...(input.error ? { last_error: input.error } : {}),
       ...(input.completion_summary ? { completion_summary: input.completion_summary } : {}),
     };
@@ -356,7 +347,7 @@ export function recordIntentContractOutcome(input: {
     context_fingerprint: input.context_fingerprint || prev.context_fingerprint,
     sample_count: nextCount,
     success_rate: Number(nextRate.toFixed(4)),
-    last_seen: new Date().toISOString(),
+    last_seen: nowIso(),
     last_error: input.success ? undefined : input.error || prev.last_error,
     ...(input.completion_summary ? { completion_summary: input.completion_summary } : {}),
   };

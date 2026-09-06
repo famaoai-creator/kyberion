@@ -9,7 +9,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // the JSONL event log and marker file land in a throwaway tmp root instead of
 // the real repo's active/shared/runtime/ directory.
 const secureIo = vi.hoisted(() => ({
+  assertSafeRepositoryPath: (filePath: string) => {
+    const root = path.resolve(process.env.KYBERION_ROOT || process.cwd());
+    const absolute = path.resolve(filePath);
+    const relative = path.relative(root, absolute);
+    if (
+      !relative ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error(
+        `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+      );
+    }
+    return absolute;
+  },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
@@ -59,11 +76,29 @@ describe('FailoverReasoningBackend — XP-05 switch surfacing + provenance', () 
     tmpRoot = path.join(os.tmpdir(), `kyberion-reasoning-failover-events-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    const failoverMarkerSchemaPath = path.join(
+      tmpRoot,
+      'knowledge/product/schemas/reasoning-failover-marker.schema.json'
+    );
+    fs.mkdirSync(path.dirname(failoverMarkerSchemaPath), { recursive: true });
+    fs.copyFileSync(
+      path.join(process.cwd(), 'knowledge/product/schemas/reasoning-failover-marker.schema.json'),
+      failoverMarkerSchemaPath
+    );
     const rulesPath = path.join(tmpRoot, 'knowledge/product/governance/knowledge-sync-rules.json');
+    const schemaPath = path.join(
+      tmpRoot,
+      'knowledge/product/schemas/knowledge-sync-rules.schema.json'
+    );
     fs.mkdirSync(path.dirname(rulesPath), { recursive: true });
+    fs.mkdirSync(path.dirname(schemaPath), { recursive: true });
     fs.copyFileSync(
       path.join(process.cwd(), 'knowledge/product/governance/knowledge-sync-rules.json'),
       rulesPath
+    );
+    fs.copyFileSync(
+      path.join(process.cwd(), 'knowledge/product/schemas/knowledge-sync-rules.schema.json'),
+      schemaPath
     );
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.KYBERION_REASONING_RETRY_BASE_MS = '0';

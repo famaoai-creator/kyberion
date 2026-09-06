@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { uxText } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
+import { parseAgentLogsResponse } from '../lib/agent-logs-response';
 
 type TerminalLine = { ts?: number | string; type?: string; content?: string };
 
@@ -31,9 +32,13 @@ export function LiveTerminalDrawer({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'logs', agentId, limit: 2000 }),
     });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || 'terminal log load failed');
-    setLines(payload.logs || []);
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error('terminal log load failed');
+    const parsed = parseAgentLogsResponse(payload);
+    if (!parsed || parsed.agentId !== agentId) {
+      throw new Error('terminal log response was invalid');
+    }
+    setLines(parsed.logs);
   }, [agentId]);
 
   React.useEffect(() => {
@@ -66,8 +71,7 @@ export function LiveTerminalDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'ask', agentId, query: prompt.trim(), itemId }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || 'steering failed');
+      if (!response.ok) throw new Error('steering failed');
       setPrompt('');
       await refresh();
       setError(null);
@@ -90,8 +94,7 @@ export function LiveTerminalDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'mission_control', missionId, operation }),
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || `${operation} failed`);
+      if (!response.ok) throw new Error(`${operation} failed`);
       setError(null);
       await refresh();
     } catch (err) {

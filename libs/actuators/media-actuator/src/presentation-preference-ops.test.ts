@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeExistsSync, safeReadFile, safeRmSync } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { handleAction } from './index.js';
 
 describe('media presentation preference ownership', () => {
@@ -56,6 +63,84 @@ describe('media presentation preference ownership', () => {
       );
     } finally {
       if (safeExistsSync(registryPath)) safeRmSync(registryPath, { force: true });
+    }
+  });
+
+  it('rejects profile and registry paths outside the repository', async () => {
+    const { registerPresentationPreferenceProfileOp } =
+      await import('./presentation-preference-ops.js');
+    const profile = {
+      kind: 'presentation-preference-profile',
+      profile_id: 'boundary-profile',
+      scope: 'default',
+      theme_selection_policy: { decision_mode: 'ask_when_uncertain', ask_user_when: [] },
+      brief_question_sets: [],
+      theme_sets: [],
+    } as any;
+
+    expect(() =>
+      registerPresentationPreferenceProfileOp({
+        profile_path: '/tmp/external-presentation-profile.json',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(() =>
+      registerPresentationPreferenceProfileOp({
+        profile,
+        registry_path: '/tmp/external-presentation-registry.json',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a profile path that is not a regular file', async () => {
+    const directory = pathResolver.sharedTmp('actuators/media-actuator/profile-directory');
+    safeMkdir(directory, { recursive: true });
+
+    try {
+      const { registerPresentationPreferenceProfileOp } =
+        await import('./presentation-preference-ops.js');
+      expect(() =>
+        registerPresentationPreferenceProfileOp({
+          profile_path: pathResolver.toRepoRelative(directory),
+        })
+      ).toThrow('profile_path must be a regular file');
+    } finally {
+      if (safeExistsSync(directory)) safeRmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('validates inline profiles and profile files before registry mutation', async () => {
+    const registryPath = pathResolver.sharedTmp(
+      'actuators/media-actuator/invalid-presentation-preference-registry.json'
+    );
+    const profilePath = pathResolver.sharedTmp(
+      'actuators/media-actuator/invalid-presentation-preference-profile.json'
+    );
+    const { registerPresentationPreferenceProfileOp } =
+      await import('./presentation-preference-ops.js');
+
+    try {
+      expect(() =>
+        registerPresentationPreferenceProfileOp({
+          registry_path: pathResolver.toRepoRelative(registryPath),
+          profile: {
+            kind: 'presentation-preference-profile',
+            profile_id: '',
+            brief_question_sets: [],
+            theme_sets: [],
+          } as never,
+        })
+      ).toThrow(/Invalid catalog presentation-preference-profile/);
+
+      safeWriteFile(profilePath, JSON.stringify({ kind: 'presentation-preference-profile' }));
+      expect(() =>
+        registerPresentationPreferenceProfileOp({
+          profile_path: pathResolver.toRepoRelative(profilePath),
+        })
+      ).toThrow(/Invalid catalog presentation-preference-profile/);
+      expect(safeExistsSync(registryPath)).toBe(false);
+    } finally {
+      if (safeExistsSync(registryPath)) safeRmSync(registryPath, { force: true });
+      if (safeExistsSync(profilePath)) safeRmSync(profilePath, { force: true });
     }
   });
 });

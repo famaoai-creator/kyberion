@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeRmSync } from './index.js';
+import { pathResolver, safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './index.js';
 import {
   advertiseMeshCapabilities,
   expireMeshPresence,
@@ -114,6 +114,55 @@ describe('mesh-peer-directory', () => {
       expires_at: '2099-06-24T00:06:00.000Z',
     });
     expect(resolved?.capabilities).toHaveLength(1);
+  });
+
+  it('fails closed when a tenant registry contains malformed JSONL', () => {
+    registerMeshPeer({
+      peer_id: 'peer-a1',
+      tenant_id: 'tenant-acme',
+      endpoint_ref: 'mesh://peer-a1.local',
+      key_ref: 'vault://mesh/peer-a1/key',
+      authority_role: 'infrastructure_sentinel',
+    });
+    const registrationsPath = path.join(
+      TEST_RUNTIME_ROOT_ABS,
+      'tenants/tenant-acme/registrations.jsonl'
+    );
+    safeWriteFile(registrationsPath, '{not-json}\n');
+
+    expect(() => resolveMeshPeer('tenant-acme', 'peer-a1')).toThrow();
+  });
+
+  it('rejects a tenant runtime directory that is replaced by a symbolic link', () => {
+    const targetDir = pathResolver.sharedTmp(`mesh-hub-read-target-${process.pid}`);
+    const tenantDir = path.join(TEST_RUNTIME_ROOT_ABS, 'tenants/tenant-acme');
+    safeMkdir(targetDir, { recursive: true });
+    safeWriteFile(
+      path.join(targetDir, 'registrations.jsonl'),
+      JSON.stringify({ peer_id: 'peer-a1', tenant_id: 'tenant-acme', status: 'enrolled' }) + '\n'
+    );
+    safeRmSync(tenantDir, { recursive: true, force: true });
+    safeSymlinkSync(targetDir, tenantDir, 'dir');
+    try {
+      expect(() => resolveMeshPeer('tenant-acme', 'peer-a1')).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(tenantDir, { recursive: true, force: true });
+      safeRmSync(targetDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a peer record file that is replaced by a symbolic link', () => {
+    const tenantDir = path.join(TEST_RUNTIME_ROOT_ABS, 'tenants/tenant-acme');
+    const targetPath = path.join(TEST_RUNTIME_ROOT_ABS, 'registrations-target.jsonl');
+    const linkedPath = path.join(tenantDir, 'registrations.jsonl');
+    safeMkdir(tenantDir, { recursive: true });
+    safeWriteFile(
+      targetPath,
+      JSON.stringify({ peer_id: 'peer-a1', tenant_id: 'tenant-acme', status: 'enrolled' }) + '\n'
+    );
+    safeSymlinkSync(targetPath, linkedPath);
+
+    expect(() => resolveMeshPeer('tenant-acme', 'peer-a1')).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
   it('excludes stale heartbeats and tenant mismatches from eligibility', () => {

@@ -21,7 +21,7 @@ For repo-local paths, the reviewer should verify the file or directory is presen
 ```bash
 pnpm run validate
 pnpm check -- --scope full --only production-evidence-status
-pnpm run check:production-evidence-complete
+pnpm run check -- --scope release --only production-evidence-complete
 ```
 
 `check:production-evidence-status` is the daily status check and succeeds while evidence is pending. `check:production-evidence-complete` is the release-promotion gate and must fail until every item is reviewed and `verified`.
@@ -91,5 +91,5 @@ After evidence review:
 1. Update `knowledge/product/governance/production-evidence-register.json`.
 2. Mirror the status in `docs/developer/PRODUCTION_EVIDENCE_REGISTER.ja.md`.
 3. Run `pnpm check -- --scope full --only production-evidence-status`.
-4. Run `pnpm run check:production-evidence-complete` only when all items are expected to be verified.
+4. Run `pnpm run check -- --scope release --only production-evidence-complete` only when all items are expected to be verified.
 5. Update `docs/developer/PRODUCTION_RELEASE_GATE_AUDIT.ja.md` if the release decision changes.

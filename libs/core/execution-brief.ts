@@ -15,6 +15,7 @@ import type { GuidedCoordinationBrief } from './src/types/guided-coordination-br
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import { resolveInputBindings, type InputBinding } from './input-binding.js';
 import { type WorkflowExecutionShape } from './execution-shape.js';
+import { clamp } from './foundation/text.js';
 
 const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/actuator-execution-brief.schema.json'
@@ -38,6 +39,11 @@ export interface ExecutionBriefSeed {
   contextualFrame?: ContextualIntentFrame;
   approvalSystemHint?: string;
   approvalScopeHint?: string;
+}
+
+function clampConfidence(value: unknown, fallback = 0.65): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return clamp(value, 0, 1);
 }
 
 export interface ExecutionBriefQuestion {
@@ -68,11 +74,6 @@ function ensureExecutionBriefValidator(): ValidateFunction {
   if (executionBriefValidateFn) return executionBriefValidateFn;
   executionBriefValidateFn = compileSchema(EXECUTION_BRIEF_SCHEMA_PATH);
   return executionBriefValidateFn;
-}
-
-function clampConfidence(value: unknown, fallback = 0.65): number {
-  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
-  return Math.min(1, Math.max(0, value));
 }
 
 function isMeetingRequest(text: string): boolean {

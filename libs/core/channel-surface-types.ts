@@ -11,6 +11,7 @@ import type { A2UIMessage } from './a2ui.js';
 import type { AgentContextMode } from './context-boundary.js';
 import type { AgentRoutingDecision } from './intent-contract.js';
 import type { IntentResolutionContract } from './intent-resolution-contract.js';
+import type { SupportedLocale } from './locale-normalize.js';
 import type {
   ExecutionFeedbackInput,
   ExecutionFeedbackRecord,
@@ -334,7 +335,8 @@ export interface BaseSurfaceMetadata {
   channel: string;
   threadTs: string;
   scope?: EventScope;
-  [key: string]: any;
+  /** Provider-specific metadata must be narrowed by the provider adapter. */
+  [key: string]: unknown;
 }
 
 export interface SlackSurfaceMetadata extends BaseSurfaceMetadata {
@@ -382,6 +384,7 @@ interface SurfaceConversationInputBase {
   agentId: string;
   query: string;
   senderAgentId: string;
+  locale?: SupportedLocale;
   correlationId?: string;
   surfaceText?: string;
   attachments?: SurfaceConversationAttachment[];
@@ -402,6 +405,7 @@ export type SurfaceConversationInput = SurfaceConversationInputBase & {
 
 interface SurfaceConversationMessageInputBase {
   text: string;
+  locale?: SupportedLocale;
   surfaceText?: string;
   attachments?: SurfaceConversationAttachment[];
   correlationId?: string;

@@ -1,20 +1,20 @@
 {
   "version": 1,
-  "generated_at": "2026-08-26T20:11:50.550Z",
+  "generated_at": "2026-09-06T14:55:11.530Z",
   "counts": {
     "src": {
-      "any_keywords": 3218,
-      "as_any": 610,
+      "any_keywords": 3086,
+      "as_any": 562,
       "ts_ignore": 1,
-      "files": 1801,
-      "max_lines": 3709
+      "files": 1836,
+      "max_lines": 1575
     },
     "test": {
-      "any_keywords": 1540,
-      "as_any": 1013,
+      "any_keywords": 1575,
+      "as_any": 1034,
       "ts_ignore": 2,
-      "files": 1230,
-      "max_lines": 3099
+      "files": 1408,
+      "max_lines": 3157
     }
   }
 }

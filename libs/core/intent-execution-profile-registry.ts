@@ -1,10 +1,11 @@
-import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchema } from './foundation/ajv.js';
-import { loadJson } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 const INTENT_EXECUTION_PROFILE_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/intent-execution-profile-registry.schema.json'
+);
+const INTENT_EXECUTION_PROFILE_REGISTRY_PATH = pathResolver.knowledge(
+  'product/governance/intent-execution-profile-registry.json'
 );
 
 export type IntentExecutionProfileStatus = 'active' | 'experimental' | 'conceptual' | 'deprecated';
@@ -64,40 +65,14 @@ export interface IntentExecutionProfileResolutionHints {
   runtime_context?: Record<string, unknown>;
 }
 
-let registryCache: IntentExecutionProfileRegistryFile | null = null;
-let registryValidateFn: ValidateFunction | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (registryValidateFn) return registryValidateFn;
-  registryValidateFn = compileSchema(INTENT_EXECUTION_PROFILE_REGISTRY_SCHEMA_PATH);
-  return registryValidateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
+const intentExecutionProfileCatalog = defineCatalog<IntentExecutionProfileRegistryFile>({
+  id: 'intent-execution-profile-registry',
+  path: INTENT_EXECUTION_PROFILE_REGISTRY_PATH,
+  schema: INTENT_EXECUTION_PROFILE_REGISTRY_SCHEMA_PATH,
+});
 
 export function loadIntentExecutionProfileRegistry(): IntentExecutionProfileRegistryFile {
-  if (registryCache) return registryCache;
-  const filePath = pathResolver.knowledge(
-    'product/governance/intent-execution-profile-registry.json'
-  );
-  const source = loadJson<IntentExecutionProfileRegistryFile>(
-    filePath
-  ) as IntentExecutionProfileRegistryFile & {
-    $schema?: string;
-  };
-  const { $schema: _schema, ...parsed } = source;
-  const validate = ensureValidator();
-  if (!validate(parsed)) {
-    throw new Error(
-      `Invalid intent-execution-profile-registry: ${errorsFrom(validate).join('; ')}`
-    );
-  }
-  registryCache = parsed;
-  return registryCache;
+  return intentExecutionProfileCatalog.load();
 }
 
 function statusRank(status: IntentExecutionProfileStatus): number {
@@ -340,8 +315,4 @@ export function summarizeRelevantExecutionProfilesForIntentIdsCompact(
       return `- ${profile.profile_id} [${profile.status}] default=${profile.default_for_intent ? 'yes' : 'no'} bundle=${bundle} toolsets=${toolsets}${providerBits ? ` provider=${providerBits}` : ''}`;
     })
     .join('\n');
-}
-
-export function resetIntentExecutionProfileRegistryCache(): void {
-  registryCache = null;
 }

@@ -2,6 +2,8 @@
  * Tests for cowork-health-check.ts (Phase 5 — L6 baseline layer)
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── vi.hoisted ────────────────────────────────────────────────────────────────
@@ -11,8 +13,30 @@ const { mockSafeExistsSync, mockSafeReadFile } = vi.hoisted(() => ({
 }));
 
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   safeExistsSync: mockSafeExistsSync,
   safeReadFile: mockSafeReadFile,
+  safeLstat: () => ({ isFile: () => true }),
+}));
+
+vi.mock('./foundation/json.js', () => ({
+  readJson: (filePath: string) => JSON.parse(String(mockSafeReadFile(filePath))),
+}));
+
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: <T>(filePath: string) => JSON.parse(String(mockSafeReadFile(filePath))) as T,
+    loadJsonIfPresent: <T>(filePath: string) => {
+      if (!mockSafeExistsSync(filePath)) return null;
+      return JSON.parse(String(mockSafeReadFile(filePath))) as T;
+    },
+    appendFile: () => undefined,
+    exists: (filePath: string) => mockSafeExistsSync(filePath),
+    readFile: (filePath: string) => String(mockSafeReadFile(filePath)),
+    stat: () => ({ mtimeMs: 0, size: 1 }),
+    writeFile: () => undefined,
+  }),
+  registerFoundationIo: vi.fn(),
 }));
 
 vi.mock('./path-resolver.js', () => ({
@@ -110,6 +134,12 @@ describe('runCoworkHealthCheck()', () => {
     const staleDate = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(); // 30h ago
     mockSafeExistsSync.mockImplementation(allPresent);
     mockSafeReadFile.mockImplementation((p: string) => {
+      if (p.includes('cowork-sync-state.schema.json')) {
+        return fs.readFileSync(
+          path.resolve('knowledge/product/schemas/cowork-sync-state.schema.json'),
+          'utf8'
+        );
+      }
       if (p.includes('cowork-sync-state')) {
         return JSON.stringify({ ingested: {}, supplied: {}, last_sync_at: staleDate });
       }
@@ -128,6 +158,12 @@ describe('runCoworkHealthCheck()', () => {
     const freshDate = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(); // 2h ago
     mockSafeExistsSync.mockImplementation(allPresent);
     mockSafeReadFile.mockImplementation((p: string) => {
+      if (p.includes('cowork-sync-state.schema.json')) {
+        return fs.readFileSync(
+          path.resolve('knowledge/product/schemas/cowork-sync-state.schema.json'),
+          'utf8'
+        );
+      }
       if (p.includes('cowork-sync-state')) {
         return JSON.stringify({ ingested: {}, supplied: {}, last_sync_at: freshDate });
       }

@@ -85,4 +85,24 @@ describe('LiveSyncScheduler', () => {
     expect(scheduler.revision).toBe(5);
     expect(onSnapshot).toHaveBeenCalledTimes(2);
   });
+
+  it('does not apply a snapshot that finishes after the scheduler stopped', async () => {
+    let resolveSnapshot!: (snapshot: { items: string[] }) => void;
+    const onSnapshot = vi.fn();
+    const scheduler = new LiveSyncScheduler({
+      fetchSnapshot: () =>
+        new Promise<{ items: string[] }>((resolve) => {
+          resolveSnapshot = resolve;
+        }),
+      onSnapshot,
+    });
+
+    const refresh = scheduler.refresh();
+    scheduler.stop();
+    resolveSnapshot({ items: ['late'] });
+    await refresh;
+
+    expect(onSnapshot).not.toHaveBeenCalled();
+    expect(scheduler.snapshot).toBeUndefined();
+  });
 });

@@ -1,16 +1,16 @@
+import { discoverProviders } from '@agent/core/provider-discovery';
+import { listDemotedProviders } from '@agent/core/provider-health-view';
+import { listAgentRuntimesViaDaemon } from '@agent/core/agent-runtime-supervisor-client';
+import { listDaemonHeartbeatStatuses } from '@agent/core/daemon-heartbeat';
 import {
-  discoverProviders,
-  listDemotedProviders,
-  listAgentRuntimesViaDaemon,
-  listDaemonHeartbeatStatuses,
   listSurfaceOutboxMessages,
   listSurfaceDeadLetters,
-  buildAgentCollaborationProjection,
-  currentScope,
-  pathResolver,
-  type AgentRuntimeSupervisorSnapshot,
-  type SurfaceAsyncChannel,
-} from '@agent/core';
+} from '@agent/core/surface-coordination-store';
+import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
+import { currentScope } from '@agent/core/scope-context';
+import { pathResolver } from '@agent/core/path-resolver';
+import type { AgentRuntimeSupervisorSnapshot } from '@agent/core/agent-runtime-supervisor-client';
+import type { SurfaceAsyncChannel } from '@agent/core/channel-surface-types';
 import { statusColor, theme } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { PanelViewModel } from './types.js';

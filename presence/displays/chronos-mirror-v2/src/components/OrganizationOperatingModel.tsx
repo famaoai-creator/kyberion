@@ -15,6 +15,7 @@ import {
 import * as React from 'react';
 import { useChronosLocale } from '../lib/hooks';
 import { uxMessage, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
+import { parseOrganizationOperatingModelResponse } from '../lib/organization-operating-model-response';
 
 type OrganizationHealth = 'healthy' | 'degraded' | 'critical' | 'unknown';
 type OrganizationPriority = 'high' | 'medium' | 'low';
@@ -177,12 +178,9 @@ export function OrganizationOperatingModel({
         `/api/organization-operating-model${params.size ? `?${params.toString()}` : ''}`,
         { cache: 'no-store' }
       );
-      const payload = (await response.json()) as {
-        view?: OrganizationOperatingModelView;
-        error?: string;
-      };
-      if (!response.ok || !payload.view)
-        throw new Error(payload.error || `organization ${response.status}`);
+      const rawPayload: unknown = await response.json().catch(() => null);
+      const payload = parseOrganizationOperatingModelResponse(rawPayload);
+      if (!response.ok || !payload) throw new Error(`organization ${response.status}`);
       setView(payload.view);
       setError(null);
     } catch (err) {

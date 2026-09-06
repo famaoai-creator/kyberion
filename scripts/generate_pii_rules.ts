@@ -1,11 +1,8 @@
 #!/usr/bin/env node
-import { pathResolver } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { loadPiiRules } from '@agent/core/pii-scrubber';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
-type SourceRule = { id?: string; name?: string; regex?: string };
-
-const sourcePath = pathResolver.knowledge('product/governance/knowledge-sync-rules.json');
 // Every extension that sends observed content to an on-device model shares the
 // same redaction boundary; each one gets its own copy because MV3 extensions
 // cannot load scripts from outside their own directory.
@@ -15,14 +12,8 @@ const outputPaths = [
 ];
 
 function loadRules(): Array<{ id: string; regex: string }> {
-  const source = readJson<{
-    security?: { pii_patterns?: SourceRule[] };
-  }>(sourcePath);
-  const rules = source.security?.pii_patterns;
-  if (!Array.isArray(rules) || rules.length === 0)
-    throw new Error('knowledge-sync-rules.json has no security.pii_patterns');
-  return rules
-    .map((rule) => ({ id: String(rule.id || rule.name || ''), regex: String(rule.regex || '') }))
+  return loadPiiRules()
+    .map((rule) => ({ id: rule.id, regex: rule.pattern }))
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 

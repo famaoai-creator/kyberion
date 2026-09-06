@@ -8,9 +8,10 @@
  */
 import * as path from 'node:path';
 import * as ts from 'typescript';
+import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { safeExistsSync, safeLstat, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const SOURCE_ROOT = pathResolver.rootResolve('libs/core');
 const GRAPH_PATH = pathResolver.rootResolve('docs/developer/CAPABILITY_SEAMS.md');
@@ -23,6 +24,13 @@ interface SeamDeclaration {
 }
 
 const SEAM_CONSTRUCTORS = new Set(['createSeam', 'defineSeam']);
+
+export function readCapabilitySeamsTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function collectSourceFiles(directory: string): string[] {
   const files: string[] = [];
@@ -59,7 +67,7 @@ function literalString(node: ts.Expression | undefined): string | undefined {
 function scanDeclarations(): SeamDeclaration[] {
   const declarations: SeamDeclaration[] = [];
   for (const file of collectSourceFiles(SOURCE_ROOT)) {
-    const source = String(safeReadFile(file, { encoding: 'utf8' }) || '');
+    const source = readCapabilitySeamsTextFile(file);
     const sourceFile = ts.createSourceFile(
       file,
       source,
@@ -95,7 +103,7 @@ function check(): string[] {
   const findings: string[] = [];
   const declarations = scanDeclarations();
   const byKey = new Map<string, SeamDeclaration>();
-  const graph = String(safeReadFile(GRAPH_PATH, { encoding: 'utf8' }) || '');
+  const graph = readCapabilitySeamsTextFile(GRAPH_PATH);
   // Prettier pads Markdown table cells to a common width, so compare the
   // trimmed first cell instead of relying on the exact substring
   // `| key |`.
@@ -141,7 +149,7 @@ export const runCheckCapabilitySeamsAst = defineScript({
   run(context): void {
     const findings = check();
     if (findings.length > 0) {
-      throw new Error(findings.join('; '));
+      throw new ScriptExitError(1, findings.map((finding) => `- ${finding}`).join('\n'));
     }
     context.print(`[check:capability-seams-ast] OK (${scanDeclarations().length} declarations)`);
   },

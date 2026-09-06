@@ -35,6 +35,10 @@ describe('knowledge-slices: manifest loading (fail-open)', () => {
     expect(loadKnowledgeSlicesFile(missing)).toBeNull();
   });
 
+  it('returns null for a manifest path outside the repository root', () => {
+    expect(loadKnowledgeSlicesFile('../../outside-knowledge-slices.json')).toBeNull();
+  });
+
   it('returns null and warns once for a JSON-parse-invalid manifest', () => {
     const p = writeFixture('broken.json', '{ not valid json');
     const warnSpy = vitestSpyConsoleWarn();

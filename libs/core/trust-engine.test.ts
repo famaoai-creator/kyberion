@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { trustEngine } from './trust-engine.js';
+import { loadPersistedTrustLedger, trustEngine } from './trust-engine.js';
 
 describe('trust-engine', () => {
   it('initializes, records events, and computes execution rings', () => {
@@ -91,5 +91,9 @@ describe('trust-engine', () => {
     trustEngine.loadPersisted(tempRoot);
     expect(trustEngine.getScore(reloadedAgentId)?.score).toBe(930);
     expect(trustEngine.getRing(reloadedAgentId)).toBe(1);
+  });
+
+  it('rejects an external trust ledger root before loading', () => {
+    expect(() => loadPersistedTrustLedger('/tmp')).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });

@@ -1,6 +1,14 @@
 import {
-  loadJson,
-  logger,
+  clamp,
+  defineCatalog,
+  isRecord,
+  isVitestProcess,
+  nowIso,
+  readJson,
+} from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import {
+  assertSafeRepositoryPath,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
@@ -8,12 +16,12 @@ import {
   safeReaddir,
   safeRmSync,
   safeExec,
-  secureFetch,
-  pathResolver,
-  normalizeBrowserPipelineOp,
-  getOpInputContract,
-  validateOpInput,
-} from '@agent/core';
+  safeLstat,
+} from '@agent/core/secure-io';
+import { secureFetch } from '@agent/core/network';
+import { pathResolver } from '@agent/core/path-resolver';
+import { normalizeBrowserPipelineOp } from '@agent/core/op-vocabulary';
+import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
 import {
   chromium,
   type Browser,
@@ -24,6 +32,8 @@ import {
 import * as path from 'node:path';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
+import { completeBrowserOperatorApproval } from './browser-approval-records.js';
+import { parseChromeCdpVersionResponse } from './browser-cdp-response.js';
 
 export interface BrowserSnapshotElement {
   ref: string;
@@ -84,6 +94,7 @@ interface BrowserRecordedAction {
   selector?: string;
   text?: string;
   key?: string;
+  fallback_strategy?: string;
   element_name?: string;
   element_role?: string | null;
   content_excerpt?: string;
@@ -179,7 +190,31 @@ const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const BROWSER_SNAPSHOT_DIR = path.join(BROWSER_RUNTIME_DIR, 'snapshots');
 const BROWSER_ACTION_TRAIL_DIR = path.join(BROWSER_RUNTIME_DIR, 'action-trails');
 const BROWSER_APPROVAL_DIR = path.join(BROWSER_RUNTIME_DIR, 'approvals');
+const BROWSER_RUNTIME_SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-runtime-session.schema.json'
+);
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
+
+function safeBrowserRuntimePath(
+  filePath: string,
+  options: { allowMissingLeaf?: boolean } = { allowMissingLeaf: true }
+): string {
+  return assertSafeRepositoryPath(filePath, options);
+}
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function browserSessionArtifactPath(directory: string, sessionId: string, suffix: string): string {
+  const safeSessionId = String(sessionId || 'default').replace(/[^a-zA-Z0-9._-]/g, '_');
+  return safeBrowserRuntimePath(path.join(directory, `${safeSessionId}${suffix}`));
+}
 
 function createBrowserRuntime(
   context: BrowserContext,
@@ -228,7 +263,7 @@ function attachPageObservers(runtime: BrowserRuntime, page: Page): void {
       tab_id: tabId,
       type: msg.type(),
       text: msg.text(),
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.consoleEvents = runtime.consoleEvents.slice(-200);
   });
@@ -238,7 +273,7 @@ function attachPageObservers(runtime: BrowserRuntime, page: Page): void {
       method: request.method(),
       url: request.url(),
       resourceType: request.resourceType(),
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.networkEvents = runtime.networkEvents.slice(-200);
   });
@@ -250,17 +285,12 @@ function getActivePage(runtime: BrowserRuntime): Page {
   return page;
 }
 
-function summarizeRecentActions(trail: any): BrowserSessionMetadata['recent_actions'] {
-  const actions = Array.isArray(trail)
-    ? (trail as Array<{
-        op: string;
-        kind: 'control' | 'capture' | 'apply';
-        tab_id?: string;
-        ref?: string;
-        selector?: string;
-        ts: string;
-      }>)
-    : [];
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function summarizeRecentActions(trail: unknown): BrowserSessionMetadata['recent_actions'] {
+  const actions = parseRecordedActions(trail);
   return actions.slice(-8).map((action) => ({
     op: action.op,
     kind: action.kind,
@@ -340,9 +370,14 @@ function assertNavigationAllowed(
 }
 
 function loadBrowserSessionMetadata(filePath: string): BrowserSessionMetadata | null {
-  if (!safeExistsSync(filePath)) return null;
+  const safePath = safeBrowserRuntimePath(filePath);
+  if (!isExistingRegularFile(safePath)) return null;
   try {
-    return loadJson<BrowserSessionMetadata>(filePath);
+    return defineCatalog<BrowserSessionMetadata>({
+      id: 'browser-runtime-session',
+      path: safePath,
+      schema: BROWSER_RUNTIME_SESSION_SCHEMA_PATH,
+    }).load();
   } catch {
     return null;
   }
@@ -352,13 +387,14 @@ async function waitForCdpEndpoint(
   userDataDir: string,
   timeoutMs = 5_000
 ): Promise<{ cdpUrl: string; cdpPort: number } | null> {
-  if (process.env.VITEST) return null;
+  if (isVitestProcess()) return null;
   const filePath = path.join(userDataDir, 'DevToolsActivePort');
+  const safeFilePath = safeBrowserRuntimePath(filePath);
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    if (safeExistsSync(filePath)) {
+    if (isExistingRegularFile(safeFilePath)) {
       try {
-        const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '').trim();
+        const raw = String(safeReadFile(safeFilePath, { encoding: 'utf8' }) || '').trim();
         const [portLine] = raw.split(/\r?\n/);
         const cdpPort = Number(portLine);
         if (Number.isFinite(cdpPort) && cdpPort > 0) {
@@ -395,16 +431,13 @@ async function probeChromeCdpPort(
   timeoutMs = 600
 ): Promise<ChromeCdpEndpoint | null> {
   try {
-    const payload = await secureFetch<Record<string, unknown>>({
+    const payload = await secureFetch<unknown>({
       method: 'GET',
       url: `http://127.0.0.1:${port}/json/version`,
       timeout: timeoutMs,
       kyberion_allow_local_network: true,
     });
-    if (!payload || typeof payload !== 'object') return null;
-    const webSocketDebuggerUrl = (payload as any).webSocketDebuggerUrl;
-    const browser = (payload as any).Browser;
-    if (typeof webSocketDebuggerUrl === 'string' || typeof browser === 'string') {
+    if (parseChromeCdpVersionResponse(payload)) {
       return {
         cdpUrl: `http://127.0.0.1:${port}`,
         cdpPort: port,
@@ -429,9 +462,9 @@ async function discoverChromeCdpEndpoint(): Promise<ChromeCdpEndpoint | null> {
     for (const port of parseChromeRemoteDebuggingPorts(psOutput)) {
       candidatePorts.add(port);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.info(
-      `Could not inspect local process list for Chrome CDP discovery: ${error?.message || String(error)}`
+      `Could not inspect local process list for Chrome CDP discovery: ${errorMessage(error)}`
     );
   }
 
@@ -446,7 +479,11 @@ async function discoverChromeCdpEndpoint(): Promise<ChromeCdpEndpoint | null> {
 async function collectRecordedVideoPaths(runtime: BrowserRuntime): Promise<string[]> {
   const collected = new Set<string>();
   for (const page of runtime.tabs.values()) {
-    const videoHandle = typeof (page as any).video === 'function' ? (page as any).video() : null;
+    const pageWithOptionalVideo = page as Page & {
+      video?: () => { path?: () => Promise<string> } | null;
+    };
+    const videoHandle =
+      typeof pageWithOptionalVideo.video === 'function' ? pageWithOptionalVideo.video() : null;
     if (!videoHandle || typeof videoHandle.path !== 'function') continue;
     try {
       const videoPath = await videoHandle.path();
@@ -496,28 +533,138 @@ async function resetBrowserRuntimeLeasesForTest(): Promise<void> {
 }
 
 function saveBrowserSessionMetadata(filePath: string, metadata: BrowserSessionMetadata): void {
-  safeWriteFile(filePath, JSON.stringify(metadata, null, 2));
+  safeWriteFile(safeBrowserRuntimePath(filePath), JSON.stringify(metadata, null, 2));
 }
 
 function trailPath(sessionId: string): string {
-  return path.join(
-    BROWSER_ACTION_TRAIL_DIR,
-    `${String(sessionId || 'default').replace(/[^a-zA-Z0-9._-]/g, '_')}.json`
-  );
+  return browserSessionArtifactPath(BROWSER_ACTION_TRAIL_DIR, sessionId, '.json');
 }
+
+function optionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return value === undefined ? undefined : typeof value === 'string' ? value : undefined;
+}
+
+function parseRecordedAction(value: unknown): BrowserRecordedAction | null {
+  if (!isRecord(value)) return null;
+
+  const kind = value.kind;
+  const op = optionalString(value, 'op');
+  const ts = optionalString(value, 'ts');
+  if (
+    (kind !== 'control' && kind !== 'capture' && kind !== 'apply') ||
+    !op?.trim() ||
+    !ts?.trim() ||
+    !Number.isFinite(Date.parse(ts))
+  ) {
+    return null;
+  }
+
+  const classificationValue = value.classification;
+  const classification: BrowserRecordedAction['classification'] | null =
+    classificationValue === undefined
+      ? undefined
+      : classificationValue === 'user_input' || classificationValue === 'secret_ref'
+        ? classificationValue
+        : null;
+  if (classification === null) return null;
+  const resumeStatusValue = value.resume_status;
+  const resumeStatus: BrowserRecordedAction['resume_status'] | null =
+    resumeStatusValue === undefined
+      ? undefined
+      : resumeStatusValue === 'pending' ||
+          resumeStatusValue === 'approved' ||
+          resumeStatusValue === 'rejected' ||
+          resumeStatusValue === 'expired'
+        ? resumeStatusValue
+        : null;
+  if (resumeStatus === null) return null;
+
+  const stringFields = [
+    'tab_id',
+    'url',
+    'title',
+    'ref',
+    'selector',
+    'text',
+    'key',
+    'element_name',
+    'content_excerpt',
+    'secret_ref',
+    'approval_request_id',
+    'fallback_strategy',
+  ];
+  for (const field of stringFields) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') return null;
+  }
+  if (
+    value.element_role !== undefined &&
+    value.element_role !== null &&
+    typeof value.element_role !== 'string'
+  ) {
+    return null;
+  }
+  if (value.redacted !== undefined && typeof value.redacted !== 'boolean') return null;
+
+  return {
+    kind,
+    op,
+    ts,
+    ...(optionalString(value, 'tab_id') !== undefined ? { tab_id: value.tab_id as string } : {}),
+    ...(optionalString(value, 'url') !== undefined ? { url: value.url as string } : {}),
+    ...(optionalString(value, 'title') !== undefined ? { title: value.title as string } : {}),
+    ...(optionalString(value, 'ref') !== undefined ? { ref: value.ref as string } : {}),
+    ...(optionalString(value, 'selector') !== undefined
+      ? { selector: value.selector as string }
+      : {}),
+    ...(optionalString(value, 'text') !== undefined ? { text: value.text as string } : {}),
+    ...(optionalString(value, 'key') !== undefined ? { key: value.key as string } : {}),
+    ...(optionalString(value, 'fallback_strategy') !== undefined
+      ? { fallback_strategy: value.fallback_strategy as string }
+      : {}),
+    ...(optionalString(value, 'element_name') !== undefined
+      ? { element_name: value.element_name as string }
+      : {}),
+    ...(value.element_role !== undefined
+      ? { element_role: value.element_role as string | null }
+      : {}),
+    ...(optionalString(value, 'content_excerpt') !== undefined
+      ? { content_excerpt: value.content_excerpt as string }
+      : {}),
+    ...(classification !== undefined ? { classification } : {}),
+    ...(optionalString(value, 'secret_ref') !== undefined
+      ? { secret_ref: value.secret_ref as string }
+      : {}),
+    ...(value.redacted !== undefined ? { redacted: value.redacted as boolean } : {}),
+    ...(optionalString(value, 'approval_request_id') !== undefined
+      ? { approval_request_id: value.approval_request_id as string }
+      : {}),
+    ...(resumeStatus !== undefined ? { resume_status: resumeStatus } : {}),
+  };
+}
+
+function parseRecordedActions(value: unknown): BrowserRecordedAction[] {
+  return Array.isArray(value)
+    ? value.flatMap((entry) => {
+        const parsed = parseRecordedAction(entry);
+        return parsed ? [parsed] : [];
+      })
+    : [];
+}
+
 function saveBrowserActionTrail(sessionId: string, trail: unknown[]): string {
-  if (!safeExistsSync(BROWSER_ACTION_TRAIL_DIR))
-    safeMkdir(BROWSER_ACTION_TRAIL_DIR, { recursive: true });
+  const safeDirectory = safeBrowserRuntimePath(BROWSER_ACTION_TRAIL_DIR);
+  if (!safeExistsSync(safeDirectory)) safeMkdir(safeDirectory, { recursive: true });
   const filePath = trailPath(sessionId);
-  safeWriteFile(filePath, JSON.stringify(Array.isArray(trail) ? trail.slice(-200) : [], null, 2));
+  safeWriteFile(filePath, JSON.stringify(parseRecordedActions(trail).slice(-200), null, 2));
   return filePath;
 }
 function loadBrowserActionTrail(sessionId: string): BrowserRecordedAction[] {
   const filePath = trailPath(sessionId);
-  if (!safeExistsSync(filePath)) return [];
+  if (!isExistingRegularFile(filePath)) return [];
   try {
-    const value = loadJson<unknown>(filePath);
-    return Array.isArray(value) ? value.slice(-200) : [];
+    const value = readJson(filePath);
+    return parseRecordedActions(value).slice(-200);
   } catch {
     return [];
   }
@@ -528,18 +675,18 @@ function saveFailureBundle(
   requestedPath?: string
 ): string {
   const safeSessionId = String(sessionId || 'default').replace(/[^a-zA-Z0-9._-]/g, '_');
-  const outPath = pathResolver.rootResolve(
-    requestedPath || `active/shared/tmp/browser/${safeSessionId}-failure-bundle.json`
+  const outPath = assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      requestedPath || `active/shared/tmp/browser/${safeSessionId}-failure-bundle.json`
+    ),
+    { allowMissingLeaf: true }
   );
   if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
   safeWriteFile(outPath, JSON.stringify(bundle, null, 2));
   return outPath;
 }
 function approvalPath(sessionId: string): string {
-  return path.join(
-    BROWSER_APPROVAL_DIR,
-    `${String(sessionId || 'default').replace(/[^a-zA-Z0-9._-]/g, '_')}.json`
-  );
+  return browserSessionArtifactPath(BROWSER_APPROVAL_DIR, sessionId, '.json');
 }
 function beginOperatorApproval(options: {
   sessionId: string;
@@ -547,14 +694,15 @@ function beginOperatorApproval(options: {
   continueFile: string;
   timeoutMs?: number;
 }) {
-  if (!safeExistsSync(BROWSER_APPROVAL_DIR)) safeMkdir(BROWSER_APPROVAL_DIR, { recursive: true });
+  const safeDirectory = safeBrowserRuntimePath(BROWSER_APPROVAL_DIR);
+  if (!safeExistsSync(safeDirectory)) safeMkdir(safeDirectory, { recursive: true });
   const request = {
     request_id: randomUUID(),
     session_id: options.sessionId,
     status: 'pending',
     message: options.message,
     continue_file: options.continueFile,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     timeout_ms: options.timeoutMs,
   };
   const filePath = approvalPath(options.sessionId);
@@ -566,24 +714,20 @@ function completeOperatorApproval(
   status: 'approved' | 'expired' | 'rejected'
 ): void {
   const filePath = approvalPath(sessionId);
-  let current: Record<string, unknown> = {};
-  if (safeExistsSync(filePath)) {
-    try {
-      current = loadJson<Record<string, unknown>>(filePath);
-    } catch {
-      // A corrupt approval artifact is replaced with a fresh terminal state.
-    }
-  }
+  const raw = isExistingRegularFile(filePath)
+    ? String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
+    : undefined;
   safeWriteFile(
     filePath,
-    JSON.stringify({ ...current, status, completed_at: new Date().toISOString() }, null, 2)
+    JSON.stringify(completeBrowserOperatorApproval(raw, sessionId, status, nowIso()), null, 2)
   );
 }
 
 function saveBrowserSessionSnapshot(sessionId: string, snapshot: BrowserSnapshot): void {
-  if (!safeExistsSync(BROWSER_SNAPSHOT_DIR)) safeMkdir(BROWSER_SNAPSHOT_DIR, { recursive: true });
+  const safeDirectory = safeBrowserRuntimePath(BROWSER_SNAPSHOT_DIR);
+  if (!safeExistsSync(safeDirectory)) safeMkdir(safeDirectory, { recursive: true });
   safeWriteFile(
-    path.join(BROWSER_SNAPSHOT_DIR, `${sessionId}.json`),
+    browserSessionArtifactPath(BROWSER_SNAPSHOT_DIR, sessionId, '.json'),
     JSON.stringify(snapshot, null, 2)
   );
 }
@@ -748,7 +892,7 @@ async function buildSnapshot(
     tab_id: tabId,
     url: page.url(),
     title: await page.title(),
-    captured_at: new Date().toISOString(),
+    captured_at: nowIso(),
     element_count: raw.elements.length,
     viewport: raw.viewport,
     focused_ref:
@@ -801,9 +945,13 @@ async function resolveSessionHandoff(
   }
 
   if (params.path) {
-    const filePath = pathResolver.rootResolve(resolve(params.path));
-    const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    return JSON.parse(content);
+    const filePath = assertSafeRepositoryPath(pathResolver.rootResolve(resolve(params.path)), {
+      allowMissingLeaf: true,
+    });
+    if (!isExistingRegularFile(filePath)) {
+      throw new Error(`import_session_handoff path must be an existing regular file: ${filePath}`);
+    }
+    return readJson(filePath);
   }
 
   if (params.handoff && typeof params.handoff === 'object') {
@@ -836,7 +984,7 @@ function findSnapshotElement(ctx: any, ref: string): BrowserSnapshotElement | un
 }
 
 function recordBrowserAction(ctx: any, action: Omit<BrowserRecordedAction, 'ts'>): any {
-  const trail = Array.isArray(ctx?.action_trail) ? ctx.action_trail : [];
+  const trail = parseRecordedActions(ctx?.action_trail);
   const sensitive =
     action.classification === 'secret_ref' ||
     action.op === 'fill_secret_ref' ||
@@ -849,9 +997,9 @@ function recordBrowserAction(ctx: any, action: Omit<BrowserRecordedAction, 'ts'>
       : text !== undefined
         ? { text }
         : {}),
-    ts: new Date().toISOString(),
+    ts: nowIso(),
   };
-  const max = Math.max(1, Math.min(2000, Number(ctx?.action_trail_max || 200)));
+  const max = clamp(Number(ctx?.action_trail_max || 200), 1, 2000);
   return {
     ...ctx,
     action_trail: [...trail, recorded].slice(-max),
@@ -860,8 +1008,7 @@ function recordBrowserAction(ctx: any, action: Omit<BrowserRecordedAction, 'ts'>
 
 function readRecordedActions(ctx: any, from?: string): BrowserRecordedAction[] {
   const candidate = from ? ctx?.[from] : ctx?.action_trail;
-  if (!Array.isArray(candidate)) return [];
-  return candidate as BrowserRecordedAction[];
+  return parseRecordedActions(candidate);
 }
 
 function renderPlaywrightSkeleton(
@@ -905,7 +1052,7 @@ function renderPlaywrightSkeleton(
     return validateOpInput('browser', op, input);
   };
 
-  for (const action of trail) {
+  for (const action of parseRecordedActions(trail)) {
     const op = normalizeBrowserPipelineOp(action.op);
     const validation = validateRecordedAction(op, action);
     if (!validation.valid) {
@@ -1043,7 +1190,7 @@ function renderPlaywrightSkeleton(
 
 function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): BrowserAction {
   const steps: PipelineStep[] = [];
-  for (const action of trail) {
+  for (const action of parseRecordedActions(trail)) {
     const op = normalizeBrowserPipelineOp(action.op);
     const contract = getOpInputContract('browser', op);
     const properties = contract?.schema?.properties;
@@ -1150,7 +1297,7 @@ async function closeBrowserSession(sessionId: string): Promise<boolean> {
     active_tab_id: lease.runtime.activeTabId,
     tab_count: lease.runtime.tabs.size,
     tabs: [],
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     lease_status: 'released',
     retained: false,
     cdp_url: lease.cdpUrl,
@@ -1195,8 +1342,10 @@ async function waitForOperatorContinue(options: {
     return;
   }
 
-  const continueFile =
-    options.continueFile || path.join(BROWSER_RUNTIME_DIR, `${options.sessionId}.continue`);
+  const continueFile = safeBrowserRuntimePath(
+    options.continueFile ||
+      browserSessionArtifactPath(BROWSER_RUNTIME_DIR, options.sessionId, '.continue')
+  );
   logger.info(`⏸️ [BROWSER] ${options.message}`);
   logger.info(`📄 [BROWSER] Waiting for continue file: ${continueFile}`);
   while (true) {
@@ -1292,9 +1441,9 @@ export const browserRuntimeHelpers = {
           cdpPort: persistedCdpPort || Number(new URL(persistedCdpUrl).port),
         });
         return context;
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.warn(
-          `⚠️ [BROWSER] Failed to reattach persisted session ${sessionId} via CDP: ${error?.message || String(error)}`
+          `⚠️ [BROWSER] Failed to reattach persisted session ${sessionId} via CDP: ${errorMessage(error)}`
         );
       }
     }
@@ -1390,7 +1539,7 @@ function cleanupExpiredBrowserRuntimeLeases(): void {
       active_tab_id: lease.runtime.activeTabId,
       tab_count: lease.runtime.tabs.size,
       tabs: [],
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
       video_output_dir: lease.videoDir,
       video_recording_pending: false,
       lease_status: 'expired',

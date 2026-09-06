@@ -1,18 +1,14 @@
 #!/usr/bin/env node
 /** KO-19: weekly tenant-scope reconciliation and steward-facing report. */
-import {
-  listTenantProfileSlugs,
-  pathResolver,
-  safeWriteFile,
-  sendOpsAlert,
-  withExecutionContext,
-  type ScopeContext,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
-import {
-  runKnowledgeValidationSweep,
-  proposeKnowledgeRankingWeightRecalculation,
-} from '@agent/core';
+import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeWriteFile } from '@agent/core/secure-io';
+import { sendOpsAlert } from '@agent/core/ops-alert';
+import { withExecutionContext } from '@agent/core/authority';
+import type { ScopeContext } from '@agent/core/scope-context';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
+import { proposeKnowledgeRankingWeightRecalculation } from '@agent/core/knowledge-weight-recalculation';
 import { buildPlan } from './migrate_physical_namespaces.js';
 import { scanKnowledgeScopeHealth, buildHealthAlert } from './watch_knowledge_scope_health.js';
 import { scan as scanKnowledgeScopeBoundaries } from './check_knowledge_scope_boundaries.js';
@@ -67,7 +63,7 @@ export async function reconcileKnowledgeScopes(): Promise<KnowledgeScopeReconcil
       )
     );
     const report: KnowledgeScopeReconciliationReport = {
-      generated_at: new Date().toISOString(),
+      generated_at: nowIso(),
       status:
         health.status === 'attention' ||
         validation.status === 'attention' ||
@@ -90,15 +86,16 @@ export async function reconcileKnowledgeScopes(): Promise<KnowledgeScopeReconcil
 
 export const runKnowledgeScopeReconciliation = defineScript({
   name: 'knowledge:scope-reconcile',
-  flags: [],
-  run: async ({ argv }) => {
+  flags: ['json', 'quiet'],
+  run: async ({ argv, json, quiet, print }) => {
     try {
       const report = await reconcileKnowledgeScopes();
-      if (argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
-      else
-        console.log(
+      if (json) print(report);
+      else {
+        print(
           `${report.status}: ${report.migration_plans.length} migration plans; report=${reportPath()}`
         );
+      }
       if (argv.includes('--alert') && report.status === 'attention') {
         const receipt = sendOpsAlert({
           ...buildHealthAlert(report.health),
@@ -111,7 +108,7 @@ export const runKnowledgeScopeReconciliation = defineScript({
           },
           dedupe_key: 'knowledge-scope-reconciliation',
         });
-        if (!argv.includes('--quiet')) console.warn(`ops alert: ${receipt.recorded_path}`);
+        if (!quiet) print(`ops alert: ${receipt.recorded_path}`);
       }
       if (argv.includes('--fail') && report.status !== 'healthy') {
         throw new ScriptExitError(1, '', true);

@@ -13,15 +13,36 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
   safeLstat: vi.fn(),
   safeReaddir: vi.fn(),
-  classifyError: vi.fn((err: any) => ({ category: 'unknown', message: String(err?.message || err) })),
+  assertSafeRepositoryPath: vi.fn((target: string) => target),
+  classifyError: vi.fn((err: any) => ({
+    category: 'unknown',
+    message: String(err?.message || err),
+  })),
   formatClassification: vi.fn((c: any) => JSON.stringify(c)),
 }));
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core/error-classifier', () => ({
   classifyError: mocks.classifyError,
   formatClassification: mocks.formatClassification,
+}));
+
+vi.mock('@agent/core/customer-resolver', () => ({
   customerResolver: mocks.customerResolver,
-  pathResolver: mocks.pathResolver,
+  activeCustomer: mocks.customerResolver.activeCustomer,
+}));
+
+vi.mock('@agent/core/path-resolver', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/path-resolver')>(
+    '@agent/core/path-resolver'
+  );
+  return {
+    ...actual,
+    pathResolver: { ...actual.pathResolver, rootDir: mocks.pathResolver.rootDir },
+  };
+});
+
+vi.mock('@agent/core/secure-io', () => ({
+  assertSafeRepositoryPath: mocks.assertSafeRepositoryPath,
   safeExistsSync: mocks.safeExistsSync,
   safeLstat: mocks.safeLstat,
   safeReaddir: mocks.safeReaddir,
@@ -73,7 +94,7 @@ describe('customer_list', () => {
     expect(mod.listCustomers()).toEqual([]);
   });
 
-  it('prints readiness in text mode', async () => {
+  it('formats readiness in text mode', async () => {
     const entries = [
       { slug: 'acme', path: 'customer/acme', active: true, ready: true, missing: [] },
       {
@@ -84,11 +105,10 @@ describe('customer_list', () => {
         missing: ['customer.json', 'vision.md'],
       },
     ];
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const mod = await import('./customer_list.js');
-    mod.printText(entries);
+    const output = mod.printText(entries);
 
-    expect(logSpy.mock.calls.map((call) => call[0])).toEqual([
+    expect(output).toEqual([
       '* acme\tready\tcustomer/acme',
       '  client_a\tmissing customer.json, vision.md\tcustomer/client_a',
     ]);

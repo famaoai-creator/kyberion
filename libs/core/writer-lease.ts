@@ -9,8 +9,9 @@
 
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import * as pathResolver from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withLock, withLockSync } from './src/lock-utils.js';
 
 export interface FencedWriterLease {
@@ -25,6 +26,129 @@ export type WriterLeaseEvent =
   | { type: 'renewed'; lease: FencedWriterLease }
   | { type: 'released'; lease: FencedWriterLease }
   | { type: 'rejected'; resourceId: string; reason: string };
+
+export interface WriterLeaseMetricsSnapshot {
+  resource_id: string;
+  acquired: number;
+  renewed: number;
+  released: number;
+  rejected: number;
+}
+
+const WRITER_LEASE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/writer-lease.schema.json');
+const WRITER_LEASE_METRICS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/writer-lease-metrics.schema.json'
+);
+const writerLeaseCatalogs = new Map<string, GovernedCatalog<FencedWriterLease>>();
+const writerLeaseMetricsCatalogs = new Map<
+  string,
+  GovernedCatalog<Record<string, WriterLeaseMetricsSnapshot>>
+>();
+
+function writerLeaseCatalog(leasePath: string): GovernedCatalog<FencedWriterLease> {
+  const existing = writerLeaseCatalogs.get(leasePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<FencedWriterLease>({
+    id: 'writer-lease',
+    path: leasePath,
+    schema: WRITER_LEASE_SCHEMA_PATH,
+  });
+  writerLeaseCatalogs.set(leasePath, catalog);
+  return catalog;
+}
+
+function writerLeaseMetricsCatalog(
+  metricsPath: string
+): GovernedCatalog<Record<string, WriterLeaseMetricsSnapshot>> {
+  const existing = writerLeaseMetricsCatalogs.get(metricsPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<Record<string, WriterLeaseMetricsSnapshot>>({
+    id: 'writer-lease-metrics',
+    path: metricsPath,
+    schema: WRITER_LEASE_METRICS_SCHEMA_PATH,
+    fallback: {},
+    fallbackOnInvalid: true,
+  });
+  writerLeaseMetricsCatalogs.set(metricsPath, catalog);
+  return catalog;
+}
+
+const writerLeaseMetrics = new Map<string, WriterLeaseMetricsSnapshot>();
+
+export function writerLeaseMetricsPath(leasePath: string): string {
+  const safeLeasePath = assertSafeRepositoryPath(leasePath, { allowMissingLeaf: true });
+  return assertSafeRepositoryPath(
+    path.join(path.dirname(safeLeasePath), 'writer-lease-metrics.json'),
+    {
+      allowMissingLeaf: true,
+    }
+  );
+}
+
+function observeWriterLeaseMetric(event: WriterLeaseEvent, metricsPath?: string): void {
+  const resourceId = event.type === 'rejected' ? event.resourceId : event.lease.resource_id;
+  const snapshot = writerLeaseMetrics.get(resourceId) ?? {
+    resource_id: resourceId,
+    acquired: 0,
+    renewed: 0,
+    released: 0,
+    rejected: 0,
+  };
+  snapshot[event.type] += 1;
+  writerLeaseMetrics.set(resourceId, snapshot);
+  if (!metricsPath) return;
+  try {
+    const safeMetricsPath = assertSafeRepositoryPath(metricsPath, { allowMissingLeaf: true });
+    const catalog = writerLeaseMetricsCatalog(safeMetricsPath);
+    const current = catalog.load();
+    const durable = current[resourceId] ?? {
+      resource_id: resourceId,
+      acquired: 0,
+      renewed: 0,
+      released: 0,
+      rejected: 0,
+    };
+    durable[event.type] += 1;
+    current[resourceId] = durable;
+    safeMkdir(path.dirname(safeMetricsPath), { recursive: true });
+    safeWriteFile(safeMetricsPath, `${JSON.stringify(current, null, 2)}\n`);
+    catalog.reset();
+  } catch {
+    // Metrics are best effort and must never alter lease safety.
+  }
+}
+
+/** Return process-wide lease lifecycle counts without exposing lease contents. */
+export function getWriterLeaseMetrics(resourceId?: string): WriterLeaseMetricsSnapshot[] {
+  const snapshots = resourceId
+    ? [writerLeaseMetrics.get(resourceId)].filter(
+        (snapshot): snapshot is WriterLeaseMetricsSnapshot => Boolean(snapshot)
+      )
+    : [...writerLeaseMetrics.values()];
+  return snapshots.map((snapshot) => ({ ...snapshot }));
+}
+
+/** Read the durable aggregate written while the corresponding lease lock was held. */
+export function loadWriterLeaseMetrics(
+  metricsPath: string,
+  resourceId?: string
+): WriterLeaseMetricsSnapshot[] {
+  try {
+    const safeMetricsPath = assertSafeRepositoryPath(metricsPath, { allowMissingLeaf: true });
+    const parsed = writerLeaseMetricsCatalog(safeMetricsPath).load();
+    const snapshots = resourceId ? [parsed[resourceId]] : Object.values(parsed);
+    return snapshots
+      .filter((snapshot): snapshot is WriterLeaseMetricsSnapshot => Boolean(snapshot))
+      .map((snapshot) => ({ ...snapshot }));
+  } catch {
+    return [];
+  }
+}
+
+/** Test/hot-reload seam for the process-wide aggregate. */
+export function resetWriterLeaseMetrics(): void {
+  writerLeaseMetrics.clear();
+}
 
 export interface WithFencedWriterLeaseOptions<T> {
   resourceId: string;
@@ -63,32 +187,23 @@ export function writerLeaseResourceId(leasePath: string): string {
 }
 
 function readLease(leasePath: string): FencedWriterLease | undefined {
-  if (!safeExistsSync(leasePath)) return undefined;
-  let parsed: unknown;
+  const safeLeasePath = assertSafeRepositoryPath(leasePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeLeasePath)) return undefined;
   try {
-    parsed = readJson<unknown>(leasePath);
-  } catch {
+    return writerLeaseCatalog(safeLeasePath).load();
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Invalid catalog writer-lease')) {
+      throw new Error(`[WRITER_LEASE_CORRUPT] invalid lease: ${leasePath}`);
+    }
     throw new Error(`[WRITER_LEASE_CORRUPT] unreadable lease: ${leasePath}`);
   }
-  if (!parsed || typeof parsed !== 'object') {
-    throw new Error(`[WRITER_LEASE_CORRUPT] invalid lease: ${leasePath}`);
-  }
-  const candidate = parsed as Partial<FencedWriterLease>;
-  if (
-    typeof candidate.resource_id !== 'string' ||
-    typeof candidate.owner_id !== 'string' ||
-    !Number.isInteger(candidate.fence) ||
-    candidate.fence < 0 ||
-    !Number.isFinite(candidate.expires_at_ms)
-  ) {
-    throw new Error(`[WRITER_LEASE_CORRUPT] invalid lease fields: ${leasePath}`);
-  }
-  return candidate as FencedWriterLease;
 }
 
 function writeLease(leasePath: string, lease: FencedWriterLease): void {
-  safeMkdir(path.dirname(leasePath), { recursive: true });
-  safeWriteFile(leasePath, `${JSON.stringify(lease, null, 2)}\n`);
+  const safeLeasePath = assertSafeRepositoryPath(leasePath, { allowMissingLeaf: true });
+  const validated = writerLeaseCatalog(safeLeasePath).validate(lease, safeLeasePath);
+  safeMkdir(path.dirname(safeLeasePath), { recursive: true });
+  safeWriteFile(safeLeasePath, `${JSON.stringify(validated, null, 2)}\n`);
 }
 
 function validateLeaseOptions(
@@ -127,8 +242,10 @@ function assertLeaseIdentity(options: RenewFencedWriterLeaseOptions): void {
 /** Observability must never prevent the protected write from being released. */
 function emitEvent(
   onEvent: ((event: WriterLeaseEvent) => void) | undefined,
-  event: WriterLeaseEvent
+  event: WriterLeaseEvent,
+  leasePath?: string
 ): void {
+  observeWriterLeaseMetric(event, leasePath ? writerLeaseMetricsPath(leasePath) : undefined);
   try {
     onEvent?.(event);
   } catch {
@@ -152,11 +269,15 @@ async function renewFencedWriterLeaseUnderLock(
     current.fence !== options.lease.fence ||
     current.expires_at_ms <= nowMs
   ) {
-    emitEvent(options.onEvent, {
-      type: 'rejected',
-      resourceId,
-      reason: 'renewal token is stale or expired',
-    });
+    emitEvent(
+      options.onEvent,
+      {
+        type: 'rejected',
+        resourceId,
+        reason: 'renewal token is stale or expired',
+      },
+      options.leasePath
+    );
     throw new Error(
       `[WRITER_LEASE_FENCED] renewal rejected for ${resourceId} (owner=${ownerId}, fence=${options.lease.fence})`
     );
@@ -164,7 +285,7 @@ async function renewFencedWriterLeaseUnderLock(
   const renewed = { ...current, expires_at_ms: nowMs + ttlMs };
   writeLease(options.leasePath, renewed);
   assertFencedWriterLease(options.leasePath, renewed, now());
-  emitEvent(options.onEvent, { type: 'renewed', lease: renewed });
+  emitEvent(options.onEvent, { type: 'renewed', lease: renewed }, options.leasePath);
   return renewed;
 }
 
@@ -191,11 +312,15 @@ function renewFencedWriterLeaseSyncUnderLock(
     current.fence !== options.lease.fence ||
     current.expires_at_ms <= nowMs
   ) {
-    emitEvent(options.onEvent, {
-      type: 'rejected',
-      resourceId,
-      reason: 'renewal token is stale or expired',
-    });
+    emitEvent(
+      options.onEvent,
+      {
+        type: 'rejected',
+        resourceId,
+        reason: 'renewal token is stale or expired',
+      },
+      options.leasePath
+    );
     throw new Error(
       `[WRITER_LEASE_FENCED] renewal rejected for ${resourceId} (owner=${ownerId}, fence=${options.lease.fence})`
     );
@@ -203,7 +328,7 @@ function renewFencedWriterLeaseSyncUnderLock(
   const renewed = { ...current, expires_at_ms: nowMs + ttlMs };
   writeLease(options.leasePath, renewed);
   assertFencedWriterLease(options.leasePath, renewed, now());
-  emitEvent(options.onEvent, { type: 'renewed', lease: renewed });
+  emitEvent(options.onEvent, { type: 'renewed', lease: renewed }, options.leasePath);
   return renewed;
 }
 
@@ -246,6 +371,11 @@ export async function withFencedWriterLease<T>(
     const current = readLease(options.leasePath);
     const nowMs = now();
     if (current && current.expires_at_ms > nowMs) {
+      emitEvent(
+        options.onEvent,
+        { type: 'rejected', resourceId, reason: 'live lease held by another owner' },
+        options.leasePath
+      );
       throw new Error(
         `[WRITER_LEASE_BUSY] ${resourceId} is held by owner=${current.owner_id}, fence=${current.fence}`
       );
@@ -258,7 +388,7 @@ export async function withFencedWriterLease<T>(
     };
     writeLease(options.leasePath, lease);
     assertFencedWriterLease(options.leasePath, lease, now());
-    emitEvent(options.onEvent, { type: 'acquired', lease });
+    emitEvent(options.onEvent, { type: 'acquired', lease }, options.leasePath);
     let renewalInFlight: Promise<unknown> | undefined;
     let renewalError: unknown;
     const renewalTimer =
@@ -300,7 +430,11 @@ export async function withFencedWriterLease<T>(
         latest.fence === lease.fence
       ) {
         writeLease(options.leasePath, { ...lease, expires_at_ms: 0 });
-        emitEvent(options.onEvent, { type: 'released', lease: { ...lease, expires_at_ms: 0 } });
+        emitEvent(
+          options.onEvent,
+          { type: 'released', lease: { ...lease, expires_at_ms: 0 } },
+          options.leasePath
+        );
       }
     }
   });
@@ -316,6 +450,11 @@ export function withFencedWriterLeaseSync<T>(options: WithFencedWriterLeaseSyncO
     const current = readLease(options.leasePath);
     const nowMs = now();
     if (current && current.expires_at_ms > nowMs) {
+      emitEvent(
+        options.onEvent,
+        { type: 'rejected', resourceId, reason: 'live lease held by another owner' },
+        options.leasePath
+      );
       throw new Error(
         `[WRITER_LEASE_BUSY] ${resourceId} is held by owner=${current.owner_id}, fence=${current.fence}`
       );
@@ -328,7 +467,7 @@ export function withFencedWriterLeaseSync<T>(options: WithFencedWriterLeaseSyncO
     };
     writeLease(options.leasePath, lease);
     assertFencedWriterLease(options.leasePath, lease, now());
-    emitEvent(options.onEvent, { type: 'acquired', lease });
+    emitEvent(options.onEvent, { type: 'acquired', lease }, options.leasePath);
     try {
       const result = options.fn(lease);
       assertFencedWriterLease(options.leasePath, lease, now());
@@ -342,7 +481,11 @@ export function withFencedWriterLeaseSync<T>(options: WithFencedWriterLeaseSyncO
         latest.fence === lease.fence
       ) {
         writeLease(options.leasePath, { ...lease, expires_at_ms: 0 });
-        emitEvent(options.onEvent, { type: 'released', lease: { ...lease, expires_at_ms: 0 } });
+        emitEvent(
+          options.onEvent,
+          { type: 'released', lease: { ...lease, expires_at_ms: 0 } },
+          options.leasePath
+        );
       }
     }
   });

@@ -1,9 +1,17 @@
 import * as path from 'node:path';
+import { customerDirForSlug } from './customer-resolver.js';
 import { resolveTenant } from './tenant-registry.js';
 import { loadOrganizationOperationalState } from './organization-operating-model.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
 import { isRecord } from './foundation/text.js';
 
@@ -61,6 +69,21 @@ export interface TenantActivationRecord {
   activated_at?: string;
 }
 
+const TENANT_ACTIVATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tenant-activation.schema.json'
+);
+const ONBOARDING_CONTEXT_BINDING_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/onboarding-context-binding.schema.json'
+);
+
+function tenantActivationCatalog(filePath: string) {
+  return defineCatalog<TenantActivationRecord>({
+    id: 'tenant-activation',
+    path: filePath,
+    schema: TENANT_ACTIVATION_SCHEMA_PATH,
+  });
+}
+
 export interface TenantActivationScope {
   customerSlug: string;
   tenantSlug: string;
@@ -89,16 +112,18 @@ function pathSegment(value: string): string {
 }
 
 function activationPath(input: TenantActivationScope, rootDir: string): string {
-  return path.join(
-    rootDir,
-    'customer',
-    input.customerSlug,
-    'onboarding',
-    'tenant-activation',
-    pathSegment(input.tenantSlug),
-    pathSegment(input.organizationId),
-    input.tier || 'confidential',
-    'activation.json'
+  const customerRoot = customerDirForSlug(input.customerSlug, rootDir);
+  return assertSafeRepositoryPath(
+    path.join(
+      customerRoot,
+      'onboarding',
+      'tenant-activation',
+      pathSegment(input.tenantSlug),
+      pathSegment(input.organizationId),
+      input.tier || 'confidential',
+      'activation.json'
+    ),
+    { allowMissingLeaf: true, rootDir }
   );
 }
 
@@ -115,11 +140,17 @@ function activationPathForRecord(record: TenantActivationRecord, rootDir: string
 }
 
 function legacyActivationPath(customerSlug: string, rootDir: string): string {
-  return path.join(rootDir, 'customer', customerSlug, 'onboarding', 'tenant-activation.json');
+  return assertSafeRepositoryPath(
+    path.join(customerDirForSlug(customerSlug, rootDir), 'onboarding', 'tenant-activation.json'),
+    { allowMissingLeaf: true, rootDir }
+  );
 }
 
 function bindingPath(customerSlug: string, rootDir: string): string {
-  return path.join(rootDir, 'customer', customerSlug, 'onboarding', 'organization-context.json');
+  return assertSafeRepositoryPath(
+    path.join(customerDirForSlug(customerSlug, rootDir), 'onboarding', 'organization-context.json'),
+    { allowMissingLeaf: true, rootDir }
+  );
 }
 
 function nonEmpty(value: unknown): value is string {
@@ -130,8 +161,13 @@ function readBinding(customerSlug: string, rootDir: string): Record<string, unkn
   const filePath = bindingPath(customerSlug, rootDir);
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = readJson<unknown>(filePath);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+    if (!safeLstat(safeFilePath).isFile()) return null;
+    return defineCatalog<Record<string, unknown>>({
+      id: 'onboarding-context-binding',
+      path: safeFilePath,
+      schema: ONBOARDING_CONTEXT_BINDING_SCHEMA_PATH,
+    }).load();
   } catch {
     return null;
   }
@@ -281,7 +317,9 @@ export function loadTenantActivation(
   for (const filePath of candidates) {
     if (!safeExistsSync(filePath)) continue;
     try {
-      const value = readJson<unknown>(filePath);
+      const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+      if (!safeLstat(safeFilePath).isFile()) continue;
+      const value = tenantActivationCatalog(safeFilePath).load();
       if (
         !isTenantActivationRecord(value) ||
         value.customer_slug !== input.customerSlug ||
@@ -301,7 +339,7 @@ export function loadTenantActivation(
 
 export function resolveTenantActivation(input: TenantActivationInput): TenantActivationResolution {
   const rootDir = input.rootDir || pathResolver.rootDir();
-  const now = new Date().toISOString();
+  const now = nowIso();
   const previous = loadTenantActivation(input, rootDir);
   const nhiIds = (input.nhiIds || previous?.nhi_ids || []).map((id) => id.trim()).filter(Boolean);
   const { checks, probeRefs, blockers } = buildChecks(input, nhiIds);
@@ -363,11 +401,12 @@ export function applyTenantActivation(
   }
   const filePath = resolved.activation_path;
   safeMkdir(path.dirname(filePath), { recursive: true });
+  const activatedAt = nowIso();
   const record: TenantActivationRecord = {
     ...resolved.record,
     status: 'active',
-    activated_at: resolved.record.activated_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    activated_at: resolved.record.activated_at || activatedAt,
+    updated_at: activatedAt,
   };
   safeWriteFile(filePath, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8' });
   return record;
@@ -420,7 +459,7 @@ export function rollbackTenantActivation(input: {
       ...current,
       status: 'draft',
       blockers: [...new Set([...current.blockers, `rollback: ${input.reason}`])],
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
       activated_at: undefined,
     },
     rootDir
@@ -454,7 +493,7 @@ export function suspendTenantActivation(input: {
       status: 'suspended',
       blockers: [...new Set([...current.blockers, `suspended: ${input.reason}`])],
       revoked_task_grants: revokedTaskGrants,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     },
     rootDir
   );

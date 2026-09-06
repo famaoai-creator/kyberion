@@ -17,25 +17,35 @@
  * pnpm subprocess).
  *
  * Usage:
- *   pnpm patch:dependency -- --package <name> --to <version>          # propose
- *   pnpm patch:dependency -- --package <name> --to <version> --apply  # execute
+ *   pnpm kyberion patch dependency --package <name> --to <version>          # propose
+ *   pnpm kyberion patch dependency --package <name> --to <version> --apply  # execute
  */
 
 import * as path from 'node:path';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  createStandardYargs,
-  logger,
-  pathResolver,
   safeExecResult,
-  safeJsonParse,
+  safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
-} from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
-import { appendJsonLine } from '@agent/core/foundation';
-import { runDegradationWatch, type DegradationReport } from '@agent/core';
+} from '@agent/core/secure-io';
+import { safeJsonParse } from '@agent/core/validators';
+import {
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+} from './lib/harness.js';
+import { nowIso, readTextFile } from '@agent/core/foundation';
+import { appendDependencyVulnerabilityLedgerRecord } from '@agent/core/dependency-vulnerability-ledger';
+import { runDegradationWatch, type DegradationReport } from '@agent/core/health-degradation';
 import { withExecutionContext } from '@agent/core/governance';
+import { readSafeJsonFile } from './lib/json-input.js';
+
+type Print = (value: unknown) => void;
 
 export interface PatchCommandResult {
   status: number;
@@ -92,6 +102,13 @@ interface RootPackageJson {
 }
 
 const DEFAULT_LEDGER_PATH = pathResolver.active('shared/runtime/vuln-ledger.jsonl');
+
+export function readDependencyPatchTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 const defaultRunner: PatchExecRunner = {
   run(command, args, options = {}) {
@@ -167,8 +184,7 @@ function applyPlanToPackage(pkg: RootPackageJson, packageName: string, plan: Pat
 }
 
 function appendLedger(ledgerPath: string, record: Record<string, unknown>): void {
-  safeMkdir(path.dirname(ledgerPath), { recursive: true });
-  appendJsonLine(ledgerPath, record);
+  appendDependencyVulnerabilityLedgerRecord(ledgerPath, record);
 }
 
 function auditStillVulnerable(auditStdout: string, packageName: string): boolean {
@@ -191,11 +207,11 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
   const runner = options.runner || defaultRunner;
   const gates = options.gates || defaultGates();
   const packageJsonPath = path.join(rootDir, 'package.json');
-  const timestamp = new Date().toISOString();
+  const timestamp = nowIso();
 
-  const pkg = safeJsonParse<RootPackageJson>(
-    safeReadFile(packageJsonPath, { encoding: 'utf8' }) as string,
-    'root package.json'
+  const pkg = readSafeJsonFile<RootPackageJson>(
+    packageJsonPath,
+    'dependency patch package manifest'
   );
   const plan = planDependencyPatch(
     pkg,
@@ -239,11 +255,11 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
     timestamp.replace(/[:.]/g, '-')
   );
   safeMkdir(backupDir, { recursive: true });
-  const packageJsonRaw = safeReadFile(packageJsonPath, { encoding: 'utf8' }) as string;
+  const packageJsonRaw = readDependencyPatchTextFile(packageJsonPath);
   safeWriteFile(path.join(backupDir, 'package.json'), packageJsonRaw);
 
   // 2. Apply the version bump (direct section or pnpm.overrides).
-  const nextPkg: RootPackageJson = safeJsonParse(packageJsonRaw, 'root package.json');
+  const nextPkg: RootPackageJson = structuredClone(pkg);
   applyPlanToPackage(nextPkg, options.packageName, plan);
   safeWriteFile(packageJsonPath, `${JSON.stringify(nextPkg, null, 2)}\n`);
 
@@ -315,8 +331,11 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
   return outcome;
 }
 
-async function main(): Promise<number> {
-  const argv = createStandardYargs()
+export async function main(
+  args: string[] = currentProcessArgv().slice(2),
+  print: Print = () => undefined
+): Promise<number> {
+  const argv = createStandardYargs(['node', 'apply_dependency_patch', ...args])
     .option('package', { type: 'string', demandOption: true, describe: 'Direct dependency name' })
     .option('to', {
       type: 'string',
@@ -344,7 +363,7 @@ async function main(): Promise<number> {
     })
   );
 
-  console.log(JSON.stringify(outcome, null, 2));
+  print(JSON.stringify(outcome, null, 2));
   if (outcome.status === 'patched' || outcome.status === 'proposed') {
     logger.success(`[patch] ${outcome.package_name}: ${outcome.status}`);
     return 0;
@@ -353,15 +372,19 @@ async function main(): Promise<number> {
   return 1;
 }
 
+const runApplyDependencyPatch = defineScript({
+  name: 'patch:dependency',
+  flags: [],
+  async run({ argv, print }) {
+    const code = await main(argv, print);
+    if (code !== 0) throw new ScriptExitError(code, '', true);
+    return code;
+  },
+});
+
 if (
   isDirectScript(import.meta.url, 'apply_dependency_patch.ts') ||
   isDirectScript(import.meta.url, 'apply_dependency_patch.js')
 ) {
-  main().then(
-    (code) => (process.exitCode = code),
-    (error) => {
-      logger.error(`[patch] failed: ${(error as Error).message || error}`);
-      process.exitCode = 1;
-    }
-  );
+  void runApplyDependencyPatch();
 }

@@ -1,13 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  pathResolver,
-  safeExistsSync,
-  safeRmSync,
-  safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 
 const ROOT = pathResolver.rootDir();
 const FIXTURE_PATH = pathResolver.rootResolve(

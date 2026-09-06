@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { addPlanFrontmatter, parseFrontmatter } from './check_improvement_plan_metadata.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { readImprovementPlanTextFile } from './check_improvement_plan_metadata.js';
 
 describe('improvement plan metadata', () => {
+  it('rejects a directory replacement before metadata parsing', () => {
+    expect(() => readImprovementPlanTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('adds stable metadata without changing the plan body', () => {
     const body = '# Plan\n\n本文';
     const next = addPlanFrontmatter(body, 'EXAMPLE_PLAN.ja.md');

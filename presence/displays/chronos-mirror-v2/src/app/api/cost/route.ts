@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { buildMissionHistoryItems, collectCostSummary } from '../../../lib/su-surface-data';
 import {
@@ -6,6 +7,7 @@ import {
   strictViewerScopeTenantSlugs,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
+import { readChronosOptionalStringParam, readChronosStringParam } from '../../../lib/request-input';
 
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -17,9 +19,11 @@ export function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const budget = Number(
-    url.searchParams.get('budgetUsd') || process.env.CHRONOS_COST_BUDGET_USD || ''
+    readChronosStringParam(url.searchParams.get('budgetUsd')) ||
+      getRegisteredEnvText('CHRONOS_COST_BUDGET_USD') ||
+      ''
   );
-  const requestedTenant = url.searchParams.get('tenant') || undefined;
+  const requestedTenant = readChronosOptionalStringParam(url.searchParams.get('tenant'));
   const summary = withViewerExecutionContext(resolvedViewer.context, () =>
     (() => {
       const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
@@ -30,9 +34,9 @@ export function GET(req: NextRequest) {
               (mission) => mission.missionId
             );
       return collectCostSummary({
-        missionId: url.searchParams.get('missionId') || undefined,
+        missionId: readChronosOptionalStringParam(url.searchParams.get('missionId')),
         missionIds,
-        since: url.searchParams.get('since') || undefined,
+        since: readChronosOptionalStringParam(url.searchParams.get('since')),
         budgetUsd: Number.isFinite(budget) && budget > 0 ? budget : undefined,
         ...(tenantSlugs !== 'all' ? { scopeFilter: { tenant_slugs: tenantSlugs } } : {}),
       });

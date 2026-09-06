@@ -1,9 +1,24 @@
 import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { safeMkdir, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeMkdir,
+  safeWriteFile,
+  safeExistsSync,
+  safeLstat,
+} from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { logger, safeExec } from '@agent/core';
-import { readTextFile } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import { safeExec } from '@agent/core/secure-io';
+import { nowIso, readTextFile } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+
+export function readIntentSmokeTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 const DEFAULT_INTENTS = [
   'verify-actuator-capability',
@@ -13,8 +28,24 @@ const DEFAULT_INTENTS = [
   'inspect-runtime-supervisor',
 ];
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+interface IntentSmokeRunResult {
+  summaryText: string;
+  failed: number;
+  report: Array<{
+    intent: string;
+    ok: boolean;
+    stdout_path: string;
+    stderr_path: string;
+    exit_code: number;
+  }>;
+}
+
+export function resolveIntentSmokeOutputDir(outputDir: string): string {
+  return assertSafeRepositoryPath(pathResolver.resolve(outputDir), { allowMissingLeaf: true });
+}
+
+export async function main(args: string[] = []): Promise<IntentSmokeRunResult> {
+  const argv = await createStandardYargs(['node', 'intent_smoke', ...args])
     .option('output', {
       type: 'string',
       default: pathResolver.shared('tmp/intent-smoke'),
@@ -27,7 +58,7 @@ async function main(): Promise<void> {
     })
     .parseAsync();
 
-  const outputDir = path.resolve(String(argv.output));
+  const outputDir = resolveIntentSmokeOutputDir(String(argv.output));
   safeMkdir(outputDir, { recursive: true });
 
   const intents =
@@ -90,7 +121,7 @@ async function main(): Promise<void> {
     summaryPath,
     JSON.stringify(
       {
-        generated_at: new Date().toISOString(),
+        generated_at: nowIso(),
         intents: report,
       },
       null,
@@ -98,15 +129,25 @@ async function main(): Promise<void> {
     )
   );
 
-  const summaryText = safeExistsSync(summaryPath) ? readTextFile(summaryPath) : '';
-  console.log(summaryText);
-
-  if (failed > 0) {
-    process.exitCode = 1;
-  }
+  const summaryText = safeExistsSync(summaryPath) ? readIntentSmokeTextFile(summaryPath) : '';
+  return { summaryText, failed, report };
 }
 
-main().catch((error: any) => {
-  logger.error(error?.message || String(error));
-  process.exitCode = 1;
+export const runIntentSmoke = defineScript({
+  name: 'intent:smoke',
+  flags: [],
+  run: async (context) => {
+    const result = await main(context.argv);
+    context.print(result.summaryText);
+    if (result.failed > 0) {
+      throw new ScriptExitError(1, `intent smoke failed: ${result.failed} intent(s)`);
+    }
+    return result;
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'intent_smoke.ts') ||
+  isDirectScript(import.meta.url, 'intent_smoke.js')
+)
+  void runIntentSmoke();

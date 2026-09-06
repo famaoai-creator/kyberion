@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { resetA2ASecretCache } from '@agent/core';
+import { _resetA2ASecretCacheForTests } from '@agent/core/a2a-envelope-signature';
 import {
   assertKnowledgePackage,
   assertKnowledgePackageOriginScope,
@@ -27,12 +27,12 @@ function makePackage() {
 describe('knowledge package trust boundary', () => {
   afterEach(() => {
     delete process.env.KYBERION_A2A_SECRET;
-    resetA2ASecretCache();
+    _resetA2ASecretCacheForTests();
   });
 
   it('creates and verifies a signed package', () => {
     process.env.KYBERION_A2A_SECRET = 'knowledge-package-test-secret';
-    resetA2ASecretCache();
+    _resetA2ASecretCacheForTests();
     const pkg = makePackage();
 
     expect(pkg.metadata.trust_status).toBe('verified');

@@ -19,6 +19,7 @@ vi.mock('./secure-io.js', async () => {
     loadJson: loadJsonMock,
     safeExistsSync: existsMock,
     safeStat: statMock,
+    safeLstat: vi.fn(() => ({ isFile: () => true })),
   };
 });
 
@@ -73,6 +74,28 @@ vi.mock('./error-classifier.js', () => ({
 }));
 
 describe('recovery-policy', () => {
+  it('creates an override-compatible builder for actuator helpers', async () => {
+    manifestMock.mockReturnValue({
+      actuator_id: 'test-actuator',
+      version: '1.0.0',
+      capabilities: [],
+      recovery_policy: {
+        retry: { initialDelayMs: 700 },
+      },
+    });
+    const { createGovernedRetryOptionsBuilder } = await import('./recovery-policy.js');
+    const buildRetryOptions = createGovernedRetryOptionsBuilder({
+      manifestPath: 'active/shared/tmp/recovery-policy-test/manifest-builder.json',
+      defaults: { maxRetries: 2, initialDelayMs: 500 },
+      fallbackCategories: ['timeout'],
+    });
+
+    const options = buildRetryOptions({ maxRetries: 1 });
+
+    expect(options.maxRetries).toBe(1);
+    expect(options.initialDelayMs).toBe(700);
+  });
+
   it('preserves defaults and applies manifest plus explicit overrides', async () => {
     manifestMock.mockReturnValue({
       actuator_id: 'test-actuator',
@@ -85,7 +108,7 @@ describe('recovery-policy', () => {
     });
     const { buildGovernedRetryOptions } = await import('./recovery-policy.js');
     const options = buildGovernedRetryOptions({
-      manifestPath: '/tmp/manifest-first.json',
+      manifestPath: 'active/shared/tmp/recovery-policy-test/manifest-first.json',
       defaults: { maxRetries: 2, initialDelayMs: 500, maxDelayMs: 1000, factor: 2, jitter: true },
       override: { maxRetries: 1 },
     });
@@ -105,12 +128,21 @@ describe('recovery-policy', () => {
     });
     const { buildGovernedRetryOptions } = await import('./recovery-policy.js');
     const options = buildGovernedRetryOptions({
-      manifestPath: '/tmp/manifest-second.json',
+      manifestPath: 'active/shared/tmp/recovery-policy-test/manifest-second.json',
       defaults: { maxRetries: 1 },
       fallbackCategories: ['resource_unavailable'],
     });
 
     expect(options.shouldRetry?.(new Error('ENOSPC: resource unavailable'))).toBe(true);
     expect(options.shouldRetry?.(new Error('invalid input'))).toBe(false);
+  });
+
+  it('rejects a schema-invalid actuator manifest instead of dropping its policy', async () => {
+    manifestMock.mockReturnValue({ malformed: true });
+    const { loadRecoveryPolicy } = await import('./recovery-policy.js');
+
+    expect(() =>
+      loadRecoveryPolicy('active/shared/tmp/recovery-policy-test/manifest-invalid.json')
+    ).toThrow('Invalid catalog actuator-manifest-recovery-policy');
   });
 });

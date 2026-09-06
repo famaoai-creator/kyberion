@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Media Document Composition Presets Catalog",
+  "type": "object",
+  "required": ["defaults", "profiles"],
+  "properties": {
+    "defaults": { "type": "object", "additionalProperties": true },
+    "profiles": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false
+}

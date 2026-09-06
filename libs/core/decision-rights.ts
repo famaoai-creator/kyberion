@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { isValidTenantSlug } from './entity-scope.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 
 export interface DecisionThreshold {
   metric: string;
@@ -65,24 +67,20 @@ const DEFAULT_DECISION_RIGHTS_PATHS = [
     path.join(baseDir, 'knowledge', 'product', 'governance', 'decision-rights.json'),
 ];
 
+const DECISION_RIGHTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/decision-rights.schema.json'
+);
+
 function resolveBaseDir(rootDir?: string): string {
   return rootDir ? path.resolve(rootDir) : pathResolver.rootDir();
 }
 
-function loadJsonIfPresent<T>(filePath: string): T | null {
-  return loadOptionalJson<T>(filePath);
-}
-
-function isDecisionRightsMatrix(value: unknown): value is DecisionRightsMatrix {
-  if (!value || typeof value !== 'object') return false;
-  const matrix = value as Record<string, unknown>;
-  return (
-    typeof matrix.version === 'string' &&
-    typeof matrix.company_id === 'string' &&
-    Array.isArray(matrix.decisions) &&
-    typeof matrix.source_kind === 'string' &&
-    typeof matrix.source_path === 'string'
-  );
+function decisionRightsCatalog(filePath: string, rootDir: string) {
+  return defineCatalog<DecisionRightsMatrix>({
+    id: 'decision-rights',
+    path: assertSafeRepositoryPath(filePath, { allowMissingLeaf: false, rootDir }),
+    schema: DECISION_RIGHTS_SCHEMA_PATH,
+  });
 }
 
 function normalizeLoadedMatrix(
@@ -107,15 +105,37 @@ export function resolveDecisionRightsMatrix(
   rootDir?: string
 ): DecisionRightsMatrix {
   const baseDir = resolveBaseDir(rootDir);
-  const resolvedTenantSlug = tenantSlug?.trim() || null;
+  const requestedTenantSlug = tenantSlug?.trim() || null;
+  const resolvedTenantSlug =
+    requestedTenantSlug && isValidTenantSlug(requestedTenantSlug) ? requestedTenantSlug : null;
   const companyId = resolvedTenantSlug || 'default';
+  if (requestedTenantSlug && !resolvedTenantSlug) {
+    return {
+      version: '1.0.0',
+      company_id: 'default',
+      tenant_slug: null,
+      source_kind: 'public',
+      source_path: path.join(baseDir, 'knowledge', 'product', 'governance', 'decision-rights.json'),
+      decisions: [],
+    };
+  }
   const candidates = resolvedTenantSlug
-    ? DEFAULT_DECISION_RIGHTS_PATHS.map((builder) => builder(baseDir, resolvedTenantSlug))
-    : [path.join(baseDir, 'knowledge', 'product', 'governance', 'decision-rights.json')];
+    ? DEFAULT_DECISION_RIGHTS_PATHS.map((builder) =>
+        assertSafeRepositoryPath(builder(baseDir, resolvedTenantSlug), {
+          allowMissingLeaf: true,
+          rootDir: baseDir,
+        })
+      )
+    : [
+        assertSafeRepositoryPath(
+          path.join(baseDir, 'knowledge', 'product', 'governance', 'decision-rights.json'),
+          { allowMissingLeaf: true, rootDir: baseDir }
+        ),
+      ];
 
   for (const candidate of candidates) {
-    const parsed = loadJsonIfPresent<DecisionRightsMatrix>(candidate);
-    if (!parsed || !isDecisionRightsMatrix(parsed)) continue;
+    if (!safeExistsSync(candidate)) continue;
+    const parsed = decisionRightsCatalog(candidate, baseDir).load();
     const sourceKind: DecisionRightsMatrix['source_kind'] = candidate.includes('/customer/')
       ? 'customer'
       : candidate.includes('/confidential/')

@@ -1,17 +1,22 @@
 import type { ValidateFunction } from 'ajv';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
 import { resolveSurfaceIntent } from './router-contract.js';
+import type { IntentResolutionPacket } from './intent-resolution.js';
 
 export type BrowserConversationSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type BrowserConversationStatus =
@@ -169,6 +174,39 @@ export interface BrowserConversationExecutionResult {
   raw?: Record<string, unknown>;
 }
 
+const BROWSER_ACTUATOR_STATUSES = new Set(['succeeded', 'success', 'failed', 'blocked']);
+
+export function normalizeBrowserActuatorResult(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('Browser actuator returned a non-object result.');
+  }
+  const result = value as Record<string, unknown>;
+  if (typeof result.status !== 'string' || !BROWSER_ACTUATOR_STATUSES.has(result.status)) {
+    throw new Error('Browser actuator returned an invalid status.');
+  }
+  if (Object.hasOwn(result, 'results') && !Array.isArray(result.results)) {
+    throw new Error('Browser actuator returned invalid results.');
+  }
+  if (Object.hasOwn(result, 'context')) {
+    if (
+      typeof result.context !== 'object' ||
+      result.context === null ||
+      Array.isArray(result.context)
+    ) {
+      throw new Error('Browser actuator returned invalid context.');
+    }
+  }
+  if (
+    Object.hasOwn(result, 'total_steps') &&
+    (typeof result.total_steps !== 'number' ||
+      !Number.isInteger(result.total_steps) ||
+      result.total_steps < 0)
+  ) {
+    throw new Error('Browser actuator returned invalid total_steps.');
+  }
+  return result;
+}
+
 function resolveConfirmationCandidateIndex(
   utterance: string,
   candidateCount: number
@@ -216,16 +254,19 @@ const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
 const SESSION_DIR = pathResolver.shared('runtime/browser/conversation-sessions');
 const BROWSER_SESSION_DIR = pathResolver.shared('runtime/browser/sessions');
 const BROWSER_SNAPSHOT_DIR = pathResolver.shared('runtime/browser/snapshots');
-
-const ajv = createAjv();
+const BROWSER_SNAPSHOT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-session-snapshot.schema.json'
+);
+const BROWSER_RUNTIME_SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-runtime-session.schema.json'
+);
 
 let sessionValidateFn: ValidateFunction | null = null;
 let commandValidateFn: ValidateFunction | null = null;
 let feedbackValidateFn: ValidateFunction | null = null;
 
 function loadSchemaValidator(schemaPath: string): ValidateFunction {
-  const raw = safeReadFile(schemaPath, { encoding: 'utf8' }) as string;
-  return ajv.compile(JSON.parse(raw));
+  return compileSchema(schemaPath);
 }
 
 function ensureSessionValidator(): ValidateFunction {
@@ -249,16 +290,47 @@ function errorsFrom(validate: ValidateFunction): string[] {
   );
 }
 
+function assertSessionPathSegment(value: string, label = 'session id'): string {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[BROWSER_CONVERSATION_SESSION] ${label} must be a single path segment`);
+  }
+  return normalized;
+}
+
 function sessionPath(sessionId: string): string {
-  return `${SESSION_DIR}/${sessionId}.json`;
+  const safeSessionId = assertSessionPathSegment(sessionId);
+  return assertSafeRepositoryPath(`${SESSION_DIR}/${safeSessionId}.json`, {
+    allowMissingLeaf: true,
+  });
+}
+
+function browserConversationSessionCatalog(filePath: string) {
+  return defineCatalog<BrowserConversationSession>({
+    id: 'browser-conversation-session',
+    path: filePath,
+    schema: SESSION_SCHEMA_PATH,
+  });
 }
 
 function browserSnapshotPath(sessionId: string): string {
-  return `${BROWSER_SNAPSHOT_DIR}/${sessionId}.json`;
+  const safeSessionId = assertSessionPathSegment(sessionId);
+  return assertSafeRepositoryPath(`${BROWSER_SNAPSHOT_DIR}/${safeSessionId}.json`, {
+    allowMissingLeaf: true,
+  });
 }
 
 function browserRuntimeSessionPath(sessionId: string): string {
-  return `${BROWSER_SESSION_DIR}/${sessionId}.json`;
+  const safeSessionId = assertSessionPathSegment(sessionId);
+  return assertSafeRepositoryPath(`${BROWSER_SESSION_DIR}/${safeSessionId}.json`, {
+    allowMissingLeaf: true,
+  });
+}
+
+function browserConversationTempPath(fileName: string): string {
+  return assertSafeRepositoryPath(pathResolver.sharedTmp(`browser-conversation/${fileName}`), {
+    allowMissingLeaf: true,
+  });
 }
 
 interface BrowserSnapshotElementRecord {
@@ -292,11 +364,255 @@ interface BrowserRuntimeSessionRecord {
   }>;
 }
 
+export function loadBrowserSnapshotAtPath(filePath: string): BrowserSnapshotRecord {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath)) {
+    throw new Error(`[BROWSER_CONVERSATION_SESSION] snapshot is missing: ${filePath}`);
+  }
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[BROWSER_CONVERSATION_SESSION] snapshot must be a regular file: ${filePath}`);
+  }
+  return browserSnapshotCatalog(safeFilePath).load();
+}
+
+function browserSnapshotCatalog(filePath: string) {
+  return defineCatalog<BrowserSnapshotRecord>({
+    id: 'browser-session-snapshot',
+    path: filePath,
+    schema: BROWSER_SNAPSHOT_SCHEMA_PATH,
+  });
+}
+
+export function loadBrowserRuntimeSessionAtPath(filePath: string): BrowserRuntimeSessionRecord {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath)) {
+    throw new Error(`[BROWSER_CONVERSATION_SESSION] runtime session is missing: ${filePath}`);
+  }
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(
+      `[BROWSER_CONVERSATION_SESSION] runtime session must be a regular file: ${filePath}`
+    );
+  }
+  return browserRuntimeSessionCatalog(safeFilePath).load();
+}
+
+function browserRuntimeSessionCatalog(filePath: string) {
+  return defineCatalog<BrowserRuntimeSessionRecord>({
+    id: 'browser-runtime-session',
+    path: filePath,
+    schema: BROWSER_RUNTIME_SESSION_SCHEMA_PATH,
+  });
+}
+
+function assertStringField(record: Record<string, unknown>, field: string, label: string): string {
+  const value = record[field];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${label}.${field} must be a non-empty string`);
+  }
+  return value;
+}
+
+function assertOptionalStringField(
+  record: Record<string, unknown>,
+  field: string,
+  label: string
+): string | undefined {
+  const value = record[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw new Error(`${label}.${field} must be a string`);
+  return value;
+}
+
+function assertAllowedFields(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+  label: string
+): void {
+  const allowed = new Set(fields);
+  if (Object.keys(record).some((key) => !allowed.has(key))) {
+    throw new Error(`${label} contains unknown fields`);
+  }
+}
+
+function parseBrowserSnapshotRecord(value: unknown, sessionId: string): BrowserSnapshotRecord {
+  const label = 'browser snapshot';
+  const record = parseSafeJsonObjectValue(value, label);
+  assertAllowedFields(
+    record,
+    [
+      'session_id',
+      'tab_id',
+      'url',
+      'title',
+      'captured_at',
+      'element_count',
+      'viewport',
+      'focused_ref',
+      'ready_state',
+      'elements',
+    ],
+    label
+  );
+  const parsedSessionId = assertStringField(record, 'session_id', label);
+  if (parsedSessionId !== sessionId)
+    throw new Error(`${label}.session_id does not match requested session`);
+  const tabId = assertStringField(record, 'tab_id', label);
+  const url = assertStringField(record, 'url', label);
+  const title = assertStringField(record, 'title', label);
+  const capturedAt = assertStringField(record, 'captured_at', label);
+  const rawElementCount = record.element_count;
+  let elementCount: number | undefined;
+  if (rawElementCount !== undefined) {
+    if (
+      typeof rawElementCount !== 'number' ||
+      !Number.isInteger(rawElementCount) ||
+      rawElementCount < 0
+    ) {
+      throw new Error(`${label}.element_count must be a non-negative integer`);
+    }
+    elementCount = rawElementCount;
+  }
+  if (!Array.isArray(record.elements)) throw new Error(`${label}.elements must be an array`);
+  const elements = record.elements.map((candidate, index) => {
+    const elementLabel = `${label}.elements[${index}]`;
+    const element = parseSafeJsonObjectValue(candidate, elementLabel);
+    assertAllowedFields(
+      element,
+      [
+        'ref',
+        'tag',
+        'role',
+        'text',
+        'name',
+        'type',
+        'placeholder',
+        'href',
+        'value',
+        'visible',
+        'editable',
+        'focused',
+        'value_redacted',
+        'selector',
+      ],
+      elementLabel
+    );
+    const ref = assertStringField(element, 'ref', elementLabel);
+    const role = element.role;
+    if (role !== undefined && role !== null && typeof role !== 'string') {
+      throw new Error(`${elementLabel}.role must be a string or null`);
+    }
+    const text = assertOptionalStringField(element, 'text', elementLabel);
+    const name = assertOptionalStringField(element, 'name', elementLabel);
+    return {
+      ref,
+      ...(role !== undefined ? { role: role as string | null } : {}),
+      ...(text !== undefined ? { text } : {}),
+      ...(name !== undefined ? { name } : {}),
+    };
+  });
+  return {
+    session_id: parsedSessionId,
+    tab_id: tabId,
+    url,
+    title,
+    captured_at: capturedAt,
+    ...(elementCount !== undefined ? { element_count: elementCount } : {}),
+    elements,
+  };
+}
+
+function parseBrowserRuntimeSessionRecord(
+  value: unknown,
+  sessionId: string
+): BrowserRuntimeSessionRecord {
+  const label = 'browser runtime session';
+  const record = parseSafeJsonObjectValue(value, label);
+  assertAllowedFields(
+    record,
+    [
+      'session_id',
+      'user_data_dir',
+      'active_tab_id',
+      'tab_count',
+      'tabs',
+      'updated_at',
+      'last_trace_path',
+      'last_video_paths',
+      'video_output_dir',
+      'video_recording_pending',
+      'lease_expires_at',
+      'lease_status',
+      'retained',
+      'cdp_url',
+      'cdp_port',
+      'action_trail_count',
+      'action_trail_path',
+      'recent_actions',
+    ],
+    label
+  );
+  const parsedSessionId = assertStringField(record, 'session_id', label);
+  if (parsedSessionId !== sessionId)
+    throw new Error(`${label}.session_id does not match requested session`);
+  const activeTabId = assertOptionalStringField(record, 'active_tab_id', label);
+  const leaseStatus = assertOptionalStringField(record, 'lease_status', label);
+  const cdpUrl = assertOptionalStringField(record, 'cdp_url', label);
+  const rawCdpPort = record.cdp_port;
+  let cdpPort: number | undefined;
+  if (rawCdpPort !== undefined) {
+    if (
+      typeof rawCdpPort !== 'number' ||
+      !Number.isInteger(rawCdpPort) ||
+      rawCdpPort < 1 ||
+      rawCdpPort > 65535
+    ) {
+      throw new Error(`${label}.cdp_port must be a valid TCP port`);
+    }
+    cdpPort = rawCdpPort;
+  }
+  let tabs: BrowserRuntimeSessionRecord['tabs'];
+  if (record.tabs !== undefined) {
+    if (!Array.isArray(record.tabs)) throw new Error(`${label}.tabs must be an array`);
+    tabs = record.tabs.map((candidate, index) => {
+      const tabLabel = `${label}.tabs[${index}]`;
+      const tab = parseSafeJsonObjectValue(candidate, tabLabel);
+      assertAllowedFields(tab, ['tab_id', 'url', 'title', 'active'], tabLabel);
+      const tabId = assertStringField(tab, 'tab_id', tabLabel);
+      const url = assertOptionalStringField(tab, 'url', tabLabel);
+      const title = assertOptionalStringField(tab, 'title', tabLabel);
+      if (tab.active !== undefined && typeof tab.active !== 'boolean') {
+        throw new Error(`${tabLabel}.active must be a boolean`);
+      }
+      const active = tab.active;
+      return {
+        tab_id: tabId,
+        ...(url !== undefined ? { url } : {}),
+        ...(title !== undefined ? { title } : {}),
+        ...(typeof active === 'boolean' ? { active } : {}),
+      };
+    });
+  }
+  return {
+    session_id: parsedSessionId,
+    ...(activeTabId !== undefined ? { active_tab_id: activeTabId } : {}),
+    ...(leaseStatus !== undefined ? { lease_status: leaseStatus } : {}),
+    ...(cdpUrl !== undefined ? { cdp_url: cdpUrl } : {}),
+    ...(cdpPort !== undefined ? { cdp_port: cdpPort } : {}),
+    ...(tabs !== undefined ? { tabs } : {}),
+  };
+}
+
 function loadBrowserSnapshot(sessionId: string): BrowserSnapshotRecord | null {
   const filePath = browserSnapshotPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return JSON.parse(raw) as BrowserSnapshotRecord;
+  try {
+    return parseBrowserSnapshotRecord(loadBrowserSnapshotAtPath(filePath), sessionId);
+  } catch (error) {
+    logger.warn(
+      `[BROWSER_CONVERSATION_SESSION] Invalid snapshot ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
 }
 
 function loadBrowserSnapshotForConversationSession(
@@ -319,8 +635,8 @@ function refreshBrowserSnapshotForConversationSession(
   if (!browserSessionId) return null;
 
   const browserRuntimeSession = loadBrowserRuntimeSession(browserSessionId);
-  const tmpPath = pathResolver.sharedTmp(
-    `browser-conversation/refresh-${session.session_id}-${Date.now().toString(36)}.json`
+  const tmpPath = browserConversationTempPath(
+    `refresh-${assertSessionPathSegment(session.session_id)}-${Date.now().toString(36)}.json`
   );
   const steps: Array<Record<string, unknown>> = [];
   if (session.target?.tab_id) {
@@ -375,8 +691,14 @@ function refreshBrowserSnapshotForConversationSession(
 function loadBrowserRuntimeSession(sessionId: string): BrowserRuntimeSessionRecord | null {
   const filePath = browserRuntimeSessionPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return JSON.parse(raw) as BrowserRuntimeSessionRecord;
+  try {
+    return parseBrowserRuntimeSessionRecord(loadBrowserRuntimeSessionAtPath(filePath), sessionId);
+  } catch (error) {
+    logger.warn(
+      `[BROWSER_CONVERSATION_SESSION] Invalid runtime session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
 }
 
 function normalizeRegionHint(text?: string): string | undefined {
@@ -441,7 +763,7 @@ export function createBrowserConversationSession(input: {
   goal: { summary: string; success_condition: string };
   target?: BrowserConversationSession['target'];
 }): BrowserConversationSession {
-  const now = new Date().toISOString();
+  const now = nowIso();
   return {
     session_id:
       input.sessionId ||
@@ -478,8 +800,8 @@ export function bootstrapBrowserConversationSession(params: {
   }
 
   if (!loadBrowserSnapshot(params.browserSessionId)) {
-    const tmpPath = pathResolver.sharedTmp(
-      `browser-conversation/bootstrap-${params.browserSessionId}.json`
+    const tmpPath = browserConversationTempPath(
+      `bootstrap-${assertSessionPathSegment(params.browserSessionId, 'browser session id')}.json`
     );
     safeWriteFile(
       tmpPath,
@@ -577,13 +899,16 @@ export function validateBrowserConversationFeedback(
 }
 
 export function saveBrowserConversationSession(session: BrowserConversationSession): string {
-  const result = validateBrowserConversationSession(session);
-  if (!result.valid) {
-    throw new Error(`Invalid browser conversation session: ${result.errors.join('; ')}`);
-  }
   if (!safeExistsSync(SESSION_DIR)) safeMkdir(SESSION_DIR, { recursive: true });
   const filePath = sessionPath(session.session_id);
-  safeWriteFile(filePath, JSON.stringify(session, null, 2));
+  let canonical: BrowserConversationSession;
+  try {
+    canonical = browserConversationSessionCatalog(filePath).validate(session, filePath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid browser conversation session: ${message}`);
+  }
+  safeWriteFile(filePath, JSON.stringify(canonical, null, 2));
   return filePath;
 }
 
@@ -592,8 +917,16 @@ export function loadBrowserConversationSession(
 ): BrowserConversationSession | null {
   const filePath = sessionPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as BrowserConversationSession;
+  let parsed: BrowserConversationSession;
+  try {
+    parsed = browserConversationSessionCatalog(filePath).load();
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    logger.warn(
+      `[BROWSER_CONVERSATION_SESSION] Invalid session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
   const result = validateBrowserConversationSession(parsed);
   if (!result.valid) {
     logger.warn(
@@ -620,7 +953,7 @@ export function recordBrowserConversationHistory(
   const session = loadBrowserConversationSession(sessionId);
   if (!session) return null;
   session.history = [...session.history, entry].slice(-50);
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
   saveBrowserConversationSession(session);
   return session;
 }
@@ -642,11 +975,16 @@ export function getActiveBrowserConversationSession(
 }
 
 export function classifyBrowserConversationCommand(
-  utterance: string
+  utterance: string,
+  options: {
+    packet?: IntentResolutionPacket;
+    tier?: 'personal' | 'confidential' | 'public';
+    tenantId?: string;
+  } = {}
 ): BrowserConversationCommandResolution | null {
   const trimmed = utterance.trim();
   if (!trimmed) return null;
-  const resolvedSurfaceIntent = resolveSurfaceIntent(trimmed);
+  const resolvedSurfaceIntent = resolveSurfaceIntent(trimmed, options);
 
   if (
     /^(止めて|停止|キャンセル|やめて|stop|cancel|pause|resume|続けて|再開|戻って|back)\b/i.test(
@@ -825,7 +1163,7 @@ export function createBrowserConversationCommand(params: {
     session_id: params.sessionId,
     command_type: params.resolution.commandType,
     utterance: params.utterance,
-    issued_at: new Date().toISOString(),
+    issued_at: nowIso(),
     resolution: {
       action: params.resolution.action,
       input_text: params.resolution.inputText,
@@ -845,7 +1183,7 @@ export function createBrowserConversationFeedback(params: {
     session_id: params.sessionId,
     status: params.status,
     message: params.message,
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     candidates: params.candidates,
   };
 }
@@ -858,7 +1196,7 @@ export function applyBrowserConversationCommand(
   if (!session) return null;
 
   session.conversation_context.last_user_instruction = command.utterance;
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
 
   if (command.command_type === 'control_command') {
     session.status = command.resolution?.action === 'resume' ? 'awaiting_instruction' : 'paused';
@@ -974,8 +1312,8 @@ export function executeBrowserConversationCandidateAction(
   if (!selected) return null;
   const browserSessionId = session.target?.browser_session_id || session.session_id;
   const browserRuntimeSession = loadBrowserRuntimeSession(browserSessionId);
-  const tmpPath = pathResolver.sharedTmp(
-    `browser-conversation/${sessionId}-${Date.now().toString(36)}.json`
+  const tmpPath = browserConversationTempPath(
+    `${assertSessionPathSegment(sessionId)}-${Date.now().toString(36)}.json`
   );
   const steps: Array<Record<string, unknown>> = [];
 
@@ -1089,17 +1427,21 @@ export function executeBrowserConversationCandidateAction(
         timeoutMs: 60_000,
       }
     );
-    const parsed = JSON.parse(stdout) as Record<string, unknown>;
+    const parsed: unknown = parseSafeJsonInput(stdout, 'browser actuator response');
+    const normalized = normalizeBrowserActuatorResult(parsed);
+    if (normalized.status !== 'succeeded' && normalized.status !== 'success') {
+      throw new Error(`Browser actuator did not complete the action: ${normalized.status}`);
+    }
     session.status = 'completed';
     session.active_step.status = 'completed';
     session.conversation_context.pending_confirmation = false;
     const historyEntry: BrowserConversationHistoryEntry = {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       type: 'execution',
       text: `Executed ${session.active_step.kind} on ${selected.element_id}`,
     };
     session.history = [...session.history, historyEntry].slice(-50);
-    session.updated_at = new Date().toISOString();
+    session.updated_at = nowIso();
     saveBrowserConversationSession(session);
     return {
       ok: true,
@@ -1108,19 +1450,19 @@ export function executeBrowserConversationCandidateAction(
         status: 'completed',
         message: `「${selected.label || selected.text || selected.element_id}」を操作しました。`,
       }),
-      raw: parsed,
+      raw: normalized,
     };
   } catch (error: any) {
     const message = error?.message || String(error);
     session.status = 'failed';
     session.active_step.status = 'failed';
     const historyEntry: BrowserConversationHistoryEntry = {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       type: 'error',
       text: message,
     };
     session.history = [...session.history, historyEntry].slice(-50);
-    session.updated_at = new Date().toISOString();
+    session.updated_at = nowIso();
     saveBrowserConversationSession(session);
     return {
       ok: false,
@@ -1169,7 +1511,7 @@ export function confirmBrowserConversationCandidate(
 
   const selected = session.candidate_targets[candidateIndex];
   session.conversation_context.last_agent_ack = `候補 ${candidateIndex + 1} を選択しました。`;
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
   saveBrowserConversationSession(session);
   return executeBrowserConversationCandidateAction(sessionId, selected.element_id);
 }

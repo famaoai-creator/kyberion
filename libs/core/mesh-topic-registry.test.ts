@@ -2,7 +2,7 @@ import * as path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { pathResolver, safeRmSync } from './index.js';
+import { pathResolver, safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './index.js';
 import {
   advertiseMeshCapabilities,
   recordMeshHeartbeat,
@@ -95,6 +95,22 @@ describe('mesh-topic-registry', () => {
         { now: '2026-06-24T00:03:00.000Z' }
       )
     ).toHaveLength(1);
+  });
+
+  it('rejects subscriptions reached through a symlink', () => {
+    const tenantRoot = path.join(TEST_RUNTIME_ROOT_ABS, 'tenants', 'tenant-acme');
+    const target = path.join(TEST_RUNTIME_ROOT_ABS, 'subscriptions-target.jsonl');
+    const linked = path.join(tenantRoot, 'subscriptions.jsonl');
+    safeMkdir(tenantRoot, { recursive: true });
+    safeWriteFile(target, `${JSON.stringify({ tenant_id: 'tenant-acme' })}\n`);
+    safeSymlinkSync(target, linked);
+
+    expect(() =>
+      listMeshTopicSubscriptions({
+        tenant_id: 'tenant-acme',
+        topic: 'release.review',
+      })
+    ).toThrow(/RESOURCE_PATH_SYMLINK/);
   });
 
   it('resolves only explicitly subscribed and currently eligible peers', () => {

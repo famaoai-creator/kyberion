@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { agentRegistry, AgentProvider } from './agent-registry.js';
 import {
   canonicalA2AEnvelopeContent,
@@ -21,7 +22,8 @@ import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
 import { listDemotedProviders } from './provider-health-registry.js';
 import { auditChain } from './audit-chain.js';
 import { isA2ATaskContractLike, validateA2ATaskContract } from './a2a-task-contract.js';
-import { recordGovernanceAction } from './kill-switch.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
+import { registerA2ARoute } from './a2a-route-port.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
@@ -50,6 +52,7 @@ import {
 } from './agent-runtime-supervisor-client.js';
 import { normalizeAgentContextMode, type AgentContextMode } from './context-boundary.js';
 import { type TaskModelHint } from './reasoning-model-routing.js';
+import { isRecord } from './foundation/primitives.js';
 import {
   validateContextSecurityScope,
   validateReasoningEgress,
@@ -103,7 +106,21 @@ export interface A2AMessage {
      */
     delegation_chain?: string;
   };
-  payload: any;
+  payload: A2AMessagePayload;
+}
+
+/**
+ * The wire payload is extensible, but common response fields have stable
+ * types. Unknown extension fields remain opaque and are inspected only after
+ * an explicit record/context guard in the bridge.
+ */
+export interface A2AMessagePayload {
+  text?: string;
+  runtime_id?: string;
+  intent?: string;
+  objective?: string;
+  context?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 // AA-03: signing/verification delegate to the shared envelope-signature
@@ -159,6 +176,16 @@ export class AgentBusyError extends Error {
 // In-process fallback semaphores
 const GLOBAL_LIMIT = Number(getRegisteredEnvText('KYBERION_GLOBAL_INFLIGHT_LIMIT') || 8);
 const AGENT_LIMIT = Number(getRegisteredEnvText('KYBERION_AGENT_INFLIGHT_LIMIT') || 2);
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function errorName(error: unknown): string | undefined {
+  if (error instanceof Error) return error.name;
+  if (isRecord(error) && typeof error.name === 'string') return error.name;
+  return undefined;
+}
 
 const globalSemaphore = new Semaphore(GLOBAL_LIMIT);
 const agentSemaphores = new Map<string, Semaphore>();
@@ -225,8 +252,8 @@ class A2ABridgeImpl {
           recordGovernanceAction(envelope.header.sender, 'a2a_signature_invalid', 'system', true);
           throw new Error('A2A message signature verification failed');
         }
-      } catch (e: any) {
-        if (e.message.includes('signature verification')) throw e;
+      } catch (e: unknown) {
+        if (e instanceof Error && e.message.includes('signature verification')) throw e;
         // Buffer length mismatch etc - treat as invalid
         throw new Error('A2A message signature malformed');
       }
@@ -347,13 +374,15 @@ class A2ABridgeImpl {
     const rawPrompt = this.buildPromptFromPayload(envelope.payload);
     let runtimePrompt = rawPrompt;
     let rehydrated = false;
+    const payloadRecord = isRecord(envelope.payload) ? envelope.payload : undefined;
+    const payloadContext = isRecord(payloadRecord?.context) ? payloadRecord.context : undefined;
 
     const storageConversationId = conversationId
       ? this.scopeConversationId(conversationId, securityScope)
       : undefined;
     const missionId =
-      typeof envelope.payload?.context?.mission_id === 'string'
-        ? String(envelope.payload.context.mission_id).toUpperCase()
+      typeof payloadContext?.mission_id === 'string'
+        ? payloadContext.mission_id.toUpperCase()
         : undefined;
 
     if (storageConversationId) {
@@ -398,28 +427,17 @@ class A2ABridgeImpl {
         sender: envelope.header.sender,
         receiver: agentId,
         team_role:
-          typeof envelope.payload?.context?.team_role === 'string'
-            ? String(envelope.payload.context.team_role)
-            : undefined,
-        channel:
-          typeof envelope.payload?.context?.channel === 'string'
-            ? String(envelope.payload.context.channel)
-            : undefined,
-        thread:
-          typeof envelope.payload?.context?.thread === 'string'
-            ? String(envelope.payload.context.thread)
-            : undefined,
+          typeof payloadContext?.team_role === 'string' ? payloadContext.team_role : undefined,
+        channel: typeof payloadContext?.channel === 'string' ? payloadContext.channel : undefined,
+        thread: typeof payloadContext?.thread === 'string' ? payloadContext.thread : undefined,
         correlation_id: correlationId,
         performative: envelope.header.performative,
-        intent:
-          typeof envelope.payload?.intent === 'string'
-            ? String(envelope.payload.intent)
-            : undefined,
+        intent: typeof payloadRecord?.intent === 'string' ? payloadRecord.intent : undefined,
         prompt_excerpt: runtimePrompt.slice(0, 240),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn(
-        `[A2A_BRIDGE] Failed to record orchestration observation: ${error?.message || error}`
+        `[A2A_BRIDGE] Failed to record orchestration observation: ${errorMessage(error)}`
       );
     }
 
@@ -462,11 +480,19 @@ class A2ABridgeImpl {
           ...(missionId ? { missionId } : {}),
         });
         responseText = result.text;
-      } catch (err: any) {
-        if (err?.errorDetail?.type === 'busy') {
-          throw new AgentBusyError(err.message, err.errorDetail.retry_after_ms);
+      } catch (err: unknown) {
+        const errorDetail =
+          isRecord(err) && isRecord(err.errorDetail) ? err.errorDetail : undefined;
+        if (errorDetail?.type === 'busy') {
+          const retryAfterMs =
+            typeof errorDetail.retry_after_ms === 'number' &&
+            Number.isFinite(errorDetail.retry_after_ms) &&
+            errorDetail.retry_after_ms > 0
+              ? errorDetail.retry_after_ms
+              : 1000;
+          throw new AgentBusyError(errorMessage(err), retryAfterMs);
         }
-        if (err?.name === 'AgentRuntimeCrashedError') {
+        if (errorName(err) === 'AgentRuntimeCrashedError') {
           logger.warn(
             `[A2A_BRIDGE] Crash detected during ask. Re-ensuring agent and retrying with rehydrated prompt...`
           );
@@ -498,7 +524,7 @@ class A2ABridgeImpl {
           throw err;
         }
       }
-    } catch (daemonErr: any) {
+    } catch (daemonErr: unknown) {
       if (daemonErr instanceof AgentBusyError) throw daemonErr;
 
       // Fallback in-process route with Semaphore limits
@@ -522,8 +548,8 @@ class A2ABridgeImpl {
             })
           )
         );
-      } catch (inProcessErr: any) {
-        if (inProcessErr?.name === 'AgentRuntimeCrashedError') {
+      } catch (inProcessErr: unknown) {
+        if (errorName(inProcessErr) === 'AgentRuntimeCrashedError') {
           logger.warn(
             `[A2A_BRIDGE] Crash detected during in-process ask. Re-ensuring agent and retrying with rehydrated prompt...`
           );
@@ -567,7 +593,7 @@ class A2ABridgeImpl {
         conversation_id: envelope.header.conversation_id,
         correlation_id: correlationId,
         performative: 'result',
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       payload: {
         text: responseText,
@@ -610,8 +636,8 @@ class A2ABridgeImpl {
     for (const handler of handlers) {
       try {
         handler(response);
-      } catch (err: any) {
-        logger.warn(`[A2A_BRIDGE] Response handler failed: ${err?.message || err}`);
+      } catch (err: unknown) {
+        logger.warn(`[A2A_BRIDGE] Response handler failed: ${errorMessage(err)}`);
       }
     }
 
@@ -636,11 +662,11 @@ class A2ABridgeImpl {
     this.syncCachedHandle(agentId);
 
     const securityScope = this.extractSecurityScope(payload);
+    const payloadRecord = isRecord(payload) ? payload : undefined;
+    const payloadContext = isRecord(payloadRecord?.context) ? payloadRecord.context : undefined;
     const runtimeMissionId =
       securityScope?.mission_id ||
-      (typeof (payload as any)?.context?.mission_id === 'string'
-        ? String((payload as any).context.mission_id)
-        : undefined);
+      (typeof payloadContext?.mission_id === 'string' ? payloadContext.mission_id : undefined);
     const runtimeScope = securityScope
       ? {
           scope_kind: 'mission' as const,
@@ -766,33 +792,20 @@ class A2ABridgeImpl {
       cwd,
       requestedBy: 'a2a_bridge',
       runtimeOwnerId:
-        typeof (payload as any)?.context?.mission_id === 'string'
-          ? String((payload as any).context.mission_id)
-          : agentId,
-      runtimeOwnerType:
-        typeof (payload as any)?.context?.mission_id === 'string' ? 'mission' : 'agent',
+        typeof payloadContext?.mission_id === 'string' ? payloadContext.mission_id : agentId,
+      runtimeOwnerType: typeof payloadContext?.mission_id === 'string' ? 'mission' : 'agent',
       runtimeMetadata: {
         lease_kind: 'a2a',
         execution_mode: this.extractExecutionMode(payload) || 'default',
         mission_id:
-          typeof (payload as any)?.context?.mission_id === 'string'
-            ? String((payload as any).context.mission_id)
-            : undefined,
+          typeof payloadContext?.mission_id === 'string' ? payloadContext.mission_id : undefined,
         team_role:
-          typeof (payload as any)?.context?.team_role === 'string'
-            ? String((payload as any).context.team_role)
-            : undefined,
-        channel:
-          typeof (payload as any)?.context?.channel === 'string'
-            ? String((payload as any).context.channel)
-            : undefined,
-        thread:
-          typeof (payload as any)?.context?.thread === 'string'
-            ? String((payload as any).context.thread)
-            : undefined,
+          typeof payloadContext?.team_role === 'string' ? payloadContext.team_role : undefined,
+        channel: typeof payloadContext?.channel === 'string' ? payloadContext.channel : undefined,
+        thread: typeof payloadContext?.thread === 'string' ? payloadContext.thread : undefined,
         correlation_id:
-          typeof (payload as any)?.context?.correlation_id === 'string'
-            ? String((payload as any).context.correlation_id)
+          typeof payloadContext?.correlation_id === 'string'
+            ? payloadContext.correlation_id
             : undefined,
         // Mission assignments are concrete runtime targets. Do not run the
         // lifecycle's capability-based provider resolver a second time and
@@ -801,10 +814,7 @@ class A2ABridgeImpl {
           ? { provider_strategy: 'strict', skip_provider_resolution: true }
           : {}),
         task_model_hint: this.extractTaskModelHint(payload),
-        intent:
-          typeof (payload as any)?.intent === 'string'
-            ? String((payload as any).intent)
-            : undefined,
+        intent: typeof payloadRecord?.intent === 'string' ? payloadRecord.intent : undefined,
       },
     } as const;
     let handle: AgentHandle;
@@ -893,18 +903,16 @@ class A2ABridgeImpl {
   }
 
   private extractExecutionMode(payload: unknown): string | undefined {
-    if (!payload || typeof payload !== 'object') return undefined;
-    const context = (payload as Record<string, unknown>).context;
-    if (!context || typeof context !== 'object') return undefined;
-    const executionMode = (context as Record<string, unknown>).execution_mode;
+    if (!isRecord(payload)) return undefined;
+    const context = isRecord(payload.context) ? payload.context : undefined;
+    const executionMode = context?.execution_mode;
     return typeof executionMode === 'string' ? executionMode : undefined;
   }
 
   private extractSecurityScope(payload: unknown): ContextSecurityScope | undefined {
-    if (!payload || typeof payload !== 'object') return undefined;
-    const context = (payload as Record<string, unknown>).context;
-    if (!context || typeof context !== 'object') return undefined;
-    const scope = (context as Record<string, unknown>).security_scope;
+    if (!isRecord(payload)) return undefined;
+    const context = isRecord(payload.context) ? payload.context : undefined;
+    const scope = context?.security_scope;
     return scope && typeof scope === 'object' ? (scope as ContextSecurityScope) : undefined;
   }
 
@@ -933,15 +941,14 @@ class A2ABridgeImpl {
   }
 
   private extractTaskModelHint(payload: unknown): TaskModelHint | undefined {
-    if (!payload || typeof payload !== 'object') return undefined;
-    const record = payload as Record<string, unknown>;
+    if (!isRecord(payload)) return undefined;
+    const record = payload;
+    const context = isRecord(record.context) ? record.context : undefined;
     const candidate =
       record.task_model_hint ||
       record.model_hint ||
-      (record.context && typeof record.context === 'object'
-        ? (record.context as Record<string, unknown>).task_model_hint ||
-          (record.context as Record<string, unknown>).model_hint
-        : undefined);
+      context?.task_model_hint ||
+      context?.model_hint;
     if (!candidate || typeof candidate !== 'object') return undefined;
 
     const hint = candidate as Record<string, unknown>;
@@ -960,37 +967,33 @@ class A2ABridgeImpl {
   }
 
   private extractProvider(payload: unknown): AgentProvider | undefined {
-    if (!payload || typeof payload !== 'object') return undefined;
-    const context = (payload as Record<string, unknown>).context;
-    if (!context || typeof context !== 'object') return undefined;
-    const provider = (context as Record<string, unknown>).provider;
+    if (!isRecord(payload)) return undefined;
+    const context = isRecord(payload.context) ? payload.context : undefined;
+    const provider = context?.provider;
     return typeof provider === 'string' && provider.trim()
       ? (provider.trim() as AgentProvider)
       : undefined;
   }
 
   private extractProviderModelId(payload: unknown): string | undefined {
-    if (!payload || typeof payload !== 'object') return undefined;
-    const context = (payload as Record<string, unknown>).context;
-    if (!context || typeof context !== 'object') return undefined;
-    const modelId = (context as Record<string, unknown>).provider_model_id;
+    if (!isRecord(payload)) return undefined;
+    const context = isRecord(payload.context) ? payload.context : undefined;
+    const modelId = context?.provider_model_id;
     return typeof modelId === 'string' && modelId.trim() ? modelId.trim() : undefined;
   }
 
   private extractDispatchTimeoutMs(payload: unknown): number | undefined {
-    if (!payload || typeof payload !== 'object') return undefined;
-    const context = (payload as Record<string, unknown>).context;
-    if (!context || typeof context !== 'object') return undefined;
-    const value = (context as Record<string, unknown>).dispatch_timeout_ms;
+    if (!isRecord(payload)) return undefined;
+    const context = isRecord(payload.context) ? payload.context : undefined;
+    const value = context?.dispatch_timeout_ms;
     return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
   }
 
   private extractContextMode(payload: unknown, hasConversation = false): AgentContextMode {
     const fallback: AgentContextMode = hasConversation ? 'continue' : 'fresh';
-    if (!payload || typeof payload !== 'object') return fallback;
-    const context = (payload as Record<string, unknown>).context;
-    if (!context || typeof context !== 'object') return fallback;
-    return normalizeAgentContextMode((context as Record<string, unknown>).context_mode, fallback);
+    if (!isRecord(payload)) return fallback;
+    const context = isRecord(payload.context) ? payload.context : undefined;
+    return normalizeAgentContextMode(context?.context_mode, fallback);
   }
 
   private validateTaskContractPayload(payload: unknown): { valid: boolean; errors: string[] } {
@@ -1010,7 +1013,9 @@ class A2ABridgeImpl {
     if (typeof headerCorrelationId === 'string' && headerCorrelationId.trim()) {
       return headerCorrelationId.trim();
     }
-    const payloadCorrelationId = (envelope.payload as any)?.context?.correlation_id;
+    const payloadRecord = isRecord(envelope.payload) ? envelope.payload : undefined;
+    const payloadContext = isRecord(payloadRecord?.context) ? payloadRecord.context : undefined;
+    const payloadCorrelationId = payloadContext?.correlation_id;
     if (typeof payloadCorrelationId === 'string' && payloadCorrelationId.trim()) {
       return payloadCorrelationId.trim();
     }
@@ -1092,7 +1097,10 @@ class A2ABridgeImpl {
 }
 
 const GLOBAL_KEY = Symbol.for('@kyberion/a2a-bridge');
-if (!(globalThis as any)[GLOBAL_KEY]) {
-  (globalThis as any)[GLOBAL_KEY] = new A2ABridgeImpl();
+const globalRegistry = globalThis as typeof globalThis & { [key: symbol]: unknown };
+if (!globalRegistry[GLOBAL_KEY]) {
+  globalRegistry[GLOBAL_KEY] = new A2ABridgeImpl();
 }
-export const a2aBridge: A2ABridgeImpl = (globalThis as any)[GLOBAL_KEY];
+export const a2aBridge = globalRegistry[GLOBAL_KEY] as A2ABridgeImpl;
+
+registerA2ARoute((envelope) => a2aBridge.route(envelope));

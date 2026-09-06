@@ -3,15 +3,26 @@ import {
   listScheduledPipelines,
   registerScheduledPipeline,
   unregisterScheduledPipeline,
-  spawnManagedProcess,
-  pathResolver,
-} from '@agent/core';
-import { safeExistsSync } from '@agent/core/secure-io';
+} from '@agent/core/pipeline-scheduler';
+import { spawnManagedProcess } from '@agent/core/managed-process';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { distScript } from './exec.js';
 import { auditAction, toActionResult, HUD_PEER_ID, type ActionResult } from './dispatch.js';
 
 function findSchedule(id: string) {
   return listScheduledPipelines().find((schedule) => schedule.id === id);
+}
+
+export function resolvePipelineFile(pipelinePath: string, root: string): string | null {
+  try {
+    const resolved = assertSafeRepositoryPath(path.resolve(root, pipelinePath), {
+      allowMissingLeaf: true,
+    });
+    return safeExistsSync(resolved) && safeLstat(resolved).isFile() ? resolved : null;
+  } catch {
+    return null;
+  }
 }
 
 export function toggleSchedule(id: string): ActionResult {
@@ -47,8 +58,8 @@ export function runScheduleNow(id: string): ActionResult {
   try {
     const schedule = findSchedule(id);
     if (!schedule) return { ok: false, message: `not found: ${id}` };
-    const pipelinePath = path.resolve(pathResolver.rootDir(), schedule.pipelinePath);
-    if (!safeExistsSync(pipelinePath)) {
+    const pipelinePath = resolvePipelineFile(schedule.pipelinePath, pathResolver.rootDir());
+    if (!pipelinePath) {
       return { ok: false, message: `pipeline missing: ${schedule.pipelinePath}` };
     }
     const handle = spawnManagedProcess({
@@ -77,12 +88,14 @@ export function registerScheduleFromPalette(input: {
   cron: string;
 }): ActionResult {
   try {
-    const resolved = path.resolve(pathResolver.rootDir(), input.pipelinePath);
-    const pipelinesRoot = path.resolve(pathResolver.rootDir(), 'pipelines');
-    if (!resolved.startsWith(pipelinesRoot + path.sep)) {
+    const root = pathResolver.rootDir();
+    const candidate = path.resolve(root, input.pipelinePath);
+    const pipelinesRoot = path.resolve(root, 'pipelines');
+    if (candidate !== pipelinesRoot && !candidate.startsWith(pipelinesRoot + path.sep)) {
       return { ok: false, message: 'pipeline must live under pipelines/' };
     }
-    if (!safeExistsSync(resolved)) {
+    const resolved = resolvePipelineFile(input.pipelinePath, root);
+    if (!resolved) {
       return { ok: false, message: `pipeline missing: ${input.pipelinePath}` };
     }
     registerScheduledPipeline({

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   EnergyVad,
   MeetingParticipationCoordinator,
+  checkMeetingParticipationConsent,
   TraceContext,
   finalizeAndPersist,
   StubAudioBus,
@@ -16,6 +17,11 @@ import {
   type MeetingTarget,
   type TranscriptChunk,
   pathResolver,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+  withExecutionContext,
 } from './index.js';
 
 const ROOT = pathResolver.rootDir();
@@ -111,6 +117,51 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     expect(persistedText).toContain('meeting_participation.run');
     expect(persistedText).toContain('meeting_participation.spoke');
     fs.rmSync(traceDir, { recursive: true, force: true });
+  });
+
+  it('hands the live session to onSession right after join', async () => {
+    const bus = new StubAudioBus();
+    const driver = new StubMeetingJoinDriver();
+    const stt = new StubStreamingSpeechToTextBridge(1);
+    const tts = new StubStreamingTextToSpeechBridge();
+    const vad = new EnergyVad();
+    const trace = new TraceContext('meeting_participation:test', { missionId: 'MSN-TEST-1' });
+
+    const seen: string[] = [];
+    const coordinator = new MeetingParticipationCoordinator({
+      driver,
+      bus,
+      stt,
+      tts,
+      vad,
+      agent: {
+        async onUtterance() {
+          return { leave: true };
+        },
+      },
+      trace,
+    });
+
+    for (let i = 0; i < 11; i++) bus.injectInbound(makeChunk());
+
+    const report = await coordinator.run(
+      {
+        url: 'https://meet.google.com/test-test-test',
+        platform: 'meet',
+        display_name: 'Kyberion',
+      },
+      {
+        max_minutes: 1,
+        voice_profile_id: 'operator-default-v1',
+        audio_format: FORMAT,
+        post_playback_drain_ms: 0,
+        onSession: (session) => {
+          seen.push(session.state.session_id);
+        },
+      }
+    );
+
+    expect(seen).toEqual([report.session_id]);
   });
 
   it('captions mode consumes the driver transcript stream and replies over chat', async () => {
@@ -308,6 +359,38 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     expect(JSON.stringify(trace.finalize())).toContain('meeting_participation.recording_denied');
   });
 
+  it('fails closed before reading consent through an invalid mission id or symlinked evidence dir', () => {
+    const invalid = checkMeetingParticipationConsent({
+      mission_id: '../outside',
+      purpose: 'recording',
+    });
+    expect(invalid.allowed).toBe(false);
+    expect(invalid.reason).toMatch(/mission evidence path rejected/);
+
+    const outsideDir = path.join(ROOT, 'active/shared/tmp/meeting-consent-outside');
+    const evidenceDir = path.join(CONSENT_MISSION_DIR, 'evidence');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(CONSENT_MISSION_DIR, { recursive: true });
+      safeMkdir(outsideDir, { recursive: true });
+      safeWriteFile(
+        path.join(CONSENT_MISSION_DIR, 'mission-state.json'),
+        JSON.stringify({
+          mission_id: CONSENT_MISSION,
+          tier: 'confidential',
+          assigned_persona: 'ecosystem_architect',
+        })
+      );
+      safeSymlinkSync(outsideDir, evidenceDir, 'dir');
+      const result = checkMeetingParticipationConsent({
+        mission_id: CONSENT_MISSION,
+        purpose: 'recording',
+      });
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toMatch(/voice-consent path rejected/);
+      safeRmSync(outsideDir);
+    });
+  });
+
   it('re-checks voice consent before TTS speech', async () => {
     writeVoiceConsent({
       consent: 'revoked',
@@ -354,6 +437,23 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
 
     expect(ttsSpy).not.toHaveBeenCalled();
     expect(JSON.stringify(trace.finalize())).toContain('meeting_participation.speak_denied');
+  });
+
+  it('fails closed when consent contains fields outside the persisted schema', () => {
+    writeVoiceConsent({
+      consent: 'granted',
+      mission_id: CONSENT_MISSION,
+      operator_handle: 'operator',
+      unexpected: true,
+    });
+
+    const result = checkMeetingParticipationConsent({
+      mission_id: CONSENT_MISSION,
+      purpose: 'recording',
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/malformed/);
   });
 
   it('allows capture and speech when mission consent is granted', async () => {

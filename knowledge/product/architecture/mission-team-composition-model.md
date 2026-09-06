@@ -96,7 +96,7 @@ To keep planning and execution explicit, mission team data is split into three a
 Mission retrospective records objective `model × team_role` outcomes in
 `active/shared/observability/retrospectives/model-role-outcomes.jsonl` and
 aggregates them in `model-performance.json`. A user or operator may also
-record a bounded 1–5 rating with `pnpm model:feedback`; ratings are kept in a
+record a bounded 1–5 rating with `pnpm kyberion model feedback`; ratings are kept in a
 separate append-only journal.
 
 The learned score is deliberately bounded and ignored until the minimum sample

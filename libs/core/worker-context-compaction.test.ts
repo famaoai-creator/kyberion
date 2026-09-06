@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MissionWorkingMemory } from './mission-working-memory.js';
 import {
@@ -8,6 +9,7 @@ import {
   estimateContextTokenDetails,
   estimateContextTokens,
   isPromptTooLongError,
+  isRegularUpdateSummaryPromptPath,
   loadCarryover,
   resolveContextWindowProfile,
   type CompactionCarryover,
@@ -15,6 +17,11 @@ import {
   type CompactionEvent,
   type WorkerContextMessage,
 } from './worker-context-compaction.js';
+import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
+import * as pathResolver from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+
+const PROMPT_FIXTURE_ROOT = pathResolver.sharedTmp('worker-context-prompt-loader-test');
 
 const CARRYOVER: CompactionCarryover = {
   goal: 'Ship the Q3 governance report',
@@ -31,9 +38,23 @@ afterEach(() => {
   delete process.env.KYBERION_CONTEXT_WINDOW_TOKENS;
   delete process.env.KYBERION_CONTEXT_RESERVE_TOKENS;
   delete process.env.KYBERION_CONTEXT_BUFFER_TOKENS;
+  safeRmSync(PROMPT_FIXTURE_ROOT, { recursive: true, force: true });
 });
 
 describe('worker-context-compaction (OH-01)', () => {
+  it('accepts only regular files for the update-summary prompt', () => {
+    const filePath = path.join(PROMPT_FIXTURE_ROOT, 'prompt.md');
+    const directoryPath = path.join(PROMPT_FIXTURE_ROOT, 'prompt-directory.md');
+    safeWriteFile(filePath, 'summary prompt', { mkdir: true });
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(isRegularUpdateSummaryPromptPath(filePath)).toBe(true);
+    expect(isRegularUpdateSummaryPromptPath(directoryPath)).toBe(false);
+    expect(isRegularUpdateSummaryPromptPath(path.join(PROMPT_FIXTURE_ROOT, 'missing.md'))).toBe(
+      false
+    );
+  });
+
   it('uses provider usage as an anchor and estimates only the trailing messages', () => {
     const messages: WorkerContextMessage[] = [
       { role: 'user', content: 'measured prefix' },
@@ -72,6 +93,22 @@ describe('worker-context-compaction (OH-01)', () => {
     expect(result.compacted).toBe(false);
     expect(result.stage).toBe('none');
     expect(result.messages[0].content).toBe('small output');
+  });
+
+  it('does not persist a summary outside the repository', async () => {
+    const result = await compactWorkerContext(
+      [
+        { role: 'user', content: 'x'.repeat(5_000) },
+        { role: 'assistant', content: 'y'.repeat(5_000) },
+      ],
+      {
+        profile: { contextWindowTokens: 2_000, reserveTokens: 500, bufferTokens: 500 },
+        summaryDir: '/tmp/kyberion-compaction',
+        summarize: async () => 'summary',
+      }
+    );
+    expect(result.stage).toBe('summary');
+    expect(result.summaryArtifactPath).toBeUndefined();
   });
 
   it('microcompacts old tool_results, keeps recent ones, and injects structured carryover', async () => {
@@ -172,6 +209,39 @@ describe('worker-context-compaction (OH-01)', () => {
     expect(result.retainedTail.length).toBeGreaterThan(0);
     const summaryMessage = result.messages.find((message) => message.content.includes('<summary>'));
     expect(summaryMessage?.retained_tail?.length).toBe(result.retainedTail.length);
+  });
+
+  it('applies the declared reasoning payload scope while summarizing', async () => {
+    let observed: ReturnType<typeof getReasoningPayloadScope>;
+    const big = 's'.repeat(5_000);
+    const result = await compactWorkerContext(
+      [
+        { role: 'user', content: big },
+        { role: 'assistant', content: big },
+      ],
+      {
+        profile: { contextWindowTokens: 2_000, reserveTokens: 500, bufferTokens: 500 },
+        summaryProvider: 'local-model',
+        scope: { tier: 'public', mission_id: 'M-COMPACTION-SCOPE' },
+        summaryReasoningScope: {
+          tier: 'confidential',
+          tenant_slug: 'tenant-a',
+          purpose: 'test summary scope',
+        },
+        summarize: async () => {
+          observed = getReasoningPayloadScope();
+          return 'scoped summary';
+        },
+      }
+    );
+
+    expect(result.stage).toBe('summary');
+    expect(observed).toEqual({
+      tier: 'confidential',
+      tenant_slug: 'tenant-a',
+      purpose: 'test summary scope',
+    });
+    expect(getReasoningPayloadScope()).toBeUndefined();
   });
 
   it('preserves a governing decision across five consecutive summary compactions', async () => {

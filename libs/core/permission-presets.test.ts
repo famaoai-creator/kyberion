@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   derivePermissionPreset,
   resolvePermissionPreset,
-  resetPermissionPresetRegistryCache,
+  _resetPermissionPresetRegistryCacheForTests,
 } from './permission-presets.js';
 
 describe('permission-presets (DH-11)', () => {
@@ -35,6 +35,6 @@ describe('permission-presets (DH-11)', () => {
       capability_profile: 'implementer',
     });
     expect(edit).toMatchObject({ name: 'edit', derived: false });
-    resetPermissionPresetRegistryCache();
+    _resetPermissionPresetRegistryCacheForTests();
   });
 });

@@ -44,10 +44,10 @@ status: archived
 ### ミラー再同期の運用
 
 ```bash
-pnpm audit:mirror-reconcile -- --mission-id MSN-SA-01-<DATE>
-pnpm audit:mirror-reconcile -- --request-approval --mission-id MSN-SA-01-<DATE> --requested-by <operator>
+pnpm kyberion audit mirror-reconcile --mission-id MSN-SA-01-<DATE>
+pnpm kyberion audit mirror-reconcile --request-approval --mission-id MSN-SA-01-<DATE> --requested-by <operator>
 pnpm cli approve <REQUEST_ID> terminal
-pnpm audit:mirror-reconcile -- --apply --mission-id MSN-SA-01-<DATE> --approval-request-id <REQUEST_ID>
+pnpm kyberion audit mirror-reconcile --apply --mission-id MSN-SA-01-<DATE> --approval-request-id <REQUEST_ID>
 ```
 
 対象は `customer/{slug}/logs/audit/` のみで、master (`active/shared/logs/audit/`) は変更しない。退避先は `active/archive/.trash/audit-mirror-<run>/` であり、復旧可能である。適用後は `pnpm audit:verify --days 7 --warn-only` と `pnpm check -- --scope full --only entity-governance -- --strict-warnings` を再実行する。

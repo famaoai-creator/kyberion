@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from './path-resolver.js';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(() => ''),
@@ -13,6 +14,9 @@ vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
   return {
     ...actual,
+    // The recorder suite uses /tmp as an isolated output seam; production
+    // path confinement is covered by the real secure-io implementation.
+    assertSafeRepositoryPath: (filePath: string) => filePath,
     safeExec: mocks.safeExec,
     safeMkdir: mocks.safeMkdir,
     safeWriteFile: mocks.safeWriteFile,
@@ -39,8 +43,19 @@ vi.mock('./virtual-audio-input-recording-bridge.js', () => ({
 }));
 
 import { recordVoiceSample } from './voice-sample-recorder.js';
+import { safeReadFile } from './secure-io.js';
 
 describe('voice-sample-recorder', () => {
+  it('routes recording command environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/voice-sample-recorder.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   const originalPlatform = process.platform;
 
   afterEach(() => {
@@ -125,7 +140,7 @@ describe('voice-sample-recorder', () => {
     expect(mocks.safeExec).not.toHaveBeenCalled();
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       '/tmp/voice-sample-recording/rec-1/s1.wav',
-      expect.any(Buffer),
+      expect.any(Buffer)
     );
   });
 
@@ -172,7 +187,8 @@ describe('voice-sample-recorder', () => {
   });
 
   it('invokes the configured shell recording command', async () => {
-    process.env.KYBERION_AUDIO_RECORD_COMMAND = 'record-tool --out {{output}} --sec {{duration_sec}}';
+    process.env.KYBERION_AUDIO_RECORD_COMMAND =
+      'record-tool --out {{output}} --sec {{duration_sec}}';
     const result = await recordVoiceSample({
       action: 'record_voice_sample',
       request_id: 'rec-2',
@@ -183,11 +199,14 @@ describe('voice-sample-recorder', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.output_path).toBe('/tmp/voice-sample-recording/rec-2/s2.wav');
-    expect(mocks.safeWriteFile).toHaveBeenCalledWith('/tmp/voice-sample-recording/rec-2/s2.prompt.txt', 'Please read this line.\n');
+    expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+      '/tmp/voice-sample-recording/rec-2/s2.prompt.txt',
+      'Please read this line.\n'
+    );
     expect(mocks.safeExec).toHaveBeenCalledWith(
       expect.any(String),
       ['-lc', 'record-tool --out "/tmp/voice-sample-recording/rec-2/s2.wav" --sec 12'],
-      expect.objectContaining({ timeoutMs: 30000 }),
+      expect.objectContaining({ timeoutMs: 30000 })
     );
   });
 });

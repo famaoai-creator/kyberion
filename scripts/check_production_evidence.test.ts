@@ -6,7 +6,8 @@ import {
   REQUIRED_PRODUCTION_EVIDENCE_IDS,
   type ProductionEvidenceRegister,
 } from './check_production_evidence.js';
-import { pathResolver, safeMkdir } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir } from '@agent/core/secure-io';
 
 function verifiedRegister(): ProductionEvidenceRegister {
   const register = loadProductionEvidenceRegister();

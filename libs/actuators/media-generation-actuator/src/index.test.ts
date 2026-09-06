@@ -2,7 +2,8 @@ import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath, pathResolver } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { pathResolver } from '@agent/core/path-resolver';
 import { describeOps, MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
 
 const mocks = vi.hoisted(() => ({
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   safeCopyFileSync: vi.fn(),
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
+  resetSafeReadFile: vi.fn(),
   handleSystemAction: vi.fn(async () => ({
     media_recording: {
       status: 'succeeded',
@@ -29,19 +31,76 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 const COMFY_OUTPUT_DIR = pathResolver.sharedTmp('comfy/output');
 
-vi.mock('@agent/core', async () => {
-  const actual = (await vi.importActual('@agent/core')) as any;
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
+  mocks.resetSafeReadFile.mockImplementation(() =>
+    mocks.safeReadFile.mockImplementation((...args: Parameters<typeof actual.safeReadFile>) =>
+      actual.safeReadFile(...args)
+    )
+  );
+  mocks.resetSafeReadFile();
   return {
     ...actual,
     safeReadFile: mocks.safeReadFile,
     safeWriteFile: mocks.safeWriteFile,
-    executeServicePreset: mocks.executeServicePreset,
-    compileMusicGenerationADF: mocks.compileMusicGenerationADF,
-    compileImageGenerationADF: mocks.compileImageGenerationADF,
-    compileVideoGenerationADF: mocks.compileVideoGenerationADF,
-    generateImage: mocks.generateImage,
-    secureFetch: mocks.secureFetch,
-    buildGovernedRetryOptions: vi.fn(({ manifestPath, defaults, override }: any) => {
+    safeCopyFileSync: mocks.safeCopyFileSync,
+    safeExistsSync: mocks.safeExistsSync,
+    safeMkdir: mocks.safeMkdir,
+  };
+});
+
+vi.mock('@agent/core/service-engine', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/service-engine')>()),
+  executeServicePreset: mocks.executeServicePreset,
+}));
+
+vi.mock('@agent/core/music-workflow-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/music-workflow-compiler')>()),
+  compileMusicGenerationADF: mocks.compileMusicGenerationADF,
+}));
+
+vi.mock('@agent/core/visual-workflow-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/visual-workflow-compiler')>()),
+  compileImageGenerationADF: mocks.compileImageGenerationADF,
+  compileVideoGenerationADF: mocks.compileVideoGenerationADF,
+}));
+
+vi.mock('@agent/core/image-generation-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/image-generation-bridge')>()),
+  generateImage: mocks.generateImage,
+}));
+
+vi.mock('@agent/core/network', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/network')>()),
+  secureFetch: mocks.secureFetch,
+}));
+
+vi.mock('@agent/core/media-backend-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/media-backend-registry')>()),
+  resolveMediaBackendForPlatform: (modality: 'image' | 'video' | 'music', backendId?: string) => ({
+    backend_id: backendId || `media-generation.comfyui.${modality}`,
+    modality,
+    display_name: `test ${modality} backend`,
+    kind: 'service_preset' as const,
+    provider: 'comfyui',
+    status: 'active' as const,
+    platforms: ['any' as const],
+    supports: { async: true },
+  }),
+}));
+
+vi.mock('@agent/core/recovery-policy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/recovery-policy')>();
+  const buildGovernedRetryOptions = vi.fn(
+    ({
+      manifestPath,
+      defaults,
+      override,
+    }: {
+      manifestPath: string;
+      defaults: Record<string, unknown>;
+      override?: Record<string, unknown>;
+    }) => {
       let retryPolicy = {};
       try {
         const manifest = JSON.parse(String(mocks.safeReadFile(manifestPath)));
@@ -50,13 +109,22 @@ vi.mock('@agent/core', async () => {
         retryPolicy = {};
       }
       return { ...defaults, ...retryPolicy, ...(override || {}), shouldRetry: vi.fn() };
-    }),
-    retry: mocks.retry,
-    safeCopyFileSync: mocks.safeCopyFileSync,
-    safeExistsSync: mocks.safeExistsSync,
-    safeMkdir: mocks.safeMkdir,
+    }
+  );
+  return {
+    ...actual,
+    buildGovernedRetryOptions,
+    createGovernedRetryOptionsBuilder:
+      (input: { manifestPath: string; defaults: Record<string, unknown> }) =>
+      (override?: Record<string, unknown>) =>
+        buildGovernedRetryOptions({ ...input, override }),
   };
 });
+
+vi.mock('@agent/core/async-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
+  retry: mocks.retry,
+}));
 
 vi.mock('@agent/core/foundation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/foundation')>();
@@ -70,10 +138,74 @@ vi.mock('@actuator/system', () => ({
   handleAction: mocks.handleSystemAction,
 }));
 
+function resetTestDoubles(): void {
+  mocks.safeReadFile.mockReset();
+  mocks.resetSafeReadFile();
+  mocks.safeWriteFile.mockReset();
+  mocks.safeCopyFileSync.mockReset();
+  mocks.safeExistsSync.mockReset();
+  mocks.safeMkdir.mockReset();
+  mocks.executeServicePreset.mockReset();
+  mocks.compileMusicGenerationADF.mockReset();
+  mocks.compileImageGenerationADF.mockReset();
+  mocks.compileVideoGenerationADF.mockReset();
+  mocks.generateImage.mockReset();
+  mocks.secureFetch.mockReset();
+  mocks.retry.mockReset();
+  mocks.retry.mockImplementation(async (fn: () => Promise<unknown>) => fn());
+  mocks.handleSystemAction.mockReset();
+  mocks.handleSystemAction.mockResolvedValue({
+    media_recording: {
+      status: 'succeeded',
+      output_path: '/repo/capture.mp4',
+    },
+  });
+}
+
+async function installMockFoundationIo(): Promise<void> {
+  const foundation = await import('@agent/core/foundation');
+  const actualSecureIo =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+  const readFile = (filePath: string): string => {
+    const normalizedPath = String(filePath).replaceAll('\\', '/');
+    const useActualFile =
+      normalizedPath.includes('/knowledge/product/schemas/') ||
+      normalizedPath.endsWith('/knowledge/product/governance/error-classifier-rules.json') ||
+      normalizedPath.endsWith('/libs/actuators/media-generation-actuator/manifest.json');
+    return String(
+      useActualFile
+        ? actualSecureIo.safeReadFile(filePath, { encoding: 'utf8' })
+        : mocks.safeReadFile(filePath)
+    );
+  };
+  const loadJson = <T>(filePath: string): T => JSON.parse(readFile(filePath)) as T;
+  foundation.registerFoundationIo({
+    loadJson,
+    loadJsonIfPresent: <T>(filePath: string): T | null => {
+      const mockedExists = mocks.safeExistsSync(filePath);
+      const exists = typeof mockedExists === 'boolean' ? mockedExists : true;
+      return exists ? loadJson<T>(filePath) : null;
+    },
+    appendFile: (filePath, content) => mocks.safeWriteFile(filePath, content),
+    exists: (filePath) => {
+      const mockedExists = mocks.safeExistsSync(filePath);
+      return typeof mockedExists === 'boolean' ? mockedExists : true;
+    },
+    readFile,
+    stat: (filePath) => ({
+      mtimeMs: 0,
+      size: readFile(filePath).length,
+    }),
+    writeFile: (filePath, content) => mocks.safeWriteFile(filePath, content),
+  });
+}
+
 describe('prompt style pack injection (E2E-02 Task 4)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
+    resetTestDoubles();
+    await installMockFoundationIo();
   });
 
   async function prepare(action: string, params: Record<string, unknown>) {
@@ -129,9 +261,28 @@ describe('prompt style pack injection (E2E-02 Task 4)', () => {
 });
 
 describe('media-generation-actuator', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
+    resetTestDoubles();
+    await installMockFoundationIo();
+  });
+
+  it('uses the schema-bound catalog for persisted generation jobs', async () => {
+    const actual =
+      await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+    const source = String(
+      actual.safeReadFile(
+        pathResolver.rootResolve(
+          'libs/actuators/media-generation-actuator/src/media-generation-helpers.ts'
+        ),
+        { encoding: 'utf8' }
+      )
+    );
+
+    expect(source).toContain("id: 'generation-job'");
+    expect(source).toContain("'product/schemas/generation-job.schema.json'");
+    expect(source).not.toContain('readJson<unknown>(jobPath)');
   });
 
   it('uses the manifest recovery policy when polling generation history', async () => {
@@ -407,7 +558,8 @@ describe('media-generation-actuator', () => {
   });
 
   it('keeps schema, manifest, handler, and op catalog action sets aligned', async () => {
-    const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
+    const actual =
+      await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
     const manifest = JSON.parse(
       String(
         actual.safeReadFile(
@@ -968,7 +1120,8 @@ describe('media-generation-actuator', () => {
   });
 
   it('validates every action example fixture against the discriminated action schema', async () => {
-    const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
+    const actual =
+      await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
     const catalog = JSON.parse(
       String(
         actual.safeReadFile(

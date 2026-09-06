@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   executeProgrammaticToolCall,
+  normalizeProgrammaticRpcRequest,
+  normalizeProgrammaticRunnerOutput,
   resolveProgrammaticToolGrant,
 } from './programmatic-tool-calling.js';
 import { pathResolver } from './path-resolver.js';
@@ -18,6 +20,27 @@ function sourceRunner() {
 }
 
 describe('programmatic-tool-calling', () => {
+  it('rejects malformed RPC and runner envelopes before dispatch', () => {
+    expect(() => normalizeProgrammaticRpcRequest([])).toThrow('[PTC_RPC] request must be');
+    expect(() =>
+      normalizeProgrammaticRpcRequest({
+        token: 't',
+        id: 'r1',
+        method: 'call_op',
+        op: 'system:read_file',
+        params: [],
+      })
+    ).toThrow('params must be an object');
+    expect(() => normalizeProgrammaticRunnerOutput({ ok: 'true' })).toThrow(
+      'output.ok must be boolean'
+    );
+    expect(normalizeProgrammaticRunnerOutput({ ok: true, stdout: 'done', calls: 1 })).toEqual({
+      ok: true,
+      stdout: 'done',
+      calls: 1,
+    });
+  });
+
   it('enforces sandbox allowlist ∩ session grant', () => {
     expect(
       resolveProgrammaticToolGrant(

@@ -1,6 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeRmSync } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   buildDelegatedTaskWorkerProcessSpec,
   completeDelegatedTaskTrace,
@@ -78,6 +87,44 @@ describe('KC-06 delegated-task-observability store', () => {
     expect(delegatedTaskStoreDir()).toContain('kc06-tests');
   });
 
+  it('persists the canonical schema payload for resumable snapshots', () => {
+    const trace = startDelegatedTaskTrace({
+      owner: 'canonical-owner',
+      instruction: 'Persist only the governed snapshot shape.',
+    });
+    const traceWithSchema = {
+      ...trace,
+      $schema: 'https://example.invalid/delegated-task.json',
+    } as typeof trace & { $schema: string };
+
+    completeDelegatedTaskTrace(traceWithSchema, { resultSummary: 'snapshot ready' });
+
+    const persistedPath = pathResolver.rootResolve(
+      path.join(STORE_OVERRIDE, `${trace.trace_id}.json`)
+    );
+    const persisted = JSON.parse(String(safeReadFile(persistedPath, { encoding: 'utf8' })));
+    expect(persisted.$schema).toBeUndefined();
+    expect(loadDelegatedTaskRecord(trace.trace_id)?.status).toBe('completed');
+  });
+
+  it('fails closed for schema-invalid and non-regular records', () => {
+    const trace = startDelegatedTaskTrace({
+      owner: 'test-owner',
+      instruction: 'Validate the persisted record boundary.',
+    });
+    const persistedPath = pathResolver.rootResolve(
+      path.join(STORE_OVERRIDE, `${trace.trace_id}.json`)
+    );
+    safeWriteFile(persistedPath, JSON.stringify({ delegation_id: trace.trace_id }), {
+      encoding: 'utf8',
+    });
+    expect(loadDelegatedTaskRecord(trace.trace_id)).toBeNull();
+
+    safeRmSync(persistedPath, { recursive: true, force: true });
+    safeMkdir(persistedPath, { recursive: true });
+    expect(loadDelegatedTaskRecord(trace.trace_id)).toBeNull();
+  });
+
   it('builds a runtime-supervised worker spec without putting inbox text in argv', () => {
     const trace = startDelegatedTaskTrace({
       owner: 'process-spec-owner',
@@ -109,6 +156,34 @@ describe('KC-06 delegated-task-observability store', () => {
     const active = listActiveDelegatedTaskRecords(8);
     expect(active.map((record) => record.delegation_id)).toEqual([running.trace_id]);
     expect(listActiveDelegatedTaskRecords(0)).toEqual([]);
+  });
+
+  it('rejects an observability trace override outside the repository', () => {
+    const originalTrace = process.env.KYBERION_DELEGATION_TRACE_PATH;
+    process.env.KYBERION_DELEGATION_TRACE_PATH = '/tmp/delegations-external.jsonl';
+    try {
+      expect(() =>
+        startDelegatedTaskTrace({ owner: 'path-owner', instruction: 'must not write outside' })
+      ).toThrow('[RESOURCE_PATH_SCOPE]');
+    } finally {
+      process.env.KYBERION_DELEGATION_TRACE_PATH = originalTrace;
+    }
+  });
+
+  it('rejects an observability store override traversing a symbolic link', () => {
+    const targetPath = pathResolver.sharedTmp(`delegations-target-${process.pid}`);
+    const linkPath = pathResolver.sharedTmp(`delegations-link-${process.pid}`);
+    safeWriteFile(`${targetPath}/placeholder.json`, '{}');
+    safeSymlinkSync(targetPath, linkPath, 'dir');
+    const originalStore = process.env.KYBERION_DELEGATION_STORE_DIR;
+    process.env.KYBERION_DELEGATION_STORE_DIR = linkPath;
+    try {
+      expect(() => delegatedTaskStoreDir()).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      process.env.KYBERION_DELEGATION_STORE_DIR = originalStore;
+      safeUnlinkSync(linkPath);
+      safeRmSync(targetPath, { recursive: true, force: true });
+    }
   });
 
   it('enqueues a claim-based notification when a background delegation completes', () => {

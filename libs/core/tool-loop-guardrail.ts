@@ -1,3 +1,5 @@
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+
 export interface ToolCallLike {
   name: string;
   arguments: string;
@@ -30,7 +32,9 @@ function stableSerialize(value: unknown): string {
     return `[${value.map((item) => stableSerialize(item)).join(',')}]`;
   }
   if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+      a.localeCompare(b)
+    );
     return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`).join(',')}}`;
   }
   return JSON.stringify(value);
@@ -41,7 +45,7 @@ export function normalizeToolCallSignature(toolCall: ToolCallLike): string {
   const rawArguments = toolCall.arguments.trim();
   if (!rawArguments) return `${toolName}()`;
   try {
-    return `${toolName}:${stableSerialize(JSON.parse(rawArguments))}`;
+    return `${toolName}:${stableSerialize(parseSafeJsonInput(rawArguments, 'tool arguments'))}`;
   } catch {
     return `${toolName}:${rawArguments}`;
   }
@@ -57,7 +61,7 @@ export function createToolLoopGuardrailState(): ToolLoopGuardrailState {
 export function advanceToolLoopGuardrail(
   state: ToolLoopGuardrailState,
   toolCall: ToolCallLike,
-  config: ToolLoopGuardrailConfig = {},
+  config: ToolLoopGuardrailConfig = {}
 ): ToolLoopGuardrailDecision {
   const limits = {
     ...DEFAULT_GUARDRAIL_CONFIG,

@@ -1,4 +1,11 @@
-import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
+import { defineCatalog } from '../../foundation/governed-catalog.js';
+import { pathResolver } from '../../path-resolver.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeWriteFile,
+} from '../../secure-io.js';
 
 export type Layer =
   'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8' | 'L9' | 'L10' | 'L11';
@@ -17,13 +24,28 @@ export interface LayerResult {
   circuit_broken: boolean;
 }
 
+const PFC_STATE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/pfc-state.schema.json');
+
+/** Load persisted PFC state through the governed schema and file boundary. */
+export function loadPfcStateAtPath(stateFilePath: string): PfcState {
+  const safeStateFilePath = assertSafeRepositoryPath(stateFilePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeStateFilePath).isFile()) {
+    throw new Error(`[PFC_STATE] state must be a regular file: ${stateFilePath}`);
+  }
+  return defineCatalog<PfcState>({
+    id: 'pfc-state',
+    path: safeStateFilePath,
+    schema: PFC_STATE_SCHEMA_PATH,
+  }).load();
+}
+
 export class PfcController {
   private stateFilePath: string;
   private state: PfcState;
   private readonly MAX_ATTEMPTS = 3;
 
   constructor(stateFilePath: string) {
-    this.stateFilePath = stateFilePath;
+    this.stateFilePath = assertSafeRepositoryPath(stateFilePath, { allowMissingLeaf: true });
     this.state = this.loadState();
   }
 
@@ -49,8 +71,7 @@ export class PfcController {
   private loadState(): PfcState {
     if (safeExistsSync(this.stateFilePath)) {
       try {
-        const raw = safeReadFile(this.stateFilePath, { encoding: 'utf8' }) as string;
-        const parsed = JSON.parse(raw) as PfcState;
+        const parsed = loadPfcStateAtPath(this.stateFilePath);
         // Forward-compat: a state file persisted before a new layer was
         // added won't have that layer's key. Backfill defaults rather than
         // crash the first time the new layer runs.

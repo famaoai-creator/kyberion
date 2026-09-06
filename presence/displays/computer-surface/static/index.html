@@ -85,6 +85,47 @@
         font-size: 12px;
         word-break: break-all;
       }
+      .intent-resolution-panel {
+        margin-top: 14px;
+        padding: 12px;
+        border: 1px solid rgba(125, 211, 252, 0.24);
+        border-radius: 14px;
+        background: rgba(34, 211, 238, 0.06);
+      }
+      .intent-resolution-panel.hidden {
+        display: none;
+      }
+      .intent-resolution-title {
+        color: rgba(189, 224, 254, 0.85);
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .intent-resolution-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        margin-top: 10px;
+      }
+      .intent-resolution-label {
+        color: var(--muted);
+        display: block;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .intent-resolution-value {
+        display: block;
+        font-size: 13px;
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+      }
+      .intent-resolution-consequence {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+        margin-top: 10px;
+      }
       .os-header {
         display: flex;
         justify-content: space-between;
@@ -502,6 +543,32 @@
             <div class="value" id="actionCount">0</div>
           </div>
         </div>
+        <div id="intent-resolution-panel" class="intent-resolution-panel hidden">
+          <div class="intent-resolution-title">Intent resolution contract</div>
+          <div class="intent-resolution-grid">
+            <div>
+              <span class="intent-resolution-label">Understanding</span>
+              <strong id="intent-resolution-understanding" class="intent-resolution-value">—</strong>
+            </div>
+            <div>
+              <span class="intent-resolution-label">Missing input</span>
+              <strong id="intent-resolution-missing" class="intent-resolution-value">—</strong>
+            </div>
+            <div>
+              <span class="intent-resolution-label">Authority</span>
+              <strong id="intent-resolution-authority" class="intent-resolution-value">—</strong>
+            </div>
+            <div>
+              <span class="intent-resolution-label">Outcome</span>
+              <strong id="intent-resolution-outcome" class="intent-resolution-value">—</strong>
+            </div>
+            <div>
+              <span class="intent-resolution-label">Next action</span>
+              <strong id="intent-resolution-next-action" class="intent-resolution-value">—</strong>
+            </div>
+          </div>
+          <div id="intent-resolution-consequence" class="intent-resolution-consequence"></div>
+        </div>
         <div class="path" id="detail">No interaction detail yet.</div>
         <div class="path" id="metadata"></div>
         <div class="path" id="screenshotPath"></div>
@@ -584,6 +651,13 @@
         detail: document.getElementById('detail'),
         metadata: document.getElementById('metadata'),
         screenshotPath: document.getElementById('screenshotPath'),
+        intentResolutionPanel: document.getElementById('intent-resolution-panel'),
+        intentResolutionUnderstanding: document.getElementById('intent-resolution-understanding'),
+        intentResolutionMissing: document.getElementById('intent-resolution-missing'),
+        intentResolutionAuthority: document.getElementById('intent-resolution-authority'),
+        intentResolutionOutcome: document.getElementById('intent-resolution-outcome'),
+        intentResolutionNextAction: document.getElementById('intent-resolution-next-action'),
+        intentResolutionConsequence: document.getElementById('intent-resolution-consequence'),
       };
       const osIds = {
         scopeWarning: document.getElementById('os-scope-warning'),
@@ -710,6 +784,59 @@
         });
       }
 
+      function isIntentResolutionContract(value) {
+        return Boolean(
+          value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          typeof value.request_id === 'string' &&
+          typeof value.normalized_intent === 'string' &&
+          Array.isArray(value.missing_inputs) &&
+          value.missing_inputs.every((input) => typeof input === 'string' && input.trim()) &&
+          ['answer', 'artifact', 'approval_ready_plan', 'service_change', 'status_report'].includes(
+            value.outcome_kind
+          ) &&
+          ['autonomous', 'approval_required', 'human_clarification_required'].includes(
+            value.authority_level
+          ) &&
+          value.next_action &&
+          typeof value.next_action === 'object' &&
+          ['request_approval', 'provide_input', 'continue'].includes(value.next_action.kind) &&
+          typeof value.next_action.label === 'string' &&
+          typeof value.next_action.consequence === 'string'
+        );
+      }
+
+      function renderIntentResolution(data) {
+        const contract = data?.intentResolution || data?.intent_resolution;
+        if (!ids.intentResolutionPanel) return;
+        if (!isIntentResolutionContract(contract)) {
+          ids.intentResolutionPanel.classList.add('hidden');
+          return;
+        }
+        const authorityLabels = {
+          autonomous: 'Autonomous',
+          approval_required: 'Approval required',
+          human_clarification_required: 'Human clarification required',
+        };
+        const outcomeLabels = {
+          answer: 'Answer',
+          artifact: 'Artifact',
+          approval_ready_plan: 'Approval-ready plan',
+          service_change: 'Service change',
+          status_report: 'Status report',
+        };
+        ids.intentResolutionPanel.classList.remove('hidden');
+        ids.intentResolutionUnderstanding.textContent = contract.normalized_intent;
+        ids.intentResolutionMissing.textContent = contract.missing_inputs.length
+          ? contract.missing_inputs.join(', ')
+          : 'None';
+        ids.intentResolutionAuthority.textContent = authorityLabels[contract.authority_level];
+        ids.intentResolutionOutcome.textContent = outcomeLabels[contract.outcome_kind];
+        ids.intentResolutionNextAction.textContent = contract.next_action.label;
+        ids.intentResolutionConsequence.textContent = contract.next_action.consequence;
+      }
+
       function applyState(payload) {
         const surface = payload?.surfaces?.['computer-surface'];
         const data = surface?.data || {};
@@ -727,6 +854,7 @@
         ids.screenshotPath.textContent = data.screenshotPath
           ? 'screenshot: ' + data.screenshotPath
           : '';
+        renderIntentResolution(data);
         lastActionCount = Number(data.actionCount || 0);
         if (lastUpdatedEl) {
           lastUpdatedEl.textContent = formatTimestamp(data.updatedAt || payload?.lastUpdatedAt);

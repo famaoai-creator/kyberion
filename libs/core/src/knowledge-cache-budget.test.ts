@@ -8,9 +8,19 @@ import * as path from 'node:path';
 // KYBERION_KI_CACHE_MAX_MB budget, using the ki-usage.json sidecar.
 
 vi.mock('../path-resolver.js', () => ({
-  knowledge: (sub = '') => (sub ? `/tmp/test-knowledge-base/${sub}` : '/tmp/test-knowledge-base'),
+  knowledge: (sub = '') =>
+    sub.startsWith('product/schemas/')
+      ? `${process.cwd()}/knowledge/${sub}`
+      : sub
+        ? `/tmp/test-knowledge-base/${sub}`
+        : '/tmp/test-knowledge-base',
   pathResolver: {
-    knowledge: (sub = '') => (sub ? `/tmp/test-knowledge-base/${sub}` : '/tmp/test-knowledge-base'),
+    knowledge: (sub = '') =>
+      sub.startsWith('product/schemas/')
+        ? `${process.cwd()}/knowledge/${sub}`
+        : sub
+          ? `/tmp/test-knowledge-base/${sub}`
+          : '/tmp/test-knowledge-base',
     rootDir: () => '/tmp/test-root',
     rootResolve: (sub = '') => (sub ? `/tmp/test-root/${sub}` : '/tmp/test-root'),
     shared: (sub = '') => (sub ? `/tmp/test-shared/${sub}` : '/tmp/test-shared'),
@@ -20,11 +30,13 @@ vi.mock('../path-resolver.js', () => ({
 vi.mock('../secure-io.js', () => ({
   safeExistsSync: (p: string) => fs.existsSync(p),
   safeReaddir: (p: string) => fs.readdirSync(p),
+  safeLstat: (p: string) => fs.lstatSync(p),
   safeReadFile: (p: string, opts: any) => fs.readFileSync(p, opts?.encoding ?? 'utf8'),
   safeWriteFile: (p: string, data: string) => fs.writeFileSync(p, data),
   safeMkdir: (p: string, opts: any) => fs.mkdirSync(p, opts),
   safeStat: (p: string) => fs.statSync(p),
   safeUnlinkSync: (p: string) => fs.unlinkSync(p),
+  assertSafeRepositoryPath: (p: string) => p,
   loadJson: <T>(p: string): T => JSON.parse(fs.readFileSync(p, 'utf8')) as T,
   loadJsonIfPresent: <T>(p: string): T | null => {
     if (!fs.existsSync(p)) return null;
@@ -34,6 +46,23 @@ vi.mock('../secure-io.js', () => ({
       return null;
     }
   },
+}));
+
+vi.mock('../foundation/json.js', () => ({
+  readJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+}));
+
+vi.mock('../foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: (filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')),
+    loadJsonIfPresent: (filePath: string) =>
+      fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, 'utf8')) : null,
+    appendFile: (filePath: string, content: string) => fs.appendFileSync(filePath, content),
+    exists: (filePath: string) => fs.existsSync(filePath),
+    readFile: (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: (filePath: string, content: string) => fs.writeFileSync(filePath, content),
+  }),
 }));
 
 import { enforceKnowledgeCacheBudget } from './knowledge-index.js';
@@ -111,5 +140,12 @@ describe('enforceKnowledgeCacheBudget (KM-02)', () => {
     for (const h of HASHES) {
       expect(fs.existsSync(path.join(dir, `ki-${h}.json`))).toBe(false);
     }
+  });
+
+  it('ignores a non-object usage sidecar and falls back to file metadata', () => {
+    fs.writeFileSync(usagePath(), '[]');
+    process.env.KYBERION_KI_CACHE_MAX_MB = String(2100 / (1024 * 1024));
+
+    expect(() => enforceKnowledgeCacheBudget()).not.toThrow();
   });
 });

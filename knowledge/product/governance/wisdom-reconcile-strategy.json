@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/wisdom-reconcile-strategy.schema.json",
   "strategies": [
     {
       "id": "capabilities-guide-sync",

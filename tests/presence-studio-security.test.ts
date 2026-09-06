@@ -102,9 +102,15 @@ describe('presence studio security helpers', () => {
   it('validates high-risk request payloads', () => {
     expect(presenceStudioVoiceStimulusSchema.safeParse({ text: 'hello' }).success).toBe(true);
     expect(presenceStudioVoiceStimulusSchema.safeParse({ text: '' }).success).toBe(false);
+    expect(
+      presenceStudioVoiceStimulusSchema.safeParse({ text: 'hello', extra: true }).success
+    ).toBe(false);
 
     expect(presenceStudioVoiceNativeListenSchema.safeParse({ timeout_seconds: 8 }).success).toBe(
       true
+    );
+    expect(presenceStudioVoiceNativeListenSchema.safeParse({ timeout_seconds: '8' }).success).toBe(
+      false
     );
     expect(presenceStudioVoiceNativeListenSchema.safeParse({ timeout_seconds: 60 }).success).toBe(
       false
@@ -143,6 +149,13 @@ describe('presence studio security helpers', () => {
     ).toBe(true);
     expect(
       presenceStudioLocationSchema.safeParse({ latitude: 200, longitude: 139.7 }).success
+    ).toBe(false);
+    expect(
+      presenceStudioLocationSchema.safeParse({ latitude: '35.6', longitude: 139.7 }).success
+    ).toBe(false);
+    expect(
+      presenceStudioLocationSchema.safeParse({ latitude: 35.6, longitude: 139.7, extra: true })
+        .success
     ).toBe(false);
 
     expect(

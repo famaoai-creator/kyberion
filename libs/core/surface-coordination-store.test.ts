@@ -13,6 +13,7 @@ import {
   listSurfaceDeadLetters,
   listSurfaceOutboxMessages,
   listSurfaceDeadTargets,
+  loadSurfaceOutboxMessageAtPath,
   updateSurfaceOutboxMessage,
   markSurfaceDeadTarget,
   replaySurfaceDeadLetter,
@@ -23,6 +24,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeReaddir,
+  safeSymlinkSync,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -152,6 +154,85 @@ describe('surface coordination outbox recovery', () => {
     ).toBe(false);
     expect(safeExistsSync(invalidPath)).toBe(false);
     expect(safeReaddir(quarantineDir).filter((name) => name.includes(testPrefix))).toHaveLength(1);
+  });
+
+  it('loads a valid outbox record through the canonical schema and surface binding', () => {
+    const messagePath = enqueueSurfaceOutboxMessage({
+      surface: testSurface,
+      correlationId: `${testPrefix}-canonical-load`,
+      channel: 'channel-canonical',
+      threadTs: '',
+      text: 'canonical outbox message',
+    });
+    createdOutboxFiles.push(messagePath);
+
+    expect(loadSurfaceOutboxMessageAtPath(messagePath, testSurface)).toMatchObject({
+      message_id: path.basename(messagePath, '.json'),
+      correlation_id: `${testPrefix}-canonical-load`,
+      text: 'canonical outbox message',
+    });
+    expect(() => loadSurfaceOutboxMessageAtPath(messagePath, 'slack')).toThrow(
+      '[SURFACE_OUTBOX_SCOPE_MISMATCH]'
+    );
+  });
+
+  it('rejects a direct outbox load when the persisted record violates the schema', () => {
+    const invalidPath = path.join(outboxDir, `${testPrefix}-DIRECT-INVALID.json`);
+    withExecutionContext('surface_runtime', () => {
+      safeMkdir(outboxDir, { recursive: true });
+      safeWriteFile(
+        invalidPath,
+        JSON.stringify({
+          message_id: `${testPrefix}-direct-invalid`,
+          surface: testSurface,
+          correlation_id: `${testPrefix}-direct-invalid`,
+          channel: 'channel-invalid',
+          thread_ts: '',
+          text: 'invalid direct record',
+          source: 'surface',
+          created_at: new Date().toISOString(),
+          unexpected: true,
+        })
+      );
+    });
+
+    expect(() => loadSurfaceOutboxMessageAtPath(invalidPath, testSurface)).toThrow(
+      'Invalid catalog surface-outbox-message'
+    );
+  });
+
+  it('does not follow symlinked outbox records during discovery', () => {
+    const externalPath = pathResolver.resolve(`active/shared/tmp/${testPrefix}-external.json`);
+    const symlinkPath = path.join(outboxDir, `${testPrefix}-SYMLINK.json`);
+    withExecutionContext('surface_runtime', () => {
+      safeWriteFile(
+        externalPath,
+        JSON.stringify({
+          surface: testSurface,
+          message_id: `${testPrefix}-external`,
+          correlation_id: `${testPrefix}-external-correlation`,
+          channel: 'external-channel',
+          thread_ts: '',
+          text: 'must not be exposed',
+          source: 'surface',
+          created_at: new Date().toISOString(),
+        })
+      );
+      safeSymlinkSync(externalPath, symlinkPath);
+    });
+
+    try {
+      expect(
+        listSurfaceOutboxMessages(testSurface).some(
+          (message) => message.correlation_id === `${testPrefix}-external-correlation`
+        )
+      ).toBe(false);
+    } finally {
+      withExecutionContext('surface_runtime', () => {
+        safeUnlinkSync(symlinkPath);
+        safeUnlinkSync(externalPath);
+      });
+    }
   });
 
   it('reuses an existing outbox record for the same producer deduplication key', () => {

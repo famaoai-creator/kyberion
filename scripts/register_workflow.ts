@@ -24,8 +24,8 @@
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
-import { createAjv, readJson as readFoundationJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeWriteFile, safeMkdir } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -36,6 +36,12 @@ const ROUTING_REL = 'knowledge/product/governance/intent-routing-map.json';
 const GATE_PROFILES_REL = 'knowledge/product/governance/gate-profiles/gate-profile-registry.json';
 const GOV_BODY_REL = 'knowledge/product/governance/governance-body-registry.json';
 const SCHEMA_REL = 'knowledge/product/schemas/workflow-registration-request.schema.json';
+const CATALOG_SCHEMA_REL = 'knowledge/product/schemas/mission-workflow-catalog.schema.json';
+const INTENTS_SCHEMA_REL = 'knowledge/product/schemas/standard-intents.schema.json';
+const ONTOLOGY_SCHEMA_REL = 'knowledge/product/schemas/intent-domain-ontology.schema.json';
+const ROUTING_SCHEMA_REL = 'knowledge/product/schemas/intent-routing-map.schema.json';
+const GATE_PROFILES_SCHEMA_REL = 'knowledge/product/schemas/gate-profile-registry.schema.json';
+const GOV_BODY_SCHEMA_REL = 'knowledge/product/schemas/governance-body-registry.schema.json';
 const PROPOSALS_REL = 'active/shared/tmp/workflow-registration-proposals';
 const DEFAULT_WORKFLOW = 'single-track-default';
 
@@ -92,15 +98,34 @@ interface RegistrationRequest {
 }
 
 function abs(rel: string): string {
-  return path.join(pathResolver.rootDir(), rel);
+  return assertSafeRepositoryPath(path.join(pathResolver.rootDir(), rel), {
+    allowMissingLeaf: true,
+  });
 }
 
-function readJson(rel: string): Json {
-  return readFoundationJson<Json>(abs(rel));
+function loadRegistrationRequest(filePath: string): RegistrationRequest {
+  return defineCatalog<RegistrationRequest>({
+    id: 'workflow-registration-request',
+    path: assertSafeRepositoryPath(filePath),
+    schema: abs(SCHEMA_REL),
+  }).load();
 }
 
-function writeJson(rel: string, obj: unknown): void {
-  safeWriteFile(abs(rel), `${JSON.stringify(obj, null, 2)}\n`);
+function updateGovernedCatalog(
+  relativePath: string,
+  schemaRelativePath: string,
+  update: (catalog: Json) => void
+): void {
+  const catalog = defineCatalog<Json>({
+    id: `workflow-registration:${relativePath}`,
+    path: abs(relativePath),
+    schema: abs(schemaRelativePath),
+  });
+  const expectedGeneration = catalog.generation();
+  if (!expectedGeneration) throw new Error(`governed catalog is missing: ${relativePath}`);
+  const next = structuredClone(catalog.load());
+  update(next);
+  catalog.publish(next, expectedGeneration);
 }
 
 function parseArgs(argv: string[]): { mode: 'propose' | 'apply'; request: string } {
@@ -112,19 +137,6 @@ function parseArgs(argv: string[]): { mode: 'propose' | 'apply'; request: string
     else if (a === '--propose') out.mode = 'propose';
   }
   return out;
-}
-
-function validateRequest(req: unknown): void {
-  const schema = readFoundationJson<unknown>(abs(SCHEMA_REL));
-  const ajv = createAjv();
-  const validate = ajv.compile(schema);
-  const ok = validate(req);
-  if (!ok) {
-    const errors = (validate as unknown as { errors?: unknown }).errors;
-    throw new Error(
-      `Registration request failed schema validation:\n${JSON.stringify(errors, null, 2)}`
-    );
-  }
 }
 
 function gateCheck(
@@ -263,76 +275,76 @@ function applyToGovernedCatalogs(req: RegistrationRequest): string[] {
   const touched: string[] = [];
 
   // 1) mission-workflow-catalog: insert before the default template so it stays last.
-  const catalog = readJson(CATALOG_REL);
-  const templates = (catalog.templates as unknown[]) ?? [];
-  const withoutMine = templates.filter((t) => (t as Json)?.id !== req.workflow_id);
-  const defaultIdx = withoutMine.findIndex((t) => (t as Json)?.id === DEFAULT_WORKFLOW);
-  const template = buildTemplate(req);
-  if (defaultIdx >= 0) withoutMine.splice(defaultIdx, 0, template);
-  else withoutMine.push(template);
-  catalog.templates = withoutMine;
-  writeJson(CATALOG_REL, catalog);
+  updateGovernedCatalog(CATALOG_REL, CATALOG_SCHEMA_REL, (catalog) => {
+    const templates = (catalog.templates as unknown[]) ?? [];
+    const withoutMine = templates.filter((t) => (t as Json)?.id !== req.workflow_id);
+    const defaultIdx = withoutMine.findIndex((t) => (t as Json)?.id === DEFAULT_WORKFLOW);
+    const template = buildTemplate(req);
+    if (defaultIdx >= 0) withoutMine.splice(defaultIdx, 0, template);
+    else withoutMine.push(template);
+    catalog.templates = withoutMine;
+  });
   touched.push(CATALOG_REL);
 
   // 2) standard-intents
-  const intents = readJson(INTENTS_REL);
-  intents.intents = upsertById((intents.intents as unknown[]) ?? [], 'id', buildIntent(req));
-  writeJson(INTENTS_REL, intents);
+  updateGovernedCatalog(INTENTS_REL, INTENTS_SCHEMA_REL, (intents) => {
+    intents.intents = upsertById((intents.intents as unknown[]) ?? [], 'id', buildIntent(req));
+  });
   touched.push(INTENTS_REL);
 
   // 3) intent-domain-ontology
-  const ontology = readJson(ONTOLOGY_REL);
-  ontology.intents = upsertById(
-    (ontology.intents as unknown[]) ?? [],
-    'intent_id',
-    buildOntology(req)
-  );
-  writeJson(ONTOLOGY_REL, ontology);
+  updateGovernedCatalog(ONTOLOGY_REL, ONTOLOGY_SCHEMA_REL, (ontology) => {
+    ontology.intents = upsertById(
+      (ontology.intents as unknown[]) ?? [],
+      'intent_id',
+      buildOntology(req)
+    );
+  });
   touched.push(ONTOLOGY_REL);
 
   // 4) routing (track policy map) — optional
   if (req.track && req.track.track_type) {
-    const routing = readJson(ROUTING_REL);
-    const map = (routing.track_intent_policy_map as Json) ?? {};
-    map[req.workflow_id] = {
-      track_type: req.track.track_type,
-      default_lifecycle: req.track.default_lifecycle ?? 'default-sdlc',
-      min_confidence_to_autostart: req.track.min_confidence_to_autostart ?? 0.75,
-    };
-    routing.track_intent_policy_map = map;
-    writeJson(ROUTING_REL, routing);
+    updateGovernedCatalog(ROUTING_REL, ROUTING_SCHEMA_REL, (routing) => {
+      const map = (routing.track_intent_policy_map as Json) ?? {};
+      map[req.workflow_id] = {
+        track_type: req.track.track_type,
+        default_lifecycle: req.track.default_lifecycle ?? 'default-sdlc',
+        min_confidence_to_autostart: req.track.min_confidence_to_autostart ?? 0.75,
+      };
+      routing.track_intent_policy_map = map;
+    });
     touched.push(ROUTING_REL);
   }
 
   // 5) gate-profile gates — optional
   if (req.gate_profile_gates && req.gate_profile_gates.gates.length > 0) {
-    const reg = readJson(GATE_PROFILES_REL);
-    const profiles = (reg.profiles as Json) ?? {};
-    const profile = (profiles[req.gate_profile_gates.profile] as Json) ?? {
-      domain: 'delivery',
-      gates: [],
-    };
-    const gates = (profile.gates as unknown[]) ?? [];
-    for (const g of req.gate_profile_gates.gates) {
-      const gid = (g as Json).gate_id;
-      const idx = gates.findIndex((x) => (x as Json)?.gate_id === gid);
-      if (idx >= 0) gates[idx] = g;
-      else gates.push(g);
-    }
-    profile.gates = gates;
-    profiles[req.gate_profile_gates.profile] = profile;
-    reg.profiles = profiles;
-    writeJson(GATE_PROFILES_REL, reg);
+    updateGovernedCatalog(GATE_PROFILES_REL, GATE_PROFILES_SCHEMA_REL, (reg) => {
+      const profiles = (reg.profiles as Json) ?? {};
+      const profile = (profiles[req.gate_profile_gates.profile] as Json) ?? {
+        domain: 'delivery',
+        gates: [],
+      };
+      const gates = (profile.gates as unknown[]) ?? [];
+      for (const g of req.gate_profile_gates.gates) {
+        const gid = (g as Json).gate_id;
+        const idx = gates.findIndex((x) => (x as Json)?.gate_id === gid);
+        if (idx >= 0) gates[idx] = g;
+        else gates.push(g);
+      }
+      profile.gates = gates;
+      profiles[req.gate_profile_gates.profile] = profile;
+      reg.profiles = profiles;
+    });
     touched.push(GATE_PROFILES_REL);
   }
 
   // 6) governance bodies — optional
   if (req.governance_bodies && req.governance_bodies.length > 0) {
-    const reg = readJson(GOV_BODY_REL);
-    let bodies = (reg.bodies as unknown[]) ?? [];
-    for (const b of req.governance_bodies) bodies = upsertById(bodies, 'id', b as Json);
-    reg.bodies = bodies;
-    writeJson(GOV_BODY_REL, reg);
+    updateGovernedCatalog(GOV_BODY_REL, GOV_BODY_SCHEMA_REL, (reg) => {
+      let bodies = (reg.bodies as unknown[]) ?? [];
+      for (const b of req.governance_bodies!) bodies = upsertById(bodies, 'id', b as Json);
+      reg.bodies = bodies;
+    });
     touched.push(GOV_BODY_REL);
   }
 
@@ -399,8 +411,7 @@ function main(argv: string[]): void {
   }
 
   const requestPath = path.isAbsolute(args.request) ? args.request : abs(args.request);
-  const req = readFoundationJson<RegistrationRequest>(requestPath);
-  validateRequest(req);
+  const req = loadRegistrationRequest(requestPath);
 
   if (args.mode === 'apply') {
     const touched = applyToGovernedCatalogs(req);

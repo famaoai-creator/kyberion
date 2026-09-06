@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/marketing-risk-policy.schema.json",
+  "title": "Marketing Risk Policy",
+  "type": "object",
+  "required": ["version", "levels", "allowed_channels", "cta_domain_allowlist"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "levels": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "0": { "$ref": "#/$defs/level" },
+        "1": { "$ref": "#/$defs/level" },
+        "2": { "$ref": "#/$defs/level" },
+        "3": { "$ref": "#/$defs/level" },
+        "4": { "$ref": "#/$defs/level" }
+      }
+    },
+    "allowed_channels": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "cta_domain_allowlist": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "level": {
+      "type": "object",
+      "required": ["required_gates", "required_reviewers", "required_approvals"],
+      "additionalProperties": false,
+      "properties": {
+        "required_gates": {
+          "type": "array",
+          "items": { "enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"] }
+        },
+        "required_reviewers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "required_approvals": { "type": "integer", "minimum": 0 },
+        "dry_run_required": { "type": "boolean" }
+      }
+    }
+  }
+}

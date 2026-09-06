@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/agent-trust-scores.schema.json",
+  "title": "Persisted Agent Trust Scores",
+  "description": "Validated personal-tier trust records used for delegation and mission governance decisions.",
+  "type": "object",
+  "additionalProperties": {
+    "$ref": "#/$defs/trustRecord"
+  },
+  "$defs": {
+    "trustRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["current_score", "tier", "dimensions", "last_updated"],
+      "properties": {
+        "current_score": { "type": "number", "minimum": 0, "maximum": 1000 },
+        "tier": {
+          "type": ["string", "integer"],
+          "minimum": 0
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policyCompliance",
+            "securityPosture",
+            "outputQuality",
+            "resourceEfficiency",
+            "collaborationHealth"
+          ],
+          "properties": {
+            "policyCompliance": { "type": "number", "minimum": 0, "maximum": 200 },
+            "securityPosture": { "type": "number", "minimum": 0, "maximum": 200 },
+            "outputQuality": { "type": "number", "minimum": 0, "maximum": 200 },
+            "resourceEfficiency": { "type": "number", "minimum": 0, "maximum": 200 },
+            "collaborationHealth": { "type": "number", "minimum": 0, "maximum": 200 }
+          }
+        },
+        "last_updated": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

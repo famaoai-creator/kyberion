@@ -1,22 +1,10 @@
 import type { ChildProcess } from 'node:child_process';
+import { authorSceneCompositions } from '@agent/core/video-scene-composition';
+import { generateVideoMotionDirection } from '@agent/core/video-motion-direction';
+import { generateVideoVisualDirection } from '@agent/core/video-visual-direction';
+import { defineCatalog, nowIso, type GovernedCatalog } from '@agent/core/foundation';
 import {
-  authorSceneCompositions,
-  generateVideoMotionDirection,
-  generateVideoVisualDirection,
-} from '@agent/core';
-import {
-  compileNarratedVideoBriefToCompositionADF,
-  compileVideoCompositionADF,
-  compileVideoContentBriefToStoryboard,
-  compileVideoStoryboardToNarratedVideoBrief,
-  formatVideoLintReport,
-  getVideoCompositionTemplateRegistry,
-  getVideoRenderRuntimePolicy,
-  lintVideoComposition,
-  logger,
-  pathResolver,
-  renderNarratedFallbackVideo,
-  renderVideoCompositionBundleAsync,
+  assertSafeRepositoryPath,
   safeExec,
   safeExecResult,
   safeExistsSync,
@@ -24,18 +12,35 @@ import {
   safeReadFile,
   safeStat,
   safeWriteFile,
-  spawnManagedProcess,
-  retry,
+} from '@agent/core/secure-io';
+import { retry } from '@agent/core/async-utils';
+import { compileNarratedVideoBriefToCompositionADF } from '@agent/core/narrated-video-brief-compiler';
+import {
+  compileVideoCompositionADF,
   writeVideoCompositionBundle,
-  ensureDefaultOpPreflight,
-  runOpPreflightSync,
-} from '@agent/core';
+} from '@agent/core/video-composition-compiler';
+import {
+  compileVideoContentBriefToStoryboard,
+  compileVideoStoryboardToNarratedVideoBrief,
+} from '@agent/core/video-content-brief-contract';
+import { formatVideoLintReport, lintVideoComposition } from '@agent/core/video-composition-lint';
+import { getVideoCompositionTemplateRegistry } from '@agent/core/video-composition-template-registry';
+import { getVideoRenderRuntimePolicy } from '@agent/core/video-render-runtime-policy';
+import {
+  renderNarratedFallbackVideo,
+  renderVideoCompositionBundleAsync,
+} from '@agent/core/video-render-backend';
+import { spawnManagedProcess } from '@agent/core/managed-process';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflightSync } from '@agent/core/op-preflight';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import type { VideoCompositionADF } from '@agent/core/video-composition-contract';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { VideoCompositionADF } from '@agent/core';
 import {
-  buildRetryOptions,
+  buildVideoRetryOptions,
   computeAwaitTimeoutMs,
   deepResolve,
   extractBackendTerminationState,
@@ -49,7 +54,6 @@ import {
   trackLifecycleDiagnostics,
   upsertJobDiagnostics,
   validateVideoCompositionAction,
-  DEFAULT_VIDEO_RETRY,
   waitForRenderJob,
 } from './video-composition-helpers.js';
 
@@ -158,26 +162,58 @@ interface VideoCompositionJobTicket {
   diagnostics?: VideoCompositionJobDiagnostics | null;
 }
 
+const VIDEO_COMPOSITION_JOB_TICKET_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/video-composition-job-ticket.schema.json'
+);
+const videoCompositionJobTicketCatalogs = new Map<
+  string,
+  GovernedCatalog<VideoCompositionJobTicket>
+>();
+
+function videoCompositionJobTicketCatalogAtPath(
+  ticketPath: string
+): GovernedCatalog<VideoCompositionJobTicket> {
+  const existing = videoCompositionJobTicketCatalogs.get(ticketPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<VideoCompositionJobTicket>({
+    id: 'video-composition-job-ticket',
+    path: ticketPath,
+    schema: VIDEO_COMPOSITION_JOB_TICKET_SCHEMA_PATH,
+  });
+  videoCompositionJobTicketCatalogs.set(ticketPath, catalog);
+  return catalog;
+}
+
 const DETACHED_WORKER_SCRIPT = pathResolver.rootResolve(
   'dist/libs/actuators/video-composition-actuator/src/index.js'
 );
+
+function resolveVideoRepositoryPath(ref: string, allowMissingLeaf = true): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(String(ref || '').trim()), {
+    allowMissingLeaf,
+  });
+}
 
 function writeVideoCompositionJobTicket(
   ticketPath: string,
   ticket: VideoCompositionJobTicket
 ): void {
   safeMkdir(path.dirname(ticketPath), { recursive: true });
-  safeWriteFile(ticketPath, JSON.stringify(ticket, null, 2));
+  const validated = videoCompositionJobTicketCatalogAtPath(ticketPath).validate(ticket, ticketPath);
+  safeWriteFile(ticketPath, JSON.stringify(validated, null, 2));
 }
 
 function readVideoCompositionJobTicket(ticketPath: string): VideoCompositionJobTicket | null {
-  if (!safeExistsSync(ticketPath)) return null;
   try {
-    return JSON.parse(
-      String(safeReadFile(ticketPath, { encoding: 'utf8' }))
-    ) as VideoCompositionJobTicket;
-  } catch {
-    return null;
+    return videoCompositionJobTicketCatalogAtPath(ticketPath).load();
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith('Catalog video-composition-job-ticket is missing:')
+    ) {
+      return null;
+    }
+    throw error;
   }
 }
 
@@ -344,11 +380,11 @@ async function lintVideoCompositionAction(params: {
   const bundleDir = params.bundle_dir || adf.output?.bundle_dir;
   const sceneHtml: Record<string, string> = {};
   if (bundleDir) {
+    const safeBundleDir = resolveVideoRepositoryPath(bundleDir);
     for (const scene of adf.scenes || []) {
-      const scenePath = path.join(
-        pathResolver.rootResolve(bundleDir),
-        'compositions',
-        `${scene.scene_id}.html`
+      const scenePath = assertSafeRepositoryPath(
+        path.join(safeBundleDir, 'compositions', `${scene.scene_id}.html`),
+        { allowMissingLeaf: true }
       );
       if (safeExistsSync(scenePath)) {
         sceneHtml[scene.scene_id] = safeReadFile(scenePath, { encoding: 'utf8' }) as string;
@@ -473,7 +509,7 @@ async function verifyRenderedVideoArtifact(params: {
   export_as?: string;
 }) {
   const rootDir = pathResolver.rootDir();
-  const artifactPath = pathResolver.rootResolve(String(params.path || '').trim());
+  const artifactPath = resolveVideoRepositoryPath(String(params.path || '').trim());
   if (!artifactPath || !safeExistsSync(artifactPath)) {
     throw new Error(
       `verify_rendered_video_artifact requires an existing path: ${String(params.path || '')}`
@@ -540,7 +576,7 @@ async function validateNarratedVideoArtifact(params: {
 }) {
   const rootDir = pathResolver.rootDir();
   const resolveArtifactPath = (value: string) =>
-    pathResolver.rootResolve(String(value || '').trim());
+    resolveVideoRepositoryPath(String(value || '').trim());
   const narrationPath = resolveArtifactPath(params.narration_path);
   const videoPath = resolveArtifactPath(params.video_output_path);
   const bundleDir = resolveArtifactPath(params.video_bundle_dir);
@@ -564,7 +600,9 @@ async function validateNarratedVideoArtifact(params: {
     require_audio: true,
     require_video: true,
   });
-  const frameDir = path.join(evidenceDir, `${videoSlug}-frames`);
+  const frameDir = assertSafeRepositoryPath(path.join(evidenceDir, `${videoSlug}-frames`), {
+    allowMissingLeaf: true,
+  });
   safeMkdir(frameDir, { recursive: true });
   const framePaths = [
     path.join(frameDir, 'frame-000.png'),
@@ -702,7 +740,7 @@ async function getVideoCompositionJobStatus(params: { job_id?: string; job_ticke
   const packet = runtime.getPacket(jobId);
   if (!packet) {
     const ticketPath = params.job_ticket_path
-      ? pathResolver.rootResolve(String(params.job_ticket_path))
+      ? resolveVideoRepositoryPath(String(params.job_ticket_path))
       : null;
     const ticket = ticketPath ? readVideoCompositionJobTicket(ticketPath) : null;
     if (ticket) {
@@ -741,7 +779,7 @@ async function awaitVideoCompositionJob(params: {
   if (!jobId) throw new Error('await_video_composition_job requires params.job_id');
   const timeoutMs = normalizeAwaitTimeoutMs(params.timeout_ms);
   const ticketPath = params.job_ticket_path
-    ? pathResolver.rootResolve(String(params.job_ticket_path))
+    ? resolveVideoRepositoryPath(String(params.job_ticket_path))
     : null;
 
   if (ticketPath) {
@@ -809,7 +847,7 @@ async function cancelVideoCompositionJob(params: { job_id?: string; reason?: str
   if (reason) {
     upsertJobDiagnostics(jobId, {
       cancellation_reason: reason,
-      cancellation_requested_at: new Date().toISOString(),
+      cancellation_requested_at: nowIso(),
     });
   }
   const cancellation = runtime.cancel(jobId, { reason });
@@ -850,12 +888,12 @@ async function prepareVideoComposition(params: {
     awaitCompletion === false &&
     policy.render.enable_backend_rendering &&
     runMode !== 'in-process';
-  upsertJobDiagnostics(jobId, { created_at: new Date().toISOString() });
+  upsertJobDiagnostics(jobId, { created_at: nowIso() });
   writeVideoCompositionJobTicket(jobTicketPath, {
     job_id: jobId,
     status: 'queued',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: nowIso(),
+    updated_at: nowIso(),
     bundle_dir: bundlePreview.bundle_dir,
     output_format: adf.output.format,
     output_target_path: adf.output.target_path,
@@ -947,15 +985,15 @@ async function prepareVideoComposition(params: {
 
         const plan = await retry(
           async () => writeVideoCompositionBundle(adf, { bundleDir: bundlePreview.bundle_dir }),
-          buildRetryOptions(DEFAULT_VIDEO_RETRY)
+          buildVideoRetryOptions()
         );
         let artifactRefs = [...plan.artifact_refs];
         let backendOutputPath: string | undefined;
         writeVideoCompositionJobTicket(jobTicketPath, {
           job_id: jobId,
           status: 'running',
-          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: jobDiagnostics.get(jobId)?.created_at || nowIso(),
+          updated_at: nowIso(),
           bundle_dir: plan.bundle_dir,
           output_format: adf.output.format,
           output_target_path: adf.output.target_path,
@@ -987,7 +1025,7 @@ async function prepareVideoComposition(params: {
                 renderVideoCompositionBundleAsync(plan, policy, {
                   isCancelled: api.isCancelled,
                 }),
-              buildRetryOptions(DEFAULT_VIDEO_RETRY)
+              buildVideoRetryOptions()
             );
           } catch (error: any) {
             const backendState = extractBackendTerminationState(error);
@@ -1027,8 +1065,8 @@ async function prepareVideoComposition(params: {
           writeVideoCompositionJobTicket(jobTicketPath, {
             job_id: jobId,
             status: 'completed',
-            created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            created_at: jobDiagnostics.get(jobId)?.created_at || nowIso(),
+            updated_at: nowIso(),
             bundle_dir: plan.bundle_dir,
             output_format: adf.output.format,
             output_target_path: adf.output.target_path,
@@ -1063,8 +1101,8 @@ async function prepareVideoComposition(params: {
         writeVideoCompositionJobTicket(jobTicketPath, {
           job_id: jobId,
           status: 'completed',
-          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: jobDiagnostics.get(jobId)?.created_at || nowIso(),
+          updated_at: nowIso(),
           bundle_dir: plan.bundle_dir,
           output_format: adf.output.format,
           output_target_path: adf.output.target_path,
@@ -1081,8 +1119,8 @@ async function prepareVideoComposition(params: {
         writeVideoCompositionJobTicket(jobTicketPath, {
           job_id: jobId,
           status: api.isCancelled() ? 'cancelled' : 'failed',
-          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: jobDiagnostics.get(jobId)?.created_at || nowIso(),
+          updated_at: nowIso(),
           bundle_dir: bundlePreview.bundle_dir,
           output_format: adf.output.format,
           output_target_path: adf.output.target_path,

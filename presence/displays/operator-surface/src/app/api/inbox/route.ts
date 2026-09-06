@@ -1,28 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { acceptInboxEntryWithHumanReceipt, markInboxEntry } from '@agent/core';
+import { readJsonObjectRequest } from '@agent/core/foundation';
+import { acceptInboxEntryWithHumanReceipt, markInboxEntry } from '@agent/core/deliverable-inbox';
 import { requireOperatorSurfaceMutationAccess } from '../../../lib/api-guard';
+import {
+  parseInboxMutationForm,
+  parseInboxMutationInput,
+  type InboxMutationParseResult,
+} from './inbox-input';
 
 export async function POST(req: NextRequest) {
   const denied = requireOperatorSurfaceMutationAccess(req);
   if (denied) return denied;
 
   const contentType = req.headers.get('content-type') || '';
-  let entryId = '';
-  let status = '';
+  let parsed: InboxMutationParseResult;
 
   if (contentType.includes('application/json')) {
-    const body = await req.json();
-    entryId = typeof body?.entry_id === 'string' ? body.entry_id : '';
-    status = typeof body?.status === 'string' ? body.status : '';
+    const body = await readJsonObjectRequest(req, 'Inbox request body');
+    if (!body.ok) return NextResponse.json({ error: body.error }, { status: 400 });
+    parsed = parseInboxMutationInput(body.body);
   } else {
-    const form = await req.formData();
-    entryId = String(form.get('entry_id') || '');
-    status = String(form.get('status') || '');
+    let form: FormData;
+    try {
+      form = await req.formData();
+    } catch {
+      return NextResponse.json({ error: 'Inbox form body must be valid' }, { status: 400 });
+    }
+    parsed = parseInboxMutationForm(form);
   }
 
-  if (!entryId || (status !== 'read' && status !== 'accepted' && status !== 'unread')) {
-    return NextResponse.json({ error: 'Missing inbox mutation payload' }, { status: 400 });
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
+
+  const { entryId, status } = parsed.value;
 
   const updated =
     status === 'accepted'

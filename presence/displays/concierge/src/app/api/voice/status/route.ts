@@ -1,9 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { isRecord } from '@agent/core/foundation';
 import { voiceHubUrl } from '../../../../lib/voice-hub';
-import type {
-  VoiceInputDevice,
-  VoiceSpeechState,
-  VoiceStatusResponse,
+import { resolveConciergeViewer } from '../../../../lib/viewer-context';
+import type { VoiceStatusResponse } from '../../../../lib/voice-types';
+import {
+  parseVoiceInputDevices,
+  parseVoiceSpeechState,
+  parseVoiceStatusResponse,
 } from '../../../../lib/voice-types';
 
 export const dynamic = 'force-dynamic';
@@ -18,13 +21,13 @@ export const dynamic = 'force-dynamic';
  */
 const PROBE_TIMEOUT_MS = 1500;
 
-async function probeJson<T>(path: string): Promise<T | null> {
+async function probeJson(path: string): Promise<unknown | null> {
   try {
     const response = await fetch(`${voiceHubUrl()}${path}`, {
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    return (await response.json()) as T;
+    return await response.json();
   } catch {
     // voice-hub down/slow — treated as "capability absent", never as an error.
     return null;
@@ -35,33 +38,59 @@ async function probeJson<T>(path: string): Promise<T | null> {
 const BACKEND_IDS: Array<[string, string]> = [
   ['server', 'server'],
   ['fluidAudio', 'fluid_audio'],
+  ['fasterWhisper', 'faster_whisper'],
   ['mlxWhisper', 'mlx_whisper'],
   ['whisperCpp', 'whisper_cpp'],
   ['nativeSpeech', 'native_speech'],
 ];
 
-export async function GET() {
-  const health = await probeJson<{ ok?: boolean }>('/health');
-  if (!health?.ok) {
+export async function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
+
+  const health = await probeJson('/health');
+  if (!isRecord(health) || health.ok !== true) {
     return NextResponse.json({ available: false } satisfies VoiceStatusResponse);
   }
 
   const [backends, devices, speech] = await Promise.all([
-    probeJson<{ ok?: boolean; available?: Record<string, boolean> }>('/api/stt/backends'),
-    probeJson<{ ok?: boolean; devices?: VoiceInputDevice[] }>('/api/input-devices'),
-    probeJson<{ ok?: boolean; speech?: VoiceSpeechState }>('/api/speech/state'),
+    probeJson('/api/stt/backends'),
+    probeJson('/api/input-devices'),
+    probeJson('/api/speech/state'),
   ]);
 
-  const sttBackends = backends?.ok
-    ? BACKEND_IDS.filter(([key]) => backends.available?.[key]).map(([, id]) => id)
-    : undefined;
-  const inputDevices = devices?.ok && Array.isArray(devices.devices) ? devices.devices : undefined;
+  const backendRecord = isRecord(backends) ? backends : undefined;
+  const availableBackends =
+    backendRecord && isRecord(backendRecord.available) ? backendRecord.available : undefined;
+  const sttBackends =
+    backendRecord?.ok === true && availableBackends
+      ? BACKEND_IDS.filter(([key]) => availableBackends[key] === true).map(([, id]) => id)
+      : undefined;
+  const backendSelection =
+    backendRecord && isRecord(backendRecord.selection) ? backendRecord.selection : undefined;
+  const persistedBackend =
+    backendRecord?.ok === true && typeof backendSelection?.selected_backend === 'string'
+      ? backendSelection.selected_backend
+      : undefined;
+  const deviceRecord = isRecord(devices) ? devices : undefined;
+  const inputDevices =
+    deviceRecord?.ok === true ? parseVoiceInputDevices(deviceRecord.devices) : undefined;
+  const speechRecord = isRecord(speech) ? speech : undefined;
+  const speechState =
+    speechRecord?.ok === true ? parseVoiceSpeechState(speechRecord.speech) : undefined;
 
-  const payload: VoiceStatusResponse = {
+  const payload = parseVoiceStatusResponse({
     available: true,
     sttBackends,
+    selectedSttBackend:
+      persistedBackend && persistedBackend !== 'auto' && sttBackends?.includes(persistedBackend)
+        ? persistedBackend
+        : undefined,
     inputDevices,
-    speech: speech?.ok ? speech.speech : undefined,
-  };
+    speech: speechState,
+  });
+  if (!payload) {
+    return NextResponse.json({ available: false } satisfies VoiceStatusResponse, { status: 502 });
+  }
   return NextResponse.json(payload);
 }

@@ -1,4 +1,5 @@
-import { safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { normalizeIso } from './foundation/time.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -59,20 +60,18 @@ interface MeshHubPolicySnapshot {
   };
 }
 
-function normalizeIso(value?: string | Date): string {
-  const input = value ?? new Date();
-  const date = input instanceof Date ? input : new Date(input);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`invalid_iso_timestamp:${String(value)}`);
-  }
-  return date.toISOString();
-}
+const MESH_HUB_POLICY_PATH = pathResolver.knowledge('product/governance/mesh-hub-policy.json');
+const MESH_HUB_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mesh-hub-policy.schema.json'
+);
+const meshHubPolicyCatalog = defineCatalog<MeshHubPolicySnapshot>({
+  id: 'mesh-hub-policy',
+  path: MESH_HUB_POLICY_PATH,
+  schema: MESH_HUB_POLICY_SCHEMA_PATH,
+});
 
 function loadMeshHubPolicy(): MeshHubPolicySnapshot {
-  const policyPath = pathResolver.resolve('knowledge/product/governance/mesh-hub-policy.json');
-  return JSON.parse(
-    String(safeReadFile(policyPath, { encoding: 'utf8' }) || '{}')
-  ) as MeshHubPolicySnapshot;
+  return meshHubPolicyCatalog.load();
 }
 
 function normalizeRequestKind(value: string): MeshRequestKind | null {

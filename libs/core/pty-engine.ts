@@ -7,6 +7,7 @@ import * as os from 'node:os';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
 /**
  * Kyberion PTY Engine (Logical Kernel) v2.1
@@ -30,6 +31,14 @@ interface TerminalAdapter {
   onData(cb: (data: string) => void): void;
   onExit(cb: (code: number | null, signal: string | null) => void): void;
   pid?: number;
+}
+
+export function parsePtyAdfPayload(raw: string): Record<string, unknown> | undefined {
+  try {
+    return parseSafeJsonObjectInput(raw, 'PTY ADF payload');
+  } catch {
+    return undefined;
+  }
 }
 
 class NativePtyAdapter implements TerminalAdapter {
@@ -224,7 +233,8 @@ class PtyRegistry {
     const id = crypto.randomUUID();
     if (threadId) this.threadToSession.set(threadId, id);
     const targetShell =
-      shell || (os.platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash');
+      shell ||
+      (os.platform() === 'win32' ? 'powershell.exe' : getRegisteredEnvText('SHELL') || '/bin/bash');
     const targetCwd = cwd || pathResolver.rootDir();
     const targetEnv = { ...process.env, ...env, TERM: 'xterm-256color', PAGER: 'cat' };
 
@@ -270,7 +280,8 @@ class PtyRegistry {
       let match;
       while ((match = ADF_PATTERN.exec(processed)) !== null) {
         try {
-          const adfPayload = JSON.parse(match[1]);
+          const adfPayload = parsePtyAdfPayload(match[1]);
+          if (!adfPayload) throw new Error('invalid PTY ADF payload');
           logger.info(
             `[ADF_TUNNEL] Detected instruction from session ${id}: ${JSON.stringify(adfPayload)}`
           );

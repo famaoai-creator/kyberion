@@ -29,6 +29,7 @@ function retainEquivalent<T>(previous: T | undefined, next: T): T {
 export interface LiveSyncSchedulerOptions<T> {
   fetchSnapshot: () => Promise<T>;
   onSnapshot: (snapshot: T) => void;
+  onError?: (error: unknown) => void;
   /** PI-07: authoritative snapshot revision; older snapshots are discarded. */
   revisionOf?: (snapshot: T) => number | undefined;
   debounceMs?: number;
@@ -73,7 +74,7 @@ export class LiveSyncScheduler<T> {
     if (this.timer) this.cancel(this.timer);
     this.timer = this.schedule(() => {
       this.timer = undefined;
-      void this.refresh();
+      void this.refresh().catch(() => undefined);
     }, this.debounceMs);
   }
 
@@ -87,7 +88,11 @@ export class LiveSyncScheduler<T> {
     this.queued = false;
     try {
       const next = await this.options.fetchSnapshot();
+      if (this.stopped) return;
       this.applySnapshot(next);
+    } catch (error) {
+      this.options.onError?.(error);
+      throw error;
     } finally {
       this.inFlight = false;
       if (this.queued) this.invalidate();
@@ -99,7 +104,9 @@ export class LiveSyncScheduler<T> {
     this.invalidate();
     const tick = () => {
       if (this.stopped) return;
-      if (!this.options.isVisible || this.options.isVisible()) void this.refresh();
+      if (!this.options.isVisible || this.options.isVisible()) {
+        void this.refresh().catch(() => undefined);
+      }
       this.backgroundTimer = this.schedule(tick, this.backgroundMs);
     };
     this.backgroundTimer = this.schedule(tick, this.backgroundMs);

@@ -1,11 +1,12 @@
-import { withCatalogInputContract } from '@agent/core';
+import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
 
 // AR-02: self-described op catalog — mirrors this actuator's action
 // dispatch (if/else style handleAction). None of these ops appear in the
 // shared pools, so every entry is strictly additive: pipelines reached them
 // via explicit step roles, and determineActuatorStepType threw unknown-op.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 
@@ -45,6 +46,49 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
       language: { type: 'string' },
       output_path: { type: 'string' },
       request_id: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
+  normalize_audio: {
+    type: 'object',
+    properties: {
+      audio_path: { type: 'string' },
+      output_path: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
+  render_talking_avatar: {
+    type: 'object',
+    properties: {
+      portrait_path: { type: 'string' },
+      avatar_name: { type: 'string' },
+      text: { type: 'string' },
+      audio_path: { type: 'string' },
+      output_path: { type: 'string' },
+      language: { type: 'string' },
+      voice: { type: 'string' },
+      fps: { type: 'number' },
+      max_duration_sec: { type: 'number' },
+      mouth_x: { type: 'number' },
+      mouth_y: { type: 'number' },
+      mouth_w: { type: 'number' },
+      eyes_y: { type: 'number' },
+    },
+    additionalProperties: false,
+  },
+  output_to_virtual_camera: {
+    type: 'object',
+    properties: {
+      video_path: { type: 'string' },
+      backend: { type: 'string' },
+      scene_name: { type: 'string' },
+      source_name: { type: 'string' },
+      loop: { type: 'boolean' },
+      stop: { type: 'boolean' },
+      obs_host: { type: 'string' },
+      obs_port: { type: 'number' },
+      obs_password: { type: 'string' },
+      v4l2_device_path: { type: 'string' },
     },
     additionalProperties: false,
   },
@@ -178,6 +222,11 @@ const VOICE_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   list_audio_routes: [{ bus: 'stub' }],
   probe_audio_route: [{ bus: 'stub' }],
   transcribe: [{ audio_path: 'active/shared/tmp/sample.wav', language: 'ja' }],
+  normalize_audio: [{ audio_path: 'active/shared/tmp/meeting.m4a' }],
+  render_talking_avatar: [
+    { portrait_path: 'active/shared/tmp/avatar.png', text: 'こんにちは。', language: 'ja' },
+  ],
+  output_to_virtual_camera: [{ video_path: 'active/shared/tmp/avatar.mp4' }],
   transcribe_voice_sample: [{ sample_id: 'sample-1', audio_path: 'active/shared/tmp/sample.wav' }],
   collect_and_register_voice_profile: [{ profile_id: 'profile-1', samples: [] }],
   collect_voice_samples: [{ output_dir: 'active/shared/tmp/voice-samples' }],
@@ -223,15 +272,18 @@ export const VOICE_ACTUATOR_APPLY_OPS = [
   'collect_and_register_voice_profile',
   'collect_voice_samples',
   'generate_voice',
+  'normalize_audio',
+  'output_to_virtual_camera',
   'record_interaction',
   'record_voice_sample',
   'record_verify_repair_voice_sample',
   'register_voice_profile',
+  'render_talking_avatar',
   'speak_local',
   'verify_tts_loopback',
 ] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   return withCatalogInputContract('voice', op, kind, {
     op,
     kind,
@@ -240,7 +292,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   });
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...VOICE_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...VOICE_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

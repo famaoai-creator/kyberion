@@ -8,7 +8,12 @@ import { spawn } from 'node:child_process';
 import { recordEstimatedCliUsage } from './cli-usage-metering.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
-import { buildSafeExecEnv } from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import {
+  buildProviderChildEnv,
+  resolveActiveProviderPermissionArgs,
+} from './provider-permission-profiles.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import type {
@@ -56,6 +61,28 @@ export class GeminiCliBackend implements ReasoningBackend {
     this.model = options.model ?? resolveRuntimeModelId('gemini-default');
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
+  }
+
+  /** Keep caller extras, but never let them widen an ambient sandbox policy. */
+  private permissionArgs(
+    active = resolveActiveProviderPermissionArgs('gemini')
+  ): readonly string[] {
+    if (!active) return this.extraArgs;
+
+    const filtered: string[] = [];
+    for (let index = 0; index < this.extraArgs.length; index += 1) {
+      const arg = this.extraArgs[index]!;
+      if (arg === '-y' || arg === '--yolo' || arg === '--sandbox' || arg.startsWith('--sandbox=')) {
+        continue;
+      }
+      if (arg === '--approval-mode') {
+        index += 1;
+        continue;
+      }
+      if (arg.startsWith('--approval-mode=')) continue;
+      filtered.push(arg);
+    }
+    return [...filtered, ...active];
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -208,12 +235,20 @@ export class GeminiCliBackend implements ReasoningBackend {
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
     assertReasoningEgressAllowed(this.name);
+    const activePermissionArgs = resolveActiveProviderPermissionArgs('gemini');
     const args = [
       '-p',
       `${instruction}\n\nContext: ${context ?? 'none'}`,
-      '-y', // YOLO mode for autonomous task execution
-      ...(this.model ? ['--model', this.model] : []),
-      ...this.extraArgs,
+      ...(activePermissionArgs
+        ? [
+            ...(this.model ? ['--model', this.model] : []),
+            ...this.permissionArgs(activePermissionArgs),
+          ]
+        : [
+            '-y', // YOLO mode for autonomous task execution
+            ...(this.model ? ['--model', this.model] : []),
+            ...this.extraArgs,
+          ]),
     ];
     // For delegation, we don't necessarily want JSON format, we want it to just do the work.
     // However, the caller expects a string result (the report).
@@ -225,8 +260,12 @@ export class GeminiCliBackend implements ReasoningBackend {
     }
     const cleanStdout = lines.slice(jsonStartIdx).join('\n');
     try {
-      const cliResult = JSON.parse(cleanStdout);
-      return (cliResult.response || stdout).trim();
+      const cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response') as {
+        response?: unknown;
+        error?: unknown;
+      };
+      const response = typeof cliResult.response === 'string' ? cliResult.response : undefined;
+      return (response || stdout).trim();
     } catch (_) {
       return stdout.trim();
     }
@@ -248,7 +287,7 @@ export class GeminiCliBackend implements ReasoningBackend {
       '-o',
       'json',
       ...(this.model ? ['--model', this.model] : []),
-      ...this.extraArgs,
+      ...this.permissionArgs(),
     ];
 
     const stdout = await this.spawnCli(args);
@@ -263,7 +302,7 @@ export class GeminiCliBackend implements ReasoningBackend {
 
     let cliResult: any;
     try {
-      cliResult = JSON.parse(cleanStdout);
+      cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response');
     } catch (err: any) {
       throw new Error(
         `[gemini-cli] failed to parse CLI JSON output: ${err.message}. Raw: ${cleanStdout.slice(0, 500)}`
@@ -283,7 +322,7 @@ export class GeminiCliBackend implements ReasoningBackend {
     const cleanJson = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseStr;
 
     try {
-      const structured = JSON.parse(cleanJson);
+      const structured = parseSafeJsonInput(cleanJson, 'Gemini CLI structured response');
       const parsed = params.schema.safeParse(structured);
       if (!parsed.success) {
         throw new Error(`[gemini-cli] schema validation failed: ${parsed.error.message}`);
@@ -304,7 +343,7 @@ export class GeminiCliBackend implements ReasoningBackend {
       '-o',
       'json',
       ...(this.model ? ['--model', this.model] : []),
-      ...this.extraArgs,
+      ...this.permissionArgs(),
     ];
 
     const stdout = await this.spawnCli(args);
@@ -315,15 +354,17 @@ export class GeminiCliBackend implements ReasoningBackend {
     }
     const cleanStdout = lines.slice(jsonStartIdx).join('\n');
     try {
-      const cliResult = JSON.parse(cleanStdout);
+      const cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response') as {
+        response?: unknown;
+        error?: unknown;
+      };
       if (cliResult.error) {
         throw new Error(`[gemini-cli] CLI returned error: ${JSON.stringify(cliResult.error)}`);
       }
-      const responseStr: string | undefined = cliResult.response;
-      if (responseStr === undefined || responseStr === null) {
+      if (typeof cliResult.response !== 'string') {
         throw new Error('[gemini-cli] CLI result missing "response" field');
       }
-      return responseStr.trim() || stdout.trim();
+      return cliResult.response.trim() || stdout.trim();
     } catch (err: any) {
       if (err.message.startsWith('[gemini-cli]')) throw err;
       return stdout.trim();
@@ -354,7 +395,7 @@ export class GeminiCliBackend implements ReasoningBackend {
     return new Promise((resolve, reject) => {
       const child = spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env },
+        env: buildProviderChildEnv({ provider: 'gemini' }),
       });
       let stdout = '';
       let stderr = '';
@@ -385,12 +426,12 @@ export function buildGeminiCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
   modelOverride?: string
 ): GeminiCliBackend | null {
-  const bin = env.KYBERION_GEMINI_CLI_BIN?.trim();
+  const bin = getRegisteredEnvText('KYBERION_GEMINI_CLI_BIN', { env })?.trim();
   const model =
     modelOverride ||
-    env.KYBERION_GEMINI_CLI_MODEL?.trim() ||
+    getRegisteredEnvText('KYBERION_GEMINI_CLI_MODEL', { env })?.trim() ||
     resolveRuntimeModelId('gemini-default', env);
-  const timeoutRaw = env.KYBERION_GEMINI_CLI_TIMEOUT?.trim();
+  const timeoutRaw = getRegisteredEnvText('KYBERION_GEMINI_CLI_TIMEOUT', { env })?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
   const backend = new GeminiCliBackend({
     ...(bin ? { bin } : {}),
@@ -426,7 +467,7 @@ export async function runGeminiCliQuery<T>(params: {
   const stdout = await new Promise<string>((resolve, reject) => {
     const child = spawn(bin, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: buildSafeExecEnv(),
+      env: buildProviderChildEnv({ provider: 'gemini' }),
     });
     let out = '';
     let err = '';
@@ -457,16 +498,18 @@ export async function runGeminiCliQuery<T>(params: {
     throw new Error(`[gemini-cli] could not find JSON in stdout: ${stdout}`);
   }
   const cleanStdout = lines.slice(jsonStartIdx).join('\n');
-  const cliResult = JSON.parse(cleanStdout);
-  const responseStr = cliResult.response;
-  if (!responseStr) {
+  const cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response') as {
+    response?: unknown;
+  };
+  if (typeof cliResult.response !== 'string' || !cliResult.response) {
     throw new Error(
       `[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`
     );
   }
+  const responseStr = cliResult.response;
   const jsonMatch = responseStr.match(/```json\n([\s\S]*?)\n```/) || responseStr.match(/{[\s\S]*}/);
   const cleanJson = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseStr;
-  const structured = JSON.parse(cleanJson);
+  const structured = parseSafeJsonInput(cleanJson, 'Gemini CLI structured response');
   const parsed = params.schema.safeParse(structured);
   if (!parsed.success) {
     throw new Error(`[gemini-cli] schema validation failed: ${parsed.error.message}`);

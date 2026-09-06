@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/cloudflare-os-control-plane-state.schema.json",
+  "title": "Cloudflare OS Control Plane State",
+  "description": "Persisted control-plane projection. Detailed action and gadget validation remains in the domain parser.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "held",
+    "introductions",
+    "observations",
+    "autoRules",
+    "capabilities",
+    "threadCapabilities",
+    "blueprints",
+    "network",
+    "gadgets"
+  ],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "held": { "type": "array" },
+    "introductions": { "type": "array" },
+    "observations": { "type": "array" },
+    "autoRules": { "type": "array" },
+    "capabilities": { "type": "array" },
+    "threadCapabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "blueprints": { "type": "array" },
+    "network": { "type": "array" },
+    "gadgets": { "type": "array" }
+  }
+}

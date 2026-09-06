@@ -79,7 +79,7 @@ export function getSurfaceCoordinationRole(surface: string): GovernedArtifactRol
   return cachedMap.entries.find((entry) => entry.surface === normalized)?.role || 'surface_runtime';
 }
 
-export function resetSurfaceCoordinationRoleMapCache(): void {
+export function _resetSurfaceCoordinationRoleMapCacheForTests(): void {
   cachedMap = null;
   cachedMapKey = null;
 }

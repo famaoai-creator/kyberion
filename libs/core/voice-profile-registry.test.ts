@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
 import * as pathResolver from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
@@ -14,6 +15,7 @@ import {
   getWritableVoiceProfileRegistryForTier,
   getVoiceProfileRecord,
   getVoiceProfileRegistry,
+  loadVoiceProfileRegistryAtPath,
   listVoiceProfiles,
   resetVoiceProfileRegistryCache,
 } from './voice-profile-registry.js';
@@ -67,6 +69,36 @@ describe('voice profile registry', () => {
     expect(registry.default_profile_id).toBe('ja-default');
     expect(getVoiceProfileRecord().profile_id).toBe('ja-default');
     expect(listVoiceProfiles('shadow')).toHaveLength(1);
+  });
+
+  it('fails closed when the configured base registry is invalid', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({ version: 'test', default_profile_id: '', profiles: [] })
+    );
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = overridePath;
+
+    expect(() => getVoiceProfileRegistry()).toThrow(/Invalid catalog voice-profile-registry/);
+  });
+
+  it('rejects configured base registries outside the repository', () => {
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = '/tmp/kyberion-voice-profile-registry.json';
+
+    expect(() => getVoiceProfileRegistry()).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects registry overrides that traverse a symbolic link', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({ version: 'test', default_profile_id: '', profiles: [] })
+    );
+    const linkedPath = `${tmpDir}/linked-registry.json`;
+    fs.symlinkSync(overridePath, linkedPath);
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = linkedPath;
+
+    expect(() => getVoiceProfileRegistry()).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
   it('keeps explicit registry overrides isolated from the personal overlay', () => {
@@ -266,5 +298,34 @@ describe('voice profile registry', () => {
     expect(
       writable.registry.profiles.some((profile) => profile.profile_id === 'operator-ja-default')
     ).toBe(false);
+  });
+
+  it('keeps an empty personal overlay valid before the first profile is registered', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overlayPath,
+      JSON.stringify({ version: 'test', default_profile_id: '', profiles: [] })
+    );
+    process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = overlayPath;
+
+    const writable = getWritableVoiceProfileRegistryForTier('personal');
+    expect(writable.registry).toEqual({ version: 'test', default_profile_id: '', profiles: [] });
+  });
+
+  it('loads a path-bound registry with the same empty-overlay contract', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({ version: 'test', default_profile_id: '', profiles: [] })
+    );
+
+    expect(loadVoiceProfileRegistryAtPath(overridePath, { allowEmpty: true })).toEqual({
+      version: 'test',
+      default_profile_id: '',
+      profiles: [],
+    });
+    expect(() => loadVoiceProfileRegistryAtPath(overridePath)).toThrow(
+      /Invalid catalog voice-profile-registry/
+    );
   });
 });

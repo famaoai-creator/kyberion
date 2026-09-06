@@ -1,4 +1,5 @@
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const DEPLOYMENT_SCHEMA = {
   type: 'object',
@@ -17,7 +18,7 @@ export const DEPLOYMENT_ACTUATOR_CAPTURE_OPS = [] as const;
 export const DEPLOYMENT_ACTUATOR_TRANSFORM_OPS = [] as const;
 export const DEPLOYMENT_ACTUATOR_APPLY_OPS = ['deploy_release'] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   return {
     op,
     kind,
@@ -33,7 +34,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...DEPLOYMENT_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...DEPLOYMENT_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

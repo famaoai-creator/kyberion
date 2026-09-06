@@ -25,8 +25,11 @@ import {
   recordPostToolUse,
   summarizeTranscriptUsage,
 } from '@agent/core/claude-code-hook';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
-import { currentProcessArgv } from './lib/harness.js';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
+import { parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord } from '@agent/core/foundation/text';
+import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
@@ -35,15 +38,27 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8').trim();
 }
 
+export function parseHookPayload(raw: string): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = parseSafeJsonInput(raw, 'Claude Code hook payload');
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function readClaudeCodeHookTranscript(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 async function main(args: string[] = currentProcessArgv()): Promise<void> {
   const event = args[2] ?? '';
   const raw = await readStdin();
-  let payload: Record<string, unknown> = {};
-  try {
-    payload = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-  } catch {
-    payload = {};
-  }
+  const payload = parseHookPayload(raw);
 
   switch (event) {
     case 'SessionStart': {
@@ -86,9 +101,7 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
         const transcriptPath =
           typeof payload.transcript_path === 'string' ? payload.transcript_path : '';
         if (transcriptPath && safeExistsSync(transcriptPath)) {
-          recordCliUsage(
-            summarizeTranscriptUsage(safeReadFile(transcriptPath, { encoding: 'utf8' }) as string)
-          );
+          recordCliUsage(summarizeTranscriptUsage(readClaudeCodeHookTranscript(transcriptPath)));
         }
       } catch {
         // usage capture is best-effort; never block session close
@@ -108,21 +121,34 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
   }
 }
 
-const hookArgv = currentProcessArgv();
-main(hookArgv).catch((err) => {
-  // Fail open: emit an allow decision for PreToolUse so a hook bug never wedges the session.
-  if (hookArgv[2] === 'PreToolUse') {
-    process.stdout.write(
-      JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'PreToolUse',
-          permissionDecision: 'allow',
-          permissionDecisionReason: `Kyberion hook errored (failing open): ${String(err)}`,
-        },
-      })
-    );
-  } else {
-    process.stderr.write(`[claude_code_hook] ${String(err)}\n`);
-  }
-  process.exitCode = 0;
+export const claudeCodeHook = defineScript({
+  name: 'claude-code-hook',
+  flags: [],
+  run: async ({ argv }) => {
+    const hookArgv = ['node', 'claude_code_hook', ...argv];
+    try {
+      await main(hookArgv);
+    } catch (err) {
+      // Fail open: emit an allow decision for PreToolUse so a hook bug never wedges the session.
+      if (hookArgv[2] === 'PreToolUse') {
+        process.stdout.write(
+          JSON.stringify({
+            hookSpecificOutput: {
+              hookEventName: 'PreToolUse',
+              permissionDecision: 'allow',
+              permissionDecisionReason: `Kyberion hook errored (failing open): ${String(err)}`,
+            },
+          })
+        );
+      } else {
+        process.stderr.write(`[claude_code_hook] ${String(err)}\n`);
+      }
+    }
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'claude_code_hook.ts') ||
+  isDirectScript(import.meta.url, 'claude_code_hook.js')
+)
+  void claudeCodeHook();

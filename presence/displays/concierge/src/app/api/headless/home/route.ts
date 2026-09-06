@@ -5,6 +5,7 @@ import {
   parseConciergeLimit,
   readConciergeHome,
 } from '../../../../lib/headless-projections';
+import { readConciergeScopeQuery } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
@@ -13,15 +14,14 @@ export function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
   try {
+    const scopeQuery = readConciergeScopeQuery(req.nextUrl.searchParams);
     authorizeConciergeOperation(resolved.context, 'concierge.home.read', {
-      tenantSlug: req.nextUrl.searchParams.get('tenant') || undefined,
-      organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,
-      projectId: req.nextUrl.searchParams.get('project_id') || undefined,
+      tenantSlug: scopeQuery.tenant,
+      organizationId: scopeQuery.organizationId,
+      projectId: scopeQuery.projectId,
     });
     const summary = readConciergeHome(resolved.context, {
-      tenant: req.nextUrl.searchParams.get('tenant'),
-      organizationId: req.nextUrl.searchParams.get('organization_id'),
-      projectId: req.nextUrl.searchParams.get('project_id'),
+      ...scopeQuery,
       limit: parseConciergeLimit(req.nextUrl.searchParams.get('limit')),
     });
     return NextResponse.json(conciergeEnvelope('home', summary, resolved.context));

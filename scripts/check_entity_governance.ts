@@ -1,18 +1,19 @@
 /** EG-09/12: cross-entity drift and boundary conformance checker. */
 import * as path from 'node:path';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { listProjectRecords } from '@agent/core/project-registry';
 import {
-  pathResolver,
   safeExistsSync,
-  safeReadFile,
+  safeLstat,
   safeReaddir,
   safeExecResult,
   safeStat,
-  listProjectRecords,
-  withExecutionContext,
-} from '@agent/core';
-import { getRegisteredEnvBool, readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { getRegisteredEnvBool, readTextFile } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 export interface EntityGovernanceReport {
   status: 'ok' | 'drift';
@@ -42,6 +43,13 @@ const REQUIRED_RETENTION_PATHS = [
   'active/shared/runtime/pipeline-runs',
   'active/shared/runtime/run-graphs',
 ];
+
+export function readEntityGovernanceTextFile(filePath: string, label = filePath): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function childDirectories(root: string): string[] {
   if (!safeExistsSync(root)) return [];
@@ -115,7 +123,7 @@ function collectPlanLedgerGaps(rootDir: string): string[] {
   const planDir = path.join(rootDir, 'docs/developer/improvement-plans-2026-07');
   const statusPath = path.join(planDir, 'STATUS.ja.md');
   if (!safeExistsSync(statusPath)) return ['STATUS.ja.md'];
-  const status = String(safeReadFile(statusPath, { encoding: 'utf8' }));
+  const status = readEntityGovernanceTextFile(statusPath, 'improvement plan status');
   return safeReaddir(planDir)
     .filter((entry) => entry.endsWith('.ja.md'))
     .filter((entry) => !['README.ja.md', 'STATUS.ja.md'].includes(entry))
@@ -142,12 +150,12 @@ export function collectEntityGovernanceReport(
   let policy: any = null;
   let catalog: any = null;
   try {
-    policy = readJson<unknown>(policyPath);
+    policy = readSafeJsonFile<Record<string, unknown>>(policyPath, 'security policy');
   } catch (error) {
     violations.push(`security policy unreadable: ${String(error)}`);
   }
   try {
-    catalog = readJson<unknown>(catalogPath);
+    catalog = readSafeJsonFile<Record<string, unknown>>(catalogPath, 'retention catalog');
   } catch (error) {
     violations.push(`retention catalog unreadable: ${String(error)}`);
   }
@@ -234,7 +242,7 @@ export function collectEntityGovernanceReport(
   const planLedgerMissing = collectPlanLedgerGaps(rootDir);
   const gitIgnorePath = path.join(rootDir, '.gitignore');
   if (safeExistsSync(gitIgnorePath)) {
-    const gitIgnore = String(safeReadFile(gitIgnorePath, { encoding: 'utf8' }));
+    const gitIgnore = readEntityGovernanceTextFile(gitIgnorePath, '.gitignore');
     if (/^\*\.jsonl$/m.test(gitIgnore))
       gitBoundaryViolations.push('global *.jsonl ignore rule remains');
     if ((gitIgnore.match(/^active\/$/gm) || []).length > 1)
@@ -294,7 +302,8 @@ export const runCheckEntityGovernance = defineScript({
     const strictWarnings =
       context.argv.includes('--strict-warnings') ||
       getRegisteredEnvBool('KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS') === true;
-    if (shouldFailEntityGovernance(report, strictWarnings)) process.exitCode = 1;
+    if (shouldFailEntityGovernance(report, strictWarnings)) throw new ScriptExitError(1);
+    return report;
   },
 });
 

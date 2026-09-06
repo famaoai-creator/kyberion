@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { extractPlaceholderNames } from '@agent/core/message-format';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import catalog from '../knowledge/product/orchestration/user-facing-vocabulary.json';
 import {
   buildPseudoLocalizedCatalog,
@@ -11,6 +13,16 @@ import {
 } from './generate_pseudo_locale.js';
 
 describe('generate_pseudo_locale (I18N-07)', () => {
+  it('uses the governed vocabulary catalog loader', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/generate_pseudo_locale.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('loadVocabularyCatalog()');
+    expect(source).not.toContain('readJson<');
+  });
+
   describe('decorateLiteralText', () => {
     it('maps ascii letters to accented look-alikes, preserving case', () => {
       expect(decorateLiteralText('Hello World')).toBe('Ħėŀŀő Ẇőřŀḓ');
@@ -90,7 +102,7 @@ describe('generate_pseudo_locale (I18N-07)', () => {
       const templates = [
         'Please provide {input}.',
         'There are {count} more clarification items.',
-        'Unknown command "{command}". Try `npm run cli -- help`.',
+        'Unknown command "{command}". Try `pnpm kyberion help`.',
         'Agent catalog refreshed. {manifests} manifests, {runtimes} active runtimes.',
         'no placeholders here at all',
       ];

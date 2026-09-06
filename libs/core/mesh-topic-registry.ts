@@ -1,10 +1,11 @@
 import * as crypto from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { nowIso } from './foundation/time.js';
+import { readJsonLines } from './foundation/json.js';
+import { normalizeIso, nowIso } from './foundation/time.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeRmSync } from './secure-io.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { listEligibleMeshPeers } from './mesh-peer-directory.js';
 import type {
@@ -85,15 +86,6 @@ export interface MeshTopicResolutionOptions {
   policyVersion?: string;
 }
 
-function normalizeIso(value?: string | Date): string {
-  const input = value ?? new Date();
-  const date = input instanceof Date ? input : new Date(input);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`invalid_iso_timestamp:${String(value)}`);
-  }
-  return date.toISOString();
-}
-
 function normalizeNamespace(namespace?: string): string {
   return String(namespace || '')
     .trim()
@@ -133,13 +125,12 @@ function randomId(prefix: string): string {
 }
 
 function readJsonl<T>(logicalPath: string): T[] {
-  if (!safeExistsSync(logicalPath)) return [];
-  const raw = String(safeReadFile(logicalPath, { encoding: 'utf8' }) || '');
-  return raw
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
+  const safePath = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath)) return [];
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`mesh topic registry JSONL must be a regular file: ${safePath}`);
+  }
+  return readJsonLines<T>(safePath);
 }
 
 function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: unknown): string {

@@ -36,6 +36,43 @@ function currentRoot(): string {
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   return {
+    assertSafeRepositoryPath: (filePath: string, options: { allowMissingLeaf?: boolean } = {}) => {
+      const root = path.resolve(currentRoot());
+      const resolved = path.resolve(filePath);
+      const relative = path.relative(root, resolved);
+      if (
+        !relative ||
+        relative === '..' ||
+        relative.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relative)
+      ) {
+        throw new Error(
+          `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+        );
+      }
+      let current = root;
+      for (const segment of relative.split(path.sep)) {
+        current = path.join(current, segment);
+        try {
+          if (actual.lstatSync(current).isSymbolicLink()) {
+            throw new Error(
+              `[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link: ${filePath}`
+            );
+          }
+        } catch (error: unknown) {
+          const code =
+            error && typeof error === 'object' && 'code' in error
+              ? (error as { code?: string }).code
+              : undefined;
+          if (code === 'ENOENT') break;
+          throw error;
+        }
+      }
+      if (!options.allowMissingLeaf && !actual.existsSync(resolved)) {
+        throw new Error(`Resource path does not exist: ${resolved}`);
+      }
+      return resolved;
+    },
     safeReaddir: (dir: string) => actual.readdirSync(dir),
     safeStat: (p: string) => actual.statSync(p),
     safeLstat: (p: string) => actual.lstatSync(p),
@@ -134,6 +171,26 @@ function abs(repoRelative: string): string {
   return path.join(currentRoot(), ...repoRelative.split('/'));
 }
 
+function missionState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    mission_id: 'MIS-AL04-TEST',
+    tier: 'public',
+    status: 'active',
+    execution_mode: 'local',
+    priority: 1,
+    assigned_persona: 'worker',
+    confidence_score: 1,
+    git: {
+      branch: 'scope-offboarding-test',
+      start_commit: 'abc123',
+      latest_commit: 'abc123',
+      checkpoints: [],
+    },
+    history: [],
+    ...overrides,
+  };
+}
+
 function trashPathOf(repoRelative: string): string {
   return path.join(currentRoot(), ...TRASH_REPO_SUBPATH.split('/'), ...repoRelative.split('/'));
 }
@@ -157,7 +214,13 @@ function auditEvents(): Array<Record<string, any>> {
 
 beforeEach(() => {
   rootDirState = undefined;
-  currentRoot();
+  const root = currentRoot();
+  const schemaPath = path.join(root, 'knowledge/product/schemas/mission-state.schema.json');
+  fs.mkdirSync(path.dirname(schemaPath), { recursive: true });
+  fs.copyFileSync(
+    path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
+    schemaPath
+  );
 });
 
 afterEach(() => {
@@ -217,6 +280,19 @@ describe('AL-04 mission runtime residue GC', () => {
     expect(fs.existsSync(abs('active/shared/runtime/artifacts/ART-MINE.json'))).toBe(true);
   });
 
+  it('fails closed for residue records containing dangerous JSON keys', () => {
+    writeJson(abs('active/shared/runtime/artifacts/ART-DANGEROUS.json'), {
+      artifact_id: 'ART-DANGEROUS',
+      mission_id: MISSION_ID,
+      ['__proto__']: { poisoned: true },
+    });
+
+    expect(gcMissionRuntimeResidue({ missionId: MISSION_ID, dryRun: true })).toMatchObject({
+      status: 'noop',
+      candidates: [],
+    });
+  });
+
   it('soft-deletes the residue, audits each removal, and stays idempotent', () => {
     seedResidue();
     const result = gcMissionRuntimeResidue({ missionId: MISSION_ID });
@@ -264,15 +340,22 @@ describe('AL-04 mission runtime residue GC', () => {
 describe('AL-04 tenant/project offboarding', () => {
   function seedTenant(): void {
     writeJson(abs('active/projects/public/tenant-alpha/workspace/plan.json'), { a: 1 });
-    writeJson(abs('active/missions/public/MIS-ALPHA-1/mission-state.json'), {
-      mission_id: 'MIS-ALPHA-1',
-      tenant_slug: 'tenant-alpha',
-      relationships: { project: { project_id: 'proj-x', relationship_type: 'belongs_to' } },
-    });
+    writeJson(
+      abs('active/missions/public/MIS-ALPHA-1/mission-state.json'),
+      missionState({
+        mission_id: 'MIS-ALPHA-1',
+        tenant_slug: 'tenant-alpha',
+        relationships: { project: { project_id: 'proj-x', relationship_type: 'belongs_to' } },
+      })
+    );
     // Another tenant's mission — must never be swept in.
-    writeJson(abs('active/missions/public/MIS-BETA-1/mission-state.json'), {
-      mission_id: 'MIS-BETA-1',
-      tenant_slug: 'tenant-beta',
+    writeJson(
+      abs('active/missions/public/MIS-BETA-1/mission-state.json'),
+      missionState({ mission_id: 'MIS-BETA-1', tenant_slug: 'tenant-beta' })
+    );
+    writeJson(abs('active/missions/public/MIS-INVALID/mission-state.json'), {
+      mission_id: 'MIS-INVALID',
+      tenant_slug: 'tenant-alpha',
     });
   }
 
@@ -359,6 +442,30 @@ describe('AL-04 tenant/project offboarding', () => {
     });
   });
 
+  it('ignores a symlinked mission tree during scope discovery', () => {
+    const tierDir = abs('active/missions/public');
+    const externalMission = abs('active/shared/tmp/offboarding-external-mission');
+    const linkedMission = path.join(tierDir, 'MIS-SYMLINK-TENANT');
+    fs.mkdirSync(tierDir, { recursive: true });
+    fs.mkdirSync(externalMission, { recursive: true });
+    writeJson(
+      path.join(externalMission, 'mission-state.json'),
+      missionState({ mission_id: 'MIS-SYMLINK-TENANT', tenant_slug: 'tenant-alpha' })
+    );
+    fs.symlinkSync(externalMission, linkedMission, 'dir');
+    try {
+      expect(
+        collectScopeTargets('tenant', 'tenant-alpha').some((target) =>
+          target.path.includes('MIS-SYMLINK-TENANT')
+        )
+      ).toBe(false);
+      expect(fs.existsSync(path.join(externalMission, 'mission-state.json'))).toBe(true);
+    } finally {
+      fs.unlinkSync(linkedMission);
+      fs.rmSync(externalMission, { recursive: true, force: true });
+    }
+  });
+
   it('applies tenant and organization lineage to project workspaces and missions', () => {
     writeJson(abs('active/projects/confidential/tenant-a/proj-shared/state/project-state.json'), {
       tenant_slug: 'tenant-a',
@@ -368,18 +475,26 @@ describe('AL-04 tenant/project offboarding', () => {
       tenant_slug: 'tenant-b',
       organization_id: 'org-b',
     });
-    writeJson(abs('active/missions/confidential/MIS-PROJ-A/mission-state.json'), {
-      mission_id: 'MIS-PROJ-A',
-      tenant_slug: 'tenant-a',
-      organization_id: 'org-a',
-      relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
-    });
-    writeJson(abs('active/missions/confidential/MIS-PROJ-B/mission-state.json'), {
-      mission_id: 'MIS-PROJ-B',
-      tenant_slug: 'tenant-b',
-      organization_id: 'org-b',
-      relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
-    });
+    writeJson(
+      abs('active/missions/confidential/MIS-PROJ-A/mission-state.json'),
+      missionState({
+        mission_id: 'MIS-PROJ-A',
+        tier: 'confidential',
+        tenant_slug: 'tenant-a',
+        organization_id: 'org-a',
+        relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
+      })
+    );
+    writeJson(
+      abs('active/missions/confidential/MIS-PROJ-B/mission-state.json'),
+      missionState({
+        mission_id: 'MIS-PROJ-B',
+        tier: 'confidential',
+        tenant_slug: 'tenant-b',
+        organization_id: 'org-b',
+        relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
+      })
+    );
 
     expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
       'PROJECT_WORKSPACE_AMBIGUOUS'
@@ -677,6 +792,32 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     const verification = verifyScopeOffboarded('tenant', TENANT);
     expect(verification.clean).toBe(false);
     expect(verification.leftovers.length).toBeGreaterThan(0);
+  });
+
+  it('keeps a dedup line with a dangerous JSON key as an unreadable record', () => {
+    seedIngestResidue();
+    fs.appendFileSync(
+      abs(INGEST_DEDUP_REGISTRY_REPO_PATH),
+      `{"content_sha256":"${ALPHA_HASH}","target_path":"${KNOWLEDGE_ROOT}","meta":{"__proto__":{}}}\n`
+    );
+
+    const result = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+
+    expect(result.status).toBe('dry_run');
+    expect(result.dedup_registry).toEqual({ matched: 2, removed: 0 });
+    expect(registryLines()).toHaveLength(5);
+  });
+
+  it('does not read a dedup registry replaced by a directory', () => {
+    seedIngestResidue();
+    const registryPath = abs(INGEST_DEDUP_REGISTRY_REPO_PATH);
+    fs.rmSync(registryPath, { force: true });
+    fs.mkdirSync(registryPath, { recursive: true });
+
+    const result = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+
+    expect(result.status).toBe('dry_run');
+    expect(result.dedup_registry).toBeUndefined();
   });
 
   it('execute leaves zero trace — knowledge, ledger, cursors, quota, dedup lines, vault — all audited', () => {

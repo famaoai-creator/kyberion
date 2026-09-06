@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 
 vi.mock('./path-resolver.js', async () => {
@@ -21,7 +20,8 @@ vi.mock('./policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
-import { rootResolve } from './path-resolver.js';
+import { pathResolver, rootResolve } from './path-resolver.js';
+import { safeMkdir, safeSymlinkSync, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 import {
   getTrustLevel,
   listNgTopics,
@@ -35,7 +35,9 @@ describe('relationship-graph-store', () => {
   const mockResolve = rootResolve as unknown as ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rel-graph-'));
+    tmpDir = pathResolver.sharedTmp(`rel-graph-${process.pid}`);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.mkdirSync(tmpDir, { recursive: true });
     mockResolve.mockImplementation((rel: string) => path.join(tmpDir, rel));
   });
 
@@ -101,8 +103,26 @@ describe('relationship-graph-store', () => {
           org: 'nbs',
           source: 'some-random-actuator' as unknown as 'voice-actuator',
           interaction: { at: '2026-04-20T10:00:00Z', summary: 'attempted write' },
-        }),
+        })
       ).toThrow(/unsupported source/);
+    });
+
+    it('rejects schema-invalid interactions before writing a new node', () => {
+      expect(() =>
+        recordInteraction({
+          personSlug: 'invalid-interaction',
+          org: 'nbs',
+          source: 'voice-actuator',
+          interaction: {
+            at: 'not-a-timestamp',
+            summary: 'must not be persisted',
+          } as unknown as {
+            at: string;
+            summary: string;
+          },
+        })
+      ).toThrow(/Invalid catalog relationship-node|valid timestamp/);
+      expect(readNode('nbs', 'invalid-interaction')).toBeNull();
     });
 
     it('rejects path-traversal in slugs', () => {
@@ -112,8 +132,21 @@ describe('relationship-graph-store', () => {
           org: 'nbs',
           source: 'voice-actuator',
           interaction: { at: '2026-04-20T10:00:00Z', summary: 'x' },
-        }),
+        })
       ).toThrow(/illegal path segment/);
+    });
+
+    it('rejects a relationship organization directory that traverses a symbolic link', () => {
+      const realDir = path.join(tmpDir, 'real-relationships');
+      const linkedDir = path.join(tmpDir, 'knowledge/confidential/relationships/linked-org');
+      fs.mkdirSync(realDir, { recursive: true });
+      fs.mkdirSync(path.dirname(linkedDir), { recursive: true });
+      safeSymlinkSync(realDir, linkedDir, 'dir');
+      try {
+        expect(() => readNode('linked-org', 'person')).toThrow('[RESOURCE_PATH_SYMLINK]');
+      } finally {
+        safeUnlinkSync(linkedDir);
+      }
     });
   });
 
@@ -145,7 +178,7 @@ describe('relationship-graph-store', () => {
           source: 'voice-actuator',
           fieldPath: 'trust_level.current',
           proposedValue: 5,
-        }),
+        })
       ).toThrow(/node missing/);
     });
   });
@@ -153,6 +186,35 @@ describe('relationship-graph-store', () => {
   describe('read helpers', () => {
     it('returns null from readNode when absent', () => {
       expect(readNode('nbs', 'nobody')).toBeNull();
+    });
+
+    it('rejects malformed persisted nodes before relationship data is used', () => {
+      const file = path.join(tmpDir, 'knowledge/confidential/relationships/nbs/malformed.json');
+      safeWriteFile(
+        file,
+        JSON.stringify({
+          identity: { name: 'Malformed', org: 'nbs', person_slug: 'malformed' },
+          trust_level: {
+            current: 99,
+            updated_at: '2026-04-20T10:00:00.000Z',
+          },
+          history: [],
+          updated_at: '2026-04-20T10:00:00.000Z',
+        }),
+        { encoding: 'utf8', mkdir: true }
+      );
+
+      expect(() => readNode('nbs', 'malformed')).toThrow(/trust_level.current/);
+    });
+
+    it('rejects a relationship node path that is a directory', () => {
+      const directoryPath = path.join(
+        tmpDir,
+        'knowledge/confidential/relationships/nbs/directory.json'
+      );
+      safeMkdir(directoryPath, { recursive: true });
+
+      expect(() => readNode('nbs', 'directory')).toThrow(/regular file/);
     });
 
     it('returns defaults for missing fields', () => {

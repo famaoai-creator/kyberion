@@ -1,9 +1,9 @@
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { withExecutionContext } from './authority.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 
 export type ToolRuntimeMode = 'trial' | 'approved_install' | 'installed' | 'pinned';
 export type ToolRuntimeEcosystem = 'python' | 'node' | 'system';
@@ -23,64 +23,59 @@ export interface ToolRuntimePolicy {
 }
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/tool-runtime-policy.json');
-
-const FALLBACK_POLICY: ToolRuntimePolicy = {
-  version: 'fallback',
-  managed_roots: {
-    tool_runtime_root: 'active/shared/runtime',
-    cache_root: 'active/shared/tmp/tool-runtime-cache',
-  },
-  mode_preference: {
-    python: 'trial_first',
-    node: 'installed_first',
-    system: 'installed_first',
-  },
-  approval: {
-    install_requires_approval: true,
-    pin_requires_approval: true,
-  },
-};
+const POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tool-runtime-policy.schema.json'
+);
 
 let cachedPolicyPath: string | null = null;
 let cachedPolicy: ToolRuntimePolicy | null = null;
 
 function getPolicyPath(): string {
   const explicit = getRegisteredEnvText('KYBERION_TOOL_RUNTIME_POLICY_PATH')?.trim();
-  if (explicit) return explicit;
+  if (explicit) return assertSafeRepositoryPath(explicit, { allowMissingLeaf: true });
   const operatorOverlay = `${resolveActiveProfileRoot()}/onboarding/tool-runtime-policy.json`;
-  return safeExistsSync(operatorOverlay) ? operatorOverlay : DEFAULT_POLICY_PATH;
+  const candidate = safeExistsSync(operatorOverlay) ? operatorOverlay : DEFAULT_POLICY_PATH;
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
-export function resetToolRuntimePolicyCache(): void {
+const policyCatalog = defineCatalog<ToolRuntimePolicy>({
+  id: 'tool-runtime-policy',
+  path: getPolicyPath,
+  schema: POLICY_SCHEMA_PATH,
+});
+
+export function _resetToolRuntimePolicyCacheForTests(): void {
   cachedPolicyPath = null;
   cachedPolicy = null;
+  policyCatalog.reset();
 }
 
 export function getToolRuntimePolicy(): ToolRuntimePolicy {
   const policyPath = getPolicyPath();
   if (cachedPolicyPath === policyPath && cachedPolicy) return cachedPolicy;
 
-  if (!safeExistsSync(policyPath)) {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = FALLBACK_POLICY;
-    return cachedPolicy;
-  }
+  cachedPolicy = withExecutionContext(
+    'sovereign_concierge',
+    () => policyCatalog.load(),
+    'ecosystem_architect'
+  );
+  cachedPolicyPath = policyPath;
+  return cachedPolicy;
+}
 
-  try {
-    const raw = withExecutionContext(
-      'sovereign_concierge',
-      () => safeReadFile(policyPath, { encoding: 'utf8' }) as string,
-      'ecosystem_architect'
-    );
-    const parsed = safeJsonParse<ToolRuntimePolicy>(raw, 'tool runtime policy');
-    cachedPolicyPath = policyPath;
-    cachedPolicy = parsed;
-    return parsed;
-  } catch (error: any) {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = FALLBACK_POLICY;
-    return cachedPolicy;
-  }
+/** Validate and persist a profile policy through the same catalog as reads. */
+export function writeToolRuntimePolicyAtPath(filePath: string, policy: ToolRuntimePolicy): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = defineCatalog<ToolRuntimePolicy>({
+    id: 'tool-runtime-policy',
+    path: safePath,
+    schema: POLICY_SCHEMA_PATH,
+  }).validate(policy, safePath);
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2) + '\n', {
+    mkdir: true,
+    encoding: 'utf8',
+  });
+  return safePath;
 }
 
 export function resolveToolRuntimeRoot(policy: ToolRuntimePolicy = getToolRuntimePolicy()): string {

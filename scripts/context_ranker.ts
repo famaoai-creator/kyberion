@@ -18,26 +18,26 @@
  */
 
 import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { currentScope } from '@agent/core/scope-context';
+import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { loadKnowledgeTaxonomy, type KnowledgeTaxonomy } from '@agent/core/knowledge-taxonomy';
 import {
-  logger,
-  pathResolver,
-  safeReaddir,
-  safeReadFile,
-  safeExistsSync,
-  safeStat,
   scopeAffinityScore,
   docAuthorityScore,
   recencyDecayScore,
-  currentScope,
-  resolveKnowledgeScopeSet,
-  assertKnowledgePathInScope,
   knowledgeScopeProximityScore,
-  loadKnowledgeUsageAggregate,
   loadKnowledgeRankingWeights,
-} from '@agent/core';
+} from '@agent/core/ranking-signals';
+import { resolveKnowledgeScopeSet, assertKnowledgePathInScope } from '@agent/core/knowledge-scope';
+import { loadKnowledgeUsageAggregate } from '@agent/core/knowledge-feedback-loop';
+import { loadAnalysisConfigAtPath } from '@agent/core/analysis-config';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import type { ScopeContext } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import type { ScopeContext } from '@agent/core/scope-context';
+import { isRecord, readTextFile } from '@agent/core/foundation';
+
+type Print = (value: unknown) => void;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,23 +96,6 @@ interface ScoredEntry extends KnowledgeEntry {
   };
 }
 
-interface TaxonomyManifest {
-  kinds?: Record<
-    string,
-    {
-      default_authority?: string;
-      default_scope?: string;
-    }
-  >;
-  directory_defaults?: Array<{
-    path_prefix: string;
-    kind: string;
-    authority: string;
-    scope: string;
-  }>;
-  retrieval_priority?: Record<string, string[]>;
-}
-
 export interface KnowledgeScanStats {
   scanned_files: number;
   in_scope_files: number;
@@ -128,20 +111,38 @@ function normalizeStringArray(value: unknown): string[] {
       : [];
 }
 
-let cachedTaxonomy: TaxonomyManifest | null = null;
-
-function loadTaxonomy(): TaxonomyManifest {
-  if (cachedTaxonomy) return cachedTaxonomy;
-  const taxonomyPath = pathResolver.knowledge('product/governance/knowledge-taxonomy.json');
-  if (!safeExistsSync(taxonomyPath)) {
-    cachedTaxonomy = {};
-    return cachedTaxonomy;
+export function normalizeRankingWeights(
+  value: unknown,
+  defaults: RankingWeights
+): Partial<RankingWeights> {
+  if (!isRecord(value)) return {};
+  const algorithms = isRecord(value.algorithms) ? value.algorithms : {};
+  const ranking = isRecord(algorithms.ranking) ? algorithms.ranking : {};
+  const weights = isRecord(ranking.weights) ? ranking.weights : {};
+  const normalized: Partial<RankingWeights> = {};
+  for (const key of Object.keys(defaults) as Array<keyof RankingWeights>) {
+    const candidate = weights[key];
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      normalized[key] = candidate;
+    }
   }
+  return normalized;
+}
 
+let cachedTaxonomy: KnowledgeTaxonomy | null = null;
+
+function loadTaxonomy(): KnowledgeTaxonomy {
+  if (cachedTaxonomy) return cachedTaxonomy;
   try {
-    cachedTaxonomy = readJson<TaxonomyManifest>(taxonomyPath);
+    cachedTaxonomy = loadKnowledgeTaxonomy();
   } catch (_) {
-    cachedTaxonomy = {};
+    cachedTaxonomy = {
+      version: 'fallback',
+      kinds: {},
+      directory_defaults: [],
+      overlay_precedence: [],
+      retrieval_priority: {},
+    };
   }
 
   return cachedTaxonomy;
@@ -253,7 +254,7 @@ export function scanKnowledgeFiles(
             continue;
           }
           if (stats) stats.in_scope_files += 1;
-          const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
+          const content = readTextFile(fullPath);
           const fm = parseFrontmatter(content);
           const tier = relativePath.startsWith('personal/')
             ? 'personal'
@@ -406,7 +407,6 @@ export function scoreEntry(
 // Main
 // ---------------------------------------------------------------------------
 function loadWeights(scope?: ScopeContext): RankingWeights {
-  const configPath = pathResolver.knowledge('product/governance/analysis-config.json');
   const defaults: RankingWeights = {
     title: 10,
     id: 5,
@@ -420,12 +420,11 @@ function loadWeights(scope?: ScopeContext): RankingWeights {
     proximity: 1,
     usage_yield: 4,
   };
-  if (!safeExistsSync(configPath)) return { ...defaults, ...loadKnowledgeRankingWeights(scope) };
   try {
-    const config = readJson<any>(configPath);
+    const config = loadAnalysisConfigAtPath();
     return {
       ...defaults,
-      ...config.algorithms?.ranking?.weights,
+      ...normalizeRankingWeights(config, defaults),
       ...loadKnowledgeRankingWeights(scope),
     };
   } catch (_) {
@@ -433,7 +432,7 @@ function loadWeights(scope?: ScopeContext): RankingWeights {
   }
 }
 
-async function main(args: string[] = []) {
+export async function main(args: string[] = [], print: Print = () => undefined) {
   const intentIdx = args.indexOf('--intent');
   const roleIdx = args.indexOf('--role');
   const phaseIdx = args.indexOf('--phase');
@@ -533,7 +532,7 @@ async function main(args: string[] = []) {
     .slice(0, limit);
 
   if (jsonFlag) {
-    console.log(
+    print(
       JSON.stringify(
         {
           intent,
@@ -568,7 +567,7 @@ async function main(args: string[] = []) {
 const script = defineScript({
   name: 'knowledge:context-ranker',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'context_ranker.ts') ||

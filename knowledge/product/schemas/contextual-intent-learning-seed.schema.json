@@ -7,6 +7,7 @@
   "required": ["version", "entries"],
   "properties": {
     "$schema": { "type": "string", "format": "uri-reference" },
+    "documentation_only": { "type": "boolean" },
     "version": {
       "type": "string",
       "minLength": 1

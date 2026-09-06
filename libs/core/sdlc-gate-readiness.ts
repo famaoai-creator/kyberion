@@ -1,13 +1,22 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { readTextFile } from './foundation/text.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { SPECIALIST_IDS } from './specialist-ids.js';
 import type { ArtifactRecord } from './artifact-record.js';
 import type { ProjectRecord } from './project-registry.js';
 import type { ProjectTrackRecord } from './project-track-registry.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 
-interface SdlcGateCatalogRecord {
+interface SdlcGateProfile {
+  domain: string;
   gates: Array<{
     gate_id: string;
     phase: string;
@@ -16,6 +25,11 @@ interface SdlcGateCatalogRecord {
     required_artifacts?: string[];
     exit_criteria?: string[];
   }>;
+}
+
+interface GateProfileRegistryRecord {
+  version: string;
+  profiles: Record<string, SdlcGateProfile>;
 }
 
 export interface TrackGateReadinessGateSummary {
@@ -55,17 +69,23 @@ export interface TrackNextWorkProposal {
   work_loop: OrganizationWorkLoopSummary;
 }
 
-const GATE_CATALOG_PATH = pathResolver.knowledge('product/governance/sdlc-gate-catalog.json');
+const GATE_PROFILE_REGISTRY_PATH = pathResolver.knowledge(
+  'product/governance/gate-profiles/gate-profile-registry.json'
+);
 
-let cachedCatalog: SdlcGateCatalogRecord | null = null;
+let cachedCatalog: SdlcGateProfile | null = null;
 
-function loadGateCatalog(): SdlcGateCatalogRecord {
+const gateProfileRegistryCatalog = defineCatalog<GateProfileRegistryRecord>({
+  id: 'gate-profile-registry',
+  path: GATE_PROFILE_REGISTRY_PATH,
+  schema: pathResolver.knowledge('product/schemas/gate-profile.schema.json'),
+});
+
+function loadGateCatalog(): SdlcGateProfile {
   if (cachedCatalog) return cachedCatalog;
-  if (!safeExistsSync(GATE_CATALOG_PATH)) {
-    cachedCatalog = { gates: [] };
-    return cachedCatalog;
-  }
-  cachedCatalog = loadJson<SdlcGateCatalogRecord>(GATE_CATALOG_PATH);
+  const profile = gateProfileRegistryCatalog.load().profiles.sdlc;
+  if (!profile) throw new Error('[GATE_PROFILE_MISSING] sdlc profile is not governed');
+  cachedCatalog = profile;
   return cachedCatalog;
 }
 
@@ -89,8 +109,14 @@ function buildArtifactEvidenceSet(input: {
 
 function resolveTemplateRef(artifactId: string): string | undefined {
   const logicalPath = `knowledge/public/templates/blueprints/${artifactId}.md`;
-  const resolvedPath = pathResolver.resolve(logicalPath);
-  return safeExistsSync(resolvedPath) ? logicalPath : undefined;
+  const resolvedPath = assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(resolvedPath)) return undefined;
+  if (!safeLstat(resolvedPath).isFile()) {
+    throw new Error(`[SDLC_TEMPLATE] template must be a regular file: ${logicalPath}`);
+  }
+  return logicalPath;
 }
 
 function sanitizeSeedFragment(value: string): string {
@@ -348,17 +374,28 @@ export function materializeTrackArtifactSkeleton(input: {
   proposal: TrackNextWorkProposal;
 }): string | null {
   if (!input.proposal.template_ref) return null;
-  const templatePath = pathResolver.resolve(input.proposal.template_ref);
+  const templatePath = assertSafeRepositoryPath(pathResolver.resolve(input.proposal.template_ref), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(templatePath)) return null;
-  const projectRoot = pathResolver.resolve(input.projectRootPath);
+  if (!safeLstat(templatePath).isFile()) {
+    throw new Error(
+      `[SDLC_TEMPLATE] template must be a regular file: ${input.proposal.template_ref}`
+    );
+  }
+  const projectRoot = assertSafeRepositoryPath(pathResolver.resolve(input.projectRootPath), {
+    allowMissingLeaf: true,
+  });
   const logicalTarget = input.proposal.target_path;
-  const targetPath = path.join(projectRoot, logicalTarget);
+  const targetPath = assertSafeRepositoryPath(path.join(projectRoot, logicalTarget), {
+    allowMissingLeaf: true,
+  });
   const targetDir = path.dirname(targetPath);
   if (!safeExistsSync(targetDir)) {
     safeMkdir(targetDir, { recursive: true });
   }
   if (!safeExistsSync(targetPath)) {
-    const templateBody = safeReadFile(templatePath, { encoding: 'utf8' }) as string;
+    const templateBody = readTextFile(templatePath);
     safeWriteFile(
       targetPath,
       `<!-- Instantiated from ${input.proposal.template_ref} -->\n${templateBody}`

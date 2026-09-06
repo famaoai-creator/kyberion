@@ -47,4 +47,7 @@ function main(): void {
   });
 }
 
-main();
+/** Clean must remain runnable before any workspace package has been built. */
+export function runClean(): void {
+  main();
+}

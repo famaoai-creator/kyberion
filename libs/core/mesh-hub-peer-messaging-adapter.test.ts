@@ -8,12 +8,14 @@ import {
   listPeerInboxRecords,
   buildPeerMessageEnvelope,
 } from './peer-messaging.js';
-import { pathResolver, safeReadFile, safeRmSync } from './index.js';
+import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './index.js';
 import {
   clearMeshHubPeerMessagingAdapterNamespace,
   createMeshHubPeerMessagingAdapter,
   decideMeshHubRecipientProposal,
   listMeshHubRecipientProposals,
+  parseMeshHubRecipientProposal,
+  parseMeshHubRecipientProposalDecision,
 } from './mesh-hub-peer-messaging-adapter.js';
 import type { MeshRequest } from './mesh-hub-contract.js';
 
@@ -71,6 +73,115 @@ describe('mesh-hub-peer-messaging-adapter', () => {
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshHubPeerMessagingAdapterNamespace();
     vi.unstubAllGlobals();
+  });
+
+  it('rejects malformed persisted proposal and decision shapes before projection', () => {
+    const proposal = {
+      kind: 'mesh-hub-recipient-proposal' as const,
+      tenant_id: TENANT_ID,
+      proposal_id: 'proposal-1',
+      peer_id: 'peer-recipient',
+      request_id: 'request-1',
+      message_id: 'message-1',
+      request_kind: 'review.request' as const,
+      selector: { kind: 'peer' as const, peer_id: 'peer-recipient' },
+      proposal_kind: 'a2a' as const,
+      proposal_ref: { type: 'a2a-message' as const, payload: {} },
+      mission_controller_mutation: 'deny' as const,
+      created_at: '2026-06-24T00:03:00.000Z',
+    };
+    const decision = {
+      kind: 'mesh-hub-recipient-proposal-decision' as const,
+      tenant_id: TENANT_ID,
+      decision_id: 'decision-1',
+      proposal_id: 'proposal-1',
+      peer_id: 'peer-recipient',
+      decision: 'accepted' as const,
+      actor_id: 'operator-1',
+      reason: 'approved',
+      decided_at: '2026-06-24T00:04:00.000Z',
+    };
+
+    expect(parseMeshHubRecipientProposal(proposal)).toEqual(proposal);
+    expect(parseMeshHubRecipientProposalDecision(decision)).toEqual(decision);
+    expect(() =>
+      parseMeshHubRecipientProposal({ ...proposal, selector: { kind: 'unknown' } })
+    ).toThrow();
+    expect(() =>
+      parseMeshHubRecipientProposalDecision({ ...decision, decision: 'pending' })
+    ).toThrow();
+  });
+
+  it('skips malformed JSONL rows while retaining valid tenant-scoped proposals', () => {
+    const adapter = createMeshHubPeerMessagingAdapter({
+      peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
+      sharedSecret: 'recipient-secret',
+      namespace: 'mesh-hub-adapter-tests',
+    });
+    const request = buildRequest('meshreq-parser', 'review.request', {
+      kind: 'peer',
+      peer_id: 'peer-recipient',
+    });
+    request.created_at = new Date(Date.now() - 1_000).toISOString();
+    const proposal = adapter.proposeLocalRequest(request, 'message-parser');
+    const proposalsPath = path.join(
+      ROOT,
+      TEST_RUNTIME_ROOT,
+      'mesh-hub-adapter-tests',
+      'tenants',
+      TENANT_ID,
+      'adapters',
+      'peer-recipient',
+      'proposals.jsonl'
+    );
+    const foreignProposal = { ...proposal, tenant_id: 'tenant-other' };
+    safeWriteFile(
+      proposalsPath,
+      `${JSON.stringify(proposal)}\n${JSON.stringify(foreignProposal)}\n[]\n{"kind":"broken"}\n`,
+      { encoding: 'utf8' }
+    );
+    expect(
+      listMeshHubRecipientProposals('peer-recipient', {
+        tenantId: TENANT_ID,
+        namespace: 'mesh-hub-adapter-tests',
+      })
+    ).toHaveLength(1);
+  });
+
+  it('rejects a proposal JSONL path replaced by a directory', () => {
+    const adapter = createMeshHubPeerMessagingAdapter({
+      peerId: 'peer-recipient',
+      tenantId: TENANT_ID,
+      sharedSecret: 'recipient-secret',
+      namespace: 'mesh-hub-adapter-tests',
+    });
+    const request = buildRequest('meshreq-regular-file', 'review.request', {
+      kind: 'peer',
+      peer_id: 'peer-recipient',
+    });
+    request.created_at = new Date(Date.now() - 1_000).toISOString();
+    adapter.proposeLocalRequest(request, 'message-regular-file');
+
+    const proposalsPath = path.join(
+      ROOT,
+      TEST_RUNTIME_ROOT,
+      'mesh-hub-adapter-tests',
+      'tenants',
+      TENANT_ID,
+      'adapters',
+      'peer-recipient',
+      'proposals.jsonl'
+    );
+    safeRmSync(proposalsPath);
+    safeMkdir(proposalsPath);
+
+    expect(() =>
+      listMeshHubRecipientProposals('peer-recipient', {
+        tenantId: TENANT_ID,
+        namespace: 'mesh-hub-adapter-tests',
+      })
+    ).toThrow('mesh-hub persisted JSONL must be a regular file');
   });
 
   it('dispatches a signed mesh request through peer-messaging', async () => {

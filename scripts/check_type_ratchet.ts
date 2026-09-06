@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import ts from 'typescript';
-import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readTextFile } from '@agent/core/foundation';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 const ROOT = pathResolver.rootDir();
-const DEFAULT_BASELINE_PATH = pathResolver.rootResolve('scripts/check_type_ratchet.baseline.json');
+const DEFAULT_BASELINE_PATH = resolveCiGateBaselinePath('type-ratchet');
 const DEFAULT_SCAN_ROOTS = ['libs', 'scripts', 'satellites', 'presence', 'tests'];
 
 // OP-03: the ratchet baselines are computed against the git-tracked tree.
@@ -48,6 +51,7 @@ function isGeneratedFile(repoRelativePath: string): boolean {
   const segments = repoRelativePath.split('/');
   return (
     /^libs\/core\/index-part-\d+\.ts$/u.test(repoRelativePath) ||
+    repoRelativePath === 'libs/core/vocabulary-keys.generated.ts' ||
     segments.some((segment) =>
       new Set(['.next', '.turbo', 'coverage', 'dist', 'node_modules', 'test-results']).has(segment)
     ) ||
@@ -73,9 +77,16 @@ function incrementBucket(target: RatchetBucket, source: RatchetBucket): void {
   target.max_lines = Math.max(target.max_lines, source.max_lines);
 }
 
+export function readTypeRatchetTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function countFile(filePath: string, repoRelativePath: string): RatchetBucket {
   const bucket = emptyBucket();
-  const text = String(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  const text = readTypeRatchetTextFile(filePath);
   bucket.max_lines = text.split(/\r?\n/u).length;
   const source = ts.createSourceFile(
     repoRelativePath,
@@ -126,14 +137,14 @@ function scanCurrentCounts(scanRoots: string[]): RatchetBaseline {
 
   return {
     version: 1,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     counts: { src, test },
   };
 }
 
 function loadBaseline(baselinePath: string): RatchetBaseline | null {
   if (!safeExistsSync(baselinePath)) return null;
-  return readJson<RatchetBaseline>(baselinePath);
+  return readSafeJsonFile<RatchetBaseline>(baselinePath, 'type ratchet baseline');
 }
 
 function compareBuckets(current: RatchetBucket, baseline: RatchetBucket, label: string): string[] {
@@ -208,15 +219,16 @@ export const runCheckTypeRatchet = defineScript({
     const report = checkTypeRatchet({ writeBaseline });
 
     if (report.violations.length > 0) {
-      console.error('[check:type-ratchet] violations detected:');
-      for (const violation of report.violations) {
-        console.error(`- ${violation}`);
-      }
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...report.violations.map((violation) => `- ${violation}`)].join(
+          '\n'
+        )
+      );
     }
 
     context.print('[check:type-ratchet] OK');
+    return { report };
   },
 });
 

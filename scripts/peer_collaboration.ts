@@ -1,13 +1,24 @@
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
 import {
-  createStandardYargs,
   decideMeshHubRecipientProposal,
-  getRegisteredEnv,
   listMeshHubRecipientProposals,
-  logger,
-} from '@agent/core';
+} from '@agent/core/mesh-hub-peer-messaging-adapter';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+function normalizePeerCollaborationArguments(args: string[]): string[] {
+  return stripSharedScriptFlags(args);
+}
+
+async function main(
+  args: string[] = [],
+  options: { dryRun?: boolean; check?: boolean } = {}
+): Promise<unknown> {
+  const argv = await createStandardYargs([
+    'node',
+    'peer_collaboration',
+    ...normalizePeerCollaborationArguments(args),
+  ])
     .command('list', 'List recipient collaboration proposals', () => undefined)
     .command('accept', 'Accept a pending proposal', () => undefined)
     .command('reject', 'Reject a pending proposal', () => undefined)
@@ -39,8 +50,7 @@ async function main(): Promise<void> {
       namespace,
       status: argv.status as 'pending' | 'accepted' | 'rejected' | undefined,
     });
-    console.log(JSON.stringify({ peer_id: peerId, proposals }, null, 2));
-    return;
+    return { peer_id: peerId, proposals };
   }
 
   if (command !== 'accept' && command !== 'reject') {
@@ -52,6 +62,17 @@ async function main(): Promise<void> {
   if (!proposalId || !actorId || !reason) {
     throw new Error(`${command} requires --proposal-id, --actor-id, and --reason`);
   }
+  if (options.dryRun === true || options.check === true) {
+    return {
+      dry_run: true,
+      operation: command,
+      peer_id: peerId,
+      tenant_id: tenantId,
+      proposal_id: proposalId,
+      actor_id: actorId,
+      reason,
+    };
+  }
   const decision = await decideMeshHubRecipientProposal({
     peerId,
     tenantId,
@@ -61,11 +82,20 @@ async function main(): Promise<void> {
     reason,
     namespace,
   });
-  logger.success(`[peer-collaboration] ${decision.decision} ${decision.proposal_id}`);
-  console.log(JSON.stringify({ decision }, null, 2));
+  return { decision };
 }
 
-main().catch((error: unknown) => {
-  logger.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+export const runPeerCollaboration = defineScript({
+  name: 'peer-collaboration',
+  run: async ({ argv, dryRun, check, print }) => {
+    const result = await main(argv, { dryRun, check });
+    print(result);
+    return result;
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'peer_collaboration.ts') ||
+  isDirectScript(import.meta.url, 'peer_collaboration.js')
+)
+  void runPeerCollaboration();

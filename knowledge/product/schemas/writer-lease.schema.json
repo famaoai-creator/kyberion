@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "writer-lease.schema.json",
+  "title": "Fenced writer lease",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["resource_id", "owner_id", "fence", "expires_at_ms"],
+  "properties": {
+    "resource_id": { "type": "string", "minLength": 1 },
+    "owner_id": { "type": "string", "minLength": 1 },
+    "fence": { "type": "integer", "minimum": 0 },
+    "expires_at_ms": { "type": "number" }
+  }
+}

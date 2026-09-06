@@ -14,17 +14,23 @@
  */
 
 import {
-  installAppleSpeechFileToTextBridgeIfAvailable,
-  installAppleSpeechToTextBridgeIfAvailable,
   installFluidAudioSpeechToTextBridgeIfAvailable,
   installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
   installShellSpeechToTextBridgeIfAvailable,
-  logger,
-  probeMicCapture,
-  startInRoomMinutesSession,
-} from '@agent/core';
+} from '@agent/core/speech-to-text-bridge';
+import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
+import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
+import { logger } from '@agent/core/core';
+import { probeMicCapture } from '@agent/core/mic-capture';
+import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';
 import { t as catalogT } from '@agent/core/t';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import {
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+  setProcessExitCode,
+} from './lib/harness.js';
 
 function getFlag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -34,7 +40,9 @@ function getFlag(argv: string[], name: string): string | undefined {
 }
 
 async function main(argv: string[] = []): Promise<void> {
-  process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
+  if (!getRegisteredEnvText('MISSION_ROLE')) {
+    setRegisteredEnv('MISSION_ROLE', 'mission_controller');
+  }
   const missionId = getFlag(argv, '--mission');
   if (!missionId) {
     logger.error(
@@ -106,10 +114,10 @@ async function main(argv: string[] = []): Promise<void> {
           minutes,
         })}`
       );
-      process.exitCode = 0;
+      setProcessExitCode(0);
     } catch (error) {
       logger.error(error instanceof Error ? error.message : String(error));
-      process.exitCode = 1;
+      setProcessExitCode(1);
     }
   };
   process.on('SIGINT', () => void finish());

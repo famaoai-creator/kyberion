@@ -3,73 +3,22 @@
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import {
+  isJsonRecord,
+  optionalStringField,
+  parseJsonValue,
+  parseJsonRecord,
+  recordField,
+} from '../lib/json-record';
 import { chronosSpeechLocale } from '../lib/ux-vocabulary';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
-
-type TraceFeedRecord = {
-  traceId: string;
-  tracePath: string;
-  persistedAt: string;
-  startedAt: string;
-  completedAt?: string;
-  missionId?: string;
-  pipelineId?: string;
-  actuator?: string;
-  status: 'ok' | 'error' | 'in_progress';
-  rootSpanName: string;
-  spanCount: number;
-  eventCount: number;
-  artifactCount: number;
-  errorCount: number;
-  rootSpan: {
-    spanId?: string;
-    name: string;
-    status: 'ok' | 'error' | 'in_progress';
-    startTime: string;
-    endTime?: string;
-    attributes?: Record<string, string | number | boolean>;
-    events: number;
-    artifacts: number;
-    children: number;
-  };
-};
-
-type TraceSpanDetail = {
-  spanId?: string;
-  name: string;
-  status: 'ok' | 'error' | 'in_progress';
-  startTime: string;
-  endTime?: string;
-  attributes?: Record<string, string | number | boolean>;
-  events: Array<{
-    name: string;
-    timestamp: string;
-    attributes?: Record<string, string | number | boolean>;
-  }>;
-  artifacts: Array<{
-    type: 'screenshot' | 'file' | 'document' | 'log';
-    path: string;
-    description?: string;
-    timestamp: string;
-  }>;
-  knowledgeRefs: string[];
-  error?: string;
-  children: TraceSpanDetail[];
-};
-
-type TraceDetailRecord = TraceFeedRecord & {
-  rootSpan: TraceSpanDetail;
-};
-
-type TraceFeedResponse = {
-  traces: TraceFeedRecord[];
-  traceDir: string;
-};
-
-type TraceDetailResponse = {
-  trace: TraceDetailRecord | null;
-  traceDir: string;
-};
+import {
+  parseTraceDetailResponse,
+  parseTraceFeedResponse,
+  type TraceDetailRecord,
+  type TraceFeedRecord,
+  type TraceSpanDetail,
+} from '../lib/trace-response';
 
 type TraceFilters = {
   status: 'all' | TraceFeedRecord['status'];
@@ -125,15 +74,17 @@ function gapPhaseBreakdown(span: TraceSpanDetail): Array<{ phase: string; ms: nu
   const raw = event?.attributes?.gap_phases;
   if (typeof raw !== 'string') return [];
   try {
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = parseJsonValue(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (entry): entry is { phase: string; ms: number } =>
-        Boolean(entry) &&
-        typeof entry === 'object' &&
-        typeof (entry as { phase?: unknown }).phase === 'string' &&
-        typeof (entry as { ms?: unknown }).ms === 'number'
-    );
+    return parsed.filter((entry): entry is { phase: string; ms: number } => {
+      const record = recordField(entry);
+      return (
+        isJsonRecord(entry) &&
+        typeof record.phase === 'string' &&
+        typeof record.ms === 'number' &&
+        Number.isFinite(record.ms)
+      );
+    });
   } catch {
     return [];
   }
@@ -169,8 +120,8 @@ export function focusTraceRecord(rawText: string, traceId?: string | null): stri
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const parsed = JSON.parse(trimmed) as { traceId?: string };
-      if (parsed.traceId === needle) {
+      const parsed = parseJsonRecord(trimmed);
+      if (parsed && optionalStringField(parsed, 'traceId') === needle) {
         return `${JSON.stringify(parsed, null, 2)}\n`;
       }
     } catch {
@@ -269,19 +220,28 @@ function normalizeTraceFocusHistory(value: unknown, limit = 5): string[] {
   return next;
 }
 
+function normalizeTraceFilters(value: unknown): TraceFilters {
+  const filters = recordField(value);
+  const status = filters.status;
+  return {
+    status: status === 'ok' || status === 'error' || status === 'in_progress' ? status : 'all',
+    missionId: optionalStringField(filters, 'missionId') || '',
+    pipelineId: optionalStringField(filters, 'pipelineId') || '',
+    actuator: optionalStringField(filters, 'actuator') || '',
+    query: optionalStringField(filters, 'query') || '',
+  };
+}
+
 export function loadTraceViewerPrefs(rawValue?: string | null): TraceViewerPrefs | null {
   const raw =
     rawValue ??
     (typeof window === 'undefined' ? null : window.localStorage.getItem(TRACE_VIEWER_PREFS_KEY));
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as Partial<TraceViewerPrefs>;
-    if (!parsed || typeof parsed !== 'object') return null;
+    const parsed = parseJsonRecord(raw);
+    if (!parsed) return null;
     return {
-      filters: {
-        ...DEFAULT_FILTERS,
-        ...(parsed.filters ?? {}),
-      },
+      filters: normalizeTraceFilters(parsed.filters),
       sort:
         parsed.sort === 'error-first' ||
         parsed.sort === 'newest' ||
@@ -289,9 +249,8 @@ export function loadTraceViewerPrefs(rawValue?: string | null): TraceViewerPrefs
         parsed.sort === 'largest'
           ? parsed.sort
           : DEFAULT_SORT,
-      selectedTraceId: typeof parsed.selectedTraceId === 'string' ? parsed.selectedTraceId : null,
-      rawTraceFocusTraceId:
-        typeof parsed.rawTraceFocusTraceId === 'string' ? parsed.rawTraceFocusTraceId : '',
+      selectedTraceId: optionalStringField(parsed, 'selectedTraceId') || null,
+      rawTraceFocusTraceId: optionalStringField(parsed, 'rawTraceFocusTraceId') || '',
       rawTraceFocusHistory: normalizeTraceFocusHistory(parsed.rawTraceFocusHistory),
       rawTraceVisible: typeof parsed.rawTraceVisible === 'boolean' ? parsed.rawTraceVisible : false,
     };
@@ -629,7 +588,8 @@ export function TraceViewer({
         if (!response.ok) {
           throw new Error(`Trace feed request failed (${response.status})`);
         }
-        const payload = (await response.json()) as TraceFeedResponse;
+        const payload = parseTraceFeedResponse(await response.json().catch(() => null));
+        if (!payload) throw new Error('Invalid trace feed response');
         setData(payload);
       } catch (err) {
         if ((err as Error)?.name === 'AbortError') return;
@@ -679,7 +639,8 @@ export function TraceViewer({
         if (!response.ok) {
           throw new Error(`Trace detail request failed (${response.status})`);
         }
-        const payload = (await response.json()) as TraceDetailResponse;
+        const payload = parseTraceDetailResponse(await response.json().catch(() => null));
+        if (!payload) throw new Error('Invalid trace detail response');
         setSelectedTrace(payload.trace);
       } catch (err) {
         if ((err as Error)?.name === 'AbortError') return;

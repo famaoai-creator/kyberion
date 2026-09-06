@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver, safeMkdir, safeWriteFile, safeRmSync } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeWriteFile, safeRmSync, safeReadFile } from '@agent/core/secure-io';
 import { checkPullRequestTitle, checkTitle } from './check_pr_title.js';
 
 const TMP_DIR = pathResolver.sharedTmp('check-pr-title-tests');
@@ -8,6 +9,14 @@ const TMP_DIR = pathResolver.sharedTmp('check-pr-title-tests');
 describe('check_pr_title', () => {
   beforeEach(() => {
     safeRmSync(TMP_DIR, { recursive: true, force: true });
+  });
+
+  it('reads the GitHub event fallback through the environment registry', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/check_pr_title.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toContain('process.env.GITHUB_EVENT_PATH');
+    expect(source).toContain("getRegisteredEnvText('GITHUB_EVENT_PATH')");
   });
 
   it('accepts a conventional commit title', () => {
@@ -24,12 +33,27 @@ describe('check_pr_title', () => {
   it('reads the title from a GitHub event file', () => {
     const eventPath = path.join(TMP_DIR, 'event.json');
     safeMkdir(TMP_DIR, { recursive: true });
-    safeWriteFile(eventPath, JSON.stringify({ pull_request: { title: 'fix(release): lint PR titles' } }), {
-      encoding: 'utf8',
-    });
+    safeWriteFile(
+      eventPath,
+      JSON.stringify({ pull_request: { title: 'fix(release): lint PR titles' } }),
+      {
+        encoding: 'utf8',
+      }
+    );
 
     const result = checkPullRequestTitle({ eventPath });
     expect(result.ok).toBe(true);
     expect(result.source).toContain('event file');
+  });
+
+  it('fails closed when the event path is a directory or contains a dangerous key', () => {
+    safeMkdir(path.join(TMP_DIR, 'directory-event'), { recursive: true });
+    expect(checkPullRequestTitle({ eventPath: path.join(TMP_DIR, 'directory-event') }).source).toBe(
+      'HEAD commit subject'
+    );
+
+    const dangerousPath = path.join(TMP_DIR, 'dangerous-event.json');
+    safeWriteFile(dangerousPath, '{"__proto__":{"polluted":true}}', { encoding: 'utf8' });
+    expect(checkPullRequestTitle({ eventPath: dangerousPath }).source).toBe('HEAD commit subject');
   });
 });

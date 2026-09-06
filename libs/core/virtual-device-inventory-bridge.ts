@@ -1,4 +1,6 @@
 import { safeExecResult } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export const VIRTUAL_DEVICE_INVENTORY_BRIDGE_ID = 'virtual-device-inventory-bridge' as const;
 
@@ -82,10 +84,21 @@ function uniqueByName(records: VirtualDeviceRecord[]): VirtualDeviceRecord[] {
 
 function tryParseJson(text: string): unknown | null {
   try {
-    return JSON.parse(text);
+    return parseSafeJsonInput(text, 'virtual device inventory response');
   } catch {
     return null;
   }
+}
+
+export function parseSystemProfilerItems(
+  payload: unknown,
+  sectionKey: string
+): Array<Record<string, unknown>> {
+  if (!isRecord(payload) || !Array.isArray(payload[sectionKey])) return [];
+  return payload[sectionKey].filter(isRecord).flatMap((section) => {
+    const items = section._items;
+    return Array.isArray(items) ? items.filter(isRecord) : [];
+  });
 }
 
 function runCommand(
@@ -104,45 +117,40 @@ function collectMacAudioDevices(
   const result = runCommand(opts, bin, ['SPAudioDataType', '-json']);
   const records: VirtualDeviceRecord[] = [];
   const payload = tryParseJson(result.stdout);
-  const sections = Array.isArray((payload as any)?.SPAudioDataType)
-    ? (payload as any).SPAudioDataType
-    : [];
-  for (const section of sections) {
-    for (const device of Array.isArray(section?._items) ? section._items : []) {
-      const name = String(device?._name || device?.coreaudio_device_name || '').trim();
-      if (!name) continue;
-      const hasInput = Boolean(
-        device?.coreaudio_default_audio_input_device || device?.coreaudio_input_source
-      );
-      const hasOutput = Boolean(
-        device?.coreaudio_default_audio_output_device || device?.coreaudio_output_source
-      );
-      const isVirtual = /blackhole|loopback|meeting_in|meeting_out|pulse/i.test(name);
-      const base: VirtualDeviceRecord = {
-        kind:
-          hasInput && !hasOutput
-            ? 'audio-input'
-            : hasOutput && !hasInput
-              ? 'audio-output'
-              : 'audio-input',
-        name,
-        platform: process.platform,
-        source: 'system_profiler',
-        available: true,
-        details: {
-          model: device?._model || device?.coreaudio_device_transport || undefined,
-        },
-      };
-      records.push(base);
-      if (hasOutput) {
-        records.push({ ...base, kind: 'audio-output' });
-      }
-      if (hasInput) {
-        records.push({ ...base, kind: 'audio-input' });
-      }
-      if (isVirtual) {
-        records.push({ ...base, kind: 'virtual-audio' });
-      }
+  for (const device of parseSystemProfilerItems(payload, 'SPAudioDataType')) {
+    const name = String(device._name || device.coreaudio_device_name || '').trim();
+    if (!name) continue;
+    const hasInput = Boolean(
+      device.coreaudio_default_audio_input_device || device.coreaudio_input_source
+    );
+    const hasOutput = Boolean(
+      device.coreaudio_default_audio_output_device || device.coreaudio_output_source
+    );
+    const isVirtual = /blackhole|loopback|meeting_in|meeting_out|pulse/i.test(name);
+    const base: VirtualDeviceRecord = {
+      kind:
+        hasInput && !hasOutput
+          ? 'audio-input'
+          : hasOutput && !hasInput
+            ? 'audio-output'
+            : 'audio-input',
+      name,
+      platform: process.platform,
+      source: 'system_profiler',
+      available: true,
+      details: {
+        model: device._model || device.coreaudio_device_transport || undefined,
+      },
+    };
+    records.push(base);
+    if (hasOutput) {
+      records.push({ ...base, kind: 'audio-output' });
+    }
+    if (hasInput) {
+      records.push({ ...base, kind: 'audio-input' });
+    }
+    if (isVirtual) {
+      records.push({ ...base, kind: 'virtual-audio' });
     }
   }
   return uniqueByName(records);
@@ -156,24 +164,19 @@ function collectMacCameraDevices(
   const records: VirtualDeviceRecord[] = [];
   const sp = runCommand(opts, systemProfilerBin, ['SPCameraDataType', '-json']);
   const payload = tryParseJson(sp.stdout);
-  const sections = Array.isArray((payload as any)?.SPCameraDataType)
-    ? (payload as any).SPCameraDataType
-    : [];
-  for (const section of sections) {
-    for (const device of Array.isArray(section?._items) ? section._items : []) {
-      const name = String(device?._name || device?.coremediaio_dal_device_name || '').trim();
-      if (!name) continue;
-      records.push({
-        kind: 'camera',
-        name,
-        platform: process.platform,
-        source: 'system_profiler',
-        available: true,
-        details: {
-          model: device?._model || undefined,
-        },
-      });
-    }
+  for (const device of parseSystemProfilerItems(payload, 'SPCameraDataType')) {
+    const name = String(device._name || device.coremediaio_dal_device_name || '').trim();
+    if (!name) continue;
+    records.push({
+      kind: 'camera',
+      name,
+      platform: process.platform,
+      source: 'system_profiler',
+      available: true,
+      details: {
+        model: device._model || undefined,
+      },
+    });
   }
 
   if (records.length === 0) {
@@ -343,13 +346,17 @@ function collectWindowsDevices(
   ]);
   let payload: unknown;
   try {
-    payload = JSON.parse(result.stdout);
+    payload = parseSafeJsonInput(result.stdout, 'virtual device inventory response');
   } catch {
     return [];
   }
-  const rows = Array.isArray(payload) ? payload : payload ? [payload] : [];
+  const rows = Array.isArray(payload)
+    ? payload.filter(isRecord)
+    : isRecord(payload)
+      ? [payload]
+      : [];
   const records: VirtualDeviceRecord[] = [];
-  for (const row of rows as Array<Record<string, unknown>>) {
+  for (const row of rows) {
     const name = String(row.FriendlyName || '').trim();
     const deviceClass = String(row.Class || '').trim();
     if (!name) continue;

@@ -1,3 +1,5 @@
+import { nowIso } from './foundation/time.js';
+
 export type OrchestrationEvaluationMode = 'baseline' | 'orchestrated';
 export type OrchestrationCompletionStatus = 'completed' | 'blocked' | 'failed';
 
@@ -139,7 +141,7 @@ function scenarioDelta(
 
 export function buildMissionOrchestrationEvaluationReport(
   records: OrchestrationScenarioRunRecord[],
-  evaluatedAt = new Date().toISOString()
+  evaluatedAt = nowIso()
 ): MissionOrchestrationEvaluationReport {
   const baseline = modeMetrics(records, 'baseline');
   const orchestrated = modeMetrics(records, 'orchestrated');

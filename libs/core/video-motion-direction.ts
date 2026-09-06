@@ -1,10 +1,12 @@
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { tryRepairJson } from './json-repair.js';
 import type { VideoCompositionSceneRole } from './video-composition-contract.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
-import { isRecord } from './foundation/text.js';
+import { clamp, isRecord } from './foundation/text.js';
 
 /**
  * MP-02: motion vocabulary as governed tokens.
@@ -89,79 +91,31 @@ const MIDSCENE_DURATION_RANGE: [number, number] = [0.4, 8];
 export const MIN_MIDSCENE_LAYERS = 2;
 export const MIN_DISTINCT_EASES = 3;
 
-const BUILT_IN_CATALOG: VideoMotionCatalog = {
-  eases: {
-    'smooth-out': 'cubic-bezier(0.16, 1, 0.3, 1)',
-    overshoot: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-    gentle: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
-    'sine-io': 'ease-in-out',
-    decelerate: 'cubic-bezier(0.0, 0.0, 0.2, 1)',
-    snap: 'cubic-bezier(0.22, 1, 0.36, 1)',
-    linear: 'linear',
-  },
-  entrance: {
-    'fade-rise': {
-      name: 'Fade rise',
-      keyframes:
-        'from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); }',
-      duration_sec: 0.8,
-      offset_sec: 0.15,
-      default_ease: 'smooth-out',
-    },
-  },
-  midscene: {
-    breathe: {
-      name: 'Breathe',
-      keyframes: 'from { transform: translateY(0); } to { transform: translateY(-8px); }',
-      duration_sec: 4,
-      default_ease: 'sine-io',
-      alternate: true,
-    },
-    'pulse-accent': {
-      name: 'Accent pulse',
-      keyframes: 'from { opacity: 0.55; } to { opacity: 1; }',
-      duration_sec: 2.4,
-      default_ease: 'sine-io',
-      alternate: true,
-    },
-  },
-  role_defaults: {
-    generic: { entrance: 'fade-rise', midscene: ['breathe', 'pulse-accent'] },
-  },
-  transitions: {
-    default: 'cut',
-    max_non_cut_per_video: 3,
-    min_duration_sec: 0.3,
-    preferred_duration_sec: 0.5,
-  },
-};
-
 let cachedCatalog: VideoMotionCatalog | null = null;
+const MOTION_CATALOG_PATH = pathResolver.knowledge(
+  'public/design-patterns/media-templates/video-motion-patterns.json'
+);
+const MOTION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/video-motion-patterns.schema.json'
+);
+const motionCatalog: GovernedCatalog<VideoMotionCatalog> = defineCatalog<VideoMotionCatalog>({
+  id: 'video-motion-patterns',
+  path: MOTION_CATALOG_PATH,
+  schema: MOTION_SCHEMA_PATH,
+});
 
-/** Load the curated motion catalog; a missing/broken file degrades to built-ins. */
+/** Load the curated motion catalog from the governed source file. */
 export function loadVideoMotionCatalog(): VideoMotionCatalog {
   if (cachedCatalog) return cachedCatalog;
-  try {
-    const catalogPath = pathResolver.knowledge(
-      'public/design-patterns/media-templates/video-motion-patterns.json'
-    );
-    if (safeExistsSync(catalogPath)) {
-      const parsed = loadJson<{ patterns?: unknown }>(catalogPath);
-      const catalog = coerceCatalog(parsed);
-      if (catalog) {
-        cachedCatalog = catalog;
-        return cachedCatalog;
-      }
-    }
-  } catch (error: any) {
-    logger.warn(`motion catalog unreadable, using built-in default: ${error?.message || error}`);
+  if (!safeExistsSync(MOTION_CATALOG_PATH)) {
+    throw new Error(`[VIDEO_MOTION_CATALOG_MISSING] ${MOTION_CATALOG_PATH}`);
   }
-  cachedCatalog = BUILT_IN_CATALOG;
+  const catalog = coerceCatalog(motionCatalog.load());
+  if (!catalog) {
+    throw new Error(`[VIDEO_MOTION_CATALOG_INVALID] ${MOTION_CATALOG_PATH}`);
+  }
+  cachedCatalog = catalog;
   return cachedCatalog;
-}
-
-export function resetVideoMotionCatalogCache(): void {
-  cachedCatalog = null;
 }
 
 /** Drop `_meta` documentation keys and reject a catalog missing either layer. */
@@ -179,21 +133,23 @@ function coerceCatalog(parsed: any): VideoMotionCatalog | null {
   const entrance = strip<MotionEntrancePattern>(parsed.entrance);
   const midscene = strip<MotionMidscenePattern>(parsed.midscene);
   const roleDefaults = strip<{ entrance: string; midscene: string[] }>(parsed.role_defaults);
-  if (Object.keys(entrance).length === 0 || Object.keys(midscene).length < MIN_MIDSCENE_LAYERS) {
+  if (
+    Object.keys(eases).length === 0 ||
+    Object.keys(entrance).length === 0 ||
+    Object.keys(midscene).length < MIN_MIDSCENE_LAYERS ||
+    Object.keys(roleDefaults).length === 0 ||
+    !parsed.transitions ||
+    typeof parsed.transitions !== 'object'
+  ) {
     return null;
   }
   return {
-    eases: Object.keys(eases).length > 0 ? eases : BUILT_IN_CATALOG.eases,
+    eases,
     entrance,
     midscene,
-    role_defaults:
-      Object.keys(roleDefaults).length > 0 ? roleDefaults : BUILT_IN_CATALOG.role_defaults,
-    transitions: { ...BUILT_IN_CATALOG.transitions, ...(parsed.transitions || {}) },
+    role_defaults: roleDefaults,
+    transitions: parsed.transitions,
   };
-}
-
-function clampMotionDirectionValue(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 /** Read a pattern id from either a bare string or a normalized `{pattern_id}`. */
@@ -322,7 +278,7 @@ export function normalizeVideoMotionDirection(
         ease,
         // A looping layer must not outrun the scene it lives in.
         duration_sec: roundTo2(
-          clampMotionDirectionValue(
+          clamp(
             scene.duration_sec
               ? Math.min(pattern.duration_sec, scene.duration_sec * 2)
               : pattern.duration_sec,
@@ -339,14 +295,14 @@ export function normalizeVideoMotionDirection(
         pattern_id: entranceId,
         ease: entranceEase,
         duration_sec: roundTo2(
-          clampMotionDirectionValue(
+          clamp(
             Number(draft?.entrance_duration_sec) || entrancePattern.duration_sec,
             ENTRANCE_DURATION_RANGE[0],
             ENTRANCE_DURATION_RANGE[1]
           )
         ),
         offset_sec: roundTo2(
-          clampMotionDirectionValue(
+          clamp(
             Number(draft?.entrance_offset_sec) || entrancePattern.offset_sec,
             OFFSET_RANGE[0],
             OFFSET_RANGE[1]
@@ -372,7 +328,7 @@ export function normalizeVideoMotionDirection(
       after_scene_id: String(entry.after_scene_id),
       kind: String(entry.kind || 'crossfade'),
       duration_sec: roundTo2(
-        clampMotionDirectionValue(
+        clamp(
           Number(entry.duration_sec) || catalog.transitions.preferred_duration_sec,
           catalog.transitions.min_duration_sec,
           1.5
@@ -526,7 +482,7 @@ export async function generateVideoMotionDirection(
     const jsonText = rawReply.slice(rawReply.indexOf('{'), rawReply.lastIndexOf('}') + 1);
     let parsed: any;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = parseSafeJsonInput(jsonText, 'video motion direction response');
     } catch {
       parsed = tryRepairJson(jsonText);
     }

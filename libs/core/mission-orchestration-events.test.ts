@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import AjvModule from 'ajv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -131,6 +132,78 @@ describe('mission-orchestration-events', () => {
     }
   });
 
+  it('rejects an orchestration payload envelope with unknown fields', async () => {
+    const { enqueueMissionOrchestrationEvent, loadMissionOrchestrationEvent } =
+      await import('./mission-orchestration-events.js');
+    const { safeReadFile, safeUnlinkSync, safeWriteFile } = await import('./secure-io.js');
+    const event = enqueueMissionOrchestrationEvent({
+      eventType: 'mission_issue_requested',
+      missionId: 'MSN-QUEUE',
+      requestedBy: 'test',
+      payload: { sourceText: 'payload schema test' },
+    });
+    const eventPath = `${pathResolver.shared('coordination/orchestration/events')}/${event.event_id}.json`;
+    const payloadPath = pathResolver.rootResolve(event.payload_ref!);
+    const payload = JSON.parse(safeReadFile(payloadPath, { encoding: 'utf8' }) as string);
+    safeWriteFile(payloadPath, JSON.stringify({ ...payload, unexpected: true }));
+    try {
+      expect(() => loadMissionOrchestrationEvent(eventPath)).toThrow(
+        '[MISSION_ORCHESTRATION_EVENT_INVALID]'
+      );
+    } finally {
+      safeUnlinkSync(payloadPath);
+      safeUnlinkSync(eventPath);
+    }
+  });
+
+  it('rejects an orchestration payload envelope bound to another event', async () => {
+    const { enqueueMissionOrchestrationEvent, loadMissionOrchestrationEvent } =
+      await import('./mission-orchestration-events.js');
+    const { safeReadFile, safeUnlinkSync, safeWriteFile } = await import('./secure-io.js');
+    const event = enqueueMissionOrchestrationEvent({
+      eventType: 'mission_issue_requested',
+      missionId: 'MSN-QUEUE',
+      requestedBy: 'test',
+      payload: { sourceText: 'payload binding test' },
+    });
+    const eventPath = `${pathResolver.shared('coordination/orchestration/events')}/${event.event_id}.json`;
+    const payloadPath = pathResolver.rootResolve(event.payload_ref!);
+    const payload = JSON.parse(safeReadFile(payloadPath, { encoding: 'utf8' }) as string);
+    safeWriteFile(payloadPath, JSON.stringify({ ...payload, event_id: 'ME-OTHER' }));
+    try {
+      expect(() => loadMissionOrchestrationEvent(eventPath)).toThrow(
+        '[MISSION_ORCHESTRATION_PAYLOAD_SCOPE_MISMATCH]'
+      );
+    } finally {
+      safeUnlinkSync(payloadPath);
+      safeUnlinkSync(eventPath);
+    }
+  });
+
+  it('rejects an orchestration event loaded through a symlink', async () => {
+    const { loadMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
+    const { safeUnlinkSync, safeWriteFile } = await import('./secure-io.js');
+    const targetPath = pathResolver.sharedTmp(`valid-orchestration-${process.pid}.json`);
+    const linkedPath = pathResolver.sharedTmp(`linked-orchestration-${process.pid}.json`);
+    safeWriteFile(
+      targetPath,
+      JSON.stringify({
+        event_id: 'ME-SYMLINK',
+        event_type: 'mission_issue_requested',
+        mission_id: 'MSN-QUEUE',
+        requested_by: 'test',
+        payload: {},
+      })
+    );
+    fs.symlinkSync(targetPath, linkedPath, 'file');
+    try {
+      expect(() => loadMissionOrchestrationEvent(linkedPath)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.unlinkSync(linkedPath);
+      safeUnlinkSync(targetPath);
+    }
+  });
+
   it('rejects a mission id before resolving a tenant payload path', async () => {
     const { enqueueMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
     expect(() =>
@@ -142,6 +215,11 @@ describe('mission-orchestration-events', () => {
         scope: { tier: 'confidential', tenant_slug: 'client-a' },
       })
     ).toThrow(/invalid mission id/i);
+  });
+
+  it('rejects an event id that escapes the shared event directory', async () => {
+    const { getMissionOrchestrationEventPath } = await import('./mission-orchestration-events.js');
+    expect(() => getMissionOrchestrationEventPath('../outside')).toThrow(/invalid event id/);
   });
 
   it('accepts all runtime orchestration event types', async () => {

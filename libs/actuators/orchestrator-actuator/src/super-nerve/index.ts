@@ -1,23 +1,30 @@
+import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
+import { classifyError } from '@agent/core/error-classifier';
+import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
+import { determineActuatorStepType } from '@agent/core/actuator-op-registry';
+import { evaluateCondition, resolveVars } from '@agent/core/logic-utils';
+import { skipAdfStep } from '@agent/core/adf-engine';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import {
-  attemptAutonomousRepair,
-  classifyError,
-  recordGovernanceAction,
-  determineActuatorStepType,
-  evaluateCondition,
-  executeAdfSteps,
-  logger,
-  pathResolver,
-  resolveVars,
-  skipAdfStep,
-  safeExistsSync,
-  safeExec,
-  loadJson,
-  suggestClosestStrings,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-  registerSuperNerveExecutor,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertProjectTrustApproval } from '@agent/core/project-trust';
+import { safeExistsSync, safeExec, safeLstat } from '@agent/core/secure-io';
+import { suggestClosestStrings } from '@agent/core/op-suggestions';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { registerSuperNerveExecutor } from '@agent/core/super-nerve-execution-port';
+import {
+  getRegisteredEnvText,
+  nowIso,
+  parseSafeJsonObjectValue,
+  readJson,
+} from '@agent/core/foundation';
+import { loadPipelineAdfAtPath } from '@agent/core/pipeline-contract';
+import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /**
@@ -52,8 +59,8 @@ export async function executeSuperPipeline(
   options: any = {},
   state: any = { stepCount: 0, startTime: Date.now() }
 ) {
-  const maxSteps = options.max_steps || 1000;
-  const timeoutMs = options.timeout_ms || 60000;
+  const maxSteps = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
+  const timeoutMs = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
   let steps: SuperPipelineStep[];
   let conversationCtx: any = { ...initialCtx };
@@ -78,16 +85,17 @@ export async function executeSuperPipeline(
 
   const initial = {
     ...conversationCtx,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   };
-  const normalizedSteps = steps.map(normalizeStep);
+  let normalizedSteps = steps.map(normalizeStep);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const result = await executeAdfSteps(
-      normalizedSteps,
-      initial,
-      { maxSteps: maxSteps - state.stepCount, timeoutMs },
-      {
+    const result = await runAdfActuatorPipeline({
+      actuatorId: 'orchestrator',
+      steps: normalizedSteps,
+      context: initial,
+      options: { maxSteps: maxSteps - state.stepCount, timeoutMs },
+      handlers: {
         capture: async (_op, _params, ctx) => ctx,
         transform: async (_op, _params, ctx) => ctx,
         apply: async (op, params, ctx) => {
@@ -95,10 +103,10 @@ export async function executeSuperPipeline(
           return await dispatchToActuator(domain, action, params, ctx);
         },
         control: async (op, params, ctx, runSteps) => {
-          return await handleCoreAction(op, params, ctx, runSteps);
+          return await handleCoreAction(op, params, ctx, runSteps, options);
         },
-      }
-    );
+      },
+    });
 
     state.stepCount += result.total_steps;
     if (state.stepCount > maxSteps) {
@@ -114,17 +122,41 @@ export async function executeSuperPipeline(
     }
 
     const failure = classifyError(new Error(failed.error || `Step failed: ${failed.op}`));
-    if (attempt === 0 && failure.repairAction) {
+    const pipelinePath =
+      typeof options.pipelinePath === 'string' ? options.pipelinePath : undefined;
+    if (attempt === 0 && failure.repairAction && pipelinePath) {
       logger.warn(`  [NERVE] Step failed: ${failure.label}. Attempting autonomous repair...`);
       const failedStep = normalizedSteps.find((step) => step.op === failed.op) ||
         steps[0] || { op: failed.op, params: {} };
       const repaired = await attemptAutonomousRepair({
         step: { op: failedStep.op, params: failedStep.params },
-        failure,
+        failure: {
+          category: failure.category,
+          detail: failure.detail,
+          repairAction: failure.repairAction,
+        },
+        pipelinePath,
+        trustResolved: options.trustResolved === true,
+        projectTrustApprovalId:
+          typeof options.projectTrustApprovalId === 'string'
+            ? options.projectTrustApprovalId
+            : undefined,
         logPrefix: '[NERVE:REPAIR]',
       });
       if (repaired) {
         logger.success(`  [NERVE] Repair successful. Retrying pipeline...`);
+        try {
+          const repairedPipeline = loadPipelineAdfAtPath(
+            path.resolve(pathResolver.rootResolve(pipelinePath))
+          );
+          steps = repairedPipeline.steps;
+          normalizedSteps = steps.map(normalizeStep);
+        } catch (reloadError) {
+          logger.warn(
+            `  [NERVE] Failed to reload repaired pipeline ${pipelinePath}: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`
+          );
+          return result;
+        }
         continue;
       }
     }
@@ -155,7 +187,8 @@ async function handleCoreAction(
   action: string,
   params: any,
   ctx: any,
-  runSteps: (steps: any[], seedCtx?: any) => Promise<any>
+  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
+  options: Record<string, unknown>
 ): Promise<any> {
   switch (action) {
     case 'if':
@@ -208,9 +241,40 @@ async function handleCoreAction(
     case 'call':
     case 'include': {
       const ref = String(resolveVars(params.path ?? params.fragment ?? '', ctx));
-      const macroPath = pathResolver.rootResolve(ref);
-      const macroDef = loadJson<{ steps?: Array<Record<string, unknown>> }>(macroPath);
-      const nested = await runSteps(normalizeNestedSteps(macroDef.steps || []), ctx);
+      if (path.isAbsolute(ref)) {
+        throw new Error(`[TRUST_REQUIRED] super pipeline resource must be repo-relative: ${ref}`);
+      }
+      const macroPath = path.resolve(pathResolver.rootResolve(ref));
+      const relativePath = path.relative(pathResolver.rootDir(), macroPath).replaceAll('\\', '/');
+      if (
+        !relativePath ||
+        relativePath === '.' ||
+        relativePath.startsWith('../') ||
+        path.isAbsolute(relativePath)
+      ) {
+        throw new Error(
+          `[TRUST_REQUIRED] super pipeline resource must stay inside the repository: ${ref}`
+        );
+      }
+      if (typeof options.projectTrustApprovalId === 'string' && options.projectTrustApprovalId) {
+        assertProjectTrustApproval(options.projectTrustApprovalId, macroPath);
+      } else if (options.trustResolved !== true) {
+        throw new Error(
+          `[TRUST_REQUIRED] super pipeline include requires an explicit project-trust decision: ${relativePath}`
+        );
+      }
+      if (!safeExistsSync(macroPath) || !safeLstat(macroPath).isFile()) {
+        throw new Error(`Super pipeline include must be an existing regular file: ${macroPath}`);
+      }
+      const macroDef = parseSafeJsonObjectValue(
+        readJson(macroPath),
+        `super pipeline include ${relativePath}`
+      );
+      const macroSteps = macroDef.steps === undefined ? [] : macroDef.steps;
+      if (!Array.isArray(macroSteps)) {
+        throw new Error(`Super pipeline include steps must be an array: ${relativePath}`);
+      }
+      const nested = await runSteps(normalizeNestedSteps(macroSteps), ctx);
       if (nested.status === 'failed') {
         throw new Error(
           nested.results.find((result: any) => result.status === 'failed')?.error ||
@@ -238,14 +302,13 @@ function buildUnknownCoreActionMessage(action: string): string {
 async function dispatchToActuator(domain: string, action: string, params: any, ctx: any) {
   ensureDefaultOpPreflight();
   const inputParams = params && typeof params === 'object' ? params : {};
-  const approvalGranted = inputParams._approval_granted === true || ctx?._approval_granted === true;
   const preflight = await runOpPreflight({
     op: `${domain}:${action}`,
     params: inputParams,
     context: ctx,
     source: 'actuator',
     requiresApproval: inputParams._approval_required === true || ctx?._approval_required === true,
-    approvalGranted,
+    approvalGranted: false,
   });
   if (preflight.decision !== 'allow') {
     throw new Error(

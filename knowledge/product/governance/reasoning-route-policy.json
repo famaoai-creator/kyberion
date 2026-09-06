@@ -46,6 +46,28 @@
       "capabilities": ["text", "structured_output", "tools"],
       "supported_parameters": ["effort"]
     },
+    "cursor-cli": {
+      "adapter": "cursor-cli",
+      "selection": {
+        "display_name": "Cursor Agent CLI",
+        "model_provider": "cursor",
+        "discovery_provider": "cursor",
+        "availability": { "kind": "provider_discovery" }
+      },
+      "capabilities": ["text", "structured_output", "tools"],
+      "supported_parameters": ["effort"]
+    },
+    "opencode-cli": {
+      "adapter": "opencode-cli",
+      "selection": {
+        "display_name": "OpenCode CLI",
+        "model_provider": "opencode",
+        "discovery_provider": "opencode",
+        "availability": { "kind": "provider_discovery" }
+      },
+      "capabilities": ["text", "structured_output", "tools"],
+      "supported_parameters": ["effort"]
+    },
     "grok-api": {
       "adapter": "openai-compatible",
       "selection": {
@@ -374,6 +396,15 @@
     "grok-cli-default": {
       "mode": "grok-cli",
       "model_ref": "xai:grok-4.6",
+      "capabilities": ["text", "structured_output", "tools"]
+    },
+    "cursor-cli-default": {
+      "mode": "cursor-cli",
+      "capabilities": ["text", "structured_output", "tools"]
+    },
+    "opencode-cli-default": {
+      "mode": "opencode-cli",
+      "model_ref": "opencode:muse-spark-1.3-contributor-free",
       "capabilities": ["text", "structured_output", "tools"]
     },
     "grok-api-default": {

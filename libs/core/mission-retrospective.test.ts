@@ -5,11 +5,41 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const realFsSecureIo = vi.hoisted(() => ({
+  assertSafeRepositoryPath: (filePath: string, options: { allowMissingLeaf?: boolean } = {}) => {
+    const root = path.resolve(process.env.KYBERION_ROOT || process.cwd());
+    const resolved = path.resolve(filePath);
+    const relative = path.relative(root, resolved);
+    if (
+      !relative ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error(`[RESOURCE_PATH_SCOPE] ${filePath}`);
+    }
+    let current = root;
+    for (const segment of relative.split(path.sep)) {
+      current = path.join(current, segment);
+      try {
+        if (fs.lstatSync(current).isSymbolicLink()) {
+          throw new Error(`[RESOURCE_PATH_SYMLINK] ${filePath}`);
+        }
+      } catch (error: any) {
+        if (error?.code === 'ENOENT') break;
+        throw error;
+      }
+    }
+    if (!options.allowMissingLeaf && !fs.existsSync(resolved)) {
+      throw new Error(`Resource path does not exist: ${resolved}`);
+    }
+    return resolved;
+  },
   safeAppendFileSync: (filePath: string, data: string) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.appendFileSync(filePath, data, 'utf8');
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string, options?: { recursive?: boolean }) =>
     fs.mkdirSync(dirPath, { recursive: options?.recursive !== false }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
@@ -69,6 +99,29 @@ describe('mission retrospective loop', () => {
     fs.mkdirSync(path.join(missionDir, 'evidence'), { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     fs.mkdirSync(path.join(tmpRoot, 'knowledge'), { recursive: true });
+    const schemaPath = path.join(tmpRoot, 'knowledge/product/schemas/mission-state.schema.json');
+    fs.mkdirSync(path.dirname(schemaPath), { recursive: true });
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
+      schemaPath
+    );
+    // agent-performance-index.ts records outcomes through governed catalogs;
+    // mission-retrospective.ts reads the dispatch manifest through one too.
+    for (const schemaName of [
+      'agent-role-outcome',
+      'agent-performance-index',
+      'mission-workitem-dispatch-manifest',
+      'mission-ticket-dispatch-manifest',
+      'mission-next-tasks',
+      'model-role-outcome',
+      'model-performance-index',
+      'process-improvement-proposal',
+    ]) {
+      fs.copyFileSync(
+        path.resolve(process.cwd(), `knowledge/product/schemas/${schemaName}.schema.json`),
+        path.join(tmpRoot, `knowledge/product/schemas/${schemaName}.schema.json`)
+      );
+    }
     process.env.KYBERION_ROOT = tmpRoot;
 
     fs.writeFileSync(
@@ -82,6 +135,7 @@ describe('mission retrospective loop', () => {
     fs.writeFileSync(
       path.join(missionDir, 'coordination', 'tickets', 'dispatch-manifest.json'),
       JSON.stringify({
+        mission_id: MISSION,
         records: [
           { task_id: 'T-3', status: 'failed', notes: ['missing assigned_to.agent_id'] },
           {
@@ -101,7 +155,23 @@ describe('mission retrospective loop', () => {
     );
     fs.writeFileSync(
       path.join(missionDir, 'mission-state.json'),
-      JSON.stringify({ mission_id: MISSION, context: { goal_reconciliation_round: 1 } })
+      JSON.stringify({
+        mission_id: MISSION,
+        tier: 'public',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: {
+          branch: 'mission-retrospective-test',
+          start_commit: 'abc123',
+          latest_commit: 'abc123',
+          checkpoints: [],
+        },
+        history: [],
+        context: { goal_reconciliation_round: 1 },
+      })
     );
     fs.mkdirSync(path.join(tmpRoot, 'work', 'metrics'), { recursive: true });
     fs.writeFileSync(
@@ -193,6 +263,89 @@ describe('mission retrospective loop', () => {
     expect(stats.resource_usage).toEqual({ entries: 1, cost_usd: 0.02 });
   });
 
+  it('does not derive lifecycle stats from a schema-invalid mission state', () => {
+    fs.writeFileSync(
+      path.join(missionDir, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: MISSION,
+        context: {
+          goal_reconciliation_round: 99,
+          mission_finish_gate_last_reason: 'must not be reported',
+        },
+      })
+    );
+
+    const stats = mod.collectMissionExecutionStats(MISSION);
+
+    expect(stats.goal_reconciliation_rounds).toBe(0);
+    expect(stats.finish_gate_failures).toEqual([]);
+  });
+
+  it('fails closed when mission task or ticket manifest roots are malformed', () => {
+    fs.writeFileSync(path.join(missionDir, 'NEXT_TASKS.json'), JSON.stringify({ tasks: [] }));
+    fs.writeFileSync(
+      path.join(missionDir, 'coordination', 'tickets', 'dispatch-manifest.json'),
+      JSON.stringify({ mission_id: MISSION, records: 'invalid' })
+    );
+
+    const stats = mod.collectMissionExecutionStats(MISSION);
+
+    expect(stats.task_total).toBe(0);
+    expect(stats.tasks_by_role).toEqual({});
+    expect(stats.ticket_failures).toEqual([]);
+  });
+
+  it('skips malformed JSONL records and does not count non-object events', () => {
+    fs.writeFileSync(
+      path.join(missionDir, 'coordination', 'events', 'task-events.jsonl'),
+      [
+        JSON.stringify([]),
+        JSON.stringify(null),
+        JSON.stringify({ decision: 'best_of_judged', payload: [] }),
+        '{broken json',
+      ].join('\n') + '\n'
+    );
+
+    const stats = mod.collectMissionExecutionStats(MISSION);
+    expect(stats.best_of_judgements).toBe(1);
+    expect(stats.rework_events).toBe(0);
+    expect(stats.clarifications).toBe(0);
+  });
+
+  it('does not read symlinked mission telemetry into the retrospective', () => {
+    const taskEventsPath = path.join(missionDir, 'coordination', 'events', 'task-events.jsonl');
+    const externalEventsPath = path.join(tmpRoot, 'external-task-events.jsonl');
+    fs.writeFileSync(
+      externalEventsPath,
+      JSON.stringify({ decision: 'best_of_judged', payload: {} }) + '\n'
+    );
+    fs.unlinkSync(taskEventsPath);
+    fs.symlinkSync(externalEventsPath, taskEventsPath, 'file');
+
+    try {
+      const stats = mod.collectMissionExecutionStats(MISSION);
+      expect(stats.best_of_judgements).toBe(0);
+      expect(fs.existsSync(externalEventsPath)).toBe(true);
+    } finally {
+      fs.unlinkSync(taskEventsPath);
+    }
+  });
+
+  it('fails closed when the process improvement queue is a symlink', () => {
+    const queuePath = mod.processImprovementQueuePath();
+    const externalQueuePath = path.join(tmpRoot, 'external-process-improvements.jsonl');
+    fs.mkdirSync(path.dirname(queuePath), { recursive: true });
+    fs.writeFileSync(externalQueuePath, '');
+    fs.symlinkSync(externalQueuePath, queuePath, 'file');
+
+    try {
+      expect(() => mod.listProcessImprovementProposals()).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.unlinkSync(queuePath);
+      fs.unlinkSync(externalQueuePath);
+    }
+  });
+
   it('queues LLM proposals for operator ratification and notifies', async () => {
     backendPrompt.mockResolvedValue(
       JSON.stringify({
@@ -225,12 +378,70 @@ describe('mission retrospective loop', () => {
     expect(String(backendPrompt.mock.calls[0][0])).toContain('goal_reconciliation_rounds');
   });
 
+  it('rejects malformed LLM proposal shapes and malformed queued records', async () => {
+    backendPrompt.mockResolvedValue(
+      JSON.stringify({
+        proposals: [
+          [],
+          { proposal: 42 },
+          { proposal: 'valid', kind: 'unknown', evidence: ['ok'] },
+          { proposal: 'valid', kind: 'tooling', evidence: ['ok'] },
+        ],
+      })
+    );
+    const result = await mod.runMissionRetrospective(MISSION);
+    expect(result.proposals).toHaveLength(1);
+
+    const queuePath = mod.processImprovementQueuePath();
+    fs.appendFileSync(queuePath, `${JSON.stringify([])}\n${JSON.stringify({ proposal: 'bad' })}\n`);
+    expect(mod.listProcessImprovementProposals()).toHaveLength(1);
+    expect(mod.normalizeProcessImprovementProposal([])).toBeUndefined();
+  });
+
+  it('rewrites queued proposals through the canonical schema boundary', async () => {
+    backendPrompt.mockResolvedValue(
+      JSON.stringify({
+        proposals: [
+          {
+            kind: 'tooling',
+            target: 'queue',
+            proposal: 'queue schemaを適用する',
+            rationale: 'durable queue contract',
+            evidence: ['queue.jsonl'],
+          },
+        ],
+      })
+    );
+    const result = await mod.runMissionRetrospective(MISSION);
+    const queuePath = mod.processImprovementQueuePath();
+    const proposal = result.proposals[0];
+    fs.writeFileSync(
+      queuePath,
+      `${JSON.stringify({ $schema: 'https://example.invalid/proposal.json', ...proposal })}\n`
+    );
+
+    mod.decideProcessImprovementProposal(proposal.proposal_id, 'approved');
+
+    const persisted = JSON.parse(fs.readFileSync(queuePath, 'utf8').trim());
+    expect(persisted.$schema).toBeUndefined();
+    expect(persisted.status).toBe('approved');
+  });
+
+  it('does not promote dangerous LLM proposal responses', async () => {
+    backendPrompt.mockResolvedValue(
+      '{"proposals":[{"kind":"tooling","proposal":"unsafe"}],"meta":{"__proto__":{}}}'
+    );
+    const result = await mod.runMissionRetrospective(MISSION);
+    expect(result.proposals).toHaveLength(0);
+  });
+
   it('records agent×role outcomes into the performance index and adjusts selection scores', async () => {
     // add outcomes to the dispatch manifest fixture
     fs.mkdirSync(path.join(missionDir, 'evidence'), { recursive: true });
     fs.writeFileSync(
       path.join(missionDir, 'evidence', 'workitem-dispatch-manifest.json'),
       JSON.stringify({
+        mission_id: MISSION,
         records: Array.from({ length: 6 }, (_, index) => ({
           item_id: `witem-${index}`,
           team_role: 'implementer',

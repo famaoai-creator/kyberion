@@ -1,5 +1,6 @@
 import { TaskResultSchema, formatZodIssues } from './structured-output-contracts.js';
 import type { TaskResultBlock } from './channel-surface-types.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 export interface TaskResultValidationResult {
   valid: boolean;
@@ -72,7 +73,7 @@ export function extractTaskResultBlocks(raw: string): {
     }
 
     try {
-      const parsed = JSON.parse(trimmed);
+      const parsed = parseSafeJsonInput(trimmed, 'task_result block');
       const validation = validateTaskResult(parsed);
       if (validation.valid && validation.value) {
         taskResults.push(validation.value);

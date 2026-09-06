@@ -15,6 +15,13 @@ import {
   normalizeRejectionReasonCategory,
   type RejectionReasonCategory,
 } from './rejection-reason.js';
+import {
+  renderIntentAuthorityLabel,
+  renderIntentOutcomeLabel,
+  type IntentResolutionContract,
+} from './intent-resolution-contract.js';
+import type { SupportedLocale } from './locale-normalize.js';
+import { t } from './t.js';
 
 /** MO-11 S-2: `brief` = the mission-brief HTML review surface (report-review). */
 export type SurfaceApproval = 'slack' | 'telegram' | 'discord' | 'imessage' | 'presence' | 'brief';
@@ -73,18 +80,38 @@ export function createSurfaceApprovalRequest(params: {
 
 export function buildSurfaceApprovalText(
   surface: SurfaceApproval,
-  record: ApprovalRequestRecord
+  record: ApprovalRequestRecord,
+  intentResolution?: IntentResolutionContract,
+  options: { locale?: SupportedLocale } = {}
 ): string {
+  const locale = options.locale ?? 'ja';
   return [
-    `承認が必要です [${surface}]`,
-    `タイトル: ${record.title}`,
+    t('bridge:approval_heading', { surface }, locale),
+    `${t('bridge:approval_title_label', undefined, locale)}: ${record.title}`,
     record.summary,
-    ...(record.details ? [`詳細: ${record.details}`] : []),
-    `重要度: ${record.severity || 'medium'}`,
+    ...(record.details
+      ? [`${t('bridge:approval_details_label', undefined, locale)}: ${record.details}`]
+      : []),
+    `${t('bridge:approval_severity_label', undefined, locale)}: ${record.severity || 'medium'}`,
     '',
-    '1: 承認する',
-    '2: 却下する',
-    `返信: appr:${record.id}:approve または appr:${record.id}:reject`,
+    t('bridge:approval_approve_choice', undefined, locale),
+    t('bridge:approval_reject_choice', undefined, locale),
+    t('bridge:approval_reply_instruction', { requestId: record.id }, locale),
+    ...(intentResolution
+      ? [
+          '',
+          `${t('bridge:contract_understanding', undefined, locale)}: ${intentResolution.normalized_intent}`,
+          `${t('bridge:contract_missing_input', undefined, locale)}: ${
+            intentResolution.missing_inputs.length > 0
+              ? intentResolution.missing_inputs.join(', ')
+              : t('bridge:contract_none', undefined, locale)
+          }`,
+          `${t('bridge:contract_authority', undefined, locale)}: ${renderIntentAuthorityLabel(intentResolution.authority_level, locale)}`,
+          `${t('bridge:contract_next_action', undefined, locale)}: ${intentResolution.next_action.label}`,
+          `${t('bridge:contract_consequence', undefined, locale)}: ${intentResolution.next_action.consequence}`,
+          `${t('bridge:contract_outcome', undefined, locale)}: ${renderIntentOutcomeLabel(intentResolution.outcome_kind, locale)}`,
+        ]
+      : []),
   ].join('\n');
 }
 

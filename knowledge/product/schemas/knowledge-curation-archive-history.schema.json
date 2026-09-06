@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/knowledge-curation-archive-history.schema.json",
+  "title": "Knowledge curation archive history",
+  "description": "Weekly observations retained before a knowledge archive advisory is proposed.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "key",
+      "document_path",
+      "consecutive_weeks",
+      "first_observed_at",
+      "last_observed_at",
+      "last_week"
+    ],
+    "properties": {
+      "key": { "type": "string", "minLength": 1 },
+      "document_path": { "type": "string", "minLength": 1 },
+      "tenant_slug": { "type": "string", "minLength": 1 },
+      "consecutive_weeks": { "type": "integer", "minimum": 1 },
+      "first_observed_at": { "type": "string", "minLength": 1 },
+      "last_observed_at": { "type": "string", "minLength": 1 },
+      "last_week": { "type": "string", "minLength": 1 }
+    }
+  }
+}

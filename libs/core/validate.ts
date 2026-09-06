@@ -8,18 +8,38 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ValidationResult, ValidationError, JsonSchema } from './types.js';
-import { loadJson } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const schemasDir: string = path.resolve(currentDir, '../../knowledge/product/schemas');
-const schemaCache: Record<string, JsonSchema> = {};
+const schemaCache = new Map<string, JsonSchema>();
 
 export function loadSchema(schemaName: string): JsonSchema {
-  if (schemaCache[schemaName]) return schemaCache[schemaName];
-  const filePath = path.join(schemasDir, `${schemaName}.schema.json`);
-  const schema = loadJson<JsonSchema>(filePath);
-  schemaCache[schemaName] = schema;
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(schemaName)) {
+    throw new Error(
+      `[SCHEMA_INVALID] schema name must be a single filename segment: ${schemaName}`
+    );
+  }
+  const cached = schemaCache.get(schemaName);
+  if (cached) return cached;
+  const filePath = assertSafeRepositoryPath(path.join(schemasDir, `${schemaName}.schema.json`), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(filePath)) {
+    throw new Error(`[SCHEMA_NOT_FOUND] schema not found: ${schemaName}`);
+  }
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[SCHEMA_INVALID] schema must be a regular file: ${schemaName}`);
+  }
+  const schema = parseSchemaDocument(readJson<unknown>(filePath), schemaName);
+  schemaCache.set(schemaName, schema);
   return schema;
+}
+
+export function parseSchemaDocument(value: unknown, schemaName = 'schema'): JsonSchema {
+  return parseSafeJsonObjectValue(value, `${schemaName} schema`);
 }
 
 export function validate(data: Record<string, unknown>, schemaName: string): ValidationResult {

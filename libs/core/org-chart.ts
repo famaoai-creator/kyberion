@@ -1,6 +1,9 @@
 import * as path from 'node:path';
-import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
+import { loadAuthorityRoleIndex, loadTeamRoleIndex } from './mission-team-index.js';
 import { pathResolver } from './path-resolver.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import type { TeamRoleRecord } from './team-role-assignment-selection.js';
 
 export interface OrganizationOrgChartDomain {
@@ -36,22 +39,49 @@ export interface OrganizationOrgChartSummary {
   top_level_roles: string[];
 }
 
-const DEFAULT_ORG_CHART_PATHS = [
-  (baseDir: string, tenantSlug: string) =>
-    path.join(baseDir, 'customer', tenantSlug, 'org-chart.json'),
-  (baseDir: string, tenantSlug: string) =>
-    path.join(
-      baseDir,
-      'knowledge',
-      'confidential',
-      tenantSlug,
-      'organization',
-      'org-chart-2604.json'
-    ),
-  (baseDir: string, tenantSlug: string) =>
-    path.join(baseDir, 'knowledge', 'confidential', tenantSlug, 'org-chart.json'),
-  (baseDir: string) => path.join(baseDir, 'knowledge', 'product', 'governance', 'org-chart.json'),
+const DEFAULT_ORG_CHART_CANDIDATES: Array<{
+  buildPath: (baseDir: string, tenantSlug: string) => string;
+  sourceKind: Exclude<OrganizationOrgChart['source_kind'], 'derived'>;
+}> = [
+  {
+    buildPath: (baseDir, tenantSlug) =>
+      path.join(baseDir, 'customer', tenantSlug, 'org-chart.json'),
+    sourceKind: 'customer',
+  },
+  {
+    buildPath: (baseDir, tenantSlug) =>
+      path.join(
+        baseDir,
+        'knowledge',
+        'confidential',
+        tenantSlug,
+        'organization',
+        'org-chart-2604.json'
+      ),
+    sourceKind: 'confidential',
+  },
+  {
+    buildPath: (baseDir, tenantSlug) =>
+      path.join(baseDir, 'knowledge', 'confidential', tenantSlug, 'org-chart.json'),
+    sourceKind: 'confidential',
+  },
+  {
+    buildPath: (baseDir) =>
+      path.join(baseDir, 'knowledge', 'product', 'governance', 'org-chart.json'),
+    sourceKind: 'public',
+  },
 ];
+const ORG_CHART_SCHEMA_PATH = pathResolver.knowledge('product/schemas/org-chart.schema.json');
+const PERSONALITY_ROLES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/personality-roles.schema.json'
+);
+
+interface PersonalityRoleCatalog {
+  domains: Record<string, { name: string; roles: Record<string, string> }>;
+  roles?: Record<string, unknown>;
+}
+
+const personalityRoleCatalogs = new Map<string, GovernedCatalog<PersonalityRoleCatalog>>();
 
 function resolveBaseDir(rootDir?: string): string {
   return rootDir ? path.resolve(rootDir) : pathResolver.rootDir();
@@ -80,50 +110,48 @@ function normalizeRoleId(label: string): string {
   return aliases[cleaned] || cleaned;
 }
 
-function loadJsonIfPresent<T>(filePath: string): T | null {
-  return loadOptionalJson<T>(filePath);
-}
-
-function isOrgChartCandidate(value: unknown): value is OrganizationOrgChart {
-  if (!value || typeof value !== 'object') return false;
-  const chart = value as Record<string, unknown>;
-  return Array.isArray(chart.positions) && Array.isArray(chart.domains);
-}
-
 function loadTeamRoleIndexFromRoot(baseDir: string): Record<string, TeamRoleRecord> {
-  const filePath = path.join(
-    baseDir,
-    'knowledge',
-    'product',
-    'orchestration',
-    'team-role-index.json'
-  );
-  const payload = loadJsonIfPresent<{ team_roles?: Record<string, TeamRoleRecord> }>(filePath);
-  return payload?.team_roles || {};
+  try {
+    return loadTeamRoleIndex(baseDir);
+  } catch {
+    return {};
+  }
 }
 
 function loadAuthorityRoleIndexFromRoot(
   baseDir: string
 ): Record<string, { scope_classes?: string[] }> {
-  const indexPath = path.join(
-    baseDir,
-    'knowledge',
-    'product',
-    'governance',
-    'authority-role-index.json'
-  );
-  const payload = loadJsonIfPresent<{
-    authority_roles?: Record<string, { scope_classes?: string[] }>;
-  }>(indexPath);
-  return payload?.authority_roles || {};
+  try {
+    return loadAuthorityRoleIndex(baseDir);
+  } catch {
+    return {};
+  }
 }
 
 function loadDomainCatalog(baseDir: string): OrganizationOrgChartDomain[] {
-  const catalog = loadJsonIfPresent<{
-    domains?: Record<string, { name?: string; roles?: Record<string, string> }>;
-  }>(path.join(baseDir, 'knowledge', 'product', 'personalities', 'roles.json'));
+  const catalogPath = assertSafeRepositoryPath(
+    path.join(baseDir, 'knowledge', 'product', 'personalities', 'roles.json'),
+    { allowMissingLeaf: true, rootDir: baseDir }
+  );
+  let catalog: PersonalityRoleCatalog;
+  try {
+    let loader = personalityRoleCatalogs.get(catalogPath);
+    if (!loader) {
+      loader = defineCatalog<PersonalityRoleCatalog>({
+        id: 'personality-role-catalog',
+        path: catalogPath,
+        schema: PERSONALITY_ROLES_SCHEMA_PATH,
+      });
+      personalityRoleCatalogs.set(catalogPath, loader);
+    }
+    catalog = loader.load();
+  } catch {
+    // A malformed optional personality catalog must not prevent the derived
+    // org chart from exposing the independently governed team-role index.
+    return [];
+  }
 
-  const domains = Object.values(catalog?.domains || {});
+  const domains = Object.values(catalog.domains);
   const knownRoles = new Set<string>();
   const result = domains.map((domain, index) => {
     const roleIds = Object.values(domain.roles || {})
@@ -193,19 +221,24 @@ function loadOrgChartFromCandidates(
   baseDir: string,
   tenantSlug: string
 ): OrganizationOrgChart | null {
-  for (const candidateBuilder of DEFAULT_ORG_CHART_PATHS) {
-    const candidatePath = candidateBuilder(baseDir, tenantSlug);
-    const parsed = loadJsonIfPresent<OrganizationOrgChart>(candidatePath);
-    if (parsed && isOrgChartCandidate(parsed)) {
+  for (const candidate of DEFAULT_ORG_CHART_CANDIDATES) {
+    try {
+      const candidatePath = assertSafeRepositoryPath(candidate.buildPath(baseDir, tenantSlug), {
+        allowMissingLeaf: true,
+        rootDir: baseDir,
+      });
+      const parsed = defineCatalog<OrganizationOrgChart>({
+        id: 'organization-org-chart',
+        path: candidatePath,
+        schema: ORG_CHART_SCHEMA_PATH,
+      }).load();
       return {
         ...parsed,
         source_path: candidatePath,
-        source_kind: candidatePath.includes('/customer/')
-          ? 'customer'
-          : candidatePath.includes('/confidential/')
-            ? 'confidential'
-            : 'public',
+        source_kind: candidate.sourceKind,
       };
+    } catch {
+      // Continue to the next scoped candidate when the file is missing or invalid.
     }
   }
   return null;
@@ -217,13 +250,11 @@ export function resolveOrganizationOrgChart(
 ): OrganizationOrgChart {
   const baseDir = resolveBaseDir(rootDir);
   const resolvedTenantSlug = tenantSlug?.trim() || null;
-  const organizationId = resolvedTenantSlug || 'default';
-  const name = resolvedTenantSlug
-    ? `${resolvedTenantSlug} Org Chart`
-    : 'Default Organization Org Chart';
-  const loaded = resolvedTenantSlug
-    ? loadOrgChartFromCandidates(baseDir, resolvedTenantSlug)
-    : null;
+  const safeTenantSlug =
+    resolvedTenantSlug && isValidTenantSlug(resolvedTenantSlug) ? resolvedTenantSlug : null;
+  const organizationId = safeTenantSlug || 'default';
+  const name = safeTenantSlug ? `${safeTenantSlug} Org Chart` : 'Default Organization Org Chart';
+  const loaded = safeTenantSlug ? loadOrgChartFromCandidates(baseDir, safeTenantSlug) : null;
   if (loaded) return loaded;
   return buildDerivedOrgChart(
     baseDir,

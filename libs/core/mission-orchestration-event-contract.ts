@@ -9,6 +9,7 @@ export type MissionOrchestrationEventType =
   | 'mission_distillation_requested'
   | 'mission_completion_requested'
   | 'mission_control_requested'
+  | 'mission_worker_recovery_requested'
   | 'surface_control_requested';
 
 export const MISSION_ORCHESTRATION_EVENT_TYPES: readonly MissionOrchestrationEventType[] = [
@@ -20,6 +21,7 @@ export const MISSION_ORCHESTRATION_EVENT_TYPES: readonly MissionOrchestrationEve
   'mission_distillation_requested',
   'mission_completion_requested',
   'mission_control_requested',
+  'mission_worker_recovery_requested',
   'surface_control_requested',
 ];
 

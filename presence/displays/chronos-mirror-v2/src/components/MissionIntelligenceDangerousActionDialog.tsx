@@ -1,4 +1,3 @@
-import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 import { actionButtonClass } from './MissionIntelligenceViewHelpers';
 
 export function MissionIntelligenceDangerousActionDialog(context: Record<string, unknown>) {

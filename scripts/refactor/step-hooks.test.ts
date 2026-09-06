@@ -6,12 +6,27 @@ const mocks = vi.hoisted(() => ({
   warn: vi.fn(),
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = (await vi.importActual('@agent/core')) as any;
+vi.mock('@agent/core/secure-io', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
   return {
     ...actual,
     safeExecResult: mocks.safeExecResult,
+  };
+});
+
+vi.mock('@agent/core/network', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/network')>('@agent/core/network');
+  return {
+    ...actual,
     secureFetch: mocks.secureFetch,
+  };
+});
+
+vi.mock('@agent/core/core', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/core')>('@agent/core/core');
+  return {
+    ...actual,
     logger: {
       ...actual.logger,
       warn: mocks.warn,
@@ -35,7 +50,7 @@ describe('step-hooks', () => {
       ],
       {},
       'before',
-      async () => async () => ({ handled: false, ctx: {} }),
+      async () => async () => ({ handled: false, ctx: {} })
     );
 
     expect(decision).toBe('abort');
@@ -56,7 +71,7 @@ describe('step-hooks', () => {
       ],
       {},
       'before',
-      async () => async () => ({ handled: true, ctx: {} }),
+      async () => async () => ({ handled: true, ctx: {} })
     );
 
     expect(decision).toBe('continue');
@@ -75,9 +90,33 @@ describe('step-hooks', () => {
       ],
       {},
       'after',
-      async () => async () => ({ handled: false, ctx: {} }),
+      async () => async () => ({ handled: false, ctx: {} })
     );
 
     expect(decision).toBe('continue');
+  });
+
+  it('only treats a validated object response as an HTTP hook decision', async () => {
+    const { runStepHooks } = await import('./step-hooks.js');
+    mocks.secureFetch.mockResolvedValueOnce({ approved: false });
+
+    await expect(
+      runStepHooks(
+        [{ type: 'http', url: 'https://example.com/hook' }],
+        {},
+        'before',
+        async () => async () => ({ handled: true, ctx: {} })
+      )
+    ).resolves.toBe('abort');
+
+    mocks.secureFetch.mockResolvedValueOnce(null);
+    await expect(
+      runStepHooks(
+        [{ type: 'http', url: 'https://example.com/hook' }],
+        {},
+        'before',
+        async () => async () => ({ handled: true, ctx: {} })
+      )
+    ).resolves.toBe('continue');
   });
 });

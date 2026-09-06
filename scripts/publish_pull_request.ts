@@ -6,9 +6,13 @@
  * requested PR title does not satisfy the repository's PR-title policy.
  */
 
-import { safeExec, pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { safeExec } from '@agent/core/secure-io';
 import { checkTitle } from './check_pr_title.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
+
+type Print = (value: unknown) => void;
 
 interface PublishOptions {
   title?: string;
@@ -30,8 +34,19 @@ function readDefaultBranch(): string {
   const raw = safeExec('gh', ['repo', 'view', '--json', 'defaultBranchRef'], {
     cwd: pathResolver.rootDir(),
   }).trim();
-  const parsed = JSON.parse(raw);
-  return parsed?.defaultBranchRef?.name || 'main';
+  return parseDefaultBranchResponse(raw);
+}
+
+export function parseDefaultBranchResponse(raw: string): string {
+  const parsed = parseSafeJsonObjectValue(
+    parseSafeJsonInput(raw, 'gh repository response'),
+    'gh repository response'
+  );
+  const ref = parsed.defaultBranchRef;
+  const refRecord = ref && typeof ref === 'object' && !Array.isArray(ref) ? ref : null;
+  return refRecord && typeof (refRecord as Record<string, unknown>).name === 'string'
+    ? String((refRecord as Record<string, unknown>).name)
+    : 'main';
 }
 
 export function parsePublishArgs(argv: string[]): PublishOptions {
@@ -85,7 +100,7 @@ export function buildGhArgs(
   return args;
 }
 
-async function main(argv: string[]): Promise<void> {
+async function main(argv: string[], print: Print = () => undefined): Promise<void> {
   const options = parsePublishArgs(argv);
 
   safeExec('gh', ['--version'], { cwd: pathResolver.rootDir() });
@@ -93,15 +108,13 @@ async function main(argv: string[]): Promise<void> {
 
   const args = buildGhArgs(options);
   const output = safeExec('gh', args, { cwd: pathResolver.rootDir() });
-  if (output.trim()) {
-    console.log(output.trim());
-  }
+  if (output.trim()) print(output.trim());
 }
 
 const script = defineScript({
   name: 'pr:publish',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (
   isDirectScript(import.meta.url, 'publish_pull_request.ts') ||

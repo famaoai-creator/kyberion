@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Media Confidential Layout Template Catalog",
+  "type": "object",
+  "required": ["version", "default", "templates"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "default": { "type": "string", "minLength": 1 },
+    "templates": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "object", "additionalProperties": true }
+    }
+  },
+  "additionalProperties": false
+}

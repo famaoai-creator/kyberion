@@ -12,6 +12,14 @@ vi.mock('./path-resolver.js', () => ({
 vi.mock('./secure-io.js', async () => {
   const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
   return {
+    assertSafeRepositoryPath: (p: string) => {
+      const resolved = path.resolve(p);
+      const root = path.resolve(logsProcessDir);
+      if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
+        throw new Error('[RESOURCE_PATH_SCOPE]');
+      }
+      return resolved;
+    },
     safeAppendFileSync: (p: string, data: string) => actualFs.appendFileSync(p, data),
     safeExistsSync: (p: string) => actualFs.existsSync(p),
     safeMkdir: (p: string, opts: any) => actualFs.mkdirSync(p, opts),
@@ -122,5 +130,11 @@ describe('ProcessLogger', () => {
     // Even if writes fail, logger should not propagate errors
     const log = new ProcessLogger('safe-daemon');
     expect(() => log.info('silent failure test')).not.toThrow();
+  });
+
+  it('does not write outside the process log directory for a traversal-shaped name', () => {
+    const log = new ProcessLogger('../outside');
+    expect(() => log.info('must remain contained')).not.toThrow();
+    expect(fs.readdirSync(logsProcessDir)).toEqual([]);
   });
 });

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { advanceToolLoopGuardrail, createToolLoopGuardrailState, normalizeToolCallSignature } from './tool-loop-guardrail.js';
+import {
+  advanceToolLoopGuardrail,
+  createToolLoopGuardrailState,
+  normalizeToolCallSignature,
+} from './tool-loop-guardrail.js';
 
 describe('tool-loop guardrail', () => {
   it('normalizes tool arguments before comparing signatures', () => {
@@ -15,11 +19,28 @@ describe('tool-loop guardrail', () => {
     expect(first).toBe(second);
   });
 
+  it('does not treat dangerous JSON keys as structured tool arguments', () => {
+    const rawArguments = '{"path":"README.md","meta":{"__proto__":{}}}';
+
+    expect(normalizeToolCallSignature({ name: 'read_file', arguments: rawArguments })).toBe(
+      `read_file:${rawArguments}`
+    );
+  });
+
   it('stops repeated identical tool calls before another loop round', () => {
     const initial = createToolLoopGuardrailState();
-    const first = advanceToolLoopGuardrail(initial, { name: 'read_file', arguments: JSON.stringify({ path: 'README.md' }) });
-    const second = advanceToolLoopGuardrail(first.state, { name: 'read_file', arguments: JSON.stringify({ path: 'README.md' }) });
-    const third = advanceToolLoopGuardrail(second.state, { name: 'read_file', arguments: JSON.stringify({ path: 'README.md' }) });
+    const first = advanceToolLoopGuardrail(initial, {
+      name: 'read_file',
+      arguments: JSON.stringify({ path: 'README.md' }),
+    });
+    const second = advanceToolLoopGuardrail(first.state, {
+      name: 'read_file',
+      arguments: JSON.stringify({ path: 'README.md' }),
+    });
+    const third = advanceToolLoopGuardrail(second.state, {
+      name: 'read_file',
+      arguments: JSON.stringify({ path: 'README.md' }),
+    });
 
     expect(first.shouldStop).toBe(false);
     expect(second.shouldStop).toBe(false);
@@ -29,11 +50,23 @@ describe('tool-loop guardrail', () => {
 
   it('stops long tool loops even when the tool name changes', () => {
     let state = createToolLoopGuardrailState();
-    let decision = advanceToolLoopGuardrail(state, { name: 'read_file', arguments: JSON.stringify({ path: 'README.md' }) }, { maxTotalCalls: 2, maxConsecutiveSameCalls: 99 });
+    let decision = advanceToolLoopGuardrail(
+      state,
+      { name: 'read_file', arguments: JSON.stringify({ path: 'README.md' }) },
+      { maxTotalCalls: 2, maxConsecutiveSameCalls: 99 }
+    );
     state = decision.state;
-    decision = advanceToolLoopGuardrail(state, { name: 'list_directory', arguments: JSON.stringify({ path: '.' }) }, { maxTotalCalls: 2, maxConsecutiveSameCalls: 99 });
+    decision = advanceToolLoopGuardrail(
+      state,
+      { name: 'list_directory', arguments: JSON.stringify({ path: '.' }) },
+      { maxTotalCalls: 2, maxConsecutiveSameCalls: 99 }
+    );
     state = decision.state;
-    decision = advanceToolLoopGuardrail(state, { name: 'shell_exec', arguments: JSON.stringify({ command: 'pwd' }) }, { maxTotalCalls: 2, maxConsecutiveSameCalls: 99 });
+    decision = advanceToolLoopGuardrail(
+      state,
+      { name: 'shell_exec', arguments: JSON.stringify({ command: 'pwd' }) },
+      { maxTotalCalls: 2, maxConsecutiveSameCalls: 99 }
+    );
 
     expect(decision.shouldStop).toBe(true);
     expect(decision.reason).toContain('without reaching a final answer');

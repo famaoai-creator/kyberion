@@ -16,13 +16,13 @@
  * warning — it never throws.
  *
  * The JSON schema (`knowledge/product/schemas/storage-retention-catalog.schema.json`)
- * documents the vocabulary for external tooling; runtime validation here is
- * structural TypeScript (no schema-file dependency) so the loader keeps
- * working under hermetic test roots where the schema file does not exist.
+ * is enforced by the shared governed catalog boundary. Domain-specific path
+ * and duplicate checks remain below because they are retention semantics, not
+ * generic JSON shape validation.
  */
 
 import * as nodePath from 'node:path';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { rootDir } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
 import { logger } from './core.js';
@@ -96,6 +96,18 @@ export interface LoadedRetentionCatalog {
   source: 'catalog' | 'builtin-defaults';
   /** Human-readable reasons for a fallback / anomalies. Empty on a clean load. */
   warnings: string[];
+}
+
+interface RetentionCatalogFile {
+  version: string;
+  entries: RetentionCatalogEntry[];
+}
+
+function retentionCatalogSchemaPath(): string {
+  return nodePath.join(
+    rootDir(),
+    'knowledge/product/schemas/storage-retention-catalog.schema.json'
+  );
 }
 
 /**
@@ -229,40 +241,42 @@ export function loadRetentionCatalog(
     return fallback(`retention catalog not found at ${catalogPath}`);
   }
 
-  let parsed: unknown;
   try {
-    parsed = readJson<unknown>(catalogPath);
+    const parsed = defineCatalog<RetentionCatalogFile>({
+      id: 'storage-retention-catalog',
+      path: catalogPath,
+      schema: retentionCatalogSchemaPath(),
+    }).load();
+    const entriesRaw = parsed.entries;
+    if (!Array.isArray(entriesRaw) || entriesRaw.length === 0) {
+      return fallback(`retention catalog at ${catalogPath} has no "entries" array`);
+    }
+
+    const seenPaths = new Set<string>();
+    for (let i = 0; i < entriesRaw.length; i++) {
+      const error = validateEntry(entriesRaw[i], i);
+      if (error) {
+        return fallback(`retention catalog invalid at ${catalogPath}: ${error}`);
+      }
+      const entryPath = entriesRaw[i].path;
+      if (seenPaths.has(entryPath)) {
+        return fallback(
+          `retention catalog invalid at ${catalogPath}: duplicate entry for path "${entryPath}"`
+        );
+      }
+      seenPaths.add(entryPath);
+    }
+
+    return {
+      entries: entriesRaw,
+      source: 'catalog',
+      warnings: [],
+    };
   } catch (err) {
     return fallback(
       `retention catalog corrupt at ${catalogPath}: ${err instanceof Error ? err.message : String(err)}`
     );
   }
-
-  const entriesRaw = (parsed as { entries?: unknown } | null)?.entries;
-  if (!Array.isArray(entriesRaw) || entriesRaw.length === 0) {
-    return fallback(`retention catalog at ${catalogPath} has no "entries" array`);
-  }
-
-  const seenPaths = new Set<string>();
-  for (let i = 0; i < entriesRaw.length; i++) {
-    const error = validateEntry(entriesRaw[i], i);
-    if (error) {
-      return fallback(`retention catalog invalid at ${catalogPath}: ${error}`);
-    }
-    const entryPath = (entriesRaw[i] as RetentionCatalogEntry).path;
-    if (seenPaths.has(entryPath)) {
-      return fallback(
-        `retention catalog invalid at ${catalogPath}: duplicate entry for path "${entryPath}"`
-      );
-    }
-    seenPaths.add(entryPath);
-  }
-
-  return {
-    entries: entriesRaw as RetentionCatalogEntry[],
-    source: 'catalog',
-    warnings: [],
-  };
 }
 
 /** TTL in milliseconds declared for an exact repo-relative directory, or null when none/no TTL. */

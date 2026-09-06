@@ -10,17 +10,20 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { readJsonLines } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { clamp, isRecord } from './foundation/text.js';
 import {
+  assertSafeRepositoryPath,
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
+  safeLstat,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
-import { loadJson } from './secure-io.js';
-import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
+import { loadAuthorityRoleIndex } from './authority-role-registry.js';
 import { auditChain } from './audit-chain.js';
 import { resolveRole } from './authority.js';
 import { createLogger } from './logger.js';
@@ -121,26 +124,11 @@ function normalizeAuthority(authority: TriggerAuthoritySnapshot): TriggerAuthori
 type CanonicalAuthorityRole = { role?: string; scope_classes?: string[] };
 
 function readCanonicalAuthorityRole(role: string): CanonicalAuthorityRole | null {
-  const rolePath = pathResolver.knowledge(`product/governance/authority-roles/${role}.json`);
-  const indexPath = pathResolver.knowledge('product/governance/authority-role-index.json');
-  if (safeExistsSync(rolePath)) {
-    try {
-      const record = readJson<CanonicalAuthorityRole>(rolePath);
-      if (record.role === role) return record;
-    } catch {
-      // Fall through to the synchronized role index.
-    }
-  }
-  if (safeExistsSync(indexPath)) {
-    try {
-      const index = loadJson<{
-        authority_roles?: Record<string, CanonicalAuthorityRole>;
-      }>(indexPath);
-      const record = index.authority_roles?.[role];
-      if (record) return { role, ...record };
-    } catch {
-      // Fail closed below.
-    }
+  try {
+    const record = loadAuthorityRoleIndex()[role];
+    if (record) return { role, ...record };
+  } catch {
+    // Fail closed below when the role directory and snapshot are invalid.
   }
   return null;
 }
@@ -174,7 +162,7 @@ function resolveGovernedAuthority(authority: TriggerAuthoritySnapshot): TriggerA
       `[POLICY_VIOLATION] Trigger authority level does not match role registry: role=${normalized.authority_role} expected=${governedLevel} received=${normalized.level}`
     );
   }
-  const activeRole = process.env.MISSION_ROLE?.trim() || resolveRole();
+  const activeRole = getRegisteredEnvText('MISSION_ROLE')?.trim() || resolveRole();
   if (activeRole && activeRole !== normalized.authority_role) {
     throw new Error(
       `[POLICY_VIOLATION] Trigger authority is not bound to the active execution role: active=${activeRole} requested=${normalized.authority_role}`
@@ -197,7 +185,7 @@ function resolveGovernedAuthority(authority: TriggerAuthoritySnapshot): TriggerA
  * Throws when no role is bound, because an unattributable trigger must not run.
  */
 export function resolveCurrentTriggerAuthority(tenantSlug?: string): TriggerAuthoritySnapshot {
-  const activeRole = process.env.MISSION_ROLE?.trim() || resolveRole();
+  const activeRole = getRegisteredEnvText('MISSION_ROLE')?.trim() || resolveRole();
   if (!activeRole) {
     throw new Error('[AUTHORITY_UNBOUND] Trigger execution requires an active MISSION_ROLE.');
   }
@@ -250,20 +238,101 @@ export function assertNoEscalation(
   }
 }
 
-function readRecords(storePath: string): TriggerRecord[] {
-  if (!safeExistsSync(storePath)) return [];
-  const raw = safeReadFile(storePath, { encoding: 'utf8', maxSizeMB: 5 }) as string;
-  const records: TriggerRecord[] = [];
-  for (const line of raw.split(/\r?\n/u)) {
-    if (!line.trim()) continue;
-    try {
-      const parsed = JSON.parse(line) as TriggerRecord;
-      if (parsed && typeof parsed.idempotencyKey === 'string') records.push(parsed);
-    } catch {
-      // A torn record must not erase the valid history before it.
+function persistedRequiredString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function persistedAuthority(value: unknown): TriggerAuthoritySnapshot | null {
+  if (!isRecord(value)) return null;
+  const authorityRole = persistedRequiredString(value.authority_role);
+  const level = value.level;
+  if (authorityRole === null || typeof level !== 'number' || !Number.isFinite(level) || level < 0) {
+    return null;
+  }
+  if (value.tenant_slug !== undefined && typeof value.tenant_slug !== 'string') return null;
+  return {
+    authority_role: authorityRole,
+    level,
+    ...(typeof value.tenant_slug === 'string' && value.tenant_slug.trim()
+      ? { tenant_slug: value.tenant_slug }
+      : {}),
+  };
+}
+
+/** Normalize one persisted receipt before it participates in idempotency state. */
+export function normalizeTriggerRecord(value: unknown): TriggerRecord | null {
+  if (!isRecord(value)) return null;
+  const idempotencyKey = persistedRequiredString(value.idempotencyKey);
+  const recordedAt = persistedRequiredString(value.recordedAt);
+  const source = value.source;
+  const status = value.status;
+  const createdBy = persistedAuthority(value.createdBy);
+  if (
+    idempotencyKey === null ||
+    recordedAt === null ||
+    !Number.isFinite(Date.parse(recordedAt)) ||
+    (source !== 'cron' && source !== 'watch' && source !== 'wake') ||
+    (status !== 'delivered' &&
+      status !== 'failed' &&
+      status !== 'rejected' &&
+      status !== 'duplicate') ||
+    createdBy === null
+  ) {
+    return null;
+  }
+
+  const requestedAuthority =
+    value.requestedAuthority === undefined
+      ? undefined
+      : persistedAuthority(value.requestedAuthority);
+  if (value.requestedAuthority !== undefined && requestedAuthority === null) return null;
+
+  for (const field of ['deliveryId', 'reason', 'claimId', 'claimExpiresAt'] as const) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') return null;
+  }
+  const claimExpiresAt = value.claimExpiresAt;
+  if (typeof claimExpiresAt === 'string' && !Number.isFinite(Date.parse(claimExpiresAt))) {
+    return null;
+  }
+  for (const field of ['claimOwnerPid', 'attempt'] as const) {
+    if (
+      value[field] !== undefined &&
+      (typeof value[field] !== 'number' || !Number.isInteger(value[field]) || value[field] < 0)
+    ) {
+      return null;
     }
   }
-  return records;
+
+  return {
+    idempotencyKey,
+    source,
+    status,
+    createdBy,
+    ...(requestedAuthority ? { requestedAuthority } : {}),
+    ...(typeof value.deliveryId === 'string' ? { deliveryId: value.deliveryId } : {}),
+    ...(typeof value.reason === 'string' ? { reason: value.reason } : {}),
+    recordedAt,
+    ...(typeof value.claimId === 'string' ? { claimId: value.claimId } : {}),
+    ...(typeof value.claimOwnerPid === 'number' ? { claimOwnerPid: value.claimOwnerPid } : {}),
+    ...(typeof claimExpiresAt === 'string' ? { claimExpiresAt } : {}),
+    ...(typeof value.attempt === 'number' ? { attempt: value.attempt } : {}),
+  };
+}
+
+function readRecords(storePath: string): TriggerRecord[] {
+  if (!safeExistsSync(storePath)) return [];
+  assertTriggerStoreFile(storePath);
+  return readJsonLines<TriggerRecord | null>(storePath, {
+    onMalformed: 'skip',
+    readOptions: { maxSizeMB: 5 },
+    map: normalizeTriggerRecord,
+  }).filter((record): record is TriggerRecord => record !== null);
+}
+
+function assertTriggerStoreFile(storePath: string): void {
+  if (safeExistsSync(storePath) && !safeLstat(storePath).isFile()) {
+    throw new Error('[TRIGGER_STORE_INVALID] delivery store must be a regular file: ' + storePath);
+  }
 }
 
 function isProcessAlive(pid: number | undefined): boolean {
@@ -285,6 +354,7 @@ function compactRecords(storePath: string, records: TriggerRecord[]): void {
 
 function appendRecord(storePath: string, record: TriggerRecord, maxStoreBytes: number): void {
   safeMkdir(path.dirname(pathResolver.rootResolve(storePath)));
+  assertTriggerStoreFile(storePath);
   const serialized = `${JSON.stringify(record)}\n`;
   let size = 0;
   if (safeExistsSync(storePath)) {
@@ -352,12 +422,16 @@ export class TriggerRunner {
   private readonly lockId: string;
 
   constructor(options: TriggerRunnerOptions = {}) {
-    this.storePath = options.storePath || DEFAULT_STORE_PATH;
+    this.storePath = assertSafeRepositoryPath(
+      pathResolver.rootResolve(options.storePath || DEFAULT_STORE_PATH),
+      { allowMissingLeaf: true }
+    );
     this.now = options.now || (() => new Date());
     this.claimLeaseMs = Math.max(1000, options.claimLeaseMs ?? DEFAULT_CLAIM_LEASE_MS);
-    this.maxStoreBytes = Math.max(
+    this.maxStoreBytes = clamp(
+      options.maxStoreBytes ?? DEFAULT_MAX_STORE_BYTES,
       64 * 1024,
-      Math.min(options.maxStoreBytes ?? DEFAULT_MAX_STORE_BYTES, MAX_STORE_BYTES)
+      MAX_STORE_BYTES
     );
     this.authorityResolver = options.authorityResolver || resolveGovernedAuthority;
     this.lockId = `trigger-store-${createHash('sha256')

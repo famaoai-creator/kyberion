@@ -1,6 +1,9 @@
 import * as path from 'node:path';
+import { readJsonLines } from './foundation/json.js';
+import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
 import {
   collaborationKindFromEventType,
   createAgentCollaborationEvent,
@@ -96,25 +99,27 @@ const JSONL_SOURCES: Array<{ file: string; source: CollaborationSource }> = [
   { file: 'agent-runtime-supervisor-events.jsonl', source: 'runtime' },
 ];
 
+function safeOptionalRepositoryPath(filePath: string): string | undefined {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  } catch {
+    return undefined;
+  }
+}
+
 function toRecordOrNull(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : null;
 }
 
 function readJsonl(filePath: string): JsonRecord[] {
-  if (!safeExistsSync(filePath)) return [];
+  const safePath = safeOptionalRepositoryPath(filePath);
+  if (!safePath || !safeExistsSync(safePath)) return [];
+  if (!safeLstat(safePath).isFile()) return [];
   try {
-    return String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
-      .split(/\r?\n/u)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .flatMap((line) => {
-        try {
-          const value = toRecordOrNull(JSON.parse(line));
-          return value ? [value] : [];
-        } catch {
-          return [];
-        }
-      });
+    return readJsonLines<JsonRecord | null>(safePath, {
+      onMalformed: 'skip',
+      map: (value) => toRecordOrNull(value),
+    }).filter((value): value is JsonRecord => value !== null);
   } catch {
     return [];
   }
@@ -249,16 +254,21 @@ function eventFromRecord(
 }
 
 function readWorkerEvents(): AgentCollaborationEvent[] {
-  if (!safeExistsSync(WORKER_EVENTS_DIR)) return [];
+  const safeWorkerEventsDir = safeOptionalRepositoryPath(WORKER_EVENTS_DIR);
+  if (!safeWorkerEventsDir || !safeExistsSync(safeWorkerEventsDir)) return [];
   const files: string[] = [];
-  for (const entry of safeReaddir(WORKER_EVENTS_DIR)) {
-    const entryPath = path.join(WORKER_EVENTS_DIR, entry);
+  for (const entry of safeReaddir(safeWorkerEventsDir)) {
+    const entryPath = safeOptionalRepositoryPath(path.join(safeWorkerEventsDir, entry));
+    if (!entryPath) continue;
     if (entry.endsWith('.jsonl')) files.push(entryPath);
     if (entry === 'missions' && safeExistsSync(entryPath)) {
       for (const mission of safeReaddir(entryPath)) {
-        const missionPath = path.join(entryPath, mission);
+        const missionPath = safeOptionalRepositoryPath(path.join(entryPath, mission));
+        if (!missionPath || !safeExistsSync(missionPath)) continue;
         for (const file of safeReaddir(missionPath)) {
-          if (file.endsWith('.jsonl')) files.push(path.join(missionPath, file));
+          if (!file.endsWith('.jsonl')) continue;
+          const filePath = safeOptionalRepositoryPath(path.join(missionPath, file));
+          if (filePath) files.push(filePath);
         }
       }
     }
@@ -407,7 +417,8 @@ function attentionForEvent(event: AgentCollaborationEvent): CollaborationAttenti
 
 function statusFromEvents(
   events: AgentCollaborationEvent[],
-  options: ComposeCollaborationProjectionOptions
+  options: ComposeCollaborationProjectionOptions,
+  generatedAt: string
 ): { flags: CollaborationStatusFlag[]; gaps: CollaborationSequenceGap[] } {
   const gaps: CollaborationSequenceGap[] = [];
   for (const source of new Set(events.map((event) => event.source))) {
@@ -438,7 +449,7 @@ function statusFromEvents(
   if (gaps.length > 0) flags.add('sequence_gap');
 
   const staleAfterMs = options.staleAfterMs ?? 5 * 60 * 1000;
-  const now = Date.parse(options.now || new Date().toISOString());
+  const now = Date.parse(generatedAt);
   const latestRuntime = events
     .filter((event) => event.source === 'runtime')
     .slice()
@@ -458,7 +469,7 @@ export function composeAgentCollaborationProjection(
   input: AgentCollaborationEvent[],
   options: ComposeCollaborationProjectionOptions = {}
 ): AgentCollaborationProjection {
-  const limit = Math.max(1, Math.min(options.limit || 100, 500));
+  const limit = clamp(options.limit || 100, 1, 500);
   const deduped = new Map<string, AgentCollaborationEvent>();
   for (const event of input.filter((event) => eventMatches(event, options))) {
     deduped.set(`${event.source}:${event.source_event_id}`, event);
@@ -469,7 +480,8 @@ export function composeAgentCollaborationProjection(
         left.ts.localeCompare(right.ts) || left.event_id.localeCompare(right.event_id)
     )
     .slice(-limit);
-  const status = statusFromEvents(events, options);
+  const generatedAt = options.now ?? nowIso();
+  const status = statusFromEvents(events, options, generatedAt);
   const nodes = new Map<string, CollaborationGraphNode>();
   const edges: CollaborationGraphEdge[] = [];
   const attention: CollaborationAttentionItem[] = [];
@@ -571,7 +583,7 @@ export function composeAgentCollaborationProjection(
     }
   }
   return {
-    generated_at: options.now || new Date().toISOString(),
+    generated_at: generatedAt,
     cursor: events.at(-1)?.event_id || null,
     partial: status.flags.length > 0,
     status_flags: status.flags,

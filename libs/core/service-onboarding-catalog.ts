@@ -22,7 +22,6 @@ const catalog = defineCatalog<ServiceOnboardingCatalog>({
   id: 'service-onboarding-catalog',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: { version: '1.0.0', services: [] },
 });
 
 export function loadServiceOnboardingCatalog(): ServiceOnboardingCatalog {

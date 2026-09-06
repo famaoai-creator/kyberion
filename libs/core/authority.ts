@@ -5,10 +5,11 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 // here created a cycle (secure-io → tier-guard/policy-engine → authority →
 // secure-io) that hit TDZ errors during module evaluation and silently broke
 // resolveIdentityContext. Read-only bootstrap IO goes through fs-primitives.
-import { rawExistsSync, rawReaddir, rawReadTextFile } from './fs-primitives.js';
+import { rawExistsSync, rawLstatSync, rawReaddir, rawReadTextFile } from './fs-primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service-authority-map.js';
 import { createLogger } from './logger.js';
@@ -17,16 +18,6 @@ const logger = createLogger('authority');
 
 type RolePersonaIndex = {
   authority_roles?: Record<string, { default_persona?: Persona }>;
-};
-
-type AuthorityRoleFile = {
-  role: string;
-  description: string;
-  default_persona?: Persona;
-  write_scopes: string[];
-  scope_classes: string[];
-  allowed_actuators: string[];
-  tier_access: string[];
 };
 
 const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
@@ -71,17 +62,29 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
 
 let cachedRolePersonaIndex: RolePersonaIndex | null = null;
 
-type RoleAuthorityMapEntry = {
-  role: string;
-  persona: Persona;
-  execution_mode?: string;
-  authority_role?: string;
-};
-type RoleAuthorityMap = {
-  system_roles?: RoleAuthorityMapEntry[];
-  mission_roles?: RoleAuthorityMapEntry[];
-  context_roles?: RoleAuthorityMapEntry[];
-};
+type JsonRecord = Record<string, unknown>;
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseJsonRecord(raw: string): JsonRecord | null {
+  try {
+    const value: unknown = parseSafeJsonInput(raw, 'authority JSON');
+    return isJsonRecord(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function stringField(record: JsonRecord, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function optionalStringFieldIsValid(record: JsonRecord, key: string): boolean {
+  return record[key] === undefined || typeof record[key] === 'string';
+}
 
 let cachedRoleAuthorityMap: Record<string, Persona> | null = null;
 const executionScopeStorage = new AsyncLocalStorage<{
@@ -97,14 +100,21 @@ function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
       cachedRoleAuthorityMap = {};
       return cachedRoleAuthorityMap;
     }
-    const raw = JSON.parse(rawReadTextFile(filePath)) as RoleAuthorityMap;
+    const raw = parseJsonRecord(rawReadTextFile(filePath));
+    if (!raw) {
+      cachedRoleAuthorityMap = {};
+      return cachedRoleAuthorityMap;
+    }
     const result: Record<string, Persona> = {};
-    for (const entry of [
-      ...(raw.system_roles ?? []),
-      ...(raw.mission_roles ?? []),
-      ...(raw.context_roles ?? []),
-    ]) {
-      if (entry.role && entry.persona) result[entry.role] = entry.persona;
+    for (const group of ['system_roles', 'mission_roles', 'context_roles']) {
+      const entries = raw[group];
+      if (!Array.isArray(entries)) continue;
+      for (const value of entries) {
+        if (!isJsonRecord(value)) continue;
+        const role = stringField(value, 'role')?.trim();
+        const persona = normalizePersona(stringField(value, 'persona'));
+        if (role && persona !== 'unknown') result[role] = persona;
+      }
     }
     cachedRoleAuthorityMap = result;
   } catch {
@@ -129,17 +139,19 @@ function loadRolePersonaIndexDirectory(): RolePersonaIndex | null {
   const authority_roles: Record<string, { default_persona?: Persona }> = {};
   for (const file of files) {
     const filePath = pathResolver.knowledge(`product/governance/authority-roles/${file}`);
-    const payload = JSON.parse(rawReadTextFile(filePath)) as AuthorityRoleFile;
-    const role = String(payload.role || '').trim();
+    const payload = parseJsonRecord(rawReadTextFile(filePath));
+    if (!payload) {
+      throw new Error(`Authority role file ${file} must contain a JSON object`);
+    }
+    const role = stringField(payload, 'role')?.trim() || '';
     if (!role) {
       throw new Error(`Authority role file ${file} must declare a role id`);
     }
     if (file.replace(/\.json$/i, '') !== role) {
       throw new Error(`Authority role file ${file} must match its role id (${role})`);
     }
-    authority_roles[role] = {
-      default_persona: payload.default_persona,
-    };
+    const defaultPersona = normalizePersona(stringField(payload, 'default_persona'));
+    authority_roles[role] = defaultPersona === 'unknown' ? {} : { default_persona: defaultPersona };
   }
 
   return { authority_roles };
@@ -155,7 +167,20 @@ function loadRolePersonaIndex(): RolePersonaIndex {
 
   const indexPath = pathResolver.knowledge('product/governance/authority-role-index.json');
   try {
-    cachedRolePersonaIndex = JSON.parse(rawReadTextFile(indexPath)) as RolePersonaIndex;
+    const raw = parseJsonRecord(rawReadTextFile(indexPath));
+    const roles = raw?.authority_roles;
+    if (!isJsonRecord(roles)) {
+      cachedRolePersonaIndex = {};
+      return cachedRolePersonaIndex;
+    }
+    const authority_roles: RolePersonaIndex['authority_roles'] = {};
+    for (const [role, value] of Object.entries(roles)) {
+      if (!isJsonRecord(value)) continue;
+      const defaultPersona = normalizePersona(stringField(value, 'default_persona'));
+      authority_roles[role] =
+        defaultPersona === 'unknown' ? {} : { default_persona: defaultPersona };
+    }
+    cachedRolePersonaIndex = { authority_roles };
   } catch {
     cachedRolePersonaIndex = {};
   }
@@ -167,8 +192,8 @@ function loadRolePersonaIndex(): RolePersonaIndex {
  * Resolves logical identity and temporal authorities for the current execution.
  */
 
-function normalizePersona(value: string | undefined): Persona {
-  if (!value) return 'unknown';
+function normalizePersona(value: unknown): Persona {
+  if (typeof value !== 'string' || !value) return 'unknown';
   const normalized = value.toLowerCase().replace(/\s+/g, '_');
   if (
     normalized === 'sovereign' ||
@@ -182,8 +207,19 @@ function normalizePersona(value: string | undefined): Persona {
   return 'unknown';
 }
 
+function isAuthority(value: string): value is Authority {
+  return (
+    value === 'SUDO' ||
+    value === 'GIT_WRITE' ||
+    value === 'SECRET_READ' ||
+    value === 'NETWORK_FETCH' ||
+    value === 'SYSTEM_EXEC' ||
+    value === 'KNOWLEDGE_WRITE'
+  );
+}
+
 export function resolveRole(): string | undefined {
-  const envRole = process.env.SYSTEM_ROLE || process.env.MISSION_ROLE;
+  const envRole = getRegisteredEnvText('SYSTEM_ROLE') || getRegisteredEnvText('MISSION_ROLE');
   if (envRole) return envRole.toLowerCase().replace(/\s+/g, '_');
 
   const argv1 = process.argv[1] || '';
@@ -228,9 +264,9 @@ export function withExecutionContext<T>(
   persona?: Persona,
   tenantSlug?: string
 ): T {
-  const previousRole = process.env.MISSION_ROLE;
+  const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  process.env.MISSION_ROLE = role;
+  setRegisteredEnv('MISSION_ROLE', role);
   const resolvedPersona = persona || inferPersonaFromRole(role);
   if (resolvedPersona !== 'unknown') {
     setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
@@ -243,8 +279,7 @@ export function withExecutionContext<T>(
       fn
     );
   } finally {
-    if (previousRole === undefined) delete process.env.MISSION_ROLE;
-    else process.env.MISSION_ROLE = previousRole;
+    setRegisteredEnv('MISSION_ROLE', previousRole);
     setRegisteredEnv('KYBERION_PERSONA', previousPersona);
   }
 }
@@ -260,9 +295,9 @@ export async function withExecutionContextAsync<T>(
   persona?: Persona,
   tenantSlug?: string
 ): Promise<T> {
-  const previousRole = process.env.MISSION_ROLE;
+  const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
-  process.env.MISSION_ROLE = role;
+  setRegisteredEnv('MISSION_ROLE', role);
   const resolvedPersona = persona || inferPersonaFromRole(role);
   if (resolvedPersona !== 'unknown') {
     setRegisteredEnv('KYBERION_PERSONA', resolvedPersona);
@@ -275,8 +310,7 @@ export async function withExecutionContextAsync<T>(
       fn
     );
   } finally {
-    if (previousRole === undefined) delete process.env.MISSION_ROLE;
-    else process.env.MISSION_ROLE = previousRole;
+    setRegisteredEnv('MISSION_ROLE', previousRole);
     setRegisteredEnv('KYBERION_PERSONA', previousPersona);
   }
 }
@@ -326,10 +360,34 @@ const TASK_GRANT_AUTHORITY_NAMES: ReadonlySet<string> = new Set([
   'KNOWLEDGE_WRITE',
 ]);
 
-function resolveTaskGrantsReadPath(): string {
+function resolveTaskGrantsReadPath(): string | undefined {
   const override = getRegisteredEnvText('KYBERION_TASK_GRANTS_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('coordination/identity/task-grants.jsonl');
+  const candidate = override
+    ? pathResolver.rootResolve(override)
+    : pathResolver.shared('coordination/identity/task-grants.jsonl');
+  const root = path.resolve(pathResolver.rootDir());
+  const absolute = path.resolve(candidate);
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    logger.debug(`task grant read path rejected outside repository: ${candidate}`);
+    return undefined;
+  }
+
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (rawLstatSync(current).isSymbolicLink()) {
+        logger.debug(`task grant read path rejected through symbolic link: ${candidate}`);
+        return undefined;
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') break;
+      logger.debug(`task grant read path could not be inspected: ${candidate}: ${error}`);
+      return undefined;
+    }
+  }
+  return absolute;
 }
 
 /**
@@ -353,8 +411,8 @@ function resolveGrantActorNhiId(role: string | undefined): string | undefined {
   try {
     const profilePath = pathResolver.knowledge('product/governance/organization-profile.json');
     if (rawExistsSync(profilePath)) {
-      const profile = JSON.parse(rawReadTextFile(profilePath)) as { organization_id?: unknown };
-      const candidate = typeof profile.organization_id === 'string' ? profile.organization_id : '';
+      const profile = parseJsonRecord(rawReadTextFile(profilePath));
+      const candidate = profile ? stringField(profile, 'organization_id') || '' : '';
       if (TASK_GRANT_NHI_SLUG_PATTERN.test(candidate)) organizationId = candidate;
     }
   } catch (err) {
@@ -364,7 +422,7 @@ function resolveGrantActorNhiId(role: string | undefined): string | undefined {
 }
 
 export function resolveIdentityContext(tenantOverride?: string): IdentityContext {
-  const missionId = process.env.MISSION_ID;
+  const missionId = getRegisteredEnvText('MISSION_ID');
   const envPersona = getRegisteredEnvText('KYBERION_PERSONA');
   const envRole = resolveRole();
 
@@ -397,23 +455,25 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
     for (const statePath of candidates) {
       try {
         if (rawExistsSync(statePath)) {
-          const state = JSON.parse(rawReadTextFile(statePath));
+          const state = parseJsonRecord(rawReadTextFile(statePath));
+          if (!state) continue;
           if (persona === 'unknown') persona = normalizePersona(state.assigned_persona);
-          if (!tenantSlug) tenantSlug = normalizeTenantSlug(state.tenant_slug);
-          const brokered = state.cross_tenant_brokerage?.source_tenants;
+          if (!tenantSlug) tenantSlug = normalizeTenantSlug(stringField(state, 'tenant_slug'));
+          const brokerage = state.cross_tenant_brokerage;
+          const brokered = isJsonRecord(brokerage) ? brokerage.source_tenants : undefined;
           if (Array.isArray(brokered) && brokered.length > 0) {
             const slugs = brokered
               .map((t: unknown) => normalizeTenantSlug(typeof t === 'string' ? t : undefined))
               .filter((t): t is string => !!t);
             if (slugs.length > 0) brokeredTenants = slugs;
           }
-          if (state.cross_tenant_brokerage && typeof state.cross_tenant_brokerage === 'object') {
-            const cfg = state.cross_tenant_brokerage;
+          if (isJsonRecord(brokerage)) {
+            const cfg = brokerage;
             brokerApproval = {
-              purpose: typeof cfg.purpose === 'string' ? cfg.purpose : undefined,
-              approvedBy: typeof cfg.approved_by === 'string' ? cfg.approved_by : undefined,
-              approvedAt: typeof cfg.approved_at === 'string' ? cfg.approved_at : undefined,
-              expiresAt: typeof cfg.expires_at === 'string' ? cfg.expires_at : undefined,
+              purpose: stringField(cfg, 'purpose'),
+              approvedBy: stringField(cfg, 'approved_by'),
+              approvedAt: stringField(cfg, 'approved_at'),
+              expiresAt: stringField(cfg, 'expires_at'),
             };
           }
           break;
@@ -453,16 +513,26 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   const grantsPath = pathResolver.active('shared/auth-grants.json');
   if (rawExistsSync(grantsPath) && missionId) {
     try {
-      const grants = JSON.parse(rawReadTextFile(grantsPath));
-      const activeGrants = grants.filter(
-        (g: any) => g.missionId === missionId && g.expiresAt > Date.now()
-      );
+      const grants: unknown = parseSafeJsonInput(rawReadTextFile(grantsPath), 'authority grants');
+      const activeGrants = Array.isArray(grants)
+        ? grants.filter((value): value is JsonRecord => {
+            if (!isJsonRecord(value)) return false;
+            const expiresAt = value.expiresAt;
+            return (
+              stringField(value, 'missionId') === missionId &&
+              typeof expiresAt === 'number' &&
+              Number.isFinite(expiresAt) &&
+              expiresAt > Date.now()
+            );
+          })
+        : [];
 
       for (const grant of activeGrants) {
-        for (const authority of getServiceAuthorities(String(grant.serviceId || ''))) {
-          authorities.push(authority as Authority);
+        for (const authority of getServiceAuthorities(stringField(grant, 'serviceId') || '')) {
+          if (isAuthority(authority)) authorities.push(authority);
         }
-        if (grant.authority) authorities.push(grant.authority as Authority);
+        const authority = stringField(grant, 'authority');
+        if (authority && isAuthority(authority)) authorities.push(authority);
       }
     } catch (err) {
       logger.warn(`suppressed error in resolveIdentityContext: ${err}`);
@@ -480,18 +550,19 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   if (missionId) {
     try {
       const taskGrantsPath = resolveTaskGrantsReadPath();
-      if (rawExistsSync(taskGrantsPath)) {
+      if (taskGrantsPath && rawExistsSync(taskGrantsPath)) {
         const actorNhiId = resolveGrantActorNhiId(envRole);
         if (actorNhiId) {
-          const taskId = process.env.TASK_ID?.trim() || undefined;
-          const latestGrants = new Map<string, any>();
+          const taskId = getRegisteredEnvText('TASK_ID')?.trim() || undefined;
+          const latestGrants = new Map<string, JsonRecord>();
           for (const line of rawReadTextFile(taskGrantsPath).split('\n')) {
             const trimmed = line.trim();
             if (!trimmed) continue;
             try {
-              const parsed = JSON.parse(trimmed);
-              if (parsed && typeof parsed.grant_id === 'string') {
-                latestGrants.set(parsed.grant_id, parsed);
+              const parsed: unknown = parseSafeJsonInput(trimmed, 'authority grant entry');
+              if (isJsonRecord(parsed)) {
+                const grantId = stringField(parsed, 'grant_id');
+                if (grantId) latestGrants.set(grantId, parsed);
               }
             } catch {
               // torn/corrupt line — tolerated, like the store's own reader
@@ -499,43 +570,59 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
           }
           const now = Date.now();
           for (const grant of latestGrants.values()) {
-            if (grant.grantee_nhi_id !== actorNhiId) continue;
-            if (grant.revoked_at) {
-              logger.debug(`task grant ${grant.grant_id} skipped: revoked`);
+            if (
+              !stringField(grant, 'grantee_nhi_id') ||
+              !stringField(grant, 'expires_at') ||
+              !isJsonRecord(grant.audience) ||
+              !isJsonRecord(grant.scope) ||
+              !optionalStringFieldIsValid(grant, 'revoked_at') ||
+              !optionalStringFieldIsValid(grant.audience, 'task_id') ||
+              !optionalStringFieldIsValid(grant.scope, 'tenant_slug')
+            ) {
               continue;
             }
-            const expiresMs = Date.parse(String(grant.expires_at || ''));
+            if (stringField(grant, 'grantee_nhi_id') !== actorNhiId) continue;
+            if (stringField(grant, 'revoked_at')) {
+              logger.debug(`task grant ${stringField(grant, 'grant_id')} skipped: revoked`);
+              continue;
+            }
+            const expiresAt = stringField(grant, 'expires_at');
+            const expiresMs = Date.parse(expiresAt || '');
             if (!Number.isFinite(expiresMs) || expiresMs <= now) {
-              logger.debug(`task grant ${grant.grant_id} skipped: expired`);
+              logger.debug(`task grant ${stringField(grant, 'grant_id')} skipped: expired`);
               continue;
             }
-            const audience = grant.audience || {};
-            const grantTenant = String(grant.scope?.tenant_slug || '').trim();
+            const audience = grant.audience;
+            const scope = grant.scope;
+            const grantTenant = (stringField(scope, 'tenant_slug') || '').trim();
             const actorTenant = getRegisteredEnvText('KYBERION_TENANT')?.trim();
             if (!grantTenant || !actorTenant || grantTenant !== actorTenant) {
               logger.debug(
-                `task grant ${grant.grant_id} skipped: tenant scope ${grantTenant || '<missing>'} != ${actorTenant || '<missing>'}`
+                `task grant ${stringField(grant, 'grant_id')} skipped: tenant scope ${grantTenant || '<missing>'} != ${actorTenant || '<missing>'}`
               );
               continue;
             }
-            if (audience.mission_id !== missionId) {
+            if (stringField(audience, 'mission_id') !== missionId) {
               logger.debug(
-                `task grant ${grant.grant_id} skipped: audience mission ${audience.mission_id} != ${missionId}`
+                `task grant ${stringField(grant, 'grant_id')} skipped: audience mission ${stringField(audience, 'mission_id')} != ${missionId}`
               );
               continue;
             }
-            if (audience.task_id !== undefined && audience.task_id !== taskId) {
+            const audienceTaskId = stringField(audience, 'task_id');
+            if (audienceTaskId !== undefined && audienceTaskId !== taskId) {
               logger.debug(
-                `task grant ${grant.grant_id} skipped: audience task ${audience.task_id} != ${taskId ?? '<none>'}`
+                `task grant ${stringField(grant, 'grant_id')} skipped: audience task ${audienceTaskId} != ${taskId ?? '<none>'}`
               );
               continue;
             }
-            const capabilities = Array.isArray(grant.scope?.capabilities)
-              ? grant.scope.capabilities
-              : [];
+            const capabilities = Array.isArray(scope.capabilities) ? scope.capabilities : [];
             for (const capability of capabilities) {
-              if (typeof capability === 'string' && TASK_GRANT_AUTHORITY_NAMES.has(capability)) {
-                authorities.push(capability as Authority);
+              if (
+                typeof capability === 'string' &&
+                TASK_GRANT_AUTHORITY_NAMES.has(capability) &&
+                isAuthority(capability)
+              ) {
+                authorities.push(capability);
               }
             }
           }

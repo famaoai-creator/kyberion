@@ -1,5 +1,6 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/maintenance-schedule.schema.json",
+  "documentation_only": true,
   "schedule": "daily",
   "policy_path": "knowledge/governance/package-policy.json",
   "default_tasks": [

@@ -3,6 +3,9 @@ import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeExistsSync } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveLocale } from './locale.js';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -60,8 +63,10 @@ export class PythonVoiceBridge implements VoiceBridge {
       const raw = execFileSync(this.pythonBin, [this.voiceBridgePath, payload], {
         encoding: 'utf8',
       });
-      const result = JSON.parse(raw.trim());
-      if (result.status !== 'success' && result.status !== 'ok') return undefined;
+      const result = parseSafeJsonInput(raw.trim(), 'Python voice bridge response');
+      if (!isRecord(result) || (result.status !== 'success' && result.status !== 'ok')) {
+        return undefined;
+      }
       return outputPath;
     } catch {
       return undefined;
@@ -112,16 +117,19 @@ const DEFAULT_VOICE_BRIDGE_SCRIPT = path.join(
 export function installPythonVoiceBridgeIfAvailable(
   env: Record<string, string | undefined> = process.env as Record<string, string | undefined>
 ): boolean {
-  const profileId = env.KYBERION_VOICE_PROFILE_ID;
+  const profileId = getRegisteredEnvText('KYBERION_VOICE_PROFILE_ID', { env });
   if (!profileId) return false;
 
-  const bridgePath = env.KYBERION_VOICE_BRIDGE_PATH ?? DEFAULT_VOICE_BRIDGE_SCRIPT;
+  const bridgePath =
+    getRegisteredEnvText('KYBERION_VOICE_BRIDGE_PATH', { env }) ?? DEFAULT_VOICE_BRIDGE_SCRIPT;
   if (!safeExistsSync(bridgePath)) return false;
 
   const audioOutputDir =
-    env.KYBERION_VOICE_OUTPUT_DIR ?? path.join(process.cwd(), 'active/shared/tmp/voice-out');
-  const blackholePath = env.KYBERION_BLACKHOLE_SCRIPT ?? null;
-  const playThroughBlackhole = env.KYBERION_VOICE_PLAY_BLACKHOLE === '1';
+    getRegisteredEnvText('KYBERION_VOICE_OUTPUT_DIR', { env }) ??
+    path.join(process.cwd(), 'active/shared/tmp/voice-out');
+  const blackholePath = getRegisteredEnvText('KYBERION_BLACKHOLE_SCRIPT', { env }) ?? null;
+  const playThroughBlackhole =
+    getRegisteredEnvText('KYBERION_VOICE_PLAY_BLACKHOLE', { env }) === '1';
 
   const bridge = new PythonVoiceBridge({
     profileId,
@@ -129,8 +137,11 @@ export function installPythonVoiceBridgeIfAvailable(
     audioOutputDir,
     // I18N-01: voice defaults now follow the unified locale resolution
     // chain instead of a hardcoded 'ja'.
-    language: env.KYBERION_VOICE_LANGUAGE ?? resolveLocale(),
-    pythonBin: env.KYBERION_PYTHON_BIN ?? env.KYBERION_PYTHON ?? 'python3',
+    language: getRegisteredEnvText('KYBERION_VOICE_LANGUAGE', { env }) ?? resolveLocale(),
+    pythonBin:
+      getRegisteredEnvText('KYBERION_PYTHON_BIN', { env }) ??
+      getRegisteredEnvText('KYBERION_PYTHON', { env }) ??
+      'python3',
     blackholePath: blackholePath ?? undefined,
     playThroughBlackhole,
   });

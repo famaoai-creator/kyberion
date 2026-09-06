@@ -16,8 +16,9 @@
 
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import * as pathResolver from './path-resolver.js';
-import { loadJson } from './secure-io.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 
 export interface RestrictedActionRule {
   id: string;
@@ -35,18 +36,37 @@ export interface RestrictedActionMatch {
 }
 
 const DEFAULT_POLICY_PATH = 'knowledge/product/governance/restricted-action-kinds-policy.json';
+const POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/restricted-action-kinds-policy.schema.json'
+);
+
+interface RestrictedActionPolicyFile {
+  rules: RestrictedActionRule[];
+}
+
+const restrictedActionCatalog = defineCatalog<RestrictedActionPolicyFile>({
+  id: 'restricted-action-kinds-policy',
+  path: () =>
+    assertSafeRepositoryPath(pathResolver.rootResolve(DEFAULT_POLICY_PATH), {
+      allowMissingLeaf: true,
+    }),
+  schema: POLICY_SCHEMA_PATH,
+});
 
 export function loadRestrictedActionRules(opts?: { path?: string }): RestrictedActionRule[] {
   const rel =
     opts?.path ?? getRegisteredEnvText('KYBERION_RESTRICTED_ACTIONS_POLICY') ?? DEFAULT_POLICY_PATH;
-  try {
-    const abs = pathResolver.rootResolve(rel);
-    const data = loadJson<{ rules?: unknown }>(abs);
-    return Array.isArray(data?.rules) ? (data.rules as RestrictedActionRule[]) : [];
-  } catch (err: any) {
-    logger.warn(`[restricted-actions] policy load failed: ${err?.message ?? err}`);
-    return [];
+  const safePath = assertSafeRepositoryPath(pathResolver.rootResolve(rel), {
+    allowMissingLeaf: true,
+  });
+  if (safePath === pathResolver.rootResolve(DEFAULT_POLICY_PATH)) {
+    return restrictedActionCatalog.load().rules;
   }
+  return defineCatalog<RestrictedActionPolicyFile>({
+    id: 'restricted-action-kinds-policy',
+    path: safePath,
+    schema: POLICY_SCHEMA_PATH,
+  }).load().rules;
 }
 
 /**

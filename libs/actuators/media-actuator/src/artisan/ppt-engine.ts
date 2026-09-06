@@ -6,8 +6,8 @@ import {
   safeMkdir,
   safeExistsSync,
   safeExec,
-  pathResolver,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 
 export interface PPTConvertOptions {
   markdown: DocumentArtifact;

@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolveFinancialModel, summarizeFinancialModel } from './financial-model.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 describe('financial-model', () => {
   const tmpRoot = pathResolver.sharedTmp('financial-model-test');
@@ -72,5 +78,50 @@ describe('financial-model', () => {
     expect(model.periods[0]?.revenue_jpy).toBe(1000000);
     expect(model.periods[0]?.gross_profit_jpy).toBe(250000);
     expect(model.periods[0]?.note).toBe('legacy');
+  });
+
+  it('skips an invalid higher-priority model and rejects an invalid tenant slug', () => {
+    safeMkdir(`${tmpRoot}/customer/acme/finance`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/customer/acme/finance/financial-model.json`,
+      JSON.stringify({ company_id: 'acme', tenant_slug: 'acme', periods: 'invalid' })
+    );
+
+    const invalidTenant = resolveFinancialModel('../outside-tenant', tmpRoot);
+    const invalidOverlay = resolveFinancialModel('acme', tmpRoot);
+
+    expect(invalidTenant.source_kind).toBe('derived');
+    expect(invalidTenant.tenant_slug).toBeNull();
+    expect(invalidTenant.source_path).not.toContain('outside-tenant');
+    expect(invalidOverlay.source_kind).toBe('derived');
+    expect(invalidOverlay.periods).toEqual([]);
+  });
+
+  it('fails closed when legacy customer financial fields are malformed', () => {
+    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/customer/acme/customer.json`,
+      JSON.stringify({ display_name: 'ACME Inc.', financials_prev_fy: 'invalid' })
+    );
+
+    const model = resolveFinancialModel('acme', tmpRoot);
+
+    expect(model.source_kind).toBe('derived');
+    expect(model.periods).toEqual([]);
+  });
+
+  it('rejects a symlinked financial model before reading it', () => {
+    safeMkdir(`${tmpRoot}/customer/acme/finance`, { recursive: true });
+    safeMkdir(`${tmpRoot}/outside`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/outside/financial-model.json`,
+      JSON.stringify({ company_id: 'outside', tenant_slug: 'outside', periods: [] })
+    );
+    safeSymlinkSync(
+      `${tmpRoot}/outside/financial-model.json`,
+      `${tmpRoot}/customer/acme/finance/financial-model.json`
+    );
+
+    expect(() => resolveFinancialModel('acme', tmpRoot)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 });

@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { resolveOrganizationOrgChart } from './org-chart.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 describe('org-chart', () => {
   const tmpRoot = pathResolver.sharedTmp('org-chart-resolver-test');
@@ -125,5 +131,84 @@ describe('org-chart', () => {
     expect(chart.name).toBe('ACME Org Chart');
     expect(chart.positions).toHaveLength(1);
     expect(chart.domains[0].role_ids).toEqual(['ceo']);
+  });
+
+  it('skips a schema-invalid explicit chart and derives a safe fallback', () => {
+    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/customer/acme/org-chart.json`,
+      JSON.stringify({
+        version: '1.0.0',
+        organization_id: 'acme',
+        name: 'Invalid ACME Org Chart',
+        source_kind: 'customer',
+        source_path: 'customer/acme/org-chart.json',
+        domains: [],
+        positions: [{ role_id: 'ceo' }],
+      })
+    );
+
+    const chart = resolveOrganizationOrgChart('acme', tmpRoot);
+
+    expect(chart.source_kind).toBe('derived');
+    expect(chart.source_path).toContain('org-chart.derived.json');
+  });
+
+  it('fails closed when the personality role catalog is malformed', () => {
+    safeMkdir(`${tmpRoot}/knowledge/product/personalities`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/knowledge/product/personalities/roles.json`,
+      JSON.stringify({ domains: { 1: { name: 'Invalid', roles: { 1: 42 } } } })
+    );
+
+    const chart = resolveOrganizationOrgChart('acme', tmpRoot);
+
+    expect(chart.source_kind).toBe('derived');
+    expect(chart.domains).toEqual([]);
+  });
+
+  it('fails closed for an invalid tenant slug', () => {
+    safeMkdir(`${tmpRoot}/customer`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/customer/secret/org-chart.json`,
+      JSON.stringify({
+        version: '1.0.0',
+        organization_id: 'secret',
+        name: 'Secret Org Chart',
+        source_kind: 'customer',
+        source_path: 'customer/secret/org-chart.json',
+        domains: [],
+        positions: [],
+      })
+    );
+
+    const chart = resolveOrganizationOrgChart('../secret', tmpRoot);
+
+    expect(chart.organization_id).toBe('default');
+    expect(chart.source_kind).toBe('derived');
+    expect(chart.source_path).toContain('org-chart.derived.json');
+  });
+
+  it('derives a safe fallback when the customer chart is a symlink', () => {
+    safeMkdir(`${tmpRoot}/customer`, { recursive: true });
+    safeMkdir(`${tmpRoot}/outside`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/outside/org-chart.json`,
+      JSON.stringify({
+        version: '1.0.0',
+        organization_id: 'outside',
+        name: 'Outside Org Chart',
+        source_kind: 'customer',
+        source_path: 'outside/org-chart.json',
+        domains: [],
+        positions: [],
+      })
+    );
+    safeSymlinkSync(`${tmpRoot}/outside/org-chart.json`, `${tmpRoot}/customer/acme/org-chart.json`);
+
+    const chart = resolveOrganizationOrgChart('acme', tmpRoot);
+
+    expect(chart.source_kind).toBe('derived');
+    expect(chart.source_path).toContain('org-chart.derived.json');
   });
 });

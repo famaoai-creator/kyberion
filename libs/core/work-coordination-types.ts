@@ -70,6 +70,9 @@ export interface WorkItemAttempt {
 
 export interface WorkBoardFilter {
   project_id?: string;
+  tenant_slugs?: string[];
+  organization_ids?: string[];
+  project_ids?: string[];
   source?: WorkItemSource | WorkItemSource[];
   status?: WorkItemStatus | WorkItemStatus[];
   assignee_peer_id?: string;
@@ -88,6 +91,11 @@ export interface WorkBoard {
   lanes?: string[];
   created_at: string;
   updated_at: string;
+}
+
+export interface WorkBoardCatalog {
+  version: '1';
+  boards: WorkBoard[];
 }
 
 export interface WorkLease {

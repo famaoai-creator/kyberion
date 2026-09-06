@@ -14,6 +14,7 @@ import {
   viewerErrorResponse,
   strictViewerScopeTenantSlugs,
 } from '../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../lib/request-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export function GET(req: NextRequest) {
   if (denied) return denied;
   const requiresAccess = requireChronosAccess(req, 'readonly');
   if (requiresAccess) return requiresAccess;
-  const tenant = req.nextUrl.searchParams.get('tenant') || undefined;
+  const tenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
   try {

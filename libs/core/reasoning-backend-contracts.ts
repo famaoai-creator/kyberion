@@ -372,6 +372,8 @@ export interface ReasoningCallOptions {
   deferred_tool_names?: string[];
   /** PI-17: governed definitions passed to a provider-native deferred-tool wire. */
   deferred_tool_definitions?: ToolDefinition[];
+  /** PI-10: provider-native constrained sampling, after capability resolution. */
+  constrainedSampling?: ConstrainedSampling;
   /** DH-06: append a metadata-only visibility receipt before provider execution. */
   prompt_visibility?: ReasoningPromptVisibilityContext;
 }

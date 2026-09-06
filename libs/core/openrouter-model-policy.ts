@@ -2,6 +2,7 @@ import {
   loadReasoningBackendPolicy,
   type ReasoningBackendPolicy,
 } from './reasoning-backend-policy.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export const OPENROUTER_FREE_ROUTER_MODEL = 'openrouter/free';
 
@@ -20,6 +21,10 @@ export interface OpenRouterModelRecord {
   canonical_slug?: string;
   pricing?: Record<string, string | number | null | undefined>;
   supported_parameters?: string[];
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
 }
 
 function readPolicyConfig(policy: ReasoningBackendPolicy): {
@@ -84,15 +89,19 @@ export function resolveOpenRouterModelPolicy(
   policy: ReasoningBackendPolicy = loadReasoningBackendPolicy()
 ): OpenRouterModelPolicy {
   const config = readPolicyConfig(policy);
-  const configuredModel = modelOverride?.trim() || env.KYBERION_OPENROUTER_MODEL?.trim();
+  const configuredModel =
+    modelOverride?.trim() || envText(env, 'KYBERION_OPENROUTER_MODEL')?.trim();
   const inferredProfile: OpenRouterModelProfile = configuredModel
     ? isOpenRouterFreeModelId(configuredModel)
       ? 'free-pinned'
       : 'explicit'
     : config.defaultProfile;
-  const profile = normalizeProfile(env.KYBERION_OPENROUTER_PROFILE?.trim(), inferredProfile);
+  const profile = normalizeProfile(
+    envText(env, 'KYBERION_OPENROUTER_PROFILE')?.trim(),
+    inferredProfile
+  );
   const costPolicy = normalizeCostPolicy(
-    env.KYBERION_OPENROUTER_COST_POLICY?.trim(),
+    envText(env, 'KYBERION_OPENROUTER_COST_POLICY')?.trim(),
     config.defaultCostPolicy
   );
   const model = configuredModel || OPENROUTER_FREE_ROUTER_MODEL;
@@ -117,7 +126,7 @@ export function resolveOpenRouterModelPolicy(
     model,
     costPolicy,
     requiredParameters: parseRequiredParameters(
-      env.KYBERION_OPENROUTER_REQUIRED_PARAMETERS?.trim(),
+      envText(env, 'KYBERION_OPENROUTER_REQUIRED_PARAMETERS')?.trim(),
       config.requiredParameters
     ),
   };

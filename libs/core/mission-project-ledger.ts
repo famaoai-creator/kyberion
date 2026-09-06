@@ -7,35 +7,73 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
 import { resolveMissionLedgerPolicy } from './mission-ledger-policy.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
-import { loadState, readJsonFileSafe } from './mission-state.js';
-import { readTextFile } from './cli-input.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
+import { loadState } from './mission-state.js';
+import {
+  loadProjectMissionLedgerAtPath,
+  writeProjectMissionLedgerAtPath,
+  type ProjectMissionLedger,
+} from './project-mission-ledger.js';
+import { readTextFile } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { normalizeEventScope } from './event-scope.js';
 
 export function resolveProjectLedgerPath(projectPath: string): string {
   const resolved = pathResolver.rootResolve(projectPath);
-  if (resolved.endsWith('.md')) return resolved;
-  return path.join(resolved, '04_control', 'mission-ledger.md');
+  const ledgerPath = resolved.endsWith('.md')
+    ? resolved
+    : path.join(resolved, '04_control', 'mission-ledger.md');
+  return assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
 }
 
 export function resolveProjectLedgerJsonPath(projectPath: string): string {
   const resolved = pathResolver.rootResolve(projectPath);
-  if (resolved.endsWith('.json')) return resolved;
-  if (resolved.endsWith('.md')) return resolved.replace(/\.md$/i, '.json');
-  return path.join(resolved, '04_control', 'mission-ledger.json');
+  const ledgerPath = resolved.endsWith('.json')
+    ? resolved
+    : resolved.endsWith('.md')
+      ? resolved.replace(/\.md$/i, '.json')
+      : path.join(resolved, '04_control', 'mission-ledger.json');
+  return assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
 }
 
 export function ensureProjectMissionLedgerExists(ledgerPath: string): void {
-  if (safeExistsSync(ledgerPath)) return;
-  const blueprintPath = pathResolver.knowledge('public/templates/blueprints/mission-ledger.md');
-  const ledgerDir = path.dirname(ledgerPath);
+  const safeLedgerPath = assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
+  if (safeExistsSync(safeLedgerPath)) {
+    if (!safeLstat(safeLedgerPath).isFile()) {
+      throw new Error(`[PROJECT_MISSION_LEDGER] ledger must be a regular file: ${safeLedgerPath}`);
+    }
+    return;
+  }
+  const blueprintPath = assertSafeRepositoryPath(
+    pathResolver.knowledge('public/templates/blueprints/mission-ledger.md')
+  );
+  const ledgerDir = assertSafeRepositoryPath(path.dirname(safeLedgerPath), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(ledgerDir)) safeMkdir(ledgerDir, { recursive: true });
-  const blueprint = safeReadFile(blueprintPath, { encoding: 'utf8' }) as string;
-  safeWriteFile(ledgerPath, blueprint);
+  const blueprint = readTextFile(blueprintPath);
+  safeWriteFile(safeLedgerPath, blueprint);
 }
 
 export function escapeTableCell(value: string): string {
   return value.replace(/\|/g, '\\|').replace(/\n/g, ' ').trim();
+}
+
+function readProjectMissionLedger(filePath: string): ProjectMissionLedger | null {
+  try {
+    return loadProjectMissionLedgerAtPath(filePath);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[PROJECT_MISSION_LEDGER]')) {
+      throw error;
+    }
+    return null;
+  }
 }
 
 export function upsertMissionLedgerRow(content: string, row: string, missionId: string): string {
@@ -67,6 +105,9 @@ export function removeMissionFromProjectLedger(projectPath: string, missionId: s
   const ledgerPath = resolveProjectLedgerPath(projectPath);
   const ledgerJsonPath = resolveProjectLedgerJsonPath(projectPath);
   if (safeExistsSync(ledgerPath)) {
+    if (!safeLstat(ledgerPath).isFile()) {
+      throw new Error(`[PROJECT_MISSION_LEDGER] ledger must be a regular file: ${ledgerPath}`);
+    }
     const current = readTextFile(ledgerPath);
     const updated = current
       .split('\n')
@@ -75,10 +116,10 @@ export function removeMissionFromProjectLedger(projectPath: string, missionId: s
     safeWriteFile(ledgerPath, `${updated.trimEnd()}\n`);
   }
   if (safeExistsSync(ledgerJsonPath)) {
-    const jsonLedger = readJsonFileSafe(ledgerJsonPath);
+    const jsonLedger = readProjectMissionLedger(ledgerJsonPath);
     if (jsonLedger && Array.isArray(jsonLedger.entries)) {
       jsonLedger.entries = jsonLedger.entries.filter((entry: any) => entry?.mission_id !== upperId);
-      safeWriteFile(ledgerJsonPath, JSON.stringify(jsonLedger, null, 2));
+      writeProjectMissionLedgerAtPath(ledgerJsonPath, jsonLedger);
     }
   }
 }
@@ -105,7 +146,9 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
   const ledgerPath = resolveProjectLedgerPath(project.project_path);
   const ledgerJsonPath = resolveProjectLedgerJsonPath(project.project_path);
   ensureProjectMissionLedgerExists(ledgerPath);
-  const ledgerDir = path.dirname(ledgerJsonPath);
+  const ledgerDir = assertSafeRepositoryPath(path.dirname(ledgerJsonPath), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(ledgerDir)) safeMkdir(ledgerDir, { recursive: true });
 
   const summary = escapeTableCell(
@@ -120,11 +163,13 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
   safeWriteFile(ledgerPath, updated);
 
   const projectId = project.project_id || path.basename(path.dirname(path.dirname(ledgerJsonPath)));
-  const jsonLedger = readJsonFileSafe(ledgerJsonPath) || {
-    project_id: projectId,
-    project_name: projectId,
-    entries: [],
-  };
+  const jsonLedger =
+    readProjectMissionLedger(ledgerJsonPath) ||
+    ({
+      project_id: projectId,
+      project_name: projectId,
+      entries: [],
+    } satisfies ProjectMissionLedger);
   jsonLedger.project_id = jsonLedger.project_id || projectId;
   jsonLedger.project_name = jsonLedger.project_name || projectId;
   const projectScope = resolveProjectLedgerScope(state, projectId);
@@ -137,13 +182,13 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
     gate_impact: project.gate_impact || 'none',
     traceability_refs: project.traceability_refs || [],
     owner: state.assigned_persona,
-    last_updated: new Date().toISOString(),
+    last_updated: nowIso(),
     ...(projectScope ? { scope: projectScope } : {}),
   };
   jsonLedger.entries = Array.isArray(jsonLedger.entries) ? jsonLedger.entries : [];
   jsonLedger.entries = jsonLedger.entries.filter((entry: any) => entry?.mission_id !== upperId);
   jsonLedger.entries.push(nextEntry);
-  safeWriteFile(ledgerJsonPath, JSON.stringify(jsonLedger, null, 2));
+  writeProjectMissionLedgerAtPath(ledgerJsonPath, jsonLedger);
 
   logger.success(
     `🔗 Synced mission ${upperId} into project ledger: ${path.relative(rootDir, ledgerPath)} (+ ${path.relative(rootDir, ledgerJsonPath)})`

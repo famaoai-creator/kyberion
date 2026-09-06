@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { pathResolver, rootDir } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonObjectValue } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { appendSupervisorEvent } from './agent-runtime-events.js';
 import { registerAgentRuntimeEnsurer } from './agent-runtime-port.js';
 import type { EnsureAgentRuntimeOptions } from './agent-runtime-contracts.js';
@@ -11,12 +14,18 @@ import {
 } from './mission-team-orchestrator.js';
 import { agentLifecycle, type AgentHandle, type AgentRuntimeSnapshot } from './agent-lifecycle.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { logger } from './core.js';
 import { metrics, resolveCostRates } from './metrics.js';
-import type { EventScope, EventScopeInput } from './event-scope.js';
+import { parseEventScopeInput, type EventScope, type EventScopeInput } from './event-scope.js';
 import {
   assertRuntimeNhiScope,
   assertRuntimeScopeCompatible,
@@ -58,6 +67,110 @@ interface EnsureMissionTeamRuntimeViaSupervisorOptions extends EnsureMissionTeam
 
 const REQUESTS_DIR = pathResolver.shared('coordination/agent-runtime/requests');
 const RESULTS_DIR = pathResolver.shared('coordination/agent-runtime/results');
+const AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-runtime-ensure-result.schema.json'
+);
+const AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-runtime-ensure-request.schema.json'
+);
+
+const agentRuntimeEnsureResultCatalog = defineCatalog<AgentRuntimeEnsureResult>({
+  id: 'agent-runtime-ensure-result',
+  path: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
+  schema: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
+});
+
+function agentRuntimeEnsureRequestCatalogAtPath(filePath: string) {
+  return defineCatalog<AgentRuntimeEnsureRequest>({
+    id: 'agent-runtime-ensure-request',
+    path: filePath,
+    schema: AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH,
+  });
+}
+
+function agentRuntimeEnsureResultCatalogAtPath(filePath: string) {
+  return defineCatalog<AgentRuntimeEnsureResult>({
+    id: 'agent-runtime-ensure-result',
+    path: filePath,
+    schema: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
+  });
+}
+
+function safeQueuePath(filePath: string, queueDir: string): string {
+  const resolved = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const relative = path.relative(path.resolve(queueDir), resolved);
+  if (
+    !relative ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error(`[AGENT_RUNTIME_QUEUE_SCOPE] path is outside the queue directory: ${filePath}`);
+  }
+  return resolved;
+}
+
+type ParsedAgentRuntimeEnsureRequest = Omit<AgentRuntimeEnsureRequest, 'scope'> & {
+  scope: EventScopeInput;
+};
+
+function requiredRequestString(
+  record: Record<string, unknown>,
+  key: keyof AgentRuntimeEnsureRequest
+): string {
+  const value = record[key];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`[AGENT_RUNTIME_REQUEST_INVALID] ${String(key)} must be a non-empty string`);
+  }
+  return value;
+}
+
+function parseAgentRuntimeEnsureRequest(
+  value: unknown,
+  expectedRequestId: string
+): ParsedAgentRuntimeEnsureRequest {
+  const record = parseSafeJsonObjectValue(value, 'agent runtime request');
+  const requestId = requiredRequestString(record, 'request_id');
+  if (requestId !== expectedRequestId) {
+    throw new Error(
+      `[AGENT_RUNTIME_REQUEST_INVALID] request_id '${requestId}' does not match queue file '${expectedRequestId}'`
+    );
+  }
+  const missionId = requiredRequestString(record, 'mission_id');
+  const requestedBy = requiredRequestString(record, 'requested_by');
+  const createdAt = requiredRequestString(record, 'created_at');
+  const scope = parseEventScopeInput(record.scope);
+  const teamRolesValue = record.team_roles;
+  let teamRoles: string[] | undefined;
+  if (teamRolesValue !== undefined) {
+    if (!Array.isArray(teamRolesValue)) {
+      throw new Error(
+        '[AGENT_RUNTIME_REQUEST_INVALID] team_roles must be an array of non-empty strings'
+      );
+    }
+    teamRoles = teamRolesValue.map((role) => {
+      if (typeof role !== 'string' || role.trim() === '') {
+        throw new Error(
+          '[AGENT_RUNTIME_REQUEST_INVALID] team_roles must be an array of non-empty strings'
+        );
+      }
+      return role;
+    });
+  }
+  const reason = record.reason;
+  if (reason !== undefined && typeof reason !== 'string') {
+    throw new Error('[AGENT_RUNTIME_REQUEST_INVALID] reason must be a string');
+  }
+  return {
+    request_id: requestId,
+    mission_id: missionId,
+    scope,
+    ...(teamRoles ? { team_roles: teamRoles } : {}),
+    requested_by: requestedBy,
+    ...(typeof reason === 'string' ? { reason } : {}),
+    created_at: createdAt,
+  };
+}
 
 function estimateRuntimeTokens(chars: unknown): number {
   const count = Number(chars || 0);
@@ -98,18 +211,20 @@ export function resolveRuntimeTokenUsage(input: {
 }
 
 function ensureQueueDirs(): void {
+  assertSafeRepositoryPath(REQUESTS_DIR, { allowMissingLeaf: true });
+  assertSafeRepositoryPath(RESULTS_DIR, { allowMissingLeaf: true });
   safeMkdir(REQUESTS_DIR);
   safeMkdir(RESULTS_DIR);
 }
 
 export function getAgentRuntimeEnsureRequestPath(requestId: string): string {
   ensureQueueDirs();
-  return `${REQUESTS_DIR}/${requestId}.json`;
+  return safeQueuePath(path.join(REQUESTS_DIR, `${requestId}.json`), REQUESTS_DIR);
 }
 
 export function getAgentRuntimeEnsureResultPath(requestId: string): string {
   ensureQueueDirs();
-  return `${RESULTS_DIR}/${requestId}.json`;
+  return safeQueuePath(path.join(RESULTS_DIR, `${requestId}.json`), RESULTS_DIR);
 }
 
 export function enqueueMissionTeamPrewarmRequest(input: {
@@ -127,12 +242,14 @@ export function enqueueMissionTeamPrewarmRequest(input: {
     team_roles: input.teamRoles?.length ? [...input.teamRoles] : undefined,
     requested_by: input.requestedBy,
     reason: input.reason,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
   };
-  safeWriteFile(
-    getAgentRuntimeEnsureRequestPath(request.request_id),
-    JSON.stringify(request, null, 2)
+  const requestPath = getAgentRuntimeEnsureRequestPath(request.request_id);
+  const validated = agentRuntimeEnsureRequestCatalogAtPath(requestPath).validate(
+    request,
+    requestPath
   );
+  safeWriteFile(requestPath, JSON.stringify(validated, null, 2));
   appendSupervisorEvent({
     decision: 'agent_runtime_prewarm_requested',
     request_id: request.request_id,
@@ -145,7 +262,15 @@ export function enqueueMissionTeamPrewarmRequest(input: {
 }
 
 export function loadMissionTeamPrewarmRequest(requestPath: string): AgentRuntimeEnsureRequest {
-  const request = readJson<AgentRuntimeEnsureRequest>(requestPath);
+  const safePath = safeQueuePath(requestPath, REQUESTS_DIR);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[AGENT_RUNTIME_REQUEST] request must be a regular file: ${requestPath}`);
+  }
+  const validated = agentRuntimeEnsureRequestCatalogAtPath(safePath).load();
+  const request = parseAgentRuntimeEnsureRequest(
+    validated,
+    path.basename(safePath, path.extname(safePath))
+  );
   return {
     ...request,
     mission_id: request.mission_id.toUpperCase(),
@@ -175,13 +300,17 @@ export async function processMissionTeamPrewarmRequest(
 
   const result: AgentRuntimeEnsureResult = {
     ...request,
-    completed_at: new Date().toISOString(),
+    completed_at: nowIso(),
     organization_profile: runtime_plan.organization_profile,
     runtime_plan,
   };
+  const validatedResult = agentRuntimeEnsureResultCatalog.validate(
+    result,
+    getAgentRuntimeEnsureResultPath(request.request_id)
+  );
   safeWriteFile(
     getAgentRuntimeEnsureResultPath(request.request_id),
-    JSON.stringify(result, null, 2)
+    JSON.stringify(validatedResult, null, 2)
   );
   appendSupervisorEvent({
     decision: 'agent_runtime_prewarm_completed',
@@ -191,7 +320,7 @@ export async function processMissionTeamPrewarmRequest(
     requested_by: request.requested_by,
     assignment_count: runtime_plan.assignments.length,
   });
-  return result;
+  return validatedResult;
 }
 
 export function startAgentRuntimeSupervisorForRequest(request: AgentRuntimeEnsureRequest): string {
@@ -230,7 +359,7 @@ export async function waitForMissionTeamPrewarmResult(
 
   while (Date.now() < deadline) {
     if (safeExistsSync(resultPath)) {
-      return readJson<AgentRuntimeEnsureResult>(resultPath);
+      return loadMissionTeamPrewarmResultAtPath(resultPath, requestId);
     }
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
@@ -240,6 +369,37 @@ export async function waitForMissionTeamPrewarmResult(
     request_id: requestId,
   });
   throw new Error(`Timed out waiting for agent runtime prewarm result: ${requestId}`);
+}
+
+/** Load one persisted prewarm result through the shared schema and request binding. */
+export function loadMissionTeamPrewarmResultAtPath(
+  resultPath: string,
+  expectedRequestId: string
+): AgentRuntimeEnsureResult {
+  const safeResultPath = safeQueuePath(resultPath, RESULTS_DIR);
+  if (!safeLstat(safeResultPath).isFile()) {
+    throw new Error(`[AGENT_RUNTIME_RESULT] result must be a regular file: ${resultPath}`);
+  }
+  const result = agentRuntimeEnsureResultCatalogAtPath(safeResultPath).load();
+  if (result.request_id !== expectedRequestId) {
+    throw new Error(
+      `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] result belongs to ${result.request_id}, expected ${expectedRequestId}`
+    );
+  }
+  if (result.runtime_plan.mission_id.toUpperCase() !== result.mission_id.toUpperCase()) {
+    throw new Error(
+      `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] runtime plan belongs to ${result.runtime_plan.mission_id}, expected ${result.mission_id}`
+    );
+  }
+  if (
+    result.scope.mission_id &&
+    result.scope.mission_id.toUpperCase() !== result.mission_id.toUpperCase()
+  ) {
+    throw new Error(
+      `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] scope belongs to ${result.scope.mission_id}, expected ${result.mission_id}`
+    );
+  }
+  return result;
 }
 
 export async function ensureMissionTeamRuntimeViaSupervisor(

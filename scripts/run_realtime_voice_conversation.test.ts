@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   registerSpeechToTextBridge,
   resetSpeechToTextBridge,
   type SpeechToTextBridge,
 } from '@agent/core';
 import {
+  parseRecorderBridgeResponse,
   parseRealtimeVoiceConversationCli,
   runRealtimeVoiceConversationInteractive,
 } from './run_realtime_voice_conversation.js';
@@ -119,6 +121,36 @@ describe('run_realtime_voice_conversation cli', () => {
     ).toThrow(/--vad-threshold/);
   });
 
+  it('rejects custom recording paths outside the repository', () => {
+    expect(() =>
+      parseRealtimeVoiceConversationCli({
+        'session-id': 'rtc-boundary',
+        audio: 'active/shared/tmp/input.wav',
+        'record-bridge-path': '../record_bridge.py',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(() =>
+      parseRealtimeVoiceConversationCli({
+        'session-id': 'rtc-boundary',
+        interactive: true,
+        mission: 'MSN-BOUNDARY-001',
+        'record-output-dir': '../recordings',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('parses recorder bridge output at the external process boundary', () => {
+    expect(
+      parseRecorderBridgeResponse('progress\n{"status":"success","path":"/tmp/turn.wav"}')
+    ).toEqual({ status: 'success', path: '/tmp/turn.wav' });
+    expect(() => parseRecorderBridgeResponse('{"status":"success","path":42}')).toThrow(
+      'recorder bridge response field path must be a string'
+    );
+    expect(() => parseRecorderBridgeResponse('{"status":"success","__proto__":{}}')).toThrow(
+      /Could not find JSON payload/
+    );
+  });
+
   it('runs an injected interactive loop without touching real audio backends', async () => {
     const fakeStt: SpeechToTextBridge = {
       name: 'fake-stt',
@@ -130,6 +162,7 @@ describe('run_realtime_voice_conversation cli', () => {
 
     const recordCalls: number[] = [];
     const turnCalls: Array<{ audioPath: string; user_text: string }> = [];
+    const output: string[] = [];
 
     await runRealtimeVoiceConversationInteractive(
       {
@@ -172,13 +205,16 @@ describe('run_realtime_voice_conversation cli', () => {
           };
         },
         promptForContinue: async () => undefined,
-      }
+      },
+      (value) => output.push(String(value))
     );
 
     expect(recordCalls).toEqual([0, 1]);
     expect(turnCalls).toHaveLength(2);
     expect(turnCalls[0]?.audioPath).toBe('/tmp/realtime-voice/turn-01.wav');
     expect(turnCalls[1]?.audioPath).toBe('/tmp/realtime-voice/turn-02.wav');
+    expect(output.some((line) => line.includes('User: 来週の予定教えて'))).toBe(true);
+    expect(output.some((line) => line.includes('Assistant: 予定を確認します。'))).toBe(true);
   });
 
   it('does not gate VAD-mode turns behind the Enter prompt', async () => {
@@ -235,5 +271,18 @@ describe('run_realtime_voice_conversation cli', () => {
     );
 
     expect(recordCalls).toEqual([0, 1]);
+  });
+
+  it('keeps the production entrypoint free of direct final-output logging', () => {
+    const source = readFileSync(
+      new URL('./run_realtime_voice_conversation.ts', import.meta.url),
+      'utf8'
+    );
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).not.toContain('console.log(');
+    expect(source).not.toContain('process.stdout.write');
+    expect(source).not.toContain('process.stderr.write');
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
   });
 });

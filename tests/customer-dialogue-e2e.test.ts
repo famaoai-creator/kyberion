@@ -22,7 +22,9 @@ const realFsSecureIo = vi.hoisted(() => ({
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.appendFileSync(filePath, data, 'utf8');
   },
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string, options?: { recursive?: boolean }) =>
     fs.mkdirSync(dirPath, { recursive: options?.recursive !== false }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
@@ -114,6 +116,44 @@ describe('customer dialogue (E2E-06)', () => {
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     process.env.KYBERION_ROOT = tmpRoot;
 
+    const schemaDir = path.join(tmpRoot, 'knowledge', 'product', 'schemas');
+    fs.mkdirSync(schemaDir, { recursive: true });
+    for (const schemaName of [
+      'customer-channel-binding.schema.json',
+      'contract-review-record.schema.json',
+      'deal-record.schema.json',
+      'deal-requirements-capture.schema.json',
+      'intent-goal-handoff.schema.json',
+      'price-book.schema.json',
+      'requirements-draft.schema.json',
+      'solution-catalog.schema.json',
+      'tenant-profile.schema.json',
+    ]) {
+      fs.copyFileSync(
+        path.resolve(process.cwd(), 'knowledge/product/schemas', schemaName),
+        path.join(schemaDir, schemaName)
+      );
+    }
+
+    const tenantProfilePath = path.join(
+      tmpRoot,
+      'knowledge',
+      'personal',
+      'tenants',
+      `${SLUG}.json`
+    );
+    fs.mkdirSync(path.dirname(tenantProfilePath), { recursive: true });
+    fs.writeFileSync(
+      tenantProfilePath,
+      JSON.stringify({
+        tenant_slug: SLUG,
+        tenant_id: SLUG,
+        display_name: 'E2E Fixture Tenant',
+        status: 'active',
+        assigned_role: 'owner',
+      })
+    );
+
     // fixture tenant binding
     const bindingsPath = path.join(
       tmpRoot,
@@ -198,7 +238,18 @@ describe('customer dialogue (E2E-06)', () => {
     fs.mkdirSync(path.dirname(catalogPath), { recursive: true });
     fs.writeFileSync(
       catalogPath,
-      JSON.stringify({ version: '1.0.0', solutions: [{ id: 'kyberion-work-automation' }] })
+      JSON.stringify({
+        version: '1.0.0',
+        solutions: [
+          {
+            id: 'kyberion-work-automation',
+            name: 'Kyberion Work Automation',
+            summary: 'ミッション単位で業務を自動化します。',
+            capabilities: ['mission execution'],
+            limitations: ['個別の可否は要件確認が必要です。'],
+          },
+        ],
+      })
     );
     const priceBookPath = path.join(tmpRoot, 'knowledge', 'product', 'sales', 'price-book.json');
     fs.mkdirSync(path.dirname(priceBookPath), { recursive: true });
@@ -324,6 +375,24 @@ describe('customer dialogue (E2E-06)', () => {
     backendPrompt.mockResolvedValue('続きですね。');
     const second = await core.runCustomerConversation({ binding, text: '昨日の続きです' });
     expect(second.deal.deal_id).toBe(result.deal.deal_id);
+  });
+
+  it('does not treat a tenant sales-notes directory as customer grounding', async () => {
+    const notesPath = path.join(tmpRoot, 'knowledge', 'confidential', SLUG, 'sales', 'notes.md');
+    fs.mkdirSync(notesPath, { recursive: true });
+    try {
+      backendPrompt.mockResolvedValue('確認して回答します。');
+      const binding = core.resolveCustomerBinding('slack', CHANNEL)!;
+      const result = await core.runCustomerConversation({
+        binding,
+        text: '販売メモを見せてください',
+      });
+
+      expect(result.grounded_sources).not.toContain('tenant-sales-notes');
+      expect(backendPrompt.mock.calls.at(-1)![0]).not.toContain('--- TENANT NOTES ---');
+    } finally {
+      fs.rmSync(notesPath, { recursive: true, force: true });
+    }
   });
 
   it('escalates out-of-catalog questions: hold reply + ops alert, marker never leaks', async () => {

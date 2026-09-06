@@ -26,15 +26,12 @@
  */
 
 import * as path from 'node:path';
-import {
-  deriveAssetId,
-  findAssetBySource,
-  pathResolver,
-  proposeTierPlacement,
-  safeExistsSync,
-  scanContent,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { deriveAssetId, findAssetBySource } from '@agent/core/ingest-asset-ledger';
+import { proposeTierPlacement } from '@agent/core/ingest-tier-gate';
+import { scanContent } from '@agent/core/pii-scrubber';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   commitIngest,
@@ -45,6 +42,7 @@ import {
 } from '../libs/actuators/ingest-actuator/src/index.js';
 
 const FORMATS: IngestFormat[] = ['docx', 'pdf', 'xlsx', 'html', 'slack_thread', 'markdown', 'text'];
+type Print = (value: unknown) => void;
 
 const EXTENSION_FORMATS: Record<string, IngestFormat> = {
   '.docx': 'docx',
@@ -220,7 +218,7 @@ function resolveIdentity(args: CliArgs): string {
   if (explicit) return explicit;
   const persona = String(getRegisteredEnvText('KYBERION_PERSONA') || '').trim();
   if (persona) return persona;
-  const role = String(process.env.MISSION_ROLE || '').trim();
+  const role = String(getRegisteredEnvText('MISSION_ROLE') || '').trim();
   if (role) return role;
   throw new Error(
     'no ingest identity — pass --ingested-by <who> or run with KYBERION_PERSONA / MISSION_ROLE set. ' +
@@ -228,10 +226,10 @@ function resolveIdentity(args: CliArgs): string {
   );
 }
 
-export async function main(argv: string[] = []): Promise<void> {
+export async function main(argv: string[] = [], print: Print = () => undefined): Promise<void> {
   const args = parseArgs(argv);
   if (args.help || argv.length === 0) {
-    console.log(USAGE);
+    print(USAGE);
     return;
   }
   if (!args.tenant) throw new Error('--tenant is required (see --help)');
@@ -254,8 +252,8 @@ export async function main(argv: string[] = []): Promise<void> {
     ? path.join(rootDir, 'active/shared/runtime/ingest/content-hash-registry.jsonl')
     : undefined;
 
-  console.log(`[ingest] tenant=${args.tenant} file=${absFile} format=${format}`);
-  console.log(`[ingest] source=${sourceSystem}::${sourceId} ingested_by=${ingestedBy}`);
+  print(`[ingest] tenant=${args.tenant} file=${absFile} format=${format}`);
+  print(`[ingest] source=${sourceSystem}::${sourceId} ingested_by=${ingestedBy}`);
 
   // 1. parse_document — raw bytes → unified IR (content_sha256 over raw bytes).
   const ir = await parseDocument({
@@ -264,7 +262,7 @@ export async function main(argv: string[] = []): Promise<void> {
     source_meta: {
       source_system: sourceSystem,
       source_id: sourceId,
-      retrieved_at: new Date().toISOString(),
+      retrieved_at: nowIso(),
     },
   });
 
@@ -303,8 +301,8 @@ export async function main(argv: string[] = []): Promise<void> {
       ...(args.tenant !== 'common' ? { tenant_slug: args.tenant } : {}),
       findings: scan.findings,
     });
-    console.log('[ingest] tier placement proposal (advisory — steward approval decides):');
-    console.log(JSON.stringify(proposal, null, 2));
+    print('[ingest] tier placement proposal (advisory — steward approval decides):');
+    print(JSON.stringify(proposal, null, 2));
   }
   const blockedRuleIds = scan.findings
     .filter((finding) => finding.action === 'block' && !overrideRuleIds.includes(finding.rule_id))
@@ -347,8 +345,8 @@ export async function main(argv: string[] = []): Promise<void> {
       pii_findings: scan.findings,
       frontmatter: normalized.frontmatter,
     };
-    console.log('[ingest] DRY RUN — no card written, no ledger record appended');
-    console.log(JSON.stringify(plan, null, 2));
+    print('[ingest] DRY RUN — no card written, no ledger record appended');
+    print(JSON.stringify(plan, null, 2));
     return;
   }
 
@@ -367,18 +365,18 @@ export async function main(argv: string[] = []): Promise<void> {
   });
 
   if (!result.committed) {
-    console.log(`[ingest] NOT committed (${result.reason}) — the ledger is unchanged`);
-    console.log(JSON.stringify(result, null, 2));
+    print(`[ingest] NOT committed (${result.reason}) — the ledger is unchanged`);
+    print(JSON.stringify(result, null, 2));
     return;
   }
-  console.log(`[ingest] committed ${result.provenance_ref} → ${result.target_path}`);
-  console.log(JSON.stringify(result.asset, null, 2));
+  print(`[ingest] committed ${result.provenance_ref} → ${result.target_path}`);
+  print(JSON.stringify(result.asset, null, 2));
 }
 
 const script = defineScript({
   name: 'ingest',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (isDirectScript(import.meta.url, 'ingest.ts') || isDirectScript(import.meta.url, 'ingest.js')) {
   void script();

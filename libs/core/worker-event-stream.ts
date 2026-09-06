@@ -1,4 +1,6 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
+import * as path from 'node:path';
 /**
  * Worker event stream (KC-02).
  *
@@ -12,9 +14,10 @@ import { appendJsonLine } from './foundation/json.js';
 
 import { z } from 'zod';
 import { logger } from './core.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
-import { safeMkdir, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { currentTriggerDeliveryId } from './trigger-correlation.js';
 import { redactCollaborationMetadata } from './agent-collaboration-events.js';
 
@@ -126,6 +129,24 @@ export type WorkerEventEnvelope<K extends WorkerEventType = WorkerEventType> = O
 
 export type WorkerEventListener = (event: WorkerEventEnvelope) => void;
 
+const WORKER_EVENT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/worker-event-envelope.schema.json'
+);
+
+function workerEventCatalog(filePath: string): GovernedCatalog<WorkerEventEnvelope> {
+  return defineCatalog<WorkerEventEnvelope>({
+    id: 'worker-event-envelope',
+    path: filePath,
+    schema: WORKER_EVENT_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularWorkerEventFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[worker-event-stream] event log must be a regular file: ${filePath}`);
+  }
+}
+
 export class WorkerEventStream {
   private readonly listeners = new Set<WorkerEventListener>();
   private seq = 0;
@@ -164,7 +185,7 @@ export class WorkerEventStream {
         : undefined;
     const envelope = workerEventEnvelopeSchema.parse({
       type,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       seq: this.seq++,
       ...(mergedSource && Object.keys(mergedSource).length > 0 ? { source: mergedSource } : {}),
       payload,
@@ -188,25 +209,23 @@ export class WorkerEventStream {
 
 /** Append every envelope to a jsonl file; returns the detach function. */
 export function attachJsonlRecorder(stream: WorkerEventStream, filePath: string): () => void {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const catalog = workerEventCatalog(safeFilePath);
   return stream.subscribe((event) => {
-    appendJsonLine(filePath, event);
+    ensureRegularWorkerEventFile(safeFilePath);
+    appendJsonLine(safeFilePath, catalog.validate(event, safeFilePath));
   });
 }
 
 /** Parse a recorded jsonl file back into validated envelopes (replay). */
 export function readWorkerEventStreamJsonl(filePath: string): WorkerEventEnvelope[] {
-  const raw = String(safeReadFile(filePath, { encoding: 'utf-8' }));
-  const events: WorkerEventEnvelope[] = [];
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      events.push(workerEventEnvelopeSchema.parse(JSON.parse(trimmed)));
-    } catch {
-      // A torn/corrupt line must not poison replay of the rest.
-    }
-  }
-  return events;
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  ensureRegularWorkerEventFile(safeFilePath);
+  const catalog = workerEventCatalog(safeFilePath);
+  return readJsonLines<WorkerEventEnvelope>(safeFilePath, {
+    onMalformed: 'skip',
+    map: (value, lineNumber) => catalog.validate(value, `${safeFilePath}:${lineNumber}`),
+  }).filter((event) => Boolean(event));
 }
 
 const GLOBAL_KEY = Symbol.for('kyberion.workerEventStream');
@@ -237,10 +256,13 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
     // default_allow path, so every persona can record its own events without
     // a security-policy registration.
     const realDir = pathResolver.shared('logs/worker-events');
-    const dir = resolveSharedObservabilityDir(realDir);
+    const resolvedDir = resolveSharedObservabilityDir(realDir);
+    const dir = resolvedDir
+      ? assertSafeRepositoryPath(resolvedDir, { allowMissingLeaf: true })
+      : undefined;
     if (!dir) return;
     safeMkdir(dir);
-    const day = new Date().toISOString().slice(0, 10);
+    const day = nowIso().slice(0, 10);
     stream.subscribe((event) => {
       const sharedEvent = {
         ...event,
@@ -261,12 +283,24 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
         // select an empty confidential directory. The mission id still gives
         // consumers a physically separated replay stream without mutating
         // mission lifecycle state.
-        const missionEventDir = `${dir}/missions/${missionId}`;
+        const missionEventDir = assertSafeRepositoryPath(path.join(dir, 'missions', missionId), {
+          allowMissingLeaf: true,
+        });
         safeMkdir(missionEventDir, { recursive: true });
-        appendJsonLine(`${missionEventDir}/worker-events-${day}.jsonl`, sharedEvent);
+        appendJsonLine(
+          assertSafeRepositoryPath(path.join(missionEventDir, `worker-events-${day}.jsonl`), {
+            allowMissingLeaf: true,
+          }),
+          sharedEvent
+        );
         return;
       }
-      appendJsonLine(`${dir}/worker-events-${day}.jsonl`, sharedEvent);
+      appendJsonLine(
+        assertSafeRepositoryPath(path.join(dir, `worker-events-${day}.jsonl`), {
+          allowMissingLeaf: true,
+        }),
+        sharedEvent
+      );
     });
   } catch {
     // Observability wiring is best-effort; never block stream creation.

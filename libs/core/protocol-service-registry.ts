@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export type ProtocolServiceClassification =
   'protocol-gateway' | 'control-plane-worker' | 'artifact-review-port';
@@ -26,44 +26,24 @@ export interface ProtocolServiceRegistryEntry {
 
 interface ProtocolServiceRegistryFile {
   version: string;
+  description: string;
   entries: ProtocolServiceRegistryEntry[];
 }
 
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/protocol-service-registry.json');
+const protocolServiceRegistryCatalog = defineCatalog<ProtocolServiceRegistryFile>({
+  id: 'protocol-service-registry',
+  path: REGISTRY_PATH,
+  schema: pathResolver.knowledge('product/schemas/protocol-service-registry.schema.json'),
+});
 
 export function loadProtocolServiceRegistry(): ProtocolServiceRegistryEntry[] {
-  const raw = safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as ProtocolServiceRegistryFile;
-  if (!parsed || !Array.isArray(parsed.entries)) {
-    throw new Error('[PROTOCOL_SERVICE_REGISTRY_INVALID] entries must be an array');
+  try {
+    return protocolServiceRegistryCatalog.load().entries;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`[PROTOCOL_SERVICE_REGISTRY_INVALID] ${detail}`, { cause: error });
   }
-  for (const entry of parsed.entries) {
-    if (
-      !entry.id ||
-      !entry.classification ||
-      !entry.process_scope ||
-      !entry.request_scope_mode ||
-      !entry.health ||
-      !entry.owner ||
-      !entry.binding ||
-      !entry.approval ||
-      !entry.principal_resolution ||
-      !entry.write_authority ||
-      !entry.nhi_binding ||
-      !Array.isArray(entry.approval_classes) ||
-      entry.approval_classes.length === 0 ||
-      !entry.data_residency ||
-      !Array.isArray(entry.data_paths) ||
-      entry.data_paths.length === 0 ||
-      !Array.isArray(entry.lifecycle_actions) ||
-      entry.lifecycle_actions.length === 0
-    ) {
-      throw new Error(
-        `[PROTOCOL_SERVICE_REGISTRY_INVALID] entry '${String(entry?.id || 'unknown')}' is incomplete`
-      );
-    }
-  }
-  return parsed.entries;
 }
 
 export function getProtocolServiceRegistryEntry(id: string): ProtocolServiceRegistryEntry {

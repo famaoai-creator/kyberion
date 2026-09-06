@@ -8,17 +8,14 @@
  *   pnpm cost:report -- --json             # machine-readable
  */
 
-import {
-  buildCostReportFromHistory,
-  formatCostReport,
-  logger,
-  type EventScopeFilter,
-} from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+import { buildCostReportFromHistory, formatCostReport } from '@agent/core/cost-report';
+import { logger } from '@agent/core/core';
+import type { EventScopeFilter } from '@agent/core/event-scope';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
-function main(): number {
-  const argv = createStandardYargs()
+export function main(args = currentProcessArgv()): ReturnType<typeof buildCostReportFromHistory> {
+  const argv = createStandardYargs(args)
     .option('since', { type: 'string', describe: 'Window start (ISO date/time)' })
     .option('until', { type: 'string', describe: 'Window end (ISO date/time)' })
     .option('last-days', { type: 'number', describe: 'Shorthand: window = now minus N days' })
@@ -52,19 +49,24 @@ function main(): number {
     ...(Object.keys(scopeFilter).length > 0 ? { scopeFilter } : {}),
   });
 
-  if (argv.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    for (const line of formatCostReport(report)) console.log(line);
-  }
   if (report.calls === 0) {
     logger.info('[cost-report] no costed usage entries in the window');
   }
-  return 0;
+  return report;
 }
+
+export const runCostReport = defineScript({
+  name: 'cost:report',
+  flags: ['json'],
+  run(context) {
+    const report = main(['node', 'cost_report.ts', ...context.argv]);
+    context.print(context.json ? report : formatCostReport(report).join('\n'));
+    return report;
+  },
+});
 
 if (
   isDirectScript(import.meta.url, 'cost_report.ts') ||
   isDirectScript(import.meta.url, 'cost_report.js')
 )
-  process.exitCode = main();
+  void runCostReport();

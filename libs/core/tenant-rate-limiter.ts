@@ -20,21 +20,31 @@
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
+import { isRecord } from './foundation/text.js';
 import {
-  safeReadFile,
+  assertSafeRepositoryPath,
   safeWriteFile,
   safeMkdir,
-  safeExistsSync,
   safeCreateExclusiveFileSync,
+  safeLstat,
   safeUnlinkSync,
+  safeExistsSync,
 } from './secure-io.js';
-import { loadJson } from './secure-io.js';
 import { resolveIdentityContext } from './authority.js';
 
 const POLICY_PATH = 'knowledge/product/governance/tenant-rate-limit-policy.json';
 const STATE_PATH = 'active/shared/runtime/tenant-rate-limit-state.json';
 const LOCK_PATH = `${STATE_PATH}.lock`;
 const LOCK_TIMEOUT_MS = 5000;
+const POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tenant-rate-limit-policy.schema.json'
+);
+const STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tenant-rate-limit-state.schema.json'
+);
 
 interface RateLimitPolicy {
   default: {
@@ -63,6 +73,31 @@ interface RateLimitState {
   tenants: Record<string, TenantBucket>;
 }
 
+interface TenantRateLimitLockRecord {
+  pid: number;
+  created_at?: string;
+}
+
+export function normalizeTenantRateLimitLockRecord(
+  value: unknown
+): TenantRateLimitLockRecord | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.pid !== 'number' ||
+    !Number.isInteger(value.pid) ||
+    !Number.isFinite(value.pid) ||
+    value.pid <= 0
+  ) {
+    return null;
+  }
+  const createdAt = value.created_at;
+  if (createdAt !== undefined && typeof createdAt !== 'string') return null;
+  return {
+    pid: value.pid,
+    ...(typeof createdAt === 'string' ? { created_at: createdAt } : {}),
+  };
+}
+
 export interface RateLimitDecision {
   allowed: boolean;
   reason?: string;
@@ -72,40 +107,39 @@ export interface RateLimitDecision {
 
 let cachedPolicy: RateLimitPolicy | null = null;
 
+const policyCatalog = defineCatalog<RateLimitPolicy>({
+  id: 'tenant-rate-limit-policy',
+  path: () => pathResolver.rootResolve(POLICY_PATH),
+  schema: POLICY_SCHEMA_PATH,
+});
+
+const stateCatalog = defineCatalog<RateLimitState>({
+  id: 'tenant-rate-limit-state',
+  path: () => pathResolver.rootResolve(STATE_PATH),
+  schema: STATE_SCHEMA_PATH,
+});
+
 function loadPolicy(): RateLimitPolicy {
   if (cachedPolicy) return cachedPolicy;
-  const abs = pathResolver.rootResolve(POLICY_PATH);
-  if (!safeExistsSync(abs)) {
-    cachedPolicy = {
-      default: { tokens_per_minute: 60, burst_capacity: 60, denial_grace_ms: 30000 },
-      tenants: {},
-      operation_costs: {},
-      exempt_personas: ['sovereign', 'ecosystem_architect'],
-    };
-    return cachedPolicy;
-  }
-  cachedPolicy = loadJson<RateLimitPolicy>(abs);
+  cachedPolicy = policyCatalog.load();
   return cachedPolicy;
 }
 
 export function _resetTenantRateLimitPolicyCacheForTests(): void {
   cachedPolicy = null;
+  policyCatalog.reset();
 }
 
 function loadState(): RateLimitState {
-  const abs = pathResolver.rootResolve(STATE_PATH);
-  if (!safeExistsSync(abs)) return { tenants: {} };
-  try {
-    return loadJson<RateLimitState>(abs);
-  } catch {
-    return { tenants: {} };
-  }
+  const statePath = pathResolver.rootResolve(STATE_PATH);
+  return safeExistsSync(statePath) ? stateCatalog.load() : { tenants: {} };
 }
 
 function saveState(state: RateLimitState): void {
   const abs = pathResolver.rootResolve(STATE_PATH);
+  const validated = stateCatalog.validate(state, abs);
   safeMkdir(path.dirname(abs), { recursive: true });
-  safeWriteFile(abs, JSON.stringify(state, null, 2) + '\n');
+  safeWriteFile(abs, JSON.stringify(validated, null, 2) + '\n');
 }
 
 function sleepSync(ms: number): void {
@@ -114,9 +148,10 @@ function sleepSync(ms: number): void {
 
 function isStaleLock(lockPath: string): boolean {
   try {
-    const raw = safeReadFile(lockPath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw || '{}') as { pid?: number; created_at?: string };
-    if (typeof parsed.pid !== 'number') return true;
+    const safeLockPath = assertSafeRepositoryPath(lockPath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeLockPath) || !safeLstat(safeLockPath).isFile()) return true;
+    const parsed = normalizeTenantRateLimitLockRecord(readJson<unknown>(safeLockPath));
+    if (!parsed) return true;
     process.kill(parsed.pid, 0);
     return false;
   } catch (err: any) {
@@ -139,7 +174,7 @@ function withTenantRateLimitLock<T>(fn: () => T): T {
         lockAbs,
         JSON.stringify({
           pid: process.pid,
-          created_at: new Date().toISOString(),
+          created_at: nowIso(),
           resource: 'tenant-rate-limit-state',
         })
       );
@@ -285,6 +320,7 @@ export function inspectTenantBudget(tenantSlug: string): {
 
 /** Test-only: reset persistent state. */
 export function _resetTenantRateLimitStateForTests(): void {
+  stateCatalog.reset();
   saveState({ tenants: {} });
 }
 

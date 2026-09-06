@@ -12,6 +12,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
   writeEngineeringArtifactBundle,
 } from './index.js';
@@ -135,6 +136,35 @@ describe('source-analysis compiler', () => {
     expect(bundle.iac_proposal.terraform).toContain('No target_provider');
   });
 
+  it('does not load dependencies from a symlinked package manifest', () => {
+    prepareFixture();
+    const packagePath = path.join(FIXTURE, 'package.json');
+    const targetPath = path.join(FIXTURE, 'package-target.json');
+    safeRmSync(packagePath, { force: true });
+    safeWriteFile(targetPath, JSON.stringify({ dependencies: { should_not_be_loaded: '^1.0.0' } }));
+    safeSymlinkSync(targetPath, packagePath);
+
+    const analysis = analyzeSourceTree({
+      sourceRoot: 'active/shared/tmp/source-analysis-tests/sample-app',
+    });
+
+    expect(analysis.dependencies).not.toContain('should_not_be_loaded');
+  });
+
+  it('ignores a package manifest containing a dangerous JSON key', () => {
+    prepareFixture();
+    safeWriteFile(
+      path.join(FIXTURE, 'package.json'),
+      '{"dependencies":{"__proto__":{"polluted":true},"safe-package":"^1.0.0"}}'
+    );
+
+    const analysis = analyzeSourceTree({
+      sourceRoot: 'active/shared/tmp/source-analysis-tests/sample-app',
+    });
+
+    expect(analysis.dependencies).not.toContain('safe-package');
+  });
+
   it('requires approval for tests with external side-effect signals', () => {
     prepareFixture();
     safeWriteFile(
@@ -185,5 +215,22 @@ describe('source-analysis compiler', () => {
     expect(() =>
       writeEngineeringArtifactBundle(invalid, 'active/shared/tmp/source-analysis-tests/invalid')
     ).toThrow('[SOURCE_ARTIFACT_SCHEMA] source-analysis-ir is invalid');
+  });
+
+  it('rejects schema-compatible but semantically invalid test inventory values', () => {
+    prepareFixture();
+    const analysis = analyzeSourceTree({
+      sourceRoot: 'active/shared/tmp/source-analysis-tests/sample-app',
+    });
+    const bundle = compileEngineeringArtifacts({ analysis });
+    const invalid = JSON.parse(JSON.stringify(bundle)) as typeof bundle;
+    invalid.test_inventory.project_id = '   ';
+
+    expect(() =>
+      writeEngineeringArtifactBundle(
+        invalid,
+        'active/shared/tmp/source-analysis-tests/invalid-semantic'
+      )
+    ).toThrow('[SOURCE_ARTIFACT_SCHEMA] source-test-inventory is invalid');
   });
 });

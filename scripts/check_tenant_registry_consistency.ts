@@ -29,28 +29,28 @@
  * reproducibility.
  */
 import * as path from 'node:path';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { listTenantProfileSlugs, resolveTenant } from '@agent/core/tenant-registry';
+import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
+import { isValidTenantSlug, TENANT_SLUG_PATTERN } from '@agent/core/foundation/scope';
+import { listProjectRecords } from '@agent/core/project-registry';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  listTenantProfileSlugs,
-  pathResolver,
-  resolveTenant,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
-  safeStat,
-  listProjectRecords,
-  isValidTenantSlug,
-  TENANT_SLUG_PATTERN,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import {
+  loadTenantRegistryExceptionsFile,
+  type TenantRegistryException,
+} from '@agent/core/tenant-registry-exceptions';
 
 export const EXCEPTIONS_RELATIVE_PATH =
   'knowledge/product/governance/tenant-registry-exceptions.json';
 const CONFIDENTIAL_INDEX_RELATIVE_PATH = 'knowledge/confidential/tenants/index.json';
 
-export interface TenantRegistryException {
-  slug: string;
-  reason: string;
-}
+export type { TenantRegistryException } from '@agent/core/tenant-registry-exceptions';
 
 export interface TenantSystemsSnapshot {
   /** (a) tenant profile slugs — the spine. */
@@ -85,11 +85,6 @@ export interface CheckOptions {
   env?: NodeJS.ProcessEnv;
 }
 
-function readJsonIfExists<T>(filePath: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  return readJson<T>(filePath);
-}
-
 export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsSnapshot {
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   const env = options.env ?? process.env;
@@ -101,24 +96,32 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
   }
 
   let confidentialIndex: string[] = [];
-  const indexPath = path.join(rootDir, CONFIDENTIAL_INDEX_RELATIVE_PATH);
-  const indexPayload = readJsonIfExists<{ tenants?: Array<{ id?: string }> }>(indexPath);
-  if (indexPayload) {
-    confidentialIndex = (indexPayload.tenants || [])
-      .map((entry) => String(entry.id || ''))
-      .filter((id) => id.length > 0)
-      .sort();
+  const indexPath = assertSafeRepositoryPath(path.join(rootDir, CONFIDENTIAL_INDEX_RELATIVE_PATH), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
+  if (safeExistsSync(indexPath)) {
+    const indexPayload = loadTenantDesignOverrideIndex(rootDir, { fallbackOnInvalid: false });
+    confidentialIndex = indexPayload.tenants.map((entry) => entry.id).sort();
   } else {
     notes.push(`(b) ${CONFIDENTIAL_INDEX_RELATIVE_PATH} not present — treated as empty set`);
   }
 
   let customerTenantProfiles: string[] = [];
-  const customerBase = path.join(rootDir, 'customer');
-  if (safeExistsSync(customerBase)) {
+  const customerBase = assertSafeRepositoryPath(path.join(rootDir, 'customer'), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
+  if (safeExistsSync(customerBase) && safeLstat(customerBase).isDirectory()) {
     const customerDirs = safeReaddir(customerBase)
       .filter((entry) => {
         try {
-          return safeStat(path.join(customerBase, entry)).isDirectory();
+          return (
+            assertSafeRepositoryPath(path.join(customerBase, entry), {
+              allowMissingLeaf: true,
+              rootDir,
+            }) && safeLstat(path.join(customerBase, entry)).isDirectory()
+          );
         } catch {
           return false;
         }
@@ -126,10 +129,24 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
       .sort();
     customerTenantProfiles = customerDirs
       .flatMap((customerSlug) => {
-        const tenantDir = path.join(customerBase, customerSlug, 'tenants');
-        if (!safeExistsSync(tenantDir)) return [];
+        const tenantDir = assertSafeRepositoryPath(
+          path.join(customerBase, customerSlug, 'tenants'),
+          { allowMissingLeaf: true, rootDir }
+        );
+        if (!safeExistsSync(tenantDir) || !safeLstat(tenantDir).isDirectory()) return [];
         return safeReaddir(tenantDir)
-          .filter((entry) => entry.endsWith('.json'))
+          .filter((entry) => {
+            if (!entry.endsWith('.json')) return false;
+            try {
+              return safeLstat(
+                assertSafeRepositoryPath(path.join(tenantDir, entry), {
+                  rootDir,
+                })
+              ).isFile();
+            } catch {
+              return false;
+            }
+          })
           .map((entry) => entry.slice(0, -'.json'.length));
       })
       .sort();
@@ -160,9 +177,13 @@ export function loadTenantRegistryExceptions(options: CheckOptions = {}): {
 } {
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   const problems: string[] = [];
-  const payload = readJsonIfExists<{ exceptions?: TenantRegistryException[] }>(
-    path.join(rootDir, EXCEPTIONS_RELATIVE_PATH)
-  );
+  let payload: ReturnType<typeof loadTenantRegistryExceptionsFile>;
+  try {
+    payload = loadTenantRegistryExceptionsFile(rootDir);
+  } catch (error) {
+    problems.push(error instanceof Error ? error.message : String(error));
+    return { exceptions: [], problems };
+  }
   const exceptions = payload?.exceptions ?? [];
   const seen = new Set<string>();
   for (const entry of exceptions) {
@@ -310,10 +331,8 @@ export const runCheckTenantRegistry = defineScript({
   run(context) {
     const { exitCode, output } = runCheck();
     if (exitCode === 0) context.print(output);
-    else {
-      console.error(output);
-      process.exitCode = exitCode;
-    }
+    else throw new ScriptExitError(exitCode, output);
+    return { exitCode, output };
   },
 });
 

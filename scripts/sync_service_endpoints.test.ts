@@ -23,7 +23,26 @@ vi.mock('@agent/core/foundation', async () => {
     await vi.importActual<typeof import('@agent/core/foundation')>('@agent/core/foundation');
   return {
     ...actual,
+    defineCatalog: <T>(options: { path: string }) => ({
+      id: 'test-catalog',
+      path: () => options.path,
+      validate: (value: unknown) => value as T,
+      load: () => JSON.parse(String(mocks.safeReadFile(options.path) || '')) as T,
+      reset: () => undefined,
+    }),
     readJson: (filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath) || '')),
+  };
+});
+
+vi.mock('@agent/core/secure-io', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+  return {
+    ...actual,
+    safeExistsSync: mocks.safeExistsSync,
+    safeReaddir: mocks.safeReaddir,
+    safeReadFile: mocks.safeReadFile,
+    safeWriteFile: mocks.safeWriteFile,
   };
 });
 
@@ -70,7 +89,8 @@ describe('sync_service_endpoints', () => {
   });
 
   it('writes a snapshot merged from the canonical directory', async () => {
-    await import('./sync_service_endpoints.js');
+    const module = await import('./sync_service_endpoints.js');
+    await module.runSyncServiceEndpoints();
 
     expect(mocks.safeWriteFile).toHaveBeenCalledTimes(1);
     const [snapshotPath, content] = mocks.safeWriteFile.mock.calls[0];

@@ -22,6 +22,7 @@ import {
   type ApprovalRequestRecord,
 } from './approval-store.js';
 import { auditChain } from './audit-chain.js';
+import { nowIso } from './foundation/time.js';
 import type { EventScopeInput } from './event-scope.js';
 
 const COWORK_AGENT_ID = 'cowork-surface-agent';
@@ -158,7 +159,7 @@ export function decideApprovalFromCowork(params: {
     decision: params.decision,
     decided_by: params.decidedBy,
     note: params.note,
-    decided_at: updated.decidedAt ?? new Date().toISOString(),
+    decided_at: updated.decidedAt ?? nowIso(),
     previous_status: 'pending',
   };
 }

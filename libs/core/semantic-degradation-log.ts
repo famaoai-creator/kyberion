@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import { safeMkdir, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 
 /**
@@ -17,18 +19,26 @@ export interface SemanticDegradationRun {
 }
 
 const LOG_RELATIVE_PATH = 'active/shared/runtime/feedback-loop/semantic-degradations.json';
+const LOG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/semantic-degradation-log.schema.json'
+);
 const MAX_RUNS = 200;
 
 function logPath(): string {
   return pathResolver.rootResolve(LOG_RELATIVE_PATH);
 }
 
+const degradationLogCatalog = defineCatalog<SemanticDegradationRun[]>({
+  id: 'semantic-degradation-log',
+  path: logPath,
+  schema: LOG_SCHEMA_PATH,
+  fallback: [],
+  fallbackOnInvalid: true,
+});
+
 function readRuns(): SemanticDegradationRun[] {
   try {
-    const filePath = logPath();
-    if (!safeExistsSync(filePath)) return [];
-    const parsed = loadJson<unknown>(filePath);
-    return Array.isArray(parsed) ? parsed : [];
+    return degradationLogCatalog.load();
   } catch {
     return [];
   }
@@ -44,8 +54,11 @@ export function appendSemanticDegradationRun(
     const filePath = logPath();
     safeMkdir(path.dirname(filePath), { recursive: true });
     const runs = readRuns();
-    runs.push({ at: new Date().toISOString(), pipeline_id: pipelineId, counts, total });
-    safeWriteFile(filePath, `${JSON.stringify(runs.slice(-MAX_RUNS), null, 2)}\n`);
+    const nextRuns = [...runs, { at: nowIso(), pipeline_id: pipelineId, counts, total }].slice(
+      -MAX_RUNS
+    );
+    const validated = degradationLogCatalog.validate(nextRuns, filePath);
+    safeWriteFile(filePath, `${JSON.stringify(validated, null, 2)}\n`);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.warn(`[semantic-degradation-log] append failed: ${detail}`);

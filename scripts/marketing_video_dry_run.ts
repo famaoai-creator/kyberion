@@ -1,22 +1,27 @@
 import * as path from 'node:path';
+import { logger } from '@agent/core/core';
 import {
-  logger,
   canCompleteMarketingMission,
-  pathResolver,
-  safeExec,
-  safeExecResult,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
   scanMarketingTextForSensitiveData,
   sha256,
   validateMarketingIntake,
   validatePublicationClassification,
   validateVideoTechnicalArtifacts,
-} from '@agent/core';
+} from '@agent/core/marketing-workload';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExec,
+  safeExecResult,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isDirectScript } from './lib/harness.js';
+import { parseSafeJsonObjectInput, readTextFile } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface ProbeResult {
   format?: { duration?: string; size?: string };
@@ -33,6 +38,27 @@ interface ImageProbeResult {
 }
 
 const GENERATOR_VERSION = '1.4.0';
+
+function resolveMarketingVideoPath(
+  value: unknown,
+  label: string,
+  allowMissingLeaf = false
+): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`${label} is required`);
+  return assertSafeRepositoryPath(pathResolver.resolve(requested), { allowMissingLeaf });
+}
+
+export function readMarketingTextFile(filePath: string, label = filePath): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
+function childOutputPath(runDir: string, name: string): string {
+  return assertSafeRepositoryPath(path.join(runDir, name), { allowMissingLeaf: true });
+}
 
 function frameRate(value = ''): number | undefined {
   const parts = value.split('/');
@@ -61,10 +87,20 @@ export function runMarketingVideoDryRun(input: {
   channel: string;
   riskLevel: number;
 }): { status: 'created' | 'reused'; run_dir: string; review_package: string } {
-  const briefPath = pathResolver.rootResolve(input.campaignBriefPath);
-  const brandPath = pathResolver.rootResolve(input.brandProfilePath);
-  const brief = safeReadFile(briefPath, { encoding: 'utf8' }) as string;
-  const brand = safeReadFile(brandPath, { encoding: 'utf8' }) as string;
+  const briefPath = resolveMarketingVideoPath(input.campaignBriefPath, 'campaign brief path');
+  const brandPath = resolveMarketingVideoPath(input.brandProfilePath, 'brand profile path');
+  if (!safeLstat(briefPath).isFile()) {
+    throw new Error(`campaign brief path must be a regular file: ${input.campaignBriefPath}`);
+  }
+  if (!safeLstat(brandPath).isFile()) {
+    throw new Error(`brand profile path must be a regular file: ${input.brandProfilePath}`);
+  }
+  const outputRoot = resolveMarketingVideoPath(input.outputRoot, 'output root', true);
+  const brief = readMarketingTextFile(briefPath, 'campaign brief path');
+  const brand = readMarketingTextFile(brandPath, 'brand profile path');
+  const parsedBrief = parseSafeJsonObjectInput(brief, 'campaign brief JSON') as {
+    intake: Parameters<typeof validateMarketingIntake>[0];
+  };
   const runId = sha256(
     JSON.stringify({
       generator: GENERATOR_VERSION,
@@ -74,27 +110,34 @@ export function runMarketingVideoDryRun(input: {
       risk: input.riskLevel,
     })
   ).slice(0, 16);
-  const runDir = pathResolver.rootResolve(path.join(input.outputRoot, 'runs', runId));
-  const reviewPackagePath = path.join(runDir, 'review-package.json');
+  const runDir = assertSafeRepositoryPath(path.join(outputRoot, 'runs', runId), {
+    allowMissingLeaf: true,
+  });
+  const reviewPackagePath = childOutputPath(runDir, 'review-package.json');
   if (safeExistsSync(reviewPackagePath)) {
     return { status: 'reused', run_dir: runDir, review_package: reviewPackagePath };
   }
 
   safeMkdir(runDir, { recursive: true });
-  const videoPath = path.join(runDir, 'video.mp4');
-  const thumbnailPath = path.join(runDir, 'thumbnail.png');
-  const captionsPath = path.join(runDir, 'captions.vtt');
+  const videoPath = childOutputPath(runDir, 'video.mp4');
+  const thumbnailPath = childOutputPath(runDir, 'thumbnail.png');
+  const captionsPath = childOutputPath(runDir, 'captions.vtt');
+  const campaignBriefOutputPath = childOutputPath(runDir, 'campaign-brief.md');
+  const scriptOutputPath = childOutputPath(runDir, 'script.md');
+  const storyboardPath = childOutputPath(runDir, 'storyboard.json');
+  const technicalValidationPath = childOutputPath(runDir, 'technical-validation.json');
+  const completionEvidencePath = childOutputPath(runDir, 'completion-evidence.json');
 
   writeText(
-    path.join(runDir, 'campaign-brief.md'),
+    campaignBriefOutputPath,
     `# Campaign Brief\n\nSource: ${input.campaignBriefPath}\n\nChannel: ${input.channel}\nRisk level: ${input.riskLevel}`
   );
   writeText(
-    path.join(runDir, 'script.md'),
+    scriptOutputPath,
     '# Script\n\n00:00 Kyberion governed marketing dry-run.\n\n00:02 Review evidence before publication.'
   );
   safeWriteFile(
-    path.join(runDir, 'storyboard.json'),
+    storyboardPath,
     JSON.stringify(
       {
         version: '1.0.0',
@@ -150,8 +193,9 @@ export function runMarketingVideoDryRun(input: {
     thumbnailPath,
   ]);
 
-  const probe = JSON.parse(
-    safeExec('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', videoPath])
+  const probe = parseSafeJsonObjectInput(
+    safeExec('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', videoPath]),
+    'ffprobe video output'
   ) as ProbeResult;
   const blackDetection = safeExecResult(
     'ffmpeg',
@@ -190,7 +234,7 @@ export function runMarketingVideoDryRun(input: {
     silenceOutput,
     /silence_duration:\s*([0-9.]+)/g
   );
-  const imageProbe = JSON.parse(
+  const imageProbe = parseSafeJsonObjectInput(
     safeExec('ffprobe', [
       '-v',
       'error',
@@ -199,7 +243,8 @@ export function runMarketingVideoDryRun(input: {
       '-of',
       'json',
       thumbnailPath,
-    ])
+    ]),
+    'ffprobe thumbnail output'
   ) as ImageProbeResult;
   const sensitiveMetadataKeys = Object.keys(imageProbe.format?.tags || {}).filter((key) =>
     /gps|location|author|artist|comment|description|copyright/i.test(key)
@@ -252,7 +297,7 @@ export function runMarketingVideoDryRun(input: {
         : [],
   };
   safeWriteFile(
-    path.join(runDir, 'technical-validation.json'),
+    technicalValidationPath,
     JSON.stringify(
       {
         ...validation,
@@ -275,22 +320,19 @@ export function runMarketingVideoDryRun(input: {
       2
     )
   );
-  const parsedBrief = JSON.parse(brief) as {
-    intake: Parameters<typeof validateMarketingIntake>[0];
-  };
   const intakeGate = validateMarketingIntake(parsedBrief.intake);
   const sensitiveDataScan = scanMarketingTextForSensitiveData([
     {
       location: 'campaign-brief.md',
-      content: safeReadFile(path.join(runDir, 'campaign-brief.md'), { encoding: 'utf8' }) as string,
+      content: readMarketingTextFile(campaignBriefOutputPath),
     },
     {
       location: 'script.md',
-      content: safeReadFile(path.join(runDir, 'script.md'), { encoding: 'utf8' }) as string,
+      content: readMarketingTextFile(scriptOutputPath),
     },
     {
       location: 'captions.vtt',
-      content: safeReadFile(captionsPath, { encoding: 'utf8' }) as string,
+      content: readMarketingTextFile(captionsPath),
     },
   ]);
   const classificationGate = validatePublicationClassification({
@@ -318,12 +360,12 @@ export function runMarketingVideoDryRun(input: {
   ];
   const completionArtifactBindings = Object.fromEntries(
     completionArtifactNames.map((name) => {
-      const artifactPath = path.join(runDir, name);
+      const artifactPath = childOutputPath(runDir, name);
       return [name, { path: artifactPath, sha256: sha256(safeReadFile(artifactPath) as Buffer) }];
     })
   );
   safeWriteFile(
-    path.join(runDir, 'completion-evidence.json'),
+    completionEvidencePath,
     JSON.stringify(
       {
         workload: 'marketing-video-production',
@@ -341,7 +383,7 @@ export function runMarketingVideoDryRun(input: {
     )
   );
   const artifacts = [...completionArtifactNames, 'completion-evidence.json'].map((name) => {
-    const artifactPath = path.join(runDir, name);
+    const artifactPath = childOutputPath(runDir, name);
     const content = safeReadFile(artifactPath) as Buffer;
     return { name, path: artifactPath, sha256: sha256(content) };
   });
@@ -356,7 +398,7 @@ export function runMarketingVideoDryRun(input: {
         channel: input.channel,
         risk_level: input.riskLevel,
         artifacts,
-        technical_validation: path.join(runDir, 'technical-validation.json'),
+        technical_validation: technicalValidationPath,
       },
       null,
       2
@@ -367,8 +409,8 @@ export function runMarketingVideoDryRun(input: {
   return { status: 'created', run_dir: runDir, review_package: reviewPackagePath };
 }
 
-async function main(): Promise<void> {
-  const argv = createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = createStandardYargs(['node', 'marketing_video_dry_run', ...args])
     .option('campaign-brief', { type: 'string', demandOption: true })
     .option('brand-profile', { type: 'string', demandOption: true })
     .option('output-root', { type: 'string', demandOption: true })
@@ -385,12 +427,14 @@ async function main(): Promise<void> {
   logger.success(JSON.stringify(result));
 }
 
+export const runMarketingVideoDryRunScript = defineScript({
+  name: 'marketing:video-dry-run',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
 if (
   isDirectScript(import.meta.url, 'marketing_video_dry_run.ts') ||
   isDirectScript(import.meta.url, 'marketing_video_dry_run.js')
-) {
-  main().catch((error) => {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
-}
+)
+  void runMarketingVideoDryRunScript();

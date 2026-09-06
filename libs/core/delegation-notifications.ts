@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 /**
  * KC-06: claim-based delegation completion notifications.
  *
@@ -15,9 +15,17 @@ import { appendJsonLine } from './foundation/json.js';
 
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { withLockSync } from './src/lock-utils.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 
 export interface DelegationNotification {
   notification_id: string;
@@ -43,6 +51,9 @@ export interface DelegationNotification {
 
 export const DELEGATION_NOTIFICATION_CLAIM_LIMIT = 4;
 const EXCERPT_MAX_CHARS = 240;
+const DELEGATION_NOTIFICATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/delegation-notification.schema.json'
+);
 
 export interface DelegationNotificationFilter {
   missionId?: string;
@@ -54,13 +65,31 @@ export interface DelegationNotificationFilter {
 // parallel suites never clobber the real queue file (resolved lazily per call).
 function resolveQueuePath(): string {
   const override = getRegisteredEnvText('KYBERION_DELEGATION_NOTIFICATIONS_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('runtime/delegations/notifications.jsonl');
+  return assertSafeRepositoryPath(
+    override
+      ? pathResolver.rootResolve(override)
+      : pathResolver.shared('runtime/delegations/notifications.jsonl'),
+    { allowMissingLeaf: true }
+  );
 }
 
 function ensureQueueDir(): void {
   const dir = resolveQueuePath().replace(/[/\\][^/\\]+$/, '');
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+}
+
+function delegationNotificationCatalog(filePath: string): GovernedCatalog<DelegationNotification> {
+  return defineCatalog<DelegationNotification>({
+    id: 'delegation-notification',
+    path: filePath,
+    schema: DELEGATION_NOTIFICATION_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularQueueFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[delegation-notifications] queue must be a regular file: ${filePath}`);
+  }
 }
 
 function excerpt(value: string | undefined): string {
@@ -70,23 +99,6 @@ function excerpt(value: string | undefined): string {
   return normalized.length > EXCERPT_MAX_CHARS
     ? `${normalized.slice(0, EXCERPT_MAX_CHARS - 1)}…`
     : normalized;
-}
-
-function parseJsonl(raw: string): DelegationNotification[] {
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const parsed = JSON.parse(line) as Partial<DelegationNotification>;
-      return {
-        ...(parsed as DelegationNotification),
-        report_provenance: parsed.report_provenance ?? {
-          source: 'child' as const,
-          delegation_id: String(parsed.delegation_id || ''),
-        },
-      };
-    });
 }
 
 export function enqueueDelegationNotification(input: {
@@ -101,7 +113,7 @@ export function enqueueDelegationNotification(input: {
   childSessionId?: string;
   completedAt?: string;
 }): DelegationNotification {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const notification: DelegationNotification = {
     notification_id: randomUUID(),
     delegation_id: String(input.delegationId || '').trim(),
@@ -126,15 +138,34 @@ export function enqueueDelegationNotification(input: {
   }
   withLockSync('delegation-notifications', () => {
     ensureQueueDir();
-    appendJsonLine(resolveQueuePath(), notification);
+    const queuePath = resolveQueuePath();
+    ensureRegularQueueFile(queuePath);
+    appendJsonLine(
+      queuePath,
+      delegationNotificationCatalog(queuePath).validate(notification, queuePath)
+    );
   });
   return notification;
 }
 
 export function listDelegationNotifications(): DelegationNotification[] {
-  if (!safeExistsSync(resolveQueuePath())) return [];
-  const raw = safeReadFile(resolveQueuePath(), { encoding: 'utf8' }) as string;
-  return parseJsonl(raw);
+  const queuePath = resolveQueuePath();
+  if (!safeExistsSync(queuePath)) return [];
+  ensureRegularQueueFile(queuePath);
+  const catalog = delegationNotificationCatalog(queuePath);
+  return readJsonLines<DelegationNotification>(queuePath, {
+    map: (value, lineNumber) => {
+      const parsed = value as Partial<DelegationNotification>;
+      const normalized = {
+        ...(parsed as DelegationNotification),
+        report_provenance: parsed.report_provenance ?? {
+          source: 'child' as const,
+          delegation_id: String(parsed.delegation_id || ''),
+        },
+      };
+      return catalog.validate(normalized, `${queuePath}:${lineNumber}`);
+    },
+  });
 }
 
 /**
@@ -151,7 +182,7 @@ export function claimPendingDelegationNotifications(
   return withLockSync('delegation-notifications', () => {
     const rows = listDelegationNotifications();
     if (rows.length === 0) return [];
-    const claimedAt = new Date().toISOString();
+    const claimedAt = nowIso();
     const claimed: DelegationNotification[] = [];
     const next = rows.map((row) => {
       const matches =
@@ -165,7 +196,11 @@ export function claimPendingDelegationNotifications(
     });
     if (claimed.length === 0) return [];
     ensureQueueDir();
-    safeWriteFile(resolveQueuePath(), `${next.map((row) => JSON.stringify(row)).join('\n')}\n`);
+    const queuePath = resolveQueuePath();
+    ensureRegularQueueFile(queuePath);
+    const catalog = delegationNotificationCatalog(queuePath);
+    const validated = next.map((row) => catalog.validate(row, queuePath));
+    safeWriteFile(queuePath, `${validated.map((row) => JSON.stringify(row)).join('\n')}\n`);
     return claimed;
   });
 }

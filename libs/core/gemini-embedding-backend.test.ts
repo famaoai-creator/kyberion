@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GeminiEmbeddingBackend, isGeminiEmbeddingAvailable } from './gemini-embedding-backend.js';
+import {
+  GeminiEmbeddingBackend,
+  isGeminiEmbeddingAvailable,
+  normalizeGeminiEmbeddingResponse,
+} from './gemini-embedding-backend.js';
 
 describe('gemini embedding backend (KM-02)', () => {
   const savedGemini = process.env.GEMINI_API_KEY;
@@ -15,6 +19,22 @@ describe('gemini embedding backend (KM-02)', () => {
     else process.env.GEMINI_API_KEY = savedGemini;
     if (savedGoogle === undefined) delete process.env.GOOGLE_API_KEY;
     else process.env.GOOGLE_API_KEY = savedGoogle;
+  });
+
+  it('normalizes single and batch embedding response shapes', () => {
+    expect(normalizeGeminiEmbeddingResponse({ embedding: { values: [1, 0] } })).toEqual({
+      embedding: { values: [1, 0] },
+    });
+    expect(
+      normalizeGeminiEmbeddingResponse({ embeddings: [{ values: [1] }, { values: [0] }] })
+    ).toEqual({ embeddings: [{ values: [1] }, { values: [0] }] });
+  });
+
+  it('rejects malformed embedding values before vector conversion', () => {
+    expect(normalizeGeminiEmbeddingResponse(null)).toBeNull();
+    expect(normalizeGeminiEmbeddingResponse({ embedding: { values: '1,0' } })).toBeNull();
+    expect(normalizeGeminiEmbeddingResponse({ embedding: { values: [Number.NaN] } })).toBeNull();
+    expect(normalizeGeminiEmbeddingResponse({ embeddings: [null] })).toBeNull();
   });
 
   it('reports availability from the key envs', () => {
@@ -50,9 +70,15 @@ describe('gemini embedding backend (KM-02)', () => {
     expect(call.url).toContain(':batchEmbedContents');
   });
 
-  it('fails loudly on empty responses instead of returning junk vectors', async () => {
+  it('fails closed on empty responses instead of returning junk vectors', async () => {
     const fetcher = vi.fn(async () => ({}));
     const backend = new GeminiEmbeddingBackend({ fetcher: fetcher as never });
-    await expect(backend.embed('hello')).rejects.toThrow('no embedding values');
+    await expect(backend.embed('hello')).rejects.toThrow('invalid shape');
+  });
+
+  it('fails closed on malformed transport responses', async () => {
+    const fetcher = vi.fn(async () => ({ embedding: { values: ['not-a-number'] } }));
+    const backend = new GeminiEmbeddingBackend({ fetcher: fetcher as never });
+    await expect(backend.embed('hello')).rejects.toThrow('invalid shape');
   });
 });

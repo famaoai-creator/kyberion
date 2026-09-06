@@ -15,12 +15,15 @@ Actions:
   list_devices            — list audio output devices (for BlackHole routing)
 """
 
+from __future__ import annotations
+
 import sys
 import json
 import os
 import shutil
 import subprocess
 from pathlib import Path
+from json_boundary import JsonInputError, parse_json_object
 
 
 # ---------------------------------------------------------------------------
@@ -246,8 +249,8 @@ def _health() -> dict:
             "macos_say": shutil.which("say") is not None,
         },
         "install_hints": {
-            "cosyvoice2": "pnpm voice:setup --apply  # governed mlx-audio runtime; CosyVoice2 assets download on first use",
-            "fish_speech": "pnpm voice:setup --apply  # governed mlx-audio runtime; Fish Speech assets download on first use",
+            "cosyvoice2": "pnpm kyberion voice setup --apply  # governed mlx-audio runtime; CosyVoice2 assets download on first use",
+            "fish_speech": "pnpm kyberion voice setup --apply  # governed mlx-audio runtime; Fish Speech assets download on first use",
         },
     }
 
@@ -287,8 +290,8 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        payload = parse_json_object(raw, "zero-shot voice input")
+    except JsonInputError as exc:
         print(json.dumps({"status": "error", "error": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 

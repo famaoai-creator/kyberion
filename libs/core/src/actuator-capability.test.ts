@@ -33,6 +33,18 @@ const TMP_CATALOG_DIR = path.resolve(
 );
 
 describe('actuator-capability', () => {
+  it('rejects an external actuator catalog directory', () => {
+    expect(() => loadActuatorManifestCatalog('/tmp/actuator-catalog-external')).toThrow(
+      'RESOURCE_PATH_SCOPE'
+    );
+  });
+
+  it('rejects an external actuator manifest path', async () => {
+    await expect(
+      checkActuatorCapabilities('external-actuator', '/tmp/actuator-manifest-external.json')
+    ).rejects.toThrow('RESOURCE_PATH_SCOPE');
+  });
+
   afterEach(() => {
     if (fs.existsSync(TMP_MANIFEST)) {
       fs.unlinkSync(TMP_MANIFEST);
@@ -47,7 +59,10 @@ describe('actuator-capability', () => {
       const manifest = {
         actuator_id: 'test-actuator',
         version: '1.2.3',
-        capabilities: [{ op: 'read' }, { op: 'write' }],
+        capabilities: [
+          { op: 'read', platforms: ['darwin', 'linux', 'win32'] },
+          { op: 'write', platforms: ['darwin', 'linux', 'win32'] },
+        ],
       };
       fs.writeFileSync(TMP_MANIFEST, JSON.stringify(manifest));
 
@@ -249,6 +264,32 @@ describe('actuator-capability', () => {
         expect(typeof manifest.resilience_tier, entry.actuatorId).toBe('string');
         expect(manifest.recovery_policy, entry.actuatorId).toEqual(expect.any(Object));
       }
+    });
+
+    it('rejects an actuator manifest that violates the governed manifest schema', () => {
+      const invalidCatalogDir = path.join(TMP_CATALOG_DIR, 'invalid-catalog');
+      safeMkdir(invalidCatalogDir, { recursive: true });
+      const invalidDir = path.join(invalidCatalogDir, 'invalid-actuator');
+      safeMkdir(invalidDir, { recursive: true });
+      safeWriteFile(
+        path.join(invalidDir, 'manifest.json'),
+        JSON.stringify({ actuator_id: 'invalid-actuator', version: '1.0.0', capabilities: [{}] })
+      );
+
+      expect(() => loadActuatorManifestCatalog(invalidCatalogDir)).toThrowError(/Invalid catalog/);
+    });
+
+    it('rejects an actuator id that could escape the dispatch directory', () => {
+      const invalidCatalogDir = path.join(TMP_CATALOG_DIR, 'unsafe-id-catalog');
+      safeMkdir(invalidCatalogDir, { recursive: true });
+      const invalidDir = path.join(invalidCatalogDir, 'safe-directory');
+      safeMkdir(invalidDir, { recursive: true });
+      safeWriteFile(
+        path.join(invalidDir, 'manifest.json'),
+        JSON.stringify({ actuator_id: '../outside', version: '1.0.0', capabilities: [] })
+      );
+
+      expect(() => loadActuatorManifestCatalog(invalidCatalogDir)).toThrow('Invalid catalog');
     });
 
     it('actuator manifest schema accepts resilience declarations', () => {

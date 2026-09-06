@@ -2,7 +2,15 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { findMissionPath, pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { loadJson, safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 
 export type ArtifactBundleStatus =
   'assembling' | 'pending_review' | 'approved' | 'rejected' | 'superseded';
@@ -60,12 +68,29 @@ function normalizeMissionDir(
   options: { createIfMissing?: boolean } = {}
 ): string | null {
   if (missionPath) {
-    if (options.createIfMissing || safeExistsSync(missionPath)) return missionPath;
+    try {
+      const safePath = assertSafeRepositoryPath(missionPath, {
+        allowMissingLeaf: options.createIfMissing,
+      });
+      if (options.createIfMissing || safeExistsSync(safePath)) return safePath;
+    } catch {
+      return null;
+    }
     return null;
   }
   const found = findMissionPath(missionId);
-  if (found) return found;
-  if (options.createIfMissing) return pathResolver.missionDir(missionId);
+  if (found) {
+    try {
+      return assertSafeRepositoryPath(found);
+    } catch {
+      return null;
+    }
+  }
+  if (options.createIfMissing) {
+    return assertSafeRepositoryPath(pathResolver.missionDir(missionId), {
+      allowMissingLeaf: true,
+    });
+  }
   return null;
 }
 
@@ -76,7 +101,27 @@ function bundleDir(
 ): string | null {
   const missionDir = normalizeMissionDir(missionId, missionPath, options);
   if (!missionDir) return null;
-  return path.join(missionDir, 'coordination', 'artifact-bundles');
+  return assertSafeRepositoryPath(path.join(missionDir, 'coordination', 'artifact-bundles'), {
+    allowMissingLeaf: options.createIfMissing,
+  });
+}
+
+function bundleFilePath(dir: string, bundleId: string): string {
+  const normalized = String(bundleId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/]/u.test(normalized)) {
+    throw new Error(`[artifact-bundle] invalid bundle id: ${bundleId}`);
+  }
+  return assertSafeRepositoryPath(path.join(dir, `${normalized}.json`), {
+    allowMissingLeaf: true,
+  });
+}
+
+function artifactBundleCatalog(filePath: string) {
+  return defineCatalog<ArtifactBundle>({
+    id: 'artifact-bundle',
+    path: filePath,
+    schema: BUNDLE_SCHEMA_PATH,
+  });
 }
 
 function validateConsistency(bundle: ArtifactBundle): string[] {
@@ -107,7 +152,7 @@ export function createArtifactBundle(input: {
   requiredArtifactKinds?: string[];
   items?: ArtifactBundleItem[];
 }): ArtifactBundle {
-  const now = new Date().toISOString();
+  const now = nowIso();
   return {
     bundle_id: `BND-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     mission_id: input.missionId,
@@ -131,6 +176,17 @@ export function validateArtifactBundle(value: unknown): value is ArtifactBundle 
   return validateConsistency(bundle).length === 0;
 }
 
+export function writeArtifactBundleAtPath(filePath: string, bundle: ArtifactBundle): string {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const validated = artifactBundleCatalog(safePath).validate(bundle, safePath);
+  const consistencyErrors = validateConsistency(validated);
+  if (consistencyErrors.length > 0) {
+    throw new Error(`Invalid artifact bundle: ${consistencyErrors.join('; ')}`);
+  }
+  safeWriteFile(safePath, JSON.stringify(validated, null, 2));
+  return safePath;
+}
+
 export function saveArtifactBundle(bundle: ArtifactBundle, missionPath?: string): string {
   if (!validateArtifactBundle(bundle)) {
     const schemaErrors = (ensureValidator().errors ?? []).map(
@@ -146,12 +202,8 @@ export function saveArtifactBundle(bundle: ArtifactBundle, missionPath?: string)
     throw new Error(`Unable to resolve mission directory for artifact bundle ${bundle.bundle_id}.`);
   }
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  const filePath = path.join(dir, `${bundle.bundle_id}.json`);
-  safeWriteFile(
-    filePath,
-    JSON.stringify({ ...bundle, updated_at: new Date().toISOString() }, null, 2)
-  );
-  return filePath;
+  const filePath = bundleFilePath(dir, bundle.bundle_id);
+  return writeArtifactBundleAtPath(filePath, { ...bundle, updated_at: nowIso() });
 }
 
 export function loadArtifactBundle(
@@ -161,10 +213,15 @@ export function loadArtifactBundle(
 ): ArtifactBundle | null {
   const dir = bundleDir(missionId, missionPath);
   if (!dir) return null;
-  const filePath = path.join(dir, `${bundleId}.json`);
+  let filePath: string;
+  try {
+    filePath = bundleFilePath(dir, bundleId);
+  } catch {
+    return null;
+  }
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = loadJson<ArtifactBundle>(filePath);
+    const parsed = artifactBundleCatalog(filePath).load();
     return validateArtifactBundle(parsed) ? parsed : null;
   } catch {
     return null;
@@ -175,7 +232,7 @@ export function listArtifactBundlesForMission(
   missionId: string,
   missionPath?: string
 ): ArtifactBundle[] {
-  const dir = bundleDir(missionId, missionPath);
+  const dir = bundleDir(missionId, missionPath, { createIfMissing: true });
   if (!dir || !safeExistsSync(dir)) return [];
   const bundles = safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
@@ -201,19 +258,19 @@ export function addItemToArtifactBundle(
   return {
     ...bundle,
     items: [...bundle.items.filter((i) => i.artifact_id !== item.artifact_id), item],
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
 }
 
 export function transitionBundleToReview(bundle: ArtifactBundle): ArtifactBundle {
-  return { ...bundle, status: 'pending_review', updated_at: new Date().toISOString() };
+  return { ...bundle, status: 'pending_review', updated_at: nowIso() };
 }
 
 export function applyBundleApproval(
   bundle: ArtifactBundle,
   decision: { verdict: 'approved' | 'rejected'; reviewer?: string; note?: string }
 ): ArtifactBundle {
-  const now = new Date().toISOString();
+  const now = nowIso();
   return {
     ...bundle,
     status: decision.verdict === 'approved' ? 'approved' : 'rejected',

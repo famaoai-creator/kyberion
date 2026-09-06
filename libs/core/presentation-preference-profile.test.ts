@@ -1,16 +1,16 @@
 import * as path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { safeReadFile } from '@agent/core/secure-io';
+import { describe, expect, it, vi } from 'vitest';
+import { logger } from './core.js';
 import {
-  compileSchemaFromPath,
   getPresentationBriefQuestions,
   getPresentationSlidePatternSelectionPolicy,
   getPresentationThemeHint,
-  safeReadFile,
   selectPresentationBriefQuestionSet,
-} from '@agent/core';
-import { describe, expect, it, vi } from 'vitest';
-import { logger } from './core.js';
+} from './presentation-preference-profile.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;

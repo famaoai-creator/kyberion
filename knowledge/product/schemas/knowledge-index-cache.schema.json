@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "knowledge-index-cache.schema.json",
+  "title": "Knowledge Index Embedding Cache",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scopeHash", "model", "builtAt", "entries"],
+  "properties": {
+    "scopeHash": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "model": { "type": "string", "minLength": 1 },
+    "builtAt": { "type": "string", "minLength": 1 },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "textHash", "vector"],
+        "properties": {
+          "source": { "type": "string", "minLength": 1 },
+          "textHash": { "type": "string", "pattern": "^[0-9a-f]{12}$" },
+          "vector": { "type": "array", "items": { "type": "number" } }
+        }
+      }
+    }
+  }
+}

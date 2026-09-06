@@ -1,21 +1,17 @@
 import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
-import addFormatsModule from 'ajv-formats';
-import { logger } from './core.js';
-import { createAjv as createFoundationAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import {
   loadStandardIntentCatalog,
   resolveIntentResolutionPacket,
   type IntentResolutionPacket,
   type StandardIntentDefinition,
 } from './intent-resolution.js';
-
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 export type OperatorKnowledgeTier = 'personal' | 'confidential' | 'public';
 export type OperatorRouteShape =
@@ -260,12 +256,6 @@ let operatorRequestLogValidateFn: ValidateFunction | null = null;
 let operatorLearningDispatchRegistryCachePath: string | null = null;
 let operatorLearningDispatchRegistryCache: OperatorLearningDispatchRegistry | null = null;
 
-function createAjv() {
-  const ajv = createFoundationAjv();
-  addFormats(ajv);
-  return ajv;
-}
-
 function formatSchemaErrors(validate: ValidateFunction): string[] {
   return (validate.errors || []).map(
     (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
@@ -274,8 +264,7 @@ function formatSchemaErrors(validate: ValidateFunction): string[] {
 
 function ensureOperatorProfileValidator(): ValidateFunction {
   if (operatorProfileValidateFn) return operatorProfileValidateFn;
-  operatorProfileValidateFn = compileSchemaFromPath(
-    createAjv(),
+  operatorProfileValidateFn = compileSchema(
     pathResolver.knowledge('product/schemas/operator-profile.schema.json')
   );
   return operatorProfileValidateFn;
@@ -283,8 +272,7 @@ function ensureOperatorProfileValidator(): ValidateFunction {
 
 function ensureOperatorRequestLogValidator(): ValidateFunction {
   if (operatorRequestLogValidateFn) return operatorRequestLogValidateFn;
-  operatorRequestLogValidateFn = compileSchemaFromPath(
-    createAjv(),
+  operatorRequestLogValidateFn = compileSchema(
     pathResolver.knowledge('product/schemas/operator-request-log.schema.json')
   );
   return operatorRequestLogValidateFn;
@@ -299,193 +287,9 @@ const DEFAULT_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = pathResolver.k
 const DEFAULT_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = pathResolver.knowledge(
   'confidential/governance/operator-learning-dispatch-registry.json'
 );
-
-const FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY: OperatorLearningDispatchRegistry = {
-  version: 'fallback',
-  rules: [
-    {
-      rule_id: 'executive-decision-support',
-      priority: 100,
-      match: {
-        intent_ids: [
-          'executive-strategy-brief',
-          'executive-prioritization',
-          'executive-reporting',
-          'stakeholder-communication',
-          'sales-account-strategy',
-        ],
-      },
-      dispatch: {
-        decision_style_observed: 'executive_options_with_recommendation',
-        recurring_task_candidate: ['executive_decision_support'],
-      },
-    },
-    {
-      rule_id: 'technical-decision-support',
-      priority: 95,
-      match: {
-        intent_ids: ['technical-decision-memo'],
-      },
-      dispatch: {
-        decision_style_observed: 'decision_memo_with_tradeoffs',
-        recurring_task_candidate: ['technical_decision_support'],
-      },
-    },
-    {
-      rule_id: 'llm-provider-selection',
-      priority: 90,
-      match: {
-        intent_ids: ['llm-provider-selection'],
-      },
-      dispatch: {
-        decision_style_observed: 'technical_evaluation',
-        recurring_task_candidate: ['provider_selection'],
-      },
-    },
-    {
-      rule_id: 'agent-runtime-tuning',
-      priority: 90,
-      match: {
-        intent_ids: ['agent-runtime-tuning'],
-      },
-      dispatch: {
-        decision_style_observed: 'technical_evaluation',
-        recurring_task_candidate: ['runtime_tuning'],
-      },
-    },
-    {
-      rule_id: 'knowledge-query',
-      priority: 90,
-      match: {
-        intent_ids: ['knowledge-query'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['knowledge_query'],
-      },
-    },
-    {
-      rule_id: 'browser-navigation',
-      priority: 90,
-      match: {
-        intent_ids: ['open-site', 'browser-step'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['browser_navigation'],
-      },
-    },
-    {
-      rule_id: 'approval-workflow',
-      priority: 90,
-      match: {
-        intent_ids: ['request-approval', 'resolve-approval'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['approval_workflow'],
-      },
-    },
-    {
-      rule_id: 'kyberion-runtime-expansion',
-      priority: 87,
-      match: {
-        intent_ids: [
-          'bootstrap-kyberion-runtime',
-          'verify-environment-readiness',
-          'configure-reasoning-backend',
-          'register-actuator-adapter',
-        ],
-      },
-      dispatch: {
-        recurring_task_candidate: ['kyberion_runtime_expansion'],
-      },
-    },
-    {
-      rule_id: 'onboarding-toolchain-setup',
-      priority: 86,
-      match: {
-        intent_ids: ['configure-organization-toolchain'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['onboarding_setup'],
-      },
-    },
-    {
-      rule_id: 'onboarding-first-run',
-      priority: 86,
-      match: {
-        intent_ids: ['launch-first-run-onboarding'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['onboarding_setup'],
-      },
-    },
-    {
-      rule_id: 'onboarding-presentation-preferences',
-      priority: 86,
-      match: {
-        intent_ids: ['register-presentation-preference-profile'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['onboarding_setup'],
-      },
-    },
-    {
-      rule_id: 'kyberion-system-observability',
-      priority: 87,
-      match: {
-        intent_ids: [
-          'check-kyberion-baseline',
-          'check-kyberion-vital',
-          'diagnose-kyberion-system',
-          'inspect-runtime-supervisor',
-          'inspect-mission-state',
-        ],
-      },
-      dispatch: {
-        recurring_task_candidate: ['kyberion_system_observability'],
-      },
-    },
-    {
-      rule_id: 'service-lifecycle',
-      priority: 88,
-      match: {
-        intent_ids: ['start-service', 'stop-service'],
-      },
-      dispatch: {
-        recurring_task_candidate: ['service_lifecycle'],
-      },
-    },
-    {
-      rule_id: 'approval-threshold-risk',
-      priority: 80,
-      match: {
-        risk_profiles: ['approval_required', 'high_stakes'],
-      },
-      dispatch: {
-        approval_threshold_observed: ['high_risk_action'],
-      },
-    },
-    {
-      rule_id: 'approval-threshold-external-service',
-      priority: 75,
-      match: {
-        targets: ['external_service'],
-      },
-      dispatch: {
-        approval_threshold_observed: ['external_side_effect'],
-      },
-    },
-    {
-      rule_id: 'approval-threshold-llm',
-      priority: 70,
-      match: {
-        categories: ['llm_reasoning_setup'],
-      },
-      dispatch: {
-        approval_threshold_observed: ['org_policy_change'],
-      },
-    },
-  ],
-};
+const OPERATOR_LEARNING_PROMOTION_RECORD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/operator-learning-promotion-record.schema.json'
+);
 
 const dispatchRegistryCatalogs = new Map<
   string,
@@ -495,24 +299,25 @@ const dispatchRegistryCatalogs = new Map<
 function getDispatchRegistryCatalog(
   registryPath: string
 ): GovernedCatalog<OperatorLearningDispatchRegistry> {
-  const existing = dispatchRegistryCatalogs.get(registryPath);
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
+  const existing = dispatchRegistryCatalogs.get(safeRegistryPath);
   if (existing) return existing;
   const catalog = defineCatalog<OperatorLearningDispatchRegistry>({
     id: 'operator-learning-dispatch-registry',
-    path: registryPath,
+    path: safeRegistryPath,
     schema: pathResolver.knowledge(
       'product/schemas/operator-learning-dispatch-registry.schema.json'
     ),
   });
-  dispatchRegistryCatalogs.set(registryPath, catalog);
+  dispatchRegistryCatalogs.set(safeRegistryPath, catalog);
   return catalog;
 }
 
 function getOperatorLearningDispatchRegistryPath(): string {
-  return (
+  const configured =
     getRegisteredEnvText('KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim() ||
-    DEFAULT_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH
-  );
+    DEFAULT_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 function getPersonalOperatorLearningDispatchRegistryPath(): string | null {
@@ -521,7 +326,8 @@ function getPersonalOperatorLearningDispatchRegistryPath(): string | null {
   const configured =
     getRegisteredEnvText('KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim() ||
     DEFAULT_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
-  return safeExistsSync(configured) ? configured : null;
+  const safePath = assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
+  return safeExistsSync(safePath) ? safePath : null;
 }
 
 function getConfidentialOperatorLearningDispatchRegistryPath(): string | null {
@@ -531,11 +337,14 @@ function getConfidentialOperatorLearningDispatchRegistryPath(): string | null {
     getRegisteredEnvText(
       'KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH'
     )?.trim() || DEFAULT_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
-  return safeExistsSync(configured) ? configured : null;
+  const safePath = assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
+  return safeExistsSync(safePath) ? safePath : null;
 }
 
 function loadDispatchRegistryFromPath(registryPath: string): OperatorLearningDispatchRegistry {
-  return getDispatchRegistryCatalog(registryPath).load();
+  return getDispatchRegistryCatalog(
+    assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true })
+  ).load();
 }
 
 function mergeDispatchRegistries(
@@ -552,7 +361,7 @@ function mergeDispatchRegistries(
   };
 }
 
-export function resetOperatorLearningDispatchRegistryCache(): void {
+export function _resetOperatorLearningDispatchRegistryCacheForTests(): void {
   operatorLearningDispatchRegistryCachePath = null;
   operatorLearningDispatchRegistryCache = null;
 }
@@ -571,34 +380,17 @@ export function getOperatorLearningDispatchRegistry(): OperatorLearningDispatchR
     return operatorLearningDispatchRegistryCache;
   }
 
-  if (!safeExistsSync(registryPath)) {
-    operatorLearningDispatchRegistryCachePath = cacheKey;
-    operatorLearningDispatchRegistryCache = FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY;
-    return operatorLearningDispatchRegistryCache;
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
+  let parsed = loadDispatchRegistryFromPath(safeRegistryPath);
+  if (confidentialOverlayPath) {
+    parsed = mergeDispatchRegistries(parsed, loadDispatchRegistryFromPath(confidentialOverlayPath));
   }
-
-  try {
-    let parsed = loadDispatchRegistryFromPath(registryPath);
-    if (confidentialOverlayPath) {
-      parsed = mergeDispatchRegistries(
-        parsed,
-        loadDispatchRegistryFromPath(confidentialOverlayPath)
-      );
-    }
-    if (personalOverlayPath) {
-      parsed = mergeDispatchRegistries(parsed, loadDispatchRegistryFromPath(personalOverlayPath));
-    }
-    operatorLearningDispatchRegistryCachePath = cacheKey;
-    operatorLearningDispatchRegistryCache = parsed;
-    return parsed;
-  } catch (error: any) {
-    logger.warn(
-      `[OPERATOR_LEARNING_DISPATCH_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
-    );
-    operatorLearningDispatchRegistryCachePath = cacheKey;
-    operatorLearningDispatchRegistryCache = FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY;
-    return operatorLearningDispatchRegistryCache;
+  if (personalOverlayPath) {
+    parsed = mergeDispatchRegistries(parsed, loadDispatchRegistryFromPath(personalOverlayPath));
   }
+  operatorLearningDispatchRegistryCachePath = cacheKey;
+  operatorLearningDispatchRegistryCache = parsed;
+  return parsed;
 }
 
 function matchDispatchRule(
@@ -856,7 +648,7 @@ function withDefinedValues<T extends Record<string, unknown>>(value: T): Partial
 export function buildOperatorRequestLogFromIntentResolution(
   input: BuildOperatorRequestLogInput
 ): OperatorRequestLog {
-  const receivedAt = input.receivedAt || new Date().toISOString();
+  const receivedAt = input.receivedAt || nowIso();
   const selectedIntentId = input.packet.selected_intent_id || 'unresolved_intent';
   const selectedIntent = findIntent(input.packet.selected_intent_id);
   const selectedCandidate = input.packet.candidates.find(
@@ -971,12 +763,13 @@ export function buildOperatorLearningProposal(input: {
   ).length;
   const eligible = sampleCount >= requiredSamples && mismatchCount === 0;
   const recommendedTier = recommendTier(input.requestLogs);
+  const proposalAt = input.now || nowIso();
 
   return {
     kind: 'operator-learning-proposal',
-    proposal_id: `olp-${profileId}-${Date.parse(input.now || new Date().toISOString()).toString(36)}`,
+    proposal_id: `olp-${profileId}-${Date.parse(proposalAt).toString(36)}`,
     profile_id: profileId,
-    created_at: input.now || new Date().toISOString(),
+    created_at: proposalAt,
     recommended_tier: recommendedTier,
     requires_approval: true,
     summary: `Observed ${sampleCount} operator request sample(s), ${correctionCount} correction(s), and ${recurringTasks.length} recurring task candidate(s).`,
@@ -1026,7 +819,7 @@ export function simulateOperatorLearningFromUtterances(
     throw new Error('Operator learning simulation requires profile or profileId');
   }
 
-  const startAt = input.startAt || new Date().toISOString();
+  const startAt = input.startAt || nowIso();
   const startMs = Date.parse(startAt);
   if (Number.isNaN(startMs)) {
     throw new Error(`Invalid operator learning simulation startAt: ${startAt}`);
@@ -1034,7 +827,7 @@ export function simulateOperatorLearningFromUtterances(
   const intervalMs = input.intervalMs ?? 1000;
 
   const requestLogs = input.utterances.map((utterance, index) => {
-    const receivedAt = new Date(startMs + index * intervalMs).toISOString();
+    const receivedAt = nowIso(new Date(startMs + index * intervalMs));
     return buildOperatorRequestLogFromIntentResolution({
       packet: resolveIntentResolutionPacket(utterance),
       profileId,
@@ -1053,7 +846,7 @@ export function simulateOperatorLearningFromUtterances(
     proposal: buildOperatorLearningProposal({
       profile: input.profile,
       requestLogs,
-      now: new Date(startMs + input.utterances.length * intervalMs).toISOString(),
+      now: nowIso(new Date(startMs + input.utterances.length * intervalMs)),
     }),
   };
 }
@@ -1121,7 +914,7 @@ export function promoteOperatorLearningProposal(input: {
     );
   }
 
-  const approvedAt = input.approvedAt || new Date().toISOString();
+  const approvedAt = input.approvedAt || nowIso();
   const targetTier = input.targetTier || input.proposal.recommended_tier;
   const targetPath =
     input.outputPath ||
@@ -1130,6 +923,7 @@ export function promoteOperatorLearningProposal(input: {
       targetTier,
       approvedAt,
     });
+  const safeTargetPath = assertSafeRepositoryPath(targetPath, { allowMissingLeaf: true });
 
   const record: OperatorLearningPromotionRecord = {
     kind: 'operator-learning-promotion-record',
@@ -1139,16 +933,22 @@ export function promoteOperatorLearningProposal(input: {
     approved_by: approvedBy,
     approved_at: approvedAt,
     target_tier: targetTier,
-    target_path: targetPath,
+    target_path: safeTargetPath,
     summary: input.proposal.summary,
     evidence_request_ids: input.proposal.evidence_request_ids,
     promotion_decision: input.proposal.promotion_decision,
     candidate_updates: input.proposal.candidate_updates,
   };
 
+  const canonicalRecord = defineCatalog<OperatorLearningPromotionRecord>({
+    id: 'operator-learning-promotion-record',
+    path: safeTargetPath,
+    schema: OPERATOR_LEARNING_PROMOTION_RECORD_SCHEMA_PATH,
+  }).validate(record, safeTargetPath);
+
   if (!input.dryRun) {
-    safeWriteFile(targetPath, `${JSON.stringify(record, null, 2)}\n`);
+    safeWriteFile(safeTargetPath, `${JSON.stringify(canonicalRecord, null, 2)}\n`);
   }
 
-  return record;
+  return canonicalRecord;
 }

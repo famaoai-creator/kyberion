@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mission-github-ticket-artifact.schema.json",
+  "title": "Mission GitHub Ticket Artifact",
+  "type": "object",
+  "additionalProperties": true,
+  "propertyNames": {
+    "not": { "enum": ["__proto__", "constructor", "prototype"] }
+  },
+  "properties": {
+    "id": { "type": ["string", "number"] },
+    "number": { "type": "number" },
+    "issue_number": { "type": "number" },
+    "title": { "type": "string", "minLength": 1 },
+    "body": { "type": "string" },
+    "state": { "type": "string", "enum": ["open", "closed"] },
+    "state_reason": { "type": "string", "minLength": 1 },
+    "labels": { "type": "array" },
+    "assignees": { "type": "array" },
+    "comments": { "type": "array" },
+    "repository_url": { "type": "string", "minLength": 1 },
+    "html_url": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string" }
+  },
+  "required": ["title", "state"]
+}

@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
+import {
+  isValidTenantGroupProfile,
+  normalizeRegisteredTenantProfile,
+  validateReadPermission,
+  validateWritePermission,
+} from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 
@@ -70,6 +75,25 @@ describe('tier-guard tenant scope (IP-1)', () => {
     else process.env.MISSION_ID = savedMission;
     if (savedTenantScopeRequired === undefined) delete process.env.KYBERION_TENANT_SCOPE_REQUIRED;
     else process.env.KYBERION_TENANT_SCOPE_REQUIRED = savedTenantScopeRequired;
+  });
+
+  it('normalizes tenant authority records and rejects malformed group membership', () => {
+    expect(
+      normalizeRegisteredTenantProfile({ tenant_slug: 'acme-corp', status: 'active' })
+    ).toEqual({
+      tenant_slug: 'acme-corp',
+      status: 'active',
+    });
+    expect(normalizeRegisteredTenantProfile([])).toBeNull();
+    expect(normalizeRegisteredTenantProfile({ tenant_slug: 'acme-corp', status: 1 })).toBeNull();
+    expect(
+      isValidTenantGroupProfile('unit-shared', {
+        tenant_group_id: 'unit-shared',
+        status: 'active',
+        member_tenants: ['acme-corp', 7],
+        shared_prefixes: ['knowledge/confidential/shared/unit-shared/'],
+      })
+    ).toBe(false);
   });
 
   it('allows write inside the same tenant prefix', () => {

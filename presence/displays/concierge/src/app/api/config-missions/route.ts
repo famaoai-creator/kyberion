@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
+import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
 import {
-  buildExecutionEnv,
-  loadJson,
-  listTenantProfileSlugs,
-  pathResolver,
+  loadConfigMissionBriefAtPath,
+  loadConfigMissionPresetAtPath,
+} from '@agent/core/config-mission';
+import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
-  safeReadFile,
+  safeLstat,
   safeReaddir,
-  secureIo,
-  withExecutionContext,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import { readRequestObject } from '../../../lib/request-input';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
+import {
+  parseConfigMissionBrief,
+  parseConfigMissionPreset,
+  type ConfigMissionBrief,
+  type PresetSummary,
+} from '../config-mission-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,8 +39,8 @@ export const dynamic = 'force-dynamic';
  *
  * GET is a pure read: presets are plain JSON under
  * knowledge/product/config-missions/ and briefs are plain JSON under
- * knowledge/confidential/{tenant}/config-missions/ — both are read directly
- * via secure-io instead of spawning the CLI's print-formatted subcommands.
+ * knowledge/confidential/{tenant}/config-missions/ — both use the shared core
+ * schema loaders instead of spawning the CLI's print-formatted subcommands.
  */
 
 const PRESET_DIR_RELATIVE = 'knowledge/product/config-missions';
@@ -43,25 +54,6 @@ const INPUT_KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/i;
 // Inputs the CLI fills in itself — never collected from the client.
 const AUTO_INPUT_KEYS = new Set(['tenant', 'instance_id']);
 
-interface PresetInputSpec {
-  key: string;
-  type: 'string' | 'enum' | 'boolean' | 'secret';
-  description: string;
-  required: boolean;
-  values?: string[];
-  default?: string;
-}
-
-interface PresetSummary {
-  id: string;
-  category: string;
-  description: string;
-  inputs: PresetInputSpec[];
-  /** How many governed locations the change would touch (write_targets). */
-  write_target_count: number;
-  write_targets: string[];
-}
-
 interface RecentConfigMission {
   id: string;
   preset: string;
@@ -71,38 +63,25 @@ interface RecentConfigMission {
 }
 
 function readPresets(): PresetSummary[] {
-  const presetDir = pathResolver.rootResolve(PRESET_DIR_RELATIVE);
-  if (!safeExistsSync(presetDir)) return [];
+  let presetDir: string;
+  try {
+    presetDir = assertSafeRepositoryPath(pathResolver.rootResolve(PRESET_DIR_RELATIVE));
+    if (!safeLstat(presetDir).isDirectory()) return [];
+  } catch {
+    return [];
+  }
   const presets: PresetSummary[] = [];
   for (const name of (safeReaddir(presetDir) as string[]).filter((f) => f.endsWith('.json'))) {
     try {
-      const raw = safeReadFile(path.join(presetDir, name), { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
-      if (parsed.type !== 'config_mission' || typeof parsed.preset_id !== 'string') continue;
-      const inputs: PresetInputSpec[] = Object.entries(
-        (parsed.inputs || {}) as Record<string, Record<string, unknown>>
-      )
-        .filter(([key]) => !AUTO_INPUT_KEYS.has(key))
-        .map(([key, def]) => ({
-          key,
-          type: (['string', 'enum', 'boolean', 'secret'].includes(String(def.type))
-            ? String(def.type)
-            : 'string') as PresetInputSpec['type'],
-          description: String(def.description || ''),
-          required: def.required !== false && def.default === undefined,
-          ...(Array.isArray(def.values) ? { values: def.values.map(String) } : {}),
-          ...(def.default !== undefined ? { default: String(def.default) } : {}),
-        }));
-      const writeTargets = Array.isArray(parsed.write_targets)
-        ? parsed.write_targets.map(String)
-        : [];
+      const presetPath = assertSafeRepositoryPath(path.join(presetDir, name), {
+        allowMissingLeaf: true,
+      });
+      if (!safeExistsSync(presetPath) || !safeLstat(presetPath).isFile()) continue;
+      const parsed = parseConfigMissionPreset(loadConfigMissionPresetAtPath(presetPath));
+      if (!parsed) continue;
       presets.push({
-        id: parsed.preset_id,
-        category: String(parsed.category || ''),
-        description: String(parsed.description || ''),
-        inputs,
-        write_target_count: writeTargets.length,
-        write_targets: writeTargets,
+        ...parsed,
+        inputs: parsed.inputs.filter((input) => !AUTO_INPUT_KEYS.has(input.key)),
       });
     } catch {
       // An unreadable preset is skipped, never fabricated.
@@ -115,13 +94,14 @@ function briefDirRelative(tenant: string): string {
   return `knowledge/confidential/${tenant}/config-missions`;
 }
 
-function readBrief(tenant: string, instanceId: string): Record<string, unknown> | null {
-  const briefPath = pathResolver.rootResolve(
-    path.join(briefDirRelative(tenant), instanceId, 'brief.json')
-  );
-  if (!safeExistsSync(briefPath)) return null;
+function readBrief(tenant: string, instanceId: string): ConfigMissionBrief | null {
   try {
-    return loadJson<Record<string, unknown>>(briefPath);
+    const briefPath = assertSafeRepositoryPath(
+      pathResolver.rootResolve(path.join(briefDirRelative(tenant), instanceId, 'brief.json')),
+      { allowMissingLeaf: true }
+    );
+    if (!safeExistsSync(briefPath) || !safeLstat(briefPath).isFile()) return null;
+    return parseConfigMissionBrief(loadConfigMissionBriefAtPath(briefPath));
   } catch {
     return null;
   }
@@ -130,8 +110,15 @@ function readBrief(tenant: string, instanceId: string): Record<string, unknown> 
 function readRecentMissions(tenants: string[]): RecentConfigMission[] {
   const recent: RecentConfigMission[] = [];
   for (const tenant of tenants) {
-    const dir = pathResolver.rootResolve(briefDirRelative(tenant));
-    if (!safeExistsSync(dir)) continue;
+    let dir: string;
+    try {
+      dir = assertSafeRepositoryPath(pathResolver.rootResolve(briefDirRelative(tenant)), {
+        allowMissingLeaf: true,
+      });
+      if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) continue;
+    } catch {
+      continue;
+    }
     for (const entry of (safeReaddir(dir) as string[]).filter((e) => e.startsWith('cfg-'))) {
       const brief = readBrief(tenant, entry);
       if (!brief) continue;
@@ -151,7 +138,9 @@ function readRecentMissions(tenants: string[]): RecentConfigMission[] {
     .slice(0, MAX_RECENT);
 }
 
-export function GET() {
+export function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
   try {
     const payload = withExecutionContext('sovereign_concierge', () => {
       const presets = readPresets();
@@ -161,10 +150,7 @@ export function GET() {
     });
     return NextResponse.json({ ok: true, ...payload });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error, 500);
   }
 }
 
@@ -177,7 +163,10 @@ export async function POST(req: NextRequest) {
     conciergeText(key, locale, params);
 
   try {
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const parsedBody = await readRequestObject(req, 'request body', ['preset', 'tenant', 'inputs']);
+    if (!parsedBody.ok)
+      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
+    const { body } = parsedBody;
     const presetId = typeof body?.preset === 'string' ? body.preset.trim() : '';
     const tenant = typeof body?.tenant === 'string' ? body.tenant.trim() : '';
     const rawInputs =
@@ -251,7 +240,14 @@ export async function POST(req: NextRequest) {
 
     const rootDir = pathResolver.rootDir();
     const scriptPath = pathResolver.rootResolve(SCRIPT_RELATIVE);
-    if (!safeExistsSync(scriptPath)) {
+    let scriptReady = false;
+    try {
+      const safeScriptPath = assertSafeRepositoryPath(scriptPath, { allowMissingLeaf: true });
+      scriptReady = safeExistsSync(safeScriptPath) && safeLstat(safeScriptPath).isFile();
+    } catch {
+      scriptReady = false;
+    }
+    if (!scriptReady) {
       console.error(`[concierge/config-missions] config-mission build missing: ${scriptPath}`);
       return NextResponse.json({ ok: false, error: t('api.config.failed') }, { status: 503 });
     }

@@ -11,7 +11,7 @@ import {
   OPS_ALERT_WEBHOOK_ENV,
 } from './ops-alert.js';
 import { pathResolver } from './index.js';
-import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const ALERT_TEST_LOG = pathResolver.sharedTmp('ops-alert-test/alerts.jsonl');
 
@@ -288,5 +288,42 @@ describe('ops-alert triage (LC-02a)', () => {
     expect(
       resolveOpsAlertChannelStatus({ webhookUrl: '', operatorRouteConfigured: true }).configured
     ).toBe(true);
+  });
+
+  it('treats schema-invalid persisted records as unknown and non-actionable', () => {
+    seedTriageLog([
+      JSON.stringify({
+        id: 'bad-alert',
+        timestamp: '2026-08-01T00:00:00.000Z',
+        suppressed: false,
+        severity: 'critical',
+        title: 'Invalid alert',
+        context: [],
+        recommendation: 'not valid',
+      }),
+    ]);
+    const records = readOpsAlertLogRecords(TRIAGE_LOG);
+    expect(records).toHaveLength(1);
+    expect(records[0]!.kind).toBe('unknown');
+    expect(summarizeOpsAlertLog(records).alerts.total).toBe(0);
+  });
+
+  it('rejects a log path that is a directory before reading or writing', () => {
+    const directoryPath = pathResolver.sharedTmp('ops-alert-triage-test/directory.jsonl');
+    safeRmSync(directoryPath, { recursive: true, force: true });
+    safeMkdir(directoryPath, { recursive: true });
+    expect(() => readOpsAlertLogRecords(directoryPath)).toThrow(/regular file/);
+    expect(() =>
+      sendOpsAlert(
+        {
+          severity: 'warning',
+          title: 'Directory target',
+          context: {},
+          recommendation: 'stop',
+        },
+        { alertLogPath: directoryPath, now: new Date('2026-08-08T00:00:00.000Z') }
+      )
+    ).toThrow(/regular file/);
+    safeRmSync(directoryPath, { recursive: true, force: true });
   });
 });

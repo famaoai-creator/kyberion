@@ -20,8 +20,10 @@
  */
 import * as path from 'node:path';
 import ts from 'typescript';
-import { safeReadFile, safeWriteFile, safeReaddir, safeLstat } from '@agent/core/secure-io';
+import { readTextFile } from '@agent/core/foundation';
+import { safeWriteFile, safeReaddir, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
 const SKIP_DIRS = new Set([
@@ -35,6 +37,13 @@ const SKIP_DIRS = new Set([
   '__snapshots__',
   'test-results',
 ]);
+
+export function readPruneUnusedImportsTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 export interface PruneFileResult {
   /** Repo-relative path. */
@@ -394,7 +403,10 @@ function report(results: PruneFileResult[], options: CliOptions): void {
     skipped: results.filter((entry) => entry.skippedReason).map((entry) => entry.file),
   };
 
-  const byDirectory = new Map<string, { files: number; specifiers: number; declarations: number }>();
+  const byDirectory = new Map<
+    string,
+    { files: number; specifiers: number; declarations: number }
+  >();
   for (const entry of touched) {
     const key = groupKey(entry.file);
     const bucket = byDirectory.get(key) ?? { files: 0, specifiers: 0, declarations: 0 };
@@ -467,7 +479,7 @@ export function run(argv: string[]): void {
 
   const results: PruneFileResult[] = [];
   for (const file of selected) {
-    const text = String(safeReadFile(file, { encoding: 'utf8' }));
+    const text = readPruneUnusedImportsTextFile(file);
     if (!text.includes('import')) continue;
     const result = pruneFile(file, text);
     results.push(result);
@@ -478,7 +490,16 @@ export function run(argv: string[]): void {
   report(results, options);
 }
 
-const entry = process.argv[1] ?? '';
-if (entry.endsWith('prune_unused_imports.ts')) {
-  run(process.argv.slice(2));
-}
+export const runPruneUnusedImports = defineScript({
+  name: 'refactor:prune-unused-imports',
+  flags: [],
+  run({ argv }) {
+    run(argv);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'refactor/prune_unused_imports.ts') ||
+  isDirectScript(import.meta.url, 'refactor/prune_unused_imports.js')
+)
+  void runPruneUnusedImports();

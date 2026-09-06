@@ -24,7 +24,8 @@
 import * as path from 'node:path';
 import * as pathResolver from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { safeExistsSync, safeReadFile } from '../secure-io.js';
+import { readTextFile } from '../foundation/text.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import {
   COMMON_TENANT_SLUG,
   listAssets,
@@ -82,7 +83,13 @@ function sortCodepoint(values: string[]): string[] {
 function resolvePathOptions(options?: IngestLedgerPathOptions): IngestLedgerPathOptions {
   if (options && Object.keys(options).length > 0) return options;
   const override = getRegisteredEnvText('KYBERION_CURATION_TENANT_ROOTDIR')?.trim();
-  return override ? { rootDir: pathResolver.rootResolve(override) } : {};
+  return override
+    ? {
+        rootDir: assertSafeRepositoryPath(pathResolver.rootResolve(override), {
+          allowMissingLeaf: true,
+        }),
+      }
+    : {};
 }
 
 /**
@@ -133,9 +140,11 @@ export function computeTenantIngestCuration(input: {
       const cardAbs = path.join(rootDir, ...asset.target_path.split('/'));
       if (safeExistsSync(cardAbs)) {
         try {
-          const content = String(safeReadFile(cardAbs, { encoding: 'utf8' }));
-          kind = extractFrontmatterValue(content, 'kind') ?? kind;
-          lastUpdated = extractFrontmatterValue(content, 'last_updated');
+          if (safeLstat(cardAbs).isFile()) {
+            const content = readTextFile(cardAbs);
+            kind = extractFrontmatterValue(content, 'kind') ?? kind;
+            lastUpdated = extractFrontmatterValue(content, 'last_updated');
+          }
         } catch {
           /* unreadable card: fall back to the ledger below */
         }

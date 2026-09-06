@@ -1,7 +1,15 @@
 import * as path from 'node:path';
-import { sharedTmp } from './path-resolver.js';
+import { pathResolver, sharedTmp } from './path-resolver.js';
 import { logger } from './core.js';
-import { safeExistsSync, safeReadFile, safeUnlinkSync, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 /**
  * IL-01: carries the interpreted user intent (source utterance + agreed goal)
@@ -25,11 +33,137 @@ export interface IntentGoalHandoff {
 }
 
 const HANDOFF_SUBDIR = 'intent-handoff';
+const HANDOFF_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/intent-goal-handoff.schema.json'
+);
+
+const HANDOFF_FIELDS = [
+  'source_text',
+  'correlation_id',
+  'origin_intent_id',
+  'origin_utterance_ref',
+  'goal',
+  'outcome_ids',
+] as const;
+
+function optionalHandoffText(
+  record: Record<string, unknown>,
+  key: string
+): string | undefined | null {
+  const value = record[key];
+  if (value === undefined) return undefined;
+  return typeof value === 'string' ? value : null;
+}
+
+function parseIntentGoalHandoff(value: unknown): IntentGoalHandoff | null {
+  let record: Record<string, unknown>;
+  try {
+    record = parseSafeJsonObjectValue(value, 'intent goal handoff');
+  } catch {
+    return null;
+  }
+  if (
+    Object.keys(record).some(
+      (key) => !HANDOFF_FIELDS.includes(key as (typeof HANDOFF_FIELDS)[number])
+    )
+  ) {
+    return null;
+  }
+
+  const sourceText = optionalHandoffText(record, 'source_text');
+  const correlationId = optionalHandoffText(record, 'correlation_id');
+  const originIntentId = optionalHandoffText(record, 'origin_intent_id');
+  const originUtteranceRef = optionalHandoffText(record, 'origin_utterance_ref');
+  if (
+    sourceText === null ||
+    correlationId === null ||
+    originIntentId === null ||
+    originUtteranceRef === null
+  ) {
+    return null;
+  }
+
+  let goal: IntentGoalHandoff['goal'];
+  if (record.goal !== undefined) {
+    let goalRecord: Record<string, unknown>;
+    try {
+      goalRecord = parseSafeJsonObjectValue(record.goal, 'intent goal handoff goal');
+    } catch {
+      return null;
+    }
+    if (!Object.keys(goalRecord).every((key) => key === 'summary' || key === 'success_condition')) {
+      return null;
+    }
+    const summary = optionalHandoffText(goalRecord, 'summary');
+    const successCondition = optionalHandoffText(goalRecord, 'success_condition');
+    if (summary === null || successCondition === null) return null;
+    goal = {
+      ...(summary === undefined ? {} : { summary }),
+      ...(successCondition === undefined ? {} : { success_condition: successCondition }),
+    };
+  }
+
+  let outcomeIds: string[] | undefined;
+  if (record.outcome_ids !== undefined) {
+    if (
+      !Array.isArray(record.outcome_ids) ||
+      record.outcome_ids.some((entry) => typeof entry !== 'string' || !entry.trim())
+    ) {
+      return null;
+    }
+    outcomeIds = record.outcome_ids.map((entry) => entry.trim());
+  }
+
+  return {
+    ...(sourceText === undefined ? {} : { source_text: sourceText }),
+    ...(correlationId === undefined ? {} : { correlation_id: correlationId }),
+    ...(originIntentId === undefined ? {} : { origin_intent_id: originIntentId }),
+    ...(originUtteranceRef === undefined ? {} : { origin_utterance_ref: originUtteranceRef }),
+    ...(goal === undefined ? {} : { goal }),
+    ...(outcomeIds === undefined ? {} : { outcome_ids: outcomeIds }),
+  };
+}
+
+/** Load one persisted handoff through the canonical schema and file boundary. */
+export function loadIntentGoalHandoffAtPath(filePath: string): IntentGoalHandoff {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[INTENT_HANDOFF] handoff must be a regular file: ${filePath}`);
+  }
+  const validated = defineCatalog<IntentGoalHandoff>({
+    id: 'intent-goal-handoff',
+    path: safeFilePath,
+    schema: HANDOFF_SCHEMA_PATH,
+  }).load();
+  const parsed = parseIntentGoalHandoff(validated);
+  if (!parsed) {
+    throw new Error(`[INTENT_HANDOFF] invalid handoff payload: ${filePath}`);
+  }
+  return parsed;
+}
 
 export function writeIntentGoalHandoff(missionId: string, payload: IntentGoalHandoff): string {
-  const fileName = `${missionId}-${Date.now().toString(36)}.json`;
-  const handoffPath = sharedTmp(path.join(HANDOFF_SUBDIR, fileName));
-  safeWriteFile(handoffPath, JSON.stringify(payload, null, 2));
+  const normalizedMissionId = String(missionId || '').trim();
+  if (
+    !normalizedMissionId ||
+    normalizedMissionId === '.' ||
+    normalizedMissionId === '..' ||
+    /[\\/]/u.test(normalizedMissionId)
+  ) {
+    throw new Error('intent handoff missionId must be a single safe path segment');
+  }
+  const fileName = `${normalizedMissionId}-${Date.now().toString(36)}.json`;
+  const handoffPath = assertSafeRepositoryPath(sharedTmp(path.join(HANDOFF_SUBDIR, fileName)), {
+    allowMissingLeaf: true,
+  });
+  const parsedPayload = parseIntentGoalHandoff(payload);
+  if (!parsedPayload) throw new Error('Invalid intent goal handoff payload');
+  const canonicalPayload = defineCatalog<IntentGoalHandoff>({
+    id: 'intent-goal-handoff',
+    path: handoffPath,
+    schema: HANDOFF_SCHEMA_PATH,
+  }).validate(parsedPayload, handoffPath);
+  safeWriteFile(handoffPath, JSON.stringify(canonicalPayload, null, 2));
   return handoffPath;
 }
 
@@ -39,15 +173,22 @@ export function writeIntentGoalHandoff(missionId: string, payload: IntentGoalHan
  */
 export function consumeIntentGoalHandoff(handoffPath: string): IntentGoalHandoff | null {
   try {
-    if (!handoffPath || !safeExistsSync(handoffPath)) return null;
-    const raw = safeReadFile(handoffPath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as IntentGoalHandoff;
+    const safeHandoffPath = assertSafeRepositoryPath(handoffPath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeHandoffPath)) return null;
+    let parsed: IntentGoalHandoff | null;
     try {
-      safeUnlinkSync(handoffPath);
+      parsed = loadIntentGoalHandoffAtPath(safeHandoffPath);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn(`[intent-handoff] failed to parse ${handoffPath}: ${message}`);
+      parsed = null;
+    }
+    try {
+      safeUnlinkSync(safeHandoffPath);
     } catch {
       // Deletion failure is non-fatal; the janitor's tmp TTL is the backstop.
     }
-    return parsed && typeof parsed === 'object' ? parsed : null;
+    return parsed;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.warn(`[intent-handoff] failed to consume ${handoffPath}: ${message}`);

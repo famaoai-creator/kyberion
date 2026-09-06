@@ -18,36 +18,41 @@
  * on demand or with `--watch <seconds>`.
  */
 import * as path from 'node:path';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import * as customerResolver from '@agent/core/customer-resolver';
+import { listApprovalRequests } from '@agent/core/approval-store';
+import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
+import { listDeals } from '@agent/core/deal-store';
+import { listInboxEntries } from '@agent/core/deliverable-inbox';
+import { listProcessImprovementProposals } from '@agent/core/mission-retrospective';
+import { listAgentRuntimeSnapshots } from '@agent/core/agent-runtime-supervisor';
 import {
-  createStandardYargs,
-  customerResolver,
-  listApprovalRequests,
-  listCustomerChannelBindings,
-  listDeals,
-  listInboxEntries,
-  listProcessImprovementProposals,
-  listAgentRuntimeSnapshots,
   composeOfficeSnapshot as composeChronosOfficeSnapshot,
   type OfficeSnapshot as ChronosOfficeSnapshot,
-  loadOrganizationProfile,
-  loadOnboardingContextBinding,
-  getProjectManagementView,
-  listProjectRecords,
-  listTenants,
-  listTaskSessions,
-  loadAgentProfileIndex,
-  resolveOrganizationOrgChart,
-  summarizeOrganizationOrgChart,
-  pathResolver,
+} from '@agent/core/ce-adoption';
+import { loadOrganizationProfile } from '@agent/core/organization-profile';
+import { loadOnboardingContextBinding } from '@agent/core/onboarding-context';
+import { getProjectManagementView } from '@agent/core/project-management';
+import { listProjectRecords } from '@agent/core/project-registry';
+import { listTenants } from '@agent/core/tenant-governance';
+import { listTaskSessions } from '@agent/core/task-session';
+import { loadAgentProfileIndex } from '@agent/core/mission-team-index';
+import { loadAgentPerformanceIndex } from '@agent/core/agent-performance-index';
+import { loadStateAtPath } from '@agent/core/mission-state';
+import { readOpsAlertLogRecords } from '@agent/core/ops-alert';
+import { resolveOrganizationOrgChart, summarizeOrganizationOrgChart } from '@agent/core/org-chart';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
-  safeReadFile,
   safeWriteFile,
-  isValidTenantSlug,
-  readCanonicalWorkGraph,
-} from '@agent/core';
-import { getRegisteredEnvText, readJson as readFoundationJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import { readCanonicalWorkGraph } from '@agent/core/work-graph-projection';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 
 // ---------- data collection ----------
 
@@ -158,15 +163,6 @@ interface OfficeSnapshot {
   chronos_projection: ChronosOfficeSnapshot;
 }
 
-function readJson<T>(filePath: string): T | null {
-  try {
-    if (!safeExistsSync(filePath)) return null;
-    return readFoundationJson<T>(filePath);
-  } catch {
-    return null;
-  }
-}
-
 function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
   const roots: Array<{ dir: string; tier: string }> = [
     { dir: pathResolver.rootResolve('active/missions'), tier: 'legacy' },
@@ -176,18 +172,32 @@ function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
   ];
   const found: Array<{ missionPath: string; tier: string }> = [];
   for (const root of roots) {
-    if (!safeExistsSync(root.dir)) continue;
+    let safeRoot: string;
+    try {
+      safeRoot = assertSafeRepositoryPath(root.dir, { allowMissingLeaf: true });
+      if (!safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) continue;
+    } catch {
+      continue;
+    }
     let entries: string[] = [];
     try {
-      entries = safeReaddir(root.dir);
+      entries = safeReaddir(safeRoot);
     } catch {
       continue;
     }
     for (const entry of entries) {
       if (['public', 'confidential', 'personal', 'ephemeral'].includes(entry)) continue;
-      const missionPath = path.join(root.dir, entry);
-      if (safeExistsSync(path.join(missionPath, 'mission-state.json'))) {
+      try {
+        const missionPath = assertSafeRepositoryPath(path.join(safeRoot, entry), {
+          allowMissingLeaf: true,
+        });
+        const statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
+          allowMissingLeaf: true,
+        });
+        if (!safeLstat(missionPath).isDirectory() || !safeExistsSync(statePath)) continue;
         found.push({ missionPath, tier: root.tier });
+      } catch {
+        continue;
       }
     }
   }
@@ -368,14 +378,8 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   const archivedRecent: Array<{ id: string; mtime: number }> = [];
 
   for (const { missionPath, tier } of listMissionDirs()) {
-    const state = readJson<{
-      mission_id?: string;
-      status?: string;
-      mission_type?: string;
-      tenant_slug?: string;
-      tenant_id?: string;
-    }>(path.join(missionPath, 'mission-state.json'));
-    if (!state?.mission_id) continue;
+    const state = loadStateAtPath(path.join(missionPath, 'mission-state.json'));
+    if (!state) continue;
     if (!missionMatchesTenant({ ...state, tier }, visibleTenantSlugs, allowUnscopedRecords))
       continue;
     const status = String(state.status || 'unknown');
@@ -521,21 +525,8 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   });
 
   // performance index (retrospective loop output)
-  const performanceFile = tenantScopeReadable
-    ? readJson<{
-        by_agent_role?: Record<
-          string,
-          {
-            samples: number;
-            success: number;
-            review: number;
-            blocked: number;
-            success_rate: number;
-          }
-        >;
-      }>(pathResolver.shared('observability/retrospectives/agent-performance.json'))
-    : null;
-  const performance = Object.entries(performanceFile?.by_agent_role || {})
+  const performanceFile = tenantScopeReadable ? loadAgentPerformanceIndex() : {};
+  const performance = Object.entries(performanceFile)
     .map(([key, record]) => {
       const [agent, role] = key.split('|');
       return { agent, role, samples: record.samples, success_rate: record.success_rate };
@@ -544,12 +535,13 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     .slice(0, 10);
 
   // customer front desk
-  // Deal files live in the customer overlay; tenant_slug on each deal is the
-  // canonical sub-scope. Do not enumerate other customer roots while a
-  // customer or explicit tenant scope is active.
+  // Deal files are tenant-scoped; customer stance is not a tenant slug. Use
+  // only the already-resolved visible tenant set when a registry is present.
   const channelBindings = customerSlug ? [] : listCustomerChannelBindings();
   const dealRoots = customerSlug
-    ? [customerSlug]
+    ? visibleTenantSlugs
+      ? Array.from(visibleTenantSlugs)
+      : [customerSlug]
     : requestedTenantSlug
       ? [requestedTenantSlug]
       : Array.from(
@@ -587,26 +579,19 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
       return entryTenant ? visibleTenantSlugs.has(entryTenant) : allowUnscopedRecords;
     }).length;
   // bulletin board
-  const alertLines =
-    tenantScopeReadable && safeExistsSync(pathResolver.shared('observability/ops-alerts.jsonl'))
-      ? String(
-          safeReadFile(pathResolver.shared('observability/ops-alerts.jsonl'), { encoding: 'utf8' })
-        )
-          .trim()
-          .split('\n')
-          .slice(-5)
-      : [];
-  const alerts = alertLines
-    .map((line) => {
-      try {
-        const parsed = JSON.parse(line) as { title?: string; severity?: string };
-        return {
-          title: String(parsed.title || '').slice(0, 70),
-          severity: String(parsed.severity || 'info'),
-        };
-      } catch {
-        return null;
-      }
+  const alerts = (
+    tenantScopeReadable
+      ? readOpsAlertLogRecords(pathResolver.shared('observability/ops-alerts.jsonl'))
+      : []
+  )
+    .slice(-5)
+    .map((record) => {
+      const raw = record?.raw;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+      const title = typeof raw.title === 'string' ? raw.title : '';
+      if (!title) return null;
+      const severity = typeof raw.severity === 'string' ? raw.severity : 'info';
+      return { title: title.slice(0, 70), severity };
     })
     .filter((entry): entry is { title: string; severity: string } => Boolean(entry))
     .reverse();
@@ -704,7 +689,7 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     }));
 
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     customer_slug: customerSlug,
     tenant_slug: tenantSlug,
     tenant_scope: requestedTenantSlug,
@@ -1267,17 +1252,20 @@ ${legend}
 // ---------- main ----------
 
 const DEFAULT_OUT = 'active/shared/exports/virtual-office/office.html';
+type Print = (value: unknown) => void;
 
 async function generateOnce(outPath: string, refreshSeconds?: number): Promise<string> {
   const snapshot = collectOfficeSnapshot();
   const html = renderOfficeHtml(snapshot, refreshSeconds);
-  const resolved = pathResolver.rootResolve(outPath);
+  const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(outPath), {
+    allowMissingLeaf: true,
+  });
   safeWriteFile(resolved, html, { encoding: 'utf8', mkdir: true });
   return resolved;
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
+  const argv = await createStandardYargs(['node', 'virtual_office', ...args])
     .option('out', { type: 'string', default: DEFAULT_OUT })
     .option('watch', {
       type: 'number',
@@ -1287,26 +1275,36 @@ async function main(): Promise<void> {
 
   const watchSeconds = argv.watch && argv.watch > 0 ? Math.max(5, argv.watch) : undefined;
   const written = await generateOnce(String(argv.out), watchSeconds);
-  console.log(`[virtual-office] ${written}`);
-  console.log(`[virtual-office] open it: open "${written}"`);
+  print(`[virtual-office] ${written}`);
+  print(`[virtual-office] open it: open "${written}"`);
   if (watchSeconds) {
-    console.log(`[virtual-office] watching — regenerating every ${watchSeconds}s (Ctrl-C to stop)`);
+    print(`[virtual-office] watching — regenerating every ${watchSeconds}s (Ctrl-C to stop)`);
     setInterval(() => {
       void generateOnce(String(argv.out), watchSeconds)
         .then((writtenPath) => {
-          console.log(`[virtual-office] refreshed ${writtenPath} @ ${new Date().toISOString()}`);
+          print(`[virtual-office] refreshed ${writtenPath} @ ${nowIso()}`);
         })
-        .catch((error) => console.error(`[virtual-office] regeneration failed: ${error}`));
+        .catch((error) =>
+          print(
+            `[virtual-office] regeneration failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          )
+        );
     }, watchSeconds * 1000);
   }
 }
 
-const isDirectRun =
+export { generateOnce };
+
+export const runVirtualOffice = defineScript({
+  name: 'office',
+  flags: [],
+  run: ({ argv, print }) => main(argv, print),
+});
+
+if (
   isDirectScript(import.meta.url, 'virtual_office.ts') ||
-  isDirectScript(import.meta.url, 'virtual_office.js');
-if (isDirectRun) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
-}
+  isDirectScript(import.meta.url, 'virtual_office.js')
+)
+  void runVirtualOffice();

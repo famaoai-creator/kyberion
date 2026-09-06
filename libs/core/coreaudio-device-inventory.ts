@@ -1,5 +1,6 @@
 import { safeExecResult } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import type { AudioDeviceDescriptor } from './audio-route.js';
 import { isRecord } from './foundation/text.js';
 
@@ -41,7 +42,7 @@ export interface AudioDeviceResolution {
 function parseDevices(stdout: string): AudioDeviceDescriptor[] {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stdout);
+    parsed = parseSafeJsonInput(stdout, 'CoreAudio device inventory response');
   } catch {
     return [];
   }

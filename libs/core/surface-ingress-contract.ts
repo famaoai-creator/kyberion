@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { SlackSurfaceInput, SurfaceAsyncChannel } from './channel-surface-types.js';
+import { nowIso } from './foundation/time.js';
 
 export interface SurfaceIngressEnvelope {
   messageId: string;
@@ -22,7 +23,7 @@ export function buildSlackSurfaceIngressEnvelope(input: SlackSurfaceInput & { co
     threadTs: input.threadTs || input.ts || 'unknown',
     correlationId: input.correlationId || randomUUID(),
     text: input.text,
-    receivedAt: input.ts || new Date().toISOString(),
+    receivedAt: input.ts || nowIso(),
     actorId: 'slack-surface-agent',
     metadata: {
       user: input.user,
@@ -47,7 +48,7 @@ export function buildChronosSurfaceIngressEnvelope(input: {
     threadTs: input.sessionId || 'chronos-default',
     correlationId: input.correlationId || randomUUID(),
     text: input.text,
-    receivedAt: input.receivedAt || new Date().toISOString(),
+    receivedAt: input.receivedAt || nowIso(),
     actorId: input.requesterId || 'chronos-ui',
   };
 }
@@ -68,7 +69,7 @@ export function buildPresenceSurfaceIngressEnvelope(input: {
     threadTs: input.threadTs || 'presence-default',
     correlationId: input.correlationId || randomUUID(),
     text: input.text,
-    receivedAt: input.receivedAt || new Date().toISOString(),
+    receivedAt: input.receivedAt || nowIso(),
     actorId: input.speakerId || 'presence-user',
   };
 }

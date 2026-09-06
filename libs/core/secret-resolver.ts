@@ -21,6 +21,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface ResolveSecretInput {
@@ -219,7 +220,7 @@ export class ShellSecretResolver implements SecretResolver {
     const cmd = this.options.command
       .replace(/\{\{key\}\}/gu, input.key)
       .replace(/\{\{scope\}\}/gu, input.scope ?? '');
-    const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
+    const shell = this.options.shell ?? getRegisteredEnvText('SHELL') ?? '/bin/sh';
     try {
       const stdout = execFileSync(shell, ['-c', cmd], {
         encoding: 'utf8',
@@ -241,15 +242,14 @@ export class ShellSecretResolver implements SecretResolver {
  * KYBERION_SECRET_RESOLVER_COMMAND is set.
  */
 export function installSecretResolverIfAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
-  const command = env.KYBERION_SECRET_RESOLVER_COMMAND?.trim();
+  const command = getRegisteredEnvText('KYBERION_SECRET_RESOLVER_COMMAND', { env })?.trim();
   if (!command) return false;
+  const timeoutRaw = getRegisteredEnvText('KYBERION_SECRET_RESOLVER_TIMEOUT_MS', { env })?.trim();
   resetSecretResolver();
   registerSecretResolver(
     new ShellSecretResolver({
       command,
-      ...(env.KYBERION_SECRET_RESOLVER_TIMEOUT_MS
-        ? { timeoutMs: parseInt(env.KYBERION_SECRET_RESOLVER_TIMEOUT_MS, 10) }
-        : {}),
+      ...(timeoutRaw ? { timeoutMs: parseInt(timeoutRaw, 10) } : {}),
     })
   );
   logger.success(

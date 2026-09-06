@@ -82,8 +82,3 @@ export function getActuatorDependencyBundle(
     loadActuatorDependencyBundles().bundles.find((bundle) => bundle.actuator === normalized) || null
   );
 }
-
-export function resetActuatorDependencyBundlesCache(): void {
-  cachedCatalog = null;
-  cachedKey = null;
-}

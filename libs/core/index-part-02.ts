@@ -66,9 +66,25 @@ export type {
 
 export * from './company.js';
 
+export * from './i18n-hardcoding-baseline.js';
+
+export * from './frontmatter-exclusions.js';
+
+export * from './knowledge-usage-aggregate.js';
+export * from './knowledge-index-cache.js';
+
+export * from './analysis-config.js';
+
+export * from './knowledge-index-usage.js';
+
+export * from './knowledge-taxonomy.js';
+export * from './volatile-knowledge.js';
+
 export * from './financial-model.js';
 
 export * from './finance-controller.js';
+
+export * from './finance-controller-cost-report.js';
 
 export * from './okr-tracker.js';
 
@@ -81,6 +97,12 @@ export * from './approval-audit.js';
 export * from './org-chart.js';
 
 export * from './daemon-heartbeat.js';
+
+export * from './soak-restart-state.js';
+
+export * from './soak-evidence-manifest.js';
+
+export * from './i18n-coverage-history.js';
 
 export * from './ops-alert.js';
 
@@ -275,6 +297,7 @@ export {
   listBoards,
   listCoordinationEvents,
   listWorkItems,
+  loadWorkBoardCatalogAtPath,
   migrateLegacyWorkItemContexts,
   normalizeWorkItemLabels,
   releaseWorkItem,
@@ -297,6 +320,7 @@ export type {
   RenewWorkItemLeaseInput,
   UpdateWorkItemInput,
   WorkBoard,
+  WorkBoardCatalog,
   WorkBoardFilter,
   WorkBoardType,
   WorkCoordinationEventType,

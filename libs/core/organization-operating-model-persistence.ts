@@ -1,29 +1,24 @@
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
-import addFormatsModule from 'ajv-formats';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { t } from './t.js';
 import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { auditChain } from './audit-chain.js';
 import { resolveTenant } from './tenant-registry.js';
-import { getRegisteredEnvText } from './foundation/env.js';
-import { createAjv } from './foundation/ajv.js';
+import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
+import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
-  loadJson,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
-
-type AddFormatsPlugin = (instance: ReturnType<typeof createAjv>) => void;
-const addFormats =
-  (addFormatsModule as unknown as { default?: AddFormatsPlugin }).default ||
-  (addFormatsModule as unknown as AddFormatsPlugin);
-const ajv = createAjv();
-addFormats(ajv);
 
 import type {
   OrganizationTier,
@@ -103,12 +98,17 @@ const CAPABILITY_FILE_NAME = 'capability.json';
 const SERVICE_FILE_NAME = 'service.json';
 const SERVICE_STATE_FILE_NAME = 'service-state.json';
 const OPERATION_FILE_NAME = 'operation.json';
+const organizationOperatingModelCatalog = defineCatalog<OrganizationOperatingModelCatalog>({
+  id: 'organization-operating-model',
+  path: CATALOG_PATH,
+  schema: CATALOG_SCHEMA_PATH,
+});
 const validatorCache = new Map<string, ValidateFunction>();
 
 export function validatorFor(schemaPath: string): ValidateFunction {
   const cached = validatorCache.get(schemaPath);
   if (cached) return cached;
-  const validator = ajv.compile(loadJson<unknown>(schemaPath));
+  const validator = compileSchema(schemaPath);
   validatorCache.set(schemaPath, validator);
   return validator;
 }
@@ -159,7 +159,7 @@ export function assertRecordIdentity(
   recordTenant(record);
   if (
     record.tenant_slug &&
-    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST)
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
   ) {
     resolveTenant(record.tenant_slug, { rootDir });
   }
@@ -173,9 +173,12 @@ export function statePath(
 ): string {
   assertOrganizationId(organizationId);
   assertTenantSlug(tenantSlug);
-  return path.join(
-    pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
-    STATE_FILE_NAME
+  return assertSafeRepositoryPath(
+    path.join(
+      pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
+      STATE_FILE_NAME
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -187,9 +190,12 @@ export function purposePath(
 ): string {
   assertOrganizationId(organizationId);
   assertTenantSlug(tenantSlug);
-  return path.join(
-    pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
-    PURPOSE_FILE_NAME
+  return assertSafeRepositoryPath(
+    path.join(
+      pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
+      PURPOSE_FILE_NAME
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -215,11 +221,14 @@ export function recordPath(
   assertOrganizationId(recordId);
   assertOrganizationId(organizationId);
   assertTenantSlug(tenantSlug);
-  return path.join(
-    pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
-    kind,
-    recordId,
-    fileName
+  return assertSafeRepositoryPath(
+    path.join(
+      pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
+      kind,
+      recordId,
+      fileName
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -233,13 +242,61 @@ export function recordQueryTenant(tenantSlug?: string): string {
   return tenant;
 }
 
-export function readJsonRecord<T>(filePath: string, label: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return loadJson<T>(filePath);
-  } catch (error) {
-    throw new Error(`Unable to read ${label} at ${filePath}: ${String(error)}`);
+function loadOrganizationRecordAtPath<T>(
+  filePath: string,
+  schemaPath: string,
+  label: string
+): T | null {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath)) return null;
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[ORGANIZATION_RECORD] ${label} must be a regular file: ${filePath}`);
   }
+  try {
+    return defineCatalog<T>({
+      id: `organization-${label}`,
+      path: safeFilePath,
+      schema: schemaPath,
+    }).load();
+  } catch (error) {
+    throw new Error(`Unable to read ${label} at ${safeFilePath}: ${String(error)}`);
+  }
+}
+
+const ORGANIZATION_RECORD_SCHEMA_BY_LABEL: Record<string, string> = {
+  'organization purpose': PURPOSE_SCHEMA_PATH,
+  'organization operational state': STATE_SCHEMA_PATH,
+  'organization domain': DOMAIN_SCHEMA_PATH,
+  'organization capability': CAPABILITY_SCHEMA_PATH,
+  'organization service': SERVICE_SCHEMA_PATH,
+  'organization service state': SERVICE_STATE_SCHEMA_PATH,
+  'organization operation': OPERATION_SCHEMA_PATH,
+  'organization operation state': OPERATION_STATE_SCHEMA_PATH,
+  'organization operation run': OPERATION_RUN_SCHEMA_PATH,
+  'organization incident': INCIDENT_SCHEMA_PATH,
+  'organization cadence': CADENCE_SCHEMA_PATH,
+  'organization decision': DECISION_SCHEMA_PATH,
+  'organization learning candidate': LEARNING_SCHEMA_PATH,
+};
+
+/** Compatibility entry point backed by the canonical schema-aware organization loader. */
+export function readJsonRecord<T>(filePath: string, label: string): T | null {
+  const schemaPath = ORGANIZATION_RECORD_SCHEMA_BY_LABEL[label];
+  if (!schemaPath) {
+    throw new Error(`[ORGANIZATION_RECORD] no schema registered for ${label}`);
+  }
+  return loadOrganizationRecordAtPath<T>(filePath, schemaPath, label);
+}
+
+function matchesOrganizationRecordScope(
+  record: { organization_id?: string; tier?: OrganizationTier; tenant_slug?: string },
+  expected: { organizationId: string; tier: OrganizationTier; tenantSlug: string }
+): boolean {
+  return (
+    record.organization_id === expected.organizationId &&
+    record.tier === expected.tier &&
+    (record.tenant_slug?.trim() || 'shared') === expected.tenantSlug
+  );
 }
 
 export function saveValidated<T>(
@@ -248,20 +305,23 @@ export function saveValidated<T>(
   filePath: string,
   label: string
 ): string {
-  const validator = validatorFor(schemaPath);
-  if (!validator(record)) throw new Error(`Invalid ${label}: ${validationErrors(validator)}`);
-  const parent = path.dirname(filePath);
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (safeExistsSync(safeFilePath) && !safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[ORGANIZATION_RECORD] ${label} must be a regular file: ${filePath}`);
+  }
+  const validated = defineCatalog<T>({
+    id: `organization-${label}`,
+    path: safeFilePath,
+    schema: schemaPath,
+  }).validate(record, safeFilePath);
+  const parent = path.dirname(safeFilePath);
   if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(record, null, 2), { encoding: 'utf8' });
-  return filePath;
+  safeWriteFile(safeFilePath, JSON.stringify(validated, null, 2), { encoding: 'utf8' });
+  return safeFilePath;
 }
 
 export function loadOrganizationOperatingModelCatalog(): OrganizationOperatingModelCatalog {
-  const catalog = loadJson<unknown>(CATALOG_PATH);
-  const validator = validatorFor(CATALOG_SCHEMA_PATH);
-  if (!validator(catalog))
-    throw new Error(`Invalid organization operating model: ${validationErrors(validator)}`);
-  return catalog as OrganizationOperatingModelCatalog;
+  return organizationOperatingModelCatalog.load();
 }
 
 export function validateOrganizationPurpose(value: unknown): value is OrganizationPurposeRecord {
@@ -580,11 +640,20 @@ export function loadOrganizationPurpose(
   const tenantSlug = query.tenantSlug || 'shared';
   assertTenantSlug(tenantSlug);
   for (const tier of tiers) {
-    const record = readJsonRecord<OrganizationPurposeRecord>(
+    const record = loadOrganizationRecordAtPath<OrganizationPurposeRecord>(
       purposePath(organizationId, tier, tenantSlug, query.rootDir),
+      PURPOSE_SCHEMA_PATH,
       'organization purpose'
     );
-    if (record && validateOrganizationPurpose(record) && record.organization_id === organizationId)
+    if (
+      record &&
+      validateOrganizationPurpose(record) &&
+      matchesOrganizationRecordScope(record, {
+        organizationId,
+        tier,
+        tenantSlug,
+      })
+    )
       return record;
   }
   return null;
@@ -626,13 +695,14 @@ export function transitionOrganizationLifecycle(input: {
       `Cannot archive organization with active projects: ${current.active_project_ids!.join(', ')}`
     );
   }
+  const now = nowIso();
   const next: OrganizationOperationalState = {
     ...current,
     status: input.verb === 'pause' ? 'paused' : input.verb === 'resume' ? 'active' : 'archived',
-    updated_at: new Date().toISOString(),
+    updated_at: now,
     metadata: {
       ...(current.metadata || {}),
-      ...(input.verb === 'archive' ? { archived_at: new Date().toISOString() } : {}),
+      ...(input.verb === 'archive' ? { archived_at: now } : {}),
       ...(input.reason ? { lifecycle_reason: input.reason } : {}),
     },
   };
@@ -661,14 +731,19 @@ export function loadOrganizationOperationalState(
   const tenantSlug = query.tenantSlug || 'shared';
   assertTenantSlug(tenantSlug);
   for (const tier of tiers) {
-    const record = readJsonRecord<OrganizationOperationalState>(
+    const record = loadOrganizationRecordAtPath<OrganizationOperationalState>(
       statePath(organizationId, tier, tenantSlug, query.rootDir),
+      STATE_SCHEMA_PATH,
       'organization operational state'
     );
     if (
       record &&
       validateOrganizationOperationalState(record) &&
-      record.organization_id === organizationId
+      matchesOrganizationRecordScope(record, {
+        organizationId,
+        tier,
+        tenantSlug,
+      })
     )
       return record;
   }
@@ -767,7 +842,7 @@ export function loadOrganizationDomain(
   assertOrganizationId(query.organizationId);
   const tenantSlug = recordQueryTenant(query.tenantSlug);
   for (const tier of recordQueryTiers(query.tier)) {
-    const record = readJsonRecord<OrganizationDomainRecord>(
+    const record = loadOrganizationRecordAtPath<OrganizationDomainRecord>(
       recordPath(
         'domains',
         domainId,
@@ -777,9 +852,19 @@ export function loadOrganizationDomain(
         tenantSlug,
         query.rootDir
       ),
+      DOMAIN_SCHEMA_PATH,
       'organization domain'
     );
-    if (record && validateOrganizationDomain(record) && record.domain_id === domainId)
+    if (
+      record &&
+      validateOrganizationDomain(record) &&
+      record.domain_id === domainId &&
+      matchesOrganizationRecordScope(record, {
+        organizationId: query.organizationId,
+        tier,
+        tenantSlug,
+      })
+    )
       return record;
   }
   return null;
@@ -793,7 +878,7 @@ export function loadOrganizationCapability(
   assertOrganizationId(query.organizationId);
   const tenantSlug = recordQueryTenant(query.tenantSlug);
   for (const tier of recordQueryTiers(query.tier)) {
-    const record = readJsonRecord<OrganizationCapabilityRecord>(
+    const record = loadOrganizationRecordAtPath<OrganizationCapabilityRecord>(
       recordPath(
         'capabilities',
         capabilityId,
@@ -803,9 +888,19 @@ export function loadOrganizationCapability(
         tenantSlug,
         query.rootDir
       ),
+      CAPABILITY_SCHEMA_PATH,
       'organization capability'
     );
-    if (record && validateOrganizationCapability(record) && record.capability_id === capabilityId)
+    if (
+      record &&
+      validateOrganizationCapability(record) &&
+      record.capability_id === capabilityId &&
+      matchesOrganizationRecordScope(record, {
+        organizationId: query.organizationId,
+        tier,
+        tenantSlug,
+      })
+    )
       return record;
   }
   return null;
@@ -819,7 +914,7 @@ export function loadOrganizationService(
   assertOrganizationId(query.organizationId);
   const tenantSlug = recordQueryTenant(query.tenantSlug);
   for (const tier of recordQueryTiers(query.tier)) {
-    const record = readJsonRecord<OrganizationServiceRecord>(
+    const record = loadOrganizationRecordAtPath<OrganizationServiceRecord>(
       recordPath(
         'services',
         serviceId,
@@ -829,15 +924,18 @@ export function loadOrganizationService(
         tenantSlug,
         query.rootDir
       ),
+      SERVICE_SCHEMA_PATH,
       'organization service'
     );
     if (
       record &&
       validateOrganizationService(record) &&
       record.service_id === serviceId &&
-      record.organization_id === query.organizationId &&
-      record.tier === tier &&
-      recordTenant(record) === tenantSlug
+      matchesOrganizationRecordScope(record, {
+        organizationId: query.organizationId,
+        tier,
+        tenantSlug,
+      })
     )
       return record;
   }
@@ -852,7 +950,7 @@ export function loadOrganizationServiceState(
   assertOrganizationId(query.organizationId);
   const tenantSlug = recordQueryTenant(query.tenantSlug);
   for (const tier of recordQueryTiers(query.tier)) {
-    const record = readJsonRecord<OrganizationServiceState>(
+    const record = loadOrganizationRecordAtPath<OrganizationServiceState>(
       recordPath(
         'services',
         serviceId,
@@ -862,15 +960,18 @@ export function loadOrganizationServiceState(
         tenantSlug,
         query.rootDir
       ),
+      SERVICE_STATE_SCHEMA_PATH,
       'organization service state'
     );
     if (
       record &&
       validateOrganizationServiceState(record) &&
       record.service_id === serviceId &&
-      record.organization_id === query.organizationId &&
-      record.tier === tier &&
-      recordTenant(record) === tenantSlug
+      matchesOrganizationRecordScope(record, {
+        organizationId: query.organizationId,
+        tier,
+        tenantSlug,
+      })
     )
       return record;
   }
@@ -878,14 +979,32 @@ export function loadOrganizationServiceState(
 }
 
 export function organizationRecordFiles(rootDir: string, fileName: string): string[] {
-  if (!safeExistsSync(rootDir)) return [];
+  const safeRootDir = assertSafeRepositoryPath(rootDir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeRootDir)) return [];
   const files: string[] = [];
-  for (const entry of safeReaddir(rootDir)) {
-    const fullPath = path.join(rootDir, entry);
-    if (!safeExistsSync(fullPath)) continue;
-    if (safeStat(fullPath).isDirectory())
-      files.push(...organizationRecordFiles(fullPath, fileName));
-    else if (entry === fileName) files.push(fullPath);
+  for (const entry of safeReaddir(safeRootDir)) {
+    // Atomic secure-io writes briefly leave a `${file}.tmp.*` sibling. A
+    // discovery pass must ignore that transient artifact rather than racing
+    // its rename and treating the vanished path as a missing record.
+    if (entry.includes('.tmp.')) continue;
+    try {
+      const fullPath = assertSafeRepositoryPath(path.join(safeRootDir, entry));
+      if (safeStat(fullPath).isDirectory())
+        files.push(...organizationRecordFiles(fullPath, fileName));
+      else if (entry === fileName) files.push(fullPath);
+    } catch (error) {
+      // A concurrent cleanup may remove a directory after readdir but before
+      // stat. Missing records are harmless during discovery; scope and
+      // symlink violations must still fail closed.
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        (error as NodeJS.ErrnoException)?.code === 'ENOENT' ||
+        message.startsWith('Resource path does not exist:')
+      ) {
+        continue;
+      }
+      throw error;
+    }
   }
   return files;
 }

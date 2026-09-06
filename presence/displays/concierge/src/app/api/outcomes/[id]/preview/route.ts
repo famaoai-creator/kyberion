@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
+import { listInboxEntries } from '@agent/core/deliverable-inbox';
+import { loadState } from '@agent/core/mission-state';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  listInboxEntries,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
-  secureIo,
-  withExecutionContext,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import * as secureIo from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
 import {
   conciergeText,
   resolveConciergeLocale,
   type ConciergeMessageKey,
 } from '../../../../../lib/i18n';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +55,44 @@ interface ArtifactPreview {
   too_large?: boolean;
 }
 
+type PreviewTier = 'personal' | 'confidential' | 'public';
+
+function normalizePreviewTier(value: unknown): PreviewTier | undefined {
+  return value === 'personal' || value === 'confidential' || value === 'public' ? value : undefined;
+}
+
+function tierFromArtifactPath(artifactPath: string): PreviewTier | undefined {
+  const normalized = artifactPath.replace(/\\/g, '/');
+  const match = normalized.match(
+    /(?:^|\/)active\/(?:missions|projects)\/(personal|confidential|public)(?:\/|$)/
+  );
+  return normalizePreviewTier(match?.[1]);
+}
+
+function tierFromMissionState(missionId: string | undefined): PreviewTier | undefined {
+  if (!missionId) return undefined;
+  try {
+    return withExecutionContext('sovereign_concierge', () =>
+      normalizePreviewTier(loadState(missionId.toUpperCase())?.tier)
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/** Mission state is authoritative; a path tier is only a legacy fallback. */
+export function resolveOutcomePreviewTier(
+  missionId: string | undefined,
+  artifactPaths: readonly string[]
+): PreviewTier | undefined {
+  const missionTier = tierFromMissionState(missionId);
+  if (missionTier) return missionTier;
+  const pathTiers = [
+    ...new Set(artifactPaths.map(tierFromArtifactPath).filter(Boolean)),
+  ] as PreviewTier[];
+  return pathTiers.length === 1 ? pathTiers[0] : undefined;
+}
+
 function buildPreview(rootDir: string, artifactPath: string): ArtifactPreview {
   const name = path.basename(artifactPath) || artifactPath;
   const resolved = path.isAbsolute(artifactPath)
@@ -65,9 +107,11 @@ function buildPreview(rootDir: string, artifactPath: string): ArtifactPreview {
   try {
     return withExecutionContext('sovereign_concierge', () =>
       secureIo.withSensitivePathMediation((): ArtifactPreview => {
-        if (!safeExistsSync(resolved)) return { name, kind: 'other', missing: true };
+        const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+        if (!safeExistsSync(safeResolved)) return { name, kind: 'other', missing: true };
+        if (!safeLstat(safeResolved).isFile()) return { name, kind: 'other' };
         if (IMAGE_MIME[ext]) {
-          const data = safeReadFile(resolved) as Buffer;
+          const data = safeReadFile(safeResolved) as Buffer;
           if (data.length > MAX_IMAGE_BYTES) return { name, kind: 'image', too_large: true };
           return {
             name,
@@ -76,7 +120,7 @@ function buildPreview(rootDir: string, artifactPath: string): ArtifactPreview {
           };
         }
         if (MARKDOWN_EXTENSIONS.has(ext) || TEXT_EXTENSIONS.has(ext)) {
-          const raw = safeReadFile(resolved, { encoding: 'utf8' }) as string;
+          const raw = safeReadFile(safeResolved, { encoding: 'utf8' }) as string;
           const truncated = raw.length > MAX_TEXT_CHARS;
           return {
             name,
@@ -96,6 +140,8 @@ function buildPreview(rootDir: string, artifactPath: string): ArtifactPreview {
 }
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
   const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
     conciergeText(key, locale, params);
@@ -108,6 +154,22 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     );
     if (!entry) {
       return NextResponse.json({ ok: false, error: t('api.outcome_not_found') }, { status: 404 });
+    }
+    if (
+      resolved.context.tenantSlugs !== 'all' &&
+      (!entry.tenant_slug || !resolved.context.tenantSlugs.includes(entry.tenant_slug))
+    ) {
+      return NextResponse.json(
+        { ok: false, error: 'Concierge viewer tenant scope denied.' },
+        { status: 403 }
+      );
+    }
+    const tier = resolveOutcomePreviewTier(entry.mission_id, entry.artifact_paths);
+    if (!tier || !resolved.context.tierAccess.includes(tier)) {
+      return NextResponse.json(
+        { ok: false, error: 'Concierge viewer tier scope denied.' },
+        { status: 403 }
+      );
     }
     const rootDir = pathResolver.rootDir();
     const files = entry.artifact_paths
@@ -123,9 +185,6 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error, 500);
   }
 }

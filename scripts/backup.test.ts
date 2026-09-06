@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
   safeExistsSync,
   safeExecResult,
   safeMkdir,
   safeRmSync,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import {
   parseBackupArgs,
+  parseRestoredBackupManifest,
+  main,
   pruneBackups,
   resolveBackupPlan,
   restoreBackup,
@@ -56,6 +58,34 @@ describe('backup cli', () => {
       out: 'active/shared/tmp/acme.tar.gz.enc',
       encrypt: true,
     });
+  });
+
+  it('rejects malformed archive manifest roots and nested metadata', () => {
+    expect(() => parseRestoredBackupManifest('[]')).toThrow('root must be a JSON object');
+    expect(() =>
+      parseRestoredBackupManifest(
+        '{"format":"kyberion-backup-v1","scope":"all","entries":[],"__proto__":{}}'
+      )
+    ).toThrow('Backup manifest is not valid JSON');
+    expect(() =>
+      parseRestoredBackupManifest(
+        JSON.stringify({
+          format: 'kyberion-backup-v1',
+          scope: 'tenant',
+          entries: ['active'],
+          mission_git_repos: [{ repo_relative_path: { invalid: true } }],
+        })
+      )
+    ).toThrow('mission repository path is invalid');
+  });
+
+  it('emits list results through the supplied harness printer', () => {
+    safeWriteFile(`${FIXTURE_DIR}/demo.tar.gz`, 'fixture');
+    const print = vi.fn();
+
+    main(['list', '--dir', FIXTURE_DIR], print);
+
+    expect(print).toHaveBeenCalledWith({ ok: true, backups: ['demo.tar.gz'] });
   });
 
   it('includes all protected roots for full backup planning', () => {

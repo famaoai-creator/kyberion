@@ -35,6 +35,14 @@
       "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope."
     },
     {
+      "id": "memory-benchmark",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/benchmark_memory.ts"],
+      "owner": "quality",
+      "rationale": "Runs the deterministic QM-03 V-layer notebook fold and consolidation benchmark in the governed check lane."
+    },
+    {
       "id": "foundation-adoption",
       "scope": "pr",
       "executable": "node",
@@ -55,6 +63,7 @@
       "scope": "pr",
       "executable": "node",
       "args": ["dist/scripts/check_type_ratchet.js"],
+      "baseline": "scripts/check_type_ratchet.baseline.json",
       "owner": "quality",
       "rationale": "Prevents type-safety debt from increasing."
     },
@@ -63,6 +72,7 @@
       "scope": "pr",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_module_boundaries.ts"],
+      "baseline": "scripts/check_module_boundaries.baseline.json",
       "owner": "architecture",
       "rationale": "Prevents import cycles and layer direction debt from increasing."
     },
@@ -81,6 +91,14 @@
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_first_win_docs.ts"],
       "owner": "experience",
       "rationale": "Keeps the first-win command contract and documentation fences aligned."
+    },
+    {
+      "id": "wire-error-boundary",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_wire_error_boundary.ts"],
+      "owner": "security",
+      "rationale": "Prevents internal exception details from being projected onto network-facing responses."
     },
     {
       "id": "cli-manifest",
@@ -415,6 +433,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_i18n_hardcoding.ts"],
+      "baseline": "knowledge/product/governance/i18n-baseline.json",
       "owner": "experience",
       "rationale": "Checks internationalization hardcoding ratchets."
     },
@@ -455,6 +474,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_contract_semver.js"],
+      "baseline": "scripts/contract-baseline.json",
       "owner": "quality",
       "rationale": "Checks actuator contract semver compatibility."
     },
@@ -463,6 +483,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_pipeline_shell_independence.js"],
+      "baseline": "scripts/pipeline-shell-independence.baseline.json",
       "owner": "operations",
       "rationale": "Checks portable pipeline shell usage."
     },
@@ -617,26 +638,6 @@
       "workflow": ".github/workflows/pr-validation.yml",
       "script": "check:pr-title",
       "reason": "Pull-request metadata is evaluated before repository gates."
-    },
-    {
-      "workflow": ".github/workflows/cross-os.yml",
-      "script": "check:contract-schemas",
-      "reason": "Cross-platform contract smoke runs on every supported runner."
-    },
-    {
-      "workflow": ".github/workflows/cross-os.yml",
-      "script": "check:contract-semver",
-      "reason": "Cross-platform contract compatibility smoke runs on every supported runner."
-    },
-    {
-      "workflow": ".github/workflows/cross-os.yml",
-      "script": "check:pipeline-shell-independence",
-      "reason": "Cross-platform shell-independence smoke runs on Unix runners."
-    },
-    {
-      "workflow": ".github/workflows/ci.yml",
-      "script": "check:first-win-smoke",
-      "reason": "Clean-clone first-win job validates the documented entry path."
     }
   ]
 }

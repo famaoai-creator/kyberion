@@ -43,7 +43,7 @@ describe('Good first issue guidance contract', () => {
     expect(guide).toContain('Validation command');
     expect(guide).toContain('Out of scope');
     expect(guide).toContain('libs/core/error-classifier.ts');
-    expect(guide).toContain('pnpm run test:meeting-dry-run');
+    expect(guide).toContain('pnpm test -- --suite meeting-dry-run');
     expect(guide).toContain('tests/release-operations-contract.test.ts');
     expect(guide).toContain('tests/first-win-docs-contract.test.ts');
     expect(guide).toContain('tests/developer-tour-contract.test.ts');

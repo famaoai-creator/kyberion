@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Restricted Capabilities Policy",
+  "description": "Governed restrictions for actuator, capability, or operation names.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "last_updated", "restrictions"],
+  "properties": {
+    "$schema": { "type": "string", "format": "uri-reference" },
+    "version": { "type": ["string", "number"] },
+    "last_updated": { "type": "string", "minLength": 1 },
+    "restrictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status", "reason", "allow_override"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["restricted", "active"] },
+          "reason": { "type": "string", "minLength": 1 },
+          "allow_override": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

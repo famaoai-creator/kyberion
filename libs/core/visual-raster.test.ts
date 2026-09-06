@@ -11,20 +11,29 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { generateNativePdf } from './src/native-pdf-engine/engine.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExec, safeMkdir, safeReaddir } from './secure-io.js';
+import {
+  safeExec,
+  safeMkdir,
+  safeReaddir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
+import { withExecutionContext } from './authority.js';
 import {
   detectRasterCapabilities,
   assertVisualReviewPathScope,
   rasterInstallHint,
   rasterizeDocument,
-  resetRasterCapabilitiesCache,
+  _resetRasterCapabilitiesCacheForTests,
 } from './visual-raster.js';
 
 const capabilities = detectRasterCapabilities({ refresh: true });
 
 describe('capability detection', () => {
   it('reports each rasterizer independently', () => {
-    resetRasterCapabilitiesCache();
+    _resetRasterCapabilitiesCacheForTests();
     const detected = detectRasterCapabilities({ refresh: true });
     expect(typeof detected.hasSoffice).toBe('boolean');
     expect(typeof detected.hasPdfRaster).toBe('boolean');
@@ -77,6 +86,51 @@ describe('degradation', () => {
         tier: 'confidential',
       })
     ).toThrow(/VISUAL_REVIEW_TIER_MISMATCH|VISUAL_REVIEW_PATH_DENIED/);
+  });
+
+  it('rejects an artifact path that traverses a symbolic link', () => {
+    const root = pathResolver.sharedTmp('visual-raster-tests/boundary');
+    const target = path.join(root, 'target.pptx');
+    const linked = path.join(root, 'linked.pptx');
+    safeRmSync(root, { recursive: true, force: true });
+    safeMkdir(root, { recursive: true });
+    safeMkdir(path.dirname(target), { recursive: true });
+    safeSymlinkSync(target, linked);
+    try {
+      expect(() => assertVisualReviewPathScope({ artifactPath: linked, tier: 'public' })).toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+    } finally {
+      safeUnlinkSync(linked);
+      safeRmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores malformed mission state when checking visual tenant ownership', () => {
+    const missionId = 'MSN-VISUAL-STATE-SHAPE';
+    const missionDir = pathResolver.rootResolve(`active/missions/confidential/${missionId}`);
+    const statePath = path.join(missionDir, 'mission-state.json');
+    const artifactPath = path.join(missionDir, 'deliverables', 'deck.pptx');
+    const workDir = path.join(missionDir, 'visual-review');
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(missionDir, { recursive: true, force: true });
+      safeMkdir(path.dirname(artifactPath), { recursive: true });
+      safeMkdir(workDir, { recursive: true });
+      try {
+        safeWriteFile(statePath, JSON.stringify({ context: [] }));
+        expect(() =>
+          assertVisualReviewPathScope({
+            artifactPath,
+            workDir,
+            tier: 'confidential',
+            tenantSlug: 'tenant-a',
+            missionId,
+          })
+        ).not.toThrow();
+      } finally {
+        safeRmSync(missionDir, { recursive: true, force: true });
+      }
+    });
   });
 
   it('returns an unavailable result rather than throwing on a missing source', () => {

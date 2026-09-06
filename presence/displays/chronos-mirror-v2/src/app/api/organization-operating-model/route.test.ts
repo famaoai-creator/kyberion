@@ -3,19 +3,21 @@ import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
   buildOrganizationManagementView: vi.fn(),
-  withExecutionContext: vi.fn((_role: string, operation: () => unknown) => operation()),
   resolveCompany: vi.fn(),
   guardRequest: vi.fn(() => null),
   requireChronosAccess: vi.fn(() => null),
   resolveViewerContextForRequest: vi.fn(),
-  viewerScopeTenantSlugs: vi.fn(),
+  strictViewerScopeTenantSlugs: vi.fn(),
   withViewerExecutionContext: vi.fn((_viewer: unknown, operation: () => unknown) => operation()),
   viewerErrorResponse: vi.fn((error: Error) => new Response(error.message, { status: 403 })),
 }));
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core/organization-operating-model-management', () => ({
   buildOrganizationManagementView: mocks.buildOrganizationManagementView,
-  withExecutionContext: mocks.withExecutionContext,
+}));
+
+vi.mock('@agent/core/tenant-registry', () => ({
+  listTenantProfileSlugs: () => ['acme'],
 }));
 
 vi.mock('@agent/core/company', () => ({
@@ -29,7 +31,7 @@ vi.mock('../../../lib/api-guard', () => ({
 
 vi.mock('../../../lib/viewer-context', () => ({
   resolveViewerContextForRequest: mocks.resolveViewerContextForRequest,
-  viewerScopeTenantSlugs: mocks.viewerScopeTenantSlugs,
+  strictViewerScopeTenantSlugs: mocks.strictViewerScopeTenantSlugs,
   withViewerExecutionContext: mocks.withViewerExecutionContext,
   viewerErrorResponse: mocks.viewerErrorResponse,
   ViewerContextError: class ViewerContextError extends Error {},
@@ -40,12 +42,11 @@ import { GET } from './route.js';
 describe('organization-operating-model route', () => {
   beforeEach(() => {
     mocks.buildOrganizationManagementView.mockReset();
-    mocks.withExecutionContext.mockClear();
     mocks.resolveCompany.mockReset();
     mocks.guardRequest.mockReset();
     mocks.requireChronosAccess.mockReset();
     mocks.resolveViewerContextForRequest.mockReset();
-    mocks.viewerScopeTenantSlugs.mockReset();
+    mocks.strictViewerScopeTenantSlugs.mockReset();
     mocks.withViewerExecutionContext.mockReset();
     mocks.viewerErrorResponse.mockReset();
     mocks.guardRequest.mockReturnValue(null);
@@ -53,7 +54,7 @@ describe('organization-operating-model route', () => {
     mocks.resolveViewerContextForRequest.mockReturnValue({
       context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
     });
-    mocks.viewerScopeTenantSlugs.mockReturnValue(['acme']);
+    mocks.strictViewerScopeTenantSlugs.mockReturnValue(['acme']);
     mocks.withViewerExecutionContext.mockImplementation(
       (_viewer: unknown, operation: () => unknown) => operation()
     );
@@ -80,9 +81,9 @@ describe('organization-operating-model route', () => {
     expect(response.status).toBe(200);
     expect(mocks.requireChronosAccess).toHaveBeenCalledWith(expect.anything(), 'readonly');
     expect(mocks.resolveViewerContextForRequest).toHaveBeenCalled();
-    expect(mocks.viewerScopeTenantSlugs).toHaveBeenCalledWith(
+    expect(mocks.strictViewerScopeTenantSlugs).toHaveBeenCalledWith(
       { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
-      'acme'
+      undefined
     );
     expect(mocks.withViewerExecutionContext).toHaveBeenCalledWith(
       { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },

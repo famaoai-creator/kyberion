@@ -1,5 +1,6 @@
 import * as path from 'node:path';
-import { safeReaddir, safeExistsSync, safeLstat, pathResolver } from '@agent/core';
+import { safeReaddir, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { emitMosRead } from '@/lib/audit-mos';
 
 export const dynamic = 'force-dynamic';

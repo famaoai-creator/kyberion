@@ -1,20 +1,23 @@
 import path from 'node:path';
-import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import {
-  pathResolver,
-  safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { readTextFile } from '@agent/core/foundation';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type Layer = 'foundation' | 'contracts' | 'domain' | 'orchestration';
 type BoundaryConfig = {
   layers: Layer[];
   patterns: Array<{ layer: Layer; pattern: string }>;
   facade_patterns?: string[];
+  direction_exceptions?: Array<{
+    source: string;
+    target: string;
+    reason: string;
+  }>;
   default_layer: Layer;
 };
 type BoundaryBaseline = {
@@ -28,8 +31,15 @@ type DynamicImportEdge = { source: string; target: string };
 
 const ROOT = pathResolver.rootDir();
 const CONFIG_PATH = pathResolver.knowledge('product/governance/module-layer-boundaries.json');
-const BASELINE_PATH = pathResolver.rootResolve('scripts/check_module_boundaries.baseline.json');
+const BASELINE_PATH = resolveCiGateBaselinePath('module-boundaries');
 const SOURCE_ROOTS = ['libs', 'presence', 'satellites', 'scripts'];
+
+export function readModuleBoundaryTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function relative(filePath: string): string {
   return path.relative(ROOT, filePath).split(path.sep).join('/');
@@ -48,7 +58,7 @@ function matchesPattern(value: string, pattern: string): boolean {
 }
 
 function config(): BoundaryConfig {
-  return readJson<BoundaryConfig>(CONFIG_PATH);
+  return readSafeJsonFile<BoundaryConfig>(CONFIG_PATH, 'module boundary configuration');
 }
 
 function classify(filePath: string, manifest: BoundaryConfig): Layer {
@@ -62,6 +72,17 @@ function classify(filePath: string, manifest: BoundaryConfig): Layer {
 function isFacade(filePath: string, manifest: BoundaryConfig): boolean {
   const repoPath = relative(filePath);
   return (manifest.facade_patterns || []).some((pattern) => matchesPattern(repoPath, pattern));
+}
+
+function directionExceptionFor(
+  source: string,
+  target: string,
+  manifest: BoundaryConfig
+): BoundaryConfig['direction_exceptions'][number] | undefined {
+  return manifest.direction_exceptions?.find(
+    (exception) =>
+      matchesPattern(source, exception.source) && matchesPattern(target, exception.target)
+  );
 }
 
 function sourceFiles(): string[] {
@@ -155,7 +176,7 @@ export function maskComments(source: string): string {
 }
 
 function importsFor(filePath: string, includeDynamic = false, includeTypeOnly = false): string[] {
-  const text = maskComments(String(safeReadFile(filePath, { encoding: 'utf8' })));
+  const text = maskComments(readModuleBoundaryTextFile(filePath));
   const imports: string[] = [];
   const staticPattern = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
   const dynamicPattern = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
@@ -280,7 +301,10 @@ function findDirectionViolations(graph: Map<string, string[]>, manifest: Boundar
     const sourceLayer = classify(source, manifest);
     for (const target of targets) {
       const targetLayer = classify(target, manifest);
-      if ((rank.get(targetLayer) || 0) > (rank.get(sourceLayer) || 0)) {
+      if (
+        (rank.get(targetLayer) || 0) > (rank.get(sourceLayer) || 0) &&
+        !directionExceptionFor(relative(source), relative(target), manifest)
+      ) {
         violations.push(
           `${relative(source)} [${sourceLayer}] -> ${relative(target)} [${targetLayer}]`
         );
@@ -290,9 +314,42 @@ function findDirectionViolations(graph: Map<string, string[]>, manifest: Boundar
   return violations.sort();
 }
 
+function findDirectionExceptions(
+  graph: Map<string, string[]>,
+  manifest: BoundaryConfig
+): { active: string[]; stale: string[] } {
+  const configured = manifest.direction_exceptions || [];
+  const active = new Set<string>();
+  const rank = new Map(manifest.layers.map((layer, index) => [layer, index]));
+
+  for (const [source, targets] of graph) {
+    const sourceRelative = relative(source);
+    const sourceLayer = classify(source, manifest);
+    for (const target of targets) {
+      const targetRelative = relative(target);
+      const targetLayer = classify(target, manifest);
+      if ((rank.get(targetLayer) || 0) <= (rank.get(sourceLayer) || 0)) continue;
+      const exception = directionExceptionFor(sourceRelative, targetRelative, manifest);
+      if (exception) {
+        active.add(`${exception.source} -> ${exception.target}`);
+      }
+    }
+  }
+
+  return {
+    active: [...active].sort(),
+    stale: configured
+      .filter((exception) => !active.has(`${exception.source} -> ${exception.target}`))
+      .map((exception) => `${exception.source} -> ${exception.target}: ${exception.reason}`)
+      .sort(),
+  };
+}
+
 export function checkModuleBoundaries(): {
   cycles: string[][];
   directionViolations: string[];
+  directionExceptions: string[];
+  staleDirectionExceptions: string[];
   dynamicImportEdges: DynamicImportEdge[];
   maxRuntimeSccSize: number;
   baseline: BoundaryBaseline;
@@ -310,9 +367,10 @@ export function checkModuleBoundaries(): {
   const runtimeCycles = findCycles(runtimeGraph);
   const maxRuntimeSccSize = maxComponentSize(runtimeCycles);
   const directionViolations = findDirectionViolations(runtimeGraph, manifest);
+  const directionExceptions = findDirectionExceptions(runtimeGraph, manifest);
   const dynamicImportEdges = collectDynamicImportEdges(files);
   const baseline = safeExistsSync(BASELINE_PATH)
-    ? readJson<BoundaryBaseline>(BASELINE_PATH)
+    ? readSafeJsonFile<BoundaryBaseline>(BASELINE_PATH, 'module boundary baseline')
     : {
         version: 1 as const,
         cycles: cycles.length,
@@ -341,9 +399,16 @@ export function checkModuleBoundaries(): {
       `direction violations increased from ${baseline.direction_violations} to ${directionViolations.length}`
     );
   }
+  if (directionExceptions.stale.length > 0) {
+    violations.push(
+      `configured direction exceptions are stale or no longer forbidden: ${directionExceptions.stale.join('; ')}`
+    );
+  }
   return {
     cycles,
     directionViolations,
+    directionExceptions: directionExceptions.active,
+    staleDirectionExceptions: directionExceptions.stale,
     dynamicImportEdges,
     maxRuntimeSccSize,
     baseline,
@@ -375,18 +440,20 @@ export const runCheckModuleBoundaries = defineScript({
         )
       );
       context.print(
-        `[check:module-boundaries] baseline written (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, max runtime SCC ${report.maxRuntimeSccSize})`
+        `[check:module-boundaries] baseline written (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, ${report.directionExceptions.length} documented exceptions, max runtime SCC ${report.maxRuntimeSccSize})`
       );
       return;
     }
     if (report.violations.length > 0) {
-      console.error('[check:module-boundaries] FAILED');
-      for (const violation of report.violations) console.error(`- ${violation}`);
-      throw new Error(`${report.violations.length} module boundary violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['FAILED', ...report.violations.map((violation) => `- ${violation}`)].join('\n')
+      );
     }
     context.print(
-      `[check:module-boundaries] OK (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, max runtime SCC ${report.maxRuntimeSccSize}, ${report.dynamicImportEdges.length} dynamic imports tracked)`
+      `[check:module-boundaries] OK (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, ${report.directionExceptions.length} documented exceptions, max runtime SCC ${report.maxRuntimeSccSize}, ${report.dynamicImportEdges.length} dynamic imports tracked)`
     );
+    return report;
   },
 });
 

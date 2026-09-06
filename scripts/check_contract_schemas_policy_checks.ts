@@ -5,11 +5,9 @@
  * _shared / _evidence_checks / _service_checks extractions.
  */
 
-import {
-  buildProductivityTaskPlan,
-  createDistillCandidateRecord,
-  createTaskSession,
-} from '@agent/core';
+import { createDistillCandidateRecord } from '@agent/core/distill-candidate-registry';
+import { buildProductivityTaskPlan } from '@agent/core/productivity-task-plan';
+import { createTaskSession } from '@agent/core/task-session';
 import {
   ContractCheck,
   readGovernanceJson,

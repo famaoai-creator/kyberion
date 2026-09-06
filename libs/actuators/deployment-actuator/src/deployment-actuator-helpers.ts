@@ -1,12 +1,14 @@
+import { getDeploymentAdapter } from '@agent/core/deployment-adapter';
+import { requireApprovalForOp, RISKY_OPS } from '@agent/core/risky-op-registry';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import {
-  getDeploymentAdapter,
-  requireApprovalForOp,
-  RISKY_OPS,
-  executeAdfSteps,
-  resolveVars,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
+import { resolveVars } from '@agent/core/logic-utils';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { nowIso } from '@agent/core/foundation';
 import { describeOps } from './op-catalog.js';
 
 export interface DeploymentParams {
@@ -81,11 +83,15 @@ export async function handleDeploymentAction(input: DeploymentAction) {
     }
     return deployRelease(preflight.input as unknown as DeploymentParams);
   }
-  const result = await executeAdfSteps(
-    input.steps || [],
-    { ...(input.context || {}), timestamp: new Date().toISOString() },
-    { maxSteps: input.options?.max_steps || 1000, timeoutMs: input.options?.timeout_ms || 60000 },
-    {
+  const result = await runAdfActuatorPipeline({
+    actuatorId: 'deployment',
+    steps: input.steps || [],
+    context: { ...(input.context || {}), timestamp: nowIso() },
+    options: {
+      maxSteps: input.options?.max_steps || DEFAULT_MAX_PIPELINE_STEPS,
+      timeoutMs: input.options?.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS,
+    },
+    handlers: {
       capture: async () => {
         throw new Error('[UNKNOWN_OP] Deployment actuator does not own capture operations');
       },
@@ -105,7 +111,7 @@ export async function handleDeploymentAction(input: DeploymentAction) {
         const value = await deployRelease(params);
         return { ...context, [params.export_as || 'deploy_result']: value };
       },
-    }
-  );
+    },
+  });
   return result;
 }

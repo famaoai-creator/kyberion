@@ -44,8 +44,11 @@
  */
 
 import { z } from 'zod';
+import { readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
+import { isVitestProcess } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -397,8 +400,10 @@ export class AgentIdentityJournal {
   private seq = 0;
 
   constructor(options: AgentIdentityJournalOptions) {
-    this.journalPath = pathResolver.rootResolve(options.journalPath);
-    this.now = options.now ?? (() => new Date().toISOString());
+    this.journalPath = assertSafeRepositoryPath(pathResolver.rootResolve(options.journalPath), {
+      allowMissingLeaf: true,
+    });
+    this.now = options.now ?? nowIso;
   }
 
   /** Validate, stamp seq/ts, and append. Refused during restore (no mutation while replaying). */
@@ -443,19 +448,18 @@ export class AgentIdentityJournal {
 
   private readJournal(): AgentIdentityReadResult {
     if (!safeExistsSync(this.journalPath)) return { events: [], maxSeq: -1 };
-    const raw = String(safeReadFile(this.journalPath, { encoding: 'utf-8' }));
-    const events: JournalEventEnvelope[] = [];
+    if (!safeLstat(this.journalPath).isFile()) {
+      throw new Error(
+        `[AGENT_IDENTITY_RESOURCE] journal must be a regular file: ${this.journalPath}`
+      );
+    }
+    const events = readJsonLines<JournalEventEnvelope>(this.journalPath, {
+      onMalformed: 'skip',
+      map: (value) => journalEventEnvelopeSchema.parse(value),
+    });
     let maxSeq = -1;
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const parsed = journalEventEnvelopeSchema.parse(JSON.parse(trimmed));
-        events.push(parsed);
-        if (parsed.seq > maxSeq) maxSeq = parsed.seq;
-      } catch {
-        // A torn/corrupt line must not poison replay of the rest.
-      }
+    for (const event of events) {
+      if (event.seq > maxSeq) maxSeq = event.seq;
     }
     return { events, maxSeq };
   }
@@ -597,7 +601,7 @@ export function resetAgentIdentityServiceForTests(
 }
 
 function appendGoverned(opName: string, payload: unknown): void {
-  if (process.env.VITEST && !journalExplicitlyScoped) {
+  if (isVitestProcess() && !journalExplicitlyScoped) {
     throw new Error(
       '[agent-identity] refusing to write the governed default journal under vitest — ' +
         'call resetAgentIdentityServiceForTests(<active/shared/tmp/... path>) in your suite ' +
@@ -695,7 +699,7 @@ export function issueAgentIdentity(params: IssueAgentIdentityParams): AgentIdent
     ...(params.providerHint ? { provider_hint: params.providerHint } : {}),
     ...(params.modelHint ? { model_hint: params.modelHint } : {}),
     ...(params.trustRef ? { trust_ref: params.trustRef } : {}),
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
   };
   appendGoverned(AGENT_IDENTITY_OPS.identityProvisioned, payload);
   const record = ensureState().identities[nhiId];
@@ -757,7 +761,7 @@ export function activateAgentIdentity(nhiId: string): AgentIdentityRecord {
   if (existing.lifecycle_status === 'active') return existing;
   appendGoverned(AGENT_IDENTITY_OPS.identityActivated, {
     nhi_id: nhiId,
-    activated_at: new Date().toISOString(),
+    activated_at: nowIso(),
   });
   return requireIdentity(nhiId);
 }
@@ -772,7 +776,7 @@ export function suspendAgentIdentity(nhiId: string, reason?: string): AgentIdent
   if (existing.lifecycle_status === 'suspended') return existing;
   appendGoverned(AGENT_IDENTITY_OPS.identitySuspended, {
     nhi_id: nhiId,
-    suspended_at: new Date().toISOString(),
+    suspended_at: nowIso(),
     ...(reason ? { reason } : {}),
   });
   return requireIdentity(nhiId);
@@ -785,7 +789,7 @@ export function retireAgentIdentity(nhiId: string, reason: string): AgentIdentit
   if (existing.lifecycle_status === 'retired') return existing;
   appendGoverned(AGENT_IDENTITY_OPS.identityRetired, {
     nhi_id: nhiId,
-    retired_at: new Date().toISOString(),
+    retired_at: nowIso(),
     retire_reason: reason,
   });
   return requireIdentity(nhiId);
@@ -818,7 +822,7 @@ export function bindRuntimeInstance(params: BindRuntimeInstanceParams): AgentIde
   if (existing.lifecycle_status === 'provisioned') {
     appendGoverned(AGENT_IDENTITY_OPS.identityActivated, {
       nhi_id: params.nhiId,
-      activated_at: new Date().toISOString(),
+      activated_at: nowIso(),
     });
   }
   appendGoverned(AGENT_IDENTITY_OPS.instanceBound, {
@@ -828,7 +832,7 @@ export function bindRuntimeInstance(params: BindRuntimeInstanceParams): AgentIde
     ...(params.sessionId ? { session_id: params.sessionId } : {}),
     ...(params.provider ? { provider: params.provider } : {}),
     ...(params.modelId ? { model_id: params.modelId } : {}),
-    bound_at: new Date().toISOString(),
+    bound_at: nowIso(),
   });
   return requireIdentity(params.nhiId);
 }
@@ -852,7 +856,7 @@ export function releaseRuntimeInstance(
   appendGoverned(AGENT_IDENTITY_OPS.instanceReleased, {
     nhi_id: nhiId,
     instance_id: instanceId,
-    released_at: new Date().toISOString(),
+    released_at: nowIso(),
     ...(reason ? { reason } : {}),
   });
   return requireIdentity(nhiId);

@@ -105,4 +105,26 @@ describe('TtsLoopbackVerifier', () => {
     expect(dryRun.status).toBe('blocked');
     expect(dryRun.warnings[0]).toMatch(/dry_run/);
   });
+
+  it('rejects receipt output outside the repository', async () => {
+    await expect(
+      new TtsLoopbackVerifier({
+        bus: new StubAudioBus(),
+        tts: tts('test'),
+        stt: stt('test'),
+        checkConsent: () => ({ allowed: true }),
+      }).verify(request({ persistence: { output_dir: '/tmp/external-loopback-receipts' } }))
+    ).rejects.toThrow('RESOURCE_PATH_SCOPE');
+  });
+
+  it('rejects a request id containing path traversal', async () => {
+    await expect(
+      new TtsLoopbackVerifier({
+        bus: new StubAudioBus(),
+        tts: tts('test'),
+        stt: stt('test'),
+        checkConsent: () => ({ allowed: true }),
+      }).verify(request({ request_id: '../external-loopback' }))
+    ).rejects.toThrow('LOOPBACK_REQUEST_SCOPE');
+  });
 });

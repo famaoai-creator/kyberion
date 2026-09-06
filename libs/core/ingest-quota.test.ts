@@ -48,22 +48,21 @@ afterAll(() => {
 });
 
 describe('policy loading (spend-policy.json override pattern)', () => {
-  it('falls back to the defaults when no policy file exists', () => {
+  it('fails closed when no policy file exists', () => {
     const missingRoot = path.join(fixtureRoot, 'no-policy-here');
-    expect(loadIngestQuotaPolicy({ rootDir: missingRoot })).toEqual({
-      ...DEFAULT_INGEST_QUOTA_POLICY,
-    });
+    expect(() => loadIngestQuotaPolicy({ rootDir: missingRoot })).toThrowError(/missing/iu);
   });
 
-  it('falls back to the defaults on a corrupt policy file (guard never silently disabled)', () => {
+  it('fails closed on a corrupt policy file', () => {
     writePolicy('{not json!!');
-    expect(loadIngestQuotaPolicy({ rootDir: fixtureRoot })).toEqual({
-      ...DEFAULT_INGEST_QUOTA_POLICY,
-    });
+    expect(() => loadIngestQuotaPolicy({ rootDir: fixtureRoot })).toThrowError(
+      /Expected property name|JSON/iu
+    );
   });
 
   it('loads governed limits and per-tenant overrides keyed by tenant slug', () => {
     writePolicy({
+      version: '1.0.0',
       max_files_per_day: 10,
       max_bytes_per_day: 1000,
       warn_ratio: 0.5,
@@ -192,6 +191,53 @@ describe('checkIngestQuota — warn→block staging', () => {
     });
   });
 
+  it('does not adopt schema-invalid, cross-tenant, or non-file counters', () => {
+    const rootDir = path.join(fixtureRoot, `boundary-${randomUUID()}`);
+    const options = { rootDir, now: NOW, policy: { ...policy } };
+    const counterPath = ingestQuotaCounterPath('acme-corp', options);
+    safeMkdir(path.dirname(counterPath), { recursive: true });
+    const updatedAt = new Date(NOW).toISOString();
+
+    safeWriteFile(
+      counterPath,
+      JSON.stringify({
+        tenant_slug: 'acme-corp',
+        date: '2026-07-28',
+        files: 4,
+        bytes: 900,
+        updated_at: updatedAt,
+        unexpected: true,
+      })
+    );
+    expect(checkIngestQuota('acme-corp', { bytes: 1 }, options).usage).toEqual({
+      files: 0,
+      bytes: 0,
+    });
+
+    safeWriteFile(
+      counterPath,
+      JSON.stringify({
+        tenant_slug: 'other-co',
+        date: '2026-07-28',
+        files: 4,
+        bytes: 900,
+        updated_at: updatedAt,
+      })
+    );
+    expect(checkIngestQuota('acme-corp', { bytes: 1 }, options).usage).toEqual({
+      files: 0,
+      bytes: 0,
+    });
+
+    safeRmSync(counterPath, { force: true });
+    safeMkdir(counterPath, { recursive: true });
+    expect(checkIngestQuota('acme-corp', { bytes: 1 }, options).usage).toEqual({
+      files: 0,
+      bytes: 0,
+    });
+    safeRmSync(rootDir, { recursive: true, force: true });
+  });
+
   it('rejects invalid tenant slugs (path safety)', () => {
     expect(() => checkIngestQuota('../escape', { bytes: 1 }, { rootDir: fixtureRoot })).toThrow(
       /invalid tenant slug/
@@ -200,9 +246,23 @@ describe('checkIngestQuota — warn→block staging', () => {
       /invalid tenant slug/
     );
   });
+
+  it('rejects a quota root outside the repository', () => {
+    expect(() => ingestQuotaCounterPath('acme-corp', { rootDir: '/tmp' })).toThrow(
+      /outside the repository/
+    );
+  });
 });
 
 describe('shouldEnforceIngestQuota — spend-guard VITEST convention', () => {
+  it('routes the opt-in flag through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/ingest-quota.ts'), { encoding: 'utf8' })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('is off under VITEST unless the test opts in, on otherwise', () => {
     expect(shouldEnforceIngestQuota({ VITEST: 'true' } as NodeJS.ProcessEnv)).toBe(false);
     expect(

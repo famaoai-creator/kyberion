@@ -32,7 +32,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema knowledge/product/schemas/mobile-device-pipeline.schema.json)
 - `media-actuator`: Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.2.0, schema knowledge/product/schemas/media-pipeline.schema.json)
 - `media-generation-actuator`: Generative image, video, music, and screen capture actuator (12 ops, v1.2.0, schema knowledge/product/schemas/media-generation-action.schema.json)
-- `meeting-actuator`: Abstracted online meeting bridge (Zoom, Teams, Google Meet) (6 ops, v1.1.0, schema knowledge/product/schemas/meeting-action.schema.json)
+- `meeting-actuator`: Abstracted online meeting bridge (Zoom, Teams, Google Meet) (6 ops, v1.2.0, schema knowledge/product/schemas/meeting-action.schema.json)
 - `meeting-browser-driver`: Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Exposes the meeting-browser-driver join_backend label and writes captured audio to an AudioBus. (2 ops, v1.0.0)
 - `modeling-actuator`: Architectural Analysis and ADF Transformation Engine (2 ops, v1.0.0, schema knowledge/product/schemas/modeling-pipeline.schema.json)
 - `network-actuator`: ADF-driven secure fetch and A2A transport pipeline engine (1 ops, v2.2.0, schema knowledge/product/schemas/network-pipeline.schema.json)
@@ -47,7 +47,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (3 ops, v1.4.0, schema knowledge/product/schemas/vision-action.schema.json)
 - `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (12 ops, v1.6.0, schema knowledge/product/schemas/voice-action.schema.json)
 - `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (81 ops, v1.6.0, schema knowledge/product/schemas/wisdom-action.schema.json)
-- `working-memory-actuator`: Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>'). (14 ops, v1.1.0, schema knowledge/product/schemas/working-memory-action.schema.json)
+- `working-memory-actuator`: Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>'). (15 ops, v1.2.0, schema knowledge/product/schemas/working-memory-action.schema.json)
 
 ## Legacy Review Queue
 

@@ -310,7 +310,7 @@ adapter wiring for the current environment.
 ### 5.2 Mission and knowledge auditing
 
 - `inspect-mission-inventory` / `mission_controller list [status]` — mission inventory
-- `inspect-generation-schedules` / `schedule:list` — scheduled generation job inventory
+- `inspect-generation-schedules` / `generation:schedule --action list` — scheduled generation job inventory
 - `inspect-mission-state` / `mission_controller status <ID>` — checkpoint history, git refs
 - `audit-chain` ledger (keyed HMAC hash-chained, tamper-detectable) → forwarded to SIEM
 - `intent-snapshot-store` → temporal record of every intent decision
@@ -318,15 +318,15 @@ adapter wiring for the current environment.
 
 ### 5.3 Contract and tier validation
 
-| Command                                 | Purpose                                                                  |
-| --------------------------------------- | ------------------------------------------------------------------------ |
-| `pnpm run check:contract-schemas`       | All declared contracts validate against their JSON Schemas (CI-required) |
-| `pnpm check -- --only tier-hygiene`     | No org-specific names / URLs leaked into the public tier                 |
-| `pnpm check -- --only governance-rules` | Governance JSONs satisfy their schemas                                   |
-| `pnpm check -- --only catalogs`         | Capability catalogs are well-formed                                      |
-| `pnpm run check:esm`                    | ESM import integrity                                                     |
-| `pnpm run typecheck`                    | TypeScript correctness                                                   |
-| `pnpm run validate`                     | All of the above                                                         |
+| Command                                                  | Purpose                                                                  |
+| -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `pnpm run check -- --scope full --only contract-schemas` | All declared contracts validate against their JSON Schemas (CI-required) |
+| `pnpm check -- --only tier-hygiene`                      | No org-specific names / URLs leaked into the public tier                 |
+| `pnpm check -- --only governance-rules`                  | Governance JSONs satisfy their schemas                                   |
+| `pnpm check -- --only catalogs`                          | Capability catalogs are well-formed                                      |
+| `pnpm run check -- --scope pr --only esm`                | ESM import integrity                                                     |
+| `pnpm run typecheck`                                     | TypeScript correctness                                                   |
+| `pnpm run validate`                                      | All of the above                                                         |
 
 ### 5.4 Memory and learning
 

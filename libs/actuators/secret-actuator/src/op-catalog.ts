@@ -7,7 +7,8 @@
 // change; every other op previously made determineActuatorStepType throw, so
 // those entries are strictly additive.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const SECRET_SCHEMA = {
   type: 'object',
@@ -33,7 +34,7 @@ export const SECRET_ACTUATOR_TRANSFORM_OPS = ['set'] as const;
 
 export const SECRET_ACTUATOR_APPLY_OPS = ['delete'] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const required =
     op === 'set'
       ? ['service', 'account', 'value']
@@ -48,7 +49,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...SECRET_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...SECRET_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

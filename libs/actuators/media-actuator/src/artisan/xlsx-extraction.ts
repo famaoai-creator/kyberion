@@ -1,4 +1,5 @@
-import { xlsxUtils, runGovernedCommand } from '@agent/core';
+import * as xlsxUtils from '@agent/core/xlsx-utils';
+import { runGovernedCommand } from '@agent/core/command-runner';
 import type {
   Aesthetic,
   ExtractionMode,

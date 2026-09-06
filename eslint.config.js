@@ -172,29 +172,6 @@ export default [
     },
   },
   {
-    // Deferred, not waived. Measured 2026-08-27 against the widened rule above;
-    // these three surfaces hold 846 of the 1013 repo-wide findings and are
-    // dominated by one mechanical pattern each, so they are carved out by name
-    // (never by a blanket `off`) and shrink as each is decomposed:
-    //   presence/displays/chronos-mirror-v2  673 — a ~150-key view-model
-    //     destructure in ChronosMirrorLegacySections.tsx plus the mission
-    //     intelligence panels re-destructuring the same model.
-    //   presence/displays/presence-studio     89 — runtime-data/server split
-    //     left both halves holding the full symbol set.
-    //   satellites/voice-hub/server.ts        84 — single unsplit server module.
-    // Every other file under libs/, scripts/, satellites/ and presence/ is
-    // clean and enforced. Remove an entry here once its file(s) reach zero;
-    // do not add one without a count and a decomposition reason.
-    files: [
-      'presence/displays/chronos-mirror-v2/**/*.{ts,tsx}',
-      'presence/displays/presence-studio/**/*.ts',
-      'satellites/voice-hub/server.ts',
-    ],
-    rules: {
-      '@typescript-eslint/no-unused-vars': 'off',
-    },
-  },
-  {
     // Keep the editor rule on the maintained production trees. The module
     // boundary checker remains the authoritative full-graph ratchet.
     files: ['libs/**/*.ts', 'scripts/**/*.ts'],

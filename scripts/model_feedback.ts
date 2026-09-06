@@ -1,12 +1,11 @@
-import {
-  authority,
-  createStandardYargs,
-  recordModelRoleFeedback,
-  withExecutionContext,
-} from '@agent/core';
+import * as authority from '@agent/core/authority';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { recordModelRoleFeedback } from '@agent/core/model-performance-index';
+import { withExecutionContext } from '@agent/core/authority';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []) {
+  const argv = await createStandardYargs(['node', 'model_feedback', ...args])
     .option('model-id', { type: 'string', demandOption: true })
     .option('team-role', { type: 'string', demandOption: true })
     .option('rating', { type: 'number', demandOption: true })
@@ -42,10 +41,21 @@ async function main(): Promise<void> {
       source,
     })
   );
-  console.log(JSON.stringify(feedback, null, 2));
+  return feedback;
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+export const runModelFeedback = defineScript({
+  name: 'model-feedback',
+  flags: [],
+  run: async ({ argv, print }) => {
+    const feedback = await main(argv);
+    print(feedback);
+    return feedback;
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'model_feedback.ts') ||
+  isDirectScript(import.meta.url, 'model_feedback.js')
+)
+  void runModelFeedback();

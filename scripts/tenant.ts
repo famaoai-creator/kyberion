@@ -1,9 +1,5 @@
-import {
-  listTenants,
-  mutateTenant,
-  readTenantProfile,
-  type TenantLifecycleVerb,
-} from '@agent/core';
+import { mutateTenant, type TenantLifecycleVerb, listTenants } from '@agent/core/tenant-governance';
+import { readTenantProfile } from '@agent/core/tenant-registry';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Args = {
@@ -15,6 +11,8 @@ type Args = {
   apply: boolean;
   json: boolean;
 };
+
+type Print = (value: unknown) => void;
 
 function parseArgs(argv: string[]): Args {
   const [command = 'help', ...rest] = argv;
@@ -47,21 +45,21 @@ function usage(): string {
   ].join('\n');
 }
 
-export function main(argv: string[] = []): void {
+export function main(argv: string[] = [], print: Print = () => undefined): void {
   const args = parseArgs(argv);
   if (args.command === 'help') {
-    console.log(usage());
+    print(usage());
     return;
   }
   if (args.command === 'list') {
-    console.log(JSON.stringify(listTenants(), null, 2));
+    print(JSON.stringify(listTenants(), null, 2));
     return;
   }
   if (!args.slug) throw new Error(`${args.command} requires a tenant slug`);
   if (args.command === 'show') {
     const profile = readTenantProfile(args.slug);
     if (!profile) throw new Error(`Tenant '${args.slug}' does not exist.`);
-    console.log(
+    print(
       args.json ? JSON.stringify(profile, null, 2) : `${profile.tenant_slug}: ${profile.status}`
     );
     return;
@@ -74,13 +72,13 @@ export function main(argv: string[] = []): void {
     knowledgeRoot: args.knowledgeRoot,
     apply: args.apply,
   });
-  console.log(JSON.stringify(result, null, 2));
+  print(JSON.stringify(result, null, 2));
 }
 
 const script = defineScript({
   name: 'tenant',
   flags: [],
-  run: ({ argv }) => main(argv),
+  run: ({ argv, print }) => main(argv, print),
 });
 if (isDirectScript(import.meta.url, 'tenant.ts') || isDirectScript(import.meta.url, 'tenant.js')) {
   void script();

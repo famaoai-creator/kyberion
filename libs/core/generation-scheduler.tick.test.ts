@@ -320,7 +320,7 @@ describe('generation schedule tick (EV-01)', () => {
     );
     writeGenerationSchedule({
       ...(baseSchedule() as any),
-      execution_policy: { depends_on: [dependencyId] },
+      execution_policy: { concurrency: 'skip_if_running', depends_on: [dependencyId] },
     });
     const handleAction = vi.fn();
 
@@ -347,7 +347,7 @@ describe('generation schedule tick (EV-01)', () => {
     writeGenerationSchedule({
       ...(baseSchedule() as any),
       scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'client-a' },
-      execution_policy: { depends_on: [dependencyId] },
+      execution_policy: { concurrency: 'skip_if_running', depends_on: [dependencyId] },
     });
     const handleAction = vi.fn();
 

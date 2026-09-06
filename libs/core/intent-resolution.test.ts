@@ -28,6 +28,15 @@ function resetIntentOverlayTestRoot(): void {
 }
 
 describe('intent-resolution', () => {
+  it('rejects an external caller-supplied overlay path', () => {
+    expect(() =>
+      loadResolvedStandardIntentCatalog({
+        tier: 'personal',
+        overlayPaths: ['/tmp/intent-overlay-external.json'],
+      })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
   it('resolves implemented task-session and bootstrap intents from their first surface examples', () => {
     const intents = loadStandardIntentCatalog().filter((intent) =>
       [
@@ -66,6 +75,7 @@ describe('intent-resolution', () => {
     const servicePacket = resolveIntentResolutionPacket('voice-hub を再起動して');
     expect(servicePacket.selected_intent_id).toBe('restart-service');
     expect(servicePacket.selected_resolution?.result_shape).toBe('service_restarted');
+    expect(servicePacket.selected_parameters?.service_name).toBe('voice-hub');
 
     const reportPacket = resolveIntentResolutionPacket('今週の進捗レポートを docx で作って');
     expect(reportPacket.selected_intent_id).toBe('generate-report');
@@ -348,6 +358,7 @@ describe('intent-resolution', () => {
     );
     const valid = validate(packet);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+    expect(packet.contextual_frame?.kind).toBe('contextual_intent_frame');
   });
 
   it('applies governed confidence threshold and legacy fallback policy', () => {

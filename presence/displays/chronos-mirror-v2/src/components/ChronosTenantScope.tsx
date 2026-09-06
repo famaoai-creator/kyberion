@@ -5,6 +5,12 @@ import { Building2, ShieldCheck } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
+import {
+  normalizeChronosTenantScopePayload,
+  type ChronosOrganizationOption,
+  type ChronosProjectOption,
+  type ChronosTenantOption,
+} from './tenant-scope-data';
 
 export function useChronosTenant(): string {
   return useSearchParams().get('tenant') || '';
@@ -23,21 +29,9 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [tenants, setTenants] = React.useState<
-    Array<{ slug: string; displayName: string; status?: string }>
-  >([]);
-  const [organizations, setOrganizations] = React.useState<
-    Array<{ id: string; tenant_slug?: string }>
-  >([]);
-  const [projects, setProjects] = React.useState<
-    Array<{
-      id: string;
-      name: string;
-      organization_id?: string;
-      tenant_slug?: string;
-      status?: string;
-    }>
-  >([]);
+  const [tenants, setTenants] = React.useState<ChronosTenantOption[]>([]);
+  const [organizations, setOrganizations] = React.useState<ChronosOrganizationOption[]>([]);
+  const [projects, setProjects] = React.useState<ChronosProjectOption[]>([]);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const selected = searchParams.get('tenant') || '';
   const selectedOrganization = searchParams.get('organization_id') || '';
@@ -52,30 +46,19 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
     void fetch(`/api/tenant-scope${params.size ? `?${params.toString()}` : ''}`, {
       cache: 'no-store',
     })
-      .then((response) => response.json())
-      .then((payload) => {
-        if (!cancelled && Array.isArray(payload.tenants)) {
-          setTenants(
-            payload.tenants
-              .map((tenant: unknown) =>
-                typeof tenant === 'string'
-                  ? { slug: tenant, displayName: tenant }
-                  : tenant && typeof tenant === 'object' && typeof (tenant as any).slug === 'string'
-                    ? {
-                        slug: (tenant as any).slug,
-                        displayName:
-                          typeof (tenant as any).displayName === 'string'
-                            ? (tenant as any).displayName
-                            : (tenant as any).slug,
-                        status: (tenant as any).status,
-                      }
-                    : null
-              )
-              .filter(Boolean)
-          );
-          setOrganizations(Array.isArray(payload.organizations) ? payload.organizations : []);
-          setProjects(Array.isArray(payload.projects) ? payload.projects : []);
+      .then(async (response) => {
+        if (!response.ok) throw new Error('tenant scope request failed');
+        return response.json().catch(() => null);
+      })
+      .then((payload: unknown) => {
+        const normalized = normalizeChronosTenantScopePayload(payload);
+        if (!cancelled && normalized) {
+          setTenants(normalized.tenants);
+          setOrganizations(normalized.organizations);
+          setProjects(normalized.projects);
           setLoadError(null);
+        } else if (!cancelled) {
+          setLoadError(uxText('chronos_tenant_scope_unavailable', locale));
         }
       })
       .catch(() => {
@@ -84,7 +67,7 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [selected, selectedOrganization, selectedProject]);
+  }, [locale, selected, selectedOrganization, selectedProject]);
 
   const updateScope = (key: 'tenant' | 'organization_id' | 'project_id', value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -103,10 +86,12 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
     <div className="flex flex-wrap items-center gap-2 rounded-2xl border kb-border-accent kb-surface-accent px-3 py-2">
       <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] kb-text-accent">
         <Building2 size={13} />
-        <span>{compact ? 'tenant' : uxText('chronos_scope', locale)}</span>
+        <span>
+          {compact ? uxText('chronos_tenant_scope_label', locale) : uxText('chronos_scope', locale)}
+        </span>
       </div>
       <select
-        aria-label="tenant scope"
+        aria-label={uxText('chronos_tenant_scope_label', locale)}
         value={selected}
         onChange={(event) => updateScope('tenant', event.target.value)}
         className="min-w-44 rounded-lg border kb-border-subtle kb-surface-raised px-2 py-1.5 text-[11px] kb-text-primary outline-none"
@@ -122,12 +107,12 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
         ›
       </span>
       <select
-        aria-label="organization scope"
+        aria-label={uxText('chronos_organization_scope_label', locale)}
         value={selectedOrganization}
         onChange={(event) => updateScope('organization_id', event.target.value)}
         className="min-w-44 rounded-lg border kb-border-subtle kb-surface-raised px-2 py-1.5 text-[11px] kb-text-primary outline-none"
       >
-        <option value="">all organizations</option>
+        <option value="">{uxText('chronos_all_organizations', locale)}</option>
         {organizations.map((organization) => (
           <option key={organization.id} value={organization.id}>
             {organization.id}
@@ -138,12 +123,12 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
         ›
       </span>
       <select
-        aria-label="project scope"
+        aria-label={uxText('chronos_project_scope_label', locale)}
         value={selectedProject}
         onChange={(event) => updateScope('project_id', event.target.value)}
         className="min-w-44 rounded-lg border kb-border-subtle kb-surface-raised px-2 py-1.5 text-[11px] kb-text-primary outline-none"
       >
-        <option value="">all projects</option>
+        <option value="">{uxText('chronos_all_projects', locale)}</option>
         {projects
           .filter(
             (project) => !selectedOrganization || project.organization_id === selectedOrganization

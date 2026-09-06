@@ -37,33 +37,32 @@ import * as path from 'node:path';
 import {
   appendAssetRecord,
   assetProvenanceRef,
-  auditChain,
-  checkIngestQuota,
   COMMON_TENANT_SLUG,
   deriveAssetId,
   findAssetBySource,
-  logger,
-  pathResolver,
-  recordIngestUsage,
-  safeMkdir,
-  safeWriteFile,
-  scanForInjection,
-  scrubContent,
-  shouldEnforceIngestQuota,
   tenantIngestKnowledgeRoot,
-  updateMemoryPromotionCandidateStatus,
-  verifyStewardApproval,
-  withExecutionContext,
-  wrapUntrusted,
   type IngestAssetRecord,
-  type IngestLedgerPathOptions,
-  type IngestQuotaCheck,
-  type IngestQuotaLevel,
-  type MemoryCandidate,
-  type PiiScrubApplication,
-  type TierPromotionTargetRoot,
-} from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+} from '@agent/core/ingest-asset-ledger';
+import { logger } from '@agent/core/core';
+import {
+  checkIngestQuota,
+  recordIngestUsage,
+  shouldEnforceIngestQuota,
+} from '@agent/core/ingest-quota';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { scanForInjection, wrapUntrusted } from '@agent/core/untrusted-content';
+import { scrubContent } from '@agent/core/pii-scrubber';
+import { updateMemoryPromotionCandidateStatus } from '@agent/core/memory-promotion-queue';
+import { verifyStewardApproval } from '@agent/core/ingest-tier-gate';
+import { withExecutionContext } from '@agent/core/authority';
+import type { IngestLedgerPathOptions } from '@agent/core/ingest-asset-ledger';
+import type { IngestQuotaCheck, IngestQuotaLevel } from '@agent/core/ingest-quota';
+import type { MemoryCandidate } from '@agent/core/memory-promotion-queue';
+import type { PiiScrubApplication } from '@agent/core/pii-scrubber';
+import type { TierPromotionTargetRoot } from '@agent/core/ingest-tier-gate';
+import { auditChain } from '@agent/core/audit-chain';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import type { DedupResult, IngestRegistryRecord } from './dedup.js';
 import type { NormalizeCardResult } from './normalize-card.js';
 import type { IngestSourceMeta } from './parse-document.js';
@@ -171,7 +170,8 @@ export function assertTargetInsideTenantRoot(
   if (absTarget !== absRoot && !absTarget.startsWith(absRoot + path.sep)) {
     fail(`resolved target '${absTarget}' escapes the tenant knowledge root '${absRoot}'`);
   }
-  return absTarget;
+  assertSafeRepositoryPath(absRoot, { allowMissingLeaf: true });
+  return assertSafeRepositoryPath(absTarget, { allowMissingLeaf: true });
 }
 
 function resolveIngestedBy(input: IngestCommitInput): string {
@@ -179,7 +179,7 @@ function resolveIngestedBy(input: IngestCommitInput): string {
   if (explicit) return explicit;
   const persona = String(getRegisteredEnvText('KYBERION_PERSONA') || '').trim();
   if (persona) return persona;
-  const role = String(process.env.MISSION_ROLE || '').trim();
+  const role = String(getRegisteredEnvText('MISSION_ROLE') || '').trim();
   if (role) return role;
   fail(
     'ingested_by is required and no identity context is active — pass ingested_by explicitly ' +
@@ -509,7 +509,7 @@ export function commitIngest(input: IngestCommitInput): IngestCommitResult {
   ];
   const stewardApprovalId = stewardApproval?.candidate_id;
 
-  const ingestedAt = String(input.now || '').trim() || new Date().toISOString();
+  const ingestedAt = String(input.now || '').trim() || nowIso();
   const assetId = deriveAssetId(sourceSystem, sourceId);
 
   // Ledger reads/writes and the card write all run under the narrowly-scoped

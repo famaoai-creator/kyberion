@@ -21,6 +21,11 @@ vi.mock('@agent/core', async () => {
   return { ...actual, findMissionPath: mocks.findMissionPath };
 });
 
+vi.mock('@agent/core/path-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/path-resolver')>();
+  return { ...actual, findMissionPath: mocks.findMissionPath };
+});
+
 const {
   approvalRequestLogicalPath,
   decideApprovalRequest,
@@ -28,6 +33,7 @@ const {
   pathResolver,
   safeMkdir,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
   withExecutionContext,
 } = await import('@agent/core');
@@ -140,5 +146,24 @@ describe('MO-11 alignment gate end-to-end', () => {
     const result = openAlignmentApproval(MISSION_ID);
     expect(result.created).toBe(false);
     expect(result.reason).toMatch(/brief not found/u);
+  });
+
+  it('fails closed when the brief path is replaced by a symlink', () => {
+    writeBrief(BRIEF);
+    const outside = pathResolver.shared(`tmp/mo11-e2e-${RUN_ID}-outside.json`);
+    safeWriteFile(outside, JSON.stringify(BRIEF), { encoding: 'utf8' });
+    safeRmSync(BRIEF_PATH, { force: true });
+    safeSymlinkSync(outside, BRIEF_PATH);
+
+    const opened = openAlignmentApproval(MISSION_ID);
+    expect(opened.created).toBe(false);
+    expect(opened.reason).toMatch(/unsafe|symbolic link/u);
+
+    expect(assessAlignmentDecision(MISSION_ID)).toMatchObject({
+      verdict: 'brief_unsafe',
+      satisfied: false,
+    });
+
+    safeRmSync(outside, { force: true });
   });
 });

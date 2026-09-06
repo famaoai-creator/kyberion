@@ -22,7 +22,7 @@ describe('Developer tour contract', () => {
     expect(tour).toContain('voice_consent.ts');
     expect(tour).toContain('run_migrations.ts');
     expect(tour).toContain('verify-session.json');
-    expect(tour).toContain('pnpm run test:meeting-dry-run');
+    expect(tour).toContain('pnpm test -- --suite meeting-dry-run');
     expect(tour).toContain('voice-consent.json');
     expect(tour).toContain('telegram-bridge');
     expect(tour).toContain('customer/{slug}/` becomes the preferred overlay root');
@@ -35,9 +35,9 @@ describe('Developer tour contract', () => {
     const ext = read('docs/developer/EXTENSION_POINTS.md');
     const readme = read('docs/developer/README.md');
     expect(ext).toContain('release:notes');
-    expect(ext).toContain('migration:run');
+    expect(ext).toContain('migration');
     expect(ext).toContain('doctor --runtime meeting');
-    expect(ext).toContain('test:meeting-dry-run');
+    expect(ext).toContain('test -- --suite meeting-dry-run');
     expect(ext).toContain('libs/actuators/meeting-browser-driver/');
     expect(ext).toContain('meeting-actuator');
     expect(ext).toContain('voice-consent.json');

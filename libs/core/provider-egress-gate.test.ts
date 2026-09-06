@@ -17,7 +17,7 @@ import {
   highestTierForPaths,
   loadProviderEgressPolicy,
   providerIdForReasoningIdentifier,
-  resetProviderEgressPolicyCache,
+  _resetProviderEgressPolicyCacheForTests,
   ProviderEgressDeniedError,
   type ProviderEgressPolicyFile,
 } from './provider-egress-gate.js';
@@ -49,13 +49,13 @@ function writePolicy(policy: unknown): void {
 beforeEach(() => {
   mocks.sendOpsAlert.mockReset();
   process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = POLICY_PATH;
-  resetProviderEgressPolicyCache();
+  _resetProviderEgressPolicyCacheForTests();
 });
 
 afterEach(() => {
   safeRmSync(POLICY_DIR, { recursive: true, force: true });
   delete process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH;
-  resetProviderEgressPolicyCache();
+  _resetProviderEgressPolicyCacheForTests();
 });
 
 describe('checkProviderEgress', () => {
@@ -170,6 +170,16 @@ describe('assertProviderEgress', () => {
 });
 
 describe('loadProviderEgressPolicy', () => {
+  it('reports an unsafe external override as invalid instead of reading it', () => {
+    process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = '/tmp/provider-egress-external.json';
+    _resetProviderEgressPolicyCacheForTests();
+
+    const loaded = loadProviderEgressPolicy();
+
+    expect(loaded.status).toBe('invalid');
+    if (loaded.status === 'invalid') expect(loaded.reason).toContain('RESOURCE_PATH_SCOPE');
+  });
+
   it('reports status "missing" when the file does not exist', () => {
     expect(loadProviderEgressPolicy()).toEqual({ status: 'missing' });
   });
@@ -183,13 +193,22 @@ describe('loadProviderEgressPolicy', () => {
     }
   });
 
-  it('caches the result until resetProviderEgressPolicyCache is called', () => {
+  it('accepts the governance $schema metadata used by the checked-in policy', () => {
+    writePolicy({ ...VALID_POLICY, $schema: 'http://json-schema.org/draft-07/schema#' });
+    const loaded = loadProviderEgressPolicy();
+    expect(loaded.status).toBe('ok');
+    if (loaded.status === 'ok') {
+      expect(loaded.policy.providers.claude.egress).toBe('external-api');
+    }
+  });
+
+  it('caches the result until the provider egress test cache reset is called', () => {
     writePolicy(VALID_POLICY);
     expect(loadProviderEgressPolicy().status).toBe('ok');
     // Mutate the file on disk without resetting the cache.
     writePolicy({ version: '1.0.0', providers: {} });
     expect(loadProviderEgressPolicy().status).toBe('ok');
-    resetProviderEgressPolicyCache();
+    _resetProviderEgressPolicyCacheForTests();
     expect(loadProviderEgressPolicy().status).toBe('invalid');
   });
 });
@@ -238,9 +257,9 @@ describe('providerIdForReasoningIdentifier', () => {
 describe('the checked-in default policy', () => {
   it('loads and validates', () => {
     delete process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH;
-    resetProviderEgressPolicyCache();
+    _resetProviderEgressPolicyCacheForTests();
     const loaded = loadProviderEgressPolicy();
     expect(loaded.status).toBe('ok');
-    resetProviderEgressPolicyCache();
+    _resetProviderEgressPolicyCacheForTests();
   });
 });

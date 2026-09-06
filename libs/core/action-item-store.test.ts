@@ -36,7 +36,7 @@ describe('action-item-store', () => {
         mission_id: FIX_MISSION,
         tier: 'confidential',
         assigned_persona: 'ecosystem_architect',
-      }),
+      })
     );
   });
 
@@ -77,8 +77,24 @@ describe('action-item-store', () => {
         mission_id: FIX_MISSION,
         title: 'something happens',
         assignee: { kind: 'operator_self', label: 'Operator' },
-      }),
+      })
     ).toThrow(/invalid item_id/);
+  });
+
+  it('rejects an evidence directory that traverses a symlink', () => {
+    const evidenceDir = path.join(MISSION_DIR, 'evidence');
+    const targetDir = path.join(ROOT, 'active/shared/tmp/action-item-store-target');
+    fs.rmSync(evidenceDir, { recursive: true, force: true });
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.symlinkSync(targetDir, evidenceDir, 'dir');
+
+    try {
+      expect(() => listActionItems(FIX_MISSION)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.rmSync(evidenceDir, { recursive: true, force: true });
+      fs.rmSync(targetDir, { recursive: true, force: true });
+      fs.mkdirSync(evidenceDir, { recursive: true });
+    }
   });
 
   it('rejects duplicate item_id within the same mission', () => {
@@ -94,7 +110,7 @@ describe('action-item-store', () => {
         mission_id: FIX_MISSION,
         title: 'duplicate of the same id',
         assignee: { kind: 'operator_self', label: 'Operator' },
-      }),
+      })
     ).toThrow(/already exists/);
   });
 
@@ -152,7 +168,7 @@ describe('action-item-store', () => {
           owner_kind: 'team_member',
           blocked_reason: 'manual approval still pending',
         }),
-      ]),
+      ])
     );
   });
 
@@ -255,12 +271,8 @@ describe('action-item-store', () => {
       status: 'in_progress',
     });
 
-    expect(listOperatorSelfPending(FIX_MISSION).map((i) => i.item_id)).toEqual([
-      'AI-SELF-PENDING',
-    ]);
-    expect(listOthersPending(FIX_MISSION).map((i) => i.item_id)).toEqual([
-      'AI-TEAM-PENDING',
-    ]);
+    expect(listOperatorSelfPending(FIX_MISSION).map((i) => i.item_id)).toEqual(['AI-SELF-PENDING']);
+    expect(listOthersPending(FIX_MISSION).map((i) => i.item_id)).toEqual(['AI-TEAM-PENDING']);
   });
 
   it('generates a deterministic next id from existing count', () => {
@@ -270,9 +282,8 @@ describe('action-item-store', () => {
   });
 
   it('non-declarative items land in pending_speaker_review and are NOT eligible', async () => {
-    const { listPendingSpeakerReview, confirmActionItemBySpeaker } = await import(
-      './action-item-store.js'
-    );
+    const { listPendingSpeakerReview, confirmActionItemBySpeaker } =
+      await import('./action-item-store.js');
     recordActionItem({
       item_id: 'AI-MOD-1',
       mission_id: FIX_MISSION,
@@ -336,9 +347,7 @@ describe('action-item-store', () => {
   });
 
   it('partial_state items are NOT eligible until cleared', async () => {
-    const { listPartialStatePending, clearPartialState } = await import(
-      './action-item-store.js'
-    );
+    const { listPartialStatePending, clearPartialState } = await import('./action-item-store.js');
     recordActionItem({
       item_id: 'AI-PART-1',
       mission_id: FIX_MISSION,
@@ -399,6 +408,32 @@ describe('action-item-store', () => {
     // Legacy flat fields should NOT be present on the migrated shape.
     expect((items[0] as any).partial_state).toBeUndefined();
     expect((items[0] as any).restricted).toBeUndefined();
+  });
+
+  it('skips schema-invalid JSONL records from the logical view', () => {
+    const file = path.join(MISSION_DIR, 'evidence/action-items.jsonl');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      `${JSON.stringify({ item_id: 'AI-BROKEN-1', mission_id: FIX_MISSION, status: 'pending' })}\n` +
+        `${JSON.stringify({
+          item_id: 'AI-VALID-1',
+          mission_id: FIX_MISSION,
+          title: 'valid persisted action item',
+          assignee: { kind: 'operator_self', label: 'Operator' },
+          status: 'pending',
+          created_at: '2026-04-26T10:00:00.000Z',
+        })}\n`
+    );
+
+    expect(listActionItems(FIX_MISSION).map((item) => item.item_id)).toEqual(['AI-VALID-1']);
+  });
+
+  it('rejects an action item store that is not a regular file', () => {
+    const file = path.join(MISSION_DIR, 'evidence/action-items.jsonl');
+    fs.mkdirSync(file, { recursive: true });
+
+    expect(() => listActionItems(FIX_MISSION)).toThrow(/must be a regular file/);
   });
 
   it('speaker_rejected transitions the item to cancelled', async () => {

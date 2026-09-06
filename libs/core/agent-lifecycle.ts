@@ -2,7 +2,13 @@
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { ACPMediator, ACPMediatorOptions } from './acp-mediator.js';
-import { CodexAdapter, CodexAppServerAdapter, ClaudeAdapter, AgyAdapter } from './agent-adapter.js';
+import {
+  CodexAdapter,
+  CodexAppServerAdapter,
+  ClaudeAdapter,
+  AgyAdapter,
+  type AgentAdapter,
+} from './agent-adapter.js';
 import {
   agentRegistry,
   AgentRecord,
@@ -25,11 +31,20 @@ import { loadProviderConfig } from './provider-config.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
 import { normalizeEventScope, type EventScopeInput } from './event-scope.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isRecord } from './foundation/text.js';
 
 const PROJECT_ROOT = pathResolver.rootDir();
 const AGENT_IDLE_TIMEOUT_MS = Number(
   getRegisteredEnvText('KYBERION_AGENT_IDLE_TIMEOUT_MS') || 20 * 60 * 1000
 );
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
 
 /**
  * Agent Lifecycle Manager v1.0
@@ -48,11 +63,18 @@ export interface SpawnOptions {
   scope?: EventScopeInput;
   trustRequired?: number;
   turnTimeoutMs?: number;
+  /** Trusted execution-boundary presence forwarded to ACP risky approvals. */
+  hasHuman?: boolean;
+  hasUI?: boolean;
+  nonInteractive?: boolean;
   runtimeMetadata?: Record<string, unknown>;
   restartPolicy?: {
     maxRestarts: number;
     windowMs: number;
   };
+  /** Durable supervisor ownership propagated before the runtime is registered. */
+  runtimeOwnerId?: string;
+  runtimeOwnerType?: string;
 }
 
 export interface AgentHandleAskOptions {
@@ -143,7 +165,9 @@ export function resolveAgentLifecycleModelId(
   options: Pick<SpawnOptions, 'modelId' | 'runtimeMetadata'>,
   env: NodeJS.ProcessEnv = process.env
 ): string | undefined {
-  const taskRoutingMode = String(env.KYBERION_TASK_MODEL_ROUTING || 'advisory').toLowerCase();
+  const taskRoutingMode = (
+    getRegisteredEnvText('KYBERION_TASK_MODEL_ROUTING', { env }) || 'advisory'
+  ).toLowerCase();
   const taskModelHint = readTaskModelHint(options.runtimeMetadata);
   if (taskRoutingMode === 'enforce' && taskModelHint?.model_id) {
     return taskModelHint.model_id;
@@ -155,10 +179,7 @@ const loadProviderLifecycle = () => loadProviderConfig().lifecycle;
 
 class AgentLifecycleManagerImpl {
   private mediators: Map<string, ACPMediator> = new Map();
-  private execAdapters: Map<
-    string,
-    CodexAdapter | CodexAppServerAdapter | ClaudeAdapter | AgyAdapter
-  > = new Map();
+  private execAdapters: Map<string, AgentAdapter> = new Map();
   private handles: Map<string, AgentHandle> = new Map();
   private pendingSpawns: Map<string, Promise<AgentHandle>> = new Map();
   private healthInterval: ReturnType<typeof setInterval> | null = null;
@@ -185,10 +206,11 @@ class AgentLifecycleManagerImpl {
   }
 
   private getProviderRuntime(agentId: string): Record<string, unknown> | undefined {
-    const mediator = this.mediators.get(agentId) as any;
-    if (mediator?.getRuntimeInfo) return mediator.getRuntimeInfo();
-    const adapter = this.execAdapters.get(agentId) as any;
-    if (adapter?.getRuntimeInfo) return adapter.getRuntimeInfo();
+    const mediator = this.mediators.get(agentId);
+    if (mediator) return { ...mediator.getRuntimeInfo() };
+    const adapter = this.execAdapters.get(agentId);
+    const runtimeInfo = adapter?.getRuntimeInfo?.();
+    if (runtimeInfo) return { ...runtimeInfo };
     return undefined;
   }
 
@@ -196,8 +218,8 @@ class AgentLifecycleManagerImpl {
     metrics: AgentRuntimeMetrics,
     providerRuntime?: Record<string, unknown>
   ): void {
-    const usage = providerRuntime?.usage as Record<string, unknown> | undefined;
-    if (!usage) return;
+    const usage = providerRuntime?.usage;
+    if (!isRecord(usage)) return;
     metrics.usage = {
       promptChars: metrics.lastPromptChars,
       responseChars: metrics.lastResponseChars,
@@ -497,8 +519,9 @@ class AgentLifecycleManagerImpl {
       runtimeSupervisor.register({
         resourceId: agentId,
         kind: 'agent',
-        ownerId: resolvedOptions.missionId || agentId,
-        ownerType: resolvedOptions.missionId ? 'mission' : 'agent',
+        ownerId: resolvedOptions.runtimeOwnerId || resolvedOptions.missionId || agentId,
+        ownerType:
+          resolvedOptions.runtimeOwnerType || (resolvedOptions.missionId ? 'mission' : 'agent'),
         idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
         shutdownPolicy: 'idle',
         metadata: {
@@ -527,9 +550,9 @@ class AgentLifecycleManagerImpl {
             agentRegistry.updateStatus(agentId, 'ready');
             this.observeSuccess(agentId, prompt, res.text, res.stopReason, options.model_tier);
             return res.text;
-          } catch (e: any) {
+          } catch (e: unknown) {
             agentRegistry.updateStatus(agentId, 'error');
-            this.observeFailure(agentId, prompt, e);
+            this.observeFailure(agentId, prompt, asError(e));
             throw e;
           }
         },
@@ -569,6 +592,11 @@ class AgentLifecycleManagerImpl {
       systemPrompt: resolvedOptions.systemPrompt,
       cwd: resolvedOptions.cwd || PROJECT_ROOT,
       turnTimeoutMs: resolvedOptions.turnTimeoutMs,
+      ...(resolvedOptions.hasHuman !== undefined ? { hasHuman: resolvedOptions.hasHuman } : {}),
+      ...(resolvedOptions.hasUI !== undefined ? { hasUI: resolvedOptions.hasUI } : {}),
+      ...(resolvedOptions.nonInteractive !== undefined
+        ? { nonInteractive: resolvedOptions.nonInteractive }
+        : {}),
       onCrash: async ({ agentId: crashedAgentId }) => {
         const policy = resolvedOptions.restartPolicy;
         if (!policy) return;
@@ -580,9 +608,9 @@ class AgentLifecycleManagerImpl {
         try {
           await this.restart(crashedAgentId);
           logger.info(`[LIFECYCLE] Auto-restarted ${crashedAgentId} after crash.`);
-        } catch (error: any) {
+        } catch (error: unknown) {
           logger.error(
-            `[LIFECYCLE] Auto-restart failed for ${crashedAgentId}: ${error?.message || error}`
+            `[LIFECYCLE] Auto-restart failed for ${crashedAgentId}: ${errorMessage(error)}`
           );
         }
       },
@@ -596,8 +624,9 @@ class AgentLifecycleManagerImpl {
       runtimeSupervisor.register({
         resourceId: agentId,
         kind: 'agent',
-        ownerId: resolvedOptions.missionId || agentId,
-        ownerType: resolvedOptions.missionId ? 'mission' : 'agent',
+        ownerId: resolvedOptions.runtimeOwnerId || resolvedOptions.missionId || agentId,
+        ownerType:
+          resolvedOptions.runtimeOwnerType || (resolvedOptions.missionId ? 'mission' : 'agent'),
         idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
         shutdownPolicy: 'idle',
         metadata: {
@@ -611,10 +640,10 @@ class AgentLifecycleManagerImpl {
       logger.info(
         `[LIFECYCLE] Agent ${agentId} (${resolvedOptions.provider}/${mediatorOpts.modelId}) ready.`
       );
-    } catch (e: any) {
+    } catch (e: unknown) {
       agentRegistry.updateStatus(agentId, 'error');
       this.mediators.delete(agentId);
-      throw new Error(`Failed to boot ${agentId}: ${e.message}`);
+      throw new Error(`Failed to boot ${agentId}: ${errorMessage(e)}`);
     }
 
     const handle: AgentHandle = {
@@ -635,9 +664,9 @@ class AgentLifecycleManagerImpl {
           agentRegistry.updateStatus(agentId, 'ready');
           this.observeSuccess(agentId, prompt, result, 'completed', askOptions.model_tier);
           return result;
-        } catch (e: any) {
+        } catch (e: unknown) {
           agentRegistry.updateStatus(agentId, 'error');
-          this.observeFailure(agentId, prompt, e);
+          this.observeFailure(agentId, prompt, asError(e));
           throw e;
         }
       },
@@ -707,9 +736,9 @@ class AgentLifecycleManagerImpl {
               agentRegistry.updateStatus(record.agentId, 'ready');
               results.set(record.agentId, 'ready');
               continue;
-            } catch (error: any) {
+            } catch (error: unknown) {
               logger.error(
-                `[LIFECYCLE] Auto-restart failed for ${record.agentId}: ${error?.message || error}`
+                `[LIFECYCLE] Auto-restart failed for ${record.agentId}: ${errorMessage(error)}`
               );
             }
           }
@@ -764,7 +793,7 @@ class AgentLifecycleManagerImpl {
     if (mediator) return mediator.getLog(limit);
 
     const exec = this.execAdapters.get(agentId);
-    if (exec && 'getLog' in exec) return (exec as any).getLog(limit);
+    if (exec && typeof exec.getLog === 'function') return exec.getLog(limit);
 
     return [];
   }
@@ -802,8 +831,8 @@ class AgentLifecycleManagerImpl {
     mode: 'soft' | 'restart' | 'stateless';
     snapshot: AgentRuntimeSnapshot | undefined;
   }> {
-    const mediator: any = this.mediators.get(agentId);
-    const adapter: any = this.execAdapters.get(agentId);
+    const mediator = this.mediators.get(agentId);
+    const adapter = this.execAdapters.get(agentId);
     const metrics = this.ensureMetrics(agentId);
 
     if (mediator?.refreshContext) {
@@ -842,8 +871,10 @@ class AgentLifecycleManagerImpl {
 }
 
 const GLOBAL_KEY = Symbol.for('@kyberion/agent-lifecycle');
-if (!(globalThis as any)[GLOBAL_KEY]) {
-  (globalThis as any)[GLOBAL_KEY] = new AgentLifecycleManagerImpl();
+const globalState = globalThis as typeof globalThis & { [key: symbol]: unknown };
+const existingLifecycle = globalState[GLOBAL_KEY];
+if (!(existingLifecycle instanceof AgentLifecycleManagerImpl)) {
+  globalState[GLOBAL_KEY] = new AgentLifecycleManagerImpl();
   // In an import cycle (runtime-supervisor → … → agent-lifecycle) the
   // supervisor binding may still be mid-evaluation here; defer the sweep
   // start one tick so module init order can never crash the process.
@@ -853,7 +884,7 @@ if (!(globalThis as any)[GLOBAL_KEY]) {
     );
   });
 }
-export const agentLifecycle: AgentLifecycleManagerImpl = (globalThis as any)[GLOBAL_KEY];
+export const agentLifecycle = globalState[GLOBAL_KEY] as AgentLifecycleManagerImpl;
 
 function probeProcessStats(pid?: number): AgentProcessStats | undefined {
   if (!pid) return undefined;

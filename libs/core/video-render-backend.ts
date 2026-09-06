@@ -2,6 +2,7 @@
 import * as path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  assertSafeRepositoryPath,
   buildSafeExecEnv,
   safeExec,
   safeExistsSync,
@@ -14,6 +15,7 @@ import {
 import { platform } from './platform.js';
 import { pathResolver } from './path-resolver.js';
 import { createLogger } from './logger.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveVideoBackend, type MediaBackendRecord } from './media-backend-registry.js';
 
 const logger = createLogger('video-render-backend');
@@ -47,6 +49,10 @@ export interface VideoRenderBackendResult {
 export interface VideoRenderBackendExecutionOptions {
   isCancelled?: () => boolean;
   poll_interval_ms?: number;
+}
+
+function resolveRepositoryScript(relativePath: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(relativePath));
 }
 
 export class VideoRenderBackendCommandError extends Error {
@@ -136,14 +142,17 @@ async function renderVideoCompositionBundleImpl(
       };
     }
 
+    const bundleDir = assertSafeRepositoryPath(pathResolver.rootResolve(plan.bundle_dir), {
+      allowMissingLeaf: true,
+    });
     const outputPath = resolveOutputPath(plan);
     const execEnv = buildSafeExecEnv({
-      NODE_OPTIONS: `${process.env.NODE_OPTIONS ? `${process.env.NODE_OPTIONS} ` : ''}--require=${pathResolver.rootResolve('scripts/hyperframes-localhost-preload.cjs')}`,
+      NODE_OPTIONS: `${getRegisteredEnvText('NODE_OPTIONS') ? `${getRegisteredEnvText('NODE_OPTIONS')} ` : ''}--require=${resolveRepositoryScript('scripts/hyperframes-localhost-preload.cjs')}`,
     });
     const command = [
       'hyperframes',
       'render',
-      plan.bundle_dir,
+      bundleDir,
       '--output',
       outputPath,
       '--format',
@@ -238,6 +247,9 @@ export async function renderNarratedFallbackVideo(
   outputPath: string,
   cause?: Error
 ): Promise<VideoRenderBackendResult> {
+  outputPath = assertSafeRepositoryPath(pathResolver.rootResolve(outputPath), {
+    allowMissingLeaf: true,
+  });
   const rootDir = pathResolver.rootDir();
   const outputDir = path.dirname(outputPath);
   const baseName = path.basename(outputPath, path.extname(outputPath) || '.mp4');
@@ -261,7 +273,7 @@ export async function renderNarratedFallbackVideo(
     safeExec(
       'python3',
       [
-        pathResolver.rootResolve('scripts/make_video_cover.py'),
+        resolveRepositoryScript('scripts/make_video_cover.py'),
         '--out',
         sceneImagePath,
         '--title',
@@ -377,7 +389,7 @@ export async function renderNarratedFallbackVideo(
     output_path: outputPath,
     command: [
       'python3',
-      pathResolver.rootResolve('scripts/make_video_cover.py'),
+      resolveRepositoryScript('scripts/make_video_cover.py'),
       'ffmpeg',
       'ffmpeg',
     ],
@@ -494,20 +506,22 @@ function truncateText(value: string, limit: number): string {
 }
 
 function resolveOutputPath(plan: VideoCompositionRenderPlan): string {
-  if (plan.output_target_path && plan.output_target_path.trim()) {
-    return pathResolver.rootResolve(plan.output_target_path.trim());
-  }
-  const ext = plan.output_format;
-  return path.join(plan.bundle_dir, `output.${ext}`);
+  const candidate =
+    plan.output_target_path && plan.output_target_path.trim()
+      ? pathResolver.rootResolve(plan.output_target_path.trim())
+      : pathResolver.rootResolve(path.join(plan.bundle_dir, `output.${plan.output_format}`));
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 function resolveMuxAudioRef(plan: VideoCompositionRenderPlan): string | undefined {
-  return (
+  const ref =
     plan.narration_ref ||
     plan.music_ref ||
     (plan as any).audio?.narration_ref ||
-    (plan as any).audio?.music_ref
-  );
+    (plan as any).audio?.music_ref;
+  return typeof ref === 'string' && ref.trim()
+    ? assertSafeRepositoryPath(pathResolver.rootResolve(ref.trim()), { allowMissingLeaf: true })
+    : undefined;
 }
 
 async function muxAudioTrack(

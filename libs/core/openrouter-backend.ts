@@ -1,6 +1,15 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExec, safeReadFile, safeReaddir, safeWriteFile, validateUrl } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExec,
+  safeReaddir,
+  safeWriteFile,
+  validateUrl,
+} from './secure-io.js';
 import { redactSensitiveObject } from './network.js';
 import { advanceToolLoopGuardrail, createToolLoopGuardrailState } from './tool-loop-guardrail.js';
 import {
@@ -40,6 +49,10 @@ export interface OpenRouterBackendOptions {
   timeoutMs?: number;
   toolsEnabled?: boolean;
   allowedTools?: ReasoningToolName[];
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
 }
 
 export interface OpenRouterBackendOverrides {
@@ -177,7 +190,139 @@ function createToolDefinitions(
 
 function safeJsonParse(text: string): unknown {
   try {
-    return JSON.parse(text);
+    return parseSafeJsonInput(text, 'OpenRouter response');
+  } catch {
+    return null;
+  }
+}
+
+function parseChatMessage(value: unknown, label: string): ChatMessage | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, label);
+    if (
+      record.role !== 'system' &&
+      record.role !== 'user' &&
+      record.role !== 'assistant' &&
+      record.role !== 'tool'
+    ) {
+      return null;
+    }
+    if (
+      record.content !== undefined &&
+      record.content !== null &&
+      typeof record.content !== 'string'
+    ) {
+      return null;
+    }
+    if (record.tool_call_id !== undefined && typeof record.tool_call_id !== 'string') return null;
+    let toolCalls: ChatMessage['tool_calls'];
+    if (record.tool_calls !== undefined) {
+      if (!Array.isArray(record.tool_calls)) return null;
+      toolCalls = [];
+      for (const [index, rawCall] of record.tool_calls.entries()) {
+        const call = parseSafeJsonObjectValue(rawCall, `${label}.tool_calls[${index}]`);
+        const fn = parseSafeJsonObjectValue(
+          call.function,
+          `${label}.tool_calls[${index}].function`
+        );
+        if (
+          typeof call.id !== 'string' ||
+          call.type !== 'function' ||
+          typeof fn.name !== 'string' ||
+          typeof fn.arguments !== 'string'
+        ) {
+          return null;
+        }
+        toolCalls.push({
+          id: call.id,
+          type: 'function',
+          function: { name: fn.name, arguments: fn.arguments },
+        });
+      }
+    }
+    return {
+      role: record.role,
+      ...(record.content !== undefined ? { content: record.content as string | null } : {}),
+      ...(typeof record.tool_call_id === 'string' ? { tool_call_id: record.tool_call_id } : {}),
+      ...(toolCalls !== undefined ? { tool_calls: toolCalls } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseChatCompletionPayload(value: unknown): ChatCompletionResponse | null {
+  try {
+    const root = parseSafeJsonObjectValue(value, 'OpenRouter response');
+    let error: ChatCompletionResponse['error'];
+    if (root.error !== undefined) {
+      const parsedError = parseSafeJsonObjectValue(root.error, 'OpenRouter response.error');
+      if (parsedError.message !== undefined && typeof parsedError.message !== 'string') return null;
+      error = {
+        ...(typeof parsedError.message === 'string' ? { message: parsedError.message } : {}),
+      };
+    }
+    if (root.choices === undefined) return error ? { choices: [], error } : null;
+    if (!Array.isArray(root.choices)) return null;
+    const choices: ChatCompletionResponse['choices'] = [];
+    for (const [index, rawChoice] of root.choices.entries()) {
+      const choice = parseSafeJsonObjectValue(rawChoice, `OpenRouter response.choices[${index}]`);
+      const message = parseChatMessage(
+        choice.message,
+        `OpenRouter response.choices[${index}].message`
+      );
+      if (!message) return null;
+      choices.push({ message });
+    }
+    return { choices, ...(error ? { error } : {}) };
+  } catch {
+    return null;
+  }
+}
+
+function parseOpenRouterModelRecord(value: unknown): OpenRouterModelRecord | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'OpenRouter model record');
+    if (
+      (record.id !== undefined && typeof record.id !== 'string') ||
+      (record.canonical_slug !== undefined && typeof record.canonical_slug !== 'string')
+    ) {
+      return null;
+    }
+    let pricing: OpenRouterModelRecord['pricing'];
+    if (record.pricing !== undefined) {
+      const parsedPricing = parseSafeJsonObjectValue(record.pricing, 'OpenRouter model pricing');
+      if (
+        Object.values(parsedPricing).some(
+          (value) =>
+            value !== null &&
+            value !== undefined &&
+            typeof value !== 'string' &&
+            typeof value !== 'number'
+        )
+      ) {
+        return null;
+      }
+      pricing = parsedPricing as OpenRouterModelRecord['pricing'];
+    }
+    let supportedParameters: string[] | undefined;
+    if (record.supported_parameters !== undefined) {
+      if (
+        !Array.isArray(record.supported_parameters) ||
+        record.supported_parameters.some((parameter) => typeof parameter !== 'string')
+      ) {
+        return null;
+      }
+      supportedParameters = record.supported_parameters;
+    }
+    return {
+      ...(typeof record.id === 'string' ? { id: record.id } : {}),
+      ...(typeof record.canonical_slug === 'string'
+        ? { canonical_slug: record.canonical_slug }
+        : {}),
+      ...(pricing ? { pricing } : {}),
+      ...(supportedParameters ? { supported_parameters: supportedParameters } : {}),
+    };
   } catch {
     return null;
   }
@@ -236,7 +381,7 @@ export class OpenRouterBackend implements ReasoningBackend {
     });
 
     const text = await response.text();
-    const parsed = safeJsonParse(text) as ChatCompletionResponse | null;
+    const parsed = parseChatCompletionPayload(safeJsonParse(text));
     if (!response.ok) {
       const message = parsed?.error?.message || text || `HTTP ${response.status}`;
       throw new Error(`[openrouter] chat completion failed: ${message}`);
@@ -251,21 +396,30 @@ export class OpenRouterBackend implements ReasoningBackend {
     if (!this.toolsEnabled || !this.allowedTools.has(name as ReasoningToolName)) {
       return `Error: Tool ${name} is not enabled for this reasoning route.`;
     }
-    const args = (safeJsonParse(rawArguments) as Record<string, unknown>) || {};
+    let args: Record<string, unknown>;
+    try {
+      args = parseSafeJsonObjectValue(safeJsonParse(rawArguments), 'OpenRouter tool arguments');
+    } catch {
+      return 'Error: OpenRouter tool arguments must be a JSON object.';
+    }
     logger.info(`[OPENROUTER] Tool Call: ${name}(${JSON.stringify(redactSensitiveObject(args))})`);
 
     try {
       switch (name) {
         case 'read_file':
-          return String(safeReadFile(String(args.path ?? '')));
-        case 'write_file':
-          safeWriteFile(String(args.path ?? ''), String(args.content ?? ''), {
+          return readTextFile(assertSafeRepositoryPath(String(args.path ?? '')));
+        case 'write_file': {
+          const filePath = assertSafeRepositoryPath(String(args.path ?? ''), {
+            allowMissingLeaf: true,
+          });
+          safeWriteFile(filePath, String(args.content ?? ''), {
             mkdir: true,
             encoding: 'utf8',
           });
           return 'Success: File written.';
+        }
         case 'list_directory':
-          return JSON.stringify(safeReaddir(String(args.path ?? '')));
+          return JSON.stringify(safeReaddir(assertSafeRepositoryPath(String(args.path ?? ''))));
         case 'shell_exec':
           return safeExec('bash', ['-lc', String(args.command ?? '')], {
             cwd: pathResolver.rootDir(),
@@ -434,10 +588,11 @@ export function buildOpenRouterBackendFromEnv(
   modelOverride?: string,
   overrides: OpenRouterBackendOverrides = {}
 ): OpenRouterBackend | null {
-  const apiKey = env.KYBERION_OPENROUTER_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
+  const apiKey =
+    envText(env, 'KYBERION_OPENROUTER_KEY')?.trim() || envText(env, 'OPENROUTER_API_KEY')?.trim();
   if (!apiKey) return null;
   const model = resolveOpenRouterModelPolicy(env, modelOverride).model;
-  const baseURL = env.KYBERION_OPENROUTER_URL?.trim();
+  const baseURL = envText(env, 'KYBERION_OPENROUTER_URL')?.trim();
   return new OpenRouterBackend({ apiKey, model, baseURL, ...overrides });
 }
 
@@ -445,7 +600,8 @@ export function buildOpenRouterBackendFromEnv(
 export async function probeOpenRouterBackendAvailability(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<{ available: boolean; reason?: string }> {
-  const apiKey = env.KYBERION_OPENROUTER_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
+  const apiKey =
+    envText(env, 'KYBERION_OPENROUTER_KEY')?.trim() || envText(env, 'OPENROUTER_API_KEY')?.trim();
   if (!apiKey) {
     return {
       available: false,
@@ -453,7 +609,7 @@ export async function probeOpenRouterBackendAvailability(
     };
   }
 
-  const baseURL = env.KYBERION_OPENROUTER_URL?.trim() || 'https://openrouter.ai/api/v1';
+  const baseURL = envText(env, 'KYBERION_OPENROUTER_URL')?.trim() || 'https://openrouter.ai/api/v1';
   try {
     const normalizedBaseURL = baseURL.endsWith('/') ? baseURL : `${baseURL}/`;
     const modelsURL = new URL('models', normalizedBaseURL);
@@ -474,16 +630,20 @@ export async function probeOpenRouterBackendAvailability(
       if (!response.ok) {
         return { available: false, reason: `OpenRouter probe returned HTTP ${response.status}` };
       }
-      const body = safeJsonParse(await response.text()) as {
-        data?: OpenRouterModelRecord[];
-      } | null;
-      if (!body || !Array.isArray(body.data)) {
+      const body = parseSafeJsonObjectValue(
+        safeJsonParse(await response.text()),
+        'OpenRouter models response'
+      );
+      if (!Array.isArray(body.data)) {
         return { available: false, reason: 'OpenRouter probe returned an invalid models response' };
       }
       const modelPolicy = resolveOpenRouterModelPolicy(env);
-      const modelRecord = body.data.find(
-        (record) => record.id === modelPolicy.model || record.canonical_slug === modelPolicy.model
-      );
+      const modelRecord = body.data
+        .map(parseOpenRouterModelRecord)
+        .find(
+          (record) =>
+            record?.id === modelPolicy.model || record?.canonical_slug === modelPolicy.model
+        );
       if (!modelRecord) {
         return {
           available: false,

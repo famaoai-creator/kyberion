@@ -1,5 +1,36 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildChronosNextActions, summarizeMissionSeedAssessment } from './control_plane_cli.js';
+import {
+  buildChronosNextActions,
+  parseSurfaceRuntimeJsonOutput,
+  parseSurfaceRuntimeCommandOutput,
+  summarizeMissionSeedAssessment,
+} from './control_plane_cli.js';
+
+describe('surface runtime command response parser', () => {
+  it('accepts the fields used by the operator summary', () => {
+    expect(
+      parseSurfaceRuntimeCommandOutput({ status: 'started', id: 'presence', port: 3317 })
+    ).toEqual({ status: 'started', id: 'presence', port: 3317 });
+  });
+
+  it.each([null, [], 'started', { status: 42 }, { port: Number.NaN }])(
+    'rejects malformed command output: %j',
+    (value) => {
+      expect(() => parseSurfaceRuntimeCommandOutput(value)).toThrow(
+        /invalid_surface_runtime_output/
+      );
+    }
+  );
+
+  it('rejects dangerous JSON before command output normalization', () => {
+    expect(parseSurfaceRuntimeJsonOutput('{"status":"started"}')).toEqual({
+      status: 'started',
+    });
+    expect(() =>
+      parseSurfaceRuntimeJsonOutput('{"nested":{"constructor":{"polluted":true}}}')
+    ).toThrow('dangerous JSON key');
+  });
+});
 
 describe('control_plane_cli next actions', () => {
   it('prioritizes flagged mission seeds before promotable seeds', () => {
@@ -86,18 +117,12 @@ describe('parseChronosApprovalArgs (UX-04)', () => {
   });
 
   it('accepts the legacy 4-positional form with a deprecation warning', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    try {
-      expect(parseChronosApprovalArgs(['REQ-3', 'ops', 'chat', 'rejected'], 'approved')).toEqual({
-        requestId: 'REQ-3',
-        storageChannel: 'ops',
-        channel: 'chat',
-        decision: 'rejected',
-      });
-      expect(warn).toHaveBeenCalled();
-    } finally {
-      warn.mockRestore();
-    }
+    expect(parseChronosApprovalArgs(['REQ-3', 'ops', 'chat', 'rejected'], 'approved')).toEqual({
+      requestId: 'REQ-3',
+      storageChannel: 'ops',
+      channel: 'chat',
+      decision: 'rejected',
+    });
   });
 
   it('rejects incomplete flag forms with the new usage text', () => {

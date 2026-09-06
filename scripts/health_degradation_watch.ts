@@ -11,7 +11,8 @@
  * Scheduled via pipelines/health-degradation-watch.json (hourly).
  */
 
-import { logger, resolveFinanceControllerDecision, runDegradationWatch } from '@agent/core';
+import { resolveFinanceControllerDecision } from '@agent/core/finance-controller';
+import { runDegradationWatch } from '@agent/core/health-degradation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export function runHealthDegradationWatch(): ReturnType<typeof runDegradationWatch> {
@@ -20,13 +21,9 @@ export function runHealthDegradationWatch(): ReturnType<typeof runDegradationWat
   });
 }
 
-function main(): number {
+function main() {
   const { report, alert } = runHealthDegradationWatch();
-  console.log(JSON.stringify({ ...report, alert_id: alert?.id ?? null }, null, 2));
-  if (report.verdict === 'green') {
-    logger.info('[health-degradation] green — no findings');
-  }
-  return 0;
+  return { ...report, alert_id: alert?.id ?? null };
 }
 
 if (
@@ -36,9 +33,10 @@ if (
   void defineScript({
     name: 'health:degradation-watch',
     flags: [],
-    run() {
-      const status = main();
-      if (status !== 0) throw new Error(`health:degradation-watch failed with exit code ${status}`);
+    run(context) {
+      const result = main();
+      context.print(result);
+      return result;
     },
   })();
 }

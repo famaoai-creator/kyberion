@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/browser-onboarding-state.schema.json",
+  "title": "Browser Onboarding State",
+  "description": "Persisted Browser Onboarding completion receipt and projections.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["version", "status", "applied_at"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0.0" },
+    "status": { "type": "string", "const": "complete" },
+    "applied_at": { "type": "string", "minLength": 1 },
+    "identity": { "type": "object", "additionalProperties": true },
+    "providers": { "type": "object", "additionalProperties": true },
+    "reasoning": { "type": "object", "additionalProperties": true },
+    "adapter_defaults": { "type": "object", "additionalProperties": true },
+    "tools": { "type": "object", "additionalProperties": true },
+    "services": { "type": "array" },
+    "voice_profile_id": { "type": ["string", "null"] },
+    "tutorial": { "type": "object", "additionalProperties": true },
+    "artifacts": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  }
+}

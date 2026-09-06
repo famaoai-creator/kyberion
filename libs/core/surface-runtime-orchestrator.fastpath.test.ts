@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { t } from './t.js';
 
 const mocks = vi.hoisted(() => {
   const safeExec = vi.fn();
@@ -202,6 +203,11 @@ describe('surface-runtime-orchestrator fast-path', () => {
           execution_shape: 'task_session',
         },
       },
+      control: {
+        interruptible: true,
+        requires_approval: false,
+        awaiting_user_input: Boolean(params.requirements?.missing?.length),
+      },
     }));
     mocks.saveTaskSession.mockReturnValue(undefined);
     mocks.executeCapturePhotoTaskSession.mockResolvedValue({
@@ -306,7 +312,9 @@ describe('surface-runtime-orchestrator fast-path', () => {
       senderAgentId: 'test-sender',
     });
 
-    expect(result.text).toContain('承認と記録が必要なためミッションとして進めます。');
+    expect(result.text).toContain(
+      t('bridge:mission_promoted_for_approval', { missionId: '' }, 'ja')
+    );
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'node',
       expect.arrayContaining(['dist/scripts/mission_controller.js', 'create']),
@@ -359,7 +367,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     );
     expect(result.text).toContain('- mission authority');
     expect(result.text).toContain("If you'd like, I can narrow this down further.");
-    expect(result.text).toContain('Completion: Completion confirmed');
+    expect(result.text).toContain(`Completion: ${t('next_action:completion_confirmed')}`);
     expect(mocks.queryKnowledge).toHaveBeenCalledWith(
       expect.anything(),
       'mission authority',
@@ -843,7 +851,9 @@ describe('surface-runtime-orchestrator fast-path', () => {
       query: 'PPTX のテーマを取り込んで再現して',
       senderAgentId: 'test-sender',
     });
-    expect(result.text).toContain('承認と記録が必要なためミッションとして進めます。');
+    expect(result.text).toContain(
+      t('bridge:mission_promoted_for_approval', { missionId: '' }, 'ja')
+    );
     expect(result.text).toContain('"kind": "execution-receipt"');
     expect(result.text).toContain('"governance"');
     expect(result.text).toContain('"policy_version": "1.0.0"');
@@ -886,7 +896,9 @@ describe('surface-runtime-orchestrator fast-path', () => {
       senderAgentId: 'test-sender',
     });
 
-    expect(result.text).toContain('承認と記録が必要なためミッションとして進めます。');
+    expect(result.text).toContain(
+      t('bridge:mission_promoted_for_approval', { missionId: '' }, 'ja')
+    );
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'node',
       expect.arrayContaining(['dist/scripts/mission_controller.js', 'create']),
@@ -923,7 +935,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(result.text).toContain('写真を取得しました。');
     expect(result.text).toContain('使用カメラ: FaceTime HD Camera');
     expect(result.text).toContain('保存先: /tmp/capture.jpg');
-    expect(result.text).toContain('Completion: Completion confirmed');
+    expect(result.text).toContain(`Completion: ${t('next_action:completion_confirmed')}`);
     expect(mocks.executeCapturePhotoTaskSession).toHaveBeenCalledWith(
       expect.objectContaining({
         session: expect.objectContaining({
@@ -998,6 +1010,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
         requirements: { missing: ['requestId'] },
         payload: { intent_id: 'resolve-approval', channel: 'slack', decision: 'approve' },
         goal: 'resolve approval request',
+        control: { interruptible: true, requires_approval: false, awaiting_user_input: true },
       })
       .mockReturnValueOnce({
         session_id: 'TSK-ACTIVE-1',
@@ -1005,6 +1018,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
         requirements: { missing: ['requestId'] },
         payload: { intent_id: 'resolve-approval', channel: 'slack', decision: 'approve' },
         goal: 'resolve approval request',
+        control: { interruptible: true, requires_approval: false, awaiting_user_input: true },
       });
     mocks.getActiveTaskSession.mockReturnValue(null); // Prevent subsequent loop match
 
@@ -1020,6 +1034,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
       },
       status: 'planning',
       goal: 'resolve approval request',
+      control: { interruptible: true, requires_approval: false, awaiting_user_input: false },
     });
 
     mocks.safeExec.mockReturnValue(JSON.stringify({ ok: true, status: 'approved' }));
@@ -1064,6 +1079,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
       payload: input.payload,
       goal: input.goal,
       work_loop: { resolution: { execution_shape: 'task_session' } },
+      control: { interruptible: true, requires_approval: false, awaiting_user_input: false },
     }));
     mocks.updateTaskSession.mockImplementation((sessionId: string, update: any) => ({
       session_id: sessionId,
@@ -1075,6 +1091,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
         success_condition: 'Voice input is enabled.',
       },
       status: update.status,
+      control: { interruptible: true, requires_approval: false, awaiting_user_input: false },
     }));
     mocks.safeExec.mockReturnValue(JSON.stringify({ ok: true, status: 'voice_input_enabled' }));
 

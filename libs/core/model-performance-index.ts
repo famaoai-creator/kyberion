@@ -1,8 +1,16 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonObjectValue, readJsonLines } from './foundation/json.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
+import { nowIso } from './foundation/time.js';
 
 /**
  * Model×role performance feedback used by future team staffing.
@@ -44,9 +52,46 @@ export interface ModelRolePerformance {
   average_rating: number;
 }
 
+export interface ModelPerformanceIndex {
+  by_model_role: Record<string, ModelRolePerformance>;
+}
+
 const OUTCOMES_PATH = 'observability/retrospectives/model-role-outcomes.jsonl';
 const FEEDBACK_PATH = 'observability/retrospectives/model-role-feedback.jsonl';
 const INDEX_PATH = 'observability/retrospectives/model-performance.json';
+const INDEX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/model-performance-index.schema.json'
+);
+const OUTCOME_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/model-role-outcome.schema.json'
+);
+const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/model-role-feedback.schema.json'
+);
+
+function performanceIndexCatalog(filePath: string) {
+  return defineCatalog<ModelPerformanceIndex>({
+    id: 'model-performance-index',
+    path: filePath,
+    schema: INDEX_SCHEMA_PATH,
+  });
+}
+
+function modelRoleOutcomeCatalog(filePath: string): GovernedCatalog<ModelRoleOutcome> {
+  return defineCatalog<ModelRoleOutcome>({
+    id: 'model-role-outcome',
+    path: filePath,
+    schema: OUTCOME_SCHEMA_PATH,
+  });
+}
+
+function modelRoleFeedbackCatalog(filePath: string): GovernedCatalog<ModelRoleFeedback> {
+  return defineCatalog<ModelRoleFeedback>({
+    id: 'model-role-feedback',
+    path: filePath,
+    schema: FEEDBACK_SCHEMA_PATH,
+  });
+}
 
 export const MODEL_PERFORMANCE_MIN_SAMPLES = 5;
 const MAX_MODEL_ID_LENGTH = 160;
@@ -55,15 +100,15 @@ const MAX_REFERENCE_LENGTH = 160;
 const MAX_COMMENT_LENGTH = 2_000;
 
 export function modelRoleOutcomesPath(): string {
-  return pathResolver.shared(OUTCOMES_PATH);
+  return assertSafeRepositoryPath(pathResolver.shared(OUTCOMES_PATH), { allowMissingLeaf: true });
 }
 
 export function modelRoleFeedbackPath(): string {
-  return pathResolver.shared(FEEDBACK_PATH);
+  return assertSafeRepositoryPath(pathResolver.shared(FEEDBACK_PATH), { allowMissingLeaf: true });
 }
 
 export function modelPerformanceIndexPath(): string {
-  return pathResolver.shared(INDEX_PATH);
+  return assertSafeRepositoryPath(pathResolver.shared(INDEX_PATH), { allowMissingLeaf: true });
 }
 
 function keyFor(modelId: string, teamRole: string): string {
@@ -93,33 +138,119 @@ function scoreStatus(status: string): { success: number; review: number; blocked
   return { success: 0, review: 0, blocked: 1 };
 }
 
-function readJsonl<T>(filePath: string): T[] {
-  if (!safeExistsSync(filePath)) return [];
-  return String(safeReadFile(filePath, { encoding: 'utf8' }))
-    .split('\n')
-    .filter((line) => line.trim())
-    .flatMap((line) => {
-      try {
-        return [JSON.parse(line) as T];
-      } catch {
-        return [];
-      }
-    });
+function assertExactKeys(
+  record: Record<string, unknown>,
+  expected: readonly string[],
+  label: string
+): void {
+  const expectedKeys = new Set(expected);
+  const unknown = Object.keys(record).filter((key) => !expectedKeys.has(key));
+  if (unknown.length > 0) {
+    throw new Error(`${label} contains unknown field(s): ${unknown.join(', ')}`);
+  }
 }
 
-function appendJsonl(filePath: string, records: unknown[]): void {
+function parsePerformanceRecord(value: unknown, label: string): ModelRolePerformance {
+  const record = parseSafeJsonObjectValue(value, label);
+  assertExactKeys(
+    record,
+    [
+      'samples',
+      'success',
+      'review',
+      'blocked',
+      'success_rate',
+      'feedback_samples',
+      'average_rating',
+    ],
+    label
+  );
+  const counters = ['samples', 'success', 'review', 'blocked', 'feedback_samples'] as const;
+  for (const field of counters) {
+    const count = record[field];
+    if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) {
+      throw new Error(`${label}.${field} must be a non-negative integer`);
+    }
+  }
+  const successRate = record.success_rate;
+  if (
+    typeof successRate !== 'number' ||
+    !Number.isFinite(successRate) ||
+    successRate < 0 ||
+    successRate > 1
+  ) {
+    throw new Error(`${label}.success_rate must be a number between 0 and 1`);
+  }
+  const averageRating = record.average_rating;
+  if (
+    typeof averageRating !== 'number' ||
+    !Number.isFinite(averageRating) ||
+    averageRating < 0 ||
+    averageRating > 5
+  ) {
+    throw new Error(`${label}.average_rating must be a number between 0 and 5`);
+  }
+  return {
+    samples: record.samples as number,
+    success: record.success as number,
+    review: record.review as number,
+    blocked: record.blocked as number,
+    success_rate: successRate,
+    feedback_samples: record.feedback_samples as number,
+    average_rating: averageRating,
+  };
+}
+
+/** Parse the persisted model x role performance projection before routing uses it. */
+export function parseModelPerformanceIndex(value: unknown): ModelPerformanceIndex {
+  const root = parseSafeJsonObjectValue(value, 'model performance index');
+  assertExactKeys(root, ['by_model_role'], 'model performance index');
+  const byModelRole = parseSafeJsonObjectValue(
+    root.by_model_role,
+    'model performance index.by_model_role'
+  );
+  const parsed: Record<string, ModelRolePerformance> = {};
+  for (const [key, valueForKey] of Object.entries(byModelRole)) {
+    if (!key.trim() || !key.includes('|')) {
+      throw new Error(`model performance index.by_model_role key must be "model|role": ${key}`);
+    }
+    parsed[key] = parsePerformanceRecord(
+      valueForKey,
+      `model performance index.by_model_role.${key}`
+    );
+  }
+  return { by_model_role: parsed };
+}
+
+function readJsonl<T>(filePath: string, catalog: GovernedCatalog<T>): T[] {
+  if (!safeExistsSync(filePath)) return [];
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[MODEL_PERFORMANCE] record log must be a regular file: ${filePath}`);
+  }
+  return readJsonLines<T>(filePath, {
+    onMalformed: 'skip',
+    map: (value, lineNumber) => catalog.validate(value, `${filePath}:${lineNumber}`),
+  });
+}
+
+function appendJsonl<T>(filePath: string, records: T[], catalog: GovernedCatalog<T>): void {
   if (records.length === 0) return;
   safeMkdir(path.dirname(filePath), { recursive: true });
-  for (const record of records) appendJsonLine(filePath, record);
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[MODEL_PERFORMANCE] record log must be a regular file: ${filePath}`);
+  }
+  for (const record of records) appendJsonLine(filePath, catalog.validate(record, filePath));
 }
 
 export function recordModelRoleOutcomes(outcomes: ModelRoleOutcome[]): void {
   const valid = outcomes.filter((outcome) => outcome.model_id?.trim() && outcome.team_role?.trim());
   if (valid.length === 0) return;
   const outcomesPath = modelRoleOutcomesPath();
-  const existing = readJsonl<ModelRoleOutcome>(outcomesPath);
+  const catalog = modelRoleOutcomeCatalog(outcomesPath);
+  const validated = valid.map((outcome) => catalog.validate(outcome, outcomesPath));
+  const existing = readJsonl<ModelRoleOutcome>(outcomesPath, catalog);
   const latestByOutcome = new Map(existing.map((outcome) => [outcomeKey(outcome), outcome]));
-  const append = valid.filter((outcome) => {
+  const append = validated.filter((outcome) => {
     const key = outcomeKey(outcome);
     const previous = latestByOutcome.get(key);
     latestByOutcome.set(key, outcome);
@@ -129,8 +260,8 @@ export function recordModelRoleOutcomes(outcomes: ModelRoleOutcome[]): void {
       previous.provider !== outcome.provider
     );
   });
-  appendJsonl(outcomesPath, append);
-  if (valid.length > 0) rebuildModelPerformanceIndex();
+  appendJsonl(outcomesPath, append, catalog);
+  if (validated.length > 0) rebuildModelPerformanceIndex();
 }
 
 export function recordModelRoleFeedback(input: {
@@ -172,9 +303,10 @@ export function recordModelRoleFeedback(input: {
     ...(input.taskId?.trim() ? { task_id: input.taskId.trim() } : {}),
     ...(input.comment?.trim() ? { comment: input.comment.trim() } : {}),
     source: input.source || 'user',
-    recorded_at: new Date().toISOString(),
+    recorded_at: nowIso(),
   };
-  appendJsonl(modelRoleFeedbackPath(), [feedback]);
+  const feedbackPath = modelRoleFeedbackPath();
+  appendJsonl(feedbackPath, [feedback], modelRoleFeedbackCatalog(feedbackPath));
   rebuildModelPerformanceIndex();
   return feedback;
 }
@@ -182,7 +314,11 @@ export function recordModelRoleFeedback(input: {
 export function rebuildModelPerformanceIndex(): Record<string, ModelRolePerformance> {
   const byKey: Record<string, ModelRolePerformance> = {};
   const latestOutcomes = new Map<string, ModelRoleOutcome>();
-  for (const outcome of readJsonl<ModelRoleOutcome>(modelRoleOutcomesPath())) {
+  const outcomesPath = modelRoleOutcomesPath();
+  for (const outcome of readJsonl<ModelRoleOutcome>(
+    outcomesPath,
+    modelRoleOutcomeCatalog(outcomesPath)
+  )) {
     if (!outcome.model_id || !outcome.team_role) continue;
     latestOutcomes.set(outcomeKey(outcome), outcome);
   }
@@ -204,7 +340,11 @@ export function rebuildModelPerformanceIndex(): Record<string, ModelRolePerforma
     bucket.blocked += scored.blocked;
   }
 
-  for (const feedback of readJsonl<ModelRoleFeedback>(modelRoleFeedbackPath())) {
+  const feedbackPath = modelRoleFeedbackPath();
+  for (const feedback of readJsonl<ModelRoleFeedback>(
+    feedbackPath,
+    modelRoleFeedbackCatalog(feedbackPath)
+  )) {
     if (!feedback.model_id || !feedback.team_role) continue;
     const bucket = (byKey[keyFor(feedback.model_id, feedback.team_role)] ||= {
       samples: 0,
@@ -229,12 +369,37 @@ export function rebuildModelPerformanceIndex(): Record<string, ModelRolePerforma
 
   const indexPath = modelPerformanceIndexPath();
   safeMkdir(path.dirname(indexPath), { recursive: true });
-  safeWriteFile(indexPath, JSON.stringify({ by_model_role: byKey }, null, 2));
+  const validated = performanceIndexCatalog(indexPath).validate(
+    { by_model_role: byKey },
+    indexPath
+  );
+  safeWriteFile(indexPath, JSON.stringify(validated, null, 2));
   return byKey;
 }
 
 let cachedIndex: { loadedAt: number; byKey: Record<string, ModelRolePerformance> } | null = null;
 const INDEX_CACHE_TTL_MS = 30_000;
+
+export function resetModelPerformanceIndexCache(): void {
+  cachedIndex = null;
+}
+
+/** Load every validated model x role performance bucket for read-only consumers. */
+export function loadModelPerformanceIndex(): Record<string, ModelRolePerformance> {
+  const indexPath = modelPerformanceIndexPath();
+  if (!safeExistsSync(indexPath)) return {};
+  return loadModelPerformanceIndexAtPath(indexPath).by_model_role;
+}
+
+/** Load a model performance projection through the governed catalog boundary. */
+export function loadModelPerformanceIndexAtPath(filePath: string): ModelPerformanceIndex {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[MODEL_PERFORMANCE] index must be a regular file: ${filePath}`);
+  }
+  const indexed = performanceIndexCatalog(safeFilePath).load();
+  return parseModelPerformanceIndex(indexed);
+}
 
 export function getModelRolePerformance(
   modelId: string,
@@ -244,22 +409,13 @@ export function getModelRolePerformance(
   if (!cachedIndex || now - cachedIndex.loadedAt > INDEX_CACHE_TTL_MS) {
     let byKey: Record<string, ModelRolePerformance> = {};
     try {
-      const indexPath = modelPerformanceIndexPath();
-      if (safeExistsSync(indexPath)) {
-        byKey =
-          readJson<{ by_model_role?: Record<string, ModelRolePerformance> }>(indexPath)
-            .by_model_role || {};
-      }
+      byKey = loadModelPerformanceIndex();
     } catch {
       byKey = {};
     }
     cachedIndex = { loadedAt: now, byKey };
   }
   return cachedIndex.byKey[keyFor(modelId, teamRole)] || null;
-}
-
-export function resetModelPerformanceIndexCache(): void {
-  cachedIndex = null;
 }
 
 /**

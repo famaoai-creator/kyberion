@@ -35,8 +35,8 @@
  *                                   have drifted from what `en` would derive
  */
 
-import { pathResolver } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { loadVocabularyCatalog } from '@agent/core/vocabulary-catalog';
 import { format as prettierFormat } from 'prettier';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
@@ -171,7 +171,11 @@ export function pseudoLocalize(enTemplate: string): string {
 }
 
 function loadCatalog(): VocabularyCatalogFile {
-  return readJson<VocabularyCatalogFile>(CATALOG_PATH);
+  const catalog = loadVocabularyCatalog();
+  if (!catalog) {
+    throw new Error(`Vocabulary catalog is unavailable: ${CATALOG_PATH}`);
+  }
+  return catalog;
 }
 
 /**

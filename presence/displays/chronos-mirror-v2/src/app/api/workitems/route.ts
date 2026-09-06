@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  listWorkItems,
-  getWorkItem,
-  updateWorkItem,
-  type WorkItemStatus,
-} from '@agent/core/work-coordination';
+import { listWorkItems, getWorkItem, updateWorkItem } from '@agent/core/work-coordination';
 import {
   buildWorkVisibilityProjection,
   type WorkVisibilityScope,
@@ -20,18 +15,14 @@ import {
   ViewerContextError,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
+import {
+  readChronosJsonObject,
+  readChronosOptionalStringParam,
+  readChronosStringParam,
+} from '../../../lib/request-input';
+import { CHRONOS_WORK_ITEM_STATUSES, parseWorkItemStatusInput } from './work-item-input';
 
 export const dynamic = 'force-dynamic';
-
-const KANBAN_STATUSES: WorkItemStatus[] = [
-  'backlog',
-  'ready',
-  'in_progress',
-  'blocked',
-  'review',
-  'done',
-  'archived',
-];
 
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -41,7 +32,7 @@ export function GET(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
   const viewer = resolvedViewer.context;
-  const rawScope = req.nextUrl.searchParams.get('scope') || 'work_items';
+  const rawScope = readChronosStringParam(req.nextUrl.searchParams.get('scope')) || 'work_items';
   const scope: WorkVisibilityScope = [
     'organization',
     'home',
@@ -52,22 +43,22 @@ export function GET(req: NextRequest) {
   ].includes(rawScope)
     ? (rawScope as WorkVisibilityScope)
     : 'work_items';
-  const rawView = req.nextUrl.searchParams.get('view') || 'all';
+  const rawView = readChronosStringParam(req.nextUrl.searchParams.get('view')) || 'all';
   const view: WorkVisibilityView = ['all', 'actionable', 'active', 'history'].includes(rawView)
     ? (rawView as WorkVisibilityView)
     : 'all';
   try {
     const tenantSlugs = strictViewerScopeTenantSlugs(
       viewer,
-      req.nextUrl.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
     const organizationIds = strictViewerScopeOrganizationIds(
       viewer,
-      req.nextUrl.searchParams.get('organization_id') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization_id'))
     );
     const projectIds = strictViewerScopeProjectIds(
       viewer,
-      req.nextUrl.searchParams.get('project_id') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id'))
     );
     const projection = buildWorkVisibilityProjection({
       items: withViewerExecutionContext(viewer, () =>
@@ -80,13 +71,15 @@ export function GET(req: NextRequest) {
       viewer: { tenantSlugs, organizationIds, projectIds },
       scope,
       view,
-      organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,
-      missionId: req.nextUrl.searchParams.get('mission_id') || undefined,
-      projectId: req.nextUrl.searchParams.get('project_id') || undefined,
+      organizationId: readChronosOptionalStringParam(
+        req.nextUrl.searchParams.get('organization_id')
+      ),
+      missionId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('mission_id')),
+      projectId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id')),
     });
     return NextResponse.json({
       ok: true,
-      statuses: KANBAN_STATUSES,
+      statuses: CHRONOS_WORK_ITEM_STATUSES,
       scope: projection.scope,
       view: projection.view,
       items: projection.items,
@@ -108,15 +101,11 @@ export async function POST(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
   const viewer = resolvedViewer.context;
   try {
-    const body = await req.json();
-    const itemId = typeof body?.itemId === 'string' ? body.itemId : '';
-    const status = KANBAN_STATUSES.includes(body?.status) ? (body.status as WorkItemStatus) : null;
-    if (!itemId || !status) {
-      return NextResponse.json(
-        { ok: false, error: 'itemId と status が必要です' },
-        { status: 400 }
-      );
+    const parsedBody = await readChronosJsonObject(req, 'Chronos work items');
+    if (!parsedBody.ok) {
+      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
+    const { itemId, status } = parseWorkItemStatusInput(parsedBody.body);
     const current = withViewerExecutionContext(viewer, () => getWorkItem(itemId));
     if (!current)
       return NextResponse.json({ ok: false, error: 'work item not found' }, { status: 404 });

@@ -1,4 +1,5 @@
 import { appendJsonLine } from '../foundation/json.js';
+import { nowIso } from '../foundation/time.js';
 /**
  * Kyberion Trace Model
  * OpenTelemetry-inspired tracing with artifact and knowledge references.
@@ -9,9 +10,14 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import * as pathResolver from '../path-resolver.js';
 import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
-import { safeMkdir, safeExistsSync } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning-egress-scope.js';
-import { sanitizeTraceForPersistence, validateTraceReplay } from '../trace-schema.js';
+import {
+  sanitizeTraceForPersistence,
+  validateTraceReplay,
+  type ExactTelemetryAttributes,
+  type TraceSpanKind,
+} from '../trace-schema.js';
 
 export interface TraceEvent {
   name: string;
@@ -82,7 +88,7 @@ export class TraceContext {
     const rootSpan: TraceSpan = {
       spanId: randomUUID(),
       name,
-      startTime: new Date().toISOString(),
+      startTime: nowIso(),
       status: 'in_progress',
       events: [],
       artifacts: [],
@@ -116,12 +122,17 @@ export class TraceContext {
   }
 
   /** Start a new child span */
-  startSpan(name: string, attributes?: Record<string, string | number | boolean>): string {
+  startSpan<Name extends string>(
+    name: Name,
+    attributes?: Name extends TraceSpanKind
+      ? ExactTelemetryAttributes<Extract<Name, TraceSpanKind>>
+      : Record<string, string | number | boolean>
+  ): string {
     const correlationId = this.trace.metadata.correlationId;
     const span: TraceSpan = {
       spanId: randomUUID(),
       name,
-      startTime: new Date().toISOString(),
+      startTime: nowIso(),
       status: 'in_progress',
       attributes: {
         ...(attributes || {}),
@@ -141,7 +152,7 @@ export class TraceContext {
   endSpan(status: 'ok' | 'error' = 'ok', error?: string): void {
     if (this.spanStack.length <= 1) return; // don't pop root
     const span = this.spanStack.pop()!;
-    span.endTime = new Date().toISOString();
+    span.endTime = nowIso();
     span.status = status;
     if (error) span.error = error;
   }
@@ -151,7 +162,7 @@ export class TraceContext {
     const correlationId = this.trace.metadata.correlationId;
     this.currentSpan.events.push({
       name,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
       attributes: {
         ...(attributes || {}),
         ...(correlationId ? { correlationId } : {}),
@@ -165,7 +176,7 @@ export class TraceContext {
       type,
       path,
       description,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     });
   }
 
@@ -192,7 +203,7 @@ export class TraceContext {
     while (this.spanStack.length > 1) {
       this.endSpan('error', 'span not explicitly closed');
     }
-    this.trace.rootSpan.endTime = new Date().toISOString();
+    this.trace.rootSpan.endTime = nowIso();
     this.trace.rootSpan.status = this.trace.rootSpan.children.some((c) => c.status === 'error')
       ? 'error'
       : 'ok';
@@ -234,8 +245,12 @@ export function traceLogDir(): string {
   } else {
     baseDir = path.join(pathResolver.shared('logs/traces'));
   }
-  if (!safeExistsSync(baseDir)) safeMkdir(baseDir, { recursive: true });
-  return baseDir;
+  const safeDir = assertSafeRepositoryPath(baseDir, { allowMissingLeaf: true });
+  if (safeExistsSync(safeDir) && !safeLstat(safeDir).isDirectory()) {
+    throw new Error(`[TRACE_PATH] trace log root must be a directory: ${safeDir}`);
+  }
+  if (!safeExistsSync(safeDir)) safeMkdir(safeDir, { recursive: true });
+  return safeDir;
 }
 
 /**
@@ -255,12 +270,20 @@ export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
         .join('; ')}`
     );
   }
-  const dir = opts?.dir ?? traceLogDir();
+  const dir = assertSafeRepositoryPath(opts?.dir ?? traceLogDir(), { allowMissingLeaf: true });
+  if (safeExistsSync(dir) && !safeLstat(dir).isDirectory()) {
+    throw new Error(`[TRACE_PATH] trace log root must be a directory: ${dir}`);
+  }
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const file = path.join(dir, `traces-${day}.jsonl`);
+  const day = nowIso().slice(0, 10); // YYYY-MM-DD
+  const file = assertSafeRepositoryPath(path.join(dir, `traces-${day}.jsonl`), {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(file) && !safeLstat(file).isFile()) {
+    throw new Error(`[TRACE_PATH] trace log must be a regular file: ${file}`);
+  }
   const safeTrace = sanitizeTraceForPersistence(trace);
-  const record = { ...safeTrace, _persistedAt: new Date().toISOString() };
+  const record = { ...safeTrace, _persistedAt: nowIso() };
   appendJsonLine(file, record);
   // OTLP is explicitly opt-in. Local JSONL persistence remains synchronous
   // and authoritative; exporter failure must never change pipeline outcome.
@@ -273,7 +296,7 @@ function otlpId(value: string, length: number): string {
 }
 
 function unixNano(iso: string | undefined): string {
-  const ms = Date.parse(iso || new Date().toISOString());
+  const ms = Date.parse(iso || nowIso());
   return (BigInt(Math.max(0, Math.floor(ms))) * 1_000_000n).toString();
 }
 
@@ -291,7 +314,7 @@ function otlpHeaders(raw: string | undefined): Record<string, string> {
 
 /** Export the stable Kyberion trace projection as OTLP/HTTP JSON when enabled. */
 export async function exportTraceOtlp(trace: Trace): Promise<boolean> {
-  const configured = process.env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
+  const configured = getRegisteredEnvText('OTEL_EXPORTER_OTLP_ENDPOINT')?.trim();
   if (!configured) return false;
   const base = configured.replace(/\/$/u, '');
   const endpoint = /\/v1\/traces$/u.test(base) ? base : `${base}/v1/traces`;
@@ -339,7 +362,7 @@ export async function exportTraceOtlp(trace: Trace): Promise<boolean> {
   visit(trace.rootSpan);
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: otlpHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
+    headers: otlpHeaders(getRegisteredEnvText('OTEL_EXPORTER_OTLP_HEADERS')),
     body: JSON.stringify({
       resourceSpans: [
         {

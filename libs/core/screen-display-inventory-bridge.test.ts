@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { createScreenDisplayInventoryBridge, SCREEN_DISPLAY_INVENTORY_BRIDGE_ID } from './screen-display-inventory-bridge.js';
+import {
+  createScreenDisplayInventoryBridge,
+  parseSystemProfilerDisplayItems,
+  SCREEN_DISPLAY_INVENTORY_BRIDGE_ID,
+} from './screen-display-inventory-bridge.js';
 
 describe('createScreenDisplayInventoryBridge', () => {
+  it('rejects non-record system profiler display sections and devices', () => {
+    expect(
+      parseSystemProfilerDisplayItems({
+        SPDisplaysDataType: [null, 'invalid', { _items: [null, [], { _name: 'Display' }] }],
+      })
+    ).toEqual([
+      { section: { _items: [null, [], { _name: 'Display' }] }, device: { _name: 'Display' } },
+    ]);
+    expect(parseSystemProfilerDisplayItems([])).toEqual([]);
+  });
+
   it('parses macOS display inventory payloads', async () => {
     const bridge = createScreenDisplayInventoryBridge({
       platform: 'darwin',

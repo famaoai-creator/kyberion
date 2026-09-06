@@ -1,6 +1,8 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import { pathResolver } from './path-resolver.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export const NATIVE_SPEECH_LISTEN_BRIDGE_ID = 'native-speech-listen-bridge' as const;
 
@@ -20,6 +22,42 @@ export interface NativeSpeechListenResult {
   isFinal?: boolean;
   locale: string;
   deviceId?: string;
+}
+
+export function normalizeNativeSpeechListenResult(
+  value: unknown,
+  fallback: Pick<NativeSpeechListenRequest, 'locale'> & { deviceId?: string }
+): NativeSpeechListenResult {
+  if (!isRecord(value)) throw new Error('native speech result must be a JSON object');
+  const ok = value.ok;
+  const text = value.text;
+  const error = value.error;
+  const locale = value.locale;
+  const deviceId = value.deviceId;
+  const isFinal = value.isFinal;
+  if (typeof ok !== 'boolean') throw new Error('native speech result.ok must be boolean');
+
+  for (const key of ['text', 'error', 'locale', 'deviceId'] as const) {
+    if (value[key] !== undefined && typeof value[key] !== 'string') {
+      throw new Error(`native speech result.${key} must be a string`);
+    }
+  }
+  let normalizedIsFinal: boolean | undefined;
+  if (isFinal !== undefined) {
+    if (typeof isFinal !== 'boolean') {
+      throw new Error('native speech result.isFinal must be boolean');
+    }
+    normalizedIsFinal = isFinal;
+  }
+
+  return {
+    ok,
+    ...(typeof text === 'string' ? { text } : {}),
+    ...(typeof error === 'string' ? { error } : {}),
+    isFinal: normalizedIsFinal,
+    locale: typeof locale === 'string' && locale.trim() ? locale : fallback.locale,
+    deviceId: typeof deviceId === 'string' ? deviceId : (fallback.deviceId ?? undefined),
+  };
 }
 
 function buildWindowsSpeechCommand(request: NativeSpeechListenRequest): {
@@ -124,17 +162,11 @@ export async function listenNativeSpeech(
         return reject(new Error(stderr.trim() || `native_speech_failed_${code}`));
       }
       try {
-        const parsed = JSON.parse(raw) as NativeSpeechListenResult;
-        resolve({
-          ok: Boolean(parsed.ok),
-          text: parsed.text,
-          error: parsed.error,
-          isFinal: parsed.isFinal,
-          locale: parsed.locale || request.locale,
-          deviceId: parsed.deviceId ?? request.deviceId,
-        });
-      } catch (error: any) {
-        reject(new Error(`native_speech_invalid_json: ${error?.message || error}: ${raw}`));
+        const parsed: unknown = parseSafeJsonInput(raw, 'native speech listen response');
+        resolve(normalizeNativeSpeechListenResult(parsed, request));
+      } catch (error: unknown) {
+        const detail = error instanceof Error ? error.message : String(error);
+        reject(new Error(`native_speech_invalid_json: ${detail}: ${raw}`));
       }
     });
   });

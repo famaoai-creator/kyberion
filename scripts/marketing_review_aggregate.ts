@@ -1,24 +1,39 @@
 import {
   aggregateMarketingReviews,
-  logger,
-  pathResolver,
+  loadMarketingReviewAtPath,
+  loadMarketingReviewPackageAtPath,
   requiredMarketingControls,
+  sha256,
+  validateMarketingReviewAggregation,
+  type ArtifactBinding,
+  type MarketingReviewPackage,
+} from '@agent/core/marketing-workload';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   safeWriteFile,
-  sha256,
-  type ArtifactBinding,
-  type MarketingReview,
-  type MarketingRiskLevel,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-interface ReviewPackage {
-  run_id: string;
-  risk_level: MarketingRiskLevel;
-  artifacts: Array<{ name: string; path: string; sha256: string }>;
+function resolveMarketingReviewPath(
+  value: unknown,
+  label: string,
+  allowMissingLeaf = false
+): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`${label} is required`);
+  return assertSafeRepositoryPath(pathResolver.resolve(requested), { allowMissingLeaf });
+}
+
+function requireRegularMarketingInput(filePath: string, label: string): string {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file: ${filePath}`);
+  }
+  return filePath;
 }
 
 export function runMarketingReviewAggregation(input: {
@@ -26,30 +41,47 @@ export function runMarketingReviewAggregation(input: {
   reviewPaths: string[];
   outputPath: string;
 }): { ready_for_approval: boolean; output_path: string } {
-  const reviewPackage = readJson<ReviewPackage>(pathResolver.rootResolve(input.reviewPackagePath));
+  const reviewPackagePath = resolveMarketingReviewPath(
+    input.reviewPackagePath,
+    'review package path'
+  );
+  const reviewPackage: MarketingReviewPackage = loadMarketingReviewPackageAtPath(reviewPackagePath);
+  const packageHashMismatches: string[] = [];
   const artifacts: Record<string, ArtifactBinding> = Object.fromEntries(
     reviewPackage.artifacts
       .filter((artifact) => artifact.name !== 'completion-evidence.json')
       .map((artifact) => {
-        const artifactPath = pathResolver.rootResolve(artifact.path);
+        const artifactPath = resolveMarketingReviewPath(
+          artifact.path,
+          `review artifact ${artifact.name}`
+        );
         if (!safeExistsSync(artifactPath))
           throw new Error(`Review artifact is missing: ${artifact.name}`);
-        return [
-          artifact.name,
-          { path: artifact.path, sha256: sha256(safeReadFile(artifactPath) as Buffer) },
-        ];
+        requireRegularMarketingInput(artifactPath, `review artifact ${artifact.name}`);
+        const actualSha256 = sha256(safeReadFile(artifactPath) as Buffer);
+        if (artifact.sha256 !== actualSha256) {
+          packageHashMismatches.push(artifact.name);
+        }
+        return [artifact.name, { path: artifact.path, sha256: actualSha256 }];
       })
   );
-  const reviews = input.reviewPaths.map((reviewPath) =>
-    readJson<MarketingReview>(pathResolver.rootResolve(reviewPath))
-  );
+  const reviews = input.reviewPaths.map((reviewPath) => {
+    const resolvedReviewPath = resolveMarketingReviewPath(reviewPath, 'review path');
+    return loadMarketingReviewAtPath(resolvedReviewPath);
+  });
   const controls = requiredMarketingControls(reviewPackage.risk_level);
   const gate = aggregateMarketingReviews({
     artifacts,
     reviews,
     requiredReviewerRoles: controls.required_reviewers,
   });
-  const outputPath = pathResolver.rootResolve(input.outputPath);
+  if (packageHashMismatches.length > 0) {
+    gate.status = 'failed';
+    gate.reasons.push(
+      ...packageHashMismatches.map((name) => `review package artifact hash mismatch: ${name}`)
+    );
+  }
+  const outputPath = resolveMarketingReviewPath(input.outputPath, 'output path', true);
   const result = {
     run_id: reviewPackage.run_id,
     risk_level: reviewPackage.risk_level,
@@ -63,12 +95,15 @@ export function runMarketingReviewAggregation(input: {
     ready_for_approval: gate.status === 'passed',
     evidence: input.reviewPaths,
   };
-  safeWriteFile(outputPath, JSON.stringify(result, null, 2));
+  const validatedResult = validateMarketingReviewAggregation(result, outputPath);
+  safeWriteFile(outputPath, JSON.stringify(validatedResult, null, 2));
   return { ready_for_approval: result.ready_for_approval, output_path: outputPath };
 }
 
-async function main(): Promise<void> {
-  const argv = createStandardYargs()
+export async function main(
+  args: string[] = []
+): Promise<{ ready_for_approval: boolean; output_path: string }> {
+  const argv = createStandardYargs(['node', 'marketing_review_aggregate', ...args])
     .option('review-package', { type: 'string', demandOption: true })
     .option('reviews', { type: 'string', demandOption: true })
     .option('output', { type: 'string', demandOption: true })
@@ -81,16 +116,24 @@ async function main(): Promise<void> {
       .filter(Boolean),
     outputPath: String(argv.output),
   });
-  logger.success(JSON.stringify(result));
-  if (!result.ready_for_approval) process.exitCode = 1;
+  return result;
 }
+
+export const runMarketingReviewAggregationScript = defineScript({
+  name: 'marketing:review-aggregate',
+  flags: [],
+  run: async (context) => {
+    const result = await main(context.argv);
+    context.print(result);
+    if (!result.ready_for_approval) {
+      throw new ScriptExitError(1, 'marketing review aggregation is not ready for approval');
+    }
+    return result;
+  },
+});
 
 if (
   isDirectScript(import.meta.url, 'marketing_review_aggregate.ts') ||
   isDirectScript(import.meta.url, 'marketing_review_aggregate.js')
-) {
-  main().catch((error) => {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
-}
+)
+  void runMarketingReviewAggregationScript();

@@ -14,7 +14,7 @@
       "role": "source",
       "op": "system:probe",
       "produces": { "channel": "p_node", "type": "ProbeResult" },
-      "params": { "path": "node_modules" }
+      "params": { "path": "node_modules", "allow_symlink_leaf": true }
     },
     {
       "role": "source",

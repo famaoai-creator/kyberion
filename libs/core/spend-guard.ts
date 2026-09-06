@@ -12,11 +12,12 @@
  */
 
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isVitestProcess } from './foundation/env.js';
 import { metrics } from './metrics.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
 
 export interface SpendPolicyOverride {
   posture?: 'warn' | 'block';
@@ -55,43 +56,29 @@ export class SpendCapExceededError extends Error {
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/spend-policy.json');
 
-const DEFAULT_POLICY: SpendPolicy = {
-  posture: 'warn',
-  daily_cap_usd: 50,
-  mission_cap_usd: 20,
-};
+const spendPolicyCatalog = defineCatalog<SpendPolicy>({
+  id: 'spend-policy',
+  path: POLICY_PATH,
+  schema: pathResolver.knowledge('product/schemas/spend-policy.schema.json'),
+});
 
 export function loadSpendPolicy(): SpendPolicy {
-  if (!safeExistsSync(POLICY_PATH)) return DEFAULT_POLICY;
-  try {
-    const parsed = JSON.parse(
-      String(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) || '{}')
-    ) as Partial<SpendPolicy>;
-    const tenantOverrides: Record<string, SpendPolicyOverride> = {};
-    for (const [tenant, raw] of Object.entries(parsed.tenant_overrides ?? {})) {
-      if (!raw || typeof raw !== 'object') continue;
-      const override: SpendPolicyOverride = {};
-      if (raw.posture === 'block' || raw.posture === 'warn') override.posture = raw.posture;
-      if (Number(raw.daily_cap_usd) > 0) override.daily_cap_usd = Number(raw.daily_cap_usd);
-      if (Number(raw.mission_cap_usd) > 0) override.mission_cap_usd = Number(raw.mission_cap_usd);
-      if (Object.keys(override).length > 0) tenantOverrides[tenant] = override;
-    }
-    return {
-      posture: parsed.posture === 'block' ? 'block' : 'warn',
-      daily_cap_usd:
-        Number(parsed.daily_cap_usd) > 0
-          ? Number(parsed.daily_cap_usd)
-          : DEFAULT_POLICY.daily_cap_usd,
-      mission_cap_usd:
-        Number(parsed.mission_cap_usd) > 0
-          ? Number(parsed.mission_cap_usd)
-          : DEFAULT_POLICY.mission_cap_usd,
-      ...(Object.keys(tenantOverrides).length > 0 ? { tenant_overrides: tenantOverrides } : {}),
-    };
-  } catch {
-    // A broken policy file must not silently disable the guard.
-    return DEFAULT_POLICY;
+  const parsed = spendPolicyCatalog.load();
+  const tenantOverrides: Record<string, SpendPolicyOverride> = {};
+  for (const [tenant, raw] of Object.entries(parsed.tenant_overrides ?? {})) {
+    if (!raw || typeof raw !== 'object') continue;
+    const override: SpendPolicyOverride = {};
+    if (raw.posture === 'block' || raw.posture === 'warn') override.posture = raw.posture;
+    if (Number(raw.daily_cap_usd) > 0) override.daily_cap_usd = Number(raw.daily_cap_usd);
+    if (Number(raw.mission_cap_usd) > 0) override.mission_cap_usd = Number(raw.mission_cap_usd);
+    if (Object.keys(override).length > 0) tenantOverrides[tenant] = override;
   }
+  return {
+    posture: parsed.posture === 'block' ? 'block' : 'warn',
+    daily_cap_usd: parsed.daily_cap_usd,
+    mission_cap_usd: parsed.mission_cap_usd,
+    ...(Object.keys(tenantOverrides).length > 0 ? { tenant_overrides: tenantOverrides } : {}),
+  };
 }
 
 /**
@@ -146,12 +133,6 @@ function loadUsageEntries(now: number): UsageEntry[] {
   return cachedEntries;
 }
 
-/** Test hook: drop the usage cache. */
-export function resetSpendGuardCache(): void {
-  cachedEntries = null;
-  cachedAt = 0;
-}
-
 const alertedBreaches = new Set<string>();
 
 export function checkSpendGuard(
@@ -168,7 +149,7 @@ export function checkSpendGuard(
   const tenantId = options.tenantId ?? getRegisteredEnvText('KYBERION_TENANT');
   const policy = resolveSpendPolicyForTenant(options.policy ?? loadSpendPolicy(), tenantId);
   const startOfUtcDay = new Date(now).setUTCHours(0, 0, 0, 0);
-  const missionId = options.missionId || process.env.MISSION_ID || undefined;
+  const missionId = options.missionId || getRegisteredEnvText('MISSION_ID') || undefined;
   const entries = options.entries ?? loadUsageEntries(now);
   const spend = sumSpend(entries, { sinceMs: startOfUtcDay, missionId });
 
@@ -225,7 +206,7 @@ export function checkSpendGuard(
 export function enforceSpendGuardForReasoning(missionId?: string): void {
   // Same VITEST pattern as provider-health persistence: unit tests must not
   // read the real metrics history / policy unless they opt in.
-  if (process.env.VITEST && getRegisteredEnvText('KYBERION_SPEND_GUARD_TEST') !== '1') return;
+  if (isVitestProcess() && getRegisteredEnvText('KYBERION_SPEND_GUARD_TEST') !== '1') return;
   const result = checkSpendGuard({ missionId });
   if (!result.allowed) {
     throw new SpendCapExceededError(result);

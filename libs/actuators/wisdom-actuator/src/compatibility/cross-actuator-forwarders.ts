@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { getActuatorForwardingPort, type ContextSecurityScope } from '@agent/core';
+import { getActuatorForwardingPort } from '@agent/core/actuator-forwarding-port';
+import type { ContextSecurityScope } from '@agent/core/context-security-scope';
 import { assignWisdomContextValue } from '../contracts/wisdom-context.js';
 import type { WisdomContext } from '../contracts/wisdom-context.js';
 import { getWisdomOperationSpec } from '../op-catalog.js';

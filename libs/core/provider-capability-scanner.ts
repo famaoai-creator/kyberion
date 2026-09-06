@@ -1,5 +1,5 @@
-import { safeExec } from './secure-io.js';
-import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExec } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 
 type CapabilitySource = {
@@ -56,10 +56,32 @@ type ProviderScanPolicyEntry = {
   evidence_probes?: ProviderEvidenceProbe[];
 };
 
-type ProviderScanPolicy = {
+export type ProviderScanPolicy = {
   version: string;
   providers: ProviderScanPolicyEntry[];
 };
+
+const CAPABILITY_REGISTRY_PATH = 'knowledge/product/governance/harness-capability-registry.json';
+const CAPABILITY_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/harness-capability-registry.schema.json'
+);
+const PROVIDER_SCAN_POLICY_PATH =
+  'knowledge/product/governance/provider-capability-scan-policy.json';
+const PROVIDER_SCAN_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/provider-capability-scan-policy.schema.json'
+);
+
+const capabilityRegistryCatalog = defineCatalog<CapabilityRegistry>({
+  id: 'harness-capability-registry',
+  path: () => pathResolver.rootResolve(CAPABILITY_REGISTRY_PATH),
+  schema: CAPABILITY_REGISTRY_SCHEMA_PATH,
+});
+
+const providerCapabilityScanPolicyCatalog = defineCatalog<ProviderScanPolicy>({
+  id: 'provider-capability-scan-policy',
+  path: () => pathResolver.rootResolve(PROVIDER_SCAN_POLICY_PATH),
+  schema: PROVIDER_SCAN_POLICY_SCHEMA_PATH,
+});
 
 export type ProbeResult = {
   provider: string;
@@ -71,28 +93,49 @@ export type ProbeResult = {
   error?: string;
 };
 
+export type CapabilityProbeExecutor = (
+  command: string,
+  args: string[],
+  options: { timeoutMs?: number; maxOutputMB?: number }
+) => string;
+
 export type DiscoveredCapability = CapabilityRegistryEntry & {
   discovery_status: 'available' | 'missing';
   provider_probe: ProbeResult;
+  evidence_probe?: ProbeResult;
   evidence?: string;
 };
 
 export function loadCapabilityRegistry(
-  relativePath = 'knowledge/product/governance/harness-capability-registry.json'
+  relativePath = CAPABILITY_REGISTRY_PATH
 ): CapabilityRegistry {
-  return readJson<CapabilityRegistry>(pathResolver.rootResolve(relativePath));
+  if (relativePath === CAPABILITY_REGISTRY_PATH) return capabilityRegistryCatalog.load();
+  return defineCatalog<CapabilityRegistry>({
+    id: 'harness-capability-registry',
+    path: assertSafeRepositoryPath(pathResolver.rootResolve(relativePath)),
+    schema: CAPABILITY_REGISTRY_SCHEMA_PATH,
+  }).load();
 }
 
 export function loadProviderCapabilityScanPolicy(
-  relativePath = 'knowledge/product/governance/provider-capability-scan-policy.json'
+  relativePath = PROVIDER_SCAN_POLICY_PATH
 ): ProviderScanPolicy {
-  return readJson<ProviderScanPolicy>(pathResolver.rootResolve(relativePath));
+  if (relativePath === PROVIDER_SCAN_POLICY_PATH) return providerCapabilityScanPolicyCatalog.load();
+  return defineCatalog<ProviderScanPolicy>({
+    id: 'provider-capability-scan-policy',
+    path: assertSafeRepositoryPath(pathResolver.rootResolve(relativePath)),
+    schema: PROVIDER_SCAN_POLICY_SCHEMA_PATH,
+  }).load();
 }
 
-function runProbe(provider: string, probe: ProbeDefinition): ProbeResult {
+function runProbe(
+  provider: string,
+  probe: ProbeDefinition,
+  exec: CapabilityProbeExecutor = safeExec
+): ProbeResult {
   const args = probe.args || [];
   try {
-    const stdout = safeExec(probe.command, args, {
+    const stdout = exec(probe.command, args, {
       timeoutMs: probe.timeout_ms || 10000,
       maxOutputMB: probe.max_output_mb || 1,
     }).trim();
@@ -121,13 +164,14 @@ function matchesCapabilityIds(targetCapabilityId: string, candidateIds: string[]
 }
 
 export function probeProviderAvailability(
-  policy: ProviderScanPolicy = loadProviderCapabilityScanPolicy()
+  policy: ProviderScanPolicy = loadProviderCapabilityScanPolicy(),
+  options: { exec?: CapabilityProbeExecutor } = {}
 ): Map<string, ProbeResult> {
   const results = new Map<string, ProbeResult>();
   for (const providerPolicy of policy.providers) {
     results.set(
       providerPolicy.provider,
-      runProbe(providerPolicy.provider, providerPolicy.primary_probe)
+      runProbe(providerPolicy.provider, providerPolicy.primary_probe, options.exec)
     );
   }
   return results;
@@ -136,13 +180,13 @@ export function probeProviderAvailability(
 export function scanProviderCapabilities(
   registry: CapabilityRegistry = loadCapabilityRegistry(),
   policy: ProviderScanPolicy = loadProviderCapabilityScanPolicy(),
-  options: { includeUnavailable?: boolean } = {}
+  options: { includeUnavailable?: boolean; exec?: CapabilityProbeExecutor } = {}
 ): DiscoveredCapability[] {
   const includeUnavailable = options.includeUnavailable ?? false;
   const providerPolicies = new Map(
     policy.providers.map((providerPolicy) => [providerPolicy.provider, providerPolicy])
   );
-  const providerProbes = probeProviderAvailability(policy);
+  const providerProbes = probeProviderAvailability(policy, { exec: options.exec });
   const discovered: DiscoveredCapability[] = [];
 
   for (const capability of registry.capabilities) {
@@ -183,10 +227,27 @@ export function scanProviderCapabilities(
         matchesCapabilityIds(capability.capability_id, entry.capability_ids)
       );
       if (matchedProbe) {
-        const specificProbe = runProbe(providerPolicy.provider, matchedProbe.probe);
-        if (specificProbe.ok) {
-          evidence = specificProbe.evidence;
+        const specificProbe = runProbe(providerPolicy.provider, matchedProbe.probe, options.exec);
+        if (!specificProbe.ok) {
+          if (includeUnavailable) {
+            discovered.push({
+              ...capability,
+              discovery_status: 'missing',
+              provider_probe: providerProbe,
+              evidence_probe: specificProbe,
+            });
+          }
+          continue;
         }
+        evidence = specificProbe.evidence;
+        discovered.push({
+          ...capability,
+          discovery_status: 'available',
+          provider_probe: providerProbe,
+          evidence_probe: specificProbe,
+          evidence,
+        });
+        continue;
       }
     }
 

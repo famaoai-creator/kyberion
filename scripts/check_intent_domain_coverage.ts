@@ -1,6 +1,13 @@
-import { loadActuatorManifestCatalog, pathResolver, safeReaddir } from '@agent/core';
-import { readJson as readFoundationJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReaddir } from '@agent/core/secure-io';
+import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
+import { loadStandardIntentCatalog } from '@agent/core/intent-resolution';
+import { loadIntentDomainOntologyCatalog } from '@agent/core/intent-resolution';
+import { loadMissionClassificationPolicy } from '@agent/core/mission-classification';
+import { loadMissionTeamTemplates } from '@agent/core/mission-team-index';
+import { loadMissionWorkflowCatalog } from '@agent/core/mission-workflow-catalog';
+import { loadOutcomeCatalog } from '@agent/core/work-design';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type StandardIntent = {
   id?: string;
@@ -31,11 +38,6 @@ type IntentDomainEntry = {
   readiness_required: string[];
 };
 
-function readJson<T>(relativePath: string): T {
-  const fullPath = pathResolver.rootResolve(relativePath);
-  return readFoundationJson<T>(fullPath);
-}
-
 function pushIfMissing<T>(
   collection: Set<T>,
   value: T,
@@ -45,26 +47,13 @@ function pushIfMissing<T>(
   if (!collection.has(value)) violations.push(message);
 }
 
-function main(): number {
-  const standardIntents = readJson<{ intents: StandardIntent[] }>(
-    'knowledge/product/governance/standard-intents.json'
-  );
-  const ontology = readJson<{ intents: IntentDomainEntry[] }>(
-    'knowledge/product/governance/intent-domain-ontology.json'
-  );
-  const missionClassification = readJson<{
-    defaults: { mission_class: string };
-    mission_class_rules: Array<{ mission_class?: string }>;
-  }>('knowledge/product/governance/mission-classification-policy.json');
-  const workflowCatalog = readJson<{ templates: Array<{ id?: string }> }>(
-    'knowledge/product/governance/mission-workflow-catalog.json'
-  );
-  const teamTemplates = readJson<{ templates: Record<string, unknown> }>(
-    'knowledge/product/orchestration/mission-team-templates.json'
-  );
-  const outcomeCatalog = readJson<{ outcomes: Record<string, unknown> }>(
-    'knowledge/product/governance/outcome-catalog.json'
-  );
+export function checkIntentDomainCoverage(): string[] {
+  const standardIntents = loadStandardIntentCatalog();
+  const ontology = loadIntentDomainOntologyCatalog() as { intents: IntentDomainEntry[] };
+  const missionClassification = loadMissionClassificationPolicy();
+  const workflowCatalog = loadMissionWorkflowCatalog();
+  const teamTemplates = loadMissionTeamTemplates();
+  const outcomeCatalog = loadOutcomeCatalog();
   const manifests = pathResolver.rootResolve('knowledge/product/governance/environment-manifests');
 
   const readinessManifestIds = new Set(
@@ -74,7 +63,7 @@ function main(): number {
   );
 
   const standardById = new Map<string, StandardIntent>();
-  for (const intent of standardIntents.intents || []) {
+  for (const intent of standardIntents) {
     if (!intent.id) continue;
     standardById.set(intent.id, intent);
   }
@@ -150,11 +139,11 @@ function main(): number {
   const workflowIds = new Set(
     (workflowCatalog.templates || []).map((template) => String(template.id || ''))
   );
-  const teamTemplateIds = new Set(Object.keys(teamTemplates.templates || {}));
+  const teamTemplateIds = new Set(Object.keys(teamTemplates || {}));
   const actuatorIds = new Set(
     loadActuatorManifestCatalog().map((actuator) => String(actuator.n || ''))
   );
-  const outcomeIds = new Set(Object.keys(outcomeCatalog.outcomes || {}));
+  const outcomeIds = new Set(Object.keys(outcomeCatalog || {}));
 
   for (const entry of ontology.intents || []) {
     pushIfMissing(
@@ -202,25 +191,26 @@ function main(): number {
     }
   }
 
-  if (violations.length) {
-    console.error('[check:intent-domain-coverage] FAILED');
-    for (const violation of violations) {
-      console.error(`- ${violation}`);
-    }
-    return 1;
-  }
-
-  console.log(`[check:intent-domain-coverage] OK (${ontology.intents.length} intents)`);
-  return 0;
+  return violations;
 }
 
 export const runCheckIntentDomainCoverage = defineScript({
   name: 'check:intent-domain-coverage',
   flags: [],
-  run() {
-    const status = main();
-    if (status !== 0)
-      throw new Error(`intent domain coverage check failed with exit code ${status}`);
+  run(context) {
+    const violations = checkIntentDomainCoverage();
+    if (violations.length > 0) {
+      throw new ScriptExitError(
+        1,
+        [
+          'intent domain coverage check failed',
+          ...violations.map((violation) => `- ${violation}`),
+        ].join('\n')
+      );
+    }
+    const intentCount = loadIntentDomainOntologyCatalog().intents.length;
+    context.print(`[check:intent-domain-coverage] OK (${intentCount} intents)`);
+    return { intents: intentCount, violations };
   },
 });
 

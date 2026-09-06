@@ -1,10 +1,18 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
-import { assertMissionIdArgument, findMissionPath, missionDir } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import * as pathResolver from './path-resolver.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
+import {
+  provisionMissionEntry,
+  writeProvisionedJson,
+  writeProvisionedText,
+} from './mission-orchestration-journal.js';
 import type {
   MissionTeamGovernance,
   MissionTeamOrganizationProfileSummary,
@@ -126,6 +134,18 @@ interface MissionBindingPaths {
   executionLedgerPath: string;
 }
 
+const STAFFING_ASSIGNMENTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-staffing-assignments.schema.json'
+);
+
+function staffingAssignmentsCatalog(filePath: string) {
+  return defineCatalog<MissionStaffingAssignments>({
+    id: 'mission-staffing-assignments',
+    path: filePath,
+    schema: STAFFING_ASSIGNMENTS_SCHEMA_PATH,
+  });
+}
+
 function normalizeMissionId(missionId: string): string {
   return missionId.trim().toUpperCase();
 }
@@ -135,16 +155,25 @@ function resolveMissionBindingPaths(
   missionPathHint?: string
 ): MissionBindingPaths {
   const normalizedMissionId = normalizeMissionId(missionId);
-  assertMissionIdArgument(normalizedMissionId);
+  pathResolver.assertMissionIdArgument(normalizedMissionId);
   const missionPath =
     missionPathHint ||
-    findMissionPath(normalizedMissionId) ||
-    missionDir(normalizedMissionId, 'public');
+    pathResolver.findMissionPath(normalizedMissionId) ||
+    pathResolver.missionDir(normalizedMissionId, 'public');
+  const safeMissionPath = assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
   return {
-    missionPath,
-    teamBlueprintPath: path.join(missionPath, 'team-blueprint.json'),
-    staffingAssignmentsPath: path.join(missionPath, 'staffing-assignments.json'),
-    executionLedgerPath: path.join(missionPath, 'execution-ledger.jsonl'),
+    missionPath: safeMissionPath,
+    teamBlueprintPath: assertSafeRepositoryPath(path.join(safeMissionPath, 'team-blueprint.json'), {
+      allowMissingLeaf: true,
+    }),
+    staffingAssignmentsPath: assertSafeRepositoryPath(
+      path.join(safeMissionPath, 'staffing-assignments.json'),
+      { allowMissingLeaf: true }
+    ),
+    executionLedgerPath: assertSafeRepositoryPath(
+      path.join(safeMissionPath, 'execution-ledger.jsonl'),
+      { allowMissingLeaf: true }
+    ),
   };
 }
 
@@ -253,7 +282,7 @@ export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlu
     version: '1.0.0',
     mission_id: plan.mission_id,
     mission_type: plan.mission_type,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     source_artifact: 'team-composition.json',
     organization_profile: plan.organization_profile,
     team_governance: plan.team_governance,
@@ -309,7 +338,7 @@ export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionS
   return {
     version: '1.0.0',
     mission_id: plan.mission_id,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     organization_profile: plan.organization_profile,
     assignments,
   };
@@ -319,20 +348,44 @@ export function initializeMissionTeamBindings(
   missionPath: string,
   plan: MissionTeamPlan
 ): MissionBindingPaths {
-  const paths: MissionBindingPaths = {
-    missionPath,
-    teamBlueprintPath: path.join(missionPath, 'team-blueprint.json'),
-    staffingAssignmentsPath: path.join(missionPath, 'staffing-assignments.json'),
-    executionLedgerPath: path.join(missionPath, 'execution-ledger.jsonl'),
-  };
+  const paths = resolveMissionBindingPaths(plan.mission_id, missionPath);
 
-  safeMkdir(missionPath, { recursive: true });
+  safeMkdir(paths.missionPath, { recursive: true });
   const blueprint = buildMissionTeamBlueprint(plan);
   const staffingAssignments = buildMissionStaffingAssignments(plan);
-  safeWriteFile(paths.teamBlueprintPath, JSON.stringify(blueprint, null, 2));
-  safeWriteFile(paths.staffingAssignmentsPath, JSON.stringify(staffingAssignments, null, 2));
+  writeProvisionedJson({
+    missionId: plan.mission_id,
+    filePath: paths.teamBlueprintPath,
+    targetPath: path.relative(paths.missionPath, paths.teamBlueprintPath).split(path.sep).join('/'),
+    missionPathHint: paths.missionPath,
+    provisioned: provisionMissionEntry(blueprint),
+  });
+  writeProvisionedJson({
+    missionId: plan.mission_id,
+    filePath: paths.staffingAssignmentsPath,
+    targetPath: path
+      .relative(paths.missionPath, paths.staffingAssignmentsPath)
+      .split(path.sep)
+      .join('/'),
+    missionPathHint: paths.missionPath,
+    provisioned: provisionMissionEntry(
+      staffingAssignmentsCatalog(paths.staffingAssignmentsPath).validate(
+        staffingAssignments,
+        paths.staffingAssignmentsPath
+      )
+    ),
+  });
   if (!safeExistsSync(paths.executionLedgerPath)) {
-    safeWriteFile(paths.executionLedgerPath, '');
+    writeProvisionedText({
+      missionId: plan.mission_id,
+      filePath: paths.executionLedgerPath,
+      targetPath: path
+        .relative(paths.missionPath, paths.executionLedgerPath)
+        .split(path.sep)
+        .join('/'),
+      missionPathHint: paths.missionPath,
+      provisioned: provisionMissionEntry(''),
+    });
   }
   return paths;
 }
@@ -343,11 +396,12 @@ export function loadMissionStaffingAssignments(
 ): MissionStaffingAssignments | null {
   const paths = resolveMissionBindingPaths(missionId, missionPathHint);
   if (!safeExistsSync(paths.staffingAssignmentsPath)) return null;
-  const parsed = readJson<
-    Omit<MissionStaffingAssignments, 'assignments'> & {
-      assignments?: Array<Partial<MissionStaffingAssignment>>;
-    }
-  >(paths.staffingAssignmentsPath);
+  const parsed = staffingAssignmentsCatalog(paths.staffingAssignmentsPath).load() as Omit<
+    MissionStaffingAssignments,
+    'assignments'
+  > & {
+    assignments?: Array<Partial<MissionStaffingAssignment>>;
+  };
   const assignments = (parsed.assignments || []).flatMap((assignment) => {
     const actorId = String(assignment.actor_id || '').trim();
     if (!actorId) return [];
@@ -430,23 +484,17 @@ function resolveMissionLedgerScope(
   missionId: string,
   missionPath: string
 ): EventScope {
-  let state: Record<string, unknown> = {};
   const statePath = path.join(missionPath, 'mission-state.json');
-  if (safeExistsSync(statePath)) {
-    try {
-      state = readJson<Record<string, unknown>>(statePath);
-    } catch {
-      state = {};
-    }
-  }
+  const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+  const state = safeExistsSync(safeStatePath) ? loadMissionStateAtPath(safeStatePath) : null;
   const candidate: EventScopeInput = {
-    tier: (state.tier_scope || state.tier || 'public') as EventScope['tier'],
+    tier: state?.tier || 'public',
     mission_id: missionId,
-    ...(typeof state.tenant_slug === 'string' ? { tenant_slug: state.tenant_slug } : {}),
-    ...(typeof state.organization_id === 'string'
-      ? { organization_id: state.organization_id }
+    ...(state?.tenant_slug ? { tenant_slug: state.tenant_slug } : {}),
+    ...(state?.organization_id ? { organization_id: state.organization_id } : {}),
+    ...(state?.relationships?.project?.project_id
+      ? { project_id: state.relationships.project.project_id }
       : {}),
-    ...(typeof state.project_id === 'string' ? { project_id: state.project_id } : {}),
   };
   let authority: EventScope;
   try {
@@ -484,10 +532,19 @@ export function appendMissionExecutionLedgerEntry(
   };
   safeMkdir(paths.missionPath, { recursive: true });
   if (!safeExistsSync(paths.executionLedgerPath)) {
-    safeWriteFile(paths.executionLedgerPath, '');
+    writeProvisionedText({
+      missionId,
+      filePath: paths.executionLedgerPath,
+      targetPath: path
+        .relative(paths.missionPath, paths.executionLedgerPath)
+        .split(path.sep)
+        .join('/'),
+      missionPathHint: paths.missionPath,
+      provisioned: provisionMissionEntry(''),
+    });
   }
   const entry: MissionExecutionLedgerEntry = {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     mission_id: missionId,
     ...entryPayload,
   };

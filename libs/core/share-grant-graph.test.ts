@@ -3,9 +3,10 @@ import {
   ShareGrantAuthorizationError,
   ShareGrantGraph,
   ShareGrantValidationError,
+  parsePersistedEnvelope,
 } from './share-grant-graph.js';
 import { computeLedgerEntryHash, GENESIS_HASH } from './chain-integrity.js';
-import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const HMAC_KEY = 'os13-share-graph-test-key-123456789';
 
@@ -34,6 +35,72 @@ function createGraph(now = Date.parse('2026-08-09T00:00:00.000Z')) {
 }
 
 describe('ShareGrantGraph', () => {
+  it('validates persisted envelope and event shapes before hash verification', () => {
+    const envelope = {
+      version: 1,
+      previousHash: GENESIS_HASH,
+      event: {
+        type: 'resource_registered' as const,
+        resource: {
+          resourceRef: 'artifact:parser',
+          tenantSlug: 'tenant-a',
+          ownerPrincipal: 'principal:owner',
+          taint: 'confidential' as const,
+          registeredAt: '2026-08-09T00:00:00.000Z',
+        },
+      },
+      hash: 'a'.repeat(64),
+    };
+
+    expect(parsePersistedEnvelope(envelope)).toEqual(envelope);
+    expect(() =>
+      parsePersistedEnvelope({
+        ...envelope,
+        event: { ...envelope.event, resource: { ...envelope.event.resource, taint: 'publicity' } },
+      })
+    ).toThrow('taint');
+  });
+
+  it.each([
+    ['primitive root', null],
+    ['missing envelope hash', { version: 1, previousHash: GENESIS_HASH, event: {} }],
+    [
+      'invalid edge role',
+      {
+        version: 1,
+        previousHash: GENESIS_HASH,
+        hash: 'a'.repeat(64),
+        event: {
+          type: 'edge_granted',
+          edge: {
+            edgeId: 'edge-1',
+            resourceRef: 'artifact:parser',
+            grantor: 'principal:owner',
+            grantee: 'principal:viewer',
+            granteeTenantSlug: 'tenant-a',
+            role: 'admin',
+            audienceFloor: 'public',
+            grantedBy: 'principal:owner',
+            grantedAt: '2026-08-09T00:00:00.000Z',
+          },
+        },
+      },
+    ],
+  ])('rejects %s before replay', (_label, value) => {
+    expect(() => parsePersistedEnvelope(value)).toThrow();
+  });
+
+  it('rejects an external persistent store path before loading or writing it', () => {
+    expect(
+      () =>
+        new ShareGrantGraph({
+          storePath: '/tmp/share-grant-external.jsonl',
+          persist: true,
+          hmacKey: HMAC_KEY,
+        })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
   it('recomputes reachability so intermediary revocation is reversible', () => {
     const { graph } = createGraph();
     graph.registerResource({
@@ -441,6 +508,25 @@ describe('ShareGrantGraph', () => {
       ).toThrow(ShareGrantValidationError);
     } finally {
       safeRmSync(storePath, { force: true });
+    }
+  });
+
+  it('rejects a directory replacing the persisted grant ledger', () => {
+    const storePath = 'active/shared/tmp/os13-share-grant-directory.jsonl';
+    try {
+      safeMkdir(storePath, { recursive: true });
+      expect(
+        () =>
+          new ShareGrantGraph({
+            storePath,
+            persist: true,
+            hmacKey: HMAC_KEY,
+            authorizeActor: () => undefined,
+            resolveTenant: () => ({ status: 'active' }),
+          })
+      ).toThrow(/share-grant ledger must be a regular file/);
+    } finally {
+      safeRmSync(storePath, { recursive: true, force: true });
     }
   });
 });

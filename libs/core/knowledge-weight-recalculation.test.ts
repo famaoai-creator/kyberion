@@ -3,6 +3,8 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
   applyKnowledgeRankingWeightProposal,
+  isRegularKnowledgeWeightsGovernancePath,
+  loadKnowledgeRankingWeightProposal,
   proposeKnowledgeRankingWeightRecalculation,
 } from './knowledge-weight-recalculation.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
@@ -32,6 +34,16 @@ describe('proposeKnowledgeRankingWeightRecalculation', () => {
     else process.env[envKey] = originalUsagePath;
   });
 
+  it('accepts only regular files for governance backups', () => {
+    const filePath = path.join(root, 'knowledge-weights.json');
+    const directoryPath = path.join(root, 'knowledge-weights-directory.json');
+    safeWriteFile(filePath, '{}', { mkdir: true });
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(isRegularKnowledgeWeightsGovernancePath(filePath)).toBe(true);
+    expect(isRegularKnowledgeWeightsGovernancePath(directoryPath)).toBe(false);
+  });
+
   it('proposes a bounded tenant override without mutating governance JSON', () => {
     safeWriteFile(
       usagePath,
@@ -59,6 +71,23 @@ describe('proposeKnowledgeRankingWeightRecalculation', () => {
     expect(proposal.proposed_weights.usage_yield).toBe(6.8);
     expect(proposal.output_path).toContain(
       '/active/shared/runtime/feedback-loop/tenants/tenant-a/'
+    );
+    expect(loadKnowledgeRankingWeightProposal(proposal.output_path!)).toMatchObject({
+      scope: { tier: 'confidential', tenant_slug: 'tenant-a' },
+      approval_required: true,
+    });
+  });
+
+  it('rejects a schema-invalid proposal before approval evaluation', () => {
+    const proposal = proposeKnowledgeRankingWeightRecalculation({
+      scope: { tier: 'confidential', tenant_slug: 'tenant-a' },
+      persist: false,
+    });
+    const filePath = path.join(root, 'invalid-proposal.json');
+    safeWriteFile(filePath, JSON.stringify({ ...proposal, approval_required: false }));
+
+    expect(() => loadKnowledgeRankingWeightProposal(filePath)).toThrow(
+      /Invalid catalog knowledge-ranking-weight-proposal/
     );
   });
 

@@ -1,8 +1,16 @@
 #!/usr/bin/env node
-import { validateEnv } from '@agent/core';
+import { validateEnv } from '@agent/core/env-validator';
 import { getRegisteredEnvBool } from '@agent/core/foundation';
-import { loadCliManifest, type CliCommand } from './check_cli_manifest.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import {
+  loadCliManifest,
+  resolveCliModulePath,
+  type CliCommand,
+  type CliManifest,
+  type CliScriptCommand,
+} from './check_cli_manifest.js';
+import { safeExecResultAsync } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface CliEntrypoint {
   id: string;
@@ -10,8 +18,35 @@ interface CliEntrypoint {
   commands: string[];
 }
 
+function findUniqueCommand(
+  command: string,
+  manifest: ReturnType<typeof loadCliManifest>
+): CliCommand | undefined {
+  const matches = manifest.commands.filter((candidate) => candidate.command === command);
+  if (matches.length > 1) {
+    throw new Error(`CLI command registry has duplicate command: ${command || '<default>'}`);
+  }
+  return matches[0];
+}
+
+function findUniqueScriptCommand(
+  command: string,
+  manifest: CliManifest
+): CliScriptCommand | undefined {
+  const scriptCommands = manifest.script_commands || [];
+  const exactMatches = scriptCommands.filter((candidate) => candidate.command === command);
+  const matches =
+    exactMatches.length > 0 || command.includes(' ')
+      ? exactMatches
+      : scriptCommands.filter((candidate) => candidate.command === `${command} default`);
+  if (matches.length > 1) {
+    throw new Error(`CLI script command registry has duplicate command: ${command}`);
+  }
+  return matches[0];
+}
+
 export function selectEntrypoint(command: string, manifest = loadCliManifest()): CliEntrypoint {
-  const registered = manifest.commands.find((candidate) => candidate.command === command);
+  const registered = findUniqueCommand(command, manifest);
   if (!registered) throw new Error(`Unknown kyberion command: ${command}`);
   const entrypoint = manifest.entrypoints.find((candidate) => candidate.id === registered.entry);
   if (!entrypoint) {
@@ -31,7 +66,25 @@ export function resolveCommand(
   command: string,
   manifest = loadCliManifest()
 ): CliCommand | undefined {
-  return manifest.commands.find((entry) => entry.command === command);
+  return findUniqueCommand(command, manifest);
+}
+
+/** Resolve the longest governed noun/verb prefix without consuming payload args. */
+export function resolveCommandPath(args: string[], manifest = loadCliManifest()): string {
+  for (let length = Math.min(2, args.length); length >= 1; length -= 1) {
+    const candidate = args.slice(0, length).join(' ');
+    if (findUniqueCommand(candidate, manifest) || findUniqueScriptCommand(candidate, manifest)) {
+      return candidate;
+    }
+  }
+  return args[0] ?? '';
+}
+
+export function resolveScriptCommand(
+  command: string,
+  manifest = loadCliManifest()
+): CliScriptCommand | undefined {
+  return findUniqueScriptCommand(command, manifest);
 }
 
 export function formatCliManifestHelp(manifest = loadCliManifest()): string {
@@ -41,13 +94,61 @@ export function formatCliManifestHelp(manifest = loadCliManifest()): string {
       const label = command.command || '<home>';
       return `  ${label.padEnd(28)} ${command.noun} ${command.verb} [${command.audience}]`;
     });
+  const scriptRows = (manifest.script_commands || [])
+    .filter((command) => command.audience !== 'dev')
+    .sort((left, right) => left.command.localeCompare(right.command))
+    .map((command) => {
+      const displayCommand = command.command.endsWith(' default')
+        ? command.command.slice(0, -' default'.length)
+        : command.command;
+      return `  ${displayCommand.padEnd(28)} ${command.script ?? command.module} [${command.audience}]`;
+    });
   return [
     'Kyberion commands (governed registry):',
     '',
     ...rows,
     '',
+    'Script-backed operator commands:',
+    '',
+    ...scriptRows,
+    '',
     'Use `kyberion <command> --help` for command-specific options.',
   ].join('\n');
+}
+
+async function runScriptCommand(
+  command: string,
+  args: string[],
+  manifest: CliManifest,
+  print: (value: unknown) => void
+): Promise<void> {
+  const scriptCommand = resolveScriptCommand(command, manifest);
+  if (!scriptCommand) throw new Error(`Unknown kyberion command: ${command}`);
+  if (scriptCommand.script === 'kyberion') {
+    throw new Error('The kyberion package script cannot dispatch itself');
+  }
+  const commandArgs = args.slice(command.split(' ').length);
+  const result = scriptCommand.module
+    ? await safeExecResultAsync(
+        process.execPath,
+        [
+          '--import',
+          pathResolver.rootResolve('scripts/ts-loader.mjs'),
+          resolveCliModulePath(scriptCommand.module),
+          ...(scriptCommand.args || []),
+          ...commandArgs,
+        ],
+        { cwd: pathResolver.rootDir(), timeoutMs: 120_000 }
+      )
+    : await safeExecResultAsync('pnpm', ['run', scriptCommand.script!, ...commandArgs], {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 120_000,
+      });
+  if (result.stdout.trim()) print(result.stdout.trim());
+  if (result.status !== 0) {
+    const detail = result.stderr.trim() || result.error?.message || 'script command failed';
+    throw new ScriptExitError(result.status || 1, detail);
+  }
 }
 
 /** Where operators fix a startup environment failure, named in the error itself. */
@@ -80,31 +181,73 @@ export function validateKyberionStartupEnvironment(
   assertRequiredEnvironment(validateEnv(env, { strict }));
 }
 
-export async function main(args: string[] = []): Promise<void> {
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
   if (args[0] === '--help' || args[0] === '-h') {
-    console.log(formatCliManifestHelp());
+    print(formatCliManifestHelp());
     return;
   }
   validateKyberionStartupEnvironment();
-  const entrypoint = selectEntrypoint(args[0] ?? '');
-  if (entrypoint.id === 'operator-cli') {
-    const { main: operatorCliMain } = await import('./cli.js');
-    await operatorCliMain(args);
+  const manifest = loadCliManifest();
+  const command = resolveCommandPath(args, manifest);
+  const registeredEntrypoint = findUniqueCommand(command, manifest);
+  if (!registeredEntrypoint) {
+    await runScriptCommand(command, args, manifest, print);
     return;
   }
-
-  if (
-    entrypoint.id === 'organization-model' ||
-    entrypoint.id === 'organization-roles' ||
-    entrypoint.id === 'project-controller'
-  ) {
-    const { runGovernedController } = await import('./kyberion-governed-controllers.js');
-    await runGovernedController(entrypoint.id, args.slice(1));
-    return;
+  const entrypoint = selectEntrypoint(command, manifest);
+  switch (entrypoint.id) {
+    case 'operator-cli': {
+      const { main: operatorCliMain } = await import('./cli.js');
+      await operatorCliMain(args);
+      return;
+    }
+    case 'organization-model':
+    case 'organization-roles':
+    case 'project-controller': {
+      const { runGovernedController } = await import('./kyberion-governed-controllers.js');
+      await runGovernedController(entrypoint.id, args.slice(1), print);
+      return;
+    }
+    case 'operator-home': {
+      const { main: operatorHomeMain } = await import('./kyberion_home.js');
+      await operatorHomeMain(args, print);
+      return;
+    }
+    case 'pipeline-runner': {
+      const { main: pipelineMain, resolvePipelinePresetArgs } = await import('./run_pipeline.js');
+      await pipelineMain(resolvePipelinePresetArgs(args.slice(1)));
+      return;
+    }
+    case 'operator-readiness': {
+      const { main: vitalMain } = await import('./vital_check.js');
+      const result = await vitalMain(args.slice(1));
+      if (result.help) print(result.help);
+      else if (result.report) {
+        const output = result.text ?? result.report;
+        print(output);
+      }
+      if (result.status !== 0) {
+        const { ScriptExitError } = await import('./lib/harness.js');
+        throw new ScriptExitError(result.status, '', true, result);
+      }
+      return;
+    }
+    case 'operator-setup': {
+      const { runSetupReportCli } = await import('./setup_report.js');
+      await runSetupReportCli(args.slice(2));
+      return;
+    }
+    case 'operator-voice': {
+      const { runVoiceSetupScript } = await import('./voice_setup.js');
+      await runVoiceSetupScript(args.slice(2));
+      return;
+    }
+    default:
+      throw new Error(`Unsupported kyberion entrypoint: ${entrypoint.id}`);
   }
-
-  const { main: operatorHomeMain } = await import('./kyberion_home.js');
-  await operatorHomeMain(args);
 }
 
 if (
@@ -114,5 +257,5 @@ if (
   void defineScript({
     name: 'kyberion',
     flags: [],
-    run: ({ argv }) => main(argv),
+    run: ({ argv, print }) => main(argv, print),
   })();

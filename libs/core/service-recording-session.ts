@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import {
   describeServiceHarness,
   planServiceOperation,
@@ -9,8 +10,10 @@ import {
   type ServiceRecording,
   type ServiceRecordingStep,
 } from './service-recording.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export type ServiceRecordedParameterKind = 'fixed' | 'input' | 'template' | 'secret';
 
@@ -34,6 +37,18 @@ export interface ServiceRecordingSessionOptions {
 export interface RecordedServiceCall extends ServiceCallObservation {
   operation: ServiceOperationContract;
   plan_validation_errors: string[];
+}
+
+const SERVICE_RECORDING_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-recording.schema.json'
+);
+
+function serviceRecordingCatalog(filePath: string) {
+  return defineCatalog<ServiceRecording>({
+    id: 'service-recording',
+    path: filePath,
+    schema: SERVICE_RECORDING_SCHEMA_PATH,
+  });
 }
 
 const SECRET_KEY =
@@ -137,7 +152,7 @@ export class ServiceRecordingSession {
         'recording_id must contain only letters, numbers, dot, underscore, or hyphen'
       );
     }
-    this.now = options.now || (() => new Date().toISOString());
+    this.now = options.now || nowIso;
     this.targetName = options.target_name.trim();
     for (const service of options.services || []) this.services.add(service);
   }
@@ -195,11 +210,16 @@ export class ServiceRecordingSession {
 
   persist(): string {
     const recording = this.toRecording();
-    const dir = pathResolver.shared('runtime/recordings');
+    const dir = assertSafeRepositoryPath(pathResolver.shared('runtime/recordings'), {
+      allowMissingLeaf: true,
+    });
     safeMkdir(dir, { recursive: true });
-    const path = pathResolver.shared(`runtime/recordings/${this.recording_id}.json`);
-    safeWriteFile(path, `${JSON.stringify(recording, null, 2)}\n`);
-    return pathResolver.toRepoRelative(path);
+    const recordingPath = assertSafeRepositoryPath(path.join(dir, `${this.recording_id}.json`), {
+      allowMissingLeaf: true,
+    });
+    const canonical = serviceRecordingCatalog(recordingPath).validate(recording, recordingPath);
+    safeWriteFile(recordingPath, `${JSON.stringify(canonical, null, 2)}\n`);
+    return pathResolver.toRepoRelative(recordingPath);
   }
 }
 

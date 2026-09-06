@@ -5,8 +5,8 @@
 
 import * as nodePath from 'node:path';
 import { type ArtifactReviewReceipt } from './artifact-review.js';
+import { nowIso } from './foundation/time.js';
 import { executeServicePreset } from './service-engine.js';
-import { safeExistsSync } from './secure-io.js';
 import { type WorkItem } from './work-coordination.js';
 import { formatCognitiveRouteDecision, type CognitiveRouteDecision } from './cognitive-routing.js';
 import { type TaskModelHint } from './reasoning-model-routing.js';
@@ -14,11 +14,10 @@ import { type TaskResultBlock } from './channel-surface-types.js';
 import { type OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { closeTaskArtifacts } from './mission-artifact-closure.js';
 import { revokeGrantsForTaskBestEffort } from './task-scoped-grants.js';
-import {
-  readJsonFile as readJsonFileFromDispatchIO,
-  writeJsonFile as writeJsonFileFromDispatchIO,
-} from './mission-dispatch-io.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
+import { loadMissionTicketDispatchManifestAtPath } from './mission-ticket-dispatch-manifest.js';
+import { loadMissionTicketProviderArtifactAtPath } from './mission-ticket-provider-artifact.js';
 
 /**
  * Confidential missions default to external_egress=deny. A model-backed
@@ -174,19 +173,24 @@ export function evaluateAcceptanceCriteriaEvidence(input: {
 
 export function updateTicketManifest(
   missionPath: string,
+  missionId: string,
   taskId: string,
   updater: (record: Record<string, unknown>, ticketState: 'done' | 'review' | 'blocked') => void,
   ticketState: 'done' | 'review' | 'blocked'
 ): void {
   const manifestFile = ticketManifestPath(missionPath);
-  const manifest = readJsonFileFromDispatchIO<{ records?: Array<Record<string, unknown>> }>(
-    manifestFile
-  );
+  const manifest = (() => {
+    try {
+      return loadMissionTicketDispatchManifestAtPath(manifestFile);
+    } catch {
+      return null;
+    }
+  })();
   if (!manifest?.records) return;
   const index = manifest.records.findIndex((record) => String(record.task_id || '') === taskId);
   if (index < 0) return;
   updater(manifest.records[index], ticketState);
-  writeJsonFileFromDispatchIO(manifestFile, manifest);
+  writeDispatchArtifact(manifestFile, manifest, { missionId, missionPath });
 }
 
 export const TICKET_STATE_TO_TASK_STATUS: Record<string, string> = {
@@ -211,12 +215,21 @@ export const TASK_STATUS_RANK: Record<string, number> = {
 
 export function updateNextTasksReflection(
   missionPath: string,
+  missionId: string,
   taskId: string,
   payload: Record<string, unknown>,
   ticketState?: string
 ): void {
   const nextTasksFile = missionNextTasksPath(missionPath);
-  const tasks = readJsonFileFromDispatchIO<Array<Record<string, unknown>>>(nextTasksFile);
+  let tasks: Array<Record<string, unknown>> | null;
+  try {
+    tasks = loadMissionNextTaskObjectsAtPath(
+      nextTasksFile,
+      nodePath.basename(nodePath.resolve(missionPath))
+    );
+  } catch {
+    tasks = null;
+  }
   if (!tasks) return;
   const index = tasks.findIndex((task) => String(task.task_id || '') === taskId);
   if (index < 0) return;
@@ -234,7 +247,7 @@ export function updateNextTasksReflection(
       ...payload,
     },
   };
-  writeJsonFileFromDispatchIO(nextTasksFile, tasks);
+  writeDispatchArtifact(nextTasksFile, tasks, { missionId, missionPath });
 }
 
 export function appendComment(
@@ -334,9 +347,13 @@ export async function reflectTicketOutcome(input: {
         : 'blocked';
   const ticketState = deriveTicketState(effectiveFinalStatus, notes);
   const reflectionPath = ticketReplyPath(input.missionPath, taskId);
-  const manifest = readJsonFileFromDispatchIO<{ records?: Array<Record<string, unknown>> }>(
-    ticketManifestPath(input.missionPath)
-  );
+  const manifest = (() => {
+    try {
+      return loadMissionTicketDispatchManifestAtPath(ticketManifestPath(input.missionPath));
+    } catch {
+      return null;
+    }
+  })();
   const manifestRecord = manifest?.records?.find(
     (record) => String(record.task_id || '') === taskId
   );
@@ -384,18 +401,22 @@ export async function reflectTicketOutcome(input: {
     response_excerpt: input.responseExcerpt,
     notes,
     body: reflectionBody,
-    reflected_at: new Date().toISOString(),
+    reflected_at: nowIso(),
   };
-  writeDispatchArtifact(reflectionPath, reflectionPayload);
+  writeDispatchArtifact(reflectionPath, reflectionPayload, {
+    missionId: input.missionId,
+    missionPath: input.missionPath,
+  });
 
   updateTicketManifest(
     input.missionPath,
+    input.missionId,
     taskId,
     (record, state) => {
       record.reflection_status = ticketState;
       record.reflection_path = reflectionPath;
       record.reflection_excerpt = input.responseExcerpt;
-      record.reflected_at = new Date().toISOString();
+      record.reflected_at = nowIso();
       record.ticket_state_after = state;
       record.notes = Array.from(
         new Set([...(Array.isArray(record.notes) ? (record.notes as string[]) : []), ...notes])
@@ -406,9 +427,10 @@ export async function reflectTicketOutcome(input: {
 
   updateNextTasksReflection(
     input.missionPath,
+    input.missionId,
     taskId,
     {
-      reflected_at: new Date().toISOString(),
+      reflected_at: nowIso(),
       ticket_state: ticketState,
       ticket_reply_path: reflectionPath,
       response_path: input.responsePath,
@@ -456,143 +478,157 @@ export async function reflectTicketOutcome(input: {
   }
 
   const githubPath = nodePath.join(ticketRoot(input.missionPath), 'github', `${taskId}.json`);
-  if (safeExistsSync(githubPath)) {
-    const githubIssue = readJsonFileFromDispatchIO<Record<string, unknown>>(githubPath);
-    if (githubIssue) {
-      const issueNumber =
-        extractGitHubIssueNumber(liveResults.github) || extractGitHubIssueNumber(githubIssue);
-      const repoInfo = extractGitHubRepoInfo(githubIssue);
-      githubIssue.state = ticketState === 'done' ? 'closed' : 'open';
-      githubIssue.state_reason = ticketState === 'done' ? 'completed' : 'reopened';
-      githubIssue.comments = appendComment(githubIssue.comments, {
-        body: reflectionBody,
-        created_at: new Date().toISOString(),
-        state: ticketState,
-        source: 'workitem-dispatch',
-      });
-      githubIssue.last_reflection = {
-        ticket_state: ticketState,
-        reflected_at: new Date().toISOString(),
-        response_path: input.responsePath,
-        response_excerpt: input.responseExcerpt,
-        cognitive_route: cognitiveRouteSummary,
-        drift_watchdog_summary: input.driftWatchdogSummary,
-      };
-      writeJsonFileFromDispatchIO(githubPath, githubIssue);
+  const githubIssue = (() => {
+    try {
+      return loadMissionTicketProviderArtifactAtPath(githubPath, 'github');
+    } catch {
+      return null;
+    }
+  })();
+  if (githubIssue) {
+    const issueNumber =
+      extractGitHubIssueNumber(liveResults.github) || extractGitHubIssueNumber(githubIssue);
+    const repoInfo = extractGitHubRepoInfo(githubIssue);
+    githubIssue.state = ticketState === 'done' ? 'closed' : 'open';
+    githubIssue.state_reason = ticketState === 'done' ? 'completed' : 'reopened';
+    githubIssue.comments = appendComment(githubIssue.comments, {
+      body: reflectionBody,
+      created_at: nowIso(),
+      state: ticketState,
+      source: 'workitem-dispatch',
+    });
+    githubIssue.last_reflection = {
+      ticket_state: ticketState,
+      reflected_at: nowIso(),
+      response_path: input.responsePath,
+      response_excerpt: input.responseExcerpt,
+      cognitive_route: cognitiveRouteSummary,
+      drift_watchdog_summary: input.driftWatchdogSummary,
+    };
+    writeDispatchArtifact(githubPath, githubIssue, {
+      missionId: input.missionId,
+      missionPath: input.missionPath,
+    });
 
-      if (repoInfo.owner && repoInfo.repo && issueNumber) {
-        try {
+    if (repoInfo.owner && repoInfo.repo && issueNumber) {
+      try {
+        await executeServicePreset(
+          'github',
+          'add_comment',
+          {
+            owner: repoInfo.owner,
+            repo: repoInfo.repo,
+            issue_number: issueNumber,
+            body: reflectionBody,
+          },
+          'secret-guard'
+        );
+        if (ticketState === 'done') {
           await executeServicePreset(
             'github',
-            'add_comment',
+            'close_issue',
             {
               owner: repoInfo.owner,
               repo: repoInfo.repo,
               issue_number: issueNumber,
-              body: reflectionBody,
             },
             'secret-guard'
           );
-          if (ticketState === 'done') {
-            await executeServicePreset(
-              'github',
-              'close_issue',
-              {
-                owner: repoInfo.owner,
-                repo: repoInfo.repo,
-                issue_number: issueNumber,
-              },
-              'secret-guard'
-            );
-          }
-        } catch (error: any) {
-          notes.push(`github reflection failed: ${error?.message || error}`);
         }
+      } catch (error: any) {
+        notes.push(`github reflection failed: ${error?.message || error}`);
       }
     }
   }
 
   const jiraPath = nodePath.join(ticketRoot(input.missionPath), 'jira', `${taskId}.json`);
-  if (safeExistsSync(jiraPath)) {
-    const jiraIssue = readJsonFileFromDispatchIO<Record<string, unknown>>(jiraPath);
-    if (jiraIssue) {
-      const issueKey = extractJiraIssueKey(liveResults.jira) || extractJiraIssueKey(jiraIssue);
-      const jiraInfo = {
-        ...extractJiraProjectInfo(jiraIssue),
-        ...extractJiraProjectInfo(liveResults.jira),
-      };
-      const fields =
-        jiraIssue.fields && typeof jiraIssue.fields === 'object'
-          ? (jiraIssue.fields as Record<string, unknown>)
-          : {};
-      fields.status = {
-        name: ticketState === 'done' ? 'Done' : ticketState === 'review' ? 'In Review' : 'Blocked',
-      };
-      jiraIssue.fields = fields;
-      jiraIssue.comments = appendComment(jiraIssue.comments, {
-        body: reflectionBody,
-        created_at: new Date().toISOString(),
-        state: ticketState,
-        source: 'workitem-dispatch',
-      });
-      jiraIssue.last_reflection = {
-        ticket_state: ticketState,
-        reflected_at: new Date().toISOString(),
-        response_path: input.responsePath,
-        response_excerpt: input.responseExcerpt,
-        cognitive_route: cognitiveRouteSummary,
-        drift_watchdog_summary: input.driftWatchdogSummary,
-      };
-      writeJsonFileFromDispatchIO(jiraPath, jiraIssue);
+  const jiraIssue = (() => {
+    try {
+      return loadMissionTicketProviderArtifactAtPath(jiraPath, 'jira');
+    } catch {
+      return null;
+    }
+  })();
+  if (jiraIssue) {
+    const issueKey = extractJiraIssueKey(liveResults.jira) || extractJiraIssueKey(jiraIssue);
+    const jiraInfo = {
+      ...extractJiraProjectInfo(jiraIssue),
+      ...extractJiraProjectInfo(liveResults.jira),
+    };
+    const fields =
+      jiraIssue.fields && typeof jiraIssue.fields === 'object'
+        ? (jiraIssue.fields as Record<string, unknown>)
+        : {};
+    fields.status = {
+      name: ticketState === 'done' ? 'Done' : ticketState === 'review' ? 'In Review' : 'Blocked',
+    };
+    jiraIssue.fields = fields;
+    jiraIssue.comments = appendComment(jiraIssue.comments, {
+      body: reflectionBody,
+      created_at: nowIso(),
+      state: ticketState,
+      source: 'workitem-dispatch',
+    });
+    jiraIssue.last_reflection = {
+      ticket_state: ticketState,
+      reflected_at: nowIso(),
+      response_path: input.responsePath,
+      response_excerpt: input.responseExcerpt,
+      cognitive_route: cognitiveRouteSummary,
+      drift_watchdog_summary: input.driftWatchdogSummary,
+    };
+    writeDispatchArtifact(jiraPath, jiraIssue, {
+      missionId: input.missionId,
+      missionPath: input.missionPath,
+    });
 
-      if (issueKey && jiraInfo.domain) {
-        try {
-          await executeServicePreset(
+    if (issueKey && jiraInfo.domain) {
+      try {
+        await executeServicePreset(
+          'jira',
+          'add_comment',
+          {
+            issue_key: issueKey,
+            body: reflectionBody,
+          },
+          'secret-guard'
+        );
+        if (ticketState === 'done') {
+          const transitions = await executeServicePreset(
             'jira',
-            'add_comment',
+            'get_transitions',
             {
               issue_key: issueKey,
-              body: reflectionBody,
             },
             'secret-guard'
           );
-          if (ticketState === 'done') {
-            const transitions = await executeServicePreset(
+          const transitionList = Array.isArray((transitions as any)?.transitions)
+            ? (transitions as any).transitions
+            : Array.isArray((transitions as any)?.body?.transitions)
+              ? (transitions as any).body.transitions
+              : [];
+          const match = transitionList.find((transition: any) => {
+            const name = String(transition?.name || transition?.to?.name || '')
+              .trim()
+              .toLowerCase();
+            return ['done', 'closed', 'resolved', 'complete', 'completed'].includes(name);
+          });
+          if (match?.id) {
+            await executeServicePreset(
               'jira',
-              'get_transitions',
+              'transition_issue',
               {
                 issue_key: issueKey,
+                transition_id: String(match.id),
               },
               'secret-guard'
             );
-            const transitionList = Array.isArray((transitions as any)?.transitions)
-              ? (transitions as any).transitions
-              : Array.isArray((transitions as any)?.body?.transitions)
-                ? (transitions as any).body.transitions
-                : [];
-            const match = transitionList.find((transition: any) => {
-              const name = String(transition?.name || transition?.to?.name || '')
-                .trim()
-                .toLowerCase();
-              return ['done', 'closed', 'resolved', 'complete', 'completed'].includes(name);
-            });
-            if (match?.id) {
-              await executeServicePreset(
-                'jira',
-                'transition_issue',
-                {
-                  issue_key: issueKey,
-                  transition_id: String(match.id),
-                },
-                'secret-guard'
-              );
-            } else {
-              notes.push(`jira reflection transition skipped: no done transition for ${issueKey}`);
-            }
+          } else {
+            notes.push(`jira reflection transition skipped: no done transition for ${issueKey}`);
           }
-        } catch (error: any) {
-          notes.push(`jira reflection failed: ${error?.message || error}`);
         }
+      } catch (error: any) {
+        notes.push(`jira reflection failed: ${error?.message || error}`);
       }
     }
   }

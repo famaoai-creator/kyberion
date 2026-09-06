@@ -56,6 +56,34 @@ export interface WebThemePack {
   source_theme_name?: string | null;
 }
 
+export function isWebThemePack(value: unknown): value is WebThemePack {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const theme = record.theme;
+  if (!theme || typeof theme !== 'object' || Array.isArray(theme)) return false;
+  const themeRecord = theme as Record<string, unknown>;
+  const colors = themeRecord.colors;
+  const fonts = themeRecord.fonts;
+  if (!colors || typeof colors !== 'object' || Array.isArray(colors)) return false;
+  if (!fonts || typeof fonts !== 'object' || Array.isArray(fonts)) return false;
+  const colorRecord = colors as Record<string, unknown>;
+  const fontRecord = fonts as Record<string, unknown>;
+  return (
+    typeof record.kind === 'string' &&
+    typeof record.version === 'string' &&
+    typeof record.theme_id === 'string' &&
+    typeof record.brand_name === 'string' &&
+    typeof record.tenant_slug === 'string' &&
+    typeof record.design_system_id === 'string' &&
+    typeof themeRecord.name === 'string' &&
+    ['primary', 'secondary', 'accent', 'background', 'text'].every(
+      (key) => typeof colorRecord[key] === 'string'
+    ) &&
+    typeof fontRecord.heading === 'string' &&
+    typeof fontRecord.body === 'string'
+  );
+}
+
 export interface WebDesignSystemSlot {
   slot_id: string;
   role: string;

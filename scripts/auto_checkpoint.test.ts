@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import * as core from '@agent/core';
+import * as autonomousOpsGate from '@agent/core/autonomous-ops-gate';
 import * as missionState from './refactor/mission-state.js';
 import * as maintenance from './refactor/mission-maintenance.js';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
@@ -11,7 +11,7 @@ describe('auto_checkpoint', () => {
   });
 
   it('creates checkpoints for active missions when gate allows', async () => {
-    vi.spyOn(core, 'evaluateAutonomousOpsAction').mockReturnValue({
+    vi.spyOn(autonomousOpsGate, 'evaluateAutonomousOpsAction').mockReturnValue({
       actionId: 'auto_checkpoint',
       decision: 'auto',
       allowed: true,
@@ -52,7 +52,7 @@ describe('auto_checkpoint', () => {
   });
 
   it('skips when the gate requires approval', async () => {
-    vi.spyOn(core, 'evaluateAutonomousOpsAction').mockReturnValue({
+    vi.spyOn(autonomousOpsGate, 'evaluateAutonomousOpsAction').mockReturnValue({
       actionId: 'auto_checkpoint',
       decision: 'approve',
       allowed: false,

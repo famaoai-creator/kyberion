@@ -3,7 +3,10 @@ import { createHash } from 'node:crypto';
 import type { DesktopRecording, DesktopRecordingStep } from './desktop-recording.js';
 import { chooseNativeOps } from './native-op-mapping.js';
 import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 export interface DesktopIntentStep {
   id: string;
@@ -50,6 +53,32 @@ export function validateDesktopIntentDraft(input: unknown): DesktopIntentDraft {
   return input as DesktopIntentDraft;
 }
 
+/** Load one persisted intent review artifact through the regular-file contract boundary. */
+export function loadDesktopIntentDraftAtPath(
+  filePath: string,
+  expectedSourceRecordingId?: string
+): DesktopIntentDraft {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[DESKTOP_INTENT] intent draft must be a regular file: ${filePath}`);
+  }
+  const intent = defineCatalog<DesktopIntentDraft>({
+    id: 'desktop-intent',
+    path: safeFilePath,
+    schema: pathResolver.knowledge('product/schemas/desktop-intent.schema.json'),
+  }).load();
+  validateDesktopIntentDraft(intent);
+  if (
+    expectedSourceRecordingId !== undefined &&
+    intent.source_recording_id !== expectedSourceRecordingId
+  ) {
+    throw new Error(
+      `[DESKTOP_INTENT_SCOPE_MISMATCH] intent artifact belongs to ${intent.source_recording_id}, expected ${expectedSourceRecordingId}`
+    );
+  }
+  return intent;
+}
+
 function titleFor(step: DesktopRecordingStep): string {
   return step.summary.replace(/\s+/g, ' ').trim().slice(0, 140);
 }
@@ -94,7 +123,7 @@ export function reconstructDesktopIntent(recording: DesktopRecording): DesktopIn
     intent,
     steps,
     source_recording_id: recording.recording_id,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     review: { status: 'pending' },
   });
 }
@@ -110,7 +139,7 @@ export function reviewDesktopIntent(
     review: {
       status: decision,
       reviewer,
-      reviewed_at: new Date().toISOString(),
+      reviewed_at: nowIso(),
       ...(note ? { note } : {}),
     },
   });

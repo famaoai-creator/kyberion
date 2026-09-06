@@ -56,6 +56,9 @@
  * by test (delegation-chain.test.ts) instead of by a runtime import.
  */
 
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
+
 // ---------------------------------------------------------------------------
 // Model
 // ---------------------------------------------------------------------------
@@ -139,7 +142,7 @@ export function buildDelegationLink(input: {
     actor,
     ...(input.team_role ? { team_role: input.team_role } : {}),
     granted_scope: copyGrantedScope(input.granted_scope),
-    granted_at: input.granted_at ?? new Date().toISOString(),
+    granted_at: input.granted_at ?? nowIso(),
   };
 }
 
@@ -299,7 +302,7 @@ export function parseDelegationChain(value: unknown): DelegationChain | null {
   let candidate: unknown = value;
   if (typeof candidate === 'string') {
     try {
-      candidate = JSON.parse(candidate);
+      candidate = parseSafeJsonInput(candidate, 'delegation chain');
     } catch {
       return null;
     }

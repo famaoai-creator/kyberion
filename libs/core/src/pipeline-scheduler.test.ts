@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   normalizeScheduledPipelinePath,
   resolveScheduledPipelinePath,
+  type PipelineScheduleRegistry,
+  type ScheduledPipeline,
 } from './pipeline-scheduler.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeWriteFile } from '../secure-io.js';
@@ -14,6 +16,7 @@ import {
   isScheduledPipelineDue,
   loadScheduleRegistry,
   registerScheduledPipeline,
+  saveScheduleRegistry,
 } from './pipeline-scheduler.js';
 
 describe('pipeline scheduler', () => {
@@ -226,6 +229,23 @@ describe('pipeline scheduler', () => {
       expect(() => normalizeScheduledPipelinePath('', '/tmp/new-root')).toThrowError(/non-empty/);
     });
 
+    it('rejects relative traversal before a schedule can escape the repository root', () => {
+      expect(() => normalizeScheduledPipelinePath('../outside.json', '/tmp/new-root')).toThrowError(
+        /outside the repo/
+      );
+      expect(() => normalizeScheduledPipelinePath('..', '/tmp/new-root')).toThrowError(
+        /outside the repo/
+      );
+      expect(() =>
+        resolveScheduledPipelinePath(
+          { pipelinePath: 'pipelines/../../etc/passwd' },
+          {
+            rootDir: '/tmp/new-root',
+          }
+        )
+      ).toThrowError(/outside the repo/);
+    });
+
     it('resolves stored relative paths against the current root', () => {
       const resolved = resolveScheduledPipelinePath(
         { pipelinePath: 'pipelines/daily.json' },
@@ -282,6 +302,71 @@ describe('pipeline scheduler', () => {
         })
       );
       expect(() => loadScheduleRegistry({ rootDir })).toThrowError(/non-empty/);
+    });
+
+    it('fails closed when persisted schedule data violates its schema', () => {
+      const rootDir = makeRootDir();
+      const registryPath = path.join(rootDir, 'active/shared/runtime/pipeline-schedules.json');
+      safeWriteFile(
+        registryPath,
+        JSON.stringify({
+          version: '1.0',
+          schedules: [
+            {
+              id: 'invalid',
+              name: 'invalid',
+              pipelinePath: 'pipelines/invalid.json',
+              actuator: 'run_pipeline',
+              trigger: { type: 'cron', cron: '0 6 * * *' },
+              enabled: true,
+              unexpected: true,
+            },
+          ],
+        })
+      );
+
+      expect(() => loadScheduleRegistry({ rootDir })).toThrowError(
+        /Invalid catalog pipeline-schedule-registry/
+      );
+    });
+
+    it('validates the registry before writing it', () => {
+      const rootDir = makeRootDir();
+      expect(() =>
+        saveScheduleRegistry(
+          {
+            version: '1.0',
+            schedules: [
+              {
+                id: 'invalid',
+                name: 'invalid',
+                pipelinePath: 'pipelines/invalid.json',
+                actuator: 'run_pipeline',
+                trigger: { type: 'cron', cron: '0 6 * * *' },
+                enabled: true,
+                unexpected: true,
+              } as ScheduledPipeline & { unexpected: boolean },
+            ],
+          },
+          { rootDir }
+        )
+      ).toThrowError(/Invalid catalog pipeline-schedule-registry/);
+    });
+
+    it('persists the catalog-normalized registry payload', () => {
+      const rootDir = makeRootDir();
+      const registry = {
+        version: '1.0',
+        schedules: [],
+        $schema: 'governance-metadata',
+      } as unknown as PipelineScheduleRegistry;
+
+      saveScheduleRegistry(registry, { rootDir });
+
+      const raw = JSON.parse(
+        fs.readFileSync(path.join(rootDir, 'active/shared/runtime/pipeline-schedules.json'), 'utf8')
+      ) as Record<string, unknown>;
+      expect(raw).toEqual({ version: '1.0', schedules: [] });
     });
   });
 });

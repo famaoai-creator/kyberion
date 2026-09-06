@@ -1,8 +1,9 @@
-import { pathResolver } from './path-resolver.js';
+import { loadAuthorityRoleIndex } from './authority-role-registry.js';
 import { secretGuard } from './secret-guard.js';
 import { loadSurfaceManifest, loadSurfaceState } from './surface-runtime.js';
 import { getServicePresetPolicy } from './service-preset-policy.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { getServicePresetRecord } from './service-preset-registry.js';
+import { getServiceEndpointRecord } from './service-endpoint-registry.js';
 import {
   listSurfaceAsyncRequests,
   listSurfaceNotifications,
@@ -69,15 +70,6 @@ export interface SurfaceLauncherRecommendation {
 export interface SurfaceDoctorSummary {
   manifestId: string;
   counts: { must: number; should: number; nice: number };
-}
-
-function readJsonSafe<T>(absPath: string): T | null {
-  try {
-    if (!safeExistsSync(absPath)) return null;
-    return loadJson<T>(absPath);
-  } catch {
-    return null;
-  }
 }
 
 function isProcessRunning(pid: number | undefined): boolean {
@@ -152,29 +144,15 @@ function surfaceNextCommand(
   row: Pick<SurfaceDirectoryRow, 'auth_requirement' | 'auth_status' | 'runtime_status' | 'id'>
 ): string {
   if (row.auth_requirement !== 'host-managed' && row.auth_status === 'missing') {
-    return 'pnpm surfaces:setup';
+    return 'pnpm surfaces setup';
   }
   if (row.runtime_status === 'stale') {
-    return `pnpm surfaces:repair -- --surface ${row.id}`;
+    return `pnpm surfaces repair -- --surface ${row.id}`;
   }
   if (row.runtime_status === 'stopped') {
-    return `pnpm surfaces:start --surface ${row.id}`;
+    return `pnpm surfaces start -- --surface ${row.id}`;
   }
-  return `pnpm surfaces:status -- --surface ${row.id}`;
-}
-
-function loadAuthorityRoleIndex(): Record<string, any> {
-  const payload = readJsonSafe<{ authority_roles?: Record<string, any> }>(
-    pathResolver.rootResolve('knowledge/product/governance/authority-role-index.json')
-  );
-  return payload?.authority_roles || {};
-}
-
-function loadServiceEndpointCatalog(): Record<string, any> {
-  const payload = readJsonSafe<{ services?: Record<string, any> }>(
-    pathResolver.rootResolve('knowledge/product/orchestration/service-endpoints.json')
-  );
-  return payload?.services || {};
+  return `pnpm surfaces status -- --surface ${row.id}`;
 }
 
 function inspectSurfaceAuthReadOnly(
@@ -193,13 +171,12 @@ function inspectSurfaceAuthReadOnly(
     };
   }
 
-  const resolvedPresetPath = pathResolver.rootResolve(presetPath);
-  const preset = readJsonSafe<Record<string, any>>(resolvedPresetPath);
-  const policy = getServicePresetPolicy(preset);
-  const strategy = (policy.auth_strategy || 'none').toLowerCase();
   const serviceId =
     typeof definition.service_id === 'string' ? definition.service_id : String(definition.id || '');
-  const endpoint = loadServiceEndpointCatalog()[serviceId];
+  const preset = getServicePresetRecord(serviceId, presetPath);
+  const policy = getServicePresetPolicy(preset);
+  const strategy = (policy.auth_strategy || 'none').toLowerCase();
+  const endpoint = getServiceEndpointRecord(serviceId);
   const suffixes = endpoint?.credential_suffixes || {};
   const requiredSecrets = Array.from(
     new Set(
@@ -321,7 +298,7 @@ export function getSurfaceScenarioGuide(): SurfaceScenarioGuide[] {
         'Use when the operator wants natural-language requests to arrive through Slack or another message channel.',
       surface_ids: ['slack-bridge', 'imessage-bridge', 'telegram-bridge', 'discord-bridge'],
       guidance:
-        'Auth readiness comes before runtime repair. Start with pnpm surfaces:setup, then reconcile the specific bridge.',
+        'Auth readiness comes before runtime repair. Start with pnpm surfaces setup, then reconcile the specific bridge.',
     },
     {
       id: 'operator-control',
@@ -465,8 +442,8 @@ export function buildSurfaceLauncherRecommendations(
         chronosReadiness === 'ready'
           ? 'pnpm chronos:dev'
           : chronosReadiness === 'needs_setup'
-            ? chronos?.next_command || 'pnpm surfaces:reconcile'
-            : 'pnpm surfaces:status',
+            ? chronos?.next_command || 'pnpm surfaces reconcile'
+            : 'pnpm surfaces status',
     },
     {
       id: 'voice-first-win',
@@ -500,8 +477,8 @@ export function buildSurfaceLauncherRecommendations(
             : 'Slack is disabled or unavailable in the current manifest.',
       suggestedCommand:
         messagingReadiness === 'ready'
-          ? 'pnpm surfaces:start --surface slack-bridge'
-          : 'pnpm surfaces:setup',
+          ? 'pnpm surfaces start -- --surface slack-bridge'
+          : 'pnpm surfaces setup',
     },
   ];
 }
@@ -522,7 +499,7 @@ export function buildSurfaceLauncherNextActions(params: {
         title: 'Repair surface authentication',
         reason: `${summary.auth_missing} surfaces are blocked by missing auth or session setup.`,
         next_action_type: 'bootstrap_environment',
-        suggested_command: 'pnpm surfaces:setup',
+        suggested_command: 'pnpm surfaces setup',
       })
     );
   }
@@ -534,7 +511,7 @@ export function buildSurfaceLauncherNextActions(params: {
         title: 'Repair stale runtimes',
         reason: `${staleRows.length} surfaces have stale runtime records and should be reconciled before use.`,
         next_action_type: 'run_command',
-        suggested_command: 'pnpm surfaces:reconcile',
+        suggested_command: 'pnpm surfaces reconcile',
       })
     );
   }
@@ -559,7 +536,7 @@ export function buildSurfaceLauncherNextActions(params: {
         title: 'Inspect the current surface status',
         reason: 'Surfaces look ready right now. Re-check before switching workflows.',
         next_action_type: 'inspect_artifact',
-        suggested_command: 'pnpm surfaces:status',
+        suggested_command: 'pnpm surfaces status',
       })
     );
   }

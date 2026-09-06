@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readTextFile } from '@agent/core/foundation';
 import {
   pathResolver,
   safeMkdir,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
   type ProviderCapability,
 } from '@agent/core';
@@ -48,6 +50,21 @@ function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCa
 }
 
 describe('run_baseline_check', () => {
+  it('uses the canonical readiness loader for the runtime config', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/run_baseline_check.ts'));
+    expect(source).toContain('loadServiceConnectionReadinessConfig()');
+    expect(source).not.toContain('const raw = safeReadFile(configPath');
+  });
+
+  it('keeps the baseline CLI exit boundary inside the shared harness', () => {
+    const source = readTextFile(pathResolver.rootResolve('scripts/run_baseline_check.ts'));
+
+    expect(source).not.toContain('process.exitCode');
+    expect(source).toContain("new ScriptExitError(1, '', true, report)");
+    expect(source).toContain('runBaselineCheckCli = defineScript');
+    expect(source).toContain('readJsonLines');
+  });
+
   it('marks readiness config as degraded when parse fails', () => {
     const result = parseConnectionReadinessConfig('{broken-json', 'fixture.json');
 
@@ -165,6 +182,15 @@ describe('run_baseline_check', () => {
       JSON.stringify({ timestamp: new Date(now - 60 * 60 * 1000).toISOString() })
     );
     expect(readAuditLedgerFreshness(auditDir, now)).toMatchObject({ fresh: true, reason: 'fresh' });
+    const target = `${auditDir}/audit-target.jsonl`;
+    const linked = `${auditDir}/audit-2026-08-10.jsonl`;
+    safeWriteFile(target, JSON.stringify({ timestamp: new Date(now).toISOString() }));
+    safeSymlinkSync(target, linked);
+    safeRmSync(`${auditDir}/audit-2026-08-09.jsonl`, { force: true });
+    expect(readAuditLedgerFreshness(auditDir, now)).toMatchObject({
+      fresh: false,
+      reason: 'missing',
+    });
     safeRmSync(auditDir, { recursive: true, force: true });
   });
 
@@ -448,27 +474,14 @@ describe('run_baseline_check', () => {
     it('shouldEmitDailyOpsAlert gates per key per UTC day and fails open on bad markers', () => {
       expect(shouldEmitDailyOpsAlert(null, 'scheduler_alive', NOW)).toBe(true);
       expect(
-        shouldEmitDailyOpsAlert(
-          JSON.stringify({ scheduler_alive: '2026-08-08' }),
-          'scheduler_alive',
-          NOW
-        )
+        shouldEmitDailyOpsAlert({ scheduler_alive: '2026-08-08' }, 'scheduler_alive', NOW)
       ).toBe(false);
       expect(
-        shouldEmitDailyOpsAlert(
-          JSON.stringify({ scheduler_alive: '2026-08-07' }),
-          'scheduler_alive',
-          NOW
-        )
+        shouldEmitDailyOpsAlert({ scheduler_alive: '2026-08-07' }, 'scheduler_alive', NOW)
       ).toBe(true);
       expect(
-        shouldEmitDailyOpsAlert(
-          JSON.stringify({ failed_schedules: '2026-08-08' }),
-          'scheduler_alive',
-          NOW
-        )
+        shouldEmitDailyOpsAlert({ failed_schedules: '2026-08-08' }, 'scheduler_alive', NOW)
       ).toBe(true);
-      expect(shouldEmitDailyOpsAlert('{broken', 'scheduler_alive', NOW)).toBe(true);
     });
   });
 });

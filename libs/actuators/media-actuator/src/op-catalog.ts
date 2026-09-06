@@ -1,9 +1,10 @@
-import { withCatalogInputContract } from '@agent/core';
+import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
 
 // Self-described operation catalog for media-actuator.
 // These entries mirror the operation switches in media-action-{capture,transform,apply}.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 const MEDIA_MIGRATION_SCHEMA: InputSchema = {
@@ -334,7 +335,7 @@ const APPLY_OPS = [
   'xlsx_render',
 ] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const description = MEDIA_EXTRA_CONTRACTS[op]
     ? {
         op,
@@ -346,7 +347,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   return withCatalogInputContract('media', op, kind, description);
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

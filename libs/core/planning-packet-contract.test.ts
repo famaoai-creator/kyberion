@@ -35,4 +35,17 @@ describe('planning-packet-contract', () => {
     expect(extraction.planningPackets).toHaveLength(0);
     expect(extraction.planningPacketErrors[0]).toContain('validation failed');
   });
+
+  it('rejects prototype-bearing planning packets before schema processing', () => {
+    const extraction = extractPlanningPacketBlocks(
+      [
+        '```planning_packet',
+        '{"mission_id":"MSN-1","summary":"Plan","plan_markdown":"# PLAN","next_tasks":[],"__proto__":{"summary":"spoofed"}}',
+        '```',
+      ].join('\n')
+    );
+
+    expect(extraction.planningPackets).toHaveLength(0);
+    expect(extraction.planningPacketErrors[0]).toContain('dangerous JSON key');
+  });
 });

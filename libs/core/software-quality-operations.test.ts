@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from './path-resolver.js';
 import { registerReasoningBackend, resetReasoningBackend } from './reasoning-backend.js';
-import { safeRmSync } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { SoftwareQualityContract, TestInventory } from './software-quality.js';
 import {
   compileTestInventoryToAdf,
@@ -10,6 +10,8 @@ import {
   deriveTestInventory,
   dispatchTestInventory,
   evaluateQualityEnforcement,
+  parseDefectTransitionEvent,
+  parseReasoningItems,
   recordDefectCandidate,
   transitionDefect,
 } from './software-quality-operations.js';
@@ -93,6 +95,16 @@ describe('software quality operations', () => {
     expect(
       result.items.filter((item) => item.viewpoint_ids.includes('security.trust-boundary'))
     ).toHaveLength(1);
+  });
+
+  it('rejects array and dangerous-key reasoning inventory responses', () => {
+    expect(parseReasoningItems('[{"items":[]}]')).toEqual([]);
+    expect(parseReasoningItems('{"items":[],"meta":{"__proto__":{}}}')).toEqual([]);
+    expect(
+      parseReasoningItems(
+        '{"items":[{"item_id":"LLM-1","title":"Invalid","viewpoint_ids":["security"],"risk_level":"high","expected_result":"blocked","execution_mode":"safe_auto","unexpected":true}]}'
+      )
+    ).toEqual([]);
   });
 
   it('dispatches safe tests and separates approval, manual, and prohibited work', async () => {
@@ -250,6 +262,49 @@ describe('software quality operations', () => {
       filePath: defectPath,
     });
     expect(defectCurrentStatus('DEF-1', defectPath)).toBe('accepted_risk');
+  });
+
+  it('accepts only well-formed defect transition events', () => {
+    const valid = {
+      defect_id: 'DEF-2',
+      from: null,
+      to: 'candidate',
+      actor_id: 'agent:test',
+      actor_type: 'ai_agent',
+      reason: 'Observed failure',
+      evidence_refs: ['trace:2'],
+      occurred_at: '2026-09-01T00:00:00.000Z',
+    };
+    expect(parseDefectTransitionEvent(valid)).toEqual(valid);
+    expect(parseDefectTransitionEvent({ ...valid, evidence_refs: [42] })).toBeUndefined();
+    expect(parseDefectTransitionEvent(['not-an-event'])).toBeUndefined();
+  });
+
+  it('skips malformed JSONL events without hiding valid defect state', () => {
+    safeWriteFile(
+      defectPath,
+      [
+        '{not-json',
+        '{"defect_id":"DEF-3","from":null,"to":"candidate","actor_id":"agent:test","actor_type":"ai_agent","reason":"bad","evidence_refs":[],"occurred_at":"2026-09-01T00:00:00.000Z","meta":{"__proto__":{}}}',
+        JSON.stringify({
+          defect_id: 'DEF-3',
+          from: null,
+          to: 'candidate',
+          actor_id: 'agent:test',
+          actor_type: 'ai_agent',
+          reason: 'Observed failure',
+          evidence_refs: [],
+          occurred_at: '2026-09-01T00:00:00.000Z',
+        }),
+      ].join('\n') + '\n'
+    );
+    expect(defectCurrentStatus('DEF-3', defectPath)).toBe('candidate');
+  });
+
+  it('treats a directory at the defect event path as an empty history', () => {
+    safeMkdir(defectPath, { recursive: true });
+
+    expect(defectCurrentStatus('DEF-DIRECTORY', defectPath)).toBeNull();
   });
 
   it('graduates enforcement from report-only through warn to blocking', () => {

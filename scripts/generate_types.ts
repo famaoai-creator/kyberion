@@ -1,8 +1,6 @@
 import { compileFromFile } from 'json-schema-to-typescript';
-import { pathResolver } from '@agent/core';
-import { safeWriteFile } from '@agent/core/secure-io';
-import { withExecutionContext } from '@agent/core/governance';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 interface GenerationTarget {
   schemaPath: string;
@@ -168,7 +166,8 @@ const targets: GenerationTarget[] = [
   },
 ];
 
-async function main(): Promise<void> {
+async function render(): Promise<GeneratedFile[]> {
+  const files: GeneratedFile[] = [];
   for (const target of targets) {
     const schemaPath = pathResolver.rootResolve(target.schemaPath);
     const outputPath = pathResolver.rootResolve(target.outputPath);
@@ -186,17 +185,15 @@ async function main(): Promise<void> {
         singleQuote: true,
       },
     });
-    withExecutionContext('ecosystem_architect', () => safeWriteFile(outputPath, compiled));
-    console.log(`[generate:types] ${target.outputPath}`);
+    files.push({ path: outputPath, content: compiled });
   }
+  return files;
 }
 
-export const runGenerateTypes = defineScript({
-  name: 'generate:types',
-  flags: [],
-  run() {
-    return main();
-  },
+export const runGenerateTypes = defineGenerator({
+  id: 'types',
+  outputs: targets.map((target) => pathResolver.rootResolve(target.outputPath)),
+  render,
 });
 
 if (

@@ -1,7 +1,7 @@
 # Kyberion Capabilities Guide
 
 Total Actuators: 32
-Last updated: 2026-08-26
+Last updated: 2026-08-31
 
 This guide is generated from `libs/actuators/*/manifest.json` (actuator table) and `knowledge/product/orchestration/actuator-op-discovery.json` (op tables, sourced from each actuator describeOps). Human-readable counterpart to `global_actuator_index.json`.
 
@@ -27,7 +27,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `ios-actuator`               | simctl-driven iOS Simulator Actuator                                                                                                                                                                                                                                                                                                                       | 1.1.0   |     1     | `pipeline`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `bin:xcodebuild, bin:xcrun, os:darwin`                                                     | `knowledge/product/schemas/mobile-device-pipeline.schema.json`      | `libs/actuators/ios-actuator`               |
 | `media-actuator`             | Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows.                                                                                                                                                                                                  | 1.2.0   |     1     | `pipeline`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `-`                                                                                        | `knowledge/product/schemas/media-pipeline.schema.json`              | `libs/actuators/media-actuator`             |
 | `media-generation-actuator`  | Generative image, video, music, and screen capture actuator                                                                                                                                                                                                                                                                                                | 1.2.0   |    12     | `capture_focused_window, capture_screen, collect_generation_artifact, generate_image, generate_music, generate_video, get_generation_job, pipeline, record_screen, run_workflow, submit_generation, wait_generation_job`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | `-`                                                                                        | `knowledge/product/schemas/media-generation-action.schema.json`     | `libs/actuators/media-generation-actuator`  |
-| `meeting-actuator`           | Abstracted online meeting bridge (Zoom, Teams, Google Meet)                                                                                                                                                                                                                                                                                                | 1.1.0   |     6     | `chat, join, leave, listen, speak, status`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `-`                                                                                        | `knowledge/product/schemas/meeting-action.schema.json`              | `libs/actuators/meeting-actuator`           |
+| `meeting-actuator`           | Abstracted online meeting bridge (Zoom, Teams, Google Meet)                                                                                                                                                                                                                                                                                                | 1.2.0   |     6     | `chat, join, leave, listen, speak, status`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `-`                                                                                        | `knowledge/product/schemas/meeting-action.schema.json`              | `libs/actuators/meeting-actuator`           |
 | `meeting-browser-driver`     | Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Exposes the meeting-browser-driver join_backend label and writes captured audio to an AudioBus.                                                                                                                                                               | 1.0.0   |     2     | `join, leave`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `-`                                                                                        | `-`                                                                 | `libs/actuators/meeting-browser-driver`     |
 | `modeling-actuator`          | Architectural Analysis and ADF Transformation Engine                                                                                                                                                                                                                                                                                                       | 1.0.0   |     2     | `pipeline, reconcile`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `-`                                                                                        | `knowledge/product/schemas/modeling-pipeline.schema.json`           | `libs/actuators/modeling-actuator`          |
 | `network-actuator`           | ADF-driven secure fetch and A2A transport pipeline engine                                                                                                                                                                                                                                                                                                  | 2.2.0   |     1     | `pipeline`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `-`                                                                                        | `knowledge/product/schemas/network-pipeline.schema.json`            | `libs/actuators/network-actuator`           |
@@ -42,150 +42,152 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `vision-actuator`            | Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator                                                                                                                                                                                                                                                  | 1.4.0   |     3     | `describe_image, inspect_image, ocr_image`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `-`                                                                                        | `knowledge/product/schemas/vision-action.schema.json`               | `libs/actuators/vision-actuator`            |
 | `voice-actuator`             | Governed local voice generation actuator with native playback and artifact fallback                                                                                                                                                                                                                                                                        | 1.6.0   |    12     | `collect_and_register_voice_profile, collect_voice_samples, generate_voice, health, list_audio_routes, list_voices, probe_audio_route, record_verify_repair_voice_sample, record_voice_sample, register_voice_profile, speak_local, verify_tts_loopback`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | `-`                                                                                        | `knowledge/product/schemas/voice-action.schema.json`                | `libs/actuators/voice-actuator`             |
 | `wisdom-actuator`            | Knowledge-tier search, injection, import/export, and decision-support operations                                                                                                                                                                                                                                                                           | 1.6.0   |    81     | `a2a_fanout, a2a_roleplay, adjust_proposal, array_count, audit_speaker_fairness, capture_intuition, compute_readiness_matrix, conduct_1on1, conduct_1on_1, counterparty_roleplay, cross_critique, curate_background_review, curation_report, decompose_into_tasks, deploy_release, derive_test_inventory, distill, emit_dissent_log, escalate_for_review, evaluate_architecture_ready, evaluate_customer_signoff, evaluate_decision_rights_approval, evaluate_ensemble_convergence, evaluate_qa_ready, evaluate_requirements_completeness, evaluate_simulation_quality, evaluate_task_plan_ready, execute_self_action_items, execute_task_plan, extract_action_items, extract_design_spec, extract_dissent_signals, extract_requirements, extract_test_plan, find_slides_by_owner, fork_branches, generate_facilitation_script, generate_reminder_message, glob_files, history_search, if, inject_prior_knowledge, json_query, knowledge_export, knowledge_import, knowledge_inject, knowledge_read, knowledge_search, knowledge_validation_sweep, log, peer_advice, perspective_fanout, pptx_diff, propose_tool_calls, query, react_loop, read_file, read_json, reasoning, reasoning_loop, recommend, regex_extract, regex_replace, register_presentation_preference_profile, render_hypothesis_report, resolve_hypothesis_conflict, shell, simulate_all, simulate_all_ensemble, stakeholder_grid_sort, synthesize_counterparty_persona, task_plan_to_next_tasks, tool_use, track_pending_action_items, transcribe_audio, typed_cross_critique, uncertainty_gate, while, write_artifact, write_file, yaml_update` | `-`                                                                                        | `knowledge/product/schemas/wisdom-action.schema.json`               | `libs/actuators/wisdom-actuator`            |
-| `working-memory-actuator`    | Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>').                                                                                                                                         | 1.1.0   |    14     | `add-action-item, build-index, complete-action-item, daily-open, list, nominate-promotion, note, read, run-gc, set-now, todo-add, todo-done, todo-rollover, weekly-open`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | `-`                                                                                        | `knowledge/product/schemas/working-memory-action.schema.json`       | `libs/actuators/working-memory-actuator`    |
+| `working-memory-actuator`    | Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>').                                                                                                                                         | 1.2.0   |    15     | `add-action-item, build-index, complete-action-item, consolidation-status, daily-open, list, nominate-promotion, note, read, run-gc, set-now, todo-add, todo-done, todo-rollover, weekly-open`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `-`                                                                                        | `knowledge/product/schemas/working-memory-action.schema.json`       | `libs/actuators/working-memory-actuator`    |
 
 ### Capture ops (type: capture)
 
-| Op                                 | Actuators                                              |
-| :--------------------------------- | :----------------------------------------------------- |
-| `a2a_poll`                         | network                                                |
-| `action_trail`                     | browser                                                |
-| `adb_health_check`                 | android                                                |
-| `android_cli_describe`             | android                                                |
-| `android_cli_docs_search`          | android                                                |
-| `android_cli_health_check`         | android                                                |
-| `android_cli_layout`               | android                                                |
-| `android_cli_screen_resolve`       | android                                                |
-| `audit_verify`                     | system                                                 |
-| `baseline_check`                   | system                                                 |
-| `capture_focused_window`           | media-generation                                       |
-| `capture_foreground_activity`      | android                                                |
-| `capture_runtime_session_handoff`  | android, ios                                           |
-| `capture_screen`                   | media-generation                                       |
-| `chrome_tab_list`                  | system                                                 |
-| `cli_health_check`                 | system                                                 |
-| `clipboard_read`                   | system                                                 |
-| `collect_artifacts`                | system                                                 |
-| `console`                          | browser                                                |
-| `content`                          | browser                                                |
-| `control_media_devices`            | system                                                 |
-| `cost_report`                      | system                                                 |
-| `describe_image`                   | vision                                                 |
-| `discover_capabilities`            | code, orchestrator                                     |
-| `discover_skills`                  | code, orchestrator                                     |
-| `distill_dom`                      | browser                                                |
-| `document_digest`                  | media                                                  |
-| `docx_extract`                     | media                                                  |
-| `evaluate`                         | browser                                                |
-| `exec`                             | system                                                 |
-| `exists`                           | file                                                   |
-| `export_session_handoff`           | browser                                                |
-| `extract_text_ref`                 | browser                                                |
-| `extract_ui_tree`                  | android                                                |
-| `fetch`                            | network                                                |
-| `get`                              | secret                                                 |
-| `get_focused_input`                | system                                                 |
-| `get_screen_size`                  | system                                                 |
-| `get_video_composition_job_status` | video-composition                                      |
-| `get_video_composition_queue`      | video-composition                                      |
-| `glob_files`                       | code, modeling, system, wisdom                         |
-| `goto`                             | browser                                                |
-| `harness`                          | service                                                |
-| `health`                           | agent, voice                                           |
-| `history_search`                   | wisdom                                                 |
-| `inspect_image`                    | vision                                                 |
-| `json_read`                        | media                                                  |
-| `knowledge_read`                   | wisdom                                                 |
-| `knowledge_search`                 | wisdom                                                 |
-| `list`                             | agent, artifact, file, process, secret, terminal       |
-| `list_audio_routes`                | voice                                                  |
-| `list_calendars`                   | calendar                                               |
-| `list_capabilities`                | system                                                 |
-| `list_displays`                    | system                                                 |
-| `list_events`                      | calendar                                               |
-| `list_incidents`                   | system                                                 |
-| `list_input_devices`               | system                                                 |
-| `list_knowledge`                   | system                                                 |
-| `list_manifests`                   | agent                                                  |
-| `list_media_devices`               | system                                                 |
-| `list_missions`                    | system                                                 |
-| `list_pending`                     | approval                                               |
-| `list_projects`                    | system                                                 |
-| `list_running_apps`                | system                                                 |
-| `list_runtimes`                    | agent                                                  |
-| `list_service_runtimes`            | system                                                 |
-| `list_terminal_sessions`           | terminal                                               |
-| `list_tool_runtimes`               | system                                                 |
-| `list_video_composition_templates` | video-composition                                      |
-| `list_voices`                      | voice                                                  |
-| `list-surfaces`                    | process                                                |
-| `listen`                           | meeting                                                |
-| `load`                             | approval                                               |
-| `macos_automation_probe`           | system                                                 |
-| `network`                          | browser                                                |
-| `ocr_image`                        | vision                                                 |
-| `parse_document`                   | ingest                                                 |
-| `passkey_credentials`              | browser                                                |
-| `passkey_events`                   | browser                                                |
-| `pdf_delete_pages`                 | media                                                  |
-| `pdf_encrypt`                      | media                                                  |
-| `pdf_extract`                      | media                                                  |
-| `pdf_extract_range`                | media                                                  |
-| `pdf_merge`                        | media                                                  |
-| `pdf_metadata`                     | media                                                  |
-| `pdf_remove_password`              | media                                                  |
-| `pdf_reorder`                      | media                                                  |
-| `pdf_rotate`                       | media                                                  |
-| `pdf_split`                        | media                                                  |
-| `pdf_stamp`                        | media                                                  |
-| `poll`                             | terminal                                               |
-| `poll_terminal`                    | terminal                                               |
-| `pptx_extract`                     | media                                                  |
-| `pptx_slide_text`                  | media                                                  |
-| `preset`                           | service                                                |
-| `probe`                            | system                                                 |
-| `probe_active_profile`             | system                                                 |
-| `probe_audio_route`                | voice                                                  |
-| `pulse_status`                     | system                                                 |
-| `query`                            | wisdom                                                 |
-| `query_elements`                   | browser                                                |
-| `query_freebusy`                   | calendar                                               |
-| `read`                             | file                                                   |
-| `read_file`                        | code, file, modeling, system, wisdom                   |
-| `read_json`                        | android, artifact, file, ios, modeling, system, wisdom |
-| `read_text_file`                   | android, ios                                           |
-| `reconcile_config_fallbacks`       | system                                                 |
-| `reconcile_unclassified_errors`    | system                                                 |
-| `reconcile_unhandled_intents`      | system                                                 |
-| `record_screen`                    | media-generation, system                               |
-| `run_tests`                        | code                                                   |
-| `sample_traces`                    | system                                                 |
-| `scan_directory`                   | system                                                 |
-| `screenshot`                       | browser, system                                        |
-| `search`                           | file                                                   |
-| `semgrep_scan`                     | code                                                   |
-| `session_health`                   | browser                                                |
-| `shell`                            | code, modeling, network, system, wisdom                |
-| `simctl_health_check`              | ios                                                    |
-| `snapshot`                         | agent, browser                                         |
-| `stat`                             | file                                                   |
-| `status`                           | meeting, process                                       |
-| `summarize_memory_promotion_queue` | system                                                 |
-| `summarize_task_model_routing`     | system                                                 |
-| `sync_source`                      | ingest                                                 |
-| `tabs`                             | browser                                                |
-| `tail`                             | file                                                   |
-| `test_camera_injection`            | system                                                 |
-| `test_screen_mp4_roundtrip`        | system                                                 |
-| `test_screen_stream`               | system                                                 |
-| `title`                            | browser                                                |
-| `transcribe`                       | voice                                                  |
-| `transcribe_voice_sample`          | voice                                                  |
-| `url`                              | browser                                                |
-| `verify_anchor`                    | blockchain                                             |
-| `vision_consult`                   | system                                                 |
-| `window_list`                      | system                                                 |
-| `xlsx_extract`                     | media                                                  |
+| Op                                 | Actuators                                                        |
+| :--------------------------------- | :--------------------------------------------------------------- |
+| `a2a_poll`                         | network                                                          |
+| `action_trail`                     | browser                                                          |
+| `adb_health_check`                 | android                                                          |
+| `android_cli_describe`             | android                                                          |
+| `android_cli_docs_search`          | android                                                          |
+| `android_cli_health_check`         | android                                                          |
+| `android_cli_layout`               | android                                                          |
+| `android_cli_screen_resolve`       | android                                                          |
+| `audit_verify`                     | system                                                           |
+| `baseline_check`                   | system                                                           |
+| `capture_focused_window`           | media-generation                                                 |
+| `capture_foreground_activity`      | android                                                          |
+| `capture_runtime_session_handoff`  | android, ios                                                     |
+| `capture_screen`                   | media-generation                                                 |
+| `check_consent`                    | meeting                                                          |
+| `chrome_tab_list`                  | system                                                           |
+| `cli_health_check`                 | system                                                           |
+| `clipboard_read`                   | system                                                           |
+| `collect_artifacts`                | system                                                           |
+| `console`                          | browser                                                          |
+| `consolidation-status`             | working-memory                                                   |
+| `content`                          | browser                                                          |
+| `control_media_devices`            | system                                                           |
+| `cost_report`                      | system                                                           |
+| `describe_image`                   | vision                                                           |
+| `discover_capabilities`            | code, orchestrator                                               |
+| `discover_skills`                  | code, orchestrator                                               |
+| `distill_dom`                      | browser                                                          |
+| `document_digest`                  | media                                                            |
+| `docx_extract`                     | media                                                            |
+| `evaluate`                         | browser                                                          |
+| `exec`                             | system                                                           |
+| `exists`                           | file                                                             |
+| `export_session_handoff`           | browser                                                          |
+| `extract_text_ref`                 | browser                                                          |
+| `extract_ui_tree`                  | android                                                          |
+| `fetch`                            | network                                                          |
+| `get`                              | secret                                                           |
+| `get_focused_input`                | system                                                           |
+| `get_screen_size`                  | system                                                           |
+| `get_video_composition_job_status` | video-composition                                                |
+| `get_video_composition_queue`      | video-composition                                                |
+| `glob_files`                       | code, modeling, system, wisdom                                   |
+| `goto`                             | browser                                                          |
+| `harness`                          | service                                                          |
+| `health`                           | agent, voice                                                     |
+| `history_search`                   | wisdom                                                           |
+| `inspect_image`                    | vision                                                           |
+| `json_read`                        | media                                                            |
+| `knowledge_read`                   | wisdom                                                           |
+| `knowledge_search`                 | wisdom                                                           |
+| `list`                             | agent, artifact, file, process, secret, terminal, working-memory |
+| `list_audio_routes`                | voice                                                            |
+| `list_calendars`                   | calendar                                                         |
+| `list_capabilities`                | system                                                           |
+| `list_displays`                    | system                                                           |
+| `list_events`                      | calendar                                                         |
+| `list_incidents`                   | system                                                           |
+| `list_input_devices`               | system                                                           |
+| `list_knowledge`                   | system                                                           |
+| `list_manifests`                   | agent                                                            |
+| `list_media_devices`               | system                                                           |
+| `list_missions`                    | system                                                           |
+| `list_pending`                     | approval                                                         |
+| `list_projects`                    | system                                                           |
+| `list_running_apps`                | system                                                           |
+| `list_runtimes`                    | agent                                                            |
+| `list_service_runtimes`            | system                                                           |
+| `list_terminal_sessions`           | terminal                                                         |
+| `list_tool_runtimes`               | system                                                           |
+| `list_video_composition_templates` | video-composition                                                |
+| `list_voices`                      | voice                                                            |
+| `list-surfaces`                    | process                                                          |
+| `listen`                           | meeting                                                          |
+| `load`                             | approval                                                         |
+| `macos_automation_probe`           | system                                                           |
+| `network`                          | browser                                                          |
+| `ocr_image`                        | vision                                                           |
+| `parse_document`                   | ingest                                                           |
+| `passkey_credentials`              | browser                                                          |
+| `passkey_events`                   | browser                                                          |
+| `pdf_delete_pages`                 | media                                                            |
+| `pdf_encrypt`                      | media                                                            |
+| `pdf_extract`                      | media                                                            |
+| `pdf_extract_range`                | media                                                            |
+| `pdf_merge`                        | media                                                            |
+| `pdf_metadata`                     | media                                                            |
+| `pdf_remove_password`              | media                                                            |
+| `pdf_reorder`                      | media                                                            |
+| `pdf_rotate`                       | media                                                            |
+| `pdf_split`                        | media                                                            |
+| `pdf_stamp`                        | media                                                            |
+| `poll`                             | terminal                                                         |
+| `poll_terminal`                    | terminal                                                         |
+| `pptx_extract`                     | media                                                            |
+| `pptx_slide_text`                  | media                                                            |
+| `preset`                           | service                                                          |
+| `probe`                            | system                                                           |
+| `probe_active_profile`             | system                                                           |
+| `probe_audio_route`                | voice                                                            |
+| `pulse_status`                     | system                                                           |
+| `query`                            | wisdom                                                           |
+| `query_elements`                   | browser                                                          |
+| `query_freebusy`                   | calendar                                                         |
+| `read`                             | file, working-memory                                             |
+| `read_file`                        | code, file, modeling, system, wisdom                             |
+| `read_json`                        | android, artifact, file, ios, modeling, system, wisdom           |
+| `read_text_file`                   | android, ios                                                     |
+| `reconcile_config_fallbacks`       | system                                                           |
+| `reconcile_unclassified_errors`    | system                                                           |
+| `reconcile_unhandled_intents`      | system                                                           |
+| `record_screen`                    | media-generation, system                                         |
+| `run_tests`                        | code                                                             |
+| `sample_traces`                    | system                                                           |
+| `scan_directory`                   | system                                                           |
+| `screenshot`                       | browser, system                                                  |
+| `search`                           | file                                                             |
+| `semgrep_scan`                     | code                                                             |
+| `session_health`                   | browser                                                          |
+| `shell`                            | code, modeling, network, system, wisdom                          |
+| `simctl_health_check`              | ios                                                              |
+| `snapshot`                         | agent, browser                                                   |
+| `stat`                             | file                                                             |
+| `status`                           | meeting, process                                                 |
+| `summarize_memory_promotion_queue` | system                                                           |
+| `summarize_task_model_routing`     | system                                                           |
+| `sync_source`                      | ingest                                                           |
+| `tabs`                             | browser                                                          |
+| `tail`                             | file                                                             |
+| `test_camera_injection`            | system                                                           |
+| `test_screen_mp4_roundtrip`        | system                                                           |
+| `test_screen_stream`               | system                                                           |
+| `title`                            | browser                                                          |
+| `transcribe`                       | voice                                                            |
+| `transcribe_voice_sample`          | voice                                                            |
+| `url`                              | browser                                                          |
+| `verify_anchor`                    | blockchain                                                       |
+| `vision_consult`                   | system                                                           |
+| `window_list`                      | system                                                           |
+| `xlsx_extract`                     | media                                                            |
 
 ### Transform ops (type: transform)
 
@@ -265,6 +267,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `a2a_roleplay`                             | wisdom                                                                |
 | `a2a_send`                                 | network                                                               |
 | `activate_application`                     | system                                                                |
+| `add-action-item`                          | working-memory                                                        |
 | `adjust_proposal`                          | wisdom                                                                |
 | `anchor_mission`                           | blockchain                                                            |
 | `anchor_trust`                             | blockchain                                                            |
@@ -282,6 +285,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `authenticate_with_passkey`                | android                                                               |
 | `await_video_composition_job`              | video-composition                                                     |
 | `boot_simulator`                           | ios                                                                   |
+| `build-index`                              | working-memory                                                        |
 | `cancel_video_composition_job`             | video-composition                                                     |
 | `capture_intuition`                        | wisdom                                                                |
 | `capture_screen`                           | android, ios                                                          |
@@ -297,6 +301,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `collect_generation_artifact`              | media-generation                                                      |
 | `collect_voice_samples`                    | voice                                                                 |
 | `commit`                                   | ingest                                                                |
+| `complete-action-item`                     | working-memory                                                        |
 | `compute_readiness_matrix`                 | wisdom                                                                |
 | `conduct_1on_1`                            | meeting, wisdom                                                       |
 | `conduct_1on1`                             | wisdom                                                                |
@@ -311,6 +316,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `curate_background_review`                 | wisdom                                                                |
 | `curation_report`                          | wisdom                                                                |
 | `d2_render`                                | media                                                                 |
+| `daily-open`                               | working-memory                                                        |
 | `decide`                                   | approval                                                              |
 | `decompose_into_tasks`                     | orchestrator, wisdom                                                  |
 | `delegate`                                 | agent                                                                 |
@@ -389,6 +395,8 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `mouse_move`                               | system                                                                |
 | `move`                                     | file                                                                  |
 | `native_tts_speak`                         | system                                                                |
+| `nominate-promotion`                       | working-memory                                                        |
+| `note`                                     | working-memory                                                        |
 | `notify`                                   | system                                                                |
 | `oauth`                                    | service                                                               |
 | `open_deep_link`                           | android, ios                                                          |
@@ -432,6 +440,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `run_applescript`                          | system                                                                |
 | `run_execution_plan_set`                   | orchestrator                                                          |
 | `run_workflow`                             | media-generation                                                      |
+| `run-gc`                                   | working-memory                                                        |
 | `save_brand_to_confidential`               | media                                                                 |
 | `scroll`                                   | browser, system                                                       |
 | `scroll_ref`                               | browser                                                               |
@@ -439,6 +448,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `send_from_file`                           | email                                                                 |
 | `set_passkey_presence`                     | browser                                                               |
 | `set_passkey_user_verified`                | browser                                                               |
+| `set-now`                                  | working-memory                                                        |
 | `shell_command`                            | terminal                                                              |
 | `shutdown`                                 | agent                                                                 |
 | `shutdown_all`                             | agent                                                                 |
@@ -459,12 +469,16 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `tap`                                      | android                                                               |
 | `tap_ui_node`                              | android                                                               |
 | `task_plan_to_next_tasks`                  | orchestrator, wisdom                                                  |
+| `todo-add`                                 | working-memory                                                        |
+| `todo-done`                                | working-memory                                                        |
+| `todo-rollover`                            | working-memory                                                        |
 | `tool_use`                                 | wisdom                                                                |
 | `track_pending_action_items`               | meeting, wisdom                                                       |
 | `transcribe_audio`                         | wisdom                                                                |
 | `typed_cross_critique`                     | wisdom                                                                |
 | `uncertainty_gate`                         | wisdom                                                                |
 | `uninstall_app`                            | ios                                                                   |
+| `validate_narrated_video_artifact`         | video-composition                                                     |
 | `verify_rendered_video_artifact`           | video-composition                                                     |
 | `verify_tts_loopback`                      | voice                                                                 |
 | `voice`                                    | system                                                                |
@@ -474,6 +488,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `wait_for_ui_text`                         | android                                                               |
 | `wait_generation_job`                      | media-generation                                                      |
 | `wait_ref`                                 | browser                                                               |
+| `weekly-open`                              | working-memory                                                        |
 | `write`                                    | file, terminal                                                        |
 | `write_agentic_source_review_plan`         | modeling                                                              |
 | `write_agentic_source_review_verification` | modeling                                                              |

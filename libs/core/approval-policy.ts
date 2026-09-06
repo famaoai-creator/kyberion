@@ -1,8 +1,8 @@
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { safeExistsSync } from './secure-io.js';
-import { isInjectionSuspected } from './untrusted-content.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { isInjectionSuspected } from './injection-signal.js';
 import { resolveConfiguredPosture } from './security-screen.js';
 
 export interface ApprovalPolicyRule {
@@ -34,12 +34,16 @@ const approvalPolicyCatalog = defineCatalog<ApprovalPolicyFile>({
   id: 'approval-policy',
   path: () => {
     const customerPolicyPath = customerResolver.customerRoot('policy/approval-policy.json');
-    return customerPolicyPath && safeExistsSync(customerPolicyPath)
-      ? customerPolicyPath
-      : pathResolver.knowledge('product/governance/approval-policy.json');
+    const fallbackPath = assertSafeRepositoryPath(
+      pathResolver.knowledge('product/governance/approval-policy.json')
+    );
+    if (!customerPolicyPath) return fallbackPath;
+    const safeCustomerPath = assertSafeRepositoryPath(customerPolicyPath, {
+      allowMissingLeaf: true,
+    });
+    return safeExistsSync(safeCustomerPath) ? safeCustomerPath : fallbackPath;
   },
   schema: pathResolver.knowledge('product/schemas/approval-policy.schema.json'),
-  fallback: { version: '1.0.0', rules: [], defaults: { requires_approval: false } },
 });
 
 const HARD_CODED_DANGEROUS_RULES: Array<{
@@ -84,11 +88,7 @@ const HARD_CODED_DANGEROUS_RULES: Array<{
 ];
 
 export function loadApprovalPolicy(): ApprovalPolicyFile {
-  try {
-    return approvalPolicyCatalog.load();
-  } catch {
-    return { version: '1.0.0', rules: [], defaults: { requires_approval: false } };
-  }
+  return approvalPolicyCatalog.load();
 }
 
 export function resolveApprovalPolicy(input: {

@@ -30,13 +30,11 @@ const publicCatalog = defineCatalog<WorkCoordinationImportCatalog>({
   id: 'work-coordination-import-catalog.public',
   path: PUBLIC_CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: { version: '1.0.0', imports: [] },
 });
 const personalCatalog = defineCatalog<WorkCoordinationImportCatalog>({
   id: 'work-coordination-import-catalog.personal',
   path: PERSONAL_CATALOG_PATH,
   schema: SCHEMA_PATH,
-  fallback: { version: '1.0.0', imports: [] },
 });
 
 function loadCatalogFile(
@@ -85,9 +83,4 @@ export function getWorkCoordinationImportCatalogEntryByCommand(
   return (
     listWorkCoordinationImportCatalogEntries().find((entry) => entry.command === normalized) || null
   );
-}
-
-export function resetWorkCoordinationImportCatalogCache(): void {
-  publicCatalog.reset();
-  personalCatalog.reset();
 }

@@ -1,3 +1,5 @@
+import { nowIso } from './foundation/time.js';
+
 export interface TelemetryEvent {
   name: string;
   ts?: string;
@@ -16,7 +18,7 @@ const telemetryEvents: TelemetryEvent[] = [];
 export function recordTelemetryEvent(event: TelemetryEvent): void {
   telemetryEvents.push({
     ...event,
-    ts: event.ts || new Date().toISOString(),
+    ts: event.ts || nowIso(),
   });
 }
 

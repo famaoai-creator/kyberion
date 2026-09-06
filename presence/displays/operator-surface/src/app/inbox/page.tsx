@@ -1,4 +1,4 @@
-import { listInboxEntries } from '@agent/core';
+import { listInboxEntries } from '@agent/core/deliverable-inbox';
 import Link from 'next/link';
 import { emitMosRead } from '@/lib/audit-mos';
 

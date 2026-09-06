@@ -5,7 +5,24 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const secureIo = vi.hoisted(() => ({
+  assertSafeRepositoryPath: (filePath: string) => {
+    const root = path.resolve(process.env.KYBERION_ROOT || process.cwd());
+    const absolute = path.resolve(filePath);
+    const relative = path.relative(root, absolute);
+    if (
+      !relative ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error(
+        `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+      );
+    }
+    return absolute;
+  },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
@@ -55,6 +72,14 @@ describe('reasoning-failover marker + event log (XP-05)', () => {
     tmpRoot = path.join(os.tmpdir(), `kyberion-reasoning-failover-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    fs.mkdirSync(path.join(tmpRoot, 'knowledge/product/schemas'), { recursive: true });
+    fs.copyFileSync(
+      path.resolve(
+        process.cwd(),
+        'knowledge/product/schemas/reasoning-failover-marker.schema.json'
+      ),
+      path.join(tmpRoot, 'knowledge/product/schemas/reasoning-failover-marker.schema.json')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
   });
 
@@ -94,6 +119,29 @@ describe('reasoning-failover marker + event log (XP-05)', () => {
     fs.mkdirSync(path.dirname(markerPath), { recursive: true });
     fs.writeFileSync(markerPath, 'not-json');
     expect(readReasoningFailover()).toBeNull();
+  });
+
+  it('rejects unknown fields, dangerous keys, and invalid optional providers', async () => {
+    const { parseReasoningFailoverMarker } = await import('./reasoning-failover.js');
+    const base = {
+      from_mode: 'claude-agent',
+      to_mode: 'codex-cli',
+      method: 'delegateTask',
+      at: '2026-09-02T18:00:00.000Z',
+    };
+    expect(() => parseReasoningFailoverMarker({ ...base, provider_from: null })).toThrow(
+      'non-empty string'
+    );
+    expect(() => parseReasoningFailoverMarker({ ...base, extra: true })).toThrow(
+      'unknown field(s)'
+    );
+    expect(() =>
+      parseReasoningFailoverMarker(
+        JSON.parse(
+          '{"from_mode":"claude-agent","to_mode":"codex-cli","method":"delegateTask","at":"2026-09-02T18:00:00.000Z","__proto__":{}}'
+        )
+      )
+    ).toThrow('dangerous JSON key');
   });
 
   it('appends a JSONL event with from/to, method, and a truncated error summary', async () => {

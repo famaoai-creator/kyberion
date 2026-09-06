@@ -1,16 +1,14 @@
-import { getFoundationIo } from './io.js';
+import { getFoundationIo, type FoundationReadOptions } from './io.js';
+export { isRecord } from './primitives.js';
+export type { FoundationReadOptions } from './io.js';
 
 /** Read UTF-8 text through the registered secure foundation I/O boundary. */
-export function readTextFile(filePath: string): string {
-  return getFoundationIo().readFile(filePath);
+export function readTextFile(filePath: string, options: FoundationReadOptions = {}): string {
+  return getFoundationIo().readFile(filePath, options);
 }
 
 export function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : value == null ? fallback : String(value);
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function normalizeText(value: unknown): string {

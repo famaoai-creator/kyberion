@@ -2,9 +2,12 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { secureFetch } from './network.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeLstat, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from './ocr-types.js';
 import {
   probeWindowsNativeImageRecognition,
@@ -21,7 +24,7 @@ export class WindowsNativeOcrProvider implements OcrProvider {
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const result = recognizeTextWithWindowsNativeApi(request.path);
+    const result = recognizeTextWithWindowsNativeApi(resolveOcrImagePath(request.path));
     if (!result || result.status !== 'succeeded') {
       return {
         status: 'failed',
@@ -51,6 +54,80 @@ function getMimeType(filePath: string): string {
   return 'application/octet-stream';
 }
 
+function resolveOcrImagePath(requestPath: string): string {
+  const resolvedPath = assertSafeRepositoryPath(pathResolver.rootResolve(requestPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeLstat(resolvedPath).isFile()) {
+    throw new Error(`[OCR_RESOURCE] input must be a regular file: ${requestPath}`);
+  }
+  return resolvedPath;
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function firstRecord(value: unknown): Record<string, unknown> | undefined {
+  return Array.isArray(value) && isRecord(value[0]) ? value[0] : undefined;
+}
+
+function parseAppleVisionLines(value: unknown): OcrResult['lines'] {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.text !== 'string') return [];
+    const confidence = typeof entry.confidence === 'number' ? entry.confidence : 0;
+    const bbox = isRecord(entry.bbox) ? entry.bbox : undefined;
+    const hasBoundingBox =
+      bbox &&
+      typeof bbox.x0 === 'number' &&
+      typeof bbox.y0 === 'number' &&
+      typeof bbox.x1 === 'number' &&
+      typeof bbox.y1 === 'number';
+    return [
+      {
+        text: entry.text,
+        confidence,
+        ...(hasBoundingBox
+          ? {
+              boundingBox: {
+                x: bbox.x0 as number,
+                y: bbox.y0 as number,
+                width: (bbox.x1 as number) - (bbox.x0 as number),
+                height: (bbox.y1 as number) - (bbox.y0 as number),
+              },
+            }
+          : {}),
+      },
+    ];
+  });
+}
+
+export function parseGeminiOcrResponse(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const candidate = firstRecord(value.candidates);
+  const content = candidate && isRecord(candidate.content) ? candidate.content : undefined;
+  const part = content && firstRecord(content.parts);
+  return part ? nonEmptyString(part.text) : undefined;
+}
+
+export function parseClaudeOcrResponse(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const content = firstRecord(value.content);
+  return content ? nonEmptyString(content.text) : undefined;
+}
+
+export function parseOpenAiOcrResponse(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const choice = firstRecord(value.choices);
+  const message = choice && isRecord(choice.message) ? choice.message : undefined;
+  return message ? nonEmptyString(message.content) : undefined;
+}
+
+export function parseLocalVlmOcrResponse(value: unknown): string | undefined {
+  return isRecord(value) ? nonEmptyString(value.response) : undefined;
+}
+
 export class TesseractOcrProvider implements OcrProvider {
   readonly id = 'tesseract';
   readonly dataEgress = 'none' as const; // tesseract.js, in-process
@@ -66,8 +143,7 @@ export class TesseractOcrProvider implements OcrProvider {
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const logicalPath = request.path;
-    const resolvedPath = pathResolver.rootResolve(logicalPath);
+    const resolvedPath = resolveOcrImagePath(request.path);
     const lang = request.language || 'eng';
     let worker: any = null;
 
@@ -129,8 +205,8 @@ export class AppleVisionOcrProvider implements OcrProvider {
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const scriptPath = pathResolver.resolve('libs/core/native-ocr.swift');
-    const resolvedImagePath = pathResolver.rootResolve(request.path);
+    const scriptPath = assertSafeRepositoryPath(pathResolver.resolve('libs/core/native-ocr.swift'));
+    const resolvedImagePath = resolveOcrImagePath(request.path);
 
     return new Promise((resolve, reject) => {
       const args = [scriptPath, resolvedImagePath];
@@ -202,16 +278,17 @@ export class AppleVisionOcrProvider implements OcrProvider {
         }
 
         try {
-          const parsed = JSON.parse(raw);
+          const parsed = parseSafeJsonObjectInput(raw, 'apple vision OCR response');
+          if (!parsed) throw new Error('apple vision OCR response must not be empty');
           if (parsed.error) {
-            return reject(new Error(parsed.error));
+            return reject(new Error(String(parsed.error)));
           }
           resolve({
             status: parsed.status === 'succeeded' ? 'succeeded' : 'failed',
             provider: this.id,
-            text: parsed.text || '',
-            confidence: parsed.confidence || 0,
-            lines: parsed.lines,
+            text: typeof parsed.text === 'string' ? parsed.text : '',
+            confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
+            lines: parseAppleVisionLines(parsed.lines),
             elapsedMs: Date.now() - startedAt,
           });
         } catch (error: any) {
@@ -228,20 +305,22 @@ export class LlmApiOcrProvider implements OcrProvider {
 
   async isAvailable(): Promise<boolean> {
     return Boolean(
-      process.env.GEMINI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY
+      getRegisteredEnvText('GEMINI_API_KEY') ||
+      getRegisteredEnvText('ANTHROPIC_API_KEY') ||
+      getRegisteredEnvText('OPENAI_API_KEY')
     );
   }
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const resolvedPath = pathResolver.rootResolve(request.path);
+    const resolvedPath = resolveOcrImagePath(request.path);
     const buffer = safeReadFile(resolvedPath, { encoding: null }) as Buffer;
     const base64Data = buffer.toString('base64');
     const mimeType = getMimeType(request.path);
 
-    const apiKeyGemini = process.env.GEMINI_API_KEY;
-    const apiKeyClaude = process.env.ANTHROPIC_API_KEY;
-    const apiKeyOpenAI = process.env.OPENAI_API_KEY;
+    const apiKeyGemini = getRegisteredEnvText('GEMINI_API_KEY');
+    const apiKeyClaude = getRegisteredEnvText('ANTHROPIC_API_KEY');
+    const apiKeyOpenAI = getRegisteredEnvText('OPENAI_API_KEY');
 
     const order = request.providerPreference || ['gemini', 'claude', 'openai'];
 
@@ -290,7 +369,7 @@ export class LlmApiOcrProvider implements OcrProvider {
       ],
     };
 
-    const data = await secureFetch<any>({
+    const data = await secureFetch<unknown>({
       method: 'POST',
       url,
       headers: { 'Content-Type': 'application/json' },
@@ -298,7 +377,8 @@ export class LlmApiOcrProvider implements OcrProvider {
       params: { key: apiKey },
       authenticateRequest: true,
     });
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text = parseGeminiOcrResponse(data);
+    if (text === undefined) throw new Error('gemini_ocr_invalid_response');
     return {
       status: 'succeeded',
       provider: 'gemini_api',
@@ -339,7 +419,7 @@ export class LlmApiOcrProvider implements OcrProvider {
       ],
     };
 
-    const data = await secureFetch<any>({
+    const data = await secureFetch<unknown>({
       method: 'POST',
       url,
       headers: {
@@ -350,7 +430,8 @@ export class LlmApiOcrProvider implements OcrProvider {
       data: payload,
       authenticateRequest: true,
     });
-    const text = data.content?.[0]?.text || '';
+    const text = parseClaudeOcrResponse(data);
+    if (text === undefined) throw new Error('claude_ocr_invalid_response');
     return {
       status: 'succeeded',
       provider: 'claude_api',
@@ -388,7 +469,7 @@ export class LlmApiOcrProvider implements OcrProvider {
       ],
     };
 
-    const data = await secureFetch<any>({
+    const data = await secureFetch<unknown>({
       method: 'POST',
       url,
       headers: {
@@ -398,7 +479,8 @@ export class LlmApiOcrProvider implements OcrProvider {
       data: payload,
       authenticateRequest: true,
     });
-    const text = data.choices?.[0]?.message?.content || '';
+    const text = parseOpenAiOcrResponse(data);
+    if (text === undefined) throw new Error('openai_ocr_invalid_response');
     return {
       status: 'succeeded',
       provider: 'openai_api',
@@ -430,10 +512,9 @@ export class LocalVlmOcrProvider implements OcrProvider {
   readonly dataEgress: OcrDataEgress;
 
   constructor(endpoint = 'http://localhost:11434/api/generate', model = 'llama3-vision') {
-    this.endpoint = process.env.OLLAMA_HOST
-      ? `${process.env.OLLAMA_HOST.replace(/\/$/, '')}/api/generate`
-      : endpoint;
-    this.model = process.env.OLLAMA_VLM_MODEL || model;
+    const ollamaHost = getRegisteredEnvText('OLLAMA_HOST');
+    this.endpoint = ollamaHost ? `${ollamaHost.replace(/\/$/, '')}/api/generate` : endpoint;
+    this.model = getRegisteredEnvText('OLLAMA_VLM_MODEL') || model;
     this.dataEgress = isLoopbackEndpoint(this.endpoint) ? 'loopback' : 'external';
   }
 
@@ -454,7 +535,7 @@ export class LocalVlmOcrProvider implements OcrProvider {
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const resolvedPath = pathResolver.rootResolve(request.path);
+    const resolvedPath = resolveOcrImagePath(request.path);
     const buffer = safeReadFile(resolvedPath, { encoding: null }) as Buffer;
     const base64Data = buffer.toString('base64');
 
@@ -466,14 +547,15 @@ export class LocalVlmOcrProvider implements OcrProvider {
       stream: false,
     };
 
-    const data = await secureFetch<any>({
+    const data = await secureFetch<unknown>({
       method: 'POST',
       url: this.endpoint,
       headers: { 'Content-Type': 'application/json' },
       data: payload,
       kyberion_allow_local_network: true,
     });
-    const text = data.response || '';
+    const text = parseLocalVlmOcrResponse(data);
+    if (text === undefined) throw new Error('local_vlm_ocr_invalid_response');
     return {
       status: 'succeeded',
       provider: this.id,

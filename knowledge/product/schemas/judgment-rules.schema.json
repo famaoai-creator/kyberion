@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "judgment-rules.schema.json",
+  "title": "Documentation-only mission judgment rules",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "documentation_only": { "const": true },
+    "version": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "personas": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "weight": { "type": "number", "minimum": 0 },
+          "focus": { "type": "string", "minLength": 1 },
+          "thresholds": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "required": ["weight", "focus", "thresholds"]
+      }
+    },
+    "alignment_mirror": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auto_distill_on_completion": { "type": "boolean" },
+        "vault_path": { "type": "string", "minLength": 1 },
+        "require_learnings_md": { "type": "boolean" }
+      },
+      "required": ["auto_distill_on_completion", "vault_path", "require_learnings_md"]
+    },
+    "dissent_quorum": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "min_recorded_alternatives": { "type": "integer", "minimum": 0 },
+        "applies_to_mission_types": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "priority_threshold": { "type": "number", "minimum": 0 },
+        "schema": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 }
+      },
+      "required": [
+        "enabled",
+        "min_recorded_alternatives",
+        "applies_to_mission_types",
+        "priority_threshold",
+        "schema",
+        "rationale"
+      ]
+    },
+    "counterfactual": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auto_trigger_priority_threshold": { "type": "number", "minimum": 0 },
+        "cost_cap_tokens": { "type": "integer", "minimum": 0 },
+        "max_steps_per_branch": { "type": "integer", "minimum": 1 },
+        "execution_profile": { "type": "string", "minLength": 1 },
+        "schema_ref": { "type": "string", "minLength": 1 }
+      },
+      "required": [
+        "auto_trigger_priority_threshold",
+        "cost_cap_tokens",
+        "max_steps_per_branch",
+        "execution_profile",
+        "schema_ref"
+      ]
+    },
+    "intuition_capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "triggers": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "max_questions_per_capture": { "type": "integer", "minimum": 0 },
+        "storage": { "type": "string", "minLength": 1 },
+        "distillation_cadence_days": { "type": "integer", "minimum": 1 },
+        "summary_cadence_days": { "type": "integer", "minimum": 1 },
+        "tier": { "enum": ["personal", "confidential", "public"] }
+      },
+      "required": [
+        "enabled",
+        "triggers",
+        "max_questions_per_capture",
+        "storage",
+        "distillation_cadence_days",
+        "summary_cadence_days",
+        "tier"
+      ]
+    }
+  },
+  "required": [
+    "$schema",
+    "documentation_only",
+    "version",
+    "name",
+    "personas",
+    "alignment_mirror",
+    "dissent_quorum",
+    "counterfactual",
+    "intuition_capture"
+  ]
+}

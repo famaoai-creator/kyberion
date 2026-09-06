@@ -1,43 +1,25 @@
 #!/usr/bin/env node
+import { pathResolver } from '@agent/core/path-resolver';
+import { nowIso } from '@agent/core/foundation';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { resolveOnboardingText } from '@agent/core/onboarding-flow-policy';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveProductionEvidenceSummaryPolicy } from '@agent/core/production-evidence-summary-policy';
 import {
-  pathResolver,
-  resolveProductionEvidenceSummaryPolicy,
-  safeExistsSync,
-  safeReadFile,
-  resolveOnboardingText,
-  resolveOperatorLocale,
-} from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+  loadProductionEvidenceRegister,
+  type ProductionEvidenceItem,
+  type ProductionEvidenceRefRequirement,
+  type ProductionEvidenceRegister,
+} from '@agent/core/production-evidence-register';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-export type ProductionEvidenceStatus = 'pending_external_evidence' | 'verified';
-
-export interface ProductionEvidenceItem {
-  id: string;
-  gate: string;
-  required_evidence: string;
-  status: ProductionEvidenceStatus;
-  owner: string;
-  template_ref: string;
-  acceptance_criteria: string[];
-  verification_artifact: string;
-  reviewed_at: string | null;
-  reviewer: string | null;
-  ref_requirements: ProductionEvidenceRefRequirement[];
-  evidence_refs: string[];
-}
-
-export interface ProductionEvidenceRefRequirement {
-  id: string;
-  description: string;
-  accepted_ref_patterns: string[];
-}
-
-export interface ProductionEvidenceRegister {
-  version: string;
-  last_updated: string;
-  release_decision: ProductionEvidenceStatus;
-  items: ProductionEvidenceItem[];
-}
+export {
+  loadProductionEvidenceRegister,
+  type ProductionEvidenceItem,
+  type ProductionEvidenceRefRequirement,
+  type ProductionEvidenceRegister,
+  type ProductionEvidenceStatus,
+} from '@agent/core/production-evidence-register';
 
 export interface ProductionEvidenceSummary {
   ok: boolean;
@@ -49,7 +31,6 @@ export interface ProductionEvidenceSummary {
   release_decision: string;
 }
 
-const DEFAULT_REGISTER_PATH = 'knowledge/product/governance/production-evidence-register.json';
 const SUPPORTED_REF_SCHEMES = ['http:', 'https:'];
 export const REQUIRED_PRODUCTION_EVIDENCE_IDS = [
   'EV-30DAY-OPS',
@@ -100,23 +81,6 @@ const REQUIRED_REF_REQUIREMENT_PATTERNS: Record<string, readonly string[]> = {
   no_fork_statement: ['docs/operator/', 'migration/', 'https://'],
 };
 
-function parseRegister(raw: string, source: string): ProductionEvidenceRegister {
-  try {
-    return JSON.parse(raw) as ProductionEvidenceRegister;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid production evidence register JSON at ${source}: ${message}`);
-  }
-}
-
-export function loadProductionEvidenceRegister(
-  registerPath = DEFAULT_REGISTER_PATH
-): ProductionEvidenceRegister {
-  const resolved = pathResolver.rootResolve(registerPath);
-  const raw = safeReadFile(resolved, { encoding: 'utf8' }) as string;
-  return parseRegister(raw, registerPath);
-}
-
 function isSupportedUrlRef(ref: string): boolean {
   try {
     const url = new URL(ref);
@@ -138,7 +102,7 @@ export function isValidEvidenceRef(ref: string): boolean {
 }
 
 function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
+  return nowIso().slice(0, 10);
 }
 
 function isValidIsoCalendarDate(value: string): boolean {
@@ -451,7 +415,7 @@ export const runCheckProductionEvidence = defineScript({
     const args = context.argv;
     let json = false;
     let requireComplete = false;
-    let registerPath = DEFAULT_REGISTER_PATH;
+    let registerPath = 'knowledge/product/governance/production-evidence-register.json';
 
     for (let i = 0; i < args.length; i++) {
       const arg = args[i];
@@ -465,10 +429,8 @@ export const runCheckProductionEvidence = defineScript({
     const output = json ? `${JSON.stringify(summary, null, 2)}\n` : formatSummary(summary);
 
     if (summary.ok) context.print(output);
-    else {
-      console.error(output.trimEnd());
-      process.exitCode = 1;
-    }
+    else throw new ScriptExitError(1, output.trimEnd());
+    return summary;
   },
 });
 

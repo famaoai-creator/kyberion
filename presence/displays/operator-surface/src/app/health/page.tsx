@@ -50,7 +50,7 @@ export default async function HealthPage() {
           <code>pnpm watch:tenant-drift</code>
         </li>
         <li>
-          <code>pnpm run check:contract-schemas</code>
+          <code>pnpm run check -- --scope full --only contract-schemas</code>
         </li>
       </ul>
     </section>

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { A2UIMessage } from './a2ui.js';
 import { getPresenceAvatarProfile } from './presence-avatar.js';
+import { nowIso } from './foundation/time.js';
 
 export interface PresenceVoiceStimulus {
   id: string;
@@ -81,7 +82,7 @@ export function createPresenceVoiceStimulus(
   sourceId = 'local-mic',
   requestId: string = randomUUID(),
 ): PresenceVoiceStimulus {
-  const ts = new Date().toISOString();
+  const ts = nowIso();
   return {
     id: `voice-${randomUUID()}`,
     request_id: requestId,
@@ -176,7 +177,7 @@ export function buildPresenceSurfaceFrame(input: PresenceSurfaceFrameInput): A2U
           avatarAssetPath,
           expressionAvatarMap,
           transcript,
-          updatedAt: new Date().toISOString(),
+          updatedAt: nowIso(),
         },
       },
     },

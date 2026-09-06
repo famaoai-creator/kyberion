@@ -1,4 +1,8 @@
-import { createScreenDisplayInventoryBridge, type ScreenDisplayInventory, type ScreenDisplayRecord } from '@agent/core';
+import {
+  createScreenDisplayInventoryBridge,
+  type ScreenDisplayInventory,
+  type ScreenDisplayRecord,
+} from '@agent/core/screen-display-inventory-bridge';
 
 export interface ResolvedScreenDisplaySelection {
   inventory: ScreenDisplayInventory;
@@ -25,9 +29,14 @@ export function normalizeDisplayIndex(value: unknown): number | undefined {
 export function selectDisplayFromInventory(
   inventory: ScreenDisplayInventory,
   requestedIndex?: number,
-  requestedName?: string,
-): { display: ScreenDisplayRecord; selection_source: ResolvedScreenDisplaySelection['selection_source'] } {
-  const displays = Array.isArray(inventory.displays) ? inventory.displays.filter((display) => display.available !== false) : [];
+  requestedName?: string
+): {
+  display: ScreenDisplayRecord;
+  selection_source: ResolvedScreenDisplaySelection['selection_source'];
+} {
+  const displays = Array.isArray(inventory.displays)
+    ? inventory.displays.filter((display) => display.available !== false)
+    : [];
   const normalizedRequestedName = requestedName ? requestedName.toLowerCase() : undefined;
 
   if (typeof requestedIndex === 'number') {
@@ -38,11 +47,15 @@ export function selectDisplayFromInventory(
   }
 
   if (normalizedRequestedName) {
-    const exact = displays.find((display) => display.name.toLowerCase() === normalizedRequestedName);
+    const exact = displays.find(
+      (display) => display.name.toLowerCase() === normalizedRequestedName
+    );
     if (exact) {
       return { display: exact, selection_source: 'display_name' };
     }
-    const partial = displays.find((display) => display.name.toLowerCase().includes(normalizedRequestedName));
+    const partial = displays.find((display) =>
+      display.name.toLowerCase().includes(normalizedRequestedName)
+    );
     if (partial) {
       return { display: partial, selection_source: 'display_name' };
     }
@@ -70,12 +83,19 @@ export function selectDisplayFromInventory(
   };
 }
 
-export async function resolveScreenDisplaySelection(params: Record<string, any>, resolve: (value: any) => any): Promise<ResolvedScreenDisplaySelection> {
+export async function resolveScreenDisplaySelection(
+  params: Record<string, any>,
+  resolve: (value: any) => any
+): Promise<ResolvedScreenDisplaySelection> {
   const inventoryBridge = createScreenDisplayInventoryBridge();
   const probe = await inventoryBridge.probe();
   const requestedIndex = normalizeDisplayIndex(resolve(params.display_index));
   const requestedName = normalizeDisplayName(resolve(params.display_name));
-  const { display, selection_source } = selectDisplayFromInventory(probe.inventory, requestedIndex, requestedName);
+  const { display, selection_source } = selectDisplayFromInventory(
+    probe.inventory,
+    requestedIndex,
+    requestedName
+  );
   return {
     inventory: probe.inventory,
     selected_display: display,

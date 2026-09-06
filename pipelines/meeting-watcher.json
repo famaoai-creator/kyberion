@@ -1,0 +1,99 @@
+{
+  "action": "pipeline",
+  "name": "meeting-watcher",
+  "version": "1.0.0",
+  "description": "Calendar-driven auto-join: list today's events, pick the meeting starting now, join with live-caption capture. Register on Chronos every 5 minutes.",
+  "_migration_note": "v1: calendar:list_events (today window) → meeting:resolve_next_target → core:if found → meeting:join with transcript capture. join_backend: playwright (unattended default), chrome-extension (operator's signed-in Chrome), auto (extension first, playwright fallback).",
+  "schedule": {
+    "id": "meeting-watcher",
+    "cron": "*/5 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "context": {
+    "calendar_names": [],
+    "display_name": "Kyberion Agent",
+    "language": "ja",
+    "join_backend": "playwright",
+    "transcript_dir": "active/shared/tmp/meeting-watcher",
+    "started_ago_min": 5,
+    "starts_within_min": 10,
+    "max_duration_sec": 5400
+  },
+  "steps": [
+    {
+      "id": "open_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "📅 Meeting watcher tick: scanning today's calendar for a meeting to join."
+      }
+    },
+    {
+      "id": "list_events",
+      "role": "sink",
+      "op": "calendar:list_events",
+      "produces": { "channel": "events", "type": "CalendarEventList" },
+      "params": {
+        "calendar_names": "{{calendar_names}}"
+      }
+    },
+    {
+      "id": "resolve_target",
+      "role": "sink",
+      "op": "meeting:resolve_next_target",
+      "consumes": "events",
+      "produces": { "channel": "meeting_target", "type": "MeetingTarget" },
+      "params": {
+        "events": "{{events}}",
+        "started_ago_min": "{{started_ago_min}}",
+        "starts_within_min": "{{starts_within_min}}",
+        "max_duration_sec": "{{max_duration_sec}}"
+      }
+    },
+    {
+      "id": "join_or_skip",
+      "role": "gate",
+      "op": "core:if",
+      "consumes": "meeting_target",
+      "params": {
+        "condition": "meeting_target.found",
+        "then": [
+          {
+            "id": "join_meeting",
+            "role": "sink",
+            "op": "meeting:join",
+            "produces": { "channel": "join_result", "type": "MeetingJoinResult" },
+            "params": {
+              "platform": "{{meeting_target.platform}}",
+              "url": "{{meeting_target.url}}",
+              "display_name": "{{display_name}}",
+              "join_backend": "{{join_backend}}",
+              "duration_sec": "{{meeting_target.join_duration_sec}}",
+              "transcript_path": "{{transcript_dir}}/{{meeting_target.file_slug}}.txt"
+            }
+          },
+          {
+            "id": "log_joined",
+            "role": "sink",
+            "op": "system:log",
+            "consumes": "join_result",
+            "params": {
+              "message": "✅ Joined '{{meeting_target.title}}' ({{meeting_target.platform}}): transcript={{transcript_dir}}/{{meeting_target.file_slug}}.txt cues={{join_result.caption_cues}}"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "log_idle",
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "💤 No joinable meeting in window ({{meeting_target.reason}})."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

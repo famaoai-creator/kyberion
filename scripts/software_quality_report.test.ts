@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
-import { generateSoftwareQualityArtifacts } from './software_quality_report.js';
+import {
+  generateSoftwareQualityArtifacts,
+  resolveQualityArtifactPath,
+} from './software_quality_report.js';
 
 const root = pathResolver.rootResolve('active/shared/tmp/software-quality-report-test');
 
@@ -15,6 +18,12 @@ function write(name: string, value: unknown): string {
 }
 
 describe('software quality report CLI core', () => {
+  it('rejects repository-external artifact paths', () => {
+    expect(() => resolveQualityArtifactPath('/tmp/quality-report.json', true)).toThrow(
+      /RESOURCE_PATH_SCOPE/u
+    );
+  });
+
   it('writes a no-go report and defect candidates from failed execution', () => {
     const contractPath = write('contract.json', {
       version: '1.0.0',
@@ -61,8 +70,14 @@ describe('software quality report CLI core', () => {
       ],
     });
     const executionPath = write('execution.json', {
+      version: '1.0.0',
       run_id: 'RUN-1',
+      project_id: 'project-1',
       subject_ref: 'git:abc',
+      environment: 'test',
+      executor: { resource_id: 'agent:tester', resource_type: 'ai_agent' },
+      started_at: '2026-07-12T00:00:00.000Z',
+      finished_at: '2026-07-12T00:01:00.000Z',
       results: [
         { item_id: 'TEST-1', status: 'failed', evidence_refs: ['trace:1'], observed_result: '500' },
       ],

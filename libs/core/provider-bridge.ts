@@ -25,13 +25,11 @@ let cachedCapabilities: DiscoveredCapability[] | null = null;
 function getAvailableCapabilities(): DiscoveredCapability[] {
   if (!cachedCapabilities) {
     const registry = loadCapabilityRegistry();
-    cachedCapabilities = scanProviderCapabilities(registry, undefined, { includeUnavailable: false });
+    cachedCapabilities = scanProviderCapabilities(registry, undefined, {
+      includeUnavailable: false,
+    });
   }
   return cachedCapabilities;
-}
-
-export function resetProviderCapabilityCache(): void {
-  cachedCapabilities = null;
 }
 
 function normalizePayload(payload: unknown): string {
@@ -48,7 +46,7 @@ function resolveProviderBinary(provider: string): string {
 
 export function buildProviderInvocationPlan(
   capability: CapabilityRegistryEntry,
-  params: ProviderInvokeParams,
+  params: ProviderInvokeParams
 ): InvocationPlan {
   if (capability.source.type !== 'cli_native') {
     throw new Error(`[PROVIDER_BRIDGE] Capability is not CLI-native: ${capability.capability_id}`);
@@ -57,23 +55,19 @@ export function buildProviderInvocationPlan(
   const bin = resolveProviderBinary(capability.source.provider);
   const name = capability.source.name;
   const extraArgs = params.args ?? [];
-  const payloadText = params.payload === undefined || params.payload === null ? '' : normalizePayload(params.payload);
+  const payloadText =
+    params.payload === undefined || params.payload === null ? '' : normalizePayload(params.payload);
 
   if (capability.source.provider === 'gemini-cli') {
     if (name === 'prompt') {
       if (!payloadText) {
-        throw new Error(`[PROVIDER_BRIDGE] Gemini prompt requires payload: ${capability.capability_id}`);
+        throw new Error(
+          `[PROVIDER_BRIDGE] Gemini prompt requires payload: ${capability.capability_id}`
+        );
       }
       return {
         bin,
-        args: [
-          '-p',
-          payloadText,
-          '-o',
-          'json',
-          '-y',
-          ...extraArgs,
-        ],
+        args: ['-p', payloadText, '-o', 'json', '-y', ...extraArgs],
       };
     }
 
@@ -86,7 +80,9 @@ export function buildProviderInvocationPlan(
   if (capability.source.provider === 'codex-cli') {
     if (name === 'exec') {
       if (!payloadText) {
-        throw new Error(`[PROVIDER_BRIDGE] Codex exec requires payload: ${capability.capability_id}`);
+        throw new Error(
+          `[PROVIDER_BRIDGE] Codex exec requires payload: ${capability.capability_id}`
+        );
       }
       return {
         bin,
@@ -124,9 +120,13 @@ export function buildProviderInvocationPlan(
  * based on the registered capability metadata.
  */
 export async function invokeProviderCapability(params: ProviderInvokeParams): Promise<string> {
-  const capability = getAvailableCapabilities().find((c) => c.capability_id === params.capabilityId);
+  const capability = getAvailableCapabilities().find(
+    (c) => c.capability_id === params.capabilityId
+  );
   if (!capability) {
-    throw new Error(`[PROVIDER_BRIDGE] Capability not found or not available: ${params.capabilityId}`);
+    throw new Error(
+      `[PROVIDER_BRIDGE] Capability not found or not available: ${params.capabilityId}`
+    );
   }
 
   const { provider, name } = capability.source;
@@ -141,7 +141,9 @@ export async function invokeProviderCapability(params: ProviderInvokeParams): Pr
     });
     return stdout.trim();
   } catch (err: any) {
-    throw new Error(`[PROVIDER_BRIDGE] Execution failed for ${params.capabilityId}: ${err.message}`);
+    throw new Error(
+      `[PROVIDER_BRIDGE] Execution failed for ${params.capabilityId}: ${err.message}`
+    );
   }
 }
 

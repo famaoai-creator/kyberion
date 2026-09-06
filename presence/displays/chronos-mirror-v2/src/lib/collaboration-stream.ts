@@ -1,4 +1,6 @@
-import { CE_STREAM_LIMITS, BoundedRingBuffer, type WorkerEventEnvelope } from '@agent/core';
+import { parseEventScopeFromRecord, type OsKnowledgeTier } from '@agent/core/event-scope';
+import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core/ce-adoption';
+import type { WorkerEventEnvelope } from '@agent/core/worker-event-stream';
 
 export interface CollaborationStreamEvent {
   id: string;
@@ -10,6 +12,25 @@ export interface CollaborationStreamEvent {
   trace_id?: string;
   artifact_path?: string;
   payload: Record<string, unknown>;
+}
+
+/**
+ * Worker-event records from before scope propagation may only carry a mission
+ * id in the envelope source. Callers must supply the authoritative mission
+ * tier for that legacy shape; an absent or malformed tier is not visible.
+ */
+export function collaborationEventVisibleToTier(
+  payload: Record<string, unknown>,
+  fallbackTier: OsKnowledgeTier | undefined,
+  tierAccess: readonly OsKnowledgeTier[]
+): boolean {
+  const parsed = parseEventScopeFromRecord(payload);
+  if (parsed.invalid) return false;
+  // A caller-supplied fallback is authoritative when available. Persisted
+  // payload metadata must not be able to relabel a confidential mission as
+  // public and bypass the viewer tier boundary.
+  const tier = fallbackTier || parsed.scope?.tier;
+  return Boolean(tier && tierAccess.includes(tier));
 }
 
 export function normalizeWorkerEvent(

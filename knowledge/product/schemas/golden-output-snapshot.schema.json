@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/golden-output-snapshot.schema.json",
+  "title": "Golden output snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["generated_at", "pipeline_id", "pipeline_path", "result_hash", "result"],
+  "properties": {
+    "generated_at": { "type": "string", "minLength": 1 },
+    "pipeline_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "pipeline_path": {
+      "type": "string",
+      "pattern": "^(?![\\\\/])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+\\.json$"
+    },
+    "result_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "result": {}
+  }
+}

@@ -7,7 +7,8 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { chromium, type Page } from 'playwright';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { nowIso } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface ChronosPerfSample {
   url: string;
@@ -52,7 +53,7 @@ export async function sampleChronosPage(
     url,
     avg_fps: Math.round(((result.frames * 1000) / result.elapsed) * 100) / 100,
     js_heap_mib: result.heap == null ? null : Math.round((result.heap / 1024 / 1024) * 100) / 100,
-    sampled_at: new Date().toISOString(),
+    sampled_at: nowIso(),
   };
 }
 
@@ -79,7 +80,7 @@ async function waitFor(url: string): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Chronos did not become ready at ${url}`);
+  throw new ScriptExitError(1, `Chronos did not become ready at ${url}`);
 }
 
 export async function runChronosPerfBaseline(argv: string[] = []): Promise<ChronosPerfReport> {
@@ -107,7 +108,7 @@ export async function runChronosPerfBaseline(argv: string[] = []): Promise<Chron
             sample.avg_fps >= minFps &&
             (sample.js_heap_mib == null || sample.js_heap_mib <= maxHeap)
         ),
-        generated_at: new Date().toISOString(),
+        generated_at: nowIso(),
       };
       const output = pathResolver.shared('observability/chronos/ce-08-perf-baseline.json');
       safeWriteFile(output, `${JSON.stringify(report, null, 2)}\n`);
@@ -126,7 +127,22 @@ export const runCheckChronosPerf = defineScript({
   async run(context) {
     const report = await runChronosPerfBaseline(context.argv);
     context.print(report);
-    if (!report.passed) throw new Error('Chronos performance thresholds were not met');
+    if (!report.passed) {
+      throw new ScriptExitError(
+        1,
+        `Chronos performance thresholds were not met: ${report.samples
+          .filter(
+            (sample) =>
+              sample.avg_fps < report.thresholds.min_fps ||
+              (sample.js_heap_mib != null && sample.js_heap_mib > report.thresholds.max_heap_mib)
+          )
+          .map(
+            (sample) =>
+              `${sample.url} (fps=${sample.avg_fps}, heap_mib=${sample.js_heap_mib ?? 'n/a'})`
+          )
+          .join('; ')}`
+      );
+    }
     return report;
   },
 });

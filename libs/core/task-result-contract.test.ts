@@ -160,6 +160,18 @@ describe('extractTaskResultBlocks — conservative contract repair', () => {
     expect(parsed.taskResultRepairs).toEqual([]);
     expect(parsed.taskResultRepairRequiresReview).toBe(false);
   });
+
+  it('rejects prototype-bearing task_result blocks before schema processing', () => {
+    const raw = [
+      '```task_result',
+      '{"summary":"Did the thing.","artifacts":[],"verification_done":[],"gaps":[],"needs":[],"__proto__":{"summary":"spoofed"}}',
+      '```',
+    ].join('\n');
+
+    const parsed = extractTaskResultBlocks(raw);
+    expect(parsed.taskResults).toHaveLength(0);
+    expect(parsed.taskResultErrors[0]).toContain('dangerous JSON key');
+  });
 });
 
 // XP-05: task_result gained an optional `provenance` field — which reasoning

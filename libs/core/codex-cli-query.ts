@@ -4,10 +4,14 @@ import { recordEstimatedCliUsage } from './cli-usage-metering.js';
 import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { readTextFile } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExecResult, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExecResult, safeLstat, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   buildProviderChildEnv,
+  resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
@@ -41,6 +45,10 @@ export interface RunCodexCliQueryParams<T> {
    */
   profile?: ProviderPermissionProfileName;
   options?: CodexCliQueryOptions;
+}
+
+function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  return getRegisteredEnvText(name, { env });
 }
 
 export async function runCodexCliQuery<T>({
@@ -82,8 +90,9 @@ class CodexCliQuery {
     // Resolved before any file I/O or spawn so a typed refusal (e.g.
     // planner, which codex has no safe no-exec mode for) never touches the
     // filesystem or attempts to spawn the CLI.
-    const sandboxArgs = params.profile
-      ? this.resolvePermissionArgs(params.profile)
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('codex', params.profile);
+    const sandboxArgs = effectiveProfile
+      ? this.resolvePermissionArgs(effectiveProfile)
       : ['--sandbox', params.mode];
 
     const schemaJson = normalizeCodexSchema(
@@ -127,7 +136,8 @@ class CodexCliQuery {
         throw err;
       }
 
-      const raw = safeReadFile(outputPath, { encoding: 'utf8' }) as string;
+      assertRegularCodexOutputPath(outputPath);
+      const raw = readTextFile(outputPath);
       recordEstimatedCliUsage(
         'codex-cli',
         this.model,
@@ -137,7 +147,7 @@ class CodexCliQuery {
         raw.length
       );
       const clean = extractJsonPayload(raw);
-      const parsedJson = JSON.parse(clean);
+      const parsedJson = parseSafeJsonInput(clean, 'Codex CLI structured response');
       const parsed = params.schema.safeParse(parsedJson);
       if (!parsed.success) {
         throw new Error(`[codex-cli] schema validation failed: ${parsed.error.message}`);
@@ -222,6 +232,12 @@ class CodexCliQuery {
   private tempFilePath(prefix: string, extension: string): string {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return path.join(pathResolver.sharedTmp(), `kyberion-${prefix}-${id}.${extension}`);
+  }
+}
+
+function assertRegularCodexOutputPath(outputPath: string): void {
+  if (!safeLstat(outputPath).isFile()) {
+    throw new Error(`[codex-cli] structured output must be a regular file: ${outputPath}`);
   }
 }
 
@@ -323,11 +339,11 @@ function isNullSchema(node: unknown): boolean {
 export function buildCodexCliQueryOptionsFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): CodexCliQueryOptions {
-  const bin = env.KYBERION_CODEX_CLI_BIN?.trim();
-  const model = env.KYBERION_CODEX_CLI_MODEL?.trim();
-  const timeoutRaw = env.KYBERION_CODEX_CLI_TIMEOUT_MS?.trim();
+  const bin = envText(env, 'KYBERION_CODEX_CLI_BIN')?.trim();
+  const model = envText(env, 'KYBERION_CODEX_CLI_MODEL')?.trim();
+  const timeoutRaw = envText(env, 'KYBERION_CODEX_CLI_TIMEOUT_MS')?.trim();
   const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
-  const extraRaw = env.KYBERION_CODEX_CLI_EXTRA_ARGS?.trim();
+  const extraRaw = envText(env, 'KYBERION_CODEX_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/u).filter(Boolean) : undefined;
 
   logger.info(
@@ -352,7 +368,7 @@ export function buildCodexCliQueryOptionsFromEnv(
 // same thread; this function has already returned by the time any caller
 // could try.
 export function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string {
-  const explicit = env.KYBERION_CODEX_CLI_BIN?.trim();
+  const explicit = envText(env, 'KYBERION_CODEX_CLI_BIN')?.trim();
   if (explicit) return explicit;
 
   const repoRoot = pathResolver.rootDir();

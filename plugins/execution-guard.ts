@@ -1,14 +1,16 @@
 import { safeExistsSync, safeMkdir } from '@agent/core/secure-io';
-import { pathResolver } from '@agent/core';
-import { appendJsonLine } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { appendJsonLine, getRegisteredEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 /**
  * Plugin: Execution Guard
  */
 
-const BLOCKED_EXTENSIONS = (process.env.GUARD_BLOCKED_EXTS || '').split(',').filter(Boolean);
-const WARN_DURATION_MS = parseInt(process.env.GUARD_WARN_DURATION_MS || '5000', 10);
+const BLOCKED_EXTENSIONS = (getRegisteredEnvText('GUARD_BLOCKED_EXTS') || '')
+  .split(',')
+  .filter(Boolean);
+const WARN_DURATION_MS = parseInt(getRegisteredEnvText('GUARD_WARN_DURATION_MS') || '5000', 10);
 const auditLog = pathResolver.resolve('work/execution-audit.jsonl');
 
 export const beforeSkill = (skillName: string, args: any) => {

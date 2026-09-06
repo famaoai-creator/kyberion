@@ -28,15 +28,20 @@
 import * as path from 'node:path';
 
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isDirectScript } from './lib/harness.js';
-import { safeExistsSync } from '@agent/core/secure-io';
+import {
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+} from './lib/harness.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import {
   computeApprovalPayloadHash,
-  findMissionPath,
   listApprovalRequests,
   type ApprovalRequestRecord,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+} from '@agent/core/approval-store';
+import { findMissionPath } from '@agent/core/path-resolver';
+import { loadMissionBriefAtPath } from './mission-alignment-gate/mission-brief.js';
 
 export const ALIGNMENT_BRIEF_RELATIVE_PATH = path.join('evidence', 'mission-brief.json');
 export const ALIGNMENT_APPROVAL_CHANNEL = 'brief';
@@ -48,6 +53,7 @@ export type AlignmentDecisionVerdict =
   | 'no_request'
   | 'no_mission'
   | 'brief_missing'
+  | 'brief_unsafe'
   | 'brief_drifted'
   | 'unbound';
 
@@ -70,10 +76,11 @@ export interface AlignmentDecisionReport {
 
 function readBriefHash(briefPath: string): string | undefined {
   if (!safeExistsSync(briefPath)) return undefined;
+  if (!safeLstat(briefPath).isFile()) return undefined;
   try {
-    const parsed = readJson<unknown>(briefPath);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
-    return computeApprovalPayloadHash(parsed as Record<string, unknown>);
+    return computeApprovalPayloadHash(
+      loadMissionBriefAtPath(briefPath) as unknown as Record<string, unknown>
+    );
   } catch {
     return undefined;
   }
@@ -107,7 +114,21 @@ export function assessAlignmentDecision(missionIdInput: string): AlignmentDecisi
     };
   }
 
-  const briefPath = path.join(missionDir, ALIGNMENT_BRIEF_RELATIVE_PATH);
+  const candidateBriefPath = path.join(missionDir, ALIGNMENT_BRIEF_RELATIVE_PATH);
+  let briefPath: string;
+  try {
+    briefPath = assertSafeRepositoryPath(candidateBriefPath, { allowMissingLeaf: true });
+  } catch (error) {
+    return {
+      missionId,
+      verdict: 'brief_unsafe',
+      satisfied: false,
+      briefPath: candidateBriefPath,
+      reasons: [
+        `Alignment brief path is unsafe: ${error instanceof Error ? error.message : String(error)}`,
+      ],
+    };
+  }
   const record = findAlignmentRequest(missionId);
   if (!record) {
     return {
@@ -182,8 +203,20 @@ export function assessAlignmentDecision(missionIdInput: string): AlignmentDecisi
   return { ...base, verdict: 'approved', satisfied: true, reasons: [] };
 }
 
-export async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export function formatAlignmentDecision(report: AlignmentDecisionReport): string {
+  return [
+    `[alignment-decision] ${report.verdict}: ${report.missionId}`,
+    ...(report.requestId ? [`  request : ${report.requestId}`] : []),
+    ...(report.decidedBy ? [`  decided : ${report.decidedBy} @ ${report.decidedAt ?? '-'}`] : []),
+    ...(report.surface ? [`  surface : ${report.surface}`] : []),
+    ...report.reasons.map((reason) => `  - ${reason}`),
+  ].join('\n');
+}
+
+export async function main(
+  args = currentProcessArgv()
+): Promise<{ report: AlignmentDecisionReport; strict: boolean }> {
+  const argv = await createStandardYargs(['node', 'mission_alignment_decision', ...args])
     .option('mission', { alias: 'm', type: 'string', demandOption: true })
     .option('strict', { type: 'boolean', default: false })
     .option('json', { type: 'boolean', default: false })
@@ -191,24 +224,26 @@ export async function main(): Promise<void> {
 
   const report = assessAlignmentDecision(String(argv.mission));
 
-  if (argv.json) {
-    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  } else {
-    process.stdout.write(`[alignment-decision] ${report.verdict}: ${report.missionId}\n`);
-    if (report.requestId) process.stdout.write(`  request : ${report.requestId}\n`);
-    if (report.decidedBy)
-      process.stdout.write(`  decided : ${report.decidedBy} @ ${report.decidedAt ?? '-'}\n`);
-    if (report.surface) process.stdout.write(`  surface : ${report.surface}\n`);
-    for (const reason of report.reasons) process.stdout.write(`  - ${reason}\n`);
-  }
-
-  // Backward compatible: only --strict turns the verdict into an exit code, so
-  // interactive use keeps exit 0 while the gate check can fail closed.
-  process.exitCode = argv.strict && !report.satisfied ? 1 : 0;
+  return { report, strict: Boolean(argv.strict) };
 }
+
+export const runMissionAlignmentDecision = defineScript({
+  name: 'mission:alignment-decision',
+  flags: ['json'],
+  async run(context) {
+    const { report, strict } = await main(context.argv);
+    context.print(context.json ? report : formatAlignmentDecision(report));
+    // Backward compatible: only --strict turns the verdict into an exit code,
+    // so interactive use keeps exit 0 while the gate can fail closed.
+    if (strict && !report.satisfied) {
+      throw new ScriptExitError(1, report.reasons.join('\n'));
+    }
+    return report;
+  },
+});
 
 if (
   isDirectScript(import.meta.url, 'mission_alignment_decision.ts') ||
   isDirectScript(import.meta.url, 'mission_alignment_decision.js')
 )
-  void main();
+  void runMissionAlignmentDecision();

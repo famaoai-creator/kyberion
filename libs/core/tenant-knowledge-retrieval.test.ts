@@ -6,6 +6,7 @@ import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-i
 import {
   _resetTenantKnowledgeWarningsForTests,
   buildTenantKnowledgeScopeSet,
+  normalizeTenantKnowledgeSourcePath,
   queryTenantKnowledge,
 } from './tenant-knowledge-retrieval.js';
 
@@ -141,6 +142,19 @@ describe('buildTenantKnowledgeScopeSet (positive allowlist)', () => {
     expect(
       buildTenantKnowledgeScopeSet('NOT A SLUG', { rootDir: fixtureRoot, env: fixtureEnv })
     ).toBeNull();
+  });
+});
+
+describe('normalizeTenantKnowledgeSourcePath', () => {
+  it('normalizes knowledge-relative overlay sources without allowing traversal', () => {
+    expect(normalizeTenantKnowledgeSourcePath('../customer/tenant-x/brief.md')).toBe(
+      'customer/tenant-x/brief.md'
+    );
+    expect(normalizeTenantKnowledgeSourcePath('confidential/tenant-x/brief.md')).toBe(
+      'knowledge/confidential/tenant-x/brief.md'
+    );
+    expect(normalizeTenantKnowledgeSourcePath('../../outside/secret.md')).toBeNull();
+    expect(normalizeTenantKnowledgeSourcePath('/tmp/outside/secret.md')).toBeNull();
   });
 });
 

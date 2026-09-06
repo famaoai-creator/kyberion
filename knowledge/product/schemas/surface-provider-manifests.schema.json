@@ -13,7 +13,17 @@
     "providers": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["slack", "chronos", "presence", "imessage", "discord", "telegram"],
+      "required": [
+        "slack",
+        "chronos",
+        "presence",
+        "imessage",
+        "discord",
+        "telegram",
+        "cowork",
+        "cli",
+        "terminal"
+      ],
       "properties": {
         "slack": {
           "$ref": "#/$defs/providerManifest"
@@ -37,6 +47,9 @@
           "$ref": "#/$defs/coworkProviderManifest"
         },
         "cli": {
+          "$ref": "#/$defs/providerManifest"
+        },
+        "terminal": {
           "$ref": "#/$defs/providerManifest"
         }
       }
@@ -365,7 +378,16 @@
       "properties": {
         "id": {
           "type": "string",
-          "enum": ["slack", "chronos", "presence", "imessage", "discord", "telegram", "cli"]
+          "enum": [
+            "slack",
+            "chronos",
+            "presence",
+            "imessage",
+            "discord",
+            "telegram",
+            "cli",
+            "terminal"
+          ]
         },
         "displayName": {
           "type": "string"

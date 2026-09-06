@@ -4,10 +4,21 @@ import { agentRegistry, resolveAgentTrustScore } from './agent-registry.js';
 import { trustEngine } from './trust-engine.js';
 import { ACPMediator } from './acp-mediator.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
 import { getAgentIdentity, resetAgentIdentityServiceForTests } from './agent-identity.js';
+import { runtimeSupervisor } from './runtime-supervisor.js';
 
 describe('agent-lifecycle model routing', () => {
+  it('routes task model routing environment reads through the governed accessor', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/agent-lifecycle.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/env\.KYBERION_/u);
+    expect(source).toContain('getRegisteredEnvText');
+  });
+
   it('keeps the manifest model in advisory mode', () => {
     expect(
       resolveAgentLifecycleModelId(
@@ -136,6 +147,25 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
     expect(nhiId).toMatch(/ni01-ungoverned-agent$/);
     expect(getAgentIdentity(nhiId!)).toBeNull();
 
+    await agentLifecycle.shutdown(agentId);
+  });
+
+  it('registers the propagated supervisor owner at runtime creation', async () => {
+    const agentId = 'ni01-runtime-owner-agent';
+    await agentLifecycle.spawn({
+      agentId,
+      provider: 'agy',
+      modelId: 'Gemini 3.6 Flash (Medium)',
+      missionId: 'MSN-NI01-RUNTIME-OWNER',
+      runtimeOwnerId: 'agent-runtime-supervisor:request-1',
+      runtimeOwnerType: 'agent-runtime-supervisor',
+      runtimeMetadata: { skip_provider_resolution: true },
+    });
+
+    expect(runtimeSupervisor.get(agentId)).toMatchObject({
+      ownerId: 'agent-runtime-supervisor:request-1',
+      ownerType: 'agent-runtime-supervisor',
+    });
     await agentLifecycle.shutdown(agentId);
   });
 });

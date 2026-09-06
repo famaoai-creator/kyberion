@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Generate CHANGELOG entries from Conventional Commits.
  *
@@ -17,12 +16,14 @@
  * The tool does NOT auto-bump version numbers — that's part of the release runbook.
  */
 
-import { execSync } from 'node:child_process';
 import * as path from 'node:path';
-import { resolveChangelogPolicy, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { resolveChangelogPolicy } from '@agent/core/changelog-policy';
+import { readTextFile } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExec, safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-const ROOT = execSync('git rev-parse --show-toplevel').toString().trim();
+const ROOT = pathResolver.rootDir();
 const CHANGELOG_PATH = path.join(ROOT, 'CHANGELOG.md');
 
 interface ParsedCommit {
@@ -50,9 +51,14 @@ const ORDER = [
 ];
 
 function git(args: string[]): string {
-  return execSync(`git ${args.map((a) => `"${a.replace(/"/g, '\\"')}"`).join(' ')}`, { cwd: ROOT })
-    .toString()
-    .trim();
+  return safeExec('git', args, { cwd: ROOT }).trim();
+}
+
+export function readChangelogTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 function findLatestTag(): string | null {
@@ -165,22 +171,13 @@ function renderSection(commits: ParsedCommit[], from: string | null, to: string)
   return lines.join('\n');
 }
 
-function prependToChangelog(content: string): void {
-  if (!safeExistsSync(CHANGELOG_PATH)) {
-    safeWriteFile(CHANGELOG_PATH, `# Changelog\n\n## [Unreleased]\n\n${content}`, {
-      encoding: 'utf8',
-    });
-    return;
-  }
-  const existing = safeReadFile(CHANGELOG_PATH, { encoding: 'utf8' }) as string;
+export function buildPrependedChangelog(existing: string | null, content: string): string {
+  if (existing === null) return `# Changelog\n\n## [Unreleased]\n\n${content}`;
   const unreleasedRe = /(##\s*\[Unreleased\][^\n]*\n)/;
   if (unreleasedRe.test(existing)) {
-    const updated = existing.replace(unreleasedRe, `$1\n${content}\n`);
-    safeWriteFile(CHANGELOG_PATH, updated, { encoding: 'utf8' });
-  } else {
-    const updated = `# Changelog\n\n## [Unreleased]\n\n${content}\n${existing.replace(/^#\s*Changelog\s*\n/, '')}`;
-    safeWriteFile(CHANGELOG_PATH, updated, { encoding: 'utf8' });
+    return existing.replace(unreleasedRe, `$1\n${content}\n`);
   }
+  return `# Changelog\n\n## [Unreleased]\n\n${content}\n${existing.replace(/^#\s*Changelog\s*\n/, '')}`;
 }
 
 export const main = defineScript({
@@ -201,14 +198,44 @@ export const main = defineScript({
     const section = renderSection(commits, from, to);
 
     if (prepend) {
-      prependToChangelog(section);
-      context.print(`✅ Prepended to ${CHANGELOG_PATH}`);
+      const existing = safeExistsSync(CHANGELOG_PATH)
+        ? readChangelogTextFile(CHANGELOG_PATH)
+        : null;
+      const updated = buildPrependedChangelog(existing, section);
+      const changed = existing !== updated;
+      if (context.check && changed) {
+        throw new ScriptExitError(1, '', true, {
+          path: CHANGELOG_PATH,
+          changed,
+          mode: 'prepend',
+        });
+      }
+      if (!context.dryRun && !context.check) {
+        safeWriteFile(CHANGELOG_PATH, updated, { encoding: 'utf8' });
+      }
+      context.print(
+        context.json
+          ? { path: CHANGELOG_PATH, changed, mode: context.dryRun ? 'dry-run' : 'prepend' }
+          : context.dryRun
+            ? `Would prepend to ${CHANGELOG_PATH}`
+            : `✅ Prepended to ${CHANGELOG_PATH}`
+      );
     } else {
       const policy = resolveChangelogPolicy();
+      const report = {
+        from: from ?? 'root',
+        to,
+        count: commits.length,
+        section,
+      };
       context.print(
-        `${policy.header_template.replace('{from}', from ?? 'root').replace('{count}', String(commits.length))}\n`
+        context.json
+          ? report
+          : `${policy.header_template
+              .replace('{from}', from ?? 'root')
+              .replace('{count}', String(commits.length))}\n${section}`
       );
-      context.print(section);
+      return report;
     }
   },
 });

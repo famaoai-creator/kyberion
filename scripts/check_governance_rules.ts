@@ -1,13 +1,11 @@
 import * as path from 'node:path';
-import {
-  readModelRegistryDirectory,
-  pathResolver,
-  safeExistsSync,
-  safeReaddir,
-  assertProcessDefinitionRegistry,
-} from '@agent/core';
-import { compileSchema, readJson as readFoundationJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { readModelRegistryDirectory } from '@agent/core/model-registry-directory';
+import { assertProcessDefinitionRegistry } from '@agent/core/process-definition-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { loadSurfaceManifest } from '@agent/core/surface-runtime';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { compileSchema, defineCatalog } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   validateActuatorCatalogDirectoryConsistency,
   validateAgentProfileDirectoryConsistency,
@@ -23,6 +21,7 @@ import {
   findMachineAbsolutePathViolations,
   scanProductJsonForPlacementDrift,
 } from './check-governance-path-scanners.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 type GovernanceRuleCheck = {
   id: string;
@@ -31,6 +30,14 @@ type GovernanceRuleCheck = {
 };
 
 const GOVERNANCE_DIR = 'knowledge/product/governance';
+
+const voiceEngineRegistrySnapshotCatalog = defineCatalog<{
+  engines?: Array<{ engine_id?: string }>;
+}>({
+  id: 'voice-engine-registry-snapshot',
+  path: pathResolver.knowledge('product/governance/voice-engine-registry.json'),
+  schema: pathResolver.knowledge('product/schemas/voice-engine-registry.schema.json'),
+});
 
 const CHECKS: GovernanceRuleCheck[] = [
   {
@@ -298,12 +305,65 @@ export function findDeterministicCatalogViolations(): string[] {
     .map((entry) => `${GOVERNANCE_DIR}/${entry}`);
 }
 
-function readJson<T>(relativePath: string): T {
-  return readFoundationJson<T>(pathResolver.rootResolve(relativePath));
+/**
+ * Discover every governance catalog that declares a repository-local schema.
+ * The hand-authored list above remains the place for domain-specific rules
+ * and non-governance directory snapshots; schema validation itself must not
+ * require adding a second entry whenever a catalog is introduced.
+ */
+export function discoverGovernanceRuleChecks(): GovernanceRuleCheck[] {
+  const root = pathResolver.rootResolve(GOVERNANCE_DIR);
+  if (!safeExistsSync(root)) return [];
+
+  const checks: GovernanceRuleCheck[] = [];
+  for (const fileName of safeReaddir(root)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()) {
+    const dataPath = `${GOVERNANCE_DIR}/${fileName}`;
+    let payload: { $schema?: unknown };
+    try {
+      payload = readSafeJsonFile<{ $schema?: unknown }>(
+        pathResolver.rootResolve(dataPath),
+        `governance catalog ${dataPath}`
+      );
+    } catch {
+      // The catalog-integrity gate reports malformed JSON with the precise
+      // parse error; discovery should still allow the rest of this check to
+      // run and report independent governance violations.
+      continue;
+    }
+    const schemaRef = typeof payload.$schema === 'string' ? payload.$schema.trim() : '';
+    if (!schemaRef || /^https?:\/\//u.test(schemaRef)) continue;
+    const schemaPath = path.normalize(path.join(GOVERNANCE_DIR, schemaRef));
+    if (!safeExistsSync(pathResolver.rootResolve(schemaPath))) continue;
+    checks.push({
+      id: fileName.replace(/\.json$/iu, ''),
+      schemaPath,
+      dataPath,
+    });
+  }
+  return checks;
+}
+
+function allGovernanceRuleChecks(): GovernanceRuleCheck[] {
+  const checks = new Map<string, GovernanceRuleCheck>();
+  for (const check of CHECKS) {
+    checks.set(check.dataPath, check);
+  }
+  for (const check of discoverGovernanceRuleChecks()) {
+    // A hand-authored entry may carry a specialized schema or directory
+    // consistency rule. Discovery supplies coverage for new catalogs but must
+    // never replace that stronger existing contract.
+    if (!checks.has(check.dataPath)) checks.set(check.dataPath, check);
+  }
+  return [...checks.values()].sort((left, right) => left.dataPath.localeCompare(right.dataPath));
 }
 
 function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
-  const data = readJson<Record<string, unknown>>(check.dataPath);
+  const data = readSafeJsonFile<Record<string, unknown>>(
+    pathResolver.rootResolve(check.dataPath),
+    `governance catalog ${check.dataPath}`
+  );
   const validate = compileSchema(check.schemaPath);
   const ok = validate(data);
   if (!ok) {
@@ -651,10 +711,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       for (const entry of safeReaddir(surfacesDir)
         .filter((name) => name.endsWith('.json'))
         .sort()) {
-        const surfaceManifest = readJson<{
-          version?: number;
-          surfaces?: Array<{ id?: string; enabled?: boolean }>;
-        }>(path.join('knowledge/product/governance/surfaces', entry));
+        const surfaceManifest = loadSurfaceManifest(
+          pathResolver.rootResolve(path.join('knowledge/product/governance/surfaces', entry))
+        );
         if (!validate(surfaceManifest)) {
           for (const error of validate.errors || []) {
             violations.push(
@@ -1100,9 +1159,7 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       violations.push('voice-profile-registry: at least one active profile is required');
     }
 
-    const engineRegistry = readJson<{ engines?: Array<{ engine_id?: string }> }>(
-      'knowledge/product/governance/voice-engine-registry.json'
-    );
+    const engineRegistry = voiceEngineRegistrySnapshotCatalog.load();
     const engineIds = new Set(
       (engineRegistry.engines || []).map((engine) => String(engine.engine_id || ''))
     );
@@ -1416,7 +1473,7 @@ export const runCheckGovernanceRules = defineScript({
   flags: [],
   run(context) {
     const violations: string[] = [];
-    for (const check of CHECKS) {
+    for (const check of allGovernanceRuleChecks()) {
       validateRuleFile(check, violations);
     }
     validateActuatorCatalogDirectoryConsistency(violations);
@@ -1436,15 +1493,16 @@ export const runCheckGovernanceRules = defineScript({
     }
 
     if (violations.length > 0) {
-      console.error('[check:governance-rules] violations detected:');
-      for (const violation of violations.sort()) {
-        console.error(`- ${violation}`);
-      }
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...violations.sort().map((violation) => `- ${violation}`)].join(
+          '\n'
+        )
+      );
     }
 
     context.print('[check:governance-rules] OK');
+    return { violations };
   },
 });
 

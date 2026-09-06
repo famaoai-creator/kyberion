@@ -82,8 +82,3 @@ export function getServiceAuthorities(serviceId: string): string[] {
       ?.authorities || []
   );
 }
-
-export function resetServiceAuthorityMapCache(): void {
-  cachedMap = null;
-  cachedMapKey = null;
-}
