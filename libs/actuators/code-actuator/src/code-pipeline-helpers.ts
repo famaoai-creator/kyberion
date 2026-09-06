@@ -488,8 +488,7 @@ function discoverGovernedSkills(): any[] {
   }
 
   try {
-    const raw = safeReadFile(skillIndexPath, { encoding: 'utf8' }) as string;
-    const parsed = parseSafeJsonInput(raw, 'global skill index') as GlobalSkillIndex;
+    const parsed = readJson<GlobalSkillIndex>(skillIndexPath);
     const entries = Array.isArray(parsed.s) ? parsed.s : [];
     return entries.map((entry) => ({
       name: entry.n,
