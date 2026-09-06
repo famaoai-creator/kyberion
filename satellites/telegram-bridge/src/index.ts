@@ -852,7 +852,7 @@ async function handleInputFile(inputPath: string, options: TelegramBridgeOptions
   console.log(JSON.stringify(receipt, null, 2));
 }
 
-async function main(args: string[] = process.argv): Promise<void> {
+async function main(args: string[] = []): Promise<void> {
   const argv = await createStandardYargs(args)
     .option('input', {
       alias: 'i',

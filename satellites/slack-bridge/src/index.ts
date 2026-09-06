@@ -452,7 +452,7 @@ async function processSlackOutbox(client: SlackClient) {
 
 const runSlackOutbox = createSurfaceOutboxDrainGuard('slack');
 
-async function start(_args: string[] = process.argv) {
+async function start(_args: string[] = []) {
   if (!getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', 'slack_bridge');
   }
