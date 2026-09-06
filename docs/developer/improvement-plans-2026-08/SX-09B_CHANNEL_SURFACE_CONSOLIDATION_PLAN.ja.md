@@ -356,3 +356,12 @@ formatter に `SupportedLocale` を受け取る optional 引数を追加し、Sl
 
 検証: channel adapter／4 bridge **5 files／50 tests passed**、root typecheck、Prettier、`git diff --check`。
 全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 33
+
+Slack の approval／mission proposal UI に残っていた contract label、approval control、確認文言の
+日英直書きを bridge vocabulary へ移し、Slack bridge が `resolveOperatorLocale()` を UI builder へ渡すようにした。
+省略時の既存互換表示と `shouldSend`／approval state／external delivery semantics は変更していない。
+
+検証: Slack approval／proposal／surface agent **4 files／34 tests passed**、root typecheck、Prettier、
+`git diff --check`。framework-specific request parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。

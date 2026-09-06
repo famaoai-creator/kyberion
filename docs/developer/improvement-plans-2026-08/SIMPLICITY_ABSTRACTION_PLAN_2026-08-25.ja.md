@@ -1,7 +1,7 @@
 ---
 title: SIMPLICITY ABSTRACTION PLAN 2026 08 25
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-09-05
+last_updated: 2026-09-06
 status: active
 ---
 
@@ -22607,6 +22607,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/channel-adapter.ts`、`libs/core/channel-adapter.test.ts`、Slack／Telegram／Discord／iMessage bridge、SX-09b
 - **変更**: 共通 thread formatter の `en` 固定を解消し、`SupportedLocale` を受け取る optional 引数を追加した。4 bridge はそれぞれの `resolveOperatorLocale()` を formatter へ渡し、履歴見出し・話者ラベルも operator locale に従って描画する。既定値 `en`、current message 除外、履歴件数制限、delivery gate は維持した。
 - **検証**: channel adapter／4 bridge **5 files／50 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider 実機受入、日英 literal の全面移行は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1575
+
+- **対象**: `libs/core/slack-approval-ui.ts`、`libs/core/slack-mission-proposal-ui.ts`、Slack bridge と対象テスト、SX-08b／SX-09b
+- **変更**: Slack approval／mission proposal の contract label、approval control、mission confirmation、fallback に残っていた日英直書きを bridge vocabulary と `SupportedLocale` に接続した。Slack bridge は `resolveOperatorLocale()` を builderへ渡し、省略時の既存互換表示、approval／proposal state、`shouldSend`／external delivery semantics は維持した。
+- **検証**: Slack approval／proposal／surface agent **4 files／34 tests passed**、root typecheck、Prettier、`git diff --check`。12 surface の全面 contract 描画、provider 実機依存、package scripts／framework-specific request parsing の削減は継続課題とする。
 
 ## 2026-09-06 再レビュー修正 1550
 
