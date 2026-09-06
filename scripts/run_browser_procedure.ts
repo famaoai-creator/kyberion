@@ -150,8 +150,6 @@ export async function main(
     return;
   }
 
-  assertSupportedNodeEngine(deps.nodeVersion ?? process.version);
-
   const procedureId = argv['procedure-id'] ? String(argv['procedure-id']) : '';
   const recordingRef = argv.recording ? String(argv.recording) : '';
   const adfPath = argv.adf ? String(argv.adf) : argv.input ? String(argv.input) : '';
@@ -170,6 +168,8 @@ export async function main(
   if (selected.length > 1) {
     throw new ScriptExitError(1, 'use only one of --procedure-id, --recording, or --adf/--input');
   }
+
+  assertSupportedNodeEngine(deps.nodeVersion ?? process.version);
 
   const headed = Boolean(argv.headed);
   const cdpUrl = argv['cdp-url'] ? String(argv['cdp-url']) : undefined;

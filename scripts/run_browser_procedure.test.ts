@@ -80,8 +80,10 @@ describe('run_browser_procedure', () => {
     };
   }
 
-  it('prints usage when no run target is given', async () => {
-    await expect(main([], print, deps())).rejects.toBeInstanceOf(ScriptExitError);
+  it('prints usage when no run target is given, even on an unsupported Node engine', async () => {
+    await expect(main([], print, deps({ nodeVersion: 'v22.14.0' }))).rejects.toBeInstanceOf(
+      ScriptExitError
+    );
     expect(String(print.mock.calls[0][0])).toContain('pnpm kyberion browser run');
     expect(dispatch).not.toHaveBeenCalled();
   });
