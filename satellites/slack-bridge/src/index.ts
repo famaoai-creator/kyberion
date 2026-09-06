@@ -389,17 +389,21 @@ function automationRegistrationReply(
   if (!scheduled) {
     return t('bridge:automation_missing_bindings', undefined, locale);
   }
+  const cron = scheduled.trigger.cron;
+  if (!cron) {
+    return t(
+      'bridge:automation_registration_failed',
+      { detail: 'the schedule is missing a cron expression' },
+      locale
+    );
+  }
   const timezone = scheduled.trigger.timezone ? ` (${scheduled.trigger.timezone})` : '';
   const delivery = scheduled.deliver_to
     ? ` → ${scheduled.deliver_to.surface}:${scheduled.deliver_to.channel}`
     : '';
   return [
     t('bridge:automation_registered', { name: scheduled.name }, locale),
-    t(
-      'bridge:automation_registered_cron',
-      { cron: scheduled.trigger.cron, timezone, delivery },
-      locale
-    ),
+    t('bridge:automation_registered_cron', { cron, timezone, delivery }, locale),
   ].join('\n');
 }
 

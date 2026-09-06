@@ -24041,3 +24041,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: 残存server protocol entrypoint、SX-06
 - **変更**: Slack bridgeも `@agent/core/script-harness` の同一argv・失敗境界へ移行し、Telegram／Discord／iMessage／Slackの4つの主要text bridgeで直接起動時の個別 `.catch` を廃止した。import時のSocket Mode接続抑止とVITEST時の起動抑止は維持した。
 - **検証**: Slack bridge **1 file／9 tests passed**、対象ESLint、Prettier、`git diff --check`。Slack package buildは既存の `@agent/core/stimuli-journal` 公開解決不足と既存の `string | undefined` 型エラーで停止した。
+
+## 2026-09-06 再レビュー実装 1807
+
+- **対象**: Slack bridge packaging boundary、SX-03／SX-06
+- **変更**: `libs/core/stimuli-journal.ts` はcore barrelから公開済みなのにpackage subpath exportが欠けていたため、`@agent/core/stimuli-journal` のtypes/runtime exportを追加した。Slackのautomation replyでは任意のcron値を文字列へ暗黙変換せず、欠落時は登録失敗として利用者へ返すfail-closed境界を追加した。
+- **検証**: core build、Slack bridge build、Slack bridge **1 file／9 tests passed**、対象ESLint、Prettier、`git diff --check`。
