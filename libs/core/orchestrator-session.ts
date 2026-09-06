@@ -42,9 +42,8 @@
 
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { parseSafeJsonInput } from './foundation/json.js';
+import { readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
-import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
@@ -325,22 +324,11 @@ export class OrchestratorSessionJournal {
         `[ORCHESTRATOR_SESSION_RESOURCE] journal must be a regular file: ${this.journalPath}`
       );
     }
-    const raw = readTextFile(this.journalPath);
-    const events: JournalEventEnvelope[] = [];
-    let maxSeq = -1;
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const parsed = journalEventEnvelopeSchema.parse(
-          parseSafeJsonInput(trimmed, 'orchestrator session journal entry')
-        );
-        events.push(parsed);
-        if (parsed.seq > maxSeq) maxSeq = parsed.seq;
-      } catch {
-        // A torn/corrupt line must not poison replay of the rest.
-      }
-    }
+    const events = readJsonLines<JournalEventEnvelope>(this.journalPath, {
+      onMalformed: 'skip',
+      map: (value) => journalEventEnvelopeSchema.parse(value),
+    });
+    const maxSeq = events.reduce((max, event) => Math.max(max, event.seq), -1);
     return { events, maxSeq };
   }
 }
