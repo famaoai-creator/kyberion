@@ -306,11 +306,10 @@ async function opCapture(
     }
     case 'read_json': {
       const filePath = resolvedString(params.path, resolve);
-      const rawText = await retry(
-        async () => safeReadFile(resolveFilePath(String(filePath)), { encoding: 'utf8' }),
+      const parsed = await retry(
+        async () => readJson<unknown>(resolveFilePath(String(filePath))),
         buildRetryOptions()
       );
-      const parsed = parseSafeJsonInput(String(rawText), 'file read_json input');
       return {
         ...ctx,
         [exportKey(params, 'last_capture_data')]: parsed,
