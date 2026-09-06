@@ -855,6 +855,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 の direct-loader inventory から、deliverable inbox lock metadata read に operation-time の regular-file 検査を追加し、directory replacement を stale lock削除へ進めず lock timeoutでfail-closedする回帰を追加した。関連 **2 files / 8 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: PI-03 の direct-loader inventory から、onboarding apply／rollback の existing binding／organization snapshot read を共通 `readOptionalOnboardingFile` の operation-time regular-file 境界へ統一し、directory replacement を状態復元・binding更新へ到達させない回帰を追加した。関連 **2 files / 11 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: PI-03 の direct-loader inventory から、background-review の pipeline／managed skill／memory target read を共通 operation-time regular-file 境界へ統一し、directory replacement をpre-image hash／patch適用へ到達させない回帰を追加した。関連 **2 files / 13 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
+- 2026-09-06: PI-03 の direct-loader inventory から、Cowork→Kyberion artifact ingest の本文 read 前へ operation-time の regular-file 検査を追加し、directory replacement をtier分類／memory promotion queueへ到達させない回帰を追加した。関連 **2 files / 19 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 
 ## 7. 検証コマンド(実装時)
 

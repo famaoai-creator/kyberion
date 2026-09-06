@@ -265,6 +265,15 @@ export function ingestCoworkArtifacts(
       result.errors.push(`File not found: ${sourceRef}`);
       continue;
     }
+    try {
+      if (!safeLstat(absPath).isFile()) {
+        result.errors.push(`Cannot read ${sourceRef}: artifact must be a regular file`);
+        continue;
+      }
+    } catch (err) {
+      result.errors.push(`Cannot read ${sourceRef}: ${err}`);
+      continue;
+    }
 
     let content: string;
     try {
