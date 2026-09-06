@@ -1,4 +1,4 @@
-import { appendJsonLine, parseSafeJsonInput, readJson } from './foundation/json.js';
+import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
@@ -361,23 +361,15 @@ export function loadProvisionedEntryRecords(
   if (!safeLstat(filePath).isFile()) {
     throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_record_file`);
   }
-  const raw = readTextFile(filePath);
-  return raw
-    .split(/\r?\n/u)
-    .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
-    .filter((entry) => Boolean(entry.line))
-    .map(({ line, lineNumber }) => {
-      try {
-        return loadProvisionedEntryRecordAtLine(
-          parseSafeJsonInput(line, 'mission provisioned entry'),
-          `${filePath}:${lineNumber}`
-        );
-      } catch (error) {
-        throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_record:${lineNumber}`, {
-          cause: error,
-        });
-      }
-    });
+  return readJsonLines<ProvisionedEntryRecord>(filePath, {
+    map: (value, lineNumber) =>
+      loadProvisionedEntryRecordAtLine(value, `${filePath}:${lineNumber}`),
+    onMalformed: (error, lineNumber) => {
+      throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_record:${lineNumber}`, {
+        cause: error,
+      });
+    },
+  });
 }
 
 /**
@@ -787,25 +779,20 @@ export function loadMissionOrchestrationJournal(
   if (!safeLstat(filePath).isFile()) {
     throw new Error('MISSION_LOG_CORRUPT:journal_file_not_regular');
   }
-  const raw = readTextFile(filePath);
-  return raw
-    .split(/\r?\n/u)
-    .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
-    .filter((entry) => Boolean(entry.line))
-    .map(({ line, lineNumber }) => {
-      try {
-        const parsed = parseSafeJsonInput(line, 'mission orchestration journal entry');
-        const validated = missionOrchestrationJournalCatalog(filePath).validate(
-          parsed,
-          `${filePath}:${lineNumber}`
-        );
-        return normalizeJournalEntry(validated);
-      } catch (error) {
-        throw new Error(`MISSION_LOG_CORRUPT:journal_entry_unreadable:${lineNumber}`, {
-          cause: error,
-        });
-      }
-    });
+  return readJsonLines<MissionOrchestrationJournalEntry>(filePath, {
+    map: (value, lineNumber) => {
+      const validated = missionOrchestrationJournalCatalog(filePath).validate(
+        value,
+        `${filePath}:${lineNumber}`
+      );
+      return normalizeJournalEntry(validated);
+    },
+    onMalformed: (error, lineNumber) => {
+      throw new Error(`MISSION_LOG_CORRUPT:journal_entry_unreadable:${lineNumber}`, {
+        cause: error,
+      });
+    },
+  });
 }
 
 export function loadMissionOrchestrationReplayPlan(
