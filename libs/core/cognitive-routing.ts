@@ -1,10 +1,9 @@
 import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { readTextFile } from './foundation/text.js';
+import { readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/cognitive-routing-decision.schema.json'
@@ -120,7 +119,6 @@ const DETERMINISTIC_MARKERS = [
 
 let validateFn: CognitiveRouteDecisionValidator | null = null;
 let cachedSchemaPath: string | null = null;
-let cachedSchemaRaw: string | null = null;
 
 function ensureValidator(): CognitiveRouteDecisionValidator {
   if (validateFn && cachedSchemaPath === SCHEMA_PATH) return validateFn;
@@ -332,11 +330,5 @@ export function loadCognitiveRoutingSchema(): unknown {
   if (!safeLstat(safeSchemaPath).isFile()) {
     throw new Error(`Cognitive routing schema must be a regular file at ${SCHEMA_PATH}`);
   }
-  const raw = readTextFile(safeSchemaPath);
-  if (cachedSchemaRaw === raw && cachedSchemaPath === safeSchemaPath) {
-    return parseSafeJsonInput(raw, 'cognitive routing schema');
-  }
-  cachedSchemaRaw = raw;
-  cachedSchemaPath = safeSchemaPath;
-  return parseSafeJsonInput(raw, 'cognitive routing schema');
+  return readJson<unknown>(safeSchemaPath);
 }
