@@ -23399,3 +23399,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/generate_env_registry.ts`、`scripts/generate_env_registry.contract.test.ts`、PI-03
 - **変更**: env registry generatorのsource tree本文readを`readEnvRegistryTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをenvironment discovery／registry rendering判定へ到達させないようにした。既存のclassifier、curated merge、generated artifact semanticsは維持した。
 - **検証**: env registry generator **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1700
+
+- **対象**: `scripts/generate_subagent_definitions.ts`、`scripts/generate_subagent_definitions.test.ts`、PI-03
+- **変更**: subagent definitions generatorのauthority procedure本文readを`readSubagentDefinitionsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをprocedure condensation／generated definition判定へ到達させないようにした。既存のteam-role SSOT、profile projection、provider-specific generation semanticsは維持した。
+- **検証**: subagent definitions generator **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
