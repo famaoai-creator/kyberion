@@ -11,6 +11,7 @@ import {
 } from '@agent/core/headless-surface-contract';
 import { validateA2UIMessage, type A2UIMessage } from '@agent/core/a2ui';
 import { parseIntentResolutionContract } from '@agent/core/intent-resolution-contract';
+import { readSurfaceStringParam } from '@agent/core/surface-request-input';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
@@ -298,7 +299,7 @@ app.get('/api/os/control-plane', (req, res) => {
   try {
     const access = getComputerSurfaceAccess();
     const snapshot = getComputerSurfaceOsSnapshot(
-      typeof rawMissionId === 'string' ? rawMissionId : undefined,
+      readSurfaceStringParam(rawMissionId),
       undefined,
       access
     );

@@ -23531,3 +23531,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Concierge summary／SSE／headless home route、`presence/displays/concierge/src/lib/request-input.ts`、SX-09b
 - **変更**: Concierge の4つの read-only home route に重複していた tenant／organization／project query reader を共有 `readConciergeScopeQuery` へ統合した。headless の認可判定と home projection、summary／SSE の scope filter が同一の optional scalar query を使い、空値を `undefined` とする既存 semanticsを維持した。
 - **検証**: Concierge request-input **1 file／9 tests passed**、対象 Prettier、`git diff --check`。Next runtimeを含む実ブラウザ／viewer scope統合受入は継続課題である。
+
+## 2026-09-06 再レビュー実装 1722
+
+- **対象**: `libs/core/surface-request-input.ts`、Presence Studio／Computer Surface の OS control-plane route、SX-09b
+- **変更**: 2つの Express surface に重複していた `mission_id` の scalar判定を共有 `readSurfaceStringParam` へ統合した。repeated query は既存どおり400で拒否し、単一 string だけを OS projection へ渡す境界と、配列・object を暗黙文字列化しない core 回帰を追加した。
+- **検証**: core／Presence Studio／Computer Surface **3 files／24 tests passed**、対象 ESLint、Prettier、`git diff --check`。外部OS provider 実機受入は継続課題である。

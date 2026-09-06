@@ -31,6 +31,7 @@ import {
 } from '@agent/core/surface-ux';
 import { resolveWorkDesign } from '@agent/core/work-design';
 import { loadStandardIntentCatalog } from '@agent/core/intent-resolution';
+import { readSurfaceStringParam } from '@agent/core/surface-request-input';
 import { buildTrackGateReadinessSummaries } from '@agent/core/sdlc-gate-readiness';
 import { listProjectRecords } from '@agent/core/project-registry';
 import { listManagedProjects } from '@agent/core/project-management';
@@ -381,7 +382,7 @@ presenceStudioData.app.get('/api/os/control-plane', (req, res) => {
       return res.status(400).json({ ok: false, error: 'mission_id must be a single value' });
     }
     const snapshot = presenceStudioData.cloudflareOsSurface.snapshot(
-      typeof rawMissionId === 'string' ? rawMissionId : undefined,
+      readSurfaceStringParam(rawMissionId),
       access
     );
     res.setHeader('Cache-Control', 'private, no-store');

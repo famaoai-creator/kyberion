@@ -51,6 +51,16 @@ describe('Computer Surface Cloudflare OS projection', () => {
     expect(source).toContain('getRegisteredEnvText');
   });
 
+  it('uses the shared scalar query reader after rejecting repeated mission IDs', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('presence/displays/computer-surface/server.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('readSurfaceStringParam(rawMissionId)');
+    expect(source).toContain("error: 'mission_id must be a single value'");
+  });
+
   it('derives human tenant-scoped access from server environment', () => {
     vi.stubEnv('KYBERION_TENANT', 'tenant-a');
     vi.stubEnv('KYBERION_COMPUTER_SURFACE_PRINCIPAL', 'human:computer-a');
