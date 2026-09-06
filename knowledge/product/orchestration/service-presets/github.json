@@ -250,6 +250,58 @@
         "pull_number": { "required": true, "type": "number" },
         "per_page": { "required": false, "type": "number", "default": 30 }
       }
+    },
+    "create_review": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/reviews",
+      "method": "POST",
+      "kind": "apply",
+      "risk": "write",
+      "description": "Submits a pull request review (COMMENT, APPROVE, or REQUEST_CHANGES). Write-gated; approval is required.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "pull_number": { "required": true, "type": "number" },
+        "event": {
+          "required": true,
+          "type": "string",
+          "description": "COMMENT, APPROVE, or REQUEST_CHANGES"
+        },
+        "body": { "required": false, "type": "string" },
+        "commit_id": { "required": false, "type": "string" }
+      },
+      "payload_template": {
+        "event": "{{event}}",
+        "body": "{{body}}",
+        "commit_id": "{{commit_id}}"
+      },
+      "output_mapping": { "id": "id", "url": "html_url", "state": "state" }
+    },
+    "create_review_comment": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/pulls/{{pull_number}}/comments",
+      "method": "POST",
+      "kind": "apply",
+      "risk": "write",
+      "description": "Creates a line-level review comment on a pull request. Write-gated; approval is required.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "pull_number": { "required": true, "type": "number" },
+        "body": { "required": true, "type": "string" },
+        "commit_id": { "required": true, "type": "string" },
+        "path": { "required": true, "type": "string" },
+        "line": { "required": false, "type": "number" },
+        "side": { "required": false, "type": "string", "description": "LEFT or RIGHT" }
+      },
+      "payload_template": {
+        "body": "{{body}}",
+        "commit_id": "{{commit_id}}",
+        "path": "{{path}}",
+        "line": "{{line}}",
+        "side": "{{side}}"
+      },
+      "output_mapping": { "id": "id", "url": "html_url" }
     }
   }
 }

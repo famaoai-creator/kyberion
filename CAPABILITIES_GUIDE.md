@@ -546,4 +546,6 @@ See also:
 - [legacy_component_index.json](knowledge/product/orchestration/legacy_component_index.json)
 - [component-lifecycle-inventory.md](knowledge/product/architecture/component-lifecycle-inventory.md)
 - Slack 3経路: [docs/SLACK_CHANNEL_ROUTES.ja.md](docs/SLACK_CHANNEL_ROUTES.ja.md)
-- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` (not bare `pnpm doctor`).
+- Email inbox vs send: [docs/EMAIL_OPERATOR.ja.md](docs/EMAIL_OPERATOR.ja.md)
+- Single-op dry-run: `pnpm playground -- --actuator <id> --op <op> --params '{…}' --dry-run --json`
+- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` or `pnpm kyberion:doctor` (not bare `pnpm doctor`).

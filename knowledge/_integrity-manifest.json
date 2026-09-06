@@ -4431,7 +4431,7 @@
     {
       "path": "product/orchestration/service-harness-registry.json",
       "tier": "public",
-      "size": 64595,
+      "size": 65596,
       "type": "json"
     },
     {
@@ -4509,13 +4509,13 @@
     {
       "path": "product/orchestration/service-presets/github-mcp.json",
       "tier": "public",
-      "size": 1221,
+      "size": 1786,
       "type": "json"
     },
     {
       "path": "product/orchestration/service-presets/github.json",
       "tier": "public",
-      "size": 9541,
+      "size": 11631,
       "type": "json"
     },
     {
@@ -4983,7 +4983,7 @@
     {
       "path": "product/pipeline-templates/README.md",
       "tier": "public",
-      "size": 1338,
+      "size": 2935,
       "type": "md"
     },
     {
@@ -5140,6 +5140,12 @@
       "path": "product/pipeline-templates/customer-discovery-workflow.json",
       "tier": "public",
       "size": 6525,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/daily-github-inbox.json",
+      "tier": "public",
+      "size": 3289,
       "type": "json"
     },
     {
@@ -5577,7 +5583,7 @@
     {
       "path": "product/pipeline-templates/schedule-summary-and-coordination.json",
       "tier": "public",
-      "size": 4272,
+      "size": 3593,
       "type": "json"
     },
     {
@@ -10809,7 +10815,7 @@
     {
       "path": "public/connections/supported-integrations.md",
       "tier": "public",
-      "size": 10566,
+      "size": 17497,
       "type": "md"
     },
     {

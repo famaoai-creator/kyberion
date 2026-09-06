@@ -50,6 +50,34 @@ describe('service harness contract', () => {
     expect(createIssue?.parameters.title).toMatchObject({ required: true, type: 'string' });
   });
 
+  it('exposes GitHub review submit operations as write-gated apply', () => {
+    const descriptor = describeServiceHarness('github');
+    for (const action of ['create_review', 'create_review_comment'] as const) {
+      const operation = descriptor.operations.find((item) => item.action === action);
+      expect(operation).toMatchObject({
+        action,
+        kind: 'apply',
+        risk: 'write',
+        approval_required: true,
+      });
+    }
+    expect(descriptor.operation_count).toBe(19);
+  });
+
+  it('classifies github-mcp create_issue as write-gated, not capture', () => {
+    const descriptor = describeServiceHarness('github-mcp');
+    const createIssue = descriptor.operations.find((item) => item.action === 'create_issue');
+    expect(createIssue).toMatchObject({
+      action: 'create_issue',
+      kind: 'apply',
+      risk: 'write',
+      approval_required: true,
+    });
+    expect(() => assertServiceCaptureOperation('github-mcp', 'create_issue')).toThrow(
+      /Capture-only surface rejected/
+    );
+  });
+
   it('exposes GitHub issue/PR/review capture operations as read-only', () => {
     const descriptor = describeServiceHarness('github');
     const captureActions = [
@@ -78,6 +106,12 @@ describe('service harness contract', () => {
     expect(() => assertServiceCaptureOperation('github', 'create_issue')).toThrow(
       /Capture-only surface rejected/
     );
+    expect(() => assertServiceCaptureOperation('github', 'create_review')).toThrow(
+      /Capture-only surface rejected/
+    );
+    expect(() => assertServiceCaptureOperation('github', 'create_review_comment')).toThrow(
+      /Capture-only surface rejected/
+    );
     expect(() => assertServiceCaptureOperation('github', 'not_an_action')).toThrow(
       /Unknown service action/
     );
@@ -96,6 +130,16 @@ describe('service harness contract', () => {
     expect(writePlan.valid).toBe(false);
     expect(writePlan.validation_errors).toContain('title is required');
     expect(writePlan.approval_required).toBe(true);
+
+    const reviewPlan = planServiceOperation('github', 'create_review', {
+      owner: 'famaoai',
+      repo: 'kyberion',
+      pull_number: 713,
+    });
+    expect(reviewPlan.valid).toBe(false);
+    expect(reviewPlan.validation_errors).toContain('event is required');
+    expect(reviewPlan.approval_required).toBe(true);
+    expect(reviewPlan.risk).toBe('write');
   });
 
   it('redacts sensitive inputs in plans and receipts', () => {

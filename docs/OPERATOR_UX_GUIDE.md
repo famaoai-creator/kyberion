@@ -150,9 +150,11 @@ Use `pnpm services:setup` when you want the external service catalog to tell you
 
 Use `pnpm kyberion setup report` when you want a consolidated readiness view across surfaces, services, reasoning, and doctor without checking each domain one by one.
 
-`pnpm doctor` includes the baseline runtime and reasoning backend manifest checks; use it when you want the consolidated readiness view rather than a domain-specific setup report.
+Kyberion doctor is **`pnpm run doctor`** or **`pnpm kyberion:doctor`**. Bare `pnpm doctor` is pnpm's own diagnostic (registry/cache) and does not run Kyberion's readiness checks.
 
-`pnpm doctor` also reports the pipeline schedule registry maintained by Chronos. For the volatile memory layer, expect these scheduled entries after `node dist/scripts/chronos_daemon.js` has started at least once:
+`pnpm run doctor` includes the baseline runtime and reasoning backend manifest checks; use it when you want the consolidated readiness view rather than a domain-specific setup report.
+
+`pnpm run doctor` also reports the pipeline schedule registry maintained by Chronos. For the volatile memory layer, expect these scheduled entries after `node dist/scripts/chronos_daemon.js` has started at least once:
 
 | Schedule                |          Cadence | Purpose                                                                                                                    |
 | ----------------------- | ---------------: | -------------------------------------------------------------------------------------------------------------------------- |
