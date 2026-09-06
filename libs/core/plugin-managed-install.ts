@@ -16,10 +16,9 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
-import { readTextFile } from './foundation/text.js';
 import {
   createApprovalRequest,
   computeApprovalPayloadHash,
@@ -148,9 +147,7 @@ function readPluginManifestSafely(pluginRoot: string): {
       throw new Error(`plugin manifest must be a regular file: ${candidatePath}`);
     }
     parsed = parseSafeJsonObjectValue(
-      parseSafeJsonInput(readTextFile(candidatePath), `plugin manifest ${candidatePath}`, {
-        preserveParseError: true,
-      }),
+      readJson<unknown>(candidatePath),
       `plugin manifest ${candidatePath}`
     );
   } catch (err: unknown) {
