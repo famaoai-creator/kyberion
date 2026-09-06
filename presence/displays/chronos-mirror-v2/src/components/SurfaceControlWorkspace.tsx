@@ -9,12 +9,10 @@ import {
   parseSurfaceControlResponse,
   type ClientSurfaceControlAction,
   type ClientSurfaceControlActionSummary,
-  type ClientSurfaceSummary,
   type SurfaceControlResponse,
 } from '../lib/surface-control-response';
 
 type ActionDefinition = ClientSurfaceControlAction;
-type Surface = ClientSurfaceSummary;
 type ActionSummary = ClientSurfaceControlActionSummary;
 type IntelligencePayload = SurfaceControlResponse;
 

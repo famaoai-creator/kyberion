@@ -14,45 +14,23 @@ import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
 import { parseMissionIntelligenceResponse } from '../lib/mission-intelligence-response';
 import {
   buildMissionThread,
+  isEditableHotkeyTarget,
+  loadMissionIntelligenceSelectedMissionId,
   missionActionLabel,
   resolveMissionControlFocusId,
   resolveMissionThreadHotkeyAction,
+  saveMissionIntelligenceSelectedMissionId,
   toDomId,
 } from './MissionIntelligenceViewHelpers';
-import {
-  MetricCard,
-  MiniSummaryCard,
-  Panel,
-  RuntimeCell,
-  providerResolutionSummary,
-} from './MissionIntelligencePrimitives';
 import type {
-  ArtifactRecordSummary,
-  CompanySnapshot,
-  ControlActionAvailability,
-  ControlActionCatalog,
   ControlActionDefinition,
   ControlActionSummary,
   DistillCandidateSummary,
   IntelligencePayload,
   MissionIntelligenceWorkspace,
-  MissionProgressSummary,
-  MissionSeedRecordSummary,
   MissionSummary,
-  MissionThreadEntry,
-  OwnerSummary,
   PendingApprovalSummary,
-  ProjectManagementSummary,
-  ProjectRecordSummary,
-  ProjectTrackRecordSummary,
   ReferenceDetail,
-  RuntimeDoctorFinding,
-  RuntimeLease,
-  RuntimeSummary,
-  ServiceBindingRecordSummary,
-  SurfaceOutboxMessage,
-  SurfaceSummary,
-  WorkLoopPreview,
 } from './MissionIntelligenceTypes';
 
 export { buildDangerousActionPrompt } from './MissionIntelligenceViewHelpers';
@@ -127,14 +105,11 @@ export function MissionIntelligence({
     cancelLabel?: string;
     onConfirm: () => Promise<void> | void;
   } | null>(null);
-  const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
+  const [expandedActionId] = useState<string | null>(null);
   const [expandedMissionCardActionId, setExpandedMissionCardActionId] = useState<string | null>(
     null
   );
   const [expandedSurfaceCardActionId, setExpandedSurfaceCardActionId] = useState<string | null>(
-    null
-  );
-  const [expandedGlobalSurfaceActionId, setExpandedGlobalSurfaceActionId] = useState<string | null>(
     null
   );
   const [messageMissionFilter, setMessageMissionFilter] = useState<string>('all');
@@ -1325,6 +1300,14 @@ export function MissionIntelligence({
           data,
           locale,
           mt,
+          approvalTarget,
+          decideApproval,
+          decideDistillCandidate,
+          distillCandidateTarget,
+          filteredRecentArtifactsByTrack,
+          filteredDistillCandidatesByTrack,
+          memoryPromotionTarget,
+          runMemoryPromotion,
           selectedProject,
           selectedProjectId,
           selectedProjectBootstrapItems,

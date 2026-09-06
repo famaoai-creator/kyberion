@@ -17,7 +17,7 @@ import {
 } from '@agent/core/surface-mutation-guard';
 import { toWireError } from '@agent/core/wire-error';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
-import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   isChronosLoopbackRequest,
   resolveChronosAccessRole,

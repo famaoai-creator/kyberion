@@ -2,7 +2,7 @@ import path from 'node:path';
 import { nowIso } from '@agent/core/foundation';
 import type { MissionState } from '@agent/core/mission-types';
 import { uxMessage, type SupportedLocale } from '../../../lib/ux-vocabulary';
-import { optionalStringField, recordField } from '../../../lib/json-record';
+import { recordField } from '../../../lib/json-record';
 
 type ChronosQuickActionCore = {
   pathResolver: {

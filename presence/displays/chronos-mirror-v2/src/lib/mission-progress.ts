@@ -2,11 +2,7 @@ import {
   parseMissionNextTaskRecords,
   type MissionNextTaskRecord,
 } from '@agent/core/mission-next-task-reader';
-import {
-  findLatestMissionHandoff,
-  type MissionAssetCategory,
-  type MissionHandoffSummary,
-} from './mission-progress-client';
+import type { MissionAssetCategory } from './mission-progress-client';
 
 export { findLatestMissionHandoff } from './mission-progress-client';
 export type { MissionAssetCategory, MissionHandoffSummary } from './mission-progress-client';
