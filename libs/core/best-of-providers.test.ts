@@ -153,6 +153,12 @@ describe('runBestOfProviders', () => {
     expect(peekBestOfProvidersVerdictLog(VERDICT_LOG_PATH)).toHaveLength(1);
   });
 
+  it('treats a directory at the verdict log path as empty history', () => {
+    safeMkdir(VERDICT_LOG_PATH, { recursive: true });
+
+    expect(peekBestOfProvidersVerdictLog(VERDICT_LOG_PATH)).toEqual([]);
+  });
+
   it('auto-excludes an egress-ineligible provider and surfaces the exclusion', async () => {
     process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = POLICY_PATH;
     _resetProviderEgressPolicyCacheForTests();

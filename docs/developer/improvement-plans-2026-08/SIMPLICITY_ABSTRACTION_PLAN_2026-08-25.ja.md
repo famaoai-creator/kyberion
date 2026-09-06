@@ -22895,3 +22895,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-orchestration-progress.ts`、progress test、PI-03
 - **変更**: mission orchestration progress の PLAN／NEXT_TASKS／TASK_BOARD read gate を operation-time の regular-file 境界へ接続し、directory replacement を task board 再調整へ到達させないようにした。既存の mission path containment と provisioned write semantics は維持した。
 - **検証**: mission-orchestration-progress **2 files／4 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1616
+
+- **対象**: `libs/core/best-of-providers.ts`、best-of-providers test、PI-03
+- **変更**: best-of-providers verdict JSONL reader に operation-time の regular-file 検査を追加し、directory replacement を lenient verdict history read で空履歴として扱うようにした。既存の malformed record skip／provider egress／verdict semantics は維持した。
+- **検証**: best-of-providers **2 files／10 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
