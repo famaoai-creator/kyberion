@@ -25,7 +25,7 @@ import {
   recordPostToolUse,
   summarizeTranscriptUsage,
 } from '@agent/core/claude-code-hook';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { parseSafeJsonInput } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
@@ -46,6 +46,13 @@ export function parseHookPayload(raw: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+export function readClaudeCodeHookTranscript(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 async function main(args: string[] = currentProcessArgv()): Promise<void> {
@@ -94,7 +101,7 @@ async function main(args: string[] = currentProcessArgv()): Promise<void> {
         const transcriptPath =
           typeof payload.transcript_path === 'string' ? payload.transcript_path : '';
         if (transcriptPath && safeExistsSync(transcriptPath)) {
-          recordCliUsage(summarizeTranscriptUsage(readTextFile(transcriptPath)));
+          recordCliUsage(summarizeTranscriptUsage(readClaudeCodeHookTranscript(transcriptPath)));
         }
       } catch {
         // usage capture is best-effort; never block session close

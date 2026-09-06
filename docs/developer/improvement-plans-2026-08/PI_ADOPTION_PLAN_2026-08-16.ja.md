@@ -923,6 +923,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、UX contract docs checkerのpublic document本文readを`readUxContractDocsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをplain-language／surface tagline判定へ到達させない回帰を追加した。既存のfront-door、vocabulary、surface role semanticsは維持した。関連 **2 files／3 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-02／PI-03 のdirect-loader inventory残差として、wire error boundary checkerのnetwork-facing source本文readを`readWireErrorBoundaryTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをraw exception exposure判定へ到達させない回帰を追加した。既存のwire error pattern semanticsは維持した。関連 **2 files／9 tests passed**、対象ESLint、Prettier、checker direct実行、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、governance path scannersのmachine-path／product JSON本文readを`readGovernancePathScannerTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをgovernance path／placement drift判定へ到達させない回帰を追加した。既存のscan root、allowlist、placement policy semanticsは維持した。関連 **2 files／1 test passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、Claude Code hookのStop transcript本文readを`readClaudeCodeHookTranscript`のoperation-time regular-file境界へ統一し、directory／symlink replacementをCLI usage metrics判定へ到達させない回帰を追加した。既存のhook protocol、fail-open、best-effort usage semanticsは維持した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 
