@@ -46,7 +46,7 @@ import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import { resolveVars } from '@agent/core/logic-utils';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import {
   createStandardYargs,
   currentProcessArgv,
@@ -943,9 +943,8 @@ const main = async () => {
     .parseSync();
 
   const inputPath = resolveExistingMeetingFile(String(argv.input), 'input');
-  const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const result = await handleAction(
-    parseMeetingActionInput(parseSafeJsonInput(inputContent, 'meeting action input'))
+    parseMeetingActionInput(readJson<unknown>(inputPath, { label: 'meeting action input' }))
   );
   console.log(JSON.stringify(result, null, 2));
 };
