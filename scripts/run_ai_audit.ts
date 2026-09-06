@@ -106,6 +106,13 @@ const DEFAULT_INVARIANTS_DIR = 'tests_ai';
 const DEFAULT_CONCURRENCY = 3;
 const MAX_SCOPE_FILE_CHARS = 40_000;
 
+export function readAiAuditTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function isSelfTestFixture(invariant: AiAuditInvariant): boolean {
   return (
     invariant.file.startsWith('tests_ai/fixture-') ||
@@ -190,7 +197,7 @@ export function enumerateInvariants(
     .sort()
     .map((entry) => {
       const absolute = path.join(absoluteDir, entry);
-      const content = readTextFile(absolute);
+      const content = readAiAuditTextFile(absolute);
       return parseInvariantMarkdown(repoRelative(absolute), content);
     });
 }
@@ -210,7 +217,7 @@ export function resolveScopeFiles(scope: string[]): {
 
   const readScoped = (absolute: string): void => {
     assertNoSymlinkPath(absolute);
-    const raw = readTextFile(absolute);
+    const raw = readAiAuditTextFile(absolute);
     const truncated = raw.length > MAX_SCOPE_FILE_CHARS;
     files.push({
       path: repoRelative(absolute),

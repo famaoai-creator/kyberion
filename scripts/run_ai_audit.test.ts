@@ -16,6 +16,7 @@ import {
   enumerateInvariants,
   extractSection,
   parseInvariantMarkdown,
+  readAiAuditTextFile,
   renderReport,
   resolveScopeFiles,
   runAiAudit,
@@ -47,6 +48,12 @@ afterEach(() => {
 });
 
 describe('invariant markdown parsing', () => {
+  it('rejects a directory replacement before audit text parsing', () => {
+    expect(() => readAiAuditTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('extracts name, scope, and section bodies', () => {
     const md = [
       '# Invariant: errors carry guidance',
