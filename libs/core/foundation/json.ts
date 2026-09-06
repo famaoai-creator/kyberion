@@ -44,9 +44,9 @@ export function appendJsonLine<T>(filePath: string, value: T): void {
 
 export interface ReadJsonLinesOptions<T> {
   /** Replay policy for malformed JSON or mapper failures. */
-  onMalformed?: 'throw' | 'skip' | ((error: unknown, lineNumber: number) => void);
+  onMalformed?: 'throw' | 'skip' | ((error: unknown, lineNumber: number, rawLine: string) => void);
   /** Optional domain parser. The second argument is the one-based line number. */
-  map?: (value: unknown, lineNumber: number) => T;
+  map?: (value: unknown, lineNumber: number, rawLine: string) => T;
   /** Options forwarded to the governed text reader for the whole JSONL file. */
   readOptions?: FoundationReadOptions;
 }
@@ -59,10 +59,10 @@ export function readJsonLines<T>(filePath: string, options: ReadJsonLinesOptions
     if (!line.trim()) continue;
     try {
       const value = parseSafeJsonInput(line, `JSONL entry ${index + 1}`);
-      records.push(options.map ? options.map(value, index + 1) : (value as T));
+      records.push(options.map ? options.map(value, index + 1, line) : (value as T));
     } catch (error) {
       if (typeof options.onMalformed === 'function') {
-        options.onMalformed(error, index + 1);
+        options.onMalformed(error, index + 1, line);
         continue;
       }
       if (options.onMalformed === 'skip') continue;
