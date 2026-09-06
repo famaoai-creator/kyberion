@@ -23663,3 +23663,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: meeting browser driver の persisted cookie jar、SX-03／security boundary
 - **変更**: 認証cookie JSONの読み込みを `safeReadFile` + `parseSafeJsonInput` から foundation `readJson` へ統一した。account slug、repository path、regular-file、credential tier boundary、cookie shape validation、破損時の空配列 fallback は維持し、テストfixtureもcanonical readerを通す形へ更新した。
 - **検証**: meeting browser driver **1 file／25 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1744
+
+- **対象**: iOS actuator の repository-bound `read_json`、SX-03
+- **変更**: iOS pipeline の `read_json` operationに残っていた `safeReadFile` + `parseSafeJsonInput` を foundation `readJson`へ統一した。repository path／retry／mobile-app-profile validationは維持し、simctl containerから取得する session handoffの外部path readは既存 semanticsのまま対象外とした。test harnessにはfoundation readerとretry policyの明示mockを追加し、実行境界を安定化した。
+- **検証**: iOS actuator **1 file／26 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。

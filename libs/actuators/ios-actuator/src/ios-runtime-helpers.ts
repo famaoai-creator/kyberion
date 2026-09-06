@@ -12,7 +12,7 @@ import { resolvePipelineContextValues } from '@agent/core/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry } from '@agent/core/async-utils';
-import { isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { runAdfActuatorPipeline } from '../../../core/actuator-sdk.js';
 import type { AdfEngineContext } from '../../../core/adf-engine.js';
@@ -172,10 +172,7 @@ async function opCapture(
   switch (op) {
     case 'read_json': {
       const sourcePath = resolveIosRepositoryPath(rootDir, resolve(params.path));
-      const parsed = await retry(async () => {
-        const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
-        return parseSafeJsonInput(content, 'iOS JSON input');
-      }, buildRetryOptions());
+      const parsed = await retry(async () => readJson<unknown>(sourcePath), buildRetryOptions());
       if (params.validate_as === 'mobile-app-profile') {
         assertValidMobileAppProfile(parsed, sourcePath);
       }
