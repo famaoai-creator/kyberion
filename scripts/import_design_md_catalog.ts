@@ -1,4 +1,9 @@
-import { assertSafeRepositoryPath, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+} from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathResolver } from '@agent/core/path-resolver';
 import { nowIso, parseSafeJsonObjectInput, readTextFile } from '@agent/core/foundation';
@@ -55,6 +60,13 @@ const INDEX_OUTPUT_REL =
 const THEMES_OUTPUT = pathResolver.rootResolve(THEMES_OUTPUT_REL);
 const SYSTEMS_OUTPUT = pathResolver.rootResolve(SYSTEMS_OUTPUT_REL);
 const INDEX_OUTPUT = pathResolver.rootResolve(INDEX_OUTPUT_REL);
+
+export function readDesignMdCatalogTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function walkDesignMdDirs(rootDir: string): string[] {
   const result: string[] = [];
@@ -330,7 +342,7 @@ function importDesignMd(
 ): ImportedDesign {
   const slug = path.basename(dirPath);
   const markdownPath = path.join(dirPath, 'DESIGN.md');
-  const markdown = readTextFile(markdownPath);
+  const markdown = readDesignMdCatalogTextFile(markdownPath);
   const titleMatch = markdown.match(/^# Design System:\s+(.+?)\s*$/m);
   const title = titleMatch?.[1]?.trim() || slug;
   const sections = parseSections(markdown);
@@ -431,7 +443,7 @@ async function renderImportDesignMdCatalog(context: ScriptContext): Promise<Gene
     allowMissingLeaf: true,
   });
   const collectionMeta = safeLstatSafe(readmePath)?.isFile()
-    ? parseCollectionMetadata(readTextFile(readmePath))
+    ? parseCollectionMetadata(readDesignMdCatalogTextFile(readmePath))
     : new Map<string, CollectionEntry>();
 
   const imported = walkDesignMdDirs(sourceDir).map((dirPath) =>

@@ -2,7 +2,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { runImportDesignMdCatalog } from './import_design_md_catalog.js';
+import {
+  readDesignMdCatalogTextFile,
+  runImportDesignMdCatalog,
+} from './import_design_md_catalog.js';
 
 describe('import design-md catalog entrypoint', () => {
   let fixtureDir: string;
@@ -79,6 +82,10 @@ describe('import design-md catalog entrypoint', () => {
     );
     expect(source).toContain('parseSafeJsonObjectInput');
     expect(source).not.toContain('JSON.parse(content)');
+  });
+
+  it('rejects a directory before reading design catalog content', () => {
+    expect(() => readDesignMdCatalogTextFile(fixtureDir)).toThrow('must be a regular file');
   });
 
   it('rejects source paths outside the repository before reading them', async () => {
