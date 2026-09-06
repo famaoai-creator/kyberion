@@ -23561,3 +23561,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: file／orchestrator／wisdom actuator の persisted JSON loader、SX-03
 - **変更**: 3つの actuator helper に残っていた `safeReadFile` + `parseSafeJsonInput` の persisted JSON 読み込みを foundation `readJson` へ統一した。regular-file boundary、wisdom の object shape 検証、file の他の text／JSONL 読み取りは維持した。
 - **検証**: file／orchestrator／wisdom actuator **4 files／64 tests passed**、対象 ESLint、Prettier、`git diff --check`。provider 実機受入と未移行 loader 全件監査は継続課題である。
+
+## 2026-09-06 再レビュー実装 1727
+
+- **対象**: orchestrator `collect_system_status_snapshot`、SX-05／SX-07
+- **変更**: status snapshot が削除済み package alias `check:esm`／`check:catalogs` を呼び出していた残存を、`pnpm run check -- --scope pr --only esm` と `pnpm run check -- --scope full --only catalogs` へ置換した。canonical check registry command を実行する契約テストを追加し、status health が常に現行入口を使うようにした。
+- **検証**: orchestrator targeted tests、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
