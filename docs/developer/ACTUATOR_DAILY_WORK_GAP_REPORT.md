@@ -2,7 +2,7 @@
 title: Actuator Daily-Work Gap Report
 tags: [actuators, daily-ops, gap-analysis, operator-ux]
 last_updated: 2026-09-06
-status: p1-implemented
+status: p2-implemented
 ---
 
 # Actuator Daily-Work Gap Report
@@ -22,9 +22,11 @@ Desktop-assistant daily work (GitHub PR/issue/review, Slack, docs, email/calenda
 | MCP can discover actuators, run allowlisted pipelines (now includes `daily-routine`), and call capture-only `kyberion.service.capture` | `knowledge/product/governance/mcp-tool-catalog.json`                         |
 | GitHub daily read/review capture plus write-gated review submit is on the REST preset (19 ops)                                         | `knowledge/product/orchestration/service-presets/github.json`                |
 | Slack has three layers (satellite / presence / service preset)                                                                         | `satellites/slack-bridge`, `presence-actuator`, `service-presets/slack.json` |
-| `secret-actuator` is darwin/win32 only                                                                                                 | `libs/actuators/secret-actuator/manifest.json`                               |
+| `secret-actuator` is darwin/win32 keychain; Linux is opt-in file vault (`KYBERION_ALLOW_FILE_SECRETS`)                                 | `libs/actuators/secret-actuator/manifest.json`, `FileSecretProvider`         |
 | Official probes in this Cloud Agent VM failed: no `dist/`, Node 22 vs `engines.node >=24`                                              | `pnpm capabilities` / `pnpm pipeline` → `MODULE_NOT_FOUND`                   |
 
 **P0 implemented (2026-09-06):** GitHub list/get/review capture ops; MCP `kyberion.service.capture` + `daily-routine` allowlist; `pnpm capabilities` without `dist/`; Slack three-path doc.
 
-**P1 implemented (2026-09-06):** GitHub review submit writes; `daily-github-inbox` template; email operator one-pager; `pnpm playground`; calendar template off `dist/` shell; `github-mcp` deprecated as an external-MCP example; actuators README redirect; doctor naming (`pnpm run doctor` / `pnpm kyberion:doctor`). P2 leftovers are in the Japanese report §7.
+**P1 implemented (2026-09-06):** GitHub review submit writes; `daily-github-inbox` template; email operator one-pager; `pnpm playground`; calendar template off `dist/` shell; `github-mcp` deprecated as an external-MCP example; actuators README redirect; doctor naming (`pnpm run doctor` / `pnpm kyberion:doctor`).
+
+**P2 implemented (2026-09-06):** Linux file-secret opt-in + red capabilities; actuator dry-run contract; presence satellite outbox prefixes; meeting zoom-sdk/recall-ai docs-only seams; Cloud Agent Node 24 + build notes. Details in the Japanese report §7.

@@ -547,5 +547,10 @@ See also:
 - [component-lifecycle-inventory.md](knowledge/product/architecture/component-lifecycle-inventory.md)
 - Slack 3経路: [docs/SLACK_CHANNEL_ROUTES.ja.md](docs/SLACK_CHANNEL_ROUTES.ja.md)
 - Email inbox vs send: [docs/EMAIL_OPERATOR.ja.md](docs/EMAIL_OPERATOR.ja.md)
+- Linux secrets: opt-in file vault (`KYBERION_ALLOW_FILE_SECRETS=1`, `chmod 0600`). Darwin/win32 stay on OS keychain. Capabilities show red `[Missing env: KYBERION_ALLOW_FILE_SECRETS]` on Linux until opted in.
+- Presence multi-channel: `presence:dispatch` stays Slack by default; prefix `telegram:` / `discord:` / `imessage:` to forward to the existing satellite outbox. No new actuator.
+- Meeting daily path: `pnpm meeting:participate` (browser-playwright). `zoom-sdk` / `recall-ai` are **unimplemented seams** (docs-only / deferred). Do not call them.
+- Actuator dry-run: capture always executes (side-effect-free); apply `--dry-run` validates contract/params only (`pnpm playground` and `createStandardYargs --dry-run` / `pnpm kyberion run … --dry-run`).
 - Single-op dry-run: `pnpm playground -- --actuator <id> --op <op> --params '{…}' --dry-run --json`
 - Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` or `pnpm kyberion:doctor` (not bare `pnpm doctor`).
+- Cloud Agent VM: [docs/developer/CLOUD_AGENT_ENVIRONMENT.md](docs/developer/CLOUD_AGENT_ENVIRONMENT.md) — Node `>=24`, `pnpm build` before pipeline / MCP / full doctor.

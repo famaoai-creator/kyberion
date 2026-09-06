@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { FileSecretProvider, SecretPolicyRouter } from './secret-bridge.js';
-import { logger } from './core.js';
 
 let testRoot: string;
 let secretsDir: string;
@@ -100,27 +99,27 @@ describe('FileSecretProvider', () => {
   });
 });
 
-describe('SecretPolicyRouter file fallback warn phase', () => {
-  it('warns once when file secrets engage without KYBERION_ALLOW_FILE_SECRETS', async () => {
+describe('SecretPolicyRouter file-secret opt-in', () => {
+  it('does not select file secrets without KYBERION_ALLOW_FILE_SECRETS', async () => {
     const previous = process.env.KYBERION_ALLOW_FILE_SECRETS;
     delete process.env.KYBERION_ALLOW_FILE_SECRETS;
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const router = new SecretPolicyRouter([new FileSecretProvider(secretsFile)]);
+      await expect(router.selectProvider()).rejects.toThrow('No available Secret Provider');
+    } finally {
+      if (previous === undefined) delete process.env.KYBERION_ALLOW_FILE_SECRETS;
+      else process.env.KYBERION_ALLOW_FILE_SECRETS = previous;
+    }
+  });
+
+  it('selects file secrets only when KYBERION_ALLOW_FILE_SECRETS is set', async () => {
+    const previous = process.env.KYBERION_ALLOW_FILE_SECRETS;
+    process.env.KYBERION_ALLOW_FILE_SECRETS = '1';
     try {
       const router = new SecretPolicyRouter([new FileSecretProvider(secretsFile)]);
       const provider = await router.selectProvider();
       expect(provider.id).toBe('file_secrets');
-      const fallbackWarnings = warnSpy.mock.calls.filter(([message]) =>
-        String(message).includes('plaintext file secrets')
-      );
-      expect(fallbackWarnings).toHaveLength(1);
-
-      warnSpy.mockClear();
-      await router.selectProvider();
-      expect(
-        warnSpy.mock.calls.filter(([message]) => String(message).includes('plaintext file secrets'))
-      ).toHaveLength(0);
     } finally {
-      warnSpy.mockRestore();
       if (previous === undefined) delete process.env.KYBERION_ALLOW_FILE_SECRETS;
       else process.env.KYBERION_ALLOW_FILE_SECRETS = previous;
     }

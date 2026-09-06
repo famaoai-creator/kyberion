@@ -5,6 +5,7 @@ import {
   loadActuatorManifest,
   type ActuatorManifestCapability,
 } from '@agent/core/actuator-manifest-index';
+import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -22,6 +23,7 @@ export interface CapabilityDiscoveryCapability {
   platforms: string[];
   platformMatch: boolean;
   missingBins: string[];
+  missingEnv: string[];
   available: boolean;
 }
 
@@ -44,21 +46,42 @@ export interface CapabilityDiscoveryOptions {
   rootDir?: string;
   platform?: NodeJS.Platform;
   binaryAvailable?: (bin: string) => boolean;
+  envAvailable?: (name: string) => boolean;
+}
+
+export function defaultEnvAvailable(name: string): boolean {
+  const flag = getRegisteredEnvBool(name);
+  if (flag === true) return true;
+  if (flag === false) return false;
+  return Boolean(getRegisteredEnvText(name));
+}
+
+function envRequirementsApply(
+  capability: ActuatorManifestCapability,
+  platform: NodeJS.Platform
+): boolean {
+  const envPlatforms = capability.requirements?.env_platforms;
+  return !envPlatforms || envPlatforms.length === 0 || envPlatforms.includes(platform);
 }
 
 export function evaluateCapability(
   capability: ActuatorManifestCapability,
   platform: NodeJS.Platform,
-  binaryAvailable: (bin: string) => boolean
+  binaryAvailable: (bin: string) => boolean,
+  envAvailable: (name: string) => boolean = defaultEnvAvailable
 ): CapabilityDiscoveryCapability {
   const platformMatch = capability.platforms.includes(platform);
   const missingBins = (capability.requirements?.bin ?? []).filter((bin) => !binaryAvailable(bin));
+  const missingEnv = envRequirementsApply(capability, platform)
+    ? (capability.requirements?.env ?? []).filter((name) => !envAvailable(name))
+    : [];
   return {
     op: capability.op,
     platforms: capability.platforms,
     platformMatch,
     missingBins,
-    available: platformMatch && missingBins.length === 0,
+    missingEnv,
+    available: platformMatch && missingBins.length === 0 && missingEnv.length === 0,
   };
 }
 
@@ -82,6 +105,7 @@ export function discoverCapabilities(
   const items = safeReaddir(actuatorsDir);
   const currentPlatform = options.platform ?? process.platform;
   const binaryAvailable = options.binaryAvailable ?? checkBinary;
+  const envAvailable = options.envAvailable ?? defaultEnvAvailable;
   const actuators: CapabilityDiscoveryActuator[] = [];
   const errors: string[] = [];
 
@@ -104,7 +128,7 @@ export function discoverCapabilities(
         version: manifest.version,
         description: manifest.description || 'No description available.',
         capabilities: (manifest.capabilities || []).map((capability) =>
-          evaluateCapability(capability, currentPlatform, binaryAvailable)
+          evaluateCapability(capability, currentPlatform, binaryAvailable, envAvailable)
         ),
       });
     } catch (err: unknown) {
@@ -137,7 +161,11 @@ export function formatCapabilityDiscovery(report: CapabilityDiscoveryReport): st
         capability.missingBins.length > 0
           ? chalk.red(` [Missing: ${capability.missingBins.join(', ')}]`)
           : '';
-      lines.push(`  ${statusIcon} ${capability.op.padEnd(20)} ${platformInfo}${binInfo}`);
+      const envInfo =
+        capability.missingEnv.length > 0
+          ? chalk.red(` [Missing env: ${capability.missingEnv.join(', ')}]`)
+          : '';
+      lines.push(`  ${statusIcon} ${capability.op.padEnd(20)} ${platformInfo}${binInfo}${envInfo}`);
     }
     lines.push('');
   }

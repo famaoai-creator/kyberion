@@ -4,41 +4,42 @@ For people **extending or contributing to** Kyberion. If you're using it, see [`
 
 ## Start here
 
-| Doc | When to read |
-|---|---|
-| [TOUR.md](./TOUR.md) | The current 1-hour map of the codebase. Read after the first-win smoke if you need the system shape fast. |
-| [EXTENSION_POINTS.md](./EXTENSION_POINTS.md) | What's stable, what's beta, what's internal. **Read first** before patching anything. |
-| [ROLE_PERSONA_MATRIX.md](./ROLE_PERSONA_MATRIX.md) | How to reason about personas, authority roles, and what they do not imply. |
-| [CUSTOMER_AGGREGATION.md](./CUSTOMER_AGGREGATION.md) / [.ja.md](./CUSTOMER_AGGREGATION.ja.md) | How per-customer config layers on top of the codebase. |
-| [TRACE_MIGRATION_TEMPLATE.md](./TRACE_MIGRATION_TEMPLATE.md) | How to add Trace observability to an existing actuator. |
-| [MISSION_LIFECYCLE_AUDIT.md](./MISSION_LIFECYCLE_AUDIT.md) | Why the mission lifecycle is shaped the way it is. |
-| [GOLDEN_OUTPUT_CHECK.md](./GOLDEN_OUTPUT_CHECK.md) | Semantic regression detection for stable pipelines. |
-| [CHAOS_DRILLS.md](./CHAOS_DRILLS.md) | Recurring failure-injection runs. |
-| [OPERATIONS_READINESS_MATRIX.md](./OPERATIONS_READINESS_MATRIX.md) | What is ready, conditional, or risky in the current Kyberion runtime. Pair it with `pnpm kyberion setup report`. |
-| [VOICE_FIRST_WIN.md](./VOICE_FIRST_WIN.md) | Tier-0 voice setup (Phase A-5). |
-| [NARRATED_VIDEO_CONTENT_IMPLEMENTATION_CHECKPOINT.ja.md](./NARRATED_VIDEO_CONTENT_IMPLEMENTATION_CHECKPOINT.ja.md) | Current state, resume path, and validation commands for the narrated video implementation. |
-| [NARRATED_VIDEO_CONTENT_IMPLEMENTATION_ROADMAP.ja.md](./NARRATED_VIDEO_CONTENT_IMPLEMENTATION_ROADMAP.ja.md) | How to turn a fixed content brief into a narrated video through a video-specific design system. |
-| [REGISTRY_SPLIT_PLAN.md](./REGISTRY_SPLIT_PLAN.md) | Taskized backlog for moving global catalogs to per-item canonical files. |
-| [RELEASE_OPERATIONS.md](./RELEASE_OPERATIONS.md) | How releases get cut. |
-| [GOOD_FIRST_ISSUES.md](./GOOD_FIRST_ISSUES.md) | Starter slices for first-time contributors. |
-| [PRODUCTION_GOAL_INSTRUCTIONS.ja.md](./PRODUCTION_GOAL_INSTRUCTIONS.ja.md) | `/goal` handoff instructions for raising Kyberion to production level. |
-| [PRODUCTION_READINESS_PLAN.ja.md](./PRODUCTION_READINESS_PLAN.ja.md) | Implementation backlog and verification scenarios before production-grade OSS release. |
-| [PRODUCTION_RELEASE_GATE_AUDIT.ja.md](./PRODUCTION_RELEASE_GATE_AUDIT.ja.md) | Current evidence for G1-G7 release gates and remaining non-local proof. |
-| [PRODUCTION_EVIDENCE_REGISTER.ja.md](./PRODUCTION_EVIDENCE_REGISTER.ja.md) | Tracks operational proof that cannot be established by local tests alone. |
-| [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) | The PR contract. (Currently being refreshed in Phase C'-3.) |
-| [`../../GOVERNANCE.md`](../../GOVERNANCE.md) | How decisions get made. |
-| [`../../MAINTAINERS.md`](../../MAINTAINERS.md) | Who reviews what. |
+| Doc                                                                                                                | When to read                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| [TOUR.md](./TOUR.md)                                                                                               | The current 1-hour map of the codebase. Read after the first-win smoke if you need the system shape fast.        |
+| [EXTENSION_POINTS.md](./EXTENSION_POINTS.md)                                                                       | What's stable, what's beta, what's internal. **Read first** before patching anything.                            |
+| [CLOUD_AGENT_ENVIRONMENT.md](./CLOUD_AGENT_ENVIRONMENT.md)                                                         | Cloud Agent / Linux VM: Node `>=24`, `pnpm build` before pipeline / MCP / doctor.                                |
+| [ROLE_PERSONA_MATRIX.md](./ROLE_PERSONA_MATRIX.md)                                                                 | How to reason about personas, authority roles, and what they do not imply.                                       |
+| [CUSTOMER_AGGREGATION.md](./CUSTOMER_AGGREGATION.md) / [.ja.md](./CUSTOMER_AGGREGATION.ja.md)                      | How per-customer config layers on top of the codebase.                                                           |
+| [TRACE_MIGRATION_TEMPLATE.md](./TRACE_MIGRATION_TEMPLATE.md)                                                       | How to add Trace observability to an existing actuator.                                                          |
+| [MISSION_LIFECYCLE_AUDIT.md](./MISSION_LIFECYCLE_AUDIT.md)                                                         | Why the mission lifecycle is shaped the way it is.                                                               |
+| [GOLDEN_OUTPUT_CHECK.md](./GOLDEN_OUTPUT_CHECK.md)                                                                 | Semantic regression detection for stable pipelines.                                                              |
+| [CHAOS_DRILLS.md](./CHAOS_DRILLS.md)                                                                               | Recurring failure-injection runs.                                                                                |
+| [OPERATIONS_READINESS_MATRIX.md](./OPERATIONS_READINESS_MATRIX.md)                                                 | What is ready, conditional, or risky in the current Kyberion runtime. Pair it with `pnpm kyberion setup report`. |
+| [VOICE_FIRST_WIN.md](./VOICE_FIRST_WIN.md)                                                                         | Tier-0 voice setup (Phase A-5).                                                                                  |
+| [NARRATED_VIDEO_CONTENT_IMPLEMENTATION_CHECKPOINT.ja.md](./NARRATED_VIDEO_CONTENT_IMPLEMENTATION_CHECKPOINT.ja.md) | Current state, resume path, and validation commands for the narrated video implementation.                       |
+| [NARRATED_VIDEO_CONTENT_IMPLEMENTATION_ROADMAP.ja.md](./NARRATED_VIDEO_CONTENT_IMPLEMENTATION_ROADMAP.ja.md)       | How to turn a fixed content brief into a narrated video through a video-specific design system.                  |
+| [REGISTRY_SPLIT_PLAN.md](./REGISTRY_SPLIT_PLAN.md)                                                                 | Taskized backlog for moving global catalogs to per-item canonical files.                                         |
+| [RELEASE_OPERATIONS.md](./RELEASE_OPERATIONS.md)                                                                   | How releases get cut.                                                                                            |
+| [GOOD_FIRST_ISSUES.md](./GOOD_FIRST_ISSUES.md)                                                                     | Starter slices for first-time contributors.                                                                      |
+| [PRODUCTION_GOAL_INSTRUCTIONS.ja.md](./PRODUCTION_GOAL_INSTRUCTIONS.ja.md)                                         | `/goal` handoff instructions for raising Kyberion to production level.                                           |
+| [PRODUCTION_READINESS_PLAN.ja.md](./PRODUCTION_READINESS_PLAN.ja.md)                                               | Implementation backlog and verification scenarios before production-grade OSS release.                           |
+| [PRODUCTION_RELEASE_GATE_AUDIT.ja.md](./PRODUCTION_RELEASE_GATE_AUDIT.ja.md)                                       | Current evidence for G1-G7 release gates and remaining non-local proof.                                          |
+| [PRODUCTION_EVIDENCE_REGISTER.ja.md](./PRODUCTION_EVIDENCE_REGISTER.ja.md)                                         | Tracks operational proof that cannot be established by local tests alone.                                        |
+| [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md)                                                                   | The PR contract. (Currently being refreshed in Phase C'-3.)                                                      |
+| [`../../GOVERNANCE.md`](../../GOVERNANCE.md)                                                                       | How decisions get made.                                                                                          |
+| [`../../MAINTAINERS.md`](../../MAINTAINERS.md)                                                                     | Who reviews what.                                                                                                |
 
 ## Architecture
 
 The deep architecture lives in `knowledge/product/architecture/` — 92 docs of historical and current design. The most useful entry points:
 
-| Doc | What it covers |
-|---|---|
-| [`organization-work-loop.md`](../../knowledge/product/architecture/organization-work-loop.md) | The thesis. The model from which everything else derives. |
-| [`agent-mission-control-model.md`](../../knowledge/product/architecture/agent-mission-control-model.md) | How missions / agents / actuators relate. |
-| [`enterprise-operating-kernel.md`](../../knowledge/product/architecture/enterprise-operating-kernel.md) | The kernel layer above missions. |
-| [`ceo-ux.md`](../../knowledge/product/architecture/ceo-ux.md) | The user-facing interaction model. |
+| Doc                                                                                                     | What it covers                                            |
+| ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| [`organization-work-loop.md`](../../knowledge/product/architecture/organization-work-loop.md)           | The thesis. The model from which everything else derives. |
+| [`agent-mission-control-model.md`](../../knowledge/product/architecture/agent-mission-control-model.md) | How missions / agents / actuators relate.                 |
+| [`enterprise-operating-kernel.md`](../../knowledge/product/architecture/enterprise-operating-kernel.md) | The kernel layer above missions.                          |
+| [`ceo-ux.md`](../../knowledge/product/architecture/ceo-ux.md)                                           | The user-facing interaction model.                        |
 
 `TOUR.md` is the current "1 hour to read" map for contributors. The 92 architecture docs remain the deeper system-referenced material; use the four files above when you need the original design entry points.
 
@@ -46,13 +47,13 @@ The deep architecture lives in `knowledge/product/architecture/` — 92 docs of 
 
 If you're authoring an actuator or a vertical template:
 
-| Need | Doc |
-|---|---|
-| New actuator / plugin / skill | [`PLUGIN_AUTHORING.md`](./PLUGIN_AUTHORING.md), [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md) |
-| New vertical template | [`templates/verticals/README.md`](../../templates/verticals/README.md) |
-| Adding Trace to an existing actuator | [`TRACE_MIGRATION_TEMPLATE.md`](./TRACE_MIGRATION_TEMPLATE.md) |
-| Customer-specific config | [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md) |
-| Meeting participation runtime | [`TOUR.md`](./TOUR.md#7-where-to-go-next), [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md#51-meeting-runtime-boundary) |
+| Need                                 | Doc                                                                                                                   |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| New actuator / plugin / skill        | [`PLUGIN_AUTHORING.md`](./PLUGIN_AUTHORING.md), [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md)                        |
+| New vertical template                | [`templates/verticals/README.md`](../../templates/verticals/README.md)                                                |
+| Adding Trace to an existing actuator | [`TRACE_MIGRATION_TEMPLATE.md`](./TRACE_MIGRATION_TEMPLATE.md)                                                        |
+| Customer-specific config             | [`CUSTOMER_AGGREGATION.md`](./CUSTOMER_AGGREGATION.md)                                                                |
+| Meeting participation runtime        | [`TOUR.md`](./TOUR.md#7-where-to-go-next), [`EXTENSION_POINTS.md`](./EXTENSION_POINTS.md#51-meeting-runtime-boundary) |
 
 ## Scope
 

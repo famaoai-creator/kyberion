@@ -39,9 +39,14 @@ Kyberion には Slack へ届く道が3つある。**同じ `chat.postMessage` �
 
 - 実装: `libs/actuators/presence-actuator`
 - public ops: `dispatch`, `receive_event`, `dispatch_timeline`
-- `dispatch` の外部バックエンドは **Slack のみ**。binding が無ければログへフォールバック
+- `dispatch` の**既定**外部バックエンドは Slack。binding が無ければログへフォールバック
 - 向き: **一方的**。会話の状態機械は持たない
-- 日常: ミッション完了通知、タイムライン。Discord/Telegram/iMessage は **別 satellite** であり、このアクチュエータには載っていない
+- **satellite 転送** (新アクチュエータは作らない): `channel` に prefix を付けると既存 surface outbox へ enqueue し、各 satellite が drain する
+  - `telegram:<chatId>` → `satellites/telegram-bridge` (port 3035)
+  - `discord:<channelId>` → `satellites/discord-bridge`
+  - `imessage:<chatId>` → `satellites/imessage-bridge` (port 3034)
+  - 未 prefix / `slack:<id>` → 従来の Slack WebClient
+- 日常: ミッション完了通知、タイムライン。会話ループは各 satellite の役割のまま
 
 ## 3. Service preset — ガバナンス付き Slack API
 

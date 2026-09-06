@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { buildPlaygroundPayload, parsePlaygroundParams } from './actuator_playground.js';
+import {
+  buildPlaygroundPayload,
+  evaluatePlaygroundDryRun,
+  parsePlaygroundParams,
+} from './actuator_playground.js';
 
 describe('actuator playground JSON input boundary', () => {
   it('builds the canonical actuator payload for machine execution', () => {
@@ -29,6 +33,33 @@ describe('actuator playground JSON input boundary', () => {
     expect(source).toContain('print?: Print');
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
+  });
+
+  it('evaluates the actuator dry-run contract without side effects', () => {
+    expect(
+      evaluatePlaygroundDryRun({
+        actuatorId: 'secret-actuator',
+        operation: 'get',
+        payload: buildPlaygroundPayload('get', { service: 'slack', account: 'bot' }),
+      })
+    ).toMatchObject({
+      ok: true,
+      kind: 'capture',
+      handler: 'capture',
+      validated: true,
+    });
+    expect(
+      evaluatePlaygroundDryRun({
+        actuatorId: 'secret-actuator',
+        operation: 'set',
+        payload: buildPlaygroundPayload('set', { service: 'slack', account: 'bot' }),
+      })
+    ).toMatchObject({
+      ok: true,
+      kind: 'apply',
+      handler: 'skipped',
+      dry_run: true,
+    });
   });
 
   it('rejects dangerous nested keys before actuator execution', () => {

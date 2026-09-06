@@ -10,7 +10,10 @@ import {
   loadActuatorManifest,
   type ActuatorManifestFile,
 } from '@agent/core/actuator-manifest-index';
+import { planActuatorDryRun, resolveCliActionKind } from '@agent/core/actuator-sdk';
+import { createAjv } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as path from 'node:path';
@@ -75,6 +78,47 @@ export function buildPlaygroundPayload(
     action: operation,
     op: operation,
     params,
+  };
+}
+
+export function evaluatePlaygroundDryRun(args: {
+  actuatorId: string;
+  operation: string;
+  payload: Record<string, unknown>;
+  contractSchemaPath?: string;
+  mode?: 'dry-run' | 'check';
+}): Record<string, unknown> {
+  const kind = resolveCliActionKind(args.payload);
+  const plan = planActuatorDryRun({ kind, dryRun: true });
+  let validated = true;
+  let error: string | undefined;
+  if (args.contractSchemaPath) {
+    try {
+      const ajv = createAjv();
+      const schemaPath = pathResolver.rootResolve(args.contractSchemaPath);
+      const validate = compileSchemaFromPath(ajv, schemaPath);
+      if (!validate(args.payload)) {
+        validated = false;
+        error = (validate.errors || [])
+          .map((item) => `${item.instancePath || '/'} ${item.message || 'is invalid'}`)
+          .join('; ');
+      }
+    } catch (err) {
+      validated = false;
+      error = err instanceof Error ? err.message : String(err);
+    }
+  }
+  return {
+    ok: validated,
+    mode: args.mode ?? 'dry-run',
+    actuator_id: args.actuatorId,
+    operation: args.operation,
+    kind,
+    dry_run: true,
+    handler: plan.skipHandler ? 'skipped' : 'capture',
+    validated,
+    ...(error ? { error } : {}),
+    payload: args.payload,
   };
 }
 
@@ -265,13 +309,13 @@ async function runPlayground(
 
   if (options.dryRun === true || options.check === true) {
     rl.close();
-    return {
-      ok: true,
-      mode: options.check === true ? 'check' : 'dry-run',
-      actuator_id: manifest.actuator_id,
+    return evaluatePlaygroundDryRun({
+      actuatorId: manifest.actuator_id,
       operation: op,
       payload,
-    };
+      contractSchemaPath: manifest.contract_schema,
+      mode: options.check === true ? 'check' : 'dry-run',
+    });
   }
 
   // 7. Write to temp file inside active/shared/tmp/
