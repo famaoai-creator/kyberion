@@ -10,8 +10,8 @@ import {
   safeRmSync,
 } from './secure-io.js';
 import { nowIso } from './foundation/time.js';
-import { parseSafeJsonInput } from './foundation/json.js';
-import { isRecord, readTextFile } from './foundation/text.js';
+import { readJsonLines } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
   MeshDeliveryRecord,
@@ -175,20 +175,10 @@ function readJsonl<T>(logicalPath: string, normalize: (value: unknown) => T | un
   if (!safeLstat(safePath).isFile()) {
     throw new Error(`mesh-hub persisted JSONL must be a regular file: ${safePath}`);
   }
-  const raw = readTextFile(safePath);
-  const records: T[] = [];
-  for (const line of raw
-    .split(/\r?\n/u)
-    .map((value) => value.trim())
-    .filter(Boolean)) {
-    try {
-      const normalized = normalize(parseSafeJsonInput(line, 'mesh delivery record'));
-      if (normalized !== undefined) records.push(normalized);
-    } catch {
-      // A corrupt append-only row must not make the hub unreadable.
-    }
-  }
-  return records;
+  return readJsonLines<T | undefined>(safePath, {
+    onMalformed: 'skip',
+    map: normalize,
+  }).filter((value): value is T => value !== undefined);
 }
 
 function latestByKey<T>(rows: T[], key: string): T[] {

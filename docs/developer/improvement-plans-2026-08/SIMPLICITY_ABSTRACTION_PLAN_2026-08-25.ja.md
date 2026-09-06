@@ -23837,3 +23837,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: cognitive routing の governed schema loader、SX-03／SX-04／PI-03
 - **変更**: regular-file境界を通過した cognitive routing schema の手書きtext読込＋JSON parseを foundation `readJson`へ統一した。schema path／regular-file fail-closedと、既存の schema validation／route decision semanticsは維持した。
 - **検証**: cognitive routing **1 file／4 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1773
+
+- **対象**: mesh message broker の tenant-scoped delivery／dead-letter JSONL loader、SX-03／SX-09／PI-03
+- **変更**: operation-timeのregular-file確認後に行うdelivery／dead-letter JSONLの手書き行分割・parseを foundation `readJsonLines`へ統一した。malformed行skip、domain normalizeによるrecord shape filter、latest-by-key projection、tenant scope／delivery semanticsは維持した。
+- **検証**: mesh message broker／inspection **2 files／8 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
