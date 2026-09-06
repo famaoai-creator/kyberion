@@ -23645,3 +23645,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: manifest-driven `pnpm check` の runtime manifest boundary、SX-07
 - **変更**: `validateGateManifest` が型定義を信頼していた残存を修正し、manifest version、gate object、id／owner／rationale、executable args の runtime shape を fail-closed で検証するようにした。既存の scope、script registry、recursive command、timeout の検査と gate 実行 semantics は維持した。
 - **検証**: `scripts/run_checks.test.ts` **1 file／7 tests passed**、対象 ESLint、Prettier、`git diff --check`、canonical `script-integrity`／`foundation-adoption` gate passed。全体 typecheck は既存の Presence Studio boundary test の `string | Buffer` narrowing error で未完了。
+
+## 2026-09-06 再レビュー実装 1741
+
+- **対象**: `check_ci_gate_parity` の validate 構成検査、SX-07
+- **変更**: CI parity checker が `validate` の full check 呼び出しだけを確認していた残存を補強し、`pnpm run build`、`pnpm run typecheck`、`pnpm run check -- --scope full` の3要素を canonical validate sequence として検査するようにした。package script が build／typecheck／full gate のいずれかを欠いた場合、CI と validate の集合差分を具体的に報告する。
+- **検証**: `check_ci_gate_parity` **1 file／8 tests passed**、canonical `ci-gate-parity` gate passed、対象 ESLint、Prettier、`git diff --check`。
