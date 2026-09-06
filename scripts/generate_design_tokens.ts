@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 import {
@@ -39,21 +39,28 @@ const THEMES_JSON_NESTED_PATH = path.join(
   'knowledge/public/design-patterns/media-templates/themes/themes.json'
 );
 
+export function readDesignTokenTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function renderUpdatedFile(filePath: string, content: string): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
-  const source = readTextFile(filePath);
+  const source = readDesignTokenTextFile(filePath);
   return content === source ? undefined : { path: filePath, content };
 }
 
 function renderTokenSurface(filePath: string, tokenBlock: string): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
-  const source = readTextFile(filePath);
+  const source = readDesignTokenTextFile(filePath);
   return renderUpdatedFile(filePath, replaceTokenBlock(source, tokenBlock));
 }
 
 function renderTailwindConfig(filePath: string): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
-  const source = readTextFile(filePath);
+  const source = readDesignTokenTextFile(filePath);
   const next = source.replace(
     /        kyberion: \{[\s\S]*?\n        \}/m,
     renderKyberionTailwindColorsBlock()
@@ -67,7 +74,7 @@ function renderThemesCatalog(
   includeDefaultTheme: boolean
 ): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
-  const source = readTextFile(filePath);
+  const source = readDesignTokenTextFile(filePath);
   const next = updateThemesJson(source, tokens, { includeDefaultTheme });
   return renderUpdatedFile(filePath, next);
 }
