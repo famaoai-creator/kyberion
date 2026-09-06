@@ -5,9 +5,16 @@ import {
   checkWorkflowSetupOrder,
   collectCheckScopeReferences,
   collectPnpmScriptReferences,
+  readCiGateParityTextFile,
 } from './check_ci_gate_parity.js';
 
 describe('ci gate parity', () => {
+  it('rejects a directory replacement before workflow parsing', () => {
+    expect(() => readCiGateParityTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the governed package manifest loader', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_ci_gate_parity.ts'), {
