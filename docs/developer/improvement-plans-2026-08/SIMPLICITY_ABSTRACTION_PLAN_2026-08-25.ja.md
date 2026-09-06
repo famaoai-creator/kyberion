@@ -24113,3 +24113,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: meeting／file actuator の CLI JSON input loader、SX-03／SX-10
 - **変更**: regular-file 境界を通過した `meeting action input` と `file action input` の読み込みを、手書きの `safeReadFile → parseSafeJsonInput` から foundation `readJson` へ統一した。既存の typed action parser、入力 path 境界、外部 bridge／CLI 出力の safe parser は維持し、foundation adoption checker の2件の既存 allowlist を削除した。
 - **検証**: meeting／file actuator／foundation adoption **3 files／58 tests passed**、checker OK、root `pnpm run typecheck`、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-07 再レビュー実装 1819
+
+- **対象**: blockchain actuator の mock JSONL reader、SX-03／SX-10
+- **変更**: simulated blockchain の `safeReadFile → split → parseSafeJsonInput` を foundation `readJsonLines`へ移行した。既存の malformed／invalid transaction 時に検証結果を空配列へ閉じる挙動は reader 全体を try/catch することで維持し、behavior test の foundation mock も `readJsonLines`／`isRecord` 契約へ揃えた。foundation adoption checker の既存 allowlist をさらに1件削除した。
+- **検証**: blockchain actuator／foundation adoption **3 files／11 tests passed**、checker OK、root `pnpm run typecheck`、対象ESLint、Prettier、`git diff --check`。
