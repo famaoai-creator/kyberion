@@ -16,5 +16,6 @@ describe('Presence Studio route parameter boundary', () => {
     expect(source).not.toMatch(/String\(req\.params\.[^)]+\|\| ''\)\.trim\(\)/u);
     expect(source.match(/readPresenceStudioStringParam\(req\.params\.[^)]+\)/gu)).toHaveLength(6);
     expect(source.match(/readPresenceStudioStringParam\(req\.query\.path\)/gu)).toHaveLength(2);
+    expect(source).toContain('normalizeLocale(readSurfaceStringParam(req.query.locale))');
   });
 });

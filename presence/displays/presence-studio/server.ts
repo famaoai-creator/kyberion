@@ -95,7 +95,7 @@ function safeParsePresenceStudioRequestBody(body: unknown, label: string): unkno
 }
 
 presenceStudioData.app.get('/api/ui-vocabulary', (req, res) => {
-  const locale = normalizeLocale(req.query.locale) ?? 'en';
+  const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
   const texts = Object.fromEntries(
     presenceStudioData.PRESENCE_STUDIO_VOCABULARY_KEYS.map((key) => [
       key,

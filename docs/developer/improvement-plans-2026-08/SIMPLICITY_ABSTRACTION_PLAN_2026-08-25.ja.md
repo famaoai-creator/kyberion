@@ -23999,3 +23999,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Chronos agent `audit-log` quick action の JSONL reader、SX-03／SX-08／SX-09
 - **変更**: audit／orchestration／Slack event logの手書きtail・JSON parseを foundation `readJsonLines`へ統一した。regular-file／symlink boundary、malformed行skip、物理行位置を保持した直近12行tail、既存audit event parser、表示順・status projectionは維持した。あわせて、先行したrequest input整理で失われていた `readChronosJsonObject` の互換exportを復元し、agent routeの既存入力境界を壊さないようにした。
 - **検証**: Chronos agent route／resource boundary／request input **3 files／15 tests passed**、対象ESLint、Prettier、foundation adoption、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1800
+
+- **対象**: Presence Studio UI vocabulary query boundary、SX-09／SX-14
+- **変更**: `/api/ui-vocabulary` の locale query を共有 `readSurfaceStringParam` 経由へ統一し、配列・object-shaped input の暗黙文字列化を防止した。単一 string 以外は既定 localeへ閉じ、catalog lookupと既存のlocale normalizationを維持した。
+- **検証**: Presence Studio route-parameter boundary **1 file／1 test passed**、対象ESLint、Prettier、`git diff --check`。

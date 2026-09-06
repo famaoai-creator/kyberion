@@ -511,3 +511,9 @@ Presence Studio onboarding voice-sample の `content-type` header を再監査�
 で暗黙連結して音声保存へ渡し得る残存を検出した。`readPresenceStudioStringParam` を header boundary にも接続し、単一 string 以外は空値として既存の content-type／保存処理へ渡すようにした。
 
 検証: Presence Studio runtime-data boundary **1 file／3 tests passed**、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー修正 52
+
+Presence Studio の `/api/ui-vocabulary` を再監査し、`req.query.locale` を locale normalizer へ直接渡して配列・object-shaped query が暗黙文字列化される残存を修正した。共有 `readSurfaceStringParam` を先行させ、単一 string 以外は既存の既定 locale `en` へ fail-closed にした。catalog lookup と既存の locale normalization semantics は維持している。
+
+検証: Presence Studio route-parameter boundary **1 file／1 test passed**、対象 ESLint、Prettier、`git diff --check`。framework-specific request parsing、provider 実機受入、日英の channel literal 全面移行は継続課題である。
