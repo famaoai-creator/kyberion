@@ -11,16 +11,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('@agent/core')>();
   return {
-    ...(actual as any),
+    ...actual,
     loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
     inspectServiceAuth: mocks.inspectServiceAuth,
     logger: mocks.logger,
     safeExistsSync: mocks.safeExistsSync,
-    pathResolver: { ...(actual as any).pathResolver, rootDir: mocks.rootDir },
+    pathResolver: { ...actual.pathResolver, rootDir: mocks.rootDir },
     customerResolver: {
-      ...(actual as any).customerResolver,
+      ...actual.customerResolver,
       resolveOverlay: mocks.resolveOverlay,
       overlayCandidates: mocks.overlayCandidates,
     },
@@ -32,49 +32,49 @@ vi.mock('@agent/core', async (importOriginal) => {
 // aggregate `@agent/core` entry point mocked above, so the fixtures above
 // never reached the real call sites — mock the actual import sites too.
 vi.mock('@agent/core/service-endpoint-registry', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('@agent/core/service-endpoint-registry')>();
   return {
-    ...(actual as any),
+    ...actual,
     loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
   };
 });
 
 vi.mock('@agent/core/service-validator', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('@agent/core/service-validator')>();
   return {
-    ...(actual as any),
+    ...actual,
     inspectServiceAuth: mocks.inspectServiceAuth,
   };
 });
 
 vi.mock('@agent/core/core', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('@agent/core/core')>();
   return {
-    ...(actual as any),
+    ...actual,
     logger: mocks.logger,
   };
 });
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
   return {
-    ...(actual as any),
+    ...actual,
     safeExistsSync: mocks.safeExistsSync,
   };
 });
 
 vi.mock('@agent/core/path-resolver', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('@agent/core/path-resolver')>();
   return {
-    ...(actual as any),
-    pathResolver: { ...(actual as any).pathResolver, rootDir: mocks.rootDir },
+    ...actual,
+    pathResolver: { ...actual.pathResolver, rootDir: mocks.rootDir },
   };
 });
 
 vi.mock('@agent/core/customer-resolver', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('@agent/core/customer-resolver')>();
   return {
-    ...(actual as any),
+    ...actual,
     resolveOverlay: mocks.resolveOverlay,
     overlayCandidates: mocks.overlayCandidates,
   };
