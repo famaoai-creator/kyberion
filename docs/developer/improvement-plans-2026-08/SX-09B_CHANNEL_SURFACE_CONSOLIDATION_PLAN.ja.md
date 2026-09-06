@@ -441,3 +441,12 @@ held-action route と同じ `readPresenceStudioRouteParam` を全 dynamic route 
 だけを lookup／download／artifact projection へ渡すようにした。既存の resource scope、404、download semantics は維持した。
 
 検証: Presence Studio route-parameter boundary **3 files／25 tests passed**、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー修正 45
+
+Presence Studio の knowledge-ref／runtime-ref query path に残っていた `String(req.query.path || '')`
+変換を再監査し、重複 query 値や object-shaped input が path resolver へ到達し得る残存を検出した。
+route／query 共通の `readPresenceStudioStringParam` へ抽象化し、dynamic route parameter 6箇所と query path
+2箇所で単一 string の trim 済み値だけを受理するようにした。既存の knowledge／runtime allowlist、safe file read、404／403 semantics は維持した。
+
+検証: Presence Studio string-parameter boundary **3 files／25 tests passed**、対象 ESLint、Prettier、`git diff --check`。

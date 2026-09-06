@@ -68,7 +68,7 @@ import {
   presenceStudioVoiceStimulusSchema,
   resolvePresenceStudioViewerContext,
   requirePresenceStudioLocalAdmin,
-  readPresenceStudioRouteParam,
+  readPresenceStudioStringParam,
 } from './security.js';
 import {
   buildPresenceSurfaceFrame,
@@ -405,7 +405,7 @@ presenceStudioData.app.get('/api/os/control-plane', (req, res) => {
 });
 
 presenceStudioData.app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
-  const actionId = readPresenceStudioRouteParam(req.params.actionId);
+  const actionId = readPresenceStudioStringParam(req.params.actionId);
   const parsed = presenceStudioApprovalDecisionSchema.safeParse(
     safeParsePresenceStudioRequestBody(req.body, 'held action decision body')
   );
@@ -452,7 +452,7 @@ presenceStudioData.app.post('/api/os/held-actions/:actionId/decision', (req, res
 });
 
 presenceStudioData.app.post('/api/os/held-actions/:actionId/apply', async (req, res) => {
-  const actionId = readPresenceStudioRouteParam(req.params.actionId);
+  const actionId = readPresenceStudioStringParam(req.params.actionId);
   if (!actionId) return res.status(400).json({ ok: false, error: 'actionId is required' });
   try {
     const access = resolvePresenceStudioViewerContext(req);
@@ -507,7 +507,7 @@ presenceStudioData.app.get('/api/approvals', (_req, res) => {
 });
 
 presenceStudioData.app.post('/api/approvals/:requestId/decision', (req, res) => {
-  const requestId = readPresenceStudioRouteParam(req.params.requestId);
+  const requestId = readPresenceStudioStringParam(req.params.requestId);
   const parsed = presenceStudioApprovalDecisionSchema.safeParse(
     safeParsePresenceStudioRequestBody(req.body, 'approval decision body')
   );
@@ -589,7 +589,7 @@ presenceStudioData.app.get('/api/outcomes', (_req, res) => {
 });
 
 presenceStudioData.app.get('/api/knowledge-ref', (req, res) => {
-  const logicalPath = String(req.query.path || '').trim();
+  const logicalPath = readPresenceStudioStringParam(req.query.path);
   if (!logicalPath) {
     return res.status(400).json({ ok: false, error: 'path is required' });
   }
@@ -611,7 +611,7 @@ presenceStudioData.app.get('/api/knowledge-ref', (req, res) => {
 });
 
 presenceStudioData.app.get('/api/runtime-ref', (req, res) => {
-  const logicalPath = String(req.query.path || '').trim();
+  const logicalPath = readPresenceStudioStringParam(req.query.path);
   if (!logicalPath) {
     return res.status(400).json({ ok: false, error: 'path is required' });
   }
@@ -629,7 +629,7 @@ presenceStudioData.app.get('/api/runtime-ref', (req, res) => {
 });
 
 presenceStudioData.app.get('/api/artifacts/:artifactId', (req, res) => {
-  const artifactId = readPresenceStudioRouteParam(req.params.artifactId);
+  const artifactId = readPresenceStudioStringParam(req.params.artifactId);
   const artifact = listArtifactRecords().find((item) => item.artifact_id === artifactId) as
     presenceStudioData.ArtifactRecordShape | undefined;
   if (!artifact) {
@@ -671,7 +671,7 @@ presenceStudioData.app.get('/api/task-sessions', (_req, res) => {
 });
 
 presenceStudioData.app.get('/api/task-sessions/:sessionId', (req, res) => {
-  const sessionId = readPresenceStudioRouteParam(req.params.sessionId);
+  const sessionId = readPresenceStudioStringParam(req.params.sessionId);
   const session = presenceStudioData.findTaskSession(sessionId);
   if (!session) {
     return res.status(404).json({ ok: false, error: `task session not found: ${sessionId}` });
@@ -680,7 +680,7 @@ presenceStudioData.app.get('/api/task-sessions/:sessionId', (req, res) => {
 });
 
 presenceStudioData.app.get('/api/task-sessions/:sessionId/artifact', (req, res) => {
-  const sessionId = readPresenceStudioRouteParam(req.params.sessionId);
+  const sessionId = readPresenceStudioStringParam(req.params.sessionId);
   const session = presenceStudioData.findTaskSession(sessionId);
   if (!session) {
     return res.status(404).json({ ok: false, error: `task session not found: ${sessionId}` });

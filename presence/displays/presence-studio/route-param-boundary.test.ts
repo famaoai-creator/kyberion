@@ -14,6 +14,7 @@ describe('Presence Studio route parameter boundary', () => {
     const source = readServerSource();
 
     expect(source).not.toMatch(/String\(req\.params\.[^)]+\|\| ''\)\.trim\(\)/u);
-    expect(source.match(/readPresenceStudioRouteParam\(req\.params\.[^)]+\)/gu)).toHaveLength(6);
+    expect(source.match(/readPresenceStudioStringParam\(req\.params\.[^)]+\)/gu)).toHaveLength(6);
+    expect(source.match(/readPresenceStudioStringParam\(req\.query\.path\)/gu)).toHaveLength(2);
   });
 });
