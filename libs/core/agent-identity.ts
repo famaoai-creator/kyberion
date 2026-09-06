@@ -44,9 +44,8 @@
  */
 
 import { z } from 'zod';
-import { parseSafeJsonInput } from './foundation/json.js';
+import { readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
-import { readTextFile } from './foundation/text.js';
 import { isVitestProcess } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
@@ -454,21 +453,13 @@ export class AgentIdentityJournal {
         `[AGENT_IDENTITY_RESOURCE] journal must be a regular file: ${this.journalPath}`
       );
     }
-    const raw = readTextFile(this.journalPath);
-    const events: JournalEventEnvelope[] = [];
+    const events = readJsonLines<JournalEventEnvelope>(this.journalPath, {
+      onMalformed: 'skip',
+      map: (value) => journalEventEnvelopeSchema.parse(value),
+    });
     let maxSeq = -1;
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const parsed = journalEventEnvelopeSchema.parse(
-          parseSafeJsonInput(trimmed, 'agent identity journal entry')
-        );
-        events.push(parsed);
-        if (parsed.seq > maxSeq) maxSeq = parsed.seq;
-      } catch {
-        // A torn/corrupt line must not poison replay of the rest.
-      }
+    for (const event of events) {
+      if (event.seq > maxSeq) maxSeq = event.seq;
     }
     return { events, maxSeq };
   }
