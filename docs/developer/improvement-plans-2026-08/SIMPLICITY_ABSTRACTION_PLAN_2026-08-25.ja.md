@@ -23729,3 +23729,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: procedure registry の persisted JSON catalog loader、SX-03／SX-04
 - **変更**: regular-file確認後の procedure catalog 読み込みを `readTextFile` + `parseSafeJsonInput` から foundation `readJson`へ統一した。catalog schema validation、個別エントリの不正時drop、duplicate／personal overlayの優先順位、symlink／directory boundaryは維持し、テストdoubleもcanonical readerを通す形へ更新した。
 - **検証**: procedure registry **1 file／29 tests passed**、foundation adoption **1 file／7 tests passed**、canonical foundation-adoption／improvement-plan-metadata gate、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1755
+
+- **対象**: tenant rate limiter の stale lock JSON loader、SX-03／security boundary
+- **変更**: operation-time の regular-file確認後に行う lock JSON 読み込みを `readTextFile` + `parseSafeJsonInput` から foundation `readJson`へ統一した。malformed／空／invalid PIDを stale として reclaimする既存動作、symlink／lock path boundary、quota state の read-modify-write semanticsは維持し、破損 lock の回帰テストを追加した。
+- **検証**: tenant-rate-limiter **1 file／18 tests passed**、foundation adoption **1 file／7 tests passed**、canonical foundation-adoption gate、`git diff --check`。
