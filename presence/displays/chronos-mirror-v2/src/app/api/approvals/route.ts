@@ -6,6 +6,7 @@ import {
   viewerErrorResponse,
   strictViewerScopeTenantSlugs,
 } from '../../../lib/viewer-context';
+import { readChronosOptionalStringParam, readChronosStringParam } from '../../../lib/request-input';
 
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -19,17 +20,17 @@ export function GET(req: NextRequest) {
     const url = new URL(req.url);
     const tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
-      url.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(url.searchParams.get('tenant'))
     );
     const approvals = buildApprovalQueueItems({
-      query: url.searchParams.get('query') || undefined,
-      status: url.searchParams.get('status') || undefined,
-      kind: url.searchParams.get('kind') || undefined,
-      missionId: url.searchParams.get('missionId') || undefined,
-      tenant: url.searchParams.get('tenant') || undefined,
+      query: readChronosOptionalStringParam(url.searchParams.get('query')),
+      status: readChronosOptionalStringParam(url.searchParams.get('status')),
+      kind: readChronosOptionalStringParam(url.searchParams.get('kind')),
+      missionId: readChronosOptionalStringParam(url.searchParams.get('missionId')),
+      tenant: readChronosOptionalStringParam(url.searchParams.get('tenant')),
       tenantSlugs,
-      channel: url.searchParams.get('channel') || undefined,
-      limit: Number(url.searchParams.get('limit') || 24),
+      channel: readChronosOptionalStringParam(url.searchParams.get('channel')),
+      limit: Number(readChronosStringParam(url.searchParams.get('limit')) || 24),
     });
     return NextResponse.json({ approvals, accessRole: resolvedViewer.context.role });
   } catch (error) {

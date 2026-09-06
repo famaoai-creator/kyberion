@@ -15,7 +15,11 @@ import {
   ViewerContextError,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
-import { readChronosJsonObject } from '../../../lib/request-input';
+import {
+  readChronosJsonObject,
+  readChronosOptionalStringParam,
+  readChronosStringParam,
+} from '../../../lib/request-input';
 import { CHRONOS_WORK_ITEM_STATUSES, parseWorkItemStatusInput } from './work-item-input';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +32,7 @@ export function GET(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
   const viewer = resolvedViewer.context;
-  const rawScope = req.nextUrl.searchParams.get('scope') || 'work_items';
+  const rawScope = readChronosStringParam(req.nextUrl.searchParams.get('scope')) || 'work_items';
   const scope: WorkVisibilityScope = [
     'organization',
     'home',
@@ -39,22 +43,22 @@ export function GET(req: NextRequest) {
   ].includes(rawScope)
     ? (rawScope as WorkVisibilityScope)
     : 'work_items';
-  const rawView = req.nextUrl.searchParams.get('view') || 'all';
+  const rawView = readChronosStringParam(req.nextUrl.searchParams.get('view')) || 'all';
   const view: WorkVisibilityView = ['all', 'actionable', 'active', 'history'].includes(rawView)
     ? (rawView as WorkVisibilityView)
     : 'all';
   try {
     const tenantSlugs = strictViewerScopeTenantSlugs(
       viewer,
-      req.nextUrl.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
     const organizationIds = strictViewerScopeOrganizationIds(
       viewer,
-      req.nextUrl.searchParams.get('organization_id') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization_id'))
     );
     const projectIds = strictViewerScopeProjectIds(
       viewer,
-      req.nextUrl.searchParams.get('project_id') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id'))
     );
     const projection = buildWorkVisibilityProjection({
       items: withViewerExecutionContext(viewer, () =>
@@ -67,9 +71,11 @@ export function GET(req: NextRequest) {
       viewer: { tenantSlugs, organizationIds, projectIds },
       scope,
       view,
-      organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,
-      missionId: req.nextUrl.searchParams.get('mission_id') || undefined,
-      projectId: req.nextUrl.searchParams.get('project_id') || undefined,
+      organizationId: readChronosOptionalStringParam(
+        req.nextUrl.searchParams.get('organization_id')
+      ),
+      missionId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('mission_id')),
+      projectId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id')),
     });
     return NextResponse.json({
       ok: true,

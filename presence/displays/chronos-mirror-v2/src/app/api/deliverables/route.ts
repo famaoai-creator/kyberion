@@ -11,6 +11,7 @@ import {
   viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
+import { readChronosOptionalStringParam, readChronosStringParam } from '../../../lib/request-input';
 
 export async function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -27,17 +28,17 @@ export async function GET(req: NextRequest) {
   try {
     tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
     organizationIds = strictViewerScopeOrganizationIds(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('organization_id') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization_id'))
     );
     projectIds = strictViewerScopeProjectIds(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('project_id') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id'))
     );
-    const requestedTier = req.nextUrl.searchParams.get('tier') || '';
+    const requestedTier = readChronosStringParam(req.nextUrl.searchParams.get('tier'));
     tier = requestedTier
       ? strictViewerTier(
           resolvedViewer.context,
@@ -47,12 +48,12 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     return viewerErrorResponse(error);
   }
-  const limit = Number(req.nextUrl.searchParams.get('limit') || 50);
+  const limit = Number(readChronosStringParam(req.nextUrl.searchParams.get('limit')) || 50);
   const deliverables = withViewerExecutionContext(resolvedViewer.context, () =>
     collectDeliverableInbox({
-      query: req.nextUrl.searchParams.get('query') || '',
-      missionId: req.nextUrl.searchParams.get('missionId') || '',
-      kind: req.nextUrl.searchParams.get('kind') || '',
+      query: readChronosStringParam(req.nextUrl.searchParams.get('query')),
+      missionId: readChronosStringParam(req.nextUrl.searchParams.get('missionId')),
+      kind: readChronosStringParam(req.nextUrl.searchParams.get('kind')),
       tier,
       tierAccess: resolvedViewer.context.tierAccess ?? ['public', 'confidential'],
       limit: Number.isFinite(limit) ? limit : 50,
