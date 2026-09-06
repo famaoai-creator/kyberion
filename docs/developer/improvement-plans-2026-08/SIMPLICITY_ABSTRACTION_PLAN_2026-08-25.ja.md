@@ -22997,3 +22997,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts`、route resource-boundary test、PI-03
 - **変更**: Chronos agent route の security policy／surface request artifact read 前へ operation-time の regular-file 検査を追加し、directory replacement を JSON parse／projectionへ到達させないようにした。既存の viewer scope、request validation、wire error semantics は維持した。
 - **検証**: route resource-boundary **2 files／3 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1633
+
+- **対象**: `scripts/inventory_resource_loaders.ts`、inventory test、PI-03
+- **変更**: 同一の短い read section 内にある regular-file／safe path helper 証跡の後方探索範囲を 12 行から 32 行へ拡張し、長い helper 内の既存 guard を未分類として残さないようにした。これは静的分類の精度改善であり、semantic guard の完全な証明ではない。
+- **検証**: inventory **1 file／5 tests passed**、Prettier、`git diff --check`。needs-review の個別確認と provider 実機受入は継続する。
