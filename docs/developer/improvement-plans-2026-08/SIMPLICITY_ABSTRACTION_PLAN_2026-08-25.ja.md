@@ -23153,3 +23153,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_script_integrity.ts`、`scripts/check_script_integrity.test.ts`、PI-03
 - **変更**: script integrity checkerのproduction source／package script／repository docs／pipeline documentation本文readを`readScriptIntegrityTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをharness・path・pnpm script整合判定へ到達させないようにした。既存のintegrity semanticsは維持した。
 - **検証**: script integrity **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1659
+
+- **対象**: `scripts/check_tier_hygiene.ts`、`scripts/check_tier_hygiene.test.ts`、PI-03
+- **変更**: tier hygiene checkerのpersistent fixture／public-tier本文readを`readTierHygieneTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtier leak判定へ到達させないようにした。unreadable inputをscan対象から除外する既存semanticsは維持した。
+- **検証**: tier hygiene **2 files／2 focused tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。

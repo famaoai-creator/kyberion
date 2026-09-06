@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { scan } from './check_tier_hygiene.js';
+import { readTierHygieneTextFile, scan } from './check_tier_hygiene.js';
 
 /**
  * Regression test for the tier-hygiene checker. Instead of driving the
@@ -31,6 +31,12 @@ describe.sequential('check_tier_hygiene', () => {
     );
     expect(source).toContain('defineCatalog, readTextFile');
     expect(source).not.toContain('safeReadFile(');
+  });
+
+  it('rejects a directory replacement before tier text scanning', () => {
+    expect(() => readTierHygieneTextFile(pathResolver.rootDir())).toThrow(
+      `${pathResolver.rootDir()} must be a regular file`
+    );
   });
 
   it('passes on the current tree (baseline)', async () => {
