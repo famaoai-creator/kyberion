@@ -757,7 +757,13 @@ script integrity checkerをroot `package.json` の `check:script-integrity`へ�
 
 `check_backend_conformance.ts`もroot `package.json` の `check:backend-conformance`へ接続し、通常のversion／help matrixと、明示した`-- --live-sandbox`の外部model-turn probeを同じentrypointで分離した。
 
-検証: 静的backend conformance **8 provider modes**、既存core conformance suite、Prettier。実CLIのOS-level enforcement結果と未監査direct loader全体inventoryは継続課題である。
+検証: 静的backend conformance matrix、既存core conformance suite、Prettier。実CLIのOS-level enforcement結果と未監査direct loader全体inventoryは継続課題である。
+
+## 2026-09-06: PI-03 direct-loader inventory の標準入口
+
+`inventory_resource_loaders.ts` を root `package.json` の `inventory:resource-loaders` へ接続した。`libs/core`／`satellites`／`presence` の production TypeScript を対象に、直接 loader の file／line、loader 種別、path guard の静的証跡を JSON 化する。証跡が取れない callsite は `needs-review` として残し、未検証の読み込みを安全扱いしない。
+
+検証: **1,345 files／195 callsites**（inline 6、nearby guard 114、needs-review 75）、関連 **1 file / 4 tests passed**、typecheck、Prettier。個別の path guard 修正と provider CLI の実 OS-level enforcement 結果は継続課題である。
 
 ## 10. 検証コマンド(実装時)
 

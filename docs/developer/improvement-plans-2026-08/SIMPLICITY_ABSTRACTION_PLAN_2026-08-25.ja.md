@@ -22792,4 +22792,10 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 - **対象**: `libs/core/provider-capability-overview.ts`、`scripts/scan_provider_cli_capabilities.ts`、provider capability snapshot schema／tests、SX-08B
 - **変更**: provider CLI受入の残差を、version／helpの静的検出だけでなく、既存のprovider capability registryが返すruntime probe（binary検出、認証状態、sandbox flag状態）まで governed snapshotへ投影するようにした。snapshot parser／JSON Schemaを拡張し、build済みcore package経由のscanでもruntime probeを保存する。probe error本文や実行引数はsnapshotへ持ち込まず、表示・監査用の最小証跡に限定した。
-- **検証**: build後の実scanで **8 providers／registered 39／available capabilities 33／available providers 7／missing providers 2** を取得し、snapshotのruntime probe（認証 true／false／unknown、sandbox supported／unsupported）を確認。provider capability overview／scan entrypoint／report contract **3 files／6 tests passed**、root typecheck、Prettier、`git diff --check`。live model call とOS-level enforcementの実証は外部CLI・環境依存の継続課題とする。
+- **検証**: build後の実scanで provider registry の registered／available capability／available provider／missing provider 集計を取得し、snapshotのruntime probe（認証 true／false／unknown、sandbox supported／unsupported）を確認。provider capability overview／scan entrypoint／report contract **3 files／6 tests passed**、root typecheck、Prettier、`git diff --check`。live model call とOS-level enforcementの実証は外部CLI・環境依存の継続課題とする。
+
+## 2026-09-06 再レビュー実装 1599
+
+- **対象**: `scripts/inventory_resource_loaders.ts`、inventory test、root `package.json`、PI／DSH、SX-08B
+- **変更**: 未監査 direct loader の次の修正対象を手作業の grep に依存させないよう、production source の `readJson`／`readJsonLines`／`readTextFile` callsite を file／line 単位で収集し、inline／nearby path guard evidence と `needs-review` を分離する `inventory:resource-loaders` を追加した。生成物・依存物・foundation loader 実装は対象外とし、未分類を fail-open で除外しない。
+- **検証**: 実 inventory **1,345 files／195 callsites／inline 6／nearby 114／needs-review 75**、inventory **1 file／4 tests passed**、root typecheck、Prettier、`git diff --check`。needs-review の個別修正、provider実機受入、package script のさらなる整理は継続課題とする。

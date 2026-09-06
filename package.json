@@ -52,6 +52,7 @@
     "knowledge:sync": "node dist/scripts/run_pipeline.js --input pipelines/knowledge-sync.json",
     "check:contract-semver": "node dist/scripts/check_contract_semver.js",
     "check:backend-conformance": "node --import ./scripts/ts-loader.mjs scripts/check_backend_conformance.ts",
+    "inventory:resource-loaders": "node --import ./scripts/ts-loader.mjs scripts/inventory_resource_loaders.ts",
     "check:pr-title": "node --import ./scripts/ts-loader.mjs scripts/check_pr_title.ts",
     "check:commit-subject": "node --import ./scripts/ts-loader.mjs scripts/check_commit_subject.ts",
     "check:script-integrity": "node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts",
