@@ -23651,3 +23651,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `check_ci_gate_parity` の validate 構成検査、SX-07
 - **変更**: CI parity checker が `validate` の full check 呼び出しだけを確認していた残存を補強し、`pnpm run build`、`pnpm run typecheck`、`pnpm run check -- --scope full` の3要素を canonical validate sequence として検査するようにした。package script が build／typecheck／full gate のいずれかを欠いた場合、CI と validate の集合差分を具体的に報告する。
 - **検証**: `check_ci_gate_parity` **1 file／8 tests passed**、canonical `ci-gate-parity` gate passed、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1742
+
+- **対象**: service actuator の `services-pids.json` loader、SX-03
+- **変更**: persisted PID registry の `safeReadFile` + `parseSafeJsonInput` を foundation `readJsonIfPresent` へ統一した。missing／malformed registry の空 registry fallback、`parseServicePidRegistry` の shape validation、service manifest／process reconciliation semantics は維持し、reconcile test fixture の regular-file／manifest catalog boundary も明示した。
+- **検証**: service actuator index／reconcile integration **2 files／22 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
