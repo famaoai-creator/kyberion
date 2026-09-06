@@ -29,7 +29,7 @@
 
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
-import { parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
+import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -194,8 +194,7 @@ class ReflexEngine {
         try {
           const reflexPath = assertSafeRepositoryPath(path.join(safeReflexDir, file));
           if (!safeLstat(reflexPath).isFile()) continue;
-          const content = readTextFile(reflexPath);
-          const reflex = parseSafeJsonInput(content, 'reflex definition') as ReflexADF;
+          const reflex = readJson<ReflexADF>(reflexPath);
           // Reject a malformed reflex at load time: a definition that can never
           // dispatch should be visible now, not on the first matching stimulus.
           const invalid = validateReflexAction(reflex.action);

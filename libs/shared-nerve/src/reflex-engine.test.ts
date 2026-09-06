@@ -3,7 +3,7 @@ import fc from 'fast-check';
 
 // Mock @agent/core before importing the module under test.
 // ReflexEngine's constructor calls reloadReflexes(), which uses safeExistsSync,
-// safeReaddir, readTextFile, pathResolver, and logger — all must be mocked.
+// safeReaddir, readJson, pathResolver, and logger — all must be mocked.
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core')>();
   return {
@@ -43,7 +43,7 @@ vi.mock('@agent/core/foundation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/foundation')>();
   return {
     ...actual,
-    readTextFile: vi.fn().mockReturnValue('{}'),
+    readJson: vi.fn().mockReturnValue({}),
   };
 });
 
@@ -138,7 +138,7 @@ describe('ReflexEngine', () => {
     const foundation = await import('@agent/core/foundation');
     vi.mocked(secure.safeExistsSync).mockReturnValue(true);
     vi.mocked(secure.safeReaddir).mockReturnValue(['safe.adf.json', 'linked.adf.json']);
-    vi.mocked(foundation.readTextFile).mockReturnValue(JSON.stringify(makeReflex('safe-intent')));
+    vi.mocked(foundation.readJson).mockReturnValue(makeReflex('safe-intent'));
     vi.mocked(secure.assertSafeRepositoryPath).mockImplementation((candidate: string) => {
       if (candidate.endsWith('linked.adf.json')) {
         throw new Error('[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link');
@@ -153,7 +153,7 @@ describe('ReflexEngine', () => {
     } finally {
       vi.mocked(secure.safeExistsSync).mockReturnValue(false);
       vi.mocked(secure.safeReaddir).mockReturnValue([]);
-      vi.mocked(foundation.readTextFile).mockReturnValue('{}');
+      vi.mocked(foundation.readJson).mockReturnValue({});
       vi.mocked(secure.assertSafeRepositoryPath).mockImplementation(
         (candidate: string) => candidate
       );
