@@ -23501,3 +23501,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Chronos approvals／deliverables／knowledge／tenant-scope／workitems route、request-input boundary test、SX-09b
 - **変更**: 認可・一覧投影へ直結する5つの Next route に残っていた query 値の個別既定値化を、共通 `readChronosStringParam`／`readChronosOptionalStringParam` へ統一した。tenant／organization／project／filter／limit は trim 済みの単一 string だけを認可計算・scope selector・一覧 projectionへ渡し、既存の viewer scope、tier、limit、404／403 semanticsは維持した。
 - **検証**: request-input boundary **1 file／2 tests passed**、対象 route の ESLint、Prettier、`git diff --check`。隔離依存に `next/server` がないため既存 `workitems/route.test.ts` は import 前に停止し、CIでの実行確認を継続する。
+
+## 2026-09-06 再レビュー実装 1717
+
+- **対象**: Chronos collaboration snapshot／stream、headless work-items／collaboration route、request-input boundary test、SX-09b
+- **変更**: collaboration と headless の scope query に残っていた個別既定値化を、共通 `readChronosOptionalStringParam` へ統一した。mission／tenant／organization／project／task／session／scope kind／limit は trim 済みの単一 string だけを認可・projection・SSE filterへ渡し、既存の snapshot／stream／headless envelope semanticsは維持した。
+- **検証**: request-input boundary **1 file／2 tests passed**、対象 route の ESLint、Prettier、`git diff --check`。provider 実機受入と Next runtimeを含む統合実行は継続課題である。
