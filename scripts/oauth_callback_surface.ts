@@ -11,7 +11,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
-import { readSurfaceStringParam } from '@agent/core';
+import { readSurfaceStringParam } from '@agent/core/surface-request-input';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import * as path from 'node:path';
 
