@@ -204,6 +204,20 @@ describe('intent-resolution-contract', () => {
     );
   });
 
+  it('uses the explicit surface locale for next-action prose', () => {
+    const localized = resolveIntentResolutionContract('動画を生成して', { locale: 'qps-ploc' });
+
+    expect(localized.next_action.label).toBe(
+      t('next_action:intent_resolution_request_approval', undefined, 'qps-ploc')
+    );
+    expect(localized.next_action.consequence).toBe(
+      t('next_action:intent_resolution_request_approval_consequence', undefined, 'qps-ploc')
+    );
+    expect(localized.next_action.label).not.toBe(
+      t('next_action:intent_resolution_request_approval', undefined, 'en')
+    );
+  });
+
   it('reuses an injected resolution packet when deriving task requirements', () => {
     const contract = resolveIntentResolutionContract('unrelated text', {
       packet: {

@@ -29,6 +29,7 @@ export type {
 
 export interface IntentResolutionContractOptions {
   packet?: IntentResolutionPacket;
+  locale?: SupportedLocale;
   tier?: 'personal' | 'confidential' | 'public';
   tenantId?: string;
   overlayPaths?: string[];
@@ -214,27 +215,39 @@ export function resolveIntentResolutionContract(
     missingInputs.length > 0
       ? {
           kind: 'provide_input',
-          label: t('next_action:intent_resolution_provide_input', undefined, 'en'),
+          label: t(
+            'next_action:intent_resolution_provide_input',
+            undefined,
+            options.locale || 'en'
+          ),
           consequence: t(
             'next_action:intent_resolution_provide_input_consequence',
             undefined,
-            'en'
+            options.locale || 'en'
           ),
         }
       : authorityLevel === 'approval_required'
         ? {
             kind: 'request_approval',
-            label: t('next_action:intent_resolution_request_approval', undefined, 'en'),
+            label: t(
+              'next_action:intent_resolution_request_approval',
+              undefined,
+              options.locale || 'en'
+            ),
             consequence: t(
               'next_action:intent_resolution_request_approval_consequence',
               undefined,
-              'en'
+              options.locale || 'en'
             ),
           }
         : {
             kind: 'continue',
-            label: t('next_action:intent_resolution_continue', undefined, 'en'),
-            consequence: t('next_action:intent_resolution_continue_consequence', undefined, 'en'),
+            label: t('next_action:intent_resolution_continue', undefined, options.locale || 'en'),
+            consequence: t(
+              'next_action:intent_resolution_continue_consequence',
+              undefined,
+              options.locale || 'en'
+            ),
           };
 
   return {
