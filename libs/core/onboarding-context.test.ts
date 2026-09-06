@@ -5,6 +5,7 @@ import {
   applyOnboardingFirstWork,
   loadOnboardingContextBinding,
   loadOnboardingFirstWorkRecord,
+  readOptionalOnboardingFile,
   resolveOnboardingContext,
   resolveOnboardingFirstWork,
 } from './onboarding-context.js';
@@ -82,6 +83,21 @@ function bindAndActivate(): void {
 afterEach(() => safeRmSync(rootDir, { recursive: true, force: true }));
 
 describe('onboarding context binding', () => {
+  it('reads only regular existing files for onboarding snapshots', () => {
+    const filePath = path.join(rootDir, 'customer', 'acme-ai', 'onboarding', 'snapshot.json');
+    const directoryPath = path.join(rootDir, 'customer', 'acme-ai', 'onboarding', 'snapshot-dir');
+    safeWriteFile(filePath, '{"ok":true}', { mkdir: true });
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(readOptionalOnboardingFile(filePath, 'snapshot')).toBe('{"ok":true}');
+    expect(readOptionalOnboardingFile(path.join(rootDir, 'missing.json'), 'snapshot')).toBe(
+      undefined
+    );
+    expect(() => readOptionalOnboardingFile(directoryPath, 'snapshot')).toThrow(
+      /must be a regular file/
+    );
+  });
+
   it('resolves customer, tenant, and organization without writing', () => {
     seedFixture();
     const result = resolveOnboardingContext({

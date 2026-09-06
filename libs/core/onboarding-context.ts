@@ -192,6 +192,19 @@ function contextPath(customerSlug: string, rootDir = pathResolver.rootDir()): st
   );
 }
 
+export function readOptionalOnboardingFile(filePath: string, label: string): string | undefined {
+  if (!safeExistsSync(filePath)) return undefined;
+  try {
+    if (!safeLstat(filePath).isFile()) {
+      throw new Error(`[ONBOARDING_RESOURCE] ${label} must be a regular file: ${filePath}`);
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[ONBOARDING_RESOURCE]')) throw error;
+    throw new Error(`[ONBOARDING_RESOURCE] ${label} could not be inspected: ${filePath}`);
+  }
+  return readTextFile(filePath);
+}
+
 function firstWorkPath(customerSlug: string, rootDir = pathResolver.rootDir()): string {
   return assertSafeRepositoryPath(
     path.join(rootDir, 'customer', customerSlug, 'onboarding', 'first-work-resolution.json'),
@@ -674,7 +687,7 @@ export function applyOnboardingContextBinding(
     const savedPaths: string[] = [];
     const previousFiles = new Map<string, string | undefined>();
     for (const filePath of [statePath, purposePath, contextPath(binding.customer_slug, rootDir)]) {
-      previousFiles.set(filePath, safeExistsSync(filePath) ? readTextFile(filePath) : undefined);
+      previousFiles.set(filePath, readOptionalOnboardingFile(filePath, 'rollback snapshot'));
     }
     try {
       if (!organizationState) {
@@ -813,7 +826,10 @@ export function applyOnboardingFirstWork(
           updated_at: nowIso(),
         };
         const bindingPath = contextPath(nextBinding.customer_slug, rootDir);
-        const previousBinding = readTextFile(bindingPath);
+        const previousBinding = readOptionalOnboardingFile(bindingPath, 'onboarding binding');
+        if (previousBinding === undefined) {
+          throw new Error(`[ONBOARDING_RESOURCE] onboarding binding is missing: ${bindingPath}`);
+        }
         safeWriteFile(bindingPath, `${JSON.stringify(nextBinding, null, 2)}\n`, {
           encoding: 'utf8',
         });
@@ -882,9 +898,7 @@ export function applyOnboardingFirstWork(
         rootDir,
         onCommit: (bootstrapped) => {
           const bindingPath = contextPath(resolved.binding.customer_slug, rootDir);
-          const previousBinding = safeExistsSync(bindingPath)
-            ? readTextFile(bindingPath)
-            : undefined;
+          const previousBinding = readOptionalOnboardingFile(bindingPath, 'onboarding binding');
           let firstWorkPath: string | undefined;
           let workItem: WorkItem | undefined;
           const rollbackCommit = (): void => {

@@ -22931,3 +22931,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/deliverable-inbox.ts`、deliverable-inbox test、PI-03
 - **変更**: deliverable inbox lock metadata read に operation-time の regular-file 検査を追加し、directory replacement を stale lock削除へ進めず lock timeoutでfail-closedするようにした。既存の lock acquisition、stale PID、inbox catalog semantics は維持した。
 - **検証**: deliverable-inbox **2 files／8 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1622
+
+- **対象**: `libs/core/onboarding-context.ts`、onboarding-context test、PI-03
+- **変更**: onboarding apply／rollback の existing binding／organization snapshot read を共通 `readOptionalOnboardingFile` の operation-time regular-file 境界へ統一し、directory replacement を状態復元・binding更新へ到達させないようにした。既存の tenant activation、organization scaffold、rollback semantics は維持した。
+- **検証**: onboarding-context **2 files／11 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
