@@ -1,11 +1,10 @@
 import path from 'node:path';
 import { NextRequest } from 'next/server';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { readJsonLines } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -82,32 +81,40 @@ export function eventFiles(rootPath = pathResolver.shared('logs/worker-events'))
   }
 }
 
-function readEvents(
+export function readEvents(
   afterId: string | null,
   missionId?: string,
   tenantSlugs: string[] | 'all' = 'all',
   scopeFilter: Omit<EventScopeFilter, 'tenant_slug' | 'tenant_slugs'> = {},
-  tierAccess: readonly OsKnowledgeTier[] = ['public', 'confidential']
+  tierAccess: readonly OsKnowledgeTier[] = ['public', 'confidential'],
+  files: readonly string[] = eventFiles()
 ): { events: CollaborationStreamEvent[]; lastSeenId?: string } {
   const events: CollaborationStreamEvent[] = [];
   let lastSeenId: string | undefined;
   let foundCursor = !afterId;
-  for (const file of eventFiles()) {
-    const raw = String(safeReadFile(file, { encoding: 'utf8' }) || '');
-    const lines = raw.split(/\r?\n/);
-    for (let lineNumber = 0; lineNumber < lines.length; lineNumber += 1) {
-      const line = lines[lineNumber]?.trim();
-      if (!line) continue;
-      const id = `${file}:${lineNumber}`;
+  for (const file of files) {
+    const entries = readJsonLines<{ id: string; value: unknown }>(file, {
+      map: (value, lineNumber) => ({
+        id: `${file}:${lineNumber - 1}`,
+        value,
+      }),
+      onMalformed: (_error, lineNumber) => {
+        const id = `${file}:${lineNumber - 1}`;
+        if (!foundCursor) {
+          if (id === afterId) foundCursor = true;
+          return;
+        }
+        lastSeenId = id;
+      },
+    });
+    for (const { id, value } of entries) {
       if (!foundCursor) {
         if (id === afterId) foundCursor = true;
         continue;
       }
       lastSeenId = id;
       try {
-        const event = workerEventEnvelopeSchema.parse(
-          parseSafeJsonInput(line, 'collaboration event')
-        ) as WorkerEventEnvelope;
+        const event = workerEventEnvelopeSchema.parse(value) as WorkerEventEnvelope;
         if (missionId && event.source?.mission_id !== missionId) continue;
         const normalized = normalizeWorkerEvent(event, id);
         const scopeResult = parseEventScopeFromRecord(normalized.payload);
@@ -151,7 +158,7 @@ function readEvents(
   // case replay the bounded tail instead of silently waiting forever for a
   // cursor that can no longer be found.
   if (afterId && !foundCursor)
-    return readEvents(null, missionId, tenantSlugs, scopeFilter, tierAccess);
+    return readEvents(null, missionId, tenantSlugs, scopeFilter, tierAccess, files);
   return { events: events.slice(-60), lastSeenId };
 }
 
