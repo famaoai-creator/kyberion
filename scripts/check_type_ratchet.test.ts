@@ -8,7 +8,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { checkTypeRatchet } from './check_type_ratchet.js';
+import { checkTypeRatchet, readTypeRatchetTextFile } from './check_type_ratchet.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('check-type-ratchet');
 
@@ -29,7 +29,14 @@ describe('check_type_ratchet', () => {
       }) || ''
     );
     expect(source).toContain('getRegisteredEnvText, nowIso, readTextFile');
+    expect(source).toContain('readTypeRatchetTextFile(filePath: string)');
     expect(source).not.toContain('safeReadFile(filePath');
+  });
+
+  it('rejects a directory before reading it as TypeScript source', () => {
+    expect(() => readTypeRatchetTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
   });
 
   afterEach(() => {
