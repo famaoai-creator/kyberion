@@ -295,8 +295,7 @@ describe('super-nerve engine', () => {
   });
 
   it('fails closed when a core include contains dangerous JSON keys', async () => {
-    const { safeReadFile } = await import('@agent/core/secure-io');
-    vi.mocked(safeReadFile).mockReturnValue('{"constructor":{"polluted":true}}');
+    readJsonMock.mockReturnValueOnce({ constructor: { polluted: true } });
 
     const result = await executeSuperPipeline(
       [{ op: 'core:call', params: { path: 'macros/dangerous.json' } }],
