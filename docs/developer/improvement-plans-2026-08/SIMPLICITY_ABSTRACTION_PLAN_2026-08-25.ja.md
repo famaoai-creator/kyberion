@@ -23111,3 +23111,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/generate_design_tokens.ts`、`scripts/generate_design_tokens.entrypoint.test.ts`、PI-03
 - **変更**: design-token generatorの既存CSS／Tailwind／theme source readを`readDesignTokenTextFile`のoperation-time regular-file境界へ統一し、directory replacementをtoken renderingへ到達させないようにした。generatorの宣言出力とtoken rendering semanticsは維持した。
 - **検証**: design-token generator **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1652
+
+- **対象**: `scripts/check_packaging_contract.ts`、`scripts/check_packaging_contract.test.ts`、PI-03／PI-12
+- **変更**: packaging contract checkerの`.dockerignore`／package manifest／`env.example`本文readを`readPackagingTextFile`のoperation-time regular-file境界へ統一し、directory replacementをdistribution policy判定へ到達させないようにした。既存のsecret／tier／export-key semanticsは維持した。
+- **検証**: packaging contract **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
