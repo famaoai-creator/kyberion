@@ -16,6 +16,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { resolveSurfaceIntent } from './router-contract.js';
+import type { IntentResolutionPacket } from './intent-resolution.js';
 
 export type BrowserConversationSurface = 'presence' | 'slack' | 'terminal' | 'chronos' | 'web';
 export type BrowserConversationStatus =
@@ -974,11 +975,16 @@ export function getActiveBrowserConversationSession(
 }
 
 export function classifyBrowserConversationCommand(
-  utterance: string
+  utterance: string,
+  options: {
+    packet?: IntentResolutionPacket;
+    tier?: 'personal' | 'confidential' | 'public';
+    tenantId?: string;
+  } = {}
 ): BrowserConversationCommandResolution | null {
   const trimmed = utterance.trim();
   if (!trimmed) return null;
-  const resolvedSurfaceIntent = resolveSurfaceIntent(trimmed);
+  const resolvedSurfaceIntent = resolveSurfaceIntent(trimmed, options);
 
   if (
     /^(止めて|停止|キャンセル|やめて|stop|cancel|pause|resume|続けて|再開|戻って|back)\b/i.test(

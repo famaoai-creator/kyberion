@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveIntentToSteps } from './resolver.js';
+import { resolveIntentResolutionPacket } from '@agent/core/intent-resolution';
 
 describe('super-nerve resolver stop-service flow', () => {
   it('lists running services when no target service is specified', async () => {
@@ -29,6 +30,16 @@ describe('super-nerve resolver stop-service flow', () => {
 
     expect(steps).toHaveLength(1);
     expect(String(steps[0]?.params?.cmd || '')).toContain('--operation stop');
+    expect(String(steps[0]?.params?.cmd || '')).toContain('--service-name voice-hub');
+  });
+
+  it('reuses a packet supplied by the canonical intent gateway', async () => {
+    const resolutionPacket = resolveIntentResolutionPacket('voice-hub を停止して');
+    const steps = await resolveIntentToSteps('stop-service', {
+      source_text: 'voice-hub を停止して',
+      resolution_packet: resolutionPacket,
+    });
+
     expect(String(steps[0]?.params?.cmd || '')).toContain('--service-name voice-hub');
   });
 

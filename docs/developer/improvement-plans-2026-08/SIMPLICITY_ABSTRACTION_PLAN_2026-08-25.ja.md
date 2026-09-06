@@ -22709,3 +22709,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/worker-context-compaction.ts`、`libs/core/email-workflow.ts`、`libs/core/promoted-memory.ts`、`libs/core/codex-cli-query.ts`、`libs/core/mission-artifact-closure.ts` と対象テスト
 - **変更**: worker compaction prompt、email draft、promoted-memory hints、Codex CLI output、mission artifact index の本文読込を foundation の `readTextFile` へ移行した。既存のpath／scope、provider output parsing、memory promotion、email safety、artifact closure semanticsは変更せず、codex-cli test seamを新readerへ適応した。
 - **検証**: 対象テスト **7 files／67 tests passed**、foundation-adoption **passed**、対象ESLint、Prettier、`git diff --check`。残るchecker／production loaderの全件codemodは継続課題とする。
+
+## 2026-09-06 再レビュー修正 1585
+
+- **対象**: productivity task plan、browser conversation、Super-Nerve resolver、CLI workflow／intent gateway、対象テスト、SX-08b
+- **変更**: 自由文を受け取る複数の実行補助入口に `IntentResolutionPacket` の受け渡し境界を追加した。CLIではtask plan・task session・実行contextが同じpacketを再利用し、browser conversationとSuper-Nerveもpacket未指定時だけcanonical resolverへフォールバックする。これにより同一ターンのintent／service parameter再解釈を抑え、tenant／tier・approval・実行順序は維持した。
+- **検証**: productivity plan／browser conversation／Super-Nerve／CLI entrypoint **4 files／35 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceの契約投影、approval本番相当テスト、provider実機依存、framework-specific request parsing、package scriptsの削減は継続課題とする。

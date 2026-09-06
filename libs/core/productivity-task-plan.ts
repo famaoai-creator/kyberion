@@ -1,4 +1,5 @@
 import { classifyTaskSessionIntent } from './task-session.js';
+import type { IntentResolutionOptions, IntentResolutionPacket } from './intent-resolution.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 
@@ -141,11 +142,18 @@ function evidenceFor(domain: ProductivityTaskDomain, effect: ProductivityEffectL
   return evidence;
 }
 
-export function buildProductivityTaskPlan(request: string): ProductivityTaskPlan {
+export function buildProductivityTaskPlan(
+  request: string,
+  options: IntentResolutionOptions & { resolutionPacket?: IntentResolutionPacket } = {}
+): ProductivityTaskPlan {
   const normalizedRequest = request.trim();
   if (!normalizedRequest) throw new Error('request is required');
 
-  const classified = classifyTaskSessionIntent(normalizedRequest);
+  const classified = classifyTaskSessionIntent(
+    normalizedRequest,
+    options.resolutionPacket,
+    options
+  );
   const matchedDefinitions = DOMAIN_DEFINITIONS.filter((definition) =>
     definition.matches.test(normalizedRequest)
   );

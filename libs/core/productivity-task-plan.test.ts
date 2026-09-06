@@ -8,10 +8,20 @@ import {
   buildProductivityTaskPlan,
   validateProductivityTaskPlan,
 } from './productivity-task-plan.js';
+import { resolveIntentResolutionPacket } from './intent-resolution.js';
 
 const Ajv = AjvModule;
 
 describe('productivity-task-plan', () => {
+  it('reuses the canonical resolution packet for plan and session classification', () => {
+    const request = '会議の日程を変更して参加者にメールを送って';
+    const resolutionPacket = resolveIntentResolutionPacket(request);
+    const plan = buildProductivityTaskPlan(request, { resolutionPacket });
+
+    expect(plan.primary_intent_id).toBe(resolutionPacket.selected_intent_id);
+    expect(plan.missing_inputs).toEqual(expect.arrayContaining(['approval_confirmation']));
+  });
+
   it('builds a multi-domain dry-run plan without external effects', () => {
     const plan = buildProductivityTaskPlan(
       '連携システムから情報収集して会議資料をPPTXで作り、メールの下書きを用意して'
