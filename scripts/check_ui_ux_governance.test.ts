@@ -4,6 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   collectUiUxGovernanceReport,
   findHardcodedColorViolations,
+  readUiUxGovernanceTextFile,
 } from './check_ui_ux_governance.js';
 
 describe('UI/UX governance audit', () => {
@@ -29,5 +30,11 @@ describe('UI/UX governance audit', () => {
     const source = readTextFile(pathResolver.rootResolve('scripts/check_ui_ux_governance.ts'));
     expect(source).toContain("import { readTextFile } from '@agent/core/foundation'");
     expect(source).not.toContain('safeReadFile');
+  });
+
+  it('rejects a directory replacement before governance text parsing', () => {
+    expect(() => readUiUxGovernanceTextFile(pathResolver.rootDir())).toThrow(
+      'must be a regular file'
+    );
   });
 });
