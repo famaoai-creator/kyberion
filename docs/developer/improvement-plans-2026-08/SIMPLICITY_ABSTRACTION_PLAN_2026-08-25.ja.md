@@ -23831,3 +23831,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: mission gate の `deliverable_quality` JSON成果物 loader、SX-03／SX-10／PI-03
 - **変更**: regular-file境界を通過したJSON成果物の読込を foundation `readJson`へ統一した。Markdown／text成果物は従来どおりJSON読込失敗時にraw textへフォールバックし、deliverable kind／quality rubric／score threshold semanticsは維持した。LLM reviewの本文読込と外部schema inputは混在入力のため対象外とした。
 - **検証**: mission gate **2 files／18 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1772
+
+- **対象**: cognitive routing の governed schema loader、SX-03／SX-04／PI-03
+- **変更**: regular-file境界を通過した cognitive routing schema の手書きtext読込＋JSON parseを foundation `readJson`へ統一した。schema path／regular-file fail-closedと、既存の schema validation／route decision semanticsは維持した。
+- **検証**: cognitive routing **1 file／4 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
