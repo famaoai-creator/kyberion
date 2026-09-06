@@ -49,6 +49,7 @@ async function loadChronosCore() {
     toolRuntimeRegistry,
     coreLogger,
     missionState,
+    foundation,
   ] = await Promise.all([
     import('@agent/core/presence-bridge'),
     import('@agent/core/path-resolver'),
@@ -63,6 +64,7 @@ async function loadChronosCore() {
     import('@agent/core/tool-runtime-registry'),
     import('@agent/core/core'),
     import('@agent/core/mission-state'),
+    import('@agent/core/foundation'),
   ]);
 
   return {
@@ -105,6 +107,7 @@ async function loadChronosCore() {
     emitMissionOrchestrationObservation: orchestrationEvents.emitMissionOrchestrationObservation,
     enqueueMissionOrchestrationEvent: orchestrationEvents.enqueueMissionOrchestrationEvent,
     startMissionOrchestrationWorker: orchestrationEvents.startMissionOrchestrationWorker,
+    readJsonLines: foundation.readJsonLines,
   };
 }
 
@@ -128,6 +131,29 @@ function readSafeChronosFile(core: ChronosCore, filePath: string): string | null
     return core.safeReadFile(safePath, { encoding: 'utf8' }) as string;
   } catch {
     return null;
+  }
+}
+
+function readSafeChronosJsonLines(
+  core: ChronosCore,
+  filePath: string
+): Array<{ lineNumber: number; value?: unknown }> {
+  try {
+    const safePath = core.assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!core.safeExistsSync(safePath) || !core.safeLstat(safePath).isFile()) return [];
+    const entries: Array<{ lineNumber: number; value?: unknown }> = [];
+    core.readJsonLines<unknown>(safePath, {
+      map: (value, lineNumber) => {
+        entries.push({ lineNumber, value });
+        return value;
+      },
+      onMalformed: (_error, lineNumber) => {
+        entries.push({ lineNumber });
+      },
+    });
+    return entries;
+  } catch {
+    return [];
   }
 }
 
@@ -796,17 +822,9 @@ async function tryHandleChronosQuickAction(
       ];
       const events: Array<{ time: string; label: string; detail?: string; status?: string }> = [];
       for (const file of eventFiles) {
-        const raw = readSafeChronosFile(core, file);
-        if (raw === null) continue;
-        const lines = raw.trim().split('\n').filter(Boolean);
-        for (const line of lines.slice(-12)) {
-          let parsed: unknown;
-          try {
-            parsed = parseSafeJsonInput(line, 'Chronos audit event');
-          } catch {
-            continue;
-          }
-          const event = parseChronosAuditEvent(parsed);
+        for (const { value } of readSafeChronosJsonLines(core, file).slice(-12)) {
+          if (value === undefined) continue;
+          const event = parseChronosAuditEvent(value);
           if (!event) continue;
           const routingDecision = event.metadata?.routing_decision;
           const routingSummary = routingDecision
