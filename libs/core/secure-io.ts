@@ -8,6 +8,7 @@ import {
 } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
+import { assertSafeRepositoryPath } from './path-resolver.js';
 import {
   getRegisteredEnvBool,
   getRegisteredEnvText,
@@ -131,47 +132,7 @@ export interface SafeWriteOptions {
  * tools need to reject a path that stays lexically inside the repository but
  * resolves through a link into another scope.
  */
-export function assertSafeRepositoryPath(
-  filePath: string,
-  options: {
-    allowMissingLeaf?: boolean;
-    allowSymlinkLeaf?: boolean;
-    rootDir?: string;
-  } = {}
-): string {
-  if (!filePath) throw new Error('Missing required resource path');
-
-  const resolved = pathResolver.resolve(filePath);
-  const root = path.resolve(options.rootDir ?? pathResolver.rootDir());
-  const relative = path.relative(root, resolved).replaceAll('\\', '/');
-  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
-    throw new Error(
-      `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
-    );
-  }
-
-  let current = root;
-  for (const segment of relative.split('/')) {
-    current = path.join(current, segment);
-    try {
-      if (fs.lstatSync(current).isSymbolicLink()) {
-        const isLeaf = current === resolved;
-        if (options.allowSymlinkLeaf && isLeaf) continue;
-        throw new Error(
-          `[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link: ${filePath}`
-        );
-      }
-    } catch (error: any) {
-      if (error?.code === 'ENOENT') break;
-      throw error;
-    }
-  }
-
-  if (!options.allowMissingLeaf && !fs.existsSync(resolved)) {
-    throw new Error(`Resource path does not exist: ${resolved}`);
-  }
-  return resolved;
-}
+export { assertSafeRepositoryPath } from './path-resolver.js';
 
 export function buildSafeExecEnv(
   extraEnv: Record<string, string | undefined> = {}

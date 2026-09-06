@@ -24089,3 +24089,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Chronos Mirrorのno-unused-vars残存と例外設定、SX-02／SX-12
 - **変更**: Chronos Mirror v2で未使用だったLegacy/Shellの大規模destructure、Mission Intelligenceのpanel・API route・補助関数のimport／context値を整理し、不要な旧ローカルストレージ補助関数と検索補助関数を削除した。Approval／Distill／Memory Promotionのhandlerを親からpanelへ明示的に渡す不足も同時に修正した。これによりChronos専用のno-unused-vars例外設定を削除し、通常のproduction source lintへ復帰した。
 - **検証**: Chronos source ESLint **0 errors**、forced no-unused-vars **0 errors**、Mission Intelligence／intelligence API **7 files／29 tests passed**、agent／collaboration API **8 files／59 tests passed**、Prettier、`git diff --check`。全体typecheckは既存の`presence-studio-runtime-data.boundary.test.ts:46`における`string | Buffer`への`.match`型エラーで停止した。
+
+## 2026-09-07 再レビュー実装 1815
+
+- **対象**: foundation bootstrap cycleとtypecheckの型境界、SX-02／SX-07／SX-12
+- **変更**: `policy-engine`がbootstrap中の`secure-io`を直接importしていたため、`secure-io ↔ policy-engine`のruntime cycleが発生していた。repository path validatorをbootstrap可能な`path-resolver`へ移し、`secure-io`は互換re-exportを維持、policy fileの読込は登録済みFoundation I/Oへ統一した。Presence Studioのboundary testでは、UTF-8読込結果を文字列として扱う型境界を明示した。
+- **検証**: `libs/core` lint、全維持対象（`libs scripts satellites presence`）lint、policy／secure-io **3 files／49 tests passed**、root `pnpm run typecheck`、Prettier、`git diff --check`。`check:channel-adapter-adoption`は現行4 bridgeで引き続きOK。
