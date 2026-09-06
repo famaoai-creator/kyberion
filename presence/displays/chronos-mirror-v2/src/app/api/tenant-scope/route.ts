@@ -10,6 +10,7 @@ import {
   viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../lib/request-input';
 
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -19,7 +20,7 @@ export function GET(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
   try {
-    const requested = req.nextUrl.searchParams.get('tenant') || undefined;
+    const requested = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
     const tenants = strictViewerScopeTenantSlugs(resolvedViewer.context, requested);
     const visibleSlugs = withViewerExecutionContext(resolvedViewer.context, () =>
       tenants === 'all'
@@ -28,11 +29,11 @@ export function GET(req: NextRequest) {
     );
     const organizationIds = strictViewerScopeOrganizationIds(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('organization_id') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization_id'))
     );
     const projectIds = strictViewerScopeProjectIds(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('project_id') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id'))
     );
     const allowedTenants = new Set(visibleSlugs);
     const allowedOrganizations = organizationIds === 'all' ? null : new Set(organizationIds);
@@ -78,8 +79,10 @@ export function GET(req: NextRequest) {
         status: project.status,
       })),
       selected: requested || (options.length === 1 ? options[0].slug : null),
-      selectedOrganization: req.nextUrl.searchParams.get('organization_id') || null,
-      selectedProject: req.nextUrl.searchParams.get('project_id') || null,
+      selectedOrganization:
+        readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization_id')) || null,
+      selectedProject:
+        readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id')) || null,
       source: resolvedViewer.context.source,
     });
   } catch (error) {

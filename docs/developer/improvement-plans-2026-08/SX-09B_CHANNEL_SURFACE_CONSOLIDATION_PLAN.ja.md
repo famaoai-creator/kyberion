@@ -472,6 +472,18 @@ scope／trace projection へ渡すようにした。既存の tenant scope、saf
 Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英の channel
 literal 全面移行は引き続き未完了である。
 
+## 2026-09-06 再レビュー修正 49
+
+Chronos の認可・一覧投影 route（approvals、deliverables、knowledge、tenant-scope、workitems）に残っていた
+query 値の個別既定値化を再監査し、tenant／organization／project／listing filter が共通
+`readChronosStringParam`／`readChronosOptionalStringParam` を通るようにした。trim 済みの単一 string だけを
+認可計算・scope selector・一覧 projection へ渡し、既存の viewer scope、tier、limit、404／403 semantics は変更
+していない。
+
+検証: request-input boundary **1 file／2 tests passed**、対象 route の ESLint、Prettier、
+`git diff --check`。Next runtime依存が隔離環境にないため既存 `workitems/route.test.ts` は
+`next/server` import前に停止し、CIでの実行確認を継続する。
+
 ## 2026-09-06 再レビュー修正 47
 
 Presence Studio onboarding voice-sample の `content-type` header を再監査し、header array を `String(...)`
