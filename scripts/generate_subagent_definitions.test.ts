@@ -23,6 +23,7 @@ import {
   buildGeneratedFiles,
   condenseProcedure,
   main,
+  readSubagentDefinitionsTextFile,
   resolveProfile,
 } from './generate_subagent_definitions.js';
 
@@ -43,8 +44,15 @@ describe('generate_subagent_definitions', () => {
     );
     expect(source).toContain('loadTeamRoleIndex()');
     expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).toContain('readSubagentDefinitionsTextFile(filePath: string)');
     expect(source).not.toContain('safeReadFile(filePath');
     expect(source).not.toContain('readJson<');
+  });
+
+  it('rejects a directory before reading a procedure document', () => {
+    expect(() => readSubagentDefinitionsTextFile(pathResolver.rootResolve('knowledge'))).toThrow(
+      'must be a regular file'
+    );
   });
 
   it('maps team roles to KD-05 profiles deterministically', () => {
