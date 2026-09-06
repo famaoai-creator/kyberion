@@ -1,7 +1,7 @@
 /** PI-12: require an explicit opt-in for pnpm-lock.yaml changes. */
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { safeExec } from '@agent/core/secure-io';
+import { safeExec, safeLstat } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
@@ -25,6 +25,13 @@ export interface LockfileCommitGateResult {
   evidenceRef?: string;
   hasReviewEvidence: boolean;
   permitted: boolean;
+}
+
+export function readRegularTextFile(filePath: string, label: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 export function isLockfileChangePermitted(input: {
@@ -55,10 +62,16 @@ export function checkLockfileCommitGate(): LockfileCommitGateResult {
       : pathResolver.rootResolve(evidenceRef)
     : undefined;
   const lockfileHash = createHash('sha256')
-    .update(readTextFile(pathResolver.rootResolve('pnpm-lock.yaml')))
+    .update(readRegularTextFile(pathResolver.rootResolve('pnpm-lock.yaml'), 'pnpm-lock.yaml'))
     .digest('hex');
-  const evidenceText =
-    evidencePath && safeExistsSync(evidencePath) ? readTextFile(evidencePath) : '';
+  let evidenceText = '';
+  if (evidencePath) {
+    try {
+      evidenceText = readRegularTextFile(evidencePath, 'review evidence');
+    } catch {
+      evidenceText = '';
+    }
+  }
   const evidenceHash = /pnpm-lock\.yaml`?\s+sha256:\s*([a-f0-9]{64})/iu.exec(evidenceText)?.[1];
   const hasReviewEvidence = Boolean(
     evidencePath && evidenceText.trim() && evidenceHash === lockfileHash

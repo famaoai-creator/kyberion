@@ -23087,3 +23087,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_pinned_deps.ts`、`scripts/check_pinned_deps.test.ts`、PI-12／PI-03
 - **変更**: pinned-deps checkerの`pnpm-lock.yaml`／`.npmrc`本文readを共通`readPinnedTextFile`のoperation-time regular-file境界へ接続し、directory replacementをlockfile version／release-age判定へ到達させないようにした。foundation reader、既存のpinned dependency semanticsは維持した。
 - **検証**: pinned-deps **1 file／3 tests passed**、Prettier、`git diff --check`。scripts全体の未監査loaderとprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1648
+
+- **対象**: `scripts/check_lockfile_commit_gate.ts`、`scripts/check_lockfile_commit_gate.test.ts`、PI-12
+- **変更**: lockfile commit gateの`pnpm-lock.yaml`／review evidence本文readを共通`readRegularTextFile`のoperation-time regular-file境界へ接続し、lockfileのdirectory replacementはhash判定前に拒否し、evidenceのdirectory replacementは証拠なしとしてfail-closedにした。既存のlockfile変更許可条件は維持した。
+- **検証**: lockfile gate **1 file／8 tests passed**、Prettier、`git diff --check`。scripts全体の未監査loaderとprovider実機受入は継続する。
