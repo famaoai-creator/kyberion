@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
+import { readEmailWorkflowTextFile } from './email-workflow.js';
 
 function runHelp(
   script: string,
@@ -62,7 +63,14 @@ describe('CLI help entrypoints', () => {
       safeReadFile(pathResolver.rootResolve('scripts/email-workflow.ts'), { encoding: 'utf8' })
     );
     expect(source).toContain('readTextFile');
+    expect(source).toContain('readEmailWorkflowTextFile(filePath: string)');
     expect(source).not.toContain('safeReadFile(filePath');
+  });
+
+  it('rejects a directory before reading an email workflow file', () => {
+    expect(() => readEmailWorkflowTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
   });
 
   it('honors shared output flags for calendar workflow results', () => {
