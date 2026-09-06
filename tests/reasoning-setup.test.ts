@@ -9,9 +9,30 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...actual as any,
+    ...(actual as any),
     loadEnvironmentManifest: mocks.loadEnvironmentManifest,
     probeManifest: mocks.probeManifest,
+    logger: mocks.logger,
+  };
+});
+
+// scripts/reasoning_setup.ts imports directly from these submodules (SX
+// simplicity abstraction pass, commit a877d9c12) rather than the aggregate
+// `@agent/core` entry point, so the mocks above never intercept its calls —
+// mock the actual import sites too.
+vi.mock('@agent/core/environment-capability', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
+    loadEnvironmentManifest: mocks.loadEnvironmentManifest,
+    probeManifest: mocks.probeManifest,
+  };
+});
+
+vi.mock('@agent/core/core', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
     logger: mocks.logger,
   };
 });

@@ -2535,7 +2535,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 14045,
+      "size": 15128,
       "type": "json"
     },
     {
@@ -3297,7 +3297,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1435158,
+      "size": 1435244,
       "type": "json"
     },
     {
