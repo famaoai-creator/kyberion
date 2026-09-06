@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runOAuthCallbackSurface } from './oauth_callback_surface.js';
+import { pathResolver, safeReadFile } from '@agent/core';
 
 const HOST = '127.0.0.1';
 const PORT = 18787;
@@ -21,6 +22,17 @@ async function waitForSurface() {
 }
 
 describe('oauth callback surface', () => {
+  it('uses the shared strict query string boundary', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/oauth_callback_surface.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain("import { readSurfaceStringParam } from '@agent/core'");
+    expect(source.match(/readSurfaceStringParam\(req\.query\./gu)).toHaveLength(5);
+    expect(source).not.toContain("typeof req.query.service === 'string'");
+  });
+
   it('does not bind a listener in dry-run mode', async () => {
     process.exitCode = undefined;
     await expect(
