@@ -25,7 +25,13 @@ import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExecResult, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeExecResult,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { safeJsonParse } from '@agent/core/validators';
 import {
   currentProcessArgv,
@@ -96,6 +102,13 @@ interface RootPackageJson {
 }
 
 const DEFAULT_LEDGER_PATH = pathResolver.active('shared/runtime/vuln-ledger.jsonl');
+
+export function readDependencyPatchTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 const defaultRunner: PatchExecRunner = {
   run(command, args, options = {}) {
@@ -242,7 +255,7 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
     timestamp.replace(/[:.]/g, '-')
   );
   safeMkdir(backupDir, { recursive: true });
-  const packageJsonRaw = readTextFile(packageJsonPath);
+  const packageJsonRaw = readDependencyPatchTextFile(packageJsonPath);
   safeWriteFile(path.join(backupDir, 'package.json'), packageJsonRaw);
 
   // 2. Apply the version bump (direct section or pnpm.overrides).
