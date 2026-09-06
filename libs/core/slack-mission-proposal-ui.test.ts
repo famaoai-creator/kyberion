@@ -64,6 +64,35 @@ describe('Slack mission proposal UI (UX-04)', () => {
     expect(contextText).not.toContain('approval_required');
   });
 
+  it('uses the requested locale for proposal choices and contract values', () => {
+    const contract = {
+      request_id: 'ir_proposal_en',
+      normalized_intent: 'create_mission',
+      missing_inputs: [],
+      resolution_shape: 'mission' as const,
+      outcome_kind: 'service_change' as const,
+      authority_level: 'approval_required' as const,
+      next_action: {
+        kind: 'request_approval' as const,
+        label: 'Approve this mission.',
+        consequence: 'The mission remains pending until approval.',
+      },
+      rationale: 'approval is required',
+    };
+
+    expect(slackMissionProposalFallbackText(proposal, contract, 'en')).toContain(
+      '1) Create 2) Cancel'
+    );
+    expect(slackMissionProposalFallbackText(proposal, contract, 'en')).toContain(
+      'Authority: human approval required'
+    );
+    const blocks = buildSlackMissionProposalBlocks(proposal, contract, 'en');
+    const actionsBlock = blocks.find((block: { type?: string }) => block.type === 'actions');
+    expect(
+      actionsBlock.elements.map((element: { text?: { text?: string } }) => element.text?.text)
+    ).toEqual(['Approve and start', 'Reject']);
+  });
+
   it('rejects malformed action payloads', () => {
     expect(() => parseSlackMissionProposalAction(JSON.stringify({ decision: 'later' }))).toThrow(
       'Invalid Slack mission proposal decision'

@@ -47,6 +47,43 @@ describe('Slack approval UI intent contract projection', () => {
     expect(contractBlock?.text?.text).not.toContain('approval_required');
   });
 
+  it('uses the requested locale for contract labels and approval controls', () => {
+    const blocks = buildSlackApprovalBlocks(
+      {
+        id: 'approval-ja',
+        title: '送信',
+        summary: '確認済みの内容を送信します。',
+        severity: 'medium',
+        status: 'pending',
+        channel: 'ops',
+        threadTs: 'thread-ja',
+      } as never,
+      {
+        request_id: 'ir_slack_ja',
+        normalized_intent: 'send_message',
+        missing_inputs: [],
+        resolution_shape: 'task_session',
+        outcome_kind: 'service_change',
+        authority_level: 'approval_required',
+        next_action: {
+          kind: 'request_approval',
+          label: '承認してください',
+          consequence: '承認されるまで待機します。',
+        },
+        rationale: 'approval is required',
+      },
+      'ja'
+    );
+    const contractBlock = blocks.find((block: { type?: string; text?: { text?: string } }) =>
+      block.text?.text?.includes('*権限:*')
+    );
+    expect(contractBlock?.text?.text).toContain('*権限:* 人間の承認が必要');
+    const actions = blocks.find((block: { type?: string }) => block.type === 'actions');
+    expect(
+      actions?.elements?.map((element: { text?: { text?: string } }) => element.text?.text)
+    ).toEqual(['承認', '却下']);
+  });
+
   it('rejects malformed or prototype-bearing action payloads before dispatch', () => {
     expect(() => parseSlackApprovalAction('{"requestId":"approval-1","decision":"other"}')).toThrow(
       /valid decision/u

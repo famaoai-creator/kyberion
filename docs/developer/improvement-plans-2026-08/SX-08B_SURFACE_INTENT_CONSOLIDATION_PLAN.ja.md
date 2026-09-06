@@ -1816,3 +1816,13 @@ Conciergeのviewer／主要API境界を共通wire-safe projectionへ統一し、
 `KYBERION_ALLOW_UNAUTH_REMOTE=1` の意味変更について、実装済みの移行注記を `CHANGELOG.md` の Unreleased Security / migration notes と計画の完了条件へ接続した。registered env accessor が `1`／`true`／`yes`／`on` を受け付け、API token／localadmin token が未設定の場合だけ未認証 remote readonly を許可すること、既存環境は値を監査して意図しない場合は unset または `false` にすることを明記した。tokenが設定済みの環境と loopback／proxy の既存境界は変更していない。
 
 検証: Chronos API guard **1 file / 9 tests passed**。残る SX-08b の自由文入口統合、12 surface の全面 contract 描画、approval 本番相当テスト、Slack context／typing の共通化は継続課題とする。
+
+## 2026-09-06 再レビュー修正 239
+
+Slack approval／mission proposal UI の契約 projection を再監査し、contract label、approval control、
+mission confirmation、proposal fallback に日英の直書きが残っていたため、bridge vocabulary と
+operator locale を渡す境界へ統一した。省略時の既存互換表示、approval／proposal state、external delivery
+gate は維持し、明示 locale の英語・日本語回帰を追加した。
+
+検証: Slack approval／proposal／surface agent **4 files／34 tests passed**、root typecheck、Prettier、
+`git diff --check`。12 surface の全面 contract 描画、provider 実機依存、package scripts の削減は継続課題である。
