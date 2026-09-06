@@ -1,7 +1,7 @@
 import * as yaml from 'js-yaml';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { loadStandardIntentCatalog } from '@agent/core/intent-resolution';
 import { loadMissionClassificationPolicy } from '@agent/core/mission-classification';
 import { loadMissionReviewGateRegistry } from '@agent/core/mission-review-gates';
@@ -18,6 +18,13 @@ type JsonRecord = Record<string, any>;
 
 const rel = (value: string) => pathResolver.rootResolve(value);
 
+export function readMissionProcessBindingsTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function addValuesAtKey(value: unknown, key: string, out: Set<string>): void {
   if (!value || typeof value !== 'object') return;
   for (const [entryKey, entryValue] of Object.entries(value as JsonRecord)) {
@@ -31,7 +38,7 @@ function addValuesAtKey(value: unknown, key: string, out: Set<string>): void {
 }
 
 function parseFrontmatter(path: string): JsonRecord {
-  const raw = readTextFile(rel(path));
+  const raw = readMissionProcessBindingsTextFile(rel(path));
   if (!raw.startsWith('---\n')) return {};
   const end = raw.indexOf('\n---', 4);
   if (end < 0) return {};

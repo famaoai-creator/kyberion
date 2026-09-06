@@ -23327,3 +23327,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_type_ratchet.ts`、`scripts/check_type_ratchet.test.ts`、PI-03
 - **変更**: type ratchet checkerのTypeScript source本文readを`readTypeRatchetTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementを型品質ratchet判定へ到達させないようにした。既存のbaseline、scan root、ratchet semanticsは維持した。
 - **検証**: type ratchet **2 files／6 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミット変更に伴うbaseline差分（`src.max_lines`、`test.any_keywords`、`test.as_any`の増加）を表示したため、baselineは変更せず継続課題とした。
+
+## 2026-09-06 再レビュー実装 1688
+
+- **対象**: `scripts/check_mission_process_bindings.ts`、`scripts/check_mission_process_bindings.test.ts`、PI-03
+- **変更**: mission process bindings checkerのphase frontmatter本文readを`readMissionProcessBindingsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをmission governance binding判定へ到達させないようにした。既存のgoverned catalog、scenario、playbook、phase semanticsは維持した。
+- **検証**: mission process bindings **2 files／3 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
