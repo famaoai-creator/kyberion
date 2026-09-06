@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { findDuplicatePackageExportKeys } from './check_packaging_contract.js';
+import {
+  findDuplicatePackageExportKeys,
+  readPackagingTextFile,
+} from './check_packaging_contract.js';
 
 describe('check_packaging_contract', () => {
   it('uses the foundation text reader for packaging inputs', () => {
@@ -36,5 +39,11 @@ describe('check_packaging_contract', () => {
 }`;
 
     expect(findDuplicatePackageExportKeys(raw)).toEqual([]);
+  });
+
+  it('rejects a directory replacement before packaging policy parsing', () => {
+    expect(() => readPackagingTextFile(pathResolver.rootDir(), 'fixture')).toThrow(
+      'fixture must be a regular file'
+    );
   });
 });

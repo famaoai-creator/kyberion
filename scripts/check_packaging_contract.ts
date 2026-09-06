@@ -16,11 +16,19 @@
 
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface ClauseFailure {
   clause: string;
   detail: string;
+}
+
+export function readPackagingTextFile(filePath: string, label = filePath): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 const failures: ClauseFailure[] = [];
@@ -36,7 +44,7 @@ function checkImageTierIsolation(): void {
     '*.pem',
     '*.key',
   ];
-  const raw = readTextFile(`${pathResolver.rootDir()}/.dockerignore`);
+  const raw = readPackagingTextFile(`${pathResolver.rootDir()}/.dockerignore`, '.dockerignore');
   const lines = new Set(
     raw
       .split('\n')
@@ -104,7 +112,10 @@ export function findDuplicatePackageExportKeys(raw: string): string[] {
 }
 
 function checkPackageExportKeys(): void {
-  const packageJson = readTextFile(pathResolver.rootResolve('libs/core/package.json'));
+  const packageJson = readPackagingTextFile(
+    pathResolver.rootResolve('libs/core/package.json'),
+    'libs/core/package.json'
+  );
   for (const key of findDuplicatePackageExportKeys(packageJson)) {
     failures.push({
       clause: 'package-export-keys.unique',
@@ -114,7 +125,10 @@ function checkPackageExportKeys(): void {
 }
 
 function checkNoSecretValues(): void {
-  const raw = readTextFile(`${pathResolver.rootDir()}/docs/developer/env.example`);
+  const raw = readPackagingTextFile(
+    `${pathResolver.rootDir()}/docs/developer/env.example`,
+    'docs/developer/env.example'
+  );
   raw.split('\n').forEach((line, index) => {
     const location = `docs/developer/env.example:${index + 1}`;
     for (const { name, pattern } of HIGH_CONFIDENCE_SECRET_PATTERNS) {
