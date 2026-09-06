@@ -17,7 +17,7 @@ import {
   parsePersonalAgentIdentity,
   parsePersonalSovereignIdentity,
 } from '@agent/core/personal-identity-reader';
-import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -332,14 +332,23 @@ app.post('/a2ui/dispatch', (req, res) => {
   const context = authorizeSurface(req, res, 'computer_surface.a2ui.dispatch');
   if (!context) return;
   const body = req.body;
+  let messages: Array<Record<string, unknown>>;
   try {
-    assertComputerSurfacePayloadInScope(context, body);
+    const entries = Array.isArray(body) ? body : [body];
+    messages = entries.map((message, index) =>
+      parseSafeJsonObjectValue(message, `A2UI message[${index}]`)
+    );
+  } catch (error) {
+    res.status(400).json(computerSurfaceWireError(error, 400));
+    return;
+  }
+  try {
+    assertComputerSurfacePayloadInScope(context, messages);
   } catch (error) {
     const status = error instanceof ComputerSurfaceViewerError ? error.status : 403;
     res.status(status).json(computerSurfaceWireError(error, status));
     return;
   }
-  const messages = Array.isArray(body) ? body : [body];
   try {
     for (const message of messages) applyA2UIMessage(validateA2UIMessage(message));
   } catch (error) {
