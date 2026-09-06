@@ -77,7 +77,7 @@ export interface SurfaceProviderManifestRecord {
       lightweight_patterns: Array<TextMatchRule | string>;
     };
   };
-  routing: SurfaceProviderRoutingPolicy;
+  routing?: SurfaceProviderRoutingPolicy;
 }
 
 interface SurfaceProviderManifestFile {
@@ -167,6 +167,7 @@ export function deriveSurfaceDelegationReceiverForProvider(
   const normalized = text.trim();
   if (!normalized) return undefined;
   const routing = getSurfaceProviderManifestRecord(surface).routing;
+  if (!routing) return undefined;
   if (matchesAnyTextRule(normalized, routing.text_routing?.greeting_patterns)) {
     return undefined;
   }
@@ -183,6 +184,7 @@ export function resolveSurfaceConversationReceiverForProvider(
   if (!compiledFlow) return undefined;
   if (compiledFlow.routingDecision?.mode === 'prompt') return undefined;
   const routing = getSurfaceProviderManifestRecord(surface).routing;
+  if (!routing) return undefined;
   return (routing.compiled_flow_rules || []).find((rule) => {
     const executionShape = compiledFlow.intentContract.resolution.execution_shape;
     const conversationAgent = compiledFlow.workLoop.teaming.conversation_agent;
