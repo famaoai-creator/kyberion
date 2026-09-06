@@ -22602,6 +22602,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: `KYBERION_ALLOW_UNAUTH_REMOTE=1` の意味変更に関する既存のCHANGELOG移行注記とAPI guard回帰テストを、SX-08bの完了証跡として計画へ反映した。未完了の自由文入口、surface contract、approval、Slack／typing課題は残存項目として明示した。
 - **検証**: Chronos API guard **1 file／9 tests passed**、`git diff --check`、improvement-plan metadata **passed**、Prettier **passed**。
 
+## 2026-09-06 再レビュー修正 1574
+
+- **対象**: `libs/core/channel-adapter.ts`、`libs/core/channel-adapter.test.ts`、Slack／Telegram／Discord／iMessage bridge、SX-09b
+- **変更**: 共通 thread formatter の `en` 固定を解消し、`SupportedLocale` を受け取る optional 引数を追加した。4 bridge はそれぞれの `resolveOperatorLocale()` を formatter へ渡し、履歴見出し・話者ラベルも operator locale に従って描画する。既定値 `en`、current message 除外、履歴件数制限、delivery gate は維持した。
+- **検証**: channel adapter／4 bridge **5 files／50 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider 実機受入、日英 literal の全面移行は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`

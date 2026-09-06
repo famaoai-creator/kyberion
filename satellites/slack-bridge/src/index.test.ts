@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ChannelAdapter } from '@agent/core/channel-adapter';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { t } from '@agent/core/t';
 import type {
   SurfaceConversationMessageInput,
   SurfaceConversationResult,
@@ -86,7 +88,9 @@ describe('slack bridge channel turn', () => {
       '1700000001.000200'
     );
 
-    expect(context).toContain('User (U-alice): 最初の相談');
+    expect(context).toContain(
+      t('bridge:thread_user', { author: 'U-alice', text: '最初の相談' }, resolveOperatorLocale())
+    );
     expect(context).not.toContain('それで、どうなりましたか');
   });
 

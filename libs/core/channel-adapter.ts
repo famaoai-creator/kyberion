@@ -4,6 +4,7 @@ import {
   renderIntentOutcomeLabel,
 } from './intent-resolution-contract.js';
 import { t } from './t.js';
+import type { SupportedLocale } from './locale-normalize.js';
 import type {
   SurfaceAsyncChannel,
   SurfaceConversationAttachment,
@@ -39,12 +40,11 @@ export interface ChannelThreadContextEntry {
 /** Format provider-neutral recent history for a channel turn. */
 export function formatChannelThreadContext(
   channelLabel: string,
-  entries: readonly ChannelThreadContextEntry[]
+  entries: readonly ChannelThreadContextEntry[],
+  locale: SupportedLocale = 'en'
 ): string | undefined {
   const recent = entries.filter((entry) => entry.text.trim().length > 0).slice(-6);
   if (!recent.length) return undefined;
-
-  const locale = 'en' as const;
 
   return [
     t('bridge:thread_context', { channel: channelLabel }, locale),

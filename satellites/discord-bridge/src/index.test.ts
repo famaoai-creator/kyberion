@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Message } from 'discord.js';
 import { approvalRequestLogicalPath, loadApprovalRequest } from '@agent/core/approval-store';
 import { createSurfaceApprovalRequest } from '@agent/core/channel-surface';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { t } from '@agent/core/t';
 import type {
   SurfaceConversationMessageInput,
   SurfaceConversationResult,
@@ -138,9 +140,12 @@ describe('discord bridge thread context', () => {
 
     const context = buildDiscordThreadContextFromEntries(entries);
 
-    expect(context).toContain('Recent Discord thread context:');
-    expect(context).toContain('User (alice#0001): 最初の相談');
-    expect(context).toContain('Assistant: 確認しました');
+    const locale = resolveOperatorLocale();
+    expect(context).toContain(t('bridge:thread_context', { channel: 'Discord' }, locale));
+    expect(context).toContain(
+      t('bridge:thread_user', { author: 'alice#0001', text: '最初の相談' }, locale)
+    );
+    expect(context).toContain(t('bridge:thread_assistant', { text: '確認しました' }, locale));
   });
 
   it('returns undefined for empty history', () => {
@@ -169,7 +174,9 @@ describe('discord bridge thread context', () => {
 
     expect(captured.conversationInputs).toHaveLength(2);
     expect(captured.conversationInputs[0].threadContext).toBeUndefined();
-    expect(captured.conversationInputs[1].threadContext).toContain('User (alice#0001): 最初の相談');
+    expect(captured.conversationInputs[1].threadContext).toContain(
+      t('bridge:thread_user', { author: 'alice#0001', text: '最初の相談' }, resolveOperatorLocale())
+    );
     expect(captured.conversationInputs[1].threadContext).not.toContain('それで、どうなりましたか');
   });
 

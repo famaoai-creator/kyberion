@@ -227,7 +227,7 @@ function appendDiscordThreadHistory(entry: DiscordThreadHistoryEntry): void {
 export function buildDiscordThreadContextFromEntries(
   entries: DiscordThreadHistoryEntry[]
 ): string | undefined {
-  return formatChannelThreadContext('Discord', entries);
+  return formatChannelThreadContext('Discord', entries, resolveOperatorLocale());
 }
 
 async function collectDiscordThreadContext(

@@ -213,7 +213,7 @@ export async function collectSlackThreadContext(
         authorLabel: String(message.username || message.user || 'unknown'),
         text: String(message.text || ''),
       }));
-    return formatChannelThreadContext('Slack', entries);
+    return formatChannelThreadContext('Slack', entries, resolveOperatorLocale());
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(`⚠️ [SlackBridge] Failed to fetch thread history: ${message}`);
