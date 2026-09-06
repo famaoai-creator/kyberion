@@ -1,4 +1,4 @@
-import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput, readJsonLines } from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver, findMissionPath } from './path-resolver.js';
@@ -15,7 +15,7 @@ import { notifyOperator } from './operator-notifications.js';
 import { recordAgentRoleOutcomes } from './agent-performance-index.js';
 import { recordModelRoleOutcomes } from './model-performance-index.js';
 import { MetricsCollector, resolveCostRates } from './metrics.js';
-import { isRecord, readTextFile } from './foundation/text.js';
+import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
@@ -303,17 +303,7 @@ function readJsonl(filePath: string): JsonRecord[] {
   const safePath = regularProcessImprovementQueuePath(filePath);
   if (!safeExistsSync(safePath)) return [];
   try {
-    return readTextFile(safePath)
-      .split('\n')
-      .filter((line) => line.trim())
-      .flatMap((line) => {
-        try {
-          const parsed: unknown = parseSafeJsonInput(line, 'improvement queue entry');
-          return isRecord(parsed) ? [parsed] : [];
-        } catch {
-          return [];
-        }
-      });
+    return readJsonLines<unknown>(safePath, { onMalformed: 'skip' }).filter(isRecord);
   } catch {
     return [];
   }
