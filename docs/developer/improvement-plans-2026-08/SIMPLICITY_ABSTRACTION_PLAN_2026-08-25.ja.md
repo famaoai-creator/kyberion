@@ -23027,3 +23027,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `knowledge/product/governance/frontmatter-exclusions.json`、`scripts/generate_knowledge_index.ts`／test、SX-13
 - **変更**: content-first の diagram renderer README を明示 exclusion とし、exclusion 外の Markdown には YAML frontmatter を必須化する knowledge-index generator gate と回帰テストを追加した。既存の tier isolation、index／manifest snapshot、frontmatter exclusion semantics は維持した。
 - **検証**: frontmatter gate focused test **1 passed**、全 knowledge scan は frontmatter violation なし。generator `--check` は既存の未コミット `knowledge/_integrity-manifest.json` 差分のみを報告した。Prettier、`git diff --check`。完了計画の archive 移動と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1638
+
+- **対象**: `package.json`、SX-13、計画 metadata checker
+- **変更**: 既存の `scripts/check_improvement_plan_metadata.ts` を root package script `check:improvement-plan-metadata` へ登録し、計画 metadata 検査を正規の `pnpm run` 入口から再現可能にした。
+- **検証**: `node --import ./scripts/ts-loader.mjs scripts/check_improvement_plan_metadata.ts` **335 documents / OK**、Prettier、`git diff --check`。`pnpm run` は既存 worktree の依存再構築が DNS 制約で停止したため、正規 package entrypoint の再実行は環境復旧後の受入課題とする。完了計画の archive 移動と provider 実機受入を継続する。
