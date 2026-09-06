@@ -22,7 +22,7 @@ import {
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
-import { assertSafeRepositoryPath, safeExec, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExec, safeExistsSync, safeLstat } from './secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { createMissionProgressController } from './mission-orchestration-progress.js';
 import {
@@ -766,12 +766,21 @@ export function buildAuthorityRoleProcedureInjectionProvider(
     oneShot: true,
     collect: () => {
       const procedurePath = pathResolver.knowledge(`product/roles/${authorityRole}/PROCEDURE.md`);
-      if (!safeExistsSync(procedurePath)) return null;
+      if (!isRegularAuthorityRoleProcedurePath(procedurePath)) return null;
       const content = readTextFile(procedurePath).trim();
       if (!content) return null;
       return [`## Role procedure (${authorityRole})`, content].join('\n\n');
     },
   };
+}
+
+export function isRegularAuthorityRoleProcedurePath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
 }
 
 export function buildTaskExecutionPrompt(input: {
