@@ -23591,3 +23591,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: browser actuator の action trail／session handoff loader、SX-03
 - **変更**: browser runtime に残っていた2つの persisted JSON 読み込みを foundation `readJson` へ統一した。session metadata の `defineCatalog` 検証、regular-file／runtime path boundary、action trail の record filtering と invalid-file fallback は維持した。resource-boundary contract も canonical reader を検査するよう更新した。
 - **検証**: browser runtime boundary／phase3 **2 files／11 tests passed**、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
+
+## 2026-09-06 再レビュー実装 1732
+
+- **対象**: system actuator の persisted `context_path` loader、SX-03
+- **変更**: system pipeline に残っていた `safeReadFile` + `parseSafeJsonInput` の context loader を foundation `readJson` へ統一した。root／regular-file boundary と safe object validation、pipeline context merge は維持した。
+- **検証**: system context resource-boundary／reconcile targeted **1 file／4 tests passed**、対象 ESLint、Prettier、`git diff --check`。system actuator 全体 suite の OS automation 受入は別途継続確認対象である。
