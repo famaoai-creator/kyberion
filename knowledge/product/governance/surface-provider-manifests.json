@@ -1256,6 +1256,33 @@
           }
         ]
       }
+    },
+    "terminal": {
+      "id": "terminal",
+      "displayName": "Terminal bridge",
+      "agentId": "cli-surface-agent",
+      "channel": "terminal",
+      "interactionMode": "session",
+      "capabilities": {
+        "reply": true,
+        "edit": false,
+        "react": false,
+        "notify": false,
+        "asyncRequest": true,
+        "responding": true
+      },
+      "delivery": {
+        "directReply": "none",
+        "supportsOutbox": false,
+        "supportsNotifications": false
+      },
+      "routing": {
+        "text_routing": {
+          "greeting_patterns": [],
+          "receiver_rules": []
+        },
+        "compiled_flow_rules": []
+      }
     }
   }
 }

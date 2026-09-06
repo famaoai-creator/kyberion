@@ -22751,3 +22751,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `presence/bridge/terminal/server.ts`、Terminal bridge boundary／session test、SX-08b
 - **変更**: Terminal bridge の `/sessions` に残っていた Express `req.body` の直接 session parser渡しを、共有 `parseSafeJsonObjectValue` 境界へ移行した。session creationの既存validation、認証、path／runtime semanticsは維持し、配列・null・dangerous JSON keyをsession生成前に拒否する回帰境界を追加した。
 - **検証**: Terminal bridge **2 files／8 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1592
+
+- **対象**: `knowledge/product/governance/surface-provider-manifests.json`、surface provider schema、interaction model／policy tests、production approval wiring、integrity manifest、SX-08b
+- **変更**: `SurfaceAsyncChannel` と task-session schema にだけ存在していた `terminal` を、governed provider manifest、interaction provider seam、production-like approval wiringへ正式登録した。CLIと同じ session capabilitiesを利用しつつ provider id／channelをterminalとして分離し、manifest schema、一覧、routing policyの回帰を揃えた。
+- **検証**: surface provider／approval wiring **4 files／30 tests passed**、manifest schema JSON、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、package scriptsの削減は継続課題とする。
