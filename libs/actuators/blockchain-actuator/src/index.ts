@@ -105,7 +105,7 @@ function parseMockChainEntry(value: unknown): BlockchainTransaction {
 function readMockChainEntries(): BlockchainTransaction[] {
   if (!safeExistsSync(MOCK_CHAIN_PATH)) return [];
   try {
-    return readJsonLines<unknown>(MOCK_CHAIN_PATH, {
+    return readJsonLines<BlockchainTransaction>(MOCK_CHAIN_PATH, {
       map: (value) => parseMockChainEntry(value),
       onMalformed: 'throw',
     });
