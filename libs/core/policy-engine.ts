@@ -1,10 +1,9 @@
 import * as yaml from 'js-yaml';
 import { createLogger } from './logger.js';
 import { getFoundationIo } from './foundation/io.js';
-import { isRecord, readTextFile } from './foundation/text.js';
+import { isRecord } from './foundation/text.js';
 import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
+import { assertSafeRepositoryPath, pathResolver } from './path-resolver.js';
 
 const logger = createLogger('policy-engine');
 
@@ -180,24 +179,18 @@ class PolicyEngineImpl {
       filePath || path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
 
     let safePolicyPath: string;
+    let content: string;
     try {
       safePolicyPath = assertSafeRepositoryPath(policyPath, { allowMissingLeaf: true });
-      if (!getFoundationIo().exists(safePolicyPath)) {
-        logger.warn(`[POLICY_ENGINE] Policy file not found: ${safePolicyPath}`);
-        return;
-      }
-      if (!safeLstat(safePolicyPath).isFile()) {
-        logger.warn(`[POLICY_ENGINE] Policy path is not a regular file: ${safePolicyPath}`);
-        return;
-      }
+      content = getFoundationIo().readFile(safePolicyPath, {
+        label: 'agent policy file',
+      });
     } catch (error: unknown) {
       logger.warn(
-        `[POLICY_ENGINE] Policy path rejected: ${error instanceof Error ? error.message : String(error)}`
+        `[POLICY_ENGINE] Policy file unavailable: ${error instanceof Error ? error.message : String(error)}`
       );
       return;
     }
-
-    const content = readTextFile(safePolicyPath);
     // SA-05: a hand-rolled "simple YAML" parser silently produced empty
     // rules arrays for every policy (nested lists were unsupported), so the
     // engine never enforced anything. Parse with js-yaml; a parse failure
