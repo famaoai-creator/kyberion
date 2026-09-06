@@ -1,9 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { readJsonLines } from './foundation/json.js';
+import { readJson, readJsonLines } from './foundation/json.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord, readTextFile } from './foundation/text.js';
+import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
@@ -138,8 +137,7 @@ export function isRegularInboxLockPath(filePath: string): boolean {
 function isStaleLock(lockPath: string): boolean {
   if (!isRegularInboxLockPath(lockPath)) return false;
   try {
-    const raw = readTextFile(lockPath);
-    const parsed = normalizeInboxLockRecord(parseSafeJsonInput(raw, 'deliverable inbox lock'));
+    const parsed = normalizeInboxLockRecord(readJson<unknown>(lockPath));
     if (!parsed) return true;
     process.kill(parsed.pid, 0);
     return false;
