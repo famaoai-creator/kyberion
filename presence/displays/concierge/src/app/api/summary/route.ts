@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseConciergeLimit, readConciergeHome } from '../../../lib/headless-projections';
+import { readConciergeScopeQuery } from '../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
@@ -9,9 +10,7 @@ export function GET(req: NextRequest) {
   if (resolved.response) return resolved.response;
   try {
     const summary = readConciergeHome(resolved.context, {
-      tenant: req.nextUrl.searchParams.get('tenant'),
-      organizationId: req.nextUrl.searchParams.get('organization_id'),
-      projectId: req.nextUrl.searchParams.get('project_id'),
+      ...readConciergeScopeQuery(req.nextUrl.searchParams),
       limit: parseConciergeLimit(req.nextUrl.searchParams.get('limit')),
     });
     return NextResponse.json({ ok: true, summary });

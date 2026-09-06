@@ -5,6 +5,21 @@ export type RequestInputObject = Record<string, unknown>;
 export type RequestObjectResult =
   { ok: true; body: RequestInputObject } | { ok: false; error: string };
 
+export interface ConciergeScopeQuery {
+  tenant?: string;
+  organizationId?: string;
+  projectId?: string;
+}
+
+export function readConciergeScopeQuery(params: URLSearchParams): ConciergeScopeQuery {
+  const read = (key: string): string | undefined => params.get(key) || undefined;
+  return {
+    tenant: read('tenant'),
+    organizationId: read('organization_id'),
+    projectId: read('project_id'),
+  };
+}
+
 export class RequestInputError extends Error {
   constructor(message: string) {
     super(message);
