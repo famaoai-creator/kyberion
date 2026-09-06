@@ -411,3 +411,9 @@ voice-hub の入力言語を共有 surface conversation inputとtext-only contra
 Slack automation／mission proposal と Discord interaction rejection に残っていた日英リテラルをshared vocabularyへ移し、operator localeを通して描画するようにした。approval／proposal decision、actor authorization、provider配送 semanticsは維持した。
 
 検証: Slack／Discord bridge **2 files／16 tests passed**、catalog integrity、vocabulary generators、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、残る日英のchannelリテラル全面移行は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 41
+
+terminal-hud、Concierge fallback、Chronos APIのlocaleをshared conversation inputへ揃え、channel以外のoperator surfaceでもcontract label／next actionのlocaleが落ちないようにした。Concierge contract test suiteをroot Vitestへ登録し、3 surfaceのwire回帰を実行対象にした。
+
+検証: terminal-hud／Concierge／Chronos **3 files／27 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、残る日英のchannelリテラル全面移行は引き続き未完了である。

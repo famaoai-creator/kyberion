@@ -55,6 +55,9 @@ export default defineConfig({
       // Voice Hub is another production daemon outside a package src tree;
       // keep its runtime-boundary tests in the root suite as well.
       'satellites/voice-hub/**/*.test.ts',
+      // Concierge keeps browser/API contract tests in a package-level test
+      // directory; include them so its surface contracts are not skipped.
+      'presence/displays/concierge/test/**/*.test.ts',
       'libs/core/**/*.test.ts',
       'libs/actuators/**/*.test.ts',
       'libs/shared-*/**/*.test.ts',

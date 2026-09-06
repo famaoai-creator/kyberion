@@ -1199,6 +1199,7 @@ export async function POST(req: NextRequest) {
     const conversation = await runSurfaceMessageConversation({
       surface: 'chronos',
       text: query,
+      locale,
       threadTs: sessionId,
       correlationId: requestArtifact.correlation_id,
       actorId: requesterId,

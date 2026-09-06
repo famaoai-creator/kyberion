@@ -22656,6 +22656,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: Slack automation／mission proposal と Discord interaction rejection に残っていた日英直書きを bridge vocabulary と operator localeへ移行した。新規メッセージは en／ja／qps-ploc をcatalog生成し、既存のapproval／proposal decision、外部配送、actor authorization semanticsは維持した。
 - **検証**: Slack／Discord bridge **2 files／16 tests passed**、catalog integrity、vocabulary generators、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1583
+
+- **対象**: terminal-hud ask、Concierge／Chronos API conversation route、`vitest.config.mts`、対象contract tests、SX-08b／SX-09b
+- **変更**: terminal-hudの選択locale、Conciergeのfallback locale、Chronos APIの正規化localeを共有 `SurfaceConversationMessageInput` へ伝播した。Conciergeのpackage-level contract test suiteをroot Vitestへ追加し、既存のsurface契約テストがCIから漏れていた状態も修正した。tenant scope、viewer authorization、voice fallback、外部配送 semanticsは維持した。
+- **検証**: terminal-hud／Concierge／Chronos **3 files／27 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
