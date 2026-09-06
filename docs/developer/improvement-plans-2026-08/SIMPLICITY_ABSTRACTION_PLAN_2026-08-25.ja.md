@@ -22955,3 +22955,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/codex-cli-query.ts`、codex-cli-query test、PI-03
 - **変更**: Codex CLI structured output の read 前へ operation-time の regular-file 検査を追加し、CLI 出力が欠落・directory replacementされた場合に JSON parse／usage記録へ到達させないようにした。既存の一時ファイル cleanup、schema validation、provider permission semantics は維持した。
 - **検証**: codex-cli-query **2 files／15 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1626
+
+- **対象**: `libs/core/src/knowledge-curation-tenant-ingest.ts`、tenant-ingest test、PI-03
+- **変更**: tenant curation card の frontmatter read 前へ operation-time の regular-file 検査を追加し、directory replacement を kind／last_updated parseへ到達させず ledgerの `ingested_at` fallbackへ閉じるようにした。既存の tenant scope、freshness SLO、advisory／fail-open semantics は維持した。
+- **検証**: knowledge-curation-tenant-ingest **2 files／5 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
