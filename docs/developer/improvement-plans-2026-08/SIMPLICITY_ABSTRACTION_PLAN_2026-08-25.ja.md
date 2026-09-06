@@ -22811,3 +22811,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/company.ts`、company test、PI-03
 - **変更**: tenant company overlay の共通 JSON component loader に operation-time の `safeLstat(...).isFile()` を追加し、customer component の JSON leaf がディレクトリへ置換された場合に read しないようにした。tenant path scope と既存の graceful null projection は維持した。
 - **検証**: company **2 files／5 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
+
+## 2026-09-06 再レビュー実装 1602
+
+- **対象**: `libs/core/policy-engine.ts`、policy-engine test、PI-03
+- **変更**: PolicyEngine の policy override read を `assertSafeRepositoryPath`／`safeLstat` regular-file 境界へ接続した。repository 外の path と directory replacement は YAML parse 前に拒否し、既存の policy normalization と lazy default load semantics は変更していない。
+- **検証**: policy-engine **2 files／8 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { policyEngine } from './policy-engine.js';
 import { registerFoundationIo } from './foundation/io.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeWriteFile, safeRmSync } from './secure-io.js';
 
 // This suite imports policy-engine directly, before secure-io is part of the
 // module graph. Keep the fixture explicit and read-only instead of installing
@@ -96,5 +96,24 @@ describe('policyEngine (SA-05)', () => {
       false
     );
     expect(policyEngine.evaluate({ agentId: 'worker-1', operation: 'other' }).allowed).toBe(true);
+  });
+
+  it('rejects policy paths outside the repository before reading them', () => {
+    policyEngine.loadFromFile('/tmp/kyberion-policy-outside.yaml');
+
+    expect((policyEngine as any).policies).toEqual([]);
+    expect((policyEngine as any).declaredPolicyCount).toBe(0);
+  });
+
+  it('does not read a policy path replaced by a directory', () => {
+    const root = pathResolver.sharedTmp('policy-engine-directory-test');
+    const policyPath = `${root}/policies.yaml`;
+    safeMkdir(policyPath, { recursive: true });
+
+    policyEngine.loadFromFile(policyPath);
+
+    expect((policyEngine as any).policies).toEqual([]);
+    expect((policyEngine as any).declaredPolicyCount).toBe(0);
+    safeRmSync(root, { recursive: true, force: true });
   });
 });
