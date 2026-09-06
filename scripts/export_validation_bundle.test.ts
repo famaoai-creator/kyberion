@@ -13,9 +13,10 @@ afterEach(() => {
 });
 
 describe('validation bundle audit projection', () => {
-  it('uses the foundation text reader for audit JSONL projection', () => {
+  it('uses the foundation JSONL reader for audit projection', () => {
     const source = readTextFile(pathResolver.rootResolve('scripts/export_validation_bundle.ts'));
-    expect(source).toContain('nowIso, parseSafeJsonInput, readTextFile');
+    expect(source).toContain('nowIso, readJsonLines');
+    expect(source).toContain('readJsonLines<Record<string, unknown>>');
   });
 
   it('projects only shape-valid audit entries for the requested mission', () => {
