@@ -3,9 +3,16 @@ import { pathResolver, safeReadFile } from '@agent/core';
 import {
   checkChannelAdapterAdoption,
   hasSharedThreadFormatterImport,
+  readChannelAdapterTextFile,
 } from './check_channel_adapter_adoption.js';
 
 describe('channel adapter adoption checker', () => {
+  it('rejects a directory replacement before bridge parsing', () => {
+    expect(() => readChannelAdapterTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation text reader for bridge source files', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_channel_adapter_adoption.ts'), {

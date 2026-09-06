@@ -1,5 +1,6 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { readTextFile } from '@agent/core/foundation';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const BRIDGES = [
@@ -8,6 +9,13 @@ const BRIDGES = [
   'satellites/discord-bridge/src/index.ts',
   'satellites/imessage-bridge/src/index.ts',
 ] as const;
+
+export function readChannelAdapterTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/gu, '');
@@ -22,7 +30,7 @@ export function hasSharedThreadFormatterImport(source: string): boolean {
 export function checkChannelAdapterAdoption(): string[] {
   const failures: string[] = [];
   for (const relative of BRIDGES) {
-    const source = stripComments(readTextFile(pathResolver.rootResolve(relative)));
+    const source = stripComments(readChannelAdapterTextFile(pathResolver.rootResolve(relative)));
     if (!/\brunChannelTurn\s*\(/u.test(source)) {
       failures.push(`${relative}: missing executable runChannelTurn call`);
     }
