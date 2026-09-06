@@ -881,6 +881,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-12／PI-03 のscript loader残差として、pinned-deps checkerのlockfile／`.npmrc`本文readをoperation-timeのregular-file境界へ接続し、directory replacementをdependency policy判定へ到達させない回帰を追加した。関連 **1 file／3 tests passed**、Prettier、`git diff --check`で確認した。scripts全体の未監査loaderとprovider実機受入は継続課題である。
 - 2026-09-06: PI-12 のscript loader残差として、lockfile commit gateのlockfile／review evidence本文readもoperation-timeのregular-file境界へ接続し、directory replacementをhash／review evidence判定へ到達させない回帰を追加した。関連 **1 file／8 tests passed**、Prettier、`git diff --check`で確認した。scripts全体の未監査loaderとprovider実機受入は継続課題である。
 - 2026-09-06: PI-12 のscript loader残差として、install-script allowlist checkerの`pnpm-workspace.yaml`本文readをoperation-timeのregular-file境界へ接続し、directory replacementを`allowBuilds` policy判定へ到達させない回帰を追加した。関連 **1 file／3 tests passed**、Prettier、`git diff --check`で確認した。scripts全体の未監査loaderとprovider実機受入は継続課題である。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、catalog integrity checkerのsource／design-token／guide／CI manifest本文readを共通`readCatalogTextFile`のoperation-time regular-file境界へ接続し、directory replacementをcatalog解析・drift判定へ到達させない回帰を追加した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 
 ## 7. 検証コマンド(実装時)
 

@@ -23099,3 +23099,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_install_script_allowlist.ts`、`scripts/check_install_script_allowlist.test.ts`、PI-12
 - **変更**: install-script allowlist checkerの`pnpm-workspace.yaml`本文readを`readWorkspaceTextFile`のoperation-time regular-file境界へ接続し、directory replacementを`allowBuilds` policy判定へ到達させないようにした。既存のallowlist semanticsは維持した。
 - **検証**: install-script allowlist **1 file／3 tests passed**、Prettier、`git diff --check`。scripts全体の未監査loaderとprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1650
+
+- **対象**: `scripts/check_catalog_integrity.ts`、`scripts/check_catalog_integrity.loader.contract.test.ts`、PI-03
+- **変更**: catalog integrity checkerのsource／design-token／guide／CI manifest本文readを`readCatalogTextFile`のoperation-time regular-file境界へ統一し、directory replacementをcatalog解析・drift判定へ到達させないようにした。既存のschema／catalog／vocabulary semanticsは維持した。
+- **検証**: catalog integrity loader **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
