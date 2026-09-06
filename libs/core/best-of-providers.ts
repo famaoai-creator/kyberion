@@ -87,7 +87,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir } from './secure-io.js';
+import { safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { appendJsonLine, parseSafeJsonObjectValue, readJsonLines } from './foundation/json.js';
 import { checkProviderEgress } from './provider-egress-gate.js';
 import {
@@ -470,7 +470,7 @@ export function peekBestOfProvidersVerdictLog(
   filePath: string = pathResolver.shared(BEST_OF_PROVIDERS_VERDICT_LOG_RELATIVE_PATH)
 ): BestOfProvidersVerdictRecord[] {
   try {
-    if (!safeExistsSync(filePath)) return [];
+    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return [];
     return readJsonLines(filePath, {
       onMalformed: 'skip',
       map: parseBestOfProvidersVerdictRecord,
