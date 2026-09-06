@@ -9795,6 +9795,36 @@
       }
     },
     "surface": {
+      "voice_hub_error_fallback": {
+        "en": "I could not process that. Please try again.",
+        "ja": "うまく処理できませんでした。もう一度お願いします。",
+        "qps-ploc": "⟦Ï ƈőůŀḓ ñőŧ ṗřőƈėşş ŧħȧŧ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "voice_hub_capability_summary": {
+        "en": "On this surface I can handle short conversation, realtime replies, and status guidance. My main capabilities here are {capabilities}. Heavier execution and durable work should be routed to Chronos or another runtime.",
+        "ja": "この surface では短い会話、リアルタイム応答、状態案内ができます。主な capability は {capabilities} です。重い実行や durable な作業は Chronos など別の runtime に回します。",
+        "qps-ploc": "⟦Őñ ŧħïş şůřƒȧƈė Ï ƈȧñ ħȧñḓŀė şħőřŧ ƈőñṽėřşȧŧïőñ, řėȧŀŧïɱė řėṗŀïėş, ȧñḓ şŧȧŧůş ɠůïḓȧñƈė. Ɱẏ ɱȧïñ ƈȧṗȧƀïŀïŧïėş ħėřė ȧřė {capabilities}. Ħėȧṽïėř ėẋėƈůŧïőñ ȧñḓ ḓůřȧƀŀė ẇőřķ şħőůŀḓ ƀė řőůŧėḓ ŧő Ƈħřőñőş őř ȧñőŧħėř řůñŧïɱė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "voice_hub_greeting": {
+        "en": "Hello. I can handle short conversation and quick guidance here, and route heavier work if needed.",
+        "ja": "こんにちは。ここでは短い会話や状態案内ができます。必要なら Chronos や他の runtime に回します。",
+        "qps-ploc": "⟦Ħėŀŀő. Ï ƈȧñ ħȧñḓŀė şħőřŧ ƈőñṽėřşȧŧïőñ ȧñḓ ɋůïƈķ ɠůïḓȧñƈė ħėřė, ȧñḓ řőůŧė ħėȧṽïėř ẇőřķ ïƒ ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "voice_hub_thanks": {
+        "en": "Understood. Continue whenever you are ready.",
+        "ja": "了解です。続けてどうぞ。短い相談ならこのまま返せます。",
+        "qps-ploc": "⟦Ůñḓėřşŧőőḓ. Ƈőñŧïñůė ẇħėñėṽėř ẏőů ȧřė řėȧḓẏ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "voice_hub_question": {
+        "en": "I can help with short conversation and quick guidance here. Ask a more specific question and I will answer directly or route it properly.",
+        "ja": "質問は受け取れています。ここでは短く答えつつ、必要なら適切な runtime に案内します。もう少し具体的に聞いてください。",
+        "qps-ploc": "⟦Ï ƈȧñ ħėŀṗ ẇïŧħ şħőřŧ ƈőñṽėřşȧŧïőñ ȧñḓ ɋůïƈķ ɠůïḓȧñƈė ħėřė. Ȧşķ ȧ ɱőřė şṗėƈïƒïƈ ɋůėşŧïőñ ȧñḓ Ï ẇïŀŀ ȧñşẇėř ḓïřėƈŧŀẏ őř řőůŧė ïŧ ṗřőṗėřŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "voice_hub_received": {
+        "en": "I received that. I can handle short conversation and quick guidance here, and route heavier work when needed.",
+        "ja": "受け取りました。この surface では短い会話と案内ができます。必要なら次の一歩を一緒に整理します。",
+        "qps-ploc": "⟦Ï řėƈėïṽėḓ ŧħȧŧ. Ï ƈȧñ ħȧñḓŀė şħőřŧ ƈőñṽėřşȧŧïőñ ȧñḓ ɋůïƈķ ɠůïḓȧñƈė ħėřė, ȧñḓ řőůŧė ħėȧṽïėř ẇőřķ ẇħėñ ñėėḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧů⟧"
+      },
       "concierge_surface_tagline": {
         "en": "Executive secretary for requests, approvals, results, and exceptions.",
         "ja": "CEO秘書 — 依頼・承認・成果・例外",

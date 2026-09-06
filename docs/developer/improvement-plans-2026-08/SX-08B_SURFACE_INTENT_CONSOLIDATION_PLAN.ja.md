@@ -1911,3 +1911,9 @@ terminal-hud、Concierge fallback、Chronos APIで既に確定しているoperat
 CLI homeの `cliLocale`、background review E2E、日本語固定のiMessage／Telegram demoをshared conversation inputのlocaleへ接続した。demoの不要な `as any` を除去し、operator／E2E／demo入口のcontract inputを型付きで揃えた。
 
 検証: CLI trust-boundary／locale wiring、demo／backgroundのtypecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 249
+
+voice-hub の直接 fallback 応答（エラー、挨拶、能力案内、質問、受領、謝意）に残っていた日英固定文を shared vocabulary へ移行した。`t()` と `surface:voice_hub_*` を使い、既存の入力言語判定、音声再生、scope、fallback intent contract の意味は維持した。catalog の `qps-ploc` は生成器で更新し、voice-hub boundary testで固定文の再混入を検出する。
+
+検証: voice-hub／vocabulary **3 files／28 tests passed**、vocabulary generator、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。

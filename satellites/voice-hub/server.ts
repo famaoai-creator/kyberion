@@ -43,6 +43,7 @@ import {
 } from '@agent/core/voice-stt';
 import { ShellSpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
 import { formatChannelTurnText } from '@agent/core/channel-adapter';
+import { t } from '@agent/core/t';
 import {
   resolveIntentResolutionContract,
   type IntentResolutionContract,
@@ -1014,10 +1015,7 @@ async function processIngest(input: {
         // Single attempt with .catch — a failing error announcement must not
         // recurse into another announcement.
         const language = detectReplyLanguage(text);
-        const spokenFallback =
-          language === 'ja'
-            ? 'うまく処理できませんでした。もう一度お願いします。'
-            : 'I could not process that. Please try again.';
+        const spokenFallback = t('surface:voice_hub_error_fallback', undefined, language);
         rememberConversationTurn(sessionKey, 'assistant', spokenFallback);
         replyText = spokenFallback;
         intentResolution = resolveIntentResolutionContract(text, {
@@ -1180,10 +1178,7 @@ function buildCapabilityReply(language: SupportedLocale): string {
   const capabilities = (
     profile?.capabilities || ['presence', 'surface', 'conversation', 'realtime']
   ).join(', ');
-  if (language === 'ja') {
-    return `この surface では短い会話、リアルタイム応答、状態案内ができます。主な capability は ${capabilities} です。重い実行や durable な作業は Chronos など別の runtime に回します。`;
-  }
-  return `On this surface I can handle short conversation, realtime replies, and status guidance. My main capabilities here are ${capabilities}. Heavier execution and durable work should be routed to Chronos or another runtime.`;
+  return t('surface:voice_hub_capability_summary', { capabilities }, language);
 }
 
 function buildVoiceFallbackReply(userText: string): string {
@@ -1193,33 +1188,33 @@ function buildVoiceFallbackReply(userText: string): string {
 
   if (language === 'ja') {
     if (/^(こんにちは|こんばんは|おはよう|やあ|もしもし)/.test(trimmed)) {
-      return 'こんにちは。ここでは短い会話や状態案内ができます。必要なら Chronos や他の runtime に回します。';
+      return t('surface:voice_hub_greeting', undefined, language);
     }
     if (/(何ができる|なにができる|できること|何できる|何をしてくれる)/.test(trimmed)) {
       return buildCapabilityReply('ja');
     }
     if (/(ありがとう|助かった|了解)/.test(trimmed)) {
-      return '了解です。続けてどうぞ。短い相談ならこのまま返せます。';
+      return t('surface:voice_hub_thanks', undefined, language);
     }
     if (/[?？]$/.test(trimmed)) {
-      return '質問は受け取れています。ここでは短く答えつつ、必要なら適切な runtime に案内します。もう少し具体的に聞いてください。';
+      return t('surface:voice_hub_question', undefined, language);
     }
-    return '受け取りました。この surface では短い会話と案内ができます。必要なら次の一歩を一緒に整理します。';
+    return t('surface:voice_hub_received', undefined, language);
   }
 
   if (/^(hello|hi|hey)\b/.test(normalized)) {
-    return 'Hello. I can handle short conversation and quick guidance here, and route heavier work if needed.';
+    return t('surface:voice_hub_greeting', undefined, language);
   }
   if (/\b(what can you do|capabilities|help)\b/.test(normalized)) {
     return buildCapabilityReply('en');
   }
   if (/\b(thanks|thank you)\b/.test(normalized)) {
-    return 'Understood. Continue whenever you are ready.';
+    return t('surface:voice_hub_thanks', undefined, language);
   }
   if (/[?]$/.test(trimmed)) {
-    return 'I can help with short conversation and quick guidance here. Ask a more specific question and I will answer directly or route it properly.';
+    return t('surface:voice_hub_question', undefined, language);
   }
-  return 'I received that. I can handle short conversation and quick guidance here, and route heavier work when needed.';
+  return t('surface:voice_hub_received', undefined, language);
 }
 
 function withTimeoutSignal(timeoutMs: number): AbortSignal {
