@@ -1,4 +1,4 @@
-import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput, readJsonLines } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
 import { assertSafeRepositoryPath, safeMkdir, safeExistsSync, safeLstat } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
@@ -251,23 +251,18 @@ export const loadForScope = (
   const safePath = safeLedgerPath(ledgerPath);
   if (!safeExistsSync(safePath)) return [];
   ensureRegularLedgerFile(safePath);
-  const content = readTextFile(safePath);
-  return content
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .flatMap((line) => {
-      try {
-        const entry = normalizeLedgerRecord(parseSafeJsonInput(line, 'ledger entry'));
-        if (!entry) return [];
-        const scopeResult = resolveScopeForRecord(entry);
-        if (scopeResult.disposition === 'invalid') return [];
-        const scope = scopeResult.scope;
-        return eventScopeMatches(scope, filter) ? [entry] : [];
-      } catch {
-        return [];
-      }
-    });
+  return readJsonLines<unknown>(safePath, { onMalformed: 'skip' }).flatMap((value) => {
+    try {
+      const entry = normalizeLedgerRecord(value);
+      if (!entry) return [];
+      const scopeResult = resolveScopeForRecord(entry);
+      if (scopeResult.disposition === 'invalid') return [];
+      const scope = scopeResult.scope;
+      return eventScopeMatches(scope, filter) ? [entry] : [];
+    } catch {
+      return [];
+    }
+  });
 };
 
 function resolveLedgerScope(data: Record<string, unknown>): EventScope {
