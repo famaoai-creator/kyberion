@@ -238,6 +238,17 @@ describe('external hook discovery', () => {
     }
   });
 
+  it('skips a project hook config path replaced by a directory', () => {
+    const projectRoot = pathResolver.shared(`tmp/external-hook-directory-project-${process.pid}`);
+    const configPath = `${projectRoot}/.claude/settings.json`;
+    try {
+      safeMkdir(configPath, { recursive: true });
+      expect(discoverExternalHookConfigs({ rootDir: projectRoot })).toEqual([]);
+    } finally {
+      safeRmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
   it('resolves the implicit global home through the registered environment boundary', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('libs/core/external-hook-discovery.ts'), {

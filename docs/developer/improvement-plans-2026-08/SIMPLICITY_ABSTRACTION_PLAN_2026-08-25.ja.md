@@ -22973,3 +22973,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/classifier.ts`、classifier test、PI-03
 - **変更**: 汎用 classifier の file read 前へ operation-time の regular-file 検査を追加し、directory／symlink を分類本文へ渡さないようにした。既存の keyword scoring と `classifyFile` の入力・結果 semantics は維持した。
 - **検証**: classifier **2 files／2 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1629
+
+- **対象**: `libs/core/external-hook-discovery.ts`、external-hook-discovery test、PI-03
+- **変更**: external hook config discovery の candidate pathへ operation-time の regular-file 検査を追加し、directory replacement を JSON parse／hook registrationへ到達させないようにした。既存の repository／home containment、symlink拒否、trust／approval semantics は維持した。
+- **検証**: external-hook-discovery **2 files／9 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。

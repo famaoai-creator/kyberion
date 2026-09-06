@@ -78,7 +78,7 @@ function isSafeConfigPath(filePath: string, rootDir: string): boolean {
     if (!safeExistsSync(current)) return false;
     if (safeLstat(current).isSymbolicLink()) return false;
   }
-  return true;
+  return safeLstat(filePath).isFile();
 }
 
 function projectTrustApprovalId(
