@@ -23038,10 +23038,10 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 
 - **対象**: `scripts/browser_bridge_host.ts`、SX-06
 - **変更**: Browser Native Messaging host の stdin listener 登録を `startBrowserBridgeHost` へ閉じ込め、`defineScript`／`isDirectScript` の direct-entry 境界からだけ起動するようにした。Native Messaging の frame 処理、stdout の応答完了待ち、`setProcessExitCode` による異常終了通知は維持し、テスト import 時の top-level listener 副作用を除去した。
-- **検証**: Prettier、`git diff --check`。Vitest と ts-loader import-safe probe は依存関係復旧途中の `node_modules` が `.vite-temp`／現行 `@agent/core` export を解決できず起動前に停止したため、環境復旧後の受入課題とする。完了計画の archive 移動、全 script harness／generator 移行、provider 実機受入を継続する。
+- **検証**: Prettier、`git diff --check`、隔離した offline 依存環境での Vitest **4 files／25 tests passed**、ts-loader import-safe probe **passed**。初回の共有 `node_modules` では `.vite-temp` 書込不可／`@agent/core` export 不整合があったが、他 checkout を変更せず復旧用の isolated modules で再検証した。完了計画の archive 移動、全 script harness／generator 移行、provider 実機受入を継続する。
 
 ## 2026-09-06 再レビュー実装 1640
 
 - **対象**: `libs/core/src/knowledge-index.ts`、`libs/core/src/knowledge-index.test.ts`、PI-03
 - **変更**: JSON hint scanner の本文 read 前へ operation-time の `safeLstat(...).isFile()` 検査を追加し、`.json` 名のディレクトリ置換を parse／index登録へ到達させないようにした。既存の scanner containment、symlink 拒否、malformed hint の skip、Markdown index semantics は維持し、JSON hint directory の回帰テストを追加した。
-- **検証**: Prettier、`git diff --check`。Vitest は依存関係復旧途中の `node_modules` が現行 workspace の `@agent/core` export と一致せず起動前に停止したため、環境復旧後の受入課題とする。needs-review loader の個別修正、完了計画の archive 移動、provider 実機受入を継続する。
+- **検証**: `libs/core/src/knowledge-index.test.ts` **1 file／16 tests passed**、`libs/core` typecheck、Prettier、`git diff --check`。needs-review loader の個別修正、完了計画の archive 移動、provider 実機受入を継続する。
