@@ -1,5 +1,4 @@
-import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import { readTextFile } from './foundation/text.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 /**
  * Event-sourced worker state restore contract (KD-03).
@@ -818,22 +817,13 @@ export class WorkerStateJournal {
         `[WORKER_STATE_JOURNAL_RESOURCE] journal must be a regular file: ${journalPath}`
       );
     }
-    const raw = readTextFile(journalPath);
-    const events: JournalEventEnvelope[] = [];
+    const events = readJsonLines<JournalEventEnvelope>(journalPath, {
+      onMalformed: 'skip',
+      map: (value) => migrateEnvelope(journalEventEnvelopeSchema.parse(value)),
+    });
     let maxSeq = -1;
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const parsed = journalEventEnvelopeSchema.parse(
-          parseSafeJsonInput(trimmed, 'worker journal entry')
-        );
-        const migrated = migrateEnvelope(parsed);
-        events.push(migrated);
-        if (migrated.seq > maxSeq) maxSeq = migrated.seq;
-      } catch {
-        // A torn/corrupt/forward line must not poison replay of the rest.
-      }
+    for (const event of events) {
+      if (event.seq > maxSeq) maxSeq = event.seq;
     }
     return { events, maxSeq };
   }
