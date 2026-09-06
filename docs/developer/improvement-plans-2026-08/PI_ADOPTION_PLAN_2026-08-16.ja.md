@@ -880,6 +880,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-10 の provider-native wire 残差として、`delegateStructured` が能力gate後の constrained sampling request を `ReasoningCallOptions` 経由でadapterへ伝播するようにし、OpenAI-compatible adapterは JSON Schema を `response_format.json_schema` へ直列化するようにした。generic adapterがprovider固有のgrammar形式を推測して送らないよう、grammarは送信前にfail-closedとした。関連 **2 files／48 tests passed**、`libs/core` typecheck、対象ESLint、Prettier、`git diff --check`で確認した。実モデル別capability probeとprovider実機wire受入は継続課題である。
 - 2026-09-06: PI-12／PI-03 のscript loader残差として、pinned-deps checkerのlockfile／`.npmrc`本文readをoperation-timeのregular-file境界へ接続し、directory replacementをdependency policy判定へ到達させない回帰を追加した。関連 **1 file／3 tests passed**、Prettier、`git diff --check`で確認した。scripts全体の未監査loaderとprovider実機受入は継続課題である。
 - 2026-09-06: PI-12 のscript loader残差として、lockfile commit gateのlockfile／review evidence本文readもoperation-timeのregular-file境界へ接続し、directory replacementをhash／review evidence判定へ到達させない回帰を追加した。関連 **1 file／8 tests passed**、Prettier、`git diff --check`で確認した。scripts全体の未監査loaderとprovider実機受入は継続課題である。
+- 2026-09-06: PI-12 のscript loader残差として、install-script allowlist checkerの`pnpm-workspace.yaml`本文readをoperation-timeのregular-file境界へ接続し、directory replacementを`allowBuilds` policy判定へ到達させない回帰を追加した。関連 **1 file／3 tests passed**、Prettier、`git diff --check`で確認した。scripts全体の未監査loaderとprovider実機受入は継続課題である。
 
 ## 7. 検証コマンド(実装時)
 

@@ -23093,3 +23093,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_lockfile_commit_gate.ts`、`scripts/check_lockfile_commit_gate.test.ts`、PI-12
 - **変更**: lockfile commit gateの`pnpm-lock.yaml`／review evidence本文readを共通`readRegularTextFile`のoperation-time regular-file境界へ接続し、lockfileのdirectory replacementはhash判定前に拒否し、evidenceのdirectory replacementは証拠なしとしてfail-closedにした。既存のlockfile変更許可条件は維持した。
 - **検証**: lockfile gate **1 file／8 tests passed**、Prettier、`git diff --check`。scripts全体の未監査loaderとprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1649
+
+- **対象**: `scripts/check_install_script_allowlist.ts`、`scripts/check_install_script_allowlist.test.ts`、PI-12
+- **変更**: install-script allowlist checkerの`pnpm-workspace.yaml`本文readを`readWorkspaceTextFile`のoperation-time regular-file境界へ接続し、directory replacementを`allowBuilds` policy判定へ到達させないようにした。既存のallowlist semanticsは維持した。
+- **検証**: install-script allowlist **1 file／3 tests passed**、Prettier、`git diff --check`。scripts全体の未監査loaderとprovider実機受入は継続する。
