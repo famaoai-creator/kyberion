@@ -1177,7 +1177,15 @@ app.post('/api/minutes/session/start', async (req, res) => {
       res.status(409).json({ ok: false, error: `既に録音中です (${inRoomMinutesMissionId})` });
       return;
     }
-    const parsed = presenceStudioMinutesSessionStartSchema.safeParse(req.body);
+    let requestBody: unknown = req.body;
+    if (req.body !== undefined) {
+      try {
+        requestBody = parseSafeJsonObjectValue(req.body, 'minutes session start body');
+      } catch {
+        requestBody = null;
+      }
+    }
+    const parsed = presenceStudioMinutesSessionStartSchema.safeParse(requestBody);
     if (!parsed.success) {
       res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
       return;
