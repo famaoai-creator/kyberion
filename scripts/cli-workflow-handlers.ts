@@ -4,7 +4,13 @@ import { readTextFile } from '@agent/core/foundation';
 import { resolveIntentResolutionPacket } from '@agent/core/intent-resolution';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
-import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { t as coreT } from '@agent/core/t';
 import type { VocabularyKey } from '@agent/core/t';
 import { offboardScope } from '@agent/core/scope-offboarding';
@@ -69,6 +75,13 @@ function resolveWorkflowPath(value: unknown, label: string, allowMissingLeaf = f
   const requested = String(value ?? '').trim();
   if (!requested) throw new Error(`${label} is required`);
   return assertSafeRepositoryPath(pathResolver.resolve(requested), { allowMissingLeaf });
+}
+
+export function readWorkflowTextFile(filePath: string, label: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 function resolveLocale(): SupportedLocale {
@@ -505,7 +518,10 @@ export async function handleEmailWorkflowCommand(
       typeof options['--triage-file'] === 'string'
         ? options['--triage-file']
         : resolveEmailTriagePath();
-    const triageText = readTextFile(resolveWorkflowPath(triageFile, 'triage file')).trim();
+    const triageText = readWorkflowTextFile(
+      resolveWorkflowPath(triageFile, 'triage file'),
+      'triage file'
+    ).trim();
     if (!triageText) {
       throw new Error(`triage text not found at ${triageFile}`);
     }
@@ -530,7 +546,7 @@ export async function handleEmailWorkflowCommand(
       typeof options['--body-markdown'] === 'string'
         ? options['--body-markdown']
         : bodyFile
-          ? readTextFile(resolveWorkflowPath(bodyFile, 'body file'))
+          ? readWorkflowTextFile(resolveWorkflowPath(bodyFile, 'body file'), 'body file')
           : '';
     if (!bodyMarkdown.trim()) {
       throw new Error('body_markdown is required; provide --body-markdown or --body-file');
