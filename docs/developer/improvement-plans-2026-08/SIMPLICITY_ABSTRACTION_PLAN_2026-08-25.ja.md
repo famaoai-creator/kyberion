@@ -23699,3 +23699,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: foundation adoption の JSON boundary 再発防止、SX-03
 - **変更**: `safeReadFile` の結果を `parseSafeJsonInput` へ直接渡す旧境界を検出する checker を追加した。既存の外部 CLI／simulator／wire parser と secure-io canonical implementation はファイル単位・件数単位の allowlist に固定し、allowlist外の新規追加は foundation `readJson`／`readJsonLines` の利用またはレビュー対象として fail-closed にした。
 - **検証**: foundation adoption **1 file／7 tests passed**、canonical foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1750
+
+- **対象**: terminal bridge の repository-bound JSON loader、SX-03
+- **変更**: terminal session state、file-watcher control request、brain profile registry の `safeReadFile` + `parseSafeJsonInput` を foundation `readJson`へ統一した。repository path／regular-file／missing・malformed時の既存fallback、session shape validation、socket raw-message parserは維持し、外部wireの生テキスト境界は移行対象外とした。
+- **検証**: terminal bridge **2 files／8 tests passed**、foundation adoption **1 file／7 tests passed**、canonical foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。

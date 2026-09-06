@@ -6,6 +6,7 @@ import {
   nowIso,
   parseSafeJsonObjectValue,
   parseSafeJsonInput,
+  readJson,
 } from '@agent/core/foundation';
 import { installProcessGuards } from '@agent/core/process-guards';
 import { createServer } from 'node:http';
@@ -20,7 +21,6 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import {
   assertSafeRepositoryPath,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeRmSync,
@@ -262,10 +262,7 @@ async function setupSessionWatcher(session: Session) {
     try {
       const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
       if (!safeExistsSync(safeFilePath) || !safeLstat(safeFilePath).isFile()) return;
-      const content = safeReadFile(safeFilePath, { encoding: 'utf8' }) as string;
-      const request = parseTerminalControlRequest(
-        parseSafeJsonInput(content, 'terminal control request')
-      );
+      const request = parseTerminalControlRequest(readJson<unknown>(safeFilePath));
       if (!request) return;
       if (request.text) {
         typeLine(session, request.text);
@@ -280,12 +277,7 @@ async function setupSessionWatcher(session: Session) {
             { allowMissingLeaf: true }
           );
           if (safeExistsSync(registryPath) && safeLstat(registryPath).isFile()) {
-            const registry = parseNexusBrainProfileRegistry(
-              parseSafeJsonInput(
-                String(safeReadFile(registryPath, { encoding: 'utf8' })),
-                'terminal brain profile registry'
-              )
-            );
+            const registry = parseNexusBrainProfileRegistry(readJson<unknown>(registryPath));
             if (!registry) throw new Error('invalid brain profile registry');
             const profileKey =
               requestedBrain === 'default' ? registry.default_profile : requestedBrain;

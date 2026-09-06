@@ -11,6 +11,7 @@ describe('terminal bridge HTTP input boundary', () => {
     );
 
     expect(source).toContain('parseSafeJsonObjectValue');
+    expect(source).toContain('readJson<unknown>(safeFilePath)');
     expect(source).toContain(
       "parseSafeJsonObjectValue(req.body === undefined ? {} : req.body, 'terminal session request')"
     );
