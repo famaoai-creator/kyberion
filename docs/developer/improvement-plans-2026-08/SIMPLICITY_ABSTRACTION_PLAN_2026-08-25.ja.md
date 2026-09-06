@@ -22644,6 +22644,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: approval-gated な mission steering の承認待ち応答を `SurfaceConversationInput.locale` から描画するようにした。locale未指定時の既存日本語、承認 request の生成、human-only decision、steering authority、finish／verify の実行境界は維持し、qps-ploc の承認文言回帰を追加した。
 - **検証**: mission steering **1 file／12 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1581
+
+- **対象**: `satellites/voice-hub/server.ts`、voice-hub boundary test、`vitest.config.mts`、SX-08b／SX-09b
+- **変更**: voice-hub が入力言語を判定している既存の `detectReplyLanguage` を共有 surface conversation input、text-only contract formatter、fallback の intent contractへ接続した。voice-hub の boundary testをroot Vitestのinclude対象へ追加し、実行されていなかったdaemon境界テストもCI検証へ含めた。音声応答、scope、fallback、provider配送の意味は維持した。
+- **検証**: voice-hub boundary **1 file／2 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`
