@@ -26,7 +26,7 @@ describe('orchestrator execution brief catalog boundary', () => {
     expect(source).toContain('schema: ACTUATOR_ARCHETYPES_SCHEMA_PATH');
     expect(source).toContain('actuatorRequestArchetypeCatalog.load()');
     expect(source).toContain('parseSafeJsonObjectValue(');
-    expect(source).not.toContain('readJson');
+    expect(source).toContain('readJson(templateFullPath)');
   });
 
   it('loads project ledgers through the governed schema boundary', () => {
