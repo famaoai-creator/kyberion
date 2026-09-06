@@ -10,8 +10,8 @@ describe('model-cost registry — data-driven (not source-hardcoded)', () => {
 
   it('loads rates from the knowledge-tier JSON registry', () => {
     const reg = loadModelCostRegistry();
-    // claude-haiku-4-5 lives only in the file (not in the built-in fallback) —
-    // its presence proves the registry was read from disk, not hardcoded.
+    // claude-haiku-4-5 lives only in the file — its presence proves the
+    // registry was read from disk, not hardcoded.
     expect(reg.models['claude-haiku-4-5']).toBeDefined();
     expect(reg.models['claude-opus-5']).toEqual({ prompt: 0.005, completion: 0.025 });
     expect(reg.models['claude-opus-4-8']).toEqual({ prompt: 0.005, completion: 0.025 });
