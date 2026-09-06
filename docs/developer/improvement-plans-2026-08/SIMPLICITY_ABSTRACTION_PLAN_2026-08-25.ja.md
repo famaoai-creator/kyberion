@@ -23465,3 +23465,15 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/refactor/prune_unused_imports.ts`、`scripts/refactor/prune_unused_imports.reader.test.ts`、PI-03
 - **変更**: prune unused importsのsource本文readを`readPruneUnusedImportsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをimport pruning／rewrite判定へ到達させないようにした。既存のAST parse、re-parse guard、dry-run/write semanticsは維持した。
 - **検証**: prune unused imports **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1711
+
+- **対象**: `scripts/pipeline-execution-part-execution.ts`、`scripts/pipeline-execution-part-execution.env-boundary.test.ts`、PI-03
+- **変更**: pipeline executionのinclude fragment本文readを`readPipelineIncludeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfragment parsing／include expansion判定へ到達させないようにした。既存のcircular include、context interpolation、ADF execution semanticsは維持した。
+- **検証**: pipeline execution environment boundary **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1712
+
+- **対象**: `scripts/inventory_resource_loaders.ts`、`scripts/inventory_resource_loaders.test.ts`、PI-03
+- **変更**: resource loader inventory自身のsource本文readを`readResourceLoaderInventoryTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをsource scan／loader classification判定へ到達させないようにした。既存のroot filtering、helper evidence、classification semanticsは維持した。
+- **検証**: resource loader inventory **2 files／12 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。再計測は `inline-safe-path: 2 / nearby-path-guard: 99 / needs-review: 0`。
