@@ -196,7 +196,10 @@ function readPersistedTraceRecords(
   filePath: string,
   options: Pick<TraceFeedOptions, 'strictUnknownSpans'>
 ): PersistedTraceShape[] {
-  return readJsonLines<unknown>(filePath, { onMalformed: 'skip' }).flatMap((value) => {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath) || !safeLstat(safeFilePath).isFile()) return [];
+
+  return readJsonLines<unknown>(safeFilePath, { onMalformed: 'skip' }).flatMap((value) => {
     const record = normalizePersistedTrace(value, options);
     return record ? [record] : [];
   });
