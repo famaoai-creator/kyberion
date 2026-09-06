@@ -4,6 +4,8 @@
 
 Actuators are the generic, high-fidelity execution engines of the Kyberion ecosystem. They serve as the physical interface between the agent's logic (Procedures) and reality (Filesystem, Network, OS, Blockchain).
 
+The live catalog is **32 manifest-backed actuators**. Do not treat the historical "Core Nine" list as current.
+
 ## 2. Design Principles
 
 - **Agnostic Logic**: Actuators only know _how_ to execute a specific class of physical actions based on ADF (Agentic Data Format).
@@ -11,29 +13,25 @@ Actuators are the generic, high-fidelity execution engines of the Kyberion ecosy
 - **Canonical Contract First**: Compatibility handlers may remain in code during migration, but `manifest.json` should expose only the recommended public `op` surface.
 - **High Fidelity**: Provides immutable evidence (hashes, signatures) for every action taken.
 
-## 3. The Actuators (Core Nine)
+## 3. Catalog (redirect)
 
-1. **Code-Actuator**: Logic analysis, refactoring, and testing.
-2. **File-Actuator**: Advanced file I/O and discovery.
-3. **Network-Actuator**: Secure API communications.
-4. **Wisdom-Actuator**: Knowledge distillation and identity management.
-5. **Media-Actuator**: Document conversion and visual asset generation.
-6. **Browser-Actuator**: Web automation and recording.
-7. **System-Actuator**: Keyboard/Mouse, Voice, and OS-level operations.
-8. **Secret-Actuator**: **[NEW]** Native bridge to OS Secret Managers (macOS Keychain, etc.).
-9. **Blockchain-Actuator**: **[NEW]** Immutable anchoring of mission evidence and trust scores.
+The operator catalog is generated from `libs/actuators/*/manifest.json`. **Do not maintain a second actuator list here.**
+
+- Current table: [`CAPABILITIES_GUIDE.md`](../../CAPABILITIES_GUIDE.md)
+- Discovery without `dist/`: `pnpm capabilities` or `pnpm kyberion list`
+- Single-op dry-run: `pnpm playground -- --actuator <id> --op <op> --params '{…}' --dry-run --json`
+- Runtime execution (`pnpm pipeline`, `pnpm kyberion run`) still needs `pnpm build`
+
+For Slack (conversation vs presence vs API) see [`docs/SLACK_CHANNEL_ROUTES.ja.md`](../../docs/SLACK_CHANNEL_ROUTES.ja.md).  
+For email inbox vs send see [`docs/EMAIL_OPERATOR.ja.md`](../../docs/EMAIL_OPERATOR.ja.md).
 
 ## 4. Implementation Status & Capabilities
-
-Use the following command to check the actual status in your current environment (works without `pnpm build`; scans manifests via the TypeScript entry):
 
 ```bash
 pnpm capabilities
 ```
 
-`pnpm kyberion list` uses the same discovery path when `dist/` is missing. Runtime execution (`pnpm pipeline`, `pnpm kyberion run`) still needs `pnpm build`.
-
-For Slack (conversation vs presence vs API) see [`docs/SLACK_CHANNEL_ROUTES.ja.md`](../../docs/SLACK_CHANNEL_ROUTES.ja.md). The current catalog is 32 manifest-backed actuators — see [`CAPABILITIES_GUIDE.md`](../../CAPABILITIES_GUIDE.md) rather than the historical "Core Nine" list below.
+`pnpm kyberion list` uses the same discovery path when `dist/` is missing.
 
 ## 5. Example Entry Points
 
@@ -47,7 +45,8 @@ Sample inputs for individual actuators live under each actuator's `examples/` di
 - `libs/actuators/media-actuator/examples/`
 - `libs/actuators/media-generation-actuator/examples/`
 - `libs/actuators/modeling-actuator/examples/`
+- `libs/actuators/service-actuator/examples/` (includes `github-list-issues.json`)
 
 ---
 
-_Last Updated: 2026-03-11_
+_Last Updated: 2026-09-06_

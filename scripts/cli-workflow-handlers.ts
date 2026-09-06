@@ -138,6 +138,14 @@ function printEmailHelp(locale = resolveLocale()): void {
     '  pnpm kyberion email deliver --approved --body-file active/shared/runtime/presence-studio/email-drafts/latest.md'
   );
   printText('  pnpm kyberion email archive-inbox --apply');
+  printText('');
+  printText(
+    'Inbox/triage (read): Google Workspace gmail_triage. Send/draft (write): email-actuator, approval-gated.'
+  );
+  printText(
+    '受信/トリアージ(読取): Google Workspace gmail_triage。送信/下書き(書込): email-actuator、承認必須。'
+  );
+  printText('See docs/EMAIL_OPERATOR.ja.md');
 }
 
 function printCalendarHelp(locale = resolveLocale()): void {

@@ -2,7 +2,7 @@
 title: アクチュエータ日常運用ギャップ報告
 tags: [actuators, daily-ops, gap-analysis, operator-ux]
 last_updated: 2026-09-06
-status: p0-implemented
+status: p1-implemented
 ---
 
 # アクチュエータ日常運用ギャップ報告
@@ -31,12 +31,12 @@ status: p0-implemented
 
 | ID   | 状態     | 入れたもの                                                                                                                                                                                                                                                                                                                         |
 | ---- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0-1 | **done** | `github.json` に `list_issues`, `get_issue`, `list_pulls`, `get_pull`, `list_reviews`, `list_review_comments`, `list_pr_files`。harness registry 17 ops。review **投稿**は P1 のまま                                                                                                                                               |
+| P0-1 | **done** | `github.json` に `list_issues`, `get_issue`, `list_pulls`, `get_pull`, `list_reviews`, `list_review_comments`, `list_pr_files`。P1 で `create_review` / `create_review_comment`(apply/write/approval)を追加。harness registry 19 ops。                                                                                             |
 | P0-2 | **done** | MCP `kyberion.service.capture`(capture/read のみ、承認なし)。`pipelines/daily-routine.json` を pipeline allowlist へ。書き込みは従来の `service.actuate`                                                                                                                                                                           |
 | P0-3 | **done** | `pnpm capabilities` / `pnpm kyberion list` は `scripts/capability_discovery_entry.mjs` のマニフェスト走査(Node 22 でも可)。仮説「ts-loader だけで足りる」は破棄 — Node 22 に `registerHooks` が無く、`@agent/core` は dist export。実行系は引き続き `dist/` 必須。Doctor は `pnpm run doctor`(bare `pnpm doctor` は pnpm 組み込み) |
 | P0-4 | **done** | [`docs/SLACK_CHANNEL_ROUTES.ja.md`](../SLACK_CHANNEL_ROUTES.ja.md)。`docs/SURFACES.md` / `CAPABILITIES_GUIDE.md` / `libs/actuators/README.md` からリンク                                                                                                                                                                           |
 
-残り(P1+): GitHub review 投稿、digest テンプレ、カレンダー template の shell 排除、`github-mcp` 退役、Linux secret。P1-6/P1-7 は README 誘導と `kyberion:doctor` で部分対応。
+残り(P2+): Linux secret、アクチュエータ級 dry-run の拡張、presence multi-channel。P1 は下表。
 
 ---
 
@@ -393,7 +393,20 @@ pnpm kyberion run browser-actuator -- --input libs/actuators/browser-actuator/ex
 
 ## 7. Brush-up 推奨(優先度つき)
 
-P0 は実装済み(上表)。P1/P2 は形だけ残す。
+P0 と P1 は実装済み(上表および下表)。P2 は形だけ残す。
+
+### P1 実装状況(2026-09-06)
+
+| ID                         | 状態     | 入れたもの                                                                                                                                                                                                                                                    |
+| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0 leftover / review write | **done** | REST `github.json` に `create_review`, `create_review_comment`。`kind=apply` / `risk=write` / `approval_required`。capture 面は拒否                                                                                                                           |
+| P1-1                       | **done** | `knowledge/product/pipeline-templates/daily-github-inbox.json`。`list_issues` / `list_pulls` / `actions_list_runs` でローカル digest。Slack `post_message` はテンプレに含めず(承認/write ゲートのまま)。`schedule.enabled=false` + README に Chronos 登録手順 |
+| P1-2                       | **done** | `docs/EMAIL_OPERATOR.ja.md`。`pnpm kyberion email` をオペレータ面、`email-actuator` は配送、Gmail/gws は読取と明記。CLI help / `email-workflow` usage を更新                                                                                                  |
+| P1-3                       | **done** | `package.json` に `playground` / `actuator:playground` → `tsx scripts/actuator_playground.ts`。`--dry-run --json` で単発発見                                                                                                                                  |
+| P1-4                       | **done** | `schedule-summary-and-coordination.json` v3。`calendar:list_calendars` / `calendar:list_events`。`node dist/.../calendar-actuator` の shell を削除                                                                                                            |
+| P1-5                       | **done** | `github-mcp.json` を deprecated external-MCP example として残す。正本は REST `github`。MCP `create_issue` を apply/write に直し(以前は method 無しで capture と誤分類)。テスト用 3 op は維持                                                                  |
+| P1-6                       | **done** | `libs/actuators/README.md` の Core Nine を削除し CAPABILITIES_GUIDE / `pnpm capabilities` / `pnpm playground` へリダイレクト                                                                                                                                  |
+| P1-7                       | **done** | `kyberion:doctor` は既存。OPERATOR_UX / INITIALIZATION / CLI help / kyberion_cli_entry で `pnpm run doctor` を強制。first-win 契約の `pnpm doctor` 文言は維持(契約テスト固定)                                                                                 |
 
 ### P0 — 日常がアクチュエータに乗らない直接因
 
