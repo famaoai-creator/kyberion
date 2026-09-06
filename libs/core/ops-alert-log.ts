@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { appendJsonLine } from './foundation/json.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 
@@ -42,11 +41,4 @@ export function appendOpsAlertLogRecord(filePath: string, value: unknown): strin
   ensureRegularOpsAlertLogFile(safeFilePath);
   appendJsonLine(safeFilePath, catalog(safeFilePath).validate(value, safeFilePath));
   return safeFilePath;
-}
-
-export function readOpsAlertLogText(filePath: string): { path: string; text: string } | null {
-  const safeFilePath = resolveOpsAlertLogPath(filePath);
-  if (!safeExistsSync(safeFilePath)) return null;
-  ensureRegularOpsAlertLogFile(safeFilePath);
-  return { path: safeFilePath, text: readTextFile(safeFilePath) };
 }
