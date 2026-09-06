@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import ts from 'typescript';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import { getRegisteredEnvText, nowIso, readTextFile } from '@agent/core/foundation';
@@ -77,9 +77,16 @@ function incrementBucket(target: RatchetBucket, source: RatchetBucket): void {
   target.max_lines = Math.max(target.max_lines, source.max_lines);
 }
 
+export function readTypeRatchetTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function countFile(filePath: string, repoRelativePath: string): RatchetBucket {
   const bucket = emptyBucket();
-  const text = readTextFile(filePath);
+  const text = readTypeRatchetTextFile(filePath);
   bucket.max_lines = text.split(/\r?\n/u).length;
   const source = ts.createSourceFile(
     repoRelativePath,
