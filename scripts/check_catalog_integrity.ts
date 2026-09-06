@@ -3,7 +3,7 @@ import { extractPlaceholderNames } from '@agent/core/message-format';
 import { loadActuatorManifestCatalog } from '@agent/core/actuator-manifest-index';
 import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { compileSchema, readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { generateIndex } from './generate_knowledge_index.js';
@@ -35,6 +35,13 @@ type GovernanceCatalogMetadata = {
 };
 
 const GENERIC_GOVERNANCE_SCHEMA_REF = '../schemas/governance-catalog.schema.json';
+
+export function readCatalogTextFile(filePath: string, label = filePath): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 const CHECKS: CatalogCheck[] = [
   {
@@ -485,7 +492,7 @@ function findUndefinedKeyReferences(files: string[]): string[] {
   const sources: Record<string, string> = {};
   for (const file of files) {
     const label = path.relative(pathResolver.rootDir(), file);
-    sources[label] = readTextFile(file);
+    sources[label] = readCatalogTextFile(file, label);
   }
   return collectUndefinedKeyReferenceViolations(sources);
 }
@@ -603,7 +610,9 @@ function validateUserFacingVocabulary(
   const files = collectSourceFiles(VOCABULARY_SCAN_DIRS);
   violations.push(...findUndefinedKeyReferences(files));
 
-  const haystack = files.map((file) => readTextFile(file)).join('\n');
+  const haystack = files
+    .map((file) => readCatalogTextFile(file, path.relative(pathResolver.rootDir(), file)))
+    .join('\n');
   warnings.push(...findUnusedVocabularyKeys(data as VocabularyCatalogShape, haystack));
 }
 
@@ -673,7 +682,7 @@ function validateDesignTokenCatalog(violations: string[]) {
       );
       continue;
     }
-    const actual = readTextFile(filePath).trim();
+    const actual = readCatalogTextFile(filePath).trim();
     if (filePath.endsWith('globals.css')) {
       const tokenBlock = extractKyberionTokenBlock(actual);
       if (tokenBlock !== expectedTokenBlock) {
@@ -696,7 +705,7 @@ function validateDesignTokenCatalog(violations: string[]) {
   if (!safeExistsSync(tailwindPath)) {
     violations.push('design-tokens: missing tailwind.config.cjs');
   } else {
-    const tailwindText = readTextFile(tailwindPath);
+    const tailwindText = readCatalogTextFile(tailwindPath);
     if (!tailwindText.includes(expectedTailwindBlock)) {
       violations.push('design-tokens: kyberion tailwind color block drift');
     }
@@ -754,7 +763,7 @@ function validateCapabilitiesGuideDrift(violations: string[]) {
     violations.push('capabilities-guide: CAPABILITIES_GUIDE.md is missing');
     return;
   }
-  const guide = readTextFile(guidePath);
+  const guide = readCatalogTextFile(guidePath);
   const catalog = loadActuatorManifestCatalog();
   const totalMatch = guide.match(/Total Actuators:\s*(\d+)/u);
   const guideTotal = totalMatch ? Number(totalMatch[1]) : NaN;
@@ -826,7 +835,7 @@ function collectGovernanceRuntimeSourceFiles(): Record<string, string> {
       )
         continue;
       const relative = path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
-      sourceFiles[relative] = readTextFile(file);
+      sourceFiles[relative] = readCatalogTextFile(file, relative);
     }
   }
   // Manifest-driven checkers resolve their governed catalogs from the CI gate
@@ -834,7 +843,10 @@ function collectGovernanceRuntimeSourceFiles(): Record<string, string> {
   // those declarations visible to the unreferenced-catalog audit.
   const gateManifestPath = pathResolver.rootResolve('knowledge/product/governance/ci-gates.json');
   if (safeExistsSync(gateManifestPath)) {
-    sourceFiles['knowledge/product/governance/ci-gates.json'] = readTextFile(gateManifestPath);
+    sourceFiles['knowledge/product/governance/ci-gates.json'] = readCatalogTextFile(
+      gateManifestPath,
+      'knowledge/product/governance/ci-gates.json'
+    );
   }
   return sourceFiles;
 }
