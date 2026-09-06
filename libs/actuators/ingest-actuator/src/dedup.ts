@@ -19,9 +19,8 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
 } from '@agent/core/secure-io';
-import { appendJsonLine, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
 
 export const DEFAULT_INGEST_REGISTRY_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
@@ -94,22 +93,10 @@ function readRegistry(absPath: string): IngestRegistryRecord[] {
   if (!safeLstat(absPath).isFile()) {
     throw new Error(`ingest:dedup — registry_path must be a regular file: ${absPath}`);
   }
-  const raw = String(safeReadFile(absPath, { encoding: 'utf8' }) || '');
-  const records: IngestRegistryRecord[] = [];
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const record = parseIngestRegistryRecord(
-        parseSafeJsonInput(trimmed, 'ingest dedup registry entry')
-      );
-      if (record) records.push(record);
-    } catch {
-      // Corrupt line: skip rather than block ingestion — the registry is
-      // append-only evidence, not the source of truth for card content.
-    }
-  }
-  return records;
+  return readJsonLines<unknown>(absPath, { onMalformed: 'skip' }).flatMap((value) => {
+    const record = parseIngestRegistryRecord(value);
+    return record ? [record] : [];
+  });
 }
 
 export function dedupContent(input: DedupInput): DedupResult {
