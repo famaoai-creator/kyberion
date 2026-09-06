@@ -68,6 +68,7 @@ import {
   presenceStudioVoiceStimulusSchema,
   resolvePresenceStudioViewerContext,
   requirePresenceStudioLocalAdmin,
+  readPresenceStudioRouteParam,
 } from './security.js';
 import {
   buildPresenceSurfaceFrame,
@@ -404,7 +405,7 @@ presenceStudioData.app.get('/api/os/control-plane', (req, res) => {
 });
 
 presenceStudioData.app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
-  const actionId = String(req.params.actionId || '').trim();
+  const actionId = readPresenceStudioRouteParam(req.params.actionId);
   const parsed = presenceStudioApprovalDecisionSchema.safeParse(
     safeParsePresenceStudioRequestBody(req.body, 'held action decision body')
   );
@@ -451,7 +452,7 @@ presenceStudioData.app.post('/api/os/held-actions/:actionId/decision', (req, res
 });
 
 presenceStudioData.app.post('/api/os/held-actions/:actionId/apply', async (req, res) => {
-  const actionId = String(req.params.actionId || '').trim();
+  const actionId = readPresenceStudioRouteParam(req.params.actionId);
   if (!actionId) return res.status(400).json({ ok: false, error: 'actionId is required' });
   try {
     const access = resolvePresenceStudioViewerContext(req);
