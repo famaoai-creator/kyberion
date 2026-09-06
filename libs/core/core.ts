@@ -7,6 +7,7 @@ import * as readline from 'node:readline';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveVision } from './vision-resolver.js';
+import { safeLstat } from './secure-io.js';
 import {
   rawExistsSync,
   rawMkdirp,
@@ -444,6 +445,7 @@ export const fileUtils = {
   readJson: (filePath: string) => {
     try {
       const resolved = path.resolve(filePath);
+      if (!safeLstat(resolved).isFile()) return null;
       const stat = rawStatSync(resolved);
       const mtimeMs = stat.mtimeMs;
       const cached = _fileCache.get(resolved);
