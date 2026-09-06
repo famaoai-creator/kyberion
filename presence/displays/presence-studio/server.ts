@@ -1471,9 +1471,15 @@ presenceStudioData.app.post('/api/demo/frame', (req, res) => {
 });
 
 presenceStudioData.app.post('/api/timeline/dispatch', (req, res) => {
-  const timeline = validatePresenceTimeline(req.body);
-  const result = presenceStudioData.playTimeline(timeline);
-  return res.status(result.accepted ? 202 : 409).json({ ok: result.accepted, ...result });
+  try {
+    const timeline = validatePresenceTimeline(
+      parseSafeJsonObjectValue(req.body ?? {}, 'presence timeline request')
+    );
+    const result = presenceStudioData.playTimeline(timeline);
+    return res.status(result.accepted ? 202 : 409).json({ ok: result.accepted, ...result });
+  } catch (error: unknown) {
+    return res.status(400).json(presenceStudioData.presenceStudioWireError(error, 400));
+  }
 });
 
 presenceStudioData.app.get('/api/stimuli/tail', (_req, res) => {

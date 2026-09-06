@@ -99,4 +99,17 @@ describe('Presence Studio OS control-plane route contract', () => {
       "parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding apply body')"
     );
   });
+
+  it('validates timeline JSON before scheduling presence events', () => {
+    const source = readRepoFile('presence/displays/presence-studio/server.ts');
+    const routeStart = source.indexOf("presenceStudioData.app.post('/api/timeline/dispatch'");
+    const routeEnd = source.indexOf("presenceStudioData.app.get('/api/stimuli/tail'", routeStart);
+    const route = source.slice(routeStart, routeEnd);
+
+    expect(route).toContain(
+      "parseSafeJsonObjectValue(req.body ?? {}, 'presence timeline request')"
+    );
+    expect(route).toContain('validatePresenceTimeline(');
+    expect(route).toContain('presenceStudioData.presenceStudioWireError(error, 400)');
+  });
 });
