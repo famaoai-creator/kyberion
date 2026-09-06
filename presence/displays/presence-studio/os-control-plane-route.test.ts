@@ -89,4 +89,14 @@ describe('Presence Studio OS control-plane route contract', () => {
     expect(route).toContain('parseSafeJsonObjectValue(message, `A2UI message[${index}]`)');
     expect(route).toContain('presenceStudioData.presenceStudioWireError(error, 400)');
   });
+
+  it('validates onboarding JSON before preview or apply reaches the domain parser', () => {
+    const source = readRepoFile('presence/displays/presence-studio/server.ts');
+    expect(source).toContain(
+      "parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding preview body')"
+    );
+    expect(source).toContain(
+      "parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding apply body')"
+    );
+  });
 });

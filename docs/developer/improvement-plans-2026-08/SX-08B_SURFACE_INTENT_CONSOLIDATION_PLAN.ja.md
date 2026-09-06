@@ -1947,3 +1947,9 @@ Terminal bridge の `/sessions` に残っていた Express `req.body` の直接 
 `SurfaceAsyncChannel` と task-session schema にだけ存在していた `terminal` を、governed provider manifest、interaction provider seam、production-like approval wiringへ正式登録した。CLIと同じ session capabilitiesを利用しつつ provider id／channelをterminalとして分離し、manifest schema、一覧、routing policyの回帰を揃えた。
 
 検証: surface provider／approval wiring **4 files／30 tests passed**、manifest schema JSON、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 255
+
+Presence Studio の browser onboarding preview／apply に残っていた Express `req.body` の直接 domain parser渡しを、共有 `parseSafeJsonObjectValue` 境界へ揃えた。Zod draft validation、applyのlock／副作用、既存400 wire errorは維持し、配列・null・dangerous JSON keyをdomain parser前に拒否する回帰を追加した。
+
+検証: Presence Studio route contract **3 files／10 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、package scriptsの削減は継続課題とする。
