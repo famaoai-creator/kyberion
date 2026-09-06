@@ -17,6 +17,7 @@ import {
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 import { normalizeScopedReadPath } from '../../../lib/scoped-read-path';
+import { readChronosStringParam } from '../../../lib/request-input';
 
 function isAllowedRuntimeRefPath(logicalPath: string): boolean {
   const normalized = normalizeScopedReadPath(logicalPath);
@@ -98,7 +99,7 @@ export async function GET(req: NextRequest) {
   if (requiresAccess) return requiresAccess;
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
-  const logicalPath = req.nextUrl.searchParams.get('path')?.trim() ?? '';
+  const logicalPath = readChronosStringParam(req.nextUrl.searchParams.get('path'));
   if (!logicalPath) {
     return NextResponse.json({ error: 'path is required' }, { status: 400 });
   }

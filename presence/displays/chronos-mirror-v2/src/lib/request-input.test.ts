@@ -1,25 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { readChronosJsonObject } from './request-input';
+import { readChronosOptionalStringParam, readChronosStringParam } from './request-input';
 
-describe('readChronosJsonObject', () => {
-  it.each([
-    ['malformed JSON', () => Promise.reject(new SyntaxError('invalid JSON'))],
-    ['null', async () => null],
-    ['array', async () => []],
-    ['string', async () => 'body'],
-  ])('rejects %s before route logic', async (_label, json) => {
-    await expect(readChronosJsonObject({ json }, 'Chronos test')).resolves.toMatchObject({
-      ok: false,
-    });
+describe('Chronos request input', () => {
+  it('accepts only trimmed strings at the framework boundary', () => {
+    expect(readChronosStringParam('  path/to/file.md  ')).toBe('path/to/file.md');
+    expect(readChronosStringParam('   ')).toBe('');
+    expect(readChronosStringParam(undefined)).toBe('');
+    expect(readChronosStringParam(null)).toBe('');
+    expect(readChronosStringParam(['path/to/file.md'])).toBe('');
+    expect(readChronosStringParam({ value: 'path/to/file.md' })).toBe('');
   });
 
-  it('returns a JSON object unchanged', async () => {
-    const body = { operation: 'approve', nested: { value: true } };
-    await expect(
-      readChronosJsonObject({ json: async () => body }, 'Chronos test')
-    ).resolves.toEqual({
-      ok: true,
-      body,
-    });
+  it('maps empty values to an absent optional parameter', () => {
+    expect(readChronosOptionalStringParam('  tenant-a  ')).toBe('tenant-a');
+    expect(readChronosOptionalStringParam('')).toBeUndefined();
+    expect(readChronosOptionalStringParam(['tenant-a'])).toBeUndefined();
   });
 });

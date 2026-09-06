@@ -23489,3 +23489,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Chronos knowledge-ref／runtime-file／trace-log route、request-input boundary test、SX-08b
 - **変更**: 3つの Next route で `URLSearchParams.get('path')` を `String(...)` で再変換していた経路を、`?.trim() ?? ''` の文字列境界へ統一した。URL query の欠落は空文字として既存の400応答へ閉じ、配列・オブジェクトを暗黙文字列化する実装を追加しない契約をテストで固定した。
 - **検証**: request-input boundary **1 file／1 test passed**、関連 route boundary tests、対象 Prettier、`git diff --check`。残る framework-specific request parsing と provider 実機受入は継続課題である。
+
+## 2026-09-06 再レビュー実装 1715
+
+- **対象**: Chronos filesystem／trace query routes、shared request-input helper、SX-09b
+- **変更**: knowledge-ref／runtime-file／trace-log に加え、mission-asset、deliverable-preview、traces の高リスク query input を共通 `readChronosStringParam`／`readChronosOptionalStringParam` へ接続した。配列・object・空白値の暗黙変換を path／artifact lookup／viewer scope／trace projection へ到達させず、既存の認可・safe path・404／403 semantics を維持した。
+- **検証**: request-input **1 file／2 tests passed**、route source boundary **1 file／1 test passed**、対象 lint、Prettier、`git diff --check`。残る全 route の framework-specific parsing と provider 実機受入は継続課題である。

@@ -11,6 +11,7 @@ import {
   resolveViewerContextForRequest,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
+import { readChronosStringParam } from '../../../lib/request-input';
 
 export async function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
 
-  const logicalPath = req.nextUrl.searchParams.get('path')?.trim() ?? '';
+  const logicalPath = readChronosStringParam(req.nextUrl.searchParams.get('path'));
   if (!logicalPath) {
     return NextResponse.json({ error: 'path is required' }, { status: 400 });
   }

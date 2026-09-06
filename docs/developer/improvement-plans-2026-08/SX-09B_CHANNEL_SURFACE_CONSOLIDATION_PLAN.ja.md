@@ -459,6 +459,19 @@ Presence Studio runtime-data の onboarding voice-sample `profile_id` query を�
 
 検証: Presence Studio runtime-data boundary **1 file／3 tests passed**、対象 ESLint、Prettier、`git diff --check`。
 
+## 2026-09-06 再レビュー修正 48
+
+Chronos の filesystem／trace 系 Next route に残っていた framework query 値の個別読み取りを再監査し、
+mission asset、deliverable preview、trace feed、knowledge/runtime/trace-log reference の path・ID・scope
+値が route ごとの既定値化へ分散している残存を検出した。共通 `readChronosStringParam`／
+`readChronosOptionalStringParam` を追加し、trim 済みの単一 string だけを path／artifact lookup／viewer
+scope／trace projection へ渡すようにした。既存の tenant scope、safe path、404／403、trace filtering semantics
+は変更していない。
+
+検証: request-input **1 file／2 tests passed**、route source boundary **1 file／1 test passed**、対象 lint、
+Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英の channel
+literal 全面移行は引き続き未完了である。
+
 ## 2026-09-06 再レビュー修正 47
 
 Presence Studio onboarding voice-sample の `content-type` header を再監査し、header array を `String(...)`

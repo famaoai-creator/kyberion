@@ -20,6 +20,7 @@ import {
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
+import { readChronosOptionalStringParam, readChronosStringParam } from '../../../lib/request-input';
 
 const ALLOWED_PREFIXES = ['deliverables/', 'artifacts/', 'outputs/', 'evidence/'] as const;
 // Repo-relative mode (no missionId): where governed artifacts actually live.
@@ -199,13 +200,13 @@ export async function GET(req: NextRequest) {
     const withViewerContext = <T>(operation: () => T): T =>
       withViewerExecutionContext(resolvedViewer.context, operation);
 
-    const missionId = req.nextUrl.searchParams.get('missionId') || '';
-    const relativePath = req.nextUrl.searchParams.get('path') || '';
-    const artifactId = req.nextUrl.searchParams.get('artifactId') || '';
+    const missionId = readChronosStringParam(req.nextUrl.searchParams.get('missionId'));
+    const relativePath = readChronosStringParam(req.nextUrl.searchParams.get('path'));
+    const artifactId = readChronosStringParam(req.nextUrl.searchParams.get('artifactId'));
     let artifact: Parameters<typeof inferDeliverableTier>[0] | undefined;
     const tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
     if (artifactId) {
       artifact = withViewerContext(() => loadArtifactRecord(artifactId));
