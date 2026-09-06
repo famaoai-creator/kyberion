@@ -365,6 +365,7 @@ export function acquirePendingOAuthCallback(
   } catch (error) {
     if (!safeExistsSync(lockPath)) throw error;
     try {
+      if (!safeLstat(lockPath).isFile()) return null;
       const lockContents = readTextFile(lockPath);
       const lockCreatedAt = Number(lockContents.trim().split(':').at(-1));
       if (!Number.isFinite(lockCreatedAt) || now - lockCreatedAt <= OAUTH_CALLBACK_TTL_MS) {

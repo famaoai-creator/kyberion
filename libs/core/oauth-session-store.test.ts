@@ -11,9 +11,11 @@ import {
 import {
   isOAuthSessionExpired,
   isSafeOAuthState,
+  acquirePendingOAuthCallback,
   listPendingOAuthSessions,
   loadPendingOAuthSession,
   serviceSessionDir,
+  serviceSessionLockPath,
   serviceSessionPath,
 } from './oauth-session-store.js';
 
@@ -119,6 +121,19 @@ describe('oauth session hygiene', () => {
       );
     } finally {
       safeRmSync(filePath, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when the callback lock path is replaced by a directory', () => {
+    const serviceId = 'oauth-callback-lock-directory-test';
+    const state = 'D'.repeat(32);
+    const lockPath = serviceSessionLockPath(serviceId, state);
+    safeMkdir(serviceSessionDir(serviceId), { recursive: true });
+    safeMkdir(lockPath, { recursive: true });
+    try {
+      expect(acquirePendingOAuthCallback(serviceId, state)).toBeNull();
+    } finally {
+      safeRmSync(lockPath, { recursive: true, force: true });
     }
   });
 });
