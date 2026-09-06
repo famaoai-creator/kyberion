@@ -268,6 +268,34 @@
       "notes": "Standard Anthropic option for balanced reasoning and analysis."
     },
     {
+      "model_id": "gemini:gemini-3.8-flash",
+      "provider": "gemini",
+      "family": "gemini-3.8",
+      "status": "approved",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "medium",
+      "latency_band": "low",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "agentic_coding",
+        "balanced_reasoning",
+        "tool_use",
+        "multimodal",
+        "hybrid_reasoning"
+      ],
+      "notes": "Google Gemini 3.8 Flash model for agentic coding, hybrid reasoning, and multimodal workflows."
+    },
+    {
       "model_id": "gemini:gemini-3.7-flash",
       "provider": "gemini",
       "family": "gemini-3.7",

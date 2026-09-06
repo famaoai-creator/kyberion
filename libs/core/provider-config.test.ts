@@ -15,9 +15,9 @@ const AjvCtor = (AjvModule as any).default ?? AjvModule;
 describe('provider-config', () => {
   it('loads runtime defaults and lifecycle defaults from the shared config', () => {
     const config = loadProviderConfig();
-    expect(config.default_models.gemini).toBe('gemini-3.6-flash');
+    expect(config.default_models.gemini).toBe('gemini-3.8-flash');
     expect(config.default_models.claude).toBe('claude-opus-5');
-    expect(config.default_models.agy).toBe('Gemini 3.7 Flash (Medium)');
+    expect(config.default_models.agy).toBe('Gemini 3.8 Flash (Low)');
     expect(config.default_models.codex).toBe('gpt-5.6-sol');
     expect(config.default_models.grok).toBe('grok-4.6');
     expect(config.runtime_defaults['anthropic-default']).toBe('claude-opus-5');
