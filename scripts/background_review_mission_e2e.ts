@@ -165,6 +165,7 @@ async function main(argv: string[]): Promise<void> {
     const conversation = await runSurfaceMessageConversation({
       surface,
       text: 'ナレッジで planner を調べて',
+      locale: 'ja',
       channel,
       threadTs,
       correlationId: `ha01-e2e-${runKey}`,

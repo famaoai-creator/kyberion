@@ -294,6 +294,7 @@ async function handleAskSubcommand(
     threadTs: correlationId,
     correlationId,
     receivedAt: nowIso(),
+    locale: cliLocale,
     actorId: 'operator',
     senderAgentId: 'kyberion:home-cli',
     agentId: 'cli-surface-agent',

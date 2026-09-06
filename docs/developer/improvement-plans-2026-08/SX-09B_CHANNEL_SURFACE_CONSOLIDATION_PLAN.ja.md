@@ -417,3 +417,9 @@ Slack automation／mission proposal と Discord interaction rejection に残っ�
 terminal-hud、Concierge fallback、Chronos APIのlocaleをshared conversation inputへ揃え、channel以外のoperator surfaceでもcontract label／next actionのlocaleが落ちないようにした。Concierge contract test suiteをroot Vitestへ登録し、3 surfaceのwire回帰を実行対象にした。
 
 検証: terminal-hud／Concierge／Chronos **3 files／27 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、残る日英のchannelリテラル全面移行は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 42
+
+CLI／background review／iMessage demo／Telegram demoのsurface conversation inputにもlocaleを明示し、channel bridge以外の入口でもshared contractのlocale境界を落とさないようにした。既存のprovider配送、approval、tenant scope semanticsは変更していない。
+
+検証: CLI trust-boundary／locale wiring、demo／backgroundのtypecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、残る日英のchannelリテラル全面移行は引き続き未完了である。

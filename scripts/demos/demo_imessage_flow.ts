@@ -12,6 +12,7 @@ export const simulateIMessage = defineScript({
     const result = await runSurfaceMessageConversation({
       surface: 'imessage',
       text: '来週の月曜日の予定を教えて',
+      locale: 'ja',
       channel: 'chat123',
       threadTs: 'msg456',
       correlationId: 'demo-123',
@@ -21,7 +22,7 @@ export const simulateIMessage = defineScript({
       agentId: 'imessage-surface-agent',
       delegationSummaryInstruction:
         'Produce a concise iMessage reply in the user language. Do not use A2A blocks.',
-    } as any);
+    });
 
     logger.success('✅ Conversation logic completed.');
     logger.info('📤 Response Text:');

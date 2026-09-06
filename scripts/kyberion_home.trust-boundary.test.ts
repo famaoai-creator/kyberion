@@ -13,6 +13,7 @@ describe('kyberion home procedure inspection trust boundary', () => {
     expect(source).not.toContain('JSON.parse(argv.inputs)');
     expect(source).not.toContain('process.env.MISSION_ID');
     expect(source).toContain("getRegisteredEnvText('MISSION_ID')");
+    expect(source).toContain('locale: cliLocale,');
   });
 
   it('does not bypass project trust while inspecting desktop pipelines', () => {
