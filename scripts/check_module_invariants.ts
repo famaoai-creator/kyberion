@@ -2,6 +2,7 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { listModuleInvariants } from '@agent/core/invariants';
 import { readTextFile } from '@agent/core/foundation';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const required = [
@@ -10,6 +11,14 @@ const required = [
   { module: 'lifecycle-hook-engine', source: 'libs/core/lifecycle-hook-engine.ts' },
   { module: 'reasoning-provider-registry', source: 'libs/core/reasoning-provider-registry.ts' },
 ];
+
+export function readModuleInvariantTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 export function checkModuleInvariants(): { registeredInvariants: number } {
   const entries = listModuleInvariants();
   const missing: string[] = [];
@@ -18,7 +27,7 @@ export function checkModuleInvariants(): { registeredInvariants: number } {
   for (const target of required) {
     const owned = entries.filter((entry) => entry.module === target.module);
     if (owned.length === 0) missing.push(target.module);
-    const source = readTextFile(pathResolver.rootResolve(target.source));
+    const source = readModuleInvariantTextFile(pathResolver.rootResolve(target.source));
     if (!source.includes('assertModuleInvariant')) sourceMissing.push(target.source);
     for (const entry of owned) {
       if (entry.enforcement === 'runtime' && !entry.check) {

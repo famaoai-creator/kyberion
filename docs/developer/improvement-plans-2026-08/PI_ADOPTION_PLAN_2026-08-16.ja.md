@@ -917,6 +917,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、knowledge scope boundaries checkerのworkspace source本文readを`readKnowledgeScopeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant scope／runtime writer判定へ到達させない回帰を追加した。関連 **2 files／6 tests passed**、対象ESLint、Prettier、checker direct実行（OK）、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、max file lines checkerのsource本文readを`readMaxFileLinesTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをline count判定へ到達させない回帰を追加した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミット`voice-actuator/src/index.ts`の1500行超過を表示したため、例外・分割は変更せず継続課題とした。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、module boundaries checkerのmodule source本文readを`readModuleBoundaryTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをimport graph／cycle判定へ到達させない回帰を追加した。関連 **2 files／4 passed, 1 existing ratchet failure**、対象ESLint、Prettier、`git diff --check`で確認した。既存の未コミット変更によりcycles `0→1`、runtime cycles `2→3`となったため、baseline・ユーザー変更は変更せず継続課題とした。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、module invariants checkerのrequired module source本文readを`readModuleInvariantTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをassertModuleInvariant判定へ到達させない回帰を追加した。関連 **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行（6 registered invariants OK）、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 
