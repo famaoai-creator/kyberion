@@ -1,7 +1,7 @@
 import { loadDocumentationSourceMapAtPath } from '@agent/core/documentation-source-map';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const DOCUMENTATION_SOURCE_MAP = 'docs/documentation-source-map.json';
@@ -164,8 +164,15 @@ export function validateDocumentationSourceMap(
   return failures;
 }
 
+export function readDocumentationSourceMapTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function read(relativePath: string): string {
-  return readTextFile(pathResolver.rootResolve(relativePath));
+  return readDocumentationSourceMapTextFile(pathResolver.rootResolve(relativePath));
 }
 
 export function checkDocumentationSourceMap(): string[] {
