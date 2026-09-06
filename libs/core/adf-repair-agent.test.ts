@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { validateAndRepairAdf } from './adf-repair-agent.js';
+import { assertRegularAdfResource, validateAndRepairAdf } from './adf-repair-agent.js';
 import { runBackgroundReviewFork } from './background-review-runner.js';
 import {
   registerReasoningBackend,
@@ -146,6 +146,18 @@ describe('validateAndRepairAdf', () => {
     await expect(validateAndRepairAdf(filePath, 'capability-input')).rejects.toThrow(
       '[ADF_REPAIR] repair target must be a regular file'
     );
+  });
+
+  it('rejects a schema resource replaced with a directory', () => {
+    const schemaPath = fixturePath('directory-schema.json');
+    safeMkdir(schemaPath, { recursive: true });
+    try {
+      expect(() => assertRegularAdfResource(schemaPath)).toThrow(
+        '[ADF_REPAIR] schema resource must be a regular file'
+      );
+    } finally {
+      safeRmSync(schemaPath, { recursive: true, force: true });
+    }
   });
 
   it('routes work-item ADF repair through the coordinated native path', async () => {

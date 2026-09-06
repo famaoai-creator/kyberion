@@ -23009,3 +23009,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-orchestration-journal.ts`、journal test、PI-03
 - **変更**: mission orchestration の provisioned artifact read／write-after-read verification を共通 `assertRegularArtifactPath` 境界へ接続し、directory replacement を JSON／text verificationへ到達させないようにした。既存の hash-bound receipt、schema validation、replay semantics は維持した。
 - **検証**: mission-orchestration-journal **2 files／14 tests passed**、Prettier、`git diff --check`。needs-review の個別確認と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1635
+
+- **対象**: `libs/core/adf-repair-agent.ts`、adf-repair-agent test、PI-03
+- **変更**: ADF repair の pipeline schema read 前へ `assertRegularAdfResource` 境界を追加し、directory replacement を repair prompt の schema readへ到達させないようにした。既存の ADF target guard、trust gate、schema fallback semantics は維持した。
+- **検証**: adf-repair-agent **2 files／19 tests passed**、Prettier、`git diff --check`。needs-review の個別確認と provider 実機受入を継続する。
