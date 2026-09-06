@@ -23783,3 +23783,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Chronos Mirror trace-feed の operation-time resource boundary、SX-04／SX-09／PI-03
 - **変更**: trace directoryの列挙時だけでなく、JSONLを読む直前にも repository path・存在・regular-file を再確認するようにした。列挙後のdirectory置換を空のfeedとしてfail-closedにし、既存のsymlink除外、malformed行skip、tenant／tier projectionは維持した。
 - **検証**: trace-feed **1 file／13 tests passed**、resource-loader inventory **1 file／12 tests passed・needs-review 0**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1764
+
+- **対象**: `create_actuator` の生成テンプレート、SX-06／SX-10
+- **変更**: 新規actuator scaffoldの direct-entry 判定を `import.meta.main` から共有 `isDirectEntry` へ統一した。source／compiled `.js` の両方を判定する既存契約と、actuator CLIのエラー境界・生成内容は維持し、テンプレート契約テストで再導入を拒否する。
+- **検証**: create-actuator **1 file／4 tests passed**、対象ESLint、Prettier、`git diff --check`。

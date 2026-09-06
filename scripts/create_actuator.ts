@@ -127,6 +127,7 @@ function buildPackage(description: string, name: string, fullName: string): stri
 function buildIndexTs(fullName: string, _pascalName: string, _name: string): string {
   return `import { defineActuator } from '@agent/core/actuator-sdk';
 import { logger } from '@agent/core/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { nowIso } from '@agent/core/foundation';
 import {
   currentProcessArgv,
@@ -183,7 +184,9 @@ export async function main(): Promise<void> {
   await runActuatorCli({ args: currentProcessArgv(), name: '${fullName}', actuator });
 }
 
-if (import.meta.main) void runActuatorCliEntryPoint(main, '${fullName}');
+if (isDirectEntry(import.meta.url, 'libs/actuators/${fullName}/src/index.ts')) {
+  void runActuatorCliEntryPoint(main, '${fullName}');
+}
 `;
 }
 

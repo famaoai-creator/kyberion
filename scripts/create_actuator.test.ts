@@ -41,6 +41,11 @@ describe('create_actuator', () => {
     expect(indexSource).toContain('defineActuator');
     expect(indexSource).toContain('runActuatorCli');
     expect(indexSource).toContain('runActuatorCliEntryPoint');
+    expect(indexSource).toContain("import { isDirectEntry } from '@agent/core/direct-entry';");
+    expect(indexSource).toContain(
+      "isDirectEntry(import.meta.url, 'libs/actuators/sample-feature-actuator/src/index.ts')"
+    );
+    expect(indexSource).not.toContain('import.meta.main');
     expect(indexSource).not.toContain('main().catch');
     expect(indexSource).not.toContain('process.exitCode');
     expect(indexSource).toContain('export const actuator');
