@@ -23861,3 +23861,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: worker state journal の replay JSONL loader、SX-03／SX-11／PI-03
 - **変更**: operation-timeのregular-file確認後に行うworker journalの行分割・safe JSON parse・schema validation・version migrationを foundation `readJsonLines`へ統一した。malformed／torn／forward record skip、sequence projection、restore semantics、journal resource boundaryは維持した。
 - **検証**: worker-state-journal **1 file／21 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1777
+
+- **対象**: stimuli journal の recent-load JSONL reader、SX-03／SX-09／SX-11
+- **変更**: regular-file境界を通過した stimuli journalの手書き本文分割・parse・normalizeを foundation `readJsonLines`へ統一した。5MB上限、malformed行skip、TTL filtering、tail limit、rotation、raw line helperの契約は維持した。
+- **検証**: stimuli journal／TTL **2 files／16 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
