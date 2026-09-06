@@ -91,8 +91,6 @@
     "doctor": "node dist/scripts/run_doctor.js",
     "office": "node --import ./scripts/ts-loader.mjs scripts/virtual_office.ts",
     "tui": "node --import ./scripts/ts-loader.mjs scripts/tui.ts",
-    "tui:once": "pnpm tui --once",
-    "tui:dev": "pnpm tui --dev",
     "deps:check": "node dist/scripts/dependency_resolver.js",
     "service:preflight": "node dist/scripts/service_preflight.js",
     "kyberion": "node dist/scripts/kyberion.js",

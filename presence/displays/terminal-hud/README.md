@@ -6,8 +6,8 @@ Kyberion のフルスクリーン対話型 TUI（Ink / React）。起動直後�
 
 ```bash
 pnpm tui        # 本番 (dist から / 要 pnpm build)
-pnpm tui:once   # 非対話スナップショット (CI / non-TTY)
-pnpm tui:dev    # ソース実行 (@agent/core の dist は事前ビルドが必要)
+pnpm tui --once # 非対話スナップショット (CI / non-TTY)。--panel <id> で単一パネル
+pnpm tui --dev  # ソース実行 (@agent/core の dist は事前ビルドが必要)
 ```
 
 `pnpm tui` は実 TTY では対話画面を起動し、CI・パイプ・IDE のタスク実行など TTY がない場合は自動的に snapshot を表示して正常終了します。raw mode が使えない環境でも起動エラーにはなりません。
