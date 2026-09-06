@@ -23063,3 +23063,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `package.json`、`scripts/reasoning_auth_check.ts`、entrypoint test、PI-11
 - **変更**: 既存のcredential shape／provider probe実装を重複させず、利用者向けのcanonical `pnpm auth check` を `reasoning_auth_check.ts` へ接続した。`--backend`、`--json`、`--probe`、`--quiet` は既存のshared harness経路を維持する。
 - **検証**: entrypoint **1 file／2 tests passed**、stub実行、Prettier、`git diff --check`、隔離環境root typecheck **exit 0**。通常auth checkは資格情報を出力せず、実provider検証は明示的な`--probe`経路に限定する。
+
+## 2026-09-06 再レビュー実装 1644
+
+- **対象**: `.npmrc`、`scripts/check_pinned_deps.ts`／test、PI-12
+- **変更**: package managerのユーザー設定に依存していたminimum release ageをrepo固有`.npmrc`へ固定し、`minimum-release-age=1440`（24時間）とstrict modeをpinned-deps checkerで必須化した。既存のinstall-script allowlist／lockfile gateとsource archive CI接続は変更していない。
+- **検証**: pinned-deps **1 file／2 tests passed**、`check:pinned-deps`、install-script allowlist **11 packages OK**、lockfile gate、pnpm project configの実値、Prettier、`git diff --check`。

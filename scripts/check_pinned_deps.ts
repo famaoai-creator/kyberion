@@ -4,6 +4,8 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 
+const MINIMUM_RELEASE_AGE_MINUTES = 1_440;
+
 type PackageManifest = {
   packageManager?: string;
   overrides?: Record<string, string>;
@@ -35,6 +37,23 @@ export function checkPinnedDependencies(): string[] {
     }
   } catch {
     findings.push('pnpm-lock.yaml is required');
+  }
+
+  try {
+    const npmrc = readTextFile(pathResolver.rootResolve('.npmrc'));
+    const releaseAge = npmrc.match(/^\s*minimum-release-age\s*=\s*(\d+)\s*$/mu);
+    if (!releaseAge) {
+      findings.push('.npmrc must set minimum-release-age');
+    } else if (Number(releaseAge[1]) < MINIMUM_RELEASE_AGE_MINUTES) {
+      findings.push(
+        `.npmrc minimum-release-age must be at least ${MINIMUM_RELEASE_AGE_MINUTES} minutes`
+      );
+    }
+    if (!/^\s*minimum-release-age-strict\s*=\s*true\s*$/imu.test(npmrc)) {
+      findings.push('.npmrc must set minimum-release-age-strict=true');
+    }
+  } catch {
+    findings.push('.npmrc is required for the dependency release-age policy');
   }
 
   return findings;
