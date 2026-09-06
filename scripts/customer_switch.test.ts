@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   pathResolver: {
     rootDir: vi.fn(() => '/tmp/kyberion'),
     shared: vi.fn((p = '') => `/tmp/kyberion/active/shared/${String(p).replace(/^\/+/, '')}`),
+    knowledge: vi.fn((p = '') => `/tmp/kyberion/knowledge/${String(p).replace(/^\/+/, '')}`),
   },
   safeExistsSync: vi.fn(),
   safeLstat: vi.fn(),

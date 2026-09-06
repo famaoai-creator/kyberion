@@ -118,7 +118,7 @@ export function composeCollaborationTree(
 - 配線: `keymap.ts`(`PANELS` に `agents`、`PANEL_LABEL_KEYS`、`GLOBAL_HELP` の `1-8`→`1-9`)、`app.tsx`、`snapshot.ts`(`SNAPSHOT_LOADERS`)、`user-facing-vocabulary.json`(`tui_tab_agents`、列・待ち理由・section 見出しを en/ja/qps-ploc)→ `pnpm generate:vocabulary-types`。
 - cockpit(`store/operator-home.ts`)の先頭に `stats.agents_waiting` / `humans_waited_on` の 1 行を追加。
 - テスト: `view-models.test.ts`(純関数)、`snapshot.test.ts`(8→9)、`keymap.test.ts`(digit/cycle)。
-- `README.md` のパネル表を 9 行に更新し、`pnpm tui:once` / `tui:dev` の記述を実在する `pnpm tui --once` / `pnpm tui --dev` に直す(script 追加は SX-05 の package scripts ラチェット 120 に当たるため行わない)。
+- `README.md` のパネル表を 9 行に更新し、`tui:once` / `tui:dev`(存在しない package script)という記述を実在する `pnpm tui --once` / `pnpm tui --dev` に直す(script 追加は SX-05 の package scripts ラチェット 120 に当たるため行わない)。
 
 受入: `pnpm tui --once --panel agents` が木を出す。`pnpm test -- --suite tui` green。
 
@@ -142,7 +142,7 @@ export function composeCollaborationTree(
 | 0    | AC-01         | sonnet     | `libs/core/agent-dispatch.ts`, `agent-dispatch.test.ts`                                                                                                            | `vitest libs/core/agent-dispatch*`                                      |
 | 0    | AC-02 + AC-03 | sonnet     | `libs/core/agent-collaboration-events.ts`, `agent-collaboration-projection.ts`, `event-vocabulary.ts`, それぞれの test                                             | `vitest libs/core/agent-collaboration* event-vocabulary*`               |
 | 1    | AC-04         | opus       | `libs/core/agent-collaboration-tree.ts` + test, `index-part-09.ts`, `libs/core/package.json`                                                                       | `tests/core-runtime-import-contract.test.ts`, `check_module_boundaries` |
-| 2    | AC-05         | sonnet     | `presence/displays/terminal-hud/**`, `user-facing-vocabulary.json`(`tui` domain のみ), `vocabulary-keys.generated.ts`(生成), (root `package.json` は触らない)      | `pnpm test -- --suite tui`, `check:vocabulary-types`                    |
+| 2    | AC-05         | sonnet     | `presence/displays/terminal-hud/**`, `user-facing-vocabulary.json`(`tui` domain のみ), `vocabulary-keys.generated.ts`(生成), (root `package.json` は触らない)      | `pnpm test -- --suite tui`, `pnpm check -- --only vocabulary-types`     |
 | 2    | AC-06         | sonnet     | `presence/displays/chronos-mirror-v2/src/app/api/collaboration/**`, `components/AgentCollaborationBoard.tsx`, `user-facing-vocabulary.json`(`chronos` domain のみ) | `tests/chronos-ux-vocabulary-contract.test.ts`                          |
 | 3    | AC-07         | haiku      | docs / knowledge                                                                                                                                                   | `check_improvement_plan_metadata`, link checker                         |
 
@@ -150,7 +150,7 @@ Wave ごとに orchestrator(Fable)が diff をレビューし、typecheck + 該�
 
 ## 4. 検証
 
-- `pnpm typecheck`、`pnpm test -- --suite core`(該当ファイル)、`--suite tui`、`tests/core-runtime-import-contract.test.ts`、`tests/package-boundary-contract.test.ts`、`scripts/check_module_boundaries.ts`、`pnpm check:vocabulary-types`。
+- `pnpm typecheck`、`pnpm test -- --suite core`(該当ファイル)、`--suite tui`、`tests/core-runtime-import-contract.test.ts`、`tests/package-boundary-contract.test.ts`、`scripts/check_module_boundaries.ts`、`pnpm check -- --only vocabulary-types`。
 - 実物確認: 本ミッションで subagent を dispatch した後に `pnpm tui --once --panel agents` を実行し、`MSN-AGENT-COLLAB-VIEW-20260906` の木に子エージェントと `elapsed` が出ることを evidence に残す。
 
 ## 5. スコープ外(別起票)
