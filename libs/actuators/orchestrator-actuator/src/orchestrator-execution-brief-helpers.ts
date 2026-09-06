@@ -4,6 +4,7 @@ import {
   defineCatalog,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
+  readJson,
 } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
@@ -553,10 +554,7 @@ export function renderPipelineBundleJob(
     };
   }
   const raw = parseSafeJsonObjectValue(
-    parseSafeJsonInput(
-      String(safeReadFile(templateFullPath, { encoding: 'utf8' }) || ''),
-      `pipeline template ${job.template_path}`
-    ),
+    readJson(templateFullPath),
     `pipeline template ${job.template_path}`
   );
   const renderedPipeline = applyPathOverrides(raw, job.parameter_overrides || {}, variables);

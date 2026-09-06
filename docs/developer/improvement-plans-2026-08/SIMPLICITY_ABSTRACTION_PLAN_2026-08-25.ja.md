@@ -23609,3 +23609,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: media actuator の standalone JSON loader、SX-03／SX-04
 - **変更**: media catalog loader の standalone JSON 読み込みを foundation `readJson` へ統一した。symlink／regular-file boundary、recursive discovery、confidential theme pack／design catalog の後段 validation は維持し、dynamic merge 経路は変更していない。
 - **検証**: media catalog loaders **1 file／7 tests passed**、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
+
+## 2026-09-06 再レビュー実装 1735
+
+- **対象**: orchestrator execution brief の pipeline template loader、SX-03／SX-04
+- **変更**: pipeline bundle template の regular JSON 読み込みを foundation `readJson` へ統一した。repository／regular-file boundary、template object validation、parameter override／rendering、request archetype catalog は維持した。README／command output の text／response parser は変更していない。
+- **検証**: orchestrator execution brief boundary／bundle rendering **2 files／10 tests passed**、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
