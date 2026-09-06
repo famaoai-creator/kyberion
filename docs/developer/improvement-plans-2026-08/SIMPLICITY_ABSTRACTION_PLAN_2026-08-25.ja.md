@@ -23633,3 +23633,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: code actuator の governed global skill index loader、SX-03／SX-04
 - **変更**: `discover_skills` の global skill index 読み込みを foundation `readJson` へ統一した。repository path／existence boundary、entry projection、invalid input の fallback は維持し、resource-boundary contract と test double を canonical reader に合わせた。code の JSON transform／command response parser は変更していない。
 - **検証**: code catalog boundary／discover skills **2 files／2 tests passed**、対象 ESLint、Prettier、`git diff --check`。code actuator 全体 suite の既存 manifest mock 不在は別途継続確認対象である。
+
+## 2026-09-06 再レビュー実装 1739
+
+- **対象**: `check_script_integrity` の structured command validation、SX-07
+- **変更**: pipeline／environment manifest の `{ command: "pnpm", args: [...] }` 形式について、`run <script>` を package script registry と照合する検査を追加した。これまで文字列 command のみを検査していたため見逃していた削除済み package alias の再発を、structured probe／ADF command でも検出する。通常の非 pnpm command と任意 args は対象外にした。
+- **検証**: checker **1 file／9 tests passed**、canonical `pnpm run check -- --scope pr --only script-integrity` passed、対象 ESLint、Prettier、`git diff --check`。
