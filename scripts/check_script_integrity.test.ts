@@ -11,6 +11,7 @@ import {
   checkScriptIntegrity,
   findDirectScriptGuardViolations,
   findScriptHarnessViolations,
+  readScriptIntegrityTextFile,
 } from './check_script_integrity.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('check-script-integrity');
@@ -42,6 +43,12 @@ describe('check_script_integrity', () => {
 
     expect(source).toContain("readTextFile } from '@agent/core/foundation'");
     expect(source).not.toContain('safeReadFile(');
+  });
+
+  it('rejects a directory replacement before integrity text scanning', () => {
+    expect(() => readScriptIntegrityTextFile(pathResolver.rootDir(), 'fixture')).toThrow(
+      'fixture must be a regular file'
+    );
   });
 
   it('requires compiled direct-script guards alongside TypeScript guards', () => {

@@ -23147,3 +23147,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_first_win_smoke.ts`、`scripts/check_first_win_smoke.test.ts`、PI-03
 - **変更**: first-win smoke checkerのcanonical document／required-token本文readを`readFirstWinTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfirst-win受入判定へ到達させないようにした。ADF validationとweekly dry-run semanticsは維持した。
 - **検証**: first-win smoke **2 files／7 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1658
+
+- **対象**: `scripts/check_script_integrity.ts`、`scripts/check_script_integrity.test.ts`、PI-03
+- **変更**: script integrity checkerのproduction source／package script／repository docs／pipeline documentation本文readを`readScriptIntegrityTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをharness・path・pnpm script整合判定へ到達させないようにした。既存のintegrity semanticsは維持した。
+- **検証**: script integrity **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。

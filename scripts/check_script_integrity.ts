@@ -2,12 +2,19 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { readTextFile } from '@agent/core/foundation';
-import { safeExistsSync, safeStat } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeStat } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile, readSafeJsonValueFile } from './lib/json-input.js';
 
 const ROOT = pathResolver.rootDir();
+
+export function readScriptIntegrityTextFile(filePath: string, label = filePath): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 export interface ScriptIntegrityOptions {
   packageJsonPath?: string;
@@ -271,7 +278,7 @@ function checkProductionScriptBoundaries(): string[] {
     ) {
       continue;
     }
-    const source = readTextFile(file);
+    const source = readScriptIntegrityTextFile(file, relative);
     if (argvPattern.test(source)) {
       violations.push(
         `${relative}: direct ${processArgvLabel} access; use the script harness boundary`
@@ -304,7 +311,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
       ...findScriptHarnessViolations(packageJson.scripts || {}, (repoRelativePath) => {
         const sourcePath = pathResolver.rootResolve(repoRelativePath);
         if (!safeExistsSync(sourcePath)) return undefined;
-        return readTextFile(sourcePath);
+        return readScriptIntegrityTextFile(sourcePath, repoRelativePath);
       })
     );
   }
@@ -345,7 +352,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
       )
         continue;
       validatePackageScriptReferences(
-        readTextFile(file),
+        readScriptIntegrityTextFile(file, toRepoRelative(file)),
         toRepoRelative(file),
         packageScripts,
         violations
@@ -356,7 +363,7 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
   if (scanRepositoryDocs) {
     for (const file of listPipelineDocumentationFiles()) {
       validatePackageScriptReferences(
-        readTextFile(file),
+        readScriptIntegrityTextFile(file, toRepoRelative(file)),
         toRepoRelative(file),
         packageScripts,
         violations
