@@ -4,6 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   checkLockfileCommitGate,
   isLockfileChangePermitted,
+  readRegularTextFile,
 } from './check_lockfile_commit_gate.js';
 
 describe('lockfile commit gate', () => {
@@ -22,6 +23,12 @@ describe('lockfile commit gate', () => {
     const result = checkLockfileCommitGate();
     expect(result.changedFiles).not.toContain('pnpm-lock.yaml');
     expect(result.permitted).toBe(true);
+  });
+
+  it('rejects a directory replacement before foundation text reading', () => {
+    expect(() => readRegularTextFile(pathResolver.rootDir(), 'fixture')).toThrow(
+      'fixture must be a regular file'
+    );
   });
 
   it.each([
