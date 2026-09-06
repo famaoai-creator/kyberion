@@ -18,7 +18,7 @@ import { validateTraceReplay } from '@agent/core/trace-schema';
 import type { IntentContractMemoryEntry } from '@agent/core/intent-contract-learning';
 import { loadMissionOrchestrationJournal } from '@agent/core/mission-orchestration-journal';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isRecord, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
+import { isRecord, readJsonLines } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
 
@@ -187,19 +187,10 @@ function normalizeTraceRecord(value: unknown): TraceRecord | null {
 function readJsonlRecords<T>(filePath: string, normalize: (value: unknown) => T | null): T[] {
   const safeFile = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   if (!safeExistsSync(safeFile) || !safeLstat(safeFile).isFile()) return [];
-  const raw = readTextFile(safeFile);
-  return raw
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .flatMap((line) => {
-      try {
-        const record = normalize(parseSafeJsonInput(line, 'intent trace entry'));
-        return record ? [record] : [];
-      } catch {
-        return [];
-      }
-    });
+  return readJsonLines<unknown>(safeFile, { onMalformed: 'skip' }).flatMap((value) => {
+    const record = normalize(value);
+    return record ? [record] : [];
+  });
 }
 
 function walkTraceSpans(

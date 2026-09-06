@@ -173,7 +173,9 @@ describe('intent trace entrypoint', () => {
 
     expect(source).toContain('runIntentTrace = defineScript');
     expect(source).toContain('print(formatTraceReport(');
-    expect(source).toContain("readTextFile } from '@agent/core/foundation'");
+    expect(source).toContain("isRecord, readJsonLines } from '@agent/core/foundation'");
+    expect(source).toContain("readJsonLines<unknown>(safeFile, { onMalformed: 'skip' })");
+    expect(source).not.toContain('readTextFile(safeFile');
     expect(source).not.toContain('safeReadFile(safeFile');
     expect(source).not.toContain('console.log(');
   });
