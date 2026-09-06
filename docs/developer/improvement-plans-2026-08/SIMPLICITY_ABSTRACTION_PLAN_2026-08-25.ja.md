@@ -23423,3 +23423,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/intent_smoke.ts`、`scripts/intent_smoke.test.ts`、PI-03
 - **変更**: intent smokeのsummary本文readを`readIntentSmokeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをsmoke report outputへ到達させないようにした。既存のintent execution、governed output path、failure aggregation semanticsは維持した。
 - **検証**: intent smoke **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1704
+
+- **対象**: `scripts/license_audit.ts`、`scripts/license_audit.entrypoint.test.ts`、PI-03
+- **変更**: license auditのlicense file本文readを`readLicenseAuditTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをlicense classification判定へ到達させないようにした。既存のpackage manifest、SPDX classification、restrictive-license report semanticsは維持した。
+- **検証**: license audit **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
