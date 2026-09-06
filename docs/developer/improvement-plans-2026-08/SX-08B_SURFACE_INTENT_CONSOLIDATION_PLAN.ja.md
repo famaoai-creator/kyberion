@@ -1923,3 +1923,9 @@ voice-hub の直接 fallback 応答（エラー、挨拶、能力案内、質問
 Computer Surface の Express A2UI dispatch が受け取った `req.body` を共有 `parseSafeJsonObjectValue` でメッセージ単位に正規化してから tenant scope 走査と A2UI validation へ渡すようにした。単体／配列メッセージ、認可順序、既存の400／403 semanticsは維持し、dangerous JSON key は状態反映前に拒否する回帰を追加した。
 
 検証: Computer Surface **3 files／18 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 251
+
+Presence Studio の Express `/a2ui/dispatch` に残っていた `req.body` の直接利用を、Computer Surface と同じ共有 `parseSafeJsonObjectValue` 境界へ揃えた。A2UIの単体／配列形式、アクセス制御、既存のaudit／400 semanticsは維持し、危険なJSON keyを状態反映前に拒否する経路を共通化した。
+
+検証: Presence Studio **3 files／9 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。

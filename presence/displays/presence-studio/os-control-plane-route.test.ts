@@ -78,4 +78,15 @@ describe('Presence Studio OS control-plane route contract', () => {
 
     expect(source).not.toContain("operator_handle: 'presence-studio-user'");
   });
+
+  it('validates A2UI messages through the shared safe JSON boundary', () => {
+    const source = readRepoFile('presence/displays/presence-studio/server.ts');
+    const routeStart = source.indexOf("presenceStudioData.app.post('/a2ui/dispatch'");
+    const routeEnd = source.indexOf("presenceStudioData.app.post('/api/voice/stimuli'", routeStart);
+    const route = source.slice(routeStart, routeEnd);
+
+    expect(source).toContain('import { appendJsonLine, nowIso, parseSafeJsonObjectValue }');
+    expect(route).toContain('parseSafeJsonObjectValue(message, `A2UI message[${index}]`)');
+    expect(route).toContain('presenceStudioData.presenceStudioWireError(error, 400)');
+  });
 });

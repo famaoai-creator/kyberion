@@ -1,4 +1,4 @@
-import { appendJsonLine, nowIso } from '@agent/core/foundation';
+import { appendJsonLine, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import {
@@ -789,7 +789,22 @@ presenceStudioData.app.get('/api/stream', (req, res) => {
 
 presenceStudioData.app.post('/a2ui/dispatch', (req, res) => {
   const body = req.body;
-  const messages = Array.isArray(body) ? body : [body];
+  let messages: Array<Record<string, unknown>>;
+  try {
+    const entries = Array.isArray(body) ? body : [body];
+    messages = entries.map((message, index) =>
+      parseSafeJsonObjectValue(message, `A2UI message[${index}]`)
+    );
+  } catch (error) {
+    logger.warn(
+      presenceStudioData.presenceStudioAuditLine(req, 'a2ui/dispatch.reject', {
+        messages: Array.isArray(body) ? body.length : 1,
+        status: 400,
+        error: presenceStudioData.safeErrorMessage(error),
+      })
+    );
+    return res.status(400).json(presenceStudioData.presenceStudioWireError(error, 400));
+  }
   logger.info(
     presenceStudioData.presenceStudioAuditLine(req, 'a2ui/dispatch.accept', {
       messages: messages.length,
