@@ -23975,3 +23975,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Chronos intelligence observations の JSONL projection、SX-03／SX-09
 - **変更**: orchestration event／control action／owner summary の4つの手書き行分割・JSON parseを、regular-file boundary確認後の foundation `readJsonLines`へ統一した。malformed／primitive／array rowのskip、symlink拒否、event projection／lifecycle dedupe／sort・limit semanticsは維持し、browser sessionの単一JSON読込はJSONL readerの責務外として変更していない。
 - **検証**: intelligence observations **3 files／7 tests passed**、対象ESLint、Prettier、foundation adoption、`git diff --check`。全体typecheckは既存のPresence Studio boundary testの型エラー1件のみで停止した。
+
+## 2026-09-06 再レビュー実装 1796
+
+- **対象**: Chronos A2A handoff message feed の JSONL reader、SX-03／SX-09
+- **変更**: orchestration event logの手書き本文分割・JSON parseを foundation `readJsonLines`へ統一した。regular-file／symlink boundary、malformed／primitive／array行のskip、A2A event filtering、bounded ring bufferによる最新順・上限 semanticsは維持した。
+- **検証**: agent message feed resource boundary **2 tests passed**、対象ESLint、Prettier、foundation adoption、`git diff --check`。
