@@ -13,6 +13,7 @@ import {
   readMissionDashboardState,
   readDashboardOperatorIdentity,
   readDashboardJsonValueIfExists,
+  readDashboardTextFile,
   readProviderCapabilitySnapshot,
   readSurfaceDashboardState,
   safeListDir,
@@ -26,6 +27,12 @@ afterEach(() => {
 });
 
 describe('sovereign dashboard governance loaders', () => {
+  it('rejects a directory replacement before dashboard log parsing', () => {
+    expect(() => readDashboardTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('reuses governed readiness and trust loaders', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/sovereign_dashboard.ts'), {
