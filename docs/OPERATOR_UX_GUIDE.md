@@ -585,6 +585,28 @@ pnpm run kyberion -- search browser
 pnpm run kyberion -- info browser-actuator
 ```
 
+### Browser Playwright execution
+
+Record in the Chrome extension, approve the recording, then replay through Kyberion
+(not only discover the actuator):
+
+```bash
+pnpm kyberion browser run --procedure-id <id>
+pnpm kyberion browser run --recording active/shared/runtime/recordings/<id>.json
+pnpm kyberion procedure run <id>
+```
+
+Hand-authored examples skip the recording approval gate and call browser-actuator
+directly:
+
+```bash
+pnpm kyberion browser run --adf libs/actuators/browser-actuator/examples/explore-and-export.json
+```
+
+Requires Node `>=24` and `pnpm build` (or `pnpm build:actuators`). Standalone
+Chromium is the default; pass `--cdp-url` only to attach to a live Chrome.
+See `knowledge/product/architecture/browser-execution-substrate-howto.md`.
+
 ### Direct mission control
 
 ```bash

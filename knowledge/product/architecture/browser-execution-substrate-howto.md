@@ -6,6 +6,7 @@ authority: reference
 phase: [execution]
 tags: [browser, actuator, playwright, chrome-extension, execution_substrate, security]
 owner: ecosystem_architect
+last_updated: 2026-09-06
 ---
 
 # Browser Execution Substrate — How To
@@ -65,8 +66,8 @@ functions). It reuses `enforceBrowserExtensionApproval` and the origin-allowlist
 **verbatim** from the extension path, so governance parity holds across both substrates —
 same high-risk approval gate, same allowed-origins enforcement.
 
-**Important — not yet wired to a real call site.** `dispatchPlaywrightPipeline` requires an
-injected function on `DispatchInput`:
+`dispatchPlaywrightPipeline` still takes an injected function on `DispatchInput` (core must
+never statically import `libs/actuators/*`):
 
 ```ts
 executeBrowserPipeline?: (input: {
@@ -76,11 +77,16 @@ executeBrowserPipeline?: (input: {
 }) => Promise<{ status: 'succeeded' | 'failed'; results?: unknown[]; errors?: string[] }>;
 ```
 
-This is injected rather than statically imported because `libs/core` must never depend on
-`libs/actuators/*` (actuators depend on core, never the reverse). No existing `scripts/*.ts`
-entry point wires in the real `@agent/browser-actuator` `handleAction` yet — that's the next
-step for whoever needs this live (mirror how `scripts/browser_bridge_host.ts` wires the
-`extension_session` path, or `scripts/run_service_procedure.ts` for `service:preset`).
+The production host boundary that wires `@agent/browser-actuator` `handleAction` is
+`scripts/browser_playwright_executor.ts`. Operator entry points that inject it:
+
+- `pnpm kyberion browser run` → `scripts/run_browser_procedure.ts` (standalone Playwright;
+  optional `--cdp-url` / `--tab-id` to attach)
+- `pnpm kyberion procedure run <id>` → `scripts/kyberion_home.ts` (same helper; standalone
+  unless CDP flags are present)
+
+Both launch Chromium through browser-actuator. They do **not** require a live Chrome
+extension tab. Need Node `>=24` and a built `dist/` (`pnpm build` or `pnpm build:actuators`).
 
 ## Security model — read before enabling this for anything high-value
 
@@ -110,6 +116,39 @@ signal than exists today — `snapshot_hash` on a recorded action only hashes th
 interactive-element inventory (origin+path+title+every element's role/name), not one
 element's identity, so it can't be used as-is for this. Tracked as a follow-up.
 
+## Operator path — record → compile → run
+
+Two legal ways to execute browser work through Kyberion:
+
+1. **Governed recording / catalog procedure** (approval gate + origin allowlist)
+
+   ```text
+   Chrome extension records browser-recording.v1
+     → human review approves the recording
+     → promote / register a procedure (or keep the allowlisted recording)
+     → pnpm kyberion browser run --procedure-id <id>
+        or pnpm kyberion browser run --recording <allowlisted-recording.json>
+        or pnpm kyberion procedure run <id>
+   ```
+
+   High-risk ops still stop at `approval_required`. Origins the recording touches must
+   stay inside `procedure.target.origins`. Compiled recording drafts
+   (`_source.kind = browser-recording.v1`) cannot be passed to `--adf` — that would
+   skip the gate.
+
+2. **Hand-authored browser-actuator example** (actuator contract only)
+
+   ```text
+   pnpm kyberion browser run --adf libs/actuators/browser-actuator/examples/explore-and-export.json
+   ```
+
+   This is the same JSON shape as
+   `node dist/libs/actuators/browser-actuator/src/index.js --input …`. Use it for
+   examples and engineering repros, not for unreviewed recordings.
+
+Attach to an already-running Chrome only when you pass `--cdp-url` / `--cdp-port`
+(and optionally `--tab-id`). Otherwise Playwright launches its own Chromium.
+
 ## Testing this yourself
 
 - `libs/actuators/browser-actuator/src/recorded-ref-resolver.test.ts` — resolver unit tests,
@@ -120,7 +159,7 @@ substrate')`) — dispatcher routing, approval-gate parity, and blocked/executed
 - `libs/actuators/browser-actuator/src/index.test.ts` — end-to-end through the real
   actuator's `handleAction`, including the fallback-resolution and fail-closed cases.
 
-Run: `pnpm vitest run libs/actuators/browser-actuator libs/core/browser-extension-bridge.test.ts libs/core/procedure-dispatcher.test.ts`
+Run: `pnpm vitest run libs/actuators/browser-actuator libs/core/browser-extension-bridge.test.ts libs/core/procedure-dispatcher.test.ts scripts/browser_playwright_executor.test.ts scripts/run_browser_procedure.test.ts`
 
 ## Review process note
 
@@ -143,8 +182,6 @@ self-declared — before a review-kind task can complete. Use `review-task`, not
 
 ## Deliberately deferred (not built here)
 
-- A real call site wiring `executeBrowserPipeline` to `@agent/browser-actuator`'s
-  `handleAction` (see "not yet wired" above).
 - A `procedure:*` actuator op family to expose compile→dispatch as a proper ADF pipeline
   under `knowledge/product/pipeline-templates/` (blocked on: `pipelines/*.json` is scoped to
   Kyberion self-ops only, and wrapping a script in `system:exec` just to give it a pipeline
