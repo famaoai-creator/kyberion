@@ -30,6 +30,19 @@ const allowedManagedProcessConsumers = [
   'libs/core/mission-orchestration-events.test.ts',
   'libs/core/mission-orchestration-events.ts',
   'libs/core/mission-orchestration-worker.resume.test.ts',
+  // Mocks the managed-process owner (mission-orchestration-events.ts, already
+  // allowlisted) that recordTask/recovery scaffolding transitively spawns
+  // through, so the suite stays a hermetic test double rather than a real
+  // process boundary.
+  'libs/core/mission-maintenance.test.ts',
+  // PI-08: resumes a suspended pipeline after its exact approval is decided
+  // by launching the canonical dist/scripts/run_pipeline.js runner detached,
+  // the same governed re-entry pattern as the terminal-hud schedule launcher
+  // below, scoped to the approval-gate resume path.
+  'libs/core/pipeline-approval-resume.ts',
+  // Test of the owner above; mocks the managed-process module so approval
+  // resume logic is exercised without spawning a real process.
+  'libs/core/pipeline-approval-resume.test.ts',
   // Terminal HUD schedule actions launch detached pipelines through the
   // managed-process owner so the UI loop remains responsive and the child
   // process has an explicit surface owner.
