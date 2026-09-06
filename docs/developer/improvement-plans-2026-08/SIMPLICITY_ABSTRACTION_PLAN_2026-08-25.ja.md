@@ -23771,3 +23771,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: scripts 共通 `readSafeJson*File` helper、SX-03／SX-06／SX-07
 - **変更**: checker／migration／task scenario が共有する `scripts/lib/json-input.ts` の persisted JSON readを foundation `readJson`へ移行した。既存の regular-file／path boundary、label付き malformed／dangerous-key error、object shape validation、各 scriptの呼び出し契約は維持した。
 - **検証**: script JSON boundary **8 files／48 tests passed**、foundation adoption **1 file／7 tests passed**、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1762
+
+- **対象**: foundation JSON readerのサイズ／label options と source-analysis package manifest、SX-03
+- **変更**: foundation `readJson`／`loadJsonIfPresent` が既存 `FoundationReadOptions`（`maxSizeMB`／`label`）をsecure-io bridgeへ伝播できるようにし、4MB上限付きの source-analysis package manifestを旧 `readTextFile` + `parseSafeJsonInput` から移行した。サイズ制限、label付きparse error、dangerous-key拒否、malformed metadataのfail-soft、source analysis IR semanticsは維持した。
+- **検証**: foundation JSON／secure-io／source-analysis **4 files／62 tests passed**、foundation adoption **1 file／7 tests passed**、`git diff --check`。

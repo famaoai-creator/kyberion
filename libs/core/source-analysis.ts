@@ -10,7 +10,7 @@ import {
 } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { isRecord } from './foundation/primitives.js';
 import { clamp, readTextFile } from './foundation/text.js';
 import { parseTestInventory } from './software-quality.js';
@@ -476,10 +476,10 @@ export function analyzeSourceTree(options: AnalyzeSourceTreeOptions = {}): Sourc
   if (safeExistsSync(packagePath)) {
     try {
       const packageJson = parseSafeJsonObjectValue(
-        parseSafeJsonInput(
-          String(readTextFile(assertSafeRepositoryPath(packagePath), { maxSizeMB: 4 })),
-          'source package manifest'
-        ),
+        readJson<unknown>(assertSafeRepositoryPath(packagePath), {
+          maxSizeMB: 4,
+          label: 'source package manifest',
+        }),
         'source package manifest'
       );
       for (const group of ['dependencies', 'devDependencies', 'peerDependencies']) {

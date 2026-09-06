@@ -2,7 +2,7 @@
 // the first catalog read. secure-io no longer imports this module, so this
 // bootstrap is intentionally one-way and does not create an import cycle.
 import '../secure-io.js';
-import { getFoundationIo } from './io.js';
+import { getFoundationIo, type FoundationReadOptions } from './io.js';
 import { readTextFile } from './text.js';
 export {
   parseSafeJsonInput,
@@ -18,20 +18,20 @@ export {
 } from './safe-json.js';
 import { parseSafeJsonInput } from './safe-json.js';
 
-export function loadJson<T>(filePath: string): T {
-  return getFoundationIo().loadJson<T>(filePath);
+export function loadJson<T>(filePath: string, options?: FoundationReadOptions): T {
+  return getFoundationIo().loadJson<T>(filePath, options);
 }
 
-export function loadJsonIfPresent<T>(filePath: string): T | null {
-  return getFoundationIo().loadJsonIfPresent<T>(filePath);
+export function loadJsonIfPresent<T>(filePath: string, options?: FoundationReadOptions): T | null {
+  return getFoundationIo().loadJsonIfPresent<T>(filePath, options);
 }
 
-export function readJson<T>(filePath: string): T {
-  return getFoundationIo().loadJson<T>(filePath);
+export function readJson<T>(filePath: string, options?: FoundationReadOptions): T {
+  return getFoundationIo().loadJson<T>(filePath, options);
 }
 
-export function readJsonIfPresent<T>(filePath: string): T | null {
-  return loadJsonIfPresent<T>(filePath);
+export function readJsonIfPresent<T>(filePath: string, options?: FoundationReadOptions): T | null {
+  return loadJsonIfPresent<T>(filePath, options);
 }
 
 export function writeJson<T>(filePath: string, value: T): void {
