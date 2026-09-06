@@ -1,5 +1,5 @@
-import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import { isRecord, readTextFile } from './foundation/text.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 /**
  * DA-05 Hybrid Sovereign Ledger — per-tenant information-asset ledger.
  *
@@ -307,26 +307,12 @@ export function readAssetLedger(
   const ledgerFile = assetLedgerPath(tenantSlug, options);
   if (!safeExistsSync(ledgerFile)) return [];
   ensureRegularAssetLedgerFile(ledgerFile);
-  const raw = readTextFile(ledgerFile);
-  const records: IngestAssetRecord[] = [];
   const catalog = ingestAssetCatalog(ledgerFile);
-  for (const [index, line] of raw.split('\n').entries()) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const record = normalizeIngestAssetRecord(
-        catalog.validate(
-          parseSafeJsonInput(trimmed, 'ingest asset ledger record'),
-          `${ledgerFile}:${index + 1}`
-        ),
-        options
-      );
-      if (record) records.push(record);
-    } catch {
-      /* skip corrupt line */
-    }
-  }
-  return records;
+  return readJsonLines<IngestAssetRecord | null>(ledgerFile, {
+    onMalformed: 'skip',
+    map: (value, lineNumber) =>
+      normalizeIngestAssetRecord(catalog.validate(value, `${ledgerFile}:${lineNumber}`), options),
+  }).filter((record): record is IngestAssetRecord => record !== null);
 }
 
 /**

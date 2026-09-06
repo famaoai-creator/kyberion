@@ -23915,3 +23915,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: orchestrator session の replay JSONL loader、SX-03／SX-09／SX-11
 - **変更**: regular-file確認済みのorchestrator session journalを foundation `readJsonLines`へ統一した。malformed／torn record skip、sequence projection、restart replay、release／ownership semanticsは維持し、byte-offset／rotationを必要とする`jsonl-tail`は別責務として対象外にした。
 - **検証**: orchestrator-session **1 file／26 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1786
+
+- **対象**: ingest asset ledger の tenant-scoped append-only JSONL reader、SX-03／SX-09／SX-11
+- **変更**: regular-file確認済みのasset ledger読込を foundation `readJsonLines`へ統一した。malformed／schema／tenant-path-invalid recordのskip、append order、latest-version／lineage semantics、tenant boundaryは維持した。
+- **検証**: ingest-asset-ledger **1 file／14 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
