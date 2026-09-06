@@ -22632,6 +22632,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: generic approval text と mission proposal confirmation にoptionalな `SupportedLocale` を追加し、Telegram／Discord／iMessage bridgeのoperator localeを渡すようにした。Slackで先行したlocale境界を3 bridgeのapproval／proposal fallbackにも揃え、省略時の既存日本語、approval state、proposal state、external delivery gateは維持した。
 - **検証**: generic approval／proposal／3 bridge **5 test files／46 tests passed**、root typecheck、Prettier、`git diff --check`。12 surfaceの全面contract描画、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1579
+
+- **対象**: `libs/core/surface-mission-proposals.ts`、mission proposal test、Telegram／Discord／iMessage bridge、SX-08b／SX-09b
+- **変更**: pending mission proposal の取消返信と発行結果にもoptional localeを接続し、3 bridgeがoperator localeを確認後のgeneric proposal replyへ渡すようにした。proposal state、mission issuance、external delivery gate、既定の日本語表示は維持した。
+- **検証**: mission proposal／3 bridge **4 test files／35 tests passed**、root typecheck、Prettier、`git diff --check`。12 surfaceの全面contract描画、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`

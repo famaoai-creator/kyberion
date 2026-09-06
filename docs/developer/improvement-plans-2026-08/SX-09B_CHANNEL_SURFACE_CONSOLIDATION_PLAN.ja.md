@@ -387,3 +387,9 @@ shared surface conversation inputへ `SupportedLocale` を追加し、orchestrat
 generic approval／proposal builderにoptional localeを追加し、Telegram／Discord／iMessage bridgeがoperator localeを渡すようにした。Slackで先行したapproval／proposalのvocabulary境界を3 bridgeにも適用し、既定の日本語とprovider配送、approval／tenant scope semanticsは維持した。
 
 検証: generic approval／proposal／3 bridge **5 test files／46 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、日英のchannelリテラル全面移行は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 37
+
+`resolveMissionProposalReply` の取消／発行結果へoptional localeを伝播し、Telegram／Discord／iMessage bridgeの確認後replyもoperator localeで描画するようにした。既定の日本語、proposal state、mission issuance、provider配送、approval／tenant scope semanticsは維持した。
+
+検証: mission proposal／3 bridge **4 test files／35 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、日英のchannelリテラル全面移行は引き続き未完了である。

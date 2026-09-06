@@ -385,6 +385,7 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
       channel: msg.chatId,
       thread: msg.chatId,
       text: incomingText,
+      locale: resolveOperatorLocale(),
     });
   } catch (error) {
     releaseDedupKey();

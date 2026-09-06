@@ -300,6 +300,7 @@ export async function handleDiscordMessage(message: Message) {
     channel: message.channelId,
     thread: threadTs,
     text: message.content,
+    locale: resolveOperatorLocale(),
   });
   if (proposalReply.handled) {
     await replyDiscordText(message, proposalReply.reply);
