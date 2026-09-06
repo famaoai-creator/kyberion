@@ -105,6 +105,9 @@ export function removeMissionFromProjectLedger(projectPath: string, missionId: s
   const ledgerPath = resolveProjectLedgerPath(projectPath);
   const ledgerJsonPath = resolveProjectLedgerJsonPath(projectPath);
   if (safeExistsSync(ledgerPath)) {
+    if (!safeLstat(ledgerPath).isFile()) {
+      throw new Error(`[PROJECT_MISSION_LEDGER] ledger must be a regular file: ${ledgerPath}`);
+    }
     const current = readTextFile(ledgerPath);
     const updated = current
       .split('\n')

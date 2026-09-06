@@ -23015,3 +23015,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/adf-repair-agent.ts`、adf-repair-agent test、PI-03
 - **変更**: ADF repair の pipeline schema read 前へ `assertRegularAdfResource` 境界を追加し、directory replacement を repair prompt の schema readへ到達させないようにした。既存の ADF target guard、trust gate、schema fallback semantics は維持した。
 - **検証**: adf-repair-agent **2 files／19 tests passed**、Prettier、`git diff --check`。needs-review の個別確認と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1636
+
+- **対象**: `libs/core/mission-project-ledger.ts`、mission-project-reassignment test、PI-03
+- **変更**: project mission ledger の Markdown removal read 前へ regular-file 境界を追加し、directory replacement を ledger removal に到達させないようにした。既存の project scope、symlink rejection、JSON ledger loader semantics は維持した。
+- **検証**: mission-project-reassignment **2 files／7 tests passed**、Prettier、`git diff --check`。needs-review の個別確認と provider 実機受入を継続する。
