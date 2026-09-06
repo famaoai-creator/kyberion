@@ -2,9 +2,17 @@
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { LIFECYCLE_HOOK_EVENTS } from '@agent/core/lifecycle-hook-engine';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const extensionPointsPath = pathResolver.rootResolve('docs/developer/EXTENSION_POINTS.md');
+
+export function readExtensionOrderTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 const requiredRuntimeLabels = [
   'pre_tool_use',
   'post_tool_use',
@@ -24,7 +32,7 @@ const requiredRuntimeLabels = [
 ];
 
 export function checkExtensionOrder(): { runtimeEvents: number } {
-  const document = readTextFile(extensionPointsPath);
+  const document = readExtensionOrderTextFile(extensionPointsPath);
   const contractStart = document.indexOf('## 2.11 Lifecycle order');
   const contractEnd = document.indexOf('\n## 3. Semver Rules', contractStart);
   if (contractStart < 0 || contractEnd < 0) {
