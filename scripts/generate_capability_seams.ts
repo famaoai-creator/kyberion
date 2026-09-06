@@ -2,7 +2,7 @@
 import { loadCoreSeamBindings } from './bindings.js';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 interface SeamRoleEntry {
@@ -127,8 +127,15 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
 
 const OUTPUT_PATH = pathResolver.rootResolve('docs/developer/CAPABILITY_SEAMS.md');
 
+export function readCapabilitySeamsTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function source(relativePath: string): string {
-  return readTextFile(pathResolver.rootResolve(relativePath));
+  return readCapabilitySeamsTextFile(pathResolver.rootResolve(relativePath));
 }
 
 function validateRoles(bindings: ReturnType<typeof loadCoreSeamBindings>): string[] {

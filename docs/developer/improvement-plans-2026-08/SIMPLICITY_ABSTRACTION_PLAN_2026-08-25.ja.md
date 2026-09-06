@@ -23381,3 +23381,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/find_dead_code.ts`、`scripts/find_dead_code.entrypoint.test.ts`、PI-03
 - **変更**: dead code finderのsource／search本文readを`readDeadCodeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcandidate extraction／usage count判定へ到達させないようにした。既存のadvisory-only、portable report、manual verification semanticsは維持した。
 - **検証**: dead code finder **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1697
+
+- **対象**: `scripts/generate_capability_seams.ts`、`scripts/generate_capability_seams.entrypoint.test.ts`、PI-03
+- **変更**: capability seams generatorのdeclaration本文readを`readCapabilitySeamsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをseam role validationへ到達させないようにした。既存のruntime catalog、role completeness、generated document semanticsは維持した。
+- **検証**: capability seams generator **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
