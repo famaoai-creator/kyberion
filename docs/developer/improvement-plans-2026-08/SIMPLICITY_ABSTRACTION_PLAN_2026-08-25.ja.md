@@ -23051,3 +23051,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/inventory_resource_loaders.ts`、`scripts/inventory_resource_loaders.test.ts`、PI-03
 - **変更**: resource-loader inventory が同一ファイル内の regular-file helper 本体を解析し、`safeLstat/safeStat(...).isFile()` または regular-resource assertion を実装している helper の callsiteを evidence として扱えるようにした。generic function、class method、object-property arrow の宣言も収集対象へ拡張し、path-only helper は regular-file evidence として誤認しない回帰テストを追加した。
 - **検証**: 実 inventory **1,347 files／inline 6／nearby 178／needs-review 0**、inventory **1 file／7 tests passed**、root typecheck、Prettier、`git diff --check`。provider 実機受入と、外部 helper 間の semantic path flow は継続課題とする。
+
+## 2026-09-06 再レビュー実装 1642
+
+- **対象**: `scripts/inventory_resource_loaders.ts`、`scripts/inventory_resource_loaders.test.ts`、PI-03
+- **変更**: resource-loader inventory が相対 import 先の helper 実装まで追跡し、helper 本体に `safeStat/safeLstat(...).isFile()` または regular-resource assertion がある場合だけ `external-regular-file-helper` evidence として採用するようにした。package／barrel import は実装を同一 inventory 内で確認できないため未分類のまま扱い、path-only helper を安全証跡へ昇格しない回帰テストを追加した。
+- **検証**: inventory **1,347 files／184 callsites／inline 6／nearby 178／needs-review 0**、inventory **1 file／9 tests passed**、Prettier、`git diff --check`。package／barrelを跨ぐsemantic flow、provider 実機受入は継続課題とする。
