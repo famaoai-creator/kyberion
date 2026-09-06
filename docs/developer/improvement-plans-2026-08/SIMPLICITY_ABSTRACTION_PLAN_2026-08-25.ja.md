@@ -23675,3 +23675,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Android actuator の repository-bound `read_json`、SX-03
 - **変更**: Android pipeline の `read_json` operationに残っていた `safeReadFile` + `parseSafeJsonInput` を foundation `readJson`へ統一した。repository path／retry／mobile-app-profile validationは維持し、session handoff・ADB CLIの外部出力 parserは変更していない。test harnessにはfoundation readerとretry policyの明示mockを追加した。
 - **検証**: Android actuator **1 file／30 tests passed**、catalog resource boundary **1 test passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1746
+
+- **対象**: file actuator の `read_json` operation、SX-03
+- **変更**: repository pathへ解決済みの `read_json` operationに残っていた `safeReadFile` + `parseSafeJsonInput` を foundation `readJson`へ統一した。path safety、retry、parsed valueのcontext projectionは維持し、通常text read、JSONL、CLI input boundaryは変更していない。foundation reader利用を回帰テストで固定した。
+- **検証**: file actuator **1 file／28 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
