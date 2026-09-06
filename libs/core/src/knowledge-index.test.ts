@@ -176,6 +176,14 @@ describe('knowledge-index', () => {
 
       expect(index.hints.some((hint) => hint.source.includes('directory.md'))).toBe(false);
     });
+
+    it('skips a directory that only looks like a JSON hint file', async () => {
+      ensureDir(path.join(HINTS_DIR, 'directory.json'));
+
+      const index = await buildKnowledgeIndex(TEST_ROOT);
+
+      expect(index.hints.some((hint) => hint.source.includes('directory.json'))).toBe(false);
+    });
   });
 
   describe('queryKnowledge', () => {

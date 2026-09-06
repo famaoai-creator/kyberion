@@ -950,6 +950,11 @@ function _loadJsonHints(
     const filePath = path.join(dir, file);
     if (!isSafeScannerPath(knowledgeBase, filePath)) continue;
     try {
+      if (!safeLstat(filePath).isFile()) continue;
+    } catch {
+      continue;
+    }
+    try {
       const entries = parseSafeJsonEntriesInput(
         readTextFile(filePath),
         `knowledge hint file ${filePath}`
