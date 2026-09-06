@@ -30,6 +30,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { nowIso, readTextFile } from '@agent/core/foundation';
 import {
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeStat,
@@ -74,6 +75,13 @@ const EXCLUDE_FILES = (p: string): boolean =>
 
 // Files to NEVER flag as candidates (public API surface, by definition exported "for outside").
 const PUBLIC_API_PATHS = new Set(['libs/core/index.ts']);
+
+export function readDeadCodeTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function walkTs(dir: string): string[] {
   if (!safeExistsSync(dir)) return [];
@@ -120,7 +128,7 @@ const EXPORT_PATTERNS: { regex: RegExp; kind: ExportedSymbol['kind'] }[] = [
 ];
 
 function extractExports(file: string): ExportedSymbol[] {
-  const text = readTextFile(file);
+  const text = readDeadCodeTextFile(file);
   const symbols: ExportedSymbol[] = [];
   for (const { regex, kind } of EXPORT_PATTERNS) {
     let m: RegExpExecArray | null;
@@ -148,7 +156,7 @@ function countOccurrences(
   for (const f of files) {
     let text: string;
     try {
-      text = readTextFile(f);
+      text = readDeadCodeTextFile(f);
     } catch {
       continue;
     }
