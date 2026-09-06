@@ -6,8 +6,8 @@
  * direct foundation import bypass tier, tenant, size, and audit checks.
  */
 export interface FoundationIo {
-  loadJson<T>(filePath: string): T;
-  loadJsonIfPresent<T>(filePath: string): T | null;
+  loadJson<T>(filePath: string, options?: FoundationReadOptions): T;
+  loadJsonIfPresent<T>(filePath: string, options?: FoundationReadOptions): T | null;
   appendFile(filePath: string, content: string): void;
   exists(filePath: string): boolean;
   readFile(filePath: string, options?: FoundationReadOptions): string;
