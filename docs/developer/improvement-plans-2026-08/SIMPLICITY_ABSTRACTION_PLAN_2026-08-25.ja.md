@@ -23657,3 +23657,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: service actuator の `services-pids.json` loader、SX-03
 - **変更**: persisted PID registry の `safeReadFile` + `parseSafeJsonInput` を foundation `readJsonIfPresent` へ統一した。missing／malformed registry の空 registry fallback、`parseServicePidRegistry` の shape validation、service manifest／process reconciliation semantics は維持し、reconcile test fixture の regular-file／manifest catalog boundary も明示した。
 - **検証**: service actuator index／reconcile integration **2 files／22 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1743
+
+- **対象**: meeting browser driver の persisted cookie jar、SX-03／security boundary
+- **変更**: 認証cookie JSONの読み込みを `safeReadFile` + `parseSafeJsonInput` から foundation `readJson` へ統一した。account slug、repository path、regular-file、credential tier boundary、cookie shape validation、破損時の空配列 fallback は維持し、テストfixtureもcanonical readerを通す形へ更新した。
+- **検証**: meeting browser driver **1 file／25 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
