@@ -28,7 +28,9 @@ describe('oauth callback surface', () => {
         encoding: 'utf8',
       })
     );
-    expect(source).toContain("import { readSurfaceStringParam } from '@agent/core'");
+    expect(source).toContain(
+      "import { readSurfaceStringParam } from '@agent/core/surface-request-input'"
+    );
     expect(source.match(/readSurfaceStringParam\(req\.query\./gu)).toHaveLength(5);
     expect(source).not.toContain("typeof req.query.service === 'string'");
   });
