@@ -7,9 +7,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('@agent/core')>();
   return {
-    ...(actual as any),
+    ...actual,
     loadEnvironmentManifest: mocks.loadEnvironmentManifest,
     probeManifest: mocks.probeManifest,
     logger: mocks.logger,
@@ -21,18 +21,18 @@ vi.mock('@agent/core', async (importOriginal) => {
 // `@agent/core` entry point, so the mocks above never intercept its calls —
 // mock the actual import sites too.
 vi.mock('@agent/core/environment-capability', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('@agent/core/environment-capability')>();
   return {
-    ...(actual as any),
+    ...actual,
     loadEnvironmentManifest: mocks.loadEnvironmentManifest,
     probeManifest: mocks.probeManifest,
   };
 });
 
 vi.mock('@agent/core/core', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual = await importOriginal<typeof import('@agent/core/core')>();
   return {
-    ...(actual as any),
+    ...actual,
     logger: mocks.logger,
   };
 });
