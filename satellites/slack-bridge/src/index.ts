@@ -1,6 +1,6 @@
 import { App, LogLevel } from '@slack/bolt';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { isDirectEntry } from '@agent/core/direct-entry';
+import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import { appendJsonLine, getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
@@ -448,7 +448,7 @@ async function processSlackOutbox(client: SlackClient) {
 
 const runSlackOutbox = createSurfaceOutboxDrainGuard('slack');
 
-async function start() {
+async function start(_args: string[] = process.argv) {
   if (!getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', 'slack_bridge');
   }
@@ -1209,12 +1209,15 @@ async function start() {
 // Same guard as the Telegram bridge: only a direct `node index.js` invocation
 // starts the bridge, so importing this module in a test cannot open a Socket
 // Mode connection — and a leaked VITEST env cannot silently no-op a real start.
-const directEntry = isDirectEntry(import.meta.url, 'satellites/slack-bridge/src/index.ts');
+const directEntry = isDirectScript(import.meta.url, 'satellites/slack-bridge/src/index.ts');
+const runSlackBridge = defineScript({
+  name: 'slack-bridge',
+  async run({ argv }) {
+    await start(['node', 'satellites/slack-bridge/src/index.ts', ...argv]);
+  },
+});
 if (directEntry && !getRegisteredEnvText('VITEST')) {
-  start().catch((err) => {
-    logger.error(`SlackBridge crashed: ${err.message}`);
-    process.exitCode = 1;
-  });
+  void runSlackBridge();
 } else if (directEntry) {
   logger.warn('[SlackBridge] VITEST is set — suppressing the direct-entry start.');
 }

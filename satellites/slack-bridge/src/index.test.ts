@@ -59,6 +59,18 @@ function baseRequest() {
 }
 
 describe('slack bridge channel turn', () => {
+  it('uses the shared script harness for direct startup and failure handling', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/slack-bridge/src/index.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain("from '@agent/core/script-harness'");
+    expect(source).toContain("name: 'slack-bridge'");
+    expect(source).toContain("['node', 'satellites/slack-bridge/src/index.ts', ...argv]");
+    expect(source).not.toContain('start().catch(');
+  });
+
   it('renders approval authority through the shared user-facing vocabulary', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('satellites/slack-bridge/src/index.ts'), {
