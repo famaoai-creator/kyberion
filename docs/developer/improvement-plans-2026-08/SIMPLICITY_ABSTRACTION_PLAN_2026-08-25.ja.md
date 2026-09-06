@@ -23813,3 +23813,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: mission orchestration progress の task-event JSONL loader、SX-03／SX-10／SX-11
 - **変更**: operation-timeのregular-file境界を通したtask-event JSONL読込を、手書きの行分割・parseから foundation `readJsonLines`へ統一した。malformed行skip、identity parserによるmission／event／task filter、directory／symlink fail-closed、dedupe／reconciliation semanticsは維持した。
 - **検証**: mission-orchestration-progress **1 file／4 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1769
+
+- **対象**: task-scoped grants の認可台帳JSONL loader、SX-03／SX-09／PI-03
+- **変更**: operation-timeのregular-file確認後に行うtask grant JSONL読込を、手書きの行分割・parseから foundation `readJsonLines`へ統一した。malformed／torn行skip、各recordのschema validation、last-record-wins、audience／expiry／revocation semantics、vitest default-path write guardは維持した。
+- **検証**: task-scoped grants **1 file／25 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。

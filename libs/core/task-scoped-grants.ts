@@ -1,7 +1,5 @@
-import { appendJsonLine } from './foundation/json.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
-import { readTextFile } from './foundation/text.js';
 /**
  * NI-04: task-scoped short-lived grants — audience-bound authority.
  *
@@ -269,12 +267,9 @@ function readGrantRecords(): Map<string, TaskScopedGrant> {
   if (!safeLstat(storePath).isFile()) {
     throw new Error(`[TASK_GRANTS_RESOURCE] store must be a regular file: ${storePath}`);
   }
-  const raw = readTextFile(storePath);
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
+  for (const value of readJsonLines<unknown>(storePath, { onMalformed: 'skip' })) {
     try {
-      const parsed = taskScopedGrantSchema.parse(parseSafeJsonInput(trimmed, 'task-scoped grant'));
+      const parsed = taskScopedGrantSchema.parse(value);
       latest.set(parsed.grant_id, parsed);
     } catch {
       // A torn/corrupt line must not poison replay of the rest.
