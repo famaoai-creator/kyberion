@@ -6,10 +6,10 @@ import {
   findLatestMissionHandoff,
   type MissionAssetCategory,
 } from '../lib/mission-progress-client';
-import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
+import { buildAttentionItems } from '../lib/operator-console';
 import { buildRuntimeTopologyGraph } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';
-import { chronosSpeechLocale, resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
+import { chronosSpeechLocale, resolveChronosLocale, uxTextOr } from '../lib/ux-vocabulary';
 import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
 import { parseFocusedOperatorResponse } from '../lib/focused-operator-response';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';

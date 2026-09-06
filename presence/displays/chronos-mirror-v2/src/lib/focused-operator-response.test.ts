@@ -141,7 +141,8 @@ describe('focused operator response boundary', () => {
   });
 
   it('accepts empty collections and optional runtime', () => {
-    const { runtime: _runtime, ...withoutRuntime } = valid;
+    const withoutRuntime = { ...valid };
+    delete withoutRuntime.runtime;
     expect(
       parseFocusedOperatorResponse({
         ...withoutRuntime,

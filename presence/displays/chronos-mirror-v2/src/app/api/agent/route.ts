@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 import { resolveRuntimeModelId } from '@agent/core/reasoning-model-routing';
-import { safeExistsSync } from '@agent/core/secure-io';
 import { toWireError } from '@agent/core/wire-error';
 import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
@@ -40,7 +39,6 @@ async function loadChronosCore() {
     pathResolverModule,
     secureIo,
     channelSurface,
-    surfaceInteraction,
     runtimeSupervisor,
     runtimeSupervisorClient,
     pipelineContract,
@@ -55,7 +53,6 @@ async function loadChronosCore() {
     import('@agent/core/path-resolver'),
     import('@agent/core/secure-io'),
     import('@agent/core/channel-surface'),
-    import('@agent/core/surface-interaction-model'),
     import('@agent/core/agent-runtime-supervisor'),
     import('@agent/core/agent-runtime-supervisor-client'),
     import('@agent/core/pipeline-contract'),
@@ -82,7 +79,6 @@ async function loadChronosCore() {
     safeWriteFile: secureIo.safeWriteFile,
     recordChronosDelegationSummary: channelSurface.recordChronosDelegationSummary,
     recordChronosSurfaceRequest: channelSurface.recordChronosSurfaceRequest,
-    runSurfaceConversation: channelSurface.runSurfaceConversation,
     runSurfaceMessageConversation: channelSurface.runSurfaceMessageConversation,
     buildMissionIssuanceReply: channelSurface.buildMissionIssuanceReply,
     issueChronosMissionFromProposal: channelSurface.issueChronosMissionFromProposal,
@@ -1004,9 +1000,7 @@ export async function POST(req: NextRequest) {
       reflectPresenceAgentReply,
       recordChronosDelegationSummary,
       recordChronosSurfaceRequest,
-      runSurfaceConversation,
       runSurfaceMessageConversation,
-      safeReadFile,
       logger,
     } = core;
     const dispatchPresenceFrameBestEffort = async (frame: any) => {
