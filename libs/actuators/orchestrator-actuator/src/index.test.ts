@@ -1075,6 +1075,40 @@ describe('orchestrator-actuator', () => {
     expect(report.metrics.weekly_cost_usd).toBe(12.35);
   });
 
+  it('uses canonical check registry commands for system status snapshots', async () => {
+    mocks.safeExec.mockReturnValue('');
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        status_brief: {
+          kind: 'system-status-brief',
+          scope: 'system',
+          summary: 'system status',
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'collect_system_status_snapshot',
+          params: { from: 'status_brief', export_as: 'system_status_snapshot' },
+        },
+      ],
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'pnpm',
+      ['run', 'check', '--', '--scope', 'pr', '--only', 'esm'],
+      expect.objectContaining({ timeoutMs: 120000 })
+    );
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'pnpm',
+      ['run', 'check', '--', '--scope', 'full', '--only', 'catalogs'],
+      expect.objectContaining({ timeoutMs: 120000 })
+    );
+  });
+
   it('handles status_report_to_operator_packet transform', async () => {
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
