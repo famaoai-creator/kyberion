@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
 
 import {
   readDesignMdCatalogTextFile,
@@ -11,7 +12,7 @@ describe('import design-md catalog entrypoint', () => {
   let fixtureDir: string;
 
   beforeEach(() => {
-    fixtureDir = fs.mkdtempSync(path.join(process.cwd(), 'active/shared/tmp/design-md-test-'));
+    fixtureDir = fs.mkdtempSync(pathResolver.sharedTmp('design-md-test-'));
     const sourceDir = path.join(fixtureDir, 'design-md', 'example');
     fs.mkdirSync(sourceDir, { recursive: true });
     fs.writeFileSync(
@@ -55,8 +56,7 @@ describe('import design-md catalog entrypoint', () => {
   });
 
   it('honors dry-run and shared output flags without writing generated files', async () => {
-    const outputPath = path.join(
-      process.cwd(),
+    const outputPath = pathResolver.rootResolve(
       'knowledge/public/design-patterns/media-templates/themes/design-md-imports.json'
     );
     const before = fs.readFileSync(outputPath, 'utf8');
@@ -78,7 +78,7 @@ describe('import design-md catalog entrypoint', () => {
 
   it('uses the governed parser for generated catalog comparison', () => {
     const source = String(
-      fs.readFileSync(path.join(process.cwd(), 'scripts/import_design_md_catalog.ts'), 'utf8')
+      fs.readFileSync(pathResolver.rootResolve('scripts/import_design_md_catalog.ts'), 'utf8')
     );
     expect(source).toContain('parseSafeJsonObjectInput');
     expect(source).not.toContain('JSON.parse(content)');
