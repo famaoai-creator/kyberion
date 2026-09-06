@@ -12,6 +12,7 @@ import type {
   DiscoveredCapability,
   ProbeResult,
 } from './provider-capability-scanner.js';
+import type { ProviderCapability } from './provider-capability-registry.js';
 import type { ProviderInfo } from './provider-discovery.js';
 
 const snapshotRoot = pathResolver.sharedTmp(`provider-capability-overview-${process.pid}`);
@@ -108,6 +109,24 @@ describe('provider-capability-overview', () => {
       discovered,
       providerAvailability,
       providers,
+      runtimeProbes: [
+        {
+          provider_id: 'alpha',
+          binary_found: true,
+          authenticated: true,
+          headless: true,
+          structured_output: true,
+          models: [],
+          probed_at: '2026-05-26T00:00:00.000Z',
+          sandbox_probe: {
+            status: 'supported',
+            method: 'help-flag',
+            command: 'alpha',
+            args: ['--help'],
+            expected_flags: ['--sandbox'],
+          },
+        } satisfies ProviderCapability,
+      ],
       generatedAt: '2026-05-26T00:00:00.000Z',
     });
 
@@ -137,6 +156,14 @@ describe('provider-capability-overview', () => {
     expect(snapshot.capabilities.map((capability) => capability.capability_id)).toEqual([
       'cap.one',
       'cap.two',
+    ]);
+    expect(snapshot.runtime_probes).toEqual([
+      {
+        provider_id: 'alpha',
+        binary_found: true,
+        authenticated: true,
+        sandbox_status: 'supported',
+      },
     ]);
     expect(parseProviderCapabilitySnapshot(snapshot)).toEqual(snapshot);
   });
@@ -176,6 +203,14 @@ describe('provider-capability-overview', () => {
         missing_providers: [],
         providers: [],
         capabilities: [],
+        runtime_probes: [
+          {
+            provider_id: 'alpha',
+            binary_found: true,
+            authenticated: true,
+            sandbox_status: 'supported',
+          },
+        ],
       })
     );
 
@@ -183,6 +218,14 @@ describe('provider-capability-overview', () => {
       generated_at: '2026-05-26T00:00:00.000Z',
       providers: [],
       capabilities: [],
+      runtime_probes: [
+        {
+          provider_id: 'alpha',
+          binary_found: true,
+          authenticated: true,
+          sandbox_status: 'supported',
+        },
+      ],
     });
 
     safeWriteFile(snapshotPath, JSON.stringify({ providers: [] }));

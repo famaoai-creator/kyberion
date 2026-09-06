@@ -13,6 +13,7 @@ import {
   probeProviderAvailability,
   scanProviderCapabilities,
 } from '@agent/core/provider-capability-scanner';
+import { probeProviderCapabilities } from '@agent/core/provider-capability-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -33,6 +34,7 @@ export function main(args: string[]): unknown {
 
   const registry = loadCapabilityRegistry();
   const providerAvailability = probeProviderAvailability();
+  const runtimeProbes = probeProviderCapabilities();
   const discovered = scanProviderCapabilities(registry);
   const discoveredProviders = new Map(
     discoverProviders(true).map((provider) => [provider.provider, provider])
@@ -57,6 +59,7 @@ export function main(args: string[]): unknown {
     discovered,
     providerAvailability,
     providers,
+    runtimeProbes,
   });
 
   const resolvedOutPath = assertSafeRepositoryPath(pathResolver.resolve(outPath), {

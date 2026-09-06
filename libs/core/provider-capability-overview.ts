@@ -3,6 +3,7 @@ import type {
   DiscoveredCapability,
   ProbeResult,
 } from './provider-capability-scanner.js';
+import type { ProviderCapability } from './provider-capability-registry.js';
 import type { ProviderInfo } from './provider-discovery.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
@@ -22,6 +23,13 @@ export type ProviderCapabilitySnapshotCapability = {
   evidence?: string;
 };
 
+export type ProviderCapabilityRuntimeProbe = {
+  provider_id: string;
+  binary_found: boolean;
+  authenticated: boolean | 'unknown';
+  sandbox_status?: 'supported' | 'unsupported' | 'unknown';
+};
+
 export type ProviderCapabilitySnapshot = {
   generated_at: string;
   registered_capabilities: number;
@@ -30,6 +38,7 @@ export type ProviderCapabilitySnapshot = {
   missing_providers: string[];
   providers: ProviderCapabilitySnapshotProvider[];
   capabilities: ProviderCapabilitySnapshotCapability[];
+  runtime_probes?: ProviderCapabilityRuntimeProbe[];
 };
 
 const PROVIDER_CAPABILITY_SNAPSHOT_SCHEMA_PATH = pathResolver.knowledge(
@@ -123,6 +132,42 @@ function parseSnapshotCapability(
   };
 }
 
+function parseRuntimeProbe(value: unknown, index: number): ProviderCapabilityRuntimeProbe {
+  const label = `provider capability snapshot.runtime_probes[${index}]`;
+  const record = parseSafeJsonObjectValue(value, label);
+  assertExactKeys(
+    record,
+    ['provider_id', 'binary_found', 'authenticated', 'sandbox_status'],
+    label
+  );
+  if (typeof record.binary_found !== 'boolean') {
+    throw new Error(`${label}.binary_found must be a boolean`);
+  }
+  if (
+    record.authenticated !== true &&
+    record.authenticated !== false &&
+    record.authenticated !== 'unknown'
+  ) {
+    throw new Error(`${label}.authenticated must be a boolean or unknown`);
+  }
+  const sandboxStatusValue = record.sandbox_status;
+  if (
+    sandboxStatusValue !== undefined &&
+    sandboxStatusValue !== 'supported' &&
+    sandboxStatusValue !== 'unsupported' &&
+    sandboxStatusValue !== 'unknown'
+  ) {
+    throw new Error(`${label}.sandbox_status is invalid`);
+  }
+  const sandboxStatus = sandboxStatusValue as ProviderCapabilityRuntimeProbe['sandbox_status'];
+  return {
+    provider_id: nonEmptyString(record.provider_id, `${label}.provider_id`),
+    binary_found: record.binary_found,
+    authenticated: record.authenticated,
+    ...(sandboxStatus !== undefined ? { sandbox_status: sandboxStatus } : {}),
+  };
+}
+
 /** Parse the persisted provider capability overview before a dashboard renders it. */
 export function parseProviderCapabilitySnapshot(value: unknown): ProviderCapabilitySnapshot {
   const root = parseSafeJsonObjectValue(value, 'provider capability snapshot');
@@ -136,6 +181,7 @@ export function parseProviderCapabilitySnapshot(value: unknown): ProviderCapabil
       'missing_providers',
       'providers',
       'capabilities',
+      'runtime_probes',
     ],
     'provider capability snapshot'
   );
@@ -154,6 +200,11 @@ export function parseProviderCapabilitySnapshot(value: unknown): ProviderCapabil
   if (!Array.isArray(capabilities)) {
     throw new Error('provider capability snapshot.capabilities must be an array');
   }
+  const runtimeProbesValue = root.runtime_probes;
+  if (runtimeProbesValue !== undefined && !Array.isArray(runtimeProbesValue)) {
+    throw new Error('provider capability snapshot.runtime_probes must be an array');
+  }
+  const runtimeProbes = runtimeProbesValue as unknown[] | undefined;
   return {
     generated_at: generatedAt,
     registered_capabilities: nonNegativeInteger(
@@ -174,6 +225,9 @@ export function parseProviderCapabilitySnapshot(value: unknown): ProviderCapabil
     ),
     providers: providers.map(parseSnapshotProvider),
     capabilities: capabilities.map(parseSnapshotCapability),
+    ...(runtimeProbes !== undefined
+      ? { runtime_probes: runtimeProbes.map(parseRuntimeProbe) }
+      : {}),
   };
 }
 
@@ -197,6 +251,7 @@ export function buildProviderCapabilitySnapshot(params: {
   discovered: DiscoveredCapability[];
   providerAvailability: Map<string, ProbeResult>;
   providers: ProviderInfo[];
+  runtimeProbes?: readonly ProviderCapability[];
   generatedAt?: string;
 }): ProviderCapabilitySnapshot {
   const availableProviders = [...params.providerAvailability.entries()]
@@ -232,5 +287,17 @@ export function buildProviderCapabilitySnapshot(params: {
         evidence: capability.evidence,
       }))
       .sort((a, b) => a.capability_id.localeCompare(b.capability_id)),
+    ...(params.runtimeProbes
+      ? {
+          runtime_probes: [...params.runtimeProbes]
+            .map((probe) => ({
+              provider_id: probe.provider_id,
+              binary_found: probe.binary_found,
+              authenticated: probe.authenticated,
+              ...(probe.sandbox_probe ? { sandbox_status: probe.sandbox_probe.status } : {}),
+            }))
+            .sort((a, b) => a.provider_id.localeCompare(b.provider_id)),
+        }
+      : {}),
   };
 }

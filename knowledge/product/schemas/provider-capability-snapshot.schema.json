@@ -54,6 +54,20 @@
           "evidence": { "type": "string" }
         }
       }
+    },
+    "runtime_probes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider_id", "binary_found", "authenticated"],
+        "properties": {
+          "provider_id": { "type": "string", "minLength": 1 },
+          "binary_found": { "type": "boolean" },
+          "authenticated": { "type": ["boolean", "string"], "enum": [true, false, "unknown"] },
+          "sandbox_status": { "enum": ["supported", "unsupported", "unknown"] }
+        }
+      }
     }
   }
 }
