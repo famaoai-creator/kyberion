@@ -23033,3 +23033,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `package.json`、SX-13、計画 metadata checker
 - **変更**: 既存の `scripts/check_improvement_plan_metadata.ts` を root package script `check:improvement-plan-metadata` へ登録し、計画 metadata 検査を正規の `pnpm run` 入口から再現可能にした。
 - **検証**: `node --import ./scripts/ts-loader.mjs scripts/check_improvement_plan_metadata.ts` **335 documents / OK**、Prettier、`git diff --check`。`pnpm run` は既存 worktree の依存再構築が DNS 制約で停止したため、正規 package entrypoint の再実行は環境復旧後の受入課題とする。完了計画の archive 移動と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1639
+
+- **対象**: `scripts/browser_bridge_host.ts`、SX-06
+- **変更**: Browser Native Messaging host の stdin listener 登録を `startBrowserBridgeHost` へ閉じ込め、`defineScript`／`isDirectScript` の direct-entry 境界からだけ起動するようにした。Native Messaging の frame 処理、stdout の応答完了待ち、`setProcessExitCode` による異常終了通知は維持し、テスト import 時の top-level listener 副作用を除去した。
+- **検証**: Prettier、`git diff --check`。Vitest と ts-loader import-safe probe は依存関係復旧途中の `node_modules` が `.vite-temp`／現行 `@agent/core` export を解決できず起動前に停止したため、環境復旧後の受入課題とする。完了計画の archive 移動、全 script harness／generator 移行、provider 実機受入を継続する。

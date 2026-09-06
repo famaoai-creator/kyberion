@@ -15,7 +15,7 @@
  */
 
 import { Buffer } from 'node:buffer';
-import { setProcessExitCode } from './lib/harness.js';
+import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import {
   buildBrowserExtensionPipelineCandidate,
   compileBrowserRecordingToPipeline,
@@ -958,44 +958,60 @@ function writeFrame(payload: HostResponse): Promise<void> {
   });
 }
 
-let inbox = Buffer.alloc(0);
-let inputEnded = false;
-let pendingResponses = 0;
+function startBrowserBridgeHost(): void {
+  let inbox = Buffer.alloc(0);
+  let inputEnded = false;
+  let pendingResponses = 0;
 
-function exitWhenDrained(): void {
-  // Native Messaging one-shot calls may close stdin immediately after sending
-  // the request. Let stdout finish and allow Node to exit naturally; an
-  // explicit process.exit can make Chrome report "Native host has exited"
-  // before it has consumed the response frame.
-  if (inputEnded && pendingResponses === 0) process.stdin.pause();
-}
-
-function drain(): void {
-  while (inbox.length >= 4) {
-    const length = inbox.readUInt32LE(0);
-    if (inbox.length < 4 + length) return;
-    const body = inbox.subarray(4, 4 + length);
-    inbox = inbox.subarray(4 + length);
-    pendingResponses += 1;
-    Promise.resolve()
-      .then(() => handle(parseBrowserBridgeMessage(body.toString('utf8'))))
-      .then((response) => writeFrame(response))
-      .catch((error) =>
-        writeFrame({ ok: false, error: formatWireError(error, 'Browser bridge request failed') })
-      )
-      .finally(() => {
-        pendingResponses -= 1;
-        exitWhenDrained();
-      });
+  function exitWhenDrained(): void {
+    // Native Messaging one-shot calls may close stdin immediately after sending
+    // the request. Let stdout finish and allow Node to exit naturally; an
+    // explicit process.exit can make Chrome report "Native host has exited"
+    // before it has consumed the response frame.
+    if (inputEnded && pendingResponses === 0) process.stdin.pause();
   }
+
+  function drain(): void {
+    while (inbox.length >= 4) {
+      const length = inbox.readUInt32LE(0);
+      if (inbox.length < 4 + length) return;
+      const body = inbox.subarray(4, 4 + length);
+      inbox = inbox.subarray(4 + length);
+      pendingResponses += 1;
+      Promise.resolve()
+        .then(() => handle(parseBrowserBridgeMessage(body.toString('utf8'))))
+        .then((response) => writeFrame(response))
+        .catch((error) =>
+          writeFrame({ ok: false, error: formatWireError(error, 'Browser bridge request failed') })
+        )
+        .finally(() => {
+          pendingResponses -= 1;
+          exitWhenDrained();
+        });
+    }
+  }
+
+  process.stdin.on('data', (chunk: Buffer) => {
+    inbox = Buffer.concat([inbox, chunk]);
+    drain();
+  });
+  process.stdin.on('end', () => {
+    inputEnded = true;
+    exitWhenDrained();
+  });
+  process.stdin.on('error', () => setProcessExitCode(1));
 }
 
-process.stdin.on('data', (chunk: Buffer) => {
-  inbox = Buffer.concat([inbox, chunk]);
-  drain();
+const runBrowserBridgeHost = defineScript({
+  name: 'browser-bridge-host',
+  flags: [],
+  run() {
+    startBrowserBridgeHost();
+  },
 });
-process.stdin.on('end', () => {
-  inputEnded = true;
-  exitWhenDrained();
-});
-process.stdin.on('error', () => setProcessExitCode(1));
+
+if (
+  isDirectScript(import.meta.url, 'browser_bridge_host.ts') ||
+  isDirectScript(import.meta.url, 'browser_bridge_host.js')
+)
+  void runBrowserBridgeHost();
