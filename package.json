@@ -34,6 +34,7 @@
     "generate:pseudo-locale": "node --import ./scripts/ts-loader.mjs scripts/generate_pseudo_locale.ts",
     "generate:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts",
     "config:report": "node --import ./scripts/ts-loader.mjs scripts/env_config_report.ts",
+    "auth": "node --import ./scripts/ts-loader.mjs scripts/reasoning_auth_check.ts",
     "agents:generate": "node --import ./scripts/ts-loader.mjs scripts/generate_subagent_definitions.ts",
     "check:apple-fm": "node --import ./scripts/ts-loader.mjs scripts/check_apple_fm.ts",
     "report:i18n-coverage": "node --import ./scripts/ts-loader.mjs scripts/report_i18n_translation_coverage.ts",

@@ -16,4 +16,18 @@ describe('reasoning auth check entrypoint', () => {
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain("context.argv, '--json'");
   });
+
+  it('exposes the canonical pnpm auth entrypoint without duplicating auth logic', () => {
+    const packageJson = JSON.parse(
+      String(
+        safeReadFile(pathResolver.rootResolve('package.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as { scripts?: Record<string, unknown> };
+
+    expect(packageJson.scripts?.auth).toBe(
+      'node --import ./scripts/ts-loader.mjs scripts/reasoning_auth_check.ts'
+    );
+  });
 });
