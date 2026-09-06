@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getFoundationIo, registerFoundationIo, type FoundationIo } from './io.js';
+import {
+  getFoundationIo,
+  registerFoundationIo,
+  type FoundationIo,
+  type FoundationReadOptions,
+} from './io.js';
 import {
   parseSafeJsonInput,
   parseSafeJsonEntriesInput,
@@ -108,6 +113,7 @@ describe('foundation safe JSON parser', () => {
 describe('foundation JSONL reader', () => {
   let original: FoundationIo;
   const files = new Map<string, string>();
+  let capturedReadOptions: FoundationReadOptions | undefined;
 
   beforeEach(() => {
     original = getFoundationIo();
@@ -118,7 +124,10 @@ describe('foundation JSONL reader', () => {
       loadJsonIfPresent: () => null,
       appendFile: () => undefined,
       exists: (filePath) => files.has(filePath),
-      readFile: (filePath) => files.get(filePath) || '',
+      readFile: (filePath, options) => {
+        capturedReadOptions = options;
+        return files.get(filePath) || '';
+      },
       stat: () => ({ mtimeMs: 0, size: 0 }),
       writeFile: () => undefined,
     });
@@ -133,6 +142,17 @@ describe('foundation JSONL reader', () => {
     files.set('events.jsonl', '{"id":1}\n\n {"id":2}\n');
 
     expect(readJsonLines<{ id: number }>('events.jsonl')).toEqual([{ id: 1 }, { id: 2 }]);
+  });
+
+  it('forwards governed read options to the whole JSONL file', () => {
+    files.set('events.jsonl', '{"id":1}\n');
+
+    expect(
+      readJsonLines<{ id: number }>('events.jsonl', {
+        readOptions: { maxSizeMB: 5, label: 'bounded event store' },
+      })
+    ).toEqual([{ id: 1 }]);
+    expect(capturedReadOptions).toEqual({ maxSizeMB: 5, label: 'bounded event store' });
   });
 
   it('can skip malformed or rejected records while preserving one-based line numbers', () => {
