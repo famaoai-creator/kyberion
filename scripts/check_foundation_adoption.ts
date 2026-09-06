@@ -34,16 +34,8 @@ const LEGACY_JSON_BOUNDARY_ALLOWLIST: ReadonlyMap<string, { count: number; reaso
       { count: 1, reason: 'simulated blockchain JSONL fixture' },
     ],
     [
-      'libs/actuators/file-actuator/src/file-pipeline-helpers.ts',
-      { count: 1, reason: 'CLI action input file' },
-    ],
-    [
       'libs/actuators/ios-actuator/src/ios-runtime-helpers.ts',
       { count: 1, reason: 'simulator session handoff output' },
-    ],
-    [
-      'libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts',
-      { count: 1, reason: 'CLI action input file' },
     ],
     [
       'libs/actuators/network-actuator/src/a2a-transport.ts',
