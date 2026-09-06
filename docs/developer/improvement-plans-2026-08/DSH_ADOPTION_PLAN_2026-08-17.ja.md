@@ -755,6 +755,10 @@ script integrity checkerをroot `package.json` の `check:script-integrity`へ�
 
 検証: `pnpm run check:script-integrity`、checker **1 file / 7 tests passed**、Prettier。provider CLIの実OS-level enforcement probeと未監査direct loader全体inventoryは継続課題である。
 
+`check_backend_conformance.ts`もroot `package.json` の `check:backend-conformance`へ接続し、通常のversion／help matrixと、明示した`-- --live-sandbox`の外部model-turn probeを同じentrypointで分離した。
+
+検証: 静的backend conformance **8 provider modes**、既存core conformance suite、Prettier。実CLIのOS-level enforcement結果と未監査direct loader全体inventoryは継続課題である。
+
 ## 10. 検証コマンド(実装時)
 
 - DH-01: `pnpm vitest run libs/core/op-preflight.test.ts libs/core/op-preflight-defaults.test.ts` + `pnpm check -- --scope full --only op-preflight-coverage`
