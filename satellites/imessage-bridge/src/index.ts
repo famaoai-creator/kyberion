@@ -413,6 +413,7 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'imessage',
+          locale: resolveOperatorLocale(),
           text: incomingText,
           channel: msg.chatId,
           threadTs: msg.id,

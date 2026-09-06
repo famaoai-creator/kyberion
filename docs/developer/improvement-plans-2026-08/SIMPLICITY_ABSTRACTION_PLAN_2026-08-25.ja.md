@@ -22620,6 +22620,12 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **変更**: text-only contract projectionのlocaleを本文の日本語文字判定だけでなく `ChannelTurnInput.locale` から指定できるようにした。Slack／Telegram／Discord／iMessage が `resolveOperatorLocale()` を共通formatterへ渡し、thread contextとcontract labelsのlocaleを統一した。既存の推定fallback、delivery gate、approval semanticsは維持した。
 - **検証**: channel adapter／4 bridge **5 files／51 tests passed**、root typecheck、Prettier、`git diff --check`。12 surface の全面 contract 描画、provider 実機依存、package scripts／framework-specific request parsing の削減は継続課題とする。
 
+## 2026-09-06 再レビュー修正 1577
+
+- **対象**: `libs/core/intent-resolution-contract.ts`、`libs/core/channel-surface-types.ts`、`libs/core/surface-interaction-model.ts`、`libs/core/surface-runtime-orchestrator.ts`、4 bridge、契約／orchestratorテスト、SX-08b／SX-09b
+- **変更**: `IntentResolutionContract` の `next_action` label／consequence に `SupportedLocale` を渡せるようにし、surface conversation inputからorchestratorまでlocaleを伝播した。4 bridgeのoperator localeがtext-only formatterだけでなく、契約を直接描画するsurfaceの次アクション文言にも反映される。省略時の既定値、intent packet、tenant／tier、approval gateは維持した。
+- **検証**: intent contract／surface interaction／orchestrator／4 bridge **8 files／83 tests passed**、root typecheck、Prettier、`git diff --check`。12 surfaceの全面contract描画、provider実機依存、package scripts／framework-specific request parsingの削減は継続課題とする。
+
 ## 2026-09-06 再レビュー修正 1550
 
 - **対象**: `libs/core/runtime-health-history.ts`、`libs/core/surface-runtime.ts`、`libs/core/report-ops.ts`、`libs/core/mesh-message-broker.ts`、`libs/core/ingest-sync-cursors.ts`、`libs/core/customer-conversation-modes.ts`

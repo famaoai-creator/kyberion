@@ -11,6 +11,7 @@ import type { A2UIMessage } from './a2ui.js';
 import type { AgentContextMode } from './context-boundary.js';
 import type { AgentRoutingDecision } from './intent-contract.js';
 import type { IntentResolutionContract } from './intent-resolution-contract.js';
+import type { SupportedLocale } from './locale-normalize.js';
 import type {
   ExecutionFeedbackInput,
   ExecutionFeedbackRecord,
@@ -383,6 +384,7 @@ interface SurfaceConversationInputBase {
   agentId: string;
   query: string;
   senderAgentId: string;
+  locale?: SupportedLocale;
   correlationId?: string;
   surfaceText?: string;
   attachments?: SurfaceConversationAttachment[];
@@ -403,6 +405,7 @@ export type SurfaceConversationInput = SurfaceConversationInputBase & {
 
 interface SurfaceConversationMessageInputBase {
   text: string;
+  locale?: SupportedLocale;
   surfaceText?: string;
   attachments?: SurfaceConversationAttachment[];
   correlationId?: string;

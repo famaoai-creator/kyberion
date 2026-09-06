@@ -1837,3 +1837,9 @@ qps-plocを含む明示localeの回帰を追加した。
 
 検証: channel adapter／4 bridge **5 files／51 tests passed**、root typecheck、Prettier、`git diff --check`。
 12 surface の全面 contract 描画、provider 実機依存、package scripts の削減は継続課題である。
+
+## 2026-09-06 再レビュー修正 241
+
+`IntentResolutionContract` の `next_action` label／consequence が契約生成時に英語固定だった残存を修正し、surface conversation inputからorchestratorへ `SupportedLocale` を伝播した。4 bridgeのoperator localeが専用text formatterだけでなく、契約を直接描画するsurfaceの次アクション文言にも反映される。既定の英語、intent packet、tenant／tier境界、approval semanticsは維持し、qps-plocを含む契約生成とproduction-like surface wiringの回帰を追加した。
+
+検証: intent contract／surface interaction／orchestrator／4 bridge **8 files／83 tests passed**、root typecheck、Prettier、`git diff --check`。残る自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は継続課題である。

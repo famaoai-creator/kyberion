@@ -134,6 +134,7 @@ describe('surface-interaction-model', () => {
     const telegramInput = buildSurfaceConversationInput({
       surface: 'telegram',
       text: 'Telegramで会話して',
+      locale: 'qps-ploc',
       channel: '123',
       threadTs: '456',
       senderAgentId: 'kyberion:telegram-bridge',
@@ -145,6 +146,7 @@ describe('surface-interaction-model', () => {
     expect(telegramInput.surface).toBe('telegram');
     expect(telegramInput.agentId).toBe('telegram-surface-agent');
     expect(telegramInput.query).toBe('Telegramで会話して');
+    expect(telegramInput.locale).toBe('qps-ploc');
   });
 
   it('propagates an inbound tenant scope into surface coordination records', () => {

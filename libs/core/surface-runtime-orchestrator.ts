@@ -1059,6 +1059,7 @@ export async function runSurfaceConversation(
       ...emptySurfaceResult(surfaceRuntimeData.buildFeedbackAcknowledgement(record)),
       executionFeedbackRecord: record,
       intentResolution: resolveIntentResolutionContract(input.surfaceText || input.query || '', {
+        locale: input.locale,
         tier: input.scope?.tier,
         tenantId: input.scope?.tenant_slug,
       }),
@@ -1079,6 +1080,7 @@ export async function runSurfaceConversation(
   const intentResolution: IntentResolutionContract = resolveIntentResolutionContract(
     resolutionText,
     {
+      locale: input.locale,
       tier: input.scope?.tier,
       tenantId: input.scope?.tenant_slug,
       // A normal turn has identical resolution text and can reuse the packet
