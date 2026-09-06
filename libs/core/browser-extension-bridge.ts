@@ -1,5 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import type { ValidateFunction } from 'ajv';
 import { Buffer } from 'node:buffer';
@@ -18,7 +17,6 @@ import {
 import { validateOpInput } from './op-input-contracts.js';
 import { resolveBrowserRecordingPipelineOp, normalizeBrowserPipelineOp } from './op-vocabulary.js';
 import { compileSchema } from './foundation/ajv.js';
-import { readTextFile } from './foundation/text.js';
 
 /** Approval-gate operation id for governed Chrome extension execution. */
 export const BROWSER_EXTENSION_EXECUTE_OP = 'browser:extension_execute';
@@ -1181,24 +1179,17 @@ export function loadBrowserExtensionObservations(
   } catch {
     return [];
   }
-  let raw: string;
   try {
     if (safeStat(filePath).size > MAX_OBSERVATION_STORE_BYTES) return [];
-    raw = readTextFile(filePath);
   } catch {
     return [];
   }
-  const observations: BrowserExtensionObservation[] = [];
-  for (const line of raw.split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const parsed = validateBrowserExtensionObservation(
-        parseSafeJsonInput(line, 'browser extension observation')
-      );
-      if (parsed.value) observations.push(parsed.value);
-    } catch {
-      // skip corrupt lines
-    }
-  }
-  return observations.slice(-limit);
+  return readJsonLines<BrowserExtensionObservation>(filePath, {
+    onMalformed: 'skip',
+    map: (value) => {
+      const parsed = validateBrowserExtensionObservation(value);
+      if (!parsed.value) throw new Error(parsed.errors.join('; '));
+      return parsed.value;
+    },
+  }).slice(-limit);
 }
