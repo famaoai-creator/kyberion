@@ -159,4 +159,28 @@ describe('check_script_integrity', () => {
       'active/shared/tmp/check-script-integrity/pipelines/broken.json: pnpm script not found (check:removed-gate)',
     ]);
   });
+
+  it('flags missing pnpm scripts inside structured command arguments', () => {
+    writeJson('pipelines/structured-command.json', {
+      steps: [
+        {
+          op: 'system:exec',
+          params: {
+            command: 'pnpm',
+            args: ['-s', 'run', 'check:removed-gate'],
+          },
+        },
+      ],
+    });
+
+    const packageJsonPath = writeJson('package.json', { scripts: { typecheck: 'tsc --noEmit' } });
+    const violations = checkScriptIntegrity({
+      packageJsonPath,
+      pipelineRoots: ['active/shared/tmp/check-script-integrity/pipelines'],
+    });
+
+    expect(violations).toContain(
+      'active/shared/tmp/check-script-integrity/pipelines/structured-command.json: pnpm script not found (check:removed-gate)'
+    );
+  });
 });
