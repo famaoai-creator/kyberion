@@ -19,8 +19,32 @@ import {
   withExecutionContextAsync,
   type EnvironmentManifest,
 } from './index.js';
+import { readNodeEnginesRangeFromFile } from './environment-capability-probes.js';
 
 const ROOT = pathResolver.rootDir();
+
+describe('environment capability resource loaders', () => {
+  const fixtureRoot = pathResolver.sharedTmp('environment-node-range-loader-test');
+
+  afterEach(() => {
+    safeRmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  it('reads the node range only from a governed regular file', () => {
+    const filePath = path.join(fixtureRoot, 'package.json');
+    safeWriteFile(filePath, JSON.stringify({ engines: { node: '>=24.0.0' } }), { mkdir: true });
+
+    expect(readNodeEnginesRangeFromFile(filePath)).toBe('>=24.0.0');
+  });
+
+  it('rejects directory and repository-external node range paths', () => {
+    const directoryPath = path.join(fixtureRoot, 'package.json');
+    safeMkdir(directoryPath, { recursive: true });
+
+    expect(readNodeEnginesRangeFromFile(directoryPath)).toBeNull();
+    expect(readNodeEnginesRangeFromFile('/tmp/kyberion-package.json')).toBeNull();
+  });
+});
 
 describe('probeManifest', () => {
   beforeEach(() => {
