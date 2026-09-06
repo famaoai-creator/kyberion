@@ -23135,3 +23135,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/marketing_video_dry_run.ts`、`scripts/marketing_video_dry_run.path.test.ts`、PI-03
 - **変更**: marketing video dry-runのcampaign brief／brand profile／生成artifact本文readを`readMarketingTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをmarketing validation／sensitive-data scanへ到達させないようにした。既存のpath scope、validation、dry-run semanticsは維持した。
 - **検証**: marketing dry-run path **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1656
+
+- **対象**: `scripts/check_entity_governance.ts`、`scripts/check_entity_governance.entrypoint.test.ts`、PI-03
+- **変更**: entity governance checkerの改善計画status／`.gitignore`本文readを`readEntityGovernanceTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant／retention／git boundary判定へ到達させないようにした。既存のdrift／warning semanticsは維持した。
+- **検証**: entity governance reader **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
