@@ -23219,3 +23219,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/apply_dependency_patch.ts`、`scripts/apply_dependency_patch.test.ts`、PI-03／PI-12
 - **変更**: dependency patch apply時のpackage manifest backup本文readを`readDependencyPatchTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpatch backup・rollback処理へ到達させないようにした。既存のproposal、gate、rollback semanticsは維持した。
 - **検証**: dependency patch **2 files／13 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1670
+
+- **対象**: `scripts/check_capability_seams_ast.ts`、`scripts/check_capability_seams_ast.entrypoint.test.ts`、PI-03
+- **変更**: capability seams AST checkerのproduction source／generated graph本文readを`readCapabilitySeamsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをAST／graph整合判定へ到達させないようにした。既存のAST declaration、catalog、graph semanticsは維持した。
+- **検証**: capability seams AST **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミット`camera-output-bridge`に対する生成graph差分を表示したため、生成物は変更せず継続課題とした。
