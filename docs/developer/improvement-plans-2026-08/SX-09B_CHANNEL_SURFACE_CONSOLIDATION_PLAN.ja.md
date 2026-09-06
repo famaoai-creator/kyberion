@@ -484,6 +484,16 @@ query 値の個別既定値化を再監査し、tenant／organization／project�
 `git diff --check`。Next runtime依存が隔離環境にないため既存 `workitems/route.test.ts` は
 `next/server` import前に停止し、CIでの実行確認を継続する。
 
+## 2026-09-06 再レビュー修正 50
+
+Chronos の collaboration snapshot／stream と headless work-items／collaboration route に残っていた
+scope query の個別既定値化を再監査し、mission／tenant／organization／project／task／session／scope kind／limit
+を共通 `readChronosOptionalStringParam` へ接続した。trim 済みの単一 string だけを認可・projection・SSE filterへ
+渡し、既存の collaboration snapshot／stream semantics と headless envelope semantics は変更していない。
+
+検証: request-input boundary **1 file／2 tests passed**、対象 route の ESLint、Prettier、
+`git diff --check`。provider 実機受入と Next runtime を含む統合実行は継続課題である。
+
 ## 2026-09-06 再レビュー修正 47
 
 Presence Studio onboarding voice-sample の `content-type` header を再監査し、header array を `String(...)`

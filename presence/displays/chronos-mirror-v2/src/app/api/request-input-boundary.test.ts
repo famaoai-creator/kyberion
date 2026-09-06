@@ -16,6 +16,10 @@ const SCOPE_ROUTES = [
   'knowledge/route.ts',
   'tenant-scope/route.ts',
   'workitems/route.ts',
+  'collaboration/route.ts',
+  'collaboration/stream/route.ts',
+  'headless/work-items/route.ts',
+  'headless/collaboration/route.ts',
 ] as const;
 
 describe('Chronos route request input boundary', () => {

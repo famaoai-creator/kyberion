@@ -7,6 +7,7 @@ import {
 } from '../../../../lib/headless-response';
 import { readHeadlessWorkItems } from '../../../../lib/headless-projections';
 import { resolveViewerContextForRequest } from '../../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../../lib/request-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,17 +21,21 @@ export function GET(req: NextRequest) {
 
   try {
     authorizeHeadlessOperation(resolvedViewer.context, 'chronos.work_items.read', {
-      tenantSlug: req.nextUrl.searchParams.get('tenant') || undefined,
-      organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,
-      projectId: req.nextUrl.searchParams.get('project_id') || undefined,
+      tenantSlug: readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant')),
+      organizationId: readChronosOptionalStringParam(
+        req.nextUrl.searchParams.get('organization_id')
+      ),
+      projectId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id')),
     });
     const projection = readHeadlessWorkItems(resolvedViewer.context, {
-      tenant: req.nextUrl.searchParams.get('tenant') || undefined,
-      organizationId: req.nextUrl.searchParams.get('organization_id') || undefined,
-      projectId: req.nextUrl.searchParams.get('project_id') || undefined,
-      missionId: req.nextUrl.searchParams.get('mission_id') || undefined,
-      scope: req.nextUrl.searchParams.get('scope') || undefined,
-      view: req.nextUrl.searchParams.get('view') || undefined,
+      tenant: readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant')),
+      organizationId: readChronosOptionalStringParam(
+        req.nextUrl.searchParams.get('organization_id')
+      ),
+      projectId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project_id')),
+      missionId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('mission_id')),
+      scope: readChronosOptionalStringParam(req.nextUrl.searchParams.get('scope')),
+      view: readChronosOptionalStringParam(req.nextUrl.searchParams.get('view')),
     });
     return NextResponse.json(headlessEnvelope('work-items', projection, resolvedViewer.context));
   } catch (error) {

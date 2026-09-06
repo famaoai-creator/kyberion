@@ -35,6 +35,7 @@ import {
   viewerScopeTenantSlugs,
   withViewerExecutionContext,
 } from '../../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../../lib/request-input';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -189,8 +190,8 @@ export async function GET(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   const encoder = new TextEncoder();
-  const missionId = req.nextUrl.searchParams.get('mission') || undefined;
-  const scopeKind = req.nextUrl.searchParams.get('scope_kind') || undefined;
+  const missionId = readChronosOptionalStringParam(req.nextUrl.searchParams.get('mission'));
+  const scopeKind = readChronosOptionalStringParam(req.nextUrl.searchParams.get('scope_kind'));
   const allowedScopeKinds = new Set([
     'system',
     'tenant',
@@ -201,17 +202,21 @@ export async function GET(req: NextRequest) {
     'session',
   ]);
   const scopeFilter: Omit<EventScopeFilter, 'tenant_slug' | 'tenant_slugs'> = {
-    ...(req.nextUrl.searchParams.get('organization')
-      ? { organization_id: req.nextUrl.searchParams.get('organization')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization'))
+      ? {
+          organization_id: readChronosOptionalStringParam(
+            req.nextUrl.searchParams.get('organization')
+          )!,
+        }
       : {}),
-    ...(req.nextUrl.searchParams.get('project')
-      ? { project_id: req.nextUrl.searchParams.get('project')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('project'))
+      ? { project_id: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project'))! }
       : {}),
-    ...(req.nextUrl.searchParams.get('task')
-      ? { task_id: req.nextUrl.searchParams.get('task')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('task'))
+      ? { task_id: readChronosOptionalStringParam(req.nextUrl.searchParams.get('task'))! }
       : {}),
-    ...(req.nextUrl.searchParams.get('session')
-      ? { session_id: req.nextUrl.searchParams.get('session')! }
+    ...(readChronosOptionalStringParam(req.nextUrl.searchParams.get('session'))
+      ? { session_id: readChronosOptionalStringParam(req.nextUrl.searchParams.get('session'))! }
       : {}),
     ...(scopeKind && allowedScopeKinds.has(scopeKind)
       ? { scope_kind: scopeKind as EventScopeFilter['scope_kind'] }
@@ -221,7 +226,7 @@ export async function GET(req: NextRequest) {
   try {
     tenantSlugs = viewerScopeTenantSlugs(
       resolvedViewer.context,
-      req.nextUrl.searchParams.get('tenant') || undefined
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'))
     );
   } catch (error) {
     return viewerErrorResponse(error);
