@@ -22883,3 +22883,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-distill.ts`、mission-distill test、wisdom-policy catalog test、PI-03
 - **変更**: mission-distill の distill prompt read を operation-time の regular-file 境界へ接続し、directory replacement を wisdom生成へ到達させず空prompt fallbackへ閉じるようにした。governed wisdom policy catalog と既存の distillation semantics は維持した。
 - **検証**: mission-distill／wisdom-policy catalog **2 files／6 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1614
+
+- **対象**: `libs/core/knowledge-weight-recalculation.ts`、knowledge-weight-recalculation test、PI-03
+- **変更**: knowledge-weight recalculation の governance backup read を operation-time の regular-file 境界へ接続し、directory replacement の本文を backup／historyへ読み込まないようにした。既存の tenant scope、steward approval、stale proposal、governed weight loader semantics は維持した。
+- **検証**: knowledge-weight-recalculation **2 files／5 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
