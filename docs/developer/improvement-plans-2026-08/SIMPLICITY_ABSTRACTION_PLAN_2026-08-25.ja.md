@@ -23819,3 +23819,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: task-scoped grants の認可台帳JSONL loader、SX-03／SX-09／PI-03
 - **変更**: operation-timeのregular-file確認後に行うtask grant JSONL読込を、手書きの行分割・parseから foundation `readJsonLines`へ統一した。malformed／torn行skip、各recordのschema validation、last-record-wins、audience／expiry／revocation semantics、vitest default-path write guardは維持した。
 - **検証**: task-scoped grants **1 file／25 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1770
+
+- **対象**: scope offboarding の ledger／dedup registry 検証用 JSONL loader、SX-03／SX-04／PI-03
+- **変更**: ledger と post-offboarding verification が共有する一般的な JSONL record 読込を foundation `readJsonLines`へ統一した。operation-timeのregular-file境界、malformed行skip、object-only projectionは維持した。dedup registry の export／prune は、corrupt行を保持しつつ非対象行を原文で再出力する契約があるため専用処理として残した。
+- **検証**: scope-offboarding **1 file／21 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
