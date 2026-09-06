@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { checkFirstWinDocs, FIRST_WIN_COMMANDS } from './check_first_win_docs.js';
+import {
+  checkFirstWinDocs,
+  FIRST_WIN_COMMANDS,
+  readFirstWinDocsTextFile,
+} from './check_first_win_docs.js';
 
 describe('first-win documentation contract', () => {
+  it('rejects a directory replacement before document parsing', () => {
+    expect(() => readFirstWinDocsTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation text reader for entry documents', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_first_win_docs.ts'), {
