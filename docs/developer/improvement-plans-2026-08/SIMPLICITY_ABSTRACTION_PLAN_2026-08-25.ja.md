@@ -23279,3 +23279,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_first_win_docs.ts`、`scripts/check_first_win_docs.test.ts`、PI-03
 - **変更**: first-win docs checkerのREADME／Quickstart／Initialization本文readを`readFirstWinDocsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcanonical command／stage order判定へ到達させないようにした。既存のfirst-win command、fence、canonical link semanticsは維持した。
 - **検証**: first-win docs **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行（3 documents OK）、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1680
+
+- **対象**: `scripts/check_foundation_adoption.ts`、`scripts/check_foundation_adoption.test.ts`、PI-03
+- **変更**: foundation adoption checkerのproduction source本文readを`readFoundationAdoptionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfoundation adoption／ratchet判定へ到達させないようにした。既存のsource roots、ratchet、allowlist semanticsは維持した。
+- **検証**: foundation adoption **2 files／5 tests passed**、対象ESLint、Prettier、checker direct実行（OK）、`git diff --check`で確認した。

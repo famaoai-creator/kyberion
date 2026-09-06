@@ -2,6 +2,7 @@ import path from 'node:path';
 import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
@@ -20,6 +21,13 @@ const JSONL_APPEND_RATCHET = 0;
 const ENV_RATCHET = 0;
 const SIMPLE_ISO_TIMESTAMP_RATCHET = 0;
 const SIMPLE_ISO_TIMESTAMP_PATTERN = /new\s+Date\(\)\.toISOString\(\)/gu;
+
+export function readFoundationAdoptionTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 export function countSimpleIsoTimestampViolations(source: string): number {
   return [...source.matchAll(SIMPLE_ISO_TIMESTAMP_PATTERN)].length;
@@ -61,7 +69,7 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
   let catalogDefinitionsWithoutSchema = 0;
 
   for (const filePath of files) {
-    const source = readTextFile(filePath);
+    const source = readFoundationAdoptionTextFile(filePath);
     const relativePath = path
       .relative(pathResolver.rootResolve('.'), filePath)
       .split(path.sep)
