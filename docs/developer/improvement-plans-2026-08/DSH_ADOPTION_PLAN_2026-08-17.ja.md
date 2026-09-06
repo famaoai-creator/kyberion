@@ -751,17 +751,17 @@ First-Win lifecycle smoke の live identity、schedule pipeline、dry-run fixtur
 
 ## 2026-09-06: PI-13／DH-11 の script integrity CLI 接続
 
-script integrity checkerをroot `package.json` の `check:script-integrity`へ登録した。共通 `defineScript`／`defineGenerator` のentrypoint監査は本体実装だけでなく、開発者とCIが同じ正規package scriptから再実行できることを受入条件とし、harness移行漏れを手動コマンドに依存させない。
+script integrity checkerを governed CLI の `pnpm kyberion check script-integrity`へ接続した。共通 `defineScript`／`defineGenerator` のentrypoint監査は本体実装だけでなく、開発者とCIが同じ正規commandから再実行できることを受入条件とし、harness移行漏れを手動コマンドに依存させない。
 
-検証: `pnpm run check:script-integrity`、checker **1 file / 7 tests passed**、Prettier。provider CLIの実OS-level enforcement probeと未監査direct loader全体inventoryは継続課題である。
+検証: `pnpm kyberion check script-integrity`、checker **1 file / 7 tests passed**、Prettier。provider CLIの実OS-level enforcement probeと未監査direct loader全体inventoryは継続課題である。
 
-`check_backend_conformance.ts`もroot `package.json` の `check:backend-conformance`へ接続し、通常のversion／help matrixと、明示した`-- --live-sandbox`の外部model-turn probeを同じentrypointで分離した。
+`check_backend_conformance.ts`も governed CLI の `pnpm kyberion check backend-conformance`へ接続し、通常のversion／help matrixと、明示した`--live-sandbox`の外部model-turn probeを同じentrypointで分離した。
 
 検証: 静的backend conformance matrix、既存core conformance suite、Prettier。実CLIのOS-level enforcement結果と未監査direct loader全体inventoryは継続課題である。
 
 ## 2026-09-06: PI-03 direct-loader inventory の標準入口
 
-`inventory_resource_loaders.ts` を root `package.json` の `inventory:resource-loaders` へ接続した。`libs/core`／`satellites`／`presence` の production TypeScript を対象に、直接 loader の file／line、loader 種別、path guard の静的証跡を JSON 化する。証跡が取れない callsite は `needs-review` として残し、未検証の読み込みを安全扱いしない。
+`inventory_resource_loaders.ts` を governed CLI の `pnpm kyberion inventory resource-loaders` へ接続した。`libs/core`／`satellites`／`presence` の production TypeScript を対象に、直接 loader の file／line、loader 種別、path guard の静的証跡を JSON 化する。証跡が取れない callsite は `needs-review` として残し、未検証の読み込みを安全扱いしない。
 
 検証: **1,345 files／195 callsites**（inline 6、nearby guard 114、needs-review 75）、関連 **1 file / 4 tests passed**、typecheck、Prettier。個別の path guard 修正と provider CLI の実 OS-level enforcement 結果は継続課題である。
 
