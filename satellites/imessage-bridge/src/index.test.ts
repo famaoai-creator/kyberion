@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runChannelTurn } from '@agent/core/channel-adapter';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { t } from '@agent/core/t';
 import type { IMessageStimulus } from '@agent/core/imessage-utils';
 import type { SurfaceConversationResult } from '@agent/core/channel-surface-types';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -142,8 +144,11 @@ describe('imessage bridge processing note', () => {
 
     const context = await buildIMessageChannelAdapter(MESSAGE).threadContext?.(TURN_INPUT);
 
-    expect(context).toContain('Recent iMessage thread context:');
-    expect(context).toContain('User (+15550000000): 前の相談');
+    const locale = resolveOperatorLocale();
+    expect(context).toContain(t('bridge:thread_context', { channel: 'iMessage' }, locale));
+    expect(context).toContain(
+      t('bridge:thread_user', { author: '+15550000000', text: '前の相談' }, locale)
+    );
     expect(context).not.toContain('ちょっと相談があります');
     expect(context).not.toContain('Current incoming message:');
   });

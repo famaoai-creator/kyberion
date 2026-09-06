@@ -30,6 +30,21 @@ describe('formatChannelThreadContext', () => {
       formatChannelThreadContext('Slack', [{ role: 'user', authorLabel: 'alice', text: '   ' }])
     ).toBeUndefined();
   });
+
+  it('renders thread context using the requested operator locale', () => {
+    expect(
+      formatChannelThreadContext(
+        'Slack',
+        [
+          { role: 'user', authorLabel: 'alice', text: 'こんにちは' },
+          { role: 'assistant', authorLabel: 'bot', text: '確認しました' },
+        ],
+        'ja'
+      )
+    ).toBe(
+      'Slack スレッドの最近の文脈:\nユーザー（alice）: こんにちは\nアシスタント: 確認しました'
+    );
+  });
 });
 
 describe('runChannelTurn', () => {

@@ -1,7 +1,7 @@
 ---
 title: SX-09b channel surface consolidation follow-up
 tags: [simplicity, channel-adapter, surface, 2026-08]
-last_updated: 2026-09-02
+last_updated: 2026-09-06
 status: partial
 ---
 
@@ -345,3 +345,14 @@ A2UI 共通 validator の適用範囲を再監査し、既知 operation の組�
 A2UI の wire Schema と runtime validator を再照合し、nested payload の未知 field と Component の `props` 欠落に対して Schema 側の制約が緩い残存を修正した。create／update／delete 各 payload、Component の `additionalProperties` と `props` 必須条件を runtime validator と一致させ、Schema 経由の検証でも同じ fail-closed 契約を適用するようにした。
 
 検証: A2UI／Computer Surface **3 files / 17 tests passed**、root typecheck、root lint、`git diff --check`、knowledge index 生成、canonical full gate **69/69 passed**。
+
+## 2026-09-06 再レビュー修正 32
+
+channel adapter の共通 thread formatter を再監査し、履歴の見出し・話者ラベルだけが
+`en` 固定で、operator locale を解決済みの各 bridge から渡せない残存を検出した。
+formatter に `SupportedLocale` を受け取る optional 引数を追加し、Slack／Telegram／Discord／iMessage
+の4 bridge が `resolveOperatorLocale()` を渡すようにした。既定値は `en` として既存の呼出し互換性を
+維持し、delivery gate、current message 除外、履歴件数制限、provider 配送 semantics は変更していない。
+
+検証: channel adapter／4 bridge **5 files／50 tests passed**、root typecheck、Prettier、`git diff --check`。
+全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
