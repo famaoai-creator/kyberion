@@ -7,10 +7,9 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { parseSafeJsonInput } from './foundation/json.js';
+import { readJsonLines } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { readTextFile } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -327,20 +326,20 @@ export function readPipelineRunJournal(filePath: string): PipelineRunJournalStat
   if (!safeExistsSync(safeFilePath))
     throw new Error(`[PIPELINE_JOURNAL] not found: ${safeFilePath}`);
   ensureRegularPipelineJournalFile(safeFilePath);
-  const lines = readTextFile(safeFilePath)
-    .split('\n')
-    .filter((line) => line.trim().length > 0);
+  let rows: Array<{ value: unknown; lineNumber: number }>;
+  try {
+    rows = readJsonLines(safeFilePath, {
+      onMalformed: 'throw',
+      map: (value, lineNumber) => ({ value, lineNumber }),
+    });
+  } catch {
+    throw new Error('[PIPELINE_JOURNAL] corrupt JSONL journal; refusing to resume');
+  }
   const events: PipelineRunJournalEvent[] = [];
   let previousSequence = 0;
   const catalog = pipelineJournalCatalog(safeFilePath);
-  for (const [index, line] of lines.entries()) {
-    let parsed: unknown;
-    try {
-      parsed = parseSafeJsonInput(line, 'pipeline journal event');
-    } catch {
-      throw new Error('[PIPELINE_JOURNAL] corrupt JSONL journal; refusing to resume');
-    }
-    const source = `${safeFilePath}:${index + 1}`;
+  for (const { value: parsed, lineNumber } of rows) {
+    const source = `${safeFilePath}:${lineNumber}`;
     const originalVersion =
       parsed && typeof parsed === 'object' && !Array.isArray(parsed)
         ? Number(
