@@ -23,6 +23,10 @@ export interface ResourceLoaderInventory {
   counts: Record<ResourceLoaderReviewStatus, number>;
 }
 
+export interface ResourceLoaderSourceOptions {
+  externalRegularFileHelpers?: ReadonlySet<string>;
+}
+
 const DEFAULT_ROOTS = ['libs/core', 'satellites', 'presence'];
 const LOADER_PATTERN = /\b(readJsonLines|readJson|readTextFile)(?:<[^\n;>]+>)?\s*\(/gu;
 const DECLARATION_PATTERN =
@@ -92,6 +96,55 @@ function collectRegularFileHelperNames(source: string): Set<string> {
   return names;
 }
 
+function resolveRelativeImportSource(
+  importer: string,
+  specifier: string,
+  sourceByFile: ReadonlyMap<string, string>
+): string | undefined {
+  if (!specifier.startsWith('.')) return undefined;
+  const base = path.resolve(path.dirname(importer), specifier);
+  const candidates = [
+    base,
+    base.replace(/\.js$/u, '.ts'),
+    base.replace(/\.mjs$/u, '.ts'),
+    `${base}.ts`,
+    `${base}.tsx`,
+    path.join(base, 'index.ts'),
+  ];
+  return candidates.find((candidate) => sourceByFile.has(candidate));
+}
+
+/**
+ * Resolve only named relative imports whose target module proves a
+ * regular-file check in the helper body. Package/barrel imports remain
+ * unclassified so the inventory does not turn a name match into false safety
+ * evidence without seeing the implementation.
+ */
+export function collectImportedRegularFileHelperNames(
+  importer: string,
+  source: string,
+  sourceByFile: ReadonlyMap<string, string>
+): Set<string> {
+  const names = new Set<string>();
+  const importPattern = /import\s*\{([\s\S]*?)\}\s*from\s*['"]([^'"]+)['"]/gu;
+  for (const match of source.matchAll(importPattern)) {
+    const bindings = match[1];
+    const specifier = match[2];
+    const importedFile = resolveRelativeImportSource(importer, specifier, sourceByFile);
+    if (!importedFile) continue;
+    const targetNames = collectRegularFileHelperNames(sourceByFile.get(importedFile) ?? '');
+    for (const binding of bindings.split(',')) {
+      const normalized = binding.replace(/\btype\s+/u, '').trim();
+      if (!normalized) continue;
+      const [imported, local = imported] = normalized
+        .split(/\s+as\s+/u)
+        .map((value) => value.trim());
+      if (targetNames.has(imported)) names.add(local);
+    }
+  }
+  return names;
+}
+
 function toRepoRelative(filePath: string): string {
   return path.relative(pathResolver.rootDir(), filePath).split(path.sep).join('/');
 }
@@ -103,7 +156,8 @@ function isLoaderDeclaration(line: string): boolean {
 function nearbyEvidence(
   lines: readonly string[],
   lineIndex: number,
-  regularFileHelpers: ReadonlySet<string>
+  regularFileHelpers: ReadonlySet<string>,
+  externalRegularFileHelpers: ReadonlySet<string>
 ): string[] {
   const start = Math.max(0, lineIndex - GUARD_LOOKBACK_LINES);
   const window = lines.slice(start, lineIndex + 1).join('\n');
@@ -116,12 +170,23 @@ function nearbyEvidence(
       evidence.push(`regular-file-helper:${helper}`);
     }
   }
+  for (const helper of externalRegularFileHelpers) {
+    const escapedHelper = helper.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+    if (new RegExp(`\\b${escapedHelper}(?:<[^>\\n]+>)?\\s*\\(`, 'u').test(window)) {
+      evidence.push(`external-regular-file-helper:${helper}`);
+    }
+  }
   return [...new Set(evidence)];
 }
 
-export function scanResourceLoaderSource(file: string, source: string): ResourceLoaderCallSite[] {
+export function scanResourceLoaderSource(
+  file: string,
+  source: string,
+  options: ResourceLoaderSourceOptions = {}
+): ResourceLoaderCallSite[] {
   const lines = source.split(/\r?\n/u);
   const regularFileHelpers = collectRegularFileHelperNames(source);
+  const externalRegularFileHelpers = options.externalRegularFileHelpers ?? new Set<string>();
   const callsites: ResourceLoaderCallSite[] = [];
   for (const [index, line] of lines.entries()) {
     if (isLoaderDeclaration(line)) continue;
@@ -130,7 +195,7 @@ export function scanResourceLoaderSource(file: string, source: string): Resource
       const inline = line.slice(match.index).includes('assertSafeRepositoryPath(');
       const evidence = inline
         ? ['assertSafeRepositoryPath']
-        : nearbyEvidence(lines, index, regularFileHelpers);
+        : nearbyEvidence(lines, index, regularFileHelpers, externalRegularFileHelpers);
       callsites.push({
         file,
         line: index + 1,
@@ -171,8 +236,15 @@ export function buildResourceLoaderInventory(
   roots: readonly string[] = DEFAULT_ROOTS
 ): ResourceLoaderInventory {
   const files = sourceFiles(roots);
+  const sourceByFile = new Map(files.map((file) => [file, readTextFile(file)]));
   const callsites = files.flatMap((file) =>
-    scanResourceLoaderSource(toRepoRelative(file), readTextFile(file))
+    scanResourceLoaderSource(toRepoRelative(file), sourceByFile.get(file) ?? '', {
+      externalRegularFileHelpers: collectImportedRegularFileHelperNames(
+        file,
+        sourceByFile.get(file) ?? '',
+        sourceByFile
+      ),
+    })
   );
   const counts: Record<ResourceLoaderReviewStatus, number> = {
     'inline-safe-path': 0,

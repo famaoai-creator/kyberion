@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { scanResourceLoaderSource } from './inventory_resource_loaders.js';
+import {
+  collectImportedRegularFileHelperNames,
+  scanResourceLoaderSource,
+} from './inventory_resource_loaders.js';
 
 describe('resource loader inventory', () => {
   it('records inline path validation as the strongest evidence', () => {
@@ -118,6 +121,89 @@ describe('resource loader inventory', () => {
         loader: 'readTextFile',
         status: 'nearby-path-guard',
         evidence: ['assertSafeRepositoryPath'],
+      },
+    ]);
+  });
+
+  it('follows a relative regular-file helper import into its implementation', () => {
+    const importer = '/repo/libs/consumer.ts';
+    const helper = '/repo/libs/resource-guards.ts';
+    const sourceByFile = new Map([
+      [
+        importer,
+        [
+          "import { assertRegularArtifact as assertArtifact } from './resource-guards.js';",
+          'assertArtifact(filePath);',
+          'return readJson(filePath);',
+        ].join('\n'),
+      ],
+      [
+        helper,
+        [
+          'export function assertRegularArtifact(filePath: string): void {',
+          '  if (!safeStat(filePath).isFile()) throw new Error("not a file");',
+          '}',
+        ].join('\n'),
+      ],
+    ]);
+
+    const external = collectImportedRegularFileHelperNames(
+      importer,
+      sourceByFile.get(importer) ?? '',
+      sourceByFile
+    );
+    expect(external).toEqual(new Set(['assertArtifact']));
+    expect(
+      scanResourceLoaderSource(importer, sourceByFile.get(importer) ?? '', {
+        externalRegularFileHelpers: external,
+      })
+    ).toEqual([
+      {
+        file: importer,
+        line: 3,
+        loader: 'readJson',
+        status: 'nearby-path-guard',
+        evidence: ['external-regular-file-helper:assertArtifact'],
+      },
+    ]);
+  });
+
+  it('does not follow a relative path-only helper as regular-file evidence', () => {
+    const importer = '/repo/libs/consumer.ts';
+    const helper = '/repo/libs/resource-guards.ts';
+    const sourceByFile = new Map([
+      [
+        importer,
+        [
+          "import { safeArtifactPath } from './resource-guards.js';",
+          'safeArtifactPath(filePath);',
+          'return readJson(filePath);',
+        ].join('\n'),
+      ],
+      [
+        helper,
+        [
+          'export function safeArtifactPath(filePath: string): string {',
+          '  return assertSafeRepositoryPath(filePath);',
+          '}',
+        ].join('\n'),
+      ],
+    ]);
+
+    expect(
+      collectImportedRegularFileHelperNames(
+        importer,
+        sourceByFile.get(importer) ?? '',
+        sourceByFile
+      )
+    ).toEqual(new Set());
+    expect(scanResourceLoaderSource(importer, sourceByFile.get(importer) ?? '')).toEqual([
+      {
+        file: importer,
+        line: 3,
+        loader: 'readJson',
+        status: 'needs-review',
+        evidence: [],
       },
     ]);
   });
