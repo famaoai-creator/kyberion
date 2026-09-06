@@ -1935,3 +1935,9 @@ Presence Studio の Express `/a2ui/dispatch` に残っていた `req.body` の�
 iMessage bridge の BlueBubbles webhook と `/send` に残っていた Express `req.body` の直接 domain parser渡しを、共有 `parseSafeJsonObjectValue` 境界へ移行した。webhook secret検証後かつ外部処理前に object shape と dangerous JSON key を検査し、既存のイベント無視、送信validation、wire error semanticsは維持した。
 
 検証: iMessage／BlueBubbles **2 files／21 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 253
+
+Terminal bridge の `/sessions` に残っていた Express `req.body` の直接 session parser渡しを、共有 `parseSafeJsonObjectValue` 境界へ移行した。session creationの既存validation、認証、path／runtime semanticsは維持し、配列・null・dangerous JSON keyをsession生成前に拒否する回帰境界を追加した。
+
+検証: Terminal bridge **2 files／8 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。
