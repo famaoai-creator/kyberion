@@ -716,6 +716,46 @@
       "audience": "dev"
     },
     {
+      "id": "script.auth.check",
+      "module": "scripts/reasoning_auth_check.ts",
+      "command": "auth check",
+      "noun": "auth",
+      "verb": "check",
+      "audience": "operator"
+    },
+    {
+      "id": "script.check.backend-conformance",
+      "module": "scripts/check_backend_conformance.ts",
+      "command": "check backend-conformance",
+      "noun": "check",
+      "verb": "backend-conformance",
+      "audience": "dev"
+    },
+    {
+      "id": "script.inventory.resource-loaders",
+      "module": "scripts/inventory_resource_loaders.ts",
+      "command": "inventory resource-loaders",
+      "noun": "inventory",
+      "verb": "resource-loaders",
+      "audience": "dev"
+    },
+    {
+      "id": "script.check.script-integrity",
+      "module": "scripts/check_script_integrity.ts",
+      "command": "check script-integrity",
+      "noun": "check",
+      "verb": "script-integrity",
+      "audience": "dev"
+    },
+    {
+      "id": "script.check.improvement-plan-metadata",
+      "module": "scripts/check_improvement_plan_metadata.ts",
+      "command": "check improvement-plan-metadata",
+      "noun": "check",
+      "verb": "improvement-plan-metadata",
+      "audience": "dev"
+    },
+    {
       "id": "script.report.i18n-coverage",
       "script": "report:i18n-coverage",
       "command": "report i18n-coverage",

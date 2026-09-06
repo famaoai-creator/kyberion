@@ -83,6 +83,25 @@ describe('kyberion command router', () => {
     expect(output[0]).toEqual(expect.stringContaining('Uninstall steps'));
   });
 
+  it('keeps verification and authentication tools module-backed', () => {
+    expect(resolveScriptCommand('auth check')).toMatchObject({
+      module: 'scripts/reasoning_auth_check.ts',
+      command: 'auth check',
+    });
+    expect(resolveScriptCommand('check backend-conformance')).toMatchObject({
+      module: 'scripts/check_backend_conformance.ts',
+    });
+    expect(resolveScriptCommand('inventory resource-loaders')).toMatchObject({
+      module: 'scripts/inventory_resource_loaders.ts',
+    });
+    expect(resolveScriptCommand('check script-integrity')).toMatchObject({
+      module: 'scripts/check_script_integrity.ts',
+    });
+    expect(resolveScriptCommand('check improvement-plan-metadata')).toMatchObject({
+      module: 'scripts/check_improvement_plan_metadata.ts',
+    });
+  });
+
   it('rejects unknown commands instead of falling back to an executable surface', () => {
     expect(() => selectEntrypoint('unknown-command')).toThrow('Unknown kyberion command');
   });
