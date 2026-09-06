@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { readTextFile } from './foundation/text.js';
@@ -365,12 +366,12 @@ async function evaluateGateCheck(
       if (!isRegularGateFile(safeArtifactPath)) {
         return { passed: false, reason: `Deliverable must be a regular file: ${artifactPath}` };
       }
-      const raw = readTextFile(safeArtifactPath);
-      let artifact: unknown = raw;
+      let artifact: unknown;
       try {
-        artifact = parseSafeJsonInput(raw, 'mission gate deliverable');
+        artifact = readJson<unknown>(safeArtifactPath);
       } catch {
         // Non-JSON deliverables (markdown, text) are evaluated as raw text.
+        artifact = readTextFile(safeArtifactPath);
       }
       const extension = safeArtifactPath.split('.').pop() ?? '';
       const kind =
