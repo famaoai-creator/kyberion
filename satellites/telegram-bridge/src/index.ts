@@ -692,6 +692,7 @@ export async function handleTelegramUpdate(
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'telegram',
+          locale: resolveOperatorLocale(),
           text,
           channel: chatId,
           threadTs,

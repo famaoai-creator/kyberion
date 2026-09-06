@@ -375,3 +375,9 @@ approval／clarification contract labelsが同じlocaleで描画されるよう�
 
 検証: channel adapter／4 bridge **5 files／51 tests passed**、root typecheck、Prettier、`git diff --check`。
 framework-specific request parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 35
+
+shared surface conversation inputへ `SupportedLocale` を追加し、orchestratorが生成する `IntentResolutionContract` の `next_action` label／consequenceまでbridgeのoperator localeを利用するようにした。専用channel formatterと契約直接描画のlocaleを同一経路へ揃え、既定の英語とprovider配送、approval／tenant scope semanticsは維持した。
+
+検証: intent contract／surface interaction／orchestrator／4 bridge **8 files／83 tests passed**、root typecheck、Prettier、`git diff --check`。framework-specific request parsing、provider実機受入、日英のchannelリテラル全面移行は引き続き未完了である。

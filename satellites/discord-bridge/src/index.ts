@@ -358,6 +358,7 @@ export async function handleDiscordMessage(message: Message) {
       ({ threadContext }) =>
         runSurfaceMessageConversation({
           surface: 'discord',
+          locale: resolveOperatorLocale(),
           text: message.content,
           channel: message.channelId,
           threadTs,

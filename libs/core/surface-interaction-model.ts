@@ -26,6 +26,7 @@ import type {
   SurfaceConversationMessageInput,
   SurfaceNotificationRecord,
 } from './channel-surface-types.js';
+import type { SupportedLocale } from './locale-normalize.js';
 import type { ExecutionFeedbackInput } from './execution-feedback.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 
@@ -150,6 +151,7 @@ export function resolveSurfaceIngressScope(input: {
 export interface BuildSurfaceConversationInputOptions {
   agentId: string;
   senderAgentId: string;
+  locale?: SupportedLocale;
   cwd?: string;
   threadContext?: string;
   forcedReceiver?: string;
@@ -625,6 +627,7 @@ export function buildSurfaceConversationInputFromMessage(
     agentId: options.agentId,
     query,
     senderAgentId: options.senderAgentId,
+    locale: options.locale,
     correlationId: message.correlationId,
     surface: message.surface,
     surfaceText: message.text,
@@ -726,6 +729,7 @@ export function buildSurfaceConversationInput(
   const baseInput = buildSurfaceConversationInputFromMessage(message, {
     agentId: input.agentId || manifest.agentId,
     senderAgentId: input.senderAgentId,
+    locale: input.locale,
     cwd: input.cwd,
     threadContext: input.threadContext,
     forcedReceiver: input.forcedReceiver,

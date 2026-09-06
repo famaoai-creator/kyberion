@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { t } from './t.js';
 
 const mocks = vi.hoisted(() => ({
   ask: vi.fn<(prompt: string, options?: unknown) => Promise<string>>(),
@@ -69,6 +70,27 @@ describe('surface approval wiring with the real intent and routing contracts', (
     expect(result.text).toContain('承認待ちです。まだ実行していません。');
     // The governed task-session route must stop before invoking a provider.
     expect(mocks.ask).not.toHaveBeenCalled();
+  });
+
+  it('carries an explicit surface locale into the generated contract action', async () => {
+    const { runSurfaceMessageConversation } = await import('./surface-runtime-orchestrator.js');
+
+    const result = await runSurfaceMessageConversation({
+      surface: 'telegram',
+      locale: 'qps-ploc',
+      channel: 'ops',
+      threadTs: 'production-wiring-locale',
+      text: 'secretを更新して',
+      actorId: 'operator-1',
+      senderAgentId: 'test-sender',
+    });
+
+    expect(result.intentResolution?.next_action.label).toBe(
+      t('next_action:intent_resolution_request_approval', undefined, 'qps-ploc')
+    );
+    expect(result.intentResolution?.next_action.label).not.toBe(
+      t('next_action:intent_resolution_request_approval', undefined, 'en')
+    );
   });
 
   it.each(['slack', 'chronos', 'presence', 'imessage', 'discord', 'telegram'] as const)(
