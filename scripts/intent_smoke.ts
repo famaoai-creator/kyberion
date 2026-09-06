@@ -5,12 +5,20 @@ import {
   safeMkdir,
   safeWriteFile,
   safeExistsSync,
+  safeLstat,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { logger } from '@agent/core/core';
 import { safeExec } from '@agent/core/secure-io';
 import { nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+
+export function readIntentSmokeTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 const DEFAULT_INTENTS = [
   'verify-actuator-capability',
@@ -121,7 +129,7 @@ export async function main(args: string[] = []): Promise<IntentSmokeRunResult> {
     )
   );
 
-  const summaryText = safeExistsSync(summaryPath) ? readTextFile(summaryPath) : '';
+  const summaryText = safeExistsSync(summaryPath) ? readIntentSmokeTextFile(summaryPath) : '';
   return { summaryText, failed, report };
 }
 
