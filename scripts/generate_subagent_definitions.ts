@@ -47,7 +47,7 @@ import { loadTeamRoleIndex } from '@agent/core/mission-team-index';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveCapabilityProfileForTeamRole } from '@agent/core/subagent-capability-profiles';
 import { readTextFile } from '@agent/core/foundation';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 import {
   buildAgyAgentDefinitionSource,
@@ -100,6 +100,13 @@ export const SHARED_DIRECTORY_RULES_LINES: readonly string[] =
 // controls which tier it gets.
 export const GENERATED_ROLES: readonly string[] = ['implementer', 'reviewer', 'devils_advocate'];
 
+export function readSubagentDefinitionsTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 interface TeamRoleDefinition {
   role: string;
   description: string;
@@ -124,7 +131,7 @@ function loadProcedureMarkdown(authorityRole: string | undefined): string | null
   if (!authorityRole) return null;
   const filePath = pathResolver.knowledge(`product/roles/${authorityRole}/PROCEDURE.md`);
   if (!safeExistsSync(filePath)) return null;
-  return readTextFile(filePath) || null;
+  return readSubagentDefinitionsTextFile(filePath) || null;
 }
 
 /**
