@@ -22739,3 +22739,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `presence/displays/presence-studio/server.ts`、Presence Studio route contract test、SX-08b
 - **変更**: Presence Studio の Express `/a2ui/dispatch` に残っていた `req.body` の直接利用を、Computer Surface と同じ共有 `parseSafeJsonObjectValue` 境界へ揃えた。A2UIの単体／配列形式、アクセス制御、既存のaudit／400 semanticsは維持し、危険なJSON keyを状態反映前に拒否する経路を共通化した。
 - **検証**: Presence Studio **3 files／9 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1590
+
+- **対象**: `satellites/imessage-bridge/src/index.ts`、iMessage／BlueBubbles test、SX-08b
+- **変更**: iMessage bridge の BlueBubbles webhook と `/send` に残っていた Express `req.body` の直接 domain parser渡しを、共有 `parseSafeJsonObjectValue` 境界へ移行した。webhook secret検証後かつ外部処理前に object shape と dangerous JSON key を検査し、既存のイベント無視、送信validation、wire error semanticsは維持した。
+- **検証**: iMessage／BlueBubbles **2 files／21 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。
