@@ -542,12 +542,9 @@ const main = async () => {
   const argv = await createStandardYargs(currentProcessArgv())
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
-  const inputContent = safeReadFile(resolveFilePath(String(argv.input)), {
-    encoding: 'utf8',
-  }) as string;
   const result = await handleAction(
     parseSafeJsonObjectValue(
-      parseSafeJsonInput(inputContent, 'file action input'),
+      readJson<unknown>(resolveFilePath(String(argv.input)), { label: 'file action input' }),
       'file action input'
     ) as unknown as FileAction
   );

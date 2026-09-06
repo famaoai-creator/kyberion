@@ -24107,3 +24107,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: native DOCX round-trip example entrypoint、SX-06／SX-12
 - **変更**: `libs/core/src/native-docx-engine/examples/roundtrip_docx.ts` に残っていた `process.argv`／`process.exit`／直接 `main().catch` を shared script harnessへ移行した。明示的な argv、usage error、compiled／source の direct-entry 判定を追加し、DOCX抽出・再生成・比較の処理内容は変更していない。entrypoint contract testで直接 process 境界の再発を固定した。
 - **検証**: DOCX entrypoint **1 test passed**、core build、root `pnpm run typecheck`、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-07 再レビュー実装 1818
+
+- **対象**: meeting／file actuator の CLI JSON input loader、SX-03／SX-10
+- **変更**: regular-file 境界を通過した `meeting action input` と `file action input` の読み込みを、手書きの `safeReadFile → parseSafeJsonInput` から foundation `readJson` へ統一した。既存の typed action parser、入力 path 境界、外部 bridge／CLI 出力の safe parser は維持し、foundation adoption checker の2件の既存 allowlist を削除した。
+- **検証**: meeting／file actuator／foundation adoption **3 files／58 tests passed**、checker OK、root `pnpm run typecheck`、対象ESLint、Prettier、`git diff --check`。

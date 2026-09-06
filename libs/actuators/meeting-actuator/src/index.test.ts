@@ -46,7 +46,7 @@ describe('meeting-actuator', () => {
     expect(parseMeetingActionResult({ status: 'success', elapsed: Number.NaN })).toBeUndefined();
   });
 
-  it('uses the safe parser at the action and bridge JSON boundaries', () => {
+  it('uses foundation readers at the action and bridge JSON boundaries', () => {
     const source = safeReadFile(
       path.join(
         pathResolver.rootDir(),
@@ -55,7 +55,7 @@ describe('meeting-actuator', () => {
       { encoding: 'utf8' }
     ) as string;
     expect(source).toContain("parseSafeJsonInput(normalized, 'meeting bridge result')");
-    expect(source).toContain("parseSafeJsonInput(inputContent, 'meeting action input')");
+    expect(source).toContain("readJson<unknown>(inputPath, { label: 'meeting action input' })");
     expect(source).not.toContain('handleAction(JSON.parse(inputContent))');
   });
 
