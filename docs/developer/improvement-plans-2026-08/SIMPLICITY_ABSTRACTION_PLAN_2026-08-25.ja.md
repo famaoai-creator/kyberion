@@ -23567,3 +23567,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: orchestrator `collect_system_status_snapshot`、SX-05／SX-07
 - **変更**: status snapshot が削除済み package alias `check:esm`／`check:catalogs` を呼び出していた残存を、`pnpm run check -- --scope pr --only esm` と `pnpm run check -- --scope full --only catalogs` へ置換した。canonical check registry command を実行する契約テストを追加し、status health が常に現行入口を使うようにした。
 - **検証**: orchestrator targeted tests、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
+
+## 2026-09-06 再レビュー実装 1728
+
+- **対象**: `schema-integrity` environment manifest、environment capability contract test、SX-07
+- **変更**: environment manifest に残っていた削除済み `check:esm` alias を、`pnpm -s run check -- --scope pr --only esm` へ置換した。manifest contract test が ESM probe も canonical command として検査するよう拡張し、宣言だけ旧 alias のまま戻る再発を防止した。
+- **検証**: environment capability targeted tests、対象 ESLint、Prettier、`git diff --check`。CI／provider 実機受入は継続確認対象である。
