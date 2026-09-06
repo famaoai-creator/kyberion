@@ -458,3 +458,10 @@ Presence Studio runtime-data の onboarding voice-sample `profile_id` query を�
 共通 `readPresenceStudioStringParam` を runtime-data の入口にも接続し、未指定値は空文字、単一 string だけを既存の onboarding path／保存契約へ渡すようにした。
 
 検証: Presence Studio runtime-data boundary **1 file／3 tests passed**、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー修正 47
+
+Presence Studio onboarding voice-sample の `content-type` header を再監査し、header array を `String(...)`
+で暗黙連結して音声保存へ渡し得る残存を検出した。`readPresenceStudioStringParam` を header boundary にも接続し、単一 string 以外は空値として既存の content-type／保存処理へ渡すようにした。
+
+検証: Presence Studio runtime-data boundary **1 file／3 tests passed**、対象 ESLint、Prettier、`git diff --check`。

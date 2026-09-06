@@ -1073,7 +1073,7 @@ app.post(
       const data = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
       const result = saveBrowserOnboardingVoiceSample({
         profileId,
-        contentType: String(req.headers['content-type'] || ''),
+        contentType: readPresenceStudioStringParam(req.headers['content-type']) ?? '',
         data,
       });
       logger.info(

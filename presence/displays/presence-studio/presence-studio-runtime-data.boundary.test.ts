@@ -33,5 +33,7 @@ describe('presence studio runtime environment boundary', () => {
 
     expect(source).toContain('readPresenceStudioStringParam(req.query.profile_id)');
     expect(source).not.toContain("String(req.query.profile_id || '').trim()");
+    expect(source).toContain("readPresenceStudioStringParam(req.headers['content-type'])");
+    expect(source).not.toContain("String(req.headers['content-type'] || '')");
   });
 });
