@@ -36,4 +36,14 @@ describe('presence studio runtime environment boundary', () => {
     expect(source).toContain("readPresenceStudioStringParam(req.headers['content-type'])");
     expect(source).not.toContain("String(req.headers['content-type'] || '')");
   });
+
+  it('uses the shared scalar reader for headless tenant narrowing', () => {
+    const source = safeReadFile(
+      fileURLToPath(new URL('./presence-studio-runtime-data.ts', import.meta.url)),
+      { encoding: 'utf8' }
+    );
+
+    expect(source.match(/readSurfaceStringParam\(req\.query\.tenant\)/gu)).toHaveLength(2);
+    expect(source).not.toContain("typeof req.query.tenant === 'string'");
+  });
 });

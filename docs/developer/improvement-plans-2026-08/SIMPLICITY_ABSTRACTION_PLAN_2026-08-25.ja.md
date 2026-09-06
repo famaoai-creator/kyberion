@@ -23537,3 +23537,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/surface-request-input.ts`、Presence Studio／Computer Surface の OS control-plane route、SX-09b
 - **変更**: 2つの Express surface に重複していた `mission_id` の scalar判定を共有 `readSurfaceStringParam` へ統合した。repeated query は既存どおり400で拒否し、単一 string だけを OS projection へ渡す境界と、配列・object を暗黙文字列化しない core 回帰を追加した。
 - **検証**: core／Presence Studio／Computer Surface **3 files／24 tests passed**、対象 ESLint、Prettier、`git diff --check`。外部OS provider 実機受入は継続課題である。
+
+## 2026-09-06 再レビュー実装 1723
+
+- **対象**: Presence Studio runtime-data headless overview、shared surface request reader、SX-09b
+- **変更**: headless overview／A2UI overview に残っていた tenant query の framework-specific `typeof` 判定2箇所を `readSurfaceStringParam` へ統一した。単一 string／非scalarの既存 narrowing semantics を維持し、shared reader の利用数を境界テストで固定した。
+- **検証**: Presence Studio runtime-data boundary **1 file／4 tests passed**、対象 ESLint、Prettier、`git diff --check`。外部OS/provider実機受入は継続課題である。

@@ -37,6 +37,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { toWireError } from '@agent/core/wire-error';
+import { readSurfaceStringParam } from '@agent/core/surface-request-input';
 import { saveBrowserOnboardingVoiceSample } from '@agent/core/browser-onboarding';
 import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';
 import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
@@ -1120,7 +1121,7 @@ app.get('/api/headless/manifest', (req, res) => {
 app.get('/api/headless/overview', (req, res) => {
   try {
     const viewer = resolvePresenceStudioViewerContext(req);
-    const requestedTenant = typeof req.query.tenant === 'string' ? req.query.tenant : undefined;
+    const requestedTenant = readSurfaceStringParam(req.query.tenant);
     authorizePresenceOperation(viewer, 'presence.overview.read', {
       tenantSlug: requestedTenant,
     });
@@ -1138,7 +1139,7 @@ app.get('/api/headless/overview', (req, res) => {
 app.get('/api/headless/a2ui/overview', (req, res) => {
   try {
     const viewer = resolvePresenceStudioViewerContext(req);
-    const requestedTenant = typeof req.query.tenant === 'string' ? req.query.tenant : undefined;
+    const requestedTenant = readSurfaceStringParam(req.query.tenant);
     authorizePresenceOperation(viewer, 'presence.overview.a2ui', {
       tenantSlug: requestedTenant,
     });
