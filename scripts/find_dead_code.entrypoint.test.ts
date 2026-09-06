@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
+import { readDeadCodeTextFile } from './find_dead_code.js';
 
 describe('find dead code script boundary', () => {
   it('routes scan progress through the shared script printer', () => {
@@ -15,5 +16,12 @@ describe('find dead code script boundary', () => {
     expect(source).not.toContain('safeReadFile(file');
     expect(source).toContain('run({ print })');
     expect(source).toContain('main(print)');
+    expect(source).toContain('readDeadCodeTextFile(filePath: string)');
+  });
+
+  it('rejects a directory before reading scanned source', () => {
+    expect(() => readDeadCodeTextFile(pathResolver.rootResolve('libs'))).toThrow(
+      'must be a regular file'
+    );
   });
 });
