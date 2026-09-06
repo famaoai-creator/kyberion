@@ -23735,3 +23735,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: tenant rate limiter の stale lock JSON loader、SX-03／security boundary
 - **変更**: operation-time の regular-file確認後に行う lock JSON 読み込みを `readTextFile` + `parseSafeJsonInput` から foundation `readJson`へ統一した。malformed／空／invalid PIDを stale として reclaimする既存動作、symlink／lock path boundary、quota state の read-modify-write semanticsは維持し、破損 lock の回帰テストを追加した。
 - **検証**: tenant-rate-limiter **1 file／18 tests passed**、foundation adoption **1 file／7 tests passed**、canonical foundation-adoption gate、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1756
+
+- **対象**: environment capability の audit-chain JSONL probe、SX-03／SX-07
+- **変更**: audit-chain integrity probe の行単位読み込みを手書き `readTextFile` + `parseSafeJsonInput` から foundation `readJsonLines`へ統一した。regular-file boundary、空行処理、行番号付き malformed／shape error、fail-closed probe result、監査エントリの既存 validation semanticsは維持した。
+- **検証**: environment capability probe **3 files／73 tests passed**、foundation adoption **1 file／7 tests passed**、canonical foundation-adoption gate、`git diff --check`。

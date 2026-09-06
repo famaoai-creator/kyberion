@@ -22,8 +22,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
-import { readTextFile } from './foundation/text.js';
+import { parseSafeJsonObjectValue, readJson, readJsonLines } from './foundation/json.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -33,7 +32,6 @@ import {
   safeExec,
 } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { normalizePersistedAuditEntry } from './audit-chain.js';
 
 function kyberionEnv(name: string): string | undefined {
@@ -336,14 +334,16 @@ async function probeAuditChain(): Promise<{ available: boolean; reason?: string 
   }
   let lineNumber = 0;
   try {
-    const text = readTextFile(chainPath);
-    for (const raw of text.split('\n')) {
-      lineNumber += 1;
-      const line = raw.trim();
-      if (!line) continue;
-      const entry = parseSafeJsonInput(line, 'environment audit entry');
-      normalizePersistedAuditEntry(entry);
-    }
+    readJsonLines(chainPath, {
+      map: (entry, currentLine) => {
+        lineNumber = currentLine;
+        return normalizePersistedAuditEntry(entry);
+      },
+      onMalformed: (error, currentLine) => {
+        lineNumber = currentLine;
+        throw error;
+      },
+    });
     return { available: true };
   } catch (err: any) {
     return {
