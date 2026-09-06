@@ -223,4 +223,14 @@ describe('mission Project reassignment', () => {
       '[PROJECT_MISSION_LEDGER] ledger must be a regular file'
     );
   });
+
+  it('does not treat a directory markdown ledger as an existing ledger', async () => {
+    await saveState(MISSION_ID, fixtureMission());
+    const ledgerPath = resolveProjectLedgerPath(SOURCE_PATH);
+    safeMkdir(ledgerPath, { recursive: true });
+
+    await expect(syncProjectLedger(MISSION_ID, pathResolver.rootDir())).rejects.toThrow(
+      '[PROJECT_MISSION_LEDGER] ledger must be a regular file'
+    );
+  });
 });

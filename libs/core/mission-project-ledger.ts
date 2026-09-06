@@ -7,7 +7,13 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
 import { resolveMissionLedgerPolicy } from './mission-ledger-policy.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { loadState } from './mission-state.js';
 import {
   loadProjectMissionLedgerAtPath,
@@ -38,7 +44,12 @@ export function resolveProjectLedgerJsonPath(projectPath: string): string {
 
 export function ensureProjectMissionLedgerExists(ledgerPath: string): void {
   const safeLedgerPath = assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
-  if (safeExistsSync(safeLedgerPath)) return;
+  if (safeExistsSync(safeLedgerPath)) {
+    if (!safeLstat(safeLedgerPath).isFile()) {
+      throw new Error(`[PROJECT_MISSION_LEDGER] ledger must be a regular file: ${safeLedgerPath}`);
+    }
+    return;
+  }
   const blueprintPath = assertSafeRepositoryPath(
     pathResolver.knowledge('public/templates/blueprints/mission-ledger.md')
   );
