@@ -4,6 +4,7 @@ import { getFoundationIo } from './foundation/io.js';
 import { isRecord, readTextFile } from './foundation/text.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 const logger = createLogger('policy-engine');
 
@@ -178,12 +179,25 @@ class PolicyEngineImpl {
     const policyPath =
       filePath || path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
 
-    if (!getFoundationIo().exists(policyPath)) {
-      logger.warn(`[POLICY_ENGINE] Policy file not found: ${policyPath}`);
+    let safePolicyPath: string;
+    try {
+      safePolicyPath = assertSafeRepositoryPath(policyPath, { allowMissingLeaf: true });
+      if (!getFoundationIo().exists(safePolicyPath)) {
+        logger.warn(`[POLICY_ENGINE] Policy file not found: ${safePolicyPath}`);
+        return;
+      }
+      if (!safeLstat(safePolicyPath).isFile()) {
+        logger.warn(`[POLICY_ENGINE] Policy path is not a regular file: ${safePolicyPath}`);
+        return;
+      }
+    } catch (error: unknown) {
+      logger.warn(
+        `[POLICY_ENGINE] Policy path rejected: ${error instanceof Error ? error.message : String(error)}`
+      );
       return;
     }
 
-    const content = readTextFile(policyPath);
+    const content = readTextFile(safePolicyPath);
     // SA-05: a hand-rolled "simple YAML" parser silently produced empty
     // rules arrays for every policy (nested lists were unsupported), so the
     // engine never enforced anything. Parse with js-yaml; a parse failure
@@ -193,7 +207,7 @@ class PolicyEngineImpl {
       parsed = yaml.load(content);
     } catch (err: unknown) {
       logger.error(
-        `[POLICY_ENGINE] Failed to parse ${policyPath}: ${err instanceof Error ? err.message : String(err)}`
+        `[POLICY_ENGINE] Failed to parse ${safePolicyPath}: ${err instanceof Error ? err.message : String(err)}`
       );
       return;
     }
@@ -209,7 +223,7 @@ class PolicyEngineImpl {
       if (dropped > 0) {
         // Task 2.3: never run silently on fewer rules than the file declares.
         logger.warn(
-          `[POLICY_ENGINE] ${dropped} policy(ies) dropped (no parseable rules) — check ${policyPath}`
+          `[POLICY_ENGINE] ${dropped} policy(ies) dropped (no parseable rules) — check ${safePolicyPath}`
         );
       }
       logger.info(`[POLICY_ENGINE] Loaded ${this.policies.length} policies`);
