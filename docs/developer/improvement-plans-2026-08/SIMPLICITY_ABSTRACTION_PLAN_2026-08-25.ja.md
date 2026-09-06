@@ -23061,7 +23061,7 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 ## 2026-09-06 再レビュー実装 1643
 
 - **対象**: `package.json`、`scripts/reasoning_auth_check.ts`、entrypoint test、PI-11
-- **変更**: 既存のcredential shape／provider probe実装を重複させず、利用者向けのcanonical `pnpm auth check` を `reasoning_auth_check.ts` へ接続した。`--backend`、`--json`、`--probe`、`--quiet` は既存のshared harness経路を維持する。
+- **変更**: 既存のcredential shape／provider probe実装を重複させず、利用者向けのcanonical `pnpm kyberion auth check` を `reasoning_auth_check.ts` の module-backed command へ接続した。`--backend`、`--json`、`--probe`、`--quiet` は既存のshared harness経路を維持する。
 - **検証**: entrypoint **1 file／2 tests passed**、stub実行、Prettier、`git diff --check`、隔離環境root typecheck **exit 0**。通常auth checkは資格情報を出力せず、実provider検証は明示的な`--probe`経路に限定する。
 
 ## 2026-09-06 再レビュー実装 1644
@@ -23477,3 +23477,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/inventory_resource_loaders.ts`、`scripts/inventory_resource_loaders.test.ts`、PI-03
 - **変更**: resource loader inventory自身のsource本文readを`readResourceLoaderInventoryTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをsource scan／loader classification判定へ到達させないようにした。既存のroot filtering、helper evidence、classification semanticsは維持した。
 - **検証**: resource loader inventory **2 files／12 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。再計測は `inline-safe-path: 2 / nearby-path-guard: 99 / needs-review: 0`。
+
+## 2026-09-06 再レビュー実装 1713
+
+- **対象**: `package.json`、`knowledge/product/governance/cli-commands.json`、`scripts/kyberion.test.ts`、PI-03／PI-11／PI-13
+- **変更**: `auth`、`check:backend-conformance`、`inventory:resource-loaders`、`check:script-integrity`、`check:improvement-plan-metadata` の5つの package alias を削除し、既存の TypeScript entrypoint を統合 CLI の module-backed command（`pnpm kyberion auth check`、`pnpm kyberion check backend-conformance`、`pnpm kyberion inventory resource-loaders`、`pnpm kyberion check script-integrity`、`pnpm kyberion check improvement-plan-metadata`）へ移した。機能本体は保持し、package script 数を **125 → 120** に戻した。
+- **検証**: CLI manifest checker、module-backed command routing test、対象 Prettier、`git diff --check`で確認した。provider の実 OS-level enforcement、依存欠落による root typecheck、残存 direct-loader の意味的な全経路確認は継続課題である。
