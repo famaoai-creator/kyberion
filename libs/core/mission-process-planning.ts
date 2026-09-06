@@ -30,7 +30,13 @@ import {
   resolveMissionWorkflowDesign,
   type MissionWorkflowDesign,
 } from './mission-workflow-catalog.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReaddir } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReaddir,
+} from './secure-io.js';
 import { loadMissionPhaseGateDefinitionAtPath } from './mission-phase-gate-definition-reader.js';
 import {
   type MissionClass,
@@ -182,7 +188,7 @@ function renderPhaseChecklist(
   tasks: ProcessTemplatePlannedTask[]
 ): boolean {
   const taskBoardPath = safeMissionArtifactPath(missionDir, 'TASK_BOARD.md');
-  if (!safeExistsSync(taskBoardPath)) return false;
+  if (!isRegularProcessPlanningArtifactPath(taskBoardPath)) return false;
   const board = readTextFile(taskBoardPath);
   if (board.includes(CHECKLIST_HEADER)) return false;
 
@@ -207,6 +213,15 @@ function renderPhaseChecklist(
     provisioned: provisionMissionEntry(`${board.trimEnd()}\n${lines.join('\n')}`),
   });
   return true;
+}
+
+export function isRegularProcessPlanningArtifactPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
 }
 
 /**

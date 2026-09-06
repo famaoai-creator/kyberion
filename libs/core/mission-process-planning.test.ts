@@ -16,6 +16,7 @@ import {
   applyProcessTemplatePlan,
   evaluatePhaseEntryGate,
   evaluateStoredMissionGate,
+  isRegularProcessPlanningArtifactPath,
   markPhaseTasksCompleted,
   markPhaseTasksForRework,
   planProcessTemplateTasks,
@@ -84,6 +85,28 @@ afterEach(() => {
 });
 
 describe('mission process planning', () => {
+  it('does not read a directory replacement as a task board', () => {
+    const directoryPath = `${missionPath}/TASK_BOARD-directory.md`;
+    safeMkdir(directoryPath, { recursive: true });
+    try {
+      expect(isRegularProcessPlanningArtifactPath(directoryPath)).toBe(false);
+      safeRmSync(`${missionPath}/TASK_BOARD.md`, { force: true });
+      safeMkdir(`${missionPath}/TASK_BOARD.md`, { recursive: true });
+
+      const result = applyProcessTemplatePlan({
+        missionId,
+        missionDir: missionPath,
+        design: presentationDesign(),
+      });
+
+      expect(result.taskBoardUpdated).toBe(false);
+    } finally {
+      safeRmSync(directoryPath, { recursive: true, force: true });
+      safeRmSync(`${missionPath}/TASK_BOARD.md`, { recursive: true, force: true });
+      safeWriteFile(`${missionPath}/TASK_BOARD.md`, `# Task Board: ${missionId}\n`);
+    }
+  });
+
   it('rejects an external mission directory before writing a process plan', () => {
     expect(() =>
       applyProcessTemplatePlan({
