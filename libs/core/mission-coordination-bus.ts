@@ -1,4 +1,4 @@
-import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { isRecord, readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { randomUUID } from 'node:crypto';
@@ -207,32 +207,30 @@ export class MissionCoordinationBus {
             `[MISSION_COORDINATION_RESOURCE] stream must be a regular file: ${filePath}`
           );
         }
-        const raw = readTextFile(filePath);
-        for (const line of raw.split(/\r?\n/u)) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const event = parseMissionCoordinationEvent(
-              parseSafeJsonInput(trimmed, 'mission coordination event')
-            );
-            if (!event) continue;
-            if ('kind' in event && event.kind === 'ack') {
-              const ack = event;
-              const message = messages.get(ack.message_id);
-              if (message && !message.acknowledged_by.includes(ack.agent_id)) {
-                message.acknowledged_by.push(ack.agent_id);
-              }
-              continue;
+        const events = readJsonLines<
+          MissionCoordinationEvent | MissionCoordinationMessage | undefined
+        >(filePath, {
+          onMalformed: 'skip',
+          map: parseMissionCoordinationEvent,
+        }).filter(
+          (event): event is MissionCoordinationEvent | MissionCoordinationMessage =>
+            event !== undefined
+        );
+        for (const event of events) {
+          if ('kind' in event && event.kind === 'ack') {
+            const ack = event;
+            const message = messages.get(ack.message_id);
+            if (message && !message.acknowledged_by.includes(ack.agent_id)) {
+              message.acknowledged_by.push(ack.agent_id);
             }
-            const message = 'kind' in event ? event.message : event;
-            if (message.mission_id.toUpperCase() !== normalizedMissionId) continue;
-            messages.set(message.message_id, {
-              ...message,
-              acknowledged_by: [...message.acknowledged_by],
-            });
-          } catch {
-            // Ignore malformed legacy lines; the bus is append-only and should preserve subsequent records.
+            continue;
           }
+          const message = 'kind' in event ? event.message : event;
+          if (message.mission_id.toUpperCase() !== normalizedMissionId) continue;
+          messages.set(message.message_id, {
+            ...message,
+            acknowledged_by: [...message.acknowledged_by],
+          });
         }
       }
     });
