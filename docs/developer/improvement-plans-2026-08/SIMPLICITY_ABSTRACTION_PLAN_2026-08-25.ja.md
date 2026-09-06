@@ -23873,3 +23873,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: A2A conversation history の persisted JSONL reader、SX-03／SX-09／PI-03
 - **変更**: operation-timeのregular-file確認後に行うconversation historyの本文分割・safe JSON parse・turn projectionを foundation `readJsonLines`へ統一した。malformed turn skip、tier／mission projection、rehydration、append側の原文保持とMAX_TURNS semanticsは維持した。
 - **検証**: A2A conversation store **1 file／6 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1779
+
+- **対象**: agent identity journal の replay JSONL loader、SX-03／SX-09／PI-03
+- **変更**: operation-timeのregular-file確認後に行うNHI journalの行分割・safe JSON parse・shared envelope schema validationを foundation `readJsonLines`へ統一した。torn／corrupt line skip、sequence projection、identity issue／retire／runtime binding、journal resource boundaryは維持した。
+- **検証**: agent-identity **1 file／30 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
