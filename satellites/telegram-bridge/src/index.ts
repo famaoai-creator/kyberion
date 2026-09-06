@@ -1,6 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { isDirectEntry } from '@agent/core/direct-entry';
 import {
   appendJsonLine,
   getRegisteredEnvText,
@@ -49,6 +48,7 @@ import {
   runSurfaceMessageConversation,
 } from '@agent/core/channel-surface';
 import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
+import { defineScript, isDirectScript } from '@agent/core/script-harness';
 import * as path from 'node:path';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
@@ -852,8 +852,8 @@ async function handleInputFile(inputPath: string, options: TelegramBridgeOptions
   console.log(JSON.stringify(receipt, null, 2));
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs(process.argv)
+async function main(args: string[] = process.argv): Promise<void> {
+  const argv = await createStandardYargs(args)
     .option('input', {
       alias: 'i',
       type: 'string',
@@ -958,10 +958,13 @@ async function main(): Promise<void> {
   void runTelegramOutbox(drainOutbox);
 }
 
-const directEntry = isDirectEntry(import.meta.url, 'satellites/telegram-bridge/src/index.ts');
+const directEntry = isDirectScript(import.meta.url, 'satellites/telegram-bridge/src/index.ts');
+const runTelegramBridge = defineScript({
+  name: 'telegram-bridge',
+  async run({ argv }) {
+    await main(['node', 'satellites/telegram-bridge/src/index.ts', ...argv]);
+  },
+});
 if (directEntry && !getRegisteredEnvText('VITEST')) {
-  main().catch((error) => {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+  void runTelegramBridge();
 }

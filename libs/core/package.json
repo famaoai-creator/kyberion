@@ -1363,6 +1363,10 @@
       "types": "./dist/service-harness.d.ts",
       "default": "./dist/service-harness.js"
     },
+    "./script-harness": {
+      "types": "./dist/script-harness.d.ts",
+      "default": "./dist/script-harness.js"
+    },
     "./service-recording-session": {
       "types": "./dist/service-recording-session.d.ts",
       "default": "./dist/service-recording-session.js"
