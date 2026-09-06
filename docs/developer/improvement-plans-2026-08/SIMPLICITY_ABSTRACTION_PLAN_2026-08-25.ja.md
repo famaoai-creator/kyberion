@@ -23291,3 +23291,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_i18n_hardcoding.ts`、`scripts/check_i18n_hardcoding.test.ts`、PI-03
 - **変更**: i18n hardcoding checkerのworkspace source本文readを`readI18nHardcodingTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをkana／baseline判定へ到達させないようにした。既存のscan roots、exemption、baseline ratchet semanticsは維持した。
 - **検証**: i18n hardcoding **2 files／21 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミットmeeting／voice変更に伴うbaseline差分（増加2件、stale 4件）を表示したため、baselineは変更せず継続課題とした。
+
+## 2026-09-06 再レビュー実装 1682
+
+- **対象**: `scripts/check_improvement_plan_metadata.ts`、`scripts/check_improvement_plan_metadata.test.ts`、PI-03
+- **変更**: improvement plan metadata checkerのplan本文readを`readImprovementPlanTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをfrontmatter／metadata判定へ到達させないようにした。既存のplan roots、frontmatter normalization、`--fix` semanticsは維持した。
+- **検証**: improvement plan metadata **2 files／4 tests passed**、対象ESLint、Prettier、checker direct実行（335 documents OK）、`git diff --check`で確認した。
