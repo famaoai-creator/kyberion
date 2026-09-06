@@ -23825,3 +23825,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: scope offboarding の ledger／dedup registry 検証用 JSONL loader、SX-03／SX-04／PI-03
 - **変更**: ledger と post-offboarding verification が共有する一般的な JSONL record 読込を foundation `readJsonLines`へ統一した。operation-timeのregular-file境界、malformed行skip、object-only projectionは維持した。dedup registry の export／prune は、corrupt行を保持しつつ非対象行を原文で再出力する契約があるため専用処理として残した。
 - **検証**: scope-offboarding **1 file／21 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1771
+
+- **対象**: mission gate の `deliverable_quality` JSON成果物 loader、SX-03／SX-10／PI-03
+- **変更**: regular-file境界を通過したJSON成果物の読込を foundation `readJson`へ統一した。Markdown／text成果物は従来どおりJSON読込失敗時にraw textへフォールバックし、deliverable kind／quality rubric／score threshold semanticsは維持した。LLM reviewの本文読込と外部schema inputは混在入力のため対象外とした。
+- **検証**: mission gate **2 files／18 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
