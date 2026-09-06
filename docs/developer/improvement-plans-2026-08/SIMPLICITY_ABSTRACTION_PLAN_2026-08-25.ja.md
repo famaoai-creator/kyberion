@@ -22937,3 +22937,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/onboarding-context.ts`、onboarding-context test、PI-03
 - **変更**: onboarding apply／rollback の existing binding／organization snapshot read を共通 `readOptionalOnboardingFile` の operation-time regular-file 境界へ統一し、directory replacement を状態復元・binding更新へ到達させないようにした。既存の tenant activation、organization scaffold、rollback semantics は維持した。
 - **検証**: onboarding-context **2 files／11 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1623
+
+- **対象**: `libs/core/background-review-patch.ts`、background-review-patch test、PI-03
+- **変更**: background-review の pipeline／managed skill／memory target read を共通 operation-time regular-file 境界へ統一し、directory replacement を pre-image hash／patch適用へ到達させないようにした。既存の path containment、provenance、approval、hash-bound patch semantics は維持した。
+- **検証**: background-review-patch **2 files／13 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。

@@ -149,10 +149,21 @@ function resolvePipelineTarget(targetRef: unknown): { ref: string; absolute: str
   if (!(absolute === root || absolute.startsWith(`${root}${path.sep}`))) {
     throw new Error(`[POLICY_VIOLATION] Pipeline target escapes repository root: ${ref}`);
   }
-  return {
-    ref,
-    absolute: assertSafeRepositoryPath(absolute, { allowMissingLeaf: true }),
-  };
+  const safeAbsolute = assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
+  return { ref, absolute: assertRegularBackgroundTarget(safeAbsolute, ref, 'Pipeline') };
+}
+
+function assertRegularBackgroundTarget(filePath: string, ref: string, label: string): string {
+  if (!safeExistsSync(filePath)) throw new Error(`${label} target not found: ${ref}`);
+  try {
+    if (!safeLstat(filePath).isFile()) {
+      throw new Error(`[POLICY_VIOLATION] ${label} target must be a regular file: ${ref}`);
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[POLICY_VIOLATION]')) throw error;
+    throw new Error(`[POLICY_VIOLATION] ${label} target could not be inspected: ${ref}`);
+  }
+  return filePath;
 }
 
 function parsePipelinePatch(value: unknown): BackgroundPipelineAppendStepPatch {
@@ -612,10 +623,10 @@ function resolveManagedSkillTarget(targetRef: unknown): {
     throw new Error(`[POLICY_VIOLATION] Skill target escapes repository root: ${ref}`);
   }
   const safeAbsolute = assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
-  if (!safeExistsSync(safeAbsolute)) throw new Error(`Skill target not found: ${ref}`);
+  const regularSkillPath = assertRegularBackgroundTarget(safeAbsolute, ref, 'Skill');
 
   const sidecar = assertSafeRepositoryPath(
-    path.join(path.dirname(safeAbsolute), 'provenance.json'),
+    path.join(path.dirname(regularSkillPath), 'provenance.json'),
     { allowMissingLeaf: true }
   );
   if (!safeExistsSync(sidecar)) {
@@ -648,7 +659,7 @@ function resolveManagedSkillTarget(targetRef: unknown): {
       `[POLICY_VIOLATION] Managed skill provenance does not authorize append-only patching: ${ref}`
     );
   }
-  return { ref, absolute: safeAbsolute, provenance };
+  return { ref, absolute: regularSkillPath, provenance };
 }
 
 function resolveMemoryTarget(targetRef: unknown): { ref: string; absolute: string } {
@@ -662,8 +673,7 @@ function resolveMemoryTarget(targetRef: unknown): { ref: string; absolute: strin
     throw new Error(`[POLICY_VIOLATION] Memory target escapes repository root: ${ref}`);
   }
   const safeAbsolute = assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
-  if (!safeExistsSync(safeAbsolute)) throw new Error(`Memory target not found: ${ref}`);
-  return { ref, absolute: safeAbsolute };
+  return { ref, absolute: assertRegularBackgroundTarget(safeAbsolute, ref, 'Memory') };
 }
 
 function applySkillSection(content: string, section: string): string {

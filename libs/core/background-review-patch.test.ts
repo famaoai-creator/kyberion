@@ -332,6 +332,32 @@ describe('background-review-patch', () => {
     }
   });
 
+  it('rejects a pipeline target replaced by a directory', () => {
+    const ref = targetRef('directory');
+    const absolute = pathResolver.rootResolve(ref);
+    const candidate = saveProposal({
+      candidateId: `PATCH-TEST-${process.pid}-DIRECTORY`,
+      targetRef: ref,
+      patch: { operation: 'append_step', step: { op: 'system:log', params: { message: 'x' } } },
+    });
+    withExecutionContext('ecosystem_architect', () => safeMkdir(absolute, { recursive: true }));
+
+    try {
+      expect(() =>
+        applyBackgroundReviewPipelinePatch({
+          candidateId: candidate.candidate_id,
+          expectedSha256: '0'.repeat(64),
+          approvedBy: 'operator-test',
+          approvalRef: 'approval-test-directory',
+        })
+      ).toThrow(/target must be a regular file/);
+    } finally {
+      withExecutionContext('ecosystem_architect', () =>
+        safeRmSync(absolute, { recursive: true, force: true })
+      );
+    }
+  });
+
   it('rejects a patch that fails pipeline guardrails', () => {
     const ref = targetRef('guardrail');
     const before = writePipeline(ref, {
