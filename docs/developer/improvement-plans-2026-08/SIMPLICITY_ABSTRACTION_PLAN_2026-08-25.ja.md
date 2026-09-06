@@ -23129,3 +23129,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/agent_runtime_supervisor_daemon.ts`、`scripts/agent_runtime_supervisor_daemon.reader.test.ts`、PI-03
 - **変更**: agent runtime supervisorのPID lock inspection／cleanup readを`readDaemonLockTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementを多重起動・stale lock裁定へ到達させないようにした。既存のhealthy／stale lock semanticsは維持した。
 - **検証**: supervisor lock reader **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1655
+
+- **対象**: `scripts/marketing_video_dry_run.ts`、`scripts/marketing_video_dry_run.path.test.ts`、PI-03
+- **変更**: marketing video dry-runのcampaign brief／brand profile／生成artifact本文readを`readMarketingTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをmarketing validation／sensitive-data scanへ到達させないようにした。既存のpath scope、validation、dry-run semanticsは維持した。
+- **検証**: marketing dry-run path **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
