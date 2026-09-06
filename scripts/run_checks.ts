@@ -61,34 +61,57 @@ function isValidScope(value: string | undefined): value is Gate['scope'] {
   return value !== undefined && VALID_SCOPES.has(value as Gate['scope']);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 export function validateGateManifest(manifest: GateManifest, availableScripts?: Set<string>): void {
-  if (!manifest || !Array.isArray(manifest.gates)) {
+  if (!isRecord(manifest) || !Array.isArray(manifest.gates)) {
     throw new Error('ci gate manifest must contain a gates array');
   }
+  if (manifest.version !== 1) {
+    throw new Error(`ci gate manifest version must be 1: ${String(manifest.version)}`);
+  }
   const ids = new Set<string>();
-  for (const gate of manifest.gates) {
-    if (!gate.id || ids.has(gate.id)) {
+  for (const candidate of manifest.gates) {
+    if (!isRecord(candidate)) {
+      throw new Error('ci gate manifest entries must be objects');
+    }
+    const gate = candidate as unknown as Gate;
+    if (typeof gate.id !== 'string' || !gate.id.trim() || ids.has(gate.id)) {
       throw new Error(
         `ci gate manifest contains a duplicate or empty gate id: ${gate.id || '(empty)'}`
       );
     }
-    if (!isValidScope(gate.scope)) {
+    if (typeof gate.scope !== 'string' || !isValidScope(gate.scope)) {
       throw new Error(`ci gate ${gate.id} has an invalid scope: ${String(gate.scope)}`);
     }
-    const hasExecutable = Boolean(gate.executable);
-    const hasScript = Boolean(gate.script);
+    if (typeof gate.owner !== 'string' || !gate.owner.trim()) {
+      throw new Error(`ci gate ${gate.id} must declare a non-empty owner`);
+    }
+    if (typeof gate.rationale !== 'string' || !gate.rationale.trim()) {
+      throw new Error(`ci gate ${gate.id} must declare a non-empty rationale`);
+    }
+    if (
+      gate.args !== undefined &&
+      (!Array.isArray(gate.args) || gate.args.some((arg) => typeof arg !== 'string'))
+    ) {
+      throw new Error(`ci gate ${gate.id} args must be an array of strings`);
+    }
+    if (
+      gate.timeout_ms !== undefined &&
+      (!Number.isSafeInteger(gate.timeout_ms) || gate.timeout_ms <= 0)
+    ) {
+      throw new Error(`ci gate ${gate.id} timeout_ms must be a positive integer`);
+    }
+    const hasExecutable = typeof gate.executable === 'string' && gate.executable.trim().length > 0;
+    const hasScript = typeof gate.script === 'string' && gate.script.trim().length > 0;
     if (hasExecutable === hasScript) {
       throw new Error(`ci gate ${gate.id} must declare exactly one of executable or script`);
     }
     if (hasExecutable) {
       if (!Array.isArray(gate.args)) {
         throw new Error(`ci gate ${gate.id} executable gates must declare args`);
-      }
-      if (
-        gate.timeout_ms !== undefined &&
-        (!Number.isSafeInteger(gate.timeout_ms) || gate.timeout_ms <= 0)
-      ) {
-        throw new Error(`ci gate ${gate.id} timeout_ms must be a positive integer`);
       }
       const command = [gate.executable, ...gate.args].join(' ');
       if (/run_checks|pnpm\s+(run\s+)?(check|validate)|run_pipeline/.test(command)) {
