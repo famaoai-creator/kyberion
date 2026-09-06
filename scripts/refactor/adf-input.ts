@@ -27,6 +27,13 @@ const SCRIPT_WRAPPER_BASELINE_PATH = rootResolve(
   'scripts/pipeline-shell-independence.baseline.json'
 );
 
+export function readAdfInputTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function loadScriptWrapperBaseline(): AdfScriptWrapperBaselineEntry[] {
   if (
     !safeExistsSync(SCRIPT_WRAPPER_BASELINE_PATH) ||
@@ -156,7 +163,7 @@ export function expandPipelineIncludesForGuardrails<T extends { steps?: unknown[
             `core:include: circular reference detected — ${ref} is already in the include chain`
           );
         }
-        const fragment = parsePipelineFragment(readTextFile(fragmentPath), ref);
+        const fragment = parsePipelineFragment(readAdfInputTextFile(fragmentPath), ref);
         if (!Array.isArray(fragment?.steps)) {
           throw new Error(`core:include: fragment ${ref} must contain a steps array`);
         }

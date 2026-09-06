@@ -3,7 +3,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile, safeRmSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
-import { readValidatedPipelineAdf, readValidatedWorkflowAdf } from './adf-input.js';
+import {
+  readAdfInputTextFile,
+  readValidatedPipelineAdf,
+  readValidatedWorkflowAdf,
+} from './adf-input.js';
 
 const tmpRoot = pathResolver.sharedTmp('adf-input-tests');
 
@@ -205,6 +209,12 @@ describe('readValidatedPipelineAdf', () => {
 
     expect(source).toContain('parseSafeJsonInput(JSON.stringify(repaired)');
     expect(source).not.toContain('return JSON.parse(raw)');
+  });
+
+  it('rejects a directory before reading an include fragment', () => {
+    expect(() => readAdfInputTextFile(pathResolver.rootResolve('pipelines'))).toThrow(
+      'must be a regular file'
+    );
   });
 
   it('applies the pre-trust boundary to static pipeline fragments', async () => {

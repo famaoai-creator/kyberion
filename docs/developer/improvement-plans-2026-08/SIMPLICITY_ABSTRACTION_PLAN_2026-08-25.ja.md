@@ -23453,3 +23453,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/pipeline_promote.ts`、`scripts/pipeline_promote.resource-boundary.test.ts`、PI-03
 - **変更**: pipeline promoteのcatalog README本文readを`readPipelinePromotionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpromoted catalog row判定へ到達させないようにした。既存のADF validation、provenance、dry-run catalog semanticsは維持した。
 - **検証**: pipeline promote **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1709
+
+- **対象**: `scripts/refactor/adf-input.ts`、`scripts/refactor/adf-input.test.ts`、PI-03
+- **変更**: ADF input static include fragment本文readを`readAdfInputTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをinclude expansion／guardrail判定へ到達させないようにした。既存のtrust gate、safe JSON repair、cycle detection semanticsは維持した。
+- **検証**: adf-inputの既存テストに追加境界テストを含めて通過、対象ESLint、Prettier、`git diff --check`で確認した。
