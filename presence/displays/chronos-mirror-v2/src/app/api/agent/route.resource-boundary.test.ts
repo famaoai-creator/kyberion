@@ -37,4 +37,15 @@ describe('chronos agent route resource boundary', () => {
     expect(routeSource).toContain("['env:bootstrap', '--manifest', 'kyberion-toolchain']");
     expect(routeSource).not.toContain("['prereq:check']");
   });
+
+  it('passes the normalized request locale into the shared conversation contract', () => {
+    const routeSource = String(
+      safeReadFile(
+        pathResolver.rootResolve('presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts'),
+        { encoding: 'utf8' }
+      )
+    );
+
+    expect(routeSource).toContain('text: query,\n      locale,\n      threadTs: sessionId');
+  });
 });

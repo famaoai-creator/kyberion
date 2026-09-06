@@ -1873,3 +1873,9 @@ voice-hub の共有 surface conversation に入力言語のlocaleを渡し、voi
 Slack automation／mission proposal と Discord interaction rejection の日英直書きを shared bridge vocabularyへ移行し、各メッセージをoperator localeで描画するようにした。catalogはen／ja／qps-plocを生成し、approval／proposal decision、actor authorization、external deliveryの境界は変更していない。
 
 検証: Slack／Discord bridge **2 files／16 tests passed**、catalog integrity、vocabulary generators、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は引き続き未完了である。
+
+## 2026-09-06 再レビュー修正 247
+
+terminal-hud、Concierge fallback、Chronos APIで既に確定しているoperator localeを共有 conversation inputへ伝播した。Conciergeのpackage-level contract test suiteもroot Vitestへ追加し、locale／contract wiringの回帰をCI対象に含めた。viewer／tenant scope、voice fallback、approval semanticsは変更していない。
+
+検証: terminal-hud／Concierge／Chronos **3 files／27 tests passed**、root typecheck、Prettier、`git diff --check`。自由文入口統合、12 surfaceの全面contract描画、approval本番相当テスト、provider実機依存、package scriptsの削減は引き続き未完了である。

@@ -165,7 +165,7 @@ export function App({ initialPanel, initialLocale }: AppProps) {
       appendConversation({ who: 'you', text });
       setAskBusy(true);
       try {
-        const reply = await askKyberion(text);
+        const reply = await askKyberion(text, i18n.locale);
         setLastIntentResolution(reply.intentResolution);
         appendConversation({
           who: 'kyb',
