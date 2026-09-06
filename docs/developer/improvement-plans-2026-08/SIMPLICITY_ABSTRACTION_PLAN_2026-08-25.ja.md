@@ -23765,3 +23765,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: managed plugin install の manifest JSON loader、SX-03／SX-04／security boundary
 - **変更**: managed-copy install時の regular-file確認済み manifest readerを foundation `readJson`へ統一した。JSON parse失敗をSyntaxErrorとして分類する invalid-json／unreadable diagnostics、object validation、manifest provenance／activation gate、staging lifecycleは維持した。
 - **検証**: plugin managed install／skill plugin loader／plugin pack **3 files／49 tests passed**、foundation adoption **1 file／7 tests passed**、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1761
+
+- **対象**: scripts 共通 `readSafeJson*File` helper、SX-03／SX-06／SX-07
+- **変更**: checker／migration／task scenario が共有する `scripts/lib/json-input.ts` の persisted JSON readを foundation `readJson`へ移行した。既存の regular-file／path boundary、label付き malformed／dangerous-key error、object shape validation、各 scriptの呼び出し契約は維持した。
+- **検証**: script JSON boundary **8 files／48 tests passed**、foundation adoption **1 file／7 tests passed**、`git diff --check`。
