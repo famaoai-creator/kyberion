@@ -997,6 +997,7 @@ function _scanMarkdownHints(
 
     if (entry.endsWith('.md')) {
       try {
+        if (!safeLstat(fullPath).isFile()) continue;
         const content = readTextFile(fullPath);
         const title = _extractMarkdownTitle(content, entry);
         if (title) {

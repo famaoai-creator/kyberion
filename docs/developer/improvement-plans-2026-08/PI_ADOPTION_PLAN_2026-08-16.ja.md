@@ -858,6 +858,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 の direct-loader inventory から、Cowork→Kyberion artifact ingest の本文 read 前へ operation-time の regular-file 検査を追加し、directory replacement をtier分類／memory promotion queueへ到達させない回帰を追加した。関連 **2 files / 19 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: PI-03 の direct-loader inventory から、Codex CLI structured output の read 前へ operation-time の regular-file 検査を追加し、CLI 出力が欠落・directory replacementされた場合に JSON parse／usage記録へ到達させない回帰を追加した。関連 **2 files / 15 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 - 2026-09-06: PI-03 の direct-loader inventory から、tenant curation card の frontmatter read 前へ operation-time の regular-file 検査を追加し、directory replacement を kind／last_updated parseへ到達させず ledgerの ingested_at fallbackへ閉じる回帰を追加した。関連 **2 files / 5 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
+- 2026-09-06: PI-03 の direct-loader inventory から、knowledge index の Markdown scan read 前へ operation-time の regular-file 検査を追加し、`.md` 名の directoryを本文解析／chunk indexへ到達させない回帰を追加した。関連 **2 files / 15 tests passed**、Prettier、`git diff --check`で確認した。inventory の needs-review 個別修正と provider CLI の実 OS-level enforcement probe は継続課題である。
 
 ## 7. 検証コマンド(実装時)
 
