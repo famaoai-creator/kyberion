@@ -57,9 +57,7 @@
     "presence/sensors/voice-hub"
   ],
   "files": {
-    "libs/core/agent-activity-board.ts": 4,
     "libs/core/agent-collaboration-events.ts": 1,
-    "libs/core/agent-collaboration-projection.ts": 7,
     "libs/core/apple-intelligence-bridge.ts": 5,
     "libs/core/assistant-compiler-request.ts": 4,
     "libs/core/automation-blueprint-slack.ts": 2,
