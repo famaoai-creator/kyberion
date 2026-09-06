@@ -400,6 +400,20 @@ canonical resolverへフォールバックする。tenant／tier、approval、�
 root typecheck、Prettier、`git diff --check`。残る全surfaceの契約投影、approval本番相当テスト、provider実機依存、
 framework-specific request parsing、package scriptsの削減は継続課題である。
 
+## 2026-09-06 再レビュー修正 250
+
+approval本番相当回帰を再監査し、共有 `runSurfaceMessageConversation` の登録済み8 surfaceのうち、
+Slack／Chronos／Presence／iMessage／Discord／Telegramだけがテスト対象だった残存を修正した。
+Cowork／CLIも同じapproval contract、`IntentResolutionContract` の authority／next action、provider未実行の
+境界で検証した。合わせてCowork providerのinteraction登録と、CLI／Cowork task-sessionのschema enumを正本へ
+揃え、surfaceごとに別の承認解釈へ分岐しないことを固定した。承認保存、外部配送、tenant scope、human decision
+semanticsは変更していない。
+
+検証: 登録済み8 surfaceのproduction-like approval wiring **1 file／10 tests passed**、surface provider policy
+回帰を含む関連 **2 files／16 tests passed**、root typecheck、Prettier、
+`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、
+package scriptsの削減は継続課題である。
+
 ## 2026-08-30 実装レビュー追記 27
 
 CLI command registry を再監査し、実装側には email／calendar／task／schedule／project-trust の subcommand がある一方、

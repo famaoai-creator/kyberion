@@ -22715,3 +22715,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: productivity task plan、browser conversation、Super-Nerve resolver、CLI workflow／intent gateway、対象テスト、SX-08b
 - **変更**: 自由文を受け取る複数の実行補助入口に `IntentResolutionPacket` の受け渡し境界を追加した。CLIではtask plan・task session・実行contextが同じpacketを再利用し、browser conversationとSuper-Nerveもpacket未指定時だけcanonical resolverへフォールバックする。これにより同一ターンのintent／service parameter再解釈を抑え、tenant／tier・approval・実行順序は維持した。
 - **検証**: productivity plan／browser conversation／Super-Nerve／CLI entrypoint **4 files／35 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceの契約投影、approval本番相当テスト、provider実機依存、framework-specific request parsing、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1586
+
+- **対象**: surface interaction provider、surface provider policy、task-session schema、production-like approval wiring test、SX-08b
+- **変更**: manifestで公開済みだったCowork surfaceをinteraction provider seamへ登録し、routing policyが任意のCowork manifestでもfail-openせず未指定として扱うようにした。共有approval wiringは登録済み8 surfaceへ拡張し、CLI／Cowork task-sessionがschema境界で拒否されないようsurface enumを揃えた。承認保存、外部配送、tenant scope、人手判断の意味は変更していない。
+- **検証**: approval wiring／provider policy **2 files／16 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。

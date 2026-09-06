@@ -55,6 +55,9 @@ describe('surface-provider-policy', () => {
     expect(deriveSurfaceDelegationReceiverForProvider('telegram', '設計をレビューして')).toBe(
       'nerve-agent'
     );
+    expect(
+      deriveSurfaceDelegationReceiverForProvider('cowork', 'secretを更新して')
+    ).toBeUndefined();
   });
 
   it('loads slack-specific intent and execution rules from provider policy', () => {

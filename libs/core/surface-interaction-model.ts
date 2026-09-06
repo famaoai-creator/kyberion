@@ -490,6 +490,20 @@ export const telegramSurfaceProviderDefinition: SurfaceProviderDefinition = {
   createMessage: createSurfaceMessage,
 };
 
+export const coworkSurfaceProviderDefinition: SurfaceProviderDefinition = {
+  id: 'cowork',
+  capabilities: {
+    reply: true,
+    edit: false,
+    react: false,
+    notify: true,
+    asyncRequest: true,
+    responding: true,
+  },
+  createSpace: createSurfaceSpace,
+  createMessage: createSurfaceMessage,
+};
+
 // E2E-04 G5: the terminal is a first-class surface too — `pnpm kyberion ask`
 // and scripts/cli.ts route through the same brain as every bridge.
 export const cliSurfaceProviderDefinition: SurfaceProviderDefinition = {
@@ -514,6 +528,7 @@ registerSurfaceProvider(presenceSurfaceProviderDefinition);
 registerSurfaceProvider(imessageSurfaceProviderDefinition);
 registerSurfaceProvider(discordSurfaceProviderDefinition);
 registerSurfaceProvider(telegramSurfaceProviderDefinition);
+registerSurfaceProvider(coworkSurfaceProviderDefinition);
 registerSurfaceProvider(cliSurfaceProviderDefinition);
 
 export function createSlackSurfaceSpace(

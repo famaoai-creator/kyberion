@@ -28,6 +28,8 @@
         "imessage",
         "discord",
         "telegram",
+        "cowork",
+        "cli",
         "project-controller"
       ]
     },

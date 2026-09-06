@@ -10077,7 +10077,7 @@
     {
       "path": "product/schemas/task-session.schema.json",
       "tier": "public",
-      "size": 14340,
+      "size": 14373,
       "type": "json"
     },
     {
