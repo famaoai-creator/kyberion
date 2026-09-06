@@ -5,6 +5,9 @@ const PATH_ROUTES = [
   'knowledge-ref/route.ts',
   'runtime-file/route.ts',
   'trace-log/route.ts',
+  'mission-asset/route.ts',
+  'deliverable-preview/route.ts',
+  'traces/route.ts',
 ] as const;
 
 describe('Chronos route request input boundary', () => {
@@ -16,7 +19,7 @@ describe('Chronos route request input boundary', () => {
           { encoding: 'utf8' }
         )
       );
-      expect(source).toContain("req.nextUrl.searchParams.get('path')?.trim() ?? ''");
+      expect(source).toContain('readChronosStringParam(');
       expect(source).not.toContain("String(req.nextUrl.searchParams.get('path') || '')");
     }
   });

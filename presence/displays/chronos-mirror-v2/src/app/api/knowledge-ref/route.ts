@@ -16,6 +16,7 @@ import {
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
 import { normalizeScopedReadPath } from '../../../lib/scoped-read-path';
+import { readChronosOptionalStringParam, readChronosStringParam } from '../../../lib/request-input';
 
 function isAllowedKnowledgeRefPath(logicalPath: string): boolean {
   const normalized = normalizeScopedReadPath(logicalPath);
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
   if (requiresAccess) return requiresAccess;
   const resolvedViewer = resolveViewerContextForRequest(req);
   if (resolvedViewer.response) return resolvedViewer.response;
-  const logicalPath = req.nextUrl.searchParams.get('path')?.trim() ?? '';
+  const logicalPath = readChronosStringParam(req.nextUrl.searchParams.get('path'));
   if (!logicalPath) {
     return NextResponse.json({ error: 'path is required' }, { status: 400 });
   }
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
       { status: 403 }
     );
   }
-  const requestedTenant = req.nextUrl.searchParams.get('tenant') || undefined;
+  const requestedTenant = readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant'));
   let tenantSlugs: string[] | 'all';
   try {
     tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
