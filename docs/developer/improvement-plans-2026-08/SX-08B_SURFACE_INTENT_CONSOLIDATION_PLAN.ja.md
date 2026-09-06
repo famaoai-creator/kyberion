@@ -1941,3 +1941,9 @@ iMessage bridge の BlueBubbles webhook と `/send` に残っていた Express `
 Terminal bridge の `/sessions` に残っていた Express `req.body` の直接 session parser渡しを、共有 `parseSafeJsonObjectValue` 境界へ移行した。session creationの既存validation、認証、path／runtime semanticsは維持し、配列・null・dangerous JSON keyをsession生成前に拒否する回帰境界を追加した。
 
 検証: Terminal bridge **2 files／8 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、framework-specific request parsing、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 254
+
+`SurfaceAsyncChannel` と task-session schema にだけ存在していた `terminal` を、governed provider manifest、interaction provider seam、production-like approval wiringへ正式登録した。CLIと同じ session capabilitiesを利用しつつ provider id／channelをterminalとして分離し、manifest schema、一覧、routing policyの回帰を揃えた。
+
+検証: surface provider／approval wiring **4 files／30 tests passed**、manifest schema JSON、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、package scriptsの削減は継続課題とする。

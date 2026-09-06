@@ -102,6 +102,7 @@ describe('surface approval wiring with the real intent and routing contracts', (
     'telegram',
     'cowork',
     'cli',
+    'terminal',
   ] as const)('keeps approval gating consistent on the %s surface', async (surface) => {
     const { runSurfaceMessageConversation } = await import('./surface-runtime-orchestrator.js');
 

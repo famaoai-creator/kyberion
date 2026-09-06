@@ -520,6 +520,14 @@ export const cliSurfaceProviderDefinition: SurfaceProviderDefinition = {
   createMessage: createSurfaceMessage,
 };
 
+// The terminal bridge is the session-oriented sibling of the CLI surface.
+// Reuse the same interaction capabilities while keeping its provider id
+// distinct so persisted surface records remain explicit.
+export const terminalSurfaceProviderDefinition: SurfaceProviderDefinition = {
+  ...cliSurfaceProviderDefinition,
+  id: 'terminal',
+};
+
 // Auto-register defaults. A later registration must use a new provider id;
 // replacing a built-in provider is intentionally rejected by the seam.
 registerSurfaceProvider(slackSurfaceProviderDefinition);
@@ -530,6 +538,7 @@ registerSurfaceProvider(discordSurfaceProviderDefinition);
 registerSurfaceProvider(telegramSurfaceProviderDefinition);
 registerSurfaceProvider(coworkSurfaceProviderDefinition);
 registerSurfaceProvider(cliSurfaceProviderDefinition);
+registerSurfaceProvider(terminalSurfaceProviderDefinition);
 
 export function createSlackSurfaceSpace(
   input: SlackSurfaceInput & { correlationId?: string }
