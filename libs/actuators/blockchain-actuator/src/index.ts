@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { safeReadFile, safeMkdir, safeExistsSync } from '@agent/core/secure-io';
+import { safeMkdir, safeExistsSync } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
@@ -13,7 +13,7 @@ import {
   runActuatorCli,
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
-import { appendJsonLine, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
 
 /**
  * Blockchain-Actuator v1.0.0 [IMMUTABLE ANCHOR]
@@ -105,11 +105,10 @@ function parseMockChainEntry(value: unknown): BlockchainTransaction {
 function readMockChainEntries(): BlockchainTransaction[] {
   if (!safeExistsSync(MOCK_CHAIN_PATH)) return [];
   try {
-    return String(safeReadFile(MOCK_CHAIN_PATH, { encoding: 'utf8' }) || '')
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => parseMockChainEntry(parseSafeJsonInput(line, 'mock blockchain entry')));
+    return readJsonLines<unknown>(MOCK_CHAIN_PATH, {
+      map: (value) => parseMockChainEntry(value),
+      onMalformed: 'throw',
+    });
   } catch {
     return [];
   }

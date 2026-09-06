@@ -30,10 +30,6 @@ const LEGACY_JSON_BOUNDARY_ALLOWLIST: ReadonlyMap<string, { count: number; reaso
       { count: 1, reason: 'ADB session handoff output' },
     ],
     [
-      'libs/actuators/blockchain-actuator/src/index.ts',
-      { count: 1, reason: 'simulated blockchain JSONL fixture' },
-    ],
-    [
       'libs/actuators/ios-actuator/src/ios-runtime-helpers.ts',
       { count: 1, reason: 'simulator session handoff output' },
     ],
