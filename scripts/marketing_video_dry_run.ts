@@ -49,6 +49,13 @@ function resolveMarketingVideoPath(
   return assertSafeRepositoryPath(pathResolver.resolve(requested), { allowMissingLeaf });
 }
 
+export function readMarketingTextFile(filePath: string, label = filePath): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function childOutputPath(runDir: string, name: string): string {
   return assertSafeRepositoryPath(path.join(runDir, name), { allowMissingLeaf: true });
 }
@@ -89,8 +96,8 @@ export function runMarketingVideoDryRun(input: {
     throw new Error(`brand profile path must be a regular file: ${input.brandProfilePath}`);
   }
   const outputRoot = resolveMarketingVideoPath(input.outputRoot, 'output root', true);
-  const brief = readTextFile(briefPath);
-  const brand = readTextFile(brandPath);
+  const brief = readMarketingTextFile(briefPath, 'campaign brief path');
+  const brand = readMarketingTextFile(brandPath, 'brand profile path');
   const parsedBrief = parseSafeJsonObjectInput(brief, 'campaign brief JSON') as {
     intake: Parameters<typeof validateMarketingIntake>[0];
   };
@@ -317,15 +324,15 @@ export function runMarketingVideoDryRun(input: {
   const sensitiveDataScan = scanMarketingTextForSensitiveData([
     {
       location: 'campaign-brief.md',
-      content: readTextFile(campaignBriefOutputPath),
+      content: readMarketingTextFile(campaignBriefOutputPath),
     },
     {
       location: 'script.md',
-      content: readTextFile(scriptOutputPath),
+      content: readMarketingTextFile(scriptOutputPath),
     },
     {
       location: 'captions.vtt',
-      content: readTextFile(captionsPath),
+      content: readMarketingTextFile(captionsPath),
     },
   ]);
   const classificationGate = validatePublicationClassification({
