@@ -14,8 +14,8 @@ import { GLOBAL_LEDGER_PATH, verifyLedgerIntegrityDetailed } from './ledger.js';
 import { listMemoryPromotionCandidates, type MemoryCandidate } from './memory-promotion-queue.js';
 import { summarizeHeuristics, type HeuristicReport } from './heuristic-feedback.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
-import { isRecord, readTextFile } from './foundation/text.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
+import { readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import type { TaskModelEffort, TaskModelHint, TaskModelTier } from './reasoning-model-routing.js';
 
@@ -504,20 +504,6 @@ export interface TaskRoutingSummaryRow {
   actual_models: string[];
 }
 
-function parseJsonl(raw: string): unknown[] {
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .flatMap((line) => {
-      try {
-        return [parseSafeJsonInput(line, 'report JSONL entry')];
-      } catch {
-        return [];
-      }
-    });
-}
-
 export function buildTaskRoutingSamples(
   taskEvents: TaskIssueEvent[],
   supervisorEvents: SupervisorAskCompletedEvent[]
@@ -656,7 +642,7 @@ function readJsonlEvents(filePath: string): unknown[] {
   if (!safeLstat(safePath).isFile()) {
     throw new Error(`[REPORT_OPS_RESOURCE] event stream must be a regular file: ${safePath}`);
   }
-  return parseJsonl(readTextFile(safePath));
+  return readJsonLines<unknown>(safePath, { onMalformed: 'skip' });
 }
 
 /** Op-shaped entry: collect samples from the observability JSONL streams. */
