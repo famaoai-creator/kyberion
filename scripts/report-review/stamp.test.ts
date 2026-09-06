@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { RV_LAYER_CLOSE, RV_LAYER_OPEN } from './review-layer.js';
-import { main, planReportReviewStamp } from './stamp.js';
+import { main, planReportReviewStamp, readReportReviewStampTextFile } from './stamp.js';
 
 describe('report review stamp plan', () => {
   it('adds the review layer before the closing body tag', () => {
@@ -52,5 +52,11 @@ describe('report review stamp plan', () => {
     } finally {
       safeRmSync(target, { force: true });
     }
+  });
+
+  it('rejects a directory before reading a report', () => {
+    expect(() => readReportReviewStampTextFile(pathResolver.rootResolve('docs'))).toThrow(
+      'must be a regular file'
+    );
   });
 });

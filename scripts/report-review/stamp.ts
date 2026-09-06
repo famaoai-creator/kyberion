@@ -12,7 +12,7 @@
  *       サーバ経由(server.ts)なら localhost=セキュアコンテキストで 🎤 も使える。
  *       confidential階層への書込は適切な PERSONA が必要。
  */
-import { safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { safeWriteFile, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
@@ -29,6 +29,13 @@ export interface ReportReviewStampResult {
   target: string;
   action: ReportReviewStampPlan['action'];
   changed: boolean;
+}
+
+export function readReportReviewStampTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 export function planReportReviewStamp(html: string, remove: boolean): ReportReviewStampPlan {
@@ -66,7 +73,7 @@ export function main(
   if (!target) throw new ScriptExitError(1, 'usage: stamp <report.html> [--remove]');
   if (!safeExistsSync(target)) throw new ScriptExitError(1, `report not found: ${target}`);
 
-  const plan = planReportReviewStamp(readTextFile(target), remove);
+  const plan = planReportReviewStamp(readReportReviewStampTextFile(target), remove);
   const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
   if (!options.check && !options.dryRun && plan.changed)
     safeWriteFile(target, plan.content, { mkdir: false, encoding: 'utf8' });
