@@ -6,6 +6,7 @@ import {
   type ChannelAdapter,
 } from './channel-adapter.js';
 import { isSurfaceAsyncChannel } from './channel-surface-types.js';
+import { t } from './t.js';
 
 describe('SurfaceAsyncChannel registry', () => {
   it('accepts manifest channels and rejects unregistered values', () => {
@@ -44,6 +45,36 @@ describe('formatChannelThreadContext', () => {
     ).toBe(
       'Slack スレッドの最近の文脈:\nユーザー（alice）: こんにちは\nアシスタント: 確認しました'
     );
+  });
+
+  it('uses an explicit locale when projecting a text-only contract', () => {
+    const formatted = formatChannelTurnText(
+      {
+        text: '⟦reply⟧',
+        a2uiMessages: [],
+        a2aMessages: [],
+        delegationResults: [],
+        approvalRequests: [],
+        intentResolution: {
+          request_id: 'ir_qps',
+          normalized_intent: 'send_message',
+          missing_inputs: [],
+          resolution_shape: 'task_session',
+          outcome_kind: 'service_change',
+          authority_level: 'approval_required',
+          next_action: {
+            kind: 'request_approval',
+            label: '⟦approve⟧',
+            consequence: '⟦wait⟧',
+          },
+          rationale: 'approval',
+        },
+      },
+      { locale: 'qps-ploc' }
+    );
+
+    expect(formatted).toContain(t('bridge:contract_authority', undefined, 'qps-ploc'));
+    expect(formatted).not.toContain('Authority:');
   });
 });
 

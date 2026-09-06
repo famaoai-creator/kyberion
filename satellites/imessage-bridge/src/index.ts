@@ -407,6 +407,7 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
         text: incomingText,
         channel: msg.chatId,
         threadTs: msg.id,
+        locale: resolveOperatorLocale(),
         attachments: msg.attachments,
       },
       ({ threadContext }) =>

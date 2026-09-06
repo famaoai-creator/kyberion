@@ -1826,3 +1826,14 @@ gate は維持し、明示 locale の英語・日本語回帰を追加した。
 
 検証: Slack approval／proposal／surface agent **4 files／34 tests passed**、root typecheck、Prettier、
 `git diff --check`。12 surface の全面 contract 描画、provider 実機依存、package scripts の削減は継続課題である。
+
+## 2026-09-06 再レビュー修正 240
+
+text-only surface contract projection を再監査し、`formatChannelTurnText` が本文の日本語文字判定だけで
+localeを決めていたため、追加localeやoperatorの明示localeで契約ラベルが誤る残存を検出した。
+`ChannelTurnInput.locale` と formatter option を追加し、Slack／Telegram／Discord／iMessage の4 bridgeから
+`resolveOperatorLocale()` を渡すようにした。既存の日本語／英語推定、delivery gate、approval semanticsは維持し、
+qps-plocを含む明示localeの回帰を追加した。
+
+検証: channel adapter／4 bridge **5 files／51 tests passed**、root typecheck、Prettier、`git diff --check`。
+12 surface の全面 contract 描画、provider 実機依存、package scripts の削減は継続課題である。
