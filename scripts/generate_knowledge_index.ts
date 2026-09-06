@@ -32,6 +32,13 @@ interface IndexEntry {
 const KNOWLEDGE_INDEX_PATH = pathResolver.knowledge('_index.md');
 const KNOWLEDGE_MANIFEST_PATH = pathResolver.knowledge('_integrity-manifest.json');
 
+export function readKnowledgeTextFile(filePath: string, label = filePath): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 function matchesExclusion(relativePath: string, pattern: string): boolean {
   const expression = new RegExp(
     `^${pattern
@@ -67,7 +74,7 @@ export function validateFrontmatterExclusions(files: readonly string[]): string[
 
 export function validateKnowledgeFrontmatter(
   files: readonly string[],
-  read: (filePath: string) => string = readTextFile
+  read: (filePath: string) => string = readKnowledgeTextFile
 ): string[] {
   const kbRoot = pathResolver.knowledge('');
   const manifest = loadFrontmatterExclusions();
@@ -91,7 +98,7 @@ function getTier(relPath: string): string {
 
 function parseMarkdownMetadata(filePath: string): { title: string; author: string } {
   try {
-    const content = readTextFile(filePath);
+    const content = readKnowledgeTextFile(filePath);
     let title = path.basename(filePath, '.md');
     let author = 'Unknown';
 
@@ -296,8 +303,8 @@ function normalizeIndex(content: string): string {
 
 function generatedFilesAreCurrent(files: readonly GeneratedFile[]): boolean {
   const expected = new Map(files.map((file) => [file.path, file.content]));
-  const existingManifest = readTextFile(KNOWLEDGE_MANIFEST_PATH);
-  const existingIndex = readTextFile(KNOWLEDGE_INDEX_PATH);
+  const existingManifest = readKnowledgeTextFile(KNOWLEDGE_MANIFEST_PATH);
+  const existingIndex = readKnowledgeTextFile(KNOWLEDGE_INDEX_PATH);
   const expectedManifest = expected.get(KNOWLEDGE_MANIFEST_PATH);
   const expectedIndex = expected.get(KNOWLEDGE_INDEX_PATH);
   return (
