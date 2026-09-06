@@ -22781,3 +22781,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `presence/displays/presence-studio/presence-studio-runtime-data.ts`、runtime boundary test、SX-08b
 - **変更**: Presence Studio runtime-data の `/api/minutes/session/start` に残っていた Express `req.body` の直接 Zod 渡しを、共有 `parseSafeJsonObjectValue` 境界の後段へ移行した。マイク probe／recording consent／session directory作成の順序は維持し、配列・null・dangerous JSON key は副作用前に既存の400 validationへ流す。一方、`express.raw` で音声バイナリを受ける onboarding voice sample はJSON入口ではないため変更していない。
 - **検証**: Presence Studio runtime boundary **3 test files／18 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー確認 1597
+
+- **対象**: 12 surface の IntentResolution contract renderer、surface provider manifest／policy、production approval wiring、既存contract tests、SX-08b
+- **変更**: Chronos、Computer Surface、Concierge、Discord、iMessage、Cowork、Presence Studio、Operator Surface、Slack、Telegram、Terminal HUD、Voice Hub の各 renderer marker、provider manifest、terminalを含むapproval停止・未実行 semanticsを横断再検証した。実装済みのsurface投影／approval本番相当テストを残存課題一覧から除外する根拠を追加した。
+- **検証**: `tests/ux-contract-surfaces.test.ts`、`tests/surface-smoke-contract.test.ts`、surface provider manifest／policy、production approval wiring **5 files／24 tests passed**。残る provider の live model call と OS-level enforcement の実証は外部CLI・環境依存の継続課題とする。
