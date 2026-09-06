@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { checkModuleBoundaries } from './check_module_boundaries.js';
+import { checkModuleBoundaries, readModuleBoundaryTextFile } from './check_module_boundaries.js';
 
 describe('module boundary ratchet', () => {
+  it('rejects a directory replacement before import parsing', () => {
+    expect(() => readModuleBoundaryTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation text reader for module source files', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_module_boundaries.ts'), {
