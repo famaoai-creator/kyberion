@@ -23369,3 +23369,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/email-workflow.ts`、`scripts/help_entrypoints.test.ts`、PI-03
 - **変更**: email workflowのtriage／body file本文readを`readEmailWorkflowTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをdraft／delivery本文判定へ到達させないようにした。既存のmissing-file、approval gate、dry-run semanticsは維持した。
 - **検証**: email workflow **2 files／1 test passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1695
+
+- **対象**: `scripts/encrypt_connection_documents.ts`、`scripts/encrypt_connection_documents.test.ts`、PI-03
+- **変更**: connection documents encryptionのJSON本文readを`readConnectionDocumentTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをencrypt／decrypt／backup判定へ到達させないようにした。既存のkey-loss backup、dangerous-key skip、plaintext escape hatch semanticsは維持した。
+- **検証**: connection documents encryption **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
