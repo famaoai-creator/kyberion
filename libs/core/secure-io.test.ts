@@ -87,6 +87,25 @@ describe('secure-io core', () => {
       ).toThrow('[RESOURCE_PATH_SYMLINK]');
     });
 
+    it('allows an explicitly opted-in final symlink without allowing traversal through it', () => {
+      const targetDir = path.join(tmpDir, 'target');
+      const linkDir = path.join(tmpDir, 'linked');
+      fs.mkdirSync(targetDir);
+      fs.symlinkSync(targetDir, linkDir, 'dir');
+
+      expect(
+        assertSafeRepositoryPath(path.relative(process.cwd(), linkDir), {
+          allowSymlinkLeaf: true,
+        })
+      ).toBe(linkDir);
+      expect(() =>
+        assertSafeRepositoryPath(path.relative(process.cwd(), path.join(linkDir, 'x.txt')), {
+          allowMissingLeaf: true,
+          allowSymlinkLeaf: true,
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    });
+
     it('allows a missing leaf while keeping the path inside the repository', () => {
       const filePath = path.relative(process.cwd(), path.join(tmpDir, 'new.txt'));
       expect(assertSafeRepositoryPath(filePath, { allowMissingLeaf: true })).toBe(

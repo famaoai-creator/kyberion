@@ -125,6 +125,7 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
       export_as: { type: 'string' },
       path: { type: 'string' },
       retry: { type: 'object' },
+      allow_symlink_leaf: { type: 'boolean' },
     },
     additionalProperties: false,
   },

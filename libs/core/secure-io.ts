@@ -133,7 +133,11 @@ export interface SafeWriteOptions {
  */
 export function assertSafeRepositoryPath(
   filePath: string,
-  options: { allowMissingLeaf?: boolean; rootDir?: string } = {}
+  options: {
+    allowMissingLeaf?: boolean;
+    allowSymlinkLeaf?: boolean;
+    rootDir?: string;
+  } = {}
 ): string {
   if (!filePath) throw new Error('Missing required resource path');
 
@@ -151,6 +155,8 @@ export function assertSafeRepositoryPath(
     current = path.join(current, segment);
     try {
       if (fs.lstatSync(current).isSymbolicLink()) {
+        const isLeaf = current === resolved;
+        if (options.allowSymlinkLeaf && isLeaf) continue;
         throw new Error(
           `[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link: ${filePath}`
         );

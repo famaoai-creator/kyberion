@@ -1154,6 +1154,10 @@ vi.mock('@agent/core/async-utils', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/async-utils')),
   retry,
 }));
+vi.mock('@agent/core/recovery-policy', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/recovery-policy')),
+  createGovernedRetryOptionsBuilder: vi.fn(() => vi.fn(() => ({}))),
+}));
 vi.mock('@agent/core/execution-bounds', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/execution-bounds')),
   withinLoopBounds,
@@ -2105,6 +2109,34 @@ describe('system-actuator computer_interaction adapter', () => {
 
 describe('system-actuator new OS automation ops (pipeline mode)', () => {
   describe('capture ops', () => {
+    it('probe: allows an explicitly opted-in final symlink for read-only health checks', async () => {
+      const { handleAction } = await import('./index');
+      testCore.safeExistsSync.mockReturnValue(true);
+      testCore.safeStat.mockReturnValue({ isDirectory: () => true });
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'probe',
+            params: { path: 'node_modules', allow_symlink_leaf: true, export_as: 'node_modules' },
+          },
+        ],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.node_modules).toEqual({
+        path: 'node_modules',
+        exists: true,
+        kind: 'dir',
+      });
+      expect(assertSafeRepositoryPath).toHaveBeenCalledWith(
+        expect.stringContaining(`${path.sep}node_modules`),
+        { allowMissingLeaf: true, allowSymlinkLeaf: true }
+      );
+    });
+
     it('probe_active_profile: resolves relative paths against the active profile', async () => {
       const { handleAction } = await import('./index');
       const core = await import('@agent/core/profile-root');

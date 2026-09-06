@@ -83,8 +83,11 @@ import * as visionJudge from '@agent/shared-vision';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-function resolveSystemPath(ref: string, allowMissingLeaf = true): string {
-  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
+function resolveSystemPath(ref: string, allowMissingLeaf = true, allowSymlinkLeaf = false): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), {
+    allowMissingLeaf,
+    allowSymlinkLeaf,
+  });
 }
 
 function isExistingRegularFile(filePath: string): boolean {
@@ -510,7 +513,11 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           },
         };
       }
-      const targetPath = resolveSystemPath(String(resolve(params.path)));
+      const targetPath = resolveSystemPath(
+        String(resolve(params.path)),
+        true,
+        params.allow_symlink_leaf === true
+      );
       let exists = false;
       let kind = 'unknown';
       try {
