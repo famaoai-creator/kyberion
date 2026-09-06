@@ -244,7 +244,7 @@ async function opCapture(
       return {
         ...ctx,
         [params.export_as || 'runtime_session_handoff']: await retry(
-          async () => parseSafeJsonInput(content, 'iOS session handoff'),
+          async () => readJson<unknown>(outPath, { label: 'iOS session handoff' }),
           buildRetryOptions()
         ),
         runtime_session_handoff_path: outPath,

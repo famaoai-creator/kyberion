@@ -276,8 +276,7 @@ async function opCapture(
         buildRetryOptions()
       );
       const parsed = await retry(async () => {
-        const content = safeReadFile(outPath, { encoding: 'utf8' }) as string;
-        return parseSafeJsonInput(content, 'Android session handoff');
+        return readJson<unknown>(outPath, { label: 'Android session handoff' });
       }, buildRetryOptions());
       return {
         ...ctx,

@@ -26,14 +26,6 @@ const JSON_LOADER_RATCHET = 0;
 const LEGACY_JSON_BOUNDARY_ALLOWLIST: ReadonlyMap<string, { count: number; reason: string }> =
   new Map([
     [
-      'libs/actuators/android-actuator/src/android-runtime-helpers.ts',
-      { count: 1, reason: 'ADB session handoff output' },
-    ],
-    [
-      'libs/actuators/ios-actuator/src/ios-runtime-helpers.ts',
-      { count: 1, reason: 'simulator session handoff output' },
-    ],
-    [
       'libs/actuators/network-actuator/src/a2a-transport.ts',
       { count: 1, reason: 'encrypted A2A wire payload after decryption' },
     ],

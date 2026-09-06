@@ -24119,3 +24119,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: blockchain actuator の mock JSONL reader、SX-03／SX-10
 - **変更**: simulated blockchain の `safeReadFile → split → parseSafeJsonInput` を foundation `readJsonLines`へ移行した。既存の malformed／invalid transaction 時に検証結果を空配列へ閉じる挙動は reader 全体を try/catch することで維持し、behavior test の foundation mock も `readJsonLines`／`isRecord` 契約へ揃えた。foundation adoption checker の既存 allowlist をさらに1件削除した。
 - **検証**: blockchain actuator／foundation adoption **3 files／11 tests passed**、checker OK、root `pnpm run typecheck`、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-07 再レビュー実装 1820
+
+- **対象**: Android／iOS actuator の runtime session handoff reader、SX-03／SX-10
+- **変更**: actuator自身が repository artifact として保存した session handoff JSONの再読込を、`safeReadFile → parseSafeJsonInput` から foundation `readJson`へ統一した。ADB／simctl の外部出力、artifact path 境界、retry、invalid JSON時の失敗 semanticsは変更せず、foundation adoption checker の既存 allowlistを2件削除した。
+- **検証**: Android／iOS actuator／foundation adoption **3 files／63 tests passed**、checker OK、root `pnpm run typecheck`、対象ESLint、Prettier、`git diff --check`。
