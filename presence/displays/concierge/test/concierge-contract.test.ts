@@ -130,6 +130,7 @@ describe('concierge surface contract', () => {
     expect(route).toContain('prepareReplyForDelivery');
     expect(route).toContain("shape: 'clarification'");
     expect(route).toContain("shape: 'execution_preview'");
+    expect(route).toContain('locale,\n    senderAgentId:');
   });
 
   it('streams summary changes over SSE with heartbeat and abort cleanup', () => {

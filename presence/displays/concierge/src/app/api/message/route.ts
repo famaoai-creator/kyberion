@@ -175,6 +175,7 @@ async function replyViaOrchestrator(
   const conversation = await channelSurface.runSurfaceMessageConversation({
     surface: 'presence',
     text,
+    locale,
     senderAgentId: 'kyberion:concierge',
     agentId: 'presence-surface-agent',
     actorId: speaker,
