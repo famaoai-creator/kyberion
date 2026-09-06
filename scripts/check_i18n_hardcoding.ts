@@ -13,7 +13,7 @@
 import * as path from 'node:path';
 import ts from 'typescript';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeStat, safeReaddir } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeStat, safeReaddir } from '@agent/core/secure-io';
 import { nowIso, readTextFile } from '@agent/core/foundation';
 import {
   loadI18nHardcodingBaselineAtPath,
@@ -55,6 +55,13 @@ const DIRECT_SCAN_ROOTS = ['libs/core', 'scripts'];
 
 // Plan §2.7: sample code and dev-only tooling are explicitly out of scope.
 const EXCLUDED_SUBTREE_PATTERNS = [/^libs\/core\/src\/native-[^/]+-engine\/examples\//u];
+
+export function readI18nHardcodingTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 export type I18nHardcodingReport = {
   status: 'pass' | 'fail';
@@ -189,7 +196,7 @@ function scanTree(scanRoots: string[]): {
 
       checkedFiles += 1;
       scannedFiles.add(repoRelativePath);
-      const text = readTextFile(filePath);
+      const text = readI18nHardcodingTextFile(filePath);
       const { count, exemptions } = scanFileForKanaLiterals(text, repoRelativePath);
       exemptionCount += exemptions;
       if (count > 0) currentCounts[repoRelativePath] = count;
