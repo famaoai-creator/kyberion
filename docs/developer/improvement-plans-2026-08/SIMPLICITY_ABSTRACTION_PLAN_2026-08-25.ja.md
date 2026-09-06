@@ -23069,3 +23069,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `.npmrc`、`scripts/check_pinned_deps.ts`／test、PI-12
 - **変更**: package managerのユーザー設定に依存していたminimum release ageをrepo固有`.npmrc`へ固定し、`minimum-release-age=1440`（24時間）とstrict modeをpinned-deps checkerで必須化した。既存のinstall-script allowlist／lockfile gateとsource archive CI接続は変更していない。
 - **検証**: pinned-deps **1 file／2 tests passed**、`check:pinned-deps`、install-script allowlist **11 packages OK**、lockfile gate、pnpm project configの実値、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1645
+
+- **対象**: `scripts/inventory_resource_loaders.ts`、`scripts/inventory_resource_loaders.test.ts`、PI-03
+- **変更**: resource-loader inventory が相対 import 先の barrel の `export { ... } from`／`export * from` を辿り、実装元で regular-file check を確認できる helper だけを `external-regular-file-helper` evidence として採用するようにした。package import と循環 export は安全証跡へ昇格させず、path-only helper も従来どおり未分類とした。
+- **検証**: inventory **1,347 files／184 callsites／inline 6／nearby 178／needs-review 0**、inventory **1 file／11 tests passed**、Prettier、`git diff --check`。provider 実機受入と package／barrel を跨ぐ実行時semantic flowの完全検証は継続する。
