@@ -1,9 +1,8 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   appendSupervisorEvent,
   listSupervisorEventFiles,
@@ -43,11 +42,10 @@ describe('appendSupervisorEvent (AC-10 rotation)', () => {
 
     const today = new Date().toISOString().slice(0, 10);
     const datedPath = path.join(dir, `agent-runtime-supervisor-events-${today}.jsonl`);
-    expect(fs.existsSync(datedPath)).toBe(true);
-    expect(fs.existsSync(path.join(dir, SUPERVISOR_EVENTS_LEGACY_FILE))).toBe(false);
+    expect(safeExistsSync(datedPath)).toBe(true);
+    expect(safeExistsSync(path.join(dir, SUPERVISOR_EVENTS_LEGACY_FILE))).toBe(false);
 
-    const lines = fs
-      .readFileSync(datedPath, 'utf8')
+    const lines = (safeReadFile(datedPath, { encoding: 'utf8' }) as string)
       .split('\n')
       .filter((line) => line.trim());
     expect(lines).toHaveLength(1);
@@ -68,12 +66,12 @@ describe('listSupervisorEventFiles / readSupervisorEvents', () => {
 
   function writeFixture(fileName: string, records: Array<Record<string, unknown>>): void {
     const filePath = path.join(dir!, fileName);
-    fs.writeFileSync(filePath, records.map((record) => JSON.stringify(record)).join('\n') + '\n');
+    safeWriteFile(filePath, records.map((record) => JSON.stringify(record)).join('\n') + '\n');
   }
 
   it('lists the legacy file first, then dated files oldest-first', () => {
     dir = fixtureDir(randomUUID());
-    fs.mkdirSync(dir, { recursive: true });
+    safeMkdir(dir, { recursive: true });
     writeFixture(SUPERVISOR_EVENTS_LEGACY_FILE, [{ decision: 'legacy-1' }]);
     writeFixture('agent-runtime-supervisor-events-2026-09-05.jsonl', [{ decision: 'day-5' }]);
     writeFixture('agent-runtime-supervisor-events-2026-09-03.jsonl', [{ decision: 'day-3' }]);
@@ -84,7 +82,7 @@ describe('listSupervisorEventFiles / readSupervisorEvents', () => {
 
   it('excludes the legacy file when includeLegacy is false', () => {
     dir = fixtureDir(randomUUID());
-    fs.mkdirSync(dir, { recursive: true });
+    safeMkdir(dir, { recursive: true });
     writeFixture(SUPERVISOR_EVENTS_LEGACY_FILE, [{ decision: 'legacy-1' }]);
     writeFixture('agent-runtime-supervisor-events-2026-09-05.jsonl', [{ decision: 'day-5' }]);
 
@@ -94,7 +92,7 @@ describe('listSupervisorEventFiles / readSupervisorEvents', () => {
 
   it('filters dated files by recentDays but always keeps the legacy file (history)', () => {
     dir = fixtureDir(randomUUID());
-    fs.mkdirSync(dir, { recursive: true });
+    safeMkdir(dir, { recursive: true });
     writeFixture(SUPERVISOR_EVENTS_LEGACY_FILE, [{ decision: 'legacy-1' }]);
     writeFixture('agent-runtime-supervisor-events-2026-09-06.jsonl', [{ decision: 'today' }]);
     writeFixture('agent-runtime-supervisor-events-2026-08-20.jsonl', [{ decision: 'old' }]);
@@ -105,9 +103,9 @@ describe('listSupervisorEventFiles / readSupervisorEvents', () => {
 
   it('reads and merges every partition, skipping malformed lines', () => {
     dir = fixtureDir(randomUUID());
-    fs.mkdirSync(dir, { recursive: true });
+    safeMkdir(dir, { recursive: true });
     writeFixture(SUPERVISOR_EVENTS_LEGACY_FILE, [{ decision: 'legacy-1' }]);
-    fs.writeFileSync(
+    safeWriteFile(
       path.join(dir, 'agent-runtime-supervisor-events-2026-09-06.jsonl'),
       [JSON.stringify({ decision: 'day-6' }), 'not-json', '[]'].join('\n') + '\n'
     );
