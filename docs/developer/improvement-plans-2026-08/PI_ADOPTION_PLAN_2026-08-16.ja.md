@@ -894,6 +894,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、UI/UX governance checkerのoperator source／generated token／dashboard本文readを`readUiUxGovernanceTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをhardcoded-color・semantic-token・status vocabulary判定へ到達させない回帰を追加した。関連 **2 files／4 tests passed**、対象ESLint、Prettier、checker direct JSON実行、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、CLI workflow handlerのtriage／body本文readを`readWorkflowTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをemail draft／delivery処理へ到達させない回帰を追加した。関連 **2 files／3 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、operator CLIのartifact／packet／pipeline preview本文readを`readCliTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpreview・packet parse・artifact表示へ到達させない回帰を追加した。関連 **2 files／40 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、peer tenant migrationのplan生成／apply再検証本文readを`readMigrationTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant分割・hash再検証へ到達させない回帰を追加した。関連 **2 files／6 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 
 ## 7. 検証コマンド(実装時)
 

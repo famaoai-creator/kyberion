@@ -247,8 +247,12 @@ function requireRegularMigrationFile(source: string): string {
   return safeSource;
 }
 
+export function readMigrationTextFile(source: string): string {
+  return readTextFile(requireRegularMigrationFile(source));
+}
+
 function parseRows(source: string): ParsedRow[] {
-  const raw = readTextFile(requireRegularMigrationFile(source));
+  const raw = readMigrationTextFile(source);
   if (source.endsWith('.jsonl')) {
     return raw
       .split(/\r?\n/u)
@@ -333,7 +337,7 @@ function buildSourceItem(
     tenantIdOverride?: string;
   }
 ): SourceItem {
-  const raw = readTextFile(source);
+  const raw = readMigrationTextFile(source);
   const rows = parseRows(source);
   const byTenant = new Map<string, ParsedRow[]>();
   let unknown = 0;
@@ -430,7 +434,7 @@ export function applyPeerTenantMigrationPlan(
       for (const item of plan.sources) {
         if (!safeExistsSync(item.source))
           throw new Error(`peer_migration_source_missing:${item.source}`);
-        const currentRaw = readTextFile(item.source);
+        const currentRaw = readMigrationTextFile(item.source);
         if (sha256(currentRaw) !== item.source_sha256) {
           throw new Error(`peer_migration_source_changed:${item.source}`);
         }
