@@ -23711,3 +23711,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Chronos Mirror trace-feed の JSONL loader、SX-03／SX-09
 - **変更**: persisted trace JSONLの二重手書き読込を foundation `readJsonLines`へ統一した。regular-file／symlink除外を担う既存 file discovery、malformed行skip、trace schema validation、tenant／tier／organization／project filter、summary／detail projectionは維持した。
 - **検証**: trace-feed **1 file／12 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1752
+
+- **対象**: deliverable inbox lock の persisted JSON loader、SX-03／SX-12
+- **変更**: regular-file確認後のlock JSON読み込みを `readTextFile` + `parseSafeJsonInput` から foundation `readJson`へ統一した。lock path safety、malformed／invalid PIDのstale扱い、process existence／EPERM判定、exclusive lock lifecycleは変更していない。
+- **検証**: deliverable inbox **1 file／8 tests passed**、foundation-adoption gate、対象 ESLint、Prettier、`git diff --check`。
