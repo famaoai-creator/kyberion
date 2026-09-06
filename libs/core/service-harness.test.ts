@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import {
+  assertServiceCaptureOperation,
   createServiceExecutionReceipt,
   describeServiceHarness,
   planServiceOperation,
@@ -23,10 +24,13 @@ describe('service harness contract', () => {
       ajv,
       pathResolver.knowledge('product/schemas/service-presets.schema.json')
     );
-    const preset = getServicePresetRecord('slack');
+    const slack = getServicePresetRecord('slack');
+    const github = getServicePresetRecord('github');
 
-    expect(preset).toBeDefined();
-    expect(validate(preset)).toBe(true);
+    expect(slack).toBeDefined();
+    expect(validate(slack)).toBe(true);
+    expect(github).toBeDefined();
+    expect(validate(github)).toBe(true);
   });
 
   it('describes service operations from the canonical preset', () => {
@@ -44,6 +48,39 @@ describe('service harness contract', () => {
       approval_required: true,
     });
     expect(createIssue?.parameters.title).toMatchObject({ required: true, type: 'string' });
+  });
+
+  it('exposes GitHub issue/PR/review capture operations as read-only', () => {
+    const descriptor = describeServiceHarness('github');
+    const captureActions = [
+      'list_issues',
+      'get_issue',
+      'list_pulls',
+      'get_pull',
+      'list_reviews',
+      'list_review_comments',
+      'list_pr_files',
+    ];
+    for (const action of captureActions) {
+      const operation = descriptor.operations.find((item) => item.action === action);
+      expect(operation).toMatchObject({
+        action,
+        kind: 'capture',
+        risk: 'read',
+        approval_required: false,
+      });
+    }
+  });
+
+  it('admits GitHub capture ops and rejects writes on the capture guard', () => {
+    expect(assertServiceCaptureOperation('github', 'list_issues').action).toBe('list_issues');
+    expect(assertServiceCaptureOperation('github', 'list_pulls').risk).toBe('read');
+    expect(() => assertServiceCaptureOperation('github', 'create_issue')).toThrow(
+      /Capture-only surface rejected/
+    );
+    expect(() => assertServiceCaptureOperation('github', 'not_an_action')).toThrow(
+      /Unknown service action/
+    );
   });
 
   it('builds a valid read plan and a write plan with required inputs', () => {
