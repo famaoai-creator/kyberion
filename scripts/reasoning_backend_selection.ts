@@ -15,7 +15,7 @@ import {
   type ReasoningBackendMode,
 } from '@agent/core/reasoning-backend-policy';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 
 export const REASONING_BACKEND_ENV_KEY = 'KYBERION_REASONING_BACKEND';
@@ -69,6 +69,13 @@ export function defaultEnvLocalPath(): string {
   return pathResolver.rootResolve('.env.local');
 }
 
+export function readReasoningSelectionTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 /** Pure upsert of one `KEY=value` line in dotenv-style content. */
 export function upsertEnvVarLine(content: string, key: string, value: string): string {
   const line = `${key}=${value}`;
@@ -87,7 +94,7 @@ export function readPersistedEnvValue(
   envLocalPath: string = defaultEnvLocalPath()
 ): string | null {
   if (!safeExistsSync(envLocalPath)) return null;
-  const content = readTextFile(envLocalPath);
+  const content = readReasoningSelectionTextFile(envLocalPath);
   const match = new RegExp(`^\\s*${key}=(.*)$`, 'm').exec(content);
   const value = match?.[1]?.trim();
   return value || null;
@@ -101,7 +108,7 @@ export function persistEnvValue(
 ): string {
   let content = '';
   if (safeExistsSync(envLocalPath)) {
-    content = readTextFile(envLocalPath);
+    content = readReasoningSelectionTextFile(envLocalPath);
   }
   safeWriteFile(envLocalPath, upsertEnvVarLine(content, key, value));
   return envLocalPath;
