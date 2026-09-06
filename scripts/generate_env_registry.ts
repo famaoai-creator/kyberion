@@ -25,7 +25,7 @@
 import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { getRegisteredEnv, readTextFile } from '@agent/core/foundation';
 import { loadEnvRegistryFile } from '@agent/core/env-validator';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -166,6 +166,13 @@ const EXCLUDED_PATH_SEGMENTS = [
 ];
 const ENV_DISCOVERY_RE = /KYBERION_[A-Z0-9_]+/g;
 
+export function readEnvRegistryTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 export function classifyEnvName(name: string): { category: EnvCategory; type: EnvType } {
   // Flag prefixes win over the secret keyword scan: KYBERION_ALLOW_FILE_SECRETS
   // is an acknowledgement flag, not a secret value.
@@ -242,7 +249,7 @@ export function discoverEnvNames(rootDir: string): string[] {
       ) {
         continue;
       }
-      const content = readTextFile(filePath);
+      const content = readEnvRegistryTextFile(filePath);
       for (const match of content.matchAll(ENV_DISCOVERY_RE)) {
         // A trailing underscore is a dynamic prefix (for example
         // KYBERION_REASONING_ROLE_${role}), not a concrete registry key.
