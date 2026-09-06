@@ -432,3 +432,12 @@ Presence Studio の Cloudflare OS held-action decision／apply route を再監�
 localadmin、tenant scope、approval decision、held-action apply semantics は変更していない。
 
 検証: Presence Studio approval／OS control-plane **2 files／24 tests passed**、対象 ESLint、Prettier、`git diff --check`。隔離環境の root typecheck は既存の `discord.js` 型モジュール欠落で停止した。
+
+## 2026-09-06 再レビュー修正 44
+
+Presence Studio の approval、artifact、task-session route に残っていた `req.params` の暗黙 `String(...)`
+変換を再監査し、request ID／artifact ID／session ID が配列・オブジェクトから生成され得る残存を検出した。
+held-action route と同じ `readPresenceStudioRouteParam` を全 dynamic route parameter へ適用し、単一 string
+だけを lookup／download／artifact projection へ渡すようにした。既存の resource scope、404、download semantics は維持した。
+
+検証: Presence Studio route-parameter boundary **3 files／25 tests passed**、対象 ESLint、Prettier、`git diff --check`。
