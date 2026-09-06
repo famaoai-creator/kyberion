@@ -6,6 +6,9 @@ import {
   ProcessSpawnDispatcher,
   maybeWrapWithDispatcher,
   selectAgentDispatcher,
+  type HarnessSubagentRuntime,
+  type HarnessSubagentTaskRequest,
+  type HarnessSubagentTaskResult,
 } from './agent-dispatch.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
 import {
@@ -794,18 +797,25 @@ describe('AC-01 delegation correlation (agent-dispatch)', () => {
     return events;
   }
 
-  function makeFakeHarnessRuntime(runTaskImpl?: (params: any) => Promise<any>) {
-    return {
-      runTask: runTaskImpl ?? vi.fn(async () => ({ text: 'harness-result' })),
-      buildGovernedAgentSystemPrompt: vi.fn(({ base, missionContext }: any) =>
+  function makeFakeHarnessRuntime(
+    runTaskImpl?: (params: HarnessSubagentTaskRequest) => Promise<HarnessSubagentTaskResult>
+  ) {
+    const buildGovernedAgentSystemPrompt = vi.fn(
+      ({ base, missionContext }: { base: string; missionContext?: string }) =>
         [base, missionContext ? `Mission context:\n${missionContext}` : '']
           .filter(Boolean)
           .join('\n\n')
-      ),
-      buildKyberionMcpServerConfig: vi.fn(() => ({ kyberion: {} }) as any),
-      createKyberionCanUseTool: vi.fn(() => vi.fn() as any),
+    );
+    const runtime: HarnessSubagentRuntime & {
+      buildGovernedAgentSystemPrompt: typeof buildGovernedAgentSystemPrompt;
+    } = {
+      runTask: runTaskImpl ?? vi.fn(async () => ({ text: 'harness-result' })),
+      buildGovernedAgentSystemPrompt,
+      buildKyberionMcpServerConfig: vi.fn(() => ({ kyberion: {} })),
+      createKyberionCanUseTool: vi.fn(() => vi.fn()),
       allowedTools: ['Read', 'Write', 'Bash'],
     };
+    return runtime;
   }
 
   beforeEach(() => {
@@ -913,7 +923,7 @@ describe('AC-01 delegation correlation (agent-dispatch)', () => {
     // with this dispatch's own placeholder link, appended by
     // `propagateDelegationChainThroughContext` before `dispatch()` ran.
     const { extractDelegationChainFromContext } = await import('./delegation-chain.js');
-    const receivedContext = (runtime.buildGovernedAgentSystemPrompt as any).mock.calls[0][0]
+    const receivedContext = runtime.buildGovernedAgentSystemPrompt.mock.calls[0][0]
       .missionContext as string;
     const receivedChain = extractDelegationChainFromContext(receivedContext).chain!;
     expect(receivedChain[receivedChain.length - 1].actor).toMatch(

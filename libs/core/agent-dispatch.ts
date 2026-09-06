@@ -13,8 +13,8 @@ import {
 } from './delegation-chain.js';
 import { redactCollaborationSummary } from './agent-collaboration-events.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { readJsonIfPresent } from './foundation/json.js';
 import {
   SUBAGENT_PROFILE_CLI_TOOLS,
   describeSubagentCapabilityCatalog,
@@ -115,10 +115,7 @@ function resolveAmbientMissionIdForEvents(): string | undefined {
   try {
     const focusPath = pathResolver.shared('runtime/current_mission_focus.json');
     if (!safeExistsSync(focusPath)) return undefined;
-    const safePath = assertSafeRepositoryPath(focusPath);
-    const raw = String(safeReadFile(safePath, { encoding: 'utf8' }));
-    const parsed = parseSafeJsonInput(raw, 'current mission focus') as
-      { mission_id?: unknown } | undefined;
+    const parsed = readJsonIfPresent<{ mission_id?: unknown }>(assertSafeRepositoryPath(focusPath));
     const missionId = typeof parsed?.mission_id === 'string' ? parsed.mission_id.trim() : '';
     return missionId ? missionId.toUpperCase() : undefined;
   } catch {
