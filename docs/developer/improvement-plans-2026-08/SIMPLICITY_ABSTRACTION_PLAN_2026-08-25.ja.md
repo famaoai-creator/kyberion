@@ -23375,3 +23375,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/encrypt_connection_documents.ts`、`scripts/encrypt_connection_documents.test.ts`、PI-03
 - **変更**: connection documents encryptionのJSON本文readを`readConnectionDocumentTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをencrypt／decrypt／backup判定へ到達させないようにした。既存のkey-loss backup、dangerous-key skip、plaintext escape hatch semanticsは維持した。
 - **検証**: connection documents encryption **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1696
+
+- **対象**: `scripts/find_dead_code.ts`、`scripts/find_dead_code.entrypoint.test.ts`、PI-03
+- **変更**: dead code finderのsource／search本文readを`readDeadCodeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcandidate extraction／usage count判定へ到達させないようにした。既存のadvisory-only、portable report、manual verification semanticsは維持した。
+- **検証**: dead code finder **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
