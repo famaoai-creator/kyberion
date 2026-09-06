@@ -896,6 +896,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、operator CLIのartifact／packet／pipeline preview本文readを`readCliTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをpreview・packet parse・artifact表示へ到達させない回帰を追加した。関連 **2 files／40 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、peer tenant migrationのplan生成／apply再検証本文readを`readMigrationTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant分割・hash再検証へ到達させない回帰を追加した。関連 **2 files／6 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、reasoning backend selectionの`.env.local` preference readを`readReasoningSelectionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをbackend／persona preference解析へ到達させない回帰を追加した。関連 **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、report-review serverの配信HTML／保存前backup本文readを`readReportReviewTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをreview layer配信・backup保存へ到達させない回帰を追加した。関連 **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続課題である。
 
 ## 7. 検証コマンド(実装時)
 

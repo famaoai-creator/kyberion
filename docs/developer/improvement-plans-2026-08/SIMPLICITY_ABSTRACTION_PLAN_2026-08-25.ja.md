@@ -23189,3 +23189,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/reasoning_backend_selection.ts`、`scripts/reasoning_backend_selection.test.ts`、PI-03
 - **変更**: reasoning backend selectionの`.env.local` preference readを`readReasoningSelectionTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをbackend／persona preference解析へ到達させないようにした。既存のpolicy-derived choicesとdotenv upsert semanticsは維持した。
 - **検証**: reasoning backend selection **2 files／8 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
+
+## 2026-09-06 再レビュー実装 1665
+
+- **対象**: `scripts/report-review/server.ts`、`scripts/report-review/server.test.ts`、PI-03
+- **変更**: report-review serverの配信HTML／保存前backup本文readを`readReportReviewTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをreview layer配信・backup保存へ到達させないようにした。既存のdry-run、origin/token、backup semanticsは維持した。
+- **検証**: report-review server **2 files／5 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。scripts全体のneeds-review個別確認とprovider実機受入は継続する。
