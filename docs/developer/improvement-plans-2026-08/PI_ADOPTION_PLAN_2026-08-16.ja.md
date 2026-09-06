@@ -929,6 +929,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、connection documents encryptionのJSON本文readを`readConnectionDocumentTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをencrypt／decrypt／backup判定へ到達させない回帰を追加した。既存のkey-loss backup、dangerous-key skip、plaintext escape hatch semanticsは維持した。関連 **2 files／4 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、dead code finderのsource／search本文readを`readDeadCodeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをcandidate extraction／usage count判定へ到達させない回帰を追加した。既存のadvisory-only、portable report、manual verification semanticsは維持した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 - 2026-09-06: PI-03 のdirect-loader inventory残差として、capability seams generatorのdeclaration本文readを`readCapabilitySeamsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをseam role validationへ到達させない回帰を追加した。既存のruntime catalog、role completeness、generated document semanticsは維持した。関連 **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
+- 2026-09-06: PI-03 のdirect-loader inventory残差として、changelog generatorの既存CHANGELOG本文readを`readChangelogTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをprepend／dry-run判定へ到達させない回帰を追加した。既存のgit range、policy rendering、read-only dry-run semanticsは維持した。関連 **2 files／7 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
 
 ## 7. 検証コマンド(実装時)
 

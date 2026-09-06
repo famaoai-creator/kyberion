@@ -20,7 +20,7 @@ import * as path from 'node:path';
 import { resolveChangelogPolicy } from '@agent/core/changelog-policy';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExec, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { safeExec, safeExistsSync, safeLstat, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
@@ -52,6 +52,13 @@ const ORDER = [
 
 function git(args: string[]): string {
   return safeExec('git', args, { cwd: ROOT }).trim();
+}
+
+export function readChangelogTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
 }
 
 function findLatestTag(): string | null {
@@ -191,7 +198,9 @@ export const main = defineScript({
     const section = renderSection(commits, from, to);
 
     if (prepend) {
-      const existing = safeExistsSync(CHANGELOG_PATH) ? readTextFile(CHANGELOG_PATH) : null;
+      const existing = safeExistsSync(CHANGELOG_PATH)
+        ? readChangelogTextFile(CHANGELOG_PATH)
+        : null;
       const updated = buildPrependedChangelog(existing, section);
       const changed = existing !== updated;
       if (context.check && changed) {
