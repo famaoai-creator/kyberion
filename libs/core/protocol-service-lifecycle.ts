@@ -3,8 +3,8 @@ import * as path from 'node:path';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
-import { parseSafeJsonInput } from './foundation/json.js';
-import { isRecord, readTextFile } from './foundation/text.js';
+import { readJsonLines } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { getProtocolServiceRegistryEntry } from './protocol-service-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
@@ -280,18 +280,27 @@ export function readProtocolServiceLifecycleReceipts(
       `[PROTOCOL_LIFECYCLE_RECEIPT_INVALID] receipt stream must be a regular file: ${absolutePath}`
     );
   }
-  const lines = readTextFile(absolutePath)
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean);
   const expectedScope = normalizeEventScope(scopeInput);
-  return lines.map((line, index) => {
-    let parsed: unknown;
-    try {
-      parsed = parseSafeJsonInput(line, `protocol lifecycle receipt line ${index + 1}`);
-    } catch {
-      throw new Error(`[PROTOCOL_LIFECYCLE_RECEIPT_INVALID] invalid JSON at line ${index + 1}`);
+  let rows: Array<{ value: unknown; lineNumber: number }>;
+  try {
+    rows = readJsonLines(absolutePath, {
+      onMalformed: (_error, lineNumber) => {
+        throw new Error(`[PROTOCOL_LIFECYCLE_RECEIPT_INVALID] invalid JSON at line ${lineNumber}`);
+      },
+      map: (value, lineNumber) => ({ value, lineNumber }),
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith('[PROTOCOL_LIFECYCLE_RECEIPT_INVALID]')
+    ) {
+      throw error;
     }
-    return validateReceipt(parsed, serviceId, expectedScope);
+    throw new Error('[PROTOCOL_LIFECYCLE_RECEIPT_INVALID] unable to read receipt stream', {
+      cause: error,
+    });
+  }
+  return rows.map(({ value }) => {
+    return validateReceipt(value, serviceId, expectedScope);
   });
 }
