@@ -718,6 +718,7 @@ export async function handleTelegramUpdate(
               channel: chatId,
               thread: threadTs,
               proposal: missionProposal,
+              locale: resolveOperatorLocale(),
               sourceText: text,
               routingDecision: result.routingDecision,
               fallbackSummary: result.text,
@@ -758,7 +759,9 @@ export async function handleTelegramUpdate(
               reply = await sendTelegramMessage(
                 {
                   chatId,
-                  text: buildSurfaceApprovalText('telegram', record, result.intentResolution),
+                  text: buildSurfaceApprovalText('telegram', record, result.intentResolution, {
+                    locale: resolveOperatorLocale(),
+                  }),
                   replyMarkup: buildTelegramApprovalReplyMarkup(record),
                 },
                 options

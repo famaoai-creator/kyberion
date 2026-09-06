@@ -384,6 +384,7 @@ export async function handleDiscordMessage(message: Message) {
               channel: message.channelId,
               thread: threadTs,
               proposal: missionProposal,
+              locale: resolveOperatorLocale(),
               sourceText: message.content,
               routingDecision: result.routingDecision,
               fallbackSummary: result.text,
@@ -415,7 +416,9 @@ export async function handleDiscordMessage(message: Message) {
               });
               await replyDiscordApproval(
                 message,
-                buildSurfaceApprovalText('discord', record, result.intentResolution),
+                buildSurfaceApprovalText('discord', record, result.intentResolution, {
+                  locale: resolveOperatorLocale(),
+                }),
                 record
               );
             }

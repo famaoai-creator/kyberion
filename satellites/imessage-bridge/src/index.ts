@@ -440,6 +440,7 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
               channel: msg.chatId,
               thread: msg.chatId,
               proposal: missionProposal,
+              locale: resolveOperatorLocale(),
               sourceText: incomingText,
               routingDecision: result.routingDecision,
               fallbackSummary: result.text,
@@ -460,7 +461,9 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
                 draft,
                 sourceText: incomingText,
               });
-              return buildSurfaceApprovalText('imessage', record, result.intentResolution);
+              return buildSurfaceApprovalText('imessage', record, result.intentResolution, {
+                locale: resolveOperatorLocale(),
+              });
             });
             await sendIMessageText(buildIMessageReplyRequest(msg, approvalTexts.join('\n\n')));
             return;

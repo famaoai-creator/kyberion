@@ -20,6 +20,7 @@ import {
   resolveSurfaceApprovalReply,
 } from './surface-approval-ui.js';
 import { buildSlackApprovalAskWhyBlocks, parseSlackAskWhyAction } from './slack-approval-ui.js';
+import { t } from './t.js';
 
 const RUN_ID = `${process.pid}-${Date.now()}`;
 const FIXTURE_CHANNEL = `test-${RUN_ID}`.slice(0, 63);
@@ -268,6 +269,23 @@ describe('surface-approval-ui', () => {
     expect(text).toContain('帰結: The release waits until approval is recorded.');
     expect(text).toContain('結果: サービス変更');
     expect(text).not.toContain('approval_required');
+  });
+
+  it('uses an explicit locale for the generic approval projection', () => {
+    const record = createSurfaceApprovalRequest({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-contract-locale',
+      correlationId: `surface-approval-test-${RUN_ID}-contract-locale`,
+      requestedBy: 'agent-1',
+      draft: { title: 'Deploy', summary: 'Deploy the reviewed change.' },
+    });
+    const text = buildSurfaceApprovalText('telegram', record, undefined, {
+      locale: 'qps-ploc',
+    });
+
+    expect(text).toContain(t('bridge:approval_approve_choice', undefined, 'qps-ploc'));
+    expect(text).not.toContain(t('bridge:approval_approve_choice', undefined, 'ja'));
   });
 
   it('fails closed and durably expires stale or malformed approval requests', () => {

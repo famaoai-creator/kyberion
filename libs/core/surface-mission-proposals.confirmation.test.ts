@@ -42,6 +42,18 @@ describe('mission proposal confirmation grammar (UX-04)', () => {
     expect(text).toContain(`${t('bridge:contract_outcome', undefined, 'ja')}:`);
   });
 
+  it('uses an explicit locale for the generic confirmation projection', () => {
+    const text = buildMissionProposalConfirmationText({
+      summary: 'Create the reviewed mission',
+      locale: 'qps-ploc',
+    });
+
+    expect(text).toContain(
+      t('bridge:mission_proposal_confirmation_choices', undefined, 'qps-ploc')
+    );
+    expect(text).not.toContain(t('bridge:mission_proposal_confirmation_choices', undefined, 'ja'));
+  });
+
   it('renders mission issuance outcomes from the shared catalog', () => {
     expect(
       buildMissionIssuanceReply({
