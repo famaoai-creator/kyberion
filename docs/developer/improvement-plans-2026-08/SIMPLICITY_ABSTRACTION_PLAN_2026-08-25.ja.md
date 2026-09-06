@@ -23909,3 +23909,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: protocol service lifecycle receipt の strict JSONL reader、SX-03／SX-09／SX-11
 - **変更**: regular-file確認済みのprotocol lifecycle receipt JSONLを foundation `readJsonLines`へ統一した。malformed JSONは従来どおり行番号付きinvalid receiptへ変換し、schema／scope validation errorはdomain validationとして従来どおり表面化する。service／tenant scopeとreceipt projection semanticsは維持した。
 - **検証**: protocol-service-lifecycle **1 file／7 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-06 再レビュー実装 1785
+
+- **対象**: orchestrator session の replay JSONL loader、SX-03／SX-09／SX-11
+- **変更**: regular-file確認済みのorchestrator session journalを foundation `readJsonLines`へ統一した。malformed／torn record skip、sequence projection、restart replay、release／ownership semanticsは維持し、byte-offset／rotationを必要とする`jsonl-tail`は別責務として対象外にした。
+- **検証**: orchestrator-session **1 file／26 tests passed**、foundation adoption **1 file／7 tests passed**、対象ESLint、Prettier、`git diff --check`。
