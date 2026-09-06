@@ -123,7 +123,7 @@ export function buildReviewDiffLines(missionId: string, task: PlannedNextTask): 
     target,
     'diff.patch'
   );
-  if (!safeExistsSync(diffPath)) return [];
+  if (!isRegularMissionReviewDiffPath(diffPath)) return [];
   const diff = readTextFile(diffPath);
   if (!diff.trim()) return [];
   const lines = diff.split('\n');
@@ -141,6 +141,15 @@ export function buildReviewDiffLines(missionId: string, task: PlannedNextTask): 
     ];
   }
   return [`- Diff under review (evidence/prs/${target}/diff.patch):`, '```diff', ...lines, '```'];
+}
+
+export function isRegularMissionReviewDiffPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
 }
 
 export function ensureWorkerBackendsInstalled(): void {

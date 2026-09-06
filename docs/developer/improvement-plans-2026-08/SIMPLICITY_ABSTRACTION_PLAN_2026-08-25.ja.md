@@ -22919,3 +22919,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-orchestration-worker-part-context.ts`、専用resource-loader test、PI-03
 - **変更**: mission worker の authority-role `PROCEDURE.md` injection read に operation-time の regular-file 検査を追加し、directory replacement を worker promptへ混入させないようにした。既存の role procedure injection semantics は維持した。
 - **検証**: 専用resource-loader **3 files／1 test passed**、typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1620
+
+- **対象**: `libs/core/mission-orchestration-worker-part-context.ts`、worker resource-loader test、PI-03
+- **変更**: mission worker の review diff read に operation-time の regular-file 検査を追加し、directory replacement を review promptへ混入させないようにした。既存のreview role filter、diff truncation、changed-file表示 semantics は維持した。
+- **検証**: worker resource-loader **2 files／2 tests passed**、typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
