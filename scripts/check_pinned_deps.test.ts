@@ -11,6 +11,8 @@ describe('pinned dependency checker', () => {
     );
     expect(source).toContain("readTextFile } from '@agent/core/foundation'");
     expect(source).not.toContain('safeReadFile(');
+    expect(source).toContain('minimum-release-age');
+    expect(source).toContain('minimum-release-age-strict');
   });
 
   it('keeps the repository package manager, overrides, and lockfile governed', () => {
