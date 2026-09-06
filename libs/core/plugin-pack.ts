@@ -1,5 +1,5 @@
-import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
-import { isRecord, readTextFile } from './foundation/text.js';
+import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 /**
  * Plugin packs — git-imported plugin collections (QM-07, ported from qm's
@@ -246,21 +246,16 @@ function appendImportRecord(record: PackImportRecord, override?: string): void {
 export function listPackImportRecords(limit = 50, override?: string): PackImportRecord[] {
   const file = importLogPath(override);
   if (!safeExistsSync(file) || !safeLstat(file).isFile()) return [];
-  const records: PackImportRecord[] = [];
-  for (const line of readTextFile(file).split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const record = normalizePackImportRecord(
-        parseSafeJsonInput(trimmed, 'plugin pack import record')
-      );
-      if (record) records.push(record);
-      else logger.warn('[plugin-pack] skipping malformed import record line');
-    } catch {
-      logger.warn('[plugin-pack] skipping unparseable import record line');
-    }
-  }
-  return records.slice(-limit);
+  return readJsonLines<PackImportRecord>(file, {
+    onMalformed: (error) => {
+      logger.warn(`[plugin-pack] skipping malformed import record line: ${String(error)}`);
+    },
+    map(value) {
+      const record = normalizePackImportRecord(value);
+      if (!record) throw new Error('plugin pack import record is invalid');
+      return record;
+    },
+  }).slice(-limit);
 }
 
 const IP_LITERAL = /^(?:\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-fA-F:]+\])$/;
@@ -345,10 +340,7 @@ function manifestPluginId(dir: string): string | undefined {
     const manifestPath = manifestPathFor(dir, name);
     if (!manifestPath) continue;
     try {
-      const parsed = parseSafeJsonInput(
-        readTextFile(manifestPath),
-        `plugin manifest ${manifestPath}`
-      );
+      const parsed = readJson<unknown>(manifestPath);
       if (!isRecord(parsed)) continue;
       const candidate =
         typeof parsed.plugin_id === 'string'
