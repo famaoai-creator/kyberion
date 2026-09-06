@@ -4,7 +4,7 @@ import {
   isRecord,
   isVitestProcess,
   nowIso,
-  parseSafeJsonInput,
+  readJson,
 } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
@@ -663,10 +663,7 @@ function loadBrowserActionTrail(sessionId: string): BrowserRecordedAction[] {
   const filePath = trailPath(sessionId);
   if (!isExistingRegularFile(filePath)) return [];
   try {
-    const value = parseSafeJsonInput(
-      String(safeReadFile(filePath, { encoding: 'utf8' }) || ''),
-      `browser action trail ${filePath}`
-    );
+    const value = readJson(filePath);
     return parseRecordedActions(value).slice(-200);
   } catch {
     return [];
@@ -954,8 +951,7 @@ async function resolveSessionHandoff(
     if (!isExistingRegularFile(filePath)) {
       throw new Error(`import_session_handoff path must be an existing regular file: ${filePath}`);
     }
-    const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    return parseSafeJsonInput(content, 'browser session handoff');
+    return readJson(filePath);
   }
 
   if (params.handoff && typeof params.handoff === 'object') {
