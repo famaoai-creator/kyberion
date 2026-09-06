@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { checkExtensionOrder } from './check_extension_order.js';
+import { checkExtensionOrder, readExtensionOrderTextFile } from './check_extension_order.js';
 
 describe('extension order checker', () => {
+  it('rejects a directory replacement before lifecycle parsing', () => {
+    expect(() => readExtensionOrderTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation text reader for the extension document', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_extension_order.ts'), {
