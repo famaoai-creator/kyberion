@@ -23315,3 +23315,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_module_boundaries.ts`、`scripts/check_module_boundaries.test.ts`、PI-03
 - **変更**: module boundaries checkerのmodule source本文readを`readModuleBoundaryTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをimport graph／cycle判定へ到達させないようにした。既存のlayer、direction、cycle semanticsは維持した。
 - **検証**: module boundaries **2 files／4 passed, 1 existing ratchet failure**、対象ESLint、Prettier、`git diff --check`で確認した。既存の未コミット変更によりcycles `0→1`、runtime cycles `2→3`となったため、baseline・ユーザー変更は変更せず継続課題とした。
+
+## 2026-09-06 再レビュー実装 1686
+
+- **対象**: `scripts/check_module_invariants.ts`、`scripts/check_module_invariants.test.ts`、PI-03
+- **変更**: module invariants checkerのrequired module source本文readを`readModuleInvariantTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをassertModuleInvariant判定へ到達させないようにした。既存のrequired module、runtime/documented invariant semanticsは維持した。
+- **検証**: module invariants **2 files／3 tests passed**、対象ESLint、Prettier、checker direct実行（6 registered invariants OK）、`git diff --check`で確認した。
