@@ -123,6 +123,16 @@ describe('plugin packs (QM-07)', () => {
       }
     });
 
+    it('treats a directory at the import telemetry path as empty history', () => {
+      const filePath = path.join(registryDir, 'pack-imports.jsonl');
+      safeMkdir(filePath, { recursive: true });
+      try {
+        expect(listPackImportRecords(10, registryDir)).toEqual([]);
+      } finally {
+        safeRmSync(registryDir, { recursive: true, force: true });
+      }
+    });
+
     afterEach(() => {
       for (const dir of [fixtureDir, registryDir, managedRoot]) {
         safeRmSync(dir, { recursive: true, force: true });

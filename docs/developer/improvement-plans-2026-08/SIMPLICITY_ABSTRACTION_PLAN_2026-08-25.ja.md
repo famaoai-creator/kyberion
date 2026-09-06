@@ -22847,3 +22847,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/mission-orchestration-journal.ts`、journal test、PI-03
 - **変更**: verified provisioned artifact の replay verification 前に operation-time の regular-file 検査を追加し、target directory replacement を `readTextFile` に到達させず corruption として拒否するようにした。
 - **検証**: mission-orchestration-journal **2 files／14 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
+
+## 2026-09-06 再レビュー実装 1608
+
+- **対象**: `libs/core/plugin-pack.ts`、plugin-pack test、PI-03
+- **変更**: plugin pack の import telemetry JSONL reader に operation-time の regular-file 検査を追加し、directory replacement を既存の lenient read semanticsに従って空履歴として扱うようにした。
+- **検証**: plugin-pack **2 files／20 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。

@@ -245,7 +245,7 @@ function appendImportRecord(record: PackImportRecord, override?: string): void {
 
 export function listPackImportRecords(limit = 50, override?: string): PackImportRecord[] {
   const file = importLogPath(override);
-  if (!safeExistsSync(file)) return [];
+  if (!safeExistsSync(file) || !safeLstat(file).isFile()) return [];
   const records: PackImportRecord[] = [];
   for (const line of readTextFile(file).split('\n')) {
     const trimmed = line.trim();
