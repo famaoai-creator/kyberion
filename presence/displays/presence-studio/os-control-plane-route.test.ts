@@ -40,7 +40,9 @@ describe('Presence Studio OS control-plane route contract', () => {
     );
     expect(route).not.toContain('error: error?.message || String(error)');
     expect(decisionRoute).toMatch(/decideHeldAction\(\s*actionId,\s*decision,\s*access\s*\)/u);
-    expect(decisionRoute).toContain('presenceStudioApprovalDecisionSchema.safeParse(req.body)');
+    expect(decisionRoute).toContain(
+      "safeParsePresenceStudioRequestBody(req.body, 'held action decision body')"
+    );
     expect(applyRoute).toContain('applyHeldAction(actionId, access)');
     expect(applyRoute).toContain('res.status(502).json({');
   });
@@ -111,5 +113,13 @@ describe('Presence Studio OS control-plane route contract', () => {
     );
     expect(route).toContain('validatePresenceTimeline(');
     expect(route).toContain('presenceStudioData.presenceStudioWireError(error, 400)');
+  });
+
+  it('normalizes every schema-backed request body before validation', () => {
+    const source = readRepoFile('presence/displays/presence-studio/server.ts');
+    expect(source).toContain('function safeParsePresenceStudioRequestBody(');
+    expect(source).not.toMatch(/safeParse\(req\.body\)/u);
+    expect(source).not.toContain('req.body?.goal_summary');
+    expect(source).not.toContain('req.body?.success_condition');
   });
 });

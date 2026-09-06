@@ -22769,3 +22769,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `presence/displays/presence-studio/server.ts`、Presence Studio route contract test、SX-08b
 - **変更**: Presence Studio の `/api/timeline/dispatch` に残っていた Express `req.body` の直接 timeline validator 渡しを、共有 `parseSafeJsonObjectValue` 境界の後段へ移行した。timeline の既存 validation／schedule semantics は維持し、object shape・dangerous JSON key・不正 timeline は状態反映前に 400 wire error として返す回帰境界を追加した。
 - **検証**: Presence Studio route／timeline helper **2 test files／15 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、package scriptsの削減は継続課題とする。
+
+## 2026-09-06 再レビュー修正 1595
+
+- **対象**: `presence/displays/presence-studio/server.ts`、Presence Studio route contract test、SX-08b
+- **変更**: Presence Studio の approval、browser bootstrap、voice、email、location、demo の schema-backed route に残っていた Express `req.body` の直接 Zod 渡しを、共有 `parseSafeJsonObjectValue` を包む共通 request-body helper 経由へ統一した。既存の schema validation、認証・lock・外部送信の順序は維持し、配列・null・dangerous JSON key は既存の400 validation分岐で拒否する。
+- **検証**: Presence Studio route／timeline helper **3 test files／17 tests passed**、root typecheck、Prettier、`git diff --check`。残る全surfaceのUI投影、provider実機受入、package scriptsの削減は継続課題とする。
