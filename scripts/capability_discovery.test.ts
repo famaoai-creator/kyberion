@@ -26,6 +26,7 @@ describe('capability_discovery', () => {
       platforms: ['darwin'],
       platformMatch: false,
       missingBins: ['missing-tool'],
+      missingEnv: [],
       available: false,
     });
   });
@@ -45,6 +46,7 @@ describe('capability_discovery', () => {
               platforms: ['darwin'],
               platformMatch: true,
               missingBins: [],
+              missingEnv: [],
               available: true,
             },
           ],
@@ -84,6 +86,66 @@ describe('capability_discovery', () => {
     }
   });
 
+  it('marks Linux-only env requirements red without treating darwin as missing', () => {
+    const linux = evaluateCapability(
+      {
+        op: 'get',
+        platforms: ['darwin', 'win32', 'linux'],
+        requirements: { env: ['KYBERION_ALLOW_FILE_SECRETS'], env_platforms: ['linux'] },
+      },
+      'linux',
+      () => true,
+      () => false
+    );
+    expect(linux).toMatchObject({
+      platformMatch: true,
+      missingEnv: ['KYBERION_ALLOW_FILE_SECRETS'],
+      available: false,
+    });
+
+    const darwin = evaluateCapability(
+      {
+        op: 'get',
+        platforms: ['darwin', 'win32', 'linux'],
+        requirements: { env: ['KYBERION_ALLOW_FILE_SECRETS'], env_platforms: ['linux'] },
+      },
+      'darwin',
+      () => true,
+      () => false
+    );
+    expect(darwin).toMatchObject({
+      platformMatch: true,
+      missingEnv: [],
+      available: true,
+    });
+  });
+
+  it('renders missing env in red in the human-readable report', () => {
+    const output = formatCapabilityDiscovery({
+      platform: 'linux',
+      rootDir: '/repo',
+      actuators: [
+        {
+          actuatorId: 'secret-actuator',
+          version: '1.1.0',
+          description: 'secrets',
+          capabilities: [
+            {
+              op: 'get',
+              platforms: ['darwin', 'win32', 'linux'],
+              platformMatch: true,
+              missingBins: [],
+              missingEnv: ['KYBERION_ALLOW_FILE_SECRETS'],
+              available: false,
+            },
+          ],
+        },
+      ],
+      errors: [],
+    });
+    expect(output).toContain('Missing env: KYBERION_ALLOW_FILE_SECRETS');
+  });
+
   it('uses governed manifests to discover platform and binary requirements', () => {
     const root = pathResolver.sharedTmp('capability-discovery-manifest-tests');
     const manifestPath = path.join(root, 'actuators', 'demo', 'manifest.json');
@@ -118,6 +180,7 @@ describe('capability_discovery', () => {
             op: 'render',
             platformMatch: true,
             missingBins: ['missing-tool'],
+            missingEnv: [],
             available: false,
           },
         ],

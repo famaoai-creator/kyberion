@@ -17,17 +17,35 @@ function binaryAvailable(bin) {
   return result.status === 0;
 }
 
-function evaluateCapability(capability, platform) {
+function envAvailable(name, env = process.env) {
+  const value = env[name];
+  if (value == null || value === '') return false;
+  if (/^(0|false|no|off)$/i.test(value)) return false;
+  if (/^(1|true|yes|on)$/i.test(value)) return true;
+  return true;
+}
+
+function envRequirementsApply(capability, platform) {
+  const envPlatforms = capability.requirements?.env_platforms;
+  return !envPlatforms || envPlatforms.length === 0 || envPlatforms.includes(platform);
+}
+
+function evaluateCapability(capability, platform, env = process.env) {
   const platforms = Array.isArray(capability.platforms) ? capability.platforms : [];
   const requiredBins = capability.requirements?.bin ?? [];
+  const requiredEnv = capability.requirements?.env ?? [];
   const platformMatch = platforms.length === 0 || platforms.includes(platform);
   const missingBins = requiredBins.filter((bin) => !binaryAvailable(bin));
+  const missingEnv = envRequirementsApply(capability, platform)
+    ? requiredEnv.filter((name) => !envAvailable(name, env))
+    : [];
   return {
     op: String(capability.op || ''),
     platforms,
     platformMatch,
     missingBins,
-    available: platformMatch && missingBins.length === 0,
+    missingEnv,
+    available: platformMatch && missingBins.length === 0 && missingEnv.length === 0,
   };
 }
 
@@ -88,7 +106,11 @@ function formatReport(report) {
         : ` [OS Mismatch: ${capability.platforms.join('/')}]`;
       const binInfo =
         capability.missingBins.length > 0 ? ` [Missing: ${capability.missingBins.join(', ')}]` : '';
-      lines.push(`  ${icon} ${capability.op.padEnd(20)} ${platformInfo}${binInfo}`);
+      const envInfo =
+        capability.missingEnv.length > 0
+          ? ` [Missing env: ${capability.missingEnv.join(', ')}]`
+          : '';
+      lines.push(`  ${icon} ${capability.op.padEnd(20)} ${platformInfo}${binInfo}${envInfo}`);
     }
     lines.push('');
   }
