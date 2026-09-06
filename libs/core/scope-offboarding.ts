@@ -39,6 +39,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReaddir,
+  safeLstat,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
@@ -790,7 +791,7 @@ interface LedgerAssetLine {
 /** Parse a JSONL file leniently (corrupt lines skipped — same contract as the ingest readers). */
 function readJsonlLines(absPath: string): Array<Record<string, unknown>> {
   const safePath = safeOptionalRepositoryPath(absPath);
-  if (!safePath || !safeExistsSync(safePath)) return [];
+  if (!safePath || !safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
   const raw = readTextFile(safePath);
   const records: Array<Record<string, unknown>> = [];
   for (const line of raw.split('\n')) {
@@ -824,7 +825,9 @@ function computeDedupRegistryPrune(tenantSlug: string): DedupRegistryPrune {
   const registryAbs = safeOptionalRepositoryPath(
     pathResolver.rootResolve(INGEST_DEDUP_REGISTRY_REPO_PATH)
   );
-  if (!registryAbs || !safeExistsSync(registryAbs)) return result;
+  if (!registryAbs || !safeExistsSync(registryAbs) || !safeLstat(registryAbs).isFile()) {
+    return result;
+  }
 
   const knowledgeRoot = tenantKnowledgeRootDefault(tenantSlug);
   const ledgerLines = readJsonlLines(
