@@ -3,13 +3,12 @@ import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
-  safeReadFile,
   safeWriteFile,
   safeExec,
   safeExistsSync,
   safeLstat,
 } from '@agent/core/secure-io';
-import { nowIso, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import type { AdfEngineContext } from '@agent/core/adf-engine';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -395,13 +394,7 @@ async function executePipeline(
     if (!safeLstat(contextPath).isFile()) {
       throw new Error(`system context must be an existing regular file: ${contextPath}`);
     }
-    const saved = parseSafeJsonObjectValue(
-      parseSafeJsonInput(
-        String(safeReadFile(contextPath, { encoding: 'utf8' }) || ''),
-        'system context'
-      ),
-      'system context'
-    );
+    const saved = parseSafeJsonObjectValue(readJson(contextPath), 'system context');
     ctx = { ...ctx, ...saved };
   }
 
