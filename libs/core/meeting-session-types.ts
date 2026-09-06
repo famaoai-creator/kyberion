@@ -72,12 +72,7 @@ export interface TranscriptChunk {
 }
 
 export type MeetingSessionStatus =
-  | 'connecting'
-  | 'connected'
-  | 'in_meeting'
-  | 'leaving'
-  | 'ended'
-  | 'error';
+  'connecting' | 'connected' | 'in_meeting' | 'leaving' | 'ended' | 'error';
 
 export interface MeetingSessionState {
   session_id: string;
@@ -117,6 +112,18 @@ export interface MeetingSession {
    * platform / config doesn't allow it.
    */
   chat(text: string): Promise<void>;
+  /**
+   * Optional declared gesture: raise the participant's hand.
+   * Drivers without a control plane omit this; presence means the
+   * coordinator (or an operator verb) may invoke it mid-session.
+   */
+  raiseHand?(): Promise<{ already: boolean }>;
+  /**
+   * Optional declared gesture: admit waiting-room participants
+   * (host authority — coordinator gates this behind approval).
+   * With `name`, admits only matching rows (best effort).
+   */
+  admit?(name?: string): Promise<{ admitted: number }>;
   /**
    * Optional driver-native transcript stream (e.g. platform live
    * captions scraped by a browser extension). When present, the

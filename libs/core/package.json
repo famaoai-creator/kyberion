@@ -1391,6 +1391,10 @@
       "types": "./dist/obs-virtual-camera-output.d.ts",
       "default": "./dist/obs-virtual-camera-output.js"
     },
+    "./v4l2-virtual-camera-output": {
+      "types": "./dist/v4l2-virtual-camera-output.d.ts",
+      "default": "./dist/v4l2-virtual-camera-output.js"
+    },
     "./prompt-cache-discipline": {
       "types": "./dist/prompt-cache-discipline.d.ts",
       "default": "./dist/prompt-cache-discipline.js"

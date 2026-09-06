@@ -15,7 +15,7 @@ describe('CLI reasoning provider module', () => {
     expect(source).toContain('getRegisteredEnvText');
   });
 
-  it('owns Claude Agent, Copilot, and Cursor CLI modes outside the bootstrap switch', () => {
+  it('owns Claude Agent, Copilot, Cursor CLI, and OpenCode CLI modes outside the bootstrap switch', () => {
     const claudeAgent = buildCliProviderBundle({
       mode: 'claude-agent',
       provider: 'claude',
@@ -40,6 +40,14 @@ describe('CLI reasoning provider module', () => {
         mode: 'cursor-cli',
         provider: 'cursor',
         env: { KYBERION_CURSOR_CLI_BIN: '__definitely_missing_cursor_agent__' },
+      })
+    ).toBeNull();
+
+    expect(
+      buildCliProviderBundle({
+        mode: 'opencode-cli',
+        provider: 'opencode',
+        env: { KYBERION_OPENCODE_CLI_BIN: '__definitely_missing_opencode__' },
       })
     ).toBeNull();
   });

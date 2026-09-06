@@ -37,6 +37,10 @@
       leave: { aria: [/通話から退出/i, /通話を退出/i, /退出/i, /leave call/i] },
       captionsOn: { aria: [/字幕をオン/i, /turn on captions/i, /字幕を表示/i] },
       captionSel: ['[aria-label*="字幕"] [jsname]', 'div[jsname][aria-live="polite"]'],
+      raiseHand: { aria: [/手を挙げる/i, /raise hand/i] },
+      lowerHand: { aria: [/手を下ろす/i, /lower hand/i] },
+      admit: { aria: [/入室を許可/i, /admit/i] },
+      admitAll: { aria: [/全員を許可/i, /admit all/i] },
       chatOpen: { aria: [/全員とチャット/i, /chat with everyone/i, /^チャット$/i] },
       chatInputSel: ['textarea[aria-label*="メッセージ"]', 'textarea[aria-label*="message" i]'],
       chatSend: { aria: [/メッセージを送信/i, /send a message/i, /send message/i] },
@@ -58,6 +62,10 @@
       captionsOn: {
         aria: [/ライブ キャプションをオンに/i, /turn on live captions/i, /字幕をオンに/i],
       },
+      raiseHand: { aria: [/手を挙げる/i, /raise your hand/i, /raise hand/i] },
+      lowerHand: { aria: [/手を下ろす/i, /lower your hand/i, /lower hand/i] },
+      admit: { aria: [/許可/i, /admit/i], sel: ['[data-tid*="admit"]'] },
+      admitAll: { aria: [/全員/i, /admit all/i] },
       captionSel: [
         '[data-tid="closed-caption-v2-window-wrapper"]',
         '[data-tid*="closed-caption"]',
@@ -93,6 +101,10 @@
       captionsOn: {
         aria: [/字幕を表示/i, /show captions/i, /closed caption/i, /ライブ文字起こし/i],
       },
+      raiseHand: { aria: [/手を挙げる/i, /raise hand/i] },
+      lowerHand: { aria: [/手を下ろす/i, /lower hand/i] },
+      admit: { aria: [/許可/i, /admit/i] },
+      admitAll: { aria: [/全員/i, /admit all/i] },
       captionSel: ['[class*="live-transcription-subtitle"]', '[class*="caption"]'],
       chatOpen: { aria: [/^チャット$/i, /^chat$/i, /チャットを開く/i, /open chat/i] },
       chatInputSel: [
@@ -245,6 +257,55 @@
     const turnOff = find(S.camOff);
     if (on && turnOn) turnOn.click();
     else if (!on && turnOff) turnOff.click();
+  }
+
+  // Declared meeting gestures (kyberion-specified operations). Toggle-aware
+  // like setMic: never double-act when the state is already as requested.
+  async function raiseHand() {
+    const lowered = find(S.lowerHand);
+    if (lowered) return { ok: true, already: true };
+    const raiser = find(S.raiseHand);
+    if (!raiser) return { ok: false, error: `raise-hand control not found on ${PLATFORM}` };
+    raiser.click();
+    return { ok: true, already: false };
+  }
+
+  // Admit waiting-room participants. With a name, only admit matching rows
+  // (best effort); otherwise admit-all when offered, else every visible
+  // admit button. Reports what was clicked — the driver surfaces it for audit.
+  async function admitParticipants(name) {
+    const wanted = String(name || '')
+      .trim()
+      .toLowerCase();
+    const clicked = [];
+    const clickEl = (el, label) => {
+      try {
+        el.click();
+        clicked.push(label);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    if (!wanted) {
+      const all = find(S.admitAll);
+      if (all && isVisible(all)) {
+        clickEl(all, 'all');
+        return { ok: clicked.length > 0, admitted: clicked.length, scope: 'all' };
+      }
+    }
+    const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+    for (const btn of buttons) {
+      const label = (btn.getAttribute('aria-label') || btn.innerText || '').trim();
+      if (!/許可|admit/i.test(label)) continue;
+      if (wanted) {
+        const row = btn.closest('[role="row"], [role="listitem"], li, tr, div');
+        const rowText = ((row && row.innerText) || '').toLowerCase();
+        if (!rowText.includes(wanted)) continue;
+      }
+      if (isVisible(btn)) clickEl(btn, label.slice(0, 80));
+    }
+    return { ok: clicked.length > 0, admitted: clicked.length, scope: wanted || 'all-visible' };
   }
 
   function setGuestName(name) {
@@ -658,6 +719,10 @@
           sendResponse({ ok: true, data });
         } else if (message.type === 'meet:chat') {
           sendResponse(await sendChat(message.text));
+        } else if (message.type === 'meet:raise_hand') {
+          sendResponse(await raiseHand());
+        } else if (message.type === 'meet:admit') {
+          sendResponse(await admitParticipants(message.name));
         } else if (message.type === 'meet:capture_frame') {
           sendResponse(captureSharedScreenFrame(message.options || {}));
         } else sendResponse({ ok: false, error: `unknown message ${message.type}` });

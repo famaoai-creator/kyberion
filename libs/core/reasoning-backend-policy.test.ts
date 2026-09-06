@@ -20,6 +20,8 @@ describe('reasoning-backend-policy', () => {
     expect(policy.allowed_modes).toContain('nemotron-api');
     expect(policy.allowed_modes).toContain('copilot');
     expect(policy.allowed_modes).toContain('cursor-cli');
+    expect(policy.allowed_modes).toContain('opencode-cli');
+    expect(policy.mode_aliases.opencode).toBe('opencode-cli');
     expect(policy.allowed_modes).toContain('grok-cli');
     expect(policy.allowed_modes).toContain('grok-api');
     expect(policy.mode_aliases['gemini-api']).toBeUndefined();
@@ -30,6 +32,7 @@ describe('reasoning-backend-policy', () => {
     expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('grok-cli');
     expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('claude-cli');
     expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('cursor-cli');
+    expect(policy.provider_fallback_order.map((e) => e.mode)).toContain('opencode-cli');
     expect(policy.openrouter).toEqual({
       default_profile: 'free-router',
       default_cost_policy: 'free-only',

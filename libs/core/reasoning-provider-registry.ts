@@ -109,6 +109,7 @@ const KNOWN_MODES = new Set<ReasoningBackendMode>([
   'grok-api',
   'copilot',
   'cursor-cli',
+  'opencode-cli',
   'local',
   'ollama',
   'vllm',

@@ -28,6 +28,7 @@ const CLI_MODES = [
   'agy-cli',
   'grok-cli',
   'cursor-cli',
+  'opencode-cli',
   'copilot',
 ] as const satisfies readonly ReasoningBackendMode[];
 
@@ -38,6 +39,7 @@ const CLI_BINARIES: Record<(typeof CLI_MODES)[number], string> = {
   'agy-cli': 'agy',
   'grok-cli': 'grok',
   'cursor-cli': 'cursor-agent',
+  'opencode-cli': 'opencode',
   copilot: 'copilot',
 };
 
@@ -133,6 +135,7 @@ const SANDBOX_PROBE_PROVIDERS = [
   { mode: 'gemini-cli', provider: 'gemini', binary: 'gemini' },
   { mode: 'grok-cli', provider: 'grok', binary: 'grok' },
   { mode: 'cursor-cli', provider: 'cursor', binary: 'cursor-agent' },
+  { mode: 'opencode-cli', provider: 'opencode', binary: 'opencode' },
   { mode: 'agy-cli', provider: 'agy', binary: 'agy' },
   { mode: 'copilot', provider: undefined, binary: 'copilot' },
 ] as const satisfies readonly {
@@ -155,6 +158,7 @@ const SANDBOX_PROBE_BINARY_ENV_KEYS: Readonly<
   'gemini-cli': 'KYBERION_GEMINI_CLI_BIN',
   'grok-cli': 'KYBERION_GROK_CLI_BIN',
   'cursor-cli': 'KYBERION_CURSOR_CLI_BIN',
+  'opencode-cli': 'KYBERION_OPENCODE_CLI_BIN',
   'agy-cli': 'KYBERION_AGY_CLI_BIN',
 };
 
@@ -206,6 +210,8 @@ function sandboxCommandArgs(
       return ['-p', prompt, '--output-format', 'plain', ...permissionArgs];
     case 'cursor-cli':
       return ['-p', '--output-format', 'json', ...permissionArgs, prompt];
+    case 'opencode-cli':
+      return ['run', '--format', 'json', ...permissionArgs, prompt];
     default:
       return [];
   }

@@ -52,6 +52,7 @@ function cliProviderForMode(mode: string): string | undefined {
       'gemini-cli': 'gemini',
       'grok-cli': 'grok',
       'cursor-cli': 'cursor',
+      'opencode-cli': 'opencode',
       copilot: 'copilot',
     } as Record<string, string>
   )[mode];

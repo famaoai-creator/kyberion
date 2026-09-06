@@ -171,6 +171,19 @@ export const PROVIDER_PROBE_TABLE: Readonly<Record<string, ProviderProbeSpec>> =
       expectedFlags: ['--sandbox', '--mode'],
     },
   },
+  opencode: {
+    binaryCommand: 'opencode',
+    binaryArgs: ['--version'],
+    authCommand: 'opencode',
+    authArgs: ['auth', 'list'],
+    headless: true,
+    structuredOutput: true,
+    sandboxProbe: {
+      command: 'opencode',
+      args: ['--help'],
+      expectedFlags: ['--agent', '--format'],
+    },
+  },
   gemini: {
     binaryCommand: 'gemini',
     binaryArgs: ['--version'],
@@ -205,6 +218,7 @@ const PROVIDER_BINARY_ENV_KEYS: Readonly<Record<string, string>> = {
   agy: 'KYBERION_AGY_CLI_BIN',
   grok: 'KYBERION_GROK_CLI_BIN',
   cursor: 'KYBERION_CURSOR_CLI_BIN',
+  opencode: 'KYBERION_OPENCODE_CLI_BIN',
   gemini: 'KYBERION_GEMINI_CLI_BIN',
   copilot: 'KYBERION_COPILOT_CLI_BIN',
 };

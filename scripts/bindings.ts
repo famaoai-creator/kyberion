@@ -10,6 +10,7 @@ import '../libs/core/agent-execution-port.js';
 import '../libs/core/a2a-route-port.js';
 import '../libs/core/actuator-forwarding-port.js';
 import '../libs/core/audit-forwarder.js';
+import '../libs/core/camera-output-bridge.js';
 import '../libs/core/deployment-adapter.js';
 import '../libs/core/embedding-backend.js';
 import '../libs/core/email-account-catalog.js';

@@ -52,6 +52,8 @@ const CONTROL_COMMANDS = new Set([
   'set_mic',
   'set_camera',
   'chat',
+  'raise_hand',
+  'admit',
   'screen_context',
   'leave',
 ]);
@@ -102,6 +104,9 @@ function parseControlMessage(raw) {
     return typeof value.on === 'boolean' ? value : null;
   }
   if (value.cmd === 'chat') return typeof value.text === 'string' ? value : null;
+  if (value.cmd === 'raise_hand') return value;
+  if (value.cmd === 'admit')
+    return typeof value.name === 'string' || value.name === undefined ? value : null;
   if (value.cmd === 'screen_context') {
     return typeof value.text === 'string' && isOptionalString(value.provider) ? value : null;
   }
@@ -318,6 +323,22 @@ async function handleCommand(msg) {
       await relayToContent(tab.id, { type: 'meet:set_camera', on: msg.on });
     else if (msg.cmd === 'chat')
       await relayToContent(tab.id, { type: 'meet:chat', text: msg.text });
+    else if (msg.cmd === 'raise_hand') {
+      const resp = await relayToContent(tab.id, { type: 'meet:raise_hand' });
+      sendEvent({
+        event: 'raised_hand',
+        ok: Boolean(resp && resp.ok),
+        already: Boolean(resp && resp.already),
+      });
+    } else if (msg.cmd === 'admit') {
+      const resp = await relayToContent(tab.id, { type: 'meet:admit', name: msg.name });
+      sendEvent({
+        event: 'admitted',
+        ok: Boolean(resp && resp.ok),
+        admitted: typeof resp?.admitted === 'number' ? resp.admitted : 0,
+        ...(typeof msg.name === 'string' && msg.name ? { name: msg.name } : {}),
+      });
+    }
     // The driver returns OCR text that has already passed the governed PII
     // scrubber; the panel only ever sees this, never the frame it came from.
     else if (msg.cmd === 'screen_context') {

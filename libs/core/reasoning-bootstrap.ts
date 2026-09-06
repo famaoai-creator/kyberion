@@ -29,7 +29,7 @@
  *     OpenRouter model policy; paid inference requires an explicit
  *     `KYBERION_OPENROUTER_COST_POLICY=paid-allowed` opt-in.
  *   - Otherwise → prefer the authenticated Claude CLI, then Grok, Codex, AGY,
- *     and Copilot, then Cursor through the governed provider fallback chain. The legacy
+ *     and Copilot, then Cursor, then OpenCode through the governed provider fallback chain. The legacy
  *     `gemini-cli` adapter remains available for explicit / Enterprise
  *     configurations but is not auto-selected.
  *
@@ -662,6 +662,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     'grok',
     'copilot',
     'cursor',
+    'opencode',
   ]);
   const chainUsable = chain.some((candidate) => {
     const provider = providerForReasoningMode(candidate.mode);

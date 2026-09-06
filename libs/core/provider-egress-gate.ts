@@ -325,6 +325,8 @@ const REASONING_IDENTIFIER_TO_PROVIDER_ID: Readonly<Record<string, string>> = {
   grok: 'grok',
   'cursor-cli': 'cursor',
   cursor: 'cursor',
+  'opencode-cli': 'opencode',
+  opencode: 'opencode',
 };
 
 /** Map a reasoning mode or backend name to a provider id known to the egress policy, when possible. */

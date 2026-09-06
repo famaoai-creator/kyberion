@@ -15,6 +15,10 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/a2a-route-port.ts',
     consumers: ['libs/core/a2a-bridge.ts'],
   },
+  'camera-output-bridge': {
+    declaration: 'libs/core/camera-output-bridge.ts',
+    consumers: ['libs/actuators/voice-actuator/src/voice-media-output-helpers.ts'],
+  },
   'actuator.capability-probe': {
     declaration: 'libs/core/src/actuator-capability.ts',
     consumers: ['libs/core/src/actuator-capability.ts'],

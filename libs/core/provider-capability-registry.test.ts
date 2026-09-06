@@ -242,6 +242,33 @@ describe('provider-capability-registry', () => {
     ]);
   });
 
+  it('uses the registered CLI binary override for OpenCode capability probes', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+    const calls: string[] = [];
+    const exec: ProbeExecFn = (command, args) => {
+      calls.push(`${command} ${args.join(' ')}`);
+      return { ok: true, stdout: '--agent --format', stderr: '' };
+    };
+
+    const results = probeProviderCapabilities({
+      providerIds: ['opencode'],
+      env: { KYBERION_OPENCODE_CLI_BIN: '/custom/opencode' },
+      exec,
+    });
+
+    expect(results[0]).toMatchObject({
+      provider_id: 'opencode',
+      binary_found: true,
+      sandbox_probe: { command: '/custom/opencode' },
+    });
+    expect(calls).toEqual([
+      '/custom/opencode --version',
+      '/custom/opencode auth list',
+      '/custom/opencode --help',
+    ]);
+  });
+
   it('does not replace an explicitly configured Claude binary with a fallback candidate', async () => {
     resetMocks();
     const { probeProviderCapabilities } = await import('./provider-capability-registry.js');

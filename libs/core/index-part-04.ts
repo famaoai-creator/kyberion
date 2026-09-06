@@ -333,6 +333,8 @@ export * from './copilot-acp-reasoning-backend.js';
 
 export * from './cursor-cli-reasoning-backend.js';
 
+export * from './opencode-cli-reasoning-backend.js';
+
 export * from './agent-adapter.js';
 
 // Agent Registry & Lifecycle

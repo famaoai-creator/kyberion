@@ -119,6 +119,51 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     fs.rmSync(traceDir, { recursive: true, force: true });
   });
 
+  it('hands the live session to onSession right after join', async () => {
+    const bus = new StubAudioBus();
+    const driver = new StubMeetingJoinDriver();
+    const stt = new StubStreamingSpeechToTextBridge(1);
+    const tts = new StubStreamingTextToSpeechBridge();
+    const vad = new EnergyVad();
+    const trace = new TraceContext('meeting_participation:test', { missionId: 'MSN-TEST-1' });
+
+    const seen: string[] = [];
+    const coordinator = new MeetingParticipationCoordinator({
+      driver,
+      bus,
+      stt,
+      tts,
+      vad,
+      agent: {
+        async onUtterance() {
+          return { leave: true };
+        },
+      },
+      trace,
+    });
+
+    for (let i = 0; i < 11; i++) bus.injectInbound(makeChunk());
+
+    const report = await coordinator.run(
+      {
+        url: 'https://meet.google.com/test-test-test',
+        platform: 'meet',
+        display_name: 'Kyberion',
+      },
+      {
+        max_minutes: 1,
+        voice_profile_id: 'operator-default-v1',
+        audio_format: FORMAT,
+        post_playback_drain_ms: 0,
+        onSession: (session) => {
+          seen.push(session.state.session_id);
+        },
+      }
+    );
+
+    expect(seen).toEqual([report.session_id]);
+  });
+
   it('captions mode consumes the driver transcript stream and replies over chat', async () => {
     const bus = new StubAudioBus();
     const stub = new StubMeetingJoinDriver();

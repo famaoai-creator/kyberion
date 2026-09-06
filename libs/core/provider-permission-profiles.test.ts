@@ -151,7 +151,15 @@ describe('provider-permission-profiles', () => {
   });
 
   describe('buildProviderChildEnv', () => {
-    const providers: ProviderId[] = ['claude', 'codex', 'agy', 'grok', 'gemini', 'cursor'];
+    const providers: ProviderId[] = [
+      'claude',
+      'codex',
+      'agy',
+      'grok',
+      'gemini',
+      'cursor',
+      'opencode',
+    ];
     const fakeBaseEnv = (): NodeJS.ProcessEnv =>
       ({
         PATH: '/usr/bin:/bin',
@@ -225,6 +233,15 @@ describe('provider-permission-profiles', () => {
     it('excludes other providers credentials for cursor, and carries CURSOR_API_KEY', () => {
       const env = buildProviderChildEnv({ provider: 'cursor', baseEnv: fakeBaseEnv() });
       expect(env.CURSOR_API_KEY).toBe('fake-cursor-key');
+      expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(env.OPENAI_API_KEY).toBeUndefined();
+      expect(env.XAI_API_KEY).toBeUndefined();
+      expect(env.GEMINI_API_KEY).toBeUndefined();
+    });
+
+    it('carries no provider API key for opencode (login session auth)', () => {
+      const env = buildProviderChildEnv({ provider: 'opencode', baseEnv: fakeBaseEnv() });
+      expect(env.CURSOR_API_KEY).toBeUndefined();
       expect(env.ANTHROPIC_API_KEY).toBeUndefined();
       expect(env.OPENAI_API_KEY).toBeUndefined();
       expect(env.XAI_API_KEY).toBeUndefined();
