@@ -33,6 +33,7 @@ describe('surface-provider-policy', () => {
       'presence',
       'slack',
       'telegram',
+      'terminal',
     ]);
   });
 
@@ -131,6 +132,7 @@ describe('surface-provider-policy', () => {
     expect(getSurfaceProviderManifestRecord('imessage').displayName).toBe('iMessage');
     expect(getSurfaceProviderManifestRecord('discord').displayName).toBe('Discord');
     expect(getSurfaceProviderManifestRecord('telegram').displayName).toBe('Telegram');
+    expect(getSurfaceProviderManifestRecord('terminal').displayName).toBe('Terminal bridge');
   });
 
   it('keeps prompt-mode compiled flows on the direct reply path', () => {

@@ -19,6 +19,7 @@ describe('surface-provider-manifest', () => {
       'presence',
       'slack',
       'telegram',
+      'terminal',
     ]);
   });
 

@@ -2667,7 +2667,7 @@
     {
       "path": "product/governance/surface-provider-manifests.json",
       "tier": "public",
-      "size": 36007,
+      "size": 36680,
       "type": "json"
     },
     {
@@ -9951,7 +9951,7 @@
     {
       "path": "product/schemas/surface-provider-manifests.schema.json",
       "tier": "public",
-      "size": 10923,
+      "size": 11230,
       "type": "json"
     },
     {
