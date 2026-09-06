@@ -23303,3 +23303,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/check_knowledge_scope_boundaries.ts`、`scripts/check_knowledge_scope_boundaries.test.ts`、PI-03
 - **変更**: knowledge scope boundaries checkerのworkspace source本文readを`readKnowledgeScopeTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをtenant scope／runtime writer判定へ到達させないようにした。既存のscope literal、tenant env ratchet、physical namespace semanticsは維持した。
 - **検証**: knowledge scope boundaries **2 files／6 tests passed**、対象ESLint、Prettier、checker direct実行（OK）、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1684
+
+- **対象**: `scripts/check_max_file_lines.ts`、`scripts/check_max_file_lines.entrypoint.test.ts`、PI-03
+- **変更**: max file lines checkerのsource本文readを`readMaxFileLinesTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをline count判定へ到達させないようにした。既存のroot、exception、line-count semanticsは維持した。
+- **検証**: max file lines **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。checker direct実行は既存の未コミット`voice-actuator/src/index.ts`の1500行超過を表示したため、例外・分割は変更せず継続課題とした。

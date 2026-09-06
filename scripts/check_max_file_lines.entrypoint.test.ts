@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
+import { readMaxFileLinesTextFile } from './check_max_file_lines.js';
 
 describe('max file lines checker boundary', () => {
+  it('rejects a directory replacement before line counting', () => {
+    expect(() => readMaxFileLinesTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation text reader for source files', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_max_file_lines.ts'), {
