@@ -53,6 +53,7 @@
     "check:contract-semver": "node dist/scripts/check_contract_semver.js",
     "check:pr-title": "node --import ./scripts/ts-loader.mjs scripts/check_pr_title.ts",
     "check:commit-subject": "node --import ./scripts/ts-loader.mjs scripts/check_commit_subject.ts",
+    "check:script-integrity": "node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts",
     "task:list": "node --import ./scripts/ts-loader.mjs scripts/task_list.ts",
     "task:init": "node --import ./scripts/ts-loader.mjs scripts/task_init.ts",
     "task:run": "node --import ./scripts/ts-loader.mjs scripts/task_run.ts",
