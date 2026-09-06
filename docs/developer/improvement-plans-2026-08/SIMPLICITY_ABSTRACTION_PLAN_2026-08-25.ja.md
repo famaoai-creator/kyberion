@@ -22991,3 +22991,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/oauth-session-store.ts`、oauth-session-store test、PI-03
 - **変更**: OAuth callback lock metadata read 前へ operation-time の regular-file 検査を追加し、directory replacement を stale lock 判定／unlinkへ到達させないようにした。既存の callback TTL、exclusive lock、session validation semantics は維持した。
 - **検証**: oauth-session-store **2 files／7 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1632
+
+- **対象**: `presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts`、route resource-boundary test、PI-03
+- **変更**: Chronos agent route の security policy／surface request artifact read 前へ operation-time の regular-file 検査を追加し、directory replacement を JSON parse／projectionへ到達させないようにした。既存の viewer scope、request validation、wire error semantics は維持した。
+- **検証**: route resource-boundary **2 files／3 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。

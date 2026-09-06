@@ -21,6 +21,8 @@ describe('chronos agent route resource boundary', () => {
     );
 
     expect(routeSource).toContain('assertSafeRepositoryPath: secureIo.assertSafeRepositoryPath');
+    expect(routeSource).toContain('core.safeLstat(securityPolicyPath).isFile()');
+    expect(routeSource).toContain('core.safeLstat(requestArtifactPath).isFile()');
     expect(routeSource).toContain('loadStateAtPath: missionState.loadStateAtPath');
     expect(helperSource).toContain('core.loadStateAtPath(');
     expect(`${routeSource}\n${helperSource}`).not.toContain('core.loadJson');
