@@ -4,6 +4,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   loadState,
   loadStateAtPath,
+  loadStateForRepair,
   readFocusedMissionId,
   writeFocusedMissionId,
 } from './mission-state.js';
@@ -57,6 +58,29 @@ describe('mission-state loader', () => {
 
     expect(loadState(missionId, { rootDir })).toBeNull();
     expect(loadStateAtPath(`${missionDir}/mission-state.json`)).toBeNull();
+  });
+
+  it('does not read a repair state after the state leaf is replaced by a directory', () => {
+    writeState({
+      mission_id: missionId,
+      tier: 'public',
+      status: 'active',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'worker',
+      confidence_score: 1,
+      git: {
+        branch: 'mission/state-loader-test',
+        start_commit: 'abc123',
+        latest_commit: 'abc123',
+        checkpoints: [],
+      },
+      history: [],
+    });
+    safeRmSync(`${missionDir}/mission-state.json`, { force: true });
+    safeMkdir(`${missionDir}/mission-state.json`);
+
+    expect(loadStateForRepair(missionId, { rootDir })).toBeNull();
   });
 
   it('rejects symlinked focus and JSON paths', () => {

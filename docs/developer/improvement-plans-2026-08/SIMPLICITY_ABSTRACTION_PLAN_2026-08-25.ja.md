@@ -22799,3 +22799,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/inventory_resource_loaders.ts`、inventory test、root `package.json`、PI／DSH、SX-08B
 - **変更**: 未監査 direct loader の次の修正対象を手作業の grep に依存させないよう、production source の `readJson`／`readJsonLines`／`readTextFile` callsite を file／line 単位で収集し、inline／nearby path guard evidence と `needs-review` を分離する `inventory:resource-loaders` を追加した。生成物・依存物・foundation loader 実装は対象外とし、未分類を fail-open で除外しない。
 - **検証**: 実 inventory **1,345 files／195 callsites／inline 6／nearby 114／needs-review 75**、inventory **1 file／4 tests passed**、root typecheck、Prettier、`git diff --check`。needs-review の個別修正、provider実機受入、package script のさらなる整理は継続課題とする。
+
+## 2026-09-06 再レビュー実装 1600
+
+- **対象**: `libs/core/mission-state.ts`、mission-state test、PI-03
+- **変更**: legacy `loadStateForRepair` の JSON read 前に operation-time の `safeLstat(...).isFile()` を追加し、解決済み mission state leaf がディレクトリへ置換された場合に repair read を拒否する。通常の schema-aware loader と repair semantics は変更していない。
+- **検証**: mission-state **1 file／7 tests passed**、root typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
