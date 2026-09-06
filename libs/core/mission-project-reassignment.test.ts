@@ -7,6 +7,7 @@ import { reassignMissionToProject } from './project-management.js';
 import {
   resolveProjectLedgerJsonPath,
   resolveProjectLedgerPath,
+  removeMissionFromProjectLedger,
   syncProjectLedger,
 } from './mission-project-ledger.js';
 import {
@@ -230,6 +231,15 @@ describe('mission Project reassignment', () => {
     safeMkdir(ledgerPath, { recursive: true });
 
     await expect(syncProjectLedger(MISSION_ID, pathResolver.rootDir())).rejects.toThrow(
+      '[PROJECT_MISSION_LEDGER] ledger must be a regular file'
+    );
+  });
+
+  it('rejects a directory markdown ledger during removal', () => {
+    const ledgerPath = resolveProjectLedgerPath(SOURCE_PATH);
+    safeMkdir(ledgerPath, { recursive: true });
+
+    expect(() => removeMissionFromProjectLedger(SOURCE_PATH, MISSION_ID)).toThrow(
       '[PROJECT_MISSION_LEDGER] ledger must be a regular file'
     );
   });
