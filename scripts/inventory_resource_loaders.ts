@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { readTextFile } from '@agent/core/foundation';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -42,6 +42,13 @@ const EVIDENCE_PATTERNS: readonly [string, RegExp][] = [
   ['safeReadFile', /\bsafeReadFile\s*\(/u],
 ];
 const GUARD_LOOKBACK_LINES = 32;
+
+export function readResourceLoaderInventoryTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function stripQuotedText(line: string): string {
   return line
@@ -335,7 +342,9 @@ export function buildResourceLoaderInventory(
   roots: readonly string[] = DEFAULT_ROOTS
 ): ResourceLoaderInventory {
   const files = sourceFiles(roots);
-  const sourceByFile = new Map(files.map((file) => [file, readTextFile(file)]));
+  const sourceByFile = new Map(
+    files.map((file) => [file, readResourceLoaderInventoryTextFile(file)])
+  );
   const callsites = files.flatMap((file) =>
     scanResourceLoaderSource(toRepoRelative(file), sourceByFile.get(file) ?? '', {
       externalRegularFileHelpers: collectImportedRegularFileHelperNames(

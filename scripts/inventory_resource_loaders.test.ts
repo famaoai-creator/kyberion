@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
   collectImportedRegularFileHelperNames,
+  readResourceLoaderInventoryTextFile,
   scanResourceLoaderSource,
 } from './inventory_resource_loaders.js';
 
 describe('resource loader inventory', () => {
+  it('rejects a directory before reading a source file', () => {
+    expect(() => readResourceLoaderInventoryTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('records inline path validation as the strongest evidence', () => {
     expect(
       scanResourceLoaderSource(

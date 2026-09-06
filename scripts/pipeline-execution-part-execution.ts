@@ -1,7 +1,7 @@
 import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { classifyError } from '@agent/core/error-classifier';
 import { logger } from '@agent/core/core';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -77,6 +77,14 @@ import {
   findStepByIdRecursive,
   hasBoundApproval,
 } from './pipeline-execution-part-control.js';
+
+export function readPipelineIncludeTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 /**
  * AR-01 Phase B: retry + autonomous-repair extracted into a higher-order
  * function that wraps a single step-execution attempt, instead of being
@@ -931,7 +939,7 @@ export async function runStepsInternal(
           `core:include: circular reference detected — ${fragmentRef} is already in the include chain`
         );
       }
-      const fragmentRaw = readTextFile(fragmentPath);
+      const fragmentRaw = readPipelineIncludeTextFile(fragmentPath);
       const fragmentJson = parseFragmentJson(fragmentRaw, fragmentRef);
       const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({
         ...s,
