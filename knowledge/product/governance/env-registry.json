@@ -2025,6 +2025,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_OBS_WS_PASSWORD",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "OBS Studio WebSocket server password for the talking-avatar virtual-camera output; must match OBS Settings → General → WebSocket Server → Server Password.",
+      "documented": true,
+      "subsystem": "voice"
+    },
+    {
       "name": "KYBERION_OLLAMA_KEY",
       "category": "secret",
       "type": "string",
@@ -2089,6 +2098,42 @@
       "required": false,
       "description": "Model identifier used for OpenAI-compatible vision requests.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_OPENCODE_CLI_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for the OpenCode CLI binary (`opencode`); leave unset to resolve from PATH.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_OPENCODE_CLI_EXTRA_ARGS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional whitespace-separated extra argv passed to opencode headless invocations.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_OPENCODE_CLI_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Model id in provider/model form for the OpenCode CLI reasoning backend; defaults to opencode/muse-spark-1.3-contributor-free.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_OPENCODE_CLI_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Optional wall-clock timeout in milliseconds for a single opencode reasoning call; leave unset to use the governed default.",
+      "documented": true,
+      "subsystem": "reasoning"
     },
     {
       "name": "KYBERION_OPENROUTER_COST_POLICY",
@@ -2794,7 +2839,7 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "Speech-to-text bridge command override.",
+      "description": "Speech-to-text bridge command override. Supports {{audio}} and {{language}} placeholders; stdout is the transcript. macOS Apple Silicon example: whisperkit-cli transcribe --audio-path {{audio}} --language {{language}} (model auto-downloads on first run).",
       "documented": true,
       "subsystem": "voice"
     },

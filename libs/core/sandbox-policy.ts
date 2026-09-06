@@ -16,7 +16,7 @@ export interface SandboxPolicyInput {
   mode: SandboxMode;
   networkAccess?: boolean;
   writableRoots?: readonly string[];
-  provider?: 'codex' | 'claude' | 'agy' | 'grok' | 'gemini' | 'cursor' | 'kyberion';
+  provider?: 'codex' | 'claude' | 'agy' | 'grok' | 'gemini' | 'cursor' | 'opencode' | 'kyberion';
 }
 
 export interface SandboxPolicy {

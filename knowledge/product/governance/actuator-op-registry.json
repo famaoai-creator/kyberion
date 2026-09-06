@@ -471,11 +471,15 @@
         "extract_action_items",
         "generate_facilitation_script",
         "generate_reminder_message",
+        "hearing_session",
         "join",
         "leave",
+        "normalize_transcript",
+        "resolve_next_target",
         "run_action_item_reminder_sweep",
         "speak",
-        "track_pending_action_items"
+        "track_pending_action_items",
+        "tutor_session"
       ]
     },
     "modeling": {
@@ -696,10 +700,13 @@
         "collect_and_register_voice_profile",
         "collect_voice_samples",
         "generate_voice",
+        "normalize_audio",
+        "output_to_virtual_camera",
         "record_interaction",
         "record_verify_repair_voice_sample",
         "record_voice_sample",
         "register_voice_profile",
+        "render_talking_avatar",
         "speak_local",
         "verify_tts_loopback"
       ]

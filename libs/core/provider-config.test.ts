@@ -24,14 +24,21 @@ describe('provider-config', () => {
     expect(config.runtime_defaults['anthropic-fast']).toBe('claude-haiku-4-5-20251001');
     expect(config.default_models.copilot).toBe('auto');
     expect(config.default_models.cursor).toBe('auto');
+    expect(config.default_models.opencode).toBe('opencode/muse-spark-1.3-contributor-free');
     expect(config.obsolete_agent_runtime_providers).toEqual(['gemini']);
     expect(isObsoleteAgentRuntimeProvider('gemini')).toBe(true);
     expect(isObsoleteAgentRuntimeProvider('agy')).toBe(false);
     expect(config.runtime_defaults['copilot-default']).toBe('auto');
     expect(config.runtime_defaults['cursor-default']).toBe('auto');
+    expect(config.runtime_defaults['opencode-default']).toBe(
+      'opencode/muse-spark-1.3-contributor-free'
+    );
     expect(config.lifecycle.gemini.default_model).toBe('gemini-3.6-flash');
     expect(resolveRuntimeDefaultModelId('copilot-default')).toBe('auto');
     expect(resolveRuntimeDefaultModelId('cursor-default')).toBe('auto');
+    expect(resolveRuntimeDefaultModelId('opencode-default')).toBe(
+      'opencode/muse-spark-1.3-contributor-free'
+    );
   });
 
   it('validates the provider config against the schema', () => {

@@ -166,6 +166,7 @@ export const BACKEND_CAPABILITY_PROFILES: Record<ReasoningBackendMode, BackendCa
   'agy-cli': cli('agy-cli', { native_subagent: true }),
   'grok-cli': cli('grok-cli', { native_subagent: true }),
   'cursor-cli': cli('cursor-cli', { session_continuity: false }),
+  'opencode-cli': cli('opencode-cli', { session_continuity: false }),
   'grok-api': api('grok-api', {
     input_modalities: ['text', 'image'],
     streaming: true,

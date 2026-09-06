@@ -74,6 +74,12 @@ import {
   validateVoiceAction,
   verifyTtsLoopback,
 } from './voice-action-helpers.js';
+import {
+  ensureSttReadyAudio,
+  normalizeAudioSample,
+  outputToVirtualCamera,
+  renderTalkingAvatar,
+} from './voice-media-output-helpers.js';
 
 type VoiceAction =
   | { action: 'health'; params?: Record<string, unknown> }
@@ -158,6 +164,24 @@ async function executeSingleAction(input: VoiceAction) {
       ? { action: 'transcribe_voice_sample', ...((input as any).params || {}) }
       : { ...input, action: 'transcribe_voice_sample' };
     return transcribeVoiceSample(payload as any);
+  }
+  if (input.action === 'normalize_audio') {
+    const payload = (input as any).params
+      ? { action: 'normalize_audio', ...((input as any).params || {}) }
+      : { ...input, action: 'normalize_audio' };
+    return normalizeAudioSample(payload as any);
+  }
+  if (input.action === 'render_talking_avatar') {
+    const payload = (input as any).params
+      ? { action: 'render_talking_avatar', ...((input as any).params || {}) }
+      : { ...input, action: 'render_talking_avatar' };
+    return renderTalkingAvatar(payload as any);
+  }
+  if (input.action === 'output_to_virtual_camera') {
+    const payload = (input as any).params
+      ? { action: 'output_to_virtual_camera', ...((input as any).params || {}) }
+      : { ...input, action: 'output_to_virtual_camera' };
+    return outputToVirtualCamera(payload as any);
   }
   if (input.action === 'generate_voice') {
     return generateVoice(input);
@@ -1252,6 +1276,10 @@ async function transcribeVoiceSample(input: {
   allow_synthetic?: boolean;
 }): Promise<any> {
   const audioPath = resolveVoicePath(String(input.audio_path || '').trim(), 'audio-input');
+  // Smartphone m4a / Zoom mp4 / mp3 arrive here untouched — normalize to the
+  // STT-ready shape (16kHz mono PCM wav) before any bridge sees the file.
+  const prepared = ensureSttReadyAudio(audioPath);
+  const effectiveAudioPath = prepared.path;
   const preferTimestamps = input.prefer_timestamps !== false;
   const backendPreference = input.backend || 'auto';
   const bridges = getSpeechToTextBridges();
@@ -1264,7 +1292,7 @@ async function transcribeVoiceSample(input: {
       const result = normalizeSpeechToTextResult(
         bridge,
         await bridge.transcribe({
-          audioPath,
+          audioPath: effectiveAudioPath,
           ...(input.language ? { language: input.language } : {}),
         })
       );
@@ -1272,6 +1300,7 @@ async function transcribeVoiceSample(input: {
         status: 'succeeded',
         action: 'transcribe_voice_sample',
         audio_path: audioPath,
+        ...(prepared.converted ? { normalized_audio_path: effectiveAudioPath } : {}),
         transcript: result.text,
         language: result.language || input.language,
         backend: result.backend || bridge.name,
@@ -1299,7 +1328,7 @@ async function transcribeVoiceSample(input: {
     const payload = JSON.stringify({
       action: 'transcribe',
       params: {
-        audio_path: audioPath,
+        audio_path: effectiveAudioPath,
         ...(input.language ? { language: input.language } : {}),
         ...(input.model ? { model: input.model } : {}),
       },

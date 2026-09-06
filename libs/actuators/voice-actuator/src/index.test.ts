@@ -396,6 +396,27 @@ vi.mock('@agent/core/voice-engine-registry', () => ({
   getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform: mocks.resolveVoiceEngineForPlatform,
 }));
+vi.mock('@agent/core/media-backend-registry', () => ({
+  resolveVoiceBackend: vi.fn(() => ({
+    backend_id: 'voice.local_say',
+    modality: 'voice',
+    display_name: 'Local System TTS',
+    kind: 'local',
+    provider: 'system_tts',
+    status: 'active',
+    platforms: ['darwin', 'linux', 'win32'],
+    supports: { playback: true, artifact_formats: ['wav', 'aiff'] },
+  })),
+}));
+vi.mock('@agent/core/recovery-policy', () => ({
+  createGovernedRetryOptionsBuilder: vi.fn(() => () => ({
+    maxRetries: 0,
+    initialDelayMs: 0,
+    maxDelayMs: 0,
+    factor: 1,
+    jitter: false,
+  })),
+}));
 vi.mock('@agent/core/voice-profile-registry', () => ({
   getVoiceProfileRecord: mocks.getVoiceProfileRecord,
   getWritableVoiceProfileRegistryForTier: mocks.getWritableVoiceProfileRegistryForTier,
@@ -1024,5 +1045,192 @@ describe('voice actuator', () => {
     expect(result.artifact_refs).toEqual(['/tmp/voice-onboarding-check.wav']);
     expect(mocks.safeExec).not.toHaveBeenCalled();
     expect(mocks.createVirtualAudioOutputPlaybackBridge).not.toHaveBeenCalled();
+  });
+
+  it('passes STT-ready wav through normalize_audio untouched', async () => {
+    mocks.safeExecResult.mockImplementation((command: string) => {
+      if (command !== 'ffprobe') return { status: 0, stdout: '', stderr: '', error: null };
+      return {
+        status: 0,
+        stdout: JSON.stringify({
+          streams: [{ codec_name: 'pcm_s16le', sample_rate: '16000', channels: 1 }],
+          format: { format_name: 'wav' },
+        }),
+        stderr: '',
+        error: null,
+      };
+    });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'normalize_audio',
+      params: { audio_path: '/tmp/meeting.wav' },
+    } as any);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'succeeded',
+        action: 'normalize_audio',
+        converted: false,
+      })
+    );
+    expect(result.normalized_path).toBe(result.audio_path);
+    expect(mocks.safeExec).not.toHaveBeenCalledWith('ffmpeg', expect.anything());
+  });
+
+  it('converts smartphone m4a to 16kHz mono wav via ffmpeg', async () => {
+    mocks.safeExecResult.mockImplementation((command: string) => {
+      if (command !== 'ffprobe') return { status: 0, stdout: '', stderr: '', error: null };
+      return {
+        status: 0,
+        stdout: JSON.stringify({
+          streams: [{ codec_name: 'aac', sample_rate: '44100', channels: 1 }],
+          format: { format_name: 'mov,mp4,m4a,3gp,3g2,mj2' },
+        }),
+        stderr: '',
+        error: null,
+      };
+    });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'normalize_audio',
+      params: { audio_path: '/tmp/meeting.m4a' },
+    } as any);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'succeeded',
+        action: 'normalize_audio',
+        converted: true,
+      })
+    );
+    expect(String(result.normalized_path)).toContain('.wav');
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'ffmpeg',
+      expect.arrayContaining(['-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le'])
+    );
+  });
+
+  it('fails closed with guidance when ffprobe is unavailable', async () => {
+    mocks.safeExecResult.mockReturnValue({
+      status: 1,
+      stdout: '',
+      stderr: 'ffprobe: command not found',
+      error: new Error('spawn ffprobe ENOENT'),
+    });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'normalize_audio',
+      params: { audio_path: '/tmp/meeting.m4a' },
+    } as any);
+    expect(result.status).toBe('error');
+    expect(String(result.message)).toMatch(/ffprobe failed.*ffmpeg/);
+  });
+
+  it('renders a talking avatar from explicit audio', async () => {
+    mocks.safeExecResult.mockImplementation((command: string) => {
+      if (command === 'ffprobe') {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            streams: [{ codec_name: 'pcm_s16le', sample_rate: '16000', channels: 1 }],
+            format: { format_name: 'wav' },
+          }),
+          stderr: '',
+          error: null,
+        };
+      }
+      return {
+        status: 0,
+        stdout: JSON.stringify({
+          status: 'success',
+          output: '/tmp/avatar.mp4',
+          duration_sec: 3.5,
+          fps: 12,
+          frames: 42,
+        }),
+        stderr: '',
+        error: null,
+      };
+    });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'render_talking_avatar',
+      params: { portrait_path: '/tmp/face.png', audio_path: '/tmp/speech.wav' },
+    } as any);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'succeeded',
+        action: 'render_talking_avatar',
+        video_path: '/tmp/avatar.mp4',
+        duration_sec: 3.5,
+      })
+    );
+    expect(mocks.safeExecResult).toHaveBeenCalledWith(
+      'python3',
+      expect.arrayContaining(['--portrait', '/tmp/face.png', '--audio', '/tmp/speech.wav']),
+      expect.anything()
+    );
+  });
+
+  it('synthesizes speech with say when only text is given', async () => {
+    mocks.safeExecResult.mockImplementation((command: string) => {
+      if (command === 'ffprobe') {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            streams: [{ codec_name: 'pcm_s16le', sample_rate: '16000', channels: 1 }],
+            format: { format_name: 'wav' },
+          }),
+          stderr: '',
+          error: null,
+        };
+      }
+      return {
+        status: 0,
+        stdout: JSON.stringify({ status: 'success', output: '/tmp/a.mp4' }),
+        stderr: '',
+        error: null,
+      };
+    });
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'render_talking_avatar',
+      params: { portrait_path: '/tmp/face.png', text: 'こんにちは' },
+    } as any);
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.safeExec).toHaveBeenCalledWith(
+      'say',
+      expect.arrayContaining(['-v', 'Kyoko', 'こんにちは'])
+    );
+  });
+
+  it('fails closed without text or audio', async () => {
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'render_talking_avatar',
+      params: { portrait_path: '/tmp/face.png' },
+    } as any);
+    expect(result.status).toBe('error');
+    expect(String(result.message)).toContain('needs text or audio_path');
+  });
+
+  it('fails OBS camera output closed when OBS is unreachable', async () => {
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'output_to_virtual_camera',
+      params: { video_path: '/tmp/avatar.mp4', obs_port: 1 },
+    } as any);
+    expect(result.status).toBe('error');
+    expect(String(result.message)).toContain('OBS is not reachable');
   });
 });

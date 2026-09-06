@@ -37,7 +37,7 @@ import {
  * given — see each backend's `resolvePermissionArgs` helper).
  */
 
-export type ProviderId = 'claude' | 'codex' | 'agy' | 'grok' | 'gemini' | 'cursor';
+export type ProviderId = 'claude' | 'codex' | 'agy' | 'grok' | 'gemini' | 'cursor' | 'opencode';
 
 export const PROVIDER_IDS: readonly ProviderId[] = [
   'claude',
@@ -46,6 +46,7 @@ export const PROVIDER_IDS: readonly ProviderId[] = [
   'grok',
   'gemini',
   'cursor',
+  'opencode',
 ] as const;
 
 /**
@@ -170,6 +171,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
       ['--force', '--sandbox', 'enabled'],
       'Cursor Agent CLI force-allows tools inside its sandbox for implementer-tier write/exec work.'
     ),
+    opencode: ok(
+      ['--agent', 'build'],
+      'OpenCode CLI implementer tier runs on the build agent with the full tool set.'
+    ),
   },
   explorer: {
     claude: ok(
@@ -205,6 +210,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
       'Gemini CLI plan mode is the provider read-only projection.'
     ),
     cursor: ok(['--mode', 'plan'], 'Cursor Agent plan mode is read-only planning without edits.'),
+    opencode: ok(
+      ['--agent', 'plan'],
+      'OpenCode CLI explorer tier runs on the read-only-leaning plan agent.'
+    ),
   },
   planner: {
     claude: ok(
@@ -231,6 +240,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
     cursor: ok(
       ['--mode', 'ask'],
       'Cursor Agent ask mode is Q&A-only and does not execute mutating tools.'
+    ),
+    opencode: ok(
+      ['--agent', 'plan'],
+      'OpenCode CLI planner tier runs on the plan agent without --auto approval.'
     ),
   },
 } as const;
@@ -333,6 +346,9 @@ const PROVIDER_REQUIRED_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>
   grok: [],
   gemini: [],
   cursor: [],
+  // OpenCode authenticates via its own login session (opencode auth login);
+  // no extra config home override is required for headless run invocations.
+  opencode: [],
 };
 
 /**
@@ -348,6 +364,8 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
   grok: ['XAI_API_KEY'],
   gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
   cursor: ['CURSOR_API_KEY'],
+  // OpenCode primarily uses its login session; no provider API key passes through.
+  opencode: [],
 };
 
 /**

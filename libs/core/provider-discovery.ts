@@ -595,6 +595,38 @@ function checkCursor(): ProviderInfo {
   };
 }
 
+function checkOpencode(): ProviderInfo {
+  const configuredBinary = getRegisteredEnvText('KYBERION_OPENCODE_CLI_BIN')?.trim();
+  const binary = configuredBinary || 'opencode';
+  const version = configuredBinary
+    ? run(configuredBinary, ['--version'])
+    : (() => {
+        const which = run('which', [binary]);
+        return which.ok ? run(binary, ['--version']) : which;
+      })();
+  if (!version.ok)
+    return {
+      provider: 'opencode',
+      installed: false,
+      version: null,
+      protocol: 'print-json',
+      models: [],
+      healthy: false,
+    };
+
+  const entry = capabilityEntryFor('opencode');
+  return {
+    provider: 'opencode',
+    installed: true,
+    version: version.stdout || null,
+    protocol: 'print-json',
+    models: entry.models,
+    capabilities: entry.capabilities,
+    modelCapabilities: entry.modelCapabilities,
+    healthy: version.ok,
+  };
+}
+
 /**
  * Discover all available providers. Cached for 5 minutes.
  */
@@ -630,6 +662,7 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
     checkAgy(),
     checkGrok(),
     checkCursor(),
+    checkOpencode(),
   ];
 
   const available = providers.filter((p) => p.installed);

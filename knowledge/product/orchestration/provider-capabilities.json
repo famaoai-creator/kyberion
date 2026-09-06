@@ -456,6 +456,20 @@
         ]
       }
     },
+    "opencode": {
+      "models": ["opencode/muse-spark-1.3-contributor-free"],
+      "capabilities": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
+      "modelCapabilities": {
+        "opencode/muse-spark-1.3-contributor-free": [
+          "reasoning",
+          "planning",
+          "analysis",
+          "review",
+          "code",
+          "structured_json"
+        ]
+      }
+    },
     "agy": {
       "models": [
         "Gemini 3.7 Flash (Medium)",

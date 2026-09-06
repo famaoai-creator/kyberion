@@ -89,6 +89,13 @@ export interface MeetingParticipationOptions {
    * stream (session.transcriptInput) and replies over meeting chat.
    */
   transcript_source?: 'stt' | 'driver_captions';
+  /**
+   * Called with the live session right after join. Lets the caller
+   * (e.g. an interactive CLI loop) drive declared session verbs
+   * (`raiseHand`, `admit`, `chat`) while the run proceeds.
+   * Throwing here fails the run — keep handlers non-throwing.
+   */
+  onSession?: (session: MeetingSession) => void;
 }
 
 export interface MeetingParticipationReport {
@@ -264,6 +271,13 @@ export class MeetingParticipationCoordinator {
       this.deps.trace?.addEvent('meeting_participation.joined', {
         session_id: session.state.session_id,
       });
+      try {
+        options.onSession?.(session);
+      } catch (err: any) {
+        logger.warn(
+          `[participation-coordinator] onSession handler failed: ${err?.message ?? String(err)}`
+        );
+      }
     } catch (err: any) {
       this.deps.trace?.addEvent('meeting_participation.join_failed', {
         error: err?.message ?? String(err),

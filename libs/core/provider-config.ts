@@ -9,7 +9,8 @@ export type ProviderConfigRuntimeRole =
   | 'openai-vision'
   | 'codex-default'
   | 'copilot-default'
-  | 'cursor-default';
+  | 'cursor-default'
+  | 'opencode-default';
 
 export interface ProviderLifecycleEntry {
   boot_command: string;
@@ -57,6 +58,7 @@ const RUNTIME_ROLE_PROVIDER_FALLBACK: Record<ProviderConfigRuntimeRole, string> 
   'codex-default': 'codex',
   'copilot-default': 'copilot',
   'cursor-default': 'cursor',
+  'opencode-default': 'opencode',
 };
 
 export function resolveRuntimeDefaultModelId(role: ProviderConfigRuntimeRole): string {

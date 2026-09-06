@@ -268,6 +268,8 @@ export * from './voice-capability-bridge.js';
 
 export * from './voice-path-policy.js';
 
+export * from './camera-output-bridge.js';
+
 export * from './ledger.js';
 
 export * from './text-utils.js';
