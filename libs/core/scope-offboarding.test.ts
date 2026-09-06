@@ -808,6 +808,18 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(registryLines()).toHaveLength(5);
   });
 
+  it('does not read a dedup registry replaced by a directory', () => {
+    seedIngestResidue();
+    const registryPath = abs(INGEST_DEDUP_REGISTRY_REPO_PATH);
+    fs.rmSync(registryPath, { force: true });
+    fs.mkdirSync(registryPath, { recursive: true });
+
+    const result = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+
+    expect(result.status).toBe('dry_run');
+    expect(result.dedup_registry).toBeUndefined();
+  });
+
   it('execute leaves zero trace — knowledge, ledger, cursors, quota, dedup lines, vault — all audited', () => {
     seedIngestResidue();
     const result = offboardScope({
