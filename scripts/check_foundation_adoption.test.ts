@@ -50,11 +50,21 @@ describe('checkFoundationAdoption', () => {
   });
 
   it('detects direct safeReadFile to parseSafeJsonInput boundaries', () => {
-    expect(
-      countLegacyJsonBoundaryViolations(
-        "const raw = safeReadFile('input.json', { encoding: 'utf8' });\nparseSafeJsonInput(raw, 'input');"
-      )
-    ).toBe(1);
+    const source =
+      "const raw = safeReadFile('input.json', { encoding: 'utf8' });\nparseSafeJsonInput(raw, 'input');";
+    expect(countLegacyJsonBoundaryViolations(source)).toBe(1);
+
+    const filePath = pathResolver.sharedTmp('foundation-adoption-legacy-json-boundary.ts');
+    safeWriteFile(filePath, source);
+    try {
+      expect(
+        checkFoundationAdoption([filePath]).some((failure) =>
+          failure.startsWith('legacy JSON boundary pattern increased: 1')
+        )
+      ).toBe(true);
+    } finally {
+      safeRmSync(filePath, { force: true });
+    }
   });
 
   it('keeps existing external JSON boundaries explicitly allowlisted', () => {

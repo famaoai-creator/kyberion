@@ -23,18 +23,43 @@ const JSON_LOADER_RATCHET = 0;
  * Keep those existing boundaries explicit while preventing the pattern from
  * spreading to new source files.
  */
-const LEGACY_JSON_BOUNDARY_ALLOWLIST: ReadonlyMap<string, number> = new Map([
-  ['libs/actuators/android-actuator/src/android-runtime-helpers.ts', 1],
-  ['libs/actuators/blockchain-actuator/src/index.ts', 1],
-  ['libs/actuators/file-actuator/src/file-pipeline-helpers.ts', 1],
-  ['libs/actuators/ios-actuator/src/ios-runtime-helpers.ts', 1],
-  ['libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts', 1],
-  ['libs/actuators/network-actuator/src/a2a-transport.ts', 1],
-  ['libs/core/secure-io.ts', 1],
-  ['presence/bridge/terminal/server.ts', 1],
-  ['presence/bridge/terminal/session-utils.ts', 1],
-  ['presence/displays/chronos-mirror-v2/src/lib/trace-feed.ts', 2],
-]);
+const LEGACY_JSON_BOUNDARY_ALLOWLIST: ReadonlyMap<string, { count: number; reason: string }> =
+  new Map([
+    [
+      'libs/actuators/android-actuator/src/android-runtime-helpers.ts',
+      { count: 1, reason: 'ADB session handoff output' },
+    ],
+    [
+      'libs/actuators/blockchain-actuator/src/index.ts',
+      { count: 1, reason: 'simulated blockchain JSONL fixture' },
+    ],
+    [
+      'libs/actuators/file-actuator/src/file-pipeline-helpers.ts',
+      { count: 1, reason: 'CLI action input file' },
+    ],
+    [
+      'libs/actuators/ios-actuator/src/ios-runtime-helpers.ts',
+      { count: 1, reason: 'simulator session handoff output' },
+    ],
+    [
+      'libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts',
+      { count: 1, reason: 'CLI action input file' },
+    ],
+    [
+      'libs/actuators/network-actuator/src/a2a-transport.ts',
+      { count: 1, reason: 'encrypted A2A wire payload after decryption' },
+    ],
+    ['libs/core/secure-io.ts', { count: 1, reason: 'canonical secure JSON implementation' }],
+    ['presence/bridge/terminal/server.ts', { count: 1, reason: 'terminal control wire payload' }],
+    [
+      'presence/bridge/terminal/session-utils.ts',
+      { count: 1, reason: 'terminal session wire payload' },
+    ],
+    [
+      'presence/displays/chronos-mirror-v2/src/lib/trace-feed.ts',
+      { count: 2, reason: 'legacy trace-feed JSONL entries' },
+    ],
+  ]);
 const JSONL_APPEND_RATCHET = 0;
 const ENV_RATCHET = 0;
 const SIMPLE_ISO_TIMESTAMP_RATCHET = 0;
@@ -103,7 +128,8 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
       ...source.matchAll(/JSON\.parse\s*\(\s*(?:String\s*\(\s*)?safeReadFile\s*\(/gu),
     ].length;
     const legacyJsonBoundaryCount = countLegacyJsonBoundaryViolations(source);
-    const allowedLegacyJsonBoundaries = LEGACY_JSON_BOUNDARY_ALLOWLIST.get(relativePath) ?? 0;
+    const allowedLegacyJsonBoundaries =
+      LEGACY_JSON_BOUNDARY_ALLOWLIST.get(relativePath)?.count ?? 0;
     legacyJsonBoundaryViolations += Math.max(
       0,
       legacyJsonBoundaryCount - allowedLegacyJsonBoundaries
