@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { readTextFile } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { loadKnowledgeScopeCheckPolicy } from '@agent/core/knowledge-scope-check-policy';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface KnowledgeScopeCheckConfig {
@@ -16,6 +17,13 @@ const roots = ['libs', 'scripts', 'presence', 'satellites'];
 const sourceExtensions = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs']);
 const DEFAULT_CONFIG: KnowledgeScopeCheckConfig = { max_direct_tenant_env_reads: 26 };
 const CONFIG_PATH = path.join(root, 'knowledge/product/governance/knowledge-scope-check.json');
+
+export function readKnowledgeScopeTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
 
 function loadConfig(): KnowledgeScopeCheckConfig {
   const parsed = loadKnowledgeScopeCheckPolicy(CONFIG_PATH);
@@ -140,7 +148,7 @@ function collectSources(): Array<{ file: string; source: string }> {
       if (relativeFile === 'scripts/check_knowledge_scope_boundaries.ts') continue;
       files.push({
         file: relativeFile,
-        source: readTextFile(file),
+        source: readKnowledgeScopeTextFile(file),
       });
     }
   }

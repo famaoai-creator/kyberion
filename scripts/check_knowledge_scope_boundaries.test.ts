@@ -4,10 +4,17 @@ import {
   countDirectTenantEnvReads,
   findKnowledgeScopeViolations,
   findKnowledgeRuntimeWriterViolations,
+  readKnowledgeScopeTextFile,
   scanKnowledgeScopeBoundaries,
 } from './check_knowledge_scope_boundaries.js';
 
 describe('knowledge scope semantic checker', () => {
+  it('rejects a directory replacement before scope scanning', () => {
+    expect(() => readKnowledgeScopeTextFile(pathResolver.rootResolve('scripts'))).toThrow(
+      'must be a regular file'
+    );
+  });
+
   it('uses the foundation text reader for scope source files', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_knowledge_scope_boundaries.ts'), {
