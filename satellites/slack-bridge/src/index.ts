@@ -333,22 +333,23 @@ async function postApprovalRequest(
   }
 ) {
   const record = createSlackApprovalRequest(params);
+  const locale = resolveOperatorLocale();
   return postSlackTextWithBlocks(client, {
     channel: params.channel,
     thread_ts: params.threadTs,
     text: [
-      `Approval required: ${record.title}`,
+      `${t('bridge:approval_heading', { surface: 'Slack' }, locale)}: ${record.title}`,
       ...(params.intentResolution
         ? [
-            `Authority: ${renderIntentAuthorityLabel(
+            `${t('bridge:contract_authority', undefined, locale)}: ${renderIntentAuthorityLabel(
               params.intentResolution.authority_level,
-              resolveOperatorLocale()
+              locale
             )}`,
-            `Next action: ${params.intentResolution.next_action.label}`,
+            `${t('bridge:contract_next_action', undefined, locale)}: ${params.intentResolution.next_action.label}`,
           ]
         : []),
     ].join('\n'),
-    blocks: buildSlackApprovalBlocks(record, params.intentResolution),
+    blocks: buildSlackApprovalBlocks(record, params.intentResolution, locale),
   });
 }
 
@@ -847,8 +848,16 @@ async function start() {
               const response = await postSlackTextWithBlocks(client, {
                 channel: message.channel,
                 thread_ts: threadTs,
-                text: slackMissionProposalFallbackText(proposal, conversation.intentResolution),
-                blocks: buildSlackMissionProposalBlocks(proposal, conversation.intentResolution),
+                text: slackMissionProposalFallbackText(
+                  proposal,
+                  conversation.intentResolution,
+                  resolveOperatorLocale()
+                ),
+                blocks: buildSlackMissionProposalBlocks(
+                  proposal,
+                  conversation.intentResolution,
+                  resolveOperatorLocale()
+                ),
               });
               recordSlackDelivery(
                 artifact.correlationId,

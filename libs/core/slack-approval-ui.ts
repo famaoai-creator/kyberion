@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { createApprovalRequest, loadApprovalRequest } from './approval-store.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
+import type { SupportedLocale } from './locale-normalize.js';
+import { t } from './t.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
 import {
@@ -72,15 +74,25 @@ export function loadSlackApprovalRequest(id: string): SlackApprovalRequestRecord
 
 export function buildSlackApprovalBlocks(
   record: SlackApprovalRequestRecord,
-  intentResolution?: IntentResolutionContract
+  intentResolution?: IntentResolutionContract,
+  locale: SupportedLocale = 'en'
 ): any[] {
   const severity = record.severity || 'medium';
+  const labels = {
+    understanding: t('bridge:contract_understanding', undefined, locale),
+    missingInput: t('bridge:contract_missing_input', undefined, locale),
+    authority: t('bridge:contract_authority', undefined, locale),
+    nextAction: t('bridge:contract_next_action', undefined, locale),
+    consequence: t('bridge:contract_consequence', undefined, locale),
+    outcome: t('bridge:contract_outcome', undefined, locale),
+    none: locale === 'en' ? 'None' : t('bridge:contract_none', undefined, locale),
+  };
   return [
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Approval Required*\n*${record.title}*\n${record.summary}`,
+        text: `*${t('bridge:approval_heading', { surface: 'Slack' }, locale)}*\n*${record.title}*\n${record.summary}`,
       },
     },
     ...(record.details
@@ -90,7 +102,7 @@ export function buildSlackApprovalBlocks(
             elements: [
               {
                 type: 'mrkdwn',
-                text: `Details: ${record.details}`,
+                text: `${t('bridge:approval_details_label', undefined, locale)}: ${record.details}`,
               },
             ],
           },
@@ -101,7 +113,7 @@ export function buildSlackApprovalBlocks(
       elements: [
         {
           type: 'mrkdwn',
-          text: `Severity: ${severity} | Status: ${record.status}`,
+          text: `${t('bridge:approval_severity_label', undefined, locale)}: ${severity} | Status: ${record.status}`,
         },
       ],
     },
@@ -112,16 +124,16 @@ export function buildSlackApprovalBlocks(
             text: {
               type: 'mrkdwn',
               text: [
-                `*Understanding:* ${intentResolution.normalized_intent}`,
-                `*Missing input:* ${
+                `*${labels.understanding}:* ${intentResolution.normalized_intent}`,
+                `*${labels.missingInput}:* ${
                   intentResolution.missing_inputs.length > 0
                     ? intentResolution.missing_inputs.join(', ')
-                    : 'None'
+                    : labels.none
                 }`,
-                `*Authority:* ${renderIntentAuthorityLabel(intentResolution.authority_level)}`,
-                `*Next action:* ${intentResolution.next_action.label}`,
-                `*Consequence:* ${intentResolution.next_action.consequence}`,
-                `*Outcome:* ${renderIntentOutcomeLabel(intentResolution.outcome_kind)}`,
+                `*${labels.authority}:* ${renderIntentAuthorityLabel(intentResolution.authority_level, locale)}`,
+                `*${labels.nextAction}:* ${intentResolution.next_action.label}`,
+                `*${labels.consequence}:* ${intentResolution.next_action.consequence}`,
+                `*${labels.outcome}:* ${renderIntentOutcomeLabel(intentResolution.outcome_kind, locale)}`,
               ].join('\n'),
             },
           },
@@ -133,7 +145,10 @@ export function buildSlackApprovalBlocks(
         {
           type: 'button',
           style: 'primary',
-          text: { type: 'plain_text', text: 'Approve' },
+          text: {
+            type: 'plain_text',
+            text: t('bridge:approval_approve_button', undefined, locale),
+          },
           action_id: 'slack_approval_decide',
           value: JSON.stringify({
             requestId: record.id,
@@ -143,7 +158,10 @@ export function buildSlackApprovalBlocks(
         {
           type: 'button',
           style: 'danger',
-          text: { type: 'plain_text', text: 'Reject' },
+          text: {
+            type: 'plain_text',
+            text: t('bridge:approval_reject_button', undefined, locale),
+          },
           action_id: 'slack_approval_decide',
           value: JSON.stringify({
             requestId: record.id,
