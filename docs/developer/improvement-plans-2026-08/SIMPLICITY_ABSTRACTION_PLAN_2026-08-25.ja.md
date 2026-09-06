@@ -24101,3 +24101,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: Telegram polling server entrypoint、SX-06
 - **変更**: `satellites/telegram-bridge/src/polling.ts` に残っていた直接 `main().catch` を `@agent/core/script-harness` の明示 argv／失敗境界へ移行した。通常の Telegram bridge と同じ直接起動判定を採用し、Vitest／import 時には長時間 polling を開始しない契約をテストで固定した。Telegram API の offset、webhook forwarding、retry 待機、secret／token の fail-closed semanticsは変更していない。
 - **検証**: Telegram polling／response／process-exit boundary **3 files／5 tests passed**、Telegram bridge build、対象ESLint、Prettier、`git diff --check`。
+
+## 2026-09-07 再レビュー実装 1817
+
+- **対象**: native DOCX round-trip example entrypoint、SX-06／SX-12
+- **変更**: `libs/core/src/native-docx-engine/examples/roundtrip_docx.ts` に残っていた `process.argv`／`process.exit`／直接 `main().catch` を shared script harnessへ移行した。明示的な argv、usage error、compiled／source の direct-entry 判定を追加し、DOCX抽出・再生成・比較の処理内容は変更していない。entrypoint contract testで直接 process 境界の再発を固定した。
+- **検証**: DOCX entrypoint **1 test passed**、core build、root `pnpm run typecheck`、対象ESLint、Prettier、`git diff --check`。

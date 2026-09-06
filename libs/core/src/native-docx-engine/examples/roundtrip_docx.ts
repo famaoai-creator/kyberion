@@ -5,15 +5,16 @@
  * 3. Print comparison summary
  */
 import * as path from 'path';
+import { getRegisteredEnvText } from '../../../foundation/index.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../../../script-harness.js';
 import { safeStat } from '../../../secure-io.js';
 import { distillDocxDesign } from '../../docx-utils.js';
 import { generateNativeDocx } from '../engine.js';
 
-async function main() {
-  const sourcePath = process.argv[2];
+export async function main(args: string[] = []): Promise<void> {
+  const sourcePath = args[0];
   if (!sourcePath) {
-    console.error('Usage: npx tsx roundtrip_docx.ts <input.docx>');
-    process.exit(1);
+    throw new ScriptExitError(1, 'Usage: npx tsx roundtrip_docx.ts <input.docx>');
   }
 
   const absSource = path.resolve(sourcePath);
@@ -90,7 +91,21 @@ async function main() {
   console.log(`   ${outputPath}`);
 }
 
-main().catch((err) => {
-  console.error('❌ Error:', err.message);
-  process.exit(1);
+export const runRoundtripDocx = defineScript({
+  name: 'roundtrip-docx',
+  flags: [],
+  async run({ argv }) {
+    await main(argv);
+  },
 });
+
+if (
+  (isDirectScript(import.meta.url, 'libs/core/src/native-docx-engine/examples/roundtrip_docx.ts') ||
+    isDirectScript(
+      import.meta.url,
+      'libs/core/src/native-docx-engine/examples/roundtrip_docx.js'
+    )) &&
+  !getRegisteredEnvText('VITEST')
+) {
+  void runRoundtripDocx();
+}
