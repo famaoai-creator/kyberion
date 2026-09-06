@@ -61,6 +61,13 @@ type PromotablePipeline = PipelineAdf & {
 
 type PromotableStep = PipelineAdfStep & { _semantic?: boolean };
 
+export function readPipelinePromotionTextFile(filePath: string): string {
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+    throw new Error(`${filePath} must be a regular file`);
+  }
+  return readTextFile(filePath);
+}
+
 export function normalizePromotionAdvice(value: unknown): PromotionAdvice | null {
   if (!isRecord(value)) return null;
   const placeholders = Array.isArray(value.placeholders)
@@ -177,7 +184,7 @@ async function requestPromotionAdvice(pipeline: PipelineAdf): Promise<PromotionA
 function appendCatalogRow(slug: string, description: string, dryRun: boolean): void {
   const readmePath = pathResolver.rootResolve('pipelines/README.md');
   if (!safeExistsSync(readmePath)) return;
-  let content = readTextFile(readmePath);
+  let content = readPipelinePromotionTextFile(readmePath);
   const row = `| \`${slug}\` | \`pnpm pipeline --input pipelines/${slug}.json\` | ${description} |`;
   if (content.includes(`| \`${slug}\``)) return;
   const sectionHeader = '### Promoted (pipeline:promote)';
