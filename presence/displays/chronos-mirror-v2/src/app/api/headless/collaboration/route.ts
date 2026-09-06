@@ -8,6 +8,7 @@ import {
 } from '../../../../lib/headless-response';
 import { readHeadlessCollaboration } from '../../../../lib/headless-projections';
 import { resolveViewerContextForRequest } from '../../../../lib/viewer-context';
+import { readChronosOptionalStringParam } from '../../../../lib/request-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,19 +22,23 @@ export function GET(req: NextRequest) {
 
   try {
     authorizeHeadlessOperation(resolvedViewer.context, 'chronos.collaboration.read', {
-      tenantSlug: req.nextUrl.searchParams.get('tenant') || undefined,
-      organizationId: req.nextUrl.searchParams.get('organization') || undefined,
-      projectId: req.nextUrl.searchParams.get('project') || undefined,
+      tenantSlug: readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant')),
+      organizationId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization')),
+      projectId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project')),
     });
-    const limit = parseHeadlessLimit(req.nextUrl.searchParams.get('limit'), 100, 500);
+    const limit = parseHeadlessLimit(
+      readChronosOptionalStringParam(req.nextUrl.searchParams.get('limit')),
+      100,
+      500
+    );
     const projection = readHeadlessCollaboration(resolvedViewer.context, {
-      tenant: req.nextUrl.searchParams.get('tenant') || undefined,
-      missionId: req.nextUrl.searchParams.get('mission') || undefined,
-      organizationId: req.nextUrl.searchParams.get('organization') || undefined,
-      projectId: req.nextUrl.searchParams.get('project') || undefined,
-      taskId: req.nextUrl.searchParams.get('task') || undefined,
-      sessionId: req.nextUrl.searchParams.get('session') || undefined,
-      scopeKind: req.nextUrl.searchParams.get('scope_kind') || undefined,
+      tenant: readChronosOptionalStringParam(req.nextUrl.searchParams.get('tenant')),
+      missionId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('mission')),
+      organizationId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('organization')),
+      projectId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('project')),
+      taskId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('task')),
+      sessionId: readChronosOptionalStringParam(req.nextUrl.searchParams.get('session')),
+      scopeKind: readChronosOptionalStringParam(req.nextUrl.searchParams.get('scope_kind')),
       limit,
     });
     return NextResponse.json(headlessEnvelope('collaboration', projection, resolvedViewer.context));
