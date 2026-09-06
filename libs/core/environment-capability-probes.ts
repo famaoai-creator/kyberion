@@ -331,6 +331,9 @@ async function probeAuditChain(): Promise<{ available: boolean; reason?: string 
     // First run / fresh checkout — creating it later is normal.
     return { available: true };
   }
+  if (!isRegularAuditChainPath(chainPath)) {
+    return { available: false, reason: 'audit-chain path is not a regular file' };
+  }
   let lineNumber = 0;
   try {
     const text = readTextFile(chainPath);
@@ -347,6 +350,15 @@ async function probeAuditChain(): Promise<{ available: boolean; reason?: string 
       available: false,
       reason: `audit-chain parse failed at line ${lineNumber}: ${err?.message ?? err}`,
     };
+  }
+}
+
+export function isRegularAuditChainPath(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
   }
 }
 

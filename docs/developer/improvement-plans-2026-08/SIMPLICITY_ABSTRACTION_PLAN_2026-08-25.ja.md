@@ -22859,3 +22859,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/email-workflow.ts`、email-workflow test、PI-03
 - **変更**: email draft の latest JSON／Markdown reader を operation-time の `safeLstat(...).isFile()` 境界へ接続し、directory replacement を draft parse／body extraction に到達させないようにした。既存の malformed JSON／markdown fallback semantics は維持した。
 - **検証**: email-workflow **2 files／8 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入は継続課題とする。
+
+## 2026-09-06 再レビュー実装 1610
+
+- **対象**: `libs/core/environment-capability-probes.ts`、environment-capability-probes test、PI-03
+- **変更**: environment capability の audit-chain integrity probe を operation-time の regular-file 境界へ接続し、directory replacement を JSONL parse／integrity判定へ到達させないようにした。fresh checkout の不存在時は従来どおり利用可能扱いとし、既存の parse／error semantics は維持した。
+- **検証**: environment-capability-probes **2 files／26 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
