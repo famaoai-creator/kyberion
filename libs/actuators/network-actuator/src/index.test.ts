@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
 import { handleAction } from './index.js';
 
+const mocks = vi.hoisted(() => ({
+  safeReadFile: vi.fn().mockReturnValue('file content'),
+}));
+
 // Mock a2a-transport to avoid module-level side effects (pathResolver.rootResolve calls)
 vi.mock('./a2a-transport.js', () => ({
   sendA2AMessage: vi.fn().mockResolvedValue(undefined),
@@ -9,12 +13,17 @@ vi.mock('./a2a-transport.js', () => ({
 }));
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
-  safeReadFile: vi.fn().mockReturnValue('file content'),
+  safeReadFile: mocks.safeReadFile,
   safeWriteFile: vi.fn(),
   safeMkdir: vi.fn(),
   safeExistsSync: vi.fn().mockReturnValue(false),
   safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeExec: vi.fn().mockReturnValue(''),
+}));
+
+vi.mock('@agent/core/foundation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation')>()),
+  readJson: vi.fn((filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath)))),
 }));
 
 vi.mock('@agent/core/network', async (importOriginal) => ({
