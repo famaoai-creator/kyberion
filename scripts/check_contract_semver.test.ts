@@ -62,14 +62,15 @@ const baseFp: Fingerprint = {
 };
 
 describe('classifyBump', () => {
-  it('uses the governed parser for contract schema fingerprints', () => {
+  it('uses the foundation reader for contract schema fingerprints', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_contract_semver.ts'), {
         encoding: 'utf8',
       })
     );
-    expect(source).toContain('parseSafeJsonInput(raw,');
-    expect(source).toContain('nowIso, parseSafeJsonInput, readTextFile');
+    expect(source).toContain('readJson<unknown>(schemaPath)');
+    expect(source).toContain('nowIso, readJson, readTextFile');
+    expect(source).not.toContain('parseSafeJsonInput(raw,');
     expect(source).not.toContain('safeReadFile(schemaPath');
     expect(source).toContain('readSafeJsonFile');
     expect(source).not.toContain('readJson<Manifest>');
