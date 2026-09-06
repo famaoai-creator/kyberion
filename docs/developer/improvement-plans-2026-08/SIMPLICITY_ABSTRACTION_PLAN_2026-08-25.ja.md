@@ -23459,3 +23459,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `scripts/refactor/adf-input.ts`、`scripts/refactor/adf-input.test.ts`、PI-03
 - **変更**: ADF input static include fragment本文readを`readAdfInputTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをinclude expansion／guardrail判定へ到達させないようにした。既存のtrust gate、safe JSON repair、cycle detection semanticsは維持した。
 - **検証**: adf-inputの既存テストに追加境界テストを含めて通過、対象ESLint、Prettier、`git diff --check`で確認した。
+
+## 2026-09-06 再レビュー実装 1710
+
+- **対象**: `scripts/refactor/prune_unused_imports.ts`、`scripts/refactor/prune_unused_imports.reader.test.ts`、PI-03
+- **変更**: prune unused importsのsource本文readを`readPruneUnusedImportsTextFile`のoperation-time regular-file境界へ統一し、directory／symlink replacementをimport pruning／rewrite判定へ到達させないようにした。既存のAST parse、re-parse guard、dry-run/write semanticsは維持した。
+- **検証**: prune unused imports **2 files／2 tests passed**、対象ESLint、Prettier、`git diff --check`で確認した。
