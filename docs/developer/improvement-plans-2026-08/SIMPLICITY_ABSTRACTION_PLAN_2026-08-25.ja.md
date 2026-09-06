@@ -22913,3 +22913,9 @@ SX-03 の追加 domain reader、SX-04 の非catalog loader／未参照 catalog�
 - **対象**: `libs/core/software-quality-operations.ts`、software-quality-operations test、PI-03
 - **変更**: software quality の defect transition JSONL reader に operation-time の regular-file 検査を追加し、directory replacement を defect state read／transition判定へ到達させないようにした。既存の malformed event skip と defect transition semantics は維持した。
 - **検証**: software-quality-operations **2 files／10 tests passed**、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
+
+## 2026-09-06 再レビュー実装 1619
+
+- **対象**: `libs/core/mission-orchestration-worker-part-context.ts`、専用resource-loader test、PI-03
+- **変更**: mission worker の authority-role `PROCEDURE.md` injection read に operation-time の regular-file 検査を追加し、directory replacement を worker promptへ混入させないようにした。既存の role procedure injection semantics は維持した。
+- **検証**: 専用resource-loader **3 files／1 test passed**、typecheck、Prettier、`git diff --check`。inventory の needs-review 個別修正と provider 実機受入を継続する。
