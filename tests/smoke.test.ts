@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
 import { safeExistsSync, safeReadFile } from '@agent/core';
 import { main as runCli } from '../scripts/cli.js';
@@ -13,7 +13,9 @@ describe('Ecosystem Smoke Tests', () => {
 
     const index = JSON.parse(safeReadFile(indexPath, { encoding: 'utf8' }) as string);
     const actuators = index.actuators || index.s || index.skills || [];
-    const implemented = actuators.filter((actuator: any) => actuator.s === 'implemented' || actuator.status === 'implemented');
+    const implemented = actuators.filter(
+      (actuator: any) => actuator.s === 'implemented' || actuator.status === 'implemented'
+    );
 
     expect(Array.isArray(actuators)).toBe(true);
     expect(implemented.length).toBeGreaterThan(0);
@@ -22,16 +24,11 @@ describe('Ecosystem Smoke Tests', () => {
   it('can render the CLI help output', async () => {
     expect(safeExistsSync(cliScriptPath)).toBe(true);
 
+    // main() now routes output through an explicit print sink (SX-05
+    // governed-printer pass) rather than calling console.log directly, so
+    // help text must be captured through that sink.
     const output: string[] = [];
-    const logSpy = vi.spyOn(console, 'log').mockImplementation((...args) => {
-      output.push(args.join(' '));
-    });
-
-    try {
-      await runCli(['help']);
-    } finally {
-      logSpy.mockRestore();
-    }
+    await runCli(['help'], (value) => output.push(String(value)));
 
     const rendered = output.join('\n');
     expect(rendered).toContain('KYBERION CONSOLE');

@@ -2,16 +2,21 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createPeerMessagingServer } from './peer-messaging.js';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync, safeWriteFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
+import { safeAppendFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   appendPeerConversationTranscript,
   buildPeerConversationEnvelope,
   clearPeerConversationRuntime,
+  collectPeerTranscriptTails,
   createPeerConversationResponder,
   createPeerConversationSession,
+  listPeerConversationPeers,
   listPeerConversationSessions,
+  listPeerConversationTenants,
   loadPeerConversationSession,
   parsePeerConversationTranscriptEntry,
+  readPeerConversationEdges,
   sendPeerConversationMessageToPeer,
 } from './peer-conversation.js';
 
@@ -187,5 +192,161 @@ describe('peer conversation', () => {
     expect(senderSession.related_work_item_ids).toContain('WIT-1');
     expect(receiverSession.related_work_item_ids).toContain('WIT-1');
     fetchSpy.mockRestore();
+  });
+});
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+describe('peer conversation peer listing, transcript tails, and edges', () => {
+  afterEach(() => {
+    clearPeerConversationRuntime(TENANT_ID, 'peer-a-test');
+    clearPeerConversationRuntime(TENANT_ID, 'peer-b-test');
+  });
+
+  it('lists tenants that have a peer-conversation runtime directory (AC-11)', () => {
+    appendPeerConversationTranscript({
+      tenantId: TENANT_ID,
+      sessionId: 'PCS-tenants-1',
+      localPeerId: 'peer-a-test',
+      remotePeerId: 'peer-b-test',
+      kind: 'message',
+      direction: 'outbound',
+      text: 'hello',
+    });
+    const tenants = listPeerConversationTenants();
+    expect(tenants).toContain(TENANT_ID);
+    // Sorted and free of non-tenant entries, so callers can hand each value
+    // straight to `readPeerConversationEdges` without it throwing.
+    expect([...tenants].sort()).toEqual(tenants);
+    for (const tenant of tenants) {
+      expect(() => readPeerConversationEdges(tenant)).not.toThrow();
+    }
+  });
+
+  it('lists peers and returns the newest session tail per peer, truncated at 240 chars', async () => {
+    // An older session for peer-a-test that must be superseded by the newer one below.
+    appendPeerConversationTranscript({
+      tenantId: TENANT_ID,
+      sessionId: 'PCS-tails-a-old',
+      localPeerId: 'peer-a-test',
+      remotePeerId: 'peer-b-test',
+      kind: 'open',
+      direction: 'outbound',
+      text: 'stale session, should not appear in the tail',
+    });
+    await sleepMs(5);
+
+    const longText = 'x'.repeat(300);
+    for (let index = 0; index < 6; index += 1) {
+      appendPeerConversationTranscript({
+        tenantId: TENANT_ID,
+        sessionId: 'PCS-tails-a-new',
+        localPeerId: 'peer-a-test',
+        remotePeerId: 'peer-b-test',
+        kind: index === 0 ? 'open' : 'message',
+        direction: index % 2 === 0 ? 'outbound' : 'inbound',
+        text: index === 5 ? longText : `message-${index}`,
+      });
+    }
+
+    appendPeerConversationTranscript({
+      tenantId: TENANT_ID,
+      sessionId: 'PCS-tails-b',
+      localPeerId: 'peer-b-test',
+      remotePeerId: 'peer-a-test',
+      kind: 'open',
+      direction: 'outbound',
+      text: 'hello from b',
+    });
+
+    expect(listPeerConversationPeers(TENANT_ID)).toEqual(['peer-a-test', 'peer-b-test']);
+
+    const tails = collectPeerTranscriptTails(TENANT_ID);
+    expect(tails).toHaveLength(2);
+
+    const tailA = tails.find((tail) => tail.peer_id === 'peer-a-test');
+    expect(tailA?.session_id).toBe('PCS-tails-a-new');
+    expect(tailA?.remote_peer_id).toBe('peer-b-test');
+    expect(tailA?.lines).toHaveLength(5);
+    expect(tailA?.lines[0]?.text).toBe('message-1');
+    expect(tailA?.lines[0]?.direction).toBe('inbound');
+    expect(tailA?.lines[0]?.sender_peer_id).toBe('peer-b-test');
+    const lastLine = tailA?.lines[tailA.lines.length - 1];
+    expect(lastLine?.text).toHaveLength(240);
+    expect(lastLine?.text).toBe(longText.slice(0, 240));
+    expect(lastLine?.direction).toBe('inbound');
+    expect(lastLine?.sender_peer_id).toBe('peer-b-test');
+
+    const tailB = tails.find((tail) => tail.peer_id === 'peer-b-test');
+    expect(tailB?.session_id).toBe('PCS-tails-b');
+    expect(tailB?.lines).toHaveLength(1);
+
+    const cappedTails = collectPeerTranscriptTails(TENANT_ID, { maxPerPeer: 2 });
+    const cappedTailA = cappedTails.find((tail) => tail.peer_id === 'peer-a-test');
+    expect(cappedTailA?.lines).toHaveLength(2);
+  });
+
+  it('derives edges from observability events with orientation, since filter, limit, and malformed-line skipping', async () => {
+    appendPeerConversationTranscript({
+      tenantId: TENANT_ID,
+      sessionId: 'PCS-edge-1',
+      localPeerId: 'peer-a-test',
+      remotePeerId: 'peer-b-test',
+      kind: 'message',
+      direction: 'outbound',
+      text: 'hello',
+    });
+    await sleepMs(5);
+    appendPeerConversationTranscript({
+      tenantId: TENANT_ID,
+      sessionId: 'PCS-edge-1',
+      localPeerId: 'peer-a-test',
+      remotePeerId: 'peer-b-test',
+      kind: 'reply',
+      direction: 'inbound',
+      text: 'hi back',
+    });
+
+    const allEdges = readPeerConversationEdges(TENANT_ID);
+    expect(allEdges).toHaveLength(2);
+    expect(allEdges[0]).toMatchObject({
+      tenant_id: TENANT_ID,
+      sender_peer_id: 'peer-a-test',
+      receiver_peer_id: 'peer-b-test',
+      session_id: 'PCS-edge-1',
+      kind: 'message',
+    });
+    expect(allEdges[1]).toMatchObject({
+      sender_peer_id: 'peer-b-test',
+      receiver_peer_id: 'peer-a-test',
+      kind: 'reply',
+    });
+    expect(allEdges[0].ts <= allEdges[1].ts).toBe(true);
+
+    const sinceEdges = readPeerConversationEdges(TENANT_ID, { since: allEdges[1].ts });
+    expect(sinceEdges).toHaveLength(1);
+    expect(sinceEdges[0].kind).toBe('reply');
+
+    const limitedEdges = readPeerConversationEdges(TENANT_ID, { limit: 1 });
+    expect(limitedEdges).toHaveLength(1);
+    expect(limitedEdges[0].kind).toBe('reply');
+
+    const eventsFilePath = pathResolver.shared(
+      `observability/peer-conversations/tenants/${TENANT_ID}/peers/peer-a-test/events.jsonl`
+    );
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeAppendFile(eventsFilePath, 'not-json-at-all\n');
+    });
+
+    const edgesAfterCorruption = readPeerConversationEdges(TENANT_ID);
+    expect(edgesAfterCorruption).toHaveLength(2);
+  });
+
+  it('returns empty arrays for an invalid tenant id without throwing', () => {
+    expect(listPeerConversationPeers('../outside')).toEqual([]);
+    expect(collectPeerTranscriptTails('../outside')).toEqual([]);
+    expect(readPeerConversationEdges('../outside')).toEqual([]);
   });
 });

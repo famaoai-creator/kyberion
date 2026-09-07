@@ -46,14 +46,24 @@ vi.mock('../libs/core/a2a-bridge.js', async (importOriginal) => {
 vi.mock('../libs/core/agent-runtime-supervisor.js', () => ({
   ensureMissionTeamRuntimeViaSupervisor: mocks.ensureMissionTeamRuntimeViaSupervisor,
 }));
-vi.mock('../libs/core/mission-team-plan-composer.js', () => ({
-  resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
-  resolveMissionTeamReceiver: mocks.resolveMissionTeamReceiver,
-}));
+// Spread the real module: graph dispatch also calls loadMissionTeamPlan, which
+// a factory listing only the two resolvers would leave undefined.
+vi.mock('../libs/core/mission-team-plan-composer.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../libs/core/mission-team-plan-composer.js')>();
+  return {
+    ...actual,
+    resolveMissionTeamPlan: mocks.resolveMissionTeamPlan,
+    resolveMissionTeamReceiver: mocks.resolveMissionTeamReceiver,
+  };
+});
 vi.mock('../libs/core/ledger.js', () => ({ ledger: { record: mocks.record } }));
 vi.mock('../libs/core/mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
-  missionTaskEventsPath: (missionId: string) => `/tmp/${missionId}/task-events.jsonl`,
+  // Must stay inside the repository: the secure-io resource-path scope rejects
+  // absolute paths under the OS temp dir (RESOURCE_PATH_SCOPE).
+  missionTaskEventsPath: (missionId: string) =>
+    `${process.cwd()}/active/shared/tmp/code-change-pr-collaboration/${missionId}/task-events.jsonl`,
 }));
 
 const MISSION = 'MSN-CODECHG-01';
@@ -75,11 +85,22 @@ async function seedMission(options: { withReviewTask: boolean }): Promise<string
       mission_id: MISSION,
       tier: 'public',
       status: 'active',
+      // mission-state.json is now schema-validated on load (governed catalog);
+      // without these required fields the load fails closed and the mission
+      // class is invisible to the code_change review gate.
+      execution_mode: 'local',
+      priority: 3,
+      assigned_persona: 'operator',
+      confidence_score: 1.0,
       classification: { mission_class: 'code_change', risk_profile: 'standard' },
       outcome_contract: {
         outcome_id: 'outcome-1',
         requested_result: 'Ship the login change safely',
+        deliverable_kind: 'code_change',
         success_criteria: ['review approves the change'],
+        evidence_required: true,
+        expected_artifacts: [{ kind: 'markdown', storage_class: 'mission_deliverable' }],
+        verification_method: 'review_gate',
       },
       git: { branch: 'main', start_commit: '', latest_commit: '', checkpoints: [] },
       history: [],

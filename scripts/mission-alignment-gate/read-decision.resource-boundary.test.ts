@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
@@ -6,7 +6,19 @@ import { main, resolveDecisionResourcePath } from './read-decision.js';
 
 const tempRoot = pathResolver.sharedTmp(`read-decision-output-${process.pid}`);
 
+let previousLocale: string | undefined;
+
+beforeEach(() => {
+  // The human-readable banner goes through the i18n catalog, which resolves
+  // the locale from ambient env (LANG on CI is C.UTF-8). Pin Japanese so the
+  // banner assertions below are hermetic on every runner.
+  previousLocale = process.env.KYBERION_LOCALE;
+  process.env.KYBERION_LOCALE = 'ja';
+});
+
 afterEach(() => {
+  if (previousLocale === undefined) delete process.env.KYBERION_LOCALE;
+  else process.env.KYBERION_LOCALE = previousLocale;
   safeRmSync(tempRoot, { recursive: true, force: true });
 });
 

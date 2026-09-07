@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-31T06:22:59.568Z",
+  "generated_at": "2026-09-06T17:50:55.937Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -215,7 +215,7 @@
     },
     {
       "actuator_id": "system-actuator",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "ops": [
         "audit_verify",
         "baseline_check",
@@ -245,7 +245,7 @@
         "test_screen_stream"
       ],
       "contract_schema": "knowledge/product/schemas/system-pipeline.schema.json",
-      "contract_schema_sha256": "4862a4c4ea9179aa58c8ffbe82c96f34d2550900657d3848e066955480333c90"
+      "contract_schema_sha256": "940207f0a71426b35e775146621f88a610ea82028920c53acb4d9dbaa96b754a"
     },
     {
       "actuator_id": "terminal-actuator",
@@ -280,7 +280,7 @@
     },
     {
       "actuator_id": "voice-actuator",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "ops": [
         "collect_and_register_voice_profile",
         "collect_voice_samples",
@@ -296,7 +296,7 @@
         "verify_tts_loopback"
       ],
       "contract_schema": "knowledge/product/schemas/voice-action.schema.json",
-      "contract_schema_sha256": "35d585642e001ec88f755c107423f875dcd30a6c9ca98beefb6e530baa576118"
+      "contract_schema_sha256": "72ecddc6c45a2396398cd9e8ed00f752605b61e049445c4fd80242a4407b5a25"
     },
     {
       "actuator_id": "wisdom-actuator",

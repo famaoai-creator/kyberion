@@ -58,6 +58,7 @@ export * as secureIo from './secure-io.js';
 
 export {
   safeReadFile,
+  safeReadFileTail,
   loadJson,
   safeWriteFile,
   safeAppendFileSync,

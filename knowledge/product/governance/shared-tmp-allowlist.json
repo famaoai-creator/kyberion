@@ -78,6 +78,12 @@
       "note": "loopback/STT intermediate; split out of voice-actuator index.ts"
     },
     {
+      "file": "libs/actuators/voice-actuator/src/voice-media-output-helpers.ts",
+      "count": 3,
+      "classification": "migrate-candidate",
+      "note": "STT-normalized wav and talking-avatar aiff intermediates (legit) plus the default talking-avatar mp4 output path when no output_path is given (deliverable); split out of voice-actuator index.ts"
+    },
+    {
       "file": "libs/actuators/voice-actuator/src/voice-runtime-helpers.ts",
       "count": 3,
       "classification": "legit-tmp",
@@ -103,15 +109,21 @@
     },
     {
       "file": "libs/core/assistant-compiler-request.ts",
-      "count": 2,
+      "count": 3,
       "classification": "legit-tmp",
-      "note": "request/result IPC handoff files"
+      "note": "request/result IPC handoff files, plus a path-scope guard (assertAssistantCompilerResultPath) that resolves the same results root to bound a caller-supplied output path"
+    },
+    {
+      "file": "libs/core/backend-conformance.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "provider sandbox probe scratch dir; disposable per-probe"
     },
     {
       "file": "libs/core/browser-conversation-session.ts",
-      "count": 3,
+      "count": 1,
       "classification": "legit-tmp",
-      "note": "temp screenshots/prompt files for browser sessions"
+      "note": "temp screenshots/prompt files for browser sessions; call sites consolidated into a single browserConversationTempPath() helper"
     },
     {
       "file": "libs/core/capture-photo-task-session-executor.ts",
@@ -148,6 +160,12 @@
       "count": 1,
       "classification": "migrate-candidate",
       "note": "cost-report.json is a report-class artifact"
+    },
+    {
+      "file": "libs/core/injection-signal.ts",
+      "count": 1,
+      "classification": "migrate-candidate",
+      "note": "injection-suspicion quarantine record; evidence-class artifact (call site moved here from untrusted-content.ts)"
     },
     {
       "file": "libs/core/intent-handoff.ts",
@@ -259,15 +277,9 @@
     },
     {
       "file": "libs/core/surface-runtime-conversation-data.ts",
-      "count": 8,
-      "classification": "migrate-candidate",
-      "note": "external-data/service-operations session outputs; session-scoped artifacts (moved from surface-runtime-orchestrator.ts)"
-    },
-    {
-      "file": "libs/core/untrusted-content.ts",
       "count": 1,
       "classification": "migrate-candidate",
-      "note": "injection-suspicion quarantine record; evidence-class artifact"
+      "note": "external-data/service-operations session outputs; session-scoped artifacts (moved from surface-runtime-orchestrator.ts); call sites consolidated into a single sessionRuntimePath() helper"
     },
     {
       "file": "libs/core/video-frame-archive.ts",
@@ -412,6 +424,12 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "soak harness root"
+    },
+    {
+      "file": "scripts/source_archive.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "clean-install smoke test staging root; wiped before use and disposable"
     },
     {
       "file": "scripts/summarize_task_model_routing.ts",
