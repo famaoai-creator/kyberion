@@ -115,7 +115,7 @@ describe('reasoning-model-routing', () => {
 
   it('centralizes runtime model defaults and respects env overrides', () => {
     expect(resolveRuntimeModelId('anthropic-default', {})).toBe('claude-opus-5');
-    expect(resolveRuntimeModelId('gemini-default', {})).toBe('gemini-3.6-flash');
+    expect(resolveRuntimeModelId('gemini-default', {})).toBe('gemini-3.8-flash');
     expect(resolveRuntimeModelId('openai-vision', {})).toBe('gpt-5.5');
     expect(resolveRuntimeModelId('codex-default', {})).toBe('gpt-5.6-sol');
     expect(resolveRuntimeModelId('copilot-default', {})).toBe('auto');
