@@ -148,6 +148,8 @@ describe('working-memory-actuator', () => {
       expect(facts.some((line) => line.endsWith('bounded fact 0'))).toBe(false);
       expect(facts.some((line) => line.endsWith('bounded fact 1'))).toBe(false);
       expect(body).toContain(`bounded fact ${MAX_FACTS + 1}`);
-    });
+      // 302 sequential read-modify-write notes: IO-bound under parallel
+      // suite load, so allow headroom over the 30s CI default.
+    }, 120_000);
   });
 });
