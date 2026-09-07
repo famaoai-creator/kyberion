@@ -31,7 +31,6 @@ pnpm build
 
 pnpm pipeline --input pipelines/baseline-check.json
 pnpm run doctor          # not bare `pnpm doctor` (that is pnpm's own doctor)
-pnpm kyberion:doctor
 ```
 
 If `dist/scripts/kyberion.js` is missing, `pnpm kyberion <command>` prints this same sequence instead of a bare `MODULE_NOT_FOUND`.

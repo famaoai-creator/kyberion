@@ -13,7 +13,6 @@
  *   kyberion.mission.status         — query mission status
  *   kyberion.mission.journal        — read mission journal
  *   kyberion.capability.list        — list actuator capabilities
- *   kyberion.service.capture        — capture/read service presets only
  *   kyberion.surface.cowork.deliver — deliver artifact to Cowork outbox (Phase 1)
  *   kyberion.surface.cowork.list    — list pending Cowork outbox deliveries (Phase 1)
  *
@@ -63,7 +62,6 @@ import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { buildKnowledgeIndex, queryKnowledge } from '@agent/core/knowledge-index';
 import { recordHumanKnowledgeFeedback } from '@agent/core/knowledge-feedback-loop';
 import { executeServicePreset } from '@agent/core/service-engine';
-import { assertServiceCaptureOperation } from '@agent/core/service-harness';
 import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
 import {
   listPendingApprovalsForCowork,
@@ -74,9 +72,8 @@ import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge.js';
 import type { EventScope } from '@agent/core/event-scope';
 import type { McpRequestContext } from '@agent/core/mcp-request-context';
 import { parseMcpTextPayload, parseSafeJsonObject } from './mcp-json.js';
-
+import { registerKyberionServiceCaptureTool } from './mcp-service-capture-tool.js';
 // ─── Constants ────────────────────────────────────────────────────────────────
-
 const SERVER_NAME = 'kyberion-mcp-server';
 const SERVER_VERSION = '0.1.0';
 
@@ -996,38 +993,7 @@ export function createKyberionMcpServer(): McpServer {
     }
   );
 
-  // ── kyberion.service.capture ─────────────────────────────────────────────
-  registerGovernedTool(
-    server,
-    catalog,
-    'kyberion.service.capture',
-    'Execute a capture/read Kyberion service preset. Writes are rejected.',
-    {
-      service_id: z.string().describe('The ID of the service (e.g. "github")'),
-      action: z
-        .string()
-        .describe('A capture/read operation (e.g. "list_issues", "list_pulls", "list_reviews")'),
-      params: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('Parameters for the operation (path vars and query)'),
-    },
-    async ({ service_id, action, params }) => {
-      try {
-        assertServiceCaptureOperation(service_id, action);
-        const result = await executeServicePreset(service_id, action, params ?? {}, 'secret-guard');
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return {
-          content: [
-            { type: 'text' as const, text: formatWireError(err, 'Service capture failed') },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
+  registerKyberionServiceCaptureTool(server, catalog, registerGovernedTool);
   // ── kyberion.service.actuate ──────────────────────────────────────────────
   registerGovernedTool(
     server,

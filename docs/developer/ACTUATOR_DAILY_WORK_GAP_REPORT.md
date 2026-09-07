@@ -27,6 +27,6 @@ Desktop-assistant daily work (GitHub PR/issue/review, Slack, docs, email/calenda
 
 **P0 implemented (2026-09-06):** GitHub list/get/review capture ops; MCP `kyberion.service.capture` + `daily-routine` allowlist; `pnpm capabilities` without `dist/`; Slack three-path doc.
 
-**P1 implemented (2026-09-06):** GitHub review submit writes; `daily-github-inbox` template; email operator one-pager; `pnpm playground`; calendar template off `dist/` shell; `github-mcp` deprecated as an external-MCP example; actuators README redirect; doctor naming (`pnpm run doctor` / `pnpm kyberion:doctor`).
+**P1 implemented (2026-09-06):** GitHub review submit writes; `daily-github-inbox` template; email operator one-pager; `pnpm playground`; calendar template off `dist/` shell; `github-mcp` deprecated as an external-MCP example; actuators README redirect; doctor naming (`pnpm run doctor`; not bare `pnpm doctor`).
 
 **P2 implemented (2026-09-06):** Linux file-secret opt-in + red capabilities; actuator dry-run contract; presence satellite outbox prefixes; meeting zoom-sdk/recall-ai docs-only seams; Cloud Agent Node 24 + build notes. Details in the Japanese report §7.

@@ -329,7 +329,7 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
     "- Single-op dry-run: `pnpm playground -- --actuator <id> --op <op> --params '{…}' --dry-run --json`"
   );
   lines.push(
-    '- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` or `pnpm kyberion:doctor` (not bare `pnpm doctor`).'
+    '- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` (not bare `pnpm doctor`).'
   );
   lines.push(
     '- Cloud Agent VM: [docs/developer/CLOUD_AGENT_ENVIRONMENT.md](docs/developer/CLOUD_AGENT_ENVIRONMENT.md) — Node `>=24`, `pnpm build` before pipeline / MCP / full doctor.'
