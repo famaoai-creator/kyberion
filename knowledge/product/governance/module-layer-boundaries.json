@@ -70,6 +70,7 @@
     { "layer": "orchestration", "pattern": "libs/core/surface-runtime-conversation-data.ts" },
     { "layer": "orchestration", "pattern": "libs/core/*dispatcher*.ts" },
     { "layer": "orchestration", "pattern": "scripts/run_service_procedure.ts" },
+    { "layer": "orchestration", "pattern": "scripts/run_browser_procedure.ts" },
     { "layer": "orchestration", "pattern": "scripts/run_mission_orchestration_event_worker.ts" },
     { "layer": "orchestration", "pattern": "scripts/background_review_mission_e2e.ts" },
     { "layer": "orchestration", "pattern": "scripts/browser_bridge_host.ts" },
