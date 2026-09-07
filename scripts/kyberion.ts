@@ -185,45 +185,48 @@ export async function main(
   args: string[] = [],
   print: (value: unknown) => void = () => undefined
 ): Promise<void> {
-  if (args[0] === '--help' || args[0] === '-h') {
+  // pnpm forwards the `--` separator literally (npm strips it); drop it so
+  // `pnpm run kyberion -- <command>` keeps working (legacy cli.ts behavior).
+  const normalizedArgs = args.filter((arg) => arg !== '--');
+  if (normalizedArgs[0] === '--help' || normalizedArgs[0] === '-h') {
     print(formatCliManifestHelp());
     return;
   }
   validateKyberionStartupEnvironment();
   const manifest = loadCliManifest();
-  const command = resolveCommandPath(args, manifest);
+  const command = resolveCommandPath(normalizedArgs, manifest);
   const registeredEntrypoint = findUniqueCommand(command, manifest);
   if (!registeredEntrypoint) {
-    await runScriptCommand(command, args, manifest, print);
+    await runScriptCommand(command, normalizedArgs, manifest, print);
     return;
   }
   const entrypoint = selectEntrypoint(command, manifest);
   switch (entrypoint.id) {
     case 'operator-cli': {
       const { main: operatorCliMain } = await import('./cli.js');
-      await operatorCliMain(args);
+      await operatorCliMain(normalizedArgs);
       return;
     }
     case 'organization-model':
     case 'organization-roles':
     case 'project-controller': {
       const { runGovernedController } = await import('./kyberion-governed-controllers.js');
-      await runGovernedController(entrypoint.id, args.slice(1), print);
+      await runGovernedController(entrypoint.id, normalizedArgs.slice(1), print);
       return;
     }
     case 'operator-home': {
       const { main: operatorHomeMain } = await import('./kyberion_home.js');
-      await operatorHomeMain(args, print);
+      await operatorHomeMain(normalizedArgs, print);
       return;
     }
     case 'pipeline-runner': {
       const { main: pipelineMain, resolvePipelinePresetArgs } = await import('./run_pipeline.js');
-      await pipelineMain(resolvePipelinePresetArgs(args.slice(1)));
+      await pipelineMain(resolvePipelinePresetArgs(normalizedArgs.slice(1)));
       return;
     }
     case 'operator-readiness': {
       const { main: vitalMain } = await import('./vital_check.js');
-      const result = await vitalMain(args.slice(1));
+      const result = await vitalMain(normalizedArgs.slice(1));
       if (result.help) print(result.help);
       else if (result.report) {
         const output = result.text ?? result.report;
@@ -237,12 +240,12 @@ export async function main(
     }
     case 'operator-setup': {
       const { runSetupReportCli } = await import('./setup_report.js');
-      await runSetupReportCli(args.slice(2));
+      await runSetupReportCli(normalizedArgs.slice(2));
       return;
     }
     case 'operator-voice': {
       const { runVoiceSetupScript } = await import('./voice_setup.js');
-      await runVoiceSetupScript(args.slice(2));
+      await runVoiceSetupScript(normalizedArgs.slice(2));
       return;
     }
     default:
