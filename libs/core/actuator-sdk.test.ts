@@ -65,6 +65,10 @@ describe('actuator SDK', () => {
       skipHandler: true,
       mode: 'validate-only',
     });
+    expect(planActuatorDryRun({ kind: 'control', dryRun: true })).toEqual({
+      skipHandler: true,
+      mode: 'validate-only',
+    });
     expect(planActuatorDryRun({ kind: 'apply' })).toEqual({
       skipHandler: false,
       mode: 'execute',
@@ -93,6 +97,14 @@ describe('actuator SDK', () => {
           kind: 'capture',
           handler: () => 'peeked',
         },
+        reshape: {
+          kind: 'transform',
+          handler: () => 'transformed',
+        },
+        steer: {
+          kind: 'control',
+          handler: () => 'controlled',
+        },
       },
     });
 
@@ -110,6 +122,14 @@ describe('actuator SDK', () => {
     await expect(actuator.dispatch('peek', {}, { dryRun: true })).resolves.toMatchObject({
       ok: true,
       output: 'peeked',
+    });
+    await expect(actuator.dispatch('reshape', {}, { dryRun: true })).resolves.toMatchObject({
+      ok: true,
+      output: { dry_run: true, mode: 'validate-only', kind: 'transform', validated: true },
+    });
+    await expect(actuator.dispatch('steer', {}, { dryRun: true })).resolves.toMatchObject({
+      ok: true,
+      output: { dry_run: true, mode: 'validate-only', kind: 'control', validated: true },
     });
   });
 

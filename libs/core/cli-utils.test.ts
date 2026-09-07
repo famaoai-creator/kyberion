@@ -140,6 +140,25 @@ describe('cli-utils', () => {
     );
   });
 
+  it.each(['transform', 'control'] as const)(
+    'does not invoke %s handlers under --dry-run',
+    async (kind) => {
+      safeMkdir(TMP_DIR, { recursive: true });
+      const inputPath = `${TMP_DIR}/${kind}.json`;
+      safeWriteFile(inputPath, JSON.stringify({ kind, action: kind, params: {} }, null, 2));
+      const handleAction = vi.fn(async () => ({ mutated: true }));
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await runActuatorCli({
+        name: 'test-actuator',
+        args: ['node', 'script', '--input', inputPath, '--dry-run'],
+        handleAction,
+      });
+
+      expect(handleAction).not.toHaveBeenCalled();
+    }
+  );
+
   it('reports invalid JSON input through the caller error boundary', async () => {
     safeMkdir(TMP_DIR, { recursive: true });
     const inputPath = `${TMP_DIR}/bad.json`;

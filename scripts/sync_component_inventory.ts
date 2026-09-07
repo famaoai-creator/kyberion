@@ -312,8 +312,27 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
     `- [component-lifecycle-inventory.md](${path.relative(pathResolver.rootDir(), REPORT_PATH)})`
   );
   lines.push('- Slack 3経路: [docs/SLACK_CHANNEL_ROUTES.ja.md](docs/SLACK_CHANNEL_ROUTES.ja.md)');
+  lines.push('- Email inbox vs send: [docs/EMAIL_OPERATOR.ja.md](docs/EMAIL_OPERATOR.ja.md)');
   lines.push(
-    '- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` (not bare `pnpm doctor`).'
+    '- Linux secrets: opt-in file vault (`KYBERION_ALLOW_FILE_SECRETS=1`, `chmod 0600`). Darwin/win32 stay on OS keychain. Capabilities show red `[Missing env: KYBERION_ALLOW_FILE_SECRETS]` on Linux until opted in.'
+  );
+  lines.push(
+    '- Presence multi-channel: `presence:dispatch` stays Slack by default; prefix `telegram:` / `discord:` / `imessage:` to forward to the existing satellite outbox. No new actuator.'
+  );
+  lines.push(
+    '- Meeting daily path: `pnpm meeting:participate` (browser-playwright). `zoom-sdk` / `recall-ai` are **unimplemented seams** (docs-only / deferred). Do not call them.'
+  );
+  lines.push(
+    '- Actuator dry-run: capture always executes (side-effect-free); apply `--dry-run` validates contract/params only (`pnpm playground` and `createStandardYargs --dry-run` / `pnpm kyberion run … --dry-run`).'
+  );
+  lines.push(
+    "- Single-op dry-run: `pnpm playground -- --actuator <id> --op <op> --params '{…}' --dry-run --json`"
+  );
+  lines.push(
+    '- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` or `pnpm kyberion:doctor` (not bare `pnpm doctor`).'
+  );
+  lines.push(
+    '- Cloud Agent VM: [docs/developer/CLOUD_AGENT_ENVIRONMENT.md](docs/developer/CLOUD_AGENT_ENVIRONMENT.md) — Node `>=24`, `pnpm build` before pipeline / MCP / full doctor.'
   );
   return `${lines.join('\n')}\n`;
 }
