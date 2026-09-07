@@ -81,7 +81,7 @@ describe('cursor-cli-session-adapter', () => {
     expect(response.metadata?.nativeSubagent).toMatchObject({
       provider: 'cursor',
       mode: 'worktree-isolated-spawn',
-      worktree: 'kyberion-implementer-1',
+      worktree: expect.stringMatching(/^kyberion-implementer-[a-f0-9]+-1$/),
       profile: 'implementer',
       proof: 'kyberion_owned_worktree_spawn',
       sessionId: 'cursor-sub-1',
@@ -89,7 +89,7 @@ describe('cursor-cli-session-adapter', () => {
     expect(spawnMock).toHaveBeenCalledTimes(1);
     const [, args] = spawnMock.mock.calls[0];
     expect(args).toContain('--worktree');
-    expect(args).toContain('kyberion-implementer-1');
+    expect(args.some((a) => /^kyberion-implementer-[a-f0-9]+-1$/.test(a))).toBe(true);
     expect(args).toContain('--force');
     expect(args).toContain('--sandbox');
     expect(args).toContain('enabled');
@@ -115,7 +115,27 @@ describe('cursor-cli-session-adapter', () => {
 
     const [, firstArgs] = spawnMock.mock.calls[0];
     const [, secondArgs] = spawnMock.mock.calls[1];
-    expect(firstArgs).toContain('kyberion-explorer-1');
-    expect(secondArgs).toContain('kyberion-explorer-2');
+    expect(firstArgs.some((a) => /^kyberion-explorer-[a-f0-9]+-1$/.test(a))).toBe(true);
+    expect(secondArgs.some((a) => /^kyberion-explorer-[a-f0-9]+-2$/.test(a))).toBe(true);
+  });
+  it('routes fast and deep tiers to corresponding models', async () => {
+    const envelope = JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: 'ok',
+    });
+    spawnMock.mockReturnValue(createChild(envelope));
+
+    const adapter = new CursorCliSessionAdapter({
+      bin: 'cursor-agent',
+      model: 'auto',
+      spawnProcess: spawnMock,
+    });
+    await adapter.askNativeSubagent('run task', { profile: 'implementer', tier: 'deep' });
+    const [, args] = spawnMock.mock.calls[0];
+    const modelIdx = args.indexOf('--model');
+    expect(modelIdx).toBeGreaterThanOrEqual(0);
+    expect(args[modelIdx + 1]).toBe('composer-2.5');
   });
 });

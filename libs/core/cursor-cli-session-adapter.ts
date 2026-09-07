@@ -11,6 +11,7 @@
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import { childDelegationEnv } from './operation-policy-gate.js';
@@ -115,6 +116,7 @@ export class CursorCliSessionAdapter {
   private readonly workspaceDir: string;
   private readonly spawnProcess: typeof spawn;
   private worktreeCounter = 0;
+  private readonly sessionSuffix = randomBytes(4).toString('hex');
   private lastNativeSubagentInfo: CursorNativeSubagentInfo | null = null;
 
   constructor(options: CursorCliSessionAdapterOptions = {}) {
@@ -143,8 +145,11 @@ export class CursorCliSessionAdapter {
       throw new Error(`[SUBAGENT_UNAVAILABLE] ${permission.reason}`);
     }
 
-    const worktree = `kyberion-${profile}-${++this.worktreeCounter}`;
-    const model = resolveModelForTier(undefined, this.model);
+    const worktree = `kyberion-${profile}-${this.sessionSuffix}-${++this.worktreeCounter}`;
+    const model = resolveModelForTier(
+      options.tier as 'fast' | 'standard' | 'deep' | undefined,
+      this.model
+    );
     const args = [
       '-p',
       '--output-format',
