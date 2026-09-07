@@ -96,6 +96,33 @@ describe('browser_playwright_executor', () => {
     expect(handleAction.mock.calls[0][0].options.connect_over_cdp).toBe(false);
   });
 
+  it('does not let dispatcher options flip a standalone run onto CDP', async () => {
+    const handleAction = vi.fn().mockResolvedValue({ status: 'succeeded', results: [] });
+    const execute = createExecuteBrowserPipeline(handleAction, {
+      connectOverCdp: false,
+      headless: true,
+    });
+    await execute({
+      steps: [],
+      options: {
+        locale: 'ja',
+        connect_over_cdp: true,
+        cdp_url: 'http://127.0.0.1:9999',
+        cdp_port: 9999,
+        headless: false,
+        record_trace: false,
+        record_video: false,
+      },
+    });
+    expect(handleAction.mock.calls[0][0].options).toEqual({
+      locale: 'ja',
+      headless: true,
+      connect_over_cdp: false,
+      record_trace: true,
+      record_video: true,
+    });
+  });
+
   it('maps non-success actuator status to failed', async () => {
     const execute = createExecuteBrowserPipeline(
       vi.fn().mockResolvedValue({ status: 'failed', errors: ['click_ref failed'] })

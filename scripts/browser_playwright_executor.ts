@@ -106,24 +106,47 @@ function isSuccessfulStatus(status: string | undefined): boolean {
   return status === 'succeeded' || status === 'success';
 }
 
+/** Connection/runtime keys the host decides; dispatcher options cannot override them. */
+const HOST_OWNED_OPTION_KEYS = [
+  'connect_over_cdp',
+  'cdp_url',
+  'cdp_port',
+  'headless',
+  'record_trace',
+  'record_video',
+] as const;
+
+function omitHostOwnedOptions(
+  options: Record<string, unknown> | undefined
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...(options ?? {}) };
+  for (const key of HOST_OWNED_OPTION_KEYS) {
+    delete next[key];
+  }
+  return next;
+}
+
 export function createExecuteBrowserPipeline(
   handleAction: BrowserActuatorHandle['handleAction'],
   defaults: BrowserPipelineRunOptions = {}
 ): ExecuteBrowserPipeline {
   const connectOverCdp = Boolean(defaults.connectOverCdp || defaults.cdpUrl || defaults.cdpPort);
   return async (input: ExecuteBrowserPipelineInput): Promise<ExecuteBrowserPipelineResult> => {
+    const hostRuntimeOptions: Record<string, unknown> = {
+      headless: defaults.headless ?? true,
+      connect_over_cdp: connectOverCdp,
+      record_trace: defaults.recordTrace !== false,
+      record_video: defaults.recordVideo !== false,
+      ...(defaults.cdpUrl ? { cdp_url: defaults.cdpUrl } : {}),
+      ...(defaults.cdpPort ? { cdp_port: defaults.cdpPort } : {}),
+    };
     const actuatorResult = await handleAction({
       action: 'pipeline',
       steps: input.steps,
       session_id: input.sessionId || defaults.sessionId,
       options: {
-        headless: defaults.headless ?? true,
-        connect_over_cdp: connectOverCdp,
-        record_trace: defaults.recordTrace !== false,
-        record_video: defaults.recordVideo !== false,
-        ...(defaults.cdpUrl ? { cdp_url: defaults.cdpUrl } : {}),
-        ...(defaults.cdpPort ? { cdp_port: defaults.cdpPort } : {}),
-        ...(input.options || {}),
+        ...omitHostOwnedOptions(input.options),
+        ...hostRuntimeOptions,
       },
       context: defaults.context ?? {},
     });
