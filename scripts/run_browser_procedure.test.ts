@@ -205,6 +205,66 @@ describe('run_browser_procedure', () => {
     expect(handleAction).not.toHaveBeenCalled();
   });
 
+  it('does not enable CDP when --tab-id is the only attach-related flag', async () => {
+    await main(['--procedure-id', PROCEDURE.procedure_id, '--tab-id', 'tab-9'], print, deps());
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const input = dispatch.mock.calls[0][0];
+    expect(input.session.tab_id).toBe('tab-9');
+    const exec = await input.executeBrowserPipeline({
+      steps: [{ id: 'step-1', type: 'apply', op: 'click_ref', params: { ref: '@e1' } }],
+    });
+    expect(exec.status).toBe('succeeded');
+    expect(handleAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'pipeline',
+        session_id: 'tab-9',
+        options: expect.objectContaining({ connect_over_cdp: false }),
+      })
+    );
+    expect(handleAction.mock.calls[0][0].options.cdp_url).toBeUndefined();
+    expect(handleAction.mock.calls[0][0].options.cdp_port).toBeUndefined();
+  });
+
+  it('enables CDP attach when --cdp-url is set, keeping --tab-id as the session label', async () => {
+    await main(
+      [
+        '--procedure-id',
+        PROCEDURE.procedure_id,
+        '--cdp-url',
+        'http://127.0.0.1:9222',
+        '--tab-id',
+        'tab-9',
+      ],
+      print,
+      deps()
+    );
+    const input = dispatch.mock.calls[0][0];
+    await input.executeBrowserPipeline({ steps: [] });
+    expect(handleAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        session_id: 'tab-9',
+        options: expect.objectContaining({
+          connect_over_cdp: true,
+          cdp_url: 'http://127.0.0.1:9222',
+        }),
+      })
+    );
+  });
+
+  it('enables CDP attach when --cdp-port is set without --tab-id', async () => {
+    await main(['--procedure-id', PROCEDURE.procedure_id, '--cdp-port', '9222'], print, deps());
+    const input = dispatch.mock.calls[0][0];
+    await input.executeBrowserPipeline({ steps: [] });
+    expect(handleAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          connect_over_cdp: true,
+          cdp_port: 9222,
+        }),
+      })
+    );
+  });
+
   it('surfaces a missing-build error from the host-boundary loader', async () => {
     await expect(
       main(

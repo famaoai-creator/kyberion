@@ -604,7 +604,9 @@ pnpm kyberion browser run --adf libs/actuators/browser-actuator/examples/explore
 ```
 
 Requires Node `>=24` and `pnpm build` (or `pnpm build:actuators`). Standalone
-Chromium is the default; pass `--cdp-url` only to attach to a live Chrome.
+Chromium is the default; pass `--cdp-url` / `--cdp-port` only to attach to a
+live Chrome. `--tab-id` is an optional session label for that attach, not a
+CDP switch.
 See `knowledge/product/architecture/browser-execution-substrate-howto.md`.
 
 ### Direct mission control

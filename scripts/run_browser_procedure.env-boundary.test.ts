@@ -22,4 +22,14 @@ describe('run browser procedure environment boundary', () => {
     expect(source).not.toMatch(/from ['"].*browser-actuator\/src/);
     expect(source).toContain("from './browser_playwright_executor.js'");
   });
+
+  it('does not treat --tab-id alone as a CDP attach signal', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/run_browser_procedure.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('const connectOverCdp = Boolean(cdpUrl || cdpPort)');
+    expect(source).not.toMatch(/connectOverCdp = Boolean\(cdpUrl \|\| cdpPort \|\| tabId\)/);
+  });
 });

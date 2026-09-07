@@ -81,7 +81,7 @@ The production host boundary that wires `@agent/browser-actuator` `handleAction`
 `scripts/browser_playwright_executor.ts`. Operator entry points that inject it:
 
 - `pnpm kyberion browser run` → `scripts/run_browser_procedure.ts` (standalone Playwright;
-  optional `--cdp-url` / `--tab-id` to attach)
+  attach only with `--cdp-url` / `--cdp-port`; optional `--tab-id` is a session label)
 - `pnpm kyberion procedure run <id>` → `scripts/kyberion_home.ts` (same helper; standalone
   unless CDP flags are present)
 
