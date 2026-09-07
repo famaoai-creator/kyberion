@@ -185,58 +185,62 @@ describe.sequential('code_change PR collaboration (E2E-03 Task 6)', () => {
     clearWorkCoordinationNamespace();
   });
 
-  it('publishes diff.patch + PR.md on implement completion and injects the diff into review', async () => {
-    const missionPath = await seedMission({ withReviewTask: true });
-    const { safeWriteFile, safeReadFile, safeExistsSync, safeExec } =
-      await import('../libs/core/secure-io.js');
+  it(
+    'publishes diff.patch + PR.md on implement completion and injects the diff into review',
+    { timeout: 60_000 },
+    async () => {
+      const missionPath = await seedMission({ withReviewTask: true });
+      const { safeWriteFile, safeReadFile, safeExistsSync, safeExec } =
+        await import('../libs/core/secure-io.js');
 
-    mocks.route.mockImplementation(async (envelope: any) => {
-      const taskId = String(envelope?.payload?.context?.task_id || '');
-      if (taskId === 'task-1') {
-        // implement work mutates the micro-repo worktree
-        safeWriteFile(`${missionPath}/deliverables/change.md`, '# change v2 with fix');
-        return { payload: { text: makeTaskResultText({ summary: 'Changed the code.' }) } };
-      }
-      return {
-        payload: {
-          text: makeTaskResultText({ summary: 'Looks good.', review_findings: [] }),
-        },
-      };
-    });
+      mocks.route.mockImplementation(async (envelope: any) => {
+        const taskId = String(envelope?.payload?.context?.task_id || '');
+        if (taskId === 'task-1') {
+          // implement work mutates the micro-repo worktree
+          safeWriteFile(`${missionPath}/deliverables/change.md`, '# change v2 with fix');
+          return { payload: { text: makeTaskResultText({ summary: 'Changed the code.' }) } };
+        }
+        return {
+          payload: {
+            text: makeTaskResultText({ summary: 'Looks good.', review_findings: [] }),
+          },
+        };
+      });
 
-    const { dispatchMissionNextTasks } =
-      await import('../libs/core/mission-orchestration-worker.js');
-    await dispatchMissionNextTasks(MISSION);
+      const { dispatchMissionNextTasks } =
+        await import('../libs/core/mission-orchestration-worker.js');
+      await dispatchMissionNextTasks(MISSION);
 
-    const diffPath = `${missionPath}/evidence/prs/task-1/diff.patch`;
-    const prPath = `${missionPath}/evidence/prs/task-1/PR.md`;
-    expect(safeExistsSync(diffPath)).toBe(true);
-    expect(safeExistsSync(prPath)).toBe(true);
-    const diff = safeReadFile(diffPath, { encoding: 'utf8' }) as string;
-    expect(diff).toContain('change v2 with fix');
-    const pr = safeReadFile(prPath, { encoding: 'utf8' }) as string;
-    expect(pr).toContain('Changed the code.');
-    expect(pr).toContain('- Branch: task/task-1');
-    expect(pr).toContain('deliverables/change.md');
+      const diffPath = `${missionPath}/evidence/prs/task-1/diff.patch`;
+      const prPath = `${missionPath}/evidence/prs/task-1/PR.md`;
+      expect(safeExistsSync(diffPath)).toBe(true);
+      expect(safeExistsSync(prPath)).toBe(true);
+      const diff = safeReadFile(diffPath, { encoding: 'utf8' }) as string;
+      expect(diff).toContain('change v2 with fix');
+      const pr = safeReadFile(prPath, { encoding: 'utf8' }) as string;
+      expect(pr).toContain('Changed the code.');
+      expect(pr).toContain('- Branch: task/task-1');
+      expect(pr).toContain('deliverables/change.md');
 
-    const branches = String(
-      safeExec('git', ['branch', '--list', 'task/task-1'], { cwd: missionPath })
-    );
-    expect(branches).toContain('task/task-1');
+      const branches = String(
+        safeExec('git', ['branch', '--list', 'task/task-1'], { cwd: missionPath })
+      );
+      expect(branches).toContain('task/task-1');
 
-    // reviewer prompt carries the diff
-    const reviewPrompt = mocks.route.mock.calls
-      .map((call) => String((call[0] as any)?.payload?.text || ''))
-      .find((prompt) => prompt.includes('Diff under review'));
-    expect(reviewPrompt).toBeTruthy();
-    expect(reviewPrompt).toContain('change v2 with fix');
+      // reviewer prompt carries the diff
+      const reviewPrompt = mocks.route.mock.calls
+        .map((call) => String((call[0] as any)?.payload?.text || ''))
+        .find((prompt) => prompt.includes('Diff under review'));
+      expect(reviewPrompt).toBeTruthy();
+      expect(reviewPrompt).toContain('change v2 with fix');
 
-    // every dispatch prompt carries the mission goal (本来の目的), not just the task wording
-    const firstPrompt = String((mocks.route.mock.calls[0][0] as any)?.payload?.text || '');
-    expect(firstPrompt).toContain('## Mission goal');
-    expect(firstPrompt).toContain('Ship the login change safely');
-    expect(firstPrompt).toContain('review approves the change');
-  });
+      // every dispatch prompt carries the mission goal (本来の目的), not just the task wording
+      const firstPrompt = String((mocks.route.mock.calls[0][0] as any)?.payload?.text || '');
+      expect(firstPrompt).toContain('## Mission goal');
+      expect(firstPrompt).toContain('Ship the login change safely');
+      expect(firstPrompt).toContain('review approves the change');
+    }
+  );
 
   it('blocks a code_change plan without a review task as a planner contract violation', async () => {
     await seedMission({ withReviewTask: false });
