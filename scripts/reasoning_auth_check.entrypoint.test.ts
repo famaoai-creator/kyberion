@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
+import { resolveScriptCommand } from './kyberion.js';
 
 describe('reasoning auth check entrypoint', () => {
   it('keeps auth status output behind the shared script harness', () => {
@@ -17,17 +18,14 @@ describe('reasoning auth check entrypoint', () => {
     expect(source).not.toContain("context.argv, '--json'");
   });
 
-  it('exposes the canonical pnpm auth entrypoint without duplicating auth logic', () => {
-    const packageJson = JSON.parse(
-      String(
-        safeReadFile(pathResolver.rootResolve('package.json'), {
-          encoding: 'utf8',
-        })
-      )
-    ) as { scripts?: Record<string, unknown> };
-
-    expect(packageJson.scripts?.auth).toBe(
-      'node --import ./scripts/ts-loader.mjs scripts/reasoning_auth_check.ts'
-    );
+  it('exposes the canonical auth entrypoint without duplicating auth logic', () => {
+    // Verification aliases moved from package.json scripts to the governed
+    // CLI command registry (main 87eb0797b "move verification aliases to
+    // governed router"); `pnpm kyberion auth check` now dispatches this
+    // module directly instead of a package.json `auth` script.
+    expect(resolveScriptCommand('auth check')).toMatchObject({
+      module: 'scripts/reasoning_auth_check.ts',
+      command: 'auth check',
+    });
   });
 });

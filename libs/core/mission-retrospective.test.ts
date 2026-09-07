@@ -40,6 +40,7 @@ const realFsSecureIo = vi.hoisted(() => ({
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
   safeLstat: (filePath: string) => fs.lstatSync(filePath),
+  safeReaddir: (dirPath: string) => fs.readdirSync(dirPath),
   safeMkdir: (dirPath: string, options?: { recursive?: boolean }) =>
     fs.mkdirSync(dirPath, { recursive: options?.recursive !== false }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
@@ -252,7 +253,10 @@ describe('mission retrospective loop', () => {
       prompt_tokens: 110,
       completion_tokens: 45,
       total_tokens: 155,
-      cost_usd: 0.01233,
+      // The supervisor entry has no registry under KYBERION_ROOT, and the
+      // default cost rate is zero since the fallback registry was removed, so
+      // only the execution-metrics entry contributes cost.
+      cost_usd: 0.0123,
       entries: 2,
     });
     expect(stats.token_usage.by_model['agy-runtime-model']).toMatchObject({
@@ -261,6 +265,47 @@ describe('mission retrospective loop', () => {
       total_tokens: 15,
     });
     expect(stats.resource_usage).toEqual({ entries: 1, cost_usd: 0.02 });
+  });
+
+  it('merges the legacy supervisor file with rotated dated files (AC-10)', () => {
+    // The beforeEach fixture already seeded the legacy
+    // `agent-runtime-supervisor-events.jsonl` with one `agent_runtime_ask_completed`
+    // record for `agy-runtime-model`. Add a second, dated file
+    // (`agent-runtime-events.ts` writes these post-rotation) for a distinct
+    // model and assert both partitions are read and summed.
+    fs.writeFileSync(
+      path.join(
+        tmpRoot,
+        'active',
+        'shared',
+        'observability',
+        'mission-control',
+        'agent-runtime-supervisor-events-2026-09-06.jsonl'
+      ),
+      JSON.stringify({
+        decision: 'agent_runtime_ask_completed',
+        mission_id: MISSION,
+        correlation_id: 'runtime-correlation-dated-1',
+        model_id: 'dated-runtime-model',
+        input_tokens: 20,
+        output_tokens: 8,
+      }) + '\n'
+    );
+
+    const stats = mod.collectMissionExecutionStats(MISSION);
+
+    // Legacy entry (model: agy-runtime-model) + dated entry (model: dated-runtime-model).
+    expect(stats.token_usage.entries).toBe(3);
+    expect(stats.token_usage.by_model['agy-runtime-model']).toMatchObject({
+      prompt_tokens: 10,
+      completion_tokens: 5,
+    });
+    expect(stats.token_usage.by_model['dated-runtime-model']).toMatchObject({
+      prompt_tokens: 20,
+      completion_tokens: 8,
+    });
+    expect(stats.token_usage.prompt_tokens).toBe(130);
+    expect(stats.token_usage.completion_tokens).toBe(53);
   });
 
   it('does not derive lifecycle stats from a schema-invalid mission state', () => {

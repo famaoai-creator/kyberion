@@ -6,6 +6,11 @@ import { theme } from '../theme.js';
 import { IntentPreview } from './intent-preview.js';
 import type { VoiceState } from './input-bar.js';
 
+export interface OperatorCockpitAgentsWaiting {
+  waiting: number;
+  humansWaitedOn: number;
+}
+
 export interface OperatorCockpitProps {
   summary?: OperatorHomeSummary;
   loading: boolean;
@@ -15,6 +20,8 @@ export interface OperatorCockpitProps {
   customer?: string;
   tenant?: string;
   voiceState?: VoiceState;
+  /** AC-05: collaboration-tree "who is waiting" summary; absent when unavailable. */
+  agentsWaiting?: OperatorCockpitAgentsWaiting;
 }
 
 function statusColor(status?: OperatorHomeSummary['status']): string {
@@ -32,6 +39,7 @@ export function OperatorCockpit({
   customer,
   tenant,
   voiceState,
+  agentsWaiting,
 }: OperatorCockpitProps) {
   const { tr } = useI18n();
   const scope = tenant
@@ -48,6 +56,14 @@ export function OperatorCockpit({
           {backend || 'auto'} · {customer || '-'}
         </Text>
       </Box>
+      {agentsWaiting && (agentsWaiting.waiting > 0 || agentsWaiting.humansWaitedOn > 0) ? (
+        <Text color={theme.warn}>
+          {tr('tui:tui_home_agents_waiting', {
+            waiting: agentsWaiting.waiting,
+            humans: agentsWaiting.humansWaitedOn,
+          })}
+        </Text>
+      ) : null}
       {loading && !summary ? <Text dimColor>{tr('tui:tui_loading')}</Text> : null}
       {error ? (
         <Text color={theme.err}>

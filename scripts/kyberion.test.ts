@@ -211,6 +211,14 @@ describe('kyberion command router', () => {
     expect(output[0]).toEqual(expect.stringContaining('governed registry'));
   });
 
+  it('ignores the pnpm `--` separator pnpm forwards literally (npm strips it)', async () => {
+    const output: unknown[] = [];
+    const { main } = await import('./kyberion.js');
+    await main(['--', '--help'], (value) => output.push(value));
+    expect(output).toHaveLength(1);
+    expect(output[0]).toEqual(expect.stringContaining('governed registry'));
+  });
+
   it('does not write directly to stdout from the unified router', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/kyberion.ts'), { encoding: 'utf8' })

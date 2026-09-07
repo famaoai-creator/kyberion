@@ -231,7 +231,9 @@ export const MEET_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
   captions_toggle: [
     // Backported from tools/meet-copilot-extension (Meet verified live)
     'button[aria-label*="Turn on captions" i]',
+    // i18n-exempt: third-party Meet UI label to match, not app-facing text
     'button[aria-label*="字幕をオンにする"]',
+    // i18n-exempt: third-party UI label to match, not app-facing text
     'button[aria-label*="字幕を表示"]',
     'button[aria-label*="captions" i]',
     '[data-tooltip*="captions" i]',
@@ -250,8 +252,10 @@ export const MEET_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
 export const ZOOM_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
   captions_toggle: [
     // Backported from tools/meet-copilot-extension (best effort)
+    // i18n-exempt: third-party UI label to match, not app-facing text
     'button[aria-label*="字幕を表示"]',
     'button[aria-label*="show captions" i]',
+    // i18n-exempt: third-party Zoom UI label to match, not app-facing text
     'button[aria-label*="ライブ文字起こし"]',
     'button[aria-label*="closed caption" i]',
     'button[aria-label*="字幕" i]',
@@ -269,8 +273,10 @@ export const ZOOM_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
 export const TEAMS_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
   captions_toggle: [
     // Backported from tools/meet-copilot-extension (best effort)
+    // i18n-exempt: third-party Teams UI label to match, not app-facing text
     'button[aria-label*="ライブ キャプションをオンに"]',
     'button[aria-label*="turn on live captions" i]',
+    // i18n-exempt: third-party Teams UI label to match, not app-facing text
     'button[aria-label*="字幕をオンに"]',
     'button[data-tid="toggle-cc"]',
     'button[aria-label*="captions" i]',
@@ -284,6 +290,7 @@ export const TEAMS_IN_MEETING_SELECTORS: MeetingInMeetingSelectors = {
     '[data-tid*="caption" i]',
     'div[data-tid="closed-captions-renderer"]',
     '[aria-label*="Live captions" i]',
+    // i18n-exempt: third-party Teams UI label to match, not app-facing text
     '[aria-label*="ライブ キャプション" i]',
   ],
 };

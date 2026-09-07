@@ -6,6 +6,9 @@ import {
   ProcessSpawnDispatcher,
   maybeWrapWithDispatcher,
   selectAgentDispatcher,
+  type HarnessSubagentRuntime,
+  type HarnessSubagentTaskRequest,
+  type HarnessSubagentTaskResult,
 } from './agent-dispatch.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
 import {
@@ -42,7 +45,35 @@ vi.mock('./governance-action-recorder.js', () => ({
   recordGovernanceAction: (...args: unknown[]) => recordGovernanceAction(...args),
 }));
 
+// AC-01: `resolveAmbientMissionIdForEvents` (agent-dispatch.ts) reads the
+// shared "current mission focus" file at `pathResolver.shared('runtime/current_mission_focus.json')`
+// directly (not via `mission-state.ts` — see that function's doc comment for
+// why: it would create a runtime import cycle back into this module).
+// Redirecting just that one subPath to a scratch file under
+// `pathResolver.sharedTmp(...)` lets one test assert mission_id propagation
+// without ever touching the real shared mission-focus file (other
+// concurrent providers/missions in this worktree read/write that file for
+// real — see the multi-provider co-execution contract).
+const missionFocusPathOverride = vi.hoisted(() => ({ value: undefined as string | undefined }));
+vi.mock('./path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./path-resolver.js')>();
+  return {
+    ...actual,
+    pathResolver: {
+      ...actual.pathResolver,
+      shared: (subPath = '') =>
+        missionFocusPathOverride.value !== undefined &&
+        subPath === 'runtime/current_mission_focus.json'
+          ? missionFocusPathOverride.value
+          : actual.pathResolver.shared(subPath),
+    },
+  };
+});
+
 afterEach(() => resetOpPreflight());
+afterEach(() => {
+  missionFocusPathOverride.value = undefined;
+});
 
 /** Minimal fake backend that records delegation and supports tool-use opt-in. */
 function makeFakeBackend(opts: { withTools?: boolean } = {}): ReasoningBackend & {
@@ -750,5 +781,261 @@ describe('agent-dispatch NI-03 delegation chain', () => {
       /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/mission-controller$/
     );
     expect(extracted.chain![0].granted_scope).toEqual({});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC-01: delegation correlation — `delegation_id` pairs begin/end(/unavailable),
+// plus `team_role`, `agent_id`, `parent_agent_id`, `instruction_summary`,
+// `elapsed_ms` and `source.mission_id` on the KC-02 worker-event envelopes
+// emitted by `HarnessSubagentDispatcher` and `ProcessSpawnDispatcher`.
+// ---------------------------------------------------------------------------
+describe('AC-01 delegation correlation (agent-dispatch)', () => {
+  function collectEvents(): WorkerEventEnvelope[] {
+    const events: WorkerEventEnvelope[] = [];
+    getDefaultWorkerEventStream().subscribe((e) => events.push(e));
+    return events;
+  }
+
+  function makeFakeHarnessRuntime(
+    runTaskImpl?: (params: HarnessSubagentTaskRequest) => Promise<HarnessSubagentTaskResult>
+  ) {
+    const buildGovernedAgentSystemPrompt = vi.fn(
+      ({ base, missionContext }: { base: string; missionContext?: string }) =>
+        [base, missionContext ? `Mission context:\n${missionContext}` : '']
+          .filter(Boolean)
+          .join('\n\n')
+    );
+    const runtime: HarnessSubagentRuntime & {
+      buildGovernedAgentSystemPrompt: typeof buildGovernedAgentSystemPrompt;
+    } = {
+      runTask: runTaskImpl ?? vi.fn(async () => ({ text: 'harness-result' })),
+      buildGovernedAgentSystemPrompt,
+      buildKyberionMcpServerConfig: vi.fn(() => ({ kyberion: {} })),
+      createKyberionCanUseTool: vi.fn(() => vi.fn()),
+      allowedTools: ['Read', 'Write', 'Bash'],
+    };
+    return runtime;
+  }
+
+  beforeEach(() => {
+    resetDefaultWorkerEventStream();
+    missionFocusPathOverride.value = undefined;
+  });
+
+  afterEach(() => {
+    resetDefaultWorkerEventStream();
+  });
+
+  it('HarnessSubagentDispatcher: begin/end share one delegation_id and a stable agent_id (no native thread id)', async () => {
+    const runtime = makeFakeHarnessRuntime();
+    const dispatcher = new HarnessSubagentDispatcher({ loadRuntime: async () => runtime });
+    const backend = makeFakeBackend();
+    const events = collectEvents();
+
+    await dispatcher.dispatch('do the thing', undefined, backend, { profile: 'implementer' });
+
+    expect(events.map((e) => e.type)).toEqual(['subagent_begin', 'subagent_end']);
+    const [begin, end] = events;
+    expect(typeof begin.payload.delegation_id).toBe('string');
+    expect((begin.payload.delegation_id as string).length).toBeGreaterThan(0);
+    expect(end.payload.delegation_id).toBe(begin.payload.delegation_id);
+    expect(begin.payload.agent_id).toBe(end.payload.agent_id);
+    expect(begin.payload.team_role).toBe('implementer');
+    expect(end.payload.team_role).toBe('implementer');
+  });
+
+  it('instruction_summary is present and at most 120 chars, even for a long instruction', async () => {
+    const runtime = makeFakeHarnessRuntime();
+    const dispatcher = new HarnessSubagentDispatcher({ loadRuntime: async () => runtime });
+    const backend = makeFakeBackend();
+    const events = collectEvents();
+
+    await dispatcher.dispatch('x'.repeat(500), undefined, backend);
+
+    const [begin] = events;
+    expect(typeof begin.payload.instruction_summary).toBe('string');
+    const summary = begin.payload.instruction_summary as string;
+    expect(summary.length).toBeGreaterThan(0);
+    expect(summary.length).toBeLessThanOrEqual(120);
+  });
+
+  it('elapsed_ms on subagent_end is a non-negative integer', async () => {
+    const runtime = makeFakeHarnessRuntime();
+    const dispatcher = new HarnessSubagentDispatcher({ loadRuntime: async () => runtime });
+    const backend = makeFakeBackend();
+    const events = collectEvents();
+
+    await dispatcher.dispatch('do work', undefined, backend);
+
+    const end = events[1];
+    expect(Number.isInteger(end.payload.elapsed_ms)).toBe(true);
+    expect(end.payload.elapsed_ms as number).toBeGreaterThanOrEqual(0);
+  });
+
+  it('parent_agent_id equals the last actor of a delegation chain already embedded in context', async () => {
+    const { buildDelegationLink, embedDelegationChainInContext } =
+      await import('./delegation-chain.js');
+    const chain = [
+      buildDelegationLink({
+        actor: 'kyberion://agent/ac01-org/orchestrator',
+        granted_scope: {},
+      }),
+    ];
+    const context = embedDelegationChainInContext('task context', chain);
+    const runtime = makeFakeHarnessRuntime();
+    const dispatcher = new HarnessSubagentDispatcher({ loadRuntime: async () => runtime });
+    const backend = makeFakeBackend();
+    const events = collectEvents();
+
+    await dispatcher.dispatch('do work', context, backend);
+
+    expect(events[0].payload.parent_agent_id).toBe('kyberion://agent/ac01-org/orchestrator');
+    expect(events[1].payload.parent_agent_id).toBe('kyberion://agent/ac01-org/orchestrator');
+    // The envelope's `source.agent_id` names the emitting (parent) actor.
+    expect(events[0].source?.agent_id).toBe('kyberion://agent/ac01-org/orchestrator');
+  });
+
+  it("parent_agent_id resolves to the root actor (not this dispatch's own placeholder) when routed through DispatchingReasoningBackend", async () => {
+    const { buildDelegationLink, embedDelegationChainInContext } =
+      await import('./delegation-chain.js');
+    // The incoming chain the mission worker originates at dispatch time —
+    // no sub-worker link for THIS dispatch yet; that gets appended by
+    // `propagateDelegationChainThroughContext` inside `delegateTask` below,
+    // before `HarnessSubagentDispatcher.dispatch()` ever sees the context.
+    const rootChain = [
+      buildDelegationLink({
+        actor: 'kyberion://agent/ac01-org/root-orchestrator',
+        granted_scope: {},
+      }),
+    ];
+    const context = embedDelegationChainInContext('task context', rootChain);
+    const runtime = makeFakeHarnessRuntime();
+    const dispatcher = new HarnessSubagentDispatcher({ loadRuntime: async () => runtime });
+    const backend = makeFakeBackend();
+    const wrapped = new DispatchingReasoningBackend(backend, dispatcher);
+    const events = collectEvents();
+
+    await wrapped.delegateTask('do work', context, { profile: 'implementer' });
+
+    // Prove the fix is actually exercised (not vacuously true because no
+    // append happened): the context the dispatcher received really does end
+    // with this dispatch's own placeholder link, appended by
+    // `propagateDelegationChainThroughContext` before `dispatch()` ran.
+    const { extractDelegationChainFromContext } = await import('./delegation-chain.js');
+    const receivedContext = runtime.buildGovernedAgentSystemPrompt.mock.calls[0][0]
+      .missionContext as string;
+    const receivedChain = extractDelegationChainFromContext(receivedContext).chain!;
+    expect(receivedChain[receivedChain.length - 1].actor).toMatch(
+      /^subagent:harness-subagent:implementer$/
+    );
+    expect(receivedChain[0].actor).toBe('kyberion://agent/ac01-org/root-orchestrator');
+
+    expect(events[0].payload.parent_agent_id).toBe('kyberion://agent/ac01-org/root-orchestrator');
+    expect(events[1].payload.parent_agent_id).toBe('kyberion://agent/ac01-org/root-orchestrator');
+    expect(events[0].payload.parent_agent_id).not.toMatch(/^subagent:/);
+  });
+
+  it('omits parent_agent_id when context carries no delegation chain', async () => {
+    const runtime = makeFakeHarnessRuntime();
+    const dispatcher = new HarnessSubagentDispatcher({ loadRuntime: async () => runtime });
+    const backend = makeFakeBackend();
+    const events = collectEvents();
+
+    await dispatcher.dispatch('do work', 'plain context, no chain', backend);
+
+    expect(events[0].payload.parent_agent_id).toBeUndefined();
+    expect(events[0].source?.agent_id).toBeUndefined();
+  });
+
+  it('source.mission_id is populated from the ambient current-mission-focus file when one is set', async () => {
+    const { safeWriteFile, safeRmSync } = await import('./secure-io.js');
+    const scratchPath = pathResolver.sharedTmp(
+      'agent-dispatch-ac01-test/current_mission_focus.json'
+    );
+    safeWriteFile(scratchPath, JSON.stringify({ mission_id: 'MSN-AC01-TEST' }));
+    missionFocusPathOverride.value = scratchPath;
+    try {
+      const runtime = makeFakeHarnessRuntime();
+      const dispatcher = new HarnessSubagentDispatcher({ loadRuntime: async () => runtime });
+      const backend = makeFakeBackend();
+      const events = collectEvents();
+
+      await dispatcher.dispatch('do work', undefined, backend);
+
+      expect(events[0].source?.mission_id).toBe('MSN-AC01-TEST');
+      expect(events[1].source?.mission_id).toBe('MSN-AC01-TEST');
+    } finally {
+      safeRmSync(scratchPath, { force: true });
+    }
+  });
+
+  it('subagent_unavailable also carries the same delegation_id as its begin', async () => {
+    const backend = makeFakeBackend();
+    backend.requiresNativeSubagent = () => true;
+    const events = collectEvents();
+
+    await expect(
+      new HarnessSubagentDispatcher().dispatch('native task', undefined, backend, {
+        profile: 'implementer',
+      })
+    ).rejects.toThrow('[SUBAGENT_UNAVAILABLE]');
+
+    expect(events.map((e) => e.type)).toEqual(['subagent_begin', 'subagent_unavailable']);
+    expect(events[1].payload.delegation_id).toBe(events[0].payload.delegation_id);
+    expect(events[1].payload.delegation_id).toEqual(expect.any(String));
+  });
+
+  it('keeps agent_id stable across begin/end even with a native thread id (carried separately as thread_id)', async () => {
+    const dispatch = vi.fn(async () => 'native-result');
+    const backend = makeFakeBackend() as ReasoningBackend & {
+      getNativeSubagentAdopter: NonNullable<ReasoningBackend['getNativeSubagentAdopter']>;
+    };
+    backend.getNativeSubagentAdopter = () => ({
+      id: 'test-native-adopter',
+      dispatch,
+      getInfo: () => ({ threadId: 'native-thread-42' }),
+    });
+    const events = collectEvents();
+
+    await new HarnessSubagentDispatcher().dispatch('native task', undefined, backend);
+
+    const [begin, end] = events;
+    expect(end.payload.agent_id).toBe(begin.payload.agent_id);
+    expect(end.payload.agent_id).not.toBe('native-thread-42');
+    expect(end.payload.thread_id).toBe('native-thread-42');
+    expect(end.payload.delegation_id).toBe(begin.payload.delegation_id);
+  });
+
+  it('ProcessSpawnDispatcher now emits correlated subagent_begin/end too (previously silent)', async () => {
+    const backend = makeFakeBackend();
+    const events = collectEvents();
+
+    const out = await new ProcessSpawnDispatcher().dispatch('do X', 'ctx', backend, {
+      profile: 'explorer',
+    });
+
+    expect(out).toBe('spawned:do X');
+    expect(events.map((e) => e.type)).toEqual(['subagent_begin', 'subagent_end']);
+    expect(events[0].payload.dispatcher).toBe('process-spawn');
+    expect(events[0].payload.team_role).toBe('explorer');
+    expect(events[1].payload.delegation_id).toBe(events[0].payload.delegation_id);
+    expect(events[1].payload.status).toBe('success');
+    expect(events[1].payload.agent_id).toBe(events[0].payload.agent_id);
+  });
+
+  it('ProcessSpawnDispatcher emits subagent_end(status=failure) and rethrows when delegateTask errors', async () => {
+    const backend = makeFakeBackend();
+    backend.delegateTask.mockRejectedValueOnce(new Error('spawn failed'));
+    const events = collectEvents();
+
+    await expect(new ProcessSpawnDispatcher().dispatch('do X', 'ctx', backend)).rejects.toThrow(
+      'spawn failed'
+    );
+
+    expect(events.map((e) => e.type)).toEqual(['subagent_begin', 'subagent_end']);
+    expect(events[1].payload.status).toBe('failure');
+    expect(events[1].payload.error).toContain('spawn failed');
+    expect(events[1].payload.delegation_id).toBe(events[0].payload.delegation_id);
   });
 });

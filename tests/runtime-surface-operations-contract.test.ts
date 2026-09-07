@@ -18,7 +18,15 @@ describe('Runtime surface operations contract', () => {
     for (const action of ['setup', 'reconcile', 'status', 'repair', 'start', 'stop'])
       expect(pkg.scripts[`surfaces:${action}`]).toBeUndefined();
     expect(pkg.scripts['channels:list']).toBe('node dist/scripts/channel_directory.js');
-    expect(pkg.scripts.bootstrap).toBe('pnpm build && pnpm surfaces reconcile');
+    // SX-05 (script ratchet, commit a877d9c12) pruned the combined
+    // `bootstrap` alias along with the rest of the redundant script surface
+    // (package scripts 168 -> <=120); the canonical successor is the
+    // documented two-command sequence `pnpm build && pnpm surfaces
+    // reconcile` in docs/INITIALIZATION.md / AGENTS.md §3, not a script.
+    // The successor is the documented two-command sequence, so the contract
+    // is that both halves exist and the onboarding doc still spells it out.
+    expect(pkg.scripts.build).toContain('build:packages');
+    expect(read('docs/INITIALIZATION.md')).toContain('pnpm surfaces reconcile');
     expect(pkg.scripts.dashboard).toBe('node dist/scripts/sovereign_dashboard.js');
     expect(pkg.scripts['dashboard:onboarding']).toBeUndefined();
   });

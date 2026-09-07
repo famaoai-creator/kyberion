@@ -39,6 +39,22 @@ describe('virtual office surface', () => {
       ),
       path.join(tmpRoot, 'knowledge', 'product', 'governance', 'agent-policies.yaml')
     );
+    // A series of governance refactors on main (e.g. 6bbc36905 "fail closed
+    // on provider config", 94e72b11b "require project standards catalog")
+    // made several `@agent/core` catalogs fail closed and read eagerly at
+    // module-import time. The isolated root must serve the real artifacts
+    // (schemas are already covered wholesale by the knowledge/product/schemas
+    // copy above).
+    const REQUIRED_GOVERNED_CATALOGS = [
+      'product/governance/provider-config.json',
+      'public/common/project_standards.json',
+      'product/governance/reasoning-provider-registry.json',
+    ];
+    for (const relPath of REQUIRED_GOVERNED_CATALOGS) {
+      const destPath = path.join(tmpRoot, 'knowledge', ...relPath.split('/'));
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.copyFileSync(fileURLToPath(new URL(`../knowledge/${relPath}`, import.meta.url)), destPath);
+    }
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.KYBERION_CUSTOMER = 'acme';
 

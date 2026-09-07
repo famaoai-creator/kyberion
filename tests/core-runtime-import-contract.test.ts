@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeExec, safeReadFile } from '@agent/core/secure-io';
+import { safeExecResultAsync, safeReadFile } from '@agent/core/secure-io';
 
 interface CorePackageJson {
   exports: Record<string, { default?: string; types?: string } | string>;
@@ -25,25 +25,39 @@ describe('Core runtime import contract', () => {
 
     const failures: Array<{ specifier: string; error: string }> = [];
 
-    for (const key of exportKeys) {
-      const specifier = exportKeyToSpecifier(key);
-      try {
-        safeExec(
-          'node',
-          [
-            '--input-type=module',
-            '-e',
-            `import(${JSON.stringify(specifier)}).then(() => console.log('ok'))`,
-          ],
-          {
-            cwd: process.cwd(),
+    // ~740 subpaths × one child node each: sequential spawns take ~85s
+    // locally and exceed the timeout on shared CI runners. Overlap bounded
+    // batches through the governed async exec boundary instead; batches stay
+    // sequential so failure order remains deterministic.
+    const CONCURRENCY = 8;
+    for (let index = 0; index < exportKeys.length; index += CONCURRENCY) {
+      const batch = exportKeys.slice(index, index + CONCURRENCY);
+      const settled = await Promise.all(
+        batch.map(async (key) => {
+          const specifier = exportKeyToSpecifier(key);
+          const result = await safeExecResultAsync(
+            'node',
+            [
+              '--input-type=module',
+              '-e',
+              `import(${JSON.stringify(specifier)}).then(() => console.log('ok'))`,
+            ],
+            {
+              cwd: process.cwd(),
+            }
+          );
+          if (result.status !== 0 || result.error) {
+            return {
+              specifier,
+              error:
+                result.error?.message || result.stderr.slice(0, 300) || `exit ${result.status}`,
+            };
           }
-        );
-      } catch (error: any) {
-        failures.push({
-          specifier,
-          error: error?.message || String(error),
-        });
+          return null;
+        })
+      );
+      for (const failure of settled) {
+        if (failure) failures.push(failure);
       }
     }
 

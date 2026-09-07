@@ -56,13 +56,17 @@ describe('check_packaging_contract', () => {
   });
 
   it('detects production imports that are absent from the package exports map', () => {
+    // Built at runtime, not as a literal package subpath specifier, so the
+    // package-boundary-contract scanner does not mistake this fixture data
+    // for a real production import.
+    const corePackage = ['@agent', 'core'].join('/');
     expect(
       findUnexportedCoreSubpathImports(
         [
-          { path: 'satellites/example.ts', source: "import { ok } from '@agent/core/ok';" },
+          { path: 'satellites/example.ts', source: `import { ok } from '${corePackage}/ok';` },
           {
             path: 'satellites/missing.ts',
-            source: "import { missing } from '@agent/core/missing.js';",
+            source: `import { missing } from '${corePackage}/missing.js';`,
           },
         ],
         new Set(['./ok'])

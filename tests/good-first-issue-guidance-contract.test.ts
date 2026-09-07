@@ -25,7 +25,10 @@ describe('Good first issue guidance contract', () => {
     const contributing = read('CONTRIBUTING.md');
     expect(contributing).toContain('docs/developer/GOOD_FIRST_ISSUES.md');
     expect(contributing).toContain('good-first-issue');
-    expect(contributing).toContain('pnpm validate');
+    // c24b90cc3 ("docs: simplify pre-pr validation checklist") deliberately
+    // replaced `pnpm validate` with the narrower pre-PR command; assert the
+    // command CONTRIBUTING.md actually asks contributors to run.
+    expect(contributing).toContain('pnpm check -- --scope pr');
     expect(contributing).toContain('one small file cluster');
     expect(contributing).toContain('one validation command');
   });

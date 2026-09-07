@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { renderSnapshotLines } from './snapshot.js';
 
 describe('renderSnapshotLines', () => {
-  it('renders a section for all 8 panels', async () => {
+  it('renders a section for all 9 panels', async () => {
     const lines = await renderSnapshotLines();
     expect(lines[0]).toBe('Kyberion Terminal HUD');
-    expect(lines.filter((line) => line.startsWith('## ')).length).toBe(8);
+    expect(lines.filter((line) => line.startsWith('## ')).length).toBe(9);
   }, 60000);
 
   it('focuses a single panel via --panel', async () => {
@@ -15,6 +15,6 @@ describe('renderSnapshotLines', () => {
 
   it('ignores unknown panel ids and renders everything', async () => {
     const lines = await renderSnapshotLines({ panel: 'nope' });
-    expect(lines.filter((line) => line.startsWith('## ')).length).toBe(8);
+    expect(lines.filter((line) => line.startsWith('## ')).length).toBe(9);
   }, 60000);
 });

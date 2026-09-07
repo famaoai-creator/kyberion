@@ -81,6 +81,16 @@ const mocks = vi.hoisted(() => {
   const safeExistsSync = vi.fn((filePath: string) => fileStore.has(filePath));
   const safeMkdir = vi.fn();
   const safeReadFile = vi.fn((filePath: string) => fileStore.get(filePath) || '');
+  // `governed-catalog.ts` imports `safeLstat` directly from secure-io.js (not
+  // through FoundationIo), so this mock intercepts it even though the
+  // recovery-policy catalog read for the actuator's own real manifest.json
+  // goes through the untouched, real FoundationIo bridge. `fileStore` is a
+  // write-through overlay of test fixtures, not a full virtual filesystem —
+  // fall back to the real (governed) `safeLstat` for paths never written into
+  // it (e.g. this actuator's real manifest.json) instead of treating them as
+  // missing. The real fallback is wired in below, once the secure-io mock
+  // factory can `importOriginal()` it — `node:fs` itself is repo-restricted
+  // (AGENTS.md §1) even in this actuator's tests.
   const safeLstat = vi.fn((filePath: string) => ({ isFile: () => fileStore.has(filePath) }));
   const safeWriteFile = vi.fn((filePath: string, content: string) => {
     fileStore.set(filePath, content);
@@ -167,6 +177,9 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
+  mocks.safeLstat.mockImplementation((filePath: string) =>
+    mocks.fileStore.has(filePath) ? { isFile: () => true } : actual.safeLstat(filePath)
+  );
   return {
     ...actual,
     safeExistsSync: mocks.safeExistsSync,

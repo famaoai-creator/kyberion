@@ -1,7 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { composeAgentActivityBoard, readMissionTenantSlug } from './agent-activity-board.js';
+import {
+  UNASSIGNED_AGENT_ID,
+  composeAgentActivityBoard,
+  readMissionTenantSlug,
+} from './agent-activity-board.js';
 import type { WorkItem } from './work-coordination.js';
 import { pathResolver } from './path-resolver.js';
 import { safeWriteFile } from './secure-io.js';
@@ -59,7 +63,7 @@ describe('agent-activity-board', () => {
               run_id: 'run-x',
               status: 'blocked',
               started_at: '2026-07-07T00:00:00Z',
-              blocked_reason: '入力待ち',
+              blocked_reason: 'waiting for operator input',
             },
           ],
         }),
@@ -69,9 +73,13 @@ describe('agent-activity-board', () => {
     });
     expect(board.entries).toHaveLength(4);
     const dep = board.entries.find((entry) => entry.item_id === 'w2');
-    expect(dep?.blockers[0]).toMatchObject({ kind: 'dependency' });
+    // AC-09: the unmet ids are structured data, not embedded in display text.
+    expect(dep?.blockers[0]).toMatchObject({ kind: 'dependency', dependency_ids: ['a'] });
     const blocked = board.entries.find((entry) => entry.item_id === 'w4');
-    expect(blocked?.blockers[0]).toMatchObject({ kind: 'blocked', reason: '入力待ち' });
+    expect(blocked?.blockers[0]).toMatchObject({
+      kind: 'blocked',
+      blocked_reason: 'waiting for operator input',
+    });
     const review = board.entries.find((entry) => entry.item_id === 'w3');
     expect(review?.blockers.some((b) => b.kind === 'review_wait')).toBe(true);
     const impl = board.agents.find((a) => a.agent_id === 'impl-agent');
@@ -94,6 +102,34 @@ describe('agent-activity-board', () => {
       tenantFilter: 'aurora',
     });
     expect(board.entries.map((entry) => entry.item_id)).toEqual(['w1']);
+  });
+
+  it('names an unclaimed work item with the unassigned sentinel and no localized text (AC-09)', () => {
+    const board = composeAgentActivityBoard({
+      items: [item({ item_id: 'w1', status: 'ready', metadata: { task_id: 'a' } })],
+      tenantByMission: { 'MSN-A': 'aurora' },
+    });
+    expect(board.entries[0]?.agent_id).toBe(UNASSIGNED_AGENT_ID);
+    expect(board.agents.map((row) => row.agent_id)).toEqual([UNASSIGNED_AGENT_ID]);
+    const blocker = board.entries[0]?.blockers.find((entry) => entry.kind === 'unassigned');
+    expect(blocker?.reason).toBe('No agent is assigned to this work item');
+    expect(blocker?.dependency_ids).toBeUndefined();
+  });
+
+  it('omits blocked_reason when the work item recorded none (AC-09)', () => {
+    const board = composeAgentActivityBoard({
+      items: [
+        item({
+          item_id: 'w1',
+          status: 'blocked',
+          assignee_peer_id: 'impl-agent',
+          metadata: { task_id: 'a' },
+        }),
+      ],
+    });
+    const blocked = board.entries[0]?.blockers.find((entry) => entry.kind === 'blocked');
+    expect(blocked).toMatchObject({ kind: 'blocked' });
+    expect(blocked?.blocked_reason).toBeUndefined();
   });
 
   it('keeps an active work item visible when mission identity is explicit', () => {

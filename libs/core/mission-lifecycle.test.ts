@@ -36,6 +36,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { transitionStatus } from './mission-status.js';
+import { t } from './t.js';
 import {
   collectMissionEvidence,
   evaluateMissionFinishExitGate,
@@ -567,10 +568,10 @@ describe('mission lifecycle finish gate', () => {
     expect(state.context.mission_completion_summary).toMatchObject({
       requested_result: 'The closeout note is saved',
       satisfied: true,
-      next_step: expect.stringContaining('Proceed with archival'),
+      next_step: t('next_action:completion_next_step_proceed'),
     });
     expect(state.context.mission_completion_next_action).toMatchObject({
-      title: 'Completion confirmed',
+      title: t('next_action:completion_confirmed'),
       satisfied: true,
       evidence_refs: expect.arrayContaining([`${missionPath}/evidence/closeout.md`]),
     });

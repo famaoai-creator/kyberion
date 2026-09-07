@@ -30,6 +30,9 @@ vi.mock('./secure-io.js', async () => {
     safeUnlinkSync: (p: string) => actualFs.unlinkSync(p),
     safeReaddir: (p: string) => actualFs.readdirSync(p),
     safeStat: (p: string) => actualFs.statSync(p),
+    // Vault entries are read through a governed catalog (main bae8b1b8c),
+    // which lstats the path before loading it.
+    safeLstat: (p: string) => actualFs.lstatSync(p),
   };
 });
 

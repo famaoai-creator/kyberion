@@ -1,6 +1,10 @@
 import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProviderInfo } from './provider-discovery.js';
+// provider-config is a fail-closed governed catalog (main 6bbc36905): the
+// virtual fs below must serve the real artifact and its schema.
+import providerConfig from '../../knowledge/product/governance/provider-config.json';
+import providerConfigSchema from '../../knowledge/product/schemas/provider-config.schema.json';
 
 const recordMock = vi.fn();
 const files = new Map<string, string>();
@@ -130,6 +134,14 @@ describe('capability-broker', () => {
         },
         required: ['version', 'pins'],
       })
+    );
+    files.set(
+      '/repo/knowledge/product/governance/provider-config.json',
+      JSON.stringify(providerConfig)
+    );
+    files.set(
+      '/repo/knowledge/product/schemas/provider-config.schema.json',
+      JSON.stringify(providerConfigSchema)
     );
     recordMock.mockClear();
     delete process.env.MISSION_ID;

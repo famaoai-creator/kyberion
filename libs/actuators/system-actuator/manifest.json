@@ -1,6 +1,6 @@
 {
   "actuator_id": "system-actuator",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
   "contract_schema": "knowledge/product/schemas/system-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",

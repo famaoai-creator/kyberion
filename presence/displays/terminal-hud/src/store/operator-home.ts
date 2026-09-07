@@ -5,10 +5,24 @@ import {
 } from '@agent/core/operator-home-summary';
 import { currentScope, type ScopeContext } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
+import { loadAgentGraph } from './agent-graph.js';
+
+export interface OperatorHomeAgentsWaiting {
+  waiting: number;
+  humansWaitedOn: number;
+}
 
 export interface OperatorHomePacket {
   summary: OperatorHomeSummary;
   scope: ScopeContext;
+  /**
+   * Best-effort collaboration-tree stats for the cockpit's "who is waiting"
+   * line (AC-05). `loadAgentGraph()` is shared (and briefly cached) with the
+   * agents panel so a coincident refresh does not read the on-disk
+   * collaboration projection twice; a failure here must never fail the
+   * cockpit, so it degrades to `undefined`.
+   */
+  agentsWaiting?: OperatorHomeAgentsWaiting;
 }
 
 /** Convert the authoritative runtime scope into read-only home-summary filters. */
@@ -26,15 +40,24 @@ export function operatorHomeScopeFilter(scope: ScopeContext): OperatorHomeScopeF
 }
 
 /** Read-only operator packet used by the conversation-first cockpit. */
-export function loadOperatorHome(): OperatorHomePacket {
+export async function loadOperatorHome(): Promise<OperatorHomePacket> {
   const scope = currentScope();
-  return {
-    summary: collectOperatorHomeSummary({
-      limit: 5,
-      scope: operatorHomeScopeFilter(scope),
-    }),
-    scope,
-  };
+  const summary = collectOperatorHomeSummary({
+    limit: 5,
+    scope: operatorHomeScopeFilter(scope),
+  });
+  let agentsWaiting: OperatorHomeAgentsWaiting | undefined;
+  try {
+    const graph = await loadAgentGraph();
+    agentsWaiting = {
+      waiting: graph.tree.stats.agents_waiting,
+      humansWaitedOn: graph.tree.stats.humans_waited_on,
+    };
+  } catch {
+    // Collaboration tree is optional cockpit context.
+    agentsWaiting = undefined;
+  }
+  return { summary, scope, agentsWaiting };
 }
 
 export function operatorHomeWatchPaths(): string[] {

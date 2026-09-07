@@ -2,6 +2,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
+// `node:fs` is a native ESM namespace whose exports are non-configurable, so
+// `vi.spyOn(fs, 'readSync')` cannot redefine the property directly. Mocking
+// the module with a `vi.fn` wrapper around the real implementation gives the
+// `safeReadFileTail` byte-bound-read test below a spyable reference while
+// every other export (used throughout this file's fixtures) stays real.
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    readSync: vi.fn(actual.readSync),
+  };
+});
 import {
   validateFileSize,
   buildSafeExecEnv,
@@ -12,6 +25,7 @@ import {
   safeExecResult,
   assertSafeRepositoryPath,
   safeReadFile,
+  safeReadFileTail,
   safeWriteFile,
   sanitizePath,
   validateUrl,
@@ -70,6 +84,101 @@ describe('secure-io core', () => {
       expect(() =>
         safeReadFile(path.join(process.cwd(), 'knowledge/personal/connections/slack.json'))
       ).toThrow('[SENSITIVE_PATH_DENIED]');
+    });
+  });
+
+  describe('safeReadFileTail', () => {
+    it('reads the full content when the file is smaller than maxBytes', () => {
+      const testFile = path.join(tmpDir, 'tail-small.txt');
+      const content = 'Safe content';
+      fs.writeFileSync(testFile, content);
+
+      const result = safeReadFileTail(testFile, 1024);
+      expect(result.buffer.toString('utf8')).toBe(content);
+      expect(result.size).toBe(content.length);
+      expect(result.truncated).toBe(false);
+    });
+
+    it('truncates to the last maxBytes of a larger file', () => {
+      const testFile = path.join(tmpDir, 'tail-large.txt');
+      const content = '0123456789'.repeat(1000); // 10000 bytes
+      fs.writeFileSync(testFile, content);
+
+      const result = safeReadFileTail(testFile, 2000);
+      expect(result.buffer.length).toBe(2000);
+      expect(result.buffer.toString('utf8')).toBe(content.slice(-2000));
+      expect(result.size).toBe(10000);
+      expect(result.truncated).toBe(true);
+    });
+
+    it('reports truncated=false at the exact boundary (size === maxBytes)', () => {
+      const testFile = path.join(tmpDir, 'tail-exact.txt');
+      const content = 'x'.repeat(500);
+      fs.writeFileSync(testFile, content);
+
+      const result = safeReadFileTail(testFile, 500);
+      expect(result.buffer.toString('utf8')).toBe(content);
+      expect(result.truncated).toBe(false);
+    });
+
+    it('rejects a directory', () => {
+      const dirPath = path.join(tmpDir, 'a-directory');
+      fs.mkdirSync(dirPath);
+      expect(() => safeReadFileTail(dirPath, 1024)).toThrow('Not a regular file');
+    });
+
+    it('rejects a symbolic link', () => {
+      const target = path.join(tmpDir, 'tail-target.txt');
+      const link = path.join(tmpDir, 'tail-link.txt');
+      fs.writeFileSync(target, 'original');
+      fs.symlinkSync(target, link);
+
+      expect(() => safeReadFileTail(link, 1024)).toThrow(
+        '[SECURITY] Refusing to read symbolic link'
+      );
+    });
+
+    it('rejects a path outside the repository root', () => {
+      const outside = path.join(os.tmpdir(), 'kyberion-secure-io-outside-tail.txt');
+      expect(() => safeReadFileTail(outside, 1024)).toThrow('[SECURITY] Read access denied');
+    });
+
+    it('rejects a missing file', () => {
+      expect(() => safeReadFileTail(path.join(tmpDir, 'missing-tail.txt'), 1024)).toThrow(
+        'File not found'
+      );
+    });
+
+    it.each([0, -1, 1.5, NaN, Infinity, -Infinity])(
+      'rejects an invalid maxBytes value: %p',
+      (maxBytes) => {
+        const testFile = path.join(tmpDir, 'tail-invalid.txt');
+        fs.writeFileSync(testFile, 'content');
+        expect(() => safeReadFileTail(testFile, maxBytes)).toThrow('Invalid maxBytes');
+      }
+    );
+
+    it('never requests more than maxBytes from fs.readSync, even for a much larger file', () => {
+      const testFile = path.join(tmpDir, 'tail-spy.txt');
+      const content = 'y'.repeat(50_000);
+      fs.writeFileSync(testFile, content);
+
+      const readSyncMock = fs.readSync as unknown as ReturnType<typeof vi.fn>;
+      readSyncMock.mockClear();
+
+      const maxBytes = 4096;
+      const result = safeReadFileTail(testFile, maxBytes);
+      expect(result.truncated).toBe(true);
+      expect(result.buffer.length).toBe(maxBytes);
+
+      const relevantCalls = readSyncMock.mock.calls.filter(
+        (call: unknown[]) => typeof call[3] === 'number'
+      );
+      expect(relevantCalls.length).toBeGreaterThan(0);
+      for (const call of relevantCalls) {
+        const length = call[3] as number;
+        expect(length).toBeLessThanOrEqual(maxBytes);
+      }
     });
   });
 

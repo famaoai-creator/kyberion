@@ -189,7 +189,10 @@ describe('meeting-to-value e2e', () => {
     const pipeline = readPipeline();
     expect(pipeline.steps?.map((step) => step.id)).toEqual([
       'open_log',
-      'read_transcript',
+      // 1ffdae2ea (pipeline v2.1) replaced the plain system:read_file
+      // `read_transcript` step with meeting:normalize_transcript, which adds
+      // VTT/SRT cue parsing and speaker normalization on intake.
+      'normalize_transcript',
       'draft_minutes',
       'write_minutes',
       'extract_action_items',

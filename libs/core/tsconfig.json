@@ -23,7 +23,8 @@
     "testing/**/*.ts",
     "adapters/**/*.ts",
     "deployment-adapters/**/*.ts",
-    "work-integrations/**/*.ts"
+    "work-integrations/**/*.ts",
+    "native-pptx-engine/**/*.ts"
   ],
   "exclude": ["node_modules", "./dist", "*.test.ts", "**/*.test.ts", "**/__tests__/**"]
 }

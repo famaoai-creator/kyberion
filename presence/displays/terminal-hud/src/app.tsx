@@ -21,6 +21,7 @@ import { CoordinationPanel } from './panels/coordination-panel.js';
 import { StatsPanel } from './panels/stats-panel.js';
 import { ProfilePanel } from './panels/profile-panel.js';
 import { SettingsPanel } from './panels/settings-panel.js';
+import { AgentGraphPanel } from './panels/agent-graph-panel.js';
 import { heartbeatSummary } from './store/processes.js';
 import { loadSettings } from './store/settings.js';
 import { usePollWatch } from './store/use-poll-watch.js';
@@ -45,6 +46,7 @@ const PANEL_COMPONENTS: Record<PanelId, (props: PanelProps) => React.ReactNode> 
   stats: StatsPanel,
   profile: ProfilePanel,
   settings: SettingsPanel,
+  agents: AgentGraphPanel,
 };
 
 interface ConversationLine {
@@ -259,6 +261,7 @@ export function App({ initialPanel, initialLocale }: AppProps) {
           customer={statusLine.data?.customer}
           tenant={operatorHome.data?.scope.tenant_slug || operatorScope?.tenant_slug}
           voiceState={voice.state}
+          agentsWaiting={operatorHome.data?.agentsWaiting}
         />
         <TabBar active={panel} />
         <Box flexDirection="column" borderStyle="round" paddingX={1} minHeight={8}>

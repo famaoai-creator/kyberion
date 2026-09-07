@@ -23,7 +23,11 @@ const RUN_ID = Date.now();
 // "test", ...}` on every full test-suite run (KM-04 persistent-tier
 // pollution). runMissionController() forwards this env var to the
 // mission_controller.js subprocess via `env: { ...process.env, ... }`.
-const CUSTOMER_SLUG = `a2a-lifecycle-test-${RUN_ID}`;
+// The overlay slug is now validated as a tenant slug (TENANT_SLUG_PATTERN,
+// max 31 chars); `a2a-lifecycle-test-<ms epoch>` was 32 and mission start
+// aborted with [COMPANY_TENANT_SCOPE] invalid tenant slug. Base36 keeps the
+// per-run uniqueness inside the limit.
+const CUSTOMER_SLUG = `a2a-life-${RUN_ID.toString(36)}`;
 process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
 const PROFILE_ROOT = path.join(process.cwd(), 'customer', CUSTOMER_SLUG);
 const IDENTITY_PATH = path.join(PROFILE_ROOT, 'my-identity.json');

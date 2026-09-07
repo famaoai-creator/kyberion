@@ -83,7 +83,11 @@ export function runTestSuite(argv: readonly string[]): number {
   const vitestEntry = pathResolver.rootResolve('node_modules/vitest/vitest.mjs');
   const result = safeExecResult(process.execPath, [vitestEntry, ...args.slice(1)], {
     cwd: pathResolver.rootDir(),
-    timeoutMs: 900_000,
+    // The core suite streams steadily for 20min+ on the slowest shared
+    // runners (ubuntu, worse with --coverage); lower caps SIGTERMed healthy
+    // runs (exit 143). The workflows' own job timeouts remain the backstop
+    // for genuine hangs (cross-os: 25min).
+    timeoutMs: 2_400_000,
     maxOutputMB: 50,
   });
   if (result.stdout) process.stdout.write(result.stdout);

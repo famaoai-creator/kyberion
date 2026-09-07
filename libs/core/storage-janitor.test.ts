@@ -67,17 +67,24 @@ let dataVaultDir: string;
 const pathResolverMock = vi.hoisted(() => ({ rootDir: '', repoRoot: process.cwd() }));
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+function mockShared(sub = ''): string {
+  const base = path.dirname(tmpDir); // active/shared
+  return path.join(base, sub);
+}
+
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     // lock-utils evaluates rootDir while this mock is being hoisted, before
     // beforeEach initializes the per-test fixture.
     rootDir: () => pathResolverMock.rootDir || path.join(os.tmpdir(), 'kyberion-janitor-mock-root'),
+    // agent-runtime-events.ts resolves its EVENTS_DIR through
+    // `pathResolver.shared(...)` at module load time (AC-10 readers are
+    // imported by storage-janitor.ts), so the mocked `pathResolver` object
+    // needs the same `shared` the module-level named export below provides.
+    shared: mockShared,
   },
   sharedTmp: (sub = '') => path.join(tmpDir, sub),
-  shared: (sub = '') => {
-    const base = path.dirname(tmpDir); // active/shared
-    return path.join(base, sub);
-  },
+  shared: mockShared,
   sharedLogsAudit: (sub = '') => path.join(path.dirname(tmpDir), 'logs', 'audit', sub),
   knowledge: (sub = '') => path.join(pathResolverMock.repoRoot, 'knowledge', sub),
   // Repo root of the temp fixture: tmpDir is <root>/active/shared/tmp, so
@@ -94,6 +101,8 @@ import {
   scanTmp,
   rotateLogs,
   scanRuntime,
+  scanEventStores,
+  sweepSupervisorEventFiles,
   scanDataVault,
   sweepDelegationChildren,
   sweepTrash,
@@ -109,9 +118,11 @@ import {
   listUncoveredRuntimeDirs,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_TRASH_GRACE_DAYS,
+  DEFAULT_SUPERVISOR_EVENTS_RETENTION_DAYS,
   TRASH_REPO_SUBPATH,
   type DelegationChildRecord,
 } from './storage-janitor.js';
+import { SUPERVISOR_EVENTS_LEGACY_FILE } from './agent-runtime-events.js';
 import { fetchWithVaultCache } from './data-vault.js';
 import {
   RETENTION_CATALOG_REPO_PATH,
@@ -326,6 +337,106 @@ describe('storage-janitor', () => {
       const result = scanRuntime({ dryRun: false });
       expect(result.deleted).toContain(oldDelta);
       expect(fs.existsSync(oldDelta)).toBe(false);
+    });
+  });
+
+  describe('sweepSupervisorEventFiles (AC-10)', () => {
+    function missionControlDir(): string {
+      return path.join(path.dirname(tmpDir), 'observability', 'mission-control');
+    }
+
+    it('deletes dated supervisor files past the default 14-day retention, keeps fresh ones and the legacy file', () => {
+      const dir = missionControlDir();
+      const legacy = path.join(dir, SUPERVISOR_EVENTS_LEGACY_FILE);
+      const oldDated = path.join(dir, 'agent-runtime-supervisor-events-2026-01-01.jsonl');
+      const freshDated = path.join(dir, 'agent-runtime-supervisor-events-2026-09-06.jsonl');
+      writeFile(legacy);
+      writeFile(oldDated);
+      writeFile(freshDated);
+      setMtime(legacy, (DEFAULT_SUPERVISOR_EVENTS_RETENTION_DAYS + 200) * 24 * 60 * 60 * 1000);
+      setMtime(oldDated, (DEFAULT_SUPERVISOR_EVENTS_RETENTION_DAYS + 1) * 24 * 60 * 60 * 1000);
+
+      const result = sweepSupervisorEventFiles({ dryRun: false });
+
+      expect(result.deleted).toContain(oldDated);
+      expect(fs.existsSync(oldDated)).toBe(false);
+      expect(result.deleted).not.toContain(legacy);
+      expect(result.deleted).not.toContain(freshDated);
+      expect(fs.existsSync(legacy)).toBe(true);
+      expect(fs.existsSync(freshDated)).toBe(true);
+    });
+
+    it('respects an explicit retentionDays override', () => {
+      const dir = missionControlDir();
+      const dated = path.join(dir, 'agent-runtime-supervisor-events-2026-09-01.jsonl');
+      writeFile(dated);
+      setMtime(dated, 6 * 24 * 60 * 60 * 1000);
+
+      expect(sweepSupervisorEventFiles({ dryRun: true, retentionDays: 30 }).expired).not.toContain(
+        dated
+      );
+      expect(sweepSupervisorEventFiles({ dryRun: true, retentionDays: 5 }).expired).toContain(
+        dated
+      );
+    });
+
+    it('never appears as expired in dryRun mode without deleting anything', () => {
+      const dir = missionControlDir();
+      const oldDated = path.join(dir, 'agent-runtime-supervisor-events-2026-01-01.jsonl');
+      writeFile(oldDated);
+      setMtime(oldDated, (DEFAULT_SUPERVISOR_EVENTS_RETENTION_DAYS + 1) * 24 * 60 * 60 * 1000);
+
+      const result = sweepSupervisorEventFiles({ dryRun: true });
+      expect(result.expired).toContain(oldDated);
+      expect(result.deleted).toHaveLength(0);
+      expect(fs.existsSync(oldDated)).toBe(true);
+    });
+  });
+
+  describe('scanEventStores', () => {
+    function missionControlDir(): string {
+      return path.join(path.dirname(tmpDir), 'observability', 'mission-control');
+    }
+
+    const missionControlCatalog = {
+      version: '1.0.0',
+      entries: [
+        {
+          path: 'active/shared/observability/mission-control',
+          artifact_class: 'evidence',
+          ttl_days: 90,
+          action: 'delete',
+        },
+      ],
+    };
+
+    it('expires an unrelated event-store file under the covered directory', () => {
+      writeCatalogFile(missionControlCatalog);
+      const dir = missionControlDir();
+      const oldTaskEvents = path.join(dir, 'task-events.jsonl');
+      writeFile(oldTaskEvents);
+      setMtime(oldTaskEvents, 91 * 24 * 60 * 60 * 1000);
+
+      const result = scanEventStores({ dryRun: false });
+      expect(result.deleted).toContain(oldTaskEvents);
+      expect(fs.existsSync(oldTaskEvents)).toBe(false);
+    });
+
+    it('never sweeps the legacy or dated supervisor files, even when far older than the directory TTL', () => {
+      writeCatalogFile(missionControlCatalog);
+      const dir = missionControlDir();
+      const legacy = path.join(dir, SUPERVISOR_EVENTS_LEGACY_FILE);
+      const oldDated = path.join(dir, 'agent-runtime-supervisor-events-2020-01-01.jsonl');
+      writeFile(legacy);
+      writeFile(oldDated);
+      setMtime(legacy, 365 * 24 * 60 * 60 * 1000);
+      setMtime(oldDated, 365 * 24 * 60 * 60 * 1000);
+
+      const result = scanEventStores({ dryRun: false });
+      expect(result.deleted).not.toContain(legacy);
+      expect(result.deleted).not.toContain(oldDated);
+      expect(fs.existsSync(legacy)).toBe(true);
+      expect(fs.existsSync(oldDated)).toBe(true);
     });
   });
 
@@ -812,6 +923,8 @@ describe('storage-janitor', () => {
         deletedDataVault: expect.any(Number),
         expiredRuntime: expect.any(Number),
         deletedRuntime: expect.any(Number),
+        expiredSupervisorEvents: expect.any(Number),
+        deletedSupervisorEvents: expect.any(Number),
         staleDelegationChildren: expect.any(Number),
         killedDelegationChildren: expect.any(Number),
         errors: expect.any(Array),
@@ -857,6 +970,21 @@ describe('storage-janitor', () => {
       const report = runJanitor({ dryRun: false });
       expect(report.deletedTmp).toBeGreaterThanOrEqual(1);
       expect(fs.existsSync(oldFile)).toBe(false);
+    });
+
+    it('sweeps expired dated supervisor-event files but never the legacy file (AC-10)', () => {
+      const dir = path.join(path.dirname(tmpDir), 'observability', 'mission-control');
+      const legacy = path.join(dir, SUPERVISOR_EVENTS_LEGACY_FILE);
+      const oldDated = path.join(dir, 'agent-runtime-supervisor-events-2020-01-01.jsonl');
+      writeFile(legacy);
+      writeFile(oldDated);
+      setMtime(legacy, 365 * 24 * 60 * 60 * 1000);
+      setMtime(oldDated, (DEFAULT_SUPERVISOR_EVENTS_RETENTION_DAYS + 1) * 24 * 60 * 60 * 1000);
+
+      const report = runJanitor({ dryRun: false });
+      expect(report.deletedSupervisorEvents).toBeGreaterThanOrEqual(1);
+      expect(fs.existsSync(oldDated)).toBe(false);
+      expect(fs.existsSync(legacy)).toBe(true);
     });
   });
 

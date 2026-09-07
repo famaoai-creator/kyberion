@@ -63,7 +63,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
   };
 });
 
-import { getFoundationIo, registerFoundationIo } from '@agent/core/foundation/io.js';
+import { getFoundationIo, registerFoundationIo } from '@agent/core/foundation/io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { handleAction } from './index.js';
 

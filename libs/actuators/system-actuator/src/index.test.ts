@@ -1334,7 +1334,7 @@ beforeEach(async () => {
       content: params.content ?? params.data ?? resolve(params.from ? `{{${params.from}}}` : ''),
     })
   );
-  const { installFocusTargetStoreTestIo } = await import('../tests/system-focus-io.test.js');
+  const { installFocusTargetStoreTestIo } = await import('../tests/system-focus-io.js');
   await installFocusTargetStoreTestIo({ loadJson, safeReadFile, safeWriteFile, safeExistsSync });
   restorePlatform();
 });

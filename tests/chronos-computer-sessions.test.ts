@@ -6,11 +6,22 @@ vi.mock('@agent/core/path-resolver', () => ({
   },
 }));
 
+const SESSION_DIRS = [
+  'active/shared/runtime/computer/sessions',
+  'active/shared/runtime/browser/sessions',
+];
+
+// collectComputerSessions now guards every path with assertSafeRepositoryPath +
+// safeLstat; a factory without them makes both guards undefined, so every
+// session directory is discarded and only the pty-engine sessions survive.
 vi.mock('@agent/core/secure-io', () => ({
+  assertSafeRepositoryPath: vi.fn((target: string) => target),
+  safeLstat: vi.fn((target: string) => ({
+    isDirectory: () => SESSION_DIRS.includes(target),
+    isFile: () => target.endsWith('.json'),
+  })),
   safeExistsSync: vi.fn(
-    (target: string) =>
-      target === 'active/shared/runtime/computer/sessions' ||
-      target === 'active/shared/runtime/browser/sessions'
+    (target: string) => SESSION_DIRS.includes(target) || target.endsWith('.json')
   ),
   safeReaddir: vi.fn((target: string) => {
     if (target === 'active/shared/runtime/computer/sessions') return ['system-1.json'];

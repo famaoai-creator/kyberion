@@ -18,14 +18,14 @@ Computer Surface の `/api/identity`・`/api/state`・`/api/stream`・`/api/os/c
 
 ## 会話チャネル(UI以外)
 
-| 入口                                  | 役割                                                                                                                                                             | 備考                   |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| Slack / Telegram / Discord / iMessage | 会話・承認・通知(`runSurfaceMessageConversation` 経由)                                                                                                           | 深い履歴閲覧には不向き |
-| Voice(voice-hub / presence-studio)    | ハンズフリー会話・口述                                                                                                                                           | 一括レビューには不向き |
-| **`pnpm kyberion`**                   | **ターミナルの統合ホーム**: 状態ダイジェスト+次の一手。`ask "<依頼>"`(ブリッジと同じ脳)、`inbox`(既読/受領)、`approvals`(承認/却下)、`notify`(通知先設定) が同居 | 迷ったらまずこれ       |
-| **`pnpm tui`**(terminal-hud)          | **ターミナル常駐 HUD**(Ink TUI): ミッション・work item・ランタイムをパネルで監視/操作([README](../presence/displays/terminal-hud/README.md))                     | 常駐監視向け           |
-| `pnpm kyberion`                       | スクリプト向けCLI                                                                                                                                                | 統合ホームではない     |
-| MCP(mcp-server-cowork)                | Claude 連携のコンシェルジェ(persona: sovereign_concierge)                                                                                                        |                        |
+| 入口                                  | 役割                                                                                                                                                                                                                                                                      | 備考                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| Slack / Telegram / Discord / iMessage | 会話・承認・通知(`runSurfaceMessageConversation` 経由)                                                                                                                                                                                                                    | 深い履歴閲覧には不向き |
+| Voice(voice-hub / presence-studio)    | ハンズフリー会話・口述                                                                                                                                                                                                                                                    | 一括レビューには不向き |
+| **`pnpm kyberion`**                   | **ターミナルの統合ホーム**: 状態ダイジェスト+次の一手。`ask "<依頼>"`(ブリッジと同じ脳)、`inbox`(既読/受領)、`approvals`(承認/却下)、`notify`(通知先設定) が同居                                                                                                          | 迷ったらまずこれ       |
+| **`pnpm tui`**(terminal-hud)          | **ターミナル常駐 HUD**(Ink TUI): ミッション・work item・ランタイムをパネルで監視/操作、パネル 9「連携」で mission→task→agent→child agent の連携ツリーと待ち関係(承認待ち/子の完了待ち/クレーム待ち/ブロック)を表示([README](../presence/displays/terminal-hud/README.md)) | 常駐監視向け           |
+| `pnpm kyberion`                       | スクリプト向けCLI                                                                                                                                                                                                                                                         | 統合ホームではない     |
+| MCP(mcp-server-cowork)                | Claude 連携のコンシェルジェ(persona: sovereign_concierge)                                                                                                                                                                                                                 |                        |
 
 ## 会議・議事録
 

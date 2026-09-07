@@ -95,7 +95,11 @@ describe('docs-honesty contract (QM-10)', () => {
       const notebook = read('libs/core/memory-notebook.ts');
       expect(notebook).toContain('neutralizeUntrustedProvenance');
       const actuator = read('libs/actuators/working-memory-actuator/src/index.ts');
-      expect(actuator).toContain('neutralizeUntrustedProvenance');
+      // a877d9c12 moved the actuator off a direct neutralizeUntrustedProvenance
+      // call onto memory-notebook's foldCapture, which applies the guard itself
+      // (memory-notebook.ts:262,321) — the single-source claim still holds.
+      expect(actuator).toContain("from '@agent/core/memory-notebook'");
+      expect(actuator).toContain('foldCapture');
       expect(actuator).not.toContain('function neutralizeUntrustedProvenance');
     });
   });

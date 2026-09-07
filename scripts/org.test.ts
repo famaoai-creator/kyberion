@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
 
 function makeTempRoot(): string {
   const workspaceRoot = process.cwd();
@@ -75,7 +76,10 @@ function seedSecurityPolicyApproval(root: string, id: string): void {
 
 describe('org role create', () => {
   it('resolves existing authority roles through the governed directory loader', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'scripts', 'org.ts'), 'utf8');
+    const source = fs.readFileSync(
+      pathResolver.rootResolve(path.join('scripts', 'org.ts')),
+      'utf8'
+    );
 
     expect(source).toContain('loadAuthorityRoleDirectory(rootDir)[authorityRoleId]');
     expect(source).not.toContain('readJsonIfExists');

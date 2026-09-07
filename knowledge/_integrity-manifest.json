@@ -121,6 +121,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/agent-collaboration-view.md",
+      "tier": "public",
+      "size": 10595,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/agent-communication-layer-model.md",
       "tier": "public",
       "size": 10183,
@@ -519,7 +525,7 @@
     {
       "path": "product/architecture/meeting-facilitator-use-case.md",
       "tier": "public",
-      "size": 14756,
+      "size": 21725,
       "type": "md"
     },
     {
@@ -1065,7 +1071,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 21339,
+      "size": 21550,
       "type": "json"
     },
     {
@@ -1371,7 +1377,7 @@
     {
       "path": "product/governance/egress-policy.json",
       "tier": "public",
-      "size": 734,
+      "size": 753,
       "type": "json"
     },
     {
@@ -1383,7 +1389,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 123173,
+      "size": 125059,
       "type": "json"
     },
     {
@@ -1425,13 +1431,13 @@
     {
       "path": "product/governance/environment-manifests/reasoning-backend.json",
       "tier": "public",
-      "size": 3238,
+      "size": 3378,
       "type": "json"
     },
     {
       "path": "product/governance/environment-manifests/schema-integrity.json",
       "tier": "public",
-      "size": 2890,
+      "size": 2926,
       "type": "json"
     },
     {
@@ -1455,7 +1461,7 @@
     {
       "path": "product/governance/frontmatter-exclusions.json",
       "tier": "public",
-      "size": 911,
+      "size": 971,
       "type": "json"
     },
     {
@@ -1497,7 +1503,7 @@
     {
       "path": "product/governance/governance-catalog-contracts.json",
       "tier": "public",
-      "size": 5633,
+      "size": 5471,
       "type": "json"
     },
     {
@@ -1527,7 +1533,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 7030,
+      "size": 6787,
       "type": "json"
     },
     {
@@ -1899,7 +1905,7 @@
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 15784,
+      "size": 16631,
       "type": "json"
     },
     {
@@ -1911,7 +1917,7 @@
     {
       "path": "product/governance/model-registry/index.json",
       "tier": "public",
-      "size": 679,
+      "size": 727,
       "type": "json"
     },
     {
@@ -2014,6 +2020,12 @@
       "path": "product/governance/model-registry/model-6f70656e61693a6770742d352e362d7465727261.json",
       "tier": "public",
       "size": 673,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-6f70656e636f64653a6d7573652d737061726b2d312e332d636f6e7472696275746f722d66726565.json",
+      "tier": "public",
+      "size": 758,
       "type": "json"
     },
     {
@@ -2373,7 +2385,7 @@
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1421,
+      "size": 1549,
       "type": "json"
     },
     {
@@ -2397,7 +2409,7 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 3325,
+      "size": 3576,
       "type": "json"
     },
     {
@@ -2409,13 +2421,13 @@
     {
       "path": "product/governance/reasoning-provider-registry.json",
       "tier": "public",
-      "size": 7625,
+      "size": 8018,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 14074,
+      "size": 14637,
       "type": "json"
     },
     {
@@ -2523,7 +2535,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 14045,
+      "size": 15128,
       "type": "json"
     },
     {
@@ -2589,7 +2601,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 21066,
+      "size": 21962,
       "type": "json"
     },
     {
@@ -3285,7 +3297,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1380718,
+      "size": 1435244,
       "type": "json"
     },
     {
@@ -4107,7 +4119,7 @@
     {
       "path": "product/orchestration/provider-capabilities.json",
       "tier": "public",
-      "size": 15648,
+      "size": 16067,
       "type": "json"
     },
     {
@@ -4911,7 +4923,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 494022,
+      "size": 509996,
       "type": "json"
     },
     {
@@ -6375,7 +6387,7 @@
     {
       "path": "product/schemas/agent-collaboration-event.schema.json",
       "tier": "public",
-      "size": 3934,
+      "size": 4333,
       "type": "json"
     },
     {
@@ -9321,7 +9333,7 @@
     {
       "path": "product/schemas/provider-config.schema.json",
       "tier": "public",
-      "size": 3960,
+      "size": 4140,
       "type": "json"
     },
     {
@@ -9975,7 +9987,7 @@
     {
       "path": "product/schemas/system-pipeline.schema.json",
       "tier": "public",
-      "size": 11011,
+      "size": 11207,
       "type": "json"
     },
     {
@@ -10359,7 +10371,7 @@
     {
       "path": "product/schemas/voice-action.schema.json",
       "tier": "public",
-      "size": 7841,
+      "size": 8087,
       "type": "json"
     },
     {

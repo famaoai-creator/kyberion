@@ -2,6 +2,7 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
+import { t } from './t.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
   safeExistsSync,
@@ -431,7 +432,7 @@ describe('task-session', () => {
     expect(loaded?.completion_summary).toMatchObject({
       requested_result: expect.any(String),
       satisfied: true,
-      next_step: expect.stringContaining('Proceed'),
+      next_step: t('next_action:completion_next_step_proceed'),
     });
     expect(loaded?.completion_next_action?.satisfied).toBe(true);
   });
@@ -468,7 +469,7 @@ describe('task-session', () => {
     expect(entry).toBeTruthy();
     expect(entry?.completion_summary).toMatchObject({
       satisfied: true,
-      next_step: expect.stringContaining('Proceed'),
+      next_step: t('next_action:completion_next_step_proceed'),
     });
   });
 

@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 import { checkModuleBoundaries, readModuleBoundaryTextFile } from './check_module_boundaries.js';
 
 describe('module boundary ratchet', () => {
+  // The full-repo import walk takes ~20s locally (longer on shared CI
+  // runners); compute it once and share it instead of re-walking per test.
+  let report: ReturnType<typeof checkModuleBoundaries>;
+  beforeAll(() => {
+    report = checkModuleBoundaries();
+  }, 180_000);
   it('rejects a directory replacement before import parsing', () => {
     expect(() => readModuleBoundaryTextFile(pathResolver.rootResolve('scripts'))).toThrow(
       'must be a regular file'
@@ -20,7 +26,6 @@ describe('module boundary ratchet', () => {
   });
 
   it('does not allow cycles or forbidden direction edges to grow', () => {
-    const report = checkModuleBoundaries();
     expect(report.violations).toEqual([]);
     expect(report.directionViolations).toEqual([]);
     expect(report.directionExceptions).toEqual([
@@ -29,17 +34,15 @@ describe('module boundary ratchet', () => {
       'libs/core/secure-io.ts -> libs/core/tier-guard.ts',
     ]);
     expect(report.staleDirectionExceptions).toEqual([]);
-  }, 60_000);
+  });
 
   it('does not treat import examples inside comments as runtime edges', () => {
-    const report = checkModuleBoundaries();
     expect(report.cycles.flat()).not.toContain('scripts/dependency_resolver.ts');
-  }, 60_000);
+  });
 
   it('does not treat type-only imports as runtime cycles', () => {
-    const report = checkModuleBoundaries();
     expect(report.cycles.some((cycle) => cycle.includes('libs/core/deployment-adapter.ts'))).toBe(
       false
     );
-  }, 60_000);
+  });
 });

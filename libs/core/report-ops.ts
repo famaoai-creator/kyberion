@@ -18,6 +18,7 @@ import { isRecord } from './foundation/text.js';
 import { readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import type { TaskModelEffort, TaskModelHint, TaskModelTier } from './reasoning-model-routing.js';
+import { readSupervisorEvents } from './agent-runtime-events.js';
 
 // ─── audit verify (SA-01) ───────────────────────────────────
 
@@ -657,18 +658,20 @@ export function runTaskModelRoutingSummary(
   const taskEventsPath =
     input.task_events_path ||
     pathResolver.shared(path.join('observability', 'mission-control', 'task-events.jsonl'));
-  const supervisorEventsPath =
-    input.supervisor_events_path ||
-    pathResolver.shared(
-      path.join('observability', 'mission-control', 'agent-runtime-supervisor-events.jsonl')
-    );
+  // AC-10: the supervisor stream rotates daily now (`agent-runtime-events.ts`),
+  // so the default path reads every partition (legacy + dated) via the
+  // shared helper. `input.supervisor_events_path` is a test/diagnostic
+  // override pointing at one arbitrary file and is read directly, unchanged.
+  const supervisorEvents: unknown[] = input.supervisor_events_path
+    ? readJsonlEvents(input.supervisor_events_path)
+    : readSupervisorEvents();
 
   const samples = buildTaskRoutingSamples(
     readJsonlEvents(taskEventsPath)
       .map(normalizeTaskIssueEvent)
       .filter((event): event is TaskIssueEvent => event !== null)
       .filter((event) => eventVisibleToScope(event, scope)),
-    readJsonlEvents(supervisorEventsPath)
+    supervisorEvents
       .map(normalizeSupervisorAskCompletedEvent)
       .filter((event): event is SupervisorAskCompletedEvent => event !== null)
       .filter((event) => eventVisibleToScope(event, scope))
