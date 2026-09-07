@@ -150,7 +150,7 @@ Use `pnpm services:setup` when you want the external service catalog to tell you
 
 Use `pnpm kyberion setup report` when you want a consolidated readiness view across surfaces, services, reasoning, and doctor without checking each domain one by one.
 
-Kyberion doctor is **`pnpm run doctor`** or **`pnpm kyberion:doctor`**. Bare `pnpm doctor` is pnpm's own diagnostic (registry/cache) and does not run Kyberion's readiness checks.
+Kyberion doctor is **`pnpm run doctor`**. Bare `pnpm doctor` is pnpm's own diagnostic (registry/cache) and does not run Kyberion's readiness checks.
 
 `pnpm run doctor` includes the baseline runtime and reasoning backend manifest checks; use it when you want the consolidated readiness view rather than a domain-specific setup report.
 

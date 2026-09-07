@@ -559,5 +559,5 @@ See also:
 - Meeting daily path: `pnpm meeting:participate` (browser-playwright). `zoom-sdk` / `recall-ai` are **unimplemented seams** (docs-only / deferred). Do not call them.
 - Actuator dry-run: capture always executes (side-effect-free); apply `--dry-run` validates contract/params only (`pnpm playground` and `createStandardYargs --dry-run` / `pnpm kyberion run … --dry-run`).
 - Single-op dry-run: `pnpm playground -- --actuator <id> --op <op> --params '{…}' --dry-run --json`
-- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` or `pnpm kyberion:doctor` (not bare `pnpm doctor`).
+- Discovery without build: `pnpm capabilities` (source entry). Execution still needs `pnpm build`. Doctor: `pnpm run doctor` (not bare `pnpm doctor`).
 - Cloud Agent VM: [docs/developer/CLOUD_AGENT_ENVIRONMENT.md](docs/developer/CLOUD_AGENT_ENVIRONMENT.md) — Node `>=24`, `pnpm build` before pipeline / MCP / full doctor.

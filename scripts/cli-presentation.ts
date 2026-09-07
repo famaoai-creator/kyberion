@@ -132,9 +132,7 @@ export function printHelp(actuators: { length: number }, locale = resolveLocale(
   printText(t('cli_help_first_run', locale));
   printText(t('cli_help_onboard', locale));
   printText(t('cli_help_doctor', locale));
-  printText(
-    "  Kyberion doctor: pnpm run doctor  or  pnpm kyberion:doctor  (bare `pnpm doctor` is pnpm's own diagnostic)"
-  );
+  printText("  Kyberion doctor: pnpm run doctor  (bare `pnpm doctor` is pnpm's own diagnostic)");
   printText(t('cli_help_capabilities', locale));
   printText(t('cli_help_journal', locale));
   printText('');

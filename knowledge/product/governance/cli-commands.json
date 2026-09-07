@@ -1661,6 +1661,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.playground",
+      "script": "playground",
+      "command": "playground default",
+      "noun": "playground",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
       "id": "script.provider-capabilities.scan",
       "script": "provider-capabilities:scan",
       "command": "provider-capabilities scan",
