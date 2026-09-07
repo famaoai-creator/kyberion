@@ -74,7 +74,7 @@ describe('browser_playwright_executor', () => {
     });
   });
 
-  it('enables CDP attach only when a CDP endpoint or tab binding is provided', async () => {
+  it('enables CDP attach when a CDP endpoint is provided, not from session id alone', async () => {
     const handleAction = vi.fn().mockResolvedValue({ status: 'success', results: [] });
     const execute = createExecuteBrowserPipeline(handleAction, {
       connectOverCdp: true,
@@ -87,6 +87,13 @@ describe('browser_playwright_executor', () => {
       cdp_url: 'http://127.0.0.1:9222',
       cdp_port: 9222,
     });
+  });
+
+  it('does not enable CDP from sessionId alone', async () => {
+    const handleAction = vi.fn().mockResolvedValue({ status: 'succeeded', results: [] });
+    const execute = createExecuteBrowserPipeline(handleAction, { sessionId: 'tab-9' });
+    await execute({ steps: [] });
+    expect(handleAction.mock.calls[0][0].options.connect_over_cdp).toBe(false);
   });
 
   it('maps non-success actuator status to failed', async () => {

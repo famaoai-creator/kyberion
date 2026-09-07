@@ -139,7 +139,7 @@ export async function main(
     })
     .option('tab-id', {
       type: 'string',
-      description: 'Optional session/tab id (required only for CDP attach)',
+      description: 'Optional session/tab id when attaching with --cdp-url/--cdp-port',
     })
     .option('mission-id', { type: 'string', description: 'Mission id for the dispatch' })
     .option('json', { type: 'boolean', default: false })
@@ -175,7 +175,7 @@ export async function main(
   const cdpUrl = argv['cdp-url'] ? String(argv['cdp-url']) : undefined;
   const cdpPort = typeof argv['cdp-port'] === 'number' ? Number(argv['cdp-port']) : undefined;
   const tabId = argv['tab-id'] ? String(argv['tab-id']) : undefined;
-  const connectOverCdp = Boolean(cdpUrl || cdpPort || tabId);
+  const connectOverCdp = Boolean(cdpUrl || cdpPort);
   const missionId =
     (argv['mission-id'] ? String(argv['mission-id']) : '') ||
     deps.missionId ||
