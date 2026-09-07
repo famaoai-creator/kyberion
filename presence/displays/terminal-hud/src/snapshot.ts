@@ -10,6 +10,7 @@ import { loadCoordination, coordinationViewModel } from './store/coordination.js
 import { loadStats, statsViewModel } from './store/stats.js';
 import { loadProfile, profileViewModel } from './store/profile.js';
 import { loadSettings, settingsViewModel } from './store/settings.js';
+import { loadAgentGraph, agentGraphViewModel } from './store/agent-graph.js';
 
 export interface SnapshotOptions {
   panel?: string;
@@ -24,6 +25,7 @@ const SNAPSHOT_LOADERS: Record<PanelId, (i18n: I18n) => Promise<PanelViewModel>>
   stats: async (i18n) => statsViewModel(loadStats(), i18n),
   profile: async (i18n) => profileViewModel(loadProfile(), i18n),
   settings: async (i18n) => settingsViewModel(loadSettings(), i18n),
+  agents: async (i18n) => agentGraphViewModel(await loadAgentGraph(), i18n),
 };
 
 const MAX_SNAPSHOT_ROWS = 15;

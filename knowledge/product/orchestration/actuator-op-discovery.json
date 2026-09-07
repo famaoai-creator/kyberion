@@ -30695,6 +30695,9 @@
               },
               "obs_password": {
                 "type": "string"
+              },
+              "v4l2_device_path": {
+                "type": "string"
               }
             },
             "additionalProperties": false

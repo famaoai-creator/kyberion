@@ -6,7 +6,9 @@ import { platform as corePlatform } from './platform.js';
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(() => ''),
   safeExistsSync: vi.fn(() => true),
-  safeStat: vi.fn(() => ({ size: 4096 })),
+  // voice-engine-registry (main 636acd1f3) filters registry entries with
+  // safeStat(...).isFile(); the stub must expose the Stats predicates.
+  safeStat: vi.fn(() => ({ size: 4096, isFile: () => true, isDirectory: () => false })),
   safeMoveSync: vi.fn(),
   safeRmSync: vi.fn(),
 }));

@@ -72,7 +72,10 @@ vi.mock('../libs/core/ledger.js', () => ({
 
 vi.mock('../libs/core/mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
-  missionTaskEventsPath: (missionId: string) => `/tmp/${missionId}/task-events.jsonl`,
+  // Must stay inside the repository: the secure-io resource-path scope rejects
+  // absolute paths under the OS temp dir (RESOURCE_PATH_SCOPE).
+  missionTaskEventsPath: (missionId: string) =>
+    `${process.cwd()}/active/shared/tmp/agent-collaboration-e2e/${missionId}/task-events.jsonl`,
 }));
 
 describe.sequential('agent collaboration e2e', () => {

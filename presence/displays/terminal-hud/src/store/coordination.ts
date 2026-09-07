@@ -6,14 +6,19 @@ import {
   listSurfaceOutboxMessages,
   listSurfaceDeadLetters,
 } from '@agent/core/surface-coordination-store';
-import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
+import {
+  buildAgentCollaborationProjection,
+  type CollaborationAttentionCode,
+  type CollaborationAttentionItem,
+} from '@agent/core/agent-collaboration-projection';
 import { currentScope } from '@agent/core/scope-context';
 import { pathResolver } from '@agent/core/path-resolver';
 import type { AgentRuntimeSupervisorSnapshot } from '@agent/core/agent-runtime-supervisor-client';
 import type { SurfaceAsyncChannel } from '@agent/core/channel-surface-types';
+import type { VocabularyKey } from '@agent/core/t';
 import { statusColor, theme } from '../theme.js';
 import type { I18n } from '../i18n.js';
-import type { PanelViewModel } from './types.js';
+import type { DetailLine, PanelViewModel } from './types.js';
 
 const OUTBOX_SURFACES: readonly SurfaceAsyncChannel[] = [
   'slack',
@@ -26,8 +31,25 @@ export interface CoordinationData {
   runtimes: AgentRuntimeSupervisorSnapshot[] | null; // null = supervisor daemon offline
   providerLines: string[];
   outboxLines: string[];
-  attentionLines: string[];
+  /** AC-09: the projection's own attention items, not pre-formatted text —
+   * `coordinationViewModel` translates `code` through the vocabulary. */
+  attention: CollaborationAttentionItem[];
+  overviewLine?: string;
 }
+
+const ATTENTION_LABEL_KEYS: Record<CollaborationAttentionCode, VocabularyKey> = {
+  blocked: 'tui:tui_attention_blocked',
+  waiting_human: 'tui:tui_attention_waiting_human',
+  review_pending: 'tui:tui_attention_review_pending',
+  failure: 'tui:tui_attention_failure',
+};
+
+const ATTENTION_NEXT_KEYS: Record<CollaborationAttentionCode, VocabularyKey> = {
+  blocked: 'tui:tui_attention_next_blocked',
+  waiting_human: 'tui:tui_attention_next_waiting_human',
+  review_pending: 'tui:tui_attention_next_review_pending',
+  failure: 'tui:tui_attention_next_failure',
+};
 
 const SUPERVISOR_DAEMON_ID = 'agent-runtime-supervisor-daemon';
 
@@ -84,28 +106,18 @@ export async function loadCoordination(): Promise<CoordinationData> {
     }
   }
 
-  let attentionLines: string[] = [];
+  let attention: CollaborationAttentionItem[] = [];
+  let overviewLine: string | undefined;
   try {
-    const projection: any = buildAgentCollaborationProjection();
-    const attention = projection?.attention ?? projection?.attention_items ?? [];
-    attentionLines = (Array.isArray(attention) ? attention : [])
-      .slice(0, 5)
-      .map((item: any) =>
-        typeof item === 'string'
-          ? item
-          : String(item.summary ?? item.reason ?? JSON.stringify(item))
-      );
-    const overview = projection?.overview;
-    if (overview) {
-      attentionLines.unshift(
-        `events ${overview.events} / missions ${overview.missions} / agents ${overview.agents} / active ${overview.active}`
-      );
-    }
+    const projection = buildAgentCollaborationProjection();
+    attention = projection.attention.slice(0, 5);
+    const overview = projection.overview;
+    overviewLine = `events ${overview.events} / missions ${overview.missions} / agents ${overview.agents} / active ${overview.active}`;
   } catch {
     // collaboration projection is optional context
   }
 
-  return { runtimes, providerLines, outboxLines, attentionLines };
+  return { runtimes, providerLines, outboxLines, attention, overviewLine };
 }
 
 export function coordinationWatchPaths(): string[] {
@@ -113,6 +125,31 @@ export function coordinationWatchPaths(): string[] {
     pathResolver.active('shared/runtime/presence'),
     pathResolver.active('shared/runtime/provider-health.json'),
   ];
+}
+
+/** `<label> · <reason>` with a `(mission=… agent=…)` suffix when present. */
+function formatAttentionLine(item: CollaborationAttentionItem, i18n: I18n): string {
+  const label = i18n.tr(ATTENTION_LABEL_KEYS[item.code]);
+  const ids = [
+    item.mission_id ? `mission=${item.mission_id}` : undefined,
+    item.agent_id ? `agent=${item.agent_id}` : undefined,
+  ].filter((value): value is string => Boolean(value));
+  const suffix = ids.length > 0 ? ` (${ids.join(' ')})` : '';
+  return `${label} · ${item.reason}${suffix}`;
+}
+
+/** Row detail for the attention items attributed to one runtime's agent id. */
+function attentionDetailLines(
+  attention: CollaborationAttentionItem[],
+  agentId: string,
+  i18n: I18n
+): DetailLine[] {
+  return attention
+    .filter((item) => item.agent_id === agentId)
+    .map((item) => ({
+      label: i18n.tr('tui:tui_coord_attention'),
+      value: `${formatAttentionLine(item, i18n)} — ${i18n.tr('tui:tui_cockpit_next_action')}: ${i18n.tr(ATTENTION_NEXT_KEYS[item.code])}`,
+    }));
 }
 
 export function coordinationViewModel(data: CoordinationData, i18n: I18n): PanelViewModel {
@@ -126,8 +163,12 @@ export function coordinationViewModel(data: CoordinationData, i18n: I18n): Panel
   if (data.outboxLines.length > 0) {
     sections.push({ title: i18n.tr('tui:tui_coord_outbox'), lines: data.outboxLines });
   }
-  if (data.attentionLines.length > 0) {
-    sections.push({ title: i18n.tr('tui:tui_coord_attention'), lines: data.attentionLines });
+  const attentionLines = [
+    ...(data.overviewLine ? [data.overviewLine] : []),
+    ...data.attention.map((item) => formatAttentionLine(item, i18n)),
+  ];
+  if (attentionLines.length > 0) {
+    sections.push({ title: i18n.tr('tui:tui_coord_attention'), lines: attentionLines });
   }
   return {
     columns: [
@@ -136,16 +177,20 @@ export function coordinationViewModel(data: CoordinationData, i18n: I18n): Panel
       i18n.tr('tui:tui_mission_col_status'),
       'pid',
     ],
-    rows: (data.runtimes ?? []).map((runtime) => ({
-      id: runtime.agent_id,
-      color: statusColor(runtime.status ?? undefined) || theme.dim,
-      cells: [
-        runtime.agent_id,
-        `${runtime.provider ?? '-'}${runtime.model_id ? `/${runtime.model_id}` : ''}`,
-        runtime.status ?? '-',
-        runtime.pid !== undefined ? String(runtime.pid) : '-',
-      ],
-    })),
+    rows: (data.runtimes ?? []).map((runtime) => {
+      const detail = attentionDetailLines(data.attention, runtime.agent_id, i18n);
+      return {
+        id: runtime.agent_id,
+        color: statusColor(runtime.status ?? undefined) || theme.dim,
+        cells: [
+          runtime.agent_id,
+          `${runtime.provider ?? '-'}${runtime.model_id ? `/${runtime.model_id}` : ''}`,
+          runtime.status ?? '-',
+          runtime.pid !== undefined ? String(runtime.pid) : '-',
+        ],
+        ...(detail.length > 0 ? { detail } : {}),
+      };
+    }),
     sections,
   };
 }

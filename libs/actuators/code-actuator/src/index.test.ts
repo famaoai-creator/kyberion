@@ -19,7 +19,14 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn().mockReturnValue(''),
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
   rootDir: vi.fn().mockReturnValue('/mock/root'),
-  resolve: vi.fn((p: string) => `/mock/root/${p}`),
+  // Real secure-io's `safeReadFile` calls `pathResolver.resolve(filePath)`
+  // unconditionally, including for paths this test has already resolved to
+  // absolute (e.g. via `resolveCodeRepositoryPath`/`assertSafeRepositoryPath`
+  // upstream). The real `resolve()` returns an already-absolute path as-is;
+  // mirror that here instead of blindly re-prefixing it (which previously
+  // produced a doubled `/mock/root//mock/root/...` path once the
+  // recovery-policy catalog fix let execution reach this far).
+  resolve: vi.fn((p: string) => (p.startsWith('/mock/root') ? p : `/mock/root/${p}`)),
   rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
   knowledge: vi.fn((p: string) => `/mock/root/knowledge/${p}`),
 }));
@@ -44,16 +51,39 @@ vi.mock('@agent/core/async-utils', async (importOriginal) => {
   return { ...actual, retry: mocks.retry };
 });
 
+// `buildRetryOptions()` resolves its manifest through governed-catalog, which
+// fail-closes when the catalog can't be loaded (main removed the silent
+// `{}` fallback — see libs/core/recovery-policy.ts `loadRecoveryPolicy`).
+// The mocked `rootResolve` above points manifest paths at `/mock/root/...`,
+// a sentinel that never exists on real disk, so the real catalog load always
+// throws. `mocks.retry` above already bypasses all retry-option semantics
+// (it just calls the function once), so bypass catalog loading entirely and
+// hand back the builder's own defaults instead of reaching the filesystem.
+vi.mock('@agent/core/recovery-policy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/recovery-policy')>();
+  return {
+    ...actual,
+    createGovernedRetryOptionsBuilder:
+      (input: { defaults: Record<string, unknown> }) => (override?: Record<string, unknown>) => ({
+        ...input.defaults,
+        ...(override || {}),
+      }),
+  };
+});
+
 vi.mock('@agent/core/foundation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/foundation')>();
   return {
     ...actual,
-    readJson: vi.fn((filePath: string) => {
-      if (String(filePath).includes('global_skill_index.json')) {
-        return JSON.parse(String(mocks.safeReadFile(filePath)));
-      }
-      return actual.readJson(filePath);
-    }),
+    // `readCodeJson` (strategy/context files) and `discoverGovernedSkills`
+    // (global_skill_index.json) both now read through foundation's
+    // `readJson` instead of the old `parseSafeJsonInput(safeReadFile(...))`
+    // pairing (see git history of code-pipeline-helpers.ts's `readCodeJson`).
+    // `readJson`'s real implementation goes through FoundationIo's real,
+    // unmocked internals (bypassing this test's `safeReadFile` double
+    // entirely), so route every path through the same `mocks.safeReadFile`
+    // fixture the tests already configure, matching the prior contract.
+    readJson: vi.fn((filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath)))),
   };
 });
 

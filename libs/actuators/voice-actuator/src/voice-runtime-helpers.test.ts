@@ -18,7 +18,18 @@ const mocks = vi.hoisted(() => ({
     stderr: '',
     error: null,
   })),
-  safeReadFile: vi.fn(() => '{"recovery_policy": {}}'),
+  // Also serves as the actuator manifest fixture for `loadRecoveryPolicy`'s
+  // governed catalog, which schema-validates against
+  // actuator-manifest.schema.json — actuator_id/version/capabilities are
+  // required there even though this test only cares about recovery_policy.
+  safeReadFile: vi.fn(() =>
+    JSON.stringify({
+      actuator_id: 'voice-actuator',
+      version: '0.0.0-test',
+      capabilities: [],
+      recovery_policy: {},
+    })
+  ),
   getVoiceEngineRecord: vi.fn((engineId?: string) => {
     if (engineId === 'mlx_audio_qwen3') {
       return {
@@ -136,24 +147,61 @@ const mocks = vi.hoisted(() => ({
 
 // Keep the doubles on the canonical module boundaries used by the runtime
 // helper. The production secure-io guard must not see the test's /tmp paths.
-vi.mock('@agent/core/secure-io', () => ({
-  assertSafeRepositoryPath: (candidate: string) => {
-    const value = String(candidate);
-    if (value.startsWith('/var/') || value.includes('../')) {
-      throw new Error(
-        `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${value}`
-      );
-    }
-    return value;
-  },
-  safeExec: mocks.safeExec,
-  safeExecResult: mocks.safeExecResult,
-  safeExistsSync: mocks.safeExistsSync,
-  safeMkdir: mocks.safeMkdir,
-  safeReadFile: mocks.safeReadFile,
-  safeLstat: mocks.safeLstat,
-  safeStat: mocks.safeStat,
-}));
+vi.mock('@agent/core/secure-io', async () => {
+  const nodeFs = await import('node:fs');
+  // Real secure-io registers the FoundationIo bridge as an import side effect
+  // (see libs/core/secure-io.ts `registerFoundationIo(...)`), and
+  // `loadRecoveryPolicy` now reads actuator manifests through that governed
+  // catalog rather than a raw `safeReadFile` call. Replacing the whole
+  // secure-io module here drops that bridge, so re-register it: serve the
+  // real actuator-manifest schema from disk (governance metadata, not a test
+  // fixture) and route manifest reads through the same `safeReadFile` double
+  // the tests already configure.
+  const { registerFoundationIo } =
+    await vi.importActual<typeof import('@agent/core/foundation')>('@agent/core/foundation');
+  const isSchemaPath = (filePath: string) => filePath.endsWith('actuator-manifest.schema.json');
+  registerFoundationIo({
+    loadJson: (filePath: string) =>
+      isSchemaPath(String(filePath))
+        ? JSON.parse(nodeFs.readFileSync(String(filePath), 'utf8'))
+        : JSON.parse(String(mocks.safeReadFile(filePath))),
+    loadJsonIfPresent: (filePath: string) => {
+      try {
+        return isSchemaPath(String(filePath))
+          ? JSON.parse(nodeFs.readFileSync(String(filePath), 'utf8'))
+          : JSON.parse(String(mocks.safeReadFile(filePath)));
+      } catch {
+        return null;
+      }
+    },
+    appendFile: () => undefined,
+    exists: (filePath: string) =>
+      filePath.endsWith('manifest.json') || isSchemaPath(filePath)
+        ? true
+        : mocks.safeExistsSync(filePath),
+    readFile: (filePath: string) => String(mocks.safeReadFile(filePath)),
+    stat: () => ({ mtimeMs: 1, size: 1 }),
+    writeFile: () => undefined,
+  });
+  return {
+    assertSafeRepositoryPath: (candidate: string) => {
+      const value = String(candidate);
+      if (value.startsWith('/var/') || value.includes('../')) {
+        throw new Error(
+          `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${value}`
+        );
+      }
+      return value;
+    },
+    safeExec: mocks.safeExec,
+    safeExecResult: mocks.safeExecResult,
+    safeExistsSync: mocks.safeExistsSync,
+    safeMkdir: mocks.safeMkdir,
+    safeReadFile: mocks.safeReadFile,
+    safeLstat: mocks.safeLstat,
+    safeStat: mocks.safeStat,
+  };
+});
 vi.mock('@agent/core/path-resolver', async () => {
   const actual = await vi.importActual<typeof import('@agent/core/path-resolver')>(
     '@agent/core/path-resolver'

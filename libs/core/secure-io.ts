@@ -55,6 +55,13 @@ const SAFE_EXEC_ENV_ALLOWLIST = [
   'SHLVL',
   'NODE_ENV',
   'CI',
+  // Non-secret CI metadata: detached checkouts (PR merge refs) cannot resolve
+  // a branch via git, so runners spawned through safeExec (vitest workers,
+  // pipelines) need these to bind git-bound scaffolds. Never add GITHUB_TOKEN
+  // or other credentials here — secrets travel only via explicit overrides.
+  'GITHUB_HEAD_REF',
+  'GITHUB_REF_NAME',
+  'GITHUB_SHA',
   'PNPM_CONFIG_CONFIRM_MODULES_PURGE',
   'NPM_CONFIG_CONFIRM_MODULES_PURGE',
   'NODE_OPTIONS',
@@ -179,11 +186,15 @@ export function validateFileSize(filePath: string, maxSizeMB = DEFAULT_MAX_FILE_
 }
 
 /**
- * Read a file with size validation and optional caching.
+ * Shared read-side guard used by every function that reads an existing
+ * repository file directly (as opposed to the stricter, symlink-rejecting
+ * `assertSafeRepositoryPath` used by model-facing tools). Validates the
+ * sensitive-path deny list and the tier/role read permission, then returns
+ * the resolved absolute path. Does not check existence or file type —
+ * callers do that themselves since they differ (e.g. `safeReadFile` allows
+ * following a symlink to a regular file; `safeReadFileTail` does not).
  */
-export function safeReadFile(filePath: string, options: SafeReadOptions = {}): string | Buffer {
-  const { maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB, encoding = 'utf8', label = 'input' } = options;
-
+function assertReadableRepositoryFile(filePath: string, label: string): string {
   if (!filePath) {
     throw new Error(`Missing required ${label} file path`);
   }
@@ -194,6 +205,15 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
   if (!guard.allowed) {
     throw new Error(`[SECURITY] Read access denied to ${filePath}: ${guard.reason}`);
   }
+  return resolved;
+}
+
+/**
+ * Read a file with size validation and optional caching.
+ */
+export function safeReadFile(filePath: string, options: SafeReadOptions = {}): string | Buffer {
+  const { maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB, encoding = 'utf8', label = 'input' } = options;
+  const resolved = assertReadableRepositoryFile(filePath, label);
 
   // Fallback for non-cached or missing
   if (!fs.existsSync(resolved)) {
@@ -204,6 +224,67 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
     return fs.readFileSync(resolved);
   }
   return fs.readFileSync(resolved, { encoding });
+}
+
+export interface SafeReadTailResult {
+  buffer: Buffer;
+  size: number;
+  truncated: boolean;
+}
+
+/**
+ * Read at most `maxBytes` from the END of a regular file without loading
+ * the rest into memory. Used by log-tailing call sites (terminal-hud,
+ * the collaboration projection) that previously read the whole file and
+ * then sliced the tail in memory.
+ *
+ * Applies the same sensitive-path and read-permission checks as
+ * `safeReadFile`, plus explicit symlink/regular-file rejection since this
+ * primitive operates on raw file descriptors rather than
+ * `fs.readFileSync` (which would otherwise silently follow a symlink or
+ * surface a confusing low-level error for a directory).
+ */
+export function safeReadFileTail(filePath: string, maxBytes: number): SafeReadTailResult {
+  if (!Number.isInteger(maxBytes) || maxBytes <= 0) {
+    throw new Error(`Invalid maxBytes for tail read: ${maxBytes}`);
+  }
+
+  const resolved = assertReadableRepositoryFile(filePath, 'tail');
+
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`File not found: ${resolved}`);
+  }
+  if (fs.lstatSync(resolved).isSymbolicLink()) {
+    throw new Error(`[SECURITY] Refusing to read symbolic link: ${resolved}`);
+  }
+
+  const fd = fs.openSync(resolved, 'r');
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile()) {
+      throw new Error(`Not a regular file: ${resolved}`);
+    }
+
+    const size = stat.size;
+    const readLength = Math.min(maxBytes, size);
+    const position = Math.max(0, size - maxBytes);
+    const buffer = Buffer.alloc(readLength);
+    // A single readSync may return fewer bytes than requested; loop until the
+    // requested window is filled or the file ends.
+    let offset = 0;
+    while (offset < readLength) {
+      const read = fs.readSync(fd, buffer, offset, readLength - offset, position + offset);
+      if (read <= 0) break;
+      offset += read;
+    }
+    return {
+      buffer: offset === readLength ? buffer : buffer.subarray(0, offset),
+      size,
+      truncated: size > maxBytes,
+    };
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 /**

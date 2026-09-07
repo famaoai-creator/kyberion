@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, type CSSProperties } from 'react';
 import { ChronosMirrorLegacySections } from './ChronosMirrorLegacySections';
 
 type ViewModel = Record<string, any>;
@@ -42,8 +42,10 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
     setSelectedDeliverableId,
     deliverableReviewComment,
     setDeliverableReviewComment,
+    deliverableReviewBusy,
     deliverableReviewError,
     setDeliverableReviewError,
+    deliverableAskWhyVerdict,
     operatorHomeSummary,
     operatorHomeError,
     missionHistory,
@@ -66,6 +68,7 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
     setConnectionsError,
     connectionsQuery,
     setConnectionsQuery,
+    connectionReviewBusyId,
     connectionReviewNote,
     setConnectionReviewNote,
     selectedConnectionId,
@@ -114,6 +117,7 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
     ApprovalsWorkspace,
     DeliverablesWorkspace,
     KnowledgeWorkspace,
+    ChronosTenantScope,
     chronosSpeechLocale,
     nextChronosLocale,
     setChronosLocalePreference,

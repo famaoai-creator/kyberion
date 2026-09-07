@@ -57,9 +57,7 @@
     "presence/sensors/voice-hub"
   ],
   "files": {
-    "libs/core/agent-activity-board.ts": 4,
     "libs/core/agent-collaboration-events.ts": 1,
-    "libs/core/agent-collaboration-projection.ts": 7,
     "libs/core/apple-intelligence-bridge.ts": 5,
     "libs/core/assistant-compiler-request.ts": 4,
     "libs/core/automation-blueprint-slack.ts": 2,
@@ -90,7 +88,6 @@
     "libs/core/project-registry.ts": 9,
     "libs/core/question-resolver.ts": 6,
     "libs/core/slack-approval-ui.ts": 1,
-    "libs/core/slack-mission-proposal-ui.ts": 4,
     "libs/core/slack-onboarding.ts": 11,
     "libs/core/src/native-pdf-engine/primitives.ts": 1,
     "libs/core/surface-approval-ui.ts": 19,
@@ -139,9 +136,7 @@
     "libs/actuators/orchestrator-actuator/src/orchestrator-helpers.ts": 4,
     "libs/actuators/voice-actuator/src/index.ts": 10,
     "libs/actuators/voice-actuator/src/voice-action-helpers.ts": 4,
-    "satellites/discord-bridge/src/index.ts": 2,
-    "satellites/slack-bridge/src/index.ts": 7,
-    "satellites/voice-hub/server.ts": 8,
+    "satellites/voice-hub/server.ts": 1,
     "presence/displays/chronos-mirror-v2/src/app/ChronosMirrorShell.tsx": 11,
     "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-observation-data.ts": 2,
     "presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts": 3,

@@ -9,6 +9,8 @@ import AjvModule from 'ajv';
 vi.mock('./secure-io.js', () => ({
   assertSafeRepositoryPath: (p: string) => p,
   safeExistsSync: (p: string) => fs.existsSync(p),
+  // governed-catalog rejects non-file catalog paths via lstat (main b29d027e7).
+  safeLstat: (p: string) => fs.lstatSync(p),
   safeReadFile: (p: string, _opts: any) => fs.readFileSync(p, 'utf8'),
   loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
 }));

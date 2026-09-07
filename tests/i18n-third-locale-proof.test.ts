@@ -52,11 +52,16 @@ function isPseudoLocalized(text: string): boolean {
 describe('I18N-07 proof-of-locale: qps-ploc end to end', () => {
   describe('CLI surface: `pnpm kyberion help`', () => {
     it('renders pseudo-localized text for the ~87 cli namespace keys', async () => {
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      // 0b8a1d9da routed every CLI write through an injected print sink
+      // (`main(argv, print)`, default no-op) instead of console.log, so the
+      // help output must be captured from that sink.
+      const printed: string[] = [];
 
-      await runCli(['help', '--locale', 'qps-ploc']);
+      await runCli(['help', '--locale', 'qps-ploc'], (value) => {
+        printed.push(String(value));
+      });
 
-      const lines = logSpy.mock.calls.flat().map(String);
+      const lines = printed;
       const decoratedLines = lines.filter((line) => line.includes(PSEUDO_LOCALE_BRACKET_OPEN));
       // The cli namespace has 87 keys (see the catalog); printHelp renders a
       // large fraction of them as standalone lines. A generous floor here

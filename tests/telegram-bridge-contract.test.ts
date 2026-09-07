@@ -21,9 +21,14 @@ describe('Telegram bridge contract', () => {
     expect(pkg.scripts['telegram:bridge']).toBe(
       'node dist/satellites/telegram-bridge/src/index.js'
     );
-    expect(pkg.scripts['telegram:demo']).toBe(
-      'node --import ./scripts/ts-loader.mjs scripts/demos/demo_telegram_flow.ts'
-    );
+    // SX-05 (script ratchet, commit a877d9c12) pruned every per-demo
+    // `*:demo` package script alias, including `telegram:demo` — the demo
+    // file itself is unaffected (see the second test below) and remains
+    // directly runnable via `node --import ./scripts/ts-loader.mjs
+    // scripts/demos/demo_telegram_flow.ts`.
+    // The contract is that the demo stays runnable through the generic
+    // loader, which the second test below asserts against the file itself.
+    expect(read('scripts/demos/demo_telegram_flow.ts')).toContain('demo_telegram_flow');
     expect(manifests).toContain('"id": "telegram"');
     expect(manifests).toContain('"agentId": "telegram-surface-agent"');
     expect(activeSurfaces).toContain('"id": "telegram-bridge"');

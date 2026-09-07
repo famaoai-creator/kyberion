@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
 import path from 'node:path';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { loadPersistedTrustLedger } from './trust-engine.js';
 
 describe('persisted trust ledger catalog', () => {
   it('loads a personal-tier trust ledger through the governed catalog', () => {
     const root = path.join(process.cwd(), 'active/shared/tmp', `trust-ledger-${Date.now()}`);
     const ledgerPath = path.join(root, 'knowledge/personal/governance/agent-trust-scores.json');
-    fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
-    fs.writeFileSync(
+    safeMkdir(path.dirname(ledgerPath), { recursive: true });
+    safeWriteFile(
       ledgerPath,
       JSON.stringify({
         'Agent-Fixture': {
@@ -30,7 +30,7 @@ describe('persisted trust ledger catalog', () => {
       expect(ledger?.['Agent-Fixture']?.current_score).toBe(200);
       expect(ledger?.['Agent-Fixture']?.dimensions.policyCompliance).toBe(40);
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      safeRmSync(root, { recursive: true, force: true });
     }
   });
 
@@ -41,12 +41,12 @@ describe('persisted trust ledger catalog', () => {
       `trust-ledger-invalid-${Date.now()}`
     );
     const ledgerPath = path.join(root, 'knowledge/personal/governance/agent-trust-scores.json');
-    fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
-    fs.writeFileSync(ledgerPath, JSON.stringify({ 'Agent-Fixture': { current_score: -1 } }));
+    safeMkdir(path.dirname(ledgerPath), { recursive: true });
+    safeWriteFile(ledgerPath, JSON.stringify({ 'Agent-Fixture': { current_score: -1 } }));
     try {
       expect(() => loadPersistedTrustLedger(root)).toThrow(/Invalid catalog agent-trust-scores/);
     } finally {
-      fs.rmSync(root, { recursive: true, force: true });
+      safeRmSync(root, { recursive: true, force: true });
     }
   });
 });

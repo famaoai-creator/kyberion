@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleAction as handleNetworkAction } from '../libs/actuators/network-actuator/src/index';
-import * as core from '@agent/core';
 import * as network from '@agent/core/network';
 
 vi.mock('@agent/core', async () => {
@@ -23,8 +22,11 @@ describe('Resilience Verification', () => {
   });
 
   it('network-actuator: fetch should retry on failure', async () => {
-    const mockFetch = vi.mocked(core.secureFetch);
-    
+    // network-pipeline-helpers.ts imports secureFetch from
+    // '@agent/core/network' directly, not the '@agent/core' aggregate, so
+    // the mock instance to drive is `network.secureFetch`.
+    const mockFetch = vi.mocked(network.secureFetch);
+
     // Fail twice, succeed on third try
     mockFetch
       .mockRejectedValueOnce(new Error('Network timeout'))
@@ -40,23 +42,24 @@ describe('Resilience Verification', () => {
           params: {
             url: 'https://example.com',
             max_retries: 2,
-            retry_delay_ms: 10
-          }
-        }
-      ]
+            retry_delay_ms: 10,
+          },
+        },
+      ],
     };
 
     const result = await handleNetworkAction(input as any);
-    
+
     expect(result.status).toBe('succeeded');
     expect(mockFetch).toHaveBeenCalledTimes(3);
     expect(result.context.last_capture.data).toBe('success');
   });
 
   it('service-actuator: API mode should retry on failure', async () => {
-    const { handleAction: handleServiceAction } = await import('../libs/actuators/service-actuator/src/index');
+    const { handleAction: handleServiceAction } =
+      await import('../libs/actuators/service-actuator/src/index');
     const mockFetch = vi.mocked(network.secureFetch);
-    
+
     // Fail once, succeed on second try
     mockFetch
       .mockRejectedValueOnce(new Error('Rate limit exceeded'))
@@ -69,13 +72,13 @@ describe('Resilience Verification', () => {
       params: {
         retry: {
           maxRetries: 1,
-          initialDelayMs: 10
-        }
-      }
+          initialDelayMs: 10,
+        },
+      },
     };
 
     const result = await handleServiceAction(input as any);
-    
+
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(result.data).toBe('service success');
   });

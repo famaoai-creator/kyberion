@@ -123,8 +123,13 @@ describe('customer dialogue (E2E-06)', () => {
       'contract-review-record.schema.json',
       'deal-record.schema.json',
       'deal-requirements-capture.schema.json',
+      // Governed catalogs/validated results now fail closed under this fixture
+      // root: generateQuoteForDeal validates against quote-result.schema.json
+      // and sendToCustomer loads the egress-policy catalog with its schema.
+      'egress-policy.schema.json',
       'intent-goal-handoff.schema.json',
       'price-book.schema.json',
+      'quote-result.schema.json',
       'requirements-draft.schema.json',
       'solution-catalog.schema.json',
       'tenant-profile.schema.json',
@@ -134,6 +139,15 @@ describe('customer dialogue (E2E-06)', () => {
         path.join(schemaDir, schemaName)
       );
     }
+
+    // sendToCustomer -> resolveCustomerAudienceFloor -> loadEgressPolicy reads
+    // this governance catalog, which has no fallback and throws when missing.
+    const governanceDir = path.join(tmpRoot, 'knowledge', 'product', 'governance');
+    fs.mkdirSync(governanceDir, { recursive: true });
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/governance/egress-policy.json'),
+      path.join(governanceDir, 'egress-policy.json')
+    );
 
     const tenantProfilePath = path.join(
       tmpRoot,
