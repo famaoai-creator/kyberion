@@ -19,4 +19,9 @@ describe('kyberion home playwright wiring', () => {
   it('allows standalone Playwright without requiring --tab-id', () => {
     expect(source).not.toContain("ui('recorder:recorder_browser_tab_required')");
   });
+
+  it('does not treat --tab-id alone as a CDP attach signal', () => {
+    expect(source).toContain('const connectOverCdp = Boolean(argv.cdpUrl || argv.cdpPort)');
+    expect(source).not.toMatch(/connectOverCdp = Boolean\(tabId/);
+  });
 });

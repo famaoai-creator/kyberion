@@ -1032,7 +1032,7 @@ async function handleProcedureRun(
     const browserRecording = loaded.value as BrowserExtensionRecording;
     const origin = argv.origin || browserRecording.tab.origin;
     const tabId = argv.tabId || '';
-    const connectOverCdp = Boolean(tabId || argv.cdpUrl || argv.cdpPort);
+    const connectOverCdp = Boolean(argv.cdpUrl || argv.cdpPort);
     const requestedOperations = Array.from(
       new Set(
         browserRecording.actions
@@ -1243,7 +1243,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
     .option('origin', { type: 'string', description: 'browser procedure origin binding' })
     .option('tab-id', {
       type: 'string',
-      description: 'optional tab/session id; with --cdp-url/--cdp-port attaches to live Chrome',
+      description: 'optional session/tab id when attaching with --cdp-url/--cdp-port',
     })
     .option('headed', {
       type: 'boolean',
