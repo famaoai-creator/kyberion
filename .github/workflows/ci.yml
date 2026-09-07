@@ -111,6 +111,10 @@ jobs:
         uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
+          # pipelines/verify-session.json starts with browser:goto — the
+          # first-win sequence needs the Chromium runtime (was provisioned
+          # for every job before the setup-action consolidation).
+          install-playwright: 'true'
 
       - name: Build clean checkout
         run: pnpm build
