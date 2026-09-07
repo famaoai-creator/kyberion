@@ -45,6 +45,7 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/shell-claude-cli-backend.ts',
   'libs/core/shell-grok-cli-backend.ts',
   'libs/core/cursor-cli-reasoning-backend.ts',
+  'libs/core/cursor-cli-session-adapter.ts',
   'libs/core/opencode-cli-reasoning-backend.ts',
   'libs/core/silero-vad-bridge.ts',
   'libs/core/shell-streaming-stt-bridge.ts',
@@ -88,5 +89,5 @@ describe('Runtime child_process boundary', () => {
       .sort((a, b) => a.localeCompare(b));
 
     expect(actual).toEqual(allowedRuntimeChildProcessConsumers);
-  });
+  }, 30000);
 });

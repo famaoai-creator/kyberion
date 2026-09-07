@@ -33,6 +33,11 @@ import {
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   type StructuredOpSpec,
 } from './structured-reasoning.js';
+import { schemaHint } from './structured-schema-hint.js';
+import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
+import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
+import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js';
+import { CursorCliSessionAdapter } from './cursor-cli-session-adapter.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -71,6 +76,8 @@ function normalizePermissionProfile(
 const DEFAULT_MODEL = 'auto';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_BIN = 'cursor-agent';
+const DEEP_MODEL = 'composer-2.5';
+const FAST_MODEL = 'composer-2.5-fast';
 const GOVERNED_ARGUMENTS = new Set([
   '-p',
   '--output-format',
@@ -80,7 +87,28 @@ const GOVERNED_ARGUMENTS = new Set([
   '--mode',
   '--sandbox',
   '--force',
+  '--continue',
+  '--resume',
+  '--worktree',
+  '--worktree-base',
 ]);
+
+export function resolveCursorModelForTier(
+  tier: 'fast' | 'standard' | 'deep' | undefined,
+  defaultModel: string
+): string {
+  if (tier === 'fast') {
+    return defaultModel === 'auto' ? 'auto' : FAST_MODEL;
+  }
+  if (tier === 'deep') {
+    return defaultModel === 'auto' ? DEEP_MODEL : defaultModel;
+  }
+  return defaultModel || DEFAULT_MODEL;
+}
+
+function isNamedModelUnavailableError(message: string): boolean {
+  return /named models unavailable|free plans can only use auto/iu.test(message);
+}
 
 function validateExtraArgs(args: readonly string[]): string[] {
   for (const arg of args) {
@@ -113,11 +141,28 @@ export interface CursorCliReasoningBackendOptions {
   extraArgs?: string[];
   /** Workspace directory passed via `--workspace`. Defaults to repo root. */
   workspaceDir?: string;
+  /** Test seam and runtime injection for the shared Cursor harness session. */
+  harnessSession?: CursorCliHarnessSession;
+  /**
+   * Enable provider-native subagent dispatch via worktree-isolated spawns.
+   * Defaults to true unless `KYBERION_CURSOR_NATIVE_SUBAGENT=0`.
+   */
+  nativeSubagent?: boolean;
+}
+
+export interface CursorCliHarnessSession {
+  boot(): Promise<void>;
+  ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  askNativeSubagent?(prompt: string, options?: AgentAskOptions): Promise<AgentResponse>;
+  getRuntimeInfo?(): Record<string, unknown>;
+  shutdown?(): Promise<void>;
 }
 
 export interface CursorCliAvailability {
   available: boolean;
   reason?: string;
+  /** Present when an auth probe was attempted. */
+  authenticated?: boolean;
 }
 
 export class CursorCliReasoningBackend implements ReasoningBackend {
@@ -127,6 +172,14 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
   private readonly timeoutMs: number;
   private readonly extraArgs: string[];
   private readonly workspaceDir: string;
+  private sessionId?: string;
+  private readonly injectedHarnessSession?: CursorCliHarnessSession;
+  private readonly nativeSubagentEnabled: boolean;
+  private harnessSession?: CursorCliHarnessSession;
+  private harnessBoot?: Promise<void>;
+  private harnessQueue: Promise<void> = Promise.resolve();
+  private lastHarnessSubagentInfo: Record<string, unknown> | null = null;
+  private readonly nativeSubagentAdopter: NativeSubagentAdopter;
 
   constructor(options: CursorCliReasoningBackendOptions = {}) {
     this.bin = options.bin ?? DEFAULT_BIN;
@@ -134,6 +187,15 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.extraArgs = validateExtraArgs(options.extraArgs ?? []);
     this.workspaceDir = options.workspaceDir ?? pathResolver.rootDir();
+    this.injectedHarnessSession = options.harnessSession;
+    this.nativeSubagentEnabled =
+      options.nativeSubagent ?? getRegisteredEnvText('KYBERION_CURSOR_NATIVE_SUBAGENT') !== '0';
+    this.nativeSubagentAdopter = {
+      id: 'cursor-agent-cli',
+      dispatch: (instruction, context, callOptions) =>
+        this.dispatchNativeSubagent(instruction, context, callOptions),
+      getInfo: () => (this.lastHarnessSubagentInfo ? { ...this.lastHarnessSubagentInfo } : null),
+    };
   }
 
   private runStructured<TInput, TOutput>(
@@ -141,7 +203,10 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     input: TInput
   ): Promise<TOutput> {
     return runStructuredReasoningOp(spec, input, (systemPrompt, userPrompt) =>
-      this.complete(systemPrompt, userPrompt, { profile: 'planner' })
+      this.complete(systemPrompt, userPrompt, {
+        profile: 'planner',
+        shapeHint: schemaHint(spec.schema),
+      })
     );
   }
 
@@ -204,8 +269,107 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     return this.complete(
       'You are a focused reasoning sub-agent. Return a concise, factual answer.',
       prompt,
-      { profile: options?.profile ?? 'planner' }
+      {
+        profile: options?.profile ?? 'planner',
+        model: resolveCursorModelForTier(options?.model_tier, this.model),
+      }
     );
+  }
+
+  /** QM-06: drop the resumed CLI session on a failover switch. */
+  async resetSession(): Promise<void> {
+    this.sessionId = undefined;
+    const session = this.harnessSession;
+    this.harnessSession = undefined;
+    this.harnessBoot = undefined;
+    this.lastHarnessSubagentInfo = null;
+    if (!session || session === this.injectedHarnessSession) return;
+    await session.shutdown?.().catch(() => undefined);
+  }
+
+  /**
+   * Worktree-isolated native subagent dispatch for HarnessSubagentDispatcher.
+   * Kept separate from `delegateTask` so structured reasoning and ordinary
+   * prompt delegation stay on the resumed parent-session spawn path.
+   */
+  private async dispatchNativeSubagent(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
+    const profile = resolveCursorSubagentProfile(options);
+    const previous = this.harnessQueue;
+    let release!: () => void;
+    this.harnessQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const session = this.getHarnessSession();
+      if (!session.askNativeSubagent) {
+        throw new Error(
+          '[SUBAGENT_UNAVAILABLE] Cursor CLI session has no native subagent operation.'
+        );
+      }
+      if (!this.harnessBoot) {
+        this.harnessBoot = session.boot().catch((err) => {
+          this.harnessBoot = undefined;
+          throw err;
+        });
+      }
+      await this.harnessBoot;
+      const response = await session.askNativeSubagent(
+        [profile.systemPromptPrefix, context ? `Context:\n${context}` : '', `Task: ${instruction}`]
+          .filter(Boolean)
+          .join('\n\n'),
+        {
+          profile: profile.name,
+          subagent: true,
+          effort: options?.effort ?? 'medium',
+          signal: options?.signal,
+        }
+      );
+      if (response.stopReason === 'error') {
+        throw new Error('[SUBAGENT_UNAVAILABLE] Cursor CLI returned an error response.');
+      }
+      const nativeInfo = response.metadata?.nativeSubagent;
+      if (!nativeInfo || typeof nativeInfo !== 'object') {
+        throw new Error('[SUBAGENT_UNAVAILABLE] Cursor CLI returned no native subagent metadata.');
+      }
+      this.lastHarnessSubagentInfo = { ...(nativeInfo as Record<string, unknown>) };
+      return response.text;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith('[SUBAGENT_UNAVAILABLE]')) throw error;
+      throw new Error(`[SUBAGENT_UNAVAILABLE] Cursor CLI harness failed: ${message}`);
+    } finally {
+      release();
+    }
+  }
+
+  getNativeSubagentAdopter(): NativeSubagentAdopter | null {
+    return this.nativeSubagentEnabled ? this.nativeSubagentAdopter : null;
+  }
+
+  requiresNativeSubagent(): boolean {
+    return this.nativeSubagentEnabled;
+  }
+
+  private getHarnessSession(): CursorCliHarnessSession {
+    if (this.harnessSession) return this.harnessSession;
+    if (this.injectedHarnessSession) {
+      this.harnessSession = this.injectedHarnessSession;
+      return this.harnessSession;
+    }
+    this.harnessSession = new CursorCliSessionAdapter({
+      bin: this.bin,
+      model: this.model,
+      timeoutMs: this.timeoutMs,
+      extraArgs: this.extraArgs,
+      workspaceDir: this.workspaceDir,
+    });
+    return this.harnessSession;
   }
 
   private resolvePermissionArgs(profile?: ProviderPermissionProfileName): string[] {
@@ -230,11 +394,16 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       profile?: ProviderPermissionProfileName;
       signal?: AbortSignal;
       model?: string;
+      shapeHint?: string;
     }
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const model = options?.model?.trim() || this.model;
-    const prompt = `${systemPrompt.trim()}\n\n${userPrompt.trim()}`.trim();
+    const hint = options?.shapeHint?.trim()
+      ? `\n\nRespond with exactly this JSON shape (top-level keys, nesting, and field names must match): ${options.shapeHint.trim()}`
+      : '';
+    const prompt = `${systemPrompt.trim()}\n\n${userPrompt.trim()}${hint}`.trim();
+    const sessionArgs = this.sessionId ? ['--resume', this.sessionId] : [];
     const args = [
       '-p',
       '--output-format',
@@ -244,12 +413,35 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       '--trust',
       '--workspace',
       this.workspaceDir,
+      ...sessionArgs,
       ...this.resolvePermissionArgs(options?.profile),
       ...this.extraArgs,
       prompt,
     ];
 
-    const stdout = await this.spawnCli(args, options?.signal);
+    try {
+      return await this.spawnAndParse(args, options?.signal);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (model !== 'auto' && isNamedModelUnavailableError(message)) {
+        logger.warn(
+          `[cursor-cli] model "${model}" unavailable on current plan; retrying once with auto`
+        );
+        const fallbackArgs = args.map((arg, index) =>
+          index > 0 && args[index - 1] === '--model' ? 'auto' : arg
+        );
+        return this.spawnAndParse(fallbackArgs, options?.signal);
+      }
+      throw err;
+    }
+  }
+
+  private async spawnAndParse(args: string[], signal?: AbortSignal): Promise<string> {
+    const stdout = await this.spawnCli(args, signal);
+    return this.parseEnvelope(stdout);
+  }
+
+  private parseEnvelope(stdout: string): string {
     let cliResult: unknown;
     try {
       cliResult = parseSafeJsonInput(stdout, 'Cursor CLI response');
@@ -270,6 +462,10 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       throw new Error(
         `[cursor-cli] CLI reported error: ${typeof envelope.data.result === 'string' ? envelope.data.result : JSON.stringify(envelope.data.result).slice(0, 500)}`
       );
+    }
+
+    if (typeof envelope.data.session_id === 'string' && envelope.data.session_id.trim()) {
+      this.sessionId = envelope.data.session_id.trim();
     }
 
     if (typeof envelope.data.result === 'string') {
@@ -327,13 +523,14 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
   }
 }
 
-/** SYNC probe — version / path only; no live LLM call. */
+/** SYNC probe — version / auth / path only; no live LLM call. */
 export function probeCursorCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
-  options: { bin?: string; timeoutMs?: number } = {}
+  options: { bin?: string; timeoutMs?: number; checkAuth?: boolean } = {}
 ): CursorCliAvailability {
   const bin = options.bin?.trim() || envText(env, 'KYBERION_CURSOR_CLI_BIN')?.trim() || DEFAULT_BIN;
   const timeoutMs = options.timeoutMs ?? 5_000;
+  const checkAuth = options.checkAuth ?? true;
 
   try {
     const result = spawnSync(bin, ['--version'], {
@@ -355,7 +552,32 @@ export function probeCursorCliAvailability(
         reason: stderr || stdout || `exit code ${result.status}`,
       };
     }
-    return { available: true };
+
+    if (!checkAuth) {
+      return { available: true };
+    }
+
+    if (envText(env, 'CURSOR_API_KEY')?.trim()) {
+      return { available: true, authenticated: true };
+    }
+
+    const status = spawnSync(bin, ['status'], {
+      encoding: 'utf8',
+      env: buildProviderChildEnv({ provider: 'cursor', baseEnv: { ...process.env, ...env } }),
+      shell: false,
+      timeout: timeoutMs,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const statusOut = `${status.stdout ?? ''}\n${status.stderr ?? ''}`.trim();
+    const authenticated = status.status === 0 && /logged in|✓/iu.test(statusOut);
+    if (!authenticated) {
+      return {
+        available: true,
+        authenticated: false,
+        reason: statusOut || 'cursor-agent status did not report a logged-in session',
+      };
+    }
+    return { available: true, authenticated: true };
   } catch (err: unknown) {
     return {
       available: false,
@@ -393,6 +615,11 @@ export function buildCursorCliBackendFromEnv(
     );
     return null;
   }
+  if (availability.authenticated === false) {
+    logger.warn(
+      `[cursor-cli] backend installed but not authenticated: ${availability.reason ?? 'run cursor-agent login or set CURSOR_API_KEY'}`
+    );
+  }
 
   const options = {
     ...buildCursorCliOptionsFromEnv(env),
@@ -403,4 +630,20 @@ export function buildCursorCliBackendFromEnv(
     `[cursor-cli] backend ready (bin=${options.bin ?? DEFAULT_BIN}, model=${options.model ?? DEFAULT_MODEL})`
   );
   return backend;
+}
+
+function resolveCursorSubagentProfile(options?: ReasoningCallOptions) {
+  const requested = options?.profile || options?.role || 'implementer';
+  try {
+    const profile = getSubagentCapabilityProfile(requested);
+    const effective = resolveEffectiveProviderPermissionProfile(
+      'cursor',
+      profile.name as ProviderPermissionProfileName
+    );
+    return getSubagentCapabilityProfile(effective ?? profile.name);
+  } catch {
+    return getSubagentCapabilityProfile(
+      resolveEffectiveProviderPermissionProfile('cursor', 'implementer') ?? 'implementer'
+    );
+  }
 }
