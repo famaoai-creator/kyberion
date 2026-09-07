@@ -183,10 +183,11 @@ describe('actuator-op-registry', () => {
   });
 
   // The secure-I/O guarded recursive scan is intentionally broader than a
-  // unit-level fixture.  Under the parallel CI workers it can take several
-  // times longer than on a developer machine, so keep the guard generous
-  // enough to detect a real hang without making normal CI load flaky.
-  it('keeps actuator sources free of silent default ctx fallthroughs', { timeout: 180_000 }, () => {
+  // unit-level fixture (~50s single-core locally and growing with the
+  // actuator tree). Under parallel CI workers it can take several times
+  // longer, so keep the guard generous enough to detect a real hang without
+  // making normal CI load flaky.
+  it('keeps actuator sources free of silent default ctx fallthroughs', { timeout: 360_000 }, () => {
     const actuatorRoot = pathResolver.rootResolve('libs/actuators');
     const scanTargets = [
       ...collectSourceFiles(actuatorRoot),
