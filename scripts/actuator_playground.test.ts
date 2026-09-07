@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   buildPlaygroundPayload,
   evaluatePlaygroundDryRun,
   parsePlaygroundParams,
+  runPlayground,
 } from './actuator_playground.js';
 
 describe('actuator playground JSON input boundary', () => {
@@ -59,6 +60,46 @@ describe('actuator playground JSON input boundary', () => {
       kind: 'apply',
       handler: 'skipped',
       dry_run: true,
+    });
+  });
+
+  it('invokes capture handlers under playground --dry-run and skips apply', async () => {
+    const executeActuator = vi.fn(() => '{"status":"captured"}');
+    const capture = await runPlayground(
+      ['--actuator', 'secret-actuator', '--op', 'get', '--params', '{"service":"s","account":"a"}'],
+      {
+        dryRun: true,
+        json: true,
+        quiet: true,
+        resolveExecutable: () => '/tmp/fake-secret-actuator.js',
+        executeActuator,
+      }
+    );
+    expect(executeActuator).toHaveBeenCalledWith(
+      expect.objectContaining({ extraArgs: ['--dry-run'] })
+    );
+    expect(capture).toMatchObject({
+      handler_invoked: true,
+      kind: 'capture',
+      mode: 'dry-run',
+    });
+
+    executeActuator.mockClear();
+    const apply = await runPlayground(
+      ['--actuator', 'secret-actuator', '--op', 'set', '--params', '{"service":"s","account":"a"}'],
+      {
+        dryRun: true,
+        json: true,
+        quiet: true,
+        resolveExecutable: () => '/tmp/fake-secret-actuator.js',
+        executeActuator,
+      }
+    );
+    expect(executeActuator).not.toHaveBeenCalled();
+    expect(apply).toMatchObject({
+      handler: 'skipped',
+      handler_invoked: false,
+      kind: 'apply',
     });
   });
 

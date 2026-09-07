@@ -298,7 +298,7 @@
       "capability_count": 4,
       "ops": ["delete", "get", "list", "set"],
       "contract_schema": "knowledge/product/schemas/secret-action.schema.json",
-      "prerequisites_summary": "-"
+      "prerequisites_summary": "env:KYBERION_ALLOW_FILE_SECRETS"
     },
     {
       "n": "service-actuator",
