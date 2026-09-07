@@ -14,6 +14,7 @@ import {
 import { executeServicePreset } from './service-engine.js';
 import { resolveServiceBinding } from './service-binding.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
+import { getMediaBackendRegistry } from './media-backend-registry.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
@@ -157,13 +158,14 @@ async function runLocalFluxGeneration(
     };
   }
 
-  const runner = runtime.selected_backend || {
-    kind: 'uvx',
-    command: 'uvx',
-    args: ['--from', packageSpec, 'mflux-generate'],
-  };
-
-  const args = [...runner.args];
+  const runner = runtime.selected_backend || runtime.trial_backend;
+  const args = [...(runner.args || [])];
+  if (runner.command === 'uvx') {
+    const fromIndex = args.indexOf('--from');
+    if (fromIndex >= 0 && args[fromIndex + 1]) {
+      args[fromIndex + 1] = packageSpec;
+    }
+  }
   if (!args.includes('--model') && !args.includes('-m')) {
     args.push('--model', model);
   }
@@ -764,10 +766,36 @@ export class AgyHostBridgeImageGenerationProvider extends BaseHostBridgeImageGen
 
 export class AdaptivePolicyRouter {
   private providers: Map<string, ImageGenerationProvider> = new Map();
+  private fallbackGraph: Map<string, string> = new Map();
 
   constructor(providers: ImageGenerationProvider[]) {
     for (const p of providers) {
       this.providers.set(p.id, p);
+    }
+    this.initFallbackGraph();
+  }
+
+  private initFallbackGraph(): void {
+    try {
+      const registry = getMediaBackendRegistry();
+      const backends = registry.backends.filter((b) => b.modality === 'image');
+      const aliasToProviderId: Record<string, string> = {
+        'media-generation.comfyui': 'comfyui',
+        'media-generation.gemini.imagen-3-fast': 'gemini_fast',
+        'media-generation.gemini': 'gemini_service',
+        'media-generation.host_agent': 'host_agent',
+        'media-generation.local_flux': 'local_flux',
+        'media-generation.apple_playground': 'apple_playground',
+      };
+      for (const b of backends) {
+        if (b.fallback_backend_id) {
+          const fromId = aliasToProviderId[b.backend_id] || b.backend_id;
+          const toId = aliasToProviderId[b.fallback_backend_id] || b.fallback_backend_id;
+          this.fallbackGraph.set(fromId, toId);
+        }
+      }
+    } catch (_) {
+      // Ignore registry loading issues in unit tests with mocked environments
     }
   }
 
@@ -781,6 +809,9 @@ export class AdaptivePolicyRouter {
         (request.mode === 'privacy_first' || request.mode === 'local_only') &&
         provider.dataPolicy === 'training_eligible'
       ) {
+        return;
+      }
+      if (request.mode === 'local_only' && provider.executionLocality !== 'local') {
         return;
       }
       if (await provider.isAvailable()) {
@@ -848,6 +879,19 @@ export class AdaptivePolicyRouter {
 
     for (const id of defaultChain) {
       await addIfAvailableAndCompliant(this.providers.get(id));
+    }
+
+    // Follow governed fallback_backend_id chains for any selected candidates
+    const visited = new Set<string>(seenIds);
+    for (const c of [...candidates]) {
+      let curr = c.id;
+      while (this.fallbackGraph.has(curr)) {
+        const nextId = this.fallbackGraph.get(curr)!;
+        if (visited.has(nextId)) break;
+        visited.add(nextId);
+        await addIfAvailableAndCompliant(this.providers.get(nextId));
+        curr = nextId;
+      }
     }
 
     return candidates;

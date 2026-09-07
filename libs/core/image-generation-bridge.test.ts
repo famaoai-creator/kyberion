@@ -185,6 +185,34 @@ describe('AdaptivePolicyRouter', () => {
     expect(provider.id).toBe('codex_host_bridge');
   });
 
+  it('filters out remote providers with zero_retention when mode is local_only', async () => {
+    const remoteZeroRetentionProvider: ImageGenerationProvider = {
+      id: 'remote_zero_retention',
+      costTier: 'paid',
+      dataPolicy: 'zero_retention',
+      executionLocality: 'remote',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn(),
+    };
+    const localProvider: ImageGenerationProvider = {
+      id: 'local_flux',
+      costTier: 'self_hosted',
+      dataPolicy: 'local_only',
+      executionLocality: 'local',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn(),
+    };
+    const router = new AdaptivePolicyRouter([remoteZeroRetentionProvider, localProvider]);
+    const candidates = await router.resolveCandidateChain({
+      prompt: 'internal schema',
+      mode: 'local_only',
+      providerPreference: ['remote_zero_retention', 'local_flux'],
+    });
+
+    expect(candidates.map((c) => c.id)).not.toContain('remote_zero_retention');
+    expect(candidates.map((c) => c.id)).toContain('local_flux');
+  });
+
   it('filters out training_eligible providers when mode is privacy_first', async () => {
     const freeTrainingProvider: ImageGenerationProvider = {
       id: 'gemini_fast',
