@@ -1731,7 +1731,7 @@
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 9027,
+      "size": 11550,
       "type": "json"
     },
     {
@@ -4515,7 +4515,7 @@
     {
       "path": "product/orchestration/service-presets/gemini.json",
       "tier": "public",
-      "size": 1556,
+      "size": 1978,
       "type": "json"
     },
     {
@@ -7989,7 +7989,7 @@
     {
       "path": "product/schemas/media-backend-registry.schema.json",
       "tier": "public",
-      "size": 2839,
+      "size": 3245,
       "type": "json"
     },
     {
