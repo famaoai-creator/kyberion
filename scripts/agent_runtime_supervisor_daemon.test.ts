@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   ensureAgentRuntime: vi.fn(),
@@ -143,7 +144,10 @@ describe('agent_runtime_supervisor_daemon', () => {
 
   beforeEach(() => {
     // Keep the socket under the governed project temp root so secure-io can
-    // enforce the 0600 chmod in the same way production does.
+    // enforce the 0600 chmod in the same way production does. Ensure the
+    // parent exists first: clean checkouts (CI) have no active/ tree yet and
+    // mkdtempSync does not create missing parents.
+    safeMkdir(pathResolver.sharedTmp(), { recursive: true });
     rootDir = fs.mkdtempSync(pathResolver.sharedTmp('kyb-'));
     socketPath = path.join(rootDir, 's.sock');
     lockPath = path.join(rootDir, 'lock');
