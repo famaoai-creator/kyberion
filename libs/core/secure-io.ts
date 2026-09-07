@@ -55,6 +55,13 @@ const SAFE_EXEC_ENV_ALLOWLIST = [
   'SHLVL',
   'NODE_ENV',
   'CI',
+  // Non-secret CI metadata: detached checkouts (PR merge refs) cannot resolve
+  // a branch via git, so runners spawned through safeExec (vitest workers,
+  // pipelines) need these to bind git-bound scaffolds. Never add GITHUB_TOKEN
+  // or other credentials here — secrets travel only via explicit overrides.
+  'GITHUB_HEAD_REF',
+  'GITHUB_REF_NAME',
+  'GITHUB_SHA',
   'PNPM_CONFIG_CONFIRM_MODULES_PURGE',
   'NPM_CONFIG_CONFIRM_MODULES_PURGE',
   'NODE_OPTIONS',

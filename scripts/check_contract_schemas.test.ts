@@ -46,8 +46,15 @@ describe.sequential('check_contract_schemas', () => {
   it('passes on the current repository state', () => {
     const result = runCheckContractSchemas();
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('[check:contract-schemas] OK');
+    // Attach the check output to the assertion: a bare status tells a later
+    // failure triage nothing about which contract drifted (or crashed).
+    const diagnosis = [
+      `exit=${String(result.status)}`,
+      `stdout:\n${result.stdout.slice(-4000)}`,
+      `stderr:\n${result.stderr.slice(-4000)}`,
+    ].join('\n');
+    expect(result.status, diagnosis).toBe(0);
+    expect(result.stdout, diagnosis).toContain('[check:contract-schemas] OK');
   });
 
   it('flags unmanaged golden scenario catalogs with the fixture name', () => {
