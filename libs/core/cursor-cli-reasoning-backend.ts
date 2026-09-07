@@ -619,6 +619,7 @@ export function buildCursorCliBackendFromEnv(
     logger.warn(
       `[cursor-cli] backend installed but not authenticated: ${availability.reason ?? 'run cursor-agent login or set CURSOR_API_KEY'}`
     );
+    return null;
   }
 
   const options = {

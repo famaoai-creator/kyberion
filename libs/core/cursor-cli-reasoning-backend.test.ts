@@ -222,6 +222,16 @@ describe('cursor-cli-reasoning-backend', () => {
     expect(backend?.name).toBe('cursor-cli');
   });
 
+  it('fails closed and returns null when probe reports authenticated: false', () => {
+    const backend = buildCursorCliBackendFromEnv(
+      {
+        KYBERION_CURSOR_CLI_BIN: 'cursor-agent',
+      } as NodeJS.ProcessEnv,
+      () => ({ available: true, authenticated: false, reason: 'login required' })
+    );
+    expect(backend).toBeNull();
+  });
+
   it('resumes the CLI session on follow-up calls', async () => {
     const first = JSON.stringify({
       type: 'result',
