@@ -71,7 +71,7 @@ export function reasoningBackendEndpoint(backendName: string): string {
     'grok-cli': 'https://api.x.ai',
     'shell-grok-cli': 'https://api.x.ai',
     'grok-api': 'https://api.x.ai',
-    'cursor-cli': 'https://api.cursor.com',
+    'cursor-cli': 'https://api2.cursor.sh',
     'opencode-cli': 'https://opencode.ai',
     'agy-cli': 'https://generativelanguage.googleapis.com',
   };
