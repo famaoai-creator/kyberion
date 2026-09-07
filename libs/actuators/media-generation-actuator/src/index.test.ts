@@ -19,6 +19,12 @@ const mocks = vi.hoisted(() => ({
   safeCopyFileSync: vi.fn(),
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
+  // governed-catalog's `.load()` calls the real `safeLstat` (imported
+  // straight from secure-io.js, not routed through FoundationIo) once
+  // `exists()` reports true. The fixture jobs here are faked through
+  // `installMockFoundationIo`'s `exists` seam rather than written to real
+  // disk, so the real lstat would ENOENT — fake it to match `exists`.
+  safeLstat: vi.fn(() => ({ isFile: () => true, isSymbolicLink: () => false })),
   resetSafeReadFile: vi.fn(),
   handleSystemAction: vi.fn(async () => ({
     media_recording: {
@@ -46,6 +52,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
     safeCopyFileSync: mocks.safeCopyFileSync,
     safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
+    safeLstat: mocks.safeLstat,
   };
 });
 

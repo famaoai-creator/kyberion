@@ -258,6 +258,7 @@ The kernel of the ecosystem. Important responsibilities:
 - runtime supervision for agent, PTY, and service ownership
 - control-plane helpers for channel routing, feedback, and session-scoped artifacts
 - mission orchestration worker and event contracts
+- agent collaboration observability: worker-event + mission-control JSONL projected into a nodes/edges/attention graph (`agent-collaboration-projection.ts`, `agent-collaboration-events.ts`) and folded into a `mission -> task -> agent -> child agent` wait-tree (`agent-collaboration-tree.ts`, `composeCollaborationTree`)
 - generic surface outbox and delivery helpers
 - organization and tenancy: `organization-operating-model.ts`, `project-management.ts`, `work-coordination.ts` + `work-visibility.ts` (work-item context chain and visibility projections), `tenant-registry.ts`, `tenant-knowledge-retrieval.ts`, `peer-messaging.ts` (tenant peer mesh)
 - identity and authorization: `agent-identity.ts` (NHI), `authority.ts`, `tier-guard.ts`, `delegation-chain.ts`

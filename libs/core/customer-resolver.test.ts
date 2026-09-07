@@ -3,6 +3,19 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 const existingPaths = new Set<string>();
 vi.mock('./fs-primitives.js', () => ({
   rawExistsSync: (p: string) => existingPaths.has(p),
+  // assertSafeRepositoryPath lstats every path segment to reject symlink
+  // traversal. This fixture has no symlinks: paths the test declared are
+  // regular files, anything else reports ENOENT (which ends the walk).
+  rawLstatSync: (p: string) => {
+    if (!existingPaths.has(p)) {
+      const error = new Error(
+        `ENOENT: no such file or directory, lstat '${p}'`
+      ) as NodeJS.ErrnoException;
+      error.code = 'ENOENT';
+      throw error;
+    }
+    return { isSymbolicLink: () => false, isFile: () => true, isDirectory: () => false };
+  },
 }));
 
 const {

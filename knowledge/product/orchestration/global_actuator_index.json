@@ -316,7 +316,7 @@
       "path": "libs/actuators/system-actuator",
       "d": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
       "s": "implemented",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "capability_count": 26,
       "ops": [
         "audit_verify",
@@ -396,7 +396,7 @@
       "path": "libs/actuators/voice-actuator",
       "d": "Governed local voice generation actuator with native playback and artifact fallback",
       "s": "implemented",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "capability_count": 12,
       "ops": [
         "collect_and_register_voice_profile",

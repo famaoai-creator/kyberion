@@ -73,7 +73,11 @@ describe('realtime voice conversation', () => {
             kind: 'voice_clone_service',
             provider: 'mlx_audio',
             status: 'active',
-            platforms: ['darwin'],
+            // Platform-agnostic test double: this test selects an artifact
+            // format from the active engine, so it must resolve on every CI
+            // OS (a darwin-only fixture throws on linux in
+            // resolveVoiceEngineForPlatform).
+            platforms: ['any'],
             supports: {
               list_voices: false,
               playback: true,

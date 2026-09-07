@@ -15,7 +15,7 @@ import {
 } from '@agent/core/secure-io';
 import { saveProjectRecord, projectRecordPath } from '@agent/core/project-registry';
 import { saveServiceBindingRecord } from '@agent/core/service-binding-registry';
-import * as pptxUtils from '@agent/core/src/pptx-utils';
+import * as pptxUtils from '@agent/core/pptx-utils';
 import { withExecutionContext } from '@agent/core/authority';
 
 const ROOT = rootDir();

@@ -225,7 +225,10 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('surface_control_requested');
     expect(route).toContain('startMissionOrchestrationWorker');
     expect(route).toContain('chronos_localadmin');
-    expect(route).toContain('roleToMissionRole');
+    // f27cfe780 removed `roleToMissionRole` from all three intelligence-route
+    // modules, where it had only ever been an unused import; the route's real
+    // access-role gate is getChronosAccessRoleOrThrow (route.ts), so pin that.
+    expect(route).toContain('getChronosAccessRoleOrThrow');
     expect(route).toContain('surface_outbox_cleared');
     expect(route).toContain('runtimeLeases');
     expect(route).toContain('runtimeDoctor');

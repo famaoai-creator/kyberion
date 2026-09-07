@@ -45,7 +45,10 @@ vi.mock('../libs/core/mission-team-plan-composer.js', () => ({
 vi.mock('../libs/core/ledger.js', () => ({ ledger: { record: mocks.record } }));
 vi.mock('../libs/core/mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
-  missionTaskEventsPath: (missionId: string) => `/tmp/${missionId}/task-events.jsonl`,
+  // Must stay inside the repository: the secure-io resource-path scope rejects
+  // absolute paths under the OS temp dir (RESOURCE_PATH_SCOPE).
+  missionTaskEventsPath: (missionId: string) =>
+    `${process.cwd()}/active/shared/tmp/best-of-n-judge/${missionId}/task-events.jsonl`,
 }));
 
 const MISSION = 'MSN-BESTOF-01';

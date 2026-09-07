@@ -6,6 +6,7 @@ import * as path from 'node:path';
 const mocks = vi.hoisted(() => ({
   pathResolver: {
     rootDir: vi.fn(() => '/tmp/kyberion'),
+    knowledge: vi.fn((p = '') => `/tmp/kyberion/knowledge/${String(p).replace(/^\/+/, '')}`),
   },
   safeCopyFileSync: vi.fn(),
   assertSafeRepositoryPath: vi.fn((target: string) => target),

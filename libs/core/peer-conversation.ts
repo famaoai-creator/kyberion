@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { isRecord } from './foundation/text.js';
 import type { ValidateFunction } from 'ajv';
@@ -210,6 +210,17 @@ function safeConversationPath(logicalPath: string): string {
   return assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
     allowMissingLeaf: true,
   });
+}
+
+function tenantsRoot(): string {
+  return path.dirname(safeConversationPath(`${RUNTIME_ROOT}/tenants/.path-check`));
+}
+
+function tenantPeersRoot(tenantId: string): string {
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  return path.dirname(
+    safeConversationPath(`${RUNTIME_ROOT}/tenants/${normalizedTenantId}/peers/.path-check`)
+  );
 }
 
 function peerRoot(tenantId: string, peerId: string): string {
@@ -451,6 +462,215 @@ export function listPeerConversationSessions(
     .map((entry) => loadPeerConversationSession(tenantId, peerId, entry.replace(/\.json$/, '')))
     .filter((session): session is PeerConversationSession => Boolean(session))
     .sort((a, b) => sessionSortKey(b).localeCompare(sessionSortKey(a)));
+}
+
+const TRANSCRIPT_TAIL_TEXT_MAX_LENGTH = 240;
+const DEFAULT_TRANSCRIPT_TAIL_MAX_PER_PEER = 5;
+const DEFAULT_TRANSCRIPT_TAIL_MAX_PEERS = 50;
+const DEFAULT_PEER_CONVERSATION_EDGE_LIMIT = 500;
+const PEER_CONVERSATION_EVENT_TYPE = 'conversation_message_recorded';
+
+function truncateTranscriptTailText(text: string): string {
+  if (typeof text !== 'string') return '';
+  return text.length > TRANSCRIPT_TAIL_TEXT_MAX_LENGTH
+    ? text.slice(0, TRANSCRIPT_TAIL_TEXT_MAX_LENGTH)
+    : text;
+}
+
+/**
+ * AC-11: tenants that have a peer-conversation runtime directory, sorted.
+ *
+ * Used by the collaboration projection when no tenant scope was supplied, so
+ * an unscoped operator view still sees peer handoffs. Entries that are not
+ * valid tenant slugs (stray files, `.DS_Store`) are ignored rather than
+ * passed on to `normalizeTenantId`, which would throw.
+ */
+export function listPeerConversationTenants(): string[] {
+  return withExecutionContext(GOVERNED_ROLE, () => {
+    try {
+      const root = pathResolver.resolve(tenantsRoot());
+      if (!safeExistsSync(root)) return [];
+      return safeReaddir(root)
+        .filter((entry) => isValidTenantSlug(entry))
+        .sort();
+    } catch (error) {
+      logger.warn(
+        `[peer-conversation] failed to list conversation tenants: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return [];
+    }
+  });
+}
+
+/** List peers with a runtime conversation directory for a tenant, sorted. */
+export function listPeerConversationPeers(tenantId: string): string[] {
+  return withExecutionContext(GOVERNED_ROLE, () => {
+    try {
+      const root = pathResolver.resolve(tenantPeersRoot(tenantId));
+      if (!safeExistsSync(root)) return [];
+      return safeReaddir(root)
+        .filter((entry) => PEER_ID_PATTERN.test(entry))
+        .sort();
+    } catch (error) {
+      logger.warn(
+        `[peer-conversation] failed to list peers for tenant ${tenantId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return [];
+    }
+  });
+}
+
+export interface PeerTranscriptTail {
+  peer_id: string;
+  remote_peer_id: string;
+  session_id: string;
+  status: PeerConversationStatus;
+  updated_at: string;
+  lines: Array<{
+    at: string;
+    direction: PeerConversationDirection;
+    sender_peer_id: string;
+    text: string;
+  }>;
+}
+
+/**
+ * For each peer of a tenant, the tail of the transcript of its most recently
+ * updated session. Never throws; skips peers whose data cannot be read.
+ */
+export function collectPeerTranscriptTails(
+  tenantId: string,
+  options: { maxPerPeer?: number; maxPeers?: number } = {}
+): PeerTranscriptTail[] {
+  const maxPerPeer = options.maxPerPeer ?? DEFAULT_TRANSCRIPT_TAIL_MAX_PER_PEER;
+  const maxPeers = options.maxPeers ?? DEFAULT_TRANSCRIPT_TAIL_MAX_PEERS;
+  return withExecutionContext(GOVERNED_ROLE, () => {
+    const tails: PeerTranscriptTail[] = [];
+    let peerIds: string[];
+    try {
+      peerIds = listPeerConversationPeers(tenantId);
+    } catch {
+      return [];
+    }
+    for (const peerId of peerIds.slice(0, maxPeers)) {
+      try {
+        const sessions = listPeerConversationSessions(tenantId, peerId);
+        const newest = sessions[0];
+        if (!newest) continue;
+        tails.push({
+          peer_id: peerId,
+          remote_peer_id: newest.remote_peer_id,
+          session_id: newest.session_id,
+          status: newest.status,
+          updated_at: newest.updated_at,
+          lines: newest.transcript.slice(-maxPerPeer).map((entry) => ({
+            at: entry.created_at,
+            direction: entry.direction,
+            sender_peer_id: entry.sender_peer_id,
+            text: truncateTranscriptTailText(entry.text),
+          })),
+        });
+      } catch (error) {
+        logger.warn(
+          `[peer-conversation] skipping unreadable peer ${peerId} for tenant ${tenantId}: ${error instanceof Error ? error.message : String(error)}`
+        );
+        continue;
+      }
+    }
+    return tails;
+  });
+}
+
+export interface PeerConversationEdge {
+  ts: string;
+  tenant_id: string;
+  sender_peer_id: string;
+  receiver_peer_id: string;
+  session_id: string;
+  message_id: string;
+  kind: string;
+}
+
+interface PeerConversationEventRecord {
+  ts: string;
+  tenant_id: string;
+  peer_id: string;
+  type: string;
+  session_id: string;
+  direction: PeerConversationDirection;
+  kind: string;
+  remote_peer_id: string;
+  message_id: string;
+}
+
+function parsePeerConversationEventRecord(value: unknown): PeerConversationEventRecord | null {
+  if (!isRecord(value)) return null;
+  if (
+    !isNonEmptyString(value.ts) ||
+    !isNonEmptyString(value.tenant_id) ||
+    !isNonEmptyString(value.peer_id) ||
+    value.type !== PEER_CONVERSATION_EVENT_TYPE ||
+    !isNonEmptyString(value.session_id) ||
+    !PEER_CONVERSATION_DIRECTIONS.includes(value.direction as PeerConversationDirection) ||
+    !isNonEmptyString(value.kind) ||
+    !isNonEmptyString(value.remote_peer_id) ||
+    !isNonEmptyString(value.message_id)
+  ) {
+    return null;
+  }
+  return value as unknown as PeerConversationEventRecord;
+}
+
+/**
+ * Peer message edges derived from every peer's observability event log of a
+ * tenant. Never throws; skips peers/lines that cannot be read.
+ */
+export function readPeerConversationEdges(
+  tenantId: string,
+  options: { since?: string; limit?: number } = {}
+): PeerConversationEdge[] {
+  const limit = options.limit ?? DEFAULT_PEER_CONVERSATION_EDGE_LIMIT;
+  return withExecutionContext(GOVERNED_ROLE, () => {
+    let peerIds: string[];
+    try {
+      peerIds = listPeerConversationPeers(tenantId);
+    } catch {
+      return [];
+    }
+    const edges: PeerConversationEdge[] = [];
+    for (const peerId of peerIds) {
+      try {
+        const filePath = eventsPath(tenantId, peerId);
+        if (!safeExistsSync(filePath)) continue;
+        const records = readJsonLines<PeerConversationEventRecord | null>(filePath, {
+          onMalformed: 'skip',
+          map: (value) => parsePeerConversationEventRecord(value),
+        });
+        for (const record of records) {
+          if (!record) continue;
+          if (options.since && record.ts < options.since) continue;
+          const sender = record.direction === 'outbound' ? record.peer_id : record.remote_peer_id;
+          const receiver = record.direction === 'outbound' ? record.remote_peer_id : record.peer_id;
+          edges.push({
+            ts: record.ts,
+            tenant_id: record.tenant_id,
+            sender_peer_id: sender,
+            receiver_peer_id: receiver,
+            session_id: record.session_id,
+            message_id: record.message_id,
+            kind: record.kind,
+          });
+        }
+      } catch (error) {
+        logger.warn(
+          `[peer-conversation] failed to read events for peer ${peerId} of tenant ${tenantId}: ${error instanceof Error ? error.message : String(error)}`
+        );
+        continue;
+      }
+    }
+    edges.sort((a, b) => a.ts.localeCompare(b.ts));
+    return edges.length > limit ? edges.slice(edges.length - limit) : edges;
+  });
 }
 
 export function appendPeerConversationTranscript(

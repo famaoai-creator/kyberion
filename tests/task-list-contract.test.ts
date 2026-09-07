@@ -51,37 +51,41 @@ describe('task list contract', () => {
 
   it('prints setup-needed status and the init command when the profile is missing', () => {
     writeReadinessScenario(false);
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // printTaskScenarios() now routes output through an explicit print sink
+    // (SX-05 governed-printer pass) rather than calling console.log itself.
+    const output: string[] = [];
 
-    printTaskScenarios(listTaskScenarios(READINESS_DIR));
+    printTaskScenarios(listTaskScenarios(READINESS_DIR), (value) => output.push(value));
 
-    const output = logSpy.mock.calls.flat().join('\n');
-    expect(output).toContain('Available repeatable tasks:');
-    expect(output).toContain(READINESS_SCENARIO_ID);
-    expect(output).toContain('Status: setup needed');
-    expect(output).toContain(`Next: pnpm task:init ${READINESS_SCENARIO_ID}`);
+    const rendered = output.join('\n');
+    expect(rendered).toContain('Available repeatable tasks:');
+    expect(rendered).toContain(READINESS_SCENARIO_ID);
+    expect(rendered).toContain('Status: setup needed');
+    expect(rendered).toContain(`Next: pnpm task:init ${READINESS_SCENARIO_ID}`);
   });
 
   it('prints ready-for-dry-run status and the run command when the profile exists', () => {
     writeReadinessScenario(true);
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const output: string[] = [];
 
-    printTaskScenarios(listTaskScenarios(READINESS_DIR));
+    printTaskScenarios(listTaskScenarios(READINESS_DIR), (value) => output.push(value));
 
-    const output = logSpy.mock.calls.flat().join('\n');
-    expect(output).toContain(READINESS_SCENARIO_ID);
-    expect(output).toContain('Status: ready for dry-run');
-    expect(output).toContain(`Next: pnpm task:run ${READINESS_SCENARIO_ID} --dry-run`);
+    const rendered = output.join('\n');
+    expect(rendered).toContain(READINESS_SCENARIO_ID);
+    expect(rendered).toContain('Status: ready for dry-run');
+    expect(rendered).toContain(`Next: pnpm task:run ${READINESS_SCENARIO_ID} --dry-run`);
   });
 
   it('fails gracefully when no scenario files exist', async () => {
     safeMkdir(EMPTY_DIR, { recursive: true });
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // main() also reports this state through the print sink, not
+    // console.error — it is a handled, non-throwing state.
+    const output: unknown[] = [];
     const originalEnv = process.env.KYBERION_TASK_SCENARIO_DIR;
     process.env.KYBERION_TASK_SCENARIO_DIR = EMPTY_DIR;
 
     try {
-      await main([]);
+      await main([], (value) => output.push(value));
     } finally {
       if (originalEnv === undefined) {
         delete process.env.KYBERION_TASK_SCENARIO_DIR;
@@ -90,9 +94,9 @@ describe('task list contract', () => {
       }
     }
 
-    const output = errorSpy.mock.calls.flat().join('\n');
-    expect(output).toContain('No TaskScenario files found');
-    expect(output).toContain('knowledge/product/task-scenarios/*.json');
+    const rendered = output.map((value) => String(value)).join('\n');
+    expect(rendered).toContain('No TaskScenario files found');
+    expect(rendered).toContain('knowledge/product/task-scenarios/*.json');
   });
 });
 
