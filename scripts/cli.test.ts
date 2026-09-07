@@ -15,6 +15,7 @@ import {
   searchActuators,
   shouldBootstrapRuntime,
   stripNpmSeparatorArg,
+  buildKyberionRunNodeArgs,
   routeLegacyIntentToAsk,
   readCliTextFile,
 } from './cli.js';
@@ -153,6 +154,29 @@ describe('Kyberion CLI helpers', () => {
       'preview',
       'pipelines/baseline-check.json',
     ]);
+  });
+
+  it('forwards --dry-run from pnpm kyberion run to the actuator process', () => {
+    expect(
+      buildKyberionRunNodeArgs('dist/libs/actuators/secret-actuator/src/index.js', [
+        '--input',
+        'active/shared/tmp/in.json',
+        '--dry-run',
+      ])
+    ).toEqual([
+      'dist/libs/actuators/secret-actuator/src/index.js',
+      '--input',
+      'active/shared/tmp/in.json',
+      '--dry-run',
+    ]);
+    expect(
+      buildKyberionRunNodeArgs('dist/libs/actuators/secret-actuator/src/index.js', [
+        '--',
+        '--input',
+        'in.json',
+        '--dry-run',
+      ])
+    ).toContain('--dry-run');
   });
 
   it('skips runtime bootstrap for read-only CLI commands (LC-13)', () => {
