@@ -345,7 +345,7 @@ const PROVIDER_REQUIRED_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>
   // home override is required for headless -p invocations.
   grok: [],
   gemini: [],
-  cursor: [],
+  cursor: ['CURSOR_API_ENDPOINT'],
   // OpenCode authenticates via its own login session (opencode auth login);
   // no extra config home override is required for headless run invocations.
   opencode: [],

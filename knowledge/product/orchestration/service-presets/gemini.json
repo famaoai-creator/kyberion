@@ -33,6 +33,20 @@
         "imageBytes": "generatedImages.0.image.imageBytes"
       }
     },
+    "generate_image_fast": {
+      "type": "api",
+      "path": "models/imagen-3.0-fast-generate-001:generateImages",
+      "method": "POST",
+      "payload_template": {
+        "numberOfImages": 1,
+        "prompt": "{{prompt}}",
+        "aspectRatio": "{{aspect_ratio}}",
+        "outputMimeType": "image/jpeg"
+      },
+      "output_mapping": {
+        "imageBytes": "generatedImages.0.image.imageBytes"
+      }
+    },
     "generate_tts": {
       "type": "api",
       "path": "interactions",

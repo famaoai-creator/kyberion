@@ -37,7 +37,7 @@ pnpm kyberion improvements
 pnpm kyberion improvements --approve <candidate-id>
 ```
 
-`procedure run` は手順の substrate に応じて既存の dispatcher を使う。サービス手順はそのまま実行し、ブラウザ手順は `--tab-id` と、CLIからPlaywright実行する場合は `--cdp-url` または `--cdp-port` を要求する。ブラウザのtrace/videoは既定で有効で、結果JSONの`evidence`に保存先を返す。既存ChromeへCDP接続する場合にvideoが利用できなければ、`video_recording_pending`等の状態を返し、未取得を成功扱いにしない。
+`procedure run` は手順の substrate に応じて既存の dispatcher を使う。サービス手順はそのまま実行し、ブラウザ手順は Playwright 基板(`execution_substrate: playwright`)で `browser-actuator` を起動する。既定はスタンドアロン Chromium（`--tab-id` 不要）。既存 Chrome に付けるときだけ `--cdp-url` / `--cdp-port` と任意の `--tab-id` を渡す。同じ入口として `pnpm kyberion browser run --procedure-id <id>`（カタログ）/ `--recording <path>`（承認済み録画）/ `--adf <example.json>`（手書き example）がある。ブラウザのtrace/videoは既定で有効で、結果JSONの`evidence`に保存先を返す。既存ChromeへCDP接続する場合にvideoが利用できなければ、`video_recording_pending`等の状態を返し、未取得を成功扱いにしない。
 
 ## OS実演（desktop / screen evidence）
 
