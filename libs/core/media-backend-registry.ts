@@ -42,6 +42,9 @@ export interface MediaBackendRecord {
   command?: string;
   args?: string[];
   fallback_backend_id?: string;
+  cost_tier?: 'free' | 'paid' | 'self_hosted' | 'environment';
+  data_policy?: 'training_eligible' | 'zero_retention' | 'local_only';
+  execution_locality?: 'local' | 'remote' | 'hybrid';
   notes?: string;
 }
 
