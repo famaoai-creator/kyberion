@@ -10,7 +10,10 @@ import {
   loadActuatorManifest,
   type ActuatorManifestFile,
 } from '@agent/core/actuator-manifest-index';
+import { planActuatorDryRun, resolveCliActionKind } from '@agent/core/actuator-sdk';
+import { createAjv } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as path from 'node:path';
@@ -78,15 +81,76 @@ export function buildPlaygroundPayload(
   };
 }
 
+export function evaluatePlaygroundDryRun(args: {
+  actuatorId: string;
+  operation: string;
+  payload: Record<string, unknown>;
+  contractSchemaPath?: string;
+  mode?: 'dry-run' | 'check';
+}): Record<string, unknown> {
+  const kind = resolveCliActionKind(args.payload);
+  const plan = planActuatorDryRun({ kind, dryRun: true });
+  let validated = true;
+  let error: string | undefined;
+  if (args.contractSchemaPath) {
+    try {
+      const ajv = createAjv();
+      const schemaPath = pathResolver.rootResolve(args.contractSchemaPath);
+      const validate = compileSchemaFromPath(ajv, schemaPath);
+      if (!validate(args.payload)) {
+        validated = false;
+        error = (validate.errors || [])
+          .map((item) => `${item.instancePath || '/'} ${item.message || 'is invalid'}`)
+          .join('; ');
+      }
+    } catch (err) {
+      validated = false;
+      error = err instanceof Error ? err.message : String(err);
+    }
+  }
+  return {
+    ok: validated,
+    mode: args.mode ?? 'dry-run',
+    actuator_id: args.actuatorId,
+    operation: args.operation,
+    kind,
+    dry_run: true,
+    handler: plan.skipHandler ? 'skipped' : 'capture',
+    validated,
+    ...(error ? { error } : {}),
+    payload: args.payload,
+  };
+}
+
+export type PlaygroundExecuteActuator = (args: {
+  execPath: string;
+  inputPath: string;
+  extraArgs: string[];
+}) => string;
+
 interface PlaygroundRunOptions {
   dryRun?: boolean;
   check?: boolean;
   json?: boolean;
   quiet?: boolean;
   print?: Print;
+  /** Test seam: skip dist lookup. */
+  resolveExecutable?: (actuatorId: string) => string | null;
+  /** Test seam: intercept the compiled actuator process. */
+  executeActuator?: PlaygroundExecuteActuator;
 }
 
-async function runPlayground(
+function defaultExecuteActuator(args: {
+  execPath: string;
+  inputPath: string;
+  extraArgs: string[];
+}): string {
+  return safeExec('node', [args.execPath, '--input', args.inputPath, ...args.extraArgs], {
+    cwd: pathResolver.rootDir(),
+  });
+}
+
+export async function runPlayground(
   args: string[],
   options: PlaygroundRunOptions = {}
 ): Promise<Record<string, unknown> | undefined> {
@@ -263,15 +327,21 @@ async function runPlayground(
   // Include both 'op' and 'action' for seamless compatibility across different actuator conventions
   const payload = buildPlaygroundPayload(op, paramsObject);
 
-  if (options.dryRun === true || options.check === true) {
-    rl.close();
-    return {
-      ok: true,
-      mode: options.check === true ? 'check' : 'dry-run',
-      actuator_id: manifest.actuator_id,
+  if (options.check === true || options.dryRun === true) {
+    const plan = evaluatePlaygroundDryRun({
+      actuatorId: manifest.actuator_id,
       operation: op,
       payload,
-    };
+      contractSchemaPath: manifest.contract_schema,
+      mode: options.check === true ? 'check' : 'dry-run',
+    });
+    // `--check` is schema/plan only. Apply/transform/control `--dry-run` also
+    // stay validate-only. Capture `--dry-run` falls through and invokes the
+    // compiled actuator with `--dry-run` so the capture handler actually runs.
+    if (options.check === true || plan.ok === false || plan.handler === 'skipped') {
+      rl.close();
+      return { ...plan, handler_invoked: false };
+    }
   }
 
   // 7. Write to temp file inside active/shared/tmp/
@@ -295,12 +365,12 @@ async function runPlayground(
     allowMissingLeaf: true,
   });
 
-  let execPath = '';
-  if (safeExistsSync(execPath1)) {
+  let execPath = options.resolveExecutable?.(manifest.actuator_id) ?? '';
+  if (!execPath && safeExistsSync(execPath1)) {
     execPath = execPath1;
-  } else if (safeExistsSync(execPath2)) {
+  } else if (!execPath && safeExistsSync(execPath2)) {
     execPath = execPath2;
-  } else {
+  } else if (!execPath) {
     log(
       chalk.yellow(
         `\n⚠️  Could not find compiled JavaScript under dist/libs/actuators/${manifest.actuator_id}.`
@@ -325,22 +395,30 @@ async function runPlayground(
     throw new ScriptExitError(1, 'Actuator executable not found');
   }
 
-  // 9. Execute Actuator
+  // 9. Execute Actuator (capture `--dry-run` still invokes the handler)
+  const extraArgs = options.dryRun === true ? ['--dry-run'] : [];
+  const executeActuator = options.executeActuator ?? defaultExecuteActuator;
   log(chalk.bold.yellow(`\n⚡ Executing [${manifest.actuator_id}] with command:`));
-  log(chalk.gray(`node ${execPath} --input ${tempPath}\n`));
+  log(
+    chalk.gray(
+      `node ${execPath} --input ${tempPath}${extraArgs.length ? ` ${extraArgs.join(' ')}` : ''}\n`
+    )
+  );
 
   try {
-    const stdout = safeExec('node', [execPath, '--input', tempPath], {
-      cwd: pathResolver.rootDir(),
-    });
+    const stdout = executeActuator({ execPath, inputPath: tempPath, extraArgs });
     log(chalk.bold.green('🎉 Execution completed successfully! Result output:'));
     log(chalk.white(stdout.trim()));
     rl.close();
     return {
       ok: true,
-      mode: 'execute',
+      mode: options.dryRun === true ? 'dry-run' : 'execute',
       actuator_id: manifest.actuator_id,
       operation: op,
+      kind: resolveCliActionKind(payload),
+      dry_run: options.dryRun === true,
+      handler: 'capture',
+      handler_invoked: true,
       input_path: tempPath,
       executable_path: execPath,
       stdout: stdout.trim(),

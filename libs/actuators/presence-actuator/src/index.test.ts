@@ -4,7 +4,10 @@ import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import * as pathResolver from '@agent/core/path-resolver';
-import { normalizeTimelineDispatchResponse } from './presence-actuator-helpers.js';
+import {
+  normalizeTimelineDispatchResponse,
+  resolvePresenceDispatchRoute,
+} from './presence-actuator-helpers.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -59,6 +62,35 @@ describe('presence-actuator schema', () => {
         params: {},
       })
     ).toBe(false);
+  });
+
+  it('routes prefixed channels to satellite outbox and keeps Slack default', () => {
+    expect(resolvePresenceDispatchRoute('general')).toEqual({
+      surface: 'slack',
+      channel: 'general',
+      via: 'slack',
+    });
+    expect(resolvePresenceDispatchRoute('slack:C123')).toEqual({
+      surface: 'slack',
+      channel: 'C123',
+      via: 'slack',
+    });
+    expect(resolvePresenceDispatchRoute('telegram:12345')).toEqual({
+      surface: 'telegram',
+      channel: '12345',
+      via: 'satellite-outbox',
+    });
+    expect(resolvePresenceDispatchRoute('discord:99')).toEqual({
+      surface: 'discord',
+      channel: '99',
+      via: 'satellite-outbox',
+    });
+    expect(resolvePresenceDispatchRoute('imessage:chat-1')).toEqual({
+      surface: 'imessage',
+      channel: 'chat-1',
+      via: 'satellite-outbox',
+    });
+    expect(() => resolvePresenceDispatchRoute('telegram:')).toThrow('channel id is empty');
   });
 
   it('rejects non-object timeline bridge responses before result projection', () => {
