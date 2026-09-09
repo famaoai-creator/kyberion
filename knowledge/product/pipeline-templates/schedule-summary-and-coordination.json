@@ -1,8 +1,8 @@
 {
   "pipeline_id": "schedule-summary-and-coordination",
-  "version": "2.0.0",
-  "description": "Orchestrates macOS Calendar.app retrieval and produces a coordination report (today's schedule + N free 30-minute slots within working hours). Uses calendar-actuator (which validates input via JSON schema and runs JXA-injection-safe queries) instead of inlined osascript.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "version": "3.0.0",
+  "description": "Orchestrates calendar retrieval and produces a coordination report (today's schedule + N free 30-minute slots within working hours). Calls calendar:list_calendars and calendar:list_events directly — do not shell to dist/libs/actuators/calendar-actuator.",
+  "_migration_note": "v3: domain:action calendar ops (LAYERED_EXECUTION_PLAN). v2 used system:write_file + shell to node dist/.../calendar-actuator. v1 used type + export_as.",
   "action": "pipeline",
   "labels": ["schedule", "calendar", "coordination"],
   "inputs": {
@@ -17,49 +17,25 @@
       "description": "Optional list of calendar names to filter. When omitted, all visible calendars are scanned."
     },
     "WORKING_HOURS_START": { "required": false, "default": "09:00" },
-    "WORKING_HOURS_END":   { "required": false, "default": "18:00" },
-    "FREE_SLOT_COUNT":     { "required": false, "default": 3 },
-    "FREE_SLOT_MINUTES":   { "required": false, "default": 30 }
+    "WORKING_HOURS_END": { "required": false, "default": "18:00" },
+    "FREE_SLOT_COUNT": { "required": false, "default": 3 },
+    "FREE_SLOT_MINUTES": { "required": false, "default": 30 }
   },
   "expected_outcome": "Markdown summary describing today's events on the named calendars + the requested number of free slots, plus a structured JSON record persisted to active/shared/tmp/schedule-report.json.",
   "steps": [
     {
-      "id": "prepare-list-input",
-      "role": "sink",
-      "op": "system:write_file",
-      "params": {
-        "path": "active/shared/tmp/calendar-list.json",
-        "content": "{\"op\": \"list_calendars\"}"
-      }
-    },
-    {
       "id": "get-calendars",
       "role": "source",
-      "op": "shell",
-      "produces": { "channel": "calendars_raw", "type": "ShellResult" },
-      "params": {
-        "cmd": "node dist/libs/actuators/calendar-actuator/src/index.js --input active/shared/tmp/calendar-list.json"
-      }
-    },
-    {
-      "id": "prepare-events-input",
-      "role": "sink",
-      "op": "system:write_file",
-      "params": {
-        "path": "active/shared/tmp/calendar-events.json",
-        "content_template": {
-          "op": "list_events",
-          "params": { "calendar_names": "{{TARGET_CALENDARS}}" }
-        }
-      }
+      "op": "calendar:list_calendars",
+      "produces": { "channel": "calendars_raw", "type": "CalendarList" }
     },
     {
       "id": "fetch-today-events",
       "role": "source",
-      "op": "shell",
-      "produces": { "channel": "events_raw", "type": "ShellResult" },
+      "op": "calendar:list_events",
+      "produces": { "channel": "events_raw", "type": "CalendarEventList" },
       "params": {
-        "cmd": "node dist/libs/actuators/calendar-actuator/src/index.js --input active/shared/tmp/calendar-events.json"
+        "calendar_names": "{{TARGET_CALENDARS}}"
       }
     },
     {

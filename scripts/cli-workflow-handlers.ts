@@ -138,6 +138,9 @@ function printEmailHelp(locale = resolveLocale()): void {
     '  pnpm kyberion email deliver --approved --body-file active/shared/runtime/presence-studio/email-drafts/latest.md'
   );
   printText('  pnpm kyberion email archive-inbox --apply');
+  printText('');
+  printText(t('cli_help_email_path_note', locale));
+  printText(t('cli_help_email_operator_doc', locale));
 }
 
 function printCalendarHelp(locale = resolveLocale()): void {

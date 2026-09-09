@@ -363,6 +363,64 @@ export interface ActuatorOpDefinition<Input = unknown, Output = unknown> {
   handler: (input: Input, context: Record<string, unknown>) => Output | Promise<Output>;
 }
 
+export type ActuatorDryRunMode = 'execute' | 'capture' | 'validate-only';
+
+export interface ActuatorDryRunPlan {
+  skipHandler: boolean;
+  mode: ActuatorDryRunMode;
+}
+
+const CAPTURE_ACTION_NAMES = new Set([
+  'get',
+  'list',
+  'status',
+  'read',
+  'capture',
+  'inspect',
+  'describe',
+  'show',
+  'health',
+]);
+
+/**
+ * Capture is always side-effect-free (run the handler). Apply / transform /
+ * control with dryRun validate the contract only and skip the handler.
+ */
+export function planActuatorDryRun(args: {
+  kind: PipelineStepType;
+  dryRun?: boolean;
+}): ActuatorDryRunPlan {
+  if (args.kind === 'capture') {
+    return { skipHandler: false, mode: 'capture' };
+  }
+  if (args.dryRun === true) {
+    return { skipHandler: true, mode: 'validate-only' };
+  }
+  return { skipHandler: false, mode: 'execute' };
+}
+
+/** Resolve the inner CLI action kind for handleAction-style wrappers. */
+export function resolveCliActionKind(
+  input: unknown,
+  resolveOpKind?: (value: unknown) => PipelineStepType
+): PipelineStepType {
+  if (resolveOpKind) return resolveOpKind(input);
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return 'apply';
+  const rec = input as Record<string, unknown>;
+  if (
+    rec.kind === 'capture' ||
+    rec.kind === 'apply' ||
+    rec.kind === 'transform' ||
+    rec.kind === 'control'
+  ) {
+    return rec.kind;
+  }
+  const raw =
+    typeof rec.action === 'string' ? rec.action : typeof rec.op === 'string' ? rec.op : '';
+  const name = raw.includes(':') ? raw.slice(raw.lastIndexOf(':') + 1) : raw;
+  return CAPTURE_ACTION_NAMES.has(name) ? 'capture' : 'apply';
+}
+
 export interface ActuatorDefinition<
   Ops extends Record<string, ActuatorOpDefinition> = Record<string, ActuatorOpDefinition>,
 > {
@@ -423,6 +481,34 @@ export function defineActuator<Ops extends Record<string, ActuatorOpDefinition>>
         const validatedInput = definition.validateInput
           ? definition.validateInput(input)
           : (input as never);
+        const kindOverride = context.dryRunKind;
+        const kind =
+          kindOverride === 'capture' ||
+          kindOverride === 'apply' ||
+          kindOverride === 'transform' ||
+          kindOverride === 'control'
+            ? kindOverride
+            : op === 'execute'
+              ? resolveCliActionKind(input)
+              : definition.kind;
+        const plan = planActuatorDryRun({
+          kind,
+          dryRun: context.dryRun === true,
+        });
+        if (plan.skipHandler) {
+          return {
+            ok: true,
+            status: 'succeeded',
+            actuator_id: id,
+            op,
+            output: {
+              dry_run: true,
+              mode: plan.mode,
+              kind,
+              validated: true,
+            },
+          };
+        }
         const output = await definition.handler(validatedInput, context);
         return { ok: true, status: 'succeeded', actuator_id: id, op, output };
       } catch (error) {

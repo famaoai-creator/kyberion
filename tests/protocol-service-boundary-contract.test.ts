@@ -43,6 +43,7 @@ describe('protocol service boundary registry', () => {
       'kyberion.pipeline.job_status',
       'kyberion.knowledge.search',
       'kyberion.capability.list',
+      'kyberion.service.capture',
       'kyberion.service.actuate',
       'kyberion.mission.create',
       'kyberion.mission.status',

@@ -72,9 +72,8 @@ import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge.js';
 import type { EventScope } from '@agent/core/event-scope';
 import type { McpRequestContext } from '@agent/core/mcp-request-context';
 import { parseMcpTextPayload, parseSafeJsonObject } from './mcp-json.js';
-
+import { registerKyberionServiceCaptureTool } from './mcp-service-capture-tool.js';
 // ─── Constants ────────────────────────────────────────────────────────────────
-
 const SERVER_NAME = 'kyberion-mcp-server';
 const SERVER_VERSION = '0.1.0';
 
@@ -994,6 +993,7 @@ export function createKyberionMcpServer(): McpServer {
     }
   );
 
+  registerKyberionServiceCaptureTool(server, catalog, registerGovernedTool);
   // ── kyberion.service.actuate ──────────────────────────────────────────────
   registerGovernedTool(
     server,

@@ -1281,7 +1281,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 45289,
+      "size": 45486,
       "type": "json"
     },
     {
@@ -1389,7 +1389,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 125378,
+      "size": 125437,
       "type": "json"
     },
     {
@@ -1719,7 +1719,7 @@
     {
       "path": "product/governance/mcp-tool-catalog.json",
       "tier": "public",
-      "size": 7731,
+      "size": 8435,
       "type": "json"
     },
     {
@@ -3651,7 +3651,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19136,
+      "size": 19166,
       "type": "json"
     },
     {
@@ -4443,7 +4443,7 @@
     {
       "path": "product/orchestration/service-harness-registry.json",
       "tier": "public",
-      "size": 62635,
+      "size": 65596,
       "type": "json"
     },
     {
@@ -4521,13 +4521,13 @@
     {
       "path": "product/orchestration/service-presets/github-mcp.json",
       "tier": "public",
-      "size": 1221,
+      "size": 1786,
       "type": "json"
     },
     {
       "path": "product/orchestration/service-presets/github.json",
       "tier": "public",
-      "size": 5281,
+      "size": 11631,
       "type": "json"
     },
     {
@@ -4929,7 +4929,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 509996,
+      "size": 510845,
       "type": "json"
     },
     {
@@ -4995,7 +4995,7 @@
     {
       "path": "product/pipeline-templates/README.md",
       "tier": "public",
-      "size": 1338,
+      "size": 2935,
       "type": "md"
     },
     {
@@ -5152,6 +5152,12 @@
       "path": "product/pipeline-templates/customer-discovery-workflow.json",
       "tier": "public",
       "size": 6525,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/daily-github-inbox.json",
+      "tier": "public",
+      "size": 3289,
       "type": "json"
     },
     {
@@ -5589,7 +5595,7 @@
     {
       "path": "product/pipeline-templates/schedule-summary-and-coordination.json",
       "tier": "public",
-      "size": 4272,
+      "size": 3593,
       "type": "json"
     },
     {
@@ -10821,7 +10827,7 @@
     {
       "path": "public/connections/supported-integrations.md",
       "tier": "public",
-      "size": 10566,
+      "size": 17497,
       "type": "md"
     },
     {

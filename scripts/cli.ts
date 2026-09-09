@@ -207,6 +207,12 @@ export function stripNpmSeparatorArg(args: string[]): string[] {
   return args.filter((arg) => arg !== '--');
 }
 
+/** Node argv for `pnpm kyberion run <actuator>`. Forwards `--dry-run` unchanged. */
+export function buildKyberionRunNodeArgs(script: string, rawArgs: string[]): string[] {
+  const { args } = extractBranchArg(rawArgs);
+  return [script, ...stripNpmSeparatorArg(args)];
+}
+
 /**
  * I18N-02: thin wrapper delegating to `@agent/core`'s type-safe `t()`. Kept
  * as a local `(key, locale)` shim rather than calling `coreT` directly at
@@ -1078,7 +1084,7 @@ function runActuator(
     throw new Error(`Actuator "${actuatorName}" not found.${suffix}`);
   }
 
-  const { branchId, args } = extractBranchArg(rawArgs);
+  const { branchId } = extractBranchArg(rawArgs);
   printBranchBanner(branchId);
 
   const script = resolveActuatorPath(actuator.path);
@@ -1088,11 +1094,10 @@ function runActuator(
     );
   }
 
-  const forwardedArgs = args.filter((arg) => arg !== '--');
   printText(chalk.blue(`🚀 ACTUATING: ${actuator.name}...\n`));
 
   try {
-    const output = safeExec('node', [script, ...forwardedArgs], {
+    const output = safeExec('node', buildKyberionRunNodeArgs(script, rawArgs), {
       env: { ...process.env, MISSION_ID: missionId || '' },
       timeoutMs: 1800000, // 30 minutes for long-running actuators (media generation, etc.)
     });

@@ -43,13 +43,18 @@ function parseArgs(argv: string[]): { command: string; args: ArgMap } {
 
 function helpText(): string {
   return [
-    'Usage: npm run email:workflow -- <status|draft|latest-draft|deliver|archive-inbox> [options]',
+    'Usage: pnpm kyberion email <status|draft|latest-draft|deliver|archive-inbox> [options]',
+    'Compat: pnpm email:workflow -- <same command>',
+    '',
+    'Inbox/triage (read) uses Google Workspace gmail_triage.',
+    'Send/draft (write) uses email-actuator and stays approval-gated.',
+    'See docs/EMAIL_OPERATOR.ja.md',
     '',
     'Commands:',
-    '  status        Check email auth readiness',
-    '  draft         Generate an email draft from triage text',
-    '  latest-draft  Show the latest email draft artifact',
-    '  deliver       Deliver or draft an email (--account auto|gmail|outlook)',
+    '  status        Check Gmail/gws auth readiness (read path)',
+    '  draft         Generate a reply draft from inbox triage (gws read)',
+    '  latest-draft  Show the latest stored draft artifact',
+    '  deliver       Create a Gmail draft or send an approved reply (email-actuator)',
     '  archive-inbox Organize the inbox (--account auto|gmail|outlook)',
   ].join('\n');
 }

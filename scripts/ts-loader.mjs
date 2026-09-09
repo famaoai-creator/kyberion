@@ -31,8 +31,44 @@ function resolveCandidatePath(candidate) {
   return existsSync(candidate) ? pathToFileURL(candidate).href : null;
 }
 
+function resolveWorkspacePackageToSource(specifier) {
+  let packageRoot;
+  let subpath;
+  if (specifier === '@agent/core') {
+    packageRoot = resolvePath(PROJECT_ROOT, 'libs/core');
+    subpath = 'index';
+  } else if (specifier.startsWith('@agent/core/')) {
+    packageRoot = resolvePath(PROJECT_ROOT, 'libs/core');
+    subpath = specifier.slice('@agent/core/'.length);
+  } else {
+    return null;
+  }
+
+  const distJs = resolvePath(packageRoot, 'dist', `${subpath}.js`);
+  const distIndex = resolvePath(packageRoot, 'dist', subpath, 'index.js');
+  if (existsSync(distJs) || existsSync(distIndex)) {
+    return null;
+  }
+
+  const candidates = [
+    resolvePath(packageRoot, `${subpath}.ts`),
+    resolvePath(packageRoot, subpath, 'index.ts'),
+    resolvePath(packageRoot, 'src', `${subpath}.ts`),
+    resolvePath(packageRoot, 'src', subpath, 'index.ts'),
+  ];
+  for (const candidate of candidates) {
+    const resolved = resolveCandidatePath(candidate);
+    if (resolved) return resolved;
+  }
+  return null;
+}
+
 function resolveTsLike(specifier, context, nextResolve) {
   if (!(specifier.startsWith('.') || specifier.startsWith('/'))) {
+    const workspaceSource = resolveWorkspacePackageToSource(specifier);
+    if (workspaceSource) {
+      return { url: workspaceSource, shortCircuit: true };
+    }
     return nextResolve(specifier, context);
   }
 

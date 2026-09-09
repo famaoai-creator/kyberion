@@ -39,7 +39,7 @@
       "requires_approval": false,
       "allowed_tiers": ["public"],
       "allowed_caller_roles": ["operator", "agent", "cowork"],
-      "notes": "Only pipelines on the explicit allowlist may be run via MCP. Risky-op pipelines require approval gate."
+      "notes": "Only pipelines on the explicit allowlist may be run via MCP. Risky-op pipelines require approval gate. daily-routine is allowlisted as the operator daily journal/TODO path (local working-memory writes, not SaaS writes)."
     },
     {
       "name": "kyberion.pipeline.job_status",
@@ -106,6 +106,16 @@
       "allowed_tiers": ["public"],
       "allowed_caller_roles": ["operator", "agent", "cowork"],
       "notes": "Deferred-tool discovery surface; results are descriptions only and do not execute an operation."
+    },
+    {
+      "name": "kyberion.service.capture",
+      "description": "Execute a capture/read service preset (for example GitHub list/get issue or PR). Writes are rejected.",
+      "category": "service",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "notes": "Capture-only. kind=capture and risk=read operations only. Writes stay on kyberion.service.actuate (approval-gated, disabled by default)."
     },
     {
       "name": "kyberion.service.actuate",
@@ -191,6 +201,7 @@
     "pipelines/inspect-workspace-surfaces.json",
     "pipelines/inspect-network-environment.json",
     "pipelines/baseline-check.json",
-    "pipelines/cowork-integration-review.json"
+    "pipelines/cowork-integration-review.json",
+    "pipelines/daily-routine.json"
   ]
 }

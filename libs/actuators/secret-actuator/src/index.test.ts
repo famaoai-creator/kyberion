@@ -226,6 +226,52 @@ describe('secret-actuator: governed mutation', () => {
     ).rejects.toThrow('Unsupported secret action');
   });
 
+  it('fails closed on linux without KYBERION_ALLOW_FILE_SECRETS', async () => {
+    platformSpy?.mockReturnValue('linux');
+    delete process.env.KYBERION_ALLOW_FILE_SECRETS;
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'get',
+      params: { account: 'test_user', service: 'slack' },
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.error).toMatch(/KYBERION_ALLOW_FILE_SECRETS/);
+    expect(result.backend).toBe('unsupported_until_opt_in');
+    expect(mocks.fetchSecret).not.toHaveBeenCalled();
+  });
+
+  it('uses the file-secret bridge on linux when KYBERION_ALLOW_FILE_SECRETS is set', async () => {
+    platformSpy?.mockReturnValue('linux');
+    process.env.KYBERION_ALLOW_FILE_SECRETS = '1';
+    mocks.fetchSecret.mockResolvedValue('linux-secret');
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'get',
+      params: { account: 'test_user', service: 'slack', export_as: 'slack_token' },
+    });
+
+    expect(result.status).toBe('success');
+    expect(result.slack_token).toBe('linux-secret');
+    expect(mocks.fetchSecret).toHaveBeenCalledWith('slack', 'test_user');
+  });
+
+  it('does not require the file-secret flag on darwin', async () => {
+    delete process.env.KYBERION_ALLOW_FILE_SECRETS;
+    mocks.fetchSecret.mockResolvedValue('darwin-secret');
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'get',
+      params: { account: 'test_user', service: 'slack', export_as: 'slack_token' },
+    });
+
+    expect(result.status).toBe('success');
+    expect(result.slack_token).toBe('darwin-secret');
+  });
+
   it('set action throws when value is missing', async () => {
     process.env.MISSION_ID = 'EXISTING-MISSION-123';
 
