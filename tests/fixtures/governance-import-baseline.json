@@ -170,6 +170,7 @@
     "libs/core/claude-cli-session-adapter.ts",
     "libs/core/codex-cli-query.ts",
     "libs/core/cursor-cli-reasoning-backend.ts",
+    "libs/core/cursor-cli-session-adapter.ts",
     "libs/core/deployment-adapter.ts",
     "libs/core/deployment-adapters/mobile-beta.ts",
     "libs/core/desktop-event-feed.ts",
