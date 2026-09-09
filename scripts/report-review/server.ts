@@ -40,9 +40,63 @@ export interface ReportReviewServerResult {
   listening: boolean;
 }
 
+export const REPORT_REVIEW_MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
+export const REPORT_REVIEW_MAX_SAVE_BODY_BYTES = REPORT_REVIEW_MAX_DOCUMENT_BYTES;
+export const REPORT_REVIEW_MAX_CONCURRENT_HEAVY_REQUESTS = 1;
+export const REPORT_REVIEW_REQUEST_TIMEOUT_MS = 30_000;
+export const REPORT_REVIEW_HEADERS_TIMEOUT_MS = 10_000;
+export const REPORT_REVIEW_KEEP_ALIVE_TIMEOUT_MS = 5_000;
+
+export class ReportReviewRequestBodyTooLargeError extends Error {
+  constructor(readonly maxBytes: number) {
+    super(`request body exceeds ${maxBytes} bytes`);
+    this.name = 'ReportReviewRequestBodyTooLargeError';
+  }
+}
+
+export class ReportReviewDocumentTooLargeError extends Error {
+  constructor(readonly maxBytes: number) {
+    super(`report exceeds ${maxBytes} bytes`);
+    this.name = 'ReportReviewDocumentTooLargeError';
+  }
+}
+
+/** Read a request body with a byte bound, without repeated string concatenation. */
+export async function readReportReviewRequestBody(
+  source: AsyncIterable<Uint8Array | string>,
+  maxBytes = REPORT_REVIEW_MAX_SAVE_BODY_BYTES
+): Promise<string> {
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of source) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.byteLength;
+    if (totalBytes > maxBytes) throw new ReportReviewRequestBodyTooLargeError(maxBytes);
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks, totalBytes).toString('utf8');
+}
+
+export function validateReportReviewContentLength(
+  value?: string,
+  maxBytes = REPORT_REVIEW_MAX_SAVE_BODY_BYTES
+): number | undefined {
+  if (value === undefined) return undefined;
+  const bytes = Number(value);
+  if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > maxBytes) {
+    throw new ReportReviewRequestBodyTooLargeError(maxBytes);
+  }
+  return bytes;
+}
+
 export function readReportReviewTextFile(filePath: string): string {
-  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
+  if (!safeExistsSync(filePath)) {
     throw new Error(`${filePath} must be a regular file`);
+  }
+  const stat = safeLstat(filePath);
+  if (!stat.isFile()) throw new Error(`${filePath} must be a regular file`);
+  if (stat.size > REPORT_REVIEW_MAX_DOCUMENT_BYTES) {
+    throw new ReportReviewDocumentTooLargeError(REPORT_REVIEW_MAX_DOCUMENT_BYTES);
   }
   return readTextFile(filePath);
 }
@@ -136,15 +190,46 @@ export async function main(
     return html;
   }
   const ts = () => nowIso().replace(/[:.]/g, '').slice(0, 15);
+  let activeHeavyRequests = 0;
+
+  function acquireHeavyRequest(): (() => void) | undefined {
+    if (activeHeavyRequests >= REPORT_REVIEW_MAX_CONCURRENT_HEAVY_REQUESTS) return undefined;
+    activeHeavyRequests += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      activeHeavyRequests -= 1;
+    };
+  }
 
   const server = http.createServer((req, res) => {
     try {
       if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-        res.writeHead(200, {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-store',
-        });
-        res.end(serveHtml());
+        const release = acquireHeavyRequest();
+        if (!release) {
+          res.writeHead(503, { 'Retry-After': '1' });
+          res.end('another review request is already in progress');
+          return;
+        }
+        res.once('finish', release);
+        res.once('close', release);
+        try {
+          const html = serveHtml();
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+          });
+          res.end(html);
+        } catch (error) {
+          release();
+          if (error instanceof ReportReviewDocumentTooLargeError) {
+            res.writeHead(413);
+            res.end('report is too large');
+            return;
+          }
+          throw error;
+        }
         return;
       }
       if (req.method === 'GET' && req.url === '/health') {
@@ -156,27 +241,37 @@ export async function main(
         if (req.headers['x-rv-token'] !== TOKEN) {
           res.writeHead(403);
           res.end('bad token');
+          req.resume();
           return;
         }
         const origin = req.headers.origin;
         if (origin && !/^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(origin)) {
           res.writeHead(403);
           res.end('bad origin');
+          req.resume();
           return;
         }
-        let data = '';
-        let aborted = false;
-        req.on('data', (c) => {
-          data += c;
-          if (data.length > 25 * 1024 * 1024) {
-            aborted = true;
-            req.destroy();
-          }
-        });
-        req.on('end', () => {
-          if (aborted) return;
+        try {
+          validateReportReviewContentLength(req.headers['content-length']);
+        } catch (error) {
+          res.writeHead(413);
+          res.end('request body too large');
+          req.resume();
+          return;
+        }
+        const release = acquireHeavyRequest();
+        if (!release) {
+          res.writeHead(503, { 'Retry-After': '1' });
+          res.end('another review request is already in progress');
+          req.resume();
+          return;
+        }
+        req.once('aborted', release);
+        void (async () => {
           try {
-            const html = stripInjected(data);
+            const html = stripInjected(
+              await readReportReviewRequestBody(req, REPORT_REVIEW_MAX_SAVE_BODY_BYTES)
+            );
             if (!/<\/html>\s*$/i.test(html.trim())) {
               res.writeHead(400);
               res.end('not a complete HTML document');
@@ -214,20 +309,41 @@ export async function main(
               `[save] wrote ${target} (backup ${backup.split('/').pop()}, ${html.length} bytes)`
             );
           } catch (e: unknown) {
-            res.writeHead(500);
-            res.end(e instanceof Error ? e.message : String(e));
+            if (e instanceof ReportReviewRequestBodyTooLargeError) {
+              if (!res.headersSent) {
+                res.writeHead(413);
+                res.end('request body too large');
+              }
+              req.resume();
+            } else if (e instanceof ReportReviewDocumentTooLargeError) {
+              if (!res.headersSent) {
+                res.writeHead(413);
+                res.end('report is too large');
+              }
+            } else if (!res.headersSent) {
+              res.writeHead(500);
+              res.end(e instanceof Error ? e.message : String(e));
+            }
             print(`[save] ${e instanceof Error ? e.message : String(e)}`);
+          } finally {
+            release();
           }
-        });
+        })();
         return;
       }
       res.writeHead(404);
       res.end('not found');
     } catch (e: unknown) {
-      res.writeHead(500);
-      res.end(e instanceof Error ? e.message : String(e));
+      if (!res.headersSent) {
+        res.writeHead(500);
+        res.end(e instanceof Error ? e.message : String(e));
+      }
     }
   });
+  server.requestTimeout = REPORT_REVIEW_REQUEST_TIMEOUT_MS;
+  server.headersTimeout = REPORT_REVIEW_HEADERS_TIMEOUT_MS;
+  server.keepAliveTimeout = REPORT_REVIEW_KEEP_ALIVE_TIMEOUT_MS;
+  server.maxRequestsPerSocket = 100;
   await new Promise<void>((resolve, reject) => {
     const onError = (error: Error) =>
       reject(new ScriptExitError(1, `[report-review] failed to listen: ${error.message}`));
