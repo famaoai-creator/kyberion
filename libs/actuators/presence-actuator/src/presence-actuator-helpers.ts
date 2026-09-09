@@ -10,6 +10,8 @@ import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
+import { enqueueSurfaceOutboxMessage } from '@agent/core/surface-coordination-store';
+import type { SurfaceAsyncChannel } from '@agent/core/channel-surface-types';
 import { WebClient } from '@slack/web-api';
 
 const PRESENCE_MANIFEST_PATH = pathResolver.rootResolve(
@@ -67,6 +69,43 @@ const buildRetryOptions = createGovernedRetryOptionsBuilder({
   fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
 });
 
+export type PresenceSatelliteSurface = 'telegram' | 'discord' | 'imessage';
+
+export interface PresenceDispatchRoute {
+  surface: 'slack' | PresenceSatelliteSurface;
+  channel: string;
+  via: 'slack' | 'satellite-outbox';
+}
+
+const SATELLITE_SURFACES = new Set<PresenceSatelliteSurface>(['telegram', 'discord', 'imessage']);
+
+/**
+ * Slack is the default presence backend.
+ * Prefix the channel to forward through an existing satellite outbox:
+ * `telegram:<chatId>`, `discord:<channelId>`, `imessage:<chatId>`.
+ * Optional `slack:<id>` keeps the Slack WebClient path.
+ */
+export function resolvePresenceDispatchRoute(channel: string): PresenceDispatchRoute {
+  const trimmed = channel.trim();
+  const match = /^(slack|telegram|discord|imessage):(.*)$/i.exec(trimmed);
+  if (!match) {
+    return { surface: 'slack', channel: trimmed, via: 'slack' };
+  }
+  const surface = match[1].toLowerCase() as PresenceDispatchRoute['surface'];
+  const dest = match[2].trim();
+  if (!dest) {
+    throw new Error(`[PRESENCE] ${surface} channel id is empty. Use ${surface}:<id>.`);
+  }
+  if (SATELLITE_SURFACES.has(surface as PresenceSatelliteSurface)) {
+    return {
+      surface: surface as PresenceSatelliteSurface,
+      channel: dest,
+      via: 'satellite-outbox',
+    };
+  }
+  return { surface: 'slack', channel: dest, via: 'slack' };
+}
+
 export function normalizeTimelineDispatchResponse(value: unknown): Record<string, unknown> {
   if (!isRecord(value)) {
     throw new Error('[PRESENCE] timeline dispatch response must be a JSON object');
@@ -122,7 +161,10 @@ export async function handleAction(input: PresenceAction) {
     }
 
     case 'dispatch': {
-      logger.info(`[PRESENCE] Dispatching to ${params.channel} (Mode: ${params.mode})`);
+      const route = resolvePresenceDispatchRoute(params.channel);
+      logger.info(
+        `[PRESENCE] Dispatching to ${route.surface}:${route.channel} (Mode: ${params.mode}, via: ${route.via})`
+      );
 
       if (params.payload.threadId) {
         getPtyEngine().pushMessage(
@@ -131,6 +173,27 @@ export async function handleAction(input: PresenceAction) {
           params.payload.targetPersona || '*',
           params.payload.text
         );
+      }
+
+      if (route.via === 'satellite-outbox') {
+        const text = params.payload.text || '';
+        const messagePath = enqueueSurfaceOutboxMessage({
+          surface: route.surface as SurfaceAsyncChannel,
+          correlationId: `presence-${Date.now().toString(36)}`,
+          channel: route.channel,
+          threadTs: params.payload.threadId || '',
+          text,
+          source: 'system',
+        });
+        logger.info(
+          `✅ [PRESENCE_SATELLITE] Queued ${route.surface} outbox for ${route.channel}. ${messagePath}`
+        );
+        return {
+          status: 'queued_satellite',
+          surface: route.surface,
+          channel: route.channel,
+          via: 'satellite-outbox',
+        };
       }
 
       if (!slack) {
@@ -143,20 +206,20 @@ export async function handleAction(input: PresenceAction) {
         const result = await retry(
           async () =>
             slack.chat.postMessage({
-              channel: params.channel,
+              channel: route.channel,
               text: params.payload.text || '',
               thread_ts: params.payload.threadId,
             }),
           buildRetryOptions()
         );
 
-        logger.info(`✅ [PRESENCE_SLACK] Message sent to ${params.channel}. TS: ${result.ts}`);
+        logger.info(`✅ [PRESENCE_SLACK] Message sent to ${route.channel}. TS: ${result.ts}`);
 
         if (params.mode === 'conversational') {
           return {
             status: 'waiting',
             conversationId: result.ts,
-            channel: params.channel,
+            channel: route.channel,
             originalText: params.payload.text,
           };
         }

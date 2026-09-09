@@ -25,6 +25,7 @@ How to iterate fast on Kyberion locally. Phase C'-7 of `docs/PRODUCTIZATION_ROAD
 - `node --import ./scripts/ts-loader.mjs scripts/*.ts` is the development path for TypeScript-only execution. Use it for local iteration, but keep the matching `dist/scripts/*.js` output present.
 - `pnpm exec tsx scripts/*.ts` is reserved for emergency fallback only. If a script needs it, it should also warn and fail clearly when `dist/` is stale or missing.
 - `pnpm build` starts with the governed clean step, so stale `dist/` and `.tsbuildinfo` files do not keep dead commands alive.
+- Cloud Agent / fresh Linux VMs: Node `>=24` and `pnpm build` before `pipeline` / MCP / full doctor. See [`CLOUD_AGENT_ENVIRONMENT.md`](./CLOUD_AGENT_ENVIRONMENT.md).
 - When adding a new `scripts/*.ts` entry, confirm both execution modes work:
   1. `node --import ./scripts/ts-loader.mjs scripts/your_script.ts`
   2. `node dist/scripts/your_script.js`

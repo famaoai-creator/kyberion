@@ -130,6 +130,28 @@ describe('actuator-capability', () => {
       expect(byOp.no_prerequisites.available).toBe(true);
     });
 
+    it('applies requirements.env only on requirements.env_platforms', async () => {
+      const otherPlatform = process.platform === 'linux' ? 'darwin' : 'linux';
+      const manifest = {
+        actuator_id: 'env-platform-test-actuator',
+        version: '1.0.0',
+        capabilities: [
+          {
+            op: 'linux_only_env',
+            platforms: ['darwin', 'linux', 'win32'],
+            requirements: {
+              env: ['KYBERION_TEST_MISSING_ENV'],
+              env_platforms: [otherPlatform],
+            },
+          },
+        ],
+      };
+      fs.writeFileSync(TMP_MANIFEST, JSON.stringify(manifest));
+
+      const status = await checkActuatorCapabilities('env-platform-test-actuator', TMP_MANIFEST);
+      expect(status.capabilities[0]?.available).toBe(true);
+    });
+
     it('reports implemented:false capabilities as unavailable with not_implemented reason', async () => {
       const manifest = {
         actuator_id: 'stub-test-actuator',

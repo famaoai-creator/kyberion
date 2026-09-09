@@ -1,11 +1,10 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import * as path from 'node:path';
-import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
-import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { getRegisteredEnvBool, getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import {
   safeChmodSync,
   safeExistsSync,
@@ -256,7 +255,9 @@ export class FileSecretProvider implements SecretProvider {
   constructor(private readonly secretsPath = FILE_SECRETS_PATH) {}
 
   async isAvailable(): Promise<boolean> {
-    return true;
+    // Opt-in only. Never a silent default on darwin/win32 (keychain wins first
+    // anyway) and never an implicit Linux store without operator acknowledgement.
+    return getRegisteredEnvBool('KYBERION_ALLOW_FILE_SECRETS') === true;
   }
 
   private readSecretsFile(): Record<string, Record<string, string>> {
@@ -349,8 +350,6 @@ export class EnvSecretProvider implements SecretProvider {
 }
 
 // Adaptive policy router
-let warnedFileSecretFallback = false;
-
 export class SecretPolicyRouter {
   private providers: Map<string, SecretProvider> = new Map();
 
@@ -366,19 +365,6 @@ export class SecretPolicyRouter {
     for (const id of chain) {
       const provider = this.providers.get(id);
       if (provider && (await provider.isAvailable())) {
-        if (id === 'file_secrets' && !getRegisteredEnvText('KYBERION_ALLOW_FILE_SECRETS')) {
-          // Warn-phase (REVIEW_CODEX_2026-07-11 / AC-05): plaintext-JSON file
-          // secrets engage silently when the keychain is unavailable. TODO:
-          // after the warn observation period and AC-05 Task 2 (encryption
-          // option), make unacknowledged fallback fail-closed.
-          if (!warnedFileSecretFallback) {
-            warnedFileSecretFallback = true;
-            logger.warn(
-              '[SECRET_BRIDGE] Falling back to plaintext file secrets (keychain unavailable). ' +
-                'Set KYBERION_ALLOW_FILE_SECRETS=1 to acknowledge, or configure the OS keychain.'
-            );
-          }
-        }
         return provider;
       }
     }

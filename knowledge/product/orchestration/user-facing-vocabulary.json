@@ -3538,6 +3538,16 @@
         "ja": "  archive-inbox 常連差出人のアーカイブフィルタを作成",
         "qps-ploc": "⟦  ȧřƈħïṽė-ïñƀőẋ Ƈřėȧŧė ȧřƈħïṽė ƒïŀŧėřş ƒőř řėṗėȧŧėḓ ïñƀőẋ şėñḓėřş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
+      "cli_help_email_path_note": {
+        "en": "Inbox/triage (read): Google Workspace gmail_triage. Send/draft (write): email-actuator, approval-gated.",
+        "ja": "受信/トリアージ(読取): Google Workspace gmail_triage。送信/下書き(書込): email-actuator、承認必須。",
+        "qps-ploc": "⟦Ïñƀőẋ/ŧřïȧɠė (řėȧḓ): Ɠőőɠŀė Ẇőřķşṗȧƈė ɠɱȧïŀ_ŧřïȧɠė. Şėñḓ/ḓřȧƒŧ (ẇřïŧė): ėɱȧïŀ-ȧƈŧůȧŧőř, ȧṗṗřőṽȧŀ-ɠȧŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "cli_help_email_operator_doc": {
+        "en": "See docs/EMAIL_OPERATOR.ja.md",
+        "ja": "詳細: docs/EMAIL_OPERATOR.ja.md",
+        "qps-ploc": "⟦Şėė ḓőƈş/ĖⱮȦÏĿ_ŐṖĖŘȦŦŐŘ.ĵȧ.ɱḓ ŀőřėɱ ïṗş⟧"
+      },
       "cli_help_calendar_usage": {
         "en": "Usage: pnpm kyberion calendar <status|list-calendars|agenda|freebusy|create-event> [options]",
         "ja": "使い方: pnpm kyberion calendar <status|list-calendars|agenda|freebusy|create-event> [オプション]",
