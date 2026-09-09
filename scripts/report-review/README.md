@@ -30,6 +30,8 @@ KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/report-review/server.ts
 ```
 
 - 保存先は起動時の1ファイルに固定・127.0.0.1限定・トークン＋Origin検査。
+- 対象HTMLと保存本文は25MiBまで。大きなHTMLは413、同時に複数の重いGET/保存を受けた場合は503で拒否する。
+- 受信にはtimeoutを設け、保存本文はUTF-8バイト単位で上限を検査する。
 - confidential/personal のレビューは `--tenant`（または `KYBERION_TENANT`）を必須とし、
   `artifact_ref + EventScope + viewer_principal` を保存 receipt に固定する。client 側の
   tenant 表示だけでは認可にならない。
