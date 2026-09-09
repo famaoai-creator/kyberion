@@ -179,7 +179,7 @@ describe('backend classification', () => {
   it('maps known providers to their endpoints', () => {
     expect(reasoningBackendEndpoint('anthropic')).toContain('api.anthropic.com');
     expect(reasoningBackendEndpoint('gemini')).toContain('googleapis.com');
-    expect(reasoningBackendEndpoint('cursor-cli')).toContain('api.cursor.com');
+    expect(reasoningBackendEndpoint('cursor-cli')).toContain('api2.cursor.sh');
     expect(reasoningBackendEndpoint('opencode-cli')).toContain('opencode.ai');
   });
 
