@@ -1125,7 +1125,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 11815,
+      "size": 11928,
       "type": "json"
     },
     {
@@ -1239,7 +1239,7 @@
     {
       "path": "product/governance/authority-roles/surface_runtime.json",
       "tier": "public",
-      "size": 760,
+      "size": 865,
       "type": "json"
     },
     {
@@ -2475,7 +2475,7 @@
     {
       "path": "product/governance/role-write-access.json",
       "tier": "public",
-      "size": 3537,
+      "size": 3650,
       "type": "json"
     },
     {
@@ -2493,7 +2493,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 21304,
+      "size": 21530,
       "type": "json"
     },
     {

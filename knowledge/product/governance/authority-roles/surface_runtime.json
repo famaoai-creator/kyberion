@@ -5,6 +5,8 @@
   "write_scopes": [
     "active/shared/runtime/",
     "active/shared/logs/surfaces/",
+    "active/shared/observability/protocol-services/",
+    "active/shared/observability/review-service/",
     "knowledge/product/governance/surfaces/",
     "knowledge/product/governance/active-surfaces.json",
     "active/shared/coordination/channels/imessage/",
