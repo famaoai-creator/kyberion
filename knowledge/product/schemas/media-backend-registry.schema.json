@@ -62,6 +62,18 @@
             "items": { "type": "string" }
           },
           "fallback_backend_id": { "type": "string", "minLength": 1 },
+          "cost_tier": {
+            "type": "string",
+            "enum": ["free", "paid", "self_hosted", "environment"]
+          },
+          "data_policy": {
+            "type": "string",
+            "enum": ["training_eligible", "zero_retention", "local_only"]
+          },
+          "execution_locality": {
+            "type": "string",
+            "enum": ["local", "remote", "hybrid"]
+          },
           "notes": { "type": "string" }
         },
         "required": [

@@ -22,6 +22,10 @@
       },
       "service_id": "media-generation",
       "action": "generate_image",
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "fallback_backend_id": "media-generation.gemini.imagen-3-fast",
       "notes": "Routes governed image generation through the media-generation service preset. ComfyUI availability and managed location are also tracked via the service runtime abstraction."
     },
     {
@@ -38,6 +42,9 @@
       },
       "service_id": "media-generation",
       "action": "generate_video",
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
       "fallback_backend_id": "video.hyperframes_cli",
       "notes": "Compatibility-specific video contract for the shared ComfyUI runtime."
     },
@@ -57,6 +64,10 @@
         "async": true,
         "mux_audio": true
       },
+      "cost_tier": "free",
+      "data_policy": "training_eligible",
+      "execution_locality": "remote",
+      "fallback_backend_id": "video.hyperframes_cli",
       "notes": "Direct Google Gemini API adapter. Select explicitly; the default remains HyperFrames."
     },
     {
@@ -74,6 +85,9 @@
         "artifact_formats": ["mp4"],
         "async": true
       },
+      "cost_tier": "paid",
+      "data_policy": "zero_retention",
+      "execution_locality": "remote",
       "notes": "Provider adapter for Runway text-to-video and image-to-video task APIs."
     },
     {
@@ -91,6 +105,9 @@
         "artifact_formats": ["mp4"],
         "async": true
       },
+      "cost_tier": "paid",
+      "data_policy": "zero_retention",
+      "execution_locality": "remote",
       "notes": "Same provider abstraction as Gen-4.5; model selection stays in the governed backend registry."
     },
     {
@@ -109,6 +126,9 @@
         "async": true,
         "mux_audio": true
       },
+      "cost_tier": "paid",
+      "data_policy": "zero_retention",
+      "execution_locality": "remote",
       "notes": "Runway-hosted Gemini Omni Flash route for conversational or reference-guided clips."
     },
     {
@@ -127,6 +147,9 @@
         "async": true,
         "mux_audio": true
       },
+      "cost_tier": "paid",
+      "data_policy": "zero_retention",
+      "execution_locality": "remote",
       "notes": "Direct OpenAI Videos API adapter. Verify account access before production use."
     },
     {
@@ -144,6 +167,9 @@
         "artifact_formats": ["mp4"],
         "async": true
       },
+      "cost_tier": "paid",
+      "data_policy": "zero_retention",
+      "execution_locality": "remote",
       "notes": "Direct MiniMax asynchronous task and file retrieval adapter."
     },
     {
@@ -160,7 +186,30 @@
       },
       "service_id": "media-generation",
       "action": "generate_music",
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
       "notes": "Compatibility-specific music contract for the shared ComfyUI runtime."
+    },
+    {
+      "backend_id": "media-generation.gemini.imagen-3-fast",
+      "modality": "image",
+      "display_name": "Google AI Studio Imagen 3 Fast (Free Tier)",
+      "kind": "service_preset",
+      "provider": "gemini_api",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["jpg", "jpeg", "png", "webp"],
+        "async": false
+      },
+      "service_id": "gemini",
+      "action": "generate_image_fast",
+      "cost_tier": "free",
+      "data_policy": "training_eligible",
+      "execution_locality": "remote",
+      "fallback_backend_id": "media-generation.gemini",
+      "notes": "Routes image generation through Google AI Studio Imagen 3 Fast free tier (training-eligible, rate-limited)."
     },
     {
       "backend_id": "media-generation.gemini",
@@ -176,6 +225,10 @@
       },
       "service_id": "gemini",
       "action": "generate_image",
+      "cost_tier": "paid",
+      "data_policy": "zero_retention",
+      "execution_locality": "remote",
+      "fallback_backend_id": "media-generation.host_agent",
       "notes": "Routes image generation through the Gemini API / AI Studio service preset using GEMINI_API_KEY."
     },
     {
@@ -190,6 +243,9 @@
         "artifact_formats": ["jpg", "jpeg", "png", "webp"],
         "async": false
       },
+      "cost_tier": "environment",
+      "data_policy": "zero_retention",
+      "execution_locality": "local",
       "notes": "Requests the outer agent/host environment (e.g. agy / Antigravity IDE) to generate the image via its native tool and stores it."
     },
     {
@@ -206,6 +262,9 @@
       },
       "command": "uvx",
       "args": ["--from", "mflux", "mflux-generate"],
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
       "fallback_backend_id": "media-generation.comfyui",
       "notes": "Apple Silicon local FLUX generation via the governed tool runtime registry. Tuned via KYBERION_MFLUX_* env policy."
     },
@@ -221,6 +280,9 @@
         "artifact_formats": ["png"],
         "async": false
       },
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
       "fallback_backend_id": "media-generation.local_flux",
       "notes": "macOS Apple Silicon Image Playground via the governed native capability bridge. Availability is probed separately from Foundation Models and degrades to local FLUX when unavailable."
     },
@@ -236,6 +298,9 @@
         "playback": true,
         "artifact_formats": ["wav", "aiff"]
       },
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
       "notes": "Local fallback voice backend for playback and artifact generation."
     },
     {
@@ -253,6 +318,9 @@
       },
       "command": "npx",
       "args": ["hyperframes", "render"],
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
       "notes": "Deterministic HTML-to-video render backend with optional narration mux."
     }
   ]

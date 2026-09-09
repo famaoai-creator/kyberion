@@ -14,6 +14,7 @@ import {
 import { executeServicePreset } from './service-engine.js';
 import { resolveServiceBinding } from './service-binding.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
+import { getMediaBackendRegistry } from './media-backend-registry.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
@@ -36,6 +37,12 @@ function getFallbackTargetPath(request: ImageGenerationRequest): string {
   const candidate = request.targetPath || pathResolver.resolve(`active/shared/tmp/${filename}`);
   assertSafeRepositoryPath(pathResolver.resolve(candidate), { allowMissingLeaf: true });
   return candidate;
+}
+
+export function isRateLimitOrQuotaError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  return /429|resource_exhausted|rate\s*limit|quota/i.test(msg);
 }
 
 function isAppleSiliconMac(): boolean {
@@ -159,9 +166,10 @@ async function runLocalFluxGeneration(
       args[fromIndex + 1] = packageSpec;
     }
   }
+  if (!args.includes('--model') && !args.includes('-m')) {
+    args.push('--model', model);
+  }
   args.push(
-    '--model',
-    model,
     '--prompt',
     request.prompt,
     '--width',
@@ -218,6 +226,9 @@ async function runLocalFluxGeneration(
 
 export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'comfyui';
+  readonly costTier = 'self_hosted';
+  readonly dataPolicy = 'local_only';
+  readonly executionLocality = 'local';
 
   async isAvailable(): Promise<boolean> {
     const resolution = await probeServiceRuntime('comfyui', 'trial');
@@ -255,8 +266,70 @@ export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
   }
 }
 
+export class GeminiFastImageGenerationProvider implements ImageGenerationProvider {
+  readonly id = 'gemini_fast';
+  readonly costTier = 'free';
+  readonly dataPolicy = 'training_eligible';
+  readonly executionLocality = 'remote';
+
+  async isAvailable(): Promise<boolean> {
+    if (!getRegisteredEnvText('GEMINI_API_KEY')) return false;
+    try {
+      resolveServiceBinding('gemini', 'secret-guard');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
+    const startedAt = Date.now();
+    try {
+      const response = await executeServicePreset(
+        'gemini',
+        'generate_image_fast',
+        {
+          prompt: request.prompt,
+          aspect_ratio: request.aspectRatio || '1:1',
+        },
+        'secret-guard'
+      );
+
+      const imageBytes = imageBytesFromResponse(response);
+
+      if (!imageBytes || typeof imageBytes !== 'string') {
+        throw new Error('Gemini fast image service returned no image bytes');
+      }
+
+      const targetPath = getFallbackTargetPath(request);
+      const buffer = Buffer.from(imageBytes, 'base64');
+      safeWriteFile(targetPath, buffer);
+
+      return {
+        status: 'succeeded',
+        provider: this.id,
+        path: targetPath,
+        elapsedMs: Date.now() - startedAt,
+      };
+    } catch (error: any) {
+      logger.error(
+        `[image_generation_bridge] Gemini fast service generation failed: ${error.message}`
+      );
+      return {
+        status: 'failed',
+        provider: this.id,
+        elapsedMs: Date.now() - startedAt,
+        error: error.message || 'gemini_fast_image_generation_failed',
+      };
+    }
+  }
+}
+
 export class GeminiServiceImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'gemini_service';
+  readonly costTier = 'paid';
+  readonly dataPolicy = 'zero_retention';
+  readonly executionLocality = 'remote';
 
   async isAvailable(): Promise<boolean> {
     if (!getRegisteredEnvText('GEMINI_API_KEY')) return false;
@@ -311,6 +384,9 @@ export class GeminiServiceImageGenerationProvider implements ImageGenerationProv
 
 export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'llm_api';
+  readonly costTier = 'paid';
+  readonly dataPolicy = 'zero_retention';
+  readonly executionLocality = 'remote';
 
   async isAvailable(): Promise<boolean> {
     return Boolean(
@@ -442,6 +518,9 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
 
 export class LocalDiffusionImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'local_diffusion';
+  readonly costTier = 'self_hosted';
+  readonly dataPolicy = 'local_only';
+  readonly executionLocality = 'local';
 
   async isAvailable(): Promise<boolean> {
     return isAppleSiliconMac() && probeToolRuntime('mflux').selected_action !== 'install';
@@ -454,6 +533,9 @@ export class LocalDiffusionImageGenerationProvider implements ImageGenerationPro
 
 export class LocalFluxImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'local_flux';
+  readonly costTier = 'self_hosted';
+  readonly dataPolicy = 'local_only';
+  readonly executionLocality = 'local';
 
   async isAvailable(): Promise<boolean> {
     return isAppleSiliconMac() && probeToolRuntime('mflux').selected_action !== 'install';
@@ -466,6 +548,9 @@ export class LocalFluxImageGenerationProvider implements ImageGenerationProvider
 
 export class WindowsNativeImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'windows_native';
+  readonly costTier = 'self_hosted';
+  readonly dataPolicy = 'local_only';
+  readonly executionLocality = 'local';
 
   async isAvailable(): Promise<boolean> {
     return probeWindowsNativeImageGeneration().available;
@@ -505,6 +590,9 @@ function getApplePlaygroundTargetPath(request: ImageGenerationRequest): string {
 
 export class ApplePlaygroundImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'apple_playground';
+  readonly costTier = 'self_hosted';
+  readonly dataPolicy = 'local_only';
+  readonly executionLocality = 'local';
 
   async isAvailable(): Promise<boolean> {
     return (await probeAppleImageGeneration()).available;
@@ -594,6 +682,9 @@ function writeHostBridgeRequest(
 
 abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationProvider {
   abstract readonly id: HostBridgeVariant;
+  readonly costTier = 'environment';
+  readonly dataPolicy = 'zero_retention';
+  readonly executionLocality = 'local';
   protected abstract readonly config: HostBridgeProviderConfig;
 
   async isAvailable(): Promise<boolean> {
@@ -675,20 +766,63 @@ export class AgyHostBridgeImageGenerationProvider extends BaseHostBridgeImageGen
 
 export class AdaptivePolicyRouter {
   private providers: Map<string, ImageGenerationProvider> = new Map();
+  private fallbackGraph: Map<string, string> = new Map();
 
   constructor(providers: ImageGenerationProvider[]) {
     for (const p of providers) {
       this.providers.set(p.id, p);
     }
+    this.initFallbackGraph();
   }
 
-  async selectProvider(request: ImageGenerationRequest): Promise<ImageGenerationProvider> {
+  private initFallbackGraph(): void {
+    try {
+      const registry = getMediaBackendRegistry();
+      const backends = registry.backends.filter((b) => b.modality === 'image');
+      const aliasToProviderId: Record<string, string> = {
+        'media-generation.comfyui': 'comfyui',
+        'media-generation.gemini.imagen-3-fast': 'gemini_fast',
+        'media-generation.gemini': 'gemini_service',
+        'media-generation.host_agent': 'host_agent',
+        'media-generation.local_flux': 'local_flux',
+        'media-generation.apple_playground': 'apple_playground',
+      };
+      for (const b of backends) {
+        if (b.fallback_backend_id) {
+          const fromId = aliasToProviderId[b.backend_id] || b.backend_id;
+          const toId = aliasToProviderId[b.fallback_backend_id] || b.fallback_backend_id;
+          this.fallbackGraph.set(fromId, toId);
+        }
+      }
+    } catch (_) {
+      // Ignore registry loading issues in unit tests with mocked environments
+    }
+  }
+
+  async resolveCandidateChain(request: ImageGenerationRequest): Promise<ImageGenerationProvider[]> {
+    const candidates: ImageGenerationProvider[] = [];
+    const seenIds = new Set<string>();
+
+    const addIfAvailableAndCompliant = async (provider: ImageGenerationProvider | undefined) => {
+      if (!provider || seenIds.has(provider.id)) return;
+      if (
+        (request.mode === 'privacy_first' || request.mode === 'local_only') &&
+        provider.dataPolicy === 'training_eligible'
+      ) {
+        return;
+      }
+      if (request.mode === 'local_only' && provider.executionLocality !== 'local') {
+        return;
+      }
+      if (await provider.isAvailable()) {
+        candidates.push(provider);
+        seenIds.add(provider.id);
+      }
+    };
+
     if (request.providerPreference && request.providerPreference.length > 0) {
       for (const id of request.providerPreference) {
-        const provider = this.providers.get(id);
-        if (provider && (await provider.isAvailable())) {
-          return provider;
-        }
+        await addIfAvailableAndCompliant(this.providers.get(id));
       }
     }
 
@@ -703,6 +837,17 @@ export class AdaptivePolicyRouter {
         'local_diffusion',
         'comfyui',
       ];
+    } else if (mode === 'fast') {
+      defaultChain = [
+        'gemini_fast',
+        'gemini_service',
+        'apple_playground',
+        'windows_native',
+        'local_flux',
+        'comfyui',
+        'llm_api',
+        'host_agent',
+      ];
     } else if (mode === 'artistic') {
       defaultChain = [
         'codex_host_bridge',
@@ -711,6 +856,7 @@ export class AdaptivePolicyRouter {
         'apple_playground',
         'windows_native',
         'gemini_service',
+        'gemini_fast',
         'llm_api',
         'local_flux',
         'comfyui',
@@ -725,19 +871,78 @@ export class AdaptivePolicyRouter {
         'windows_native',
         'local_flux',
         'comfyui',
+        'gemini_fast',
         'gemini_service',
         'llm_api',
       ];
     }
 
     for (const id of defaultChain) {
-      const provider = this.providers.get(id);
-      if (provider && (await provider.isAvailable())) {
-        return provider;
+      await addIfAvailableAndCompliant(this.providers.get(id));
+    }
+
+    // Follow governed fallback_backend_id chains for any selected candidates
+    const visited = new Set<string>(seenIds);
+    for (const c of [...candidates]) {
+      let curr = c.id;
+      while (this.fallbackGraph.has(curr)) {
+        const nextId = this.fallbackGraph.get(curr)!;
+        if (visited.has(nextId)) break;
+        visited.add(nextId);
+        await addIfAvailableAndCompliant(this.providers.get(nextId));
+        curr = nextId;
       }
     }
 
+    return candidates;
+  }
+
+  async selectProvider(request: ImageGenerationRequest): Promise<ImageGenerationProvider> {
+    const chain = await this.resolveCandidateChain(request);
+    if (chain.length > 0) {
+      return chain[0];
+    }
     throw new Error('No available Image Generation provider could be resolved.');
+  }
+
+  async generateWithFallback(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
+    const candidates = await this.resolveCandidateChain(request);
+    if (candidates.length === 0) {
+      throw new Error('No available Image Generation provider could be resolved.');
+    }
+
+    let lastError: unknown = null;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const provider = candidates[i];
+      try {
+        logger.info(
+          `[image_generation_bridge] Routing generation request to provider: ${provider.id}`
+        );
+        const result = await provider.generate(request);
+        if (result.status === 'failed' && isRateLimitOrQuotaError(result.error)) {
+          logger.warn(
+            `[image_generation_bridge] Provider ${provider.id} encountered rate limit / quota error: ${result.error}. Attempting fallback.`
+          );
+          lastError = new Error(result.error);
+          continue;
+        }
+        return result;
+      } catch (err: any) {
+        lastError = err;
+        if (isRateLimitOrQuotaError(err)) {
+          logger.warn(
+            `[image_generation_bridge] Provider ${provider.id} threw rate limit / quota error: ${err?.message || err}. Attempting fallback.`
+          );
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(String(lastError || 'All image generation providers failed.'));
   }
 }
 
@@ -747,6 +952,7 @@ function getRouter(): AdaptivePolicyRouter {
   if (!globalRouter) {
     globalRouter = new AdaptivePolicyRouter([
       new ComfyUiImageGenerationProvider(),
+      new GeminiFastImageGenerationProvider(),
       new GeminiServiceImageGenerationProvider(),
       new LlmApiImageGenerationProvider(),
       new LocalFluxImageGenerationProvider(),
@@ -765,7 +971,5 @@ export async function generateImage(
   request: ImageGenerationRequest
 ): Promise<ImageGenerationResult> {
   const router = getRouter();
-  const provider = await router.selectProvider(request);
-  logger.info(`[image_generation_bridge] Routing generation request to provider: ${provider.id}`);
-  return await provider.generate(request);
+  return await router.generateWithFallback(request);
 }
