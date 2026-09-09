@@ -1321,6 +1321,20 @@ async function approveScopeChange(
 }
 
 /**
+ * Journal-only actions that never delegate to a reasoning backend.
+ * Skipping the reasoning bootstrap (~3s of CLI availability probes per
+ * spawn) keeps high-frequency per-task `record-task`/`record-evidence`
+ * spawns cheap. Unknown actions fail safe toward installing: delegation
+ * must never silently fall back to the stub.
+ */
+const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set(['record-task', 'record-evidence']);
+
+/** Whether this action may skip the reasoning-backend bootstrap. Exported for tests. */
+export function shouldSkipReasoningBootstrap(action: string | undefined): boolean {
+  return !!action && REASONING_FREE_ACTIONS.has(action);
+}
+
+/**
  * 7. Main Entry
  */
 async function mainImpl(
@@ -1347,7 +1361,10 @@ async function mainImpl(
   }
   // Register reasoning backends so dispatch-workitems delegation reaches a
   // real backend (claude-cli/anthropic) instead of silently using the stub.
-  installReasoningBackends();
+  // Journal-only actions never delegate; skip their probe cost.
+  if (!shouldSkipReasoningBootstrap(requestedAction)) {
+    installReasoningBackends();
+  }
   killSwitch.startMonitor(Number(registeredEnv('KYBERION_KILL_SWITCH_INTERVAL_MS') || 10000));
 
   const positionalArgs = extractMissionControllerPositionalArgs(args);
