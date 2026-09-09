@@ -219,7 +219,7 @@
     {
       "path": "product/architecture/browser-execution-substrate-howto.md",
       "tier": "public",
-      "size": 8847,
+      "size": 10381,
       "type": "md"
     },
     {
@@ -1281,7 +1281,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 45083,
+      "size": 45289,
       "type": "json"
     },
     {
@@ -2055,7 +2055,7 @@
     {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 5243,
+      "size": 5324,
       "type": "json"
     },
     {
