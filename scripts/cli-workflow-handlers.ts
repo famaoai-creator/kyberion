@@ -139,13 +139,8 @@ function printEmailHelp(locale = resolveLocale()): void {
   );
   printText('  pnpm kyberion email archive-inbox --apply');
   printText('');
-  printText(
-    'Inbox/triage (read): Google Workspace gmail_triage. Send/draft (write): email-actuator, approval-gated.'
-  );
-  printText(
-    '受信/トリアージ(読取): Google Workspace gmail_triage。送信/下書き(書込): email-actuator、承認必須。'
-  );
-  printText('See docs/EMAIL_OPERATOR.ja.md');
+  printText(t('cli_help_email_path_note', locale));
+  printText(t('cli_help_email_operator_doc', locale));
 }
 
 function printCalendarHelp(locale = resolveLocale()): void {
