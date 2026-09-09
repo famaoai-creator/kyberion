@@ -868,6 +868,15 @@
       "subsystem": "reasoning"
     },
     {
+      "name": "KYBERION_CURSOR_NATIVE_SUBAGENT",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Set to 0 to disable the Cursor CLI worktree-isolated native subagent harness; enabled by default.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
       "name": "KYBERION_CUSTOMER",
       "category": "runtime",
       "type": "string",

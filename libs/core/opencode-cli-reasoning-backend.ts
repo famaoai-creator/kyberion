@@ -17,7 +17,6 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { z } from 'zod';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { childDelegationEnv } from './operation-policy-gate.js';
@@ -40,6 +39,7 @@ import {
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   type StructuredOpSpec,
 } from './structured-reasoning.js';
+import { schemaHint } from './structured-schema-hint.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -110,59 +110,6 @@ function validateExtraArgs(args: readonly string[]): string[] {
     }
   }
   return [...args];
-}
-
-/**
- * Render a compact shape hint from a spec's Zod schema (e.g.
- * `{ hypotheses: array of { id: string, proposed_by: string, ... } }`).
- *
- * `opencode run` has no `--json-schema` flag, so prompt-only structured ops
- * depend on the model reproducing the exact key layout. Free-tier small
- * models guess a plausible-but-wrong shape without an explicit hint; this
- * keeps the hint backend-local instead of changing the shared specs.
- */
-function zodDefOf(schema: z.ZodTypeAny): { type?: string; [key: string]: unknown } {
-  const withInternals = schema as unknown as {
-    _zod?: { def?: { type?: string; [key: string]: unknown } };
-  };
-  return withInternals._zod?.def ?? {};
-}
-
-function zodShape(schema: z.ZodTypeAny): string {
-  const def = zodDefOf(schema);
-  if (def.type === 'optional' || def.type === 'default' || def.type === 'prefault') {
-    const inner = def.innerType as z.ZodTypeAny | undefined;
-    const rendered = inner ? zodShape(inner) : 'value';
-    return def.type === 'optional' ? `${rendered} (optional)` : rendered;
-  }
-  if (def.type === 'array') {
-    const element = def.element as z.ZodTypeAny | undefined;
-    return `array of ${element ? zodShape(element) : 'value'}`;
-  }
-  if (def.type === 'object') {
-    const shape = def.shape as Record<string, z.ZodTypeAny> | undefined;
-    const entries = Object.entries(shape ?? {}).map(([key, value]) => `${key}: ${zodShape(value)}`);
-    return `{ ${entries.join(', ')} }`;
-  }
-  if (def.type === 'enum') {
-    const values = def.values as unknown;
-    return Array.isArray(values) ? `one of ${values.join('/')}` : 'string';
-  }
-  if (def.type === 'string') return 'string';
-  if (def.type === 'number') return 'number';
-  if (def.type === 'boolean') return 'boolean';
-  // Pipes / transforms / prefaults wrap an inner schema — describe the inner shape.
-  const inner = def.innerType as z.ZodTypeAny | undefined;
-  if (inner) return zodShape(inner);
-  return 'value';
-}
-
-function schemaHint(schema: z.ZodTypeAny): string {
-  try {
-    return zodShape(schema);
-  } catch {
-    return 'a JSON object';
-  }
 }
 
 export interface OpencodeCliReasoningBackendOptions {

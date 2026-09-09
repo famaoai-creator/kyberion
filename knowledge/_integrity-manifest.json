@@ -219,7 +219,7 @@
     {
       "path": "product/architecture/browser-execution-substrate-howto.md",
       "tier": "public",
-      "size": 8847,
+      "size": 10381,
       "type": "md"
     },
     {
@@ -1281,7 +1281,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 45280,
+      "size": 45486,
       "type": "json"
     },
     {
@@ -1377,7 +1377,7 @@
     {
       "path": "product/governance/egress-policy.json",
       "tier": "public",
-      "size": 753,
+      "size": 775,
       "type": "json"
     },
     {
@@ -1389,7 +1389,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 125118,
+      "size": 125437,
       "type": "json"
     },
     {
@@ -1731,7 +1731,7 @@
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 9027,
+      "size": 11550,
       "type": "json"
     },
     {
@@ -1899,13 +1899,13 @@
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 2009,
+      "size": 2077,
       "type": "json"
     },
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 16631,
+      "size": 17493,
       "type": "json"
     },
     {
@@ -1917,7 +1917,7 @@
     {
       "path": "product/governance/model-registry/index.json",
       "tier": "public",
-      "size": 727,
+      "size": 758,
       "type": "json"
     },
     {
@@ -1976,6 +1976,12 @@
     },
     {
       "path": "product/governance/model-registry/model-67656d696e693a67656d696e692d332e372d666c617368.json",
+      "tier": "public",
+      "size": 749,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-67656d696e693a67656d696e692d332e382d666c617368.json",
       "tier": "public",
       "size": 749,
       "type": "json"
@@ -2049,7 +2055,7 @@
     {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 5243,
+      "size": 5324,
       "type": "json"
     },
     {
@@ -2385,7 +2391,7 @@
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1549,
+      "size": 1546,
       "type": "json"
     },
     {
@@ -4119,7 +4125,7 @@
     {
       "path": "product/orchestration/provider-capabilities.json",
       "tier": "public",
-      "size": 16067,
+      "size": 17432,
       "type": "json"
     },
     {
@@ -4509,7 +4515,7 @@
     {
       "path": "product/orchestration/service-presets/gemini.json",
       "tier": "public",
-      "size": 1556,
+      "size": 1978,
       "type": "json"
     },
     {
@@ -7989,7 +7995,7 @@
     {
       "path": "product/schemas/media-backend-registry.schema.json",
       "tier": "public",
-      "size": 2839,
+      "size": 3245,
       "type": "json"
     },
     {
