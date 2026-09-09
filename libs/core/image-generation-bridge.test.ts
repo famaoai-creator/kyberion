@@ -5,10 +5,12 @@ import {
   CodexHostBridgeImageGenerationProvider,
   AgyHostBridgeImageGenerationProvider,
   ApplePlaygroundImageGenerationProvider,
+  GeminiFastImageGenerationProvider,
   GeminiServiceImageGenerationProvider,
   LocalFluxImageGenerationProvider,
   LlmApiImageGenerationProvider,
   HostAgentImageGenerationProvider,
+  isRateLimitOrQuotaError,
 } from './image-generation-bridge.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { ImageGenerationProvider } from './image-generation-types.js';
@@ -182,6 +184,140 @@ describe('AdaptivePolicyRouter', () => {
 
     expect(provider.id).toBe('codex_host_bridge');
   });
+
+  it('filters out remote providers with zero_retention when mode is local_only', async () => {
+    const remoteZeroRetentionProvider: ImageGenerationProvider = {
+      id: 'remote_zero_retention',
+      costTier: 'paid',
+      dataPolicy: 'zero_retention',
+      executionLocality: 'remote',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn(),
+    };
+    const localProvider: ImageGenerationProvider = {
+      id: 'local_flux',
+      costTier: 'self_hosted',
+      dataPolicy: 'local_only',
+      executionLocality: 'local',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn(),
+    };
+    const router = new AdaptivePolicyRouter([remoteZeroRetentionProvider, localProvider]);
+    const candidates = await router.resolveCandidateChain({
+      prompt: 'internal schema',
+      mode: 'local_only',
+      providerPreference: ['remote_zero_retention', 'local_flux'],
+    });
+
+    expect(candidates.map((c) => c.id)).not.toContain('remote_zero_retention');
+    expect(candidates.map((c) => c.id)).toContain('local_flux');
+  });
+
+  it('filters out training_eligible providers when mode is privacy_first', async () => {
+    const freeTrainingProvider: ImageGenerationProvider = {
+      id: 'gemini_fast',
+      costTier: 'free',
+      dataPolicy: 'training_eligible',
+      executionLocality: 'remote',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn(),
+    };
+    const paidZeroRetentionProvider: ImageGenerationProvider = {
+      id: 'gemini_service',
+      costTier: 'paid',
+      dataPolicy: 'zero_retention',
+      executionLocality: 'remote',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn(),
+    };
+    const router = new AdaptivePolicyRouter([freeTrainingProvider, paidZeroRetentionProvider]);
+    const candidates = await router.resolveCandidateChain({
+      prompt: 'sensitive company diagram',
+      mode: 'privacy_first',
+      providerPreference: ['gemini_fast', 'gemini_service'],
+    });
+
+    expect(candidates.map((c) => c.id)).not.toContain('gemini_fast');
+    expect(candidates.map((c) => c.id)).toContain('gemini_service');
+  });
+
+  it('automatically falls back to next provider on 429 rate limit error', async () => {
+    const rateLimitedProvider: ImageGenerationProvider = {
+      id: 'gemini_fast',
+      costTier: 'free',
+      dataPolicy: 'training_eligible',
+      executionLocality: 'remote',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn().mockResolvedValue({
+        status: 'failed',
+        provider: 'gemini_fast',
+        elapsedMs: 50,
+        error: 'RESOURCE_EXHAUSTED: Rate limit exceeded (429)',
+      }),
+    };
+    const fallbackProvider: ImageGenerationProvider = {
+      id: 'gemini_service',
+      costTier: 'paid',
+      dataPolicy: 'zero_retention',
+      executionLocality: 'remote',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn().mockResolvedValue({
+        status: 'succeeded',
+        provider: 'gemini_service',
+        path: '/tmp/fallback-image.jpg',
+        elapsedMs: 80,
+      }),
+    };
+
+    const router = new AdaptivePolicyRouter([rateLimitedProvider, fallbackProvider]);
+    const result = await router.generateWithFallback({
+      prompt: 'a cat',
+      providerPreference: ['gemini_fast', 'gemini_service'],
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.provider).toBe('gemini_service');
+    expect(result.path).toBe('/tmp/fallback-image.jpg');
+    expect(rateLimitedProvider.generate).toHaveBeenCalledTimes(1);
+    expect(fallbackProvider.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back when provider throws a 429 Error', async () => {
+    const throwingProvider: ImageGenerationProvider = {
+      id: 'gemini_fast',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn().mockRejectedValue(new Error('Gemini API 429 Quota Exceeded')),
+    };
+    const fallbackProvider: ImageGenerationProvider = {
+      id: 'local_flux',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn().mockResolvedValue({
+        status: 'succeeded',
+        provider: 'local_flux',
+        path: '/tmp/local-fallback.jpg',
+        elapsedMs: 120,
+      }),
+    };
+
+    const router = new AdaptivePolicyRouter([throwingProvider, fallbackProvider]);
+    const result = await router.generateWithFallback({
+      prompt: 'a dog',
+      providerPreference: ['gemini_fast', 'local_flux'],
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.provider).toBe('local_flux');
+    expect(result.path).toBe('/tmp/local-fallback.jpg');
+  });
+
+  it('detects rate limit or quota errors properly', () => {
+    expect(isRateLimitOrQuotaError(new Error('429 Too Many Requests'))).toBe(true);
+    expect(isRateLimitOrQuotaError(new Error('RESOURCE_EXHAUSTED'))).toBe(true);
+    expect(isRateLimitOrQuotaError('Rate limit reached')).toBe(true);
+    expect(isRateLimitOrQuotaError('Monthly quota exceeded')).toBe(true);
+    expect(isRateLimitOrQuotaError(new Error('Invalid prompt content'))).toBe(false);
+    expect(isRateLimitOrQuotaError(null)).toBe(false);
+  });
 });
 
 describe('ComfyUiImageGenerationProvider', () => {
@@ -267,6 +403,61 @@ describe('GeminiServiceImageGenerationProvider', () => {
 
     const provider = new GeminiServiceImageGenerationProvider();
     await expect(provider.isAvailable()).resolves.toBe(false);
+  });
+});
+
+describe('GeminiFastImageGenerationProvider', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('calls the gemini service generate_image_fast preset and returns succeeded', async () => {
+    process.env.GEMINI_API_KEY = 'mock-gemini-key';
+    mocks.executeServicePreset.mockResolvedValue({
+      imageBytes: 'bW9jay1mYXN0LWJ5dGVz',
+    });
+
+    const provider = new GeminiFastImageGenerationProvider();
+    expect(provider.costTier).toBe('free');
+    expect(provider.dataPolicy).toBe('training_eligible');
+    expect(provider.executionLocality).toBe('remote');
+
+    const result = await provider.generate({
+      prompt: 'a fast running rabbit',
+      aspectRatio: '1:1',
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.provider).toBe('gemini_fast');
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'gemini',
+      'generate_image_fast',
+      expect.objectContaining({
+        prompt: 'a fast running rabbit',
+        aspect_ratio: '1:1',
+      }),
+      'secret-guard'
+    );
+  });
+
+  it('returns failed status if preset throws an error', async () => {
+    process.env.GEMINI_API_KEY = 'mock-gemini-key';
+    mocks.executeServicePreset.mockRejectedValue(new Error('RESOURCE_EXHAUSTED 429'));
+
+    const provider = new GeminiFastImageGenerationProvider();
+    const result = await provider.generate({
+      prompt: 'a running rabbit',
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.provider).toBe('gemini_fast');
+    expect(result.error).toContain('RESOURCE_EXHAUSTED 429');
   });
 });
 
