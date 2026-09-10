@@ -3,7 +3,7 @@ title: Multi-Provider Co-Execution Contract
 category: Governance
 tags: [governance, multi-provider, cli, co-execution, xp-04, so-03]
 importance: 9
-last_updated: 2026-07-26
+last_updated: 2026-09-11
 ---
 
 # Multi-Provider Co-Execution Contract
