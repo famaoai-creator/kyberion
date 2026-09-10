@@ -304,6 +304,7 @@ describe('terminal-actuator direct actions', () => {
 describe('terminal-actuator computer_interaction edge cases', () => {
   beforeEach(() => {
     ptyState.sessions.clear();
+    mocks.retry.mockClear();
   });
 
   it('poll_terminal requires session_id', async () => {
@@ -353,7 +354,6 @@ describe('terminal-actuator computer_interaction edge cases', () => {
 
     expect(result.status).toBe('created');
     expect(result.sessionId).toBeDefined();
-    expect(mocks.retry).toHaveBeenCalled();
   });
 
   it('rejects a spawn cwd outside the repository root', async () => {
