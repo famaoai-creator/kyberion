@@ -11,7 +11,7 @@
   "dependencies": {
     "@agent/core": "workspace:*",
     "chokidar": "^5.0.0",
-    "ink": "^6.0.0",
+    "ink": "^7.1.1",
     "ink-text-input": "^6.0.0",
     "react": "^19.2.8"
   },
