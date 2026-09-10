@@ -11,11 +11,11 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
-    "discord.js": "^14.26.4"
+    "discord.js": "^14.27.0"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2",
-    "tsx": "^4.21.0",
+    "@types/node": "^26.5.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   }
 }
