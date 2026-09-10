@@ -140,7 +140,7 @@ async function seedMission(options: { withReviewTask: boolean }): Promise<string
   return missionPath;
 }
 
-describe.sequential('code_change PR collaboration (E2E-03 Task 6)', () => {
+describe('code_change PR collaboration (E2E-03 Task 6)', { concurrent: false }, () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.resetAllMocks();

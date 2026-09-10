@@ -32,7 +32,7 @@ import {
 import { runSurfaceConversation } from '@agent/core';
 import * as core from '@agent/core';
 
-describe.sequential('Channel surface agents', () => {
+describe('Channel surface agents', { concurrent: false }, () => {
   const identityPath = pathResolver.rootResolve('knowledge/personal/my-identity.json');
   const visionPath = pathResolver.rootResolve('knowledge/personal/my-vision.md');
   const agentIdentityPath = pathResolver.rootResolve('knowledge/personal/agent-identity.json');
