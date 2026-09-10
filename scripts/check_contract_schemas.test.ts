@@ -27,7 +27,7 @@ function runCheckContractSchemas(): { status: number | null; stdout: string; std
   };
 }
 
-describe.sequential('check_contract_schemas', () => {
+describe('check_contract_schemas', { concurrent: false }, () => {
   afterEach(() => {
     withExecutionContext('mission_controller', () => {
       const previousSudo = process.env.KYBERION_SUDO;

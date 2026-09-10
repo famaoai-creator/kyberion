@@ -22,7 +22,7 @@ function writePublicFile(relPath: string, body: string): string {
   return abs;
 }
 
-describe.sequential('check_tier_hygiene', () => {
+describe('check_tier_hygiene', { concurrent: false }, () => {
   it('uses the foundation text reader for tier scan inputs', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/check_tier_hygiene.ts'), {
