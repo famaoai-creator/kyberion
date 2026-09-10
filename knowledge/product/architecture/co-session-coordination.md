@@ -95,17 +95,19 @@ Handoff / 依頼の `kind` は Mesh Hub の allowlist と同系:
 
 `pnpm exec tsx scripts/co_session.ts`（`co-session` コマンド）:
 
-| 動詞                           | 意味                                                  |
-| ------------------------------ | ----------------------------------------------------- |
-| `start`                        | goal 付きで session 開始（sticky CURRENT 更新）       |
-| `join`                         | 既存 / sticky session に参加 + heartbeat              |
-| `leave`                        | 参加終了、自 lease 解放                               |
-| `heartbeat`                    | presence 更新                                         |
-| `status`                       | 参加者・lease・未 ack handoff                         |
-| `blackboard`                   | 表示 / 追記                                           |
-| `lease acquire\|release\|list` | path 排他                                             |
-| `handoff create\|list\|ack`    | 引き継ぎ                                              |
-| `promote-hint`                 | peer / mission 昇格の次コマンドを表示（実行はしない） |
+| 動詞                           | 意味                                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `start`                        | goal 付きで session 開始（sticky CURRENT 更新）                                                |
+| `join`                         | 既存 / sticky session に参加 + heartbeat                                                       |
+| `leave`                        | 参加終了、自 lease 解放                                                                        |
+| `heartbeat`                    | presence 更新                                                                                  |
+| `status`                       | 参加者・lease・未 ack handoff                                                                  |
+| `blackboard`                   | 表示 / 追記                                                                                    |
+| `lease acquire\|release\|list` | path 排他                                                                                      |
+| `handoff create\|list\|ack`    | 引き継ぎ。同一プロバイダ複数時は `--to-participant-id` / `--participant-id` でインスタンス指定 |
+| `promote-hint`                 | peer / mission 昇格の次コマンドを表示（実行はしない）                                          |
+
+同一モデルが複数並走する場合、参加者は `provider` + `participant_id`（既定 `{provider}-{pid}`）で区別する。path lease と handoff の宛先・ack は participant 単位。`--to claude` のみはプロバイダ種へのブロードキャスト、`--to-participant-id claude-b` は特定インスタンス宛て。
 
 ## 7. 昇格ゲート
 

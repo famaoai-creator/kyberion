@@ -96,6 +96,51 @@ describe('co-session', () => {
     expect(listCoSessionHandoffs('cos-hand', { pendingOnly: true })).toHaveLength(0);
   });
 
+  it('targets a specific participant when the same provider appears twice', () => {
+    startCoSession({ goal: 'same model', provider: 'claude', session_id: 'cos-twin' });
+    joinCoSession({
+      session_id: 'cos-twin',
+      provider: 'claude',
+      participant_id: 'claude-a',
+    });
+    joinCoSession({
+      session_id: 'cos-twin',
+      provider: 'claude',
+      participant_id: 'claude-b',
+    });
+    const handoff = createCoSessionHandoff({
+      session_id: 'cos-twin',
+      kind: 'review.request',
+      from_provider: 'cursor',
+      from_participant_id: 'cursor-1',
+      to_provider: 'claude',
+      to_participant_id: 'claude-b',
+      body: 'only b should ack',
+    });
+    expect(
+      listCoSessionHandoffs('cos-twin', {
+        pendingOnly: true,
+        to_provider: 'claude',
+        to_participant_id: 'claude-b',
+      })
+    ).toHaveLength(1);
+    expect(() =>
+      ackCoSessionHandoff({
+        session_id: 'cos-twin',
+        handoff_id: handoff.handoff_id,
+        provider: 'claude',
+        participant_id: 'claude-a',
+      })
+    ).toThrow(/not claude-a/);
+    const acked = ackCoSessionHandoff({
+      session_id: 'cos-twin',
+      handoff_id: handoff.handoff_id,
+      provider: 'claude',
+      participant_id: 'claude-b',
+    });
+    expect(acked.acked_by_participant_id).toBe('claude-b');
+  });
+
   it('appends blackboard notes and leaves releasing own leases', () => {
     startCoSession({ goal: 'board', provider: 'agy', session_id: 'cos-board' });
     appendCoSessionBlackboard({
