@@ -1281,7 +1281,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 45486,
+      "size": 45714,
       "type": "json"
     },
     {
@@ -2373,7 +2373,7 @@
     {
       "path": "product/governance/protocol-service-registry.json",
       "tier": "public",
-      "size": 5872,
+      "size": 6790,
       "type": "json"
     },
     {
