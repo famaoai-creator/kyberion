@@ -56,6 +56,7 @@
 - [Capability Lifecycle Eligibility Checklist](./product/architecture/capability-lifecycle-eligibility-checklist.md) (public | Unknown)
 - [Capability Lifecycle Procedure](./product/architecture/capability-lifecycle-procedure.md) (public | Unknown)
 - [Channel, Port, and Surface Agent Model](./product/architecture/channel-port-surface-model.md) (public | Ecosystem Architect)
+- [Co-Session Coordination (Same-Checkout, Mission-Optional)](./product/architecture/co-session-coordination.md) (public | Ecosystem Architect)
 - [Coherence-Driven Change Propagation](./product/architecture/coherence-driven-change-propagation.md) (public | Ecosystem Architect)
 - [Component Lifecycle Inventory](./product/architecture/component-lifecycle-inventory.md) (public | Ecosystem Architect)
 - [Computer Use Runtime Model](./product/architecture/computer-use-runtime-model.md) (public | ecosystem_architect)

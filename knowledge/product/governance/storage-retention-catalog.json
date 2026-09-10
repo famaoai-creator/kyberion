@@ -339,6 +339,12 @@
       "note": "Work-item claim/coordination state (work-coordination.ts) — deleting live claims breaks the write-exclusion contract."
     },
     {
+      "path": "active/shared/runtime/co-sessions",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Same-checkout co-session presence/leases/handoffs (co-session.ts) — deleting live leases breaks multi-provider write exclusion."
+    },
+    {
       "path": "active/shared/runtime/mesh-hub",
       "artifact_class": "state",
       "action": "review_required",
