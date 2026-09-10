@@ -83,7 +83,7 @@ async function seedMission(risk: string): Promise<void> {
   );
 }
 
-describe.sequential('best-of-2 + judge (E2E-03 Task 5)', () => {
+describe('best-of-2 + judge (E2E-03 Task 5)', { concurrent: false }, () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.resetAllMocks();
