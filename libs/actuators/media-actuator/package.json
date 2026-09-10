@@ -20,7 +20,7 @@
     "mammoth": "^1.12.2",
     "marked": "^18.0.12",
     "pdf-parse": "^2.4.5",
-    "pdfjs-dist": "^4.0.379",
+    "pdfjs-dist": "^6.3.289",
     "puppeteer": "^25.4.0",
     "tesseract.js": "^7.0.0",
     "yargs": "^17.7.2"

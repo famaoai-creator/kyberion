@@ -78,7 +78,7 @@ vi.mock('../libs/core/mission-task-events.js', () => ({
     `${process.cwd()}/active/shared/tmp/agent-collaboration-e2e/${missionId}/task-events.jsonl`,
 }));
 
-describe.sequential('agent collaboration e2e', () => {
+describe('agent collaboration e2e', { concurrent: false }, () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.resetAllMocks();

@@ -12,7 +12,7 @@ import {
 /**
  * These suites used to inject drift by editing the repository's real
  * `themes.json` / `user-facing-vocabulary.json`, re-running the checker as a
- * subprocess, then restoring the files. `describe.sequential` ordered the tests
+ * subprocess, then restoring the files. `describe(..., { concurrent: false })` ordered the tests
  * inside this file, but vitest runs files in parallel — so the interference went
  * both ways: another suite could read a catalog while it was deliberately
  * broken, and residue another suite left under `knowledge/` could make the
