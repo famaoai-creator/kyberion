@@ -787,6 +787,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/tenant-scoped-actuator-execution.md",
+      "tier": "public",
+      "size": 4067,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/tenant-vision-model.md",
       "tier": "public",
       "size": 6267,
@@ -6765,7 +6771,7 @@
     {
       "path": "product/schemas/browser-runtime-session.schema.json",
       "tier": "public",
-      "size": 2037,
+      "size": 2100,
       "type": "json"
     },
     {

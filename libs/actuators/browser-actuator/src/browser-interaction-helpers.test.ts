@@ -5,6 +5,55 @@ import {
 } from './browser-interaction-helpers.js';
 
 describe('browser conditional interaction lowering', () => {
+  it('captures requested observations after a mutating ref action', async () => {
+    const executePipeline = vi.fn(async (steps) => ({
+      status: 'succeeded',
+      context: { observed: steps.at(-1).op },
+    }));
+    const helpers = createBrowserInteractionHelpers({
+      executePipeline,
+      emitComputerSurfacePatch: vi.fn(),
+    });
+    await helpers.handleComputerInteraction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: { type: 'click_ref', ref: '@e1' },
+      observation: {
+        include_refs: true,
+        include_screenshot: true,
+        include_console: true,
+        include_network: true,
+      },
+    });
+    expect(executePipeline.mock.calls[0][0].map((step: { op: string }) => step.op)).toEqual([
+      'snapshot',
+      'click_ref',
+      'snapshot',
+      'screenshot',
+      'console',
+      'network',
+    ]);
+  });
+
+  it.each(['snapshot', 'screenshot', 'capture_console', 'capture_network'] as const)(
+    'does not duplicate the observation already performed by %s',
+    (type) => {
+      const helpers = createBrowserInteractionHelpers({
+        executePipeline: vi.fn(),
+        emitComputerSurfacePatch: vi.fn(),
+      });
+      const result = helpers.translateComputerInteractionToBrowserAction({
+        version: '0.1',
+        kind: 'computer_interaction',
+        action: { type },
+        observation: { mode: 'mixed' },
+      });
+      for (const op of ['snapshot', 'screenshot', 'console', 'network']) {
+        expect(result.steps.filter((step) => step.op === op)).toHaveLength(1);
+      }
+    }
+  );
+
   it('lowers element presence into existing query_elements and if ops', () => {
     const steps = buildBrowserElementPresentPipeline({
       condition: {
