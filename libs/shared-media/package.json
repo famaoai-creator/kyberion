@@ -15,7 +15,8 @@
     "exceljs": "^4.4.0"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.5.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   }
 }
