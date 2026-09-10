@@ -20,6 +20,7 @@ import {
 } from '@agent/core/protocol-service-lifecycle';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { t as catalogT } from '@agent/core/t';
 import {
   createSketchInputContext,
   sketchHandoffLogicalPath,
@@ -393,7 +394,7 @@ export async function main(
           `  scope  : ${sketchContext.scope.scope_kind}/${sketchContext.scope.tenant_slug || 'system'}`
         );
         print(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only)`);
-        print('  Draw, then 「Kyberionへ渡す」 to write PNG + handoff.json. Ctrl-C to stop.');
+        print(`  ${catalogT('sketch_input:server_usage_hint')}`);
       }
       resolve();
     });

@@ -5,6 +5,7 @@
  * eraser / undo / clear. Export posts PNG(+optional instruction) to the local server.
  */
 import { resolveLocale } from '@agent/core/locale';
+import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 
 export interface SketchPageConfig {
   token: string;
@@ -13,48 +14,43 @@ export interface SketchPageConfig {
   outLabel: string;
 }
 
+function st(key: VocabularyKey, params?: Record<string, string | number>): string {
+  return catalogT(key, params);
+}
+
 function messages() {
-  const ja = resolveLocale() === 'ja';
   return {
-    title: ja ? 'Sketch Input（ローカルのみ）' : 'Sketch Input (local only)',
-    subtitle: ja
-      ? '図とテキストを描いて PNG を書き出し、Kyberion へ渡します'
-      : 'Draw diagrams and text, export PNG, and hand off to Kyberion',
-    pen: ja ? 'ペン' : 'Pen',
-    rect: ja ? '矩形' : 'Rect',
-    ellipse: ja ? '楕円' : 'Ellipse',
-    line: ja ? '直線' : 'Line',
-    arrow: ja ? '矢印' : 'Arrow',
-    text: ja ? 'テキスト' : 'Text',
-    eraser: ja ? '消しゴム' : 'Eraser',
-    undo: ja ? '元に戻す' : 'Undo',
-    clear: ja ? '消去' : 'Clear',
-    color: ja ? '色' : 'Color',
-    width: ja ? '太さ' : 'Width',
-    instruction: ja ? 'Kyberionへの指示' : 'Instruction for Kyberion',
-    instructionPlaceholder: ja
-      ? '例: この図を要件として整理して（キーボード / OSディクテーション / 🎤）'
-      : 'e.g. Turn this diagram into requirements (keyboard / OS dictation / 🎤)',
-    dictationNote: ja
-      ? '指示欄はOSディクテーション（端末内）推奨。ブラウザ🎤は機種によりクラウド送信の場合があります。'
-      : 'Prefer OS dictation (on-device) for the instruction. Browser 🎤 may send audio to a cloud provider.',
-    voice: ja ? '音声' : 'Voice',
-    voiceStop: ja ? '停止' : 'Stop',
-    download: ja ? 'PNGダウンロード' : 'Download PNG',
-    handoff: ja ? 'Kyberionへ渡す' : 'Hand off to Kyberion',
-    ready: ja ? '描画してエクスポートできます' : 'Ready to draw and export',
-    exporting: ja ? '書き出し中…' : 'Exporting…',
-    exported: ja ? '書き出し完了' : 'Exported',
-    exportFailed: ja ? '書き出し失敗' : 'Export failed',
-    clearConfirm: ja ? 'キャンバスを消去しますか？' : 'Clear the canvas?',
-    textPrompt: ja ? 'テキストを入力' : 'Enter text',
-    outLabel: ja ? '出力先' : 'Output',
-    voiceStarted: ja ? '音声入力中…' : 'Listening…',
-    voiceStopped: ja ? '音声入力を停止' : 'Voice stopped',
-    voiceError: ja ? '音声エラー' : 'Voice error',
-    voiceUnavailable: ja
-      ? 'このブラウザでは音声認識を使えません（OSディクテーションは可）'
-      : 'Speech recognition unavailable (OS dictation still works)',
+    title: st('sketch_input:title'),
+    subtitle: st('sketch_input:subtitle'),
+    pen: st('sketch_input:pen'),
+    rect: st('sketch_input:rect'),
+    ellipse: st('sketch_input:ellipse'),
+    line: st('sketch_input:line'),
+    arrow: st('sketch_input:arrow'),
+    text: st('sketch_input:text'),
+    eraser: st('sketch_input:eraser'),
+    undo: st('sketch_input:undo'),
+    clear: st('sketch_input:clear'),
+    color: st('sketch_input:color'),
+    width: st('sketch_input:width'),
+    instruction: st('sketch_input:instruction'),
+    instructionPlaceholder: st('sketch_input:instruction_placeholder'),
+    dictationNote: st('sketch_input:dictation_note'),
+    voice: st('sketch_input:voice'),
+    voiceStop: st('sketch_input:voice_stop'),
+    download: st('sketch_input:download'),
+    handoff: st('sketch_input:handoff'),
+    ready: st('sketch_input:ready'),
+    exporting: st('sketch_input:exporting'),
+    exported: st('sketch_input:exported'),
+    exportFailed: st('sketch_input:export_failed'),
+    clearConfirm: st('sketch_input:clear_confirm'),
+    textPrompt: st('sketch_input:text_prompt'),
+    outLabel: st('sketch_input:out_label'),
+    voiceStarted: st('sketch_input:voice_started'),
+    voiceStopped: st('sketch_input:voice_stopped'),
+    voiceError: st('sketch_input:voice_error'),
+    voiceUnavailable: st('sketch_input:voice_unavailable'),
   };
 }
 
