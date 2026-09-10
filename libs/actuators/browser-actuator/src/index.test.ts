@@ -8,6 +8,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { resetCurrentScope } from '@agent/core/scope-context';
 
 const REPO_ROOT = process.cwd();
 
@@ -182,9 +183,13 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
   );
   return {
     ...actual,
-    safeExistsSync: mocks.safeExistsSync,
+    safeExistsSync: (filePath: string) =>
+      mocks.fileStore.has(filePath) || mocks.safeExistsSync(filePath),
     safeMkdir: mocks.safeMkdir,
-    safeReadFile: mocks.safeReadFile,
+    safeReadFile: (filePath: string, options?: { encoding?: BufferEncoding | null }) =>
+      mocks.fileStore.has(filePath)
+        ? mocks.fileStore.get(filePath)!
+        : mocks.safeReadFile(filePath, options as any),
     safeLstat: mocks.safeLstat,
     safeWriteFile: mocks.safeWriteFile,
     safeRmSync: mocks.safeRmSync,
@@ -233,6 +238,76 @@ describe('browser-actuator v3 contract', () => {
       })
     ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
     expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
+  });
+
+  it('rejects reuse of a live browser lease after the tenant scope changes', async () => {
+    const { handleAction } = await import('./index');
+    vi.stubEnv('KYBERION_TIER', 'confidential');
+    vi.stubEnv('KYBERION_TENANT', 'tenant-alpha');
+    resetCurrentScope();
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'scope-owned-session',
+      steps: [],
+      options: { keep_alive: true },
+    } as any);
+    vi.stubEnv('KYBERION_TENANT', 'tenant-beta');
+    resetCurrentScope();
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        session_id: 'scope-owned-session',
+        steps: [],
+        options: { keep_alive: true },
+      } as any)
+    ).rejects.toThrow('[BROWSER_SESSION_OWNER_MISMATCH]');
+    vi.unstubAllEnvs();
+    resetCurrentScope();
+  });
+
+  it('rejects closing a live browser lease from another tenant', async () => {
+    const { handleAction, closeBrowserSession } = await import('./index');
+    vi.stubEnv('KYBERION_TIER', 'confidential');
+    vi.stubEnv('KYBERION_TENANT', 'tenant-alpha');
+    resetCurrentScope();
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'closed-scope-owned-session',
+      steps: [],
+      options: { keep_alive: true },
+    } as any);
+    vi.stubEnv('KYBERION_TENANT', 'tenant-beta');
+    resetCurrentScope();
+    await expect(closeBrowserSession('closed-scope-owned-session')).rejects.toThrow(
+      '[BROWSER_SESSION_OWNER_MISMATCH]'
+    );
+    vi.unstubAllEnvs();
+    resetCurrentScope();
+  });
+
+  it('rejects reuse of a released session from another tenant', async () => {
+    const { handleAction } = await import('./index');
+    vi.stubEnv('KYBERION_TIER', 'confidential');
+    vi.stubEnv('KYBERION_TENANT', 'tenant-alpha');
+    resetCurrentScope();
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'released-scope-owned-session',
+      steps: [],
+      options: { headless: true },
+    } as any);
+    vi.stubEnv('KYBERION_TENANT', 'tenant-beta');
+    resetCurrentScope();
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        session_id: 'released-scope-owned-session',
+        steps: [],
+        options: { keep_alive: true },
+      } as any)
+    ).rejects.toThrow('[BROWSER_SESSION_OWNER_MISMATCH]');
+    vi.unstubAllEnvs();
+    resetCurrentScope();
   });
 
   it('sanitizes persisted operator approval fields before completing the artifact', async () => {

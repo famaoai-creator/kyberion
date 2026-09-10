@@ -133,6 +133,7 @@
 - [Subagent Observability Model](./product/architecture/subagent-observability-model.md) (public | Ecosystem Architect)
 - [Surface Responsibility Model](./product/architecture/surface-responsibility-model.md) (public | Ecosystem Architect)
 - [Tenant-Aware Vision-Mission Model](./product/architecture/tenant-vision-model.md) (public | Ecosystem Architect)
+- [Tenant-scoped knowledge and actuator execution](./product/architecture/tenant-scoped-actuator-execution.md) (public | Unknown)
 - [Terminal Hosting: The Institutional Gateway](./product/architecture/terminal-hosting.md) (public | Ecosystem Architect)
 - [Terraform Architecture Diagramming](./product/architecture/terraform-architecture-diagramming.md) (public | Unknown)
 - [Token Management RFC Implementation Tasks for GPT-5.4 mini](./product/architecture/token-management-rfc-implementation-tasks-5.4-mini.md) (public | Ecosystem Architect)
