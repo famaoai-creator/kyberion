@@ -25,6 +25,7 @@ import {
   resolveMissionStartCreateInputFromArgv,
   resolveMissionTicketDispatchOptionsFromArgv,
   resolveMissionWorkItemDispatchOptionsFromArgv,
+  shouldSkipReasoningBootstrap,
   validateMissionStartCreateInput,
 } from './mission_controller.js';
 import * as missionControllerRouter from './refactor/mission-controller-router.js';
@@ -69,6 +70,19 @@ describe('mission_controller argument parsing', () => {
     cleanupAutoTrackFixture();
     cleanupScopeTrackFixture();
     cleanupPublicTenantFixture();
+  });
+
+  it('skips the reasoning bootstrap only for journal-only actions', () => {
+    // record-task/record-evidence never delegate: skipping their ~3s CLI
+    // probe cost keeps per-task worker spawns cheap. Everything else —
+    // including unknown actions — fails safe toward installing so delegation
+    // can never silently fall back to the stub.
+    expect(shouldSkipReasoningBootstrap('record-task')).toBe(true);
+    expect(shouldSkipReasoningBootstrap('record-evidence')).toBe(true);
+    expect(shouldSkipReasoningBootstrap('dispatch-workitems')).toBe(false);
+    expect(shouldSkipReasoningBootstrap('status')).toBe(false);
+    expect(shouldSkipReasoningBootstrap(undefined)).toBe(false);
+    expect(shouldSkipReasoningBootstrap('--')).toBe(false);
   });
 
   it('removes project traceability flags and their values from positional arguments', () => {
