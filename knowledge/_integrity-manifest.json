@@ -781,12 +781,6 @@
       "type": "md"
     },
     {
-      "path": "product/architecture/tenant-scoped-actuator-execution.md",
-      "tier": "public",
-      "size": 3554,
-      "type": "md"
-    },
-    {
       "path": "product/architecture/tenant-vision-model.md",
       "tier": "public",
       "size": 6267,
