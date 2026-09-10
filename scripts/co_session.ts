@@ -223,6 +223,9 @@ export async function main(args: string[] = [], print: Print = console.log): Pro
           .option('as', { type: 'string', choices: providerChoices() })
           .option('kind', { type: 'string', choices: kindChoices() })
           .option('to', { type: 'string', choices: providerChoices() })
+          .option('to-participant-id', { type: 'string' })
+          .option('from-participant-id', { type: 'string' })
+          .option('participant-id', { type: 'string' })
           .option('subject', { type: 'string' })
           .option('body', { type: 'string' })
           .option('handoff-id', { type: 'string' })
@@ -235,6 +238,10 @@ export async function main(args: string[] = [], print: Print = console.log): Pro
           print(
             listCoSessionHandoffs(sessionId, {
               pendingOnly: Boolean(argv['pending-only']),
+              to_provider: argv.to ? String(argv.to) : undefined,
+              to_participant_id: argv['to-participant-id']
+                ? String(argv['to-participant-id'])
+                : undefined,
             })
           );
           return;
@@ -248,6 +255,7 @@ export async function main(args: string[] = [], print: Print = console.log): Pro
               session_id: sessionId,
               provider: String(argv.as),
               handoff_id: String(argv['handoff-id']),
+              participant_id: argv['participant-id'] ? String(argv['participant-id']) : undefined,
             })
           );
           return;
@@ -259,8 +267,16 @@ export async function main(args: string[] = [], print: Print = console.log): Pro
           createCoSessionHandoff({
             session_id: sessionId,
             from_provider: String(argv.as),
+            from_participant_id: argv['from-participant-id']
+              ? String(argv['from-participant-id'])
+              : argv['participant-id']
+                ? String(argv['participant-id'])
+                : undefined,
             kind: String(argv.kind),
             to_provider: argv.to ? String(argv.to) : undefined,
+            to_participant_id: argv['to-participant-id']
+              ? String(argv['to-participant-id'])
+              : undefined,
             subject: argv.subject ? String(argv.subject) : undefined,
             body: String(argv.body),
           })
