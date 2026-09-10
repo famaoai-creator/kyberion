@@ -1820,6 +1820,14 @@
       "noun": "knowledge",
       "verb": "cowork-sync",
       "audience": "operator"
+    },
+    {
+      "id": "script.co-session",
+      "module": "scripts/co_session.ts",
+      "command": "co-session",
+      "noun": "co-session",
+      "verb": "cli",
+      "audience": "operator"
     }
   ]
 }

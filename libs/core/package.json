@@ -2043,6 +2043,10 @@
       "types": "./dist/work-coordination.d.ts",
       "default": "./dist/work-coordination.js"
     },
+    "./co-session": {
+      "types": "./dist/co-session.d.ts",
+      "default": "./dist/co-session.js"
+    },
     "./work-visibility": {
       "types": "./dist/work-visibility.d.ts",
       "default": "./dist/work-visibility.js"
