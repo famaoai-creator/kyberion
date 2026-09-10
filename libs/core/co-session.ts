@@ -94,12 +94,15 @@ export interface CoSessionHandoff {
   session_id: string;
   kind: CoSessionHandoffKind;
   from_provider: CoSessionProvider;
+  from_participant_id?: string;
   to_provider?: CoSessionProvider;
+  to_participant_id?: string;
   subject?: string;
   body: string;
   created_at: string;
   acked_at?: string;
   acked_by?: CoSessionProvider;
+  acked_by_participant_id?: string;
 }
 
 export type CoSessionEventType =
@@ -634,7 +637,9 @@ export function createCoSessionHandoff(input: {
   session_id?: string;
   kind: string;
   from_provider: string;
+  from_participant_id?: string;
   to_provider?: string;
+  to_participant_id?: string;
   subject?: string;
   body: string;
 }): CoSessionHandoff {
@@ -644,12 +649,28 @@ export function createCoSessionHandoff(input: {
   readSession(session_id);
   const body = input.body.trim();
   if (!body) throw new CoSessionError('invalid_body', 'handoff body is required');
+  const from_participant_id =
+    input.from_participant_id?.trim() || `${from_provider}-${process.pid}`;
+  const to_provider = input.to_provider ? assertProvider(input.to_provider) : undefined;
+  const to_participant_id = input.to_participant_id?.trim() || undefined;
+  if (to_participant_id && to_provider) {
+    const live = listCoSessionPresence(session_id);
+    const match = live.find((row) => row.participant_id === to_participant_id);
+    if (match && match.provider !== to_provider) {
+      throw new CoSessionError(
+        'participant_mismatch',
+        `to_participant_id ${to_participant_id} is provider ${match.provider}, not ${to_provider}`
+      );
+    }
+  }
   const handoff: CoSessionHandoff = {
     handoff_id: `csh-${randomUUID()}`,
     session_id,
     kind,
     from_provider,
-    ...(input.to_provider ? { to_provider: assertProvider(input.to_provider) } : {}),
+    from_participant_id,
+    ...(to_provider ? { to_provider } : {}),
+    ...(to_participant_id ? { to_participant_id } : {}),
     ...(input.subject?.trim() ? { subject: input.subject.trim() } : {}),
     body,
     created_at: nowIso(),
@@ -659,20 +680,39 @@ export function createCoSessionHandoff(input: {
     handoff_id: handoff.handoff_id,
     kind,
     to_provider: handoff.to_provider,
+    to_participant_id: handoff.to_participant_id,
+    from_participant_id: handoff.from_participant_id,
   });
   return handoff;
 }
 
 export function listCoSessionHandoffs(
   sessionId?: string,
-  opts: { pendingOnly?: boolean } = {}
+  opts: {
+    pendingOnly?: boolean;
+    to_provider?: string;
+    to_participant_id?: string;
+  } = {}
 ): CoSessionHandoff[] {
   const session_id = resolveCoSessionId(sessionId);
   readSession(session_id);
-  const rows = readJsonLines<CoSessionHandoff>(
+  let rows = readJsonLines<CoSessionHandoff>(
     assertSafeRepositoryPath(handoffsFile(session_id), { allowMissingLeaf: true })
   );
-  if (opts.pendingOnly) return rows.filter((row) => !row.acked_at);
+  if (opts.pendingOnly) rows = rows.filter((row) => !row.acked_at);
+  if (opts.to_participant_id?.trim()) {
+    const target = opts.to_participant_id.trim();
+    const provider = opts.to_provider ? assertProvider(opts.to_provider) : undefined;
+    rows = rows.filter((row) => {
+      if (row.to_participant_id === target) return true;
+      // Provider-broadcast handoffs (no participant) are visible to every instance.
+      if (!row.to_participant_id && provider && row.to_provider === provider) return true;
+      return false;
+    });
+  } else if (opts.to_provider) {
+    const provider = assertProvider(opts.to_provider);
+    rows = rows.filter((row) => row.to_provider === provider);
+  }
   return rows;
 }
 
@@ -680,19 +720,34 @@ export function ackCoSessionHandoff(input: {
   session_id?: string;
   handoff_id: string;
   provider: string;
+  participant_id?: string;
 }): CoSessionHandoff {
   const provider = assertProvider(input.provider);
   const session_id = resolveCoSessionId(input.session_id);
   readSession(session_id);
+  const participant_id = input.participant_id?.trim() || `${provider}-${process.pid}`;
   const rows = listCoSessionHandoffs(session_id);
   const index = rows.findIndex((row) => row.handoff_id === input.handoff_id);
   if (index < 0) throw new CoSessionError('not_found', `handoff not found: ${input.handoff_id}`);
   const current = rows[index]!;
   if (current.acked_at) return current;
+  if (current.to_participant_id && current.to_participant_id !== participant_id) {
+    throw new CoSessionError(
+      'handoff_not_for_participant',
+      `handoff is addressed to ${current.to_participant_id}, not ${participant_id}`
+    );
+  }
+  if (current.to_provider && current.to_provider !== provider) {
+    throw new CoSessionError(
+      'handoff_not_for_provider',
+      `handoff is addressed to provider ${current.to_provider}, not ${provider}`
+    );
+  }
   const acked: CoSessionHandoff = {
     ...current,
     acked_at: nowIso(),
     acked_by: provider,
+    acked_by_participant_id: participant_id,
   };
   // Rewrite handoffs file deterministically (small local log).
   const file = handoffsFile(session_id);
@@ -702,7 +757,10 @@ export function ackCoSessionHandoff(input: {
       appendJsonLine(assertSafeRepositoryPath(file, { allowMissingLeaf: true }), row);
     }
   });
-  appendEvent(session_id, 'handoff_acked', provider, { handoff_id: acked.handoff_id });
+  appendEvent(session_id, 'handoff_acked', provider, {
+    handoff_id: acked.handoff_id,
+    participant_id,
+  });
   return acked;
 }
 
