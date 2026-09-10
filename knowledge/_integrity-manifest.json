@@ -259,6 +259,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/co-session-coordination.md",
+      "tier": "public",
+      "size": 5875,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/coherence-driven-change-propagation.md",
       "tier": "public",
       "size": 3322,
@@ -1281,7 +1287,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 45486,
+      "size": 45682,
       "type": "json"
     },
     {
@@ -2073,7 +2079,7 @@
     {
       "path": "product/governance/multi-provider-coexecution-contract.md",
       "tier": "public",
-      "size": 8645,
+      "size": 9401,
       "type": "md"
     },
     {
@@ -2607,7 +2613,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 21962,
+      "size": 22240,
       "type": "json"
     },
     {
@@ -4977,7 +4983,7 @@
     {
       "path": "product/orchestration/work-coordination-platform.md",
       "tier": "public",
-      "size": 5224,
+      "size": 5479,
       "type": "md"
     },
     {
