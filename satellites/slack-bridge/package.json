@@ -12,11 +12,10 @@
   "dependencies": {
     "@agent/core": "workspace:*",
     "@slack/bolt": "^5.1.0",
-    "uuid": "^9.0.1"
+    "uuid": "^14.0.2"
   },
   "devDependencies": {
     "@types/node": "^26.5.0",
-    "@types/uuid": "^9.0.8",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   }
