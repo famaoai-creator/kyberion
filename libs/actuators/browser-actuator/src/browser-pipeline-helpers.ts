@@ -75,6 +75,7 @@ interface BrowserRuntimeLeaseLike {
   userDataDir: string;
   cdpUrl?: string;
   cdpPort?: number;
+  scopeFingerprint?: string;
 }
 
 const BROWSER_RUNTIME_DIR = pathResolver.shared('runtime/browser');
@@ -169,6 +170,11 @@ export async function executePipeline(
   runtime.navigationPolicy = options.navigation_policy;
   const activeLease = browserRuntimeHelpers.findBrowserRuntimeLease(runtime) as
     BrowserRuntimeLeaseLike | undefined;
+  // Keep the ownership captured when the lease was acquired. The ambient
+  // scope may be changed by an outer caller before finalization; persisted
+  // metadata must remain bound to the lease owner for close/expiry checks.
+  const sessionScopeFingerprint =
+    activeLease?.scopeFingerprint || browserRuntimeHelpers.getBrowserScopeFingerprint();
   if (runtime.tabs.size === 0) {
     const page = await browserContext.newPage();
     browserRuntimeHelpers.registerBrowserPage(runtime, page, 'tab-1');
@@ -358,6 +364,7 @@ export async function executePipeline(
       action_trail_count: Array.isArray(ctx.action_trail) ? ctx.action_trail.length : 0,
       action_trail_path: browserRuntimeHelpers.saveBrowserActionTrail(sessionId, ctx.action_trail),
       recent_actions: browserRuntimeHelpers.summarizeRecentActions(ctx.action_trail),
+      scope_fingerprint: sessionScopeFingerprint,
     } as any);
     if (shouldClose) {
       finalizedVideoPaths = videoRecordingEnabled
@@ -390,6 +397,7 @@ export async function executePipeline(
           ctx.action_trail
         ),
         recent_actions: browserRuntimeHelpers.summarizeRecentActions(ctx.action_trail),
+        scope_fingerprint: sessionScopeFingerprint,
       } as any);
       await browserContext.close();
     } else {

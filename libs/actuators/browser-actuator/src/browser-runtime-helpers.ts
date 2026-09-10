@@ -20,6 +20,7 @@ import {
 } from '@agent/core/secure-io';
 import { secureFetch } from '@agent/core/network';
 import { pathResolver } from '@agent/core/path-resolver';
+import { currentScope } from '@agent/core/scope-context';
 import { normalizeBrowserPipelineOp } from '@agent/core/op-vocabulary';
 import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
 import {
@@ -132,6 +133,8 @@ interface BrowserSessionMetadata {
     selector?: string;
     ts: string;
   }>;
+  /** Ambient tier + tenant that owns this retained browser session. */
+  scope_fingerprint?: string;
 }
 
 interface ChromeCdpEndpoint {
@@ -183,6 +186,7 @@ interface BrowserRuntimeLease {
   cdpPort?: number;
   browser?: Browser;
   externalConnection?: boolean;
+  scopeFingerprint: string;
 }
 
 const BROWSER_RUNTIME_DIR = pathResolver.shared('runtime/browser');
@@ -194,6 +198,19 @@ const BROWSER_RUNTIME_SESSION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/browser-runtime-session.schema.json'
 );
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
+
+function browserScopeFingerprint(): string {
+  const scope = currentScope();
+  return `${scope.tier}:${scope.tenant_slug || 'shared'}`;
+}
+
+function assertBrowserSessionOwner(actual: string | undefined, expected: string): void {
+  if (!actual || actual !== expected) {
+    throw new Error(
+      `[BROWSER_SESSION_OWNER_MISMATCH] session is bound to ${actual || 'unknown scope'}; current scope is ${expected}`
+    );
+  }
+}
 
 function safeBrowserRuntimePath(
   filePath: string,
@@ -1291,6 +1308,7 @@ async function closeBrowserSession(sessionId: string): Promise<boolean> {
   cleanupExpiredBrowserRuntimeLeases();
   const lease = browserRuntimeLeases.get(sessionId);
   if (!lease) return false;
+  assertBrowserSessionOwner(lease.scopeFingerprint, browserScopeFingerprint());
   saveBrowserSessionMetadata(lease.sessionMetadataPath, {
     session_id: sessionId,
     user_data_dir: lease.userDataDir,
@@ -1305,6 +1323,7 @@ async function closeBrowserSession(sessionId: string): Promise<boolean> {
     lease_expires_at: undefined,
     action_trail_count: 0,
     recent_actions: [],
+    scope_fingerprint: lease.scopeFingerprint,
   });
   if (lease.externalConnection && lease.browser) {
     await lease.browser.close();
@@ -1373,6 +1392,8 @@ export const browserRuntimeHelpers = {
   resetBrowserRuntimeLeasesForTest,
   summarizeTabs,
   saveBrowserSessionMetadata,
+  getBrowserScopeFingerprint: browserScopeFingerprint,
+  assertBrowserSessionOwner,
   saveBrowserSessionSnapshot,
   captureSnapshotElements,
   buildSnapshot,
@@ -1404,13 +1425,25 @@ export const browserRuntimeHelpers = {
     videoDir: string
   ): Promise<BrowserContext> => {
     cleanupExpiredBrowserRuntimeLeases();
+    const scopeFingerprint = browserScopeFingerprint();
     const existing = browserRuntimeLeases.get(sessionId);
     if (existing) {
+      assertBrowserSessionOwner(existing.scopeFingerprint, scopeFingerprint);
       logger.info(`♻️ [BROWSER] Reusing leased session: ${sessionId}`);
       return existing.runtime.context;
     }
 
     const persistedMetadata = loadBrowserSessionMetadata(sessionMetadataPath);
+    if (persistedMetadata) {
+      if (persistedMetadata.scope_fingerprint) {
+        assertBrowserSessionOwner(persistedMetadata.scope_fingerprint, scopeFingerprint);
+      } else if (persistedMetadata.retained && persistedMetadata.lease_status === 'active') {
+        assertBrowserSessionOwner(undefined, scopeFingerprint);
+      } else if (safeExistsSync(persistedMetadata.user_data_dir)) {
+        // Legacy metadata with a live profile has no trustworthy owner.
+        assertBrowserSessionOwner(undefined, scopeFingerprint);
+      }
+    }
     const persistedCdpUrl = options.cdp_url || persistedMetadata?.cdp_url;
     const persistedCdpPort = Number(options.cdp_port || persistedMetadata?.cdp_port || 0);
 
@@ -1439,6 +1472,7 @@ export const browserRuntimeHelpers = {
           externalConnection: true,
           cdpUrl: persistedCdpUrl,
           cdpPort: persistedCdpPort || Number(new URL(persistedCdpUrl).port),
+          scopeFingerprint,
         });
         return context;
       } catch (error: unknown) {
@@ -1478,6 +1512,7 @@ export const browserRuntimeHelpers = {
         externalConnection: true,
         cdpUrl,
         cdpPort: Number(new URL(cdpUrl).port),
+        scopeFingerprint,
       });
       return context;
     }
@@ -1505,6 +1540,7 @@ export const browserRuntimeHelpers = {
       sessionMetadataPath,
       videoDir,
       externalConnection: false,
+      scopeFingerprint,
       cdpUrl: cdpEndpoint?.cdpUrl,
       cdpPort: cdpEndpoint?.cdpPort,
     });
@@ -1524,6 +1560,7 @@ export const browserRuntimeHelpers = {
       userDataDir,
       sessionMetadataPath,
       externalConnection: false,
+      scopeFingerprint: browserScopeFingerprint(),
     });
     return runtime;
   },
@@ -1549,6 +1586,7 @@ function cleanupExpiredBrowserRuntimeLeases(): void {
       lease_expires_at: new Date(lease.leaseExpiresAt).toISOString(),
       action_trail_count: 0,
       recent_actions: [],
+      scope_fingerprint: lease.scopeFingerprint,
     });
     if (lease.externalConnection && lease.browser) {
       void lease.browser.close();
