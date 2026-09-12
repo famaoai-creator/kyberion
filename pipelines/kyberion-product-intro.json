@@ -1,0 +1,146 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "kyberion-product-intro",
+  "version": "1.0.0",
+  "name": "Kyberion Product Intro",
+  "description": "Local narrated product intro (Japanese): intent alignment, safe execution, evidence, Quality Gate. No publish. Prefer: KYBERION_PERSONA=sovereign pnpm exec tsx scripts/kyberion_product_intro_render.ts (pipeline voice/video catalog wrap currently rejects actuator schemas).",
+  "context": {
+    "narration_path": "active/shared/tmp/kyberion-intro/kyberion-product-intro.aiff",
+    "video_output_path": "active/shared/tmp/kyberion-intro/kyberion-product-intro.mp4",
+    "video_bundle_dir": "active/shared/tmp/kyberion-intro/video-composition/kyberion-product-intro",
+    "mission_evidence_dir": "active/shared/tmp/kyberion-intro",
+    "video_slug": "kyberion-product-intro",
+    "voice_script": "Kyberionは曖昧な指示をそのまま実行しません。まず人間と意図を合意し、検証可能な活動定義に変換します。そのうえで安全なサンドボックスでタスクを実行し、実行ログと成果物の系統関係をエビデンスとして残します。さらに Quality Gate による多層検証で、成果物の信頼性と再現性を高めます。さあ、Kyberionを動かして、自律オペレーションを始めましょう。",
+    "hook_text": "Kyberionは曖昧な指示をそのまま実行しません。",
+    "feature_text": "意図を合意し、検証可能な活動定義に変換してから、安全なサンドボックスで実行。Trace と Quality Gate で再現性を担保します。",
+    "cta_text": "さあ、Kyberionを動かして自律オペレーションを始めましょう。"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[KYBERION-INTRO] Starting local narrated product intro render"
+      }
+    },
+    {
+      "id": "check_voice_actuator_build",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "voice_build", "type": "ProbeResult" },
+      "params": { "dir": "dist/libs/actuators/voice-actuator/src", "kind": "dir" }
+    },
+    {
+      "id": "check_video_actuator_build",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "video_build", "type": "ProbeResult" },
+      "params": { "dir": "dist/libs/actuators/video-composition-actuator/src", "kind": "dir" }
+    },
+    {
+      "id": "preflight_tools",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "tool_check", "type": "ShellResult" },
+      "params": {
+        "cmd": "which say && which espeak || true && which ffmpeg && which ffprobe",
+        "preflight_artifacts": ["say", "espeak", "ffmpeg", "ffprobe"]
+      }
+    },
+    {
+      "id": "generate_audio",
+      "role": "source",
+      "op": "voice:generate_voice",
+      "params": {
+        "request_id": "kyberion-product-intro-audio",
+        "text": "{{voice_script}}",
+        "profile_ref": { "profile_id": "operator-ja-default" },
+        "engine": { "engine_id": "local_say" },
+        "rendering": {
+          "language": "ja",
+          "chunking": {
+            "max_chunk_chars": 4000,
+            "crossfade_ms": 50,
+            "preserve_paralinguistic_tags": true
+          }
+        },
+        "delivery": {
+          "mode": "artifact",
+          "format": "aiff",
+          "artifact_path": "{{narration_path}}",
+          "emit_progress_packets": true
+        },
+        "routing": { "personal_voice_mode": "allow_fallback" }
+      }
+    },
+    {
+      "id": "validate_audio_output",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "audio_check", "type": "ShellResult" },
+      "params": {
+        "cmd": "test -f {{narration_path}} && ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 {{narration_path}}"
+      }
+    },
+    {
+      "id": "generate_video",
+      "role": "source",
+      "op": "video-composition:create_narrated_intro_movie",
+      "params": {
+        "narrated_video_brief": {
+          "kind": "narrated-video-brief",
+          "version": "1.0.0",
+          "title": "Kyberion: 自律オペレーションへの招待",
+          "language": "ja",
+          "script": {
+            "hook": "{{hook_text}}",
+            "feature": "{{feature_text}}",
+            "cta": "{{cta_text}}"
+          },
+          "narration": {
+            "artifact_ref": "{{narration_path}}"
+          },
+          "design_system": {
+            "brand_name": "Kyberion",
+            "theme_tokens": {
+              "background_color": "#0B1220",
+              "layout_variant": "focus-center"
+            }
+          },
+          "timing": {
+            "duration_sec": 60,
+            "fps": 15
+          },
+          "output": {
+            "format": "mp4",
+            "target_path": "{{video_output_path}}",
+            "bundle_dir": "{{video_bundle_dir}}",
+            "await_completion": true
+          }
+        }
+      }
+    },
+    {
+      "id": "validate_video_output",
+      "role": "gate",
+      "op": "video-composition:validate_narrated_video_artifact",
+      "params": {
+        "narration_path": "{{narration_path}}",
+        "video_output_path": "{{video_output_path}}",
+        "video_bundle_dir": "{{video_bundle_dir}}",
+        "mission_evidence_dir": "{{mission_evidence_dir}}",
+        "video_slug": "{{video_slug}}",
+        "tolerance_sec": 5
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "[KYBERION-INTRO] Complete. Audio: {{narration_path}} Video: {{video_output_path}}"
+      }
+    }
+  ]
+}

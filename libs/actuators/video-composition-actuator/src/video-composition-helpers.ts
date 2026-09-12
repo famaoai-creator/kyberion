@@ -103,6 +103,62 @@ export function validateVideoCompositionAction(input: unknown): void {
   throw new Error(`Invalid video composition action: ${detail}`);
 }
 
+/**
+ * Catalog-backed pipeline dispatch wraps ops as `{ type, op, params }`.
+ * Video actions expect `{ action, params }` (or ADF kind envelopes).
+ */
+export function normalizeVideoCompositionActionInput(input: unknown): unknown {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  const rec = input as Record<string, unknown>;
+  if (rec.action === 'pipeline' && Array.isArray(rec.steps)) {
+    return {
+      ...rec,
+      steps: rec.steps.map((step) => normalizeVideoPipelineStep(step)),
+    };
+  }
+  return normalizeVideoPipelineStep(rec);
+}
+
+function normalizeVideoPipelineStep(step: unknown): unknown {
+  if (!step || typeof step !== 'object' || Array.isArray(step)) return step;
+  const rec = step as Record<string, unknown>;
+  if (typeof rec.kind === 'string' && rec.kind.startsWith('video-')) return step;
+  if (typeof rec.action === 'string' && rec.action.length > 0) {
+    return stripVideoPipelineMeta(rec);
+  }
+  if (typeof rec.op === 'string' && rec.op.length > 0) {
+    const params =
+      rec.params && typeof rec.params === 'object' && !Array.isArray(rec.params)
+        ? stripVideoParamMeta({ ...(rec.params as Record<string, unknown>) })
+        : {};
+    return { action: rec.op, params };
+  }
+  return step;
+}
+
+function stripVideoPipelineMeta(rec: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...rec };
+  delete out.export_as;
+  delete out._facets;
+  delete out._reasoning_policy;
+  delete out._step_id;
+  delete out.type;
+  delete out.op;
+  if (out.params && typeof out.params === 'object' && !Array.isArray(out.params)) {
+    out.params = stripVideoParamMeta({ ...(out.params as Record<string, unknown>) });
+  }
+  return out;
+}
+
+function stripVideoParamMeta(params: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...params };
+  delete out.export_as;
+  delete out._facets;
+  delete out._reasoning_policy;
+  delete out._step_id;
+  return out;
+}
+
 export function resolveAwaitCompletion(
   adf: { output?: { await_completion?: boolean } },
   policy: { render?: { enable_backend_rendering?: boolean } }
