@@ -560,9 +560,11 @@ describe('video composition compiler', () => {
     const html = safeReadFile(`${bundleDir}/compositions/process.html`, {
       encoding: 'utf8',
     }) as string;
-    expect(html).toContain('Ordered steps');
+    expect(html).toContain('実行サイクル');
     expect(html).toContain('Brief intake');
     expect(html).toContain('Render package');
+    expect(html).not.toContain('Ordered steps');
+    expect(html).not.toContain('Audience, use case, constraints');
   });
 
   it('renders promo and vtuber templates with mode-specific layouts', () => {
