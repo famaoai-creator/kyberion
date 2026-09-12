@@ -14,6 +14,7 @@ describe('protocol service boundary registry', () => {
     expect(entries.get('mcp-server-cowork')?.lifecycle_owner).toBe('service');
     expect(entries.get('review-checks')?.classification).toBe('control-plane-worker');
     expect(entries.get('report-review')?.classification).toBe('artifact-review-port');
+    expect(entries.get('sketch-input')?.classification).toBe('artifact-review-port');
     for (const entry of entries.values()) {
       expect(entry.process_scope).toBeTruthy();
       expect(entry.request_scope_mode).toBeTruthy();

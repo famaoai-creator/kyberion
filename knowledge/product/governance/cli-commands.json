@@ -1372,6 +1372,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.sketch-input.server",
+      "module": "scripts/sketch-input/server.ts",
+      "command": "sketch-input server",
+      "noun": "sketch-input",
+      "verb": "server",
+      "audience": "operator"
+    },
+    {
       "id": "script.model.feedback",
       "module": "scripts/model_feedback.ts",
       "command": "model feedback",
