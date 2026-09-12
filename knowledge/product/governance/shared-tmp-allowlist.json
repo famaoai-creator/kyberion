@@ -414,6 +414,12 @@
       "note": "OAuth setup runtime scratch"
     },
     {
+      "file": "scripts/sketch-input/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default PNG+handoff export path for localhost sketch board; operator-consumed intermediate"
+    },
+    {
       "file": "scripts/soak_endurance.ts",
       "count": 3,
       "classification": "legit-tmp",
