@@ -450,7 +450,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
               ? `<img src="${escapeHtml(supporting.path)}" alt="visual">`
               : visualSteps.length > 0
                 ? `<div class="fallback">
-              <h2>${escapeHtml(sceneText(scene, 'caption') || '実行サイクル')}</h2>
+              <h2>${escapeHtml(sceneText(scene, 'caption') || 'Operating cycle')}</h2>
               <div class="process-visual" style="margin-top:18px;text-align:left;">
                 ${visualSteps
                   .slice(0, 4)
@@ -467,8 +467,8 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
               </div>
             </div>`
                 : `<div class="fallback">
-              <h2>${escapeHtml(sceneText(scene, 'caption') || '実行サイクル')}</h2>
-              <p>${escapeHtml(body || '意図の合意から、安全な実行と検証までを一連の流れで進めます。')}</p>
+              <h2>${escapeHtml(sceneText(scene, 'caption') || 'Operating cycle')}</h2>
+              <p>${escapeHtml(body || 'From intent alignment through safe execution and verification.')}</p>
             </div>`
           }
         </div>

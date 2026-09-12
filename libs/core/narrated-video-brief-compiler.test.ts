@@ -311,9 +311,9 @@ describe('narrated video brief compiler', () => {
 
     expect(adf.scenes).toHaveLength(3);
     expect(adf.scenes.map((scene) => scene.content.headline)).toEqual([
-      '曖昧な指示は実行しない',
-      '意図 → 契約 → 実行',
-      '今すぐ始める',
+      'Kyberionは曖昧な指示をそのまま実行しません',
+      'Intent → Contract → Execute',
+      'さあ、Kyberionを動かして自律オペレーションを始…',
     ]);
     expect(adf.scenes[0].content.body).not.toBe(adf.scenes[0].content.headline);
     expect(adf.scenes[2].content.body).not.toBe(adf.scenes[2].content.headline);
@@ -324,9 +324,9 @@ describe('narrated video brief compiler', () => {
     expect(adf.scenes[1].template_ref.template_id).toBe('howto-guide');
     expect(adf.scenes[2].template_ref.template_id).toBe('logo-outro');
     expect(adf.scenes[1].content.visual_steps).toEqual([
-      { step: '01', detail: '曖昧な指示は実行しない' },
-      { step: '02', detail: '意図 → 契約 → 実行' },
-      { step: '03', detail: '今すぐ始める' },
+      { step: '01', detail: 'Kyberionは曖昧な指示をその…' },
+      { step: '02', detail: 'Intent → Contract…' },
+      { step: '03', detail: 'さあ、Kyberionを動かして自…' },
     ]);
   });
 });
