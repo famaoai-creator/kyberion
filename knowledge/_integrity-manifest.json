@@ -1293,7 +1293,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 45682,
+      "size": 45694,
       "type": "json"
     },
     {
@@ -2085,7 +2085,7 @@
     {
       "path": "product/governance/multi-provider-coexecution-contract.md",
       "tier": "public",
-      "size": 9401,
+      "size": 9421,
       "type": "md"
     },
     {
@@ -4989,7 +4989,7 @@
     {
       "path": "product/orchestration/work-coordination-platform.md",
       "tier": "public",
-      "size": 5479,
+      "size": 5499,
       "type": "md"
     },
     {

@@ -102,7 +102,6 @@
     "peer:register": "node --import ./scripts/ts-loader.mjs scripts/peer_network_register.ts",
     "peer:conversation": "node --import ./scripts/ts-loader.mjs scripts/peer_conversation.ts",
     "work": "node --import ./scripts/ts-loader.mjs scripts/work_coordination.ts",
-    "co-session": "node --import ./scripts/ts-loader.mjs scripts/co_session.ts",
     "mission:orchestrator": "node dist/scripts/run_mission_orchestration_event_worker.js",
     "ingest": "node dist/scripts/ingest.js",
     "dashboard": "node dist/scripts/sovereign_dashboard.js",

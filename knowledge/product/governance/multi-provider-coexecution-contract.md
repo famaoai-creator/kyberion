@@ -83,7 +83,7 @@ When several provider CLIs share one checkout and need presence, path leases,
 a blackboard, and Mesh-aligned handoffs **without** starting a mission, use
 the co-session layer documented in
 [`co-session-coordination.md`](../architecture/co-session-coordination.md)
-(`libs/core/co-session.ts`, `pnpm co-session`). Co-session is the
+(`libs/core/co-session.ts`, `pnpm exec tsx scripts/co_session.ts`). Co-session is the
 same-checkout face of work-coordination vocabulary; it does **not** replace
 peer messaging (Kyberion↔Kyberion transport) and must not write `.git`. Lift
 to peer/Mesh or promote to a mission when cross-host delivery or ownership

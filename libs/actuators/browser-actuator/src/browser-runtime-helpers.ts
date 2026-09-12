@@ -20,21 +20,27 @@ import {
 } from '@agent/core/secure-io';
 import { secureFetch } from '@agent/core/network';
 import { pathResolver } from '@agent/core/path-resolver';
-import { currentScope } from '@agent/core/scope-context';
 import { normalizeBrowserPipelineOp } from '@agent/core/op-vocabulary';
 import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
-import {
-  chromium,
-  type Browser,
-  type BrowserContext,
-  type CDPSession,
-  type Page,
-} from '@playwright/test';
+import { chromium, type BrowserContext, type Page } from '@playwright/test';
 import * as path from 'node:path';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { completeBrowserOperatorApproval } from './browser-approval-records.js';
 import { parseChromeCdpVersionResponse } from './browser-cdp-response.js';
+import {
+  assertBrowserSessionOwner,
+  assertPersistedBrowserSessionOwner,
+  browserScopeFingerprint,
+} from './browser-session-scope.js';
+import {
+  attachPageObservers,
+  createBrowserRuntime,
+  registerBrowserPage,
+} from './browser-runtime-tabs.js';
+import type { BrowserRuntime, BrowserRuntimeLease } from './browser-runtime-types.js';
+
+export type { BrowserRuntime } from './browser-runtime-types.js';
 
 export interface BrowserSnapshotElement {
   ref: string;
@@ -133,7 +139,6 @@ interface BrowserSessionMetadata {
     selector?: string;
     ts: string;
   }>;
-  /** Ambient tier + tenant that owns this retained browser session. */
   scope_fingerprint?: string;
 }
 
@@ -141,52 +146,6 @@ interface ChromeCdpEndpoint {
   cdpUrl: string;
   cdpPort: number;
   source: 'process' | 'probe';
-}
-
-interface BrowserRuntime {
-  context: BrowserContext;
-  tabs: Map<string, Page>;
-  pageIds: WeakMap<Page, string>;
-  cdpSessions: WeakMap<Page, CDPSession>;
-  activeTabId: string;
-  consoleEvents: Array<{ tab_id: string; type: string; text: string; ts: string }>;
-  networkEvents: Array<{
-    tab_id: string;
-    method: string;
-    url: string;
-    resourceType: string;
-    ts: string;
-  }>;
-  navigationPolicy?: {
-    allowed_origins?: string[];
-    allow_private_network?: boolean;
-    allow_data_url?: boolean;
-  };
-  webAuthn?: {
-    authenticatorId?: string;
-    enabled: boolean;
-    options?: Record<string, any>;
-    credentials: Array<Record<string, any>>;
-    events: Array<{
-      type: string;
-      credential?: Record<string, any>;
-      credentialId?: string;
-      ts: string;
-    }>;
-  };
-}
-
-interface BrowserRuntimeLease {
-  runtime: BrowserRuntime;
-  userDataDir: string;
-  sessionMetadataPath: string;
-  videoDir?: string;
-  leaseExpiresAt?: number;
-  cdpUrl?: string;
-  cdpPort?: number;
-  browser?: Browser;
-  externalConnection?: boolean;
-  scopeFingerprint: string;
 }
 
 const BROWSER_RUNTIME_DIR = pathResolver.shared('runtime/browser');
@@ -199,19 +158,6 @@ const BROWSER_RUNTIME_SESSION_SCHEMA_PATH = pathResolver.knowledge(
 );
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
 
-function browserScopeFingerprint(): string {
-  const scope = currentScope();
-  return `${scope.tier}:${scope.tenant_slug || 'shared'}`;
-}
-
-function assertBrowserSessionOwner(actual: string | undefined, expected: string): void {
-  if (!actual || actual !== expected) {
-    throw new Error(
-      `[BROWSER_SESSION_OWNER_MISMATCH] session is bound to ${actual || 'unknown scope'}; current scope is ${expected}`
-    );
-  }
-}
-
 function safeBrowserRuntimePath(
   filePath: string,
   options: { allowMissingLeaf?: boolean } = { allowMissingLeaf: true }
@@ -220,9 +166,8 @@ function safeBrowserRuntimePath(
 }
 
 function isExistingRegularFile(filePath: string): boolean {
-  if (!safeExistsSync(filePath)) return false;
   try {
-    return safeLstat(filePath).isFile();
+    return safeExistsSync(filePath) && safeLstat(filePath).isFile();
   } catch {
     return false;
   }
@@ -231,69 +176,6 @@ function isExistingRegularFile(filePath: string): boolean {
 function browserSessionArtifactPath(directory: string, sessionId: string, suffix: string): string {
   const safeSessionId = String(sessionId || 'default').replace(/[^a-zA-Z0-9._-]/g, '_');
   return safeBrowserRuntimePath(path.join(directory, `${safeSessionId}${suffix}`));
-}
-
-function createBrowserRuntime(
-  context: BrowserContext,
-  navigationPolicy?: BrowserRuntime['navigationPolicy']
-): BrowserRuntime {
-  const tabs = new Map<string, Page>();
-  const pageIds = new WeakMap<Page, string>();
-  const cdpSessions = new WeakMap<Page, CDPSession>();
-  const runtime: BrowserRuntime = {
-    context,
-    tabs,
-    pageIds,
-    cdpSessions,
-    activeTabId: '',
-    consoleEvents: [],
-    networkEvents: [],
-    navigationPolicy,
-  };
-  context.pages().forEach((page, index) => {
-    registerBrowserPage(runtime, page, `tab-${index + 1}`);
-  });
-  context.on('page', (page) => {
-    const tabId = `tab-${runtime.tabs.size + 1}`;
-    registerBrowserPage(runtime, page, tabId);
-  });
-  return runtime;
-}
-
-function registerBrowserPage(runtime: BrowserRuntime, page: Page, tabId: string): void {
-  runtime.tabs.set(tabId, page);
-  runtime.pageIds.set(page, tabId);
-  if (!runtime.activeTabId) runtime.activeTabId = tabId;
-  attachPageObservers(runtime, page);
-}
-
-function attachPageObservers(runtime: BrowserRuntime, page: Page): void {
-  const tabId = runtime.pageIds.get(page) || `tab-${runtime.tabs.size}`;
-  page.on('dialog', async (dialog) => {
-    logger.info(
-      `[BROWSER] Dialog intercepted: ${dialog.type()} - "${dialog.message().substring(0, 100)}"`
-    );
-    await dialog.accept();
-  });
-  page.on('console', (msg) => {
-    runtime.consoleEvents.push({
-      tab_id: tabId,
-      type: msg.type(),
-      text: msg.text(),
-      ts: nowIso(),
-    });
-    runtime.consoleEvents = runtime.consoleEvents.slice(-200);
-  });
-  page.on('request', (request) => {
-    runtime.networkEvents.push({
-      tab_id: tabId,
-      method: request.method(),
-      url: request.url(),
-      resourceType: request.resourceType(),
-      ts: nowIso(),
-    });
-    runtime.networkEvents = runtime.networkEvents.slice(-200);
-  });
 }
 
 function getActivePage(runtime: BrowserRuntime): Page {
@@ -1434,16 +1316,11 @@ export const browserRuntimeHelpers = {
     }
 
     const persistedMetadata = loadBrowserSessionMetadata(sessionMetadataPath);
-    if (persistedMetadata) {
-      if (persistedMetadata.scope_fingerprint) {
-        assertBrowserSessionOwner(persistedMetadata.scope_fingerprint, scopeFingerprint);
-      } else if (persistedMetadata.retained && persistedMetadata.lease_status === 'active') {
-        assertBrowserSessionOwner(undefined, scopeFingerprint);
-      } else if (safeExistsSync(persistedMetadata.user_data_dir)) {
-        // Legacy metadata with a live profile has no trustworthy owner.
-        assertBrowserSessionOwner(undefined, scopeFingerprint);
-      }
-    }
+    assertPersistedBrowserSessionOwner(
+      persistedMetadata,
+      scopeFingerprint,
+      Boolean(persistedMetadata?.user_data_dir && safeExistsSync(persistedMetadata.user_data_dir))
+    );
     const persistedCdpUrl = options.cdp_url || persistedMetadata?.cdp_url;
     const persistedCdpPort = Number(options.cdp_port || persistedMetadata?.cdp_port || 0);
 
