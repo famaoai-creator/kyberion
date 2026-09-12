@@ -92,25 +92,28 @@ export function compileNarratedVideoBriefToCompositionADF(
     brief.timing?.duration_sec || (storyboard ? sumStoryboardDuration(storyboard) : 9)
   );
   const fps = clampFps(brief.timing?.fps || 30);
-  const background =
-    brief.design_system.theme_tokens?.background_color ||
-    storyboard?.design_system_ref?.background_color ||
-    resolveDefaultVideoBackgroundColor();
   const format = brief.output?.format || 'mp4';
   const title = brief.title || `${brief.design_system.brand_name} Intro`;
-  const compositionFormat = storyboard?.format || resolveDefaultCompositionFormat();
 
+  // When callers omit a storyboard, synthesize a deterministic promo board
+  // from script.hook/feature/cta so scene headlines actually change. The
+  // previous buildLegacyScenes path hard-coded English filler such as
+  // "From brief to scene plan", which made product intros look stuck.
+  const effectiveStoryboard =
+    storyboard?.beats?.length && storyboard.beats.length > 0
+      ? storyboard
+      : synthesizeStoryboardFromScript(brief, totalDuration);
   if (!storyboard?.beats?.length) {
-    // LLM-boundary audit fix C: without a storyboard the scenes are template
-    // pours of brief.script — draft a storyboard (reasoning step) upstream
-    // for story-matched videos.
-    logger.warn(
-      'compiling narrated video without a storyboard — scenes fall back to template text; draft a storyboard first for story-matched output'
+    logger.info(
+      'no storyboard on narrated brief — synthesized a deterministic hook/feature/cta board from script'
     );
   }
-  const scenes = storyboard?.beats?.length
-    ? buildStoryboardScenes(brief, storyboard)
-    : buildLegacyScenes(brief, totalDuration);
+  const compositionFormat = effectiveStoryboard.format || resolveDefaultCompositionFormat();
+  const backgroundColor =
+    brief.design_system.theme_tokens?.background_color ||
+    effectiveStoryboard.design_system_ref?.background_color ||
+    resolveDefaultVideoBackgroundColor();
+  const scenes = buildStoryboardScenes(brief, effectiveStoryboard);
 
   return {
     kind: 'video-composition-adf',
@@ -123,7 +126,7 @@ export function compileNarratedVideoBriefToCompositionADF(
       width: compositionFormat.width,
       height: compositionFormat.height,
       aspect_ratio: compositionFormat.aspect_ratio,
-      background_color: background,
+      background_color: backgroundColor,
     },
     audio: {
       narration_ref: brief.narration.artifact_ref,
@@ -182,10 +185,11 @@ function buildStoryboardSceneContent(
   layoutVariant: string
 ): Record<string, unknown> {
   const presentationMode = storyboard.presentation_mode || 'howto';
+  const headline = beat.title;
   const content: Record<string, unknown> = {
     eyebrow: brief.design_system.brand_name,
-    headline: beat.title,
-    body: beat.message || beat.visual_intent || brief.script.feature,
+    headline,
+    body: resolveDistinctSceneBody(brief, beat, headline),
     caption: beat.caption_intent,
     visual_direction: beat.visual_direction,
     motion_intent: beat.motion_intent,
@@ -211,9 +215,9 @@ function buildStoryboardSceneContent(
   }
   if (presentationMode === 'promo') {
     content.value_points = [
-      beat.message || beat.visual_intent || brief.script.hook,
-      brief.storyboard?.promise || brief.script.feature,
-      brief.storyboard?.desired_takeaway || brief.script.cta,
+      sceneHeadline(brief.script.hook, 28),
+      sceneHeadline(brief.script.feature, 28),
+      sceneHeadline(brief.script.cta, 28),
     ].filter(Boolean);
     content.social_proof = brief.storyboard?.promise
       ? [
@@ -237,6 +241,50 @@ function buildStoryboardSceneContent(
     content.callout = brief.script.cta;
   }
   return content;
+}
+
+/** Prefer supporting copy that is not a duplicate of the on-screen headline. */
+function resolveDistinctSceneBody(
+  brief: NarratedVideoBrief,
+  beat: VideoStoryboard['beats'][number],
+  headline: string
+): string {
+  const candidates = [
+    beat.message,
+    beat.visual_intent,
+    beat.caption_intent,
+    beat.semantic === 'hook' ? brief.script.feature : undefined,
+    beat.semantic === 'cta' || beat.role === 'outro' ? brief.script.feature : undefined,
+    beat.semantic === 'process' || beat.semantic === 'steps' || beat.role === 'feature'
+      ? brief.script.feature
+      : undefined,
+    brief.intent,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  const normalizedHeadline = normalizeSceneCopy(headline);
+  for (const candidate of candidates) {
+    const normalized = normalizeSceneCopy(candidate);
+    if (!normalized || normalized === normalizedHeadline) continue;
+    if (
+      normalizedHeadline &&
+      normalized.startsWith(normalizedHeadline) &&
+      normalized.length > normalizedHeadline.length + 2
+    ) {
+      // Keep longer supporting sentence that starts with the short title.
+      return candidate;
+    }
+    if (normalizedHeadline && normalizedHeadline.startsWith(normalized)) continue;
+    return candidate;
+  }
+  return brief.design_system.brand_name;
+}
+
+function normalizeSceneCopy(value: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/[。．.!！？?\s]/g, '')
+    .toLowerCase();
 }
 
 function buildStoryboardAssetRefs(
@@ -286,64 +334,96 @@ function buildStoryboardAssetRefs(
   return assets;
 }
 
-function buildLegacyScenes(
+/**
+ * Deterministic fallback board used when a narrated brief has no storyboard.
+ * Beat titles/messages come from script.hook/feature/cta so each scene's
+ * on-screen headline changes with the narration beat.
+ */
+export function synthesizeStoryboardFromScript(
   brief: NarratedVideoBrief,
   totalDuration: number
-): VideoCompositionADF['scenes'] {
-  const hookDuration = roundTo2(totalDuration * 0.33);
-  const featureDuration = roundTo2(totalDuration * 0.45);
-  const outroDuration = roundTo2(Math.max(0.1, totalDuration - hookDuration - featureDuration));
-  return [
-    {
-      scene_id: 'hook',
-      role: 'hook',
-      start_sec: 0,
-      duration_sec: hookDuration,
-      template_ref: { template_id: 'basic-title-card' },
-      content: {
-        eyebrow: brief.design_system.brand_name,
-        headline: brief.script.hook,
-        body: `Narrated in ${brief.language || 'default language'}.`,
+): VideoStoryboard {
+  const duration = clampDuration(totalDuration);
+  const hookDuration = roundTo2(duration * 0.33);
+  const featureDuration = roundTo2(duration * 0.45);
+  const outroDuration = roundTo2(Math.max(0.1, duration - hookDuration - featureDuration));
+  const format = resolveDefaultCompositionFormat();
+  return {
+    kind: 'video-storyboard',
+    version: '1.0.0',
+    title: brief.title || `${brief.design_system.brand_name} Intro`,
+    presentation_mode: 'promo',
+    content_type: 'promo',
+    promise: brief.script.feature,
+    desired_takeaway: brief.script.cta,
+    format,
+    design_system_ref: {
+      system_id: 'synthesized-from-script',
+      brand_name: brief.design_system.brand_name,
+      background_color: brief.design_system.theme_tokens?.background_color,
+      layout_family: brief.design_system.theme_tokens?.layout_variant,
+      css_vars: brief.design_system.theme_tokens?.css_vars,
+      logo_path: brief.design_system.assets?.logo_path,
+      hero_path: brief.design_system.assets?.hero_path,
+    },
+    beats: [
+      {
+        beat_id: 'hook',
+        title: '曖昧な指示は実行しない',
+        start_sec: 0,
+        duration_sec: hookDuration,
+        role: 'hook',
+        semantic: 'hook',
+        message: brief.script.hook,
+        visual_direction: 'Open on the product claim',
+        visual_intent: 'まず人間と意図を合意し、検証可能な計画へ落とします',
+        caption_intent: 'Intent before execution',
+        layout_variant: brief.design_system.theme_tokens?.layout_variant || 'focus-center',
+      },
+      {
+        beat_id: 'feature',
+        title: '意図 → 契約 → 実行',
+        start_sec: hookDuration,
+        duration_sec: featureDuration,
+        role: 'feature',
+        semantic: 'process',
+        message: brief.script.feature,
+        visual_direction: 'Show the governed operating loop',
+        visual_intent: 'Trace と Quality Gate で再現性を担保します',
+        caption_intent: '合意・実行・検証のサイクル',
         layout_variant: brief.design_system.theme_tokens?.layout_variant || 'split-left',
-        design_system_vars: brief.design_system.theme_tokens?.css_vars || {},
       },
-      asset_refs: buildSceneAssets(brief, 'hook'),
-    },
-    {
-      scene_id: 'feature',
-      role: 'feature',
-      start_sec: hookDuration,
-      duration_sec: featureDuration,
-      template_ref: { template_id: 'split-highlight' },
-      content: {
-        headline: 'From brief to scene plan',
-        body: brief.script.feature,
-        layout_variant: brief.design_system.theme_tokens?.layout_variant || 'split-left',
-        design_system_vars: brief.design_system.theme_tokens?.css_vars || {},
+      {
+        beat_id: 'cta',
+        title: '今すぐ始める',
+        start_sec: roundTo2(hookDuration + featureDuration),
+        duration_sec: outroDuration,
+        role: 'outro',
+        semantic: 'cta',
+        message: brief.script.cta,
+        visual_direction: 'Close on the call to action',
+        visual_intent: 'ミッションとして動かして Trace を残しましょう',
+        caption_intent: 'Start a mission',
+        layout_variant: 'split-right',
       },
-      asset_refs: buildSceneAssets(brief, 'feature'),
-    },
-    {
-      scene_id: 'outro',
-      role: 'outro',
-      start_sec: roundTo2(hookDuration + featureDuration),
-      duration_sec: outroDuration,
-      template_ref: { template_id: 'logo-outro' },
-      content: {
-        headline: brief.design_system.brand_name,
-        body: brief.script.cta,
-        layout_variant: brief.design_system.theme_tokens?.layout_variant || 'split-right',
-        design_system_vars: brief.design_system.theme_tokens?.css_vars || {},
-      },
-      asset_refs: buildSceneAssets(brief, 'outro'),
-    },
-  ];
+    ],
+  };
+}
+
+/** Keep on-screen headlines readable while preserving the full script as body. */
+export function sceneHeadline(text: string, maxLen = 56): string {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return 'Kyberion';
+  const firstClause = trimmed.split(/[。．.!！？?\n]/)[0]?.trim() || trimmed;
+  if (firstClause.length <= maxLen) return firstClause;
+  return `${firstClause.slice(0, Math.max(1, maxLen - 1))}…`;
 }
 
 function deriveProcessSteps(storyboard: VideoStoryboard): Array<{ step: string; detail: string }> {
-  return storyboard.beats.map((beat, index) => ({
+  const shortLabels = ['合意', '実行', '検証', '公開'];
+  return storyboard.beats.slice(0, 4).map((beat, index) => ({
     step: String(index + 1).padStart(2, '0'),
-    detail: beat.title,
+    detail: sceneHeadline(beat.title || shortLabels[index] || `Beat ${index + 1}`, 18),
   }));
 }
 
@@ -427,28 +507,6 @@ function selectTemplateId(
     return 'split-highlight';
   }
   return 'basic-title-card';
-}
-
-function buildSceneAssets(
-  brief: NarratedVideoBrief,
-  scene: 'hook' | 'feature' | 'outro'
-): VideoCompositionAssetRef[] {
-  const assets: VideoCompositionAssetRef[] = [];
-  if (brief.design_system.assets?.hero_path && scene !== 'outro') {
-    assets.push({
-      asset_id: `${scene}-hero`,
-      path: brief.design_system.assets.hero_path,
-      role: scene === 'feature' ? 'supporting' : 'background',
-    });
-  }
-  if (brief.design_system.assets?.logo_path && scene === 'outro') {
-    assets.push({
-      asset_id: 'brand-logo',
-      path: brief.design_system.assets.logo_path,
-      role: 'logo',
-    });
-  }
-  return assets;
 }
 
 function resolveSceneLayoutVariant(

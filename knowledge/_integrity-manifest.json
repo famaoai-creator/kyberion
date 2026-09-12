@@ -3843,7 +3843,7 @@
     {
       "path": "product/orchestration/narrated-video-production-playbook.md",
       "tier": "public",
-      "size": 3994,
+      "size": 6130,
       "type": "md"
     },
     {
@@ -4186,6 +4186,12 @@
       "path": "product/orchestration/schedule-delivery-protocol.md",
       "tier": "public",
       "size": 1415,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/scratch-to-pipeline-video-promotion.md",
+      "tier": "public",
+      "size": 2954,
       "type": "md"
     },
     {
@@ -12141,7 +12147,7 @@
     {
       "path": "public/procedures/media/produce-narrated-video.md",
       "tier": "public",
-      "size": 4584,
+      "size": 5146,
       "type": "md"
     },
     {

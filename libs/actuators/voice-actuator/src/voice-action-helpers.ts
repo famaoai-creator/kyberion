@@ -39,6 +39,77 @@ export function validateVoiceAction(input: unknown): void {
   throw new Error(`Invalid voice action: ${detail}`);
 }
 
+const PIPELINE_META_KEYS = new Set([
+  'export_as',
+  '_facets',
+  '_reasoning_policy',
+  '_step_id',
+  'type',
+  'op',
+  'params',
+]);
+
+/**
+ * Catalog-backed pipeline dispatch wraps ops as `{ type, op, params }`.
+ * Voice actions expect `{ action, ...fields }` (flat) or `{ action, params }`.
+ */
+export function normalizeVoiceActionInput(input: unknown): unknown {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input;
+  const rec = input as Record<string, unknown>;
+  if (rec.action === 'pipeline' && Array.isArray(rec.steps)) {
+    return {
+      ...rec,
+      steps: rec.steps.map((step) => normalizeVoicePipelineStep(step)),
+    };
+  }
+  return normalizeVoicePipelineStep(rec);
+}
+
+function normalizeVoicePipelineStep(step: unknown): unknown {
+  if (!step || typeof step !== 'object' || Array.isArray(step)) return step;
+  const rec = step as Record<string, unknown>;
+  if (typeof rec.action === 'string' && rec.action.length > 0) {
+    return stripVoicePipelineMeta(rec);
+  }
+  if (typeof rec.op === 'string' && rec.op.length > 0) {
+    const params =
+      rec.params && typeof rec.params === 'object' && !Array.isArray(rec.params)
+        ? (rec.params as Record<string, unknown>)
+        : {};
+    const cleaned = stripVoicePipelineMeta({ ...params });
+    // Flat voice contracts (generate_voice, …) put fields at the top level.
+    if (cleaned.params && typeof cleaned.params === 'object') {
+      return { action: rec.op, params: cleaned.params };
+    }
+    return { action: rec.op, ...cleaned };
+  }
+  return step;
+}
+
+function stripVoicePipelineMeta(rec: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(rec)) {
+    if (PIPELINE_META_KEYS.has(key) && key !== 'params') continue;
+    if (
+      key === 'export_as' ||
+      key === '_facets' ||
+      key === '_reasoning_policy' ||
+      key === '_step_id'
+    )
+      continue;
+    out[key] = value;
+  }
+  if (out.params && typeof out.params === 'object' && !Array.isArray(out.params)) {
+    const nested = { ...(out.params as Record<string, unknown>) };
+    delete nested.export_as;
+    delete nested._facets;
+    delete nested._reasoning_policy;
+    delete nested._step_id;
+    out.params = nested;
+  }
+  return out;
+}
+
 export async function listVoices(): Promise<any> {
   const engine = resolveVoiceEngineForPlatform();
   if (!engine.supports.list_voices) {
