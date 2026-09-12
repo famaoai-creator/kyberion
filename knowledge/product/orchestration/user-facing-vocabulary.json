@@ -8988,6 +8988,168 @@
         "qps-ploc": "⟦Ƈőɱɱėñŧ ŀőř⟧"
       }
     },
+    "sketch_input": {
+      "title": {
+        "en": "Sketch Input (local only)",
+        "ja": "Sketch Input（ローカルのみ）",
+        "qps-ploc": "⟦Şķėŧƈħ Ïñṗůŧ (ŀőƈȧŀ őñŀẏ) ŀőřėɱ ïṗ⟧"
+      },
+      "subtitle": {
+        "en": "Draw diagrams and text, export PNG, and hand off to Kyberion",
+        "ja": "図とテキストを描いて PNG を書き出し、Kyberion へ渡します",
+        "qps-ploc": "⟦Ḓřȧẇ ḓïȧɠřȧɱş ȧñḓ ŧėẋŧ, ėẋṗőřŧ ṖÑƓ, ȧñḓ ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "pen": {
+        "en": "Pen",
+        "ja": "ペン",
+        "qps-ploc": "⟦Ṗėñ ŀőř⟧"
+      },
+      "rect": {
+        "en": "Rect",
+        "ja": "矩形",
+        "qps-ploc": "⟦Řėƈŧ ŀőř⟧"
+      },
+      "ellipse": {
+        "en": "Ellipse",
+        "ja": "楕円",
+        "qps-ploc": "⟦Ėŀŀïṗşė ŀőř⟧"
+      },
+      "line": {
+        "en": "Line",
+        "ja": "直線",
+        "qps-ploc": "⟦Ŀïñė ŀőř⟧"
+      },
+      "arrow": {
+        "en": "Arrow",
+        "ja": "矢印",
+        "qps-ploc": "⟦Ȧřřőẇ ŀőř⟧"
+      },
+      "text": {
+        "en": "Text",
+        "ja": "テキスト",
+        "qps-ploc": "⟦Ŧėẋŧ ŀőř⟧"
+      },
+      "eraser": {
+        "en": "Eraser",
+        "ja": "消しゴム",
+        "qps-ploc": "⟦Ėřȧşėř ŀőř⟧"
+      },
+      "undo": {
+        "en": "Undo",
+        "ja": "元に戻す",
+        "qps-ploc": "⟦Ůñḓő ŀőř⟧"
+      },
+      "clear": {
+        "en": "Clear",
+        "ja": "消去",
+        "qps-ploc": "⟦Ƈŀėȧř ŀőř⟧"
+      },
+      "color": {
+        "en": "Color",
+        "ja": "色",
+        "qps-ploc": "⟦Ƈőŀőř ŀőř⟧"
+      },
+      "width": {
+        "en": "Width",
+        "ja": "太さ",
+        "qps-ploc": "⟦Ẇïḓŧħ ŀőř⟧"
+      },
+      "instruction": {
+        "en": "Instruction for Kyberion",
+        "ja": "Kyberionへの指示",
+        "qps-ploc": "⟦Ïñşŧřůƈŧïőñ ƒőř Ķẏƀėřïőñ ŀőřėɱ ï⟧"
+      },
+      "instruction_placeholder": {
+        "en": "e.g. Turn this diagram into requirements (keyboard / OS dictation / 🎤)",
+        "ja": "例: この図を要件として整理して（キーボード / OSディクテーション / 🎤）",
+        "qps-ploc": "⟦ė.ɠ. Ŧůřñ ŧħïş ḓïȧɠřȧɱ ïñŧő řėɋůïřėɱėñŧş (ķėẏƀőȧřḓ / ŐŞ ḓïƈŧȧŧïőñ / 🎤) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "dictation_note": {
+        "en": "Prefer OS dictation (on-device) for the instruction. Browser 🎤 may send audio to a cloud provider.",
+        "ja": "指示欄はOSディクテーション（端末内）推奨。ブラウザ🎤は機種によりクラウド送信の場合があります。",
+        "qps-ploc": "⟦Ṗřėƒėř ŐŞ ḓïƈŧȧŧïőñ (őñ-ḓėṽïƈė) ƒőř ŧħė ïñşŧřůƈŧïőñ. Ƀřőẇşėř 🎤 ɱȧẏ şėñḓ ȧůḓïő ŧő ȧ ƈŀőůḓ ṗřőṽïḓėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "voice": {
+        "en": "Voice",
+        "ja": "音声",
+        "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
+      },
+      "voice_stop": {
+        "en": "Stop",
+        "ja": "停止",
+        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
+      },
+      "download": {
+        "en": "Download PNG",
+        "ja": "PNGダウンロード",
+        "qps-ploc": "⟦Ḓőẇñŀőȧḓ ṖÑƓ ŀőř⟧"
+      },
+      "handoff": {
+        "en": "Hand off to Kyberion",
+        "ja": "Kyberionへ渡す",
+        "qps-ploc": "⟦Ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŀőřėɱ ⟧"
+      },
+      "ready": {
+        "en": "Ready to draw and export",
+        "ja": "描画してエクスポートできます",
+        "qps-ploc": "⟦Řėȧḓẏ ŧő ḓřȧẇ ȧñḓ ėẋṗőřŧ ŀőřėɱ ï⟧"
+      },
+      "exporting": {
+        "en": "Exporting…",
+        "ja": "書き出し中…",
+        "qps-ploc": "⟦Ėẋṗőřŧïñɠ… ŀőř⟧"
+      },
+      "exported": {
+        "en": "Exported",
+        "ja": "書き出し完了",
+        "qps-ploc": "⟦Ėẋṗőřŧėḓ ŀőř⟧"
+      },
+      "export_failed": {
+        "en": "Export failed",
+        "ja": "書き出し失敗",
+        "qps-ploc": "⟦Ėẋṗőřŧ ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "clear_confirm": {
+        "en": "Clear the canvas?",
+        "ja": "キャンバスを消去しますか？",
+        "qps-ploc": "⟦Ƈŀėȧř ŧħė ƈȧñṽȧş? ŀőřėɱ⟧"
+      },
+      "text_prompt": {
+        "en": "Enter text",
+        "ja": "テキストを入力",
+        "qps-ploc": "⟦Ėñŧėř ŧėẋŧ ŀőř⟧"
+      },
+      "out_label": {
+        "en": "Output",
+        "ja": "出力先",
+        "qps-ploc": "⟦Őůŧṗůŧ ŀőř⟧"
+      },
+      "voice_started": {
+        "en": "Listening…",
+        "ja": "音声入力中…",
+        "qps-ploc": "⟦Ŀïşŧėñïñɠ… ŀőř⟧"
+      },
+      "voice_stopped": {
+        "en": "Voice stopped",
+        "ja": "音声入力を停止",
+        "qps-ploc": "⟦Ṽőïƈė şŧőṗṗėḓ ŀőřė⟧"
+      },
+      "voice_error": {
+        "en": "Voice error",
+        "ja": "音声エラー",
+        "qps-ploc": "⟦Ṽőïƈė ėřřőř ŀőř⟧"
+      },
+      "voice_unavailable": {
+        "en": "Speech recognition unavailable (OS dictation still works)",
+        "ja": "このブラウザでは音声認識を使えません（OSディクテーションは可）",
+        "qps-ploc": "⟦Şṗėėƈħ řėƈőɠñïŧïőñ ůñȧṽȧïŀȧƀŀė (ŐŞ ḓïƈŧȧŧïőñ şŧïŀŀ ẇőřķş) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "server_usage_hint": {
+        "en": "Draw, then Hand off to Kyberion to write PNG + handoff.json. Ctrl-C to stop.",
+        "ja": "描画し、「Kyberionへ渡す」で PNG + handoff.json を書き出します。Ctrl-C で停止。",
+        "qps-ploc": "⟦Ḓřȧẇ, ŧħėñ Ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŧő ẇřïŧė ṖÑƓ + ħȧñḓőƒƒ.ĵşőñ. Ƈŧřŀ-Ƈ ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      }
+    },
     "minutes_record": {
       "mic_capture_failed": {
         "en": "Could not start microphone capture: {reason}",
