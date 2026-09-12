@@ -560,7 +560,7 @@ describe('video composition compiler', () => {
     const html = safeReadFile(`${bundleDir}/compositions/process.html`, {
       encoding: 'utf8',
     }) as string;
-    expect(html).toContain('実行サイクル');
+    expect(html).toContain('Operating cycle');
     expect(html).toContain('Brief intake');
     expect(html).toContain('Render package');
     expect(html).not.toContain('Ordered steps');
