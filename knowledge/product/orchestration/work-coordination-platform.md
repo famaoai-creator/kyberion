@@ -21,7 +21,7 @@ Kyberion の開発ワークフロー全体は [`kyberion-development-workflow.md
 - WorkItem と依存関係を canonical Work Graph として扱い、実行面をまたいで同じ lease/attempt/handoff を共有する
 - Board は `WorkItem` の view として扱う
 - Peer messaging は coordination command の transport として使う
-- 同一 checkout 上の複数プロバイダ CLI の薄い協調は [`co-session-coordination.md`](../architecture/co-session-coordination.md)（`pnpm co-session`）— mission 無しの same-checkout 面。語彙は Mesh / WorkItem handoff と揃える
+- 同一 checkout 上の複数プロバイダ CLI の薄い協調は [`co-session-coordination.md`](../architecture/co-session-coordination.md)（`pnpm exec tsx scripts/co_session.ts`）— mission 無しの same-checkout 面。語彙は Mesh / WorkItem handoff と揃える
 - GitHub Issue / Jira Issue を `WorkItem` に取り込む
 - Mission 由来の `NEXT_TASKS.json` は互換projectionへの入力として一方向にimportし、将来的にはWork Graphから再生成する
 - `dispatch-workitems` は、実行前に mission-scoped context pack を組み立てて、役割ごとに必要な最小コンテキストだけを agent に渡す

@@ -189,7 +189,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
     safeReadFile: (filePath: string, options?: { encoding?: BufferEncoding | null }) =>
       mocks.fileStore.has(filePath)
         ? mocks.fileStore.get(filePath)!
-        : mocks.safeReadFile(filePath, options as any),
+        : mocks.safeReadFile(filePath, options),
     safeLstat: mocks.safeLstat,
     safeWriteFile: mocks.safeWriteFile,
     safeRmSync: mocks.safeRmSync,

@@ -1824,9 +1824,9 @@
     {
       "id": "script.co-session",
       "module": "scripts/co_session.ts",
-      "command": "co-session",
+      "command": "co-session default",
       "noun": "co-session",
-      "verb": "cli",
+      "verb": "default",
       "audience": "operator"
     }
   ]
