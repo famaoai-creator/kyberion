@@ -448,12 +448,28 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
           ${
             supporting
               ? `<img src="${escapeHtml(supporting.path)}" alt="visual">`
-              : `
-            <div class="fallback">
-              <h2>Ordered steps</h2>
-              <p>${escapeHtml(sceneText(scene, 'caption') || 'Audience, use case, constraints, and render output are sequenced as a governed flow.')}</p>
-            </div>
-          `
+              : visualSteps.length > 0
+                ? `<div class="fallback">
+              <h2>${escapeHtml(sceneText(scene, 'caption') || 'Operating cycle')}</h2>
+              <div class="process-visual" style="margin-top:18px;text-align:left;">
+                ${visualSteps
+                  .slice(0, 4)
+                  .map(
+                    (step: any, index: number) => `
+                  <div class="process-step" style="margin:10px 0;display:flex;gap:12px;align-items:center;">
+                    <span style="display:inline-flex;width:42px;height:42px;border-radius:14px;align-items:center;justify-content:center;background:rgba(59,130,246,0.16);font-weight:800;">${escapeHtml(step.step)}</span>
+                    <strong style="font-size:22px;">${escapeHtml(step.detail)}</strong>
+                  </div>
+                  ${index < Math.min(visualSteps.length, 4) - 1 ? '<div class="process-arrow" style="width:2px;height:14px;margin-left:20px;background:rgba(147,197,253,0.5);"></div>' : ''}
+                `
+                  )
+                  .join('')}
+              </div>
+            </div>`
+                : `<div class="fallback">
+              <h2>${escapeHtml(sceneText(scene, 'caption') || 'Operating cycle')}</h2>
+              <p>${escapeHtml(body || 'From intent alignment through safe execution and verification.')}</p>
+            </div>`
           }
         </div>
       </div>
@@ -1145,7 +1161,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
 <html lang="ja">
   <head>
     <meta charset="utf-8">
-    <title>Outro</title>
+    <title>${escapeHtml(title || 'Outro')}</title>
     <style>
       ${sceneCssVars}
       body {
@@ -1167,7 +1183,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         
       }
       h1 { font-size: 80px; letter-spacing: -0.02em; margin: 0; font-weight: 900; }
-      p { font-size: 24px; color: #64748b; margin-top: 20px; text-transform: uppercase; letter-spacing: 0.4em; }
+      p { font-size: 24px; color: #64748b; margin-top: 20px; letter-spacing: 0.08em; }
       @keyframes scaleUp { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       .glow {
         position: absolute;
@@ -1204,7 +1220,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     <div class="glow"></div>
     <div class="center">
       <h1>${escapeHtml(title || 'Kyberion')}</h1>
-      <p>Initialize Your Mission.</p>
+      <p>${escapeHtml(body || eyebrow || 'Initialize Your Mission.')}</p>
     </div>
     </div>
     ${hfScript}
@@ -1216,7 +1232,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
 <html lang="ja">
   <head>
     <meta charset="utf-8">
-    <title>Scene</title>
+    <title>${escapeHtml(title || scene.scene_id || 'Scene')}</title>
     <style>
       ${sceneCssVars}
       body {
@@ -1234,7 +1250,23 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
       .hero-text {
         
       }
+      .eyebrow {
+        font-size: 18px;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: #94a3b8;
+        margin-bottom: 18px;
+      }
       h1 { font-size: 96px; margin: 0; font-weight: 800; letter-spacing: -0.04em; }
+      .body {
+        margin-top: 24px;
+        font-size: 28px;
+        line-height: 1.5;
+        color: #94a3b8;
+        max-width: 70%;
+        margin-left: auto;
+        margin-right: auto;
+      }
       @keyframes reveal { from { opacity: 0; clip-path: inset(0 100% 0 0); } to { opacity: 1; clip-path: inset(0 0 0 0); } }
     </style>
   </head>
@@ -1254,7 +1286,9 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
       data-start="0"
     >
     <div class="hero-text">
+      ${eyebrow ? `<div class="eyebrow">${escapeHtml(eyebrow)}</div>` : ''}
       <h1>${escapeHtml(title || 'Kyberion')}</h1>
+      ${body ? `<div class="body">${escapeHtml(body)}</div>` : ''}
     </div>
     </div>
     ${hfScript}

@@ -15,6 +15,17 @@ This procedure describes the actual production flow used in Kyberion:
 
 It is the operational path for narrated videos, not a prompt-based video generator.
 
+## Scratch first
+
+For a **new** clip whose look is not locked yet, do not start here.
+Prototype with the scratch renderer first, then promote after acceptance:
+
+- Playbook: [`narrated-video-production-playbook.md`](../../../product/orchestration/narrated-video-production-playbook.md)
+- Promotion: [`scratch-to-pipeline-video-promotion.md`](../../../product/orchestration/scratch-to-pipeline-video-promotion.md)
+- Example: `scripts/kyberion_intro_scratch.ts`
+
+Use this procedure once the scratch MP4 is accepted and you need replay / validation / publish gates.
+
 ## 2. When To Use
 
 Use this procedure when the task is:
@@ -177,4 +188,3 @@ The completed flow should leave:
 - `job-state.json` for long renders
 - validation output
 - a summary note or publish handoff
-
