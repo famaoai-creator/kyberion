@@ -50,7 +50,8 @@
           "ts": { "type": "string" }
         }
       }
-    }
+    },
+    "scope_fingerprint": { "type": "string", "minLength": 3 }
   },
   "required": ["session_id"]
 }

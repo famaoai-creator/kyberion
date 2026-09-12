@@ -62,6 +62,9 @@ export function knowledgeWritePathFor(
     .replace(/^-+|-+$/g, '');
   if (!name) throw new Error('[KNOWLEDGE_WRITE_INVALID] slug is required');
   const suffix = extension.startsWith('.') ? extension : `.${extension}`;
+  if (!/^\.[a-zA-Z0-9]+(?:\.[a-zA-Z0-9]+)*$/.test(suffix)) {
+    throw new Error('[KNOWLEDGE_WRITE_INVALID] extension must contain only filename suffixes');
+  }
   if (level === 'product') return path.posix.join('product', `${name}${suffix}`);
   if (level === 'public') return path.posix.join('public', `${name}${suffix}`);
   if (level === 'common') {
@@ -87,20 +90,24 @@ export function knowledgeWritePathFor(
     session: scope.session_id,
   };
   const required = selected[level];
-  if (!required)
+  if (!Object.hasOwn(selected, level) || !required)
     throw new Error(`[KNOWLEDGE_WRITE_INVALID] ${level} is absent from the scope chain`);
-  const chain: Array<[string, string | undefined]> = [
-    ['organizations', scope.organization_id],
-    ['projects', scope.project_id],
-    ['missions', scope.mission_id],
-    ['tasks', scope.task_id],
-    ['sessions', scope.session_id],
-  ];
+  const chain = [
+    ['organization', 'organizations', scope.organization_id],
+    ['project', 'projects', scope.project_id],
+    ['mission', 'missions', scope.mission_id],
+    ['task', 'tasks', scope.task_id],
+    ['session', 'sessions', scope.session_id],
+  ] as const;
   const parts = [scope.tier === 'personal' ? 'personal' : 'confidential', scope.tenant_slug];
-  for (const [directory, value] of chain) {
-    if (!value) break;
-    parts.push(directory, value);
-    if (value === required) break;
+  if (level !== 'tenant') {
+    for (const [chainLevel, directory, value] of chain) {
+      if (!value) {
+        throw new Error(`[KNOWLEDGE_WRITE_INVALID] ${chainLevel} is absent from the scope chain`);
+      }
+      parts.push(directory, value);
+      if (chainLevel === level) break;
+    }
   }
   return path.posix.join(...parts, `${name}${suffix}`);
 }
