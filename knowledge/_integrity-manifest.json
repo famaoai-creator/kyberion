@@ -1293,7 +1293,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 45694,
+      "size": 45922,
       "type": "json"
     },
     {
@@ -2385,7 +2385,7 @@
     {
       "path": "product/governance/protocol-service-registry.json",
       "tier": "public",
-      "size": 5872,
+      "size": 6790,
       "type": "json"
     },
     {
@@ -2553,7 +2553,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 15128,
+      "size": 15351,
       "type": "json"
     },
     {
@@ -4941,7 +4941,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 510845,
+      "size": 517166,
       "type": "json"
     },
     {
