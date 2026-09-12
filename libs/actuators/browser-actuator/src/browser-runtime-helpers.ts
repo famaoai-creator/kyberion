@@ -631,6 +631,18 @@ function saveBrowserSessionSnapshot(sessionId: string, snapshot: BrowserSnapshot
   );
 }
 
+function loadBrowserSessionSnapshot(sessionId: string): BrowserSnapshot | null {
+  const filePath = browserSessionArtifactPath(BROWSER_SNAPSHOT_DIR, sessionId, '.json');
+  if (!isExistingRegularFile(filePath)) return null;
+  try {
+    const raw = safeReadFile(filePath, { encoding: 'utf8' });
+    const parsed = JSON.parse(String(raw));
+    return parsed && typeof parsed === 'object' ? (parsed as BrowserSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function summarizeTabs(runtime: BrowserRuntime): Promise<BrowserTabSummary[]> {
   const summaries: BrowserTabSummary[] = [];
   for (const [tabId, page] of runtime.tabs.entries()) {
@@ -871,7 +883,9 @@ function deriveOrigin(targetUrl: string): string {
 function resolveRefSelector(ctx: any, ref: string): string {
   const selector = ctx?.ref_map?.[ref];
   if (!selector) {
-    throw new Error(`Unknown browser ref: ${ref}. Capture a snapshot before using *_ref actions.`);
+    throw new Error(
+      `Unknown browser ref: ${ref}. Capture a snapshot in this pipeline (or reuse a keep_alive session that already snapshotted), then call click_ref/fill_ref with that ref — or pass params.selector to click.`
+    );
   }
   return selector;
 }
@@ -1277,6 +1291,7 @@ export const browserRuntimeHelpers = {
   getBrowserScopeFingerprint: browserScopeFingerprint,
   assertBrowserSessionOwner,
   saveBrowserSessionSnapshot,
+  loadBrowserSessionSnapshot,
   captureSnapshotElements,
   buildSnapshot,
   buildSessionHandoff,
