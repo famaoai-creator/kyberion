@@ -500,6 +500,62 @@ describe('browser-actuator v3 contract', () => {
       status: 'failed',
     });
     expect(String(result.results[0].error)).toContain('Unknown browser ref');
+    expect(String(result.results[0].error)).toContain('params.selector');
+    expect(result.summary).toMatchObject({ url: expect.anything() });
+  });
+
+  it('accepts navigate as an alias for goto and exposes a flat summary', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-nav-alias',
+      steps: [{ type: 'apply', op: 'navigate', params: { url: 'https://example.com' } }],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.goto).toHaveBeenCalledWith('https://example.com', expect.any(Object));
+    expect(result.url || result.summary?.url || result.context?.last_url).toBeTruthy();
+  });
+
+  it('routes click({ref}) through click_ref behavior', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-click-ref-alias',
+      steps: [
+        { type: 'capture', op: 'snapshot', params: {} },
+        { type: 'apply', op: 'click', params: { ref: '@e1' } },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.click).toHaveBeenCalled();
+  });
+
+  it('reuses keep_alive snapshot refs across separate pipeline calls', async () => {
+    const { handleAction } = await import('./index');
+    const sessionId = 'browser-keepalive-refs';
+
+    const first = await handleAction({
+      action: 'pipeline',
+      session_id: sessionId,
+      steps: [{ type: 'capture', op: 'snapshot', params: {} }],
+      options: { headless: true, keep_alive: true },
+    });
+    expect(first.status).toBe('succeeded');
+    expect(first.context.ref_map).toBeTruthy();
+
+    const second = await handleAction({
+      action: 'pipeline',
+      session_id: sessionId,
+      steps: [{ type: 'apply', op: 'click_ref', params: { ref: '@e1' } }],
+      options: { headless: true, keep_alive: true },
+    });
+
+    expect(second.status).toBe('succeeded');
+    expect(mocks.page.click).toHaveBeenCalled();
   });
 
   it('resolves a ref via recorded {role,name} when it is missing from ref_map (e.g. a step compiled from an extension recording)', async () => {

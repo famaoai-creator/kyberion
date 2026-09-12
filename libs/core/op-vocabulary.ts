@@ -18,6 +18,7 @@ export const BROWSER_RECORDING_OP_ALIASES: Record<string, string> = {
 export const BROWSER_PIPELINE_OP_ALIASES: Record<string, string> = {
   snapshot: 'snapshot',
   screenshot: 'screenshot',
+  navigate: 'goto',
   click_ref: 'click',
   fill_ref: 'fill',
   select_ref: 'click',

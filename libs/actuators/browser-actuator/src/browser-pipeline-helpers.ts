@@ -19,6 +19,7 @@ import { decideFromObservation, executeLlmDecideOp } from '@agent/core/semantic-
 import { getSecret } from '@agent/core/secret-guard';
 import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import { opControl } from './browser-control-helpers.js';
 import { type CDPSession, type Page } from '@playwright/test';
@@ -119,11 +120,14 @@ function buildRetryOptions(stepParams: Record<string, any>) {
 }
 
 export async function executePipeline(
-  steps: PipelineStep[],
+  inputSteps: PipelineStep[],
   sessionId: string,
   options: any,
   initialCtx: any = {}
 ) {
+  const steps = inputSteps.map((step) =>
+    step && typeof step === 'object' && step.op === 'navigate' ? { ...step, op: 'goto' } : step
+  );
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || 300000;
 
@@ -191,6 +195,24 @@ export async function executePipeline(
     action_trail_max: clamp(Number(options.action_trail_max || 200), 1, 2000),
     timestamp: nowIso(),
   };
+
+  // keep_alive reuse: restore the last snapshot/ref_map so *_ref ops work across
+  // separate pipeline invocations without requiring the caller to re-snapshot.
+  if (!ctx.last_snapshot || !ctx.ref_map || Object.keys(ctx.ref_map as object).length === 0) {
+    const priorSnapshot = browserRuntimeHelpers.loadBrowserSessionSnapshot(sessionId);
+    if (priorSnapshot) {
+      ctx = {
+        ...ctx,
+        last_snapshot: ctx.last_snapshot || priorSnapshot,
+        last_capture: ctx.last_capture || priorSnapshot,
+        last_url: ctx.last_url || priorSnapshot.url,
+        ref_map: {
+          ...refMapFromSnapshot(priorSnapshot),
+          ...(isRecord(ctx.ref_map) ? ctx.ref_map : {}),
+        },
+      };
+    }
+  }
 
   const traceCtx = new TraceContext(`browser-pipeline:${sessionId}`, {
     actuator: 'browser-actuator',
@@ -277,6 +299,21 @@ export async function executePipeline(
     ctx = engineResult.context;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
+    if (!ctx.last_screenshot) {
+      try {
+        const page = browserRuntimeHelpers.getActivePage(runtime);
+        const failShot = resolveBrowserRepositoryPath(
+          `evidence/browser/failure_${sessionId}_${Date.now()}.png`
+        );
+        if (!safeExistsSync(path.dirname(failShot)))
+          safeMkdir(path.dirname(failShot), { recursive: true });
+        await page.screenshot({ path: failShot });
+        ctx.last_screenshot = failShot;
+        ctx.last_url = ctx.last_url || page.url();
+      } catch {
+        // Best-effort evidence only; keep the original failure.
+      }
+    }
     ctx = {
       ...ctx,
       error: message,
@@ -422,6 +459,8 @@ export async function executePipeline(
     results: engineResult.results,
     context: ctx,
     total_steps: engineResult.total_steps,
+    summary: buildBrowserPipelineSummary(ctx),
+    ...buildBrowserPipelineSummary(ctx),
   };
 }
 
@@ -438,6 +477,7 @@ async function opCapture(
 ) {
   const page = browserRuntimeHelpers.getActivePage(runtime);
   switch (op) {
+    case 'navigate':
     case 'goto': {
       const url = resolve(params.url);
       browserRuntimeHelpers.assertNavigationAllowed(url, runtime.navigationPolicy);
@@ -1003,6 +1043,7 @@ async function opApply(
 ) {
   const page = browserRuntimeHelpers.getActivePage(runtime);
   switch (op) {
+    case 'navigate':
     case 'goto': {
       const url = resolve(params.url);
       browserRuntimeHelpers.assertNavigationAllowed(url, runtime.navigationPolicy);
@@ -1020,6 +1061,9 @@ async function opApply(
       );
     }
     case 'click':
+      if (params.ref != null && String(params.ref).trim() !== '') {
+        return opApply('click_ref', params, runtime, ctx, resolve);
+      }
       await retry(async () => {
         await page.click(resolve(params.selector), { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
@@ -1113,15 +1157,18 @@ async function opApply(
       await retry(async () => {
         await page.click(selector, { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
-      return browserRuntimeHelpers.recordBrowserAction(resolvedCtx, {
-        kind: 'apply',
-        op: 'click_ref',
-        tab_id: runtime.activeTabId,
-        ref,
-        selector,
-        element_name: element?.name ?? params.name,
-        element_role: element?.role ?? params.role,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...resolvedCtx, last_url: page.url() },
+        {
+          kind: 'apply',
+          op: 'click_ref',
+          tab_id: runtime.activeTabId,
+          ref,
+          selector,
+          element_name: element?.name ?? params.name,
+          element_role: element?.role ?? params.role,
+        }
+      );
     }
     case 'fill_ref': {
       const ref = resolve(params.ref);
