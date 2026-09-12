@@ -61,4 +61,4 @@ From the accepted scratch source (for example `scripts/kyberion_intro_scratch.ts
 ## Scratch entry points
 
 - Example scratch renderer: `scripts/kyberion_intro_scratch.ts`
-- Output root pattern: `active/shared/tmp/<slug>-scratch/`
+- Output root pattern: `active/shared/tmp/<slug>-scratch` (governed temp; never a top-level `scratch` directory)
