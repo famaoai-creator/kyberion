@@ -93,6 +93,27 @@
       "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
     },
     {
+      "id": "sketch-input",
+      "classification": "artifact-review-port",
+      "process_scope": "tenant-service",
+      "request_scope_mode": "artifact-derived",
+      "health": "localhost-health",
+      "owner": "surface_runtime",
+      "binding": "artifact-ref-and-sketch-session",
+      "approval": "local-token-is-not-human-approval",
+      "principal_resolution": "viewer-principal-at-sketch-session",
+      "write_authority": "artifact-review-receipt-only",
+      "nhi_binding": "viewer-or-runtime-nhi",
+      "approval_classes": ["local-token-not-approval"],
+      "data_residency": "tenant-sketch-receipts-and-target-artifact",
+      "data_paths": [
+        "active/shared/observability/sketch-input/tenants/{tenant}/receipts/",
+        "active/shared/tmp/sketch-input/",
+        "<target-artifact>"
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
+    },
+    {
       "id": "generation-scheduler",
       "classification": "control-plane-worker",
       "process_scope": "system",
