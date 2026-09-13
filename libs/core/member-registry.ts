@@ -26,8 +26,10 @@ import {
   safeWriteFile,
   assertSafeRepositoryPath,
 } from './secure-io.js';
+import { isValidMemberId } from './member-id-grammar.js';
 
-const MEMBER_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
+export { isValidMemberId };
+
 const OWNER_MEMBER_ID = 'owner';
 // Resolved at module load against the real repo root on purpose (same
 // rationale as tenant-registry.ts): the schema is tracked source, not
@@ -77,10 +79,6 @@ function validateMemberProfile(
     path: sourcePath,
     schema: MEMBER_PROFILE_SCHEMA_PATH,
   }).validate(profile, sourcePath);
-}
-
-export function isValidMemberId(value: string): boolean {
-  return MEMBER_ID_RE.test(value);
 }
 
 function assertMemberId(id: string): void {

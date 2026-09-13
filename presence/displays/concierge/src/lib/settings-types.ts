@@ -214,7 +214,7 @@ export function parseVoiceSelectionResponse(value: unknown): VoiceSelection | un
 // 組織とメンバー 研修: read-only catalog (proxied via /api/training/catalog)
 // plus per-tenant assignments (/api/training/assignments) — same shape as
 // libs/core/training-catalog.ts, duplicated here because the client never
-// imports @agent/core/secure-io-backed modules directly.
+// imports server-only core modules directly.
 export type TrainingTrack = { id: string; title: string };
 export type TrainingAssignmentStatus = 'not_started' | 'in_progress' | 'complete';
 export type TrainingAssignmentEntry = {
