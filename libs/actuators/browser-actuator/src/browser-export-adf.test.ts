@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { Page } from '@playwright/test';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 
 const TS = '2026-09-13T00:00:00.000Z';
 
@@ -177,5 +179,128 @@ describe('renderBrowserAdf durable export', () => {
         params: { ref: '@e1', name: 'Learn more', role: 'link' },
       },
     ]);
+  });
+
+  it('exports secret fills with recorded selector as dom_path so requireDomPathMatch can corroborate', () => {
+    const adf = browserRuntimeHelpers.renderBrowserAdf(
+      [
+        {
+          kind: 'apply',
+          op: 'fill_secret_ref',
+          ref: '@e1',
+          selector: 'input[name="token"]',
+          secret_ref: 'GITHUB_TOKEN',
+          classification: 'secret_ref',
+          element_name: 'API Key',
+          element_role: 'textbox',
+          ts: TS,
+        },
+      ],
+      'secret-durable'
+    );
+
+    expect(adf.steps).toEqual([
+      {
+        type: 'apply',
+        op: 'fill_secret_ref',
+        params: {
+          ref: '@e1',
+          secret_ref: 'GITHUB_TOKEN',
+          name: 'API Key',
+          role: 'textbox',
+          dom_path: 'input[name="token"]',
+        },
+      },
+    ]);
+    expect(adf.steps.some((step) => step.op === 'snapshot')).toBe(false);
+  });
+
+  it('inserts a snapshot for ref-only secret fills that have no corroborating identity', () => {
+    const adf = browserRuntimeHelpers.renderBrowserAdf(
+      [
+        {
+          kind: 'apply',
+          op: 'fill_secret_ref',
+          ref: '@e1',
+          secret_ref: 'GITHUB_TOKEN',
+          classification: 'secret_ref',
+          ts: TS,
+        },
+      ],
+      'secret-ref-only'
+    );
+
+    expect(adf.steps).toEqual([
+      { type: 'capture', op: 'snapshot', params: {} },
+      {
+        type: 'apply',
+        op: 'fill_secret_ref',
+        params: { ref: '@e1', secret_ref: 'GITHUB_TOKEN' },
+      },
+    ]);
+  });
+
+  it('resolves exported secret-fill identity without a prior snapshot ref_map', async () => {
+    const adf = browserRuntimeHelpers.renderBrowserAdf(
+      [
+        {
+          kind: 'apply',
+          op: 'fill_secret_ref',
+          ref: '@e1',
+          selector: 'input#key',
+          secret_ref: 'GITHUB_TOKEN',
+          classification: 'secret_ref',
+          element_name: 'API Key',
+          element_role: 'textbox',
+          ts: TS,
+        },
+      ],
+      'secret-replay'
+    );
+    const params = adf.steps[0]?.params as {
+      ref: string;
+      name: string;
+      role: string;
+      dom_path: string;
+    };
+    const page = {
+      evaluate: vi.fn(async (_fn: unknown, arg?: unknown) => {
+        if (arg && typeof arg === 'object' && 'domPath' in (arg as Record<string, unknown>)) {
+          const { domPath, candidateSelector } = arg as {
+            domPath: string;
+            candidateSelector: string;
+          };
+          return domPath === 'input#key' && candidateSelector === 'input#key';
+        }
+        return {
+          elements: [
+            {
+              ref: '@e9',
+              tag: 'input',
+              role: 'textbox',
+              text: '',
+              name: 'API Key',
+              type: 'password',
+              placeholder: null,
+              href: null,
+              value: null,
+              visible: true,
+              editable: true,
+              selector: 'input#key',
+            },
+          ],
+        };
+      }),
+    } as unknown as Page;
+
+    const resolved = await resolveRefOrRecordedTarget({}, params.ref, page, {
+      role: params.role,
+      name: params.name,
+      dom_path: params.dom_path,
+      requireDomPathMatch: true,
+    });
+
+    expect(resolved.selector).toBe('input#key');
+    expect(resolved.ctx.ref_map).toMatchObject({ '@e1': 'input#key' });
   });
 });
