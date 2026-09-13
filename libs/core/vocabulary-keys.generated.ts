@@ -2275,6 +2275,7 @@ export type VocabularyKey =
   | 'decide_by'
   | 'decide_continue'
   | 'decide_deferred'
+  | 'decide_due'
   | 'decide_effect_action'
   | 'decide_effect_approval'
   | 'decide_empty'
@@ -2432,6 +2433,7 @@ export type VocabularyKey =
   | 'front_desk:decide_by'
   | 'front_desk:decide_continue'
   | 'front_desk:decide_deferred'
+  | 'front_desk:decide_due'
   | 'front_desk:decide_effect_action'
   | 'front_desk:decide_effect_approval'
   | 'front_desk:decide_empty'
@@ -2488,6 +2490,7 @@ export type VocabularyKey =
   | 'front_desk:tenant_switch_aria'
   | 'front_desk:tenant_viewing_single'
   | 'front_desk:tenant_viewing_summary'
+  | 'front_desk:you'
   | 'generated'
   | 'header.home'
   | 'header.ingest'
@@ -4287,4 +4290,5 @@ export type VocabularyKey =
   | 'voice_hub_received'
   | 'voice_hub_thanks'
   | 'voice_start_failed'
-  | 'width';
+  | 'width'
+  | 'you';
