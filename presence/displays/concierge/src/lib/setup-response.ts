@@ -89,6 +89,15 @@ function stringField(record: JsonRecord, key: string): string | undefined {
   return typeof record[key] === 'string' ? record[key] : undefined;
 }
 
+// `stringField` returns the string itself, so callers writing
+// `!stringField(record, key)` reject a legitimately empty string along with
+// a missing/non-string field (`!''` is `true`). Use `isStringField` instead
+// wherever the empty string is a valid value (e.g. the free-text profile
+// fields before onboarding fills them in) — see FD-06's first-run scenario.
+function isStringField(record: JsonRecord, key: string): boolean {
+  return typeof record[key] === 'string';
+}
+
 function optionalString(record: JsonRecord, key: string): boolean {
   return record[key] === undefined || typeof record[key] === 'string';
 }
@@ -148,11 +157,15 @@ function parseSetup(value: unknown): Setup | undefined {
   }
 
   if (
-    !stringField(profile, 'name') ||
+    // FD-06 first run: name/primary_domain/vision are free text the person
+    // hasn't filled in yet, so an empty string is valid — only agent_id/
+    // tenant_slug/language/interaction_style are expected to always be
+    // non-empty (they carry server-side defaults).
+    !isStringField(profile, 'name') ||
     !stringField(profile, 'language') ||
     !stringField(profile, 'interaction_style') ||
-    !stringField(profile, 'primary_domain') ||
-    !stringField(profile, 'vision') ||
+    !isStringField(profile, 'primary_domain') ||
+    !isStringField(profile, 'vision') ||
     !stringField(profile, 'agent_id') ||
     !stringField(profile, 'tenant_slug') ||
     typeof profile.onboarding_complete !== 'boolean' ||

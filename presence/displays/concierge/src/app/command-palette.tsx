@@ -46,16 +46,20 @@ const PALETTE_ENTRIES: PaletteEntry[] = [
   { id: 'home', labelKey: 'palette.home', href: '/' },
   { id: 'dock', labelKey: 'palette.dock', event: 'concierge:open-dock' },
   { id: 'ingest', labelKey: 'palette.ingest', href: '/ingest' },
-  { id: 'setup', labelKey: 'palette.setup', href: '/setup' },
-  { id: 'setup-profile', labelKey: 'palette.setup_profile', href: '/setup#setup-profile' },
-  { id: 'setup-services', labelKey: 'palette.setup_services', href: '/setup#setup-services' },
+  { id: 'setup', labelKey: 'palette.setup', href: '/settings' },
+  { id: 'setup-profile', labelKey: 'palette.setup_profile', href: '/settings#setup-profile' },
+  { id: 'setup-services', labelKey: 'palette.setup_services', href: '/settings#setup-services' },
   {
     id: 'setup-notifications',
     labelKey: 'palette.setup_notifications',
-    href: '/setup#setup-notifications',
+    href: '/settings#setup-notifications',
   },
-  { id: 'setup-plugins', labelKey: 'palette.setup_plugins', href: '/setup#setup-plugins' },
-  { id: 'setup-governance', labelKey: 'palette.setup_governance', href: '/setup#setup-governance' },
+  { id: 'setup-plugins', labelKey: 'palette.setup_plugins', href: '/settings#setup-plugins' },
+  {
+    id: 'setup-governance',
+    labelKey: 'palette.setup_governance',
+    href: '/settings#setup-governance',
+  },
 ];
 
 export interface CommandPaletteProps {

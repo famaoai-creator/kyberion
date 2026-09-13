@@ -1337,6 +1337,121 @@ body {
   }
 }
 
+/* ---------- FD-06: 設定 (/settings) — left sub-nav + card stack ---------- */
+
+.settings-first-run-lead {
+  font-size: 13px;
+  color: var(--kb-text-secondary, #6b7280);
+  margin: 0 0 12px;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.settings-subnav {
+  position: sticky;
+  top: 16px;
+}
+
+.settings-subnav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-subnav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--kb-text-secondary, #6b7280);
+  cursor: pointer;
+}
+
+.settings-subnav-item:hover {
+  background: #f4efe6;
+}
+
+.settings-subnav-item.active {
+  background: #f4efe6;
+  color: var(--kb-text-primary, #1f2937);
+  font-weight: 600;
+}
+
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.settings-card-lead {
+  font-size: 13px;
+  color: var(--kb-text-secondary, #6b7280);
+  margin: 0 0 12px;
+}
+
+.settings-tenant-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-details {
+  border: 1px solid #efeae0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 12px;
+}
+
+.settings-details > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-details[open] > summary {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 720px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-subnav {
+    position: static;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-subnav ul {
+    flex-direction: row;
+    gap: 6px;
+    padding-bottom: 4px;
+  }
+
+  .settings-subnav-item {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
 /* ---------- CS-04: keyboard accessibility ---------- */
 :focus-visible {
   outline: 2px solid var(--kb-accent, #8a6d3b);
