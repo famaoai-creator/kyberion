@@ -77,6 +77,10 @@ export interface SurfaceViewerScope {
   tierAccess: OsKnowledgeTier[];
   source: 'token' | 'loopback' | 'anonymous';
   principalId?: string;
+  /** FD-07: the matched registration's `label`, when a token registration matched. */
+  registrationLabel?: string;
+  /** FD-07: the matched registration's `member_id`, when it declares one. */
+  memberId?: string;
 }
 
 export interface SurfaceViewerTokenResolution {
@@ -226,6 +230,8 @@ export function resolveSurfaceViewerScope(
       ),
       source: 'token',
       principalId: registration?.label || options.principalIds?.[resolution.role] || undefined,
+      ...(registration?.label ? { registrationLabel: registration.label } : {}),
+      ...(registration?.member_id ? { memberId: registration.member_id } : {}),
     };
   }
 

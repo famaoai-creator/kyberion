@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { renderMessage } from '@agent/core/message-format';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
+import { attachFrontDeskAuthHeaders, isLoopbackHostname } from '../lib/front-desk-auth-token';
 
 /**
  * FD-00c/FD-01c — the shared front-desk rail (plan §2.1/§2.2/§3 FD-00/FD-01).
@@ -150,8 +151,23 @@ export function FrontDeskRail() {
 
   const fetchMe = React.useCallback((tenant?: string | null) => {
     const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
-    fetch(`/api/me${query}`)
-      .then((res) => (res.ok ? res.json() : null))
+    fetch(`/api/me${query}`, { headers: attachFrontDeskAuthHeaders() })
+      .then((res) => {
+        // FD-07 item 7: a remote (non-loopback) request with no/invalid
+        // token gets 401 from /api/me — send it to the "どなたですか？"
+        // sign-in screen. Loopback is server-bound and never 401s for a
+        // missing token, so this branch never fires there.
+        if (
+          res.status === 401 &&
+          typeof window !== 'undefined' &&
+          !isLoopbackHostname(window.location.hostname) &&
+          window.location.pathname !== '/signin'
+        ) {
+          window.location.assign('/signin');
+          return null;
+        }
+        return res.ok ? res.json() : null;
+      })
       .then((data: FrontDeskMeResponse | null) => {
         if (data?.ok) setMe(data);
       })
@@ -162,7 +178,7 @@ export function FrontDeskRail() {
   }, []);
 
   React.useEffect(() => {
-    fetch(`/api/front-desk/nav?locale=${locale}`)
+    fetch(`/api/front-desk/nav?locale=${locale}`, { headers: attachFrontDeskAuthHeaders() })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: FrontDeskNavResponse | null) => {
         if (data?.ok) setNav(data);

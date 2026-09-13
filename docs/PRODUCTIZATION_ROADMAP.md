@@ -22,6 +22,7 @@ last_updated: 2026-06-05
 - **プロダクト化されたマルチテナント GUI** — テナント切替 UI、組織管理、hosted user management、課金と一体化したロールベース ACL。
   _理由_: OSS の主戦場はシングルユーザ／シングル組織で動くこと。なお、self-hosted / FDE の内部データ境界を守る server-side scope と operation 認可はこの非目標とは別であり、既存 surface の安全な運用基盤として実装する。
   _2026-09-13 追記_: hosted user management は非目標のまま。self-hosted の**最小メンバー登録簿**(ローカル自動 + オーナー発行トークン、役割 = オーナー / 承認者 / 閲覧、SSO・課金なし)と「見せる範囲を狭めるだけ」のテナント表示は内部認可の延長として [FRONT_DESK_REDESIGN_PLAN](./developer/improvement-plans-2026-08/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) で採用する。
+  _2026-09-13 追記(FD-07)_: この最小メンバー登録簿は `libs/core/member-registry.ts`(`knowledge/personal/members/{member_id}.json`)として実装済み。
 - **公開 REST API / SDK** — 外部開発者が "Kyberion を組み込む" ためのもの。
   _理由_: そもそも内部のユーザー層がまだ薄い段階で、外向きの安定 API を背負うと内部進化が止まる。
 - **OAuth / SSO 連携 / Stripe 連携** — 上記の派生。
