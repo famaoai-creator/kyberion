@@ -1,0 +1,360 @@
+/*
+ * ask.css — FD-03: the presence-studio "頼む" (ask) page.
+ *
+ * Tokens come from design-tokens.css (--kb-*) only. Responsive breakpoint
+ * matches front-desk-rail.css / home.css / progress.css (720px: rail becomes
+ * a bottom tab bar, and the two ask columns stack — conversation first, the
+ * "about this request" panel below it).
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--kb-font-sans, Inter, 'Noto Sans JP', sans-serif);
+  background: var(--kb-bg-main, #ffffff);
+  color: var(--kb-text-primary, #0f172a);
+}
+
+.ask-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100vh;
+}
+
+.ask-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.ask-header-spacer {
+  flex: 1 1 auto;
+}
+
+.ask-handsfree-toggle {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--kb-border, #e2e8f0);
+  background: var(--kb-surface, #f1f5f9);
+  color: var(--kb-text-primary, #0f172a);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ask-handsfree-toggle[aria-pressed='true'] {
+  background: var(--kb-accent, #0066cc);
+  border-color: var(--kb-accent, #0066cc);
+  color: #ffffff;
+}
+
+.ask-columns {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ask-conversation-col {
+  flex: 2 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--kb-border, #e2e8f0);
+  border-radius: 14px;
+  background: var(--kb-bg-main, #ffffff);
+  padding: 16px 18px;
+  min-height: 0;
+}
+
+.ask-conversation-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.ask-date-separator {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--kb-muted-text, #475569);
+  margin: 4px 0 14px;
+}
+
+.ask-turns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ask-turn {
+  display: flex;
+  flex-direction: column;
+}
+
+.ask-turn-user {
+  align-items: flex-end;
+}
+
+.ask-turn-companion {
+  align-items: flex-start;
+}
+
+.ask-bubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ask-turn-user .ask-bubble {
+  background: var(--kb-primary, #0f172a);
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+}
+
+.ask-turn-companion .ask-bubble {
+  background: var(--kb-bg-main, #ffffff);
+  border: 1px solid var(--kb-border, #e2e8f0);
+  color: var(--kb-text-primary, #0f172a);
+  border-bottom-left-radius: 4px;
+}
+
+.ask-turn-shape {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--kb-accent-text, #005a9c);
+  background: #e0efff;
+}
+
+.ask-turn-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ask-quick-reply {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--kb-accent, #0066cc);
+  background: #ffffff;
+  color: var(--kb-accent-text, #005a9c);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ask-empty {
+  margin: 24px 0 0;
+  font-size: 14px;
+  text-align: center;
+  color: var(--kb-muted-text, #475569);
+}
+
+.ask-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-top: 10px;
+}
+
+.ask-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--kb-border, #e2e8f0);
+  background: var(--kb-surface, #f1f5f9);
+  color: var(--kb-text-primary, #0f172a);
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.ask-input:focus {
+  outline: 2px solid var(--kb-accent, #0066cc);
+  outline-offset: 1px;
+}
+
+.ask-icon-button {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--kb-border, #e2e8f0);
+  background: var(--kb-surface, #f1f5f9);
+  color: var(--kb-text-primary, #0f172a);
+  cursor: pointer;
+}
+
+.ask-icon-button[aria-pressed='true'] {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.ask-send-button {
+  background: var(--kb-accent, #0066cc);
+  border-color: var(--kb-accent, #0066cc);
+  color: #ffffff;
+}
+
+.ask-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.ask-chips {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.ask-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--kb-border, #e2e8f0);
+  background: var(--kb-surface, #f1f5f9);
+  color: var(--kb-text-primary, #0f172a);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ask-chip .ask-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.ask-about-col {
+  flex: 1 1 0;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.ask-card {
+  background: var(--kb-bg-main, #ffffff);
+  border: 1px solid var(--kb-border, #e2e8f0);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.ask-card h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ask-about-block {
+  margin-top: 10px;
+}
+
+.ask-about-block:first-of-type {
+  margin-top: 0;
+}
+
+.ask-about-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--kb-muted-text, #475569);
+}
+
+.ask-about-text {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--kb-text-primary, #0f172a);
+}
+
+.ask-about-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--kb-muted-text, #475569);
+}
+
+.ask-recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ask-recent-row {
+  display: block;
+  padding: 8px 0;
+  border-top: 1px solid var(--kb-border, #e2e8f0);
+  color: inherit;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.ask-recent-list li:first-child .ask-recent-row {
+  border-top: none;
+  padding-top: 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  .ask-shell {
+    height: auto;
+    padding: 16px 16px 72px;
+  }
+
+  .ask-columns {
+    flex-direction: column;
+  }
+
+  /* Desktop uses `flex: 1 1 0` on both columns so they share the row's
+   * fixed height evenly. Stacked, the shell is auto-height (content-sized),
+   * so a `flex-basis: 0` item has nothing to grow into and collapses to 0 —
+   * switch both to size from their own content instead. */
+  .ask-conversation-col,
+  .ask-about-col {
+    flex: 0 0 auto;
+  }
+
+  .ask-conversation-col {
+    min-height: 60vh;
+  }
+}

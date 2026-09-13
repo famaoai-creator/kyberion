@@ -61,9 +61,15 @@ import {
 import { safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { isSimpleGreetingText } from '@agent/core/intent-contract';
+import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract-parser';
+import { checkAndRepairSurfaceUxContract } from '@agent/core/surface-ux-contract';
+import { runSurfaceMessageConversation } from '@agent/core/channel-surface';
 import {
   PresenceStudioViewerError,
   presenceStudioApprovalDecisionSchema,
+  presenceStudioConversationSchema,
+  presenceStudioConversationScope,
   presenceStudioEmailDeliverSchema,
   presenceStudioEmailDraftSchema,
   presenceStudioLocationSchema,
@@ -102,6 +108,11 @@ import {
   type ProgressHistoryEntryInput,
   type ProgressTaskSessionInput,
 } from './progress.js';
+import {
+  parseAskVoiceHubReply,
+  viewFromIntentResolution,
+  type AskConversationView,
+} from './ask-view.js';
 import {
   buildPresenceSurfaceFrame,
   createPresenceVoiceStimulus,
@@ -581,6 +592,160 @@ presenceStudioData.app.post('/api/outcomes/:id/verdict', (req, res) => {
     );
     return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
   }
+});
+
+// FD-03: exactly the keys `static/ask.js` renders. Mirrors
+// `/api/home-vocabulary` / `/api/progress-vocabulary` above.
+presenceStudioData.app.get('/api/ask-vocabulary', (req, res) => {
+  const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
+  const texts = Object.fromEntries(
+    presenceStudioData.ASK_VOCABULARY_KEYS.map((key) => [key, catalogT(key, undefined, locale)])
+  );
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, locale, texts });
+});
+
+// FD-03: `POST /api/conversation` — the "頼む" (ask) conversation turn.
+// Node port of the concierge's `/api/message` route
+// (`presence/displays/concierge/src/app/api/message/route.ts`): try
+// voice-hub first (bounded by a short abort timeout so the UI never hangs on
+// a stopped daemon), degrade to the in-process orchestrator, and only return
+// `mode: 'unavailable'` when both paths genuinely fail — never a fabricated
+// reply. Asking is a write (it can trigger delegated work), so — like
+// `/api/outcomes/:id/verdict` — it requires the server-derived loopback
+// localadmin session; a remote readonly token never reaches this route
+// (`/api/conversation` is not in `security.ts`'s remote-safe allowlist).
+const ASK_CONVERSATION_VOICE_HUB_TIMEOUT_MS = 3000;
+
+presenceStudioData.app.post('/api/conversation', async (req, res) => {
+  const parsed = presenceStudioConversationSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'conversation body')
+  );
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
+  }
+
+  let viewer: ReturnType<typeof resolvePresenceStudioViewerContext>;
+  try {
+    viewer = resolvePresenceStudioViewerContext(req);
+    requirePresenceStudioLocalAdmin(viewer);
+  } catch (error) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    logger.warn(
+      presenceStudioData.presenceStudioAuditLine(req, 'conversation.reject', {
+        status,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
+    return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+  }
+
+  const { text, session_id: sessionId } = parsed.data;
+  const locale = normalizeLocale(parsed.data.locale) ?? 'en';
+  const requestId = randomUUID();
+  const scope = presenceStudioConversationScope(viewer);
+
+  function deliverAskReply(
+    rawReply: string,
+    mode: 'voice-hub' | 'orchestrator',
+    intentResolution: IntentResolutionContract | undefined
+  ) {
+    const view: AskConversationView = intentResolution
+      ? viewFromIntentResolution(intentResolution)
+      : { shape: 'reply' };
+    const check = checkAndRepairSurfaceUxContract(rawReply, {
+      allow_conversational_reply: isSimpleGreetingText(text),
+      approval_required: intentResolution?.authority_level === 'approval_required',
+    });
+    if (!check.repaired && !check.verdict.valid) {
+      logger.warn(
+        `[presence-studio][ask] ${mode} reply violates surface UX contract: ${check.verdict.violations.join('; ')}`
+      );
+    }
+    logger.info(
+      presenceStudioData.presenceStudioAuditLine(req, 'conversation.complete', {
+        request_id: requestId,
+        mode,
+        status: 200,
+      })
+    );
+    return res.json({
+      ok: true,
+      reply: check.text,
+      mode,
+      shape: view.shape,
+      ...(view.nextActions ? { next_actions: view.nextActions } : {}),
+      ...(intentResolution ? { intent_resolution: intentResolution } : {}),
+      request_id: requestId,
+    });
+  }
+
+  // Primary path: voice-hub (rich reply + TTS + presence reflection).
+  try {
+    const response = await fetch(`${presenceStudioData.VOICE_HUB_URL}/api/ingest-text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        request_id: requestId,
+        text,
+        intent: 'conversation',
+        source_id: 'ask-page',
+        speaker: viewer.principalId,
+        scope,
+        reflect_to_surface: true,
+        auto_reply: true,
+      }),
+      signal: AbortSignal.timeout(ASK_CONVERSATION_VOICE_HUB_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`voice-hub responded ${response.status}`);
+    const parsedReply = parseAskVoiceHubReply(await response.json());
+    if (!parsedReply) throw new Error('invalid voice-hub response');
+    return deliverAskReply(parsedReply.reply, 'voice-hub', parsedReply.intentResolution);
+  } catch (error) {
+    logger.warn(
+      `[presence-studio][ask] voice-hub path failed (${error instanceof Error ? error.message : String(error)}); falling back to the orchestrator`
+    );
+  }
+
+  // Fallback path: call the orchestrator directly (no voice-hub needed).
+  try {
+    const conversation = await runSurfaceMessageConversation({
+      surface: 'presence',
+      text,
+      locale,
+      senderAgentId: 'kyberion:presence-studio',
+      agentId: 'presence-surface-agent',
+      actorId: viewer.principalId,
+      threadTs: sessionId,
+      cwd: pathResolver.rootDir(),
+      scope,
+    });
+    const reply = typeof conversation?.text === 'string' ? conversation.text.trim() : '';
+    if (!reply) throw new Error('empty orchestrator reply');
+    return deliverAskReply(reply, 'orchestrator', conversation.intentResolution);
+  } catch (error) {
+    logger.warn(
+      `[presence-studio][ask] orchestrator fallback failed (${error instanceof Error ? error.message : String(error)})`
+    );
+  }
+
+  // Both paths failed — an honest, actionable message (never a silent or
+  // fabricated reply).
+  logger.warn(
+    presenceStudioData.presenceStudioAuditLine(req, 'conversation.unavailable', {
+      request_id: requestId,
+      status: 200,
+    })
+  );
+  return res.json({
+    ok: true,
+    reply: catalogT('front_desk:ask_send_failed', undefined, locale),
+    mode: 'unavailable',
+    shape: 'reply',
+    request_id: requestId,
+  });
 });
 
 presenceStudioData.app.get('/api/onboarding/browser-state', (_req, res) => {

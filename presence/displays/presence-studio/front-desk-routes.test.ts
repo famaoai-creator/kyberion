@@ -346,23 +346,27 @@ describe('security.ts remote-safe allowlist wiring (Deliverable 1)', () => {
 });
 
 describe('interim front-desk page redirects (Deliverable 4)', () => {
-  it('registers /ask and /help as 302 redirects to their interim targets', () => {
+  it('registers /help as a 302 redirect to its interim target', () => {
     const source = readRepoFile(
       'presence/displays/presence-studio/presence-studio-runtime-data.ts'
     );
 
+    const helpStart = source.indexOf("app.get('/help'");
+    expect(helpStart).toBeGreaterThan(-1);
+    expect(source.slice(helpStart, helpStart + 200)).toContain("res.redirect(302, '/onboarding')");
+  });
+});
+
+describe('FD-03 ask page routing (Deliverable 3)', () => {
+  it('serves ask.html at /ask instead of the interim /work redirect', () => {
+    const source = readRepoFile(
+      'presence/displays/presence-studio/presence-studio-runtime-data.ts'
+    );
     const askStart = source.indexOf("app.get('/ask'");
     const progressStart = source.indexOf("app.get('/progress'");
-    const helpStart = source.indexOf("app.get('/help'");
     expect(askStart).toBeGreaterThan(-1);
-    expect(progressStart).toBeGreaterThan(-1);
-    expect(helpStart).toBeGreaterThan(-1);
-
-    // FD-02 moved the workbench these panels live in from `/` to `/work`.
-    expect(source.slice(askStart, progressStart)).toContain(
-      "res.redirect(302, '/work#voice-panel')"
-    );
-    expect(source.slice(helpStart, helpStart + 200)).toContain("res.redirect(302, '/onboarding')");
+    expect(source.slice(askStart, progressStart)).toContain("'ask.html'");
+    expect(source.slice(askStart, progressStart)).not.toContain('res.redirect');
   });
 });
 
@@ -602,5 +606,97 @@ describe('server.ts route wiring (FD-05 Deliverable 2)', () => {
     const verdictStart = source.indexOf("presenceStudioData.app.post('/api/outcomes/:id/verdict'");
     const verdictRoute = source.slice(verdictStart, verdictStart + 1500);
     expect(verdictRoute).toContain('requirePresenceStudioLocalAdmin(');
+  });
+});
+
+describe('FD-03 ask page static contract', () => {
+  it('mounts the rail in ask.html as current "ask"', () => {
+    const askHtml = readRepoFile('presence/displays/presence-studio/static/ask.html');
+    expect(askHtml).toContain('id="front-desk-rail"');
+    expect(askHtml).toContain('front-desk-rail.css');
+    expect(askHtml).toContain('front-desk-rail.js');
+    expect(askHtml).toContain("current: 'ask'");
+  });
+
+  it('ask.html/ask.js never use target="_blank", emoji, 127.0.0.1, or internal vocabulary', () => {
+    const askHtml = readRepoFile('presence/displays/presence-studio/static/ask.html');
+    const askJs = readRepoFile('presence/displays/presence-studio/static/ask.js');
+    const combined = `${askHtml}\n${askJs}`;
+
+    expect(combined).not.toContain('target=');
+    expect(combined).not.toContain('127.0.0.1');
+    expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(combined)).toBe(false);
+
+    const forbiddenWords = [
+      'mission',
+      'ADF',
+      'actuator',
+      'pipeline',
+      'stimuli',
+      'A2UI',
+      'Presence Studio',
+      'ports',
+    ];
+    for (const word of forbiddenWords) {
+      expect(combined.toLowerCase()).not.toContain(word.toLowerCase());
+    }
+  });
+});
+
+describe('FD-03 remote-safe allowlist wiring', () => {
+  it('extends the allowlist to /api/ask-vocabulary but leaves /api/conversation out', () => {
+    const source = readRepoFile('presence/displays/presence-studio/security.ts');
+    expect(source).toContain("path === '/api/ask-vocabulary'");
+  });
+
+  it('allows a remote token to reach /api/ask-vocabulary but blocks /api/conversation', () => {
+    process.env.PRESENCE_STUDIO_TOKEN = 'studio-token';
+    const middleware = requirePresenceStudioAccess();
+
+    const vocabRes = fakeResponse();
+    const vocabNext = vi.fn();
+    middleware(
+      fakeRequest({
+        remoteAddress: '198.51.100.24',
+        authorization: 'Bearer studio-token',
+        urlPath: '/api/ask-vocabulary?locale=ja',
+      }) as never,
+      vocabRes as never,
+      vocabNext
+    );
+    expect(vocabNext).toHaveBeenCalledTimes(1);
+
+    const conversationRes = fakeResponse();
+    const conversationNext = vi.fn();
+    middleware(
+      fakeRequest({
+        remoteAddress: '198.51.100.24',
+        authorization: 'Bearer studio-token',
+        urlPath: '/api/conversation',
+      }) as never,
+      conversationRes as never,
+      conversationNext
+    );
+    expect(conversationNext).not.toHaveBeenCalled();
+    expect(conversationRes.statusCode).toBe(403);
+
+    delete process.env.PRESENCE_STUDIO_TOKEN;
+  });
+});
+
+describe('server.ts route wiring (FD-03 Deliverable 1)', () => {
+  it('wires GET /api/ask-vocabulary and POST /api/conversation', () => {
+    const source = readRepoFile('presence/displays/presence-studio/server.ts');
+    expect(source).toContain("presenceStudioData.app.get('/api/ask-vocabulary'");
+    expect(source).toContain("presenceStudioData.app.post('/api/conversation'");
+
+    const conversationStart = source.indexOf("presenceStudioData.app.post('/api/conversation'");
+    const conversationRoute = source.slice(conversationStart, conversationStart + 6500);
+    expect(conversationRoute).toContain('requirePresenceStudioLocalAdmin(');
+    expect(conversationRoute).toContain('presenceStudioConversationScope(');
+    expect(conversationRoute).toContain('viewFromIntentResolution(');
+    expect(conversationRoute).toContain('checkAndRepairSurfaceUxContract(');
+    expect(conversationRoute).toContain('runSurfaceMessageConversation(');
+    expect(conversationRoute).toContain("mode: 'unavailable'");
   });
 });
