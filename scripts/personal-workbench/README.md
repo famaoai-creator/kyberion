@@ -9,7 +9,7 @@
 - **Receipt / Expense**: 領収書・金額・用途のメモ（画像解析は後段）
 - **Daily Review**: Journal / TODO / NOW の振り返り
 
-保存データは既定で `personal` tier です。各保存は `proposed` として handoff に記録され、人間承認なしにメール、カレンダー、知識ベースへ反映しません。
+保存データは既定で `personal` tier です。`/capture` は常に `proposed` handoff のみを書き、メール送信・カレンダー変更・知識キュー投入を自動では行いません。
 
 ```bash
 KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant> \
@@ -17,20 +17,24 @@ KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant> \
   --out active/shared/tmp/personal-workbench
 ```
 
-`/capture` と `/load` は `X-PW-Token` が必要です。ローカルトークンは人間承認の代替ではありません。
+`/capture`・`/load`・`/action` は `X-PW-Token` が必要です。ローカルトークンは人間承認の代替ではありません。Origin は `127.0.0.1` / `localhost` のみ許可します。
 
-認証済みセッションから `/action` を使うと、既存の governed workflow を呼び出せます。メール送信とカレンダー変更は `approved: true` が必須です。OCR は既定で `privacy_first`、知識登録は即時公開ではなく personal tier の promotion candidate としてキューに入ります。
+## `/action` の境界
+
+| action      | 挙動                                                                                                        |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| `ocr`       | governed OCR（既定 `privacy_first`）                                                                        |
+| `knowledge` | 既存 handoff を evidence にして personal promotion candidate をキュー（自動公開なし）。capture 後に明示実行 |
+| `email`     | **下書きのみ**（`draft_mode: true`）。送信はこの pad では不可                                               |
+| `calendar`  | **実行しない**。提案は capture、変更は承認済みの governed calendar workflow へ                              |
 
 ```json
 {
-  "action": "calendar",
-  "approved": true,
+  "action": "email",
   "payload": {
-    "summary": "定例",
-    "start": "2026-09-14T10:00:00+09:00",
-    "end": "2026-09-14T10:30:00+09:00"
+    "to": "person@example.com",
+    "subject": "下書き",
+    "body_markdown": "本文"
   }
 }
 ```
-
-`/action` のリクエストも `X-PW-Token` が必要です。メール・カレンダーの `approved` は human approval の記録と合わせて使用し、単なるブラウザ token を承認の代替にしないでください。
