@@ -1,23 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import {
-  generateIndex,
-  readKnowledgeTextFile,
-  runGenerateKnowledgeIndex,
-  validateKnowledgeFrontmatter,
-} from './generate_knowledge_index.js';
+import { readKnowledgeTextFile, validateKnowledgeFrontmatter } from './generate_knowledge_index.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
+/**
+ * Deliberately no "repository index is currently clean" assertion here.
+ * Vitest runs script files in parallel and many suites write under `knowledge/`,
+ * so a live `generateIndex(true)` / `--check` call measures transient churn.
+ * Freshness belongs to the serial catalogs gate
+ * (`pnpm run check -- --scope full --only catalogs`).
+ */
 describe('generate_knowledge_index', () => {
-  it('keeps the compatibility check API green for the current snapshot', () => {
-    expect(generateIndex(true)).toBe(true);
-  });
-
-  it('uses the shared generator contract for a clean check', async () => {
-    const result = await runGenerateKnowledgeIndex(['--check', '--quiet']);
-    expect(result?.changed).toEqual([]);
-  });
-
   it('keeps the generator behind the shared JSON parser', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/generate_knowledge_index.ts'), {
