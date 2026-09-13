@@ -18,4 +18,6 @@ node_modules/.bin/tsx scripts/daily-desk/server.ts --dry-run --json
 node_modules/.bin/tsx scripts/doc-drop/server.ts --dry-run --json
 ```
 
-Related: `scripts/meeting-notepad/` (8148), `scripts/sketch-input/` (8147).
+Related: `scripts/meeting-notepad/` (8148), `scripts/sketch-input/` (8147), `scripts/report-review/` (8137).
+
+Screenshots of every pad live in `docs/assets/pads/` and are shown in the [README gallery](../../README.md#local-pads--capture-at-your-desk-hand-off-to-kyberion).
