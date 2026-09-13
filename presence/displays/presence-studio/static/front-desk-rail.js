@@ -2,7 +2,8 @@
  * FD-00 / FD-01 front-desk rail — shared "5 human verbs" navigation shell.
  *
  * Plain browser script (no modules, no external resources): both
- * presence-studio pages (`index.html`, `onboarding.html`) load this file
+ * presence-studio pages (`index.html`, `home.html`, `ask.html`, `progress.html`,
+ * `help.html`) load this file
  * with a plain <script> tag and call `FrontDeskRail.mount(el, { current })`.
  *
  * All labels, hrefs, and ports come from the server (`/api/front-desk/nav`,

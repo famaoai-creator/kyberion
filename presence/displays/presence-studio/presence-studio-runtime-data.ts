@@ -1173,8 +1173,9 @@ app.get('/api/headless/a2ui/overview', (req, res) => {
 });
 
 // FD-06: the setup wizard is folded into the concierge 設定 page; the
-// concierge port comes from the surface manifest (never a literal). The
-// static onboarding.html stays on disk until FD-08 removes it.
+// concierge port comes from the surface manifest (never a literal). FD-08
+// deleted the static onboarding.html/.css/.js — this redirect is now the
+// entire route.
 app.get('/onboarding', (_req, res) => {
   res.redirect(302, `http://127.0.0.1:${readFrontDeskSurfacePorts().concierge}/settings`);
 });
@@ -1195,9 +1196,12 @@ app.get('/progress', (_req, res) => {
   res.sendFile(path.join(staticDir, 'progress.html'));
 });
 
-// Interim redirect until FD-08 ships the dedicated "how to use" page (旧 /learn).
+// FD-08: the dedicated "使い方を見る" page (旧 /learn), replacing the interim
+// `/onboarding` redirect. `express.static` (registered above) never
+// intercepts this — a literal `/help` path only matches a static file named
+// exactly `help` (no extension), never `help.html`.
 app.get('/help', (_req, res) => {
-  res.redirect(302, '/onboarding');
+  res.sendFile(path.join(staticDir, 'help.html'));
 });
 
 // Browsers always probe /favicon.ico — return 204 to silence noisy console 404.

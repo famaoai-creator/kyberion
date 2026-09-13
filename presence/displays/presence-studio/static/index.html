@@ -123,263 +123,19 @@
         background: rgba(253, 230, 138, 0.1);
         color: rgba(253, 230, 138, 0.9);
       }
-      .first-run-banner {
-        display: flex;
-        align-items: flex-start;
-        gap: 14px;
-        padding: 14px 16px;
-        margin-top: 16px;
-        border-radius: 16px;
-        border: 1px solid rgba(34, 211, 238, 0.25);
-        background: linear-gradient(90deg, rgba(34, 211, 238, 0.08), rgba(125, 211, 252, 0.03) 60%, transparent);
-      }
-      .first-run-banner.hidden {
-        display: none;
-      }
-      .first-run-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 10px;
-        margin-top: 12px;
-      }
-      .first-run-card {
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 14px;
-        padding: 10px 12px;
-        background: rgba(9, 11, 16, 0.36);
-      }
-      .first-run-card strong {
-        display: block;
-        margin-bottom: 4px;
-      }
-      .first-run-meta {
-        color: rgba(255, 255, 255, 0.74);
-        font-size: 12px;
-        line-height: 1.5;
-      }
-      .first-run-actions-list {
-        margin-top: 12px;
-        display: grid;
-        gap: 8px;
-      }
-      .first-run-action {
-        color: rgba(255, 255, 255, 0.82);
-        font-size: 12px;
-        line-height: 1.5;
-      }
-      .first-run-action code {
-        color: #ffd27b;
-      }
-      .first-run-icon {
-        font-size: 20px;
-        line-height: 1;
-        margin-top: 2px;
-      }
-      .first-run-body {
-        flex: 1;
-        font-size: 12.5px;
-        line-height: 1.55;
-        color: rgba(237, 246, 255, 0.85);
-      }
-      .first-run-eyebrow {
-        font-size: 10px;
-        letter-spacing: 0.3em;
-        text-transform: uppercase;
-        color: rgba(125, 211, 252, 0.85);
-      }
-      .first-run-title {
-        margin-top: 4px;
-      }
-      .first-run-title .first-run-sub {
-        margin-left: 6px;
-        color: rgba(237, 246, 255, 0.6);
-      }
-      .first-run-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 12px;
-      }
-      .first-run-actions .button {
-        min-width: 0;
-      }
-      .first-run-steps {
-        margin: 6px 0 0;
-        padding-left: 18px;
-        color: rgba(237, 246, 255, 0.65);
-        font-size: 11.5px;
-      }
-      .first-run-steps strong {
-        color: rgba(237, 246, 255, 0.9);
-      }
-      .first-run-steps code {
-        font-family: "SF Mono", Menlo, Consolas, monospace;
-        font-size: 11px;
-        background: rgba(0,0,0,0.25);
-        padding: 0 4px;
-        border-radius: 3px;
-        color: rgba(189, 224, 254, 0.9);
-      }
-      .first-run-close {
-        background: transparent;
-        border: none;
-        color: rgba(237, 246, 255, 0.5);
-        font-size: 18px;
-        cursor: pointer;
-        padding: 0 4px;
-        line-height: 1;
-      }
-      .first-run-close:hover {
-        color: rgba(237, 246, 255, 0.9);
-      }
-      .dev-panel {
-        margin-top: 24px;
-        padding: 12px 14px;
-        border-radius: 14px;
-        border: 1px solid rgba(255,255,255,0.08);
-        background: rgba(11, 22, 36, 0.5);
-      }
-      .dev-panel[open] {
-        background: rgba(11, 22, 36, 0.65);
-      }
-      .dev-panel-summary {
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        list-style: none;
-        font-size: 12px;
-      }
-      .dev-panel-summary::-webkit-details-marker {
-        display: none;
-      }
-      .dev-panel-icon {
-        font-size: 14px;
-      }
-      .dev-panel-title {
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        color: rgba(237, 246, 255, 0.9);
-      }
-      .dev-panel-hint {
-        color: rgba(237, 246, 255, 0.45);
-      }
-      .dev-panel-body {
-        margin-top: 12px;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 18px;
-      }
-      .dev-panel-section {
-        min-width: 0;
-      }
-      .dev-panel-label {
-        display: block;
-        font-size: 10px;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: rgba(237, 246, 255, 0.55);
-        margin-bottom: 6px;
-      }
-      .dev-panel-body textarea,
-      .dev-panel-body pre {
-        width: 100%;
-        font-family: "SF Mono", Menlo, Consolas, monospace;
-        font-size: 12px;
-        background: rgba(0,0,0,0.45);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 10px;
-        color: rgba(237, 246, 255, 0.9);
-        padding: 10px;
-        box-sizing: border-box;
-      }
-      .dev-panel-body textarea {
-        resize: vertical;
-      }
-      .dev-panel-body pre {
-        white-space: pre-wrap;
-        word-break: break-all;
-        margin: 0;
-      }
-      .dev-panel-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-top: 10px;
-      }
-      .dev-panel-result {
-        font-size: 11px;
-        color: rgba(237, 246, 255, 0.55);
-      }
-      .dev-panel-result.ok { color: rgba(190, 242, 200, 0.95); }
-      .dev-panel-result.err { color: rgba(254, 202, 202, 0.95); }
       .button-ghost {
         background: transparent !important;
         border: 1px solid rgba(255,255,255,0.16) !important;
-      }
-      @media (max-width: 720px) {
-        .dev-panel-body {
-          grid-template-columns: 1fr;
-        }
       }
       h1 {
         margin: 6px 0 0;
         font-size: clamp(32px, 5vw, 56px);
         line-height: 0.94;
       }
-      .sub {
-        color: var(--muted);
-        max-width: 680px;
-      }
       .grid {
         display: grid;
         grid-template-columns: 1.4fr 1fr;
         gap: 18px;
-      }
-      .quick-actions {
-        display: grid;
-        gap: 12px;
-      }
-      .quick-actions-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 10px;
-      }
-      .quick-actions-grid .button {
-        width: 100%;
-        min-width: 0;
-      }
-      .capability-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-        gap: 12px;
-      }
-      .capability-card {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding: 14px;
-        border-radius: 16px;
-        border: 1px solid rgba(125, 211, 252, 0.22);
-        background: rgba(17, 27, 39, 0.65);
-      }
-      .capability-title {
-        font-weight: 700;
-        font-size: 14px;
-        color: #edf6ff;
-      }
-      .capability-desc {
-        font-size: 12px;
-        color: rgba(215, 233, 252, 0.85);
-        flex: 1;
-        line-height: 1.45;
-      }
-      .capability-card .button {
-        width: 100%;
-        background: rgba(125, 211, 252, 0.16);
-        border-color: rgba(125, 211, 252, 0.35);
-        color: #0284c7;
-        font-weight: 600;
       }
       .panel {
         background: var(--panel);
@@ -733,7 +489,6 @@
       @media (max-width: 860px) {
         .grid { grid-template-columns: 1fr; }
         .avatar { min-height: 320px; }
-        .quick-actions-grid { grid-template-columns: 1fr 1fr 1fr; }
         .controls { align-items: stretch; }
         .controls .button,
         .controls .select,
@@ -743,7 +498,6 @@
         }
       }
       @media (max-width: 560px) {
-        .quick-actions-grid { grid-template-columns: 1fr; }
         .panel { padding: 16px; }
         .controls { gap: 10px; }
       }
@@ -769,55 +523,6 @@
           <div class="conn-stamp">
             <span id="conn-pill" class="conn-pill conn-pending" title="SSE connection state">…</span>
             <span id="updated" class="mono updated-text">waiting for state</span>
-          </div>
-        </div>
-      </div>
-      <div class="sub">A Digital Agency-inspired capture surface for subtitles, notes, minutes, and governed voice-channel stimuli.</div>
-      <div id="first-run-banner" class="first-run-banner hidden">
-        <div class="first-run-icon">✨</div>
-        <div class="first-run-body">
-          <div class="first-run-eyebrow">First Run</div>
-          <div class="first-run-title">
-            <span class="first-run-sub">No live surface activity yet. Choose the surface that fits the work and fix blocked setup first.</span>
-          </div>
-          <div id="first-run-summary" class="first-run-meta">Loading surface readiness…</div>
-          <div id="first-run-surfaces" class="first-run-grid"></div>
-          <div id="first-run-next" class="first-run-actions-list"></div>
-          <div class="first-run-actions">
-            <a class="button" href="/onboarding">Open Setup Studio</a>
-            <button class="button" id="first-run-voice" type="button">Try Voice</button>
-            <button class="button button-ghost" id="first-run-browser" type="button">Prepare Browser</button>
-          </div>
-        </div>
-        <button id="first-run-close" class="first-run-close" aria-label="Dismiss first run banner">×</button>
-      </div>
-      <div class="panel quick-actions" style="margin-top: 18px;">
-        <div class="label">できること</div>
-        <div class="capability-grid">
-          <div class="capability-card">
-            <div class="capability-title">📝 議事録</div>
-            <div class="capability-desc">議事録は Meeting Notepad（ローカルパッド）へ移りました。起動手順を表示します。</div>
-            <button class="button" id="quick-action-minutes" type="button">起動手順を表示</button>
-          </div>
-          <div class="capability-card">
-            <div class="capability-title">✉️ メール</div>
-            <div class="capability-desc">受信メールのトリアージと返信ドラフト、送信まで。</div>
-            <button class="button" id="quick-action-email" type="button">ドラフトする</button>
-          </div>
-          <div class="capability-card">
-            <div class="capability-title">🌐 ブラウザ</div>
-            <div class="capability-desc">調べもの・予約・フォーム入力をブラウザで代行します。</div>
-            <button class="button" id="quick-action-browser" type="button">ブラウザで進める</button>
-          </div>
-          <div class="capability-card">
-            <div class="capability-title">✅ 承認</div>
-            <div class="capability-desc">承認待ちの案件をその場で判断できます。</div>
-            <button class="button" type="button" onclick="document.getElementById('approval-panel')?.scrollIntoView({behavior:'smooth'})">承認キューへ</button>
-          </div>
-          <div class="capability-card">
-            <div class="capability-title">🧰 タスク</div>
-            <div class="capability-desc">依頼中の作業の進捗と成果物を確認できます。</div>
-            <button class="button" type="button" onclick="document.getElementById('requested-work-panel')?.scrollIntoView({behavior:'smooth'})">作業状況へ</button>
           </div>
         </div>
       </div>
@@ -964,50 +669,17 @@
         </div>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel" id="current-agent-panel">
-          <div class="label">Current Assistant</div>
-          <div class="capability-card" id="current-agent"></div>
-        </section>
-        <section class="panel" id="agent-catalog-panel">
-          <div class="label">Common Requests</div>
-          <div class="list" id="agent-catalog"></div>
-        </section>
-      </div>
-      <div class="grid" style="margin-top: 18px;">
-        <section class="panel" id="project-panel">
-          <div class="label">Projects</div>
-          <div class="list" id="project-catalog"></div>
-        </section>
-        <section class="panel" id="track-panel">
-          <div class="label">Tracks</div>
-          <div class="list" id="track-catalog"></div>
-        </section>
-      </div>
-      <div class="grid" style="margin-top: 18px;">
-        <section class="panel" id="binding-panel">
-          <div class="label">Service Bindings</div>
-          <div class="list" id="binding-catalog"></div>
-        </section>
-        <section class="panel" id="mission-seed-panel">
-          <div class="label">Mission Seeds</div>
-          <div class="list" id="mission-seed-catalog"></div>
-        </section>
-      </div>
-      <div class="grid" style="margin-top: 18px;">
         <section class="panel" id="conversation-panel">
           <div class="label">Conversation</div>
           <div class="list" id="transcript"></div>
         </section>
-        <section class="panel" id="stimuli-panel">
-          <div class="label">Recent Inputs</div>
-          <div class="list" id="stimuli"></div>
-        </section>
       </div>
-      <div class="grid" style="margin-top: 18px;">
-        <section class="panel" id="intent-resolution-panel">
-          <div class="label">Intent Resolution</div>
-          <div class="list" id="intent-resolution"></div>
-        </section>
+      <!-- FD-08: Intent Resolution is no longer a visible panel on /work (the
+           understanding / outcome_kind detail moved to /ask). renderIntentResolution()
+           still runs on every voice turn, so the target list stays in the DOM,
+           hidden, to avoid a null-target error and to keep the ux-contract literal calls. -->
+      <div style="display:none" aria-hidden="true">
+        <div class="list" id="intent-resolution"></div>
       </div>
       <div class="grid" style="margin-top: 18px;">
         <section class="panel" id="async-panel">
@@ -1034,8 +706,6 @@
           <div class="label">OS Control Plane</div>
           <div class="hint-text" id="os-control-plane-status" role="status" aria-live="polite"></div>
           <div class="list" id="os-held-actions"></div>
-          <div class="label" style="margin-top: 14px;">Observation Audit</div>
-          <div class="list" id="os-observations"></div>
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
@@ -1063,40 +733,13 @@
           <div class="list" id="task-session-detail"></div>
         </section>
       </div>
-      <div class="grid" style="margin-top: 18px;">
-        <section class="panel" id="memory-panel">
-          <div class="label">Memory Detail</div>
-          <div class="list" id="memory-detail"></div>
-        </section>
+      <!-- FD-08: Memory Detail is no longer a visible panel on /work. The
+           Requested Work / Latest Outcomes "learned" links still open a memory
+           via openKnowledgeRef(), which renders into this
+           target, so it stays in the DOM, hidden. -->
+      <div style="display:none" aria-hidden="true">
+        <div class="list" id="memory-detail"></div>
       </div>
-      <details class="dev-panel" id="dev-panel">
-        <summary class="dev-panel-summary">
-          <span class="dev-panel-icon">⚙</span>
-          <span class="dev-panel-title">Developer · A2UI dispatch sandbox</span>
-          <span class="dev-panel-hint">Send a sample message to /a2ui/dispatch and watch the surface state update live.</span>
-        </summary>
-        <div class="dev-panel-body">
-          <div class="dev-panel-section">
-            <label class="dev-panel-label" for="dev-a2ui-payload">A2UI message body (JSON)</label>
-            <textarea id="dev-a2ui-payload" rows="8" spellcheck="false">{
-  "type": "presence.subtitle",
-  "surface_id": "presence-studio",
-  "props": {
-    "text": "Hello from the developer panel"
-  }
-}</textarea>
-            <div class="dev-panel-actions">
-              <button id="dev-a2ui-send" class="button" type="button">Dispatch</button>
-              <button id="dev-a2ui-reset" class="button button-ghost" type="button">Reset</button>
-              <span id="dev-a2ui-result" class="dev-panel-result"></span>
-            </div>
-          </div>
-          <div class="dev-panel-section">
-            <label class="dev-panel-label">Equivalent curl</label>
-            <pre class="dev-panel-pre"><code id="dev-a2ui-curl"></code></pre>
-          </div>
-        </div>
-      </details>
     </div>
       </div>
     </div>
@@ -1175,138 +818,20 @@
         .then((payload) => {
           identityPayloadCache = payload;
           renderIdentityBadge(payload);
-          maybeShowFirstRunBanner(payload);
         })
         .catch(() => { /* leave badge hidden */ });
 
-      const FIRST_RUN_KEY = "presence-studio.first-run.dismissed";
-      function maybeShowFirstRunBanner(identityPayload) {
-        const banner = document.getElementById("first-run-banner");
-        if (!banner) return;
-        let dismissed = false;
-        try { dismissed = localStorage.getItem(FIRST_RUN_KEY) === "1"; } catch (_) {}
-        if (dismissed) return;
-        if (!identityPayload || !identityPayload.onboarded) return;
-
-        Promise.all([
-          fetch("/health").then((r) => r.json()).catch(() => ({ recentStimuli: 0 })),
-          fetch("/api/state").then((r) => r.json()).catch(() => ({ recentStimuli: [] })),
-        ]).then(([health, state]) => {
-          const stimuliCount = (state && Array.isArray(state.recentStimuli) ? state.recentStimuli.length : 0)
-            || (health && typeof health.recentStimuli === "number" ? health.recentStimuli : 0);
-          if (stimuliCount > 0) return;
-          Promise.resolve(surfaceLauncherPayload || fetch("/api/surface-launcher").then((r) => r.json()).catch(() => null))
-            .then((payload) => {
-              surfaceLauncherPayload = payload || surfaceLauncherPayload;
-              renderFirstRunLauncher(surfaceLauncherPayload);
-              banner.classList.remove("hidden");
-            });
-        });
-      }
-      const firstRunCloseBtn = document.getElementById("first-run-close");
-      if (firstRunCloseBtn) {
-        firstRunCloseBtn.addEventListener("click", () => {
-          const banner = document.getElementById("first-run-banner");
-          if (banner) banner.classList.add("hidden");
-          try { localStorage.setItem(FIRST_RUN_KEY, "1"); } catch (_) {}
-        });
-      }
-
-      // ---------------------------------------------------------------
-      // Developer panel — A2UI dispatch sandbox
-      // ---------------------------------------------------------------
-      const devA2uiPayload = document.getElementById("dev-a2ui-payload");
-      const devA2uiSend = document.getElementById("dev-a2ui-send");
-      const devA2uiReset = document.getElementById("dev-a2ui-reset");
-      const devA2uiResult = document.getElementById("dev-a2ui-result");
-      const devA2uiCurl = document.getElementById("dev-a2ui-curl");
-      const DEV_A2UI_DEFAULT = devA2uiPayload ? devA2uiPayload.value : "";
-
-      function refreshDevCurl() {
-        if (!devA2uiCurl || !devA2uiPayload) return;
-        const raw = devA2uiPayload.value;
-        let pretty;
-        try {
-          pretty = JSON.stringify(JSON.parse(raw));
-        } catch (_) {
-          pretty = raw.replace(/\s+/g, " ").trim();
-        }
-        const escaped = pretty.replace(/'/g, "'\\''");
-        const origin = window.location.origin;
-        devA2uiCurl.textContent =
-          `curl -X POST ${origin}/a2ui/dispatch \\\n` +
-          `  -H 'Content-Type: application/json' \\\n` +
-          `  -d '${escaped}'`;
-      }
-      if (devA2uiPayload) {
-        devA2uiPayload.addEventListener("input", refreshDevCurl);
-        refreshDevCurl();
-      }
-      if (devA2uiReset) {
-        devA2uiReset.addEventListener("click", () => {
-          if (devA2uiPayload) devA2uiPayload.value = DEV_A2UI_DEFAULT;
-          if (devA2uiResult) {
-            devA2uiResult.textContent = "";
-            devA2uiResult.className = "dev-panel-result";
-          }
-          refreshDevCurl();
-        });
-      }
-      if (devA2uiSend) {
-        devA2uiSend.addEventListener("click", async () => {
-          if (!devA2uiPayload) return;
-          let payload;
-          try {
-            payload = JSON.parse(devA2uiPayload.value);
-          } catch (err) {
-            if (devA2uiResult) {
-              devA2uiResult.textContent = "Invalid JSON: " + (err.message || err);
-              devA2uiResult.className = "dev-panel-result err";
-            }
-            return;
-          }
-          devA2uiSend.disabled = true;
-          if (devA2uiResult) {
-            devA2uiResult.textContent = "Dispatching…";
-            devA2uiResult.className = "dev-panel-result";
-          }
-          try {
-            const response = await fetch("/a2ui/dispatch", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-            const body = await response.json().catch(() => ({}));
-            if (!response.ok || body.ok === false) {
-              throw new Error(body.error || ("HTTP " + response.status));
-            }
-            if (devA2uiResult) {
-              devA2uiResult.textContent = "OK · applied " + (body.applied || 1) + " · watch the surface above.";
-              devA2uiResult.className = "dev-panel-result ok";
-            }
-          } catch (err) {
-            if (devA2uiResult) {
-              devA2uiResult.textContent = "Dispatch failed: " + (err.message || err);
-              devA2uiResult.className = "dev-panel-result err";
-            }
-          } finally {
-            devA2uiSend.disabled = false;
-          }
-        });
-      }
       const expressionEl = document.getElementById("expression");
       const avatarImageEl = document.getElementById("avatar-image");
       const statusEl = document.getElementById("status");
       const subtitleEl = document.getElementById("subtitle");
       const transcriptEl = document.getElementById("transcript");
-      const stimuliEl = document.getElementById("stimuli");
       const intentResolutionEl = document.getElementById("intent-resolution");
       const asyncRequestsEl = document.getElementById("async-requests");
       const notificationsEl = document.getElementById("notifications");
       const approvalInboxEl = document.getElementById("approval-inbox");
       const outcomeInboxEl = document.getElementById("outcome-inbox");
       const osHeldActionsEl = document.getElementById("os-held-actions");
-      const osObservationsEl = document.getElementById("os-observations");
       const osControlPlaneStatusEl = document.getElementById("os-control-plane-status");
       const taskSessionActiveEl = document.getElementById("task-session-active");
       const taskSessionDetailEl = document.getElementById("task-session-detail");
@@ -1314,12 +839,6 @@
       const browserConversationCandidatesEl = document.getElementById("browser-conversation-candidates");
       const browserSessionSelectEl = document.getElementById("browser-session");
       const browserSessionBootstrapEl = document.getElementById("browser-session-bootstrap");
-      const currentAgentEl = document.getElementById("current-agent");
-      const agentCatalogEl = document.getElementById("agent-catalog");
-      const projectCatalogEl = document.getElementById("project-catalog");
-      const trackCatalogEl = document.getElementById("track-catalog");
-      const bindingCatalogEl = document.getElementById("binding-catalog");
-      const missionSeedCatalogEl = document.getElementById("mission-seed-catalog");
       const memoryDetailEl = document.getElementById("memory-detail");
       const pttToggleEl = document.getElementById("ptt-toggle");
       const nativeMicToggleEl = document.getElementById("native-mic-toggle");
@@ -1364,25 +883,10 @@
       const emailDraftRefreshEl = document.getElementById("email-draft-refresh");
       const emailDraftCopyEl = document.getElementById("email-draft-copy");
       const emailDraftHintEl = document.getElementById("email-draft-hint");
-      const quickActionMinutesEl = document.getElementById("quick-action-minutes");
-      const quickActionEmailEl = document.getElementById("quick-action-email");
-      const quickActionBrowserEl = document.getElementById("quick-action-browser");
-      const voicePanelEl = document.getElementById("voice-panel");
-      const meetingNotepadRedirectPanelEl = document.getElementById("meeting-notepad-redirect-panel");
-      const meetingNotepadRedirectHintEl = document.getElementById("meeting-notepad-redirect-hint");
-      const emailPanelEl = document.getElementById("email-panel");
-      const browserPanelEl = document.getElementById("browser-panel");
-      const devPanelEl = document.getElementById("dev-panel");
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const MINUTES_DRAFT_KEY = "presence-studio.minutes-draft.v1";
       const EMAIL_DRAFT_KEY = "presence-studio.email-draft.v1";
       const EMAIL_AUTH_STATUS_KEY = "presence-studio.email-auth-status.v1";
-      const firstRunVoiceBtn = document.getElementById("first-run-voice");
-      const firstRunBrowserBtn = document.getElementById("first-run-browser");
-      const firstRunSummaryEl = document.getElementById("first-run-summary");
-      const firstRunSurfacesEl = document.getElementById("first-run-surfaces");
-      const firstRunNextEl = document.getElementById("first-run-next");
-      let surfaceLauncherPayload = null;
       let recognition = null;
       let isListening = false;
       let isNativeListening = false;
@@ -1395,12 +899,11 @@
       let handsFreeRestartTimer = null;
       let browserFinalTranscript = "";
       let browserInterimTranscript = "";
-      let surfaceAgentCatalog = { currentAgentId: "presence-surface-agent", current: null, agents: [] };
-      let standardIntents = [];
+      // FD-08: projectCatalog / distillCandidateCatalog are the only surface
+      // catalogs still consumed on /work (Work Detail's linked project and
+      // "learned" links). Current Assistant / Common Requests / Tracks /
+      // Service Bindings / Mission Seeds catalogs moved to the control plane.
       let projectCatalog = [];
-      let trackCatalog = [];
-      let bindingCatalog = [];
-      let missionSeedCatalog = [];
       let distillCandidateCatalog = [];
       let selectedReferenceRef = null;
       let selectedReferenceEndpoint = null;
@@ -1691,13 +1194,6 @@
           window.requestAnimationFrame(() => {
             emailSendConfirmSubmitEl?.focus();
           });
-        });
-      }
-
-      function focusSection(panelEl, focusEl) {
-        panelEl?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-        window.requestAnimationFrame(() => {
-          focusEl?.focus?.();
         });
       }
 
@@ -2270,172 +1766,25 @@
         );
       }
 
-      function renderFirstRunLauncher(payload) {
-        if (!firstRunSummaryEl || !firstRunSurfacesEl || !firstRunNextEl) return;
-        if (!payload || payload.ok === false) {
-          firstRunSummaryEl.textContent = "Surface readiness could not be loaded. Use `pnpm kyberion setup report --persona first-time-user` in the terminal.";
-          firstRunSurfacesEl.innerHTML = "";
-          firstRunNextEl.innerHTML = "";
-          return;
-        }
-
-        const summary = payload.summary || {};
-        const rows = Array.isArray(payload.rows) ? payload.rows : [];
-        const recommendations = Array.isArray(payload.recommendations) ? payload.recommendations : [];
-        const nextActions = Array.isArray(payload.nextActions) ? payload.nextActions : [];
-
-        firstRunSummaryEl.textContent =
-          `${summary.running || 0} running, ${summary.auth_missing || 0} auth missing, ${summary.blocked || 0} blocked surfaces.`;
-
-        const recommendedRows = recommendations
-          .map((recommendation) => ({
-            recommendation,
-            rows: rows.filter((row) => Array.isArray(recommendation.surfaces) && recommendation.surfaces.includes(row.id)),
-          }))
-          .slice(0, 3);
-
-        firstRunSurfacesEl.innerHTML = recommendedRows.map(({ recommendation, rows: matchedRows }) => {
-          const blocked = matchedRows.flatMap((row) => Array.isArray(row.blocked_by) ? row.blocked_by : []);
-          const bestFor = matchedRows.map((row) => row.best_for).filter(Boolean).join(" / ");
-          const nextCommand = recommendation.suggestedCommand || (matchedRows[0] && matchedRows[0].next_command) || "pnpm surfaces status";
-          return (
-            `<div class="first-run-card">
-              <strong>${escapeHtml(recommendation.title || "Surface")}</strong>
-              <div class="first-run-meta">${escapeHtml(recommendation.whenToUse || bestFor || "")}</div>
-              <div class="first-run-meta">surfaces: ${escapeHtml((recommendation.surfaces || []).join(", "))}</div>
-              <div class="first-run-meta">readiness: ${escapeHtml(recommendation.readiness || "unknown")}${blocked.length ? ` · blocked by ${escapeHtml(blocked.join(", "))}` : ""}</div>
-              <div class="first-run-meta">try: <code>${escapeHtml(nextCommand)}</code></div>
-            </div>`
-          );
-        }).join("");
-
-        firstRunNextEl.innerHTML = nextActions.slice(0, 3).map((action) => (
-          `<div class="first-run-action">
-            <strong>${escapeHtml(action.title || "Next action")}</strong><br />
-            ${escapeHtml(action.reason || "")}<br />
-            <code>${escapeHtml(action.suggested_command || "pnpm kyberion setup report --persona first-time-user")}</code>
-          </div>`
-        )).join("");
-      }
-
-      function renderChips(items) {
-        if (!items || items.length === 0) return `<div class="small">None</div>`;
-        return `<div class="chips">${items.map((item) => `<span class="chip">${String(item).replace(/</g, "&lt;")}</span>`).join("")}</div>`;
-      }
-
-      function renderCurrentAgent(agentId) {
-        const current = surfaceAgentCatalog.current && surfaceAgentCatalog.current.agentId === agentId
-          ? surfaceAgentCatalog.current
-          : (surfaceAgentCatalog.agents || []).find((agent) => agent.agentId === agentId);
-        if (!current) {
-          currentAgentEl.innerHTML = `<div class="small">No surface-agent profile found for <span class="mono">${agentId || "unknown"}</span>.</div>`;
-          return;
-        }
-        currentAgentEl.innerHTML = `
-          <div>
-            <div class="row"><strong>${current.displayName}</strong><span class="mono">${current.agentId}</span></div>
-            <div class="small">${current.summary || "No summary available."}</div>
-          </div>
-          ${(current.providerResolution || current.resolvedProvider || current.resolvedModelId) ? `
-          <div>
-            <div class="label">Model Routing</div>
-            <div class="small">preferred: <span class="mono">${escapeHtml(current.providerResolution?.preferredProvider || current.provider || "unknown")}${current.providerResolution?.preferredModelId ? `/${escapeHtml(current.providerResolution.preferredModelId)}` : current.modelId ? `/${escapeHtml(current.modelId)}` : ""}</span></div>
-            <div class="small">resolved: <span class="mono">${escapeHtml(current.resolvedProvider || current.provider || "unknown")}${current.resolvedModelId ? `/${escapeHtml(current.resolvedModelId)}` : current.modelId ? `/${escapeHtml(current.modelId)}` : ""}</span></div>
-            <div class="small">strategy: <span class="mono">${escapeHtml(current.providerResolution?.strategy || "preferred")}</span></div>
-          </div>` : ""}
-          <div>
-            <div class="label">Capabilities</div>
-            ${renderChips(current.capabilities || [])}
-          </div>
-          <div>
-            <div class="label">Authority Roles</div>
-            ${renderChips(current.authorityRoles || [])}
-          </div>
-          <div>
-            <div class="label">Delegates To</div>
-            ${renderChips(current.delegationTargets || [])}
-          </div>
-          <div>
-            <div class="label">Guardrails</div>
-            ${renderChips(current.deniedActuators || [])}
-          </div>
-        `;
-      }
-
-      function renderStandardIntents() {
-        const items = Array.isArray(standardIntents) ? standardIntents : [];
-        if (!items.length) {
-          agentCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No common requests available yet.", "common request はまだありません。"))}<br><span class="hint-text">${escapeHtml(uiText("Add a commonRequests array to the agent's manifest under knowledge/product/agents/<id>.agent.md to populate this list.", "knowledge/product/agents/<id>.agent.md の commonRequests に追加すると、ここに表示されます。"))}</span></div>`;
-          return;
-        }
-        renderList(agentCatalogEl, items.slice(0, 8), (item) =>
-          `<div class="row"><strong>${escapeHtml(item.examples?.[0] || item.id || "request")}</strong><span class="mono">${escapeHtml(item.shape || "direct")}</span></div>
-           <div class="small">${escapeHtml(item.description || "No description available.")}</div>
-           <div class="small">handled by: <span class="mono">${escapeHtml(item.primary_specialist?.label || "Kyberion")}</span></div>
-           <div class="small">team: ${escapeHtml((item.team_roles || []).join(" -> ") || "surface_liaison")}</div>
-           <div class="small">plan: ${escapeHtml((item.planOutline || []).join(" -> ") || "resolve -> execute -> return result")}</div>
-           <div class="small">result: <span class="mono">${escapeHtml((item.outcomes || []).map((outcome) => outcome.label).join(" · ") || item.resultShape || "answer")}</span></div>
-           ${(item.reusable_refs || []).length ? `<div class="small">learned: ${escapeHtml((item.reusable_refs || []).map((ref) => ref.title).join(" · "))}</div>` : ""}
-           <div class="small">examples: ${escapeHtml((item.examples || []).slice(0, 3).join(" · ") || "n/a")}</div>`
-        );
-      }
-
+      // FD-08: Current Assistant, Common Requests, first-run surface launcher
+      // recommendations moved to the control plane. /work only still needs
+      // the project catalog (Work Detail's linked project) and the distill
+      // candidate catalog ("learned" links on Requested Work / Latest
+      // Outcomes / Work Detail).
       async function loadSurfaceAgents() {
         try {
-          const [response, intentsResponse, projectsResponse, tracksResponse, bindingsResponse, missionSeedsResponse, distillCandidatesResponse] = await Promise.all([
-            fetch("/api/surface-agents"),
-            fetch("/api/standard-intents"),
+          const [projectsResponse, distillCandidatesResponse] = await Promise.all([
             fetch("/api/projects"),
-            fetch("/api/project-tracks"),
-            fetch("/api/service-bindings"),
-            fetch("/api/mission-seeds"),
             fetch("/api/distill-candidates"),
           ]);
-          const body = await response.json();
-          const intentsBody = await intentsResponse.json();
           const projectsBody = await projectsResponse.json();
-          const tracksBody = await tracksResponse.json();
-          const bindingsBody = await bindingsResponse.json();
-          const missionSeedsBody = await missionSeedsResponse.json();
           const distillCandidatesBody = await distillCandidatesResponse.json();
-          if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
-          if (!intentsResponse.ok || !intentsBody.ok) throw new Error(intentsBody.error || `HTTP ${intentsResponse.status}`);
           if (!projectsResponse.ok || !projectsBody.ok) throw new Error(projectsBody.error || `HTTP ${projectsResponse.status}`);
-          if (!tracksResponse.ok || !tracksBody.ok) throw new Error(tracksBody.error || `HTTP ${tracksResponse.status}`);
-          if (!bindingsResponse.ok || !bindingsBody.ok) throw new Error(bindingsBody.error || `HTTP ${bindingsResponse.status}`);
-          if (!missionSeedsResponse.ok || !missionSeedsBody.ok) throw new Error(missionSeedsBody.error || `HTTP ${missionSeedsResponse.status}`);
           if (!distillCandidatesResponse.ok || !distillCandidatesBody.ok) throw new Error(distillCandidatesBody.error || `HTTP ${distillCandidatesResponse.status}`);
-          surfaceAgentCatalog = body;
-          standardIntents = intentsBody.items || [];
           projectCatalog = projectsBody.items || [];
-          trackCatalog = tracksBody.items || [];
-          bindingCatalog = bindingsBody.items || [];
-          missionSeedCatalog = missionSeedsBody.items || [];
           distillCandidateCatalog = distillCandidatesBody.items || [];
-        } catch (error) {
-          surfaceAgentCatalog = {
-            currentAgentId: "presence-surface-agent",
-            current: null,
-            agents: [{
-              agentId: "error",
-              displayName: "Catalog unavailable",
-              summary: error.message || String(error),
-              capabilities: [],
-              authorityRoles: [],
-              delegationTargets: [],
-              deniedActuators: []
-            }]
-          };
-          standardIntents = [{
-            id: "error",
-            description: error.message || String(error),
-            examples: ["Catalog unavailable"],
-            shape: "error",
-          }];
+        } catch (_error) {
           projectCatalog = [];
-          trackCatalog = [];
-          bindingCatalog = [];
-          missionSeedCatalog = [];
           distillCandidateCatalog = [];
         }
       }
@@ -2540,20 +1889,6 @@
         setText("#browser-panel .label", "browser_label", "Browser Task");
         setText("#browser-session-bootstrap", "prepare_browser", "Prepare Browser");
         setText("#browser-task-hint", "browser_task_hint", "Initialize a browser automation session for research or form operations.");
-      }
-
-      function relatedPromotedRefsForProject(projectId) {
-        const items = Array.isArray(distillCandidateCatalog) ? distillCandidateCatalog : [];
-        return items.filter((item) => item.project_id === projectId && item.promoted_ref).slice(0, 3);
-      }
-
-      function relatedPromotedRefsForMissionSeed(seed) {
-        const items = Array.isArray(distillCandidateCatalog) ? distillCandidateCatalog : [];
-        return items.filter((item) => {
-          if (item.project_id !== seed.project_id || !item.promoted_ref) return false;
-          const evidence = Array.isArray(item.evidence_refs) ? item.evidence_refs : [];
-          return evidence.includes(`mission_seed:${seed.seed_id}`) || (seed.promoted_mission_id && item.mission_id === seed.promoted_mission_id);
-        }).slice(0, 3);
       }
 
       function relatedPromotedRefsForTaskSession(sessionId, projectId) {
@@ -2675,15 +2010,6 @@
         );
       }
 
-      async function openRuntimeRef(logicalPath) {
-        return openReferenceRef(
-          logicalPath,
-          "/api/runtime-ref",
-          uiText("Loading skeleton...", "skeleton を読み込み中です..."),
-          uiText("Open raw skeleton", "raw skeleton を開く"),
-        );
-      }
-
       function renderMemoryDetail() {
         if (!selectedReferenceRef || !referenceDetail) {
           memoryDetailEl.innerHTML = `<div class="item small">${escapeHtml(uiText("Select a learned memory to inspect its title, summary, evidence, and reusable sections.", "learned memory を選ぶと、title / summary / evidence / reusable sections を確認できます。"))}</div>`;
@@ -2714,83 +2040,6 @@
               ${(section.lines || []).filter((line) => line.trim()).slice(0, 12).map((line) => `<div class="small">${escapeHtml(line)}</div>`).join("") || `<div class="small">${escapeHtml(uiText("No detail.", "詳細はありません。"))}</div>`}
             </div>
           </div>`).join("") : ""}`;
-      }
-
-      function renderProjectCatalog() {
-        const items = Array.isArray(projectCatalog) ? projectCatalog : [];
-        if (!items.length) {
-          projectCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No projects registered yet.", "まだ project は登録されていません。"))}<br><span class="hint-text">${escapeHtml(uiText("Drop a project record under knowledge/public/projects/<slug>/project.json (or use mission_controller create) to see it here.", "knowledge/public/projects/<slug>/project.json を作成するか mission_controller create で生成すると表示されます。"))}</span></div>`;
-          return;
-        }
-        renderList(projectCatalogEl, items.slice(0, 8), (item) => {
-          const bootstrapItems = Array.isArray(item.bootstrap_work_items) ? item.bootstrap_work_items.slice(0, 3) : [];
-          const kickoffTaskSessionId = item.kickoff_task_session_id || "";
-          const learnedItems = relatedPromotedRefsForProject(item.project_id || "");
-          return `<div class="row"><strong>${escapeHtml(item.name || item.project_id || "project")}</strong><span class="mono">${escapeHtml(item.status || "unknown")}</span></div>
-           <div class="small">${escapeHtml(item.summary || "")}</div>
-           <div class="small">${escapeHtml(uiText("bindings", "binding"))}: <span class="mono">${escapeHtml(String((item.service_bindings || []).length))}</span> · ${escapeHtml(uiText("missions", "mission"))}: <span class="mono">${escapeHtml(String((item.active_missions || []).length))}</span></div>
-           <div class="small">id: <span class="mono">${escapeHtml(item.project_id || "unknown")}</span></div>
-           ${bootstrapItems.length ? `<div class="small">${escapeHtml(uiText("next work", "次の work"))}: ${escapeHtml(bootstrapItems.map((entry) => entry.title).join(" -> "))}</div>` : ""}
-           ${kickoffTaskSessionId ? `<div class="small">${escapeHtml(uiText("kickoff", "kickoff"))}: <span class="mono">${escapeHtml(kickoffTaskSessionId)}</span></div>` : ""}
-           ${learnedItems.length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${renderLearnedRefLinks(learnedItems)}</div>` : ""}`;
-        });
-      }
-
-      function renderTrackCatalog() {
-        const items = Array.isArray(trackCatalog) ? trackCatalog : [];
-        if (!items.length) {
-          trackCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No tracks registered yet.", "まだ track は登録されていません。"))}<br><span class="hint-text">${escapeHtml(uiText("Tracks live alongside their parent project (project.tracks[]). Add one to a project record to see it here.", "track は project.tracks[] に追記すると表示されます。"))}</span></div>`;
-          return;
-        }
-        renderList(trackCatalogEl, items.slice(0, 8), (item) =>
-          `<div class="row"><strong>${escapeHtml(item.name || item.track_id || "track")}</strong><span class="mono">${escapeHtml(item.status || "unknown")}</span></div>
-           <div class="small">${escapeHtml(item.summary || "")}</div>
-           <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "unknown")}</span></div>
-           <div class="small">${escapeHtml(uiText("type", "type"))}: <span class="mono">${escapeHtml(item.track_type || "delivery")}</span> · ${escapeHtml(uiText("lifecycle", "lifecycle"))}: <span class="mono">${escapeHtml(item.lifecycle_model || "sdlc")}</span></div>
-           ${item.release_id ? `<div class="small">release: <span class="mono">${escapeHtml(item.release_id)}</span></div>` : ""}
-           ${(item.required_artifacts || []).length ? `<div class="small">${escapeHtml(uiText("required artifacts", "required artifacts"))}: <span class="mono">${escapeHtml(String((item.required_artifacts || []).length))}</span></div>` : ""}
-           ${item.gate_readiness ? `<div class="small">${escapeHtml(uiText("gate readiness", "gate readiness"))}: <span class="mono">${escapeHtml(String(item.gate_readiness.ready_gate_count || 0))}/${escapeHtml(String(item.gate_readiness.total_gate_count || 0))}</span> · ${escapeHtml(uiText("current gate", "current gate"))}: <span class="mono">${escapeHtml(item.gate_readiness.current_gate_id || (item.gate_readiness.ready ? "ready" : "-"))}</span></div>` : ""}
-           ${item.gate_readiness && Array.isArray(item.gate_readiness.next_required_artifacts) && item.gate_readiness.next_required_artifacts.length ? `<div class="small">${escapeHtml(uiText("next required", "next required"))}: <span class="mono">${escapeHtml(item.gate_readiness.next_required_artifacts.map((entry) => entry.artifact_id).join(", "))}</span></div>` : ""}`
-        );
-      }
-
-      function renderBindingCatalog() {
-        const items = Array.isArray(bindingCatalog) ? bindingCatalog : [];
-        if (!items.length) {
-          bindingCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No service bindings registered yet.", "まだ service binding は登録されていません。"))}<br><span class="hint-text">${escapeHtml(uiText("Approve a service connection in onboarding (knowledge/personal/connections/) to bind it here.", "onboarding (knowledge/personal/connections/) で service connection を承認すると binding されます。"))}</span></div>`;
-          return;
-        }
-        renderList(bindingCatalogEl, items.slice(0, 8), (item) =>
-          `<div class="row"><strong>${escapeHtml(item.binding_id || "binding")}</strong><span class="mono">${escapeHtml(item.service_type || "service")}</span></div>
-           <div class="small">${escapeHtml(uiText("target", "target"))}: ${escapeHtml(item.target || "unknown")}</div>
-           <div class="small">${escapeHtml(uiText("scope", "scope"))}: <span class="mono">${escapeHtml(item.scope || "unknown")}</span> · ${escapeHtml(uiText("actions", "actions"))}: <span class="mono">${escapeHtml((item.allowed_actions || []).slice(0, 3).join(", ") || "n/a")}</span></div>`
-        );
-      }
-
-      function renderMissionSeedCatalog() {
-        const items = Array.isArray(missionSeedCatalog) ? missionSeedCatalog : [];
-        if (!items.length) {
-          missionSeedCatalogEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No mission seeds recorded yet.", "まだ mission seed はありません。"))}<br><span class="hint-text">${escapeHtml(uiText("Run mission_controller create or have an agent submit a seed via the surface stimuli pipeline.", "mission_controller create か surface 経由の stimuli で seed を作ると表示されます。"))}</span></div>`;
-          return;
-        }
-        renderList(missionSeedCatalogEl, items.slice(0, 8), (item) => {
-          const learnedItems = relatedPromotedRefsForMissionSeed(item);
-          return `<div class="row"><strong>${escapeHtml(item.title || item.seed_id || "mission seed")}</strong><span class="mono">${escapeHtml(item.status || "unknown")}</span></div>
-           <div class="small">${escapeHtml(item.summary || "")}</div>
-           <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "unknown")}</span> · ${escapeHtml(uiText("track", "track"))}: <span class="mono">${escapeHtml(item.track_name || item.track_id || "-")}</span></div>
-           <div class="small">${escapeHtml(uiText("specialist", "specialist"))}: <span class="mono">${escapeHtml(item.specialist_id || "unknown")}</span></div>
-           <div class="small">${escapeHtml(uiText("type", "type"))}: <span class="mono">${escapeHtml(item.mission_type_hint || "general")}</span> · ${escapeHtml(uiText("source work", "source work"))}: <span class="mono">${escapeHtml(item.source_work_id || "-")}</span></div>
-           ${item.metadata && item.metadata.template_ref ? `<div class="small">${escapeHtml(uiText("template", "template"))}: <span class="mono">${escapeHtml(item.metadata.template_ref)}</span></div>` : ""}
-           ${item.metadata && item.metadata.skeleton_path ? `<div class="small">${escapeHtml(uiText("skeleton", "skeleton"))}: <button class="button button-link mono" type="button" data-runtime-ref="${escapeHtml(item.metadata.skeleton_path)}">${escapeHtml(item.metadata.skeleton_path)}</button></div>` : ""}
-           ${item.promoted_mission_id ? `<div class="small">${escapeHtml(uiText("mission", "mission"))}: <span class="mono">${escapeHtml(item.promoted_mission_id)}</span></div>` : ""}
-           ${learnedItems.length ? `<div class="small">${escapeHtml(uiText("learned", "learned"))}: ${renderLearnedRefLinks(learnedItems)}</div>` : ""}`;
-        });
-        missionSeedCatalogEl.querySelectorAll("[data-runtime-ref]").forEach((button) => {
-          button.addEventListener("click", () => openRuntimeRef(button.getAttribute("data-runtime-ref")));
-        });
-        missionSeedCatalogEl.querySelectorAll("[data-knowledge-ref]").forEach((button) => {
-          button.addEventListener("click", () => openKnowledgeRef(button.getAttribute("data-knowledge-ref")));
-        });
       }
 
       function renderApprovalInbox() {
@@ -2853,8 +2102,9 @@
       }
 
       function renderOsControlPlane() {
+        // FD-08: the raw observation-audit list moved to the control plane.
+        // /work keeps only the held-actions approval queue.
         const heldActions = Array.isArray(osControlPlane.heldActions) ? osControlPlane.heldActions : [];
-        const observations = Array.isArray(osControlPlane.observations) ? osControlPlane.observations : [];
         osHeldActionsEl.innerHTML = heldActions.length
           ? heldActions.slice(0, 8).map((item) => `
               <div class="item">
@@ -2866,9 +2116,6 @@
                 ${item.status === "approved" ? `<div class="controls" style="margin-top: 10px; margin-bottom: 0;"><button class="button" type="button" data-os-apply-id="${escapeHtml(item.id)}">${escapeHtml(uiText("Apply", "適用"))}</button></div>` : ""}
               </div>`).join("")
           : `<div class="item small">${escapeHtml(uiText("No OS held actions are waiting.", "OS held-action の待機はありません。"))}</div>`;
-        osObservationsEl.innerHTML = observations.length
-          ? observations.slice(0, 8).map((item) => `<div class="item"><div class="row"><strong>${escapeHtml(item.service || "observation")}</strong><span class="mono">${escapeHtml(item.tier || "unknown")}</span></div><div class="small">${escapeHtml(item.resourceRef || "-")} · ${escapeHtml(item.purpose || "-")}</div><div class="small">${escapeHtml(item.summary || "-")} · <span class="mono">${escapeHtml(item.observedAt || "-")}</span></div></div>`).join("")
-          : `<div class="item small">${escapeHtml(uiText("No observations recorded yet.", "観測記録はまだありません。"))}</div>`;
 
         osHeldActionsEl.querySelectorAll("[data-os-action-id]").forEach((button) => {
           button.addEventListener("click", async () => {
@@ -3100,16 +2347,6 @@
           `<div class="row"><strong>${item.speaker || "speaker"}</strong><span class="mono">${(item.text || "").replace(/</g, "&lt;")}</span></div>`
         );
 
-        renderList(stimuliEl, state.recentStimuli || [], (item) =>
-          `<div class="label">${item.origin?.source_id || "voice"}</div><div>${item.signal?.payload || ""}</div><div class="mono">${item.ts || ""}</div>`
-        );
-
-        renderCurrentAgent(data.agentId || surfaceAgentCatalog.currentAgentId);
-        renderStandardIntents();
-        renderProjectCatalog();
-        renderTrackCatalog();
-        renderBindingCatalog();
-        renderMissionSeedCatalog();
         renderApprovalInbox();
         renderOsControlPlane();
         renderOutcomeInbox();
@@ -3733,17 +2970,6 @@
           closeEmailSendConfirm(false);
         }
       });
-      quickActionMinutesEl?.addEventListener("click", () => {
-        focusSection(meetingNotepadRedirectPanelEl, null);
-        if (meetingNotepadRedirectHintEl) {
-          meetingNotepadRedirectHintEl.textContent =
-            "Run: KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/meeting-notepad/server.ts — then open http://127.0.0.1:8148/";
-        }
-        if (minutesHintEl) {
-          minutesHintEl.textContent =
-            "Minutes moved to meeting-notepad. Launch the local server on port 8148.";
-        }
-      });
       const minutesRecordMissionEl = document.getElementById("minutes-record-mission");
       const minutesRecordStartEl = document.getElementById("minutes-record-start");
       const minutesRecordStopEl = document.getElementById("minutes-record-stop");
@@ -3810,10 +3036,6 @@
           minutesRecordStartEl.disabled = false;
         }
       });
-      quickActionEmailEl?.addEventListener("click", () => focusSection(emailPanelEl, emailDraftToEl));
-      quickActionBrowserEl?.addEventListener("click", () => focusSection(browserPanelEl, browserSessionSelectEl));
-      firstRunVoiceBtn?.addEventListener("click", () => focusSection(voicePanelEl, pttToggleEl));
-      firstRunBrowserBtn?.addEventListener("click", () => focusSection(browserPanelEl, browserSessionSelectEl));
       minutesSaveEl.addEventListener("click", async () => {
         const text = dictationNotesEl.value.trim();
         if (!text) {

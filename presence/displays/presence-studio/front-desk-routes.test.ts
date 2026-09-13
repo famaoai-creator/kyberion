@@ -345,15 +345,17 @@ describe('security.ts remote-safe allowlist wiring (Deliverable 1)', () => {
   });
 });
 
-describe('interim front-desk page redirects (Deliverable 4)', () => {
-  it('registers /help as a 302 redirect to its interim target', () => {
+describe('FD-08 help page routing', () => {
+  it('serves help.html at /help instead of the interim /onboarding redirect', () => {
     const source = readRepoFile(
       'presence/displays/presence-studio/presence-studio-runtime-data.ts'
     );
 
     const helpStart = source.indexOf("app.get('/help'");
     expect(helpStart).toBeGreaterThan(-1);
-    expect(source.slice(helpStart, helpStart + 200)).toContain("res.redirect(302, '/onboarding')");
+    const helpRoute = source.slice(helpStart, helpStart + 200);
+    expect(helpRoute).toContain("'help.html'");
+    expect(helpRoute).not.toContain('res.redirect');
   });
 });
 
@@ -405,7 +407,7 @@ describe('FD-02 home page routing (Deliverable 3)', () => {
 });
 
 describe('static rail mount (Deliverable 3)', () => {
-  it('mounts the rail in home.html as current "home", and in index.html / onboarding.html as expected', () => {
+  it('mounts the rail in home.html as current "home", and in index.html / help.html as expected', () => {
     const homeHtml = readRepoFile('presence/displays/presence-studio/static/home.html');
     expect(homeHtml).toContain('id="front-desk-rail"');
     expect(homeHtml).toContain('front-desk-rail.css');
@@ -421,11 +423,13 @@ describe('static rail mount (Deliverable 3)', () => {
     // "current" there anymore (home.html owns the "home" rail item).
     expect(indexHtml).toContain('current: null');
 
-    const onboardingHtml = readRepoFile('presence/displays/presence-studio/static/onboarding.html');
-    expect(onboardingHtml).toContain('id="front-desk-rail"');
-    expect(onboardingHtml).toContain('front-desk-rail.css');
-    expect(onboardingHtml).toContain('front-desk-rail.js');
-    expect(onboardingHtml).toContain("current: 'settings'");
+    // FD-08: /help is not one of the 5 rail items either — like /work,
+    // nothing renders as "current" there.
+    const helpHtml = readRepoFile('presence/displays/presence-studio/static/help.html');
+    expect(helpHtml).toContain('id="front-desk-rail"');
+    expect(helpHtml).toContain('front-desk-rail.css');
+    expect(helpHtml).toContain('front-desk-rail.js');
+    expect(helpHtml).toContain('current: null');
   });
 
   it('never opens a rail link in a new tab and never hardcodes the loopback host', () => {
@@ -698,5 +702,101 @@ describe('server.ts route wiring (FD-03 Deliverable 1)', () => {
     expect(conversationRoute).toContain('checkAndRepairSurfaceUxContract(');
     expect(conversationRoute).toContain('runSurfaceMessageConversation(');
     expect(conversationRoute).toContain("mode: 'unavailable'");
+  });
+});
+
+describe('FD-08 help page static contract', () => {
+  it('mounts the rail in help.html as current null and links to /ask, decide, and /progress', () => {
+    const helpHtml = readRepoFile('presence/displays/presence-studio/static/help.html');
+    expect(helpHtml).toContain('id="front-desk-rail"');
+    expect(helpHtml).toContain('front-desk-rail.css');
+    expect(helpHtml).toContain('front-desk-rail.js');
+    expect(helpHtml).toContain('current: null');
+    expect(helpHtml).toContain('id="help-ask-link"');
+    expect(helpHtml).toContain('id="help-decide-link"');
+    expect(helpHtml).toContain('id="help-progress-link"');
+  });
+
+  it('fills every link and sentence from GET /api/front-desk/nav, never a hardcoded port', () => {
+    const helpJs = readRepoFile('presence/displays/presence-studio/static/help.js');
+    expect(helpJs).toContain("fetch('/api/front-desk/nav?locale=");
+    expect(helpJs).not.toContain('127.0.0.1');
+    expect(helpJs).not.toContain('target=');
+  });
+
+  it('help.html/help.js never use target="_blank", emoji, 127.0.0.1, or internal vocabulary', () => {
+    const helpHtml = readRepoFile('presence/displays/presence-studio/static/help.html');
+    const helpJs = readRepoFile('presence/displays/presence-studio/static/help.js');
+    const combined = `${helpHtml}\n${helpJs}`;
+
+    expect(combined).not.toContain('target=');
+    expect(combined).not.toContain('127.0.0.1');
+    expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(combined)).toBe(false);
+
+    const forbiddenWords = [
+      'mission',
+      'ADF',
+      'actuator',
+      'pipeline',
+      'stimuli',
+      'A2UI',
+      'Presence Studio',
+      'ports',
+    ];
+    for (const word of forbiddenWords) {
+      expect(combined.toLowerCase()).not.toContain(word.toLowerCase());
+    }
+  });
+});
+
+describe('FD-08 removed presence-studio dashboard panels', () => {
+  it('drops the moved-to-control-plane panel ids and the developer A2UI sandbox from index.html', () => {
+    const indexHtml = readRepoFile('presence/displays/presence-studio/static/index.html');
+    const removedIds = [
+      'id="current-agent-panel"',
+      'id="agent-catalog-panel"',
+      'id="project-panel"',
+      'id="track-panel"',
+      'id="binding-panel"',
+      'id="mission-seed-panel"',
+      'id="stimuli-panel"',
+      'id="intent-resolution-panel"',
+      'id="memory-panel"',
+      'id="dev-panel"',
+      'id="first-run-banner"',
+    ];
+    for (const marker of removedIds) {
+      expect(indexHtml).not.toContain(marker);
+    }
+    expect(indexHtml).not.toContain('Observation Audit');
+    expect(indexHtml).not.toContain('できること');
+    expect(indexHtml).not.toContain(
+      'A Digital Agency-inspired capture surface for subtitles, notes, minutes, and governed voice-channel stimuli.'
+    );
+  });
+
+  it('keeps the ux-contract literal calls even though the Intent Resolution panel is gone', () => {
+    const indexHtml = readRepoFile('presence/displays/presence-studio/static/index.html');
+    expect(indexHtml).toContain('renderIntentResolution(body.intentResolution)');
+    expect(indexHtml).toContain('understanding');
+    expect(indexHtml).toContain('outcome_kind');
+  });
+
+  it('drops the /api/surface-agents route (nothing outside index.html referenced it) but keeps every route index.html or another caller still needs', () => {
+    const serverSource = readRepoFile('presence/displays/presence-studio/server.ts');
+    expect(serverSource).not.toContain("app.get('/api/surface-agents'");
+    // Kept because a test (os-control-plane-route.test.ts) requires the
+    // canonical standard-intent catalog loader be wired here.
+    expect(serverSource).toContain("presenceStudioData.app.get('/api/standard-intents'");
+    // Kept because libs/core/control-plane-client.ts and
+    // scripts/control_plane_cli.ts still call these on this surface.
+    expect(serverSource).toContain("presenceStudioData.app.get('/api/projects'");
+    expect(serverSource).toContain("presenceStudioData.app.get('/api/project-tracks'");
+    expect(serverSource).toContain("presenceStudioData.app.get('/api/service-bindings'");
+    expect(serverSource).toContain("presenceStudioData.app.get('/api/mission-seeds'");
+    // Kept because index.html's Work Detail / Requested Work / Latest
+    // Outcomes "learned" links still resolve through these.
+    expect(serverSource).toContain("presenceStudioData.app.get('/api/distill-candidates'");
+    expect(serverSource).toContain("presenceStudioData.app.get('/api/knowledge-ref'");
   });
 });
