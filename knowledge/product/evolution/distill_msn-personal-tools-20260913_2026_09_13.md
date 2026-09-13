@@ -12,7 +12,7 @@ last_updated: 2026-09-13
 
 ## Summary
 
-Implemented a personal workbench covering six secretary workflows with personal-tier defaults, authenticated loading and capture, proposal handoff, registry integration, and focused tests. Validation passed type checking, linting, focused tests, and all 69 full-suite gates.
+Implemented a personal workbench covering six secretary workflows with personal-tier defaults, authenticated loading and capture, proposal handoff, registry integration, and focused tests. Capture remains proposal-only; email drafts, knowledge enqueue, and calendar mutations stay behind explicit `/action` boundaries.
 
 ## Key Learnings
 
@@ -29,7 +29,7 @@ Implemented a personal workbench covering six secretary workflows with personal-
 - Personal-workbench implementation for six secretary workflows
 - Registry entries for workbench discovery
 - Focused personal-workbench test suite
-- Verification sequence: typecheck, lint, focused tests, and full 69-gate checks
+- Verification sequence: typecheck / lint / focused personal-workbench tests, plus broader gates as needed before merge
 
 ---
 
