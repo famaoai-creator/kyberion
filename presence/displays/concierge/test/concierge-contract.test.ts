@@ -375,7 +375,10 @@ describe('concierge surface contract', () => {
   it('runs document intake as an explicit one-shot ingest ceremony (CS-03)', () => {
     const route = fs.readFileSync(path.join(appDir, 'src/app/api/ingest/route.ts'), 'utf8');
     const page = fs.readFileSync(path.join(appDir, 'src/app/ingest/page.tsx'), 'utf8');
-    const header = fs.readFileSync(path.join(appDir, 'src/app/concierge-header.tsx'), 'utf8');
+    // FD-00c: the header's own nav links (Home / 資料の取込 / Setup) moved to
+    // the shared front-desk rail — see test/front-desk-contract.test.ts for
+    // the rail's own ingest-reachability assertion.
+    const rail = fs.readFileSync(path.join(appDir, 'src/app/front-desk-rail.tsx'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -411,7 +414,7 @@ describe('concierge surface contract', () => {
     expect(page).toContain("t('ingest.drop_hint')");
     expect(page).toContain('setDryRun] = React.useState(true)');
     expect(page).toContain("t('ingest.commit_after_preview')");
-    expect(header).toContain("t('header.ingest')");
+    expect(rail).toContain("t('header.ingest')");
     expect(messages).toContain('資料の取込');
     expect(messages).toContain('まず内容を確認する');
   });
@@ -612,7 +615,11 @@ describe('concierge surface contract', () => {
     const palette = fs.readFileSync(path.join(appDir, 'src/app/command-palette.tsx'), 'utf8');
     const layout = fs.readFileSync(path.join(appDir, 'src/app/layout.tsx'), 'utf8');
     const css = fs.readFileSync(path.join(appDir, 'src/app/globals.css'), 'utf8');
-    expect(layout).toContain('<CommandPalette />');
+    // FD-00c follow-up: CommandPalette takes a `frontDeskPorts` prop
+    // (manifest-resolved, read server-side in layout.tsx) instead of a bare
+    // `<CommandPalette />` — see test/front-desk-contract.test.ts for the
+    // no-hardcoded-port assertion.
+    expect(layout).toContain('<CommandPalette frontDeskPorts={frontDeskPorts} />');
     expect(palette).toContain('role="dialog"');
     expect(palette).toContain('aria-modal');
     expect(palette).toContain('prefers-reduced-motion');
