@@ -26,13 +26,156 @@ describe('browser conditional interaction lowering', () => {
       },
     });
     expect(executePipeline.mock.calls[0][0].map((step: { op: string }) => step.op)).toEqual([
-      'snapshot',
       'click_ref',
       'snapshot',
       'screenshot',
       'console',
       'network',
     ]);
+  });
+
+  it('does not remint a snapshot before applying a live @eN', () => {
+    const helpers = createBrowserInteractionHelpers({
+      executePipeline: vi.fn(),
+      emitComputerSurfacePatch: vi.fn(),
+    });
+    const result = helpers.translateComputerInteractionToBrowserAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      session_id: 'keep-alive-session',
+      action: { type: 'click_ref', ref: '@e1' },
+    });
+    expect(result.options?.keep_alive).toBe(true);
+    expect(result.steps.map((step) => step.op)).toEqual(['click_ref']);
+    expect(result.steps[0]?.params).toEqual({ ref: '@e1', timeout: undefined });
+  });
+
+  it('prefers a recorded selector over ephemeral @eN for click/fill/press', () => {
+    const helpers = createBrowserInteractionHelpers({
+      executePipeline: vi.fn(),
+      emitComputerSurfacePatch: vi.fn(),
+    });
+    const click = helpers.translateComputerInteractionToBrowserAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'click_ref',
+        ref: '@e1',
+        selector: 'button.submit',
+        name: 'Submit',
+        role: 'button',
+      },
+    });
+    expect(click.steps).toEqual([
+      {
+        type: 'apply',
+        op: 'click',
+        params: { selector: 'button.submit', name: 'Submit', role: 'button', timeout: undefined },
+      },
+    ]);
+
+    const fill = helpers.translateComputerInteractionToBrowserAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'fill_ref',
+        ref: '@e1',
+        selector: 'input[name="q"]',
+        text: 'kyberion',
+        name: 'Search',
+        role: 'textbox',
+      },
+    });
+    expect(fill.steps).toEqual([
+      {
+        type: 'apply',
+        op: 'fill',
+        params: {
+          selector: 'input[name="q"]',
+          text: 'kyberion',
+          name: 'Search',
+          role: 'textbox',
+          timeout: undefined,
+        },
+      },
+    ]);
+  });
+
+  it('emits fill_secret_ref with corroborating dom_path and never remints @eN', () => {
+    const helpers = createBrowserInteractionHelpers({
+      executePipeline: vi.fn(),
+      emitComputerSurfacePatch: vi.fn(),
+    });
+    const result = helpers.translateComputerInteractionToBrowserAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'fill_secret_ref',
+        ref: '@e1',
+        selector: 'input[name="token"]',
+        secret_ref: 'GITHUB_TOKEN',
+        name: 'API Key',
+        role: 'textbox',
+      },
+    });
+    expect(result.steps).toEqual([
+      {
+        type: 'apply',
+        op: 'fill_secret_ref',
+        params: {
+          ref: '@e1',
+          secret_ref: 'GITHUB_TOKEN',
+          name: 'API Key',
+          role: 'textbox',
+          dom_path: 'input[name="token"]',
+          timeout: undefined,
+        },
+      },
+    ]);
+    expect(result.steps.some((step) => step.op === 'snapshot')).toBe(false);
+  });
+
+  it('prefers explicit dom_path over selector for secret fills', () => {
+    const helpers = createBrowserInteractionHelpers({
+      executePipeline: vi.fn(),
+      emitComputerSurfacePatch: vi.fn(),
+    });
+    const result = helpers.translateComputerInteractionToBrowserAction({
+      version: '0.1',
+      kind: 'computer_interaction',
+      action: {
+        type: 'fill_secret_ref',
+        ref: '@e1',
+        selector: 'input[name="token"]',
+        dom_path: '#approved-token-field',
+        secret_ref: 'GITHUB_TOKEN',
+      },
+    });
+    expect(result.steps[0]?.params).toMatchObject({
+      dom_path: '#approved-token-field',
+      secret_ref: 'GITHUB_TOKEN',
+    });
+  });
+
+  it('fails closed on identity-insufficient secret fills instead of snapshot+@eN', () => {
+    const helpers = createBrowserInteractionHelpers({
+      executePipeline: vi.fn(),
+      emitComputerSurfacePatch: vi.fn(),
+    });
+    expect(() =>
+      helpers.translateComputerInteractionToBrowserAction({
+        version: '0.1',
+        kind: 'computer_interaction',
+        action: { type: 'fill_secret_ref', ref: '@e1', secret_ref: 'GITHUB_TOKEN' },
+      })
+    ).toThrow(/refusing snapshot\+@eN stand-in/);
+    expect(() =>
+      helpers.translateComputerInteractionToBrowserAction({
+        version: '0.1',
+        kind: 'computer_interaction',
+        action: { type: 'fill_ref', ref: '@e1', secret_ref: 'GITHUB_TOKEN', text: 'ignored' },
+      })
+    ).toThrow(/refusing snapshot\+@eN stand-in/);
   });
 
   it.each(['snapshot', 'screenshot', 'capture_console', 'capture_network'] as const)(
