@@ -287,4 +287,46 @@ describe('narrated video brief compiler', () => {
     expect(adf.scenes[0].content.layout_variant).toBe('focus-center');
     expect(adf.scenes[2].content.layout_variant).toBe('fullscreen-demo');
   });
+
+  it('synthesizes a storyboard from script so scene headlines change', () => {
+    const adf = compileNarratedVideoBriefToCompositionADF({
+      kind: 'narrated-video-brief',
+      version: '1.0.0',
+      title: 'Kyberion Intro',
+      language: 'ja',
+      script: {
+        hook: 'Kyberionは曖昧な指示をそのまま実行しません。',
+        feature: '意図を合意し、検証可能な活動定義に変換してから安全に実行します。',
+        cta: 'さあ、Kyberionを動かして自律オペレーションを始めましょう。',
+      },
+      narration: {
+        artifact_ref: 'active/shared/tmp/kyberion-intro/kyberion-product-intro.aiff',
+      },
+      design_system: {
+        brand_name: 'Kyberion',
+        theme_tokens: { background_color: '#0B1220' },
+      },
+      timing: { duration_sec: 30, fps: 15 },
+    });
+
+    expect(adf.scenes).toHaveLength(3);
+    expect(adf.scenes.map((scene) => scene.content.headline)).toEqual([
+      'Kyberionは曖昧な指示をそのまま実行しません',
+      'Intent → Contract → Execute',
+      'さあ、Kyberionを動かして自律オペレーションを始…',
+    ]);
+    expect(adf.scenes[0].content.body).not.toBe(adf.scenes[0].content.headline);
+    expect(adf.scenes[2].content.body).not.toBe(adf.scenes[2].content.headline);
+    expect(adf.scenes.map((scene) => scene.content.headline).join('|')).not.toContain(
+      'From brief to scene plan'
+    );
+    expect(adf.scenes[0].template_ref.template_id).toBe('basic-title-card');
+    expect(adf.scenes[1].template_ref.template_id).toBe('howto-guide');
+    expect(adf.scenes[2].template_ref.template_id).toBe('logo-outro');
+    expect(adf.scenes[1].content.visual_steps).toEqual([
+      { step: '01', detail: 'Kyberionは曖昧な指示をその…' },
+      { step: '02', detail: 'Intent → Contract…' },
+      { step: '03', detail: 'さあ、Kyberionを動かして自…' },
+    ]);
+  });
 });

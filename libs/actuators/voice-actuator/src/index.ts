@@ -72,6 +72,7 @@ import {
   probeAudioRoute,
   speakLocal,
   validateVoiceAction,
+  normalizeVoiceActionInput,
   verifyTtsLoopback,
 } from './voice-action-helpers.js';
 import {
@@ -891,17 +892,18 @@ async function collectAndRegisterVoiceProfile(input: {
 }
 
 export async function handleAction(input: VoiceAction) {
-  validateVoiceAction(input);
-  if ((input as any).action === 'pipeline') {
+  const normalized = normalizeVoiceActionInput(input) as VoiceAction;
+  validateVoiceAction(normalized);
+  if ((normalized as any).action === 'pipeline') {
     const traceCtx = createActuatorTrace('voice-actuator', 'pipeline', {
-      pipelineId: String((input as any).request_id || ''),
+      pipelineId: String((normalized as any).request_id || ''),
     });
     traceCtx.startSpan('voice:pipeline', {
-      stepCount: Array.isArray((input as any).steps) ? (input as any).steps.length : 0,
+      stepCount: Array.isArray((normalized as any).steps) ? (normalized as any).steps.length : 0,
     });
     const results = [];
     try {
-      for (const step of (input as any).steps) {
+      for (const step of (normalized as any).steps) {
         validateVoiceAction(step);
         traceCtx.startSpan(`voice:${String(step.action || 'step')}`);
         try {
@@ -947,11 +949,11 @@ export async function handleAction(input: VoiceAction) {
   }
   const traceCtx = createActuatorTrace(
     'voice-actuator',
-    String((input as any).action || 'unknown')
+    String((normalized as any).action || 'unknown')
   );
-  traceCtx.startSpan(`voice:${String((input as any).action || 'unknown')}`);
+  traceCtx.startSpan(`voice:${String((normalized as any).action || 'unknown')}`);
   try {
-    const result = await handleSingleAction(input);
+    const result = await handleSingleAction(normalized);
     traceCtx.endSpan('ok');
     return { ...result, ...finalizeActuatorTrace(traceCtx) };
   } catch (err: any) {

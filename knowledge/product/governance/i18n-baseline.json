@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-09-05T15:01:25.845Z",
+  "generated_at": "2026-09-12T16:37:07.694Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -117,6 +117,8 @@
     "scripts/demos/demo_imessage_flow.ts": 2,
     "scripts/demos/demo_telegram_flow.ts": 2,
     "scripts/generate_all_objects_layout_sample.ts": 36,
+    "scripts/kyberion_intro_scratch.ts": 12,
+    "scripts/kyberion_product_intro_render.ts": 5,
     "scripts/onboarding_wizard.ts": 49,
     "scripts/pipeline-execution-part-execution.ts": 1,
     "scripts/process_portal_inbox.ts": 5,

@@ -54,6 +54,7 @@ import {
   trackLifecycleDiagnostics,
   upsertJobDiagnostics,
   validateVideoCompositionAction,
+  normalizeVideoCompositionActionInput,
   waitForRenderJob,
 } from './video-composition-helpers.js';
 
@@ -1264,16 +1265,17 @@ export async function handleSingleAction(input: VideoCompositionAction) {
 }
 
 export async function handleAction(input: VideoCompositionAction) {
-  validateVideoCompositionAction(input);
-  if ((input as any).action === 'pipeline') {
+  const normalized = normalizeVideoCompositionActionInput(input) as VideoCompositionAction;
+  validateVideoCompositionAction(normalized);
+  if ((normalized as any).action === 'pipeline') {
     const results = [];
-    for (const step of (input as any).steps) {
+    for (const step of (normalized as any).steps) {
       validateVideoCompositionAction(step);
       results.push(await handleSingleAction(step));
     }
     return { status: 'succeeded', results };
   }
-  return handleSingleAction(input);
+  return handleSingleAction(normalized);
 }
 
 export async function dispatchVideoCompositionOperation(
