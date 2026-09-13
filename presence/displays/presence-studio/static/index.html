@@ -791,8 +791,8 @@
         <div class="capability-grid">
           <div class="capability-card">
             <div class="capability-title">📝 議事録</div>
-            <div class="capability-desc">口述やマイク録音から議事録とアクションアイテムを作ります。</div>
-            <button class="button" id="quick-action-minutes" type="button">議事録をつくる</button>
+            <div class="capability-desc">議事録は Meeting Notepad（ローカルパッド）へ移りました。起動手順を表示します。</div>
+            <button class="button" id="quick-action-minutes" type="button">起動手順を表示</button>
           </div>
           <div class="capability-card">
             <div class="capability-title">✉️ メール</div>
@@ -859,28 +859,41 @@
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
-        <section class="panel" id="minutes-record-panel">
-          <div class="label">会議を記録（マイク → 自動議事録）</div>
-          <div class="controls" style="margin-top: 8px;">
-            <input class="text-input" id="minutes-record-mission" type="text" placeholder="Mission ID (blank creates one; e.g. MSN-MTG-001)" />
-            <button class="button" id="minutes-record-start" type="button">🎙️ Record meeting</button>
-            <button class="button button-ghost" id="minutes-record-stop" type="button" disabled>⏹ Stop and make minutes</button>
+        <section class="panel" id="meeting-notepad-redirect-panel">
+          <div class="label">議事録は Meeting Notepad へ移動しました</div>
+          <p style="margin-top: 10px; line-height: 1.5;">
+            Presence Studio 内の議事録 UI は廃止されました。ローカルの Meeting Notepad を起動してください。
+          </p>
+          <pre style="margin-top: 12px; padding: 12px; overflow-x: auto; white-space: pre-wrap;">KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/meeting-notepad/server.ts</pre>
+          <p style="margin-top: 12px; line-height: 1.5;">
+            起動後、既定ポートを使う場合はブラウザで
+            <a href="http://127.0.0.1:8148/" rel="noopener noreferrer">http://127.0.0.1:8148/</a>
+            を開きます。
+          </p>
+          <div class="hint" id="meeting-notepad-redirect-hint" style="margin-top: 12px;">
+            Minutes moved to meeting-notepad. Launch the local pad, then open http://127.0.0.1:8148/
           </div>
-          <div id="minutes-live-transcript" class="artifact-view" style="margin-top: 12px; max-height: 180px; overflow-y: auto;" aria-live="polite">Live transcript appears here…</div>
-          <div class="hint" id="minutes-record-hint">Records microphone audio and creates minutes.md plus action items.</div>
         </section>
-        <section class="panel" id="minutes-panel">
-          <div class="label">Dictation notes</div>
-          <textarea id="dictation-notes" class="notes-area" spellcheck="false" placeholder="Dictated text appears here, or paste notes directly."></textarea>
-          <div class="controls" style="margin-top: 12px;">
-            <input class="text-input" id="minutes-title" type="text" placeholder="Meeting title (optional)" />
-            <button class="button" id="minutes-save" type="button">Create minutes</button>
-            <button class="button button-ghost" id="minutes-copy" type="button">Copy notes</button>
-            <button class="button button-ghost" id="minutes-restore" type="button">Restore draft</button>
-            <button class="button button-ghost" id="minutes-clear" type="button">Clear notes</button>
-          </div>
-          <div class="hint" id="minutes-hint">Create structured minutes from dictated or drafted notes.</div>
-        </section>
+        <div style="display:none" aria-hidden="true">
+          <section id="minutes-record-panel">
+            <div class="label">会議を記録（マイク → 自動議事録）</div>
+            <input id="minutes-record-mission" type="text" />
+            <button id="minutes-record-start" type="button">Record</button>
+            <button id="minutes-record-stop" type="button" disabled>Stop</button>
+            <div id="minutes-live-transcript"></div>
+            <div id="minutes-record-hint"></div>
+          </section>
+          <section id="minutes-panel">
+            <div class="label">Dictation notes</div>
+            <textarea id="dictation-notes"></textarea>
+            <input id="minutes-title" type="text" />
+            <button id="minutes-save" type="button">Create minutes</button>
+            <button id="minutes-copy" type="button">Copy notes</button>
+            <button id="minutes-restore" type="button">Restore draft</button>
+            <button id="minutes-clear" type="button">Clear notes</button>
+            <div id="minutes-hint"></div>
+          </section>
+        </div>
       </div>
       <div class="grid" style="margin-top: 18px;">
         <section class="panel" id="email-triage-panel">
@@ -1339,7 +1352,8 @@
       const quickActionEmailEl = document.getElementById("quick-action-email");
       const quickActionBrowserEl = document.getElementById("quick-action-browser");
       const voicePanelEl = document.getElementById("voice-panel");
-      const minutesPanelEl = document.getElementById("minutes-panel");
+      const meetingNotepadRedirectPanelEl = document.getElementById("meeting-notepad-redirect-panel");
+      const meetingNotepadRedirectHintEl = document.getElementById("meeting-notepad-redirect-hint");
       const emailPanelEl = document.getElementById("email-panel");
       const browserPanelEl = document.getElementById("browser-panel");
       const devPanelEl = document.getElementById("dev-panel");
@@ -3703,7 +3717,17 @@
           closeEmailSendConfirm(false);
         }
       });
-      quickActionMinutesEl?.addEventListener("click", () => focusSection(minutesPanelEl, minutesTitleEl));
+      quickActionMinutesEl?.addEventListener("click", () => {
+        focusSection(meetingNotepadRedirectPanelEl, null);
+        if (meetingNotepadRedirectHintEl) {
+          meetingNotepadRedirectHintEl.textContent =
+            "Run: KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/meeting-notepad/server.ts — then open http://127.0.0.1:8148/";
+        }
+        if (minutesHintEl) {
+          minutesHintEl.textContent =
+            "Minutes moved to meeting-notepad. Launch the local server on port 8148.";
+        }
+      });
       const minutesRecordMissionEl = document.getElementById("minutes-record-mission");
       const minutesRecordStartEl = document.getElementById("minutes-record-start");
       const minutesRecordStopEl = document.getElementById("minutes-record-stop");

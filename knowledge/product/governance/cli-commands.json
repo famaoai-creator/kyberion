@@ -1380,6 +1380,54 @@
       "audience": "operator"
     },
     {
+      "id": "script.meeting-notepad.server",
+      "module": "scripts/meeting-notepad/server.ts",
+      "command": "meeting-notepad server",
+      "noun": "meeting-notepad",
+      "verb": "server",
+      "audience": "operator"
+    },
+    {
+      "id": "script.memory-capture.server",
+      "module": "scripts/memory-capture/server.ts",
+      "command": "memory-capture server",
+      "noun": "memory-capture",
+      "verb": "server",
+      "audience": "operator"
+    },
+    {
+      "id": "script.screenshot-annotate.server",
+      "module": "scripts/screenshot-annotate/server.ts",
+      "command": "screenshot-annotate server",
+      "noun": "screenshot-annotate",
+      "verb": "server",
+      "audience": "operator"
+    },
+    {
+      "id": "script.clipboard-inbox.server",
+      "module": "scripts/clipboard-inbox/server.ts",
+      "command": "clipboard-inbox server",
+      "noun": "clipboard-inbox",
+      "verb": "server",
+      "audience": "operator"
+    },
+    {
+      "id": "script.daily-desk.server",
+      "module": "scripts/daily-desk/server.ts",
+      "command": "daily-desk server",
+      "noun": "daily-desk",
+      "verb": "server",
+      "audience": "operator"
+    },
+    {
+      "id": "script.doc-drop.server",
+      "module": "scripts/doc-drop/server.ts",
+      "command": "doc-drop server",
+      "noun": "doc-drop",
+      "verb": "server",
+      "audience": "operator"
+    },
+    {
       "id": "script.model.feedback",
       "module": "scripts/model_feedback.ts",
       "command": "model feedback",

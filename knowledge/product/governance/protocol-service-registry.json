@@ -114,6 +114,132 @@
       "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
     },
     {
+      "id": "meeting-notepad",
+      "classification": "artifact-review-port",
+      "process_scope": "tenant-service",
+      "request_scope_mode": "artifact-derived",
+      "health": "localhost-health",
+      "owner": "surface_runtime",
+      "binding": "artifact-ref-and-notepad-session",
+      "approval": "local-token-is-not-human-approval",
+      "principal_resolution": "viewer-principal-at-notepad-session",
+      "write_authority": "artifact-review-receipt-only",
+      "nhi_binding": "viewer-or-runtime-nhi",
+      "approval_classes": ["local-token-not-approval"],
+      "data_residency": "tenant-notepad-receipts-and-target-artifact",
+      "data_paths": [
+        "active/shared/observability/meeting-notepad/tenants/{tenant}/receipts/",
+        "active/shared/tmp/meeting-notepad/",
+        "<target-artifact>"
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
+    },
+    {
+      "id": "memory-capture",
+      "classification": "artifact-review-port",
+      "process_scope": "tenant-service",
+      "request_scope_mode": "artifact-derived",
+      "health": "localhost-health",
+      "owner": "surface_runtime",
+      "binding": "artifact-ref-and-pad-session",
+      "approval": "local-token-is-not-human-approval",
+      "principal_resolution": "viewer-principal-at-pad-session",
+      "write_authority": "artifact-review-receipt-only",
+      "nhi_binding": "viewer-or-runtime-nhi",
+      "approval_classes": ["local-token-not-approval"],
+      "data_residency": "tenant-pad-receipts-and-target-artifact",
+      "data_paths": [
+        "active/shared/observability/memory-capture/tenants/{tenant}/receipts/",
+        "active/shared/tmp/memory-capture/",
+        "<target-artifact>"
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
+    },
+    {
+      "id": "screenshot-annotate",
+      "classification": "artifact-review-port",
+      "process_scope": "tenant-service",
+      "request_scope_mode": "artifact-derived",
+      "health": "localhost-health",
+      "owner": "surface_runtime",
+      "binding": "artifact-ref-and-pad-session",
+      "approval": "local-token-is-not-human-approval",
+      "principal_resolution": "viewer-principal-at-pad-session",
+      "write_authority": "artifact-review-receipt-only",
+      "nhi_binding": "viewer-or-runtime-nhi",
+      "approval_classes": ["local-token-not-approval"],
+      "data_residency": "tenant-pad-receipts-and-target-artifact",
+      "data_paths": [
+        "active/shared/observability/screenshot-annotate/tenants/{tenant}/receipts/",
+        "active/shared/tmp/screenshot-annotate/",
+        "<target-artifact>"
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
+    },
+    {
+      "id": "clipboard-inbox",
+      "classification": "artifact-review-port",
+      "process_scope": "tenant-service",
+      "request_scope_mode": "artifact-derived",
+      "health": "localhost-health",
+      "owner": "surface_runtime",
+      "binding": "artifact-ref-and-pad-session",
+      "approval": "local-token-is-not-human-approval",
+      "principal_resolution": "viewer-principal-at-pad-session",
+      "write_authority": "artifact-review-receipt-only",
+      "nhi_binding": "viewer-or-runtime-nhi",
+      "approval_classes": ["local-token-not-approval"],
+      "data_residency": "tenant-pad-receipts-and-target-artifact",
+      "data_paths": [
+        "active/shared/observability/clipboard-inbox/tenants/{tenant}/receipts/",
+        "active/shared/tmp/clipboard-inbox/",
+        "<target-artifact>"
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
+    },
+    {
+      "id": "daily-desk",
+      "classification": "artifact-review-port",
+      "process_scope": "tenant-service",
+      "request_scope_mode": "artifact-derived",
+      "health": "localhost-health",
+      "owner": "surface_runtime",
+      "binding": "artifact-ref-and-pad-session",
+      "approval": "local-token-is-not-human-approval",
+      "principal_resolution": "viewer-principal-at-pad-session",
+      "write_authority": "artifact-review-receipt-only",
+      "nhi_binding": "viewer-or-runtime-nhi",
+      "approval_classes": ["local-token-not-approval"],
+      "data_residency": "tenant-pad-receipts-and-target-artifact",
+      "data_paths": [
+        "active/shared/observability/daily-desk/tenants/{tenant}/receipts/",
+        "active/shared/tmp/daily-desk/",
+        "<target-artifact>"
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
+    },
+    {
+      "id": "doc-drop",
+      "classification": "artifact-review-port",
+      "process_scope": "tenant-service",
+      "request_scope_mode": "artifact-derived",
+      "health": "localhost-health",
+      "owner": "surface_runtime",
+      "binding": "artifact-ref-and-pad-session",
+      "approval": "local-token-is-not-human-approval",
+      "principal_resolution": "viewer-principal-at-pad-session",
+      "write_authority": "artifact-review-receipt-only",
+      "nhi_binding": "viewer-or-runtime-nhi",
+      "approval_classes": ["local-token-not-approval"],
+      "data_residency": "tenant-pad-receipts-and-target-artifact",
+      "data_paths": [
+        "active/shared/observability/doc-drop/tenants/{tenant}/receipts/",
+        "active/shared/tmp/doc-drop/",
+        "<target-artifact>"
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
+    },
+    {
       "id": "generation-scheduler",
       "classification": "control-plane-worker",
       "process_scope": "system",
