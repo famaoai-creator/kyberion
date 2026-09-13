@@ -6,6 +6,7 @@ import {
   PERSONAL_WORKBENCH_DEFAULT_PORT,
   validatePersonalWorkbenchContentLength,
 } from './server.js';
+import { executePersonalWorkbenchAction } from './actions.js';
 
 describe('personal workbench', () => {
   it('validates configuration in public dry-run mode', async () => {
@@ -32,5 +33,34 @@ describe('personal workbench', () => {
     expect(source).toContain("req.headers['x-pw-token']");
     expect(source).toContain('requires_human_approval: true');
     expect(source).not.toContain('node:fs');
+  });
+
+  it('keeps external personal actions behind explicit approval', async () => {
+    const context = {
+      session_id: 'pwb-test',
+      artifact_ref: 'active/shared/tmp/personal-workbench',
+      viewer_principal: 'personal-test',
+      scope: { scope_kind: 'tenant' as const, tier: 'personal' as const, tenant_slug: 'test' },
+    };
+    await expect(
+      executePersonalWorkbenchAction({
+        action: 'email',
+        payload: { to: 'person@example.com', body_markdown: 'hello' },
+        context,
+        evidenceRef: 'active/shared/tmp/personal-workbench/handoff.json',
+      })
+    ).rejects.toThrow('email sending requires explicit human approval');
+    await expect(
+      executePersonalWorkbenchAction({
+        action: 'calendar',
+        payload: {
+          summary: 'Call',
+          start: '2026-09-14T10:00:00+09:00',
+          end: '2026-09-14T10:30:00+09:00',
+        },
+        context,
+        evidenceRef: 'active/shared/tmp/personal-workbench/handoff.json',
+      })
+    ).rejects.toThrow('calendar changes requires explicit human approval');
   });
 });
