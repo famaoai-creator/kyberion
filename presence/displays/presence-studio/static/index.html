@@ -751,8 +751,13 @@
     <!-- Kyberion Design System (DS-01 canonical tokens) -->
     <link rel="stylesheet" href="./design-system.css" />
     <link rel="stylesheet" href="/api/design-tokens.css" />
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <link rel="stylesheet" href="/front-desk-rail.css" />
   </head>
   <body>
+    <div class="fd-layout">
+      <nav id="front-desk-rail" class="front-desk-rail"></nav>
+      <div class="fd-content">
     <div class="shell">
       <div class="header">
         <div>
@@ -1093,6 +1098,15 @@
         </div>
       </details>
     </div>
+      </div>
+    </div>
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script src="/front-desk-rail.js"></script>
+    <script>
+      if (window.FrontDeskRail) {
+        window.FrontDeskRail.mount(document.getElementById("front-desk-rail"), { current: "home" });
+      }
+    </script>
     <script>
       const titleEl = document.getElementById("title");
       const updatedEl = document.getElementById("updated");

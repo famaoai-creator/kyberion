@@ -355,6 +355,14 @@
       "types": "./dist/frontmatter-exclusions.d.ts",
       "default": "./dist/frontmatter-exclusions.js"
     },
+    "./front-desk-nav": {
+      "types": "./dist/front-desk-nav.d.ts",
+      "default": "./dist/front-desk-nav.js"
+    },
+    "./front-desk-identity": {
+      "types": "./dist/front-desk-identity.d.ts",
+      "default": "./dist/front-desk-identity.js"
+    },
     "./knowledge-taxonomy": {
       "types": "./dist/knowledge-taxonomy.d.ts",
       "default": "./dist/knowledge-taxonomy.js"
