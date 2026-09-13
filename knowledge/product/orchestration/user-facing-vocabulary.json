@@ -11110,6 +11110,91 @@
         "en": "Let's set things up in order. You can come back to any section later.",
         "ja": "順番に整えていきましょう。あとからどの項目にも戻れます。",
         "qps-ploc": "⟦Ŀėŧ'ş şėŧ ŧħïñɠş ůṗ ïñ őřḓėř. Ẏőů ƈȧñ ƈőɱė ƀȧƈķ ŧő ȧñẏ şėƈŧïőñ ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "ask_placeholder_followup": {
+        "en": "Keep talking, or type here",
+        "ja": "続けて話しかけるか、ここに書いてください",
+        "qps-ploc": "⟦Ķėėṗ ŧȧŀķïñɠ, őř ŧẏṗė ħėřė ŀőřėɱ ïṗ⟧"
+      },
+      "ask_about_title": {
+        "en": "About this request",
+        "ja": "この依頼について",
+        "qps-ploc": "⟦Ȧƀőůŧ ŧħïş řėɋůėşŧ ŀőřėɱ⟧"
+      },
+      "ask_understood": {
+        "en": "What I understood",
+        "ja": "理解したこと",
+        "qps-ploc": "⟦Ẇħȧŧ Ï ůñḓėřşŧőőḓ ŀőřėɱ⟧"
+      },
+      "ask_state": {
+        "en": "Current state",
+        "ja": "いまの状態",
+        "qps-ploc": "⟦Ƈůřřėñŧ şŧȧŧė ŀőřė⟧"
+      },
+      "ask_decision_point": {
+        "en": "Where your decision is needed",
+        "ja": "あなたの判断が必要になる点",
+        "qps-ploc": "⟦Ẇħėřė ẏőůř ḓėƈïşïőñ ïş ñėėḓėḓ ŀőřėɱ ïṗş⟧"
+      },
+      "ask_deliverable": {
+        "en": "What you will get",
+        "ja": "できあがるもの",
+        "qps-ploc": "⟦Ẇħȧŧ ẏőů ẇïŀŀ ɠėŧ ŀőřėɱ⟧"
+      },
+      "ask_recent": {
+        "en": "Recent requests",
+        "ja": "最近の依頼",
+        "qps-ploc": "⟦Řėƈėñŧ řėɋůėşŧş ŀőřė⟧"
+      },
+      "ask_handsfree_on": {
+        "en": "Hands-free: on",
+        "ja": "ハンズフリー：オン",
+        "qps-ploc": "⟦Ħȧñḓş-ƒřėė: őñ ŀőřė⟧"
+      },
+      "ask_handsfree_off": {
+        "en": "Hands-free: off",
+        "ja": "ハンズフリー：オフ",
+        "qps-ploc": "⟦Ħȧñḓş-ƒřėė: őƒƒ ŀőřė⟧"
+      },
+      "ask_listening": {
+        "en": "Listening…",
+        "ja": "聞いています…",
+        "qps-ploc": "⟦Ŀïşŧėñïñɠ… ŀőř⟧"
+      },
+      "ask_thinking": {
+        "en": "Thinking…",
+        "ja": "考えています…",
+        "qps-ploc": "⟦Ŧħïñķïñɠ… ŀőř⟧"
+      },
+      "ask_proceed": {
+        "en": "Go ahead",
+        "ja": "進める",
+        "qps-ploc": "⟦Ɠő ȧħėȧḓ ŀőř⟧"
+      },
+      "ask_more_detail": {
+        "en": "Tell me more",
+        "ja": "もう少し詳しく",
+        "qps-ploc": "⟦Ŧėŀŀ ɱė ɱőřė ŀőř⟧"
+      },
+      "ask_empty": {
+        "en": "Say something, or start from a chip below.",
+        "ja": "ここに話しかけるか、下のチップから始めてください。",
+        "qps-ploc": "⟦Şȧẏ şőɱėŧħïñɠ, őř şŧȧřŧ ƒřőɱ ȧ ƈħïṗ ƀėŀőẇ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ask_today": {
+        "en": "Today",
+        "ja": "今日",
+        "qps-ploc": "⟦Ŧőḓȧẏ ŀőř⟧"
+      },
+      "ask_voice_settings": {
+        "en": "Voice settings",
+        "ja": "声の設定",
+        "qps-ploc": "⟦Ṽőïƈė şėŧŧïñɠş ŀőřė⟧"
+      },
+      "ask_send_failed": {
+        "en": "I could not send that. Please try again.",
+        "ja": "送れませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ï ƈőůŀḓ ñőŧ şėñḓ ŧħȧŧ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
       }
     }
   }
