@@ -442,6 +442,35 @@ describe('mission existing work reconciliation', () => {
     safeRmSync(manifestPath);
   });
 
+  it('falls back to a mission task board when direct model work has no WorkItems yet', () => {
+    prepareMission([]);
+    safeWriteFile(
+      nodePath.join(missionPath, 'NEXT_TASKS.json'),
+      JSON.stringify(
+        [
+          {
+            task_id: 'model-authored-task',
+            status: 'planned',
+            description: 'Adopt the completed model-authored work.',
+            acceptance_criteria: ['The completed work is reconciled with evidence.'],
+            dependencies: [],
+          },
+        ],
+        null,
+        2
+      )
+    );
+
+    const scaffold = generateMissionWorkReconciliationScaffold({
+      missionId,
+      outputPath: manifestPath,
+      reason: 'Recover the direct model task from the compatibility task board.',
+    });
+
+    expect(scaffold.tasks.map((task) => task.task_id)).toEqual(['model-authored-task']);
+    safeRmSync(manifestPath);
+  });
+
   it('rejects a projection-only task when no canonical WorkItem exists', async () => {
     prepareMission();
     const manifest = buildManifest({
