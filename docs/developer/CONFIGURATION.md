@@ -51,7 +51,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_TOKEN`                 | string | no       | Bearer token used to authenticate the terminal bridge.                                                                                                                 |
 | `KYBERION_VLLM_KEY`                       | string | no       | API key for the vLLM OpenAI-compatible backend, when authentication is enabled.                                                                                        |
 
-## path (89)
+## path (90)
 
 | Variable                                                         | Type | Required | Description                                                                                                                                                                         |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -116,6 +116,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_PYTHON_BIN`                                            | path | no       | Python interpreter path override (legacy alias of KYBERION_PYTHON call sites).                                                                                                      |
 | `KYBERION_ROOT`                                                  | path | no       | Repository root override for path resolution (defaults to the detected repo root).                                                                                                  |
 | `KYBERION_SCOPE_ENV_PATH`                                        | path | no       | Override for the persisted operator scope binding file (default active/shared/runtime/scope.env).                                                                                   |
+| `KYBERION_SCREENSHOT_PATH`                                       | path | no       | Optional path override for screenshot path; keep it inside governed repository or runtime storage.                                                                                  |
 | `KYBERION_SECURITY_QUARANTINE_DIR`                               | path | no       | Optional path override for security quarantine dir; keep it inside governed repository or runtime storage.                                                                          |
 | `KYBERION_SERVICE_ENDPOINTS_DIR`                                 | path | no       | Optional path override for service endpoints dir; keep it inside governed repository or runtime storage.                                                                            |
 | `KYBERION_SERVICE_ENDPOINTS_PATH`                                | path | no       | Optional path override for service endpoints path; keep it inside governed repository or runtime storage.                                                                           |
