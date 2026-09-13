@@ -9,6 +9,21 @@ import {
 } from '@agent/core/secure-io';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resetCurrentScope } from '@agent/core/scope-context';
+import type { ComputerInteractionAction } from './browser-interaction-helpers.js';
+
+function computerInteraction(
+  sessionId: string,
+  action: ComputerInteractionAction['action'],
+  observation?: ComputerInteractionAction['observation']
+): ComputerInteractionAction {
+  return {
+    version: '0.1',
+    kind: 'computer_interaction',
+    session_id: sessionId,
+    action,
+    ...(observation ? { observation } : {}),
+  };
+}
 
 const REPO_ROOT = process.cwd();
 
@@ -442,20 +457,18 @@ describe('browser-actuator v3 contract', () => {
   it('accepts computer_interaction snapshot requests and enriches them with observation outputs', async () => {
     const { handleAction } = await import('./index');
 
-    const result = await handleAction({
-      version: '0.1',
-      kind: 'computer_interaction',
-      session_id: 'computer-session',
-      observation: {
-        mode: 'mixed',
-        include_screenshot: true,
-        include_console: true,
-        include_network: true,
-      },
-      action: {
-        type: 'snapshot',
-      },
-    } as any);
+    const result = await handleAction(
+      computerInteraction(
+        'computer-session',
+        { type: 'snapshot' },
+        {
+          mode: 'mixed',
+          include_screenshot: true,
+          include_console: true,
+          include_network: true,
+        }
+      )
+    );
 
     expect(result.status).toBe('succeeded');
     expect(result.context.last_snapshot).toMatchObject({
@@ -471,24 +484,13 @@ describe('browser-actuator v3 contract', () => {
     const { handleAction } = await import('./index');
     const sessionId = 'computer-session-ref';
 
-    const observed = await handleAction({
-      version: '0.1',
-      kind: 'computer_interaction',
-      session_id: sessionId,
-      action: { type: 'snapshot' },
-    } as any);
+    const observed = await handleAction(computerInteraction(sessionId, { type: 'snapshot' }));
     expect(observed.status).toBe('succeeded');
     expect(observed.context.ref_map).toMatchObject({ '@e1': 'button:nth-of-type(1)' });
 
-    const result = await handleAction({
-      version: '0.1',
-      kind: 'computer_interaction',
-      session_id: sessionId,
-      action: {
-        type: 'click_ref',
-        ref: '@e1',
-      },
-    } as any);
+    const result = await handleAction(
+      computerInteraction(sessionId, { type: 'click_ref', ref: '@e1' })
+    );
 
     expect(result.status).toBe('succeeded');
     expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
@@ -498,12 +500,7 @@ describe('browser-actuator v3 contract', () => {
     const { handleAction } = await import('./index');
     const sessionId = 'computer-session-remint';
 
-    await handleAction({
-      version: '0.1',
-      kind: 'computer_interaction',
-      session_id: sessionId,
-      action: { type: 'snapshot' },
-    } as any);
+    await handleAction(computerInteraction(sessionId, { type: 'snapshot' }));
     expect(mocks.page.click).not.toHaveBeenCalled();
 
     const originalEvaluate = mocks.page.evaluate.getMockImplementation();
@@ -530,12 +527,9 @@ describe('browser-actuator v3 contract', () => {
         return originalEvaluate?.(arg);
       });
 
-      const result = await handleAction({
-        version: '0.1',
-        kind: 'computer_interaction',
-        session_id: sessionId,
-        action: { type: 'click_ref', ref: '@e1' },
-      } as any);
+      const result = await handleAction(
+        computerInteraction(sessionId, { type: 'click_ref', ref: '@e1' })
+      );
 
       expect(result.status).toBe('succeeded');
       expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
@@ -550,17 +544,14 @@ describe('browser-actuator v3 contract', () => {
   it('replays a computer_interaction click via durable selector without a prior snapshot', async () => {
     const { handleAction } = await import('./index');
 
-    const result = await handleAction({
-      version: '0.1',
-      kind: 'computer_interaction',
-      session_id: 'fresh-durable-click',
-      action: {
+    const result = await handleAction(
+      computerInteraction('fresh-durable-click', {
         type: 'click_ref',
         ref: '@e1',
         selector: 'a[href="https://www.iana.org/domains/example"]',
         name: 'Learn more',
-      },
-    } as any);
+      })
+    );
 
     expect(result.status).toBe('succeeded');
     expect(mocks.page.click).toHaveBeenCalledWith(
@@ -573,12 +564,13 @@ describe('browser-actuator v3 contract', () => {
   it('fails closed when computer_interaction fill_secret_ref has only an ephemeral @eN', async () => {
     const { handleAction } = await import('./index');
     await expect(
-      handleAction({
-        version: '0.1',
-        kind: 'computer_interaction',
-        session_id: 'secret-ref-only',
-        action: { type: 'fill_secret_ref', ref: '@e1', secret_ref: 'GITHUB_TOKEN' },
-      } as any)
+      handleAction(
+        computerInteraction('secret-ref-only', {
+          type: 'fill_secret_ref',
+          ref: '@e1',
+          secret_ref: 'GITHUB_TOKEN',
+        })
+      )
     ).rejects.toThrow(/refusing snapshot\+@eN stand-in/);
     expect(mocks.page.fill).not.toHaveBeenCalled();
   });
@@ -588,27 +580,19 @@ describe('browser-actuator v3 contract', () => {
     vi.stubEnv('GITHUB_TOKEN', 'test-secret-value');
     const sessionId = 'computer-session-secret';
     try {
-      const observed = await handleAction({
-        version: '0.1',
-        kind: 'computer_interaction',
-        session_id: sessionId,
-        action: { type: 'snapshot' },
-      } as any);
+      const observed = await handleAction(computerInteraction(sessionId, { type: 'snapshot' }));
       expect(observed.context.ref_map).toMatchObject({ '@e1': 'button:nth-of-type(1)' });
 
-      const result = await handleAction({
-        version: '0.1',
-        kind: 'computer_interaction',
-        session_id: sessionId,
-        action: {
+      const result = await handleAction(
+        computerInteraction(sessionId, {
           type: 'fill_secret_ref',
           ref: '@e1',
           secret_ref: 'GITHUB_TOKEN',
           selector: 'button:nth-of-type(1)',
           name: 'Submit',
           role: 'button',
-        },
-      } as any);
+        })
+      );
 
       expect(result.status).toBe('succeeded');
       expect(mocks.page.fill).toHaveBeenCalledWith('button:nth-of-type(1)', 'test-secret-value', {

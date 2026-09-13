@@ -69,7 +69,7 @@ interface BrowserAction {
   context?: Record<string, any>;
 }
 
-interface ComputerInteractionAction {
+export interface ComputerInteractionAction {
   version: '0.1';
   kind: 'computer_interaction';
   session_id?: string;
