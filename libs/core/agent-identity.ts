@@ -61,44 +61,34 @@ import {
   runInRestoreMode,
   type JournalEventEnvelope,
 } from './worker-state-journal.js';
+import {
+  NHI_SLUG_PATTERN,
+  NHI_ID_PREFIX,
+  NHI_ID_PATTERN,
+  AgentIdentityFormatError,
+  buildNhiId,
+  parseNhiId,
+} from './nhi-id.js';
 
 // ---------------------------------------------------------------------------
 // NHI id: kyberion://agent/<org>/<slug> (SPIFFE-shaped URI; NI-05 maps it out)
+//
+// The grammar itself lives in `nhi-id.ts` (a dependency-free leaf module) —
+// re-exported here for backward compatibility with every existing
+// `agent-identity.js` importer. `actor.ts` imports `parseNhiId` from
+// `nhi-id.ts` directly instead of from here, so that validating an actor ref
+// never pulls in this module's authority/organization-profile/secure-io
+// chain (see `nhi-id.ts`'s docstring for why that matters).
 // ---------------------------------------------------------------------------
 
-/** Same grammar as agent-manifest `agentId` validation (`agent-manifest.ts`). */
-export const NHI_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
-
-export const NHI_ID_PREFIX = 'kyberion://agent/';
-
-export const NHI_ID_PATTERN = /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/;
-
-export class AgentIdentityFormatError extends Error {
-  constructor(message: string) {
-    super(`[agent-identity] ${message}`);
-    this.name = 'AgentIdentityFormatError';
-  }
-}
-
-/** Build a canonical nhi_id. Throws {@link AgentIdentityFormatError} on invalid org/slug. */
-export function buildNhiId(organizationId: string, slug: string): string {
-  if (!NHI_SLUG_PATTERN.test(organizationId)) {
-    throw new AgentIdentityFormatError(
-      `invalid organization id "${organizationId}" (must match ${NHI_SLUG_PATTERN})`
-    );
-  }
-  if (!NHI_SLUG_PATTERN.test(slug)) {
-    throw new AgentIdentityFormatError(`invalid slug "${slug}" (must match ${NHI_SLUG_PATTERN})`);
-  }
-  return `${NHI_ID_PREFIX}${organizationId}/${slug}`;
-}
-
-/** Parse a canonical nhi_id back into org + slug; `null` when not a valid nhi_id. */
-export function parseNhiId(nhiId: string): { organization_id: string; slug: string } | null {
-  if (!NHI_ID_PATTERN.test(nhiId)) return null;
-  const [organizationId, slug] = nhiId.slice(NHI_ID_PREFIX.length).split('/');
-  return { organization_id: organizationId, slug };
-}
+export {
+  NHI_SLUG_PATTERN,
+  NHI_ID_PREFIX,
+  NHI_ID_PATTERN,
+  AgentIdentityFormatError,
+  buildNhiId,
+  parseNhiId,
+};
 
 /** Active organization id: explicit > organization profile > 'default'. */
 export function resolveAgentIdentityOrganizationId(organizationId?: string | null): string {

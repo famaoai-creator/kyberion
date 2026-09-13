@@ -18,7 +18,7 @@ import {
 } from '@agent/core/visual-raster';
 import { runVisualReviewLoop } from '@agent/core/visual-review-loop';
 import { loadVisualReviewRubric, formatVisualReviewReport } from '@agent/core/visual-review';
-import { evaluateArtifactVerification } from '@agent/core/artifact-verification.js';
+import { evaluateArtifactVerification } from '@agent/core/artifact-verification';
 import {
   lockMediaBrief,
   inferredDecisions,
