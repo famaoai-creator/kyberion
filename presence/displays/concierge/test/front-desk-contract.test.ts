@@ -214,6 +214,49 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(palette).toContain("href: '/settings'");
   });
 
+  it('FD-10: re-ports 声と話し方 voice selection, the accountable-agents list, and training assignment into their split section files', () => {
+    const settings = read('src/app/settings/page.tsx');
+    const voiceSection = read('src/app/settings/sections/VoiceSection.tsx');
+    const membersSection = read('src/app/settings/sections/MembersSection.tsx');
+    const useVoiceSelection = read('src/lib/use-voice-selection.ts');
+    const useTrainingAssignments = read('src/lib/use-training-assignments.ts');
+    const voiceSelectionRoute = read('src/app/api/voice/selection/route.ts');
+    const trainingCatalogRoute = read('src/app/api/training/catalog/route.ts');
+    const trainingAssignmentsRoute = read('src/app/api/training/assignments/route.ts');
+
+    // 声と話し方: TTS engine / STT backend / input device selection lives in
+    // VoiceSection.tsx; the fetch/save calls live in the use-voice-selection
+    // hook the page wires in.
+    expect(voiceSection).toContain('voiceSelection');
+    expect(voiceSection).toContain("t('dock.voice.backend')");
+    expect(voiceSection).toContain("t('dock.voice.auto')");
+    expect(useVoiceSelection).toContain("fetch('/api/voice/selection'");
+    expect(useVoiceSelection).toContain("method: 'POST'");
+    expect(settings).toContain('useVoiceSelection');
+    expect(voiceSelectionRoute).toContain('requireConciergeMutationAccess');
+
+    // 組織とメンバー: accountable agents render by display name + accountable
+    // member only — the raw nhi_id must never reach the rendered copy (plan
+    // §2.5 principle 6). `agent.nhi_id` is still used as the React `key`
+    // prop (never rendered as visible text), so only the JSX-text form
+    // (`>{agent.nhi_id}<`) is asserted absent.
+    expect(membersSection).toContain('durable_identities');
+    expect(membersSection).toContain('agent.display_name');
+    expect(membersSection).not.toMatch(/>\s*\{agent\.nhi_id\}\s*</);
+
+    // HT-05 training-track assignment: tracks come from the governed
+    // catalog (never hardcoded track titles), assignment posts to
+    // /api/training/assignments, and only an owner may assign (server-side).
+    expect(membersSection).toContain('trainingTracks');
+    expect(membersSection).toContain('onAssignTraining');
+    expect(useTrainingAssignments).toContain("fetch('/api/training/catalog'");
+    expect(useTrainingAssignments).toContain("fetch('/api/training/assignments'");
+    expect(useTrainingAssignments).toContain("method: 'POST'");
+    expect(trainingCatalogRoute).toContain('resolveConciergeViewer');
+    expect(trainingAssignmentsRoute).toContain('requireConciergeMutationAccess');
+    expect(trainingAssignmentsRoute).toContain("!== 'owner'");
+  });
+
   it('FD-06: resolves the 管制塔 (chronos-mirror-v2) link server-side, guarded like every other read route', () => {
     const route = read('src/app/api/front-desk/links/route.ts');
     expect(route).toContain('resolveConciergeViewer');

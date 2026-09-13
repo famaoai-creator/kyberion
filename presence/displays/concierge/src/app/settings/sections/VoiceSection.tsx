@@ -3,7 +3,8 @@
 import * as React from 'react';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale, ConciergeMessageKey } from '../../../lib/i18n';
-import type { Setup } from '../../../lib/settings-types';
+import type { Setup, VoiceSelection } from '../../../lib/settings-types';
+import type { VoiceInputDevice } from '../../../lib/voice-types';
 
 /** FD-06 写真・音声 pane (`#setup-media`) — camera capture + voice sample
  * recording. Extracted from settings/page.tsx; the camera/recorder refs and
@@ -31,6 +32,12 @@ export type VoiceSectionProps = {
   onStopVoiceRecording: () => void;
   onVoiceSampleFileChange: (file: File) => void;
   onSaveVoice: () => void;
+  /** 声と話し方: TTS engine / STT backend / input device (HT plan §2.3). Null
+   * while /api/voice/selection is still loading or voice-hub is down. */
+  voiceSelection: VoiceSelection | null;
+  voiceDevices: VoiceInputDevice[];
+  voiceSelectionBusy: boolean;
+  onSaveVoiceSelection: (field: 'tts_engine_id' | 'stt_backend', value: string) => void;
   sectionRef: (element: HTMLElement | null) => void;
 };
 
@@ -54,6 +61,10 @@ export function VoiceSection({
   onStopVoiceRecording,
   onVoiceSampleFileChange,
   onSaveVoice,
+  voiceSelection,
+  voiceDevices,
+  voiceSelectionBusy,
+  onSaveVoiceSelection,
   sectionRef,
 }: VoiceSectionProps) {
   return (
@@ -173,6 +184,54 @@ export function VoiceSection({
             {t('setup.save_voice')}
           </button>
         </div>
+      </div>
+      <div className="item-card" id="voice-runtime-settings">
+        <p className="item-title">{t('setup.agent_display_name')}</p>
+        <p className="item-meta">{t('setup.media_description')}</p>
+        {voiceSelection ? (
+          <div className="field-column">
+            <label className="field-label">
+              {t('dock.voice.backend')}
+              <select
+                value={voiceSelection.preferences.stt_backend}
+                disabled={voiceSelectionBusy}
+                onChange={(event) => onSaveVoiceSelection('stt_backend', event.target.value)}
+              >
+                <option value="auto">{t('dock.voice.auto')}</option>
+                {voiceSelection.stt.candidates.map((candidate) => (
+                  <option
+                    key={candidate.backend}
+                    value={candidate.backend}
+                    disabled={!candidate.selectable}
+                  >
+                    {candidate.display_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field-label">
+              {t('setup.voice_profile')}
+              <select
+                value={voiceSelection.preferences.tts_engine_id}
+                disabled={voiceSelectionBusy}
+                onChange={(event) => onSaveVoiceSelection('tts_engine_id', event.target.value)}
+              >
+                {voiceSelection.tts.candidates.map((candidate) => (
+                  <option
+                    key={candidate.engine_id}
+                    value={candidate.engine_id}
+                    disabled={!candidate.selectable}
+                  >
+                    {candidate.display_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {voiceDevices.length > 0 ? <p className="item-meta">{voiceDevices[0].name}</p> : null}
+          </div>
+        ) : (
+          <p className="item-meta">{t('setup.loading')}</p>
+        )}
       </div>
     </section>
   );
