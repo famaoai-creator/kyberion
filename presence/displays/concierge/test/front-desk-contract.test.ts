@@ -68,6 +68,72 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(me).not.toContain('tenantSlugs: ');
   });
 
+  it('FD-04: `/` renders the 決める queue from front_desk decide_* vocabulary, defers client-side only, and never blocks on window dialogs', () => {
+    const page = read('src/app/page.tsx');
+    const decideView = read('src/lib/decide-view.ts');
+
+    // Header row: h1 = nav_decide, lead paragraph = decide_lead, filter chips
+    // built from decide_filter_all + presentKinds (plan §2.1/FD-04).
+    expect(page).toContain("frontDeskText('nav_decide', locale)");
+    expect(page).toContain("frontDeskText('decide_lead', locale)");
+    expect(page).toContain("frontDeskText('decide_filter_all', locale)");
+    expect(page).toContain('presentKinds(countsByKind)');
+    expect(page).toContain('groupDecideQueue(');
+    expect(page).toContain('deriveCardFields(');
+
+    // Per-kind action labels are the front_desk:decide_* keys via
+    // frontDeskText, not hardcoded strings or the old home.* pane labels.
+    expect(page).toContain("frontDeskText('decide_approve', locale)");
+    expect(page).toContain("frontDeskText('decide_reject', locale)");
+    expect(page).toContain("frontDeskText('decide_continue', locale)");
+    expect(page).toContain("frontDeskText('decide_stop', locale)");
+    expect(page).toContain("frontDeskText('decide_remember', locale)");
+    expect(page).toContain("frontDeskText('decide_forget', locale)");
+    expect(page).toContain("frontDeskText('decide_receive', locale)");
+    expect(page).toContain("frontDeskText('decide_return', locale)");
+    expect(page).toContain("frontDeskText('decide_later', locale)");
+    expect(page).toContain("frontDeskText('decide_empty', locale)");
+    expect(page).toContain("frontDeskText('decide_deferred', locale");
+    expect(page).toContain("frontDeskText('decide_undefer', locale)");
+    expect(page).toContain("frontDeskText('decide_by', locale");
+
+    // decide_by ("決める人") comes from the shared identity contract, not a
+    // hardcoded name — same shape as front-desk-rail.tsx's /api/me fetch.
+    expect(page).toContain('fetch(`/api/me');
+    expect(page).toContain('fetch(`/api/front-desk/nav');
+    expect(page).toContain('role_labels');
+
+    // decide_later is client-side only: the handlers that move an id into
+    // `deferredIds` never call fetch(), and the deferred section persists to
+    // localStorage rather than the server.
+    const deferItemBody = page.slice(
+      page.indexOf('const deferItem = React.useCallback'),
+      page.indexOf('const undeferItem = React.useCallback')
+    );
+    const undeferItemBody = page.slice(
+      page.indexOf('const undeferItem = React.useCallback'),
+      page.indexOf('const [kindFilter,')
+    );
+    expect(deferItemBody).not.toContain('fetch(');
+    expect(undeferItemBody).not.toContain('fetch(');
+    expect(page).toContain('front-desk.deferred');
+    expect(page).not.toContain('window.prompt');
+    expect(page).not.toContain('window.confirm');
+
+    // Mission ids never reach the human-facing card copy (ceo-ux.md §6).
+    expect(page).not.toMatch(/\bmission_id\}\s*·/);
+
+    // The pure grouping/field-mapping helper never imports I/O or calls
+    // `t()`/`frontDeskText()` itself — only a type-only import of the
+    // vocabulary key union, so the caller owns every translation.
+    expect(decideView).not.toMatch(/from ['"]node:fs['"]/);
+    expect(decideView).not.toContain('frontDeskText(');
+    expect(decideView).not.toMatch(/[^\w.]t\(['"]/);
+    expect(decideView).toContain("import type { FrontDeskMessageKey } from './i18n'");
+    expect(decideView).toContain('export function groupDecideQueue');
+    expect(decideView).toContain('export function deriveCardFields');
+  });
+
   it('redirects the interim /settings route to /setup', () => {
     const settings = read('src/app/settings/page.tsx');
     expect(settings).toContain("redirect('/setup')");
