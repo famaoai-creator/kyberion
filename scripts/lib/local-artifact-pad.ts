@@ -115,6 +115,12 @@ export function validateLocalPadContentLength(
   return bytes;
 }
 
+/** Reject non-localhost Origin headers (same policy as sketch / meeting pads). */
+export function isLocalPadOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true;
+  return /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(origin);
+}
+
 export function option(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
   return index >= 0 ? args[index + 1] : undefined;

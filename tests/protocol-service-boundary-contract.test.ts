@@ -21,6 +21,7 @@ describe('protocol service boundary registry', () => {
     expect(entries.get('clipboard-inbox')?.classification).toBe('artifact-review-port');
     expect(entries.get('daily-desk')?.classification).toBe('artifact-review-port');
     expect(entries.get('doc-drop')?.classification).toBe('artifact-review-port');
+    expect(entries.get('personal-workbench')?.classification).toBe('artifact-review-port');
     for (const entry of entries.values()) {
       expect(entry.process_scope).toBeTruthy();
       expect(entry.request_scope_mode).toBeTruthy();

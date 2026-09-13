@@ -37,6 +37,24 @@ Computer Surface の `/api/identity`・`/api/state`・`/api/stream`・`/api/os/c
 
 **未実装シーム / deferred product (P2-4 docs-only):** `zoom-sdk` と `recall-ai` はドライバレジストリの名前だけ。実装しない。日常は browser-playwright。シームを埋めるな。
 
+## ローカル pad(127.0.0.1 限定・取り込み専用)
+
+手元にあるもの(図・会議メモ・スクリーンショット・ファイル・クリップボード・今日の TODO)を取り込み、session フォルダ + `handoff.json` を書き出して Kyberion に渡す小さなローカルページ群。外部リソース読込ゼロ、ファイル I/O は `secure-io` 経由、mission の自動起動や送信は行わない。スクリーンショット付きの一覧は [README の Local Pads](../README.md#local-pads--capture-at-your-desk-hand-off-to-kyberion)、索引は [`scripts/personal-pads/README.md`](../scripts/personal-pads/README.md)。
+
+| pad                                                    | port | 取り込むもの → 出力                                                                                      |
+| ------------------------------------------------------ | ---: | -------------------------------------------------------------------------------------------------------- |
+| [report-review](../scripts/report-review/)             | 8137 | 任意の自己完結 HTML レポート → 編集・コメント・音声入力・直書き保存                                      |
+| [sketch-input](../scripts/sketch-input/)               | 8147 | 描画ボード → PNG + handoff                                                                               |
+| [meeting-notepad](../scripts/meeting-notepad/)         | 8148 | メモ・口述・録音・添付 → 議事録 + handoff                                                                |
+| [memory-capture](../scripts/memory-capture/)           | 8149 | ブレインダンプ・タグ → 作業記憶 handoff                                                                  |
+| [screenshot-annotate](../scripts/screenshot-annotate/) | 8150 | 画像の貼り付け/ドロップ + 注釈 → PNG + handoff(vision 向け)                                              |
+| [clipboard-inbox](../scripts/clipboard-inbox/)         | 8151 | クリップボード断片 → inbox handoff                                                                       |
+| [daily-desk](../scripts/daily-desk/)                   | 8152 | Journal / TODO / NOW → daily-desk handoff                                                                |
+| [doc-drop](../scripts/doc-drop/)                       | 8153 | pdf / 画像 / txt / md / docx のドロップ → ingest handoff                                                 |
+| [personal-workbench](../scripts/personal-workbench/)   | 8154 | Link / Task / Follow-up / Decision / Expense / Daily Review の提案 inbox(governed OCR・メール下書きのみ) |
+
+起動は共通: `KYBERION_PERSONA=sovereign KYBERION_TENANT=<slug> node_modules/.bin/tsx scripts/<pad>/server.ts [--tier …] [port]`。`confidential` / `personal` tier は server-side `KYBERION_TENANT` が必須。書き込み API は起動時に表示されるローカルトークンを要求するが、これは人間承認の代替ではない。
+
 Related guidance:
 
 - [`docs/EMAIL_OPERATOR.ja.md`](./EMAIL_OPERATOR.ja.md) — inbox/triage is Gmail/gws (`pnpm kyberion email`); `email-actuator` is delivery-only

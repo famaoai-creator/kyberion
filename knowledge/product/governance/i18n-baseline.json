@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-09-13T03:13:35.427Z",
+  "generated_at": "2026-09-13T03:33:14.519Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -124,6 +124,7 @@
     "scripts/kyberion_product_intro_render.ts": 5,
     "scripts/memory-capture/page.ts": 22,
     "scripts/onboarding_wizard.ts": 49,
+    "scripts/personal-workbench/server.ts": 3,
     "scripts/pipeline-execution-part-execution.ts": 1,
     "scripts/process_portal_inbox.ts": 5,
     "scripts/refactor/mission-controller-router.ts": 3,

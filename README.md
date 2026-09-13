@@ -160,9 +160,51 @@ Plus:
 - **Goal-driven workers** — opt-in worker autonomy: a per-task goal state machine with token / turn / wall-clock budgets, event-sourced journals, and restart recovery that resumes exactly where the worker left off.
 - **Provenance-gated plugins** — skill plugins install through managed copies with source-derived trust; third-party code requires explicit human approval before it can ever run.
 - **Design-system-governed media** — PPTX and video are authored as semantic briefs; a single style cascade and text-measured layout fitting keep output on-brand without per-slide hand-tuning.
-- **Operator surfaces & messaging bridges** — Chronos control tower, concierge secretary, presence studio, terminal HUD, plus Slack / Telegram / Discord / iMessage bridges sharing one approval contract and a durable outbox (mechanisms hermetically tested; external-service E2E is still being proven). Map: [`docs/SURFACES.md`](./docs/SURFACES.md).
+- **Operator surfaces & messaging bridges** — Chronos control tower, concierge secretary, presence studio, terminal HUD, [local capture pads](#local-pads--capture-at-your-desk-hand-off-to-kyberion), plus Slack / Telegram / Discord / iMessage bridges sharing one approval contract and a durable outbox (mechanisms hermetically tested; external-service E2E is still being proven). Map: [`docs/SURFACES.md`](./docs/SURFACES.md).
 
 For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md). For the architecture: [`knowledge/product/architecture/organization-work-loop.md`](./knowledge/product/architecture/organization-work-loop.md).
+
+---
+
+## Local Pads — capture at your desk, hand off to Kyberion
+
+Nine small **127.0.0.1-only** pages you run from the repo. Each one captures something you already have on your desk (a sketch, meeting notes, a screenshot, a file, a clipboard, today's TODO) and writes a session folder plus `handoff.json` that Kyberion can pick up. They load zero external resources, do all file I/O through `secure-io`, and never start a mission or send anything on their own.
+
+<table>
+  <tr>
+    <td align="center" width="33%"><a href="./scripts/sketch-input/"><img src="./docs/assets/pads/sketch-input.png" alt="Sketch Input — draw a diagram, dictate an instruction, hand off PNG + handoff.json" width="100%" /></a><br /><strong>Sketch Input</strong> · <code>:8147</code><br /><sub>Draw a diagram, dictate the instruction, hand off PNG + JSON</sub></td>
+    <td align="center" width="33%"><a href="./scripts/meeting-notepad/"><img src="./docs/assets/pads/meeting-notepad.png" alt="Meeting Notepad — notes, dictation, recording and attachments turned into minutes" width="100%" /></a><br /><strong>Meeting Notepad</strong> · <code>:8148</code><br /><sub>Notes + recording + attachments → minutes → handoff</sub></td>
+    <td align="center" width="33%"><a href="./scripts/report-review/"><img src="./docs/assets/pads/report-review.png" alt="Report Review — an edit/comment/voice layer overlaid on any self-contained HTML report" width="100%" /></a><br /><strong>Report Review</strong> · <code>:8137</code><br /><sub>Edit / comment / dictate on any HTML report, save back in place</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="./scripts/screenshot-annotate/"><img src="./docs/assets/pads/screenshot-annotate.png" alt="Screenshot Annotate — paste or drop an image, draw annotations, hand off to vision" width="100%" /></a><br /><strong>Screenshot Annotate</strong> · <code>:8150</code><br /><sub>Paste / drop an image, mark it up, hand off to vision</sub></td>
+    <td align="center"><a href="./scripts/memory-capture/"><img src="./docs/assets/pads/memory-capture.png" alt="Memory Capture — brain-dump notes and tags into a working-memory handoff" width="100%" /></a><br /><strong>Memory Capture</strong> · <code>:8149</code><br /><sub>Brain-dump notes + tags → working-memory handoff</sub></td>
+    <td align="center"><a href="./scripts/clipboard-inbox/"><img src="./docs/assets/pads/clipboard-inbox.png" alt="Clipboard Inbox — collect pasted snippets and URLs into an inbox handoff" width="100%" /></a><br /><strong>Clipboard Inbox</strong> · <code>:8151</code><br /><sub>Collect pasted snippets and URLs → inbox handoff</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="./scripts/daily-desk/"><img src="./docs/assets/pads/daily-desk.png" alt="Daily Desk — Journal / TODO / NOW faces edited side by side" width="100%" /></a><br /><strong>Daily Desk</strong> · <code>:8152</code><br /><sub>Journal / TODO / NOW faces, seeded from working memory</sub></td>
+    <td align="center"><a href="./scripts/doc-drop/"><img src="./docs/assets/pads/doc-drop.png" alt="Doc Drop — drop PDF, images, text or docx files for ingestion" width="100%" /></a><br /><strong>Doc Drop</strong> · <code>:8153</code><br /><sub>Drop PDF / images / text / docx → ingest handoff</sub></td>
+    <td align="center"><a href="./scripts/personal-workbench/"><img src="./docs/assets/pads/personal-workbench.png" alt="Personal Workbench — link, task, follow-up, decision, expense and daily-review inbox with governed actions" width="100%" /></a><br /><strong>Personal Workbench</strong> · <code>:8154</code><br /><sub>Link / task / follow-up / decision / expense inbox; proposal-only, with governed OCR / email-draft actions</sub></td>
+  </tr>
+</table>
+
+Start any of them the same way and open the printed URL:
+
+```bash
+KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant-slug> \
+  node_modules/.bin/tsx scripts/meeting-notepad/server.ts        # or sketch-input, daily-desk, …
+
+# report-review wraps an existing report instead of a blank page
+KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant-slug> \
+  node_modules/.bin/tsx scripts/report-review/server.ts active/shared/tmp/report.html
+```
+
+What they share:
+
+- **Loopback only.** Bind to `127.0.0.1`, reject other origins, and require the per-run token printed at startup for every write. The token is not a substitute for human approval.
+- **Tier and tenant on the command line.** `--tier public|confidential|personal --tenant <slug>` decide where the session lands; `confidential` / `personal` need a server-side `KYBERION_TENANT`, and Personal Workbench (default tier `personal`) always does.
+- **Proposal, not execution.** Output is a session folder under `active/shared/tmp/<pad>/` plus `handoff.json`. Missions, sends, calendar changes and knowledge promotion stay behind the normal approval gates. Personal Workbench's `/action` exposes only governed OCR, a knowledge-promotion _candidate_, and email _drafts_.
+- **One helper, many pads.** They are thin twins built on `scripts/lib/local-artifact-pad.ts` and registered in the protocol-service registry, so adding a pad is a small, reviewable change. Index: [`scripts/personal-pads/README.md`](./scripts/personal-pads/README.md).
 
 ---
 
