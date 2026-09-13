@@ -1151,15 +1151,26 @@ function renderSecretFillStep(
   const ref = trimmedRecordedField(action.ref);
   const secretRef = trimmedRecordedField(action.secret_ref);
   if (!ref || !secretRef) return null;
+  const hints = durableHintParams(action);
+  // Snapshot selectors are nth-of-type ancestor paths — the same signal
+  // fill_secret_ref corroborates as `dom_path` when requireDomPathMatch is set.
+  const domPath = trimmedRecordedField(action.selector);
+  const canResolveWithoutSnapshot = Boolean((hints.name || hints.role) && domPath);
   return {
     step: {
       type: 'apply',
       op: 'fill_secret_ref',
-      params: { ref, secret_ref: secretRef, ...durableHintParams(action) },
+      params: {
+        ref,
+        secret_ref: secretRef,
+        ...hints,
+        ...(domPath ? { dom_path: domPath } : {}),
+      },
     },
-    // Secret fills require snapshot refs (or role/name + dom_path). The trail
-    // does not record dom_path, so replay must snapshot first.
-    needsSnapshot: true,
+    // Prefer recorded identity over a freshly minted @eN: snapshot order is
+    // not a stable secret-field identity. Only insert snapshot when the trail
+    // has no role/name + selector to satisfy requireDomPathMatch.
+    needsSnapshot: !canResolveWithoutSnapshot,
   };
 }
 

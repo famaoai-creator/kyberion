@@ -66,7 +66,11 @@ describe('browser-actuator phase 1-3 contracts', () => {
       {
         type: 'apply',
         op: 'fill_secret_ref',
-        params: { ref: '@e1', secret_ref: 'GITHUB_TOKEN' },
+        params: {
+          ref: '@e1',
+          secret_ref: 'GITHUB_TOKEN',
+          dom_path: 'input[name="token"]',
+        },
       },
     ]);
   });
