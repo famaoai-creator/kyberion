@@ -17,6 +17,7 @@ import { saveProjectRecord, projectRecordPath } from '@agent/core/project-regist
 import { saveServiceBindingRecord } from '@agent/core/service-binding-registry';
 import * as pptxUtils from '@agent/core/pptx-utils';
 import { withExecutionContext } from '@agent/core/authority';
+import { resetCurrentScope } from '@agent/core/scope-context';
 
 const ROOT = rootDir();
 
@@ -569,7 +570,10 @@ describe('media-actuator pdf to pptx bridge', () => {
   });
 
   it('loads confidential pptx theme packs with heritage when applying a registered theme', async () => {
-    const tenantSlug = '__pptx_theme_pack_test';
+    const tenantSlug = 'pptx-theme-pack-test';
+    vi.stubEnv('KYBERION_TIER', 'confidential');
+    vi.stubEnv('KYBERION_TENANT', tenantSlug);
+    resetCurrentScope();
     const confDir = path.resolve(ROOT, `knowledge/confidential/${tenantSlug}/design`);
     const themePackPath = path.join(confDir, 'theme.json');
     const themeName = `${tenantSlug}-imported`;
@@ -655,6 +659,8 @@ describe('media-actuator pdf to pptx bridge', () => {
       expect(result.context.active_pptx_master.elements).toHaveLength(1);
       expect(result.context.active_pptx_master.bgXml).toContain('F8FAFC');
     } finally {
+      vi.unstubAllEnvs();
+      resetCurrentScope();
       safeRmSync(path.resolve(ROOT, `knowledge/confidential/${tenantSlug}`), {
         recursive: true,
         force: true,
