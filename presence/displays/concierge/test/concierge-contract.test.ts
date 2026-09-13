@@ -37,7 +37,7 @@ describe('concierge surface contract', () => {
   });
 
   it('exposes the personal-secretary onboarding controls', () => {
-    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
     const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
@@ -225,7 +225,7 @@ describe('concierge surface contract', () => {
 
   it('renders actionable setup diagnostics that jump to in-page sections (CS-03)', () => {
     const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
-    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -265,7 +265,7 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/notification-preferences/route.ts'),
       'utf8'
     );
-    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -481,7 +481,7 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/plugins/[id]/route.ts'),
       'utf8'
     );
-    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -529,7 +529,7 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/config-missions/route.ts'),
       'utf8'
     );
-    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'

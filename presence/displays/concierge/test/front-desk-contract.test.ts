@@ -134,9 +134,71 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(decideView).toContain('export function deriveCardFields');
   });
 
-  it('redirects the interim /settings route to /setup', () => {
+  it('FD-06: /setup redirects to /settings, keeping the #hash for existing deep links', () => {
+    const setup = read('src/app/setup/page.tsx');
+    expect(setup).toContain("redirect('/settings')");
+  });
+
+  it('FD-06: /settings renders the 7 settings_nav_* sections, keeps all 8 legacy anchors, and never hardcodes a port or opens a new tab', () => {
     const settings = read('src/app/settings/page.tsx');
-    expect(settings).toContain("redirect('/setup')");
+    const palette = read('src/app/command-palette.tsx');
+
+    for (const key of [
+      'settings_nav_profile',
+      'settings_nav_members',
+      'settings_nav_services',
+      'settings_nav_voice',
+      'settings_nav_notifications',
+      'settings_nav_plugins',
+      'settings_nav_advanced',
+    ]) {
+      expect(settings).toContain(`frontDeskText('${key}', locale)`);
+    }
+
+    for (const anchor of [
+      'setup-profile',
+      'setup-management',
+      'setup-media',
+      'setup-services',
+      'setup-notifications',
+      'setup-plugins',
+      'setup-governance',
+      'setup-operations',
+    ]) {
+      expect(settings).toContain(`id="${anchor}"`);
+    }
+
+    // No hardcoded surface port in client code (plan §2.6) — the
+    // chronos-mirror-v2 link comes from /api/front-desk/links.
+    expect(settings).toContain("fetch('/api/front-desk/links'");
+    expect(settings).not.toContain('3000');
+    expect(settings).not.toContain('3031');
+    expect(settings).not.toContain('3050');
+
+    expect(settings).not.toContain('target="_blank"');
+    expect(settings).not.toContain("target={'_blank'}");
+    // No decorative emoji (the pre-existing readiness "✓" glyph, U+2713, is a
+    // status indicator carried over unchanged from setup/page.tsx, not new
+    // decorative copy — excluded from this range rather than the range
+    // being widened to legitimize it).
+    // eslint-disable-next-line no-misleading-character-class
+    expect(settings).not.toMatch(
+      /[\u{1F300}-\u{1FAFF}\u{2600}-\u{2712}\u{2714}-\u{27BF}\u{2190}-\u{21FF}]/u
+    );
+
+    // The palette's onboarding entries now point at /settings, not /setup.
+    expect(palette).not.toContain("href: '/setup'");
+    expect(palette).not.toContain("'/setup#");
+    expect(palette).toContain("href: '/settings'");
+  });
+
+  it('FD-06: resolves the 管制塔 (chronos-mirror-v2) link server-side, guarded like every other read route', () => {
+    const route = read('src/app/api/front-desk/links/route.ts');
+    expect(route).toContain('resolveConciergeViewer');
+    expect(route).toMatch(/resolved\.response/);
+    expect(route).toContain('no-store');
+    expect(route).toContain('loadSurfaceManifest');
+    expect(route).toContain('chronos-mirror-v2');
   });
 });
 
