@@ -42,6 +42,7 @@ import { reassignMissionToProject } from '@agent/core/project-management';
 import { recordMissionHandoff } from '@agent/core/work-coordination';
 import type { ArtifactReviewFinding } from '@agent/core/artifact-review';
 import { createMissionWorkReconciliationApprovalRequest } from '@agent/core/mission-work-reconciliation';
+import type { HumanDecidedBy } from '@agent/core/mission-types';
 
 type Print = (value: unknown) => void;
 
@@ -314,7 +315,12 @@ async function startMission(
   relationships: Partial<import('./refactor/mission-types.js').MissionRelationships> = {},
   tenantSlug?: string,
   organizationId?: string,
-  options?: { ephemeral?: boolean; intentGoal?: string; force?: boolean }
+  options?: {
+    ephemeral?: boolean;
+    intentGoal?: string;
+    force?: boolean;
+    decidedBy?: HumanDecidedBy;
+  }
 ) {
   await withOrganizationContext(organizationId, () =>
     missionLifecycleService.start(
@@ -454,12 +460,12 @@ async function resumeMission(id?: string) {
   return result;
 }
 
-async function pauseMission(id: string, note?: string) {
-  return missionLifecycleService.pause(id, note);
+async function pauseMission(id: string, note?: string, decidedBy?: HumanDecidedBy) {
+  return missionLifecycleService.pause(id, note, { decidedBy });
 }
 
-async function cancelMission(id: string, note?: string) {
-  return missionSystem.cancelMission(id, note);
+async function cancelMission(id: string, note?: string, decidedBy?: HumanDecidedBy) {
+  return missionSystem.cancelMission(id, note, decidedBy);
 }
 
 async function repairLegacyMissionState(id: string, note?: string) {
@@ -771,6 +777,8 @@ Lifecycle Commands:
                                  --goal <TEXT> carries the user goal into the intent baseline
                                  --success-condition <TEXT> records the acceptance condition
                                  --intent-goal <PATH> accepts an existing governed handoff file
+                                 --decided-by user:<member-id> [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
+                                 records the human member who made this decision (optional)
   checkpoint [task_id] [note]    Record a checkpoint on the focused mission
   checkpoint <ID> <task_id> <note>
                                  Record a checkpoint on an explicit mission
@@ -779,8 +787,10 @@ Lifecycle Commands:
   distill  <ID>                  Extract knowledge via LLM (distilling → completed)
   finish   <ID> [--seal]         Archive a completed mission (optionally encrypt)
   resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)
-  pause    <ID> [--note <TEXT>]  Pause an active mission without losing state
-  cancel   <ID> [--note <TEXT>]  Cancel a mission and mark it failed for follow-up
+  pause    <ID> [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
+                                 Pause an active mission without losing state
+  cancel   <ID> [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
+                                 Cancel a mission and mark it failed for follow-up
   repair   <ID> [--note <TEXT>]  Repair legacy mission state via the governed controller
   dispatch-tickets <ID>          Register NEXT_TASKS as work items / issue payloads
                                  --ticket-targets workitem,github,jira
@@ -812,9 +822,9 @@ Queue Commands:
                                  Show readiness, blockers, and physical duplicate count
   memory-review <CANDIDATE_ID> [--tenant-slug <SLUG>] [--json]
                                  Show summary, target, evidence, scope, audit, and next action
-  memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>]
+  memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
                                  Approve only when review preflight is clear
-  memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>]
+  memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
                                  Mark a memory candidate as rejected
   memory-promote <CANDIDATE_ID> [--tenant-slug <SLUG>] [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]
                                  Promote an approved candidate to governed knowledge

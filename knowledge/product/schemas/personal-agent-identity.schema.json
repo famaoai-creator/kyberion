@@ -4,5 +4,27 @@
   "title": "Personal Agent Identity",
   "description": "Persisted local agent identity. Surface consumers apply a bounded projection to this extensible onboarding record.",
   "type": "object",
+  "required": ["agent_id"],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9._-]{2,63}$",
+      "description": "The onboarding-chosen agent handle. Same grammar as browser-onboarding.ts's identitySchema and concierge /api/setup's validator — looser than the NHI slug grammar, because it predates NI-01 and existing records are not re-slugified. See `nhi_id` for the durable, NHI-grammar identity this handle is linked to (FD-10)."
+    },
+    "version": { "type": "string" },
+    "role": { "type": "string" },
+    "owner": { "type": "string" },
+    "created_at": { "type": "string" },
+    "nhi_id": {
+      "type": "string",
+      "pattern": "^kyberion://agent/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$",
+      "description": "FD-10: the durable NI-01 identity (`agent-identity.ts`) this agent_id is linked to. Populated best-effort by browser-onboarding.ts via `ensureAgentIdentityBestEffort` — never required, since onboarding must never fail on an identity-ledger write it cannot make yet."
+    },
+    "trust_tier": {
+      "type": "string",
+      "deprecated": true,
+      "description": "Deprecated (FD-10 plan §2.5 principle 5): a free string that is never evaluated. The evaluated trust vocabulary is `agent-policies.yaml`'s `agent_tier`; `trustScore` / manifest `trust_required` project onto that same tier. Kept only for backward compatibility with existing onboarding records."
+    }
+  },
   "additionalProperties": true
 }

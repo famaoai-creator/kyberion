@@ -175,7 +175,18 @@
           "event": { "type": "string" },
           "from": { "type": "string" },
           "to": { "type": "string" },
-          "note": { "type": "string" }
+          "note": { "type": "string" },
+          "decided_by": {
+            "type": "object",
+            "required": ["kind", "id"],
+            "properties": {
+              "kind": { "const": "human" },
+              "id": { "type": "string", "pattern": "^user:[a-z][a-z0-9-]{1,30}$" },
+              "display_name": { "type": "string", "minLength": 1 },
+              "role": { "enum": ["owner", "approver", "viewer"] }
+            },
+            "additionalProperties": false
+          }
         },
         "additionalProperties": true
       }

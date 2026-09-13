@@ -11,6 +11,7 @@ import { readTrustLedger, recordAgentRuntimeEvent } from './mission-governance.j
 import { deriveMissionBranchName, getCurrentBranch, getGitHash } from './mission-git.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { grantAccess, grantAccessGuarded } from './secret-guard.js';
+import type { HumanDecidedBy } from './mission-types.js';
 
 export async function delegateMission(
   id: string,
@@ -108,7 +109,11 @@ export async function importMission(
   }
 }
 
-export async function pauseMission(id: string, note?: string): Promise<void> {
+export async function pauseMission(
+  id: string,
+  note?: string,
+  decidedBy?: HumanDecidedBy
+): Promise<void> {
   if (!id) {
     logger.error('Usage: mission_controller pause <MISSION_ID> [--note "..."]');
     return;
@@ -136,6 +141,7 @@ export async function pauseMission(id: string, note?: string): Promise<void> {
     ts: nowIso(),
     event: 'PAUSE',
     note: note || 'Mission paused by operator request.',
+    ...(decidedBy ? { decided_by: decidedBy } : {}),
   });
   await saveState(upperId, state);
   recordAgentRuntimeEvent(
@@ -149,7 +155,11 @@ export async function pauseMission(id: string, note?: string): Promise<void> {
   logger.warn(`⏸️ Mission ${upperId} paused.`);
 }
 
-export async function cancelMission(id: string, note?: string): Promise<void> {
+export async function cancelMission(
+  id: string,
+  note?: string,
+  decidedBy?: HumanDecidedBy
+): Promise<void> {
   if (!id) {
     logger.error('Usage: mission_controller cancel <MISSION_ID> [--note "..."]');
     return;
@@ -172,7 +182,12 @@ export async function cancelMission(id: string, note?: string): Promise<void> {
     cancel_reason: reason,
     next_step: 'Create a replacement mission if the work should continue.',
   };
-  state.history.push({ ts: nowIso(), event: 'CANCEL', note: reason });
+  state.history.push({
+    ts: nowIso(),
+    event: 'CANCEL',
+    note: reason,
+    ...(decidedBy ? { decided_by: decidedBy } : {}),
+  });
   await saveState(upperId, state);
   recordAgentRuntimeEvent(
     pathResolver.shared('observability/mission-control/agent-runtime-events.jsonl'),

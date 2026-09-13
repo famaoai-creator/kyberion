@@ -9,6 +9,7 @@ import {
   listMemoryPromotionCandidates,
   updateMemoryPromotionCandidateStatus,
 } from '@agent/core/memory-promotion-queue';
+import type { HumanDecidedBy } from '@agent/core/mission-types';
 import {
   promoteMemoryCandidateToKnowledge,
   promotePersonalMemoryCandidates,
@@ -122,12 +123,13 @@ export function approveMemoryCandidate(
   candidateId: string,
   note?: string,
   tenantSlug?: string,
+  decidedBy?: HumanDecidedBy,
   print: Print = () => undefined
 ) {
   if (!candidateId) {
     throw new ScriptExitError(
       1,
-      'Usage: mission_controller memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>]'
+      'Usage: mission_controller memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>] [--decided-by user:<member-id>]'
     );
   }
   try {
@@ -138,6 +140,7 @@ export function approveMemoryCandidate(
       status: 'approved',
       ratificationNote: note || 'Approved for promotion.',
       ...(review.candidate.scope ? { scope: review.candidate.scope } : {}),
+      ...(decidedBy ? { decidedBy } : {}),
     });
     if (!updated) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
     logger.success(`✅ Memory candidate approved: ${updated.candidate_id}`);
@@ -151,12 +154,13 @@ export function rejectMemoryCandidate(
   note?: string,
   tenantSlug?: string,
   allDuplicates = false,
+  decidedBy?: HumanDecidedBy,
   print: Print = () => undefined
 ) {
   if (!candidateId) {
     throw new ScriptExitError(
       1,
-      'Usage: mission_controller memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>]'
+      'Usage: mission_controller memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>] [--decided-by user:<member-id>]'
     );
   }
   try {
@@ -172,6 +176,7 @@ export function rejectMemoryCandidate(
       ratificationNote: note || 'Rejected by operator review.',
       ...(review.candidate.scope ? { scope: review.candidate.scope } : {}),
       allMatching: allDuplicates,
+      ...(decidedBy ? { decidedBy } : {}),
     });
     if (!updated) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
     logger.success(`✅ Memory candidate rejected: ${updated.candidate_id}`);

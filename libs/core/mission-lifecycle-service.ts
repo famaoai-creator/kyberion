@@ -35,6 +35,7 @@ import { archiveMissionById } from './mission-maintenance.js';
 import type { ArchiveMissionByIdResult, PurgeMissionsResult } from './mission-maintenance.js';
 import type { MissionExecutionSurface } from './mission-execution-surface.js';
 import type { TeamProviderPreference } from './team-role-assignment-selection.js';
+import type { HumanDecidedBy } from './mission-types.js';
 
 export interface MissionLifecycleVerbOptions {
   /**
@@ -44,6 +45,12 @@ export interface MissionLifecycleVerbOptions {
    */
   surface?: string;
   providerPreference?: TeamProviderPreference;
+  /**
+   * FD-10 wave 1b: the human member who made this decision (plan §2.5
+   * principle 4). Additive and optional — verbs that don't persist a
+   * decision (e.g. `dispatch`) simply ignore it.
+   */
+  decidedBy?: HumanDecidedBy;
 }
 
 export class MissionLifecycleGovernedError extends Error {
@@ -79,7 +86,12 @@ function resolveActor(): string {
  * in-process/surface-context calls are indistinguishable in the audit log
  * except for their actual values.
  */
-function recordVerbAudit(verb: string, missionId: string | null, surface: string): void {
+function recordVerbAudit(
+  verb: string,
+  missionId: string | null,
+  surface: string,
+  decidedBy?: HumanDecidedBy
+): void {
   const actor = resolveActor();
   auditChain.record({
     agentId: actor,
@@ -87,6 +99,7 @@ function recordVerbAudit(verb: string, missionId: string | null, surface: string
     operation: `${verb}:${missionId ?? 'unscoped'}`,
     result: 'completed',
     metadata: { actor, surface, verb, mission: missionId },
+    ...(decidedBy ? { actor: decidedBy } : {}),
   });
 }
 
@@ -99,7 +112,7 @@ function runGovernedVerb<T>(
   assertMissionControllerContext(verb);
   const surface = options?.surface || 'cli';
   return fn().then((result) => {
-    recordVerbAudit(verb, missionId, surface);
+    recordVerbAudit(verb, missionId, surface, options?.decidedBy);
     return result;
   });
 }
@@ -267,6 +280,7 @@ export function buildMissionLifecycleService(
             intentGoal: options?.intentGoal,
             force: options?.force,
             organizationId: options?.organizationId,
+            decidedBy: options?.decidedBy,
           }
         )
       );
@@ -354,7 +368,7 @@ export function buildMissionLifecycleService(
 
     async pause(id: string, note?: string, options?: MissionLifecycleVerbOptions) {
       return runGovernedVerb('pause', normalizeMissionId(id), options, () =>
-        resolveSystem(explicitSystem).pauseMission(id, note)
+        resolveSystem(explicitSystem).pauseMission(id, note, options?.decidedBy)
       );
     },
 

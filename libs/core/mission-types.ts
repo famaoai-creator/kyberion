@@ -7,6 +7,23 @@ import type { HandoffPacket } from './handoff-packet.js';
 import type { MissionClassification } from './mission-classification.js';
 import type { WorkflowPhaseSpec } from './mission-workflow-catalog.js';
 
+/**
+ * FD-10 wave 1b (front-desk redesign plan §2.5 principle 4): the human
+ * member who made a mission or memory decision (start/pause/cancel,
+ * memory-approve/memory-reject). Minimal local shape — `libs/core/actor.ts`
+ * (FD-10a, a concurrently developed sibling module) will eventually supply a
+ * shared actor type; this interface is additive and does not depend on it.
+ */
+export type HumanDecidedByRole = 'owner' | 'approver' | 'viewer';
+
+export interface HumanDecidedBy {
+  kind: 'human';
+  /** `user:<member-id>` — never a bare id (plan §2.5 principle 1). */
+  id: string;
+  display_name?: string;
+  role?: HumanDecidedByRole;
+}
+
 export interface MissionState {
   mission_id: string;
   correlation_id?: string;
@@ -270,6 +287,8 @@ export interface MissionState {
     to?: string;
     note: string;
     handoff_packet?: HandoffPacket;
+    /** FD-10 wave 1b: set on human decision events (START/PAUSE/CANCEL). */
+    decided_by?: HumanDecidedBy;
   }>;
 }
 
