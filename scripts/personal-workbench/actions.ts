@@ -13,9 +13,10 @@ import {
   type OcrRequest,
 } from '@agent/core';
 import { nowIso } from '@agent/core/foundation';
-import { safeExistsSync, safeMkdir, safeWriteFile, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import path from 'node:path';
 import type { LocalPadContext } from '../lib/local-artifact-pad.js';
+import { readSafeJsonFile } from '../lib/json-input.js';
 
 export type PersonalWorkbenchAction = 'email' | 'calendar' | 'ocr' | 'knowledge';
 
@@ -116,8 +117,10 @@ function readProposal(outDir: string, approvalRequestId: string): CalendarPropos
   if (!safeExistsSync(filePath)) {
     throw new Error(`calendar proposal not found for approval ${approvalRequestId}`);
   }
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return JSON.parse(raw) as CalendarProposalRecord;
+  return readSafeJsonFile<CalendarProposalRecord>(
+    filePath,
+    `personal-workbench calendar proposal ${approvalRequestId}`
+  );
 }
 
 function writeProposal(outDir: string, proposal: CalendarProposalRecord): string {
@@ -143,7 +146,7 @@ export function proposeCalendarEvent(input: {
     correlationId: input.context.session_id,
     requestedBy: input.context.viewer_principal,
     draft: {
-      title: `カレンダー作成: ${event.summary}`,
+      title: `Calendar create: ${event.summary}`,
       summary: `${event.start} → ${event.end}`,
       details: event.description || undefined,
       severity: 'medium',
