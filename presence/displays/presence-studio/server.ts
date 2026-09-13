@@ -847,6 +847,37 @@ presenceStudioData.app.post('/api/hearing/:session/answer', (req, res) => {
   }
 });
 
+// HT-03: record the human decision before handing the requirements to the
+// governed alignment/mission flow. This endpoint never creates mission state.
+presenceStudioData.app.post('/api/hearing/:session/decide', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    requirePresenceStudioLocalAdmin(viewer);
+    const sessionId = hearingSessionId(req);
+    const namespace = hearingNamespace(viewer.tenantSlugs);
+    const record = loadHearingRecord(namespace, sessionId);
+    if (!record) throw new HearingRequestError('Hearing record does not exist yet.');
+    const incomplete = record.requirements.filter((item) => !item.answer?.trim());
+    if (incomplete.length > 0) {
+      throw new HearingRequestError(`Hearing still has ${incomplete.length} unanswered requirement(s).`);
+    }
+    const decided = {
+      ...record,
+      decided_by: viewer.principalId,
+      decided_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    saveHearingRecord(namespace, decided);
+    return res.json({
+      ok: true,
+      record: decided,
+      next_action: { kind: 'alignment_review', label: '要件を確認して次へ進む' },
+    });
+  } catch (error) {
+    hearingResponseError(req, res, error);
+  }
+});
+
 // FD-03: `POST /api/conversation` — the "頼む" (ask) conversation turn.
 // Node port of the concierge's `/api/message` route
 // (`presence/displays/concierge/src/app/api/message/route.ts`): try
