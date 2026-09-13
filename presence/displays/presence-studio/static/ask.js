@@ -443,6 +443,7 @@
     var record = state.hearingRecord;
     var coverage = document.getElementById('hearing-coverage');
     var canvas = document.getElementById('hearing-canvas');
+    var decide = document.getElementById('hearing-decide');
     if (coverage) {
       var complete = record
         ? record.requirements.filter(function (item) {
@@ -451,6 +452,7 @@
         : 0;
       var total = record ? record.requirements.length : 0;
       coverage.textContent = complete + '/' + total + ' 項目が埋まっています';
+      if (decide) decide.classList.toggle('hidden', complete !== total || Boolean(record && record.decided_at));
     }
     if (canvas && record && record.canvas_url && canvas.getAttribute('src') !== record.canvas_url) {
       canvas.setAttribute('src', record.canvas_url);
@@ -469,6 +471,20 @@
       .catch(function () {
         /* hearing is additive to the conversation */
       });
+  }
+
+  function decideHearing() {
+    if (!state.hearingMode || !state.hearingRecord) return;
+    fetchJson('/api/hearing/' + encodeURIComponent(state.sessionId) + '/decide', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    }).then(function (result) {
+      if (result.ok && result.body && result.body.ok) {
+        state.hearingRecord = result.body.record;
+        renderHearing();
+      }
+    }).catch(function () { /* the record remains available for retry */ });
   }
 
   function updateHearing(text, intentResolution) {
@@ -694,6 +710,11 @@
     });
   }
 
+  function wireHearingDecision() {
+    var button = document.getElementById('hearing-decide');
+    if (button) button.addEventListener('click', decideHearing);
+  }
+
   function wireChips() {
     document.querySelectorAll('.ask-chip').forEach(function (button) {
       button.addEventListener('click', function () {
@@ -746,6 +767,7 @@
     wireMic();
     wireHandsFree();
     wireChips();
+    wireHearingDecision();
 
     Promise.all([
       fetchJson('/api/ask-vocabulary?locale=' + encodeURIComponent(state.locale)),
