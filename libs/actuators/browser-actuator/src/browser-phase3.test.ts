@@ -62,7 +62,6 @@ describe('browser-actuator phase 1-3 contracts', () => {
 
     const adf = browserRuntimeHelpers.renderBrowserAdf([action], 'phase3-test');
     expect(adf.steps).toEqual([
-      { type: 'capture', op: 'snapshot', params: {} },
       {
         type: 'apply',
         op: 'fill_secret_ref',

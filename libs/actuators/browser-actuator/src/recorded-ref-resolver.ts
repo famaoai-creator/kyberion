@@ -166,14 +166,10 @@ export async function resolveRecordedRefSelector(
   if (matches.length === 1) {
     const candidateSelector = matches[0].selector;
     if (target.dom_path) {
-      const sameElement = await page.evaluate(
-        ({ domPath, candidateSelector }) => {
-          const byDomPath = document.querySelectorAll(domPath);
-          if (byDomPath.length !== 1) return false;
-          const byCandidate = document.querySelector(candidateSelector);
-          return byCandidate !== null && byDomPath[0] === byCandidate;
-        },
-        { domPath: target.dom_path, candidateSelector }
+      const sameElement = await recordedDomPathMatchesSelector(
+        page,
+        target.dom_path,
+        candidateSelector
       );
       if (!sameElement) {
         throw new RecordedRefSpoofSuspectedError(
@@ -212,6 +208,26 @@ export async function resolveRecordedRefSelector(
   throw new RecordedRefUnresolvedError(target);
 }
 
+async function recordedDomPathMatchesSelector(
+  page: Page,
+  domPath: string,
+  candidateSelector: string
+): Promise<boolean> {
+  return page.evaluate(
+    ({ domPath: path, candidateSelector: selector }) => {
+      const byDomPath = document.querySelectorAll(path);
+      if (byDomPath.length !== 1) return false;
+      const byCandidate = document.querySelector(selector);
+      return byCandidate !== null && byDomPath[0] === byCandidate;
+    },
+    { domPath, candidateSelector }
+  );
+}
+
+function hasRecordedTargetFallback(target?: RecordedRefTarget): boolean {
+  return Boolean(target?.role || target?.name || target?.dom_path);
+}
+
 /**
  * Drop-in for the actuator's `resolveRefSelector(ctx, ref)` call sites: tries
  * the existing session-scoped `ctx.ref_map` lookup first (unchanged
@@ -219,6 +235,10 @@ export async function resolveRecordedRefSelector(
  * when a recorded target was supplied — falls back to
  * `resolveRecordedRefSelector`. The resolved selector is cached into the
  * returned `ctx.ref_map` so later steps referencing the same `ref` reuse it.
+ *
+ * Secret fills set `requireDomPathMatch`. A fresh snapshot can mint the same
+ * `@eN` for a different element; if a recorded `dom_path` is present, a
+ * ref_map hit is used only when it is the same live element as that path.
  */
 export async function resolveRefOrRecordedTarget(
   ctx: RecordedRefExecutionContext,
@@ -226,18 +246,33 @@ export async function resolveRefOrRecordedTarget(
   page: Page,
   recordedTarget?: RecordedRefTarget
 ): Promise<{ selector: string; ctx: RecordedRefExecutionContext }> {
+  let refMapSelector: string | undefined;
   try {
-    return { selector: browserRuntimeHelpers.resolveRefSelector(ctx, ref), ctx };
+    refMapSelector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
   } catch (err) {
-    // Only fall back on the specific "ref not in this session's ref_map"
-    // condition — any other failure from resolveRefSelector should surface
-    // as-is rather than being silently reinterpreted as "try the recording".
     const isRefMapMiss = err instanceof Error && err.message.includes('Unknown browser ref');
-    if (!isRefMapMiss || (!recordedTarget?.role && !recordedTarget?.name)) throw err;
-    const resolved = await resolveRecordedRefSelector(page, recordedTarget);
-    return {
-      selector: resolved.selector,
-      ctx: { ...ctx, ref_map: { ...(ctx.ref_map ?? {}), [ref]: resolved.selector } },
-    };
+    if (!isRefMapMiss) throw err;
   }
+
+  if (refMapSelector) {
+    const recordedDomPath = recordedTarget?.dom_path;
+    const mustCorroborate = Boolean(recordedTarget?.requireDomPathMatch && recordedDomPath);
+    if (
+      !mustCorroborate ||
+      (await recordedDomPathMatchesSelector(page, recordedDomPath!, refMapSelector))
+    ) {
+      return { selector: refMapSelector, ctx };
+    }
+  }
+
+  if (!hasRecordedTargetFallback(recordedTarget)) {
+    throw new Error(
+      `Unknown browser ref: ${ref}. Capture a snapshot in this pipeline (or reuse a keep_alive session that already snapshotted), then call click_ref/fill_ref with that ref — or pass params.selector to click.`
+    );
+  }
+  const resolved = await resolveRecordedRefSelector(page, recordedTarget as RecordedRefTarget);
+  return {
+    selector: resolved.selector,
+    ctx: { ...ctx, ref_map: { ...(ctx.ref_map ?? {}), [ref]: resolved.selector } },
+  };
 }
