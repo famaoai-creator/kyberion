@@ -229,4 +229,11 @@ export function registerFrontDeskAuxPages(app: express.Express, staticDir: strin
   app.get('/help', (_req, res) => {
     res.sendFile(path.join(staticDir, 'help.html'));
   });
+
+  // HT-05: a single training track's page — same static file as `/help`;
+  // `static/help.js` reads the track id from `window.location.pathname` and
+  // renders the matching catalog track client-side (GET /api/training/catalog).
+  app.get('/help/:track', (_req, res) => {
+    res.sendFile(path.join(staticDir, 'help.html'));
+  });
 }
