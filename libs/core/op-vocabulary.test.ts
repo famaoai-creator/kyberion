@@ -28,12 +28,14 @@ describe('op-vocabulary', () => {
     expect(normalizeBrowserPipelineOp('press_ref')).toBe('press');
     expect(normalizeBrowserPipelineOp('wait_ref')).toBe('wait');
     expect(normalizeBrowserPipelineOp('snapshot')).toBe('snapshot');
-    expect(warnSpy).toHaveBeenCalledTimes(4);
+    expect(normalizeBrowserPipelineOp('navigate')).toBe('goto');
+    expect(warnSpy).toHaveBeenCalledTimes(5);
     expect(warnSpy.mock.calls.map((args) => args[0])).toEqual([
       '[op-vocabulary] pipeline alias "select_ref" is deprecated; use "click" instead.',
       '[op-vocabulary] pipeline alias "submit_form" is deprecated; use "click" instead.',
       '[op-vocabulary] pipeline alias "press_ref" is deprecated; use "press" instead.',
       '[op-vocabulary] pipeline alias "wait_ref" is deprecated; use "wait" instead.',
+      '[op-vocabulary] pipeline alias "navigate" is deprecated; use "goto" instead.',
     ]);
     warnSpy.mockRestore();
   });

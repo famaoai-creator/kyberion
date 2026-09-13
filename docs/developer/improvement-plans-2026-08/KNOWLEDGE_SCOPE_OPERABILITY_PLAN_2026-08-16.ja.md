@@ -187,4 +187,6 @@ KS-16 checker を PR CI に入れ意味論検査へ拡張し、新区画を rete
 
 ## 実装状況
 
+- 2026-09-11: [テナントナレッジと actuator 活用の再評価](./TENANT_KNOWLEDGE_ACTUATOR_REVIEW_2026-09-11.ja.md)で、`knowledge place` の tenant 指定が子階層へ入る問題と、同一 ID の階層取り違えを修正。制作テーマの解決にも canonical execution scope と tier 制約を適用した。KA-01〜04 の検証記録と残課題は同計画に記載。
+
 - 2026-08-17: KO-16 の tenant 別 bounded weight proposal、steward apply ceremony(stale check/backup/history/audit)、KO-17 の validation sweep pipeline、KO-19 の intent/ledger/promotion migration、tenant-sharded promotion queue、tenant-scoped curation history、promotion audit continuity、semantic checker、legacy quarantine TTL、weekly reconciliation report まで実装。既存の legacy feedback 13 件、global intent memory 1 件、global promotion queue 1 ファイルは hash 検証付きで quarantine apply 済みで、tenant 所有権を推測する移行は行っていない。

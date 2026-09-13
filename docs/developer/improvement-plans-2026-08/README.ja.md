@@ -1,11 +1,13 @@
 ---
 title: README
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-09-06
+last_updated: 2026-09-11
 status: active
 ---
 
 # コードベース改善計画 2026-08(索引)
+
+- [テナントナレッジと actuator 活用の評価・改善計画](./TENANT_KNOWLEDGE_ACTUATOR_REVIEW_2026-09-11.ja.md): 配置階層の厳密化、機密テーマの tenant 限定、personal overlay の tier 分離、computer-use の操作後観測を実装。ブラウザ所有権監査と制作物の最終検証を次段として整理。
 
 > **位置づけ**: [improvement-plans-2026-07](../improvement-plans-2026-07/README.ja.md) の後続月次バックログ。命名・ステータス規約は 07 と同一(実装状況の記録は各計画文書内の「実装状況」節)。現在の状態文書の入口は本書であり、カテゴリ横断の正本・補足資料の対応は [`documentation-source-map.json`](../../documentation-source-map.json) で管理する。
 

@@ -6,6 +6,73 @@ import {
 } from './knowledge-scope.js';
 
 describe('knowledge-scope', () => {
+  it('rejects a missing parent rather than placing knowledge at a wider level', () => {
+    expect(() =>
+      knowledgeWritePathFor(
+        {
+          tier: 'confidential',
+          tenant_slug: 'acme-corp',
+          mission_id: 'mission-a',
+        },
+        'mission',
+        'guide'
+      )
+    ).toThrow();
+  });
+
+  it('rejects unknown runtime levels including object prototype keys', () => {
+    expect(() =>
+      knowledgeWritePathFor(
+        { tier: 'confidential', tenant_slug: 'acme-corp' },
+        'toString' as Parameters<typeof knowledgeWritePathFor>[1],
+        'guide'
+      )
+    ).toThrow('[KNOWLEDGE_WRITE_INVALID]');
+  });
+
+  it.each([
+    ['tenant', 'confidential/acme-corp'],
+    ['organization', 'confidential/acme-corp/organizations/shared-id'],
+    ['project', 'confidential/acme-corp/organizations/shared-id/projects/shared-id'],
+    [
+      'mission',
+      'confidential/acme-corp/organizations/shared-id/projects/shared-id/missions/shared-id',
+    ],
+    [
+      'task',
+      'confidential/acme-corp/organizations/shared-id/projects/shared-id/missions/shared-id/tasks/shared-id',
+    ],
+    [
+      'session',
+      'confidential/acme-corp/organizations/shared-id/projects/shared-id/missions/shared-id/tasks/shared-id/sessions/shared-id',
+    ],
+  ] as const)('places %s knowledge at the requested level even when IDs repeat', (level, root) => {
+    expect(
+      knowledgeWritePathFor(
+        {
+          tier: 'confidential',
+          tenant_slug: 'acme-corp',
+          organization_id: 'shared-id',
+          project_id: 'shared-id',
+          mission_id: 'shared-id',
+          task_id: 'shared-id',
+          session_id: 'shared-id',
+        },
+        level,
+        'guide'
+      )
+    ).toBe(`${root}/guide.md`);
+  });
+
+  it.each(['../escape', '.md/../../escape', '.md\\escape', '.', ''])(
+    'rejects unsafe extension %j',
+    (extension) => {
+      expect(() => knowledgeWritePathFor({ tier: 'public' }, 'public', 'guide', extension)).toThrow(
+        '[KNOWLEDGE_WRITE_INVALID]'
+      );
+    }
+  );
+
   it('keeps a tenant-bearing public request on public/product roots', () => {
     const scope = resolveKnowledgeScopeSet({ tier: 'public', tenant_slug: 'acme-corp' });
     expect(scope.roots).toEqual(['public', 'product']);

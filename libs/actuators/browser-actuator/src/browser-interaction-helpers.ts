@@ -308,25 +308,35 @@ export function createBrowserInteractionHelpers(deps: {
       input.observation?.include_network === true ||
       input.observation?.mode === 'network' ||
       input.observation?.mode === 'mixed';
-    const includeScreenshot = input.observation?.include_screenshot === true;
+    const includeScreenshot =
+      input.observation?.include_screenshot === true ||
+      input.observation?.mode === 'screen' ||
+      input.observation?.mode === 'mixed';
+    const includeRefs =
+      input.observation?.include_refs === true ||
+      input.observation?.mode === 'dom_snapshot' ||
+      input.observation?.mode === 'mixed';
 
-    if (interaction.type === 'snapshot') {
-      if (includeScreenshot) {
-        steps.push({
-          type: 'capture',
-          op: 'screenshot',
-          params: {
-            export_as: 'last_screenshot',
-            path: `active/shared/tmp/computer/${sessionId}-snapshot.png`,
-          },
-        });
-      }
-      if (includeConsole) {
-        steps.push({ type: 'capture', op: 'console', params: { export_as: 'console_events' } });
-      }
-      if (includeNetwork) {
-        steps.push({ type: 'capture', op: 'network', params: { export_as: 'network_events' } });
-      }
+    // A ref snapshot before an action resolves its target; observations requested
+    // by the caller describe the state after the action and must run afterwards.
+    if (includeRefs && interaction.type !== 'snapshot') {
+      steps.push({ type: 'capture', op: 'snapshot', params: { export_as: 'last_snapshot' } });
+    }
+    if (includeScreenshot && interaction.type !== 'screenshot') {
+      steps.push({
+        type: 'capture',
+        op: 'screenshot',
+        params: {
+          export_as: 'last_screenshot',
+          path: `active/shared/tmp/computer/${sessionId}-snapshot.png`,
+        },
+      });
+    }
+    if (includeConsole && interaction.type !== 'capture_console') {
+      steps.push({ type: 'capture', op: 'console', params: { export_as: 'console_events' } });
+    }
+    if (includeNetwork && interaction.type !== 'capture_network') {
+      steps.push({ type: 'capture', op: 'network', params: { export_as: 'network_events' } });
     }
 
     return {

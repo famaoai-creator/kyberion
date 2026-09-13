@@ -22,18 +22,25 @@ import { secureFetch } from '@agent/core/network';
 import { pathResolver } from '@agent/core/path-resolver';
 import { normalizeBrowserPipelineOp } from '@agent/core/op-vocabulary';
 import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
-import {
-  chromium,
-  type Browser,
-  type BrowserContext,
-  type CDPSession,
-  type Page,
-} from '@playwright/test';
+import { chromium, type BrowserContext, type Page } from '@playwright/test';
 import * as path from 'node:path';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { completeBrowserOperatorApproval } from './browser-approval-records.js';
 import { parseChromeCdpVersionResponse } from './browser-cdp-response.js';
+import {
+  assertBrowserSessionOwner,
+  assertPersistedBrowserSessionOwner,
+  browserScopeFingerprint,
+} from './browser-session-scope.js';
+import {
+  attachPageObservers,
+  createBrowserRuntime,
+  registerBrowserPage,
+} from './browser-runtime-tabs.js';
+import type { BrowserRuntime, BrowserRuntimeLease } from './browser-runtime-types.js';
+
+export type { BrowserRuntime } from './browser-runtime-types.js';
 
 export interface BrowserSnapshotElement {
   ref: string;
@@ -132,57 +139,13 @@ interface BrowserSessionMetadata {
     selector?: string;
     ts: string;
   }>;
+  scope_fingerprint?: string;
 }
 
 interface ChromeCdpEndpoint {
   cdpUrl: string;
   cdpPort: number;
   source: 'process' | 'probe';
-}
-
-interface BrowserRuntime {
-  context: BrowserContext;
-  tabs: Map<string, Page>;
-  pageIds: WeakMap<Page, string>;
-  cdpSessions: WeakMap<Page, CDPSession>;
-  activeTabId: string;
-  consoleEvents: Array<{ tab_id: string; type: string; text: string; ts: string }>;
-  networkEvents: Array<{
-    tab_id: string;
-    method: string;
-    url: string;
-    resourceType: string;
-    ts: string;
-  }>;
-  navigationPolicy?: {
-    allowed_origins?: string[];
-    allow_private_network?: boolean;
-    allow_data_url?: boolean;
-  };
-  webAuthn?: {
-    authenticatorId?: string;
-    enabled: boolean;
-    options?: Record<string, any>;
-    credentials: Array<Record<string, any>>;
-    events: Array<{
-      type: string;
-      credential?: Record<string, any>;
-      credentialId?: string;
-      ts: string;
-    }>;
-  };
-}
-
-interface BrowserRuntimeLease {
-  runtime: BrowserRuntime;
-  userDataDir: string;
-  sessionMetadataPath: string;
-  videoDir?: string;
-  leaseExpiresAt?: number;
-  cdpUrl?: string;
-  cdpPort?: number;
-  browser?: Browser;
-  externalConnection?: boolean;
 }
 
 const BROWSER_RUNTIME_DIR = pathResolver.shared('runtime/browser');
@@ -203,9 +166,8 @@ function safeBrowserRuntimePath(
 }
 
 function isExistingRegularFile(filePath: string): boolean {
-  if (!safeExistsSync(filePath)) return false;
   try {
-    return safeLstat(filePath).isFile();
+    return safeExistsSync(filePath) && safeLstat(filePath).isFile();
   } catch {
     return false;
   }
@@ -214,69 +176,6 @@ function isExistingRegularFile(filePath: string): boolean {
 function browserSessionArtifactPath(directory: string, sessionId: string, suffix: string): string {
   const safeSessionId = String(sessionId || 'default').replace(/[^a-zA-Z0-9._-]/g, '_');
   return safeBrowserRuntimePath(path.join(directory, `${safeSessionId}${suffix}`));
-}
-
-function createBrowserRuntime(
-  context: BrowserContext,
-  navigationPolicy?: BrowserRuntime['navigationPolicy']
-): BrowserRuntime {
-  const tabs = new Map<string, Page>();
-  const pageIds = new WeakMap<Page, string>();
-  const cdpSessions = new WeakMap<Page, CDPSession>();
-  const runtime: BrowserRuntime = {
-    context,
-    tabs,
-    pageIds,
-    cdpSessions,
-    activeTabId: '',
-    consoleEvents: [],
-    networkEvents: [],
-    navigationPolicy,
-  };
-  context.pages().forEach((page, index) => {
-    registerBrowserPage(runtime, page, `tab-${index + 1}`);
-  });
-  context.on('page', (page) => {
-    const tabId = `tab-${runtime.tabs.size + 1}`;
-    registerBrowserPage(runtime, page, tabId);
-  });
-  return runtime;
-}
-
-function registerBrowserPage(runtime: BrowserRuntime, page: Page, tabId: string): void {
-  runtime.tabs.set(tabId, page);
-  runtime.pageIds.set(page, tabId);
-  if (!runtime.activeTabId) runtime.activeTabId = tabId;
-  attachPageObservers(runtime, page);
-}
-
-function attachPageObservers(runtime: BrowserRuntime, page: Page): void {
-  const tabId = runtime.pageIds.get(page) || `tab-${runtime.tabs.size}`;
-  page.on('dialog', async (dialog) => {
-    logger.info(
-      `[BROWSER] Dialog intercepted: ${dialog.type()} - "${dialog.message().substring(0, 100)}"`
-    );
-    await dialog.accept();
-  });
-  page.on('console', (msg) => {
-    runtime.consoleEvents.push({
-      tab_id: tabId,
-      type: msg.type(),
-      text: msg.text(),
-      ts: nowIso(),
-    });
-    runtime.consoleEvents = runtime.consoleEvents.slice(-200);
-  });
-  page.on('request', (request) => {
-    runtime.networkEvents.push({
-      tab_id: tabId,
-      method: request.method(),
-      url: request.url(),
-      resourceType: request.resourceType(),
-      ts: nowIso(),
-    });
-    runtime.networkEvents = runtime.networkEvents.slice(-200);
-  });
 }
 
 function getActivePage(runtime: BrowserRuntime): Page {
@@ -732,6 +631,18 @@ function saveBrowserSessionSnapshot(sessionId: string, snapshot: BrowserSnapshot
   );
 }
 
+function loadBrowserSessionSnapshot(sessionId: string): BrowserSnapshot | null {
+  const filePath = browserSessionArtifactPath(BROWSER_SNAPSHOT_DIR, sessionId, '.json');
+  if (!isExistingRegularFile(filePath)) return null;
+  try {
+    const raw = safeReadFile(filePath, { encoding: 'utf8' });
+    const parsed = JSON.parse(String(raw));
+    return parsed && typeof parsed === 'object' ? (parsed as BrowserSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function summarizeTabs(runtime: BrowserRuntime): Promise<BrowserTabSummary[]> {
   const summaries: BrowserTabSummary[] = [];
   for (const [tabId, page] of runtime.tabs.entries()) {
@@ -972,7 +883,9 @@ function deriveOrigin(targetUrl: string): string {
 function resolveRefSelector(ctx: any, ref: string): string {
   const selector = ctx?.ref_map?.[ref];
   if (!selector) {
-    throw new Error(`Unknown browser ref: ${ref}. Capture a snapshot before using *_ref actions.`);
+    throw new Error(
+      `Unknown browser ref: ${ref}. Capture a snapshot in this pipeline (or reuse a keep_alive session that already snapshotted), then call click_ref/fill_ref with that ref — or pass params.selector to click.`
+    );
   }
   return selector;
 }
@@ -1291,6 +1204,7 @@ async function closeBrowserSession(sessionId: string): Promise<boolean> {
   cleanupExpiredBrowserRuntimeLeases();
   const lease = browserRuntimeLeases.get(sessionId);
   if (!lease) return false;
+  assertBrowserSessionOwner(lease.scopeFingerprint, browserScopeFingerprint());
   saveBrowserSessionMetadata(lease.sessionMetadataPath, {
     session_id: sessionId,
     user_data_dir: lease.userDataDir,
@@ -1305,6 +1219,7 @@ async function closeBrowserSession(sessionId: string): Promise<boolean> {
     lease_expires_at: undefined,
     action_trail_count: 0,
     recent_actions: [],
+    scope_fingerprint: lease.scopeFingerprint,
   });
   if (lease.externalConnection && lease.browser) {
     await lease.browser.close();
@@ -1373,7 +1288,10 @@ export const browserRuntimeHelpers = {
   resetBrowserRuntimeLeasesForTest,
   summarizeTabs,
   saveBrowserSessionMetadata,
+  getBrowserScopeFingerprint: browserScopeFingerprint,
+  assertBrowserSessionOwner,
   saveBrowserSessionSnapshot,
+  loadBrowserSessionSnapshot,
   captureSnapshotElements,
   buildSnapshot,
   buildSessionHandoff,
@@ -1404,13 +1322,20 @@ export const browserRuntimeHelpers = {
     videoDir: string
   ): Promise<BrowserContext> => {
     cleanupExpiredBrowserRuntimeLeases();
+    const scopeFingerprint = browserScopeFingerprint();
     const existing = browserRuntimeLeases.get(sessionId);
     if (existing) {
+      assertBrowserSessionOwner(existing.scopeFingerprint, scopeFingerprint);
       logger.info(`♻️ [BROWSER] Reusing leased session: ${sessionId}`);
       return existing.runtime.context;
     }
 
     const persistedMetadata = loadBrowserSessionMetadata(sessionMetadataPath);
+    assertPersistedBrowserSessionOwner(
+      persistedMetadata,
+      scopeFingerprint,
+      Boolean(persistedMetadata?.user_data_dir && safeExistsSync(persistedMetadata.user_data_dir))
+    );
     const persistedCdpUrl = options.cdp_url || persistedMetadata?.cdp_url;
     const persistedCdpPort = Number(options.cdp_port || persistedMetadata?.cdp_port || 0);
 
@@ -1439,6 +1364,7 @@ export const browserRuntimeHelpers = {
           externalConnection: true,
           cdpUrl: persistedCdpUrl,
           cdpPort: persistedCdpPort || Number(new URL(persistedCdpUrl).port),
+          scopeFingerprint,
         });
         return context;
       } catch (error: unknown) {
@@ -1478,6 +1404,7 @@ export const browserRuntimeHelpers = {
         externalConnection: true,
         cdpUrl,
         cdpPort: Number(new URL(cdpUrl).port),
+        scopeFingerprint,
       });
       return context;
     }
@@ -1505,6 +1432,7 @@ export const browserRuntimeHelpers = {
       sessionMetadataPath,
       videoDir,
       externalConnection: false,
+      scopeFingerprint,
       cdpUrl: cdpEndpoint?.cdpUrl,
       cdpPort: cdpEndpoint?.cdpPort,
     });
@@ -1524,6 +1452,7 @@ export const browserRuntimeHelpers = {
       userDataDir,
       sessionMetadataPath,
       externalConnection: false,
+      scopeFingerprint: browserScopeFingerprint(),
     });
     return runtime;
   },
@@ -1549,6 +1478,7 @@ function cleanupExpiredBrowserRuntimeLeases(): void {
       lease_expires_at: new Date(lease.leaseExpiresAt).toISOString(),
       action_trail_count: 0,
       recent_actions: [],
+      scope_fingerprint: lease.scopeFingerprint,
     });
     if (lease.externalConnection && lease.browser) {
       void lease.browser.close();

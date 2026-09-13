@@ -8,6 +8,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { resetCurrentScope } from '@agent/core/scope-context';
 
 const REPO_ROOT = process.cwd();
 
@@ -182,9 +183,13 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
   );
   return {
     ...actual,
-    safeExistsSync: mocks.safeExistsSync,
+    safeExistsSync: (filePath: string) =>
+      mocks.fileStore.has(filePath) || mocks.safeExistsSync(filePath),
     safeMkdir: mocks.safeMkdir,
-    safeReadFile: mocks.safeReadFile,
+    safeReadFile: (filePath: string, options?: { encoding?: BufferEncoding | null }) =>
+      mocks.fileStore.has(filePath)
+        ? mocks.fileStore.get(filePath)!
+        : mocks.safeReadFile(filePath, options),
     safeLstat: mocks.safeLstat,
     safeWriteFile: mocks.safeWriteFile,
     safeRmSync: mocks.safeRmSync,
@@ -233,6 +238,76 @@ describe('browser-actuator v3 contract', () => {
       })
     ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
     expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
+  });
+
+  it('rejects reuse of a live browser lease after the tenant scope changes', async () => {
+    const { handleAction } = await import('./index');
+    vi.stubEnv('KYBERION_TIER', 'confidential');
+    vi.stubEnv('KYBERION_TENANT', 'tenant-alpha');
+    resetCurrentScope();
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'scope-owned-session',
+      steps: [],
+      options: { keep_alive: true },
+    } as any);
+    vi.stubEnv('KYBERION_TENANT', 'tenant-beta');
+    resetCurrentScope();
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        session_id: 'scope-owned-session',
+        steps: [],
+        options: { keep_alive: true },
+      } as any)
+    ).rejects.toThrow('[BROWSER_SESSION_OWNER_MISMATCH]');
+    vi.unstubAllEnvs();
+    resetCurrentScope();
+  });
+
+  it('rejects closing a live browser lease from another tenant', async () => {
+    const { handleAction, closeBrowserSession } = await import('./index');
+    vi.stubEnv('KYBERION_TIER', 'confidential');
+    vi.stubEnv('KYBERION_TENANT', 'tenant-alpha');
+    resetCurrentScope();
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'closed-scope-owned-session',
+      steps: [],
+      options: { keep_alive: true },
+    } as any);
+    vi.stubEnv('KYBERION_TENANT', 'tenant-beta');
+    resetCurrentScope();
+    await expect(closeBrowserSession('closed-scope-owned-session')).rejects.toThrow(
+      '[BROWSER_SESSION_OWNER_MISMATCH]'
+    );
+    vi.unstubAllEnvs();
+    resetCurrentScope();
+  });
+
+  it('rejects reuse of a released session from another tenant', async () => {
+    const { handleAction } = await import('./index');
+    vi.stubEnv('KYBERION_TIER', 'confidential');
+    vi.stubEnv('KYBERION_TENANT', 'tenant-alpha');
+    resetCurrentScope();
+    await handleAction({
+      action: 'pipeline',
+      session_id: 'released-scope-owned-session',
+      steps: [],
+      options: { headless: true },
+    } as any);
+    vi.stubEnv('KYBERION_TENANT', 'tenant-beta');
+    resetCurrentScope();
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        session_id: 'released-scope-owned-session',
+        steps: [],
+        options: { keep_alive: true },
+      } as any)
+    ).rejects.toThrow('[BROWSER_SESSION_OWNER_MISMATCH]');
+    vi.unstubAllEnvs();
+    resetCurrentScope();
   });
 
   it('sanitizes persisted operator approval fields before completing the artifact', async () => {
@@ -425,6 +500,62 @@ describe('browser-actuator v3 contract', () => {
       status: 'failed',
     });
     expect(String(result.results[0].error)).toContain('Unknown browser ref');
+    expect(String(result.results[0].error)).toContain('params.selector');
+    expect(result.summary).toMatchObject({ url: expect.anything() });
+  });
+
+  it('accepts navigate as an alias for goto and exposes a flat summary', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-nav-alias',
+      steps: [{ type: 'apply', op: 'navigate', params: { url: 'https://example.com' } }],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.goto).toHaveBeenCalledWith('https://example.com', expect.any(Object));
+    expect(result.url || result.summary?.url || result.context?.last_url).toBeTruthy();
+  });
+
+  it('routes click({ref}) through click_ref behavior', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-click-ref-alias',
+      steps: [
+        { type: 'capture', op: 'snapshot', params: {} },
+        { type: 'apply', op: 'click', params: { ref: '@e1' } },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.click).toHaveBeenCalled();
+  });
+
+  it('reuses keep_alive snapshot refs across separate pipeline calls', async () => {
+    const { handleAction } = await import('./index');
+    const sessionId = 'browser-keepalive-refs';
+
+    const first = await handleAction({
+      action: 'pipeline',
+      session_id: sessionId,
+      steps: [{ type: 'capture', op: 'snapshot', params: {} }],
+      options: { headless: true, keep_alive: true },
+    });
+    expect(first.status).toBe('succeeded');
+    expect(first.context.ref_map).toBeTruthy();
+
+    const second = await handleAction({
+      action: 'pipeline',
+      session_id: sessionId,
+      steps: [{ type: 'apply', op: 'click_ref', params: { ref: '@e1' } }],
+      options: { headless: true, keep_alive: true },
+    });
+
+    expect(second.status).toBe('succeeded');
+    expect(mocks.page.click).toHaveBeenCalled();
   });
 
   it('resolves a ref via recorded {role,name} when it is missing from ref_map (e.g. a step compiled from an extension recording)', async () => {

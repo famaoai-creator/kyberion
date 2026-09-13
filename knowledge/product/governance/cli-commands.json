@@ -1828,6 +1828,14 @@
       "noun": "knowledge",
       "verb": "cowork-sync",
       "audience": "operator"
+    },
+    {
+      "id": "script.co-session",
+      "module": "scripts/co_session.ts",
+      "command": "co-session default",
+      "noun": "co-session",
+      "verb": "default",
+      "audience": "operator"
     }
   ]
 }

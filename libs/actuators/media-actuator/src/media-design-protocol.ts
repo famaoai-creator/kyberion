@@ -1,10 +1,7 @@
 import { logger } from '@agent/core/core';
-import {
-  assertSafeRepositoryPath,
-  safeMkdir,
-  safeExistsSync,
-  safeReaddir,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from '@agent/core/secure-io';
+import { currentScope } from '@agent/core/scope-context';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { defineCatalog, isRecord } from '@agent/core/foundation';
 import { loadProjectRecord } from '@agent/core/project-registry';
 import { loadServiceBindingRecord } from '@agent/core/service-binding-registry';
@@ -196,12 +193,19 @@ function loadThemeCatalog(rootDir: string): MediaThemeCatalog {
     'active/shared/runtime/design-patterns/media-templates/themes.json',
     true
   );
-  const personalCatalog = loadScope(
-    'media-themes-personal',
-    'knowledge/personal/design-patterns/media-templates/themes',
-    'knowledge/personal/design-patterns/media-templates/themes.json',
-    true
-  );
+  const scope = currentScope();
+  const personalRoot = scope.tenant_slug
+    ? `knowledge/personal/${scope.tenant_slug}`
+    : 'knowledge/personal';
+  const personalCatalog =
+    scope.tier === 'personal' && (!scope.tenant_slug || isValidTenantSlug(scope.tenant_slug))
+      ? loadScope(
+          'media-themes-personal',
+          `${personalRoot}/design-patterns/media-templates/themes`,
+          `${personalRoot}/design-patterns/media-templates/themes.json`,
+          true
+        )
+      : emptyScope;
   const merged = deepMergeCatalog(deepMergeCatalog(publicCatalog, runtimeCatalog), personalCatalog);
   return defineCatalog<MediaThemeCatalog>({
     id: 'media-themes',
@@ -215,14 +219,16 @@ function loadConfidentialThemePackEntries(
 ): { theme_id: string; theme_name?: string; pack_path: string }[] {
   try {
     const confidentialDir = path.resolve(rootDir, 'knowledge/confidential');
-    let tenantNames: string[] = [];
-    try {
-      tenantNames = safeReaddir(confidentialDir);
-    } catch (err: unknown) {
-      logger.warn(
-        `[THEME_RESOLVER] safeReaddir failed on ${confidentialDir}: ${errorMessage(err)}`
-      );
-    }
+    // Theme names are selectors, never authorization. Use the same canonical
+    // execution scope as knowledge retrieval, without discovering other tenants.
+    const scope = currentScope();
+    if (
+      scope.tier !== 'confidential' ||
+      !scope.tenant_slug ||
+      !isValidTenantSlug(scope.tenant_slug)
+    )
+      return [];
+    const tenantNames = [scope.tenant_slug];
     const entries: { theme_id: string; theme_name?: string; pack_path: string }[] = [];
     for (const tenantName of tenantNames) {
       const themePackPath = path.join(confidentialDir, tenantName, 'design', 'theme.json');
@@ -263,37 +269,7 @@ function resolveConfidentialThemePack(
     .toLowerCase();
   if (!normalized) return null;
 
-  // Try direct path first to bypass sandbox/secure-io directory listing limitations
-  const potentialSlugs = [
-    normalized,
-    normalized.split('-')[0],
-    normalized.replace('-imported', ''),
-  ];
-  for (const slug of potentialSlugs) {
-    if (!slug) continue;
-    const directPath = path.join(rootDir, 'knowledge/confidential', slug, 'design/theme.json');
-    if (safeExistsSync(directPath)) {
-      try {
-        const pack = loadConfidentialThemePack(rootDir, directPath);
-        const themeId = String(
-          pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || ''
-        ).trim();
-        if (
-          themeId.toLowerCase() === normalized ||
-          String(pack?.theme?.name || '').toLowerCase() === normalized
-        ) {
-          logger.info(
-            `[THEME_RESOLVER] Direct resolved confidential theme pack from: ${directPath}`
-          );
-          return pack;
-        }
-      } catch (err: unknown) {
-        logger.warn(`[THEME_RESOLVER] Direct load failed for ${directPath}: ${errorMessage(err)}`);
-      }
-    }
-  }
-
-  // Scan fallback
+  // The catalog enumerates only the active tenant's exact design path.
   for (const entry of loadConfidentialThemePackEntries(rootDir)) {
     if (
       entry.theme_id.toLowerCase() !== normalized &&

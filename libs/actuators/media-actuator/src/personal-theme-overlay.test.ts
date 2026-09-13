@@ -1,4 +1,11 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import type { ScopeContext } from '@agent/core/scope-context';
+
+const activeScope = vi.hoisted(() => ({ value: { tier: 'personal' } as ScopeContext }));
+vi.mock('@agent/core/scope-context', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/scope-context')>()),
+  currentScope: () => activeScope.value,
+}));
 
 const { personalTheme } = vi.hoisted(() => ({
   personalTheme: {
@@ -66,6 +73,7 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => {
 import { getFoundationIo, registerFoundationIo } from '@agent/core/foundation/io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { handleAction } from './index.js';
+import { loadThemeCatalog } from './media-design-protocol.js';
 
 const personalThemePath = pathResolver.rootResolve(
   'knowledge/personal/design-patterns/media-templates/themes.json'
@@ -95,6 +103,21 @@ registerFoundationIo({
 afterAll(() => registerFoundationIo(originalFoundationIo));
 
 describe('media-actuator personal theme overlay', () => {
+  it.each([
+    { tier: 'public' },
+    { tier: 'confidential', tenant_slug: 'tenant-alpha' },
+    { tier: 'personal', tenant_slug: 'tenant-alpha' },
+  ] as ScopeContext[])('does not inherit global personal themes into %j', (scope) => {
+    activeScope.value = scope;
+    try {
+      expect(
+        loadThemeCatalog(pathResolver.rootDir()).themes['test-roundtrip-theme']
+      ).toBeUndefined();
+    } finally {
+      activeScope.value = { tier: 'personal' };
+    }
+  });
+
   it('merges a personal overlay theme into the catalog used by apply_theme', async () => {
     const result = await handleAction({
       action: 'pipeline',
