@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>進み具合 — Kyberion</title>
+    <!-- Kyberion Design System (DS-01 canonical tokens) -->
+    <link rel="stylesheet" href="./design-system.css" />
+    <link rel="stylesheet" href="/api/design-tokens.css" />
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <link rel="stylesheet" href="/front-desk-rail.css" />
+    <!-- FD-05: progress page styles -->
+    <link rel="stylesheet" href="/progress.css" />
+  </head>
+  <body>
+    <div class="fd-layout">
+      <nav id="front-desk-rail" class="front-desk-rail"></nav>
+      <div class="fd-content">
+        <main class="progress-shell">
+          <div class="progress-filters" id="progress-filters" role="tablist">
+            <button
+              type="button"
+              class="progress-filter"
+              id="filter-active"
+              data-filter="active"
+              role="tab"
+            ></button>
+            <button
+              type="button"
+              class="progress-filter"
+              id="filter-delivered"
+              data-filter="delivered"
+              role="tab"
+            ></button>
+            <button
+              type="button"
+              class="progress-filter"
+              id="filter-done"
+              data-filter="done"
+              role="tab"
+            ></button>
+          </div>
+
+          <div class="progress-columns">
+            <section class="progress-list-col" aria-label="進み具合の一覧">
+              <div class="progress-section-header hidden" id="delivered-header">
+                <h2 id="delivered-title"></h2>
+                <p id="delivered-waiting"></p>
+              </div>
+              <ul class="progress-list" id="progress-list"></ul>
+              <p class="progress-empty hidden" id="progress-empty"></p>
+            </section>
+
+            <section class="progress-detail-col" aria-label="選んだ項目の詳細" id="progress-detail">
+              <p class="progress-select-hint" id="progress-select-hint"></p>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script src="/front-desk-rail.js"></script>
+    <script src="/progress.js"></script>
+    <script>
+      if (window.FrontDeskRail) {
+        window.FrontDeskRail.mount(document.getElementById('front-desk-rail'), {
+          current: 'progress',
+        });
+      }
+      if (window.KyberionProgress) {
+        window.KyberionProgress.mount();
+      }
+    </script>
+  </body>
+</html>

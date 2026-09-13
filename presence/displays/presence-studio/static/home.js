@@ -243,9 +243,10 @@
 
   var PROGRESS_TAG_KEY = { in_progress: 'tag_in_progress', delivered: 'tag_delivered' };
 
-  // Interim targets (FD-05 ships the dedicated "進み具合" page).
+  // FD-05: the dedicated "進み具合" page — each row deep-links to its own
+  // item (kept in the URL hash there so a reload restores the selection).
   function progressHref(item) {
-    return item.href_hint === 'outcome' ? '/work#outcome-panel' : '/work#requested-work-panel';
+    return '/progress#' + encodeURIComponent(item.id);
   }
 
   function renderProgressCard(vocab, home) {

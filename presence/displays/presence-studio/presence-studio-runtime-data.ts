@@ -1181,10 +1181,12 @@ app.get('/ask', (_req, res) => {
   res.redirect(302, '/work#voice-panel');
 });
 
-// Interim redirect until FD-05 ships the dedicated "progress" page (進み具合).
-// FD-02 moved the workbench these panels live in from `/` to `/work`.
+// FD-05: the dedicated "進み具合" page, replacing the interim `/work` redirect.
+// `express.static` (registered above) never intercepts this — a literal
+// `/progress` path only matches a static file named exactly `progress` (no
+// extension), never `progress.html`.
 app.get('/progress', (_req, res) => {
-  res.redirect(302, '/work#requested-work-panel');
+  res.sendFile(path.join(staticDir, 'progress.html'));
 });
 
 // Interim redirect until FD-08 ships the dedicated "how to use" page (旧 /learn).
@@ -1423,4 +1425,28 @@ export const HOME_VOCABULARY_KEYS = [
   'front_desk:tag_in_progress',
   'front_desk:tag_delivered',
   'front_desk:action_receive',
+] as const satisfies readonly VocabularyKey[];
+
+// FD-05: exactly the `front_desk` keys `static/progress.js` renders. Mirrors
+// `HOME_VOCABULARY_KEYS` above — see `GET /api/progress-vocabulary` in
+// server.ts.
+export const PROGRESS_VOCABULARY_KEYS = [
+  'front_desk:progress_filter_active',
+  'front_desk:progress_filter_delivered',
+  'front_desk:progress_filter_done',
+  'front_desk:progress_delivered_title',
+  'front_desk:progress_delivered_waiting',
+  'front_desk:progress_empty_active',
+  'front_desk:progress_empty_delivered',
+  'front_desk:progress_select_hint',
+  'front_desk:progress_detail_requested',
+  'front_desk:progress_detail_now',
+  'front_desk:progress_detail_next',
+  'front_desk:progress_detail_log',
+  'front_desk:progress_action_note',
+  'front_desk:progress_open_mirror',
+  'front_desk:action_open',
+  'front_desk:action_receive',
+  'front_desk:action_revise',
+  'front_desk:count_items',
 ] as const satisfies readonly VocabularyKey[];
