@@ -645,6 +645,27 @@ describe('FD-03 ask page static contract', () => {
       expect(combined.toLowerCase()).not.toContain(word.toLowerCase());
     }
   });
+
+  it('FD-09: renders resolution_shape and the turn shape chip through vocabulary lookups, never the raw enum', () => {
+    const askJs = readRepoFile('presence/displays/presence-studio/static/ask.js');
+
+    // The "Current state" block looks `resolution_shape` up in a
+    // vocabulary-key map instead of writing the raw enum value.
+    expect(askJs).toContain('function shapeLabelKey');
+    expect(askJs).toContain('shapeLabelKey(contract.resolution_shape)');
+    expect(askJs).not.toMatch(/:\s*contract\.resolution_shape\s*[;\n]/);
+
+    // The conversation-turn shape chip does the same for the UX-contract
+    // shape id instead of `escapeHtml(turn.shape)` verbatim.
+    expect(askJs).toContain('function turnShapeLabelKey');
+    expect(askJs).toContain('turnShapeLabelKey(turn.shape)');
+    expect(askJs).not.toContain('escapeHtml(turn.shape)');
+
+    // "What I understood" prefers the server-resolved `intent_label` over
+    // the raw `normalized_intent` slug.
+    expect(askJs).toContain('companionTurn.intent_label');
+    expect(askJs).not.toMatch(/'about-understood'[^)]*contract\.normalized_intent/s);
+  });
 });
 
 describe('FD-03 remote-safe allowlist wiring', () => {

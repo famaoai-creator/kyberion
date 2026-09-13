@@ -11196,6 +11196,51 @@
         "ja": "送れませんでした。もう一度お試しください。",
         "qps-ploc": "⟦Ï ƈőůŀḓ ñőŧ şėñḓ ŧħȧŧ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
+      "shape_direct_answer": {
+        "en": "Reply now",
+        "ja": "その場で回答",
+        "qps-ploc": "⟦Řėṗŀẏ ñőẇ ŀőř⟧"
+      },
+      "shape_task_session": {
+        "en": "Working on it as a task",
+        "ja": "作業として進行",
+        "qps-ploc": "⟦Ẇőřķïñɠ őñ ïŧ ȧş ȧ ŧȧşķ ŀőřėɱ ï⟧"
+      },
+      "shape_mission": {
+        "en": "Set up as a larger job",
+        "ja": "大きな仕事として編成",
+        "qps-ploc": "⟦Şėŧ ůṗ ȧş ȧ ŀȧřɠėř ĵőƀ ŀőřėɱ ï⟧"
+      },
+      "shape_project_bootstrap": {
+        "en": "Setting up a new project",
+        "ja": "新しいプロジェクトの準備",
+        "qps-ploc": "⟦Şėŧŧïñɠ ůṗ ȧ ñėẇ ṗřőĵėƈŧ ŀőřėɱ ï⟧"
+      },
+      "shape_chip_clarification": {
+        "en": "Needs a detail",
+        "ja": "確認が必要",
+        "qps-ploc": "⟦Ñėėḓş ȧ ḓėŧȧïŀ ŀőřė⟧"
+      },
+      "shape_chip_execution_preview": {
+        "en": "Plan",
+        "ja": "進め方",
+        "qps-ploc": "⟦Ṗŀȧñ ŀőř⟧"
+      },
+      "shape_chip_status_summary": {
+        "en": "Status",
+        "ja": "状況",
+        "qps-ploc": "⟦Şŧȧŧůş ŀőř⟧"
+      },
+      "shape_chip_delivery_summary": {
+        "en": "Delivered",
+        "ja": "できました",
+        "qps-ploc": "⟦Ḓėŀïṽėřėḓ ŀőř⟧"
+      },
+      "shape_chip_reply": {
+        "en": "Reply",
+        "ja": "回答",
+        "qps-ploc": "⟦Řėṗŀẏ ŀőř⟧"
+      },
       "settings_member_add": {
         "en": "Add a member",
         "ja": "メンバーを追加",

@@ -1,8 +1,18 @@
 // FD-03: `viewFromIntentResolution` (presence-studio ask page's pure
 // contract -> { shape, next_actions } mapping). Pure, no I/O.
 import { describe, expect, it } from 'vitest';
-import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract-parser';
-import { parseAskVoiceHubReply, viewFromIntentResolution } from './ask-view.js';
+import {
+  parseIntentResolutionContract,
+  type IntentResolutionContract,
+  type IntentResolutionShape,
+} from '@agent/core/intent-resolution-contract-parser';
+import {
+  ASK_SHAPE_LABEL_KEY,
+  humanizeSlug,
+  parseAskVoiceHubReply,
+  resolveIntentLabel,
+  viewFromIntentResolution,
+} from './ask-view.js';
 
 function baseContract(overrides: Partial<IntentResolutionContract> = {}): IntentResolutionContract {
   return {
@@ -17,6 +27,103 @@ function baseContract(overrides: Partial<IntentResolutionContract> = {}): Intent
     ...overrides,
   };
 }
+
+describe('humanizeSlug', () => {
+  it('turns a kebab-case slug into plain words', () => {
+    expect(humanizeSlug('register-presentation-preference-profile')).toBe(
+      'register presentation preference profile'
+    );
+  });
+
+  it('turns a snake_case slug into plain words', () => {
+    expect(humanizeSlug('task_session')).toBe('task session');
+  });
+
+  it('collapses runs of separators and trims the ends', () => {
+    expect(humanizeSlug('--edge__case-')).toBe('edge case');
+  });
+
+  it('leaves an already-plain string untouched', () => {
+    expect(humanizeSlug('already plain')).toBe('already plain');
+  });
+});
+
+describe('resolveIntentLabel', () => {
+  it('returns the catalog description with source "catalog" on a hit', () => {
+    const catalog = new Map([
+      [
+        'register-presentation-preference-profile',
+        'Register reusable presentation brief and theme preferences for future decks.',
+      ],
+    ]);
+
+    expect(resolveIntentLabel('register-presentation-preference-profile', catalog)).toEqual({
+      label: 'Register reusable presentation brief and theme preferences for future decks.',
+      source: 'catalog',
+    });
+  });
+
+  it('falls back to a humanized slug with source "slug" on a miss', () => {
+    const catalog = new Map([['some-other-intent', 'Some other intent.']]);
+
+    expect(resolveIntentLabel('register-presentation-preference-profile', catalog)).toEqual({
+      label: 'register presentation preference profile',
+      source: 'slug',
+    });
+  });
+
+  it('falls back to a humanized slug when the catalog entry has an empty description', () => {
+    const catalog = new Map([['blank-description-intent', '   ']]);
+
+    expect(resolveIntentLabel('blank-description-intent', catalog)).toEqual({
+      label: 'blank description intent',
+      source: 'slug',
+    });
+  });
+});
+
+describe('ASK_SHAPE_LABEL_KEY', () => {
+  // Every `resolution_shape` the parser accepts must have a label key here
+  // (see `ASK_SHAPE_LABEL_KEY`'s module doc — the exhaustive `Record` type
+  // already fails `tsc` on a new `IntentResolutionShape` member; this test
+  // additionally probes the parser at runtime so a drift shows up in
+  // `vitest` too). Keep this candidate list in sync with the parser's own
+  // `resolutionShapes` array in `intent-resolution-contract-parser.ts`.
+  const candidateShapes = [
+    'direct_answer',
+    'task_session',
+    'mission',
+    'project_bootstrap',
+    'not_a_real_shape',
+  ] as const;
+
+  function isAcceptedShape(shape: string): shape is IntentResolutionShape {
+    return Boolean(
+      parseIntentResolutionContract(
+        baseContract({ resolution_shape: shape as IntentResolutionShape })
+      )
+    );
+  }
+
+  const acceptedShapes = candidateShapes.filter(isAcceptedShape);
+
+  it('has at least the four resolution shapes the parser currently accepts', () => {
+    expect(acceptedShapes.sort()).toEqual(
+      ['direct_answer', 'mission', 'project_bootstrap', 'task_session'].sort()
+    );
+  });
+
+  it('has a label key for every resolution shape the parser accepts', () => {
+    for (const shape of acceptedShapes) {
+      expect(ASK_SHAPE_LABEL_KEY[shape]).toBeTruthy();
+    }
+    expect(Object.keys(ASK_SHAPE_LABEL_KEY).sort()).toEqual([...acceptedShapes].sort());
+  });
+
+  it('rejects a shape the parser does not know', () => {
+    expect(isAcceptedShape('not_a_real_shape')).toBe(false);
+  });
+});
 
 describe('viewFromIntentResolution', () => {
   it('maps human_clarification_required to clarification with a more_detail next action', () => {
