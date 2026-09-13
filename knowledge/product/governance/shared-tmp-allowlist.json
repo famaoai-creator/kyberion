@@ -360,6 +360,12 @@
       "note": "backup/restore staging dirs"
     },
     {
+      "file": "scripts/browser_live_demo.ts",
+      "count": 2,
+      "classification": "legit-tmp",
+      "note": "ephemeral before/after screenshots for the local browser demo"
+    },
+    {
       "file": "scripts/campaign_suite.ts",
       "count": 1,
       "classification": "legit-tmp",
