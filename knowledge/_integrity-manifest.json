@@ -2745,7 +2745,7 @@
     {
       "path": "product/governance/surfaces/mcp-server-cowork.json",
       "tier": "public",
-      "size": 642,
+      "size": 632,
       "type": "json"
     },
     {
