@@ -211,4 +211,66 @@ describe('resolveRefOrRecordedTarget', () => {
       /Unknown browser ref/
     );
   });
+
+  it('does not fill via a remapped @e1 when only dom_path was exported (no role/name)', async () => {
+    const page = fakePage(
+      [],
+      (selector) => (selector === 'input[name="token"]' ? 1 : 0),
+      () => false
+    );
+    const ctx = { ref_map: { '@e1': 'input#decoy' } };
+    const result = await resolveRefOrRecordedTarget(ctx, '@e1', page, {
+      dom_path: 'input[name="token"]',
+      requireDomPathMatch: true,
+    });
+    expect(result.selector).toBe('input[name="token"]');
+    expect(result.selector).not.toBe('input#decoy');
+  });
+
+  it('does not fill via a fresh snapshot @e1 that disagrees with recorded dom_path', async () => {
+    const page = fakePage(
+      [element({ tag: 'input', role: 'textbox', name: 'API Key', selector: 'input#key' })],
+      undefined,
+      (domPath, candidateSelector) => domPath === 'input#key' && candidateSelector === 'input#key'
+    );
+    const ctx = { ref_map: { '@e1': 'input#decoy' } };
+    const result = await resolveRefOrRecordedTarget(ctx, '@e1', page, {
+      role: 'textbox',
+      name: 'API Key',
+      dom_path: 'input#key',
+      requireDomPathMatch: true,
+    });
+    expect(result.selector).toBe('input#key');
+    expect(result.selector).not.toBe('input#decoy');
+  });
+
+  it('fails closed when a disagreeing ref_map hit has no recorded identity to recover', async () => {
+    const page = fakePage([], undefined, () => false);
+    const ctx = { ref_map: { '@e1': 'input#decoy' } };
+    await expect(
+      resolveRefOrRecordedTarget(ctx, '@e1', page, {
+        role: 'textbox',
+        name: 'Ghost',
+        dom_path: 'input#key',
+        requireDomPathMatch: true,
+      })
+    ).rejects.toThrow();
+  });
+
+  it('keeps a ref_map hit when requireDomPathMatch corroborates the same element', async () => {
+    const page = fakePage(
+      [],
+      undefined,
+      (domPath, candidateSelector) => domPath === 'input#key' && candidateSelector === 'input#key'
+    );
+    const ctx = { ref_map: { '@e1': 'input#key' } };
+    const result = await resolveRefOrRecordedTarget(ctx, '@e1', page, {
+      role: 'textbox',
+      name: 'API Key',
+      dom_path: 'input#key',
+      requireDomPathMatch: true,
+    });
+    expect(result.selector).toBe('input#key');
+    expect(result.ctx).toBe(ctx);
+  });
 });

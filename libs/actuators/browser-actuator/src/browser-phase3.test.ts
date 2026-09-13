@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { Page } from '@playwright/test';
 import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
 import { safeReadFile, safeRmSync } from '@agent/core/secure-io';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 
 describe('browser-actuator phase 1-3 contracts', () => {
   it('blocks private navigation targets by default while allowing data URLs', () => {
@@ -46,7 +48,7 @@ describe('browser-actuator phase 1-3 contracts', () => {
     expect(JSON.stringify(result.action_trail)).not.toContain('actual-secret-value');
   });
 
-  it('preserves secret_ref semantics when exporting recorded ref actions', () => {
+  it('preserves secret_ref semantics when exporting recorded ref actions', async () => {
     const action = {
       kind: 'apply' as const,
       op: 'fill_ref',
@@ -60,12 +62,55 @@ describe('browser-actuator phase 1-3 contracts', () => {
     expect(playwright).toContain('process.env["GITHUB_TOKEN"]');
     expect(playwright).not.toContain('actual-secret-value');
 
-    const adf = browserRuntimeHelpers.renderBrowserAdf([action], 'phase3-test');
-    expect(adf.steps).toContainEqual({
-      type: 'apply',
-      op: 'fill_secret_ref',
-      params: { ref: '@e1', secret_ref: 'GITHUB_TOKEN' },
-    });
+    const adf = browserRuntimeHelpers.renderBrowserAdf(
+      [
+        {
+          kind: 'capture' as const,
+          op: 'snapshot',
+          url: 'https://example.com/login',
+          title: 'Login',
+          ts: action.ts,
+        },
+        action,
+      ],
+      'phase3-test'
+    );
+    expect(adf.steps).toEqual([
+      { type: 'capture', op: 'snapshot', params: {} },
+      {
+        type: 'apply',
+        op: 'fill_secret_ref',
+        params: {
+          ref: '@e1',
+          secret_ref: 'GITHUB_TOKEN',
+          dom_path: 'input[name="token"]',
+        },
+      },
+    ]);
+
+    // Trail snapshot is replayed, so a fresh session mints a new @e1. That
+    // remapping must not receive the secret when it is a different field.
+    const secretStep = adf.steps[1];
+    const page = {
+      evaluate: vi.fn(async (_fn: unknown, arg?: unknown) => {
+        if (typeof arg === 'string') return arg === 'input[name="token"]' ? 1 : 0;
+        if (arg && typeof arg === 'object' && 'domPath' in (arg as Record<string, unknown>)) {
+          return false;
+        }
+        return { elements: [] };
+      }),
+    } as unknown as Page;
+    const resolved = await resolveRefOrRecordedTarget(
+      { ref_map: { '@e1': 'input#decoy' } },
+      String(secretStep.params.ref),
+      page,
+      {
+        dom_path: String(secretStep.params.dom_path),
+        requireDomPathMatch: true,
+      }
+    );
+    expect(resolved.selector).toBe('input[name="token"]');
+    expect(resolved.selector).not.toBe('input#decoy');
   });
 
   it('exposes canonical contracts for ref extraction, scrolling, health, and evidence', () => {

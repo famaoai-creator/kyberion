@@ -723,9 +723,124 @@ describe('browser-actuator v3 contract', () => {
       action: 'pipeline',
       session_id: 'browser-test',
       steps: [
-        { type: 'apply', op: 'click_ref', params: { ref: '@e1' } },
-        { type: 'apply', op: 'fill_ref', params: { ref: '@e1', text: 'hello' } },
+        { type: 'capture', op: 'snapshot', params: {} },
+        {
+          type: 'apply',
+          op: 'click',
+          params: { selector: 'button:nth-of-type(1)', name: 'Submit', role: 'button' },
+        },
+        {
+          type: 'apply',
+          op: 'fill',
+          params: {
+            selector: 'button:nth-of-type(1)',
+            text: 'hello',
+            name: 'Submit',
+            role: 'button',
+          },
+        },
       ],
+    });
+  });
+
+  it('replays exported selector clicks in a fresh session without a prior snapshot', async () => {
+    const { handleAction, renderBrowserAdf } = await import('./index');
+
+    const exported = renderBrowserAdf(
+      [
+        {
+          kind: 'apply',
+          op: 'goto',
+          url: 'https://example.com',
+          ts: '2026-09-13T00:00:00.000Z',
+        },
+        {
+          kind: 'apply',
+          op: 'click_ref',
+          ref: '@e1',
+          selector: 'a[href="https://www.iana.org/domains/example"]',
+          element_name: 'Learn more',
+          ts: '2026-09-13T00:00:01.000Z',
+        },
+      ],
+      'export-session'
+    );
+
+    expect(exported.steps).toEqual([
+      { type: 'capture', op: 'goto', params: { url: 'https://example.com' } },
+      {
+        type: 'apply',
+        op: 'click',
+        params: {
+          selector: 'a[href="https://www.iana.org/domains/example"]',
+          name: 'Learn more',
+        },
+      },
+    ]);
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'fresh-replay',
+      steps: exported.steps,
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.goto).toHaveBeenCalledWith('https://example.com', {
+      waitUntil: 'networkidle',
+    });
+    expect(mocks.page.click).toHaveBeenCalledWith(
+      'a[href="https://www.iana.org/domains/example"]',
+      {
+        timeout: 5000,
+      }
+    );
+    expect(JSON.stringify(result.results)).not.toContain('Unknown browser ref');
+  });
+
+  it('records fill_secret_ref dom_path onto the trail so export_adf can corroborate', async () => {
+    const { handleAction, renderBrowserAdf } = await import('./index');
+    vi.stubEnv('GITHUB_TOKEN', 'test-secret-value');
+    let result: Awaited<ReturnType<typeof handleAction>>;
+    try {
+      result = await handleAction({
+        action: 'pipeline',
+        session_id: 'secret-fill-record',
+        steps: [
+          { type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } },
+          {
+            type: 'apply',
+            op: 'fill_secret_ref',
+            params: { ref: '@e1', secret_ref: 'GITHUB_TOKEN' },
+          },
+        ],
+        options: { headless: true },
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.action_trail).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          op: 'fill_secret_ref',
+          ref: '@e1',
+          selector: 'button:nth-of-type(1)',
+          dom_path: 'button:nth-of-type(1)',
+          secret_ref: 'GITHUB_TOKEN',
+        }),
+      ])
+    );
+
+    const exported = renderBrowserAdf(result.context.action_trail, 'secret-fill-record');
+    const secretStep = exported.steps.find((step) => step.op === 'fill_secret_ref');
+    expect(secretStep?.params).toMatchObject({
+      ref: '@e1',
+      secret_ref: 'GITHUB_TOKEN',
+      dom_path: 'button:nth-of-type(1)',
+      name: 'Submit',
+      role: 'button',
     });
   });
 
