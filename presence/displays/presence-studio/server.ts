@@ -57,6 +57,7 @@ import {
 import { safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import type { Request, Response } from 'express';
 import { isSimpleGreetingText } from '@agent/core/intent-contract';
 import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract-parser';
 import { checkAndRepairSurfaceUxContract } from '@agent/core/surface-ux-contract';
@@ -115,6 +116,21 @@ import {
   createPresenceVoiceStimulus,
   validatePresenceTimeline,
 } from '@agent/core/presence-surface';
+import {
+  applyHearingTurn,
+  createHearingRecord,
+  validateHearingScenario,
+  type HearingScenario,
+} from './hearing.js';
+import {
+  defaultHearingRecord,
+  hearingNamespace,
+  loadHearingRecord,
+  loadHearingCanvasVersion,
+  renderHearingCanvas,
+  saveHearingCanvasVersion,
+  saveHearingRecord,
+} from './hearing-runtime.js';
 import {
   executeEmailDelivery,
   extractFirstJsonBlock,
@@ -600,6 +616,135 @@ presenceStudioData.app.get('/api/ask-vocabulary', (req, res) => {
   );
   res.setHeader('Cache-Control', 'no-store');
   res.json({ ok: true, locale, texts });
+});
+
+class HearingRequestError extends Error {
+  readonly status = 400 as const;
+}
+
+function hearingSessionId(req: Request): string {
+  const sessionId = String(req.params.session || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u.test(sessionId)) {
+    throw new HearingRequestError('Invalid hearing session id.');
+  }
+  return sessionId;
+}
+
+function hearingScenarioFromRecord(
+  record: ReturnType<typeof defaultHearingRecord>
+): HearingScenario {
+  return {
+    id: record.scenario,
+    requirements: record.requirements.map(({ id, label }) => ({ id, label })),
+  };
+}
+
+function hearingResponseError(req: Request, res: Response, error: unknown): void {
+  const status =
+    error instanceof HearingRequestError
+      ? error.status
+      : error instanceof PresenceStudioViewerError
+        ? error.status
+        : 500;
+  logger.warn(
+    presenceStudioData.presenceStudioAuditLine(req, 'hearing.reject', {
+      status,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  );
+  res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+}
+
+// HT-01: read-only hearing record and deterministic fixed canvas. A missing
+// record is returned as an in-memory default and persisted after the first
+// answer mutation.
+presenceStudioData.app.get('/api/hearing/:session/canvas', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    const sessionId = hearingSessionId(req);
+    const namespace = hearingNamespace(viewer.tenantSlugs);
+    const record =
+      loadHearingRecord(namespace, sessionId) || defaultHearingRecord(sessionId, nowIso());
+    const requestedVersion = typeof req.query.version === 'string' ? req.query.version : '';
+    const versionedCanvas = requestedVersion
+      ? loadHearingCanvasVersion(namespace, sessionId, requestedVersion)
+      : null;
+    if (requestedVersion && !versionedCanvas)
+      throw new HearingRequestError('Hearing canvas version was not found.');
+    res.type('html');
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'"
+    );
+    res.send(versionedCanvas || renderHearingCanvas(record));
+  } catch (error) {
+    hearingResponseError(req, res, error);
+  }
+});
+
+presenceStudioData.app.get('/api/hearing/:session', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    const sessionId = hearingSessionId(req);
+    const namespace = hearingNamespace(viewer.tenantSlugs);
+    const existing = loadHearingRecord(namespace, sessionId);
+    const record = existing || defaultHearingRecord(sessionId, nowIso());
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      ok: true,
+      record,
+      persisted: Boolean(existing),
+      canvas_url: `/api/hearing/${encodeURIComponent(sessionId)}/canvas`,
+    });
+  } catch (error) {
+    hearingResponseError(req, res, error);
+  }
+});
+
+presenceStudioData.app.post('/api/hearing/:session/answer', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    requirePresenceStudioLocalAdmin(viewer);
+    const sessionId = hearingSessionId(req);
+    const body = safeParsePresenceStudioRequestBody(req.body, 'hearing answer');
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      throw new HearingRequestError('Hearing answer must be an object.');
+    }
+    const input = body as Record<string, unknown>;
+    const text = typeof input.text === 'string' ? input.text.trim() : '';
+    const requestId = typeof input.request_id === 'string' ? input.request_id.trim() : randomUUID();
+    if (!text) throw new HearingRequestError('Hearing answer text is required.');
+    const namespace = hearingNamespace(viewer.tenantSlugs);
+    const existing = loadHearingRecord(namespace, sessionId);
+    const scenario =
+      input.scenario && typeof input.scenario === 'object' && !Array.isArray(input.scenario)
+        ? (input.scenario as HearingScenario)
+        : undefined;
+    if (scenario) validateHearingScenario(scenario);
+    const record = existing || createHearingRecord(sessionId, nowIso(), scenario);
+    const next = applyHearingTurn(
+      record,
+      {
+        text,
+        request_id: requestId,
+        ...(input.intent_resolution && typeof input.intent_resolution === 'object'
+          ? { intent_resolution: input.intent_resolution as IntentResolutionContract }
+          : {}),
+      },
+      nowIso(),
+      scenario || hearingScenarioFromRecord(record)
+    );
+    const canvasVersion = saveHearingCanvasVersion(namespace, next, renderHearingCanvas(next));
+    const versioned = { ...next, canvas_versions: [...next.canvas_versions, canvasVersion] };
+    saveHearingRecord(namespace, versioned);
+    res.status(200).json({
+      ok: true,
+      record: versioned,
+      canvas_url: `/api/hearing/${encodeURIComponent(sessionId)}/canvas`,
+    });
+  } catch (error) {
+    hearingResponseError(req, res, error);
+  }
 });
 
 // FD-03: `POST /api/conversation` — the "頼む" (ask) conversation turn.
