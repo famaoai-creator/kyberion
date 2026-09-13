@@ -1104,7 +1104,9 @@
     <script src="/front-desk-rail.js"></script>
     <script>
       if (window.FrontDeskRail) {
-        window.FrontDeskRail.mount(document.getElementById("front-desk-rail"), { current: "home" });
+        // FD-02: this page moved from `/` to `/work`; `/` is now the home.html
+        // rail's own page, so nothing here should render as "current".
+        window.FrontDeskRail.mount(document.getElementById("front-desk-rail"), { current: null });
       }
     </script>
     <script>

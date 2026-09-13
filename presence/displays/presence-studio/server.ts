@@ -74,12 +74,20 @@ import {
   presenceStudioVoiceNativeListenSchema,
   presenceStudioVoiceSelectionSchema,
   presenceStudioVoiceStimulusSchema,
+  narrowPresenceStudioTenant,
+  presenceStudioRecordInScope,
   resolvePresenceStudioViewerContext,
   requirePresenceStudioLocalAdmin,
   readPresenceStudioStringParam,
   toFrontDeskViewerScope,
 } from './security.js';
 import { presenceAvailableOperations } from './headless.js';
+import {
+  buildHomePayload,
+  type HomeArtifactInput,
+  type HomeDecideCandidateInput,
+  type HomeTaskSessionInput,
+} from './home.js';
 import {
   buildPresenceSurfaceFrame,
   createPresenceVoiceStimulus,
@@ -93,6 +101,23 @@ import {
   readEmailDraftArtifact as readSharedEmailDraftArtifact,
 } from '@agent/core/email-workflow';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
+
+/** Same "never dump raw markdown as a title" heuristic the /work outcome
+ * panel's client-side `outcomeTitle()` uses (static/index.html) — reused
+ * here so `GET /api/home` and the existing outcome inbox agree. */
+function deriveHomeArtifactTitle(record: {
+  path?: string;
+  preview_text?: string;
+  kind: string;
+}): string {
+  const fromPath = record.path ? String(record.path).split('/').filter(Boolean).pop() : '';
+  if (fromPath) return fromPath;
+  const firstLine = String(record.preview_text || '')
+    .split('\n')[0]
+    .replace(/^#+\s*/, '')
+    .trim();
+  return firstLine.length > 3 && firstLine.length <= 60 ? firstLine : record.kind || 'outcome';
+}
 
 function safeParsePresenceStudioRequestBody(body: unknown, label: string): unknown {
   if (body === undefined) return undefined;
@@ -233,6 +258,87 @@ presenceStudioData.app.get('/api/front-desk/nav', (req, res) => {
       tenant_viewing_summary: catalogT('front_desk:tenant_viewing_summary', undefined, locale),
       tenant_viewing_single: catalogT('front_desk:tenant_viewing_single', undefined, locale),
     });
+  } catch (error) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+  }
+});
+
+// FD-02: exactly the `front_desk` keys static/home.js renders — mirrors
+// `/api/ui-vocabulary` above (raw, un-substituted templates; the client does
+// its own `{placeholder}` interpolation).
+presenceStudioData.app.get('/api/home-vocabulary', (req, res) => {
+  const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
+  const texts = Object.fromEntries(
+    presenceStudioData.HOME_VOCABULARY_KEYS.map((key) => [key, catalogT(key, undefined, locale)])
+  );
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, locale, texts });
+});
+
+// FD-02: the presence-studio home page's single read model. Pure assembly
+// lives in `home.ts` (`buildHomePayload`) — this route only gathers the
+// same server-side data the existing approval inbox / OS control-plane /
+// requested-work / outcome-inbox panels already read, viewer-scoped the
+// same way (`?tenant=` narrows, never widens). See
+// FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md §2.1 / FD-02.
+presenceStudioData.app.get('/api/home', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    const requestedTenant = readSurfaceStringParam(req.query.tenant);
+    // Same rule as the headless overview (`presenceStudioRecordInScope`):
+    // `?tenant=` only narrows, and records with no tenant are denied for a
+    // scoped viewer rather than shown to everyone.
+    const scopedViewer = {
+      ...viewer,
+      tenantSlugs: narrowPresenceStudioTenant(viewer, requestedTenant),
+    };
+
+    const approvals: HomeDecideCandidateInput[] = listApprovalRequests({ status: 'pending' })
+      .filter((record) => presenceStudioRecordInScope(scopedViewer, record))
+      .map((record) => ({
+        id: record.id,
+        title: record.title,
+        tenant_slug: record.scope?.tenant_slug,
+        when: record.requestedAt,
+      }));
+
+    const heldActions: HomeDecideCandidateInput[] = presenceStudioData.cloudflareOsSurface
+      .snapshot(undefined, viewer)
+      .heldActions.filter((item) => item.status === 'pending')
+      .filter((item) => presenceStudioRecordInScope(scopedViewer, { tenant_slug: item.tenantSlug }))
+      .map((item) => ({
+        id: item.id,
+        title: item.op || item.id,
+        tenant_slug: item.tenantSlug,
+        when: item.submittedAt,
+      }));
+
+    const taskSessions: HomeTaskSessionInput[] = listTaskSessions('presence')
+      .filter((session) => presenceStudioRecordInScope(scopedViewer, session))
+      .map((session) => ({
+        id: session.session_id,
+        title: session.goal?.summary || session.session_id,
+        status: session.status,
+        when: session.updated_at,
+      }));
+
+    const artifacts: HomeArtifactInput[] = listArtifactRecords()
+      .filter((record) => presenceStudioRecordInScope(scopedViewer, record))
+      .map((record) => ({
+        id: record.artifact_id,
+        title: deriveHomeArtifactTitle(record),
+      }));
+
+    const payload = buildHomePayload({
+      now: new Date(),
+      approvals,
+      heldActions,
+      taskSessions,
+      artifacts,
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(payload);
   } catch (error) {
     const status = error instanceof PresenceStudioViewerError ? error.status : 500;
     res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));

@@ -358,21 +358,54 @@ describe('interim front-desk page redirects (Deliverable 4)', () => {
     expect(progressStart).toBeGreaterThan(-1);
     expect(helpStart).toBeGreaterThan(-1);
 
-    expect(source.slice(askStart, progressStart)).toContain("res.redirect(302, '/#voice-panel')");
+    // FD-02 moved the workbench these panels live in from `/` to `/work`.
+    expect(source.slice(askStart, progressStart)).toContain(
+      "res.redirect(302, '/work#voice-panel')"
+    );
     expect(source.slice(progressStart, helpStart)).toContain(
-      "res.redirect(302, '/#requested-work-panel')"
+      "res.redirect(302, '/work#requested-work-panel')"
     );
     expect(source.slice(helpStart, helpStart + 200)).toContain("res.redirect(302, '/onboarding')");
   });
 });
 
+describe('FD-02 home page routing (Deliverable 3)', () => {
+  it('serves home.html at / and the pre-FD-02 workbench (index.html) at /work, registered ahead of express.static', () => {
+    const source = readRepoFile(
+      'presence/displays/presence-studio/presence-studio-runtime-data.ts'
+    );
+    const rootRouteStart = source.indexOf("app.get('/', ");
+    const workRouteStart = source.indexOf("app.get('/work', ");
+    const staticStart = source.indexOf('app.use(express.static(staticDir))');
+    expect(rootRouteStart).toBeGreaterThan(-1);
+    expect(workRouteStart).toBeGreaterThan(-1);
+    expect(staticStart).toBeGreaterThan(-1);
+    // Both explicit routes must be registered before express.static so its
+    // default `index: 'index.html'` behavior for `GET /` never wins.
+    expect(rootRouteStart).toBeLessThan(staticStart);
+    expect(workRouteStart).toBeLessThan(staticStart);
+
+    expect(source.slice(rootRouteStart, workRouteStart)).toContain("'home.html'");
+    expect(source.slice(workRouteStart, staticStart)).toContain("'index.html'");
+  });
+});
+
 describe('static rail mount (Deliverable 3)', () => {
-  it('mounts the rail in both index.html and onboarding.html', () => {
+  it('mounts the rail in home.html as current "home", and in index.html / onboarding.html as expected', () => {
+    const homeHtml = readRepoFile('presence/displays/presence-studio/static/home.html');
+    expect(homeHtml).toContain('id="front-desk-rail"');
+    expect(homeHtml).toContain('front-desk-rail.css');
+    expect(homeHtml).toContain('front-desk-rail.js');
+    expect(homeHtml).toContain("current: 'home'");
+    expect(homeHtml).toContain('<title>ホーム — Kyberion</title>');
+
     const indexHtml = readRepoFile('presence/displays/presence-studio/static/index.html');
     expect(indexHtml).toContain('id="front-desk-rail"');
     expect(indexHtml).toContain('front-desk-rail.css');
     expect(indexHtml).toContain('front-desk-rail.js');
-    expect(indexHtml).toContain('current: "home"');
+    // FD-02: index.html moved from `/` to `/work` — nothing renders as
+    // "current" there anymore (home.html owns the "home" rail item).
+    expect(indexHtml).toContain('current: null');
 
     const onboardingHtml = readRepoFile('presence/displays/presence-studio/static/onboarding.html');
     expect(onboardingHtml).toContain('id="front-desk-rail"');
@@ -386,5 +419,74 @@ describe('static rail mount (Deliverable 3)', () => {
     expect(railJs).not.toContain('target=');
     expect(railJs).not.toContain('127.0.0.1');
     expect(railJs).toContain('FrontDeskRail');
+  });
+
+  it('home.html/home.js never use target="_blank", emoji, 127.0.0.1, or internal vocabulary', () => {
+    const homeHtml = readRepoFile('presence/displays/presence-studio/static/home.html');
+    const homeJs = readRepoFile('presence/displays/presence-studio/static/home.js');
+    const combined = `${homeHtml}\n${homeJs}`;
+
+    expect(combined).not.toContain('target=');
+    expect(combined).not.toContain('127.0.0.1');
+    // Kana/Hangul-adjacent emoji ranges aren't checked here; this is a
+    // literal-emoji smoke check for the common pictograph block.
+    expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(combined)).toBe(false);
+
+    const forbiddenWords = [
+      'mission',
+      'ADF',
+      'actuator',
+      'pipeline',
+      'stimuli',
+      'A2UI',
+      'Presence Studio',
+      'ports',
+    ];
+    for (const word of forbiddenWords) {
+      expect(combined.toLowerCase()).not.toContain(word.toLowerCase());
+    }
+  });
+});
+
+describe('FD-02 remote-safe allowlist wiring', () => {
+  it('extends the allowlist to /api/home and /api/home-vocabulary without removing the existing entries', () => {
+    const source = readRepoFile('presence/displays/presence-studio/security.ts');
+    expect(source).toContain("path === '/api/me'");
+    expect(source).toContain("path === '/api/front-desk/nav'");
+    expect(source).toContain("path === '/api/home'");
+    expect(source).toContain("path === '/api/home-vocabulary'");
+  });
+
+  it('allows a remote token to reach /api/home and /api/home-vocabulary but still blocks other /api/* routes', () => {
+    process.env.PRESENCE_STUDIO_TOKEN = 'studio-token';
+    const middleware = requirePresenceStudioAccess();
+
+    const homeRes = fakeResponse();
+    const homeNext = vi.fn();
+    middleware(
+      fakeRequest({
+        remoteAddress: '198.51.100.24',
+        authorization: 'Bearer studio-token',
+        urlPath: '/api/home',
+      }) as never,
+      homeRes as never,
+      homeNext
+    );
+    expect(homeNext).toHaveBeenCalledTimes(1);
+
+    const vocabRes = fakeResponse();
+    const vocabNext = vi.fn();
+    middleware(
+      fakeRequest({
+        remoteAddress: '198.51.100.24',
+        authorization: 'Bearer studio-token',
+        urlPath: '/api/home-vocabulary?locale=ja',
+      }) as never,
+      vocabRes as never,
+      vocabNext
+    );
+    expect(vocabNext).toHaveBeenCalledTimes(1);
+
+    delete process.env.PRESENCE_STUDIO_TOKEN;
   });
 });

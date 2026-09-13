@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ホーム — Kyberion</title>
+    <!-- Kyberion Design System (DS-01 canonical tokens) -->
+    <link rel="stylesheet" href="./design-system.css" />
+    <link rel="stylesheet" href="/api/design-tokens.css" />
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <link rel="stylesheet" href="/front-desk-rail.css" />
+    <!-- FD-02: home page styles -->
+    <link rel="stylesheet" href="/home.css" />
+  </head>
+  <body>
+    <div class="fd-layout">
+      <nav id="front-desk-rail" class="front-desk-rail"></nav>
+      <div class="fd-content">
+        <main class="home-shell">
+          <section class="home-briefing" id="briefing-card">
+            <div class="home-briefing-date" id="briefing-date"></div>
+            <p class="home-briefing-sentence" id="briefing-sentence"></p>
+            <p class="home-briefing-recommend hidden" id="briefing-recommend"></p>
+          </section>
+
+          <section class="home-ask" aria-label="頼む">
+            <form id="ask-form" class="home-ask-form">
+              <div class="home-ask-row">
+                <input type="text" id="ask-input" class="home-ask-input" autocomplete="off" />
+                <button
+                  type="button"
+                  id="ask-mic"
+                  class="home-ask-icon-button"
+                  aria-label=""
+                ></button>
+                <button
+                  type="submit"
+                  id="ask-send"
+                  class="home-ask-icon-button home-ask-send-button"
+                  aria-label=""
+                ></button>
+              </div>
+              <div class="home-ask-chips" id="ask-chips">
+                <button type="button" class="home-chip" data-chip="email"></button>
+                <button type="button" class="home-chip" data-chip="minutes"></button>
+                <button type="button" class="home-chip" data-chip="browser"></button>
+                <button type="button" class="home-chip" data-chip="webapp"></button>
+              </div>
+            </form>
+          </section>
+
+          <section class="home-columns">
+            <div class="home-card" id="decide-card">
+              <div class="home-card-header">
+                <h2 id="decide-title"></h2>
+                <span class="home-card-count" id="decide-count"></span>
+              </div>
+              <ul class="home-list" id="decide-list"></ul>
+              <p class="home-empty hidden" id="decide-empty"></p>
+              <a class="home-card-footer" id="decide-more" href="#"></a>
+            </div>
+
+            <div class="home-card" id="progress-card">
+              <div class="home-card-header">
+                <h2 id="progress-title"></h2>
+              </div>
+              <p class="home-card-summary" id="progress-summary"></p>
+              <ul class="home-list" id="progress-list"></ul>
+              <p class="home-empty hidden" id="progress-empty"></p>
+              <a class="home-card-footer" id="progress-more" href="/work#requested-work-panel"></a>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script src="/front-desk-rail.js"></script>
+    <script src="/home.js"></script>
+    <script>
+      if (window.FrontDeskRail) {
+        window.FrontDeskRail.mount(document.getElementById('front-desk-rail'), { current: 'home' });
+      }
+      if (window.KyberionHome) {
+        window.KyberionHome.mount();
+      }
+    </script>
+  </body>
+</html>

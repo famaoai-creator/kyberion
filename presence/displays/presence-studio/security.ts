@@ -373,11 +373,15 @@ export function requirePresenceStudioAccess(): RequestHandler {
     // FD-01: /api/me and /api/front-desk/nav are read-only and viewer-scoped
     // (never widened by a client-supplied ?tenant=), so they join the same
     // remote-safe allowlist as the headless and OS control-plane APIs.
+    // FD-02: /api/home and /api/home-vocabulary are the same shape (read-only,
+    // viewer-scoped, no client-supplied widening) so they join it too.
     const remoteSafe =
       path.startsWith('/api/headless/') ||
       path.startsWith('/api/os/') ||
       path === '/api/me' ||
-      path === '/api/front-desk/nav';
+      path === '/api/front-desk/nav' ||
+      path === '/api/home' ||
+      path === '/api/home-vocabulary';
     if (remote && auth.reason === 'token' && !remoteSafe) {
       return res.status(403).json({
         ok: false,
