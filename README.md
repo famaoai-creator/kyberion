@@ -168,13 +168,13 @@ For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md)
 
 ## Surfaces — one role per screen
 
-Each surface answers one question and shows its role in the header. Full role map, ports and access rules: [`docs/SURFACES.md`](./docs/SURFACES.md).
+Each surface answers one question and shows its role in the header. The two human-facing surfaces (Concierge and Presence Studio) share one five-item rail — ホーム / 頼む / 決める / 進み具合 / 設定 — so they read as a single front desk. Full role map, ports and access rules: [`docs/SURFACES.md`](./docs/SURFACES.md).
 
 <table>
   <tr>
     <td align="center" width="33%"><a href="./presence/displays/chronos-mirror-v2/"><img src="./docs/assets/surfaces/chronos.jpg" alt="Chronos Mirror — control tower home with tenant scope, view switcher, next action and per-mission agent status" width="100%" /></a><br /><strong>Chronos Mirror</strong> · <code>:3000</code><br /><sub>Control tower: what is the system doing, where should I intervene?</sub></td>
-    <td align="center" width="33%"><a href="./presence/displays/concierge/"><img src="./docs/assets/surfaces/concierge.jpg" alt="Concierge — CEO secretary view with approvals, requests, deliverables and exceptions" width="100%" /></a><br /><strong>Concierge</strong> · <code>:3050</code><br /><sub>CEO secretary: what do I need to decide right now?</sub></td>
-    <td align="center" width="33%"><a href="./presence/displays/presence-studio/"><img src="./docs/assets/surfaces/presence-studio.jpg" alt="Presence Studio — companion workbench with minutes, email, browser, approval and task cards plus voice controls" width="100%" /></a><br /><strong>Presence Studio</strong> · <code>:3031</code><br /><sub>Companion: what are we working on together, by voice or text?</sub></td>
+    <td align="center" width="33%"><a href="./presence/displays/concierge/"><img src="./docs/assets/surfaces/concierge.jpg" alt="Concierge — the 決める (Decide) page: one urgency-ordered queue of approvals, exceptions and stalled requests, each card with why it needs you and three actions" width="100%" /></a><br /><strong>Concierge</strong> · <code>:3050</code><br /><sub>CEO secretary: what do I need to decide right now? (決める · 設定)</sub></td>
+    <td align="center" width="33%"><a href="./presence/displays/presence-studio/"><img src="./docs/assets/surfaces/presence-studio.jpg" alt="Presence Studio — the ホーム (Home) page: today's briefing, the ask box with request chips, what needs your decision and progress, behind the shared five-item rail" width="100%" /></a><br /><strong>Presence Studio</strong> · <code>:3031</code><br /><sub>Companion: what are we working on together, by voice or text? (ホーム · 頼む · 進み具合)</sub></td>
   </tr>
   <tr>
     <td align="center"><a href="./presence/displays/operator-surface/"><img src="./docs/assets/surfaces/operator-surface.jpg" alt="Operator Surface — read-only audit monitor listing missions with status, tier, tenant, persona and checkpoints" width="100%" /></a><br /><strong>Operator Surface</strong> · <code>:3331</code><br /><sub>Audit monitor, read-only: what happened, with evidence?</sub></td>

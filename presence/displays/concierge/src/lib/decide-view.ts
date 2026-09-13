@@ -62,7 +62,12 @@ export function deriveCardFields(entry: DecideQueueEntry): DecideCardFields {
   switch (entry.kind) {
     case 'approval':
       return {
-        why: entry.item.reason || undefined,
+        // A reason that merely repeats the title says nothing — leave the
+        // column out rather than showing the same words twice.
+        why:
+          entry.item.reason && entry.item.reason.trim() !== entry.item.title.trim()
+            ? entry.item.reason
+            : undefined,
         effectLabelKey: 'decide_effect_approval',
       };
     case 'hygiene':

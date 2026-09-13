@@ -187,7 +187,18 @@
     memory: 'tag_memory',
   };
 
-  function renderDecideCard(nav, vocab, home) {
+  // Tenant chips only make sense when the viewer can look at more than one
+  // tenant, and they show the tenant's display name, never its slug.
+  function tenantChipFor(me, slug) {
+    if (!me || !me.ok || !me.can_switch || !slug) return '';
+    var name = slug;
+    (me.tenants || []).forEach(function (tenant) {
+      if (tenant.tenant_slug === slug && tenant.display_name) name = tenant.display_name;
+    });
+    return '<span class="home-tenant-chip">' + escapeHtml(name) + '</span>';
+  }
+
+  function renderDecideCard(nav, vocab, home, me) {
     var titleEl = document.getElementById('decide-title');
     if (titleEl) titleEl.textContent = vt(vocab, 'home_decide_title');
 
@@ -223,9 +234,7 @@
       .map(function (item) {
         var tagKey = DECIDE_TAG_KEY[item.kind] || 'tag_approval';
         var tagLabel = vt(vocab, tagKey) || item.kind;
-        var tenantChip = item.tenant_slug
-          ? '<span class="home-tenant-chip">' + escapeHtml(item.tenant_slug) + '</span>'
-          : '';
+        var tenantChip = tenantChipFor(me, item.tenant_slug);
         return (
           '<li><a class="home-row" href="' +
           escapeHtml(href) +
@@ -355,9 +364,18 @@
     }
   }
 
-  function render(nav, vocab, home, locale) {
+  function storedTenantQuery() {
+    try {
+      var slug = window.localStorage.getItem('front-desk.tenant');
+      return slug ? '?tenant=' + encodeURIComponent(slug) : '';
+    } catch (err) {
+      return '';
+    }
+  }
+
+  function render(nav, vocab, home, locale, me) {
     renderBriefing(vocab, home, locale);
-    renderDecideCard(nav, vocab, home);
+    renderDecideCard(nav, vocab, home, me);
     renderProgressCard(vocab, home);
   }
 
@@ -374,9 +392,15 @@
         var vocab = vocabResponse.texts || {};
         renderAskShell(vocab);
         wireAskBox(vocab);
-        return fetchJson('/api/home').then(function (home) {
+        var tenantQuery = storedTenantQuery();
+        return Promise.all([
+          fetchJson('/api/home' + tenantQuery),
+          fetchJson('/api/me' + tenantQuery),
+        ]).then(function (pair2) {
+          var home = pair2[0];
+          var me = pair2[1];
           if (home && home.ok && nav && nav.ok) {
-            render(nav, vocab, home, locale);
+            render(nav, vocab, home, locale, me);
           }
         });
       })
