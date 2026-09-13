@@ -2,7 +2,11 @@ import type { IntentResolutionContract } from '@agent/core/intent-resolution-con
 
 export interface HearingScenarioRequirement {
   id: string;
-  label: string;
+  /** HT-06 (i18n gate): a `front_desk:*` vocabulary key, never raw display
+   * text — callers resolve it with `t()`/`catalogT()` at render time, per
+   * request locale. Persisted `HearingRequirement`s keep this key too, so a
+   * locale change re-renders instead of freezing the answering locale. */
+  label_key: string;
   aliases?: string[];
 }
 
@@ -14,13 +18,25 @@ export interface HearingScenario {
 export const WEB_APP_HEARING_SCENARIO: HearingScenario = {
   id: 'web_app_build',
   requirements: [
-    { id: 'audience', label: '対象となる人', aliases: ['target', 'users', 'user'] },
-    { id: 'problem', label: '解決したいこと', aliases: ['goal', 'use_case'] },
-    { id: 'core_flow', label: '主な流れ', aliases: ['flow'] },
-    { id: 'content', label: '載せる内容' },
-    { id: 'visual_direction', label: '見た目の方向', aliases: ['visual'] },
-    { id: 'constraints', label: '制約・条件', aliases: ['constraint'] },
-    { id: 'success', label: 'できたと判断する条件', aliases: ['acceptance'] },
+    {
+      id: 'audience',
+      label_key: 'front_desk:hearing_req_audience',
+      aliases: ['target', 'users', 'user'],
+    },
+    { id: 'problem', label_key: 'front_desk:hearing_req_problem', aliases: ['goal', 'use_case'] },
+    { id: 'core_flow', label_key: 'front_desk:hearing_req_core_flow', aliases: ['flow'] },
+    { id: 'content', label_key: 'front_desk:hearing_req_content' },
+    {
+      id: 'visual_direction',
+      label_key: 'front_desk:hearing_req_visual_direction',
+      aliases: ['visual'],
+    },
+    {
+      id: 'constraints',
+      label_key: 'front_desk:hearing_req_constraints',
+      aliases: ['constraint'],
+    },
+    { id: 'success', label_key: 'front_desk:hearing_req_success', aliases: ['acceptance'] },
   ],
 };
 
@@ -28,7 +44,7 @@ export type HearingRequirementId = string;
 
 export interface HearingRequirement {
   id: HearingRequirementId;
-  label: string;
+  label_key: string;
   answer?: string;
   confidence: number;
   source_turn?: string;
@@ -68,7 +84,7 @@ export function createHearingRecord(
   validateHearingScenario(scenario);
   const ids = new Set<string>();
   for (const requirement of scenario.requirements) {
-    if (!requirement.id.trim() || !requirement.label.trim() || ids.has(requirement.id)) {
+    if (!requirement.id.trim() || !requirement.label_key.trim() || ids.has(requirement.id)) {
       throw new Error('[HEARING_SCENARIO_INVALID] requirement ids and labels must be unique');
     }
     ids.add(requirement.id);
@@ -76,7 +92,11 @@ export function createHearingRecord(
   return {
     session_id: sessionId,
     scenario: scenario.id,
-    requirements: scenario.requirements.map(({ id, label }) => ({ id, label, confidence: 0 })),
+    requirements: scenario.requirements.map(({ id, label_key }) => ({
+      id,
+      label_key,
+      confidence: 0,
+    })),
     canvas_versions: [],
     updated_at: now,
   };
@@ -98,8 +118,8 @@ export function validateHearingScenario(scenario: HearingScenario): void {
       !requirement ||
       typeof requirement.id !== 'string' ||
       !/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u.test(requirement.id.trim()) ||
-      typeof requirement.label !== 'string' ||
-      !requirement.label.trim() ||
+      typeof requirement.label_key !== 'string' ||
+      !requirement.label_key.trim() ||
       ids.has(requirement.id)
     ) {
       throw new Error(

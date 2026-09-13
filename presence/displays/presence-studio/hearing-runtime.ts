@@ -6,6 +6,8 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { t as catalogT, type VocabularyKey } from '@agent/core/t';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { createHearingRecord, type HearingRecord, type HearingScenario } from './hearing.js';
 
 const HEARING_ROOT = pathResolver.sharedTmp('hearing');
@@ -50,7 +52,7 @@ export function loadHearingRecord(namespace: string, sessionId: string): Hearing
       (item) =>
         item &&
         typeof item.id === 'string' &&
-        typeof item.label === 'string' &&
+        typeof item.label_key === 'string' &&
         typeof item.confidence === 'number'
     )
   ) {
@@ -116,16 +118,28 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
-/** HT-01 fixed canvas: safe, deterministic, and free of external resources. */
-export function renderHearingCanvas(record: HearingRecord): string {
+/** HT-01/HT-06 fixed canvas: safe, deterministic, and free of external
+ * resources. All fixed chrome text (title, heading, coverage, unanswered
+ * fallback) resolves through the `front_desk` vocabulary catalog at render
+ * time via `locale` — only the requirement labels (via `label_key`) and the
+ * free-form answers are per-record data, and answers stay escaped. */
+export function renderHearingCanvas(record: HearingRecord, locale: SupportedLocale = 'en'): string {
   const complete = record.requirements.filter((item) => item.answer?.trim()).length;
+  const unanswered = catalogT('front_desk:hearing_canvas_unanswered', undefined, locale);
   const cards = record.requirements
     .map(
       (item) => `<article class="requirement ${item.answer ? 'answered' : 'open'}">
-        <h2>${escapeHtml(item.label)}</h2>
-        <p>${escapeHtml(item.answer || 'まだ聞けていません')}</p>
+        <h2>${escapeHtml(catalogT(item.label_key as VocabularyKey, undefined, locale))}</h2>
+        <p>${escapeHtml(item.answer || unanswered)}</p>
       </article>`
     )
     .join('\n');
-  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ヒアリングの案</title><style>body{font-family:system-ui,sans-serif;margin:0;padding:24px;background:#faf9f6;color:#26231d}h1{font-size:22px;margin:0 0 8px}.meta{color:#706b60;font-size:13px;margin:0 0 18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.requirement{padding:14px;border:1px solid #e3ddd1;border-radius:12px;background:#fff}.requirement h2{font-size:14px;margin:0 0 8px}.requirement p{font-size:13px;line-height:1.5;margin:0;color:#706b60}.answered{border-color:#a98a54}.answered p{color:#26231d}</style></head><body><h1>作りたいものの整理</h1><p class="meta">${complete}/${record.requirements.length} 項目が埋まっています</p><main class="grid">${cards}</main></body></html>`;
+  const pageTitle = catalogT('front_desk:hearing_canvas_page_title', undefined, locale);
+  const heading = catalogT('front_desk:hearing_canvas_heading', undefined, locale);
+  const coverage = catalogT(
+    'front_desk:hearing_canvas_coverage',
+    { complete, total: record.requirements.length },
+    locale
+  );
+  return `<!doctype html><html lang="${escapeHtml(locale)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(pageTitle)}</title><style>body{font-family:system-ui,sans-serif;margin:0;padding:24px;background:#faf9f6;color:#26231d}h1{font-size:22px;margin:0 0 8px}.meta{color:#706b60;font-size:13px;margin:0 0 18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.requirement{padding:14px;border:1px solid #e3ddd1;border-radius:12px;background:#fff}.requirement h2{font-size:14px;margin:0 0 8px}.requirement p{font-size:13px;line-height:1.5;margin:0;color:#706b60}.answered{border-color:#a98a54}.answered p{color:#26231d}</style></head><body><h1>${escapeHtml(heading)}</h1><p class="meta">${escapeHtml(coverage)}</p><main class="grid">${cards}</main></body></html>`;
 }

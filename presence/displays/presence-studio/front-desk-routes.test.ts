@@ -827,3 +827,108 @@ describe('FD-08 removed presence-studio dashboard panels', () => {
     expect(serverSource).toContain("presenceStudioData.app.get('/api/knowledge-ref'");
   });
 });
+
+describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
+  it('hearing.ts and hearing-runtime.ts carry no raw Japanese/English requirement labels or canvas chrome text', () => {
+    const hearingTs = readRepoFile('presence/displays/presence-studio/hearing.ts');
+    const hearingRuntimeTs = readRepoFile('presence/displays/presence-studio/hearing-runtime.ts');
+    // The old raw labels are gone — every requirement now carries a
+    // `front_desk:hearing_req_*` vocabulary key instead.
+    for (const oldLabel of [
+      '対象となる人',
+      '解決したいこと',
+      '主な流れ',
+      '載せる内容',
+      '見た目の方向',
+      '制約・条件',
+      'できたと判断する条件',
+    ]) {
+      expect(hearingTs).not.toContain(oldLabel);
+    }
+    expect(hearingTs).toContain("label_key: 'front_desk:hearing_req_audience'");
+    // The canvas's fixed chrome (title, heading, coverage, unanswered
+    // fallback) is gone as raw text and resolved through `t()` instead.
+    for (const oldText of [
+      'ヒアリングの案',
+      '作りたいものの整理',
+      '項目が埋まっています',
+      'まだ聞けていません',
+    ]) {
+      expect(hearingRuntimeTs).not.toContain(oldText);
+    }
+    expect(hearingRuntimeTs).toContain("catalogT('front_desk:hearing_canvas_page_title'");
+    expect(hearingRuntimeTs).toContain("catalogT('front_desk:hearing_canvas_heading'");
+    expect(hearingRuntimeTs).toContain("'front_desk:hearing_canvas_coverage'");
+    expect(hearingRuntimeTs).toContain("catalogT('front_desk:hearing_canvas_unanswered'");
+    expect(hearingRuntimeTs).toContain('item.label_key as VocabularyKey');
+  });
+
+  it('renderHearingCanvas resolves requirement labels and chrome text per locale, never persisting rendered text', () => {
+    const html = catalogT('front_desk:hearing_canvas_heading', undefined, 'ja');
+    expect(html).toBe('作りたいものの整理');
+    const enHtml = catalogT('front_desk:hearing_canvas_heading', undefined, 'en');
+    expect(enHtml).not.toBe(html);
+  });
+
+  it('ask.html/ask.js hearing card has no raw Japanese fixed copy and reads it from /api/ask-vocabulary', () => {
+    const askHtml = readRepoFile('presence/displays/presence-studio/static/ask.html');
+    const askJs = readRepoFile('presence/displays/presence-studio/static/ask.js');
+    for (const oldText of [
+      'ヒアリングの整理',
+      '項目が埋まっています',
+      'この内容で進める',
+      '準備中',
+      '要件キャンバス',
+    ]) {
+      expect(askHtml).not.toContain(oldText);
+      expect(askJs).not.toContain(oldText);
+    }
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_title')");
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_coverage')");
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_decide')");
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_pending')");
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_canvas_frame_title')");
+    // The hearing endpoints carry the same `?locale=` the page already
+    // sends to `/api/ask-vocabulary`.
+    expect(askJs).toContain('/api/hearing/');
+    expect(askJs).toMatch(/locale=.*encodeURIComponent\(state\.locale\)/);
+  });
+
+  it('help.html/help.js training block has no raw Japanese fixed copy and reads it from /api/help-vocabulary', () => {
+    const helpJs = readRepoFile('presence/displays/presence-studio/static/help.js');
+    for (const oldText of [
+      'トラックから選ぶ',
+      '開く',
+      '使い方の一覧に戻る',
+      'やってみる',
+      'できたこと:',
+      '未着手',
+      '進行中',
+      '完了',
+    ]) {
+      expect(helpJs).not.toContain(oldText);
+    }
+    expect(helpJs).toContain("fetch('/api/help-vocabulary?locale=");
+    expect(helpJs).toContain("vt(vocab, 'front_desk:training_choose_track')");
+    expect(helpJs).toContain("vt(vocab, 'front_desk:training_open')");
+    expect(helpJs).toContain("vt(vocab, 'front_desk:training_back')");
+    expect(helpJs).toContain("vt(vocab, 'front_desk:training_try')");
+    expect(helpJs).toContain("vt(vocab, 'front_desk:training_done_prefix')");
+    expect(helpJs).toContain('TRAINING_LEVEL_KEY');
+    expect(helpJs).toContain('TRAINING_STATUS_KEY');
+  });
+
+  it('extends the remote-safe allowlist to /api/help-vocabulary', () => {
+    const source = readRepoFile('presence/displays/presence-studio/security.ts');
+    expect(source).toContain("path === '/api/help-vocabulary'");
+  });
+
+  it('wires GET /api/help-vocabulary the same shape as /api/ask-vocabulary', () => {
+    const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
+    expect(source).toContain("app.get('/api/help-vocabulary'");
+    const helpVocabStart = source.indexOf("app.get('/api/help-vocabulary'");
+    const helpVocabRoute = source.slice(helpVocabStart, helpVocabStart + 400);
+    expect(helpVocabRoute).toContain('HELP_VOCABULARY_KEYS');
+    expect(helpVocabRoute).toContain("res.setHeader('Cache-Control', 'no-store')");
+  });
+});

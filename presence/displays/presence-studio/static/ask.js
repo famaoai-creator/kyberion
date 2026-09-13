@@ -435,24 +435,44 @@
     renderHearing();
   }
 
+  // Simple `{name}` interpolation for the vocabulary templates this file
+  // renders (mirrors the ICU-subset `{name}` substitution `libs/core/
+  // message-format.ts` implements server-side; this page never needs the
+  // plural form, so it only replaces bare `{name}` tokens).
+  function formatTemplate(template, params) {
+    return String(template || '').replace(/\{(\w+)\}/g, function (match, name) {
+      return Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match;
+    });
+  }
+
   function renderHearing() {
     var card = document.getElementById('hearing-card');
     if (!card) return;
     card.classList.toggle('hidden', !state.hearingMode);
     if (!state.hearingMode) return;
     var record = state.hearingRecord;
-    var coverage = document.getElementById('hearing-coverage');
+    var titleEl = document.getElementById('hearing-title');
+    if (titleEl) titleEl.textContent = vt(state.vocab, 'front_desk:hearing_title');
     var canvas = document.getElementById('hearing-canvas');
+    if (canvas)
+      canvas.setAttribute('title', vt(state.vocab, 'front_desk:hearing_canvas_frame_title'));
     var decide = document.getElementById('hearing-decide');
+    if (decide) decide.textContent = vt(state.vocab, 'front_desk:hearing_decide');
+    var coverage = document.getElementById('hearing-coverage');
     if (coverage) {
-      var complete = record
-        ? record.requirements.filter(function (item) {
-            return Boolean(item.answer);
-          }).length
-        : 0;
-      var total = record ? record.requirements.length : 0;
-      coverage.textContent = complete + '/' + total + ' 項目が埋まっています';
-      if (decide) decide.classList.toggle('hidden', complete !== total || Boolean(record && record.decided_at));
+      if (!record) {
+        coverage.textContent = vt(state.vocab, 'front_desk:hearing_pending');
+      } else {
+        var done = record.requirements.filter(function (item) {
+          return Boolean(item.answer);
+        }).length;
+        var total = record.requirements.length;
+        coverage.textContent = formatTemplate(vt(state.vocab, 'front_desk:hearing_coverage'), {
+          done: done,
+          total: total,
+        });
+        if (decide) decide.classList.toggle('hidden', done !== total || Boolean(record.decided_at));
+      }
     }
     if (canvas && record && record.canvas_url && canvas.getAttribute('src') !== record.canvas_url) {
       canvas.setAttribute('src', record.canvas_url);
@@ -461,7 +481,12 @@
 
   function loadHearing() {
     if (!state.hearingMode) return;
-    fetchJson('/api/hearing/' + encodeURIComponent(state.sessionId))
+    fetchJson(
+      '/api/hearing/' +
+        encodeURIComponent(state.sessionId) +
+        '?locale=' +
+        encodeURIComponent(state.locale)
+    )
       .then(function (result) {
         if (result.ok && result.body && result.body.ok) {
           state.hearingRecord = result.body.record;
@@ -475,16 +500,26 @@
 
   function decideHearing() {
     if (!state.hearingMode || !state.hearingRecord) return;
-    fetchJson('/api/hearing/' + encodeURIComponent(state.sessionId) + '/decide', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}',
-    }).then(function (result) {
-      if (result.ok && result.body && result.body.ok) {
-        state.hearingRecord = result.body.record;
-        renderHearing();
+    fetchJson(
+      '/api/hearing/' +
+        encodeURIComponent(state.sessionId) +
+        '/decide?locale=' +
+        encodeURIComponent(state.locale),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
       }
-    }).catch(function () { /* the record remains available for retry */ });
+    )
+      .then(function (result) {
+        if (result.ok && result.body && result.body.ok) {
+          state.hearingRecord = result.body.record;
+          renderHearing();
+        }
+      })
+      .catch(function () {
+        /* the record remains available for retry */
+      });
   }
 
   function updateHearing(text, intentResolution) {
@@ -496,6 +531,7 @@
         text: text,
         request_id: randomId(),
         intent_resolution: intentResolution,
+        locale: state.locale,
       }),
     }).then(function (result) {
       if (result.ok && result.body && result.body.ok) {

@@ -19,8 +19,8 @@ describe('hearing scenarios', () => {
     const scenario: HearingScenario = {
       id: 'event_plan',
       requirements: [
-        { id: 'date', label: '開催日', aliases: ['when'] },
-        { id: 'guests', label: '参加者', aliases: ['audience'] },
+        { id: 'date', label_key: 'front_desk:hearing_req_event_date', aliases: ['when'] },
+        { id: 'guests', label_key: 'front_desk:hearing_req_event_guests', aliases: ['audience'] },
       ],
     };
     const record = createHearingRecord('hearing-2', '2026-09-14T00:00:00.000Z', scenario);
@@ -53,8 +53,8 @@ describe('hearing scenarios', () => {
       createHearingRecord('hearing-3', '2026-09-14T00:00:00.000Z', {
         id: 'invalid',
         requirements: [
-          { id: 'same', label: 'A' },
-          { id: 'same', label: 'B' },
+          { id: 'same', label_key: 'front_desk:hearing_req_a' },
+          { id: 'same', label_key: 'front_desk:hearing_req_b' },
         ],
       })
     ).toThrow('HEARING_SCENARIO_INVALID');

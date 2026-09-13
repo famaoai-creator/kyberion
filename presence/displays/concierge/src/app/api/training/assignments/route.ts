@@ -6,6 +6,7 @@ import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { requireKnownRequestKeys, requireRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 import { resolveConciergeFrontDeskRole } from '../../../../lib/front-desk-member';
+import { frontDeskText, resolveConciergeLocale } from '../../../../lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,11 +37,12 @@ export function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
+  const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
   if (resolveConciergeFrontDeskRole(resolved.context) !== 'owner') {
     return NextResponse.json(
-      { ok: false, error: '組織の所有者だけが割り当てを変更できます。' },
+      { ok: false, error: frontDeskText('training_assign_owner_only', locale) },
       { status: 403 }
     );
   }
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
     const trackId = typeof body.track_id === 'string' ? body.track_id.trim() : '';
     if (!tenant || !memberId || !trackId || !allowedTenant(resolved.context, tenant)) {
       return NextResponse.json(
-        { ok: false, error: '割り当ての入力を確認してください。' },
+        { ok: false, error: frontDeskText('training_assign_invalid_input', locale) },
         { status: 400 }
       );
     }

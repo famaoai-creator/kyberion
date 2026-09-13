@@ -11385,6 +11385,181 @@
         "en": "That member was not found.",
         "ja": "そのメンバーは見つかりませんでした。",
         "qps-ploc": "⟦Ŧħȧŧ ɱėɱƀėř ẇȧş ñőŧ ƒőůñḓ. ŀőřėɱ ïṗ⟧"
+      },
+      "hearing_req_audience": {
+        "en": "Who it's for",
+        "ja": "対象となる人",
+        "qps-ploc": "⟦Ẇħő ïŧ'ş ƒőř ŀőř⟧"
+      },
+      "hearing_req_problem": {
+        "en": "What it should solve",
+        "ja": "解決したいこと",
+        "qps-ploc": "⟦Ẇħȧŧ ïŧ şħőůŀḓ şőŀṽė ŀőřėɱ ⟧"
+      },
+      "hearing_req_core_flow": {
+        "en": "Main flow",
+        "ja": "主な流れ",
+        "qps-ploc": "⟦Ɱȧïñ ƒŀőẇ ŀőř⟧"
+      },
+      "hearing_req_content": {
+        "en": "What content it shows",
+        "ja": "載せる内容",
+        "qps-ploc": "⟦Ẇħȧŧ ƈőñŧėñŧ ïŧ şħőẇş ŀőřėɱ ⟧"
+      },
+      "hearing_req_visual_direction": {
+        "en": "Visual direction",
+        "ja": "見た目の方向",
+        "qps-ploc": "⟦Ṽïşůȧŀ ḓïřėƈŧïőñ ŀőřėɱ⟧"
+      },
+      "hearing_req_constraints": {
+        "en": "Constraints",
+        "ja": "制約・条件",
+        "qps-ploc": "⟦Ƈőñşŧřȧïñŧş ŀőř⟧"
+      },
+      "hearing_req_success": {
+        "en": "How you'll know it's done",
+        "ja": "できたと判断する条件",
+        "qps-ploc": "⟦Ħőẇ ẏőů'ŀŀ ķñőẇ ïŧ'ş ḓőñė ŀőřėɱ ïṗ⟧"
+      },
+      "hearing_canvas_page_title": {
+        "en": "Draft requirements",
+        "ja": "ヒアリングの案",
+        "qps-ploc": "⟦Ḓřȧƒŧ řėɋůïřėɱėñŧş ŀőřėɱ⟧"
+      },
+      "hearing_canvas_heading": {
+        "en": "Organizing what you want to build",
+        "ja": "作りたいものの整理",
+        "qps-ploc": "⟦Őřɠȧñïẑïñɠ ẇħȧŧ ẏőů ẇȧñŧ ŧő ƀůïŀḓ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "hearing_canvas_coverage": {
+        "en": "{complete}/{total} answered",
+        "ja": "{complete}/{total} 項目が埋まっています",
+        "qps-ploc": "⟦{complete}/{total} ȧñşẇėřėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "hearing_canvas_unanswered": {
+        "en": "Not yet answered",
+        "ja": "まだ聞けていません",
+        "qps-ploc": "⟦Ñőŧ ẏėŧ ȧñşẇėřėḓ ŀőřėɱ⟧"
+      },
+      "hearing_title": {
+        "en": "Requirements hearing",
+        "ja": "ヒアリングの整理",
+        "qps-ploc": "⟦Řėɋůïřėɱėñŧş ħėȧřïñɠ ŀőřėɱ ⟧"
+      },
+      "hearing_coverage": {
+        "en": "{done}/{total} answered",
+        "ja": "{done}/{total} 項目が埋まっています",
+        "qps-ploc": "⟦{done}/{total} ȧñşẇėřėḓ ŀőřėɱ ï⟧"
+      },
+      "hearing_decide": {
+        "en": "Proceed with this",
+        "ja": "この内容で進める",
+        "qps-ploc": "⟦Ṗřőƈėėḓ ẇïŧħ ŧħïş ŀőřėɱ⟧"
+      },
+      "hearing_pending": {
+        "en": "Preparing…",
+        "ja": "準備中",
+        "qps-ploc": "⟦Ṗřėṗȧřïñɠ… ŀőř⟧"
+      },
+      "training_assign_owner_only": {
+        "en": "Only the organization owner can change training assignments.",
+        "ja": "組織の所有者だけが割り当てを変更できます。",
+        "qps-ploc": "⟦Őñŀẏ ŧħė őřɠȧñïẑȧŧïőñ őẇñėř ƈȧñ ƈħȧñɠė ŧřȧïñïñɠ ȧşşïɠñɱėñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "training_assign_invalid_input": {
+        "en": "Check the assignment input.",
+        "ja": "割り当ての入力を確認してください。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ȧşşïɠñɱėñŧ ïñṗůŧ. ŀőřėɱ ïṗ⟧"
+      },
+      "training_back": {
+        "en": "Back to the list",
+        "ja": "使い方の一覧に戻る",
+        "qps-ploc": "⟦Ƀȧƈķ ŧő ŧħė ŀïşŧ ŀőřėɱ⟧"
+      },
+      "training_try": {
+        "en": "Try it",
+        "ja": "やってみる",
+        "qps-ploc": "⟦Ŧřẏ ïŧ ŀőř⟧"
+      },
+      "training_done_prefix": {
+        "en": "Done:",
+        "ja": "できたこと:",
+        "qps-ploc": "⟦Ḓőñė: ŀőř⟧"
+      },
+      "training_level_beginner": {
+        "en": "Beginner",
+        "ja": "初級",
+        "qps-ploc": "⟦Ƀėɠïññėř ŀőř⟧"
+      },
+      "training_level_intermediate": {
+        "en": "Intermediate",
+        "ja": "中級",
+        "qps-ploc": "⟦Ïñŧėřɱėḓïȧŧė ŀőř⟧"
+      },
+      "training_level_advanced": {
+        "en": "Advanced",
+        "ja": "上級",
+        "qps-ploc": "⟦Ȧḓṽȧñƈėḓ ŀőř⟧"
+      },
+      "training_status_not_started": {
+        "en": "Not started",
+        "ja": "未着手",
+        "qps-ploc": "⟦Ñőŧ şŧȧřŧėḓ ŀőř⟧"
+      },
+      "training_status_in_progress": {
+        "en": "In progress",
+        "ja": "進行中",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş ŀőř⟧"
+      },
+      "training_status_complete": {
+        "en": "Complete",
+        "ja": "完了",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧė ŀőř⟧"
+      },
+      "training_choose_track": {
+        "en": "Choose a track",
+        "ja": "トラックから選ぶ",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ŧřȧƈķ ŀőřė⟧"
+      },
+      "training_open": {
+        "en": "Open",
+        "ja": "開く",
+        "qps-ploc": "⟦Őṗėñ ŀőř⟧"
+      },
+      "settings_training_title": {
+        "en": "Training",
+        "ja": "トレーニング",
+        "qps-ploc": "⟦Ŧřȧïñïñɠ ŀőř⟧"
+      },
+      "settings_training_track": {
+        "en": "Track",
+        "ja": "受講トラック",
+        "qps-ploc": "⟦Ŧřȧƈķ ŀőř⟧"
+      },
+      "settings_training_assign": {
+        "en": "Assign",
+        "ja": "割り当てる",
+        "qps-ploc": "⟦Ȧşşïɠñ ŀőř⟧"
+      },
+      "settings_training_lead": {
+        "en": "Assign a track to each member and follow their progress.",
+        "ja": "メンバーごとにトラックを割り当てて、進み具合を見ます。",
+        "qps-ploc": "⟦Ȧşşïɠñ ȧ ŧřȧƈķ ŧő ėȧƈħ ɱėɱƀėř ȧñḓ ƒőŀŀőẇ ŧħėïř ṗřőɠřėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "settings_voice_runtime_title": {
+        "en": "Voice engines and input",
+        "ja": "声のエンジンと入力",
+        "qps-ploc": "⟦Ṽőïƈė ėñɠïñėş ȧñḓ ïñṗůŧ ŀőřėɱ ï⟧"
+      },
+      "settings_voice_runtime_lead": {
+        "en": "Which engines speak and listen, and which microphone is used.",
+        "ja": "話す・聞くに使うエンジンと、使うマイク。",
+        "qps-ploc": "⟦Ẇħïƈħ ėñɠïñėş şṗėȧķ ȧñḓ ŀïşŧėñ, ȧñḓ ẇħïƈħ ɱïƈřőṗħőñė ïş ůşėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "hearing_canvas_frame_title": {
+        "en": "Requirements canvas",
+        "ja": "要件キャンバス",
+        "qps-ploc": "⟦Řėɋůïřėɱėñŧş ƈȧñṽȧş ŀőřėɱ ⟧"
       }
     }
   }

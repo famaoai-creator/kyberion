@@ -186,8 +186,8 @@ export function VoiceSection({
         </div>
       </div>
       <div className="item-card" id="voice-runtime-settings">
-        <p className="item-title">{t('setup.agent_display_name')}</p>
-        <p className="item-meta">{t('setup.media_description')}</p>
+        <p className="item-title">{frontDeskText('settings_voice_runtime_title', locale)}</p>
+        <p className="item-meta">{frontDeskText('settings_voice_runtime_lead', locale)}</p>
         {voiceSelection ? (
           <div className="field-column">
             <label className="field-label">
