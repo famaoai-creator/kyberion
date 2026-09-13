@@ -277,9 +277,15 @@ describe('renderBrowserAdf durable export', () => {
     expect(adf.steps[0]?.params.selector).toBeUndefined();
   });
 
-  it('inserts a snapshot for ref-only secret fills that have no corroborating identity', () => {
+  it('omits ref-only secret fills from export instead of snapshot + ephemeral @eN', () => {
     const adf = browserRuntimeHelpers.renderBrowserAdf(
       [
+        {
+          kind: 'apply',
+          op: 'goto',
+          url: 'https://example.com/login',
+          ts: TS,
+        },
         {
           kind: 'apply',
           op: 'fill_secret_ref',
@@ -293,13 +299,10 @@ describe('renderBrowserAdf durable export', () => {
     );
 
     expect(adf.steps).toEqual([
-      { type: 'capture', op: 'snapshot', params: {} },
-      {
-        type: 'apply',
-        op: 'fill_secret_ref',
-        params: { ref: '@e1', secret_ref: 'GITHUB_TOKEN' },
-      },
+      { type: 'capture', op: 'goto', params: { url: 'https://example.com/login' } },
     ]);
+    expect(adf.steps.some((step) => step.op === 'fill_secret_ref')).toBe(false);
+    expect(adf.steps.some((step) => step.op === 'snapshot')).toBe(false);
   });
 
   it('resolves exported secret-fill identity without a prior snapshot ref_map', async () => {
