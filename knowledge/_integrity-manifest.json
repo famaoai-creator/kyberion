@@ -5047,12 +5047,6 @@
       "type": "json"
     },
     {
-      "path": "product/pipeline-templates/attach-to-browser-sample.json",
-      "tier": "public",
-      "size": 1189,
-      "type": "json"
-    },
-    {
       "path": "product/pipeline-templates/audio-to-requirements.json",
       "tier": "public",
       "size": 2258,
@@ -5281,21 +5275,9 @@
       "type": "json"
     },
     {
-      "path": "product/pipeline-templates/generate-video-smoke.json",
-      "tier": "public",
-      "size": 1356,
-      "type": "json"
-    },
-    {
       "path": "product/pipeline-templates/github-issue-ingest.json",
       "tier": "public",
       "size": 1606,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/high-fidelity-logic.json",
-      "tier": "public",
-      "size": 403,
       "type": "json"
     },
     {
@@ -5332,42 +5314,6 @@
       "path": "product/pipeline-templates/incident-post-mortem.json",
       "tier": "public",
       "size": 3359,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/intent-audit-api-gdpr.json",
-      "tier": "public",
-      "size": 1006,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/intent-audit-api-pci.json",
-      "tier": "public",
-      "size": 1081,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/intent-audit-cicd-debt.json",
-      "tier": "public",
-      "size": 1001,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/intent-audit-db-perf.json",
-      "tier": "public",
-      "size": 1019,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/intent-audit-report-gdpr.json",
-      "tier": "public",
-      "size": 1038,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/intent-validate-api-pci.json",
-      "tier": "public",
-      "size": 1547,
       "type": "json"
     },
     {
@@ -5626,12 +5572,6 @@
       "path": "product/pipeline-templates/security-vulnerability-scan.json",
       "tier": "public",
       "size": 7432,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/setup-messaging-bridge-smoke.json",
-      "tier": "public",
-      "size": 8447,
       "type": "json"
     },
     {

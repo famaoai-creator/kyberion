@@ -61,6 +61,10 @@ Rules of thumb:
 - Do not wrap a script with a `system:exec` step just to give it a pipeline name. Expose the script's logic as an actuator op so trace spans, budgets, and error classification reach inside it.
 - For visual artifacts (PPTX/doc/video), author semantic content and set `designDefaults` / theme on the protocol — never inline per-element style literals.
 
+## Scratch first, pipeline on reuse
+
+For discovery work (browser exploration, media generation, PPTX/doc/video/web design), do **not** start inside ADF. Prototype as scratch / semantic brief under `active/shared/tmp/` or mission evidence until the result is accepted, then promote — same shape as the video [`scratch-to-pipeline-video-promotion.md`](../knowledge/product/orchestration/scratch-to-pipeline-video-promotion.md). Promote into `pipelines/` or `knowledge/product/pipeline-templates/` only when reuse, CI/validation, or a publish gate needs it.
+
 ## System Pipelines
 
 ### Health & Diagnostics
