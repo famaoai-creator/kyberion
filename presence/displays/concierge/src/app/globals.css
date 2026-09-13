@@ -213,6 +213,12 @@ body {
   margin-bottom: 10px;
 }
 
+.field-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .settings-member-form {
   margin-top: 8px;
 }
