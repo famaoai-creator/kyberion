@@ -24,7 +24,7 @@ describe('browser runtime resource boundary', () => {
     expect(source).toContain("replace(/[^a-zA-Z0-9._-]/g, '_')");
     expect(source).toContain('const safePath = safeBrowserRuntimePath(filePath);');
     expect(source).toContain('function isExistingRegularFile(filePath: string): boolean');
-    expect(source).toContain('return safeLstat(filePath).isFile();');
+    expect(source).toContain('return safeExistsSync(filePath) && safeLstat(filePath).isFile();');
     expect(source).toContain('isVitestProcess()');
     expect(source).not.toContain('process.env.VITEST');
     expect(source).toContain('readJson(');
