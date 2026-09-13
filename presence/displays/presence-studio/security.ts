@@ -375,13 +375,20 @@ export function requirePresenceStudioAccess(): RequestHandler {
     // remote-safe allowlist as the headless and OS control-plane APIs.
     // FD-02: /api/home and /api/home-vocabulary are the same shape (read-only,
     // viewer-scoped, no client-supplied widening) so they join it too.
+    // FD-05: /api/progress, /api/progress/:id, and /api/progress-vocabulary
+    // are read-only and viewer-scoped the same way — the mutating
+    // /api/outcomes/:id/verdict route deliberately does NOT join this list
+    // (it requires `requirePresenceStudioLocalAdmin`, i.e. loopback only).
     const remoteSafe =
       path.startsWith('/api/headless/') ||
       path.startsWith('/api/os/') ||
       path === '/api/me' ||
       path === '/api/front-desk/nav' ||
       path === '/api/home' ||
-      path === '/api/home-vocabulary';
+      path === '/api/home-vocabulary' ||
+      path === '/api/progress' ||
+      path.startsWith('/api/progress/') ||
+      path === '/api/progress-vocabulary';
     if (remote && auth.reason === 'token' && !remoteSafe) {
       return res.status(403).json({
         ok: false,
@@ -584,6 +591,18 @@ export const presenceStudioBrowserBootstrapSchema = z
 export const presenceStudioApprovalDecisionSchema = z
   .object({
     decision: z.enum(['approved', 'rejected']),
+  })
+  .strict();
+
+/** FD-05: `POST /api/outcomes/:id/verdict` — `:id` is a deliverable-inbox
+ * `entry_id` (see `progress.ts`'s module doc on the artifact-record vs
+ * deliverable-inbox store gap). Only the two human-facing verdicts the
+ * "進み具合" page offers (受け取る / 直してもらう) — never `changes_requested`,
+ * which this surface never renders a control for. */
+export const presenceStudioOutcomeVerdictSchema = z
+  .object({
+    status: z.enum(['accepted', 'rejected']),
+    note: z.string().trim().min(1).max(4000).optional(),
   })
   .strict();
 

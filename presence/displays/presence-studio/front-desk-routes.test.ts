@@ -346,7 +346,7 @@ describe('security.ts remote-safe allowlist wiring (Deliverable 1)', () => {
 });
 
 describe('interim front-desk page redirects (Deliverable 4)', () => {
-  it('registers /ask, /progress, and /help as 302 redirects to their interim targets', () => {
+  it('registers /ask and /help as 302 redirects to their interim targets', () => {
     const source = readRepoFile(
       'presence/displays/presence-studio/presence-studio-runtime-data.ts'
     );
@@ -362,10 +362,20 @@ describe('interim front-desk page redirects (Deliverable 4)', () => {
     expect(source.slice(askStart, progressStart)).toContain(
       "res.redirect(302, '/work#voice-panel')"
     );
-    expect(source.slice(progressStart, helpStart)).toContain(
-      "res.redirect(302, '/work#requested-work-panel')"
-    );
     expect(source.slice(helpStart, helpStart + 200)).toContain("res.redirect(302, '/onboarding')");
+  });
+});
+
+describe('FD-05 progress page routing (Deliverable 4)', () => {
+  it('serves progress.html at /progress instead of the interim /work redirect', () => {
+    const source = readRepoFile(
+      'presence/displays/presence-studio/presence-studio-runtime-data.ts'
+    );
+    const progressStart = source.indexOf("app.get('/progress'");
+    const helpStart = source.indexOf("app.get('/help'");
+    expect(progressStart).toBeGreaterThan(-1);
+    expect(source.slice(progressStart, helpStart)).toContain("'progress.html'");
+    expect(source.slice(progressStart, helpStart)).not.toContain('res.redirect');
   });
 });
 
@@ -488,5 +498,109 @@ describe('FD-02 remote-safe allowlist wiring', () => {
     expect(vocabNext).toHaveBeenCalledTimes(1);
 
     delete process.env.PRESENCE_STUDIO_TOKEN;
+  });
+});
+
+describe('FD-05 progress page static contract', () => {
+  it('mounts the rail in progress.html as current "progress"', () => {
+    const progressHtml = readRepoFile('presence/displays/presence-studio/static/progress.html');
+    expect(progressHtml).toContain('id="front-desk-rail"');
+    expect(progressHtml).toContain('front-desk-rail.css');
+    expect(progressHtml).toContain('front-desk-rail.js');
+    expect(progressHtml).toContain("current: 'progress'");
+  });
+
+  it('progress.html/progress.js never use target="_blank", emoji, 127.0.0.1, or internal vocabulary', () => {
+    const progressHtml = readRepoFile('presence/displays/presence-studio/static/progress.html');
+    const progressJs = readRepoFile('presence/displays/presence-studio/static/progress.js');
+    const combined = `${progressHtml}\n${progressJs}`;
+
+    expect(combined).not.toContain('target=');
+    expect(combined).not.toContain('127.0.0.1');
+    expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(combined)).toBe(false);
+
+    const forbiddenWords = [
+      'mission',
+      'ADF',
+      'actuator',
+      'pipeline',
+      'stimuli',
+      'A2UI',
+      'Presence Studio',
+      'ports',
+    ];
+    for (const word of forbiddenWords) {
+      expect(combined.toLowerCase()).not.toContain(word.toLowerCase());
+    }
+  });
+});
+
+describe('FD-05 remote-safe allowlist wiring', () => {
+  it('extends the allowlist to /api/progress and /api/progress-vocabulary but leaves the verdict mutation out', () => {
+    const source = readRepoFile('presence/displays/presence-studio/security.ts');
+    expect(source).toContain("path === '/api/progress'");
+    expect(source).toContain("path.startsWith('/api/progress/')");
+    expect(source).toContain("path === '/api/progress-vocabulary'");
+  });
+
+  it('allows a remote token to reach /api/progress and /api/progress/:id but still blocks other /api/* routes', () => {
+    process.env.PRESENCE_STUDIO_TOKEN = 'studio-token';
+    const middleware = requirePresenceStudioAccess();
+
+    const listRes = fakeResponse();
+    const listNext = vi.fn();
+    middleware(
+      fakeRequest({
+        remoteAddress: '198.51.100.24',
+        authorization: 'Bearer studio-token',
+        urlPath: '/api/progress',
+      }) as never,
+      listRes as never,
+      listNext
+    );
+    expect(listNext).toHaveBeenCalledTimes(1);
+
+    const detailRes = fakeResponse();
+    const detailNext = vi.fn();
+    middleware(
+      fakeRequest({
+        remoteAddress: '198.51.100.24',
+        authorization: 'Bearer studio-token',
+        urlPath: '/api/progress/ts-1',
+      }) as never,
+      detailRes as never,
+      detailNext
+    );
+    expect(detailNext).toHaveBeenCalledTimes(1);
+
+    const verdictRes = fakeResponse();
+    const verdictNext = vi.fn();
+    middleware(
+      fakeRequest({
+        remoteAddress: '198.51.100.24',
+        authorization: 'Bearer studio-token',
+        urlPath: '/api/outcomes/INBOX-1/verdict',
+      }) as never,
+      verdictRes as never,
+      verdictNext
+    );
+    expect(verdictNext).not.toHaveBeenCalled();
+    expect(verdictRes.statusCode).toBe(403);
+
+    delete process.env.PRESENCE_STUDIO_TOKEN;
+  });
+});
+
+describe('server.ts route wiring (FD-05 Deliverable 2)', () => {
+  it('wires GET /api/progress, GET /api/progress/:id, GET /api/progress-vocabulary, and POST /api/outcomes/:id/verdict', () => {
+    const source = readRepoFile('presence/displays/presence-studio/server.ts');
+    expect(source).toContain("presenceStudioData.app.get('/api/progress'");
+    expect(source).toContain("presenceStudioData.app.get('/api/progress/:id'");
+    expect(source).toContain("presenceStudioData.app.get('/api/progress-vocabulary'");
+    expect(source).toContain("presenceStudioData.app.post('/api/outcomes/:id/verdict'");
+
+    const verdictStart = source.indexOf("presenceStudioData.app.post('/api/outcomes/:id/verdict'");
+    const verdictRoute = source.slice(verdictStart, verdictStart + 1500);
+    expect(verdictRoute).toContain('requirePresenceStudioLocalAdmin(');
   });
 });

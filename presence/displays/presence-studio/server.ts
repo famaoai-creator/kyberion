@@ -26,6 +26,11 @@ import {
 } from '@agent/core/browser-conversation-session';
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/approval-store';
 import { listArtifactRecords } from '@agent/core/artifact-record';
+import {
+  acceptInboxEntryWithHumanReceipt,
+  listInboxEntries,
+  markInboxEntry,
+} from '@agent/core/deliverable-inbox';
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
 import { listAgentRuntimeSnapshots } from '@agent/core/agent-runtime-supervisor';
 import {
@@ -75,6 +80,7 @@ import {
   presenceStudioVoiceSelectionSchema,
   presenceStudioVoiceStimulusSchema,
   narrowPresenceStudioTenant,
+  presenceStudioOutcomeVerdictSchema,
   presenceStudioRecordInScope,
   resolvePresenceStudioViewerContext,
   requirePresenceStudioLocalAdmin,
@@ -88,6 +94,14 @@ import {
   type HomeDecideCandidateInput,
   type HomeTaskSessionInput,
 } from './home.js';
+import {
+  buildProgressDetail,
+  buildProgressPayload,
+  resolveComputerSurfaceMirrorHref,
+  type ProgressArtifactInput,
+  type ProgressHistoryEntryInput,
+  type ProgressTaskSessionInput,
+} from './progress.js';
 import {
   buildPresenceSurfaceFrame,
   createPresenceVoiceStimulus,
@@ -342,6 +356,230 @@ presenceStudioData.app.get('/api/home', (req, res) => {
   } catch (error) {
     const status = error instanceof PresenceStudioViewerError ? error.status : 500;
     res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+  }
+});
+
+// FD-05: exactly the `front_desk` keys `static/progress.js` renders. Mirrors
+// `/api/home-vocabulary` above.
+presenceStudioData.app.get('/api/progress-vocabulary', (req, res) => {
+  const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
+  const texts = Object.fromEntries(
+    presenceStudioData.PROGRESS_VOCABULARY_KEYS.map((key) => [
+      key,
+      catalogT(key, undefined, locale),
+    ])
+  );
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, locale, texts });
+});
+
+function progressHistoryFromTaskSession(session: {
+  history?: Array<{ ts?: string; text?: string }>;
+}): ProgressHistoryEntryInput[] {
+  return Array.isArray(session.history)
+    ? session.history
+        .filter((entry): entry is { ts?: string; text: string } => Boolean(entry?.text))
+        .map((entry) => ({ when: entry.ts, text: entry.text }))
+    : [];
+}
+
+/** Best-effort link from an artifact record to the deliverable-inbox entry
+ * that (maybe) carries it — see `progress.ts`'s module doc: these are two
+ * different stores with two different id spaces, and the only thing that
+ * can connect a given record to an entry is a shared `path` on both sides.
+ * No match means this artifact can never be verdict-eligible here. */
+function findMatchingInboxEntry(
+  inboxEntries: ReturnType<typeof listInboxEntries>,
+  artifactPath: string | undefined
+) {
+  if (!artifactPath) return undefined;
+  return inboxEntries.find((entry) => entry.artifact_paths.includes(artifactPath));
+}
+
+// FD-05: the presence-studio progress page's single read model ("進み具合").
+// Pure assembly lives in `progress.ts` (`buildProgressPayload`) — this route
+// only gathers the same server-side data the existing requested-work / async
+// / outcome-inbox panels already read, viewer-scoped the same way `/api/home`
+// is (`?tenant=` narrows, never widens). See
+// FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md §2.1 / FD-05.
+presenceStudioData.app.get('/api/progress', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    const requestedTenant = readSurfaceStringParam(req.query.tenant);
+    const scopedViewer = {
+      ...viewer,
+      tenantSlugs: narrowPresenceStudioTenant(viewer, requestedTenant),
+    };
+
+    const taskSessions: ProgressTaskSessionInput[] = listTaskSessions('presence')
+      .filter((session) => presenceStudioRecordInScope(scopedViewer, session))
+      .map((session) => ({
+        id: session.session_id,
+        title: session.goal?.summary || session.session_id,
+        status: session.status,
+        when: session.updated_at,
+        history: progressHistoryFromTaskSession(session),
+      }));
+
+    const inboxEntries = listInboxEntries({ limit: 1000 });
+    const artifacts: ProgressArtifactInput[] = listArtifactRecords()
+      .filter((record) => presenceStudioRecordInScope(scopedViewer, record))
+      .map((record) => {
+        const matchedEntry = findMatchingInboxEntry(inboxEntries, record.path);
+        const downloadable =
+          typeof record.path === 'string' &&
+          presenceStudioData.isAllowedArtifactDownloadPath(record.path) &&
+          presenceStudioData.resolveSafeExistingFile(record.path) !== null;
+        return {
+          id: record.artifact_id,
+          title: deriveHomeArtifactTitle(record),
+          kind: record.kind,
+          when: matchedEntry?.updated_at || matchedEntry?.created_at,
+          ...(matchedEntry
+            ? { inbox_status: matchedEntry.status, entry_id: matchedEntry.entry_id }
+            : {}),
+          downloadable,
+        };
+      });
+
+    const payload = buildProgressPayload({
+      now: new Date(),
+      taskSessions,
+      artifacts,
+      mirrorHref: resolveComputerSurfaceMirrorHref(),
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(payload);
+  } catch (error) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+  }
+});
+
+// FD-05: detail for a single progress item. `:id` is either a task-session
+// id (active/done rows) or an artifact-record id (delivered/done rows with
+// no backing task session) — see `progress.ts`'s module doc on why these are
+// two separate id spaces.
+presenceStudioData.app.get('/api/progress/:id', (req, res) => {
+  const id = readPresenceStudioStringParam(req.params.id);
+  if (!id) return res.status(400).json({ ok: false, error: 'id is required' });
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    const requestedTenant = readSurfaceStringParam(req.query.tenant);
+    const scopedViewer = {
+      ...viewer,
+      tenantSlugs: narrowPresenceStudioTenant(viewer, requestedTenant),
+    };
+
+    const directSession = presenceStudioData.findTaskSession(id);
+    const artifact = directSession
+      ? undefined
+      : listArtifactRecords().find((record) => record.artifact_id === id);
+    const session = directSession
+      ? directSession
+      : artifact?.task_session_id
+        ? presenceStudioData.findTaskSession(artifact.task_session_id)
+        : null;
+
+    if (session) {
+      if (!presenceStudioRecordInScope(scopedViewer, session)) {
+        return res.status(404).json({ ok: false, error: `progress item not found: ${id}` });
+      }
+      const detail = buildProgressDetail(
+        {
+          goal_summary: session.goal?.summary || session.session_id,
+          success_condition: session.goal?.success_condition,
+          status: session.status,
+          next_step: session.completion_next_action?.next_step,
+          gaps: session.completion_next_action?.gaps,
+        },
+        progressHistoryFromTaskSession(session)
+      );
+      return res.json({ ok: true, item: detail });
+    }
+
+    if (artifact) {
+      if (!presenceStudioRecordInScope(scopedViewer, artifact)) {
+        return res.status(404).json({ ok: false, error: `progress item not found: ${id}` });
+      }
+      const matchedEntry = findMatchingInboxEntry(listInboxEntries({ limit: 1000 }), artifact.path);
+      const detail = buildProgressDetail(
+        {
+          goal_summary: deriveHomeArtifactTitle(artifact),
+          status: matchedEntry?.status || artifact.kind,
+        },
+        []
+      );
+      return res.json({ ok: true, item: detail });
+    }
+
+    return res.status(404).json({ ok: false, error: `progress item not found: ${id}` });
+  } catch (error) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+  }
+});
+
+// FD-05: 受け取る / 直してもらう — the only mutation on the progress page.
+// `:id` is a deliverable-inbox `entry_id` (never an artifact-record id — see
+// `progress.ts`'s module doc), and this always requires the server-derived
+// loopback localadmin session, matching every other Presence Studio decision
+// mutation (`/api/os/held-actions/:actionId/decision`, `/api/approvals/:requestId/decision`).
+presenceStudioData.app.post('/api/outcomes/:id/verdict', (req, res) => {
+  const entryId = readPresenceStudioStringParam(req.params.id);
+  const parsed = presenceStudioOutcomeVerdictSchema.safeParse(
+    safeParsePresenceStudioRequestBody(req.body, 'outcome verdict body')
+  );
+  if (!entryId || !parsed.success) {
+    return res.status(400).json({
+      ok: false,
+      error: 'id and status (accepted|rejected) are required',
+    });
+  }
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    requirePresenceStudioLocalAdmin(viewer);
+    const { status, note } = parsed.data;
+    const updated =
+      status === 'accepted'
+        ? acceptInboxEntryWithHumanReceipt({
+            entryId,
+            actorId: viewer.principalId,
+            authenticated: true,
+            authMethod: 'surface_session',
+            responsibilityStatement: 'I accept this deliverable on behalf of the operator.',
+          })
+        : markInboxEntry(entryId, 'rejected', {
+            verdictNote: note,
+            reviewedBy: viewer.principalId,
+          });
+    if (!updated) {
+      logger.warn(
+        presenceStudioData.presenceStudioAuditLine(req, 'outcomes/verdict.reject', {
+          entry_id: entryId,
+          status: 404,
+        })
+      );
+      return res.status(404).json({ ok: false, error: `deliverable not found: ${entryId}` });
+    }
+    logger.info(
+      presenceStudioData.presenceStudioAuditLine(req, 'outcomes/verdict.complete', {
+        entry_id: entryId,
+        verdict: status,
+        status: 200,
+      })
+    );
+    return res.json({ ok: true, entry: updated });
+  } catch (error) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    logger.warn(
+      presenceStudioData.presenceStudioAuditLine(req, 'outcomes/verdict.reject', {
+        entry_id: entryId,
+        status,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
+    return res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
   }
 });
 
