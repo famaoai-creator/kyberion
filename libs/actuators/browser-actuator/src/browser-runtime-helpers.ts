@@ -1162,7 +1162,9 @@ function renderSecretFillStep(
   // bookkeeping). Snapshot `selector` is the same nth-of-type ancestor path
   // and is the fallback when older trails only stored selector.
   const domPath = trimmedRecordedField(action.dom_path) ?? trimmedRecordedField(action.selector);
-  const canResolveWithoutSnapshot = Boolean((hints.name || hints.role) && domPath);
+  // Fresh snapshot @eN is not a secret-field identity. Without a recorded
+  // path, omit the step (fail closed) instead of snapshot + ref replay.
+  if (!domPath) return null;
   return {
     step: {
       type: 'apply',
@@ -1171,13 +1173,10 @@ function renderSecretFillStep(
         ref,
         secret_ref: secretRef,
         ...hints,
-        ...(domPath ? { dom_path: domPath } : {}),
+        dom_path: domPath,
       },
     },
-    // Prefer recorded identity over a freshly minted @eN: snapshot order is
-    // not a stable secret-field identity. Only insert snapshot when the trail
-    // has no role/name + selector to satisfy requireDomPathMatch.
-    needsSnapshot: !canResolveWithoutSnapshot,
+    needsSnapshot: false,
   };
 }
 
