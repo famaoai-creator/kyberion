@@ -93,7 +93,9 @@ describe('Presence Studio OS control-plane route contract', () => {
   });
 
   it('validates onboarding JSON before preview or apply reaches the domain parser', () => {
-    const source = readRepoFile('presence/displays/presence-studio/server.ts');
+    // FD onboarding routes moved into `front-desk-routes.ts` (registered from
+    // `server.ts`) purely to keep `server.ts` under the `max-file-lines` gate.
+    const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
     expect(source).toContain(
       "parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding preview body')"
     );
@@ -116,10 +118,21 @@ describe('Presence Studio OS control-plane route contract', () => {
   });
 
   it('normalizes every schema-backed request body before validation', () => {
-    const source = readRepoFile('presence/displays/presence-studio/server.ts');
-    expect(source).toContain('function safeParsePresenceStudioRequestBody(');
-    expect(source).not.toMatch(/safeParse\(req\.body\)/u);
-    expect(source).not.toContain('req.body?.goal_summary');
-    expect(source).not.toContain('req.body?.success_condition');
+    // The helper itself moved into `presence-studio-runtime-data.ts` (shared
+    // by both `server.ts` and `front-desk-routes.ts`, which both call
+    // `presenceStudioData.safeParsePresenceStudioRequestBody(...)`) purely to
+    // keep `server.ts` under the `max-file-lines` gate.
+    const runtimeDataSource = readRepoFile(
+      'presence/displays/presence-studio/presence-studio-runtime-data.ts'
+    );
+    const serverSource = readRepoFile('presence/displays/presence-studio/server.ts');
+    const frontDeskRoutesSource = readRepoFile(
+      'presence/displays/presence-studio/front-desk-routes.ts'
+    );
+    const combined = `${serverSource}\n${frontDeskRoutesSource}\n${runtimeDataSource}`;
+    expect(runtimeDataSource).toContain('function safeParsePresenceStudioRequestBody(');
+    expect(combined).not.toMatch(/safeParse\(req\.body\)/u);
+    expect(combined).not.toContain('req.body?.goal_summary');
+    expect(combined).not.toContain('req.body?.success_condition');
   });
 });

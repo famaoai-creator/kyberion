@@ -303,11 +303,15 @@ describe('FD-01 remote-token allowlist (security.ts requirePresenceStudioAccess)
   });
 });
 
-describe('server.ts route wiring (Deliverables 1-2)', () => {
+// FD-00/FD-01 routes moved from `server.ts` into `front-desk-routes.ts` (a
+// dedicated module, registered from `server.ts` via `registerFrontDeskRoutes`)
+// purely to keep `server.ts` under the repo's `max-file-lines` gate — same
+// routes, same wiring, so these checks now read the new module instead.
+describe('front-desk-routes.ts route wiring (Deliverables 1-2)', () => {
   it('wires GET /api/me to the shared viewer-scope + readFrontDeskMe pipeline', () => {
-    const source = readRepoFile('presence/displays/presence-studio/server.ts');
-    const routeStart = source.indexOf("presenceStudioData.app.get('/api/me'");
-    const routeEnd = source.indexOf("presenceStudioData.app.get('/api/front-desk/nav'", routeStart);
+    const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
+    const routeStart = source.indexOf("app.get('/api/me'");
+    const routeEnd = source.indexOf("app.get('/api/front-desk/nav'", routeStart);
     expect(routeStart).toBeGreaterThan(-1);
     const route = source.slice(routeStart, routeEnd === -1 ? undefined : routeEnd);
 
@@ -319,12 +323,9 @@ describe('server.ts route wiring (Deliverables 1-2)', () => {
   });
 
   it('wires GET /api/front-desk/nav to the shared menu definition and locale-aware labels', () => {
-    const source = readRepoFile('presence/displays/presence-studio/server.ts');
-    const routeStart = source.indexOf("presenceStudioData.app.get('/api/front-desk/nav'");
-    const routeEnd = source.indexOf(
-      "presenceStudioData.app.get('/api/onboarding/browser-state'",
-      routeStart
-    );
+    const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
+    const routeStart = source.indexOf("app.get('/api/front-desk/nav'");
+    const routeEnd = source.indexOf("app.get('/api/home-vocabulary'", routeStart);
     expect(routeStart).toBeGreaterThan(-1);
     const route = source.slice(routeStart, routeEnd === -1 ? undefined : routeEnd);
 
@@ -345,11 +346,16 @@ describe('security.ts remote-safe allowlist wiring (Deliverable 1)', () => {
   });
 });
 
+// FD-02/03/05/08 page routes moved from `presence-studio-runtime-data.ts`
+// into `front-desk-pages.ts` (registered from the same two call sites via
+// `registerFrontDeskHomeWorkPages` / `registerFrontDeskAuxPages`) purely to
+// keep `presence-studio-runtime-data.ts` under the repo's `max-file-lines`
+// gate — same routes, same registration order, so these checks now read the
+// new module for route content and the runtime-data module only for the
+// call-site ordering around `express.static`.
 describe('FD-08 help page routing', () => {
   it('serves help.html at /help instead of the interim /onboarding redirect', () => {
-    const source = readRepoFile(
-      'presence/displays/presence-studio/presence-studio-runtime-data.ts'
-    );
+    const source = readRepoFile('presence/displays/presence-studio/front-desk-pages.ts');
 
     const helpStart = source.indexOf("app.get('/help'");
     expect(helpStart).toBeGreaterThan(-1);
@@ -361,9 +367,7 @@ describe('FD-08 help page routing', () => {
 
 describe('FD-03 ask page routing (Deliverable 3)', () => {
   it('serves ask.html at /ask instead of the interim /work redirect', () => {
-    const source = readRepoFile(
-      'presence/displays/presence-studio/presence-studio-runtime-data.ts'
-    );
+    const source = readRepoFile('presence/displays/presence-studio/front-desk-pages.ts');
     const askStart = source.indexOf("app.get('/ask'");
     const progressStart = source.indexOf("app.get('/progress'");
     expect(askStart).toBeGreaterThan(-1);
@@ -374,9 +378,7 @@ describe('FD-03 ask page routing (Deliverable 3)', () => {
 
 describe('FD-05 progress page routing (Deliverable 4)', () => {
   it('serves progress.html at /progress instead of the interim /work redirect', () => {
-    const source = readRepoFile(
-      'presence/displays/presence-studio/presence-studio-runtime-data.ts'
-    );
+    const source = readRepoFile('presence/displays/presence-studio/front-desk-pages.ts');
     const progressStart = source.indexOf("app.get('/progress'");
     const helpStart = source.indexOf("app.get('/help'");
     expect(progressStart).toBeGreaterThan(-1);
@@ -387,22 +389,26 @@ describe('FD-05 progress page routing (Deliverable 4)', () => {
 
 describe('FD-02 home page routing (Deliverable 3)', () => {
   it('serves home.html at / and the pre-FD-02 workbench (index.html) at /work, registered ahead of express.static', () => {
-    const source = readRepoFile(
+    const runtimeSource = readRepoFile(
       'presence/displays/presence-studio/presence-studio-runtime-data.ts'
     );
-    const rootRouteStart = source.indexOf("app.get('/', ");
-    const workRouteStart = source.indexOf("app.get('/work', ");
-    const staticStart = source.indexOf('app.use(express.static(staticDir))');
+    const registerCallStart = runtimeSource.indexOf('registerFrontDeskHomeWorkPages(');
+    const staticStart = runtimeSource.indexOf('app.use(express.static(staticDir))');
+    expect(registerCallStart).toBeGreaterThan(-1);
+    expect(staticStart).toBeGreaterThan(-1);
+    // The routes must be registered ahead of express.static so its default
+    // `index: 'index.html'` behavior for `GET /` never wins.
+    expect(registerCallStart).toBeLessThan(staticStart);
+
+    const pagesSource = readRepoFile('presence/displays/presence-studio/front-desk-pages.ts');
+    const rootRouteStart = pagesSource.indexOf("app.get('/', ");
+    const workRouteStart = pagesSource.indexOf("app.get('/work', ");
     expect(rootRouteStart).toBeGreaterThan(-1);
     expect(workRouteStart).toBeGreaterThan(-1);
-    expect(staticStart).toBeGreaterThan(-1);
-    // Both explicit routes must be registered before express.static so its
-    // default `index: 'index.html'` behavior for `GET /` never wins.
-    expect(rootRouteStart).toBeLessThan(staticStart);
-    expect(workRouteStart).toBeLessThan(staticStart);
+    expect(rootRouteStart).toBeLessThan(workRouteStart);
 
-    expect(source.slice(rootRouteStart, workRouteStart)).toContain("'home.html'");
-    expect(source.slice(workRouteStart, staticStart)).toContain("'index.html'");
+    expect(pagesSource.slice(rootRouteStart, workRouteStart)).toContain("'home.html'");
+    expect(pagesSource.slice(workRouteStart, workRouteStart + 200)).toContain("'index.html'");
   });
 });
 
@@ -599,15 +605,15 @@ describe('FD-05 remote-safe allowlist wiring', () => {
   });
 });
 
-describe('server.ts route wiring (FD-05 Deliverable 2)', () => {
+describe('front-desk-routes.ts route wiring (FD-05 Deliverable 2)', () => {
   it('wires GET /api/progress, GET /api/progress/:id, GET /api/progress-vocabulary, and POST /api/outcomes/:id/verdict', () => {
-    const source = readRepoFile('presence/displays/presence-studio/server.ts');
-    expect(source).toContain("presenceStudioData.app.get('/api/progress'");
-    expect(source).toContain("presenceStudioData.app.get('/api/progress/:id'");
-    expect(source).toContain("presenceStudioData.app.get('/api/progress-vocabulary'");
-    expect(source).toContain("presenceStudioData.app.post('/api/outcomes/:id/verdict'");
+    const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
+    expect(source).toContain("app.get('/api/progress'");
+    expect(source).toContain("app.get('/api/progress/:id'");
+    expect(source).toContain("app.get('/api/progress-vocabulary'");
+    expect(source).toContain("app.post('/api/outcomes/:id/verdict'");
 
-    const verdictStart = source.indexOf("presenceStudioData.app.post('/api/outcomes/:id/verdict'");
+    const verdictStart = source.indexOf("app.post('/api/outcomes/:id/verdict'");
     const verdictRoute = source.slice(verdictStart, verdictStart + 1500);
     expect(verdictRoute).toContain('requirePresenceStudioLocalAdmin(');
   });
@@ -709,13 +715,13 @@ describe('FD-03 remote-safe allowlist wiring', () => {
   });
 });
 
-describe('server.ts route wiring (FD-03 Deliverable 1)', () => {
+describe('front-desk-routes.ts route wiring (FD-03 Deliverable 1)', () => {
   it('wires GET /api/ask-vocabulary and POST /api/conversation', () => {
-    const source = readRepoFile('presence/displays/presence-studio/server.ts');
-    expect(source).toContain("presenceStudioData.app.get('/api/ask-vocabulary'");
-    expect(source).toContain("presenceStudioData.app.post('/api/conversation'");
+    const source = readRepoFile('presence/displays/presence-studio/front-desk-routes.ts');
+    expect(source).toContain("app.get('/api/ask-vocabulary'");
+    expect(source).toContain("app.post('/api/conversation'");
 
-    const conversationStart = source.indexOf("presenceStudioData.app.post('/api/conversation'");
+    const conversationStart = source.indexOf("app.post('/api/conversation'");
     const conversationRoute = source.slice(conversationStart, conversationStart + 6500);
     expect(conversationRoute).toContain('requirePresenceStudioLocalAdmin(');
     expect(conversationRoute).toContain('presenceStudioConversationScope(');
