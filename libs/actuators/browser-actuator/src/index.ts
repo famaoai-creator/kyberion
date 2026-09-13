@@ -14,6 +14,7 @@ import {
 } from './browser-interaction-helpers.js';
 import { executePipeline as executeBrowserPipeline } from './browser-pipeline-helpers.js';
 import { isDirectEntry } from '@agent/core/direct-entry';
+import { isRecord } from '@agent/core/foundation';
 import { Page } from '@playwright/test';
 import {
   currentProcessArgv,
@@ -74,19 +75,26 @@ const browserInteractionHelpers = createBrowserInteractionHelpers({
 /**
  * Main Entry Point
  */
-function isComputerInteraction(
-  input: BrowserAction | ComputerInteractionAction
-): input is ComputerInteractionAction {
-  return 'kind' in input && input.kind === 'computer_interaction';
+function isComputerInteraction(input: unknown): input is ComputerInteractionAction {
+  return isRecord(input) && input.kind === 'computer_interaction';
 }
 
-async function handleAction(input: BrowserAction | ComputerInteractionAction) {
+function isPipelineAction(input: unknown): input is BrowserAction {
+  return isRecord(input) && input.action === 'pipeline';
+}
+
+function describeUnsupportedAction(input: unknown): string {
+  if (!isRecord(input)) return 'unknown';
+  return String(input.action);
+}
+
+async function handleAction(input: unknown) {
   if (isComputerInteraction(input)) {
     ensureDefaultOpPreflight();
     const interactionType = String(input.action?.type || 'unknown');
     const preflight = await runOpPreflight({
       op: `browser:computer_interaction:${interactionType}`,
-      params: input as unknown as Record<string, unknown>,
+      params: { ...input },
       source: 'actuator',
     });
     if (preflight.decision !== 'allow') {
@@ -104,9 +112,9 @@ async function handleAction(input: BrowserAction | ComputerInteractionAction) {
     };
     return await browserInteractionHelpers.handleComputerInteraction(admitted);
   }
-  if (input.action !== 'pipeline') {
+  if (!isPipelineAction(input)) {
     throw new Error(
-      `Unsupported action: ${String(input.action)}. Browser-Actuator accepts pipeline and computer_interaction contracts.`
+      `Unsupported action: ${describeUnsupportedAction(input)}. Browser-Actuator accepts pipeline and computer_interaction contracts.`
     );
   }
   if (input.steps?.length === 1 && input.steps[0]?.op === 'extension_session') {
