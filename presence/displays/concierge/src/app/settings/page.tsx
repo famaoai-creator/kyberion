@@ -81,6 +81,13 @@ type SettingsMember = {
   memberships: Array<{ tenant_slug: string; role: SettingsRole }>;
 };
 
+type VoiceSelection = {
+  preferences: { tts_engine_id: string; stt_backend: string };
+  tts: { candidates: Array<{ engine_id: string; display_name: string; selectable: boolean }> };
+  stt: { candidates: Array<{ backend: string; display_name: string; selectable: boolean }> };
+};
+type VoiceDevice = { uid: string; name: string; isDefault: boolean };
+
 const DEFAULT_SERVICES = ['google-workspace', 'slack', 'browser'];
 
 const DIAG_LABELS: Record<string, ConciergeMessageKey> = {
@@ -276,6 +283,9 @@ export default function SettingsPage() {
   const [memberBusy, setMemberBusy] = React.useState(false);
   const [issuedToken, setIssuedToken] = React.useState<string | null>(null);
   const [chronosUrl, setChronosUrl] = React.useState<string | null>(null);
+  const [voiceSelection, setVoiceSelection] = React.useState<VoiceSelection | null>(null);
+  const [voiceDevices, setVoiceDevices] = React.useState<VoiceDevice[]>([]);
+  const [voiceSelectionBusy, setVoiceSelectionBusy] = React.useState(false);
   const [activeSection, setActiveSection] = React.useState<SettingsSectionId>('profile');
   const cameraStreamRef = React.useRef<MediaStream | null>(null);
   const cameraVideoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -392,6 +402,49 @@ export default function SettingsPage() {
       // 組織とメンバー shows an empty list rather than blocking the page.
     }
   }, []);
+
+  const refreshVoiceSelection = React.useCallback(async () => {
+    try {
+      const [selectionResponse, statusResponse] = await Promise.all([
+        fetch('/api/voice/selection', { cache: 'no-store' }),
+        fetch('/api/voice/status', { cache: 'no-store' }),
+      ]);
+      const selection = await selectionResponse.json().catch(() => null);
+      if (selectionResponse.ok && selection?.ok === true) setVoiceSelection(selection);
+      const status = await statusResponse.json().catch(() => null);
+      if (statusResponse.ok && Array.isArray(status?.inputDevices)) {
+        setVoiceDevices(status.inputDevices);
+      }
+    } catch {
+      // Voice is optional; the settings page remains usable when voice-hub is down.
+    }
+  }, []);
+
+  const saveVoiceSelection = React.useCallback(
+    async (field: 'tts_engine_id' | 'stt_backend', value: string) => {
+      if (!voiceSelection) return;
+      setVoiceSelectionBusy(true);
+      try {
+        const response = await fetch('/api/voice/selection', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            ...voiceSelection.preferences,
+            [field]: value,
+          }),
+        });
+        const next = await response.json().catch(() => null);
+        if (!response.ok || next?.ok !== true)
+          throw new Error('Voice selection could not be saved');
+        setVoiceSelection(next);
+      } catch (error) {
+        setNotice({ text: error instanceof Error ? error.message : String(error), error: true });
+      } finally {
+        setVoiceSelectionBusy(false);
+      }
+    },
+    [voiceSelection]
+  );
 
   // FD-07: the member list itself. Degrades to an empty list — a non-owner
   // viewer simply sees nothing here (the section stays visible, matching
@@ -544,6 +597,7 @@ export default function SettingsPage() {
     void refreshMe();
     void refreshMembers();
     void refreshChronosLink();
+    void refreshVoiceSelection();
     return () => {
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -556,6 +610,7 @@ export default function SettingsPage() {
     refreshMe,
     refreshMembers,
     refreshChronosLink,
+    refreshVoiceSelection,
   ]);
 
   React.useEffect(() => {
@@ -1415,6 +1470,60 @@ export default function SettingsPage() {
                   {t('setup.save_voice')}
                 </button>
               </div>
+            </div>
+            <div className="item-card" id="voice-runtime-settings">
+              <p className="item-title">{t('setup.agent_display_name')}</p>
+              <p className="item-meta">{t('setup.media_description')}</p>
+              {voiceSelection ? (
+                <div className="field-column">
+                  <label>
+                    {t('dock.voice.backend')}
+                    <select
+                      value={voiceSelection.preferences.stt_backend}
+                      disabled={voiceSelectionBusy}
+                      onChange={(event) =>
+                        void saveVoiceSelection('stt_backend', event.target.value)
+                      }
+                    >
+                      <option value="auto">{t('dock.voice.auto')}</option>
+                      {voiceSelection.stt.candidates.map((candidate) => (
+                        <option
+                          key={candidate.backend}
+                          value={candidate.backend}
+                          disabled={!candidate.selectable}
+                        >
+                          {candidate.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {t('setup.voice_profile')}
+                    <select
+                      value={voiceSelection.preferences.tts_engine_id}
+                      disabled={voiceSelectionBusy}
+                      onChange={(event) =>
+                        void saveVoiceSelection('tts_engine_id', event.target.value)
+                      }
+                    >
+                      {voiceSelection.tts.candidates.map((candidate) => (
+                        <option
+                          key={candidate.engine_id}
+                          value={candidate.engine_id}
+                          disabled={!candidate.selectable}
+                        >
+                          {candidate.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {voiceDevices.length > 0 ? (
+                    <p className="item-meta">{voiceDevices[0].name}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="item-meta">{t('setup.loading')}</p>
+              )}
             </div>
           </section>
         );
