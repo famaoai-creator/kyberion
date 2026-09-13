@@ -152,6 +152,14 @@ vi.mock('@agent/core/service-engine', async () => {
 
 // ── Mock MCP SDK (server side) ────────────────────────────────────────────────
 vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
+  class ResourceTemplate {
+    uriTemplate: string;
+    list: unknown;
+    constructor(uriTemplate: string, callbacks: { list?: unknown }) {
+      this.uriTemplate = uriTemplate;
+      this.list = callbacks.list;
+    }
+  }
   const McpServer = vi.fn(function (this: any) {
     this.connect = mockConnect;
     this.close = mockClose;
@@ -174,8 +182,9 @@ vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
         });
       }
     );
+    this.registerResource = vi.fn();
   });
-  return { McpServer };
+  return { McpServer, ResourceTemplate };
 });
 
 vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => {
@@ -222,6 +231,9 @@ const governedToolNames = [
   'kyberion.knowledge.search',
   'kyberion.capability.list',
   'kyberion.capability.search',
+  'kyberion.skill.list',
+  'kyberion.skill.get',
+  'kyberion.actuator.invoke',
   'kyberion.mission.create',
   'kyberion.mission.status',
   'kyberion.mission.journal',
@@ -238,6 +250,15 @@ const governedToolNames = [
 
 const FAKE_CATALOG = JSON.stringify({
   pipeline_run_allowlist: ['pipelines/vital-check.json'],
+  actuator_invoke_allowlist: [
+    {
+      actuator: 'file-actuator',
+      op: 'pipeline',
+      risk_class: 'low',
+      requires_approval: false,
+      execution: 'dry_run',
+    },
+  ],
   tools: governedToolNames.map((name) => ({
     name,
     allowed_tiers: name === 'kyberion.service.actuate' ? ['confidential', 'personal'] : ['public'],
@@ -281,6 +302,9 @@ describe('createKyberionMcpServer()', () => {
     expect(registeredTools.has('kyberion.knowledge.search')).toBe(true);
     expect(registeredTools.has('kyberion.capability.list')).toBe(true);
     expect(registeredTools.has('kyberion.capability.search')).toBe(true);
+    expect(registeredTools.has('kyberion.skill.list')).toBe(true);
+    expect(registeredTools.has('kyberion.skill.get')).toBe(true);
+    expect(registeredTools.has('kyberion.actuator.invoke')).toBe(true);
     expect(registeredTools.has('kyberion.mission.create')).toBe(true);
     expect(registeredTools.has('kyberion.mission.status')).toBe(true);
     expect(registeredTools.has('kyberion.mission.journal')).toBe(true);
