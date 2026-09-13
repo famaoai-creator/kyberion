@@ -364,8 +364,11 @@ describe('concierge surface contract', () => {
     expect(route).toContain('MAX_IMAGE_BYTES');
 
     // The outcome card fetches on demand and degrades politely for formats
-    // it cannot show inline.
-    expect(page).toContain("t('home.preview')");
+    // it cannot show inline. FD-04: the trigger button now reads
+    // `front_desk:action_open` (the shared "決める" action-row vocabulary);
+    // the toggled-open "hide" state keeps the pre-FD-04 `home.preview_hide`.
+    expect(page).toContain("frontDeskText('action_open', locale)");
+    expect(page).toContain("t('home.preview_hide')");
     expect(page).toContain('/preview');
     expect(page).toContain('data_uri');
     expect(messages).toContain('このファイル形式はここでは表示できません');
@@ -595,20 +598,31 @@ describe('concierge surface contract', () => {
     expect(route).toContain('peekPersistedDelegationChildrenRegistry');
     expect(route).toContain('staleChildCount');
   });
-  it('CS-04: presents one prioritized inquiry queue whose cards are shared with the panes', () => {
+  it('CS-04/FD-04: presents one prioritized decision queue (決める) whose cards call the guarded decision endpoints', () => {
     const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
     // One queue section, ordered by decision urgency, rendered from the same
-    // card helpers the detail panes use (no duplicated action UI).
+    // card helpers the (now removed) detail panes used to duplicate.
     expect(page).toContain('inquiry-queue');
-    expect(page).toContain("t('queue.title')");
+    // FD-04: `/` is the 決める page — the heading is the shared
+    // `front_desk:nav_decide` rail label, not the old `queue.title`.
+    expect(page).toContain("frontDeskText('nav_decide', locale)");
+    expect(page).toContain("frontDeskText('decide_lead', locale)");
     expect(page).toContain('renderApprovalCard');
     expect(page).toContain('renderHygieneCard');
     expect(page).toContain('renderMemoryCard');
     expect(page).toContain('renderOutcomeCard');
     expect(page).toContain('renderExceptionCard');
-    // The panes now defer to the queue instead of duplicating the cards.
-    expect(page).toContain("t('home.see_queue'");
+    // FD-04: the four duplicate panes (and their "see all in the queue"
+    // links) and the briefing card are gone — the queue is the only place
+    // these cards render.
+    expect(page).not.toContain("t('home.approval_title')");
+    expect(page).not.toContain("t('home.request_title')");
+    expect(page).not.toContain("t('home.outcome_title')");
+    expect(page).not.toContain("t('home.exception_title')");
+    expect(page).not.toContain("t('home.see_queue'");
+    expect(page).not.toContain("t('home.briefing_label')");
     expect(page).not.toContain('window.prompt');
+    expect(page).not.toContain('window.confirm');
   });
 
   it('CS-04: command palette is keyboard-first, dialog-labelled, and never performs decisions', () => {

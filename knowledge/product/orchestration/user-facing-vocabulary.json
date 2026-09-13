@@ -10895,6 +10895,16 @@
         "en": "Bring back",
         "ja": "戻す",
         "qps-ploc": "⟦Ƀřïñɠ ƀȧƈķ ŀőř⟧"
+      },
+      "you": {
+        "en": "You",
+        "ja": "あなた",
+        "qps-ploc": "⟦Ẏőů ŀőř⟧"
+      },
+      "decide_due": {
+        "en": "Due {value}",
+        "ja": "期限 {value}",
+        "qps-ploc": "⟦Ḓůė {value} ŀőř⟧"
       }
     }
   }
