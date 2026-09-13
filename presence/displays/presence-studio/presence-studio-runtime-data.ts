@@ -1097,6 +1097,18 @@ app.post(
   }
 );
 
+// FD-02: `/` is now the human home page; the pre-FD-02 workbench moved to
+// `/work` unchanged. Both are explicit routes registered ahead of
+// `express.static` below so its default `index: 'index.html'` behavior for
+// `GET /` never wins the race against `home.html`.
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(staticDir, 'home.html'));
+});
+
+app.get('/work', (_req, res) => {
+  res.sendFile(path.join(staticDir, 'index.html'));
+});
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(staticDir));
 app.use(['/api', '/a2ui'], requirePresenceStudioRateLimit(), requirePresenceStudioAccess());
@@ -1164,13 +1176,15 @@ app.get('/onboarding', (_req, res) => {
 });
 
 // Interim redirect until FD-03 ships the dedicated "ask" page (会話入力欄).
+// FD-02 moved the workbench these panels live in from `/` to `/work`.
 app.get('/ask', (_req, res) => {
-  res.redirect(302, '/#voice-panel');
+  res.redirect(302, '/work#voice-panel');
 });
 
 // Interim redirect until FD-05 ships the dedicated "progress" page (進み具合).
+// FD-02 moved the workbench these panels live in from `/` to `/work`.
 app.get('/progress', (_req, res) => {
-  res.redirect(302, '/#requested-work-panel');
+  res.redirect(302, '/work#requested-work-panel');
 });
 
 // Interim redirect until FD-08 ships the dedicated "how to use" page (旧 /learn).
@@ -1378,4 +1392,35 @@ export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
   'tui:tui_cockpit_outcome_approval_ready_plan',
   'tui:tui_cockpit_outcome_service_change',
   'tui:tui_cockpit_outcome_status_report',
+] as const satisfies readonly VocabularyKey[];
+
+// FD-02: exactly the `front_desk` keys `static/home.js` renders. Mirrors
+// `PRESENCE_STUDIO_VOCABULARY_KEYS` above / `/api/ui-vocabulary` — see
+// `GET /api/home-vocabulary` in server.ts.
+export const HOME_VOCABULARY_KEYS = [
+  'front_desk:home_briefing',
+  'front_desk:home_briefing_clear',
+  'front_desk:home_recommend',
+  'front_desk:home_ask_placeholder',
+  'front_desk:home_ask_send',
+  'front_desk:home_ask_voice',
+  'front_desk:chip_email',
+  'front_desk:chip_minutes',
+  'front_desk:chip_browser',
+  'front_desk:chip_webapp',
+  'front_desk:home_decide_title',
+  'front_desk:home_decide_more',
+  'front_desk:home_decide_empty',
+  'front_desk:home_progress_title',
+  'front_desk:home_progress_more',
+  'front_desk:home_progress_empty',
+  'front_desk:home_progress_summary',
+  'front_desk:count_items',
+  'front_desk:tag_approval',
+  'front_desk:tag_exception',
+  'front_desk:tag_stalled',
+  'front_desk:tag_memory',
+  'front_desk:tag_in_progress',
+  'front_desk:tag_delivered',
+  'front_desk:action_receive',
 ] as const satisfies readonly VocabularyKey[];
