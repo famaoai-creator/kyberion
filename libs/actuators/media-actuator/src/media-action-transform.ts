@@ -18,6 +18,7 @@ import {
 } from '@agent/core/visual-raster';
 import { runVisualReviewLoop } from '@agent/core/visual-review-loop';
 import { loadVisualReviewRubric, formatVisualReviewReport } from '@agent/core/visual-review';
+import { evaluateArtifactVerification } from '@agent/core/artifact-verification.js';
 import {
   lockMediaBrief,
   inferredDecisions,
@@ -897,6 +898,16 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         throw new Error('[VISUAL_REVIEW_GATE_BLOCKED] visual review report is missing');
       }
       const deliveryStatus = String((report as any).delivery_status || '');
+      const verification = (report as any).artifact_verification;
+      if (verification && typeof verification === 'object') {
+        const summary = evaluateArtifactVerification(verification);
+        if (!summary.publication_allowed) {
+          throw new Error(
+            '[VISUAL_REVIEW_GATE_BLOCKED] KA-06 verification did not authorize publication: ' +
+              summary.status
+          );
+        }
+      }
       if (deliveryStatus !== 'clean') {
         throw new Error(
           '[VISUAL_REVIEW_GATE_BLOCKED] delivery requires a clean visual review: ' +
