@@ -1,16 +1,30 @@
 import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract-parser';
 
-export const HEARING_REQUIREMENTS = [
-  { id: 'audience', label: '対象となる人' },
-  { id: 'problem', label: '解決したいこと' },
-  { id: 'core_flow', label: '主な流れ' },
-  { id: 'content', label: '載せる内容' },
-  { id: 'visual_direction', label: '見た目の方向' },
-  { id: 'constraints', label: '制約・条件' },
-  { id: 'success', label: 'できたと判断する条件' },
-] as const;
+export interface HearingScenarioRequirement {
+  id: string;
+  label: string;
+  aliases?: string[];
+}
 
-export type HearingRequirementId = (typeof HEARING_REQUIREMENTS)[number]['id'];
+export interface HearingScenario {
+  id: string;
+  requirements: HearingScenarioRequirement[];
+}
+
+export const WEB_APP_HEARING_SCENARIO: HearingScenario = {
+  id: 'web_app_build',
+  requirements: [
+    { id: 'audience', label: '対象となる人', aliases: ['target', 'users', 'user'] },
+    { id: 'problem', label: '解決したいこと', aliases: ['goal', 'use_case'] },
+    { id: 'core_flow', label: '主な流れ', aliases: ['flow'] },
+    { id: 'content', label: '載せる内容' },
+    { id: 'visual_direction', label: '見た目の方向', aliases: ['visual'] },
+    { id: 'constraints', label: '制約・条件', aliases: ['constraint'] },
+    { id: 'success', label: 'できたと判断する条件', aliases: ['acceptance'] },
+  ],
+};
+
+export type HearingRequirementId = string;
 
 export interface HearingRequirement {
   id: HearingRequirementId;
@@ -22,7 +36,7 @@ export interface HearingRequirement {
 
 export interface HearingRecord {
   session_id: string;
-  scenario: 'web_app_build';
+  scenario: string;
   requirements: HearingRequirement[];
   canvas_versions: string[];
   updated_at: string;
@@ -34,54 +48,54 @@ export interface HearingTurn {
   intent_resolution?: IntentResolutionContract;
 }
 
-export function createHearingRecord(sessionId: string, now: string): HearingRecord {
+export function createHearingRecord(
+  sessionId: string,
+  now: string,
+  scenario: HearingScenario = WEB_APP_HEARING_SCENARIO
+): HearingRecord {
+  if (!scenario.id.trim() || scenario.requirements.length === 0) {
+    throw new Error('[HEARING_SCENARIO_INVALID] scenario requires an id and requirements');
+  }
+  const ids = new Set<string>();
+  for (const requirement of scenario.requirements) {
+    if (!requirement.id.trim() || !requirement.label.trim() || ids.has(requirement.id)) {
+      throw new Error('[HEARING_SCENARIO_INVALID] requirement ids and labels must be unique');
+    }
+    ids.add(requirement.id);
+  }
   return {
     session_id: sessionId,
-    scenario: 'web_app_build',
-    requirements: HEARING_REQUIREMENTS.map(({ id, label }) => ({
-      id,
-      label,
-      confidence: 0,
-    })),
+    scenario: scenario.id,
+    requirements: scenario.requirements.map(({ id, label }) => ({ id, label, confidence: 0 })),
     canvas_versions: [],
     updated_at: now,
   };
 }
 
-function requirementIdForInput(input: string): HearingRequirementId | undefined {
+function requirementIdForInput(
+  input: string,
+  scenario: HearingScenario
+): HearingRequirementId | undefined {
   const normalized = input.toLowerCase().replace(/[-\s]+/g, '_');
-  const aliases: Partial<Record<string, HearingRequirementId>> = {
-    target: 'audience',
-    audience: 'audience',
-    users: 'audience',
-    user: 'audience',
-    goal: 'problem',
-    problem: 'problem',
-    use_case: 'problem',
-    flow: 'core_flow',
-    core_flow: 'core_flow',
-    content: 'content',
-    visual: 'visual_direction',
-    visual_direction: 'visual_direction',
-    constraints: 'constraints',
-    constraint: 'constraints',
-    success: 'success',
-    acceptance: 'success',
-  };
-  return aliases[normalized];
+  return scenario.requirements.find(
+    (requirement) =>
+      requirement.id === normalized ||
+      (requirement.aliases || []).some((alias) => alias.toLowerCase() === normalized)
+  )?.id;
 }
 
 /** Apply one bounded conversation turn without inventing answers. */
 export function applyHearingTurn(
   record: HearingRecord,
   turn: HearingTurn,
-  now: string
+  now: string,
+  scenario: HearingScenario = WEB_APP_HEARING_SCENARIO
 ): HearingRecord {
   const text = turn.text.trim();
   if (!text) return { ...record, updated_at: now };
 
   const requestedId = turn.intent_resolution?.missing_inputs
-    .map(requirementIdForInput)
+    .map((input) => requirementIdForInput(input, scenario))
     .find((id): id is HearingRequirementId => Boolean(id));
   const target =
     record.requirements.find((item) => item.id === requestedId) ||
