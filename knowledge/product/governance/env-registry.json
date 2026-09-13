@@ -2600,6 +2600,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_SCREENSHOT_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for screenshot path; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_SECRET_ENCRYPTION",
       "category": "flag",
       "type": "enum",

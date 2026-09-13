@@ -15,6 +15,12 @@ describe('protocol service boundary registry', () => {
     expect(entries.get('review-checks')?.classification).toBe('control-plane-worker');
     expect(entries.get('report-review')?.classification).toBe('artifact-review-port');
     expect(entries.get('sketch-input')?.classification).toBe('artifact-review-port');
+    expect(entries.get('meeting-notepad')?.classification).toBe('artifact-review-port');
+    expect(entries.get('memory-capture')?.classification).toBe('artifact-review-port');
+    expect(entries.get('screenshot-annotate')?.classification).toBe('artifact-review-port');
+    expect(entries.get('clipboard-inbox')?.classification).toBe('artifact-review-port');
+    expect(entries.get('daily-desk')?.classification).toBe('artifact-review-port');
+    expect(entries.get('doc-drop')?.classification).toBe('artifact-review-port');
     for (const entry of entries.values()) {
       expect(entry.process_scope).toBeTruthy();
       expect(entry.request_scope_mode).toBeTruthy();
