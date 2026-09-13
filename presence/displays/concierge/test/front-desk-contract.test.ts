@@ -143,46 +143,68 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     const settings = read('src/app/settings/page.tsx');
     const palette = read('src/app/command-palette.tsx');
 
-    for (const key of [
-      'settings_nav_profile',
-      'settings_nav_members',
-      'settings_nav_services',
-      'settings_nav_voice',
-      'settings_nav_notifications',
-      'settings_nav_plugins',
-      'settings_nav_advanced',
-    ]) {
-      expect(settings).toContain(`frontDeskText('${key}', locale)`);
+    // FD-06 file split (KP gate: max-file-lines): each card's JSX moved out
+    // of settings/page.tsx into its own file under settings/sections/. The
+    // page still owns state, data loading, and handlers — see
+    // test/concierge-contract.test.ts for the section-local literal checks.
+    const sectionFiles = [
+      'ProfileSection.tsx',
+      'MembersSection.tsx',
+      'ServicesSection.tsx',
+      'VoiceSection.tsx',
+      'NotificationsSection.tsx',
+      'PluginsSection.tsx',
+      'AdvancedSection.tsx',
+    ];
+    const sections = Object.fromEntries(
+      sectionFiles.map((file) => [file, read(`src/app/settings/sections/${file}`)])
+    );
+    // Every literal that used to live directly in page.tsx must still exist
+    // somewhere in the settings feature (page.tsx + its section files).
+    const wholeFeature = settings + Object.values(sections).join('\n');
+
+    const navLabelFiles: Record<string, string> = {
+      settings_nav_profile: 'ProfileSection.tsx',
+      settings_nav_members: 'MembersSection.tsx',
+      settings_nav_services: 'ServicesSection.tsx',
+      settings_nav_voice: 'VoiceSection.tsx',
+      settings_nav_notifications: 'NotificationsSection.tsx',
+      settings_nav_plugins: 'PluginsSection.tsx',
+      settings_nav_advanced: 'AdvancedSection.tsx',
+    };
+    for (const [key, file] of Object.entries(navLabelFiles)) {
+      expect(sections[file]).toContain(`frontDeskText('${key}', locale)`);
     }
 
-    for (const anchor of [
-      'setup-profile',
-      'setup-management',
-      'setup-media',
-      'setup-services',
-      'setup-notifications',
-      'setup-plugins',
-      'setup-governance',
-      'setup-operations',
-    ]) {
-      expect(settings).toContain(`id="${anchor}"`);
+    const anchorFiles: Record<string, string> = {
+      'setup-profile': 'ProfileSection.tsx',
+      'setup-management': 'AdvancedSection.tsx',
+      'setup-media': 'VoiceSection.tsx',
+      'setup-services': 'ServicesSection.tsx',
+      'setup-notifications': 'NotificationsSection.tsx',
+      'setup-plugins': 'PluginsSection.tsx',
+      'setup-governance': 'AdvancedSection.tsx',
+      'setup-operations': 'AdvancedSection.tsx',
+    };
+    for (const [anchor, file] of Object.entries(anchorFiles)) {
+      expect(sections[file]).toContain(`id="${anchor}"`);
     }
 
     // No hardcoded surface port in client code (plan §2.6) — the
     // chronos-mirror-v2 link comes from /api/front-desk/links.
     expect(settings).toContain("fetch('/api/front-desk/links'");
-    expect(settings).not.toContain('3000');
-    expect(settings).not.toContain('3031');
-    expect(settings).not.toContain('3050');
+    expect(wholeFeature).not.toContain('3000');
+    expect(wholeFeature).not.toContain('3031');
+    expect(wholeFeature).not.toContain('3050');
 
-    expect(settings).not.toContain('target="_blank"');
-    expect(settings).not.toContain("target={'_blank'}");
+    expect(wholeFeature).not.toContain('target="_blank"');
+    expect(wholeFeature).not.toContain("target={'_blank'}");
     // No decorative emoji (the pre-existing readiness "✓" glyph, U+2713, is a
     // status indicator carried over unchanged from setup/page.tsx, not new
     // decorative copy — excluded from this range rather than the range
     // being widened to legitimize it).
     // eslint-disable-next-line no-misleading-character-class
-    expect(settings).not.toMatch(
+    expect(wholeFeature).not.toMatch(
       /[\u{1F300}-\u{1FAFF}\u{2600}-\u{2712}\u{2714}-\u{27BF}\u{2190}-\u{21FF}]/u
     );
 
