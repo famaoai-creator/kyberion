@@ -113,6 +113,7 @@ export function GET(req: NextRequest) {
     const serviceCatalog = [
       { id: 'google-workspace', label: t('service.google'), auth: t('auth.oauth') },
       { id: 'microsoft-365', label: t('service.microsoft'), auth: t('auth.oauth') },
+      { id: 'notion', label: t('service.notion'), auth: t('auth.oauth') },
       { id: 'slack', label: t('service.slack'), auth: t('auth.oauth_secret') },
       { id: 'github', label: t('service.github'), auth: t('auth.oauth_secret') },
       { id: 'browser', label: t('service.browser'), auth: t('auth.session') },

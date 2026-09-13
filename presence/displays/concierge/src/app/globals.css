@@ -224,6 +224,71 @@ body {
   accent-color: var(--kb-accent, #8a6d3b);
 }
 
+.service-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 12px 0 8px;
+}
+
+.service-tile {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #d8d2c4;
+  border-radius: 14px;
+  background: #fbfaf7;
+}
+
+.service-tile-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f7f3ea;
+  background: linear-gradient(145deg, #2f4a3c, #1d2e26);
+}
+
+.service-tile[data-service='google-workspace'] .service-tile-icon {
+  background: linear-gradient(145deg, #4285f4, #34a853);
+}
+.service-tile[data-service='microsoft-365'] .service-tile-icon {
+  background: linear-gradient(145deg, #0078d4, #5059c9);
+}
+.service-tile[data-service='notion'] .service-tile-icon {
+  background: linear-gradient(145deg, #111111, #444444);
+}
+.service-tile[data-service='slack'] .service-tile-icon {
+  background: linear-gradient(145deg, #4a154b, #e01e5a);
+}
+.service-tile[data-service='github'] .service-tile-icon {
+  background: linear-gradient(145deg, #24292f, #57606a);
+}
+
+.service-tile-body {
+  display: grid;
+  gap: 8px;
+}
+
+.service-tile-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.service-connect-btn {
+  justify-self: start;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
 .status-chip {
   display: inline-block;
   font-size: 11px;

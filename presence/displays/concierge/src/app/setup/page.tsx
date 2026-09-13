@@ -125,6 +125,8 @@ export default function SetupPage() {
   const [configConfirm, setConfigConfirm] = React.useState(false);
   const [cameraState, setCameraState] = React.useState<'idle' | 'starting' | 'ready'>('idle');
   const [voiceRecording, setVoiceRecording] = React.useState(false);
+  const [oauthBusyId, setOauthBusyId] = React.useState<string | null>(null);
+  const [oauthMessage, setOauthMessage] = React.useState<string | null>(null);
   const cameraStreamRef = React.useRef<MediaStream | null>(null);
   const cameraVideoRef = React.useRef<HTMLVideoElement | null>(null);
   const cameraCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
@@ -314,6 +316,43 @@ export default function SetupPage() {
       setBusy(false);
     }
   }, [notif, refresh, refreshNotifications, t]);
+
+  const connectOAuth = React.useCallback(
+    async (serviceId: string, serviceLabel: string) => {
+      setOauthBusyId(serviceId);
+      setOauthMessage(null);
+      const oauthWindow = window.open('', '_blank', 'noopener');
+      try {
+        const response = await fetch('/api/oauth/begin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ service_id: serviceId }),
+        });
+        const body = (await response.json().catch(() => null)) as {
+          ok?: boolean;
+          error?: string;
+          authorization_url?: string;
+        } | null;
+        if (!response.ok || !body?.ok || !body.authorization_url) {
+          throw new Error(body?.error || `HTTP ${response.status}`);
+        }
+        if (oauthWindow) oauthWindow.location.href = body.authorization_url;
+        else window.location.assign(body.authorization_url);
+        setOauthMessage(t('setup.connect_oauth_started', { service: serviceLabel || serviceId }));
+      } catch (err) {
+        oauthWindow?.close();
+        setOauthMessage(
+          t('setup.connect_oauth_failed', {
+            service: serviceLabel || serviceId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        );
+      } finally {
+        setOauthBusyId(null);
+      }
+    },
+    [t]
+  );
 
   const applyOnboarding = React.useCallback(
     async (includeVoice: boolean) => {
@@ -926,27 +965,50 @@ export default function SetupPage() {
         <section className="pane" id="setup-services" aria-label={t('setup.services_title')}>
           <h2>{t('setup.services_title')}</h2>
           <p className="pane-subtitle">{t('setup.services_description')}</p>
-          {setup.service_catalog.map((service) => (
-            <label className="item-card service-row" key={service.id}>
-              <span>
-                <input
-                  type="checkbox"
-                  checked={services.includes(service.id)}
-                  onChange={(event) =>
-                    setServices((current) =>
-                      event.target.checked
-                        ? [...current, service.id]
-                        : current.filter((id) => id !== service.id)
-                    )
-                  }
-                />{' '}
-                {service.label}
-              </span>
-              <span className={`status-chip${service.configured ? '' : ' attention'}`}>
-                {service.configured ? t('setup.connected') : service.auth}
-              </span>
-            </label>
-          ))}
+          <p className="item-meta">{t('setup.connect_oauth_hint')}</p>
+          <div className="service-icon-grid">
+            {setup.service_catalog.map((service) => {
+              const oauthCapable = /oauth/i.test(service.auth);
+              const initial = service.label.slice(0, 1).toUpperCase();
+              return (
+                <div className="service-tile" key={service.id} data-service={service.id}>
+                  <div className="service-tile-icon" aria-hidden="true">
+                    {initial}
+                  </div>
+                  <div className="service-tile-body">
+                    <label className="service-tile-label">
+                      <input
+                        type="checkbox"
+                        checked={services.includes(service.id)}
+                        onChange={(event) =>
+                          setServices((current) =>
+                            event.target.checked
+                              ? [...current, service.id]
+                              : current.filter((id) => id !== service.id)
+                          )
+                        }
+                      />
+                      <span>{service.label}</span>
+                    </label>
+                    <span className={`status-chip${service.configured ? '' : ' attention'}`}>
+                      {service.configured ? t('setup.connected') : service.auth}
+                    </span>
+                    {oauthCapable ? (
+                      <button
+                        type="button"
+                        className="action-button secondary service-connect-btn"
+                        disabled={busy || oauthBusyId === service.id}
+                        onClick={() => void connectOAuth(service.id, service.label)}
+                      >
+                        {oauthBusyId === service.id ? '…' : t('setup.connect_oauth')}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {oauthMessage ? <p className="item-meta">{oauthMessage}</p> : null}
           <div className="button-row">
             <button
               className="action-button"
