@@ -106,6 +106,7 @@ import {
 } from './progress.js';
 import {
   parseAskVoiceHubReply,
+  resolveIntentLabel,
   viewFromIntentResolution,
   type AskConversationView,
 } from './ask-view.js';
@@ -651,6 +652,20 @@ presenceStudioData.app.post('/api/conversation', async (req, res) => {
     const view: AskConversationView = intentResolution
       ? viewFromIntentResolution(intentResolution)
       : { shape: 'reply' };
+    // FD-09: resolve `normalized_intent` to human wording server-side so
+    // `static/ask.js` never renders the raw internal slug — the
+    // standard-intent catalog's own `description` when registered there,
+    // else a humanized slug (see `resolveIntentLabel` module doc).
+    const intentLabel = intentResolution
+      ? resolveIntentLabel(
+          intentResolution.normalized_intent,
+          new Map(
+            loadStandardIntentCatalog()
+              .filter((intent): intent is typeof intent & { id: string } => Boolean(intent.id))
+              .map((intent) => [intent.id, intent.description ?? ''])
+          )
+        )
+      : undefined;
     const check = checkAndRepairSurfaceUxContract(rawReply, {
       allow_conversational_reply: isSimpleGreetingText(text),
       approval_required: intentResolution?.authority_level === 'approval_required',
@@ -674,6 +689,9 @@ presenceStudioData.app.post('/api/conversation', async (req, res) => {
       shape: view.shape,
       ...(view.nextActions ? { next_actions: view.nextActions } : {}),
       ...(intentResolution ? { intent_resolution: intentResolution } : {}),
+      ...(intentLabel
+        ? { intent_label: intentLabel.label, intent_label_source: intentLabel.source }
+        : {}),
       request_id: requestId,
     });
   }

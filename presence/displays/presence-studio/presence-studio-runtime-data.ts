@@ -1492,6 +1492,22 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:chip_browser',
   'front_desk:chip_webapp',
   'front_desk:count_items',
+  // FD-09: `resolution_shape` labels for the "Current state" block —
+  // `front_desk`-domain plain wording (see `ASK_SHAPE_LABEL_KEY` in
+  // `ask-view.ts` for why this does not reuse the existing
+  // `tui:tui_cockpit_shape_*` keys).
+  'front_desk:shape_direct_answer',
+  'front_desk:shape_task_session',
+  'front_desk:shape_mission',
+  'front_desk:shape_project_bootstrap',
+  // FD-09: the UX-contract conversation-turn shape chip (`AskConversationShape`
+  // in `ask-view.ts`), rendered through vocabulary instead of the raw
+  // internal shape id.
+  'front_desk:shape_chip_clarification',
+  'front_desk:shape_chip_execution_preview',
+  'front_desk:shape_chip_status_summary',
+  'front_desk:shape_chip_delivery_summary',
+  'front_desk:shape_chip_reply',
   'tui:tui_cockpit_authority_autonomous',
   'tui:tui_cockpit_authority_approval',
   'tui:tui_cockpit_authority_clarification',
