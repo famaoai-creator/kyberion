@@ -277,9 +277,15 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/computer-use-ref-identity-audit.md",
+      "tier": "public",
+      "size": 5824,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/computer-use-runtime-model.md",
       "tier": "public",
-      "size": 4578,
+      "size": 5128,
       "type": "md"
     },
     {
@@ -6855,7 +6861,7 @@
     {
       "path": "product/schemas/computer-interaction.schema.json",
       "tier": "public",
-      "size": 6149,
+      "size": 6424,
       "type": "json"
     },
     {
