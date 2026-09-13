@@ -296,6 +296,7 @@
     },
     "surface_runtime": {
       "allow_read": [
+        "active/shared/inbox/",
         "active/shared/runtime/",
         "knowledge/personal/tenants/",
         "active/shared/logs/surfaces/",
@@ -318,6 +319,7 @@
         "active/audit/"
       ],
       "allow_write": [
+        "active/shared/inbox/",
         "active/shared/runtime/",
         "active/shared/logs/surfaces/",
         "knowledge/product/governance/surfaces/",
