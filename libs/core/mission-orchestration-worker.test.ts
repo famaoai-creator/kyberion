@@ -1211,6 +1211,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
   it('persists planner packets into PLAN.md and NEXT_TASKS.json', async () => {
     const { missionDir } = await import('./path-resolver.js');
     const { safeReadFile } = await import('./secure-io.js');
+    const { listWorkItems } = await import('./work-coordination.js');
     const { persistPlanningPacket } = await import('./mission-orchestration-worker.js');
     const { loadProvisionedEntryRecords } = await import('./mission-orchestration-journal.js');
 
@@ -1247,6 +1248,17 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
         risk: 'medium',
         expected_output_format: 'files',
         estimated_scope: 'M',
+      }),
+    ]);
+    expect(listWorkItems({ projectId: 'MSN-FOLLOWUP' })).toEqual([
+      expect.objectContaining({
+        source_ref: 'mission:MSN-FOLLOWUP:task-1',
+        context: expect.objectContaining({
+          mission_id: 'MSN-FOLLOWUP',
+          project_id: 'MSN-FOLLOWUP',
+          task_id: 'task-1',
+        }),
+        metadata: expect.objectContaining({ task_id: 'task-1', team_role: 'operator' }),
       }),
     ]);
     expect(

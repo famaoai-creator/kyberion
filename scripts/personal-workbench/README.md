@@ -18,3 +18,19 @@ KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant> \
 ```
 
 `/capture` と `/load` は `X-PW-Token` が必要です。ローカルトークンは人間承認の代替ではありません。
+
+認証済みセッションから `/action` を使うと、既存の governed workflow を呼び出せます。メール送信とカレンダー変更は `approved: true` が必須です。OCR は既定で `privacy_first`、知識登録は即時公開ではなく personal tier の promotion candidate としてキューに入ります。
+
+```json
+{
+  "action": "calendar",
+  "approved": true,
+  "payload": {
+    "summary": "定例",
+    "start": "2026-09-14T10:00:00+09:00",
+    "end": "2026-09-14T10:30:00+09:00"
+  }
+}
+```
+
+`/action` のリクエストも `X-PW-Token` が必要です。メール・カレンダーの `approved` は human approval の記録と合わせて使用し、単なるブラウザ token を承認の代替にしないでください。
