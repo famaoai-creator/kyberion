@@ -184,6 +184,35 @@ export const ASK_VOCABULARY_KEYS = [
   'tui:tui_cockpit_outcome_approval_ready_plan',
   'tui:tui_cockpit_outcome_service_change',
   'tui:tui_cockpit_outcome_status_report',
+  // HT-06: the `/ask?mode=hearing` card (`hearing-card` in `ask.html`) —
+  // requirement labels themselves come from the hearing record's own
+  // per-locale `label` (resolved server-side from `label_key`), never from
+  // this fixed-chrome list.
+  'front_desk:hearing_title',
+  'front_desk:hearing_coverage',
+  'front_desk:hearing_decide',
+  'front_desk:hearing_pending',
+  'front_desk:hearing_canvas_frame_title',
+] as const satisfies readonly VocabularyKey[];
+
+// HT-06: exactly the `front_desk` keys `static/help.js` renders for the
+// training block (`#training-content`) — the track/lesson catalog data
+// itself (titles, goals, checks) stays free-form catalog content from
+// `GET /api/training/catalog`; only this fixed UI chrome is vocabulary.
+// Mirrors `ASK_VOCABULARY_KEYS` above — see `GET /api/help-vocabulary` in
+// `front-desk-routes.ts`.
+export const HELP_VOCABULARY_KEYS = [
+  'front_desk:training_choose_track',
+  'front_desk:training_open',
+  'front_desk:training_back',
+  'front_desk:training_try',
+  'front_desk:training_done_prefix',
+  'front_desk:training_level_beginner',
+  'front_desk:training_level_intermediate',
+  'front_desk:training_level_advanced',
+  'front_desk:training_status_not_started',
+  'front_desk:training_status_in_progress',
+  'front_desk:training_status_complete',
 ] as const satisfies readonly VocabularyKey[];
 
 // FD-02: `/` is now the human home page; the pre-FD-02 workbench moved to

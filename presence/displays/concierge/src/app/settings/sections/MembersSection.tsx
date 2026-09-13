@@ -24,12 +24,16 @@ const ROLE_LABEL_KEYS: Record<SettingsRole, FrontDeskMessageKey> = {
   viewer: 'role_viewer',
 };
 
-// 研修状況: kanji-only labels (no okurigana) so this file stays clear of the
-// I18N-03 hardcoded-kana ratchet without adding a new vocabulary key.
-const TRAINING_STATUS_LABEL: Record<'not_started' | 'in_progress' | 'complete', string> = {
-  not_started: '未着手',
-  in_progress: '進行中',
-  complete: '完了',
+// HT-06 (i18n gate): training status labels resolve through the shared
+// `front_desk:training_status_*` vocabulary keys (same ones `static/help.js`
+// renders) instead of an inline stand-in map.
+const TRAINING_STATUS_LABEL_KEYS: Record<
+  'not_started' | 'in_progress' | 'complete',
+  FrontDeskMessageKey
+> = {
+  not_started: 'training_status_not_started',
+  in_progress: 'training_status_in_progress',
+  complete: 'training_status_complete',
 };
 
 export type MemberFormState = {
@@ -193,14 +197,16 @@ export function MembersSection({
         </ul>
       )}
 
-      {/* HT-05: 研修 — track catalog comes from /api/training/catalog (never
+      {/* HT-05/HT-06: track catalog comes from /api/training/catalog (never
           hardcoded here), so track titles stay a single source of truth with
-          knowledge/product/orchestration/training-catalog.json. */}
-      <h3 className="pane-subheading">研修</h3>
+          knowledge/product/orchestration/training-catalog.json; the fixed
+          chrome (heading, field label, statuses, button) is vocabulary. */}
+      <h3 className="pane-subheading">{frontDeskText('settings_training_title', locale)}</h3>
+      <p className="pane-subtitle">{frontDeskText('settings_training_lead', locale)}</p>
       {trainingTracks.length > 0 ? (
         <div className="item-card settings-member-form">
           <label className="field-label">
-            受講課程
+            {frontDeskText('settings_training_track', locale)}
             <select
               value={trainingTrackId}
               onChange={(event) => setTrainingTrackId(event.target.value)}
@@ -222,14 +228,17 @@ export function MembersSection({
               <div className="button-row" key={`training-${member.member_id}`}>
                 <span>
                   {member.display_name} ·{' '}
-                  {TRAINING_STATUS_LABEL[assignment?.status ?? 'not_started']}
+                  {frontDeskText(
+                    TRAINING_STATUS_LABEL_KEYS[assignment?.status ?? 'not_started'],
+                    locale
+                  )}
                 </span>
                 <button
                   className="action-button"
                   disabled={memberBusy}
                   onClick={() => onAssignTraining(member.member_id)}
                 >
-                  割当
+                  {frontDeskText('settings_training_assign', locale)}
                 </button>
               </div>
             );
