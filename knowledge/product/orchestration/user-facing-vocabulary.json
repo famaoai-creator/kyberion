@@ -10905,6 +10905,211 @@
         "en": "Due {value}",
         "ja": "期限 {value}",
         "qps-ploc": "⟦Ḓůė {value} ŀőř⟧"
+      },
+      "progress_filter_active": {
+        "en": "In progress {count}",
+        "ja": "進行中 {count}",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş {count} ŀőřėɱ ⟧"
+      },
+      "progress_filter_delivered": {
+        "en": "Delivered {count}",
+        "ja": "できたもの {count}",
+        "qps-ploc": "⟦Ḓėŀïṽėřėḓ {count} ŀőřėɱ⟧"
+      },
+      "progress_filter_done": {
+        "en": "Finished",
+        "ja": "終わったもの",
+        "qps-ploc": "⟦Ƒïñïşħėḓ ŀőř⟧"
+      },
+      "progress_detail_requested": {
+        "en": "What you asked",
+        "ja": "頼んだこと",
+        "qps-ploc": "⟦Ẇħȧŧ ẏőů ȧşķėḓ ŀőřė⟧"
+      },
+      "progress_detail_now": {
+        "en": "What is happening now",
+        "ja": "いまやっていること",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ħȧṗṗėñïñɠ ñőẇ ŀőřėɱ ⟧"
+      },
+      "progress_detail_next": {
+        "en": "What comes next",
+        "ja": "この先",
+        "qps-ploc": "⟦Ẇħȧŧ ƈőɱėş ñėẋŧ ŀőřė⟧"
+      },
+      "progress_detail_log": {
+        "en": "Timeline",
+        "ja": "経過",
+        "qps-ploc": "⟦Ŧïɱėŀïñė ŀőř⟧"
+      },
+      "progress_action_note": {
+        "en": "Send a note",
+        "ja": "ひとこと伝える",
+        "qps-ploc": "⟦Şėñḓ ȧ ñőŧė ŀőř⟧"
+      },
+      "progress_action_stop": {
+        "en": "Stop",
+        "ja": "止める",
+        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
+      },
+      "progress_open_mirror": {
+        "en": "Watch the screen",
+        "ja": "手元の画面を見る",
+        "qps-ploc": "⟦Ẇȧŧƈħ ŧħė şƈřėėñ ŀőřėɱ⟧"
+      },
+      "progress_delivered_title": {
+        "en": "Delivered",
+        "ja": "できたもの",
+        "qps-ploc": "⟦Ḓėŀïṽėřėḓ ŀőř⟧"
+      },
+      "progress_delivered_waiting": {
+        "en": "{count} waiting to be received",
+        "ja": "受け取り待ち {count}件",
+        "qps-ploc": "⟦{count} ẇȧïŧïñɠ ŧő ƀė řėƈėïṽėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "progress_empty_active": {
+        "en": "Nothing is in progress.",
+        "ja": "進行中の作業はありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ïñ ṗřőɠřėşş. ŀőřėɱ ï⟧"
+      },
+      "progress_empty_delivered": {
+        "en": "Nothing is waiting to be received.",
+        "ja": "受け取り待ちの成果はありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ẇȧïŧïñɠ ŧő ƀė řėƈėïṽėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "progress_select_hint": {
+        "en": "Choose an item to see its details.",
+        "ja": "項目を選ぶと詳細が見られます。",
+        "qps-ploc": "⟦Ƈħőőşė ȧñ ïŧėɱ ŧő şėė ïŧş ḓėŧȧïŀş. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "settings_nav_profile": {
+        "en": "About you",
+        "ja": "あなたのこと",
+        "qps-ploc": "⟦Ȧƀőůŧ ẏőů ŀőř⟧"
+      },
+      "settings_nav_members": {
+        "en": "Organization and members",
+        "ja": "組織とメンバー",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ȧñḓ ɱėɱƀėřş ŀőřėɱ ï⟧"
+      },
+      "settings_nav_services": {
+        "en": "Connected services",
+        "ja": "サービス連携",
+        "qps-ploc": "⟦Ƈőññėƈŧėḓ şėřṽïƈėş ŀőřėɱ⟧"
+      },
+      "settings_nav_voice": {
+        "en": "Voice and speech",
+        "ja": "声と話し方",
+        "qps-ploc": "⟦Ṽőïƈė ȧñḓ şṗėėƈħ ŀőřėɱ⟧"
+      },
+      "settings_nav_notifications": {
+        "en": "Notifications",
+        "ja": "通知",
+        "qps-ploc": "⟦Ñőŧïƒïƈȧŧïőñş ŀőřė⟧"
+      },
+      "settings_nav_plugins": {
+        "en": "Extensions",
+        "ja": "拡張機能",
+        "qps-ploc": "⟦Ėẋŧėñşïőñş ŀőř⟧"
+      },
+      "settings_nav_advanced": {
+        "en": "Advanced",
+        "ja": "詳細設定",
+        "qps-ploc": "⟦Ȧḓṽȧñƈėḓ ŀőř⟧"
+      },
+      "settings_services_lead": {
+        "en": "Once connected, your companion can read and write on your behalf.",
+        "ja": "つなぐと、相棒が代わりに読み書きできます。",
+        "qps-ploc": "⟦Őñƈė ƈőññėƈŧėḓ, ẏőůř ƈőɱṗȧñïőñ ƈȧñ řėȧḓ ȧñḓ ẇřïŧė őñ ẏőůř ƀėħȧŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "settings_service_connected": {
+        "en": "Connected",
+        "ja": "接続済み",
+        "qps-ploc": "⟦Ƈőññėƈŧėḓ ŀőř⟧"
+      },
+      "settings_service_connect": {
+        "en": "Connect",
+        "ja": "接続する",
+        "qps-ploc": "⟦Ƈőññėƈŧ ŀőř⟧"
+      },
+      "settings_service_reconnect_hint": {
+        "en": "{service} needs to be reconnected. Use “Connect” to sign in again.",
+        "ja": "{service} は認証が切れています。「接続する」で再認証できます。",
+        "qps-ploc": "⟦{service} ñėėḓş ŧő ƀė řėƈőññėƈŧėḓ. Ůşė “Ƈőññėƈŧ” ŧő şïɠñ ïñ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "settings_voice_mic": {
+        "en": "Microphone",
+        "ja": "マイク",
+        "qps-ploc": "⟦Ɱïƈřőṗħőñė ŀőř⟧"
+      },
+      "settings_voice_voice": {
+        "en": "Your companion's voice",
+        "ja": "相棒の声",
+        "qps-ploc": "⟦Ẏőůř ƈőɱṗȧñïőñ'ş ṽőïƈė ŀőřėɱ ï⟧"
+      },
+      "settings_voice_handsfree": {
+        "en": "Keep listening hands-free",
+        "ja": "ハンズフリーで聞き続ける",
+        "qps-ploc": "⟦Ķėėṗ ŀïşŧėñïñɠ ħȧñḓş-ƒřėė ŀőřėɱ ïṗ⟧"
+      },
+      "settings_voice_handsfree_hint": {
+        "en": "Say “Kyberion” to get its attention.",
+        "ja": "「Kyberion」と呼びかけると反応します。",
+        "qps-ploc": "⟦Şȧẏ “Ķẏƀėřïőñ” ŧő ɠėŧ ïŧş ȧŧŧėñŧïőñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "settings_change": {
+        "en": "Change",
+        "ja": "変える",
+        "qps-ploc": "⟦Ƈħȧñɠė ŀőř⟧"
+      },
+      "settings_try": {
+        "en": "Try",
+        "ja": "試す",
+        "qps-ploc": "⟦Ŧřẏ ŀőř⟧"
+      },
+      "settings_advanced_lead": {
+        "en": "Operating rules, models and logs. You rarely need these.",
+        "ja": "運用ルール・モデル・ログ。ふだんは触らなくて大丈夫です。",
+        "qps-ploc": "⟦Őṗėřȧŧïñɠ řůŀėş, ɱőḓėŀş ȧñḓ ŀőɠş. Ẏőů řȧřėŀẏ ñėėḓ ŧħėşė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "settings_open_chronos": {
+        "en": "Open in the operations view",
+        "ja": "運用画面（管制塔）で開く",
+        "qps-ploc": "⟦Őṗėñ ïñ ŧħė őṗėřȧŧïőñş ṽïėẇ ŀőřėɱ ïṗ⟧"
+      },
+      "settings_tenants_title": {
+        "en": "Tenants",
+        "ja": "テナント",
+        "qps-ploc": "⟦Ŧėñȧñŧş ŀőř⟧"
+      },
+      "settings_tenants_lead": {
+        "en": "Where you can look, and your role there.",
+        "ja": "あなたが見られる場所と、そこでの役割。",
+        "qps-ploc": "⟦Ẇħėřė ẏőů ƈȧñ ŀőőķ, ȧñḓ ẏőůř řőŀė ŧħėřė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "settings_tenant_current": {
+        "en": "(viewing now)",
+        "ja": "（いま見ている）",
+        "qps-ploc": "⟦(ṽïėẇïñɠ ñőẇ) ŀőřė⟧"
+      },
+      "settings_members_title": {
+        "en": "Members",
+        "ja": "メンバー",
+        "qps-ploc": "⟦Ɱėɱƀėřş ŀőř⟧"
+      },
+      "settings_members_soon": {
+        "en": "Adding members comes in a later step. For now only the local owner can sign in.",
+        "ja": "メンバーの追加は次の段階で入ります。いまはローカルのオーナーだけが使えます。",
+        "qps-ploc": "⟦Ȧḓḓïñɠ ɱėɱƀėřş ƈőɱėş ïñ ȧ ŀȧŧėř şŧėṗ. Ƒőř ñőẇ őñŀẏ ŧħė ŀőƈȧŀ őẇñėř ƈȧñ şïɠñ ïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "settings_saved": {
+        "en": "Saved.",
+        "ja": "保存しました。",
+        "qps-ploc": "⟦Şȧṽėḓ. ŀőř⟧"
+      },
+      "settings_first_run_lead": {
+        "en": "Let's set things up in order. You can come back to any section later.",
+        "ja": "順番に整えていきましょう。あとからどの項目にも戻れます。",
+        "qps-ploc": "⟦Ŀėŧ'ş şėŧ ŧħïñɠş ůṗ ïñ őřḓėř. Ẏőů ƈȧñ ƈőɱė ƀȧƈķ ŧő ȧñẏ şėƈŧïőñ ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       }
     }
   }
