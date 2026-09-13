@@ -214,4 +214,8 @@ status: active
 
 ## 5. 実装状況
 
+- 2026-09-13: **FD-00 / FD-01 完了**(ブランチ `agent/front-desk-20260913`)— `front_desk` 語彙ドメイン(19 キー、en/ja + qps-ploc 生成)、`libs/core/front-desk-nav.ts`(5 項目の単一定義、manifest 由来ポート、役割ゲート)、`libs/core/front-desk-identity.ts`(`buildFrontDeskMe` 純関数 + `readFrontDeskMe`。`?tenant=` は狭めるだけ、archived は既定にしない)。相棒: `GET /api/me`・`GET /api/front-desk/nav`(remote token の read 許可リストに追加)、静的レール(`front-desk-rail.js/.css`: デスクトップ左レール / 720px 以下は下タブ)、`/ask` `/progress` `/help` の暫定 302。秘書室: 同 2 ルート、`FrontDeskRail` クライアント部品(ヘッダの nav リンクを置換)、`/settings` → `/setup` 暫定 redirect、⌘K に 5 項目追加。実機確認: 相棒を :3931 で起動し、レール描画(desktop / 400px)、`?tenant=` の非拡大、302 を確認。
+  - **判明した前提**: loopback viewer はサーバ側 `KYBERION_TENANT` に束縛される(既存契約)ため、ローカルのオーナーは常に 1 テナント表示になり切替は出ない。複数テナントの閲覧・切替は、複数 `tenant_slugs` を持つ token 登録か FD-07 のメンバー所属(member → tenants)で解決する。
+  - **既存の不具合(本計画外、記録のみ)**: 相棒 `index.html:3075` が state 未着時に `state.surfaces` を参照して TypeError、`/api/voice/speech-state` `/api/voice/input-devices` が voice-hub 停止時に 503(コンソールに出る)。FD-02/03 の書き直しで消える。
+  - **判明した制約**: `@agent/core/front-desk-nav` は `surface-runtime`(node:fs)を引くためクライアントバンドルに入れられない。クライアント側は JSON(`/api/front-desk/nav`)かサーバ部品からの props で受け取る。
 - 2026-09-13: 計画作成。§2.5(人とエージェントの役割)と FD-10 を同日追記。ワイヤーフレーム 9 枚(メニュー構成 / ホーム / 頼む / 決める / 進み具合 / 設定 / 設定›組織とメンバー / リモートで開いたとき / モバイル)をキャンバスで合意。
