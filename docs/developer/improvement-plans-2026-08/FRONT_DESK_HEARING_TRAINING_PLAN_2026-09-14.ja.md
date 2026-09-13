@@ -106,3 +106,4 @@ status: active
 
 - 2026-09-14: 計画作成(#736 の評価と、FD 計画上の置き場を確定)。
 - 2026-09-14: **HT-01 部分実装** — `presence/displays/presence-studio/hearing.ts` にシナリオ定義から要件レコードを生成する純関数、会話ターン適用、充足率計算を追加。Web アプリ要件 7 項目はデフォルトとして維持し、シナリオごとに項目・表示名・別名を差し替え可能にした。空ターンから回答を捏造しない契約を 3 テストで固定。UI/API の接続とキャンバス生成は未着手。
+- 2026-09-14: **HT-01/HT-02 第1段** — `/ask?mode=hearing` の会話横キャンバス、viewer スコープ付き `GET /api/hearing/:session` / `canvas`、localadmin 限定の回答更新を接続。キャンバスは外部リソースなし・escape 済み・sandbox iframe で描画し、回答ごとの `vN` HTML を `active/shared/tmp/hearing/` に保存して過去版を `?version=vN` で再表示できる。alignment gate、確定受け渡し、トレーニング、組織展開、公開経路への KA-06 接続は未完了。
