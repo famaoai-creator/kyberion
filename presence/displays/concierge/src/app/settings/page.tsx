@@ -1175,91 +1175,97 @@ export default function SettingsPage() {
             ) : null}
 
             <h3 className="pane-subheading">{frontDeskText('settings_member_add', locale)}</h3>
-            <label>
-              {frontDeskText('settings_member_add_display_name', locale)}
-              <input
-                type="text"
-                value={memberForm.display_name}
-                onChange={(event) =>
-                  setMemberForm({ ...memberForm, display_name: event.target.value })
-                }
-              />
-            </label>
-            <label>
-              {frontDeskText('settings_member_add_id', locale)}
-              <input
-                type="text"
-                value={memberForm.member_id}
-                onChange={(event) =>
-                  setMemberForm({ ...memberForm, member_id: event.target.value })
-                }
-              />
-            </label>
-            <label>
-              {frontDeskText('settings_member_add_tenant', locale)}
-              <select
-                value={memberForm.tenant_slug}
-                onChange={(event) =>
-                  setMemberForm({ ...memberForm, tenant_slug: event.target.value })
-                }
-              >
-                {meTenants.map((tenant) => (
-                  <option key={tenant.tenant_slug} value={tenant.tenant_slug}>
-                    {tenant.display_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {frontDeskText('settings_member_add_role', locale)}
-              <select
-                value={memberForm.role}
-                onChange={(event) =>
-                  setMemberForm({ ...memberForm, role: event.target.value as SettingsRole })
-                }
-              >
-                {(['owner', 'approver', 'viewer'] as SettingsRole[]).map((role) => (
-                  <option key={role} value={role}>
-                    {frontDeskText(ROLE_LABEL_KEYS[role], locale)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={memberForm.issue_token}
-                onChange={(event) =>
-                  setMemberForm({ ...memberForm, issue_token: event.target.checked })
-                }
-              />
-              {frontDeskText('settings_member_add_issue_token', locale)}
-            </label>
-            <div className="button-row">
-              <button
-                className="action-button"
-                disabled={
-                  memberBusy ||
-                  !memberForm.display_name ||
-                  !memberForm.member_id ||
-                  !memberForm.tenant_slug
-                }
-                onClick={() => void addMember()}
-              >
-                {frontDeskText('settings_member_add_submit', locale)}
-              </button>
-            </div>
-            {issuedToken ? (
-              <div className="notice" role="alert">
-                <p>{frontDeskText('settings_token_once', locale)}</p>
-                <code>{issuedToken}</code>
-                <div className="button-row">
-                  <button className="action-button" onClick={() => setIssuedToken(null)}>
-                    {frontDeskText('settings_token_once_dismiss', locale)}
-                  </button>
-                </div>
+            <div className="item-card settings-member-form">
+              <div className="field-row">
+                <label className="field-label">
+                  {frontDeskText('settings_member_add_display_name', locale)}
+                  <input
+                    type="text"
+                    value={memberForm.display_name}
+                    onChange={(event) =>
+                      setMemberForm({ ...memberForm, display_name: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="field-label">
+                  {frontDeskText('settings_member_add_id', locale)}
+                  <input
+                    type="text"
+                    value={memberForm.member_id}
+                    onChange={(event) =>
+                      setMemberForm({ ...memberForm, member_id: event.target.value })
+                    }
+                  />
+                </label>
               </div>
-            ) : null}
+              <div className="field-row">
+                <label className="field-label">
+                  {frontDeskText('settings_member_add_tenant', locale)}
+                  <select
+                    value={memberForm.tenant_slug}
+                    onChange={(event) =>
+                      setMemberForm({ ...memberForm, tenant_slug: event.target.value })
+                    }
+                  >
+                    {meTenants.map((tenant) => (
+                      <option key={tenant.tenant_slug} value={tenant.tenant_slug}>
+                        {tenant.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field-label">
+                  {frontDeskText('settings_member_add_role', locale)}
+                  <select
+                    value={memberForm.role}
+                    onChange={(event) =>
+                      setMemberForm({ ...memberForm, role: event.target.value as SettingsRole })
+                    }
+                  >
+                    {(['owner', 'approver', 'viewer'] as SettingsRole[]).map((role) => (
+                      <option key={role} value={role}>
+                        {frontDeskText(ROLE_LABEL_KEYS[role], locale)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={memberForm.issue_token}
+                  onChange={(event) =>
+                    setMemberForm({ ...memberForm, issue_token: event.target.checked })
+                  }
+                />
+                {frontDeskText('settings_member_add_issue_token', locale)}
+              </label>
+              <div className="button-row">
+                <button
+                  className="action-button"
+                  disabled={
+                    memberBusy ||
+                    !memberForm.display_name.trim() ||
+                    !memberForm.member_id.trim() ||
+                    !memberForm.tenant_slug
+                  }
+                  onClick={() => void addMember()}
+                >
+                  {frontDeskText('settings_member_add_submit', locale)}
+                </button>
+              </div>
+              {issuedToken ? (
+                <div className="notice" role="alert">
+                  <p>{frontDeskText('settings_token_once', locale)}</p>
+                  <code>{issuedToken}</code>
+                  <div className="button-row">
+                    <button className="action-button" onClick={() => setIssuedToken(null)}>
+                      {frontDeskText('settings_token_once_dismiss', locale)}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </section>
         );
 
