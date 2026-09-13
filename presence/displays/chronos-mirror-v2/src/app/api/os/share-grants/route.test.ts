@@ -86,6 +86,17 @@ vi.mock('../../../../lib/viewer-context', () => ({
 
 import { POST } from './route';
 
+// Vitest's default `clearMocks: true` wipes every mock's call history before
+// each test runs. `createShareGrantRegistryAuthorizer()` is only invoked once,
+// at module load time above (`shareGrantGraph` is built once and reused for
+// every request), so by the time any `it()` body runs that one call has
+// already been cleared. Snapshot the count immediately after import, before
+// the per-test auto-clear fires, so the graph-construction assertion below
+// still pins real behaviour instead of silently always failing (or being
+// weakened away).
+const registryAuthorizerCallsAtModuleLoad =
+  mocks.createShareGrantRegistryAuthorizer.mock.calls.length;
+
 describe('Chronos share-grant mutation route', () => {
   beforeEach(() => {
     mocks.guardRequest.mockReset();
@@ -136,7 +147,7 @@ describe('Chronos share-grant mutation route', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.createShareGrantRegistryAuthorizer).toHaveBeenCalledOnce();
+    expect(registryAuthorizerCallsAtModuleLoad).toBe(1);
     expect(mocks.shareGrantActorFromViewer).toHaveBeenCalledWith(
       expect.objectContaining({ principalId: 'chronos-tenant-a' })
     );

@@ -20,12 +20,32 @@ describe('voice hub runtime environment boundary', () => {
     });
 
     expect(source).toContain('locale: options?.locale,');
-    expect(source).toContain('const locale = detectReplyLanguage(userText);');
-    expect(source).toContain('locale,\n        }\n      )\n    );');
+    expect(source).toContain('const locale = detectReplyLanguage(text);');
     expect(source).toContain(
-      'formatChannelTurnText(result, { includeContract: false, locale }).trim()'
+      [
+        '          const result = await runSurfaceMessageConversation(',
+        '            buildPresenceSurfaceConversationMessageInput(',
+        '              buildPresenceConversationPrompt(text, sessionKey),',
+        '              {',
+        '                surfaceText: text,',
+        '                delegationSummaryInstruction:',
+        "                  'Below are delegated responses. Produce the final spoken answer in the user language. Keep it concise and directly answer the user. Do not emit A2A blocks.',",
+        '                scope,',
+        '                locale,',
+        '              }',
+        '            )',
+        '          );',
+      ].join('\n')
     );
-    expect(source).toContain('locale,\n        tier: context.scope?.tier,');
+    expect(source).toContain(
+      [
+        '          const formattedText = formatChannelTurnText(result, {',
+        '            includeContract: false,',
+        '            locale,',
+        '          }).trim();',
+      ].join('\n')
+    );
+    expect(source).toContain('locale,\n              tier: scope?.tier,');
   });
 
   it('keeps direct voice fallback replies in the shared vocabulary', () => {
