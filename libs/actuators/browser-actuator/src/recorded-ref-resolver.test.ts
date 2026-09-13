@@ -212,6 +212,21 @@ describe('resolveRefOrRecordedTarget', () => {
     );
   });
 
+  it('does not fill via a remapped @e1 when only dom_path was exported (no role/name)', async () => {
+    const page = fakePage(
+      [],
+      (selector) => (selector === 'input[name="token"]' ? 1 : 0),
+      () => false
+    );
+    const ctx = { ref_map: { '@e1': 'input#decoy' } };
+    const result = await resolveRefOrRecordedTarget(ctx, '@e1', page, {
+      dom_path: 'input[name="token"]',
+      requireDomPathMatch: true,
+    });
+    expect(result.selector).toBe('input[name="token"]');
+    expect(result.selector).not.toBe('input#decoy');
+  });
+
   it('does not fill via a fresh snapshot @e1 that disagrees with recorded dom_path', async () => {
     const page = fakePage(
       [element({ tag: 'input', role: 'textbox', name: 'API Key', selector: 'input#key' })],
