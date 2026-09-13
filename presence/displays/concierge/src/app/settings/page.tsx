@@ -1096,6 +1096,29 @@ export default function SettingsPage() {
               </ul>
             )}
 
+            <h3 className="pane-subheading">{t('setup.agent_display_name')}</h3>
+            <p className="pane-subtitle">
+              {t('setup.agent_registry_count', {
+                count: setup.agent_management.durable_identities.length,
+              })}
+            </p>
+            {setup.agent_management.durable_identities.length > 0 ? (
+              <ul className="settings-tenant-list">
+                {setup.agent_management.durable_identities.map((agent) => {
+                  const ownerId = agent.accountable_human_id?.replace(/^user:/, '');
+                  const owner = members.find((member) => member.member_id === ownerId);
+                  return (
+                    <li className="item-card settings-tenant-item" key={agent.nhi_id}>
+                      <p className="item-title">{agent.display_name}</p>
+                      <p className="item-meta">
+                        {owner?.display_name || frontDeskText('settings_members_title', locale)}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+
             <h3 className="pane-subheading">{frontDeskText('settings_member_add', locale)}</h3>
             <label>
               {frontDeskText('settings_member_add_display_name', locale)}
