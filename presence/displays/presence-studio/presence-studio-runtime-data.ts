@@ -1163,6 +1163,21 @@ app.get('/onboarding', (_req, res) => {
   res.sendFile(path.join(staticDir, 'onboarding.html'));
 });
 
+// Interim redirect until FD-03 ships the dedicated "ask" page (会話入力欄).
+app.get('/ask', (_req, res) => {
+  res.redirect(302, '/#voice-panel');
+});
+
+// Interim redirect until FD-05 ships the dedicated "progress" page (進み具合).
+app.get('/progress', (_req, res) => {
+  res.redirect(302, '/#requested-work-panel');
+});
+
+// Interim redirect until FD-08 ships the dedicated "how to use" page (旧 /learn).
+app.get('/help', (_req, res) => {
+  res.redirect(302, '/onboarding');
+});
+
 // Browsers always probe /favicon.ico — return 204 to silence noisy console 404.
 app.get('/favicon.ico', (_req, res) => {
   res.status(204).end();

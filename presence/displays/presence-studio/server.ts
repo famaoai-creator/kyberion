@@ -1,6 +1,13 @@
 import { appendJsonLine, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
-import { t as catalogT } from '@agent/core/t';
+import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
+import { readFrontDeskMe } from '@agent/core/front-desk-identity';
+import {
+  FRONT_DESK_HELP_LINK,
+  frontDeskRoleFromViewer,
+  readFrontDeskSurfacePorts,
+  resolveFrontDeskMenu,
+} from '@agent/core/front-desk-nav';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
@@ -70,7 +77,9 @@ import {
   resolvePresenceStudioViewerContext,
   requirePresenceStudioLocalAdmin,
   readPresenceStudioStringParam,
+  toFrontDeskViewerScope,
 } from './security.js';
+import { presenceAvailableOperations } from './headless.js';
 import {
   buildPresenceSurfaceFrame,
   createPresenceVoiceStimulus,
@@ -136,6 +145,97 @@ presenceStudioData.app.get('/api/identity', (_req, res) => {
     res.json(summarizePresenceStudioIdentity(result));
   } catch (err: any) {
     res.status(500).json(presenceStudioData.presenceStudioWireError(err, 500));
+  }
+});
+
+/** Same onboarded determination as `/api/identity`, reused by `/api/me` (FD-01). */
+function resolvePresenceStudioOnboarded(): boolean {
+  const personalDir = pathResolver.knowledge('personal');
+  const idPath = path.join(personalDir, 'my-identity.json');
+  const agentPath = path.join(personalDir, 'agent-identity.json');
+  return withExecutionContext('ecosystem_architect', () => {
+    const safeIdPath = presenceStudioData.resolveSafeExistingFile(idPath);
+    const safeAgentPath = presenceStudioData.resolveSafeExistingFile(agentPath);
+    const sovereign = safeIdPath
+      ? parsePresenceStudioSovereignIdentity(loadPersonalIdentityAtPath(safeIdPath))
+      : null;
+    const agent = safeAgentPath
+      ? parsePresenceStudioAgentIdentity(loadPersonalAgentIdentityAtPath(safeAgentPath))
+      : null;
+    return summarizePresenceStudioIdentity({ sovereign, agent, vision: null }).onboarded;
+  });
+}
+
+// FD-01: unified `GET /api/me` — see FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md
+// §2.4. Tenant profiles live under the personal tier, so the read runs
+// inside the same `ecosystem_architect` execution context `/api/identity`
+// already uses for this surface (concierge's equivalent uses
+// `sovereign_concierge`; presence-studio keeps its own established persona).
+presenceStudioData.app.get('/api/me', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    const scope = toFrontDeskViewerScope(viewer);
+    const requestedTenant = readSurfaceStringParam(req.query.tenant);
+    const me = withExecutionContext('ecosystem_architect', () =>
+      readFrontDeskMe(scope, {
+        requestedTenant,
+        availableOperations: presenceAvailableOperations(viewer),
+        onboarded: resolvePresenceStudioOnboarded(),
+      })
+    );
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(me);
+  } catch (error) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
+  }
+});
+
+// FD-00 / FD-01: the shared front-desk rail reads its menu + labels from
+// here so presence-studio and concierge never drift (libs/core/front-desk-nav.ts
+// is the single source of the 5-item menu).
+presenceStudioData.app.get('/api/front-desk/nav', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
+    const role = frontDeskRoleFromViewer({ role: toFrontDeskViewerScope(viewer).role });
+    const items = resolveFrontDeskMenu({
+      currentSurface: 'presence-studio',
+      ports: readFrontDeskSurfacePorts(),
+      role,
+    }).map((item) => ({
+      id: item.id,
+      label: catalogT(item.label_key as VocabularyKey, undefined, locale),
+      sublabel: catalogT(item.sublabel_key as VocabularyKey, undefined, locale),
+      href: item.href,
+      external: item.external,
+      allowed: item.allowed,
+      min_role: item.min_role,
+    }));
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      ok: true,
+      locale,
+      current_surface: 'presence-studio' as const,
+      items,
+      help: {
+        label: catalogT(FRONT_DESK_HELP_LINK.label_key as VocabularyKey, undefined, locale),
+        href: FRONT_DESK_HELP_LINK.path,
+      },
+      brand_tagline: catalogT('front_desk:brand_tagline', undefined, locale),
+      aria_label: catalogT('front_desk:nav_aria_label', undefined, locale),
+      tenant_switch_aria: catalogT('front_desk:tenant_switch_aria', undefined, locale),
+      role_labels: {
+        owner: catalogT('front_desk:role_owner', undefined, locale),
+        approver: catalogT('front_desk:role_approver', undefined, locale),
+        viewer: catalogT('front_desk:role_viewer', undefined, locale),
+      },
+      tenant_viewing_summary: catalogT('front_desk:tenant_viewing_summary', undefined, locale),
+      tenant_viewing_single: catalogT('front_desk:tenant_viewing_single', undefined, locale),
+    });
+  } catch (error) {
+    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
+    res.status(status).json(presenceStudioData.presenceStudioWireError(error, status));
   }
 });
 

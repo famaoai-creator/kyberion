@@ -8,6 +8,7 @@ import {
   resolveSurfaceViewerScope,
   SurfaceViewerScopeError,
   resolveSurfaceViewerToken,
+  type SurfaceViewerScope,
 } from '@agent/core/surface-mutation-guard';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
@@ -241,6 +242,28 @@ export function toSurfaceAuthorizationContext(
   };
 }
 
+/**
+ * FD-01: shape the server-resolved viewer as the framework-neutral
+ * `SurfaceViewerScope` that `@agent/core/front-desk-identity` expects. Same
+ * role/tier derivation as `presenceStudioHeadlessScope` /
+ * `toSurfaceAuthorizationContext` above — a member-registry-aware `approver`
+ * role has no server-side counterpart yet (FD-07).
+ */
+export function toFrontDeskViewerScope(viewer: PresenceStudioViewerContext): SurfaceViewerScope {
+  return {
+    role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
+    tenantSlugs: viewer.tenantSlugs,
+    organizationIds: 'all',
+    projectIds: 'all',
+    tierAccess:
+      viewer.source === 'loopback'
+        ? ['personal', 'confidential', 'public']
+        : ['confidential', 'public'],
+    source: viewer.source,
+    principalId: viewer.principalId,
+  };
+}
+
 function recordTenant(value: unknown): string | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const record = value as Record<string, unknown>;
@@ -345,8 +368,16 @@ export function requirePresenceStudioAccess(): RequestHandler {
       return res.status(auth.status).json({ ok: false, error: auth.reason });
     }
     const remote = !isLoopbackAddress(getPresenceStudioClientAddress(req));
-    const path = String(req.originalUrl || req.url || '');
-    const remoteSafe = path.startsWith('/api/headless/') || path.startsWith('/api/os/');
+    const rawPath = String(req.originalUrl || req.url || '');
+    const path = rawPath.split('?')[0] || rawPath;
+    // FD-01: /api/me and /api/front-desk/nav are read-only and viewer-scoped
+    // (never widened by a client-supplied ?tenant=), so they join the same
+    // remote-safe allowlist as the headless and OS control-plane APIs.
+    const remoteSafe =
+      path.startsWith('/api/headless/') ||
+      path.startsWith('/api/os/') ||
+      path === '/api/me' ||
+      path === '/api/front-desk/nav';
     if (remote && auth.reason === 'token' && !remoteSafe) {
       return res.status(403).json({
         ok: false,
