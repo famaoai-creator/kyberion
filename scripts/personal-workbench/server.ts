@@ -2,19 +2,13 @@
  * personal-workbench — one local inbox for personal secretary workflows.
  *
  * Captures links, tasks, follow-ups, decisions, expenses, and daily-review
- * notes into personal-tier operator proposals. It never sends mail, changes a
- * calendar, or promotes knowledge automatically.
+ * notes into personal-tier operator proposals. Mail send and knowledge enqueue
+ * stay proposal/draft-only; calendar writes require propose → confirm → apply.
  */
 import http from 'node:http';
 import { randomBytes, randomUUID } from 'node:crypto';
 import path from 'node:path';
-import {
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-  safeReadFile,
-  safeReaddir,
-} from '@agent/core/secure-io';
+import { safeExistsSync, safeMkdir, safeWriteFile, safeReaddir } from '@agent/core/secure-io';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import {
   portableProtocolServicePathRef,
@@ -111,9 +105,10 @@ function readCalendarProposals(outDir: string): CalendarProposalRecord[] {
     return names
       .map((name) => {
         try {
-          return JSON.parse(
-            safeReadFile(path.join(dir, name), { encoding: 'utf8' }) as string
-          ) as CalendarProposalRecord;
+          return readSafeJsonFile<CalendarProposalRecord>(
+            path.join(dir, name),
+            `personal-workbench calendar proposal ${name}`
+          );
         } catch {
           return null;
         }
