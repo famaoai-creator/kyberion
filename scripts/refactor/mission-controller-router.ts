@@ -25,8 +25,10 @@ import {
   runMissionRetrospective,
 } from '@agent/core/mission-retrospective';
 import { generateMissionWorkReconciliationScaffold } from '@agent/core/mission-work-reconciliation';
+import type { HumanDecidedBy } from '@agent/core/mission-types';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
 import { parseMissionVisionRef } from './mission-creation.js';
+import { resolveDecidedByFromArgv } from '../lib/decided-by-args.js';
 import type { MissionRelationships } from './mission-types.js';
 
 const MISSION_TIERS = ['personal', 'confidential', 'public'] as const;
@@ -160,10 +162,15 @@ export interface MissionControllerRoutingContext {
     relationships?: any,
     tenantSlug?: string,
     organizationId?: string,
-    options?: { ephemeral?: boolean; intentGoal?: string; force?: boolean }
+    options?: {
+      ephemeral?: boolean;
+      intentGoal?: string;
+      force?: boolean;
+      decidedBy?: HumanDecidedBy;
+    }
   ) => Awaitable<void>;
-  pauseMission: (id: string, note?: string) => Awaitable<void>;
-  cancelMission: (id: string, note?: string) => Awaitable<void>;
+  pauseMission: (id: string, note?: string, decidedBy?: HumanDecidedBy) => Awaitable<void>;
+  cancelMission: (id: string, note?: string, decidedBy?: HumanDecidedBy) => Awaitable<void>;
   repairLegacyMissionState: (id: string, note?: string) => Awaitable<void>;
   recordRoutingDecisionInMissionState: (
     missionId: string,
@@ -230,6 +237,7 @@ export interface MissionControllerRoutingContext {
     candidateId: string,
     note?: string,
     tenantSlug?: string,
+    decidedBy?: HumanDecidedBy,
     print?: Print
   ) => void;
   rejectMemoryCandidate: (
@@ -237,6 +245,7 @@ export interface MissionControllerRoutingContext {
     note?: string,
     tenantSlug?: string,
     allDuplicates?: boolean,
+    decidedBy?: HumanDecidedBy,
     print?: Print
   ) => void;
   promoteMemoryCandidate: (
@@ -634,6 +643,11 @@ export async function runMissionControllerAction(
 
   assertMissionIdArgument(action, arg1);
 
+  // FD-10 wave 1b: resolved once for the whole action dispatch and only
+  // consumed by the human decision verbs below (start/pause/cancel/
+  // memory-approve/memory-reject) — every other command ignores it.
+  const decidedBy = resolveDecidedByFromArgv(context.argv);
+
   switch (action) {
     case 'create': {
       const positionalTier = parseAllowedValue(context.arg2, 'mission tier', MISSION_TIERS);
@@ -738,6 +752,7 @@ export async function runMissionControllerAction(
           ephemeral: context.argv.includes('--ephemeral'),
           intentGoal: resolveIntentGoalHandoffPath(context, arg1),
           force: context.argv.includes('--force'),
+          decidedBy,
         }
       );
       persistIntentTrackGate(intentTrack.intentTrackGate);
@@ -913,6 +928,7 @@ export async function runMissionControllerAction(
         arg1!,
         getValue('--note', context.argv),
         getValue('--tenant-slug', context.argv),
+        decidedBy,
         context.print
       );
       break;
@@ -922,6 +938,7 @@ export async function runMissionControllerAction(
         getValue('--note', context.argv),
         getValue('--tenant-slug', context.argv),
         context.argv.includes('--all-duplicates'),
+        decidedBy,
         context.print
       );
       break;
@@ -962,10 +979,10 @@ export async function runMissionControllerAction(
       await context.resumeMission(arg1);
       break;
     case 'pause':
-      await context.pauseMission(arg1!, getValue('--note', context.argv));
+      await context.pauseMission(arg1!, getValue('--note', context.argv), decidedBy);
       break;
     case 'cancel':
-      await context.cancelMission(arg1!, getValue('--note', context.argv));
+      await context.cancelMission(arg1!, getValue('--note', context.argv), decidedBy);
       break;
     case 'repair':
       await context.repairLegacyMissionState(arg1!, getValue('--note', context.argv));

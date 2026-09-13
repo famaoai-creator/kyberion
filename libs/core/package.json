@@ -143,6 +143,10 @@
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
     },
+    "./actor": {
+      "types": "./dist/actor.d.ts",
+      "default": "./dist/actor.js"
+    },
     "./index": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"

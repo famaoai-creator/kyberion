@@ -162,6 +162,44 @@ describe('memory-promotion-queue', () => {
     expect(updated?.ratification_note).toContain('governance reviewer');
   });
 
+  it('FD-10 wave 1b: persists decided_by on an approve/reject status update', () => {
+    const queued = queueMissionMemoryPromotionCandidate({
+      missionId: 'MSN-TEST-DECIDED-BY',
+      missionType: 'incident_response',
+      tier: 'confidential',
+      summary: 'Mission produced reusable incident containment flow.',
+      evidenceRefs: ['active/missions/MSN-TEST-DECIDED-BY/evidence/ledger.jsonl'],
+    });
+
+    const approved = updateMemoryPromotionCandidateStatus({
+      candidateId: queued.candidate_id,
+      status: 'approved',
+      ratificationNote: 'Validated by governance reviewer',
+      decidedBy: { kind: 'human', id: 'user:owner-1', display_name: 'Owner One', role: 'owner' },
+    });
+    expect(approved?.decided_by).toEqual({
+      kind: 'human',
+      id: 'user:owner-1',
+      display_name: 'Owner One',
+      role: 'owner',
+    });
+
+    // A record without decided_by (legacy / non-human callers) stays valid.
+    const legacyQueued = queueMissionMemoryPromotionCandidate({
+      missionId: 'MSN-TEST-DECIDED-BY-LEGACY',
+      missionType: 'incident_response',
+      tier: 'confidential',
+      summary: 'Legacy candidate without a decision maker.',
+      evidenceRefs: ['active/missions/MSN-TEST-DECIDED-BY-LEGACY/evidence/ledger.jsonl'],
+    });
+    const legacyApproved = updateMemoryPromotionCandidateStatus({
+      candidateId: legacyQueued.candidate_id,
+      status: 'approved',
+      ratificationNote: 'Validated without a decided_by.',
+    });
+    expect(legacyApproved?.decided_by).toBeUndefined();
+  });
+
   it('deduplicates queued candidates by source_ref and content hash', () => {
     const first = createMemoryPromotionCandidate({
       sourceType: 'mission',

@@ -26,6 +26,7 @@ import {
   type EventScope,
   type EventScopeFilter,
 } from './event-scope.js';
+import { parseActorRef, type ActorRef } from './actor.js';
 
 const logger = createLogger('audit-chain');
 
@@ -64,6 +65,17 @@ export interface AuditEntry {
   tenantSlug?: string;
   /** Canonical system/tenant/entity scope; tenantSlug is a legacy flat alias. */
   scope?: EventScope;
+  /**
+   * FD-10: "who did this" in the one actor vocabulary (`actor.ts`).
+   * Additive — `agentId` remains the free-string identifier every existing
+   * caller and reader already relies on; `actor` is populated only by
+   * callers that have a structured {@link ActorRef} on hand. Entries without
+   * it (every entry recorded before FD-10, and any caller that still only
+   * has a string) hash exactly as before: the field is omitted from the
+   * object entirely rather than set to `undefined`, so `JSON.stringify`
+   * produces byte-identical output for the hash chain.
+   */
+  actor?: ActorRef;
   chain_alg?: ChainAlg;
   chain_key_id?: string;
   previousHash: string;
@@ -132,6 +144,12 @@ export function normalizePersistedAuditEntry(value: unknown): AuditEntry {
   if (scope !== undefined && !isRecord(scope)) {
     throw new Error('audit.scope must be an object');
   }
+  // FD-10: additive and tolerant — a malformed/unparseable `actor` must not
+  // fail an otherwise-valid legacy entry (it is advisory "who did this"
+  // metadata, not part of the hash-chain integrity contract). Absent or
+  // unparseable both normalize to "no actor", same as any entry recorded
+  // before this field existed.
+  const actor = value.actor !== undefined ? (parseActorRef(value.actor) ?? undefined) : undefined;
   if (
     value.chain_alg !== undefined &&
     value.chain_alg !== 'sha256' &&
@@ -153,6 +171,7 @@ export function normalizePersistedAuditEntry(value: unknown): AuditEntry {
     ...(compliance !== undefined ? { compliance: compliance as AuditEntry['compliance'] } : {}),
     ...(tenantSlug ? { tenantSlug } : {}),
     ...(scope !== undefined ? { scope: scope as AuditEntry['scope'] } : {}),
+    ...(actor ? { actor } : {}),
     ...(value.chain_alg !== undefined
       ? { chain_alg: value.chain_alg as AuditEntry['chain_alg'] }
       : {}),

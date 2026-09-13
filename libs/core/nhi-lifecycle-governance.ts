@@ -38,6 +38,8 @@ import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
 import { readTenantProfile } from './tenant-registry.js';
+import { HUMAN_ACTOR_PREFIX } from './actor.js';
+import { resolveAccountableHuman } from './member-registry.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
 import { nowIso } from './foundation/time.js';
@@ -208,7 +210,10 @@ export function retireIdentitiesForScopeBestEffort(input: {
 // ---------------------------------------------------------------------------
 
 export type NhiOrphanReason =
-  'mission_scope_missing' | 'project_scope_missing' | 'tenant_scope_missing';
+  | 'mission_scope_missing'
+  | 'project_scope_missing'
+  | 'tenant_scope_missing'
+  | 'accountable_human_unresolved';
 
 export interface NhiOrphanIdentity {
   nhi_id: string;
@@ -250,6 +255,28 @@ export function listOrphanNhiIdentities(): NhiOrphanIdentity[] {
   const orphans: NhiOrphanIdentity[] = [];
   for (const record of records) {
     if (record.lifecycle_status === 'retired') continue;
+    // FD-10 item 4 (§2.5 principle 3): an accountable human that claims to be
+    // a member (`user:<member_id>`) but does not resolve to an active member
+    // is exactly the same symptom as a missing mission/project/tenant scope
+    // — a responsibility the ledger cannot actually reach. Legacy synthetic
+    // labels (`human:operator`, ids with no `user:` prefix at all) are
+    // deliberately NOT flagged here: they were never a resolvable member
+    // claim, so they are reported separately as "legacy"
+    // ({@link listLegacyAccountableHumanIdentities}), never accused of being
+    // orphaned.
+    if (
+      record.accountable_human_id.startsWith(HUMAN_ACTOR_PREFIX) &&
+      resolveAccountableHuman(record.accountable_human_id)?.status !== 'active'
+    ) {
+      orphans.push({
+        nhi_id: record.nhi_id,
+        lifecycle_status: record.lifecycle_status,
+        accountable_human_id: record.accountable_human_id,
+        reason: 'accountable_human_unresolved',
+        missing_scope_id: record.accountable_human_id,
+      });
+      continue;
+    }
     const missionId = record.affiliation.mission_id;
     const projectId = record.affiliation.project_id;
     const tenantSlug = record.affiliation.tenant_slug;
@@ -290,6 +317,43 @@ export function listOrphanNhiIdentities(): NhiOrphanIdentity[] {
   return orphans;
 }
 
+export interface NhiLegacyAccountableHuman {
+  nhi_id: string;
+  accountable_human_id: string;
+}
+
+/**
+ * Non-retired identities whose `accountable_human_id` is a legacy synthetic
+ * label (no `user:` prefix — e.g. the `human:operator` placeholder), not a
+ * resolvable member claim. Reported separately from
+ * {@link listOrphanNhiIdentities}: these are not "broken" (nothing regressed),
+ * they simply predate the member registry (FD-07) and have not been migrated
+ * to a real `accountable_human_id` yet.
+ */
+export function listLegacyAccountableHumanIdentities(): NhiLegacyAccountableHuman[] {
+  let records: AgentIdentityRecord[];
+  try {
+    records = listAgentIdentities();
+  } catch (error) {
+    logger.warn(
+      `[nhi-lifecycle] legacy-accountable-human scan could not read the ledger: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return [];
+  }
+  return records
+    .filter(
+      (record) =>
+        record.lifecycle_status !== 'retired' &&
+        !record.accountable_human_id.startsWith(HUMAN_ACTOR_PREFIX)
+    )
+    .map((record) => ({
+      nhi_id: record.nhi_id,
+      accountable_human_id: record.accountable_human_id,
+    }));
+}
+
 /** True when no active identity has lost its scope — the baseline-check predicate. */
 export function isNhiLedgerHealthy(orphans?: NhiOrphanIdentity[]): boolean {
   const found = orphans ?? listOrphanNhiIdentities();
@@ -328,6 +392,8 @@ export interface NhiLedgerReport {
   total: number;
   by_status: Record<AgentIdentityLifecycleStatus, number>;
   orphans: NhiOrphanIdentity[];
+  /** FD-10 item 4: legacy (pre-member-registry) accountable-human labels, reported but not orphaned. */
+  legacy_accountable_human: NhiLegacyAccountableHuman[];
   identities: NhiLedgerEntry[];
 }
 
@@ -379,6 +445,7 @@ export function buildNhiLedgerReport(options?: { nowIso?: string }): NhiLedgerRe
     total: identities.length,
     by_status: byStatus,
     orphans: listOrphanNhiIdentities(),
+    legacy_accountable_human: listLegacyAccountableHumanIdentities(),
     identities,
   };
 }
