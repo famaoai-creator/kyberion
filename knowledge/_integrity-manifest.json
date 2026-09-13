@@ -8121,7 +8121,7 @@
     {
       "path": "product/schemas/memory-candidate.schema.json",
       "tier": "public",
-      "size": 3954,
+      "size": 4344,
       "type": "json"
     },
     {
@@ -8391,7 +8391,7 @@
     {
       "path": "product/schemas/mission-state.schema.json",
       "tier": "public",
-      "size": 5934,
+      "size": 6390,
       "type": "json"
     },
     {
@@ -9015,7 +9015,7 @@
     {
       "path": "product/schemas/personal-agent-identity.schema.json",
       "tier": "public",
-      "size": 363,
+      "size": 1806,
       "type": "json"
     },
     {

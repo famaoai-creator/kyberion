@@ -60,6 +60,7 @@ import {
 import { appendCoordinationEvent } from './work-coordination.js';
 import { buildWorkItemHandoffPacket } from './handoff-packet.js';
 import type { TeamProviderPreference } from './team-role-assignment-selection.js';
+import type { HumanDecidedBy } from './mission-types.js';
 
 export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
   const missionFocusPath = pathResolver.shared('runtime/current_mission_focus.json');
@@ -126,6 +127,8 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         intentGoal?: string;
         force?: boolean;
         organizationId?: string;
+        /** FD-10 wave 1b: stamped on the ACTIVATE/RESUME history entry. */
+        decidedBy?: HumanDecidedBy;
       }
     ) {
       await _startMission({
@@ -142,6 +145,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         force: options?.force,
         ephemeral: options?.ephemeral,
         intentGoal: options?.intentGoal,
+        decidedBy: options?.decidedBy,
       });
       await syncProjectOperationalStateIfLinked(id);
     },
@@ -218,16 +222,18 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
       }).then(() => (id ? syncProjectOperationalStateIfLinked(id) : Promise.resolve()));
     },
-    pauseMission(id: string, note?: string) {
-      return _pauseMission(id, note).then(() => syncProjectOperationalStateIfLinked(id));
+    pauseMission(id: string, note?: string, decidedBy?: HumanDecidedBy) {
+      return _pauseMission(id, note, decidedBy).then(() => syncProjectOperationalStateIfLinked(id));
     },
     reenterMissionFromReview(id: string) {
       return _reenterMissionFromReview(id).then((result) =>
         syncProjectOperationalStateIfLinked(id).then(() => result)
       );
     },
-    cancelMission(id: string, note?: string) {
-      return _cancelMission(id, note).then(() => syncProjectOperationalStateIfLinked(id));
+    cancelMission(id: string, note?: string, decidedBy?: HumanDecidedBy) {
+      return _cancelMission(id, note, decidedBy).then(() =>
+        syncProjectOperationalStateIfLinked(id)
+      );
     },
     repairLegacyMissionState(id: string, note?: string) {
       return _repairLegacyMissionState(id, note).then(() =>

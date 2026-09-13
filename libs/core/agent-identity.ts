@@ -51,6 +51,7 @@ import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { loadOrganizationProfile } from './organization-profile.js';
+import { ownerAccountableHumanId } from './member-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { logger } from './core.js';
 import {
@@ -879,11 +880,33 @@ export interface EnsureAgentIdentityParams {
 }
 
 /**
+ * Legacy placeholder value of `organization-profile.json`'s
+ * `accountable_human_resource_id` (never a real, resolvable member).
+ */
+const LEGACY_ACCOUNTABLE_HUMAN_ID = 'human:operator';
+
+/**
+ * FD-10 item 4 (§2.5 principle 3: "すべてのエージェントに責任者となるメンバーがいる").
+ * The organization profile's `accountable_human_resource_id` still defaults
+ * to the pre-member-registry placeholder in most checkouts; once a caller
+ * omits an explicit accountable human, prefer a real, resolvable member
+ * (the owner) over perpetuating that placeholder. Any *other* explicitly
+ * configured value (already a real workforce resource id) is kept as-is —
+ * this only replaces the specific legacy default, never a deliberate choice.
+ */
+function resolveDefaultAccountableHumanId(): string {
+  const configured = loadOrganizationProfile()?.accountable_human_resource_id;
+  if (configured && configured !== LEGACY_ACCOUNTABLE_HUMAN_ID) return configured;
+  return ownerAccountableHumanId();
+}
+
+/**
  * Governed resolve-or-issue: return the existing identity for
  * `<org>/<slug>` regardless of its params/status, or issue a fresh
- * 'provisioned' one. Accountable human resolution: explicit param >
- * organization profile `accountable_human_resource_id`; if neither exists the
- * issue fails closed ({@link AgentIdentityAccountabilityError}).
+ * 'provisioned' one. Accountable human resolution: explicit param > the
+ * organization profile's `accountable_human_resource_id` (falling back to the
+ * owner member when that is unset or still the legacy `human:operator`
+ * placeholder — see {@link resolveDefaultAccountableHumanId}).
  */
 export function ensureAgentIdentityProvisioned(
   params: EnsureAgentIdentityParams
@@ -893,9 +916,7 @@ export function ensureAgentIdentityProvisioned(
   const existing = getAgentIdentity(nhiId);
   if (existing) return existing;
   const accountableHumanId =
-    params.accountableHumanId?.trim() ||
-    loadOrganizationProfile()?.accountable_human_resource_id ||
-    '';
+    params.accountableHumanId?.trim() || resolveDefaultAccountableHumanId();
   return issueAgentIdentity({
     kind: params.kind ?? 'agent',
     organizationId,

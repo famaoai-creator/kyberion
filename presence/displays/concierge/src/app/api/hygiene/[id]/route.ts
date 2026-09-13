@@ -15,6 +15,7 @@ import {
 } from '../../../../lib/i18n';
 import { findHygieneInquiry, readMissionStatus } from '../../../../lib/hygiene-server';
 import { resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { resolveConciergeDecidedBy } from '../../../../lib/front-desk-member';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,10 +90,30 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       return NextResponse.json({ ok: false, error: t('api.hygiene.failed') }, { status: 503 });
     }
 
+    // FD-10 wave 1b: resolve the human member behind this decision, same
+    // best-effort fallback as FD-07's decidedBy seam — an unresolved
+    // principal (legacy synthetic identity) simply omits the flags, and the
+    // CLI keeps working without them.
+    const decidedBy = resolveConciergeDecidedBy(resolved.context);
+    const decidedByArgs = decidedBy
+      ? [
+          '--decided-by',
+          decidedBy.id,
+          '--decided-by-name',
+          decidedBy.display_name,
+          ...(decidedBy.role ? ['--decided-by-role', decidedBy.role] : []),
+        ]
+      : [];
     const args =
       decision === 'start'
-        ? [CONTROLLER_RELATIVE, 'start', missionId]
-        : [CONTROLLER_RELATIVE, 'cancel', missionId, ...(note ? ['--note', note] : [])];
+        ? [CONTROLLER_RELATIVE, 'start', missionId, ...decidedByArgs]
+        : [
+            CONTROLLER_RELATIVE,
+            'cancel',
+            missionId,
+            ...(note ? ['--note', note] : []),
+            ...decidedByArgs,
+          ];
     const result = safeExecResult(process.execPath, args, {
       env: { ...process.env, MISSION_ROLE: 'mission_controller' },
       cwd: rootDir,
