@@ -240,6 +240,27 @@
       "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
     },
     {
+      "id": "personal-workbench",
+      "classification": "artifact-review-port",
+      "process_scope": "tenant-service",
+      "request_scope_mode": "artifact-derived",
+      "health": "localhost-health",
+      "owner": "surface_runtime",
+      "binding": "artifact-ref-and-personal-workbench-session",
+      "approval": "local-token-is-not-human-approval",
+      "principal_resolution": "viewer-principal-at-pad-session",
+      "write_authority": "artifact-review-receipt-only",
+      "nhi_binding": "viewer-or-runtime-nhi",
+      "approval_classes": ["local-token-not-approval", "external-effect-review"],
+      "data_residency": "tenant-personal-workbench-receipts-and-target-artifact",
+      "data_paths": [
+        "active/shared/observability/personal-workbench/tenants/{tenant}/receipts/",
+        "active/shared/tmp/personal-workbench/",
+        "<target-artifact>"
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
+    },
+    {
       "id": "generation-scheduler",
       "classification": "control-plane-worker",
       "process_scope": "system",
