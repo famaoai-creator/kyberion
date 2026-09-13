@@ -30,6 +30,8 @@ import {
   type SettingsRole,
   type SettingsTenantView,
 } from '../../lib/settings-types';
+import { useVoiceSelection } from '../../lib/use-voice-selection';
+import { useTrainingAssignments } from '../../lib/use-training-assignments';
 import { ProfileSection } from './sections/ProfileSection';
 import { MembersSection, type MemberFormState } from './sections/MembersSection';
 import { ServicesSection } from './sections/ServicesSection';
@@ -148,6 +150,22 @@ export default function SettingsPage() {
   const [memberBusy, setMemberBusy] = React.useState(false);
   const [issuedToken, setIssuedToken] = React.useState<string | null>(null);
   const [chronosUrl, setChronosUrl] = React.useState<string | null>(null);
+  const {
+    voiceSelection,
+    voiceDevices,
+    voiceSelectionBusy,
+    refreshVoiceSelection,
+    saveVoiceSelection,
+  } = useVoiceSelection(setNotice);
+  const {
+    trainingTracks,
+    trainingAssignments,
+    trainingTrackId,
+    setTrainingTrackId,
+    refreshTrainingCatalog,
+    refreshTrainingAssignments,
+    assignTraining,
+  } = useTrainingAssignments(locale, setNotice);
   const [activeSection, setActiveSection] = React.useState<SettingsSectionId>('profile');
   const cameraStreamRef = React.useRef<MediaStream | null>(null);
   const cameraVideoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -416,6 +434,9 @@ export default function SettingsPage() {
     void refreshMe();
     void refreshMembers();
     void refreshChronosLink();
+    void refreshVoiceSelection();
+    void refreshTrainingCatalog();
+    void refreshTrainingAssignments();
     return () => {
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -428,6 +449,9 @@ export default function SettingsPage() {
     refreshMe,
     refreshMembers,
     refreshChronosLink,
+    refreshVoiceSelection,
+    refreshTrainingCatalog,
+    refreshTrainingAssignments,
   ]);
 
   React.useEffect(() => {
@@ -828,6 +852,7 @@ export default function SettingsPage() {
             key="members"
             locale={locale}
             t={t}
+            setup={setup}
             meTenants={meTenants}
             meViewing={meViewing}
             members={members}
@@ -838,6 +863,13 @@ export default function SettingsPage() {
             setIssuedToken={setIssuedToken}
             onAddMember={() => void addMember()}
             onPatchMember={(memberId, patch) => void patchMember(memberId, patch)}
+            trainingTracks={trainingTracks}
+            trainingAssignments={trainingAssignments}
+            trainingTrackId={trainingTrackId}
+            setTrainingTrackId={setTrainingTrackId}
+            onAssignTraining={(memberId) =>
+              void assignTraining(memberId, meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug)
+            }
             sectionRef={setSectionRef('members')}
           />
         );
@@ -885,6 +917,10 @@ export default function SettingsPage() {
             onStopVoiceRecording={stopVoiceRecording}
             onVoiceSampleFileChange={(file) => void upload('voice_sample', file, 'upload')}
             onSaveVoice={() => void applyOnboarding(true)}
+            voiceSelection={voiceSelection}
+            voiceDevices={voiceDevices}
+            voiceSelectionBusy={voiceSelectionBusy}
+            onSaveVoiceSelection={(field, value) => void saveVoiceSelection(field, value)}
             sectionRef={setSectionRef('voice')}
           />
         );
