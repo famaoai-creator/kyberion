@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "training-catalog.schema.json",
+  "title": "Front Desk Training Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "tracks"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "level", "title", "audience", "lessons"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,40}$" },
+          "level": { "type": "string", "enum": ["beginner", "intermediate", "advanced"] },
+          "title": { "type": "string", "minLength": 1 },
+          "audience": { "type": "string", "minLength": 1 },
+          "lessons": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "title", "goal", "try", "check"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,60}$" },
+                "title": { "type": "string", "minLength": 1 },
+                "goal": { "type": "string", "minLength": 1 },
+                "try": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["kind"],
+                  "properties": {
+                    "kind": { "type": "string", "enum": ["ask", "decide", "progress", "settings"] },
+                    "prefill": { "type": "string" }
+                  }
+                },
+                "check": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["kind", "text"],
+                  "properties": {
+                    "kind": { "type": "string", "enum": ["self", "artifact", "decision"] },
+                    "text": { "type": "string", "minLength": 1 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -51,10 +51,79 @@
         fillSection(byId.ask);
         fillSection(byId.decide);
         fillSection(byId.progress);
+        return fetch('/api/training/catalog', { cache: 'no-store' });
+      })
+      .then(function (response) {
+        return response && response.json();
+      })
+      .then(function (payload) {
+        if (!payload || !payload.ok || !payload.catalog) return;
+        var content = document.getElementById('training-content');
+        if (!content) return;
+        var parts = window.location.pathname.split('/').filter(Boolean);
+        var track = payload.catalog.tracks.filter(function (item) {
+          return item.id === parts[1];
+        })[0];
+        if (!track) {
+          content.innerHTML =
+            '<h2 class="help-training-title">トラックから選ぶ</h2>' +
+            payload.catalog.tracks
+              .map(function (item) {
+                return (
+                  '<a class="help-card help-track-card" href="/help/' +
+                  encodeURIComponent(item.id) +
+                  '"><h2>' +
+                  escapeHtml(item.title) +
+                  '</h2><p>' +
+                  escapeHtml(item.audience) +
+                  '</p><span class="help-card-link">開く</span></a>'
+                );
+              })
+              .join('');
+          return;
+        }
+        content.innerHTML =
+          '<a class="help-back" href="/help">使い方の一覧に戻る</a>' +
+          '<h2 class="help-track-title">' +
+          escapeHtml(track.title) +
+          '</h2><p class="help-track-audience">' +
+          escapeHtml(track.audience) +
+          '</p>' +
+          track.lessons
+            .map(function (lesson) {
+              var href =
+                lesson.try.kind === 'ask'
+                  ? '/ask?prefill=' + encodeURIComponent(lesson.try.prefill || '')
+                  : lesson.try.kind === 'decide' || lesson.try.kind === 'progress'
+                    ? '/progress'
+                    : '/settings';
+              return (
+                '<article class="help-lesson"><h3>' +
+                escapeHtml(lesson.title) +
+                '</h3><p>' +
+                escapeHtml(lesson.goal) +
+                '</p><a class="help-card-link" href="' +
+                escapeHtml(href) +
+                '">やってみる</a>' +
+                '<p class="help-check">できたこと: ' +
+                escapeHtml(lesson.check.text) +
+                '</p></article>'
+              );
+            })
+            .join('');
       })
       .catch(function () {
         // The static Japanese fallback already in help.html stays visible.
       });
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   window.KyberionHelp = { mount: mount };

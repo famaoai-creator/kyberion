@@ -1,0 +1,78 @@
+{
+  "$schema": "../schemas/training-catalog.schema.json",
+  "version": "1.0.0",
+  "tracks": [
+    {
+      "id": "first-steps",
+      "level": "beginner",
+      "title": "まず使ってみる",
+      "audience": "AI を初めて使う人",
+      "lessons": [
+        {
+          "id": "first-request",
+          "title": "頼みごとを言葉にする",
+          "goal": "やりたいことを自然な言葉で伝える",
+          "try": { "kind": "ask", "prefill": "今日やることを整理して" },
+          "check": { "kind": "self", "text": "頼みたいことを自分の言葉で入力できた" }
+        },
+        {
+          "id": "see-progress",
+          "title": "進み具合を確認する",
+          "goal": "頼んだことの状態とできたものを確認する",
+          "try": { "kind": "progress" },
+          "check": { "kind": "self", "text": "進行中のものと次の一手を確認できた" }
+        }
+      ]
+    },
+    {
+      "id": "guided-work",
+      "level": "intermediate",
+      "title": "仕事を任せる",
+      "audience": "日常的に AI を使う人",
+      "lessons": [
+        {
+          "id": "shape-request",
+          "title": "成果を添えて頼む",
+          "goal": "欲しい成果物と条件を一緒に伝える",
+          "try": { "kind": "ask", "prefill": "この目的に合う案を作って、確認しやすい形で見せて" },
+          "check": { "kind": "artifact", "text": "成果物を見て、直したい点を伝えられた" }
+        },
+        {
+          "id": "make-decision",
+          "title": "人が決める場所を知る",
+          "goal": "承認や例外だけを自分で決める",
+          "try": { "kind": "decide" },
+          "check": {
+            "kind": "decision",
+            "text": "保留中の判断を確認し、承認または差し戻しを選べた"
+          }
+        }
+      ]
+    },
+    {
+      "id": "team-practice",
+      "level": "advanced",
+      "title": "チームで育てる",
+      "audience": "チームの運用を整える人",
+      "lessons": [
+        {
+          "id": "assign-track",
+          "title": "学びを割り当てる",
+          "goal": "メンバーに合うトラックを割り当てる",
+          "try": { "kind": "settings" },
+          "check": {
+            "kind": "decision",
+            "text": "対象メンバーとトラックを確認して割り当てを保存できた"
+          }
+        },
+        {
+          "id": "review-team",
+          "title": "チームの進み具合を見る",
+          "goal": "メンバーごとの進捗を確認して支援する",
+          "try": { "kind": "settings" },
+          "check": { "kind": "self", "text": "進行中のメンバーに次の支援を決められた" }
+        }
+      ]
+    }
+  ]
+}

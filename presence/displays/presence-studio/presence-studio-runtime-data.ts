@@ -1203,6 +1203,9 @@ app.get('/progress', (_req, res) => {
 app.get('/help', (_req, res) => {
   res.sendFile(path.join(staticDir, 'help.html'));
 });
+app.get('/help/:track', (_req, res) => {
+  res.sendFile(path.join(staticDir, 'help.html'));
+});
 
 // Browsers always probe /favicon.ico — return 204 to silence noisy console 404.
 app.get('/favicon.ico', (_req, res) => {

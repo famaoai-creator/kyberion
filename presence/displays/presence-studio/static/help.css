@@ -71,3 +71,12 @@ body {
 .help-card-link:hover {
   opacity: 0.9;
 }
+
+.help-tracks { display: flex; flex-direction: column; gap: 16px; }
+.help-track-card { text-decoration: none; color: inherit; }
+.help-track-card h2, .help-track-title, .help-training-title { margin: 0; }
+.help-track-audience, .help-check { color: var(--kb-muted-text, #475569); }
+.help-lesson { border-top: 1px solid var(--kb-border, #e2e8f0); padding: 18px 0; }
+.help-lesson h3 { margin: 0 0 6px; }
+.help-lesson p { margin: 6px 0 14px; }
+.help-back { color: var(--kb-primary, #0b5fff); }

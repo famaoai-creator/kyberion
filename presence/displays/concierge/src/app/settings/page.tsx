@@ -87,6 +87,10 @@ type VoiceSelection = {
   stt: { candidates: Array<{ backend: string; display_name: string; selectable: boolean }> };
 };
 type VoiceDevice = { uid: string; name: string; isDefault: boolean };
+type TrainingAssignment = {
+  tenant_slug: string;
+  assignments: Array<{ member_id: string; track_id: string; status: string }>;
+};
 
 const DEFAULT_SERVICES = ['google-workspace', 'slack', 'browser'];
 
@@ -286,6 +290,8 @@ export default function SettingsPage() {
   const [voiceSelection, setVoiceSelection] = React.useState<VoiceSelection | null>(null);
   const [voiceDevices, setVoiceDevices] = React.useState<VoiceDevice[]>([]);
   const [voiceSelectionBusy, setVoiceSelectionBusy] = React.useState(false);
+  const [trainingAssignments, setTrainingAssignments] = React.useState<TrainingAssignment[]>([]);
+  const [trainingTrackId, setTrainingTrackId] = React.useState('first-steps');
   const [activeSection, setActiveSection] = React.useState<SettingsSectionId>('profile');
   const cameraStreamRef = React.useRef<MediaStream | null>(null);
   const cameraVideoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -460,6 +466,39 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const refreshTrainingAssignments = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/training/assignments', { cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if (response.ok && payload?.ok && Array.isArray(payload.assignments)) {
+        setTrainingAssignments(payload.assignments);
+      }
+    } catch {
+      /* optional training data must not block settings */
+    }
+  }, []);
+
+  const assignTraining = React.useCallback(
+    async (memberId: string) => {
+      const tenant = meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug;
+      if (!tenant) return;
+      const response = await fetch('/api/training/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_slug: tenant,
+          member_id: memberId,
+          track_id: trainingTrackId,
+        }),
+      });
+      if (response.ok) {
+        setNotice({ text: 'トラックを割り当てました。' });
+        await refreshTrainingAssignments();
+      }
+    },
+    [meTenants, meViewing, refreshTrainingAssignments, trainingTrackId]
+  );
+
   // FD-07 「メンバーを追加」: fires only from the explicit form submit — no
   // auto-creation, no default role. The new access token (when requested)
   // is shown exactly once via `issuedToken` and never re-fetchable.
@@ -596,6 +635,7 @@ export default function SettingsPage() {
     void refreshConfigMissions();
     void refreshMe();
     void refreshMembers();
+    void refreshTrainingAssignments();
     void refreshChronosLink();
     void refreshVoiceSelection();
     return () => {
@@ -609,6 +649,7 @@ export default function SettingsPage() {
     refreshConfigMissions,
     refreshMe,
     refreshMembers,
+    refreshTrainingAssignments,
     refreshChronosLink,
     refreshVoiceSelection,
   ]);
@@ -1150,6 +1191,47 @@ export default function SettingsPage() {
                 })}
               </ul>
             )}
+
+            <h3 className="pane-subheading">トレーニング</h3>
+            <p className="pane-subtitle">
+              メンバーに学習トラックを割り当て、進み具合を確認します。
+            </p>
+            <div className="item-card settings-member-form">
+              <label className="field-label">
+                トラック
+                <select
+                  value={trainingTrackId}
+                  onChange={(event) => setTrainingTrackId(event.target.value)}
+                >
+                  <option value="first-steps">まず使ってみる</option>
+                  <option value="guided-work">仕事を任せる</option>
+                  <option value="team-practice">チームで育てる</option>
+                </select>
+              </label>
+              {members.map((member) => {
+                const tenant = meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug;
+                const assignment = trainingAssignments
+                  .find((item) => item.tenant_slug === tenant)
+                  ?.assignments.find(
+                    (item) =>
+                      item.member_id === member.member_id && item.track_id === trainingTrackId
+                  );
+                return (
+                  <div className="button-row" key={`training-${member.member_id}`}>
+                    <span>
+                      {member.display_name} · {assignment?.status ?? '未着手'}
+                    </span>
+                    <button
+                      className="action-button"
+                      disabled={memberBusy}
+                      onClick={() => void assignTraining(member.member_id)}
+                    >
+                      割り当てる
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
 
             <h3 className="pane-subheading">{t('setup.agent_display_name')}</h3>
             <p className="pane-subtitle">
