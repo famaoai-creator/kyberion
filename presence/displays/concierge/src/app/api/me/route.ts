@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
 import { readFrontDeskMe } from '@agent/core/front-desk-identity';
+import { ensureOwnerMember } from '@agent/core/member-registry';
 import { getBrowserOnboardingState } from '@agent/core/browser-onboarding';
 import { conciergeAvailableOperations } from '../../../lib/headless-projections';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
@@ -26,13 +27,24 @@ export function GET(req: NextRequest) {
     const onboarding = getBrowserOnboardingState();
     const onboarded =
       (onboarding.onboarding as Record<string, unknown> | null)?.status === 'complete';
-    const me = withExecutionContext('sovereign_concierge', () =>
-      readFrontDeskMe(resolved.context, {
+    const me = withExecutionContext('sovereign_concierge', () => {
+      // FD-07: the local owner is provisioned lazily and idempotently on the
+      // first loopback visit (there is no login flow to hook), so
+      // member.registered becomes true without a manual ceremony. Never
+      // touches token viewers.
+      if (resolved.context.source === 'loopback') {
+        try {
+          ensureOwnerMember();
+        } catch (error) {
+          console.error('[concierge/me] could not provision the owner member', error);
+        }
+      }
+      return readFrontDeskMe(resolved.context, {
         requestedTenant,
         availableOperations: conciergeAvailableOperations(resolved.context),
         onboarded,
-      })
-    );
+      });
+    });
     return NextResponse.json(me, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     return conciergeErrorResponse(error, 500);

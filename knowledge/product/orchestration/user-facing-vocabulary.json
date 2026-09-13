@@ -11195,6 +11195,146 @@
         "en": "I could not send that. Please try again.",
         "ja": "送れませんでした。もう一度お試しください。",
         "qps-ploc": "⟦Ï ƈőůŀḓ ñőŧ şėñḓ ŧħȧŧ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "settings_member_add": {
+        "en": "Add a member",
+        "ja": "メンバーを追加",
+        "qps-ploc": "⟦Ȧḓḓ ȧ ɱėɱƀėř ŀőř⟧"
+      },
+      "settings_member_add_display_name": {
+        "en": "Display name",
+        "ja": "表示名",
+        "qps-ploc": "⟦Ḓïşṗŀȧẏ ñȧɱė ŀőř⟧"
+      },
+      "settings_member_add_id": {
+        "en": "Member ID",
+        "ja": "メンバーID",
+        "qps-ploc": "⟦Ɱėɱƀėř ÏḒ ŀőř⟧"
+      },
+      "settings_member_add_tenant": {
+        "en": "Tenant",
+        "ja": "テナント",
+        "qps-ploc": "⟦Ŧėñȧñŧ ŀőř⟧"
+      },
+      "settings_member_add_role": {
+        "en": "Role",
+        "ja": "役割",
+        "qps-ploc": "⟦Řőŀė ŀőř⟧"
+      },
+      "settings_member_add_issue_token": {
+        "en": "Issue an access token",
+        "ja": "アクセス用トークンを発行する",
+        "qps-ploc": "⟦Ïşşůė ȧñ ȧƈƈėşş ŧőķėñ ŀőřėɱ ⟧"
+      },
+      "settings_member_add_submit": {
+        "en": "Add",
+        "ja": "追加する",
+        "qps-ploc": "⟦Ȧḓḓ ŀőř⟧"
+      },
+      "settings_member_signin_local": {
+        "en": "Local",
+        "ja": "ローカル",
+        "qps-ploc": "⟦Ŀőƈȧŀ ŀőř⟧"
+      },
+      "settings_member_signin_token": {
+        "en": "Access token",
+        "ja": "アクセス用トークン",
+        "qps-ploc": "⟦Ȧƈƈėşş ŧőķėñ ŀőř⟧"
+      },
+      "settings_token_once": {
+        "en": "This token is shown only once. Copy it now, before you leave this screen.",
+        "ja": "このトークンはいまだけ表示されます。この画面を閉じる前に控えてください。",
+        "qps-ploc": "⟦Ŧħïş ŧőķėñ ïş şħőẇñ őñŀẏ őñƈė. Ƈőṗẏ ïŧ ñőẇ, ƀėƒőřė ẏőů ŀėȧṽė ŧħïş şƈřėėñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "settings_member_role_change": {
+        "en": "Change role",
+        "ja": "役割を変える",
+        "qps-ploc": "⟦Ƈħȧñɠė řőŀė ŀőř⟧"
+      },
+      "settings_member_suspend": {
+        "en": "Suspend",
+        "ja": "停止する",
+        "qps-ploc": "⟦Şůşṗėñḓ ŀőř⟧"
+      },
+      "settings_member_reactivate": {
+        "en": "Reactivate",
+        "ja": "再開する",
+        "qps-ploc": "⟦Řėȧƈŧïṽȧŧė ŀőř⟧"
+      },
+      "settings_member_status_active": {
+        "en": "Active",
+        "ja": "有効",
+        "qps-ploc": "⟦Ȧƈŧïṽė ŀőř⟧"
+      },
+      "settings_member_status_suspended": {
+        "en": "Suspended",
+        "ja": "停止中",
+        "qps-ploc": "⟦Şůşṗėñḓėḓ ŀőř⟧"
+      },
+      "settings_member_added": {
+        "en": "Member added.",
+        "ja": "メンバーを追加しました。",
+        "qps-ploc": "⟦Ɱėɱƀėř ȧḓḓėḓ. ŀőřė⟧"
+      },
+      "settings_member_updated": {
+        "en": "Member updated.",
+        "ja": "メンバーを更新しました。",
+        "qps-ploc": "⟦Ɱėɱƀėř ůṗḓȧŧėḓ. ŀőřė⟧"
+      },
+      "signin_title": {
+        "en": "Who's there?",
+        "ja": "どなたですか？",
+        "qps-ploc": "⟦Ẇħő'ş ŧħėřė? ŀőř⟧"
+      },
+      "signin_lead": {
+        "en": "Paste the access token you were given.",
+        "ja": "渡されたアクセス用トークンを貼り付けてください。",
+        "qps-ploc": "⟦Ṗȧşŧė ŧħė ȧƈƈėşş ŧőķėñ ẏőů ẇėřė ɠïṽėñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "signin_token_label": {
+        "en": "Access token",
+        "ja": "アクセス用トークン",
+        "qps-ploc": "⟦Ȧƈƈėşş ŧőķėñ ŀőř⟧"
+      },
+      "signin_submit": {
+        "en": "Enter",
+        "ja": "入る",
+        "qps-ploc": "⟦Ėñŧėř ŀőř⟧"
+      },
+      "signin_error": {
+        "en": "That token did not work.",
+        "ja": "そのトークンでは入れませんでした。",
+        "qps-ploc": "⟦Ŧħȧŧ ŧőķėñ ḓïḓ ñőŧ ẇőřķ. ŀőřėɱ ï⟧"
+      },
+      "settings_token_once_dismiss": {
+        "en": "Close",
+        "ja": "閉じる",
+        "qps-ploc": "⟦Ƈŀőşė ŀőř⟧"
+      },
+      "settings_member_owner_only": {
+        "en": "Member management requires the owner role.",
+        "ja": "メンバー管理はオーナーだけが行えます。",
+        "qps-ploc": "⟦Ɱėɱƀėř ɱȧñȧɠėɱėñŧ řėɋůïřėş ŧħė őẇñėř řőŀė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "settings_member_invalid_input": {
+        "en": "member_id, display_name, tenant_slug, and role are all required.",
+        "ja": "member_id・display_name・tenant_slug・role がすべて必要です。",
+        "qps-ploc": "⟦ɱėɱƀėř_ïḓ, ḓïşṗŀȧẏ_ñȧɱė, ŧėñȧñŧ_şŀůɠ, ȧñḓ řőŀė ȧřė ȧŀŀ řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "settings_member_already_exists": {
+        "en": "That member_id is already in use: {memberId}",
+        "ja": "その member_id はすでに使われています: {memberId}",
+        "qps-ploc": "⟦Ŧħȧŧ ɱėɱƀėř_ïḓ ïş ȧŀřėȧḓẏ ïñ ůşė: {memberId} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "settings_member_patch_invalid": {
+        "en": "Provide (tenant_slug and role) or status.",
+        "ja": "（tenant_slug と role）または status のいずれかを指定してください。",
+        "qps-ploc": "⟦Ṗřőṽïḓė (ŧėñȧñŧ_şŀůɠ ȧñḓ řőŀė) őř şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "settings_member_not_found": {
+        "en": "That member was not found.",
+        "ja": "そのメンバーは見つかりませんでした。",
+        "qps-ploc": "⟦Ŧħȧŧ ɱėɱƀėř ẇȧş ñőŧ ƒőůñḓ. ŀőřėɱ ïṗ⟧"
       }
     }
   }

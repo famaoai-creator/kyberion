@@ -34,6 +34,10 @@ export interface ConciergeViewerContext {
   tierAccess: Array<'personal' | 'confidential' | 'public'>;
   source: 'token' | 'loopback' | 'anonymous';
   principalId?: string;
+  /** FD-07: the matched chronos-access registration's label, when a token registration matched. */
+  registrationLabel?: string;
+  /** FD-07: the matched registration's member_id, when it declares one. */
+  memberId?: string;
 }
 
 export class ConciergeViewerError extends Error {
@@ -124,7 +128,15 @@ export function guardConciergeRequest(req: NextRequest): NextResponse | null {
 
 function registrations(): ChronosTokenRegistration[] | null {
   try {
-    return readChronosTokenRegistrations();
+    // FD-07 finding: `chronos-access.json` lives under the personal tier —
+    // reading it (needed to resolve ANY bearer-token viewer, not just a
+    // member-bound one) requires an authorized execution context, same as
+    // tenant/member profiles. This resolver runs before any other
+    // `withExecutionContext` call in the request (it decides the viewer that
+    // later calls use), so it must establish its own short-lived one here —
+    // without it, a corrupt/unreadable-looking `{}` is returned silently and
+    // every token viewer is rejected as unknown.
+    return withExecutionContext('sovereign_concierge', () => readChronosTokenRegistrations());
   } catch {
     throw new ConciergeViewerError(401, 'Concierge viewer token registry is unavailable.');
   }

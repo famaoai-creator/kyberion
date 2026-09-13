@@ -363,6 +363,14 @@
       "types": "./dist/front-desk-identity.d.ts",
       "default": "./dist/front-desk-identity.js"
     },
+    "./front-desk-roles": {
+      "types": "./dist/front-desk-roles.d.ts",
+      "default": "./dist/front-desk-roles.js"
+    },
+    "./member-registry": {
+      "types": "./dist/member-registry.d.ts",
+      "default": "./dist/member-registry.js"
+    },
     "./knowledge-taxonomy": {
       "types": "./dist/knowledge-taxonomy.d.ts",
       "default": "./dist/knowledge-taxonomy.js"
