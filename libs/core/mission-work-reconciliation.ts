@@ -46,6 +46,7 @@ import {
 import { sha256 } from './marketing-workload.js';
 import { withLock } from './src/lock-utils.js';
 import { loadState, saveState } from './mission-state.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { readCanonicalWorkGraphTasks } from './work-graph-projection.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 
@@ -749,8 +750,21 @@ function updateLinkedWorkItem(
 }
 
 function readPlannedTasks(missionId: string): PlannedTask[] {
-  return readCanonicalWorkGraphTasks(missionId).filter((entry): entry is PlannedTask =>
-    Boolean(entry && typeof entry === 'object')
+  const canonicalTasks = readCanonicalWorkGraphTasks(missionId).filter(
+    (entry): entry is PlannedTask => Boolean(entry && typeof entry === 'object')
+  );
+  if (canonicalTasks.length > 0) return canonicalTasks;
+
+  // Direct model work may have a planner-authored task board before its
+  // canonical WorkItems are registered. Keep NEXT_TASKS as a read-only,
+  // compatibility input for that adoption path; canonical WorkItems remain
+  // authoritative whenever they exist.
+  const resolvedMissionPath = findMissionPath(missionId);
+  if (!resolvedMissionPath) return [];
+  const nextTasksPath = nodePath.join(resolvedMissionPath, 'NEXT_TASKS.json');
+  if (!safeExistsSync(nextTasksPath)) return [];
+  return (loadMissionNextTaskObjectsAtPath(nextTasksPath, missionId) || []).filter(
+    (entry): entry is PlannedTask => Boolean(entry && typeof entry === 'object')
   );
 }
 
