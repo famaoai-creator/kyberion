@@ -75,6 +75,8 @@ import {
 } from '@agent/core/email-workflow';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 import { registerFrontDeskRoutes } from './front-desk-routes.js';
+import { registerHearingRoutes } from './hearing-routes.js';
+import { registerTrainingRoutes } from './training-routes.js';
 import { PRESENCE_STUDIO_VOCABULARY_KEYS } from './front-desk-pages.js';
 
 presenceStudioData.app.get('/api/ui-vocabulary', (req, res) => {
@@ -127,6 +129,12 @@ presenceStudioData.app.get('/api/identity', (_req, res) => {
 // `/api` + `/a2ui` guard and rate limiter (presence-studio-runtime-data.ts)
 // still run ahead of every route it registers.
 registerFrontDeskRoutes(presenceStudioData.app);
+
+// HT-01/03/04/05: hearing session + training catalog routes, split into
+// their own modules for the same reason and registered at the same position
+// (same guard order) — see hearing-routes.ts / training-routes.ts module docs.
+registerHearingRoutes(presenceStudioData.app);
+registerTrainingRoutes(presenceStudioData.app);
 
 presenceStudioData.app.get('/health', (_req, res) => {
   res.json({

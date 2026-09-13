@@ -11196,6 +11196,11 @@
         "ja": "送れませんでした。もう一度お試しください。",
         "qps-ploc": "⟦Ï ƈőůŀḓ ñőŧ şėñḓ ŧħȧŧ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
+      "hearing_next_alignment": {
+        "en": "Review the requirements and continue",
+        "ja": "要件を確認して次へ進む",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė řėɋůïřėɱėñŧş ȧñḓ ƈőñŧïñůė ŀőřėɱ ïṗşůɱ ⟧"
+      },
       "shape_direct_answer": {
         "en": "Reply now",
         "ja": "その場で回答",

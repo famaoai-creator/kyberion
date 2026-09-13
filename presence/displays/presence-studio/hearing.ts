@@ -34,13 +34,23 @@ export interface HearingRequirement {
   source_turn?: string;
 }
 
+/** FD-10 (plan §2.5 principle 4): decisions are human-only, recorded through
+ * `libs/core/actor.ts`'s `humanActor` shape plus the deciding member's
+ * front-desk role — never the synthetic loopback/token principal id. */
+export interface HearingDecidedBy {
+  kind: 'human';
+  id: string;
+  display_name?: string;
+  role: 'owner' | 'approver' | 'viewer';
+}
+
 export interface HearingRecord {
   session_id: string;
   scenario: string;
   requirements: HearingRequirement[];
   canvas_versions: string[];
   updated_at: string;
-  decided_by?: string;
+  decided_by?: HearingDecidedBy;
   decided_at?: string;
 }
 
