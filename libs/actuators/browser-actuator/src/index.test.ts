@@ -789,10 +789,59 @@ describe('browser-actuator v3 contract', () => {
     expect(mocks.page.goto).toHaveBeenCalledWith('https://example.com', {
       waitUntil: 'networkidle',
     });
-    expect(mocks.page.click).toHaveBeenCalledWith('a[href="https://www.iana.org/domains/example"]', {
-      timeout: 5000,
-    });
+    expect(mocks.page.click).toHaveBeenCalledWith(
+      'a[href="https://www.iana.org/domains/example"]',
+      {
+        timeout: 5000,
+      }
+    );
     expect(JSON.stringify(result.results)).not.toContain('Unknown browser ref');
+  });
+
+  it('records fill_secret_ref dom_path onto the trail so export_adf can corroborate', async () => {
+    const { handleAction, renderBrowserAdf } = await import('./index');
+    vi.stubEnv('GITHUB_TOKEN', 'test-secret-value');
+    let result: Awaited<ReturnType<typeof handleAction>>;
+    try {
+      result = await handleAction({
+        action: 'pipeline',
+        session_id: 'secret-fill-record',
+        steps: [
+          { type: 'capture', op: 'snapshot', params: { export_as: 'snapshot' } },
+          {
+            type: 'apply',
+            op: 'fill_secret_ref',
+            params: { ref: '@e1', secret_ref: 'GITHUB_TOKEN' },
+          },
+        ],
+        options: { headless: true },
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.action_trail).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          op: 'fill_secret_ref',
+          ref: '@e1',
+          selector: 'button:nth-of-type(1)',
+          dom_path: 'button:nth-of-type(1)',
+          secret_ref: 'GITHUB_TOKEN',
+        }),
+      ])
+    );
+
+    const exported = renderBrowserAdf(result.context.action_trail, 'secret-fill-record');
+    const secretStep = exported.steps.find((step) => step.op === 'fill_secret_ref');
+    expect(secretStep?.params).toMatchObject({
+      ref: '@e1',
+      secret_ref: 'GITHUB_TOKEN',
+      dom_path: 'button:nth-of-type(1)',
+      name: 'Submit',
+      role: 'button',
+    });
   });
 
   it('reuses leased browser sessions within the same process and can close them explicitly', async () => {
