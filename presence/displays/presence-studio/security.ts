@@ -410,6 +410,9 @@ export function requirePresenceStudioAccess(): RequestHandler {
     // list too; /api/conversation is a write (asking is a mutation) and
     // deliberately does NOT join it — it requires
     // `requirePresenceStudioLocalAdmin`, same as /api/outcomes/:id/verdict.
+    // HT-06: /api/help-vocabulary is the same read-only, viewer-scoped
+    // shape (no client-supplied widening) as the other `*-vocabulary`
+    // routes, so it joins the list too.
     const remoteSafe =
       path.startsWith('/api/headless/') ||
       path.startsWith('/api/os/') ||
@@ -420,7 +423,8 @@ export function requirePresenceStudioAccess(): RequestHandler {
       path === '/api/progress' ||
       path.startsWith('/api/progress/') ||
       path === '/api/progress-vocabulary' ||
-      path === '/api/ask-vocabulary';
+      path === '/api/ask-vocabulary' ||
+      path === '/api/help-vocabulary';
     if (remote && auth.reason === 'token' && !remoteSafe) {
       return res.status(403).json({
         ok: false,

@@ -9,8 +9,8 @@ import type express from 'express';
 import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { nowIso } from '@agent/core/foundation';
-import { t as catalogT } from '@agent/core/t';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { t as catalogT, type VocabularyKey } from '@agent/core/t';
+import { normalizeLocale, type SupportedLocale } from '@agent/core/locale-normalize';
 import { readSurfaceStringParam } from '@agent/core/surface-request-input';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
@@ -60,7 +60,23 @@ function hearingScenarioFromRecord(
 ): HearingScenario {
   return {
     id: record.scenario,
-    requirements: record.requirements.map(({ id, label }) => ({ id, label })),
+    requirements: record.requirements.map(({ id, label_key }) => ({ id, label_key })),
+  };
+}
+
+/** HT-06: the JSON `record` payload resolves each requirement's `label_key`
+ * to the request's locale at response time — never persisted — so a locale
+ * change re-renders instead of freezing the answering locale. */
+function withResolvedLabels(
+  record: ReturnType<typeof defaultHearingRecord>,
+  locale: SupportedLocale
+) {
+  return {
+    ...record,
+    requirements: record.requirements.map((item) => ({
+      ...item,
+      label: catalogT(item.label_key as VocabularyKey, undefined, locale),
+    })),
   };
 }
 
@@ -106,6 +122,7 @@ export function registerHearingRoutes(app: express.Express): void {
       const viewer = resolvePresenceStudioViewerContext(req);
       const sessionId = hearingSessionId(req);
       const namespace = hearingNamespace(viewer.tenantSlugs);
+      const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
       const record =
         loadHearingRecord(namespace, sessionId) || defaultHearingRecord(sessionId, nowIso());
       const requestedVersion = typeof req.query.version === 'string' ? req.query.version : '';
@@ -119,23 +136,29 @@ export function registerHearingRoutes(app: express.Express): void {
         'Content-Security-Policy',
         "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'"
       );
-      res.send(versionedCanvas || renderHearingCanvas(record));
+      res.send(versionedCanvas || renderHearingCanvas(record, locale));
     } catch (error) {
       hearingResponseError(req, res, error);
     }
   });
 
+  // HT-06: `?locale=` mirrors the locale the page already sends to
+  // `/api/ask-vocabulary` — every requirement's `label_key` is resolved to
+  // that locale's text server-side (`withResolvedLabels`) without touching
+  // the persisted `label_key`, so a later locale change re-renders instead
+  // of freezing the answering locale.
   app.get('/api/hearing/:session', (req, res) => {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       const sessionId = hearingSessionId(req);
       const namespace = hearingNamespace(viewer.tenantSlugs);
+      const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
       const existing = loadHearingRecord(namespace, sessionId);
       const record = existing || defaultHearingRecord(sessionId, nowIso());
       res.setHeader('Cache-Control', 'no-store');
       res.json({
         ok: true,
-        record,
+        record: withResolvedLabels(record, locale),
         persisted: Boolean(existing),
         canvas_url: `/api/hearing/${encodeURIComponent(sessionId)}/canvas`,
       });
@@ -160,6 +183,10 @@ export function registerHearingRoutes(app: express.Express): void {
       const text = typeof input.text === 'string' ? input.text.trim() : '';
       const requestId =
         typeof input.request_id === 'string' ? input.request_id.trim() : randomUUID();
+      const locale =
+        normalizeLocale(
+          typeof input.locale === 'string' ? input.locale : readSurfaceStringParam(req.query.locale)
+        ) ?? 'en';
       if (!text) throw new HearingRequestError('Hearing answer text is required.');
       const namespace = hearingNamespace(viewer.tenantSlugs);
       const existing = loadHearingRecord(namespace, sessionId);
@@ -181,12 +208,16 @@ export function registerHearingRoutes(app: express.Express): void {
         nowIso(),
         scenario || hearingScenarioFromRecord(record)
       );
-      const canvasVersion = saveHearingCanvasVersion(namespace, next, renderHearingCanvas(next));
+      const canvasVersion = saveHearingCanvasVersion(
+        namespace,
+        next,
+        renderHearingCanvas(next, locale)
+      );
       const versioned = { ...next, canvas_versions: [...next.canvas_versions, canvasVersion] };
       saveHearingRecord(namespace, versioned);
       res.status(200).json({
         ok: true,
-        record: versioned,
+        record: withResolvedLabels(versioned, locale),
         canvas_url: `/api/hearing/${encodeURIComponent(sessionId)}/canvas`,
       });
     } catch (error) {
@@ -242,7 +273,7 @@ export function registerHearingRoutes(app: express.Express): void {
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
       return res.json({
         ok: true,
-        record: decided,
+        record: withResolvedLabels(decided, locale),
         next_action: {
           kind: 'alignment_review',
           label_key: 'front_desk:hearing_next_alignment',
