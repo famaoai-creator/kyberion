@@ -60,6 +60,7 @@
 - [Coherence-Driven Change Propagation](./product/architecture/coherence-driven-change-propagation.md) (public | Ecosystem Architect)
 - [Component Lifecycle Inventory](./product/architecture/component-lifecycle-inventory.md) (public | Ecosystem Architect)
 - [Computer Use Runtime Model](./product/architecture/computer-use-runtime-model.md) (public | ecosystem_architect)
+- [Computer-Use Ref Identity Audit](./product/architecture/computer-use-ref-identity-audit.md) (public | ecosystem_architect)
 - [Contract Lifecycle](./product/architecture/contract-lifecycle.md) (public | Ecosystem Architect)
 - [Corporate Memory Loop](./product/architecture/corporate-memory-loop.md) (public | Ecosystem Architect)
 - [DOCX Markdown Ingestion Model](./product/architecture/docx-markdown-ingestion-model.md) (public | Unknown)
