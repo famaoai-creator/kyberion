@@ -1179,10 +1179,12 @@ app.get('/onboarding', (_req, res) => {
   res.redirect(302, `http://127.0.0.1:${readFrontDeskSurfacePorts().concierge}/settings`);
 });
 
-// Interim redirect until FD-03 ships the dedicated "ask" page (会話入力欄).
-// FD-02 moved the workbench these panels live in from `/` to `/work`.
+// FD-03: the dedicated "頼む" page, replacing the interim `/work` redirect.
+// `express.static` (registered above) never intercepts this — a literal
+// `/ask` path only matches a static file named exactly `ask` (no extension),
+// never `ask.html`.
 app.get('/ask', (_req, res) => {
-  res.redirect(302, '/work#voice-panel');
+  res.sendFile(path.join(staticDir, 'ask.html'));
 });
 
 // FD-05: the dedicated "進み具合" page, replacing the interim `/work` redirect.
@@ -1453,4 +1455,45 @@ export const PROGRESS_VOCABULARY_KEYS = [
   'front_desk:action_receive',
   'front_desk:action_revise',
   'front_desk:count_items',
+] as const satisfies readonly VocabularyKey[];
+
+// FD-03: exactly the keys `static/ask.js` renders. Mirrors
+// `HOME_VOCABULARY_KEYS` / `PROGRESS_VOCABULARY_KEYS` above — see
+// `GET /api/ask-vocabulary` in server.ts. Mixes the `front_desk` domain with
+// the shared `tui` authority/outcome labels (same mix `PRESENCE_STUDIO_VOCABULARY_KEYS`
+// above already uses for `index.html`'s own intent-resolution rendering).
+export const ASK_VOCABULARY_KEYS = [
+  'front_desk:home_ask_placeholder',
+  'front_desk:home_ask_send',
+  'front_desk:home_ask_voice',
+  'front_desk:ask_placeholder_followup',
+  'front_desk:ask_about_title',
+  'front_desk:ask_understood',
+  'front_desk:ask_state',
+  'front_desk:ask_decision_point',
+  'front_desk:ask_deliverable',
+  'front_desk:ask_recent',
+  'front_desk:ask_handsfree_on',
+  'front_desk:ask_handsfree_off',
+  'front_desk:ask_listening',
+  'front_desk:ask_thinking',
+  'front_desk:ask_proceed',
+  'front_desk:ask_more_detail',
+  'front_desk:ask_empty',
+  'front_desk:ask_today',
+  'front_desk:ask_voice_settings',
+  'front_desk:ask_send_failed',
+  'front_desk:chip_email',
+  'front_desk:chip_minutes',
+  'front_desk:chip_browser',
+  'front_desk:chip_webapp',
+  'front_desk:count_items',
+  'tui:tui_cockpit_authority_autonomous',
+  'tui:tui_cockpit_authority_approval',
+  'tui:tui_cockpit_authority_clarification',
+  'tui:tui_cockpit_outcome_answer',
+  'tui:tui_cockpit_outcome_artifact',
+  'tui:tui_cockpit_outcome_approval_ready_plan',
+  'tui:tui_cockpit_outcome_service_change',
+  'tui:tui_cockpit_outcome_status_report',
 ] as const satisfies readonly VocabularyKey[];
