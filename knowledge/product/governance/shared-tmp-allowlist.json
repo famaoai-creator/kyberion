@@ -426,6 +426,12 @@
       "note": "default PNG+handoff export path for localhost sketch board; operator-consumed intermediate"
     },
     {
+      "file": "scripts/personal-workbench/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default personal workflow proposal and handoff path for localhost personal-workbench pad; operator-consumed intermediate"
+    },
+    {
       "file": "scripts/meeting-notepad/server.ts",
       "count": 1,
       "classification": "legit-tmp",
