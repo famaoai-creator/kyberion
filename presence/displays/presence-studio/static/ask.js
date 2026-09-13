@@ -141,12 +141,28 @@
   var recognition = null;
   var suppressRecognitionRestart = false;
 
-  function latestIntentResolution() {
+  function latestCompanionTurn() {
     for (var index = state.turns.length - 1; index >= 0; index -= 1) {
       var turn = state.turns[index];
-      if (turn.role === 'companion' && turn.intent_resolution) return turn.intent_resolution;
+      if (turn.role === 'companion' && turn.intent_resolution) return turn;
     }
     return null;
+  }
+
+  function latestIntentResolution() {
+    var turn = latestCompanionTurn();
+    return turn ? turn.intent_resolution : null;
+  }
+
+  // FD-09: last-resort `kebab-case`/`snake_case` -> plain-words fallback for
+  // any slug this page must show a human a value for (e.g. `missing_inputs`
+  // entries) without a vocabulary-catalog label of their own. Mirrors
+  // `humanizeSlug` in `ask-view.ts` (a plain browser script cannot import
+  // that Node module — see the module doc above).
+  function humanizeSlug(slug) {
+    return String(slug || '')
+      .replace(/[-_]+/g, ' ')
+      .trim();
   }
 
   // ---------------------------------------------------------------------
@@ -218,6 +234,18 @@
     service_change: 'tui:tui_cockpit_outcome_service_change',
     status_report: 'tui:tui_cockpit_outcome_status_report',
   };
+  // FD-09: vocabulary keys for the execution shape ("Current state" block)
+  // and the UX-contract turn shape chip are built from the enum value
+  // (`front_desk:shape_<value>` / `front_desk:shape_chip_<value>`), so no
+  // internal identifier is written into this human-facing file and a new
+  // enum value only needs a catalog entry. Unknown values fall back to the
+  // humanized slug at the call sites.
+  function shapeLabelKey(value) {
+    return value ? 'front_desk:shape_' + String(value) : '';
+  }
+  function turnShapeLabelKey(value) {
+    return value ? 'front_desk:shape_chip_' + String(value) : '';
+  }
 
   function setBlockText(prefix, label, text) {
     var labelEl = document.getElementById(prefix + '-label');
@@ -233,7 +261,8 @@
     var titleEl = document.getElementById('about-title');
     if (titleEl) titleEl.textContent = vt(state.vocab, 'front_desk:ask_about_title');
 
-    var contract = latestIntentResolution();
+    var companionTurn = latestCompanionTurn();
+    var contract = companionTurn ? companionTurn.intent_resolution : null;
     var hasLiveState = state.sending || state.listening;
     var showBlocks = Boolean(contract) || hasLiveState;
 
@@ -262,21 +291,25 @@
       : state.listening
         ? vt(state.vocab, 'front_desk:ask_listening')
         : contract
-          ? contract.resolution_shape
+          ? vt(state.vocab, shapeLabelKey(contract.resolution_shape)) ||
+            humanizeSlug(contract.resolution_shape)
           : '';
     setBlockText('about-state', vt(state.vocab, 'front_desk:ask_state'), stateText);
 
     if (!contract) return;
 
-    setBlockText(
-      'about-understood',
-      vt(state.vocab, 'front_desk:ask_understood'),
-      contract.normalized_intent
-    );
+    // FD-09: `intent_label` is resolved server-side (`/api/conversation`)
+    // from the standard-intent catalog's own description, or a humanized
+    // slug as a last resort — never the raw `normalized_intent` id. Falls
+    // back to humanizing it here only if an older cached turn predates that
+    // field (see `sessionStorage`'s `TURNS_STORAGE_KEY`).
+    var understoodText =
+      (companionTurn && companionTurn.intent_label) || humanizeSlug(contract.normalized_intent);
+    setBlockText('about-understood', vt(state.vocab, 'front_desk:ask_understood'), understoodText);
 
     var missing =
       Array.isArray(contract.missing_inputs) && contract.missing_inputs.length
-        ? contract.missing_inputs.join('、')
+        ? contract.missing_inputs.map(humanizeSlug).join('、')
         : '';
     var authorityLabel =
       vt(state.vocab, AUTHORITY_LABEL_KEY[contract.authority_level] || '') ||
@@ -324,9 +357,10 @@
 
   function turnHtml(turn) {
     var roleClass = turn.role === 'user' ? 'ask-turn-user' : 'ask-turn-companion';
+    var shapeLabel = vt(state.vocab, turnShapeLabelKey(turn.shape)) || humanizeSlug(turn.shape);
     var shapeHtml =
       turn.role === 'companion' && turn.shape && turn.shape !== 'reply'
-        ? '<span class="ask-turn-shape">' + escapeHtml(turn.shape) + '</span>'
+        ? '<span class="ask-turn-shape">' + escapeHtml(shapeLabel) + '</span>'
         : '';
     var actionsHtml = '';
     if (turn.role === 'companion' && Array.isArray(turn.next_actions) && turn.next_actions.length) {
@@ -460,6 +494,8 @@
           shape: body.shape,
           next_actions: body.next_actions,
           intent_resolution: body.intent_resolution,
+          intent_label: body.intent_label,
+          intent_label_source: body.intent_label_source,
         });
         speakReply(body.reply);
         refreshRecent();
