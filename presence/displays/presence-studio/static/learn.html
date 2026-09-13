@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Learn — Presence Studio</title>
+    <link rel="stylesheet" href="/companion-hub.css" />
+  </head>
+  <body class="companion-hub">
+    <div class="hub-shell">
+      <header class="hub-top">
+        <div class="hub-brand">
+          <div class="eyebrow">Learn</div>
+          <h1>学び方</h1>
+          <p>上手く使いこなしている例を眺め、これから覚える人はガイドから始めます。</p>
+        </div>
+        <div class="role-badge">相棒 — Companion</div>
+      </header>
+      <nav id="hub-nav"></nav>
+
+      <div class="split">
+        <section class="panel">
+          <h2>Gallery</h2>
+          <p class="sub">使いこなしている人のパターン</p>
+          <div id="gallery" class="card-list">Loading…</div>
+        </section>
+        <section class="panel">
+          <h2>Guides</h2>
+          <p class="sub">これから使いこなす人のための手順</p>
+          <div id="guides" class="card-list">Loading…</div>
+        </section>
+      </div>
+      <p class="status-line" id="status"></p>
+    </div>
+    <script src="/companion-nav.js"></script>
+    <script>
+      CompanionHubNav.mount(document.getElementById('hub-nav'), 'learn');
+
+      async function loadCatalog() {
+        const status = document.getElementById('status');
+        try {
+          const res = await fetch('/api/companion/learn');
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || 'failed to load catalog');
+          const gallery = document.getElementById('gallery');
+          const guides = document.getElementById('guides');
+          gallery.innerHTML = (data.catalog.gallery || [])
+            .map(
+              (item) => `
+            <article class="entry-card">
+              <h3>${escapeHtml(item.title)}</h3>
+              <p>${escapeHtml(item.summary)}</p>
+              <details>
+                <summary>試すヒント</summary>
+                <code class="hint-code">${escapeHtml(item.try_hint || '')}</code>
+                <p>${(item.related || []).map(escapeHtml).join(' · ')}</p>
+              </details>
+            </article>`
+            )
+            .join('');
+          guides.innerHTML = (data.catalog.guides || [])
+            .map(
+              (item) => `
+            <article class="entry-card">
+              <h3>${escapeHtml(item.title)}</h3>
+              <p>${escapeHtml(item.audience)} · ${escapeHtml(item.doc || '')}</p>
+              <ol>${(item.steps || []).map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>
+            </article>`
+            )
+            .join('');
+          status.textContent = '';
+        } catch (error) {
+          status.textContent = String(error.message || error);
+        }
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      loadCatalog();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Discover — Presence Studio</title>
+    <link rel="stylesheet" href="/companion-hub.css" />
+  </head>
+  <body class="companion-hub">
+    <div class="hub-shell">
+      <header class="hub-top">
+        <div class="hub-brand">
+          <div class="eyebrow">Discover · Web app scenario</div>
+          <h1>要望ヒアリング</h1>
+          <p>サイト案を見ながらチェックリストで要望を確認し、確認ゲートへ渡せるドラフトを残します。</p>
+        </div>
+        <div class="role-badge">相棒 — Companion</div>
+      </header>
+      <nav id="hub-nav"></nav>
+
+      <div class="split">
+        <section class="panel">
+          <h2>Site</h2>
+          <p class="sub">参考 URL を開き、手元ミラーでも確認できます。</p>
+          <div class="field">
+            <label for="site-url">Site URL</label>
+            <input id="site-url" type="url" placeholder="https://example.com" />
+          </div>
+          <div class="button-row">
+            <button class="hub-btn" id="open-site" type="button">ブラウザで開く</button>
+            <a class="hub-btn secondary" href="http://127.0.0.1:3040" target="_blank" rel="noopener"
+              >Computer Surface</a
+            >
+          </div>
+          <div class="preview-frame" id="preview">
+            外部サイトは iframe 制限があるため、URL を開くか Computer Surface（:3040）で手元を見ながら右のチェックを進めます。
+          </div>
+          <div class="field">
+            <label for="notes">Notes</label>
+            <textarea id="notes" rows="5" placeholder="ヒアリング中のメモ"></textarea>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Requirements</h2>
+          <p class="sub">Webアプリ構築シナリオの確認項目</p>
+          <ul class="checklist" id="checklist"></ul>
+          <div class="button-row">
+            <button class="hub-btn" id="save-draft" type="button">ドラフトを保存</button>
+            <a class="hub-btn secondary" href="http://127.0.0.1:8137" target="_blank" rel="noopener"
+              >Alignment gate</a
+            >
+          </div>
+          <p class="status-line" id="status"></p>
+        </section>
+      </div>
+    </div>
+    <script src="/companion-nav.js"></script>
+    <script>
+      CompanionHubNav.mount(document.getElementById('hub-nav'), 'discover');
+
+      const checklistEl = document.getElementById('checklist');
+      const statusEl = document.getElementById('status');
+      let requirements = [];
+
+      function renderChecklist() {
+        checklistEl.innerHTML = requirements
+          .map(
+            (item, index) => `
+          <li>
+            <input type="checkbox" data-index="${index}" ${item.checked ? 'checked' : ''} />
+            <span>${escapeHtml(item.label)}</span>
+          </li>`
+          )
+          .join('');
+        checklistEl.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+          input.addEventListener('change', () => {
+            const idx = Number(input.getAttribute('data-index'));
+            requirements[idx].checked = input.checked;
+          });
+        });
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      async function loadTemplate() {
+        const res = await fetch('/api/companion/discover');
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'failed to load discover template');
+        if (data.draft) {
+          document.getElementById('site-url').value = data.draft.site_url || '';
+          document.getElementById('notes').value = data.draft.notes || '';
+          requirements = data.draft.requirements || data.template;
+        } else {
+          requirements = data.template;
+        }
+        renderChecklist();
+        updatePreview();
+      }
+
+      function updatePreview() {
+        const url = document.getElementById('site-url').value.trim();
+        const preview = document.getElementById('preview');
+        if (!url) {
+          preview.textContent =
+            '外部サイトは iframe 制限があるため、URL を開くか Computer Surface（:3040）で手元を見ながら右のチェックを進めます。';
+          return;
+        }
+        preview.innerHTML = `対象: <a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(
+          url
+        )}</a><br/>ブラウザまたは Computer Surface で見ながら要望を確認してください。`;
+      }
+
+      document.getElementById('site-url').addEventListener('change', updatePreview);
+      document.getElementById('open-site').addEventListener('click', () => {
+        const url = document.getElementById('site-url').value.trim();
+        try {
+          const parsed = new URL(url);
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error();
+          window.open(parsed.href, '_blank', 'noopener');
+        } catch {
+          statusEl.textContent = 'HTTP(S) の URL を指定してください。';
+        }
+      });
+
+      document.getElementById('save-draft').addEventListener('click', async () => {
+        statusEl.textContent = 'Saving…';
+        try {
+          const res = await fetch('/api/companion/discover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              site_url: document.getElementById('site-url').value,
+              notes: document.getElementById('notes').value,
+              requirements,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || 'save failed');
+          statusEl.textContent = `Saved ${data.path}. Next: confirm in alignment gate (:8137).`;
+        } catch (error) {
+          statusEl.textContent = String(error.message || error);
+        }
+      });
+
+      loadTemplate().catch((error) => {
+        statusEl.textContent = String(error.message || error);
+      });
+    </script>
+  </body>
+</html>

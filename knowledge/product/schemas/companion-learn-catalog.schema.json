@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "companion-learn-catalog.schema.json",
+  "title": "Companion Learn Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "gallery", "guides"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string" },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "gallery": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "summary", "kind"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "enum": ["playbook", "pipeline", "pad", "scenario"] },
+          "related": { "type": "array", "items": { "type": "string" } },
+          "try_hint": { "type": "string" }
+        }
+      }
+    },
+    "guides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "audience", "steps"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "audience": { "type": "string", "enum": ["beginner", "intermediate", "advanced"] },
+          "steps": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "doc": { "type": "string" }
+        }
+      }
+    }
+  }
+}

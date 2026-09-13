@@ -3559,6 +3559,12 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/companion-learn-catalog.json",
+      "tier": "public",
+      "size": 3494,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/consensus-protocol.md",
       "tier": "public",
       "size": 2494,
@@ -4947,7 +4953,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 525975,
+      "size": 527525,
       "type": "json"
     },
     {
@@ -6838,6 +6844,12 @@
       "path": "product/schemas/cognitive-routing-decision.schema.json",
       "tier": "public",
       "size": 1300,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/companion-learn-catalog.schema.json",
+      "tier": "public",
+      "size": 1586,
       "type": "json"
     },
     {

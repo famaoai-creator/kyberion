@@ -38,6 +38,14 @@ import {
 } from '@agent/core/secure-io';
 import { toWireError } from '@agent/core/wire-error';
 import { readSurfaceStringParam } from '@agent/core/surface-request-input';
+import {
+  DEFAULT_WEB_APP_REQUIREMENTS,
+  discoverScopeKey,
+  loadCompanionLearnCatalog,
+  readDiscoverDraft,
+  saveDiscoverDraft,
+  type DiscoverRequirementItem,
+} from './companion-hub.js';
 import { saveBrowserOnboardingVoiceSample } from '@agent/core/browser-onboarding';
 import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';
 import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
@@ -1098,6 +1106,21 @@ app.post(
 );
 
 app.use(express.json({ limit: '1mb' }));
+
+// Companion Hub pages — explicit routes so `/` is the intent menu, not the workbench.
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(staticDir, 'hub.html'));
+});
+app.get('/work', (_req, res) => {
+  res.sendFile(path.join(staticDir, 'index.html'));
+});
+app.get('/learn', (_req, res) => {
+  res.sendFile(path.join(staticDir, 'learn.html'));
+});
+app.get('/discover', (_req, res) => {
+  res.sendFile(path.join(staticDir, 'discover.html'));
+});
+
 app.use(express.static(staticDir));
 app.use(['/api', '/a2ui'], requirePresenceStudioRateLimit(), requirePresenceStudioAccess());
 
@@ -1161,6 +1184,57 @@ app.get('/api/headless/a2ui/overview', (req, res) => {
 
 app.get('/onboarding', (_req, res) => {
   res.sendFile(path.join(staticDir, 'onboarding.html'));
+});
+
+app.get('/api/companion/learn', (_req, res) => {
+  try {
+    res.json({ ok: true, catalog: loadCompanionLearnCatalog() });
+  } catch (error) {
+    res.status(500).json(presenceStudioWireError(error, 500));
+  }
+});
+
+app.get('/api/companion/discover', (_req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(_req);
+    const scopeKey = discoverScopeKey(viewer);
+    const draft = readDiscoverDraft('current', scopeKey);
+    res.json({
+      ok: true,
+      template: DEFAULT_WEB_APP_REQUIREMENTS,
+      draft,
+      alignment_gate: 'http://127.0.0.1:8137',
+      computer_surface: 'http://127.0.0.1:3040',
+    });
+  } catch (error) {
+    res.status(500).json(presenceStudioWireError(error, 500));
+  }
+});
+
+app.post('/api/companion/discover', (req, res) => {
+  try {
+    const viewer = resolvePresenceStudioViewerContext(req);
+    const scopeKey = discoverScopeKey(viewer);
+    const body = (req.body || {}) as {
+      site_url?: string;
+      notes?: string;
+      requirements?: DiscoverRequirementItem[];
+      session_id?: string;
+    };
+    const saved = saveDiscoverDraft(
+      {
+        site_url: body.site_url,
+        notes: body.notes,
+        requirements: body.requirements,
+        session_id: body.session_id || 'current',
+      },
+      { persona: viewer.principalId, scopeKey }
+    );
+    res.json({ ok: true, path: saved.path, draft: saved.draft });
+  } catch (error) {
+    const status = /denied|persona|authority|SCOPE/i.test(String(error)) ? 403 : 400;
+    res.status(status).json(presenceStudioWireError(error, status));
+  }
 });
 
 // Browsers always probe /favicon.ico — return 204 to silence noisy console 404.

@@ -751,6 +751,7 @@
     <!-- Kyberion Design System (DS-01 canonical tokens) -->
     <link rel="stylesheet" href="./design-system.css" />
     <link rel="stylesheet" href="/api/design-tokens.css" />
+    <link rel="stylesheet" href="/companion-hub.css" />
   </head>
   <body>
     <div class="shell">
@@ -767,6 +768,7 @@
           </div>
         </div>
       </div>
+      <nav id="hub-nav" aria-label="Companion Hub"></nav>
       <div class="sub">A Digital Agency-inspired capture surface for subtitles, notes, minutes, and governed voice-channel stimuli.</div>
       <div id="first-run-banner" class="first-run-banner hidden">
         <div class="first-run-icon">✨</div>
@@ -3844,6 +3846,12 @@
           browserSessionBootstrapEl.disabled = false;
         }
       });
+    </script>
+    <script src="/companion-nav.js"></script>
+    <script>
+      if (window.CompanionHubNav) {
+        CompanionHubNav.mount(document.getElementById('hub-nav'), 'work');
+      }
     </script>
   </body>
   </html>

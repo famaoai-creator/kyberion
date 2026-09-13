@@ -7,7 +7,7 @@ Kyberion の操作系サーフェスの役割マップ。**各サーフェスは
 | サーフェス            | 役割                                                                                                                                                                                           | 答える問い                                     | port | 書き込み                                       | 起動                                                                        |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- | ---------------------------------------------- | --------------------------------------------------------------------------- |
 | **concierge(秘書室)** | **CEO秘書** — 依頼・承認・成果・例外(+ `/setup` オンボーディング/拡張設定)                                                                                                                     | 「私は今なにを判断すればよいか」               | 3050 | scoped(依頼・承認・受領・取込・プラグイン承認) | `active-surfaces.json`(`pnpm surfaces reconcile`)                           |
-| **presence-studio**   | **相棒** — いっしょに作業するワークベンチ(音声・議事録・メール・クイックアクション)                                                                                                            | 「いま一緒に何を進めるか」                     | 3031 | 実作業                                         | `active-surfaces.json`                                                      |
+| **presence-studio**   | **相棒** — Companion Hub（Learn / Discover / Work）+ いっしょに作業するワークベンチ(音声・議事録・メール・クイックアクション)。Connect は秘書室へ深リンク                                      | 「いま一緒に何を進めるか」                     | 3031 | 実作業                                         | `active-surfaces.json`                                                      |
 | **chronos-mirror-v2** | **管制塔** — 監視と介入(プラン→起動、承認、成果物レビュー、**組織運営モデル+6つの可視化スコープ(organization / home / work_items / operations / missions / governance)による work item 投影**) | 「システムは何をしていて、どこに介入すべきか」 | 3000 | 介入                                           | `pnpm chronos:dev` / `active-surfaces.json`                                 |
 | **operator-surface**  | **監査モニタ**(読み取り専用: ミッション・監査チェーン・ヘルス)                                                                                                                                 | 「何が起きたかを証跡で確認したい」             | 3331 | なし(inbox既読化のみ例外)                      | `pnpm --dir presence/displays/operator-surface dev`(意図的にマニフェスト外) |
 | **computer-surface**  | **作業の手元ミラー** — ブラウザ/ターミナルのいまの手元を映す                                                                                                                                   | 「Kyberion はいま手元で何をしているか」        | 3040 | なし                                           | `active-surfaces.json`                                                      |
@@ -15,6 +15,18 @@ Kyberion の操作系サーフェスの役割マップ。**各サーフェスは
 > **アクセス制御**: 各 headless surface は server-side viewer principal を解決し、共通の operation permission と tenant / organization / project / tier scope を評価する。`tenant` query は許可集合を狭めるだけで、権限を拡大しない。Chronos の `KYBERION_VIEWER_SCOPE=off|warn|enforce` は移行時の監査モード名を保持するが、未認可 tenant の要求は全モードで拒否する(`warn` は audit を先に記録する)。既定値は `warn`。実装計画は [`SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md`](./developer/improvement-plans-2026-08/SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md)。これは OSS / self-hosted の内部認可であり、SaaS の hosted account management ではない。運用手順: [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)。
 
 Computer Surface の `/api/identity`・`/api/state`・`/api/stream`・`/api/os/control-plane` は read operation、`/a2ui/dispatch` は localadmin の write operation とする。remote bearer access は `KYBERION_TENANT` に server-side bind し、内部 A2UI relay は `KYBERION_LOCALADMIN_TOKEN` を使用する。
+
+## Companion Hub（Presence Studio の意図メニュー）
+
+新 surface は増やさない。相棒（:3031）のホームを意図メニューにし、役割ごとの迷子を防ぐ。
+
+| 意図     | パス                              | 役割の所在              | やること                                                                                   |
+| -------- | --------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
+| Home     | `/`                               | presence-studio         | Learn / Discover / Connect / Work を選ぶ                                                   |
+| Learn    | `/learn`                          | presence-studio         | 上手い使い方ギャラリー + はじめのガイド（`companion-learn-catalog.json`）                  |
+| Discover | `/discover`                       | presence-studio         | Webアプリ要望ヒアリング（サイト確認 + 要件チェック → tmp ドラフト → alignment gate :8137） |
+| Work     | `/work`                           | presence-studio         | 既存ワークベンチ（音声・メールなど）                                                       |
+| Connect  | Concierge `/setup#setup-services` | **concierge（秘書室）** | サービスアイコンから OAuth begin（callback :8787）。Studio からは深リンクのみ              |
 
 ## 会話チャネル(UI以外)
 

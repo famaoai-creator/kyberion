@@ -1,0 +1,87 @@
+{
+  "$schema": "../schemas/companion-learn-catalog.schema.json",
+  "version": "1.0.0",
+  "title": "Companion Learn Catalog",
+  "description": "Gallery of skilled Kyberion usage patterns and beginner guides for Presence Studio /learn.",
+  "gallery": [
+    {
+      "id": "meeting-facilitator",
+      "title": "Meeting facilitator",
+      "summary": "Capture notes, record minutes, and hand off follow-ups without leaving the companion workbench.",
+      "kind": "playbook",
+      "related": [
+        "docs/user/meeting-facilitator.md",
+        "scripts/meeting-notepad/",
+        "pipelines/meeting-followup.json"
+      ],
+      "try_hint": "Open Work → Meeting notepad (port 8148) or run pnpm meeting:participate --help"
+    },
+    {
+      "id": "report-generation",
+      "title": "Narrated report",
+      "summary": "Generate a report summary and optional audio/video artifacts from a governed pipeline.",
+      "kind": "pipeline",
+      "related": ["pipelines/trial-narrated-report.json", "docs/user/USE_CASE_QUICKSTARTS.md"],
+      "try_hint": "pnpm exec tsx scripts/run_pipeline.ts --input pipelines/trial-narrated-report.json"
+    },
+    {
+      "id": "browser-research",
+      "title": "Browser research",
+      "summary": "Explore a page, capture state, and produce a browser artifact with persona-guided research.",
+      "kind": "pipeline",
+      "related": ["pipelines/persona-beginner-competitor-research.json", "docs/SCENARIOS.md"],
+      "try_hint": "pnpm pipeline --input pipelines/persona-beginner-competitor-research.json"
+    },
+    {
+      "id": "personal-pads",
+      "title": "Personal capture pads",
+      "summary": "Local pads for memory, screenshots, clipboard, desk, and docs — capture then hand off.",
+      "kind": "pad",
+      "related": ["scripts/personal-pads/README.md", "docs/assets/pads/"],
+      "try_hint": "See scripts/personal-pads/README.md (ports 8149–8154)"
+    },
+    {
+      "id": "secretary-workbench",
+      "title": "Secretary workbench",
+      "summary": "Proposal-only capture with governed email draft and calendar approve → create.",
+      "kind": "pad",
+      "related": ["scripts/personal-workbench/", "pipelines/"],
+      "try_hint": "KYBERION_PERSONA=sovereign node_modules/.bin/tsx scripts/personal-workbench/server.ts"
+    }
+  ],
+  "guides": [
+    {
+      "id": "first-win",
+      "title": "First win in one sitting",
+      "audience": "beginner",
+      "steps": [
+        "Open this Companion Hub and pick Learn or Work.",
+        "Run the browser smoke path from docs/QUICKSTART.md.",
+        "Capture one real outcome (minutes, report, or pad handoff)."
+      ],
+      "doc": "docs/QUICKSTART.md"
+    },
+    {
+      "id": "outcome-quickstarts",
+      "title": "Pick an outcome, not a subsystem",
+      "audience": "beginner",
+      "steps": [
+        "Choose Meeting, Report, or Browser research from USE_CASE_QUICKSTARTS.",
+        "Copy the start command from the matching gallery card.",
+        "When stuck, return here and open Discover for a requirements walkthrough."
+      ],
+      "doc": "docs/user/USE_CASE_QUICKSTARTS.md"
+    },
+    {
+      "id": "connect-services",
+      "title": "Connect external services",
+      "audience": "beginner",
+      "steps": [
+        "From the Hub, open Connect (Concierge setup).",
+        "Click a service icon and complete OAuth in the browser.",
+        "Confirm the Connected chip before using service-actuator workflows."
+      ],
+      "doc": "docs/OAUTH_SETUP.md"
+    }
+  ]
+}
