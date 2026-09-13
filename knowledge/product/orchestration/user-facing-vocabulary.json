@@ -5921,6 +5921,26 @@
         "ja": "接続済み",
         "qps-ploc": "⟦ƈőññėƈŧėḓ ŀőř⟧"
       },
+      "setup.connect_oauth": {
+        "en": "Connect",
+        "ja": "連携する",
+        "qps-ploc": "⟦Ƈőññėƈŧ ŀőř⟧"
+      },
+      "setup.connect_oauth_hint": {
+        "en": "Opens the provider consent screen. Keep the OAuth callback surface on :8787 running.",
+        "ja": "プロバイダの同意画面を開きます。OAuth callback（:8787）を起動したままにしてください。",
+        "qps-ploc": "⟦Őṗėñş ŧħė ṗřőṽïḓėř ƈőñşėñŧ şƈřėėñ. Ķėėṗ ŧħė ŐȦůŧħ ƈȧŀŀƀȧƈķ şůřƒȧƈė őñ :8787 řůññïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "setup.connect_oauth_started": {
+        "en": "Authorization opened for {service}. Complete consent in the new tab.",
+        "ja": "{service} の認可を開きました。新しいタブで同意を完了してください。",
+        "qps-ploc": "⟦Ȧůŧħőřïẑȧŧïőñ őṗėñėḓ ƒőř {service}. Ƈőɱṗŀėŧė ƈőñşėñŧ ïñ ŧħė ñėẇ ŧȧƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "setup.connect_oauth_failed": {
+        "en": "Could not start OAuth for {service}: {error}",
+        "ja": "{service} の OAuth を開始できませんでした: {error}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şŧȧřŧ ŐȦůŧħ ƒőř {service}: {error} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "setup.save_connections": {
         "en": "Save connection preparation",
         "ja": "接続準備を保存",
@@ -6475,6 +6495,11 @@
         "en": "Voice",
         "ja": "音声",
         "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
+      },
+      "service.notion": {
+        "en": "Notion",
+        "ja": "Notion",
+        "qps-ploc": "⟦Ñőŧïőñ ŀőř⟧"
       },
       "auth.oauth": {
         "en": "OAuth",
