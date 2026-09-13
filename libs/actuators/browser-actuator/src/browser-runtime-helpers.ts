@@ -1101,8 +1101,84 @@ function renderPlaywrightSkeleton(
   return lines.join('\n');
 }
 
+function trimmedRecordedField(value: string | null | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const next = value.trim();
+  return next || undefined;
+}
+
+function durableHintParams(action: BrowserRecordedAction): Record<string, string> {
+  const name = trimmedRecordedField(action.element_name);
+  const role = trimmedRecordedField(action.element_role);
+  return {
+    ...(name ? { name } : {}),
+    ...(role ? { role } : {}),
+  };
+}
+
+/**
+ * Prefer a CSS selector (plus recorded role/name) so a fresh session can
+ * replay without the ephemeral `@eN` ref_map from the recording session.
+ * `click({ref})` is still canonical and routes to click_ref; fill/press/wait
+ * do not, so those fall back to their `*_ref` ops when only a ref remains.
+ */
+function renderDurableApplyStep(
+  canonicalOp: 'click' | 'fill' | 'press' | 'wait',
+  action: BrowserRecordedAction,
+  extra: Record<string, unknown> = {}
+): { step: PipelineStep; needsSnapshot: boolean } | null {
+  const selector = trimmedRecordedField(action.selector);
+  const hints = durableHintParams(action);
+  if (selector) {
+    return {
+      step: { type: 'apply', op: canonicalOp, params: { selector, ...hints, ...extra } },
+      needsSnapshot: false,
+    };
+  }
+  const ref = trimmedRecordedField(action.ref);
+  if (!ref) return null;
+  const refOp = canonicalOp === 'click' ? 'click' : `${canonicalOp}_ref`;
+  return {
+    step: { type: 'apply', op: refOp, params: { ref, ...hints, ...extra } },
+    // click_ref / *_ref can resolve {role,name} against the live page.
+    needsSnapshot: !hints.name && !hints.role,
+  };
+}
+
+function renderSecretFillStep(
+  action: BrowserRecordedAction
+): { step: PipelineStep; needsSnapshot: boolean } | null {
+  const ref = trimmedRecordedField(action.ref);
+  const secretRef = trimmedRecordedField(action.secret_ref);
+  if (!ref || !secretRef) return null;
+  return {
+    step: {
+      type: 'apply',
+      op: 'fill_secret_ref',
+      params: { ref, secret_ref: secretRef, ...durableHintParams(action) },
+    },
+    // Secret fills require snapshot refs (or role/name + dom_path). The trail
+    // does not record dom_path, so replay must snapshot first.
+    needsSnapshot: true,
+  };
+}
+
 function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): BrowserAction {
   const steps: PipelineStep[] = [];
+  let refsEstablished = false;
+
+  const ensureSnapshot = () => {
+    if (refsEstablished) return;
+    steps.push({ type: 'capture', op: 'snapshot', params: {} });
+    refsEstablished = true;
+  };
+
+  const pushApply = (rendered: { step: PipelineStep; needsSnapshot: boolean } | null) => {
+    if (!rendered) return;
+    if (rendered.needsSnapshot) ensureSnapshot();
+    steps.push(rendered.step);
+  };
+
   for (const action of parseRecordedActions(trail)) {
     const op = normalizeBrowserPipelineOp(action.op);
     const contract = getOpInputContract('browser', op);
@@ -1124,69 +1200,33 @@ function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): Br
     switch (op) {
       case 'goto':
       case 'open_tab':
-        if (action.url) steps.push({ type: 'capture', op: 'goto', params: { url: action.url } });
+        if (action.url) {
+          steps.push({ type: 'capture', op: 'goto', params: { url: action.url } });
+          refsEstablished = false;
+        }
+        break;
+      case 'snapshot':
+        steps.push({ type: 'capture', op: 'snapshot', params: {} });
+        refsEstablished = true;
         break;
       case 'click':
-        if (action.ref) steps.push({ type: 'apply', op: 'click_ref', params: { ref: action.ref } });
+        pushApply(renderDurableApplyStep('click', action));
         break;
       case 'fill':
-        if (action.ref)
-          steps.push(
-            action.secret_ref || action.classification === 'secret_ref'
-              ? {
-                  type: 'apply',
-                  op: 'fill_secret_ref',
-                  params: { ref: action.ref, secret_ref: action.secret_ref },
-                }
-              : {
-                  type: 'apply',
-                  op: 'fill_ref',
-                  params: { ref: action.ref, text: action.text || '' },
-                }
-          );
+        if (action.secret_ref || action.classification === 'secret_ref') {
+          pushApply(renderSecretFillStep(action));
+        } else {
+          pushApply(renderDurableApplyStep('fill', action, { text: action.text || '' }));
+        }
         break;
       case 'press':
-        if (action.ref)
-          steps.push({
-            type: 'apply',
-            op: 'press_ref',
-            params: { ref: action.ref, key: action.key || 'Enter' },
-          });
+        pushApply(renderDurableApplyStep('press', action, { key: action.key || 'Enter' }));
         break;
       case 'wait':
-        if (action.ref) steps.push({ type: 'apply', op: 'wait_ref', params: { ref: action.ref } });
-        break;
-      case 'click_ref':
-        if (action.selector)
-          steps.push({ type: 'apply', op: 'click', params: { selector: action.selector } });
-        break;
-      case 'fill_ref':
-        if (action.selector)
-          steps.push({
-            type: 'apply',
-            op: 'fill',
-            params: { selector: action.selector, text: action.text || '' },
-          });
+        pushApply(renderDurableApplyStep('wait', action));
         break;
       case 'fill_secret_ref':
-        if (action.ref && action.secret_ref)
-          steps.push({
-            type: 'apply',
-            op: 'fill_secret_ref',
-            params: { ref: action.ref, secret_ref: action.secret_ref },
-          });
-        break;
-      case 'press_ref':
-        if (action.selector)
-          steps.push({
-            type: 'apply',
-            op: 'press',
-            params: { selector: action.selector, key: action.key || 'Enter' },
-          });
-        break;
-      case 'wait_ref':
-        if (action.selector)
-          steps.push({ type: 'apply', op: 'wait', params: { selector: action.selector } });
+        pushApply(renderSecretFillStep(action));
         break;
       default:
         break;

@@ -61,11 +61,14 @@ describe('browser-actuator phase 1-3 contracts', () => {
     expect(playwright).not.toContain('actual-secret-value');
 
     const adf = browserRuntimeHelpers.renderBrowserAdf([action], 'phase3-test');
-    expect(adf.steps).toContainEqual({
-      type: 'apply',
-      op: 'fill_secret_ref',
-      params: { ref: '@e1', secret_ref: 'GITHUB_TOKEN' },
-    });
+    expect(adf.steps).toEqual([
+      { type: 'capture', op: 'snapshot', params: {} },
+      {
+        type: 'apply',
+        op: 'fill_secret_ref',
+        params: { ref: '@e1', secret_ref: 'GITHUB_TOKEN' },
+      },
+    ]);
   });
 
   it('exposes canonical contracts for ref extraction, scrolling, health, and evidence', () => {
