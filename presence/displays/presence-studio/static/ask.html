@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>頼む — Kyberion</title>
+    <!-- Kyberion Design System (DS-01 canonical tokens) -->
+    <link rel="stylesheet" href="./design-system.css" />
+    <link rel="stylesheet" href="/api/design-tokens.css" />
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <link rel="stylesheet" href="/front-desk-rail.css" />
+    <!-- FD-03: ask page styles -->
+    <link rel="stylesheet" href="/ask.css" />
+  </head>
+  <body>
+    <div class="fd-layout">
+      <nav id="front-desk-rail" class="front-desk-rail"></nav>
+      <div class="fd-content">
+        <main class="ask-shell">
+          <header class="ask-header">
+            <div class="ask-header-spacer"></div>
+            <button
+              type="button"
+              id="handsfree-toggle"
+              class="ask-handsfree-toggle"
+              aria-pressed="false"
+            ></button>
+          </header>
+
+          <div class="ask-columns">
+            <section class="ask-conversation-col" aria-label="会話">
+              <div class="ask-conversation-scroll" id="conversation-scroll">
+                <div class="ask-date-separator" id="date-separator"></div>
+                <ol class="ask-turns" id="turns"></ol>
+                <p class="ask-empty hidden" id="ask-empty"></p>
+              </div>
+
+              <form id="ask-form" class="ask-input-row">
+                <input type="text" id="ask-input" class="ask-input" autocomplete="off" />
+                <button type="button" id="ask-mic" class="ask-icon-button" aria-label=""></button>
+                <button
+                  type="submit"
+                  id="ask-send"
+                  class="ask-icon-button ask-send-button"
+                  aria-label=""
+                ></button>
+              </form>
+              <div class="ask-chips" id="ask-chips">
+                <button type="button" class="ask-chip" data-chip="email"></button>
+                <button type="button" class="ask-chip" data-chip="minutes"></button>
+                <button type="button" class="ask-chip" data-chip="browser"></button>
+                <button type="button" class="ask-chip" data-chip="webapp"></button>
+              </div>
+            </section>
+
+            <aside class="ask-about-col" aria-label="この依頼について">
+              <div class="ask-card" id="about-card">
+                <h2 id="about-title"></h2>
+                <div class="ask-about-block" id="about-understood-block">
+                  <p class="ask-about-label" id="about-understood-label"></p>
+                  <p class="ask-about-text" id="about-understood-text"></p>
+                </div>
+                <div class="ask-about-block" id="about-state-block">
+                  <p class="ask-about-label" id="about-state-label"></p>
+                  <p class="ask-about-text" id="about-state-text"></p>
+                </div>
+                <div class="ask-about-block" id="about-decision-block">
+                  <p class="ask-about-label" id="about-decision-label"></p>
+                  <p class="ask-about-text" id="about-decision-text"></p>
+                </div>
+                <div class="ask-about-block" id="about-deliverable-block">
+                  <p class="ask-about-label" id="about-deliverable-label"></p>
+                  <p class="ask-about-text" id="about-deliverable-text"></p>
+                </div>
+                <p class="ask-about-empty" id="about-empty"></p>
+              </div>
+
+              <div class="ask-card" id="recent-card">
+                <h2 id="recent-title"></h2>
+                <ul class="ask-recent-list" id="recent-list"></ul>
+              </div>
+            </aside>
+          </div>
+        </main>
+      </div>
+    </div>
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script src="/front-desk-rail.js"></script>
+    <script src="/ask.js"></script>
+    <script>
+      if (window.FrontDeskRail) {
+        window.FrontDeskRail.mount(document.getElementById('front-desk-rail'), { current: 'ask' });
+      }
+      if (window.KyberionAsk) {
+        window.KyberionAsk.mount();
+      }
+    </script>
+  </body>
+</html>

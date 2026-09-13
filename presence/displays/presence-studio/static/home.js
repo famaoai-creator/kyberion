@@ -124,23 +124,30 @@
     });
   }
 
-  function goToWork(hash, askText) {
-    var url = '/work';
-    if (askText) url += '?ask=' + encodeURIComponent(askText);
-    url += '#' + hash;
-    window.location.href = url;
+  // FD-03: the ask box hands off to the dedicated "頼む" page — `send` submits
+  // and sends immediately (`&send=1`), `mic` opens the page with the mic
+  // focused (`&mic=1`, picked up by `static/ask.js`), and chips only prefill
+  // the input there (no auto-send). `/work` is no longer this box's target.
+  function goToAsk(params) {
+    var query = Object.keys(params || {})
+      .filter(function (key) {
+        return params[key];
+      })
+      .map(function (key) {
+        return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+      })
+      .join('&');
+    window.location.href = query ? '/ask?' + query : '/ask';
   }
 
-  var CHIP_TARGETS = {
-    email: { hash: 'email-panel' },
-    minutes: { hash: 'meeting-notepad-redirect-panel' },
-    browser: { hash: 'browser-panel' },
-    // Interim ask-prefill text distinct from the chip's own label, matching
-    // the FD-02 wireframe copy for this hand-off.
-    webapp: { hash: 'conversation-panel', ask: 'Webアプリの要望をまとめたい' },
+  var CHIP_TEXT_KEY = {
+    email: 'chip_email',
+    minutes: 'chip_minutes',
+    browser: 'chip_browser',
+    webapp: 'chip_webapp',
   };
 
-  function wireAskBox() {
+  function wireAskBox(vocab) {
     var form = document.getElementById('ask-form');
     var input = document.getElementById('ask-input');
     var micButton = document.getElementById('ask-mic');
@@ -148,19 +155,19 @@
       form.addEventListener('submit', function (event) {
         event.preventDefault();
         var text = ((input && input.value) || '').trim();
-        goToWork('conversation-panel', text || undefined);
+        goToAsk(text ? { ask: text, send: '1' } : {});
       });
     }
     if (micButton) {
       micButton.addEventListener('click', function () {
-        goToWork('voice-panel');
+        goToAsk({ mic: '1' });
       });
     }
     document.querySelectorAll('.home-chip').forEach(function (button) {
       button.addEventListener('click', function () {
-        var target = CHIP_TARGETS[button.getAttribute('data-chip')];
-        if (!target) return;
-        goToWork(target.hash, target.ask);
+        var textKey = CHIP_TEXT_KEY[button.getAttribute('data-chip')];
+        var template = textKey ? vt(vocab, textKey) : '';
+        goToAsk(template ? { ask: template } : {});
       });
     });
   }
@@ -366,7 +373,7 @@
         if (!vocabResponse || !vocabResponse.ok) return undefined;
         var vocab = vocabResponse.texts || {};
         renderAskShell(vocab);
-        wireAskBox();
+        wireAskBox(vocab);
         return fetchJson('/api/home').then(function (home) {
           if (home && home.ok && nav && nav.ok) {
             render(nav, vocab, home, locale);
