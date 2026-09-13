@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
-import { conciergeErrorResponse } from '../../../../lib/viewer-context';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { resolveConciergeDecidedBy } from '../../../../lib/front-desk-member';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
+  // FD-07: resolving the viewer here is best-effort context for `decided_by`
+  // only — an unresolved viewer still falls through to the pre-FD-07
+  // 'concierge'/'sovereign' identity below, same as before this change.
+  const resolved = resolveConciergeViewer(req);
+  const decidedBy = resolved.context ? resolveConciergeDecidedBy(resolved.context) : null;
 
   try {
     const { id } = await context.params;
@@ -46,8 +52,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       storageChannel,
       requestId: id,
       decision,
-      decidedBy: 'concierge',
-      decidedByRole: 'sovereign',
+      decidedBy: decidedBy?.id ?? 'concierge',
+      decidedByRole: decidedBy?.role ?? 'sovereign',
       authMethod: 'surface_session',
       decidedByType: 'human',
       authenticated: true,

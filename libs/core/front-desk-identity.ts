@@ -19,10 +19,23 @@ import {
   type TenantProfile,
   type TenantRegistryPathOptions,
 } from './tenant-registry.js';
+import { resolveMemberByPrincipal, type MemberRegistryPathOptions } from './member-registry.js';
 import { narrowSurfaceViewerTenant, type SurfaceViewerScope } from './surface-mutation-guard.js';
 
 /** Human-facing role union (plan §2.3). `approver` arrives with FD-07. */
 export type FrontDeskRole = 'owner' | 'approver' | 'viewer';
+
+/**
+ * FD-07: a member resolved by `resolveMemberByPrincipal`, projected to the
+ * fields `buildFrontDeskMe` needs. Kept local (rather than importing
+ * `MemberProfile` wholesale) so this pure function only depends on the shape
+ * it actually reads.
+ */
+export interface FrontDeskResolvedMember {
+  member_id: string;
+  display_name: string;
+  memberships: ReadonlyArray<{ tenant_slug: string; role: FrontDeskRole }>;
+}
 
 export interface FrontDeskTenantView {
   tenant_slug: string;
@@ -38,6 +51,8 @@ export interface FrontDeskMe {
     member_id: string;
     display_name: string;
     source: 'loopback' | 'token' | 'anonymous';
+    /** FD-07: true once this principal resolves to a knowledge/personal/members/ record. */
+    registered: boolean;
   };
   /** The tenant currently displayed (narrowed selection), or null when the viewer has none. */
   viewing: FrontDeskTenantView | null;
@@ -63,12 +78,19 @@ export interface BuildFrontDeskMeInput {
   writeTenant?: string | null;
   /** Caller-loaded tenant profiles. This function performs no I/O. */
   tenantProfiles: readonly TenantProfile[];
+  /** FD-07: caller-resolved member (resolveMemberByPrincipal). null/absent = unregistered principal, legacy behavior. */
+  member?: FrontDeskResolvedMember | null;
 }
 
-/** localadmin -> owner, readonly -> viewer. `approver` arrives in FD-07. */
+/**
+ * localadmin -> owner, readonly -> viewer. `memberRole`, when given, wins
+ * outright — this is the only way `approver` is ever produced (FD-07).
+ */
 export function frontDeskRoleFromViewerScope(
-  scope: Pick<SurfaceViewerScope, 'role'>
+  scope: Pick<SurfaceViewerScope, 'role'>,
+  memberRole?: FrontDeskRole | null
 ): FrontDeskRole {
+  if (memberRole) return memberRole;
   return scope.role === 'localadmin' ? 'owner' : 'viewer';
 }
 
@@ -110,13 +132,26 @@ function resolveViewing(
 
 /** Pure: combines a trusted viewer scope with caller-loaded tenant profiles. No I/O. */
 export function buildFrontDeskMe(input: BuildFrontDeskMeInput): FrontDeskMe {
-  const { scope, tenantProfiles, availableOperations, onboarded } = input;
-  const role = frontDeskRoleFromViewerScope(scope);
+  const { scope, tenantProfiles, availableOperations, onboarded, member } = input;
+  const legacyRole = frontDeskRoleFromViewerScope(scope);
+  const isLoopback = scope.source === 'loopback';
   const allowedSlugs = scope.tenantSlugs === 'all' ? null : new Set(scope.tenantSlugs);
 
+  // FD-07: once a member is resolved, each tenant's role comes from that
+  // member's own memberships, not from the viewer's blanket scope role. A
+  // token viewer sees only the tenants they hold a membership for; loopback
+  // (the owner) keeps seeing every scope-allowed tenant even for one it has
+  // no explicit membership row for yet (e.g. a tenant created after
+  // ensureOwnerMember last ran).
   const tenants = tenantProfiles
     .filter((profile) => allowedSlugs === null || allowedSlugs.has(profile.tenant_slug))
-    .map((profile) => toTenantView(profile, role))
+    .map((profile) => {
+      const membership = member?.memberships.find((m) => m.tenant_slug === profile.tenant_slug);
+      if (membership) return toTenantView(profile, membership.role);
+      if (member && !isLoopback) return null;
+      return toTenantView(profile, legacyRole);
+    })
+    .filter((view): view is FrontDeskTenantView => view !== null)
     .sort((a, b) => a.display_name.localeCompare(b.display_name, 'ja'));
 
   const writeTenant = input.writeTenant?.trim() || null;
@@ -128,9 +163,10 @@ export function buildFrontDeskMe(input: BuildFrontDeskMeInput): FrontDeskMe {
   return {
     ok: true,
     member: {
-      member_id: principalId || 'anonymous',
-      display_name: displayName || principalId || 'anonymous',
+      member_id: member?.member_id || principalId || 'anonymous',
+      display_name: member?.display_name || displayName || principalId || 'anonymous',
       source: scope.source,
+      registered: Boolean(member),
     },
     viewing,
     tenants,
@@ -146,29 +182,58 @@ export interface ReadFrontDeskMeOptions {
   availableOperations: readonly string[];
   onboarded: boolean;
   tenantRegistry?: TenantRegistryPathOptions;
+  /** FD-07: defaults to tenantRegistry's rootDir/env — separate seam kept for callers that ever need to diverge. */
+  memberRegistry?: MemberRegistryPathOptions;
 }
 
 /**
- * Thin I/O wrapper: loads tenant profiles via tenant-registry, display name
- * via operator-identity for loopback (else registration label / principalId,
- * already carried by `scope.principalId`), write tenant from
- * KYBERION_TENANT / currentScope(), then delegates to buildFrontDeskMe.
+ * Thin I/O wrapper: loads tenant profiles via tenant-registry, resolves the
+ * member via member-registry's `resolveMemberByPrincipal` (FD-07), display
+ * name via operator-identity for an unregistered loopback viewer (else
+ * registration label / principalId, already carried by `scope.principalId`),
+ * write tenant from KYBERION_TENANT / currentScope(), then delegates to
+ * buildFrontDeskMe.
  *
- * Tenant profiles live under the personal tier: the caller must already be
- * running inside an authorized execution context (withExecutionContext) —
- * this function does not establish one itself.
+ * Tenant/member profiles live under the personal tier: the caller must
+ * already be running inside an authorized execution context
+ * (withExecutionContext) — this function does not establish one itself.
  */
 export function readFrontDeskMe(
   scope: SurfaceViewerScope,
   options: ReadFrontDeskMeOptions
 ): FrontDeskMe {
   const registryOptions = options.tenantRegistry ?? {};
+  const memberRegistryOptions = options.memberRegistry ?? registryOptions;
   const tenantProfiles = listTenantProfileSlugs(registryOptions)
     .map((slug) => readTenantProfile(slug, registryOptions))
     .filter((profile): profile is TenantProfile => profile !== null);
 
+  let resolvedMember;
+  try {
+    resolvedMember = resolveMemberByPrincipal(
+      {
+        principalId: scope.principalId,
+        source: scope.source,
+        registrationLabel: scope.registrationLabel,
+      },
+      memberRegistryOptions
+    );
+  } catch {
+    // A corrupt/unreadable member profile must never break /api/me — fall
+    // back to the pre-FD-07 unregistered-principal behavior.
+    resolvedMember = null;
+  }
+
+  const member: FrontDeskResolvedMember | null = resolvedMember
+    ? {
+        member_id: resolvedMember.member_id,
+        display_name: resolvedMember.display_name,
+        memberships: resolvedMember.memberships,
+      }
+    : null;
+
   const displayName =
-    scope.source === 'loopback'
+    !resolvedMember && scope.source === 'loopback'
       ? resolveOperatorDisplayName(scope.principalId || 'sovereign-user')
       : undefined;
 
@@ -185,5 +250,6 @@ export function readFrontDeskMe(
     displayName,
     writeTenant,
     tenantProfiles,
+    member,
   });
 }

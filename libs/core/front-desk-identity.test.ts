@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as pathResolver from './path-resolver.js';
 import { safeRmSync } from './secure-io.js';
 import { writeTenantProfile, type TenantProfile } from './tenant-registry.js';
+import { writeMemberProfile, type MemberProfile } from './member-registry.js';
 import type { SurfaceViewerScope } from './surface-mutation-guard.js';
 
 vi.mock('./operator-identity.js', () => ({
@@ -221,6 +222,7 @@ describe('buildFrontDeskMe', () => {
       member_id: 'alice',
       display_name: 'Alice A.',
       source: 'token',
+      registered: false,
     });
 
     const withoutDisplayName = buildFrontDeskMe(
@@ -237,6 +239,7 @@ describe('buildFrontDeskMe', () => {
       member_id: 'anonymous',
       display_name: 'anonymous',
       source: 'anonymous',
+      registered: false,
     });
   });
 
@@ -247,6 +250,87 @@ describe('buildFrontDeskMe', () => {
     expect(result.available_operations).toEqual(['a.read', 'b.write']);
     expect(result.onboarded).toBe(false);
     expect(result.ok).toBe(true);
+  });
+
+  describe('FD-07: a resolved member', () => {
+    it('uses the member id/display_name and marks registered: true', () => {
+      const result = buildFrontDeskMe(
+        makeInput({
+          member: {
+            member_id: 'alice',
+            display_name: 'Alice from the registry',
+            memberships: [{ tenant_slug: 'default', role: 'viewer' }],
+          },
+        })
+      );
+      expect(result.member).toEqual({
+        member_id: 'alice',
+        display_name: 'Alice from the registry',
+        source: 'token',
+        registered: true,
+      });
+    });
+
+    it("uses each tenant's role from the member's own membership, not the viewer scope role", () => {
+      const result = buildFrontDeskMe(
+        makeInput({
+          scope: makeScope({ role: 'localadmin', tenantSlugs: 'all' }),
+          tenantProfiles: [
+            makeProfile({ tenant_slug: 'acme-corp', display_name: 'Acme Corp' }),
+            makeProfile({ tenant_slug: 'beta-co', display_name: 'Beta Co' }),
+          ],
+          member: {
+            member_id: 'alice',
+            display_name: 'Alice',
+            memberships: [
+              { tenant_slug: 'acme-corp', role: 'approver' },
+              { tenant_slug: 'beta-co', role: 'viewer' },
+            ],
+          },
+        })
+      );
+      expect(result.tenants).toEqual([
+        expect.objectContaining({ tenant_slug: 'acme-corp', role: 'approver' }),
+        expect.objectContaining({ tenant_slug: 'beta-co', role: 'viewer' }),
+      ]);
+    });
+
+    it('excludes a tenant the token member has no membership for', () => {
+      const result = buildFrontDeskMe(
+        makeInput({
+          scope: makeScope({ source: 'token', tenantSlugs: ['acme-corp', 'beta-co'] }),
+          tenantProfiles: [
+            makeProfile({ tenant_slug: 'acme-corp', display_name: 'Acme Corp' }),
+            makeProfile({ tenant_slug: 'beta-co', display_name: 'Beta Co' }),
+          ],
+          member: {
+            member_id: 'alice',
+            display_name: 'Alice',
+            memberships: [{ tenant_slug: 'acme-corp', role: 'viewer' }],
+          },
+        })
+      );
+      expect(result.tenants.map((t) => t.tenant_slug)).toEqual(['acme-corp']);
+    });
+
+    it('keeps every scope-allowed tenant for a loopback member even without an explicit membership row', () => {
+      const result = buildFrontDeskMe(
+        makeInput({
+          scope: makeScope({ source: 'loopback', role: 'localadmin', tenantSlugs: 'all' }),
+          tenantProfiles: [
+            makeProfile({ tenant_slug: 'acme-corp', display_name: 'Acme Corp' }),
+            makeProfile({ tenant_slug: 'beta-co', display_name: 'Beta Co' }),
+          ],
+          member: {
+            member_id: 'owner',
+            display_name: 'Owner',
+            memberships: [{ tenant_slug: 'acme-corp', role: 'owner' }],
+          },
+        })
+      );
+      expect(result.tenants.map((t) => t.tenant_slug)).toEqual(['acme-corp', 'beta-co']);
+      expect(result.tenants.find((t) => t.tenant_slug === 'beta-co')?.role).toBe('owner');
+    });
   });
 });
 
@@ -327,6 +411,7 @@ describe('readFrontDeskMe', () => {
       member_id: 'famao',
       display_name: 'mocked-operator(famao)',
       source: 'loopback',
+      registered: false,
     });
     expect(result.onboarded).toBe(true);
     expect(result.available_operations).toEqual(['presence.overview.read']);
@@ -348,5 +433,74 @@ describe('readFrontDeskMe', () => {
 
     expect(result.viewing?.tenant_slug).toBe('beta-co');
     expect(result.member.display_name).toBe('audit-token');
+  });
+
+  describe('FD-07: member resolution', () => {
+    it('resolves the owner member record for loopback and reports registered: true', () => {
+      writeMemberProfile(
+        {
+          member_id: 'owner',
+          display_name: 'Famao',
+          status: 'active',
+          memberships: [{ tenant_slug: 'acme-corp', role: 'owner' }],
+          access_registrations: [],
+          created_at: '2026-09-13T00:00:00.000Z',
+          updated_at: '2026-09-13T00:00:00.000Z',
+        } satisfies MemberProfile,
+        { rootDir: fixtureRoot }
+      );
+      const scope = makeScope({ source: 'loopback', role: 'localadmin', principalId: 'famao' });
+      const result = readFrontDeskMe(scope, {
+        availableOperations: [],
+        onboarded: true,
+        tenantRegistry: { rootDir: fixtureRoot },
+      });
+
+      expect(result.member).toEqual({
+        member_id: 'owner',
+        display_name: 'Famao',
+        source: 'loopback',
+        registered: true,
+      });
+      // beta-co has no explicit membership row yet: loopback (owner) still sees it.
+      expect(result.tenants.map((t) => t.tenant_slug)).toEqual(['acme-corp', 'beta-co']);
+    });
+
+    it('resolves a token member by registrationLabel and narrows tenants to its memberships', () => {
+      writeMemberProfile(
+        {
+          member_id: 'reviewer',
+          display_name: 'Reviewer Ren',
+          status: 'active',
+          memberships: [{ tenant_slug: 'beta-co', role: 'approver' }],
+          access_registrations: [{ label: 'reviewer-token' }],
+          created_at: '2026-09-13T00:00:00.000Z',
+          updated_at: '2026-09-13T00:00:00.000Z',
+        } satisfies MemberProfile,
+        { rootDir: fixtureRoot }
+      );
+      const scope = makeScope({
+        source: 'token',
+        role: 'readonly',
+        tenantSlugs: ['acme-corp', 'beta-co'],
+        principalId: 'reviewer-token',
+        registrationLabel: 'reviewer-token',
+      });
+      const result = readFrontDeskMe(scope, {
+        availableOperations: [],
+        onboarded: true,
+        tenantRegistry: { rootDir: fixtureRoot },
+      });
+
+      expect(result.member).toEqual({
+        member_id: 'reviewer',
+        display_name: 'Reviewer Ren',
+        source: 'token',
+        registered: true,
+      });
+      expect(result.tenants).toEqual([
+        expect.objectContaining({ tenant_slug: 'beta-co', role: 'approver' }),
+      ]);
+    });
   });
 });

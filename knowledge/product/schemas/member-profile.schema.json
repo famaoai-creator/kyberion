@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/member-profile.schema.json",
+  "title": "Member Profile",
+  "description": "FD-07 minimal member model: a human member of a local Kyberion instance, identified as user:<member_id>. Roles (owner/approver/viewer) are per-tenant memberships; a member never carries an authority role directly.",
+  "type": "object",
+  "required": [
+    "member_id",
+    "display_name",
+    "status",
+    "memberships",
+    "access_registrations",
+    "created_at",
+    "updated_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "member_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$"
+    },
+    "display_name": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["active", "suspended"] },
+    "memberships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tenant_slug", "role"],
+        "additionalProperties": false,
+        "properties": {
+          "tenant_slug": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{1,30}$"
+          },
+          "role": { "type": "string", "enum": ["owner", "approver", "viewer"] }
+        }
+      }
+    },
+    "access_registrations": {
+      "type": "array",
+      "description": "Labels of chronos-access.json token registrations that belong to this member.",
+      "items": {
+        "type": "object",
+        "required": ["label"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

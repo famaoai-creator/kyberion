@@ -99,11 +99,20 @@ export function frontDeskRoleAllows(role: FrontDeskRole, min: FrontDeskRole): bo
 
 /**
  * Map a server-resolved viewer role to the human role. `localadmin` ->
- * `owner`; `readonly` -> `viewer`. `approver` has no server-side counterpart
- * yet — it is introduced in FD-07 alongside `surface.decision.write` — so it
- * is never produced here.
+ * `owner`; `readonly` -> `viewer`.
+ *
+ * FD-07: when the caller has already resolved a member (member-registry.ts,
+ * kept out of this fs-free module on purpose) and knows that member's role
+ * for the tenant in view, it passes it as `memberRole` and that value wins
+ * outright — this is the only way `approver` is ever produced. With no
+ * `memberRole` (unregistered principal, back-compat), the legacy
+ * localadmin/readonly mapping applies unchanged.
  */
-export function frontDeskRoleFromViewer(input: { role: 'readonly' | 'localadmin' }): FrontDeskRole {
+export function frontDeskRoleFromViewer(input: {
+  role: 'readonly' | 'localadmin';
+  memberRole?: FrontDeskRole | null;
+}): FrontDeskRole {
+  if (input.memberRole) return input.memberRole;
   return input.role === 'localadmin' ? 'owner' : 'viewer';
 }
 

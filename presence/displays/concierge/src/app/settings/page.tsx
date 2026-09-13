@@ -72,6 +72,15 @@ type SettingsTenantView = {
   status: 'active' | 'suspended' | 'archived';
 };
 
+// FD-07: 組織とメンバー member list + add form.
+type SettingsMember = {
+  member_id: string;
+  display_name: string;
+  status: 'active' | 'suspended';
+  sign_in: 'local' | 'token';
+  memberships: Array<{ tenant_slug: string; role: SettingsRole }>;
+};
+
 const DEFAULT_SERVICES = ['google-workspace', 'slack', 'browser'];
 
 const DIAG_LABELS: Record<string, ConciergeMessageKey> = {
@@ -168,6 +177,42 @@ function parseSettingsMe(
   };
 }
 
+function isSettingsMember(value: unknown): value is SettingsMember {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.member_id === 'string' &&
+    typeof record.display_name === 'string' &&
+    (record.status === 'active' || record.status === 'suspended') &&
+    (record.sign_in === 'local' || record.sign_in === 'token') &&
+    Array.isArray(record.memberships) &&
+    record.memberships.every(
+      (m) =>
+        m &&
+        typeof m === 'object' &&
+        typeof (m as Record<string, unknown>).tenant_slug === 'string' &&
+        isSettingsRole((m as Record<string, unknown>).role)
+    )
+  );
+}
+
+function parseMembersResponse(value: unknown): SettingsMember[] | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  if (record.ok !== true || !Array.isArray(record.members)) return undefined;
+  if (!record.members.every(isSettingsMember)) return undefined;
+  return record.members;
+}
+
+function parseAddMemberResponse(
+  value: unknown
+): { member: SettingsMember; token: string | null } | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  if (record.ok !== true || !isSettingsMember(record.member)) return undefined;
+  return { member: record.member, token: typeof record.token === 'string' ? record.token : null };
+}
+
 function parseChronosLink(value: unknown): string | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const record = value as Record<string, unknown>;
@@ -220,6 +265,16 @@ export default function SettingsPage() {
   const [oauthMessage, setOauthMessage] = React.useState<string | null>(null);
   const [meTenants, setMeTenants] = React.useState<SettingsTenantView[]>([]);
   const [meViewing, setMeViewing] = React.useState<SettingsTenantView | null>(null);
+  const [members, setMembers] = React.useState<SettingsMember[]>([]);
+  const [memberForm, setMemberForm] = React.useState({
+    display_name: '',
+    member_id: '',
+    tenant_slug: '',
+    role: 'viewer' as SettingsRole,
+    issue_token: false,
+  });
+  const [memberBusy, setMemberBusy] = React.useState(false);
+  const [issuedToken, setIssuedToken] = React.useState<string | null>(null);
   const [chronosUrl, setChronosUrl] = React.useState<string | null>(null);
   const [activeSection, setActiveSection] = React.useState<SettingsSectionId>('profile');
   const cameraStreamRef = React.useRef<MediaStream | null>(null);
@@ -338,6 +393,83 @@ export default function SettingsPage() {
     }
   }, []);
 
+  // FD-07: the member list itself. Degrades to an empty list — a non-owner
+  // viewer simply sees nothing here (the section stays visible, matching
+  // every other degrade-gracefully pane on this page).
+  const refreshMembers = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/members', { cache: 'no-store' });
+      const parsed = parseMembersResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) throw new Error('Invalid members response');
+      setMembers(parsed);
+    } catch {
+      // Members pane shows an empty list rather than blocking the page.
+    }
+  }, []);
+
+  // FD-07 「メンバーを追加」: fires only from the explicit form submit — no
+  // auto-creation, no default role. The new access token (when requested)
+  // is shown exactly once via `issuedToken` and never re-fetchable.
+  const addMember = React.useCallback(async () => {
+    setMemberBusy(true);
+    try {
+      const response = await fetch('/api/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(memberForm),
+      });
+      const parsed = parseAddMemberResponse(await response.json().catch(() => null));
+      if (!response.ok || !parsed) {
+        const failure = await response
+          .clone()
+          .json()
+          .catch(() => null);
+        throw new Error(
+          (failure && typeof failure.error === 'string' && failure.error) ||
+            'Member creation failed'
+        );
+      }
+      setNotice({ text: frontDeskText('settings_member_added', locale) });
+      setIssuedToken(parsed.token);
+      setMemberForm((current) => ({ ...current, display_name: '', member_id: '' }));
+      await refreshMembers();
+    } catch (err) {
+      setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+    } finally {
+      setMemberBusy(false);
+    }
+  }, [memberForm, locale, refreshMembers]);
+
+  // FD-07 role change / suspend / reactivate — owner-only PATCH, no delete.
+  const patchMember = React.useCallback(
+    async (
+      memberId: string,
+      patch: { tenant_slug: string; role: SettingsRole } | { status: 'active' | 'suspended' }
+    ) => {
+      setMemberBusy(true);
+      try {
+        const response = await fetch(`/api/members/${encodeURIComponent(memberId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        const parsed = await response.json().catch(() => null);
+        if (!response.ok || !parsed?.ok) {
+          throw new Error(
+            (parsed && typeof parsed.error === 'string' && parsed.error) || 'Member update failed'
+          );
+        }
+        setNotice({ text: frontDeskText('settings_member_updated', locale) });
+        await refreshMembers();
+      } catch (err) {
+        setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+      } finally {
+        setMemberBusy(false);
+      }
+    },
+    [locale, refreshMembers]
+  );
+
   // FD-06 詳細設定: the 管制塔 (chronos-mirror-v2) link's port is resolved
   // server-side (plan §2.6) — this component only ever holds the string URL.
   const refreshChronosLink = React.useCallback(async () => {
@@ -410,6 +542,7 @@ export default function SettingsPage() {
     void refreshPlugins();
     void refreshConfigMissions();
     void refreshMe();
+    void refreshMembers();
     void refreshChronosLink();
     return () => {
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -421,8 +554,14 @@ export default function SettingsPage() {
     refreshPlugins,
     refreshConfigMissions,
     refreshMe,
+    refreshMembers,
     refreshChronosLink,
   ]);
+
+  React.useEffect(() => {
+    if (memberForm.tenant_slug || meTenants.length === 0) return;
+    setMemberForm((current) => ({ ...current, tenant_slug: meTenants[0].tenant_slug }));
+  }, [meTenants, memberForm.tenant_slug]);
 
   const jumpToSection = React.useCallback((target: string) => {
     if (!target.startsWith('#')) return;
@@ -880,7 +1019,169 @@ export default function SettingsPage() {
               </ul>
             )}
             <h3 className="pane-subheading">{frontDeskText('settings_members_title', locale)}</h3>
-            <p className="item-meta">{frontDeskText('settings_members_soon', locale)}</p>
+            {members.length === 0 ? (
+              <p className="pane-empty">{t('setup.loading')}</p>
+            ) : (
+              <ul className="settings-tenant-list">
+                {members.map((member) => {
+                  const membership = member.memberships.find(
+                    (m) => m.tenant_slug === (meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug)
+                  );
+                  return (
+                    <li className="item-card settings-tenant-item" key={member.member_id}>
+                      <p className="item-title">
+                        {member.display_name} ({member.member_id})
+                        <span className="status-chip">
+                          {frontDeskText(
+                            member.sign_in === 'token'
+                              ? 'settings_member_signin_token'
+                              : 'settings_member_signin_local',
+                            locale
+                          )}
+                        </span>
+                        {membership ? (
+                          <span className="status-chip ok">
+                            {frontDeskText(ROLE_LABEL_KEYS[membership.role], locale)}
+                          </span>
+                        ) : null}
+                        <span className="status-chip">
+                          {frontDeskText(
+                            member.status === 'suspended'
+                              ? 'settings_member_status_suspended'
+                              : 'settings_member_status_active',
+                            locale
+                          )}
+                        </span>
+                      </p>
+                      <div className="button-row">
+                        <select
+                          aria-label={frontDeskText('settings_member_role_change', locale)}
+                          defaultValue={membership?.role ?? 'viewer'}
+                          disabled={memberBusy}
+                          onChange={(event) => {
+                            const tenantSlug = meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug;
+                            if (!tenantSlug) return;
+                            void patchMember(member.member_id, {
+                              tenant_slug: tenantSlug,
+                              role: event.target.value as SettingsRole,
+                            });
+                          }}
+                        >
+                          {(['owner', 'approver', 'viewer'] as SettingsRole[]).map((role) => (
+                            <option key={role} value={role}>
+                              {frontDeskText(ROLE_LABEL_KEYS[role], locale)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="action-button"
+                          disabled={memberBusy}
+                          onClick={() =>
+                            void patchMember(member.member_id, {
+                              status: member.status === 'suspended' ? 'active' : 'suspended',
+                            })
+                          }
+                        >
+                          {frontDeskText(
+                            member.status === 'suspended'
+                              ? 'settings_member_reactivate'
+                              : 'settings_member_suspend',
+                            locale
+                          )}
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            <h3 className="pane-subheading">{frontDeskText('settings_member_add', locale)}</h3>
+            <label>
+              {frontDeskText('settings_member_add_display_name', locale)}
+              <input
+                type="text"
+                value={memberForm.display_name}
+                onChange={(event) =>
+                  setMemberForm({ ...memberForm, display_name: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              {frontDeskText('settings_member_add_id', locale)}
+              <input
+                type="text"
+                value={memberForm.member_id}
+                onChange={(event) =>
+                  setMemberForm({ ...memberForm, member_id: event.target.value })
+                }
+              />
+            </label>
+            <label>
+              {frontDeskText('settings_member_add_tenant', locale)}
+              <select
+                value={memberForm.tenant_slug}
+                onChange={(event) =>
+                  setMemberForm({ ...memberForm, tenant_slug: event.target.value })
+                }
+              >
+                {meTenants.map((tenant) => (
+                  <option key={tenant.tenant_slug} value={tenant.tenant_slug}>
+                    {tenant.display_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {frontDeskText('settings_member_add_role', locale)}
+              <select
+                value={memberForm.role}
+                onChange={(event) =>
+                  setMemberForm({ ...memberForm, role: event.target.value as SettingsRole })
+                }
+              >
+                {(['owner', 'approver', 'viewer'] as SettingsRole[]).map((role) => (
+                  <option key={role} value={role}>
+                    {frontDeskText(ROLE_LABEL_KEYS[role], locale)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={memberForm.issue_token}
+                onChange={(event) =>
+                  setMemberForm({ ...memberForm, issue_token: event.target.checked })
+                }
+              />
+              {frontDeskText('settings_member_add_issue_token', locale)}
+            </label>
+            <div className="button-row">
+              <button
+                className="action-button"
+                disabled={
+                  memberBusy ||
+                  !memberForm.display_name ||
+                  !memberForm.member_id ||
+                  !memberForm.tenant_slug
+                }
+                onClick={() => void addMember()}
+              >
+                {frontDeskText('settings_member_add_submit', locale)}
+              </button>
+            </div>
+            {issuedToken ? (
+              <div className="notice" role="alert">
+                <p>{frontDeskText('settings_token_once', locale)}</p>
+                <code>{issuedToken}</code>
+                <div className="button-row">
+                  <button className="action-button" onClick={() => setIssuedToken(null)}>
+                    {frontDeskText('settings_token_once_dismiss', locale)}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </section>
         );
 
