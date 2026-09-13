@@ -101,6 +101,36 @@ describe('Computer interaction contract schema', () => {
     expect(valid, ajv.errorsText(validate.errors)).toBe(true);
   });
 
+  it('accepts a secret fill with durable identity', () => {
+    const ajv = new Ajv({ allErrors: true });
+    const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');
+    const validate = ajv.compile(schema);
+
+    const payload = {
+      version: '0.1',
+      kind: 'computer_interaction',
+      session_id: 'browser-session-secret',
+      action: {
+        type: 'fill_secret_ref',
+        ref: '@e1',
+        secret_ref: 'GITHUB_TOKEN',
+        selector: 'input[name="token"]',
+        name: 'API Key',
+        role: 'textbox',
+        dom_path: 'input[name="token"]',
+      },
+      risk: {
+        level: 'high',
+        reason: 'submits a credential',
+        requires_approval: true,
+        approval_scope: 'workflow',
+      },
+    };
+
+    const valid = validate(payload);
+    expect(valid, ajv.errorsText(validate.errors)).toBe(true);
+  });
+
   it('rejects payloads without action', () => {
     const ajv = new Ajv({ allErrors: true });
     const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');

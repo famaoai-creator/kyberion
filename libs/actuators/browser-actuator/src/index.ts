@@ -10,9 +10,11 @@ import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import {
   buildBrowserElementPresentPipeline,
   createBrowserInteractionHelpers,
+  type ComputerInteractionAction,
 } from './browser-interaction-helpers.js';
 import { executePipeline as executeBrowserPipeline } from './browser-pipeline-helpers.js';
 import { isDirectEntry } from '@agent/core/direct-entry';
+import { isRecord } from '@agent/core/foundation';
 import { Page } from '@playwright/test';
 import {
   currentProcessArgv,
@@ -73,13 +75,26 @@ const browserInteractionHelpers = createBrowserInteractionHelpers({
 /**
  * Main Entry Point
  */
-async function handleAction(input: BrowserAction) {
-  if ((input as any).kind === 'computer_interaction') {
+function isComputerInteraction(input: unknown): input is ComputerInteractionAction {
+  return isRecord(input) && input.kind === 'computer_interaction';
+}
+
+function isPipelineAction(input: unknown): input is BrowserAction {
+  return isRecord(input) && input.action === 'pipeline';
+}
+
+function describeUnsupportedAction(input: unknown): string {
+  if (!isRecord(input)) return 'unknown';
+  return String(input.action);
+}
+
+async function handleAction(input: unknown) {
+  if (isComputerInteraction(input)) {
     ensureDefaultOpPreflight();
-    const interactionType = String((input as any).action?.type || 'unknown');
+    const interactionType = String(input.action?.type || 'unknown');
     const preflight = await runOpPreflight({
       op: `browser:computer_interaction:${interactionType}`,
-      params: input as unknown as Record<string, unknown>,
+      params: { ...input },
       source: 'actuator',
     });
     if (preflight.decision !== 'allow') {
@@ -87,16 +102,19 @@ async function handleAction(input: BrowserAction) {
         `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation browser:computer_interaction:${interactionType} was not admitted.`}`
       );
     }
-    const admitted = {
-      ...(input as unknown as Record<string, unknown>),
-      ...preflight.input,
+    const admitted: ComputerInteractionAction = {
+      ...input,
+      action: {
+        ...input.action,
+        ...(preflight.input as ComputerInteractionAction['action']),
+      },
       kind: 'computer_interaction',
     };
-    return await browserInteractionHelpers.handleComputerInteraction(admitted as any);
+    return await browserInteractionHelpers.handleComputerInteraction(admitted);
   }
-  if (input.action !== 'pipeline') {
+  if (!isPipelineAction(input)) {
     throw new Error(
-      `Unsupported action: ${(input as any).action}. Browser-Actuator accepts pipeline and computer_interaction contracts.`
+      `Unsupported action: ${describeUnsupportedAction(input)}. Browser-Actuator accepts pipeline and computer_interaction contracts.`
     );
   }
   if (input.steps?.length === 1 && input.steps[0]?.op === 'extension_session') {
@@ -216,6 +234,7 @@ export {
   restartBrowserSession,
   waitForOperatorContinue,
 };
+export type { ComputerInteractionAction };
 
 export type {
   BrowserElementPresentCondition,
