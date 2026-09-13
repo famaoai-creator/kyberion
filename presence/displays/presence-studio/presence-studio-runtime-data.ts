@@ -1,4 +1,5 @@
 import express from 'express';
+import { readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
 import { installProcessGuards } from '@agent/core/process-guards';
 import {
   defineCatalog,
@@ -1171,8 +1172,11 @@ app.get('/api/headless/a2ui/overview', (req, res) => {
   }
 });
 
+// FD-06: the setup wizard is folded into the concierge 設定 page; the
+// concierge port comes from the surface manifest (never a literal). The
+// static onboarding.html stays on disk until FD-08 removes it.
 app.get('/onboarding', (_req, res) => {
-  res.sendFile(path.join(staticDir, 'onboarding.html'));
+  res.redirect(302, `http://127.0.0.1:${readFrontDeskSurfacePorts().concierge}/settings`);
 });
 
 // Interim redirect until FD-03 ships the dedicated "ask" page (会話入力欄).
