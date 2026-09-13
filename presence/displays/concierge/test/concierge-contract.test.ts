@@ -38,20 +38,39 @@ describe('concierge surface contract', () => {
 
   it('exposes the personal-secretary onboarding controls', () => {
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
+    // FD-06 file split (KP gate: max-file-lines): each card's JSX now lives
+    // in its own file under settings/sections/ — the page still owns every
+    // handler (getUserMedia/MediaRecorder/action:'save_management' below).
+    const profileSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/ProfileSection.tsx'),
+      'utf8'
+    );
+    const voiceSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/VoiceSection.tsx'),
+      'utf8'
+    );
+    const servicesSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/ServicesSection.tsx'),
+      'utf8'
+    );
+    const advancedSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/AdvancedSection.tsx'),
+      'utf8'
+    );
     const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
     );
-    expect(setupPage).toContain("t('setup.save_profile')");
-    expect(setupPage).toContain("t('setup.image_label')");
-    expect(setupPage).toContain("t('setup.save_voice')");
+    expect(profileSection).toContain("t('setup.save_profile')");
+    expect(voiceSection).toContain("t('setup.image_label')");
+    expect(voiceSection).toContain("t('setup.save_voice')");
     expect(setupPage).toContain('getUserMedia');
     expect(setupPage).toContain('MediaRecorder');
-    expect(setupPage).toContain("t('setup.capture_avatar')");
-    expect(setupPage).toContain("t('setup.camera_fallback')");
-    expect(setupPage).toContain("t('setup.services_title')");
-    expect(setupPage).toContain("t('setup.management_title')");
+    expect(voiceSection).toContain("t('setup.capture_avatar')");
+    expect(voiceSection).toContain("t('setup.camera_fallback')");
+    expect(servicesSection).toContain("t('setup.services_title')");
+    expect(advancedSection).toContain("t('setup.management_title')");
     expect(setupPage).toContain("action: 'save_management'");
     expect(messages).toContain('プロフィールと接続準備を保存');
     expect(messages).toContain('アバター画像');
@@ -237,13 +256,16 @@ describe('concierge surface contract', () => {
     // The page renders the checklist and attention items jump to their section.
     expect(setupPage).toContain("t('setup.readiness_title')");
     expect(setupPage).toContain('scrollIntoView');
-    for (const anchor of [
-      'setup-profile',
-      'setup-media',
-      'setup-services',
-      'setup-notifications',
-    ]) {
-      expect(setupPage).toContain(`id="${anchor}"`);
+    // The 4 anchors now live in their own section files (FD-06 file split).
+    const anchorFiles: Record<string, string> = {
+      'setup-profile': 'ProfileSection.tsx',
+      'setup-media': 'VoiceSection.tsx',
+      'setup-services': 'ServicesSection.tsx',
+      'setup-notifications': 'NotificationsSection.tsx',
+    };
+    for (const [anchor, file] of Object.entries(anchorFiles)) {
+      const section = fs.readFileSync(path.join(appDir, 'src/app/settings/sections', file), 'utf8');
+      expect(section).toContain(`id="${anchor}"`);
     }
     // ceo-ux.md: items with an in-app section no longer print shell commands,
     // and pipeline IDs are not exposed as UI copy.
@@ -266,6 +288,11 @@ describe('concierge surface contract', () => {
       'utf8'
     );
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
+    // FD-06 file split: the notifications card's JSX moved into its own file.
+    const notificationsSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/NotificationsSection.tsx'),
+      'utf8'
+    );
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -282,7 +309,7 @@ describe('concierge surface contract', () => {
     expect(route).toContain('requireConciergeMutationAccess');
     expect(route).not.toMatch(/export (async )?function (PUT|DELETE|PATCH)/);
     // The setup page exposes the section and reports it in the checklist.
-    expect(setupPage).toContain("t('setup.notifications_title')");
+    expect(notificationsSection).toContain("t('setup.notifications_title')");
     expect(setupPage).toContain("fetch('/api/notification-preferences'");
     expect(messages).toContain('通知設定を保存');
   });
@@ -482,6 +509,11 @@ describe('concierge surface contract', () => {
       'utf8'
     );
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
+    // FD-06 file split: the plugins card's JSX moved into its own file.
+    const pluginsSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/PluginsSection.tsx'),
+      'utf8'
+    );
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -513,10 +545,10 @@ describe('concierge surface contract', () => {
 
     // The setup section shows status chips, decides via inline confirm only,
     // and carries the trust caveat (third-party code runs only after approval).
-    expect(setupPage).toContain('id="setup-plugins"');
-    expect(setupPage).toContain("t('setup.plugins_caveat')");
-    expect(setupPage).toContain("'setup.plugin_confirm_approve'");
-    expect(setupPage).toContain("'setup.plugin_confirm_deny'");
+    expect(pluginsSection).toContain('id="setup-plugins"');
+    expect(pluginsSection).toContain("t('setup.plugins_caveat')");
+    expect(pluginsSection).toContain("'setup.plugin_confirm_approve'");
+    expect(pluginsSection).toContain("'setup.plugin_confirm_deny'");
     expect(setupPage).not.toContain('window.confirm');
     expect(messages).toContain('稼働可能');
     expect(messages).toContain('承認待ち');
@@ -530,6 +562,12 @@ describe('concierge surface contract', () => {
       'utf8'
     );
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
+    // FD-06 file split: the governance sub-pane's JSX now lives in the
+    // 詳細設定 (advanced) section file, inside its own <details>.
+    const advancedSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/AdvancedSection.tsx'),
+      'utf8'
+    );
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -557,8 +595,8 @@ describe('concierge surface contract', () => {
 
     // The setup section is preset-picker → declared inputs → inline confirm,
     // and the copy says the change takes effect only after approval.
-    expect(setupPage).toContain('id="setup-governance"');
-    expect(setupPage).toContain("t('setup.governance_confirm')");
+    expect(advancedSection).toContain('id="setup-governance"');
+    expect(advancedSection).toContain("t('setup.governance_confirm')");
     expect(setupPage).not.toContain('window.confirm');
     expect(messages).toContain('反映はご承認を通ってからになります');
     expect(messages).toContain('変更依頼を起票する');
