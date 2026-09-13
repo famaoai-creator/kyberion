@@ -160,9 +160,36 @@ Plus:
 - **Goal-driven workers** — opt-in worker autonomy: a per-task goal state machine with token / turn / wall-clock budgets, event-sourced journals, and restart recovery that resumes exactly where the worker left off.
 - **Provenance-gated plugins** — skill plugins install through managed copies with source-derived trust; third-party code requires explicit human approval before it can ever run.
 - **Design-system-governed media** — PPTX and video are authored as semantic briefs; a single style cascade and text-measured layout fitting keep output on-brand without per-slide hand-tuning.
-- **Operator surfaces & messaging bridges** — Chronos control tower, concierge secretary, presence studio, terminal HUD, [local capture pads](#local-pads--capture-at-your-desk-hand-off-to-kyberion), plus Slack / Telegram / Discord / iMessage bridges sharing one approval contract and a durable outbox (mechanisms hermetically tested; external-service E2E is still being proven). Map: [`docs/SURFACES.md`](./docs/SURFACES.md).
+- **Operator surfaces & messaging bridges** — Chronos control tower, concierge secretary, presence studio, terminal HUD ([screenshots](#surfaces--one-role-per-screen)), [local capture pads](#local-pads--capture-at-your-desk-hand-off-to-kyberion), plus Slack / Telegram / Discord / iMessage bridges sharing one approval contract and a durable outbox (mechanisms hermetically tested; external-service E2E is still being proven). Map: [`docs/SURFACES.md`](./docs/SURFACES.md).
 
 For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md). For the architecture: [`knowledge/product/architecture/organization-work-loop.md`](./knowledge/product/architecture/organization-work-loop.md).
+
+---
+
+## Surfaces — one role per screen
+
+Each surface answers one question and shows its role in the header. Full role map, ports and access rules: [`docs/SURFACES.md`](./docs/SURFACES.md).
+
+<table>
+  <tr>
+    <td align="center" width="33%"><a href="./presence/displays/chronos-mirror-v2/"><img src="./docs/assets/surfaces/chronos.jpg" alt="Chronos Mirror — control tower home with tenant scope, view switcher, next action and per-mission agent status" width="100%" /></a><br /><strong>Chronos Mirror</strong> · <code>:3000</code><br /><sub>Control tower: what is the system doing, where should I intervene?</sub></td>
+    <td align="center" width="33%"><a href="./presence/displays/concierge/"><img src="./docs/assets/surfaces/concierge.jpg" alt="Concierge — CEO secretary view with approvals, requests, deliverables and exceptions" width="100%" /></a><br /><strong>Concierge</strong> · <code>:3050</code><br /><sub>CEO secretary: what do I need to decide right now?</sub></td>
+    <td align="center" width="33%"><a href="./presence/displays/presence-studio/"><img src="./docs/assets/surfaces/presence-studio.jpg" alt="Presence Studio — companion workbench with minutes, email, browser, approval and task cards plus voice controls" width="100%" /></a><br /><strong>Presence Studio</strong> · <code>:3031</code><br /><sub>Companion: what are we working on together, by voice or text?</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="./presence/displays/operator-surface/"><img src="./docs/assets/surfaces/operator-surface.jpg" alt="Operator Surface — read-only audit monitor listing missions with status, tier, tenant, persona and checkpoints" width="100%" /></a><br /><strong>Operator Surface</strong> · <code>:3331</code><br /><sub>Audit monitor, read-only: what happened, with evidence?</sub></td>
+    <td align="center"><a href="./presence/displays/computer-surface/"><img src="./docs/assets/surfaces/computer-surface.jpg" alt="Computer Surface — live mirror of the browser or terminal Kyberion is operating, with session, executor and status tiles" width="100%" /></a><br /><strong>Computer Surface</strong> · <code>:3040</code><br /><sub>Mirror: what is Kyberion doing in the browser or terminal right now?</sub></td>
+    <td align="center"><a href="./presence/displays/terminal-hud/"><img src="./docs/assets/surfaces/terminal-hud.jpg" alt="Terminal HUD — Ink TUI with operator cockpit, intent preview and the mission panel" width="100%" /></a><br /><strong>Terminal HUD</strong> · <code>pnpm tui</code><br /><sub>Terminal cockpit: missions, work items, runtimes and intent preview without leaving the shell</sub></td>
+  </tr>
+</table>
+
+```bash
+pnpm surfaces reconcile              # start the surfaces declared in active-surfaces.json
+pnpm chronos:dev                     # or run the control tower alone
+pnpm tui                             # terminal HUD (pnpm tui --once for a non-interactive snapshot)
+```
+
+Every HTTP surface resolves the viewer principal server-side and treats a client-supplied `tenant` only as a narrowing filter. On Next.js 15+ a same-machine browser is recognised as loopback only through a surface token or `KYBERION_TRUST_PROXY=1` behind a proxy that sets `x-real-ip` (see [`CHANGELOG.md`](./CHANGELOG.md) and [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)).
 
 ---
 
