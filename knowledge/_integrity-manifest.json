@@ -4921,6 +4921,12 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/training-catalog.json",
+      "tier": "public",
+      "size": 2825,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/travel-planning-playbook.md",
       "tier": "public",
       "size": 9106,
@@ -10222,6 +10228,24 @@
       "path": "product/schemas/tracker-sheet-policy.schema.json",
       "tier": "public",
       "size": 584,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/training-assignments.schema.json",
+      "tier": "public",
+      "size": 951,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/training-catalog.schema.json",
+      "tier": "public",
+      "size": 2176,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/training-progress.schema.json",
+      "tier": "public",
+      "size": 825,
       "type": "json"
     },
     {
