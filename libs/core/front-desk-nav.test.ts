@@ -16,7 +16,7 @@ import {
   resolveFrontDeskMenu,
   type FrontDeskRole,
 } from './front-desk-nav.js';
-import { t } from './t.js';
+import { t, type VocabularyKey } from './t.js';
 
 beforeEach(() => {
   loadSurfaceManifestMock.mockReset();
@@ -38,7 +38,7 @@ describe('FRONT_DESK_MENU', () => {
     const keys = FRONT_DESK_MENU.flatMap((item) => [item.label_key, item.sublabel_key]);
     for (const key of keys) {
       for (const locale of ['en', 'ja'] as const) {
-        const text = t(key as any, undefined, locale);
+        const text = t(key as VocabularyKey, undefined, locale);
         expect(text.length).toBeGreaterThan(0);
         expect(text).not.toBe(key);
         for (const pattern of forbiddenPatterns) {
@@ -50,7 +50,7 @@ describe('FRONT_DESK_MENU', () => {
 
   it('defines the help link outside the 5-item menu', () => {
     expect(FRONT_DESK_HELP_LINK.id).toBe('help');
-    const helpText = t(FRONT_DESK_HELP_LINK.label_key as any, undefined, 'ja');
+    const helpText = t(FRONT_DESK_HELP_LINK.label_key as VocabularyKey, undefined, 'ja');
     expect(helpText.length).toBeGreaterThan(0);
     expect(FRONT_DESK_MENU.some((item) => (item as { id: string }).id === 'help')).toBe(false);
   });
