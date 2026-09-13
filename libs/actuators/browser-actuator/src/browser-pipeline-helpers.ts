@@ -1034,6 +1034,12 @@ function recordedRefTargetFromParams(
   };
 }
 
+function recordedSecretDomPath(params: Record<string, unknown>, selector: string): string {
+  return typeof params.dom_path === 'string' && params.dom_path.trim()
+    ? params.dom_path.trim()
+    : selector;
+}
+
 async function opApply(
   op: string,
   params: any,
@@ -1205,7 +1211,11 @@ async function opApply(
         ref,
         selector,
         ...(secretKey
-          ? { classification: 'secret_ref' as const, secret_ref: secretKey }
+          ? {
+              classification: 'secret_ref' as const,
+              secret_ref: secretKey,
+              dom_path: recordedSecretDomPath(params, selector),
+            }
           : { text }),
         element_name: element?.name ?? params.name,
         element_role: element?.role ?? params.role,
@@ -1236,6 +1246,7 @@ async function opApply(
         selector,
         secret_ref: secretKey,
         classification: 'secret_ref',
+        dom_path: recordedSecretDomPath(params, selector),
         element_name: element?.name ?? params.name,
         element_role: element?.role ?? params.role,
       });
