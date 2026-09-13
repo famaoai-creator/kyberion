@@ -9150,6 +9150,223 @@
         "qps-ploc": "⟦Ḓřȧẇ, ŧħėñ Ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŧő ẇřïŧė ṖÑƓ + ħȧñḓőƒƒ.ĵşőñ. Ƈŧřŀ-Ƈ ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
       }
     },
+    "meeting_notepad": {
+      "title": {
+        "en": "Meeting Notepad (local only)",
+        "ja": "Meeting Notepad（ローカルのみ）",
+        "qps-ploc": "⟦Ɱėėŧïñɠ Ñőŧėṗȧḓ (ŀőƈȧŀ őñŀẏ) ŀőřėɱ ïṗş⟧"
+      },
+      "subtitle": {
+        "en": "Capture notes, voice, recordings, and attachments; create minutes and hand off to Kyberion",
+        "ja": "メモ・音声・録音・添付を取り込み、議事録を作成して Kyberion へ渡します",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ñőŧėş, ṽőïƈė, řėƈőřḓïñɠş, ȧñḓ ȧŧŧȧƈħɱėñŧş; ƈřėȧŧė ɱïñůŧėş ȧñḓ ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "meeting_title": {
+        "en": "Meeting title",
+        "ja": "会議タイトル",
+        "qps-ploc": "⟦Ɱėėŧïñɠ ŧïŧŀė ŀőřė⟧"
+      },
+      "meeting_title_placeholder": {
+        "en": "e.g. Weekly sync",
+        "ja": "例: 週次ミーティング",
+        "qps-ploc": "⟦ė.ɠ. Ẇėėķŀẏ şẏñƈ ŀőřėɱ⟧"
+      },
+      "notes": {
+        "en": "Notes",
+        "ja": "メモ",
+        "qps-ploc": "⟦Ñőŧėş ŀőř⟧"
+      },
+      "notes_placeholder": {
+        "en": "Type or dictate meeting notes…",
+        "ja": "会議メモを入力または口述…",
+        "qps-ploc": "⟦Ŧẏṗė őř ḓïƈŧȧŧė ɱėėŧïñɠ ñőŧėş… ŀőřėɱ ïṗşů⟧"
+      },
+      "transcript": {
+        "en": "Transcript",
+        "ja": "文字起こし",
+        "qps-ploc": "⟦Ŧřȧñşƈřïṗŧ ŀőř⟧"
+      },
+      "transcript_placeholder": {
+        "en": "Live or pasted transcript…",
+        "ja": "ライブまたは貼り付けた文字起こし…",
+        "qps-ploc": "⟦Ŀïṽė őř ṗȧşŧėḓ ŧřȧñşƈřïṗŧ… ŀőřėɱ ïṗ⟧"
+      },
+      "instruction": {
+        "en": "Instruction for Kyberion",
+        "ja": "Kyberionへの指示",
+        "qps-ploc": "⟦Ïñşŧřůƈŧïőñ ƒőř Ķẏƀėřïőñ ŀőřėɱ ï⟧"
+      },
+      "instruction_placeholder": {
+        "en": "e.g. Summarize decisions and action items (keyboard / OS dictation / 🎤)",
+        "ja": "例: 決定事項とアクションを整理して（キーボード / OSディクテーション / 🎤）",
+        "qps-ploc": "⟦ė.ɠ. Şůɱɱȧřïẑė ḓėƈïşïőñş ȧñḓ ȧƈŧïőñ ïŧėɱş (ķėẏƀőȧřḓ / ŐŞ ḓïƈŧȧŧïőñ / 🎤) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "dictation_note": {
+        "en": "Prefer OS dictation (on-device) for notes. Browser 🎤 may send audio to a cloud provider.",
+        "ja": "メモ欄はOSディクテーション（端末内）推奨。ブラウザ🎤は機種によりクラウド送信の場合があります。",
+        "qps-ploc": "⟦Ṗřėƒėř ŐŞ ḓïƈŧȧŧïőñ (őñ-ḓėṽïƈė) ƒőř ñőŧėş. Ƀřőẇşėř 🎤 ɱȧẏ şėñḓ ȧůḓïő ŧő ȧ ƈŀőůḓ ṗřőṽïḓėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "voice": {
+        "en": "Voice",
+        "ja": "音声",
+        "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
+      },
+      "voice_stop": {
+        "en": "Stop",
+        "ja": "停止",
+        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
+      },
+      "record": {
+        "en": "Record",
+        "ja": "録音",
+        "qps-ploc": "⟦Řėƈőřḓ ŀőř⟧"
+      },
+      "record_stop": {
+        "en": "Stop recording",
+        "ja": "録音停止",
+        "qps-ploc": "⟦Şŧőṗ řėƈőřḓïñɠ ŀőřė⟧"
+      },
+      "camera": {
+        "en": "Camera",
+        "ja": "カメラ",
+        "qps-ploc": "⟦Ƈȧɱėřȧ ŀőř⟧"
+      },
+      "attach": {
+        "en": "Attach",
+        "ja": "添付",
+        "qps-ploc": "⟦Ȧŧŧȧƈħ ŀőř⟧"
+      },
+      "create_minutes": {
+        "en": "Create minutes",
+        "ja": "議事録を作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ɱïñůŧėş ŀőřė⟧"
+      },
+      "handoff": {
+        "en": "Hand off to Kyberion",
+        "ja": "Kyberionへ渡す",
+        "qps-ploc": "⟦Ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŀőřėɱ ⟧"
+      },
+      "clear": {
+        "en": "Clear",
+        "ja": "消去",
+        "qps-ploc": "⟦Ƈŀėȧř ŀőř⟧"
+      },
+      "restore": {
+        "en": "Restore draft",
+        "ja": "下書き復元",
+        "qps-ploc": "⟦Řėşŧőřė ḓřȧƒŧ ŀőřė⟧"
+      },
+      "ready": {
+        "en": "Ready to capture and export",
+        "ja": "取り込みと書き出しができます",
+        "qps-ploc": "⟦Řėȧḓẏ ŧő ƈȧṗŧůřė ȧñḓ ėẋṗőřŧ ŀőřėɱ ïṗ⟧"
+      },
+      "exporting": {
+        "en": "Exporting…",
+        "ja": "書き出し中…",
+        "qps-ploc": "⟦Ėẋṗőřŧïñɠ… ŀőř⟧"
+      },
+      "exported": {
+        "en": "Exported",
+        "ja": "書き出し完了",
+        "qps-ploc": "⟦Ėẋṗőřŧėḓ ŀőř⟧"
+      },
+      "export_failed": {
+        "en": "Export failed",
+        "ja": "書き出し失敗",
+        "qps-ploc": "⟦Ėẋṗőřŧ ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "minutes_running": {
+        "en": "Creating minutes…",
+        "ja": "議事録を作成中…",
+        "qps-ploc": "⟦Ƈřėȧŧïñɠ ɱïñůŧėş… ŀőřėɱ⟧"
+      },
+      "minutes_done": {
+        "en": "Minutes ready",
+        "ja": "議事録ができました",
+        "qps-ploc": "⟦Ɱïñůŧėş řėȧḓẏ ŀőřė⟧"
+      },
+      "minutes_failed": {
+        "en": "Minutes failed",
+        "ja": "議事録の作成に失敗",
+        "qps-ploc": "⟦Ɱïñůŧėş ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "recording": {
+        "en": "Recording…",
+        "ja": "録音中…",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ… ŀőř⟧"
+      },
+      "recording_stopped": {
+        "en": "Recording stopped",
+        "ja": "録音を停止しました",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ şŧőṗṗėḓ ŀőřėɱ⟧"
+      },
+      "recording_error": {
+        "en": "Recording error",
+        "ja": "録音エラー",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ ėřřőř ŀőřė⟧"
+      },
+      "camera_error": {
+        "en": "Camera error",
+        "ja": "カメラエラー",
+        "qps-ploc": "⟦Ƈȧɱėřȧ ėřřőř ŀőř⟧"
+      },
+      "attach_added": {
+        "en": "Attachment added",
+        "ja": "添付を追加しました",
+        "qps-ploc": "⟦Ȧŧŧȧƈħɱėñŧ ȧḓḓėḓ ŀőřėɱ⟧"
+      },
+      "clear_confirm": {
+        "en": "Clear the notepad?",
+        "ja": "メモ帳を消去しますか？",
+        "qps-ploc": "⟦Ƈŀėȧř ŧħė ñőŧėṗȧḓ? ŀőřėɱ⟧"
+      },
+      "out_label": {
+        "en": "Output",
+        "ja": "出力先",
+        "qps-ploc": "⟦Őůŧṗůŧ ŀőř⟧"
+      },
+      "attachments": {
+        "en": "Attachments",
+        "ja": "添付",
+        "qps-ploc": "⟦Ȧŧŧȧƈħɱėñŧş ŀőř⟧"
+      },
+      "no_attachments": {
+        "en": "No attachments yet",
+        "ja": "添付はまだありません",
+        "qps-ploc": "⟦Ñő ȧŧŧȧƈħɱėñŧş ẏėŧ ŀőřėɱ⟧"
+      },
+      "voice_started": {
+        "en": "Listening…",
+        "ja": "音声入力中…",
+        "qps-ploc": "⟦Ŀïşŧėñïñɠ… ŀőř⟧"
+      },
+      "voice_stopped": {
+        "en": "Voice stopped",
+        "ja": "音声入力を停止",
+        "qps-ploc": "⟦Ṽőïƈė şŧőṗṗėḓ ŀőřė⟧"
+      },
+      "voice_error": {
+        "en": "Voice error",
+        "ja": "音声エラー",
+        "qps-ploc": "⟦Ṽőïƈė ėřřőř ŀőř⟧"
+      },
+      "voice_unavailable": {
+        "en": "Speech recognition unavailable (OS dictation still works)",
+        "ja": "このブラウザでは音声認識を使えません（OSディクテーションは可）",
+        "qps-ploc": "⟦Şṗėėƈħ řėƈőɠñïŧïőñ ůñȧṽȧïŀȧƀŀė (ŐŞ ḓïƈŧȧŧïőñ şŧïŀŀ ẇőřķş) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "preview": {
+        "en": "Preview",
+        "ja": "プレビュー",
+        "qps-ploc": "⟦Ṗřėṽïėẇ ŀőř⟧"
+      },
+      "server_usage_hint": {
+        "en": "Capture notes, create minutes, then Hand off to Kyberion. Ctrl-C to stop.",
+        "ja": "メモを取り込み、議事録を作成し、「Kyberionへ渡す」で書き出します。Ctrl-C で停止。",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ñőŧėş, ƈřėȧŧė ɱïñůŧėş, ŧħėñ Ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ. Ƈŧřŀ-Ƈ ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      }
+    },
     "minutes_record": {
       "mic_capture_failed": {
         "en": "Could not start microphone capture: {reason}",

@@ -426,6 +426,42 @@
       "note": "default PNG+handoff export path for localhost sketch board; operator-consumed intermediate"
     },
     {
+      "file": "scripts/meeting-notepad/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default handoff/session export path for localhost meeting notepad; operator-consumed intermediate"
+    },
+    {
+      "file": "scripts/memory-capture/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default handoff/session export path for localhost memory-capture pad; operator-consumed intermediate"
+    },
+    {
+      "file": "scripts/screenshot-annotate/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default PNG+handoff export path for localhost screenshot-annotate pad; operator-consumed intermediate"
+    },
+    {
+      "file": "scripts/clipboard-inbox/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default handoff/session export path for localhost clipboard-inbox pad; operator-consumed intermediate"
+    },
+    {
+      "file": "scripts/daily-desk/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default handoff/session export path for localhost daily-desk pad; operator-consumed intermediate"
+    },
+    {
+      "file": "scripts/doc-drop/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default handoff/session export path for localhost doc-drop pad; operator-consumed intermediate"
+    },
+    {
       "file": "scripts/soak_endurance.ts",
       "count": 3,
       "classification": "legit-tmp",
