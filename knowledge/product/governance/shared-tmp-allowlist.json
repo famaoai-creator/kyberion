@@ -348,6 +348,12 @@
       "note": "compaction summary fallback dir"
     },
     {
+      "file": "libs/shared-network/src/mcp-actuator-invoke.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "MCP actuator.invoke live CLI input staging"
+    },
+    {
       "file": "scripts/actuator_playground.ts",
       "count": 1,
       "classification": "legit-tmp",
@@ -370,6 +376,24 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "actuator input handoff file"
+    },
+    {
+      "file": "scripts/clipboard-inbox/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default handoff/session export path for localhost clipboard-inbox pad; operator-consumed intermediate"
+    },
+    {
+      "file": "scripts/daily-desk/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default handoff/session export path for localhost daily-desk pad; operator-consumed intermediate"
+    },
+    {
+      "file": "scripts/doc-drop/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default handoff/session export path for localhost doc-drop pad; operator-consumed intermediate"
     },
     {
       "file": "scripts/entity_governance_cleanup.ts",
@@ -396,6 +420,24 @@
       "note": "launchd plist staging before governed copy into ~/Library/LaunchAgents"
     },
     {
+      "file": "scripts/meeting-notepad/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default handoff/session export path for localhost meeting notepad; operator-consumed intermediate"
+    },
+    {
+      "file": "scripts/memory-capture/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default handoff/session export path for localhost memory-capture pad; operator-consumed intermediate"
+    },
+    {
+      "file": "scripts/personal-workbench/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default personal workflow proposal and handoff path for localhost personal-workbench pad; operator-consumed intermediate"
+    },
+    {
       "file": "scripts/refactor/ephemeral-actuator-call.ts",
       "count": 1,
       "classification": "legit-tmp",
@@ -414,6 +456,12 @@
       "note": "conversation recordings; session-scoped artifacts"
     },
     {
+      "file": "scripts/screenshot-annotate/server.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "default PNG+handoff export path for localhost screenshot-annotate pad; operator-consumed intermediate"
+    },
+    {
       "file": "scripts/setup_oauth.ts",
       "count": 1,
       "classification": "legit-tmp",
@@ -424,48 +472,6 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "default PNG+handoff export path for localhost sketch board; operator-consumed intermediate"
-    },
-    {
-      "file": "scripts/personal-workbench/server.ts",
-      "count": 1,
-      "classification": "legit-tmp",
-      "note": "default personal workflow proposal and handoff path for localhost personal-workbench pad; operator-consumed intermediate"
-    },
-    {
-      "file": "scripts/meeting-notepad/server.ts",
-      "count": 1,
-      "classification": "legit-tmp",
-      "note": "default handoff/session export path for localhost meeting notepad; operator-consumed intermediate"
-    },
-    {
-      "file": "scripts/memory-capture/server.ts",
-      "count": 1,
-      "classification": "legit-tmp",
-      "note": "default handoff/session export path for localhost memory-capture pad; operator-consumed intermediate"
-    },
-    {
-      "file": "scripts/screenshot-annotate/server.ts",
-      "count": 1,
-      "classification": "legit-tmp",
-      "note": "default PNG+handoff export path for localhost screenshot-annotate pad; operator-consumed intermediate"
-    },
-    {
-      "file": "scripts/clipboard-inbox/server.ts",
-      "count": 1,
-      "classification": "legit-tmp",
-      "note": "default handoff/session export path for localhost clipboard-inbox pad; operator-consumed intermediate"
-    },
-    {
-      "file": "scripts/daily-desk/server.ts",
-      "count": 1,
-      "classification": "legit-tmp",
-      "note": "default handoff/session export path for localhost daily-desk pad; operator-consumed intermediate"
-    },
-    {
-      "file": "scripts/doc-drop/server.ts",
-      "count": 1,
-      "classification": "legit-tmp",
-      "note": "default handoff/session export path for localhost doc-drop pad; operator-consumed intermediate"
     },
     {
       "file": "scripts/soak_endurance.ts",
