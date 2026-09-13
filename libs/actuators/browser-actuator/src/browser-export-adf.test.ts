@@ -215,6 +215,68 @@ describe('renderBrowserAdf durable export', () => {
     expect(adf.steps.some((step) => step.op === 'snapshot')).toBe(false);
   });
 
+  it('preserves an explicit trail dom_path when selector is absent (extension-style recording)', () => {
+    const recorded = browserRuntimeHelpers.recordBrowserAction(
+      { session_id: 'secret-dom-path', action_trail: [] },
+      {
+        kind: 'apply',
+        op: 'fill_secret_ref',
+        ref: '@e1',
+        dom_path: 'form > input:nth-of-type(2)',
+        secret_ref: 'GITHUB_TOKEN',
+        classification: 'secret_ref',
+        element_name: 'API Key',
+        element_role: 'textbox',
+      }
+    );
+
+    expect(recorded.action_trail[0]).toMatchObject({
+      op: 'fill_secret_ref',
+      dom_path: 'form > input:nth-of-type(2)',
+    });
+
+    const adf = browserRuntimeHelpers.renderBrowserAdf(recorded.action_trail, 'secret-dom-path');
+    expect(adf.steps).toEqual([
+      {
+        type: 'apply',
+        op: 'fill_secret_ref',
+        params: {
+          ref: '@e1',
+          secret_ref: 'GITHUB_TOKEN',
+          name: 'API Key',
+          role: 'textbox',
+          dom_path: 'form > input:nth-of-type(2)',
+        },
+      },
+    ]);
+    expect(adf.steps.some((step) => step.op === 'snapshot')).toBe(false);
+  });
+
+  it('prefers explicit trail dom_path over selector when both are present', () => {
+    const adf = browserRuntimeHelpers.renderBrowserAdf(
+      [
+        {
+          kind: 'apply',
+          op: 'fill_secret_ref',
+          ref: '@e1',
+          selector: 'input[name="token"]',
+          dom_path: '#approved-token-field',
+          secret_ref: 'GITHUB_TOKEN',
+          classification: 'secret_ref',
+          element_name: 'API Key',
+          element_role: 'textbox',
+          ts: TS,
+        },
+      ],
+      'secret-dom-path-preferred'
+    );
+
+    expect(adf.steps[0]?.params).toMatchObject({
+      dom_path: '#approved-token-field',
+    });
+    expect(adf.steps[0]?.params.selector).toBeUndefined();
+  });
+
   it('inserts a snapshot for ref-only secret fills that have no corroborating identity', () => {
     const adf = browserRuntimeHelpers.renderBrowserAdf(
       [

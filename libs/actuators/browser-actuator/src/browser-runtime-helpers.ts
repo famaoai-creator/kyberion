@@ -99,6 +99,8 @@ interface BrowserRecordedAction {
   title?: string;
   ref?: string;
   selector?: string;
+  /** Structural path used by fill_secret_ref requireDomPathMatch corroboration. */
+  dom_path?: string;
   text?: string;
   key?: string;
   fallback_strategy?: string;
@@ -485,6 +487,7 @@ function parseRecordedAction(value: unknown): BrowserRecordedAction | null {
     'title',
     'ref',
     'selector',
+    'dom_path',
     'text',
     'key',
     'element_name',
@@ -515,6 +518,9 @@ function parseRecordedAction(value: unknown): BrowserRecordedAction | null {
     ...(optionalString(value, 'ref') !== undefined ? { ref: value.ref as string } : {}),
     ...(optionalString(value, 'selector') !== undefined
       ? { selector: value.selector as string }
+      : {}),
+    ...(optionalString(value, 'dom_path') !== undefined
+      ? { dom_path: value.dom_path as string }
       : {}),
     ...(optionalString(value, 'text') !== undefined ? { text: value.text as string } : {}),
     ...(optionalString(value, 'key') !== undefined ? { key: value.key as string } : {}),
@@ -1152,9 +1158,10 @@ function renderSecretFillStep(
   const secretRef = trimmedRecordedField(action.secret_ref);
   if (!ref || !secretRef) return null;
   const hints = durableHintParams(action);
-  // Snapshot selectors are nth-of-type ancestor paths — the same signal
-  // fill_secret_ref corroborates as `dom_path` when requireDomPathMatch is set.
-  const domPath = trimmedRecordedField(action.selector);
+  // Prefer an explicit trail `dom_path` (extension recordings / secret-fill
+  // bookkeeping). Snapshot `selector` is the same nth-of-type ancestor path
+  // and is the fallback when older trails only stored selector.
+  const domPath = trimmedRecordedField(action.dom_path) ?? trimmedRecordedField(action.selector);
   const canResolveWithoutSnapshot = Boolean((hints.name || hints.role) && domPath);
   return {
     step: {
