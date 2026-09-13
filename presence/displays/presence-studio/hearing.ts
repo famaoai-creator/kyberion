@@ -40,6 +40,8 @@ export interface HearingRecord {
   requirements: HearingRequirement[];
   canvas_versions: string[];
   updated_at: string;
+  decided_by?: string;
+  decided_at?: string;
 }
 
 export interface HearingTurn {
@@ -53,9 +55,7 @@ export function createHearingRecord(
   now: string,
   scenario: HearingScenario = WEB_APP_HEARING_SCENARIO
 ): HearingRecord {
-  if (!scenario.id.trim() || scenario.requirements.length === 0) {
-    throw new Error('[HEARING_SCENARIO_INVALID] scenario requires an id and requirements');
-  }
+  validateHearingScenario(scenario);
   const ids = new Set<string>();
   for (const requirement of scenario.requirements) {
     if (!requirement.id.trim() || !requirement.label.trim() || ids.has(requirement.id)) {
@@ -70,6 +70,34 @@ export function createHearingRecord(
     canvas_versions: [],
     updated_at: now,
   };
+}
+
+export function validateHearingScenario(scenario: HearingScenario): void {
+  if (
+    !scenario ||
+    typeof scenario.id !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u.test(scenario.id.trim()) ||
+    !Array.isArray(scenario.requirements) ||
+    scenario.requirements.length === 0
+  ) {
+    throw new Error('[HEARING_SCENARIO_INVALID] scenario requires a safe id and requirements');
+  }
+  const ids = new Set<string>();
+  for (const requirement of scenario.requirements) {
+    if (
+      !requirement ||
+      typeof requirement.id !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/u.test(requirement.id.trim()) ||
+      typeof requirement.label !== 'string' ||
+      !requirement.label.trim() ||
+      ids.has(requirement.id)
+    ) {
+      throw new Error(
+        '[HEARING_SCENARIO_INVALID] requirement ids and labels must be unique and safe'
+      );
+    }
+    ids.add(requirement.id);
+  }
 }
 
 function requirementIdForInput(

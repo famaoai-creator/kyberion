@@ -136,6 +136,8 @@
     sending: false,
     listening: false,
     handsFree: false,
+    hearingMode: false,
+    hearingRecord: null,
   };
 
   var recognition = null;
@@ -430,6 +432,61 @@
     renderHandsFreeToggle();
     renderAboutCard();
     renderTurns();
+    renderHearing();
+  }
+
+  function renderHearing() {
+    var card = document.getElementById('hearing-card');
+    if (!card) return;
+    card.classList.toggle('hidden', !state.hearingMode);
+    if (!state.hearingMode) return;
+    var record = state.hearingRecord;
+    var coverage = document.getElementById('hearing-coverage');
+    var canvas = document.getElementById('hearing-canvas');
+    if (coverage) {
+      var complete = record
+        ? record.requirements.filter(function (item) {
+            return Boolean(item.answer);
+          }).length
+        : 0;
+      var total = record ? record.requirements.length : 0;
+      coverage.textContent = complete + '/' + total + ' 項目が埋まっています';
+    }
+    if (canvas && record && record.canvas_url && canvas.getAttribute('src') !== record.canvas_url) {
+      canvas.setAttribute('src', record.canvas_url);
+    }
+  }
+
+  function loadHearing() {
+    if (!state.hearingMode) return;
+    fetchJson('/api/hearing/' + encodeURIComponent(state.sessionId))
+      .then(function (result) {
+        if (result.ok && result.body && result.body.ok) {
+          state.hearingRecord = result.body.record;
+          renderHearing();
+        }
+      })
+      .catch(function () {
+        /* hearing is additive to the conversation */
+      });
+  }
+
+  function updateHearing(text, intentResolution) {
+    if (!state.hearingMode) return Promise.resolve();
+    return fetchJson('/api/hearing/' + encodeURIComponent(state.sessionId) + '/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: text,
+        request_id: randomId(),
+        intent_resolution: intentResolution,
+      }),
+    }).then(function (result) {
+      if (result.ok && result.body && result.body.ok) {
+        state.hearingRecord = result.body.record;
+        renderHearing();
+      }
+    });
   }
 
   // ---------------------------------------------------------------------
@@ -497,7 +554,12 @@
           intent_label: body.intent_label,
           intent_label_source: body.intent_label_source,
         });
-        speakReply(body.reply);
+        return updateHearing(trimmed, body.intent_resolution).catch(function () {
+          // The conversation remains usable when the hearing record is unavailable.
+        });
+      })
+      .then(function () {
+        speakReply(state.turns[state.turns.length - 1]?.text || '');
         refreshRecent();
       })
       .catch(function () {
@@ -675,6 +737,11 @@
 
   function mount() {
     state.locale = normalizeLocale();
+    try {
+      state.hearingMode = new URLSearchParams(window.location.search).get('mode') === 'hearing';
+    } catch (err) {
+      state.hearingMode = false;
+    }
     wireForm();
     wireMic();
     wireHandsFree();
@@ -691,6 +758,7 @@
           state.vocab = vocabResult.body.texts || {};
         }
         render();
+        loadHearing();
         if (progressResult.ok && progressResult.body && progressResult.body.ok) {
           renderRecent(progressResult.body.active || []);
         }
