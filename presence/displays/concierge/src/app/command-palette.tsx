@@ -2,19 +2,40 @@
 
 import * as React from 'react';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
-import type { ConciergeMessageKey } from '../lib/i18n';
+import { frontDeskText, type ConciergeMessageKey, type FrontDeskMessageKey } from '../lib/i18n';
+// Type-only: erased at compile time (`isolatedModules`), so it never pulls
+// `@agent/core/front-desk-nav`'s Node-only runtime (`surface-runtime` /
+// `secure-io`) into this client bundle. See the `frontDeskPorts` prop below.
+import type { FrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
 
 /**
  * CS-04 command palette — ⌘K / Ctrl+K opens a small, keyboard-first overlay
  * for reaching every concierge destination without hunting through the
  * navigation. Pure navigation + opening the conversation dock; it never
  * performs a decision itself (those stay behind their guarded, confirmed
- * flows).
+ * flows) and never fetches — every entry resolves synchronously so the
+ * palette opens instantly.
+ *
+ * FD-00c: also exposes the 5 shared front-desk rail items (home / ask /
+ * decide / progress / settings). The concierge-hosted two (decide /
+ * settings) use relative hrefs; the other three's cross-surface hrefs are
+ * built from `frontDeskPorts` — the manifest-resolved ports, read once by
+ * `layout.tsx` (a Server Component) via `readFrontDeskSurfacePorts()` and
+ * passed down as a plain prop, since `@agent/core/front-desk-nav`'s runtime
+ * exports cannot be imported into this client component (that module pulls
+ * in `surface-runtime`/`secure-io`, which reference Node-only `node:fs`,
+ * `node:child_process`, … and cannot be bundled for the browser). No port
+ * is ever hardcoded here. Role gating is left to the destination route
+ * (same defense-in-depth already used by the unconditional `setup`/`ingest`
+ * entries below); the palette is a navigation aid, not an authorization
+ * surface.
  */
 
 type PaletteEntry = {
   id: string;
-  labelKey: ConciergeMessageKey;
+  labelKey?: ConciergeMessageKey;
+  /** Pre-resolved label (used for the front-desk rail entries below). */
+  label?: string;
   /** Either a navigation target… */
   href?: string;
   /** …or a same-page action (open the conversation dock). */
@@ -37,20 +58,48 @@ const PALETTE_ENTRIES: PaletteEntry[] = [
   { id: 'setup-governance', labelKey: 'palette.setup_governance', href: '/setup#setup-governance' },
 ];
 
-export function CommandPalette() {
-  const { t } = useConciergeI18n();
+export interface CommandPaletteProps {
+  /** Manifest-resolved surface ports, read server-side by `layout.tsx`. */
+  frontDeskPorts: FrontDeskSurfacePorts;
+}
+
+export function CommandPalette({ frontDeskPorts }: CommandPaletteProps) {
+  const { locale, t } = useConciergeI18n();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [activeIndex, setActiveIndex] = React.useState(0);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const listRef = React.useRef<HTMLUListElement | null>(null);
 
+  const frontDeskEntries = React.useMemo<PaletteEntry[]>(() => {
+    const presenceStudioPort = frontDeskPorts['presence-studio'];
+    const items: Array<{ id: string; labelKey: FrontDeskMessageKey; href: string }> = [
+      { id: 'home', labelKey: 'nav_home', href: `http://127.0.0.1:${presenceStudioPort}/` },
+      { id: 'ask', labelKey: 'nav_ask', href: `http://127.0.0.1:${presenceStudioPort}/ask` },
+      { id: 'decide', labelKey: 'nav_decide', href: '/' },
+      {
+        id: 'progress',
+        labelKey: 'nav_progress',
+        href: `http://127.0.0.1:${presenceStudioPort}/progress`,
+      },
+      { id: 'settings', labelKey: 'nav_settings', href: '/settings' },
+    ];
+    return items.map((item) => ({
+      id: `front-desk-${item.id}`,
+      label: frontDeskText(item.labelKey, locale),
+      href: item.href,
+    }));
+  }, [frontDeskPorts, locale]);
+
   const entries = React.useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const labeled = PALETTE_ENTRIES.map((entry) => ({ entry, label: t(entry.labelKey) }));
+    const labeled = [...PALETTE_ENTRIES, ...frontDeskEntries].map((entry) => ({
+      entry,
+      label: entry.label ?? t(entry.labelKey as ConciergeMessageKey),
+    }));
     if (!needle) return labeled;
     return labeled.filter(({ label }) => label.toLowerCase().includes(needle));
-  }, [query, t]);
+  }, [query, t, frontDeskEntries]);
 
   const close = React.useCallback(() => {
     setOpen(false);
