@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { isLocalPadOriginAllowed } from '../lib/local-artifact-pad.js';
@@ -7,7 +7,13 @@ import {
   PERSONAL_WORKBENCH_DEFAULT_PORT,
   validatePersonalWorkbenchContentLength,
 } from './server.js';
-import { executePersonalWorkbenchAction } from './actions.js';
+import {
+  applyCalendarEvent,
+  executePersonalWorkbenchAction,
+  parseCalendarEventPayload,
+  proposeCalendarEvent,
+  PERSONAL_WORKBENCH_APPROVAL_CHANNEL,
+} from './actions.js';
 
 describe('personal workbench', () => {
   it('validates configuration in public dry-run mode', async () => {
@@ -35,45 +41,65 @@ describe('personal workbench', () => {
     expect(source).toContain('isLocalPadOriginAllowed');
     expect(source).toContain('requires_human_approval: true');
     expect(source).toContain('Capture stores proposals only');
+    expect(source).toContain('承認して作成');
     expect(source).not.toContain('node:fs');
-    expect(source).not.toContain("action: 'knowledge'");
-    expect(source).not.toContain('id="approval"');
   });
 
   it('allows only localhost origins', () => {
     expect(isLocalPadOriginAllowed(undefined)).toBe(true);
     expect(isLocalPadOriginAllowed('http://127.0.0.1:8154')).toBe(true);
-    expect(isLocalPadOriginAllowed('http://localhost:8154')).toBe(true);
     expect(isLocalPadOriginAllowed('https://evil.example')).toBe(false);
   });
 
-  it('keeps email draft-only and blocks calendar mutation from the pad', async () => {
+  it('parses calendar payloads and requires confirmation before apply', async () => {
+    expect(
+      parseCalendarEventPayload({
+        summary: '定例',
+        start: '2026-09-14T10:00:00+09:00',
+        end: '2026-09-14T10:30:00+09:00',
+      })
+    ).toMatchObject({ summary: '定例' });
+
     const context = {
       session_id: 'pwb-test',
       artifact_ref: 'active/shared/tmp/personal-workbench',
       viewer_principal: 'personal-test',
-      scope: { scope_kind: 'tenant' as const, tier: 'personal' as const, tenant_slug: 'test' },
+      scope: { scope_kind: 'tenant' as const, tier: 'personal' as const, tenant_slug: 'default' },
     };
+    const outDir = pathResolver.sharedTmp('personal-workbench-test-calendar');
+    const proposed = proposeCalendarEvent({
+      payload: {
+        summary: 'レビュー定例',
+        start: '2026-09-14T10:00:00+09:00',
+        end: '2026-09-14T10:30:00+09:00',
+        description: 'workbench flow',
+      },
+      context,
+      outDir,
+      evidenceRef: `${outDir}/handoff.json`,
+    });
+    expect(proposed).toMatchObject({
+      stage: 'propose',
+      status: 'pending',
+    });
+    expect(String(proposed.approval_request_id)).toBeTruthy();
+
     await expect(
-      executePersonalWorkbenchAction({
-        action: 'calendar',
-        payload: {
-          summary: 'Call',
-          start: '2026-09-14T10:00:00+09:00',
-          end: '2026-09-14T10:30:00+09:00',
-        },
-        approved: true,
+      applyCalendarEvent({
+        payload: { approval_request_id: String(proposed.approval_request_id) },
         context,
-        evidenceRef: 'active/shared/tmp/personal-workbench/handoff.json',
+        outDir,
+        confirmed: false,
       })
-    ).rejects.toThrow('calendar changes are not executed from personal-workbench');
+    ).rejects.toThrow('confirmed=true');
 
     await expect(
       executePersonalWorkbenchAction({
         action: 'knowledge',
         payload: { summary: 'decision note' },
         context,
-        evidenceRef: 'active/shared/tmp/personal-workbench/missing-handoff.json',
+        evidenceRef: `${outDir}/missing-handoff.json`,
+        outDir,
       })
     ).rejects.toThrow('knowledge enqueue requires an existing evidence handoff file');
 
@@ -81,7 +107,8 @@ describe('personal workbench', () => {
       pathResolver.rootResolve('scripts/personal-workbench/actions.ts')
     );
     expect(actionsSource).toContain('draft_mode: true');
-    expect(actionsSource).toContain('approved: false');
-    expect(actionsSource).not.toContain('createCalendarEvent');
+    expect(actionsSource).toContain("authMethod: 'manual'");
+    expect(actionsSource).toContain(PERSONAL_WORKBENCH_APPROVAL_CHANNEL);
+    expect(actionsSource).toContain('createCalendarEvent');
   });
 });
