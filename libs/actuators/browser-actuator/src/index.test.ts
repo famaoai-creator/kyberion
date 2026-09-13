@@ -507,38 +507,44 @@ describe('browser-actuator v3 contract', () => {
     expect(mocks.page.click).not.toHaveBeenCalled();
 
     const originalEvaluate = mocks.page.evaluate.getMockImplementation();
-    mocks.page.evaluate.mockImplementation(async (arg?: unknown) => {
-      if (typeof arg === 'function') {
-        return [
-          {
-            ref: '@e1',
-            tag: 'input',
-            role: 'textbox',
-            text: '',
-            name: 'Decoy',
-            type: 'text',
-            placeholder: null,
-            href: null,
-            value: null,
-            visible: true,
-            editable: true,
-            selector: 'input#decoy',
-          },
-        ];
+    try {
+      mocks.page.evaluate.mockImplementation(async (arg?: unknown) => {
+        if (typeof arg === 'function') {
+          return [
+            {
+              ref: '@e1',
+              tag: 'input',
+              role: 'textbox',
+              text: '',
+              name: 'Decoy',
+              type: 'text',
+              placeholder: null,
+              href: null,
+              value: null,
+              visible: true,
+              editable: true,
+              selector: 'input#decoy',
+            },
+          ];
+        }
+        return originalEvaluate?.(arg);
+      });
+
+      const result = await handleAction({
+        version: '0.1',
+        kind: 'computer_interaction',
+        session_id: sessionId,
+        action: { type: 'click_ref', ref: '@e1' },
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+      expect(mocks.page.click).not.toHaveBeenCalledWith('input#decoy', expect.anything());
+    } finally {
+      if (originalEvaluate) {
+        mocks.page.evaluate.mockImplementation(originalEvaluate);
       }
-      return originalEvaluate?.(arg);
-    });
-
-    const result = await handleAction({
-      version: '0.1',
-      kind: 'computer_interaction',
-      session_id: sessionId,
-      action: { type: 'click_ref', ref: '@e1' },
-    } as any);
-
-    expect(result.status).toBe('succeeded');
-    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
-    expect(mocks.page.click).not.toHaveBeenCalledWith('input#decoy', expect.anything());
+    }
   });
 
   it('replays a computer_interaction click via durable selector without a prior snapshot', async () => {
