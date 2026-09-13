@@ -3,9 +3,9 @@ import { spawn } from 'node:child_process';
 import { beginInteractiveServiceOAuth } from '@agent/core/oauth-broker';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { requireConciergeMutationAccess } from '../../../lib/api-guard';
-import { readRequestObject } from '../../../lib/request-input';
-import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
+import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import { readRequestObject } from '../../../../lib/request-input';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
