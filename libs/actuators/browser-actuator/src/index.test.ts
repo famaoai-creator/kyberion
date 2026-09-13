@@ -9,6 +9,21 @@ import {
 } from '@agent/core/secure-io';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resetCurrentScope } from '@agent/core/scope-context';
+import type { ComputerInteractionAction } from './browser-interaction-helpers.js';
+
+function computerInteraction(
+  sessionId: string,
+  action: ComputerInteractionAction['action'],
+  observation?: ComputerInteractionAction['observation']
+): ComputerInteractionAction {
+  return {
+    version: '0.1',
+    kind: 'computer_interaction',
+    session_id: sessionId,
+    action,
+    ...(observation ? { observation } : {}),
+  };
+}
 
 const REPO_ROOT = process.cwd();
 
@@ -442,20 +457,18 @@ describe('browser-actuator v3 contract', () => {
   it('accepts computer_interaction snapshot requests and enriches them with observation outputs', async () => {
     const { handleAction } = await import('./index');
 
-    const result = await handleAction({
-      version: '0.1',
-      kind: 'computer_interaction',
-      session_id: 'computer-session',
-      observation: {
-        mode: 'mixed',
-        include_screenshot: true,
-        include_console: true,
-        include_network: true,
-      },
-      action: {
-        type: 'snapshot',
-      },
-    } as any);
+    const result = await handleAction(
+      computerInteraction(
+        'computer-session',
+        { type: 'snapshot' },
+        {
+          mode: 'mixed',
+          include_screenshot: true,
+          include_console: true,
+          include_network: true,
+        }
+      )
+    );
 
     expect(result.status).toBe('succeeded');
     expect(result.context.last_snapshot).toMatchObject({
@@ -469,19 +482,126 @@ describe('browser-actuator v3 contract', () => {
 
   it('accepts computer_interaction ref actions through the browser executor', async () => {
     const { handleAction } = await import('./index');
+    const sessionId = 'computer-session-ref';
 
-    const result = await handleAction({
-      version: '0.1',
-      kind: 'computer_interaction',
-      session_id: 'computer-session',
-      action: {
-        type: 'click_ref',
-        ref: '@e1',
-      },
-    } as any);
+    const observed = await handleAction(computerInteraction(sessionId, { type: 'snapshot' }));
+    expect(observed.status).toBe('succeeded');
+    expect(observed.context.ref_map).toMatchObject({ '@e1': 'button:nth-of-type(1)' });
+
+    const result = await handleAction(
+      computerInteraction(sessionId, { type: 'click_ref', ref: '@e1' })
+    );
 
     expect(result.status).toBe('succeeded');
     expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+  });
+
+  it('does not remint @e1 onto a decoy when a later snapshot would remap the live page', async () => {
+    const { handleAction } = await import('./index');
+    const sessionId = 'computer-session-remint';
+
+    await handleAction(computerInteraction(sessionId, { type: 'snapshot' }));
+    expect(mocks.page.click).not.toHaveBeenCalled();
+
+    const originalEvaluate = mocks.page.evaluate.getMockImplementation();
+    try {
+      mocks.page.evaluate.mockImplementation(async (arg?: unknown) => {
+        if (typeof arg === 'function') {
+          return [
+            {
+              ref: '@e1',
+              tag: 'input',
+              role: 'textbox',
+              text: '',
+              name: 'Decoy',
+              type: 'text',
+              placeholder: null,
+              href: null,
+              value: null,
+              visible: true,
+              editable: true,
+              selector: 'input#decoy',
+            },
+          ];
+        }
+        return originalEvaluate?.(arg);
+      });
+
+      const result = await handleAction(
+        computerInteraction(sessionId, { type: 'click_ref', ref: '@e1' })
+      );
+
+      expect(result.status).toBe('succeeded');
+      expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+      expect(mocks.page.click).not.toHaveBeenCalledWith('input#decoy', expect.anything());
+    } finally {
+      if (originalEvaluate) {
+        mocks.page.evaluate.mockImplementation(originalEvaluate);
+      }
+    }
+  });
+
+  it('replays a computer_interaction click via durable selector without a prior snapshot', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction(
+      computerInteraction('fresh-durable-click', {
+        type: 'click_ref',
+        ref: '@e1',
+        selector: 'a[href="https://www.iana.org/domains/example"]',
+        name: 'Learn more',
+      })
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(mocks.page.click).toHaveBeenCalledWith(
+      'a[href="https://www.iana.org/domains/example"]',
+      { timeout: 5000 }
+    );
+    expect(JSON.stringify(result.results)).not.toContain('Unknown browser ref');
+  });
+
+  it('fails closed when computer_interaction fill_secret_ref has only an ephemeral @eN', async () => {
+    const { handleAction } = await import('./index');
+    await expect(
+      handleAction(
+        computerInteraction('secret-ref-only', {
+          type: 'fill_secret_ref',
+          ref: '@e1',
+          secret_ref: 'GITHUB_TOKEN',
+        })
+      )
+    ).rejects.toThrow(/refusing snapshot\+@eN stand-in/);
+    expect(mocks.page.fill).not.toHaveBeenCalled();
+  });
+
+  it('fills a computer_interaction secret from SecretResolver without reminting @eN', async () => {
+    const { handleAction } = await import('./index');
+    vi.stubEnv('GITHUB_TOKEN', 'test-secret-value');
+    const sessionId = 'computer-session-secret';
+    try {
+      const observed = await handleAction(computerInteraction(sessionId, { type: 'snapshot' }));
+      expect(observed.context.ref_map).toMatchObject({ '@e1': 'button:nth-of-type(1)' });
+
+      const result = await handleAction(
+        computerInteraction(sessionId, {
+          type: 'fill_secret_ref',
+          ref: '@e1',
+          secret_ref: 'GITHUB_TOKEN',
+          selector: 'button:nth-of-type(1)',
+          name: 'Submit',
+          role: 'button',
+        })
+      );
+
+      expect(result.status).toBe('succeeded');
+      expect(mocks.page.fill).toHaveBeenCalledWith('button:nth-of-type(1)', 'test-secret-value', {
+        timeout: 5000,
+      });
+      expect(JSON.stringify(result.context.action_trail)).not.toContain('test-secret-value');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('fails fast when a ref action is used before snapshot capture', async () => {

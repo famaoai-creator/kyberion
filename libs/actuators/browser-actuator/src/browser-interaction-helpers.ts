@@ -69,7 +69,7 @@ interface BrowserAction {
   context?: Record<string, any>;
 }
 
-interface ComputerInteractionAction {
+export interface ComputerInteractionAction {
   version: '0.1';
   kind: 'computer_interaction';
   session_id?: string;
@@ -111,6 +111,7 @@ interface ComputerInteractionAction {
       | 'wait'
       | 'click_ref'
       | 'fill_ref'
+      | 'fill_secret_ref'
       | 'press_ref'
       | 'wait_for_ref'
       | 'extract_text_ref'
@@ -122,12 +123,63 @@ interface ComputerInteractionAction {
     button?: 'left' | 'right' | 'middle';
     text?: string;
     selector?: string;
+    name?: string;
+    role?: string;
+    dom_path?: string;
+    secret_ref?: string;
     exact?: boolean;
     key?: string;
     ref?: string;
     url?: string;
     timeout_ms?: number;
     scroll_delta?: { x?: number; y?: number };
+  };
+}
+
+function trimmedInteractionField(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const next = value.trim();
+  return next || undefined;
+}
+
+function durableHintParams(
+  interaction: ComputerInteractionAction['action']
+): Record<string, string> {
+  const name = trimmedInteractionField(interaction.name);
+  const role = trimmedInteractionField(interaction.role);
+  return {
+    ...(name ? { name } : {}),
+    ...(role ? { role } : {}),
+  };
+}
+
+function durableSelector(interaction: ComputerInteractionAction['action']): string | undefined {
+  return trimmedInteractionField(interaction.selector);
+}
+
+function durableDomPath(interaction: ComputerInteractionAction['action']): string | undefined {
+  return trimmedInteractionField(interaction.dom_path) ?? durableSelector(interaction);
+}
+
+function secretFillIdentity(
+  interaction: ComputerInteractionAction['action']
+): { secretRef: string; identity: Record<string, string> } | null {
+  const secretRef = trimmedInteractionField(interaction.secret_ref);
+  if (!secretRef) return null;
+  const hints = durableHintParams(interaction);
+  const domPath = durableDomPath(interaction);
+  // Fresh snapshot @eN is not a secret-field identity. Without a recorded
+  // path, refuse to translate rather than remint + ephemeral ref.
+  if (!domPath) return null;
+  const ref = trimmedInteractionField(interaction.ref) ?? '@recorded';
+  return {
+    secretRef,
+    identity: {
+      ref,
+      secret_ref: secretRef,
+      ...hints,
+      dom_path: domPath,
+    },
   };
 }
 
@@ -169,16 +221,10 @@ export function createBrowserInteractionHelpers(deps: {
       steps.push({ type: 'control', op: 'select_tab', params: { tab_id: input.target.tab_id } });
     }
 
-    const requiresRefSnapshot =
-      interaction.type === 'click_ref' ||
-      interaction.type === 'fill_ref' ||
-      interaction.type === 'press_ref' ||
-      interaction.type === 'wait_for_ref' ||
-      interaction.type === 'extract_text_ref' ||
-      (interaction.type === 'scroll' && Boolean(interaction.ref));
-    if (requiresRefSnapshot) {
-      steps.push({ type: 'capture', op: 'snapshot', params: { export_as: 'last_snapshot' } });
-    }
+    // Do not remint a snapshot before applying a caller-supplied @eN.
+    // A fresh snapshot's @e1 is not the observation-time field. Same-session
+    // keep_alive already restores the last observation's ref_map; fresh
+    // replay must carry durable selector / name / role / dom_path.
 
     switch (interaction.type) {
       case 'snapshot':
@@ -205,13 +251,27 @@ export function createBrowserInteractionHelpers(deps: {
           params: { tab_id: input.target?.tab_id || 'tab-1' },
         });
         break;
-      case 'click_ref':
-        steps.push({
-          type: 'apply',
-          op: 'click_ref',
-          params: { ref: interaction.ref, timeout: interaction.timeout_ms },
-        });
+      case 'click_ref': {
+        const selector = durableSelector(interaction);
+        const hints = durableHintParams(interaction);
+        const ref = trimmedInteractionField(interaction.ref);
+        if (selector) {
+          steps.push({
+            type: 'apply',
+            op: 'click',
+            params: { selector, ...hints, timeout: interaction.timeout_ms },
+          });
+        } else if (ref) {
+          steps.push({
+            type: 'apply',
+            op: 'click_ref',
+            params: { ref, ...hints, timeout: interaction.timeout_ms },
+          });
+        } else {
+          throw new Error('click_ref requires action.ref or a durable selector');
+        }
         break;
+      }
       case 'click_if_present':
         steps.push(
           ...buildBrowserElementPresentPipeline({
@@ -236,51 +296,137 @@ export function createBrowserInteractionHelpers(deps: {
           })
         );
         break;
-      case 'fill_ref':
+      case 'fill_ref': {
+        const secret = secretFillIdentity(interaction);
+        if (interaction.secret_ref || secret) {
+          if (!secret) {
+            throw new Error(
+              'fill_secret_ref requires a durable selector or dom_path; refusing snapshot+@eN stand-in'
+            );
+          }
+          steps.push({
+            type: 'apply',
+            op: 'fill_secret_ref',
+            params: { ...secret.identity, timeout: interaction.timeout_ms },
+          });
+          break;
+        }
+        const selector = durableSelector(interaction);
+        const hints = durableHintParams(interaction);
+        const ref = trimmedInteractionField(interaction.ref);
+        const text = interaction.text || '';
+        if (selector) {
+          steps.push({
+            type: 'apply',
+            op: 'fill',
+            params: { selector, text, ...hints, timeout: interaction.timeout_ms },
+          });
+        } else if (ref) {
+          steps.push({
+            type: 'apply',
+            op: 'fill_ref',
+            params: { ref, text, ...hints, timeout: interaction.timeout_ms },
+          });
+        } else {
+          throw new Error('fill_ref requires action.ref or a durable selector');
+        }
+        break;
+      }
+      case 'fill_secret_ref': {
+        const secret = secretFillIdentity(interaction);
+        if (!secret) {
+          throw new Error(
+            'fill_secret_ref requires a durable selector or dom_path; refusing snapshot+@eN stand-in'
+          );
+        }
         steps.push({
           type: 'apply',
-          op: 'fill_ref',
-          params: {
-            ref: interaction.ref,
-            text: interaction.text || '',
-            timeout: interaction.timeout_ms,
-          },
+          op: 'fill_secret_ref',
+          params: { ...secret.identity, timeout: interaction.timeout_ms },
         });
         break;
-      case 'press_ref':
-        steps.push({
-          type: 'apply',
-          op: 'press_ref',
-          params: {
-            ref: interaction.ref,
-            key: interaction.key || 'Enter',
-            timeout: interaction.timeout_ms,
-          },
-        });
+      }
+      case 'press_ref': {
+        const selector = durableSelector(interaction);
+        const hints = durableHintParams(interaction);
+        const ref = trimmedInteractionField(interaction.ref);
+        const key = interaction.key || 'Enter';
+        if (selector) {
+          steps.push({
+            type: 'apply',
+            op: 'press',
+            params: { selector, key, ...hints, timeout: interaction.timeout_ms },
+          });
+        } else if (ref) {
+          steps.push({
+            type: 'apply',
+            op: 'press_ref',
+            params: { ref, key, ...hints, timeout: interaction.timeout_ms },
+          });
+        } else {
+          throw new Error('press_ref requires action.ref or a durable selector');
+        }
         break;
-      case 'wait_for_ref':
-        steps.push({
-          type: 'apply',
-          op: 'wait_ref',
-          params: { ref: interaction.ref, timeout: interaction.timeout_ms },
-        });
+      }
+      case 'wait_for_ref': {
+        const selector = durableSelector(interaction);
+        const hints = durableHintParams(interaction);
+        const ref = trimmedInteractionField(interaction.ref);
+        if (selector) {
+          steps.push({
+            type: 'apply',
+            op: 'wait',
+            params: { selector, ...hints, timeout: interaction.timeout_ms },
+          });
+        } else if (ref) {
+          steps.push({
+            type: 'apply',
+            op: 'wait_ref',
+            params: { ref, ...hints, timeout: interaction.timeout_ms },
+          });
+        } else {
+          throw new Error('wait_for_ref requires action.ref or a durable selector');
+        }
         break;
-      case 'extract_text_ref':
+      }
+      case 'extract_text_ref': {
+        const ref = trimmedInteractionField(interaction.ref);
+        if (!ref) {
+          throw new Error('extract_text_ref requires action.ref');
+        }
+        const selector = durableSelector(interaction);
+        const domPath = durableDomPath(interaction);
         steps.push({
           type: 'capture',
           op: 'extract_text_ref',
-          params: { ref: interaction.ref, export_as: 'last_capture' },
+          params: {
+            ref,
+            ...(selector ? { selector } : {}),
+            ...(domPath ? { dom_path: domPath } : {}),
+            ...durableHintParams(interaction),
+            export_as: 'last_capture',
+          },
         });
         break;
-      case 'scroll':
+      }
+      case 'scroll': {
+        const hints = durableHintParams(interaction);
+        const ref = trimmedInteractionField(interaction.ref);
+        const selector = durableSelector(interaction);
         steps.push({
           type: 'apply',
-          op: interaction.ref ? 'scroll_ref' : 'scroll',
-          params: interaction.ref
-            ? { ref: interaction.ref, timeout: interaction.timeout_ms }
-            : { delta: interaction.scroll_delta, timeout: interaction.timeout_ms },
+          op: ref && !selector ? 'scroll_ref' : 'scroll',
+          params:
+            ref && !selector
+              ? { ref, ...hints, timeout: interaction.timeout_ms }
+              : {
+                  ...(selector ? { selector, ...hints } : {}),
+                  delta: interaction.scroll_delta,
+                  timeout: interaction.timeout_ms,
+                },
         });
         break;
+      }
       case 'capture_console':
         steps.push({ type: 'capture', op: 'console', params: { export_as: 'console_events' } });
         break;

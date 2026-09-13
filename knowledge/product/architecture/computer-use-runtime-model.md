@@ -6,6 +6,7 @@ authority: reference
 phase: [alignment, execution]
 tags: [computer-use, browser, actuator, runtime, governance]
 owner: ecosystem_architect
+last_updated: 2026-09-13
 ---
 
 # Computer Use Runtime Model
@@ -117,9 +118,18 @@ Preferred families:
 - ref-driven browser actions
   - `click_ref`
   - `fill_ref`
+  - `fill_secret_ref`
   - `press_ref`
   - `wait_for_ref`
   - `extract_text_ref`
+
+Live `@eN` refs are session-scoped. A computer-use apply must not remint a
+snapshot and then reuse a previously observed `@eN` — a fresh snapshot's
+`@e1` is not the recording-time field. Prefer durable `selector` / `name` /
+`role` / `dom_path` when replaying or filling secrets. Secret fills require a
+corroborating `dom_path` or `selector`; the translator must not insert a
+snapshot as a stand-in identity. Same-session `keep_alive` may apply a live
+`@eN` from the last observation in that session.
 
 This allows the same contract to work across:
 
