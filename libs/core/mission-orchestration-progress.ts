@@ -19,6 +19,7 @@ import {
 import { validatePlanningPacket } from './planning-packet-contract.js';
 import { readProcessTemplateSeededTasks } from './mission-planning-packet.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
+import { importExternalWorkItem } from './work-coordination.js';
 import type { PlannedNextTask } from './mission-orchestration-worker-contracts.js';
 
 type GateSummary = { lines: string[]; reworkCount: number };
@@ -296,6 +297,50 @@ export function createMissionProgressController(
       };
     });
     const nextTasks = validation.value.next_tasks.map((_, index) => ({ ...derivedTasks[index] }));
+
+    function registerCanonicalWorkItems(tasks: Array<Record<string, unknown>>): void {
+      for (const task of tasks) {
+        const taskId = String(task.task_id || '').trim();
+        if (!taskId) continue;
+        const description = String(task.description || taskId).trim();
+        const assignment =
+          task.assigned_to && typeof task.assigned_to === 'object'
+            ? (task.assigned_to as Record<string, unknown>)
+            : {};
+        importExternalWorkItem({
+          source: 'local',
+          sourceRef: `mission:${missionId}:${taskId}`,
+          title: description,
+          description,
+          status: 'ready',
+          projectId: missionId,
+          assigneePeerId:
+            typeof assignment.agent_id === 'string' && assignment.agent_id.trim()
+              ? assignment.agent_id.trim()
+              : undefined,
+          dependencies: Array.isArray(task.dependencies) ? task.dependencies.map(String) : [],
+          context: { mission_id: missionId, project_id: missionId, task_id: taskId },
+          metadata: {
+            task_id: taskId,
+            mission_id: missionId,
+            ...(typeof assignment.role === 'string' ? { team_role: assignment.role } : {}),
+            ...(task.deliverable ? { deliverable: task.deliverable } : {}),
+            ...(task.target_path ? { target_path: task.target_path } : {}),
+            ...(Array.isArray(task.acceptance_criteria)
+              ? { acceptance_criteria: task.acceptance_criteria.map(String) }
+              : {}),
+            ...(task.risk ? { risk: task.risk } : {}),
+            ...(task.expected_output_format
+              ? { expected_output_format: task.expected_output_format }
+              : {}),
+            ...(task.estimated_scope ? { estimated_scope: task.estimated_scope } : {}),
+            ...(task.review_target ? { review_target: task.review_target } : {}),
+            ...(typeof task.origin === 'string' ? { origin: task.origin } : {}),
+          },
+        });
+      }
+    }
+
     // MO-01: process-template-seeded tasks are the mission's fixed skeleton —
     // the planner may add tasks around them but never drop or restructure them.
     const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
@@ -303,6 +348,7 @@ export function createMissionProgressController(
     if (seededTasks.length > 0) {
       const seededIds = new Set(seededTasks.map((task) => String(task.task_id)));
       const additions = nextTasks.filter((task) => !seededIds.has(task.task_id));
+      registerCanonicalWorkItems([...seededTasks, ...additions]);
       writeProvisionedJson({
         missionId,
         filePath: nextTasksPath,
@@ -317,6 +363,7 @@ export function createMissionProgressController(
       });
       return;
     }
+    registerCanonicalWorkItems(nextTasks);
     writeProvisionedJson({
       missionId,
       filePath: nextTasksPath,

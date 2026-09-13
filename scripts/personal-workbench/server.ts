@@ -32,6 +32,7 @@ import {
 } from '../lib/local-artifact-pad.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
+import { executePersonalWorkbenchAction, type PersonalWorkbenchAction } from './actions.js';
 
 export const PERSONAL_WORKBENCH_DEFAULT_PORT = 8154;
 export const PERSONAL_WORKBENCH_MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -126,9 +127,9 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown): 
 function pageHtml(token: string, out: string): string {
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Personal Workbench</title><style>
   :root{font-family:-apple-system,BlinkMacSystemFont,"Yu Gothic",sans-serif;color:#17202b;background:#eef2f6}body{max-width:1100px;margin:auto;padding:18px}main{display:grid;grid-template-columns:1fr 1fr;gap:14px}.card{background:#fff;border:1px solid #d5dbe5;border-radius:12px;padding:14px;display:grid;gap:8px}textarea,input,select{font:inherit;padding:9px;border:1px solid #cbd3df;border-radius:8px}textarea{min-height:130px}.wide{grid-column:1/-1}.muted{font-size:12px;color:#5c6778}button{padding:9px 13px;border:0;border-radius:8px;background:#356d5b;color:white;cursor:pointer}#status{min-height:1.4em}.entry{border-top:1px solid #e1e5eb;padding:8px 0}.entry small{color:#687487}.entry p{white-space:pre-wrap;margin:5px 0}
-  </style></head><body><h1>Personal Workbench</h1><p class="muted">Link、Task、Follow-up、Decision、Expense、Daily Review を一つの personal inbox に保存します。外部送信や自動反映は行いません。</p>
-  <main><section class="card"><label>用途<select id="kind"><option value="link">Link Inbox</option><option value="task">Task Triage</option><option value="follow-up">Follow-up Desk</option><option value="decision">Decision Log</option><option value="expense">Receipt / Expense</option><option value="daily-review">Daily Review</option></select></label><label>タイトル<input id="title" maxlength="200"/></label><label>内容<textarea id="body"></textarea></label><label>補足（JSON）<input id="meta" placeholder='{"due":"2026-09-14"}'/></label><button id="save">提案として保存</button><div id="status"></div><div class="muted">出力先: ${escapeHtml(out)}</div></section><section class="card"><h2>保存済み</h2><button id="load">認証済みデータを読む</button><div id="entries" class="muted">未読込</div></section></main>
-  <script>(function(){var token=${JSON.stringify(token)},status=document.getElementById('status'),entries=document.getElementById('entries');function say(x){status.textContent=x}function render(rows){entries.innerHTML=rows.length?rows.map(function(e){return '<div class="entry"><b>'+esc(e.kind)+' — '+esc(e.title)+'</b><small> '+esc(e.status)+' / '+esc(e.created_at)+'</small><p>'+esc(e.body)+'</p></div>'}).join(''):'<span class="muted">まだありません</span>'}function esc(x){return String(x||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}document.getElementById('save').onclick=function(){var meta={};try{meta=JSON.parse(document.getElementById('meta').value||'{}')}catch(e){say('補足 JSON が不正です');return}say('保存中…');fetch('/capture',{method:'POST',headers:{'Content-Type':'application/json','X-PW-Token':token},body:JSON.stringify({kind:document.getElementById('kind').value,title:document.getElementById('title').value,body:document.getElementById('body').value,metadata:meta})}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})}).then(function(x){if(!x.ok||!x.j.ok)throw Error(x.j.error||'保存失敗');say('保存しました（人間承認待ち）');document.getElementById('title').value='';document.getElementById('body').value='';return fetch('/load',{method:'POST',headers:{'X-PW-Token':token},body:'{}'})}).then(function(r){return r.json()}).then(function(j){if(j.ok)render(j.entries||[])}).catch(function(e){say(e.message||'保存失敗')});};document.getElementById('load').onclick=function(){say('読込中…');fetch('/load',{method:'POST',headers:{'X-PW-Token':token},body:'{}'}).then(function(r){return r.json()}).then(function(j){if(!j.ok)throw Error(j.error||'読込失敗');render(j.entries||[]);say('読込完了')}).catch(function(e){say(e.message||'読込失敗')})};})();</script></body></html>`;
+  </style></head><body><h1>Personal Workbench</h1><p class="muted">Link、Task、Follow-up、Decision、Expense、Daily Review を一つの personal inbox に保存します。メール・カレンダー変更は明示承認後、OCR と知識候補登録は governed API 経由で実行します。</p>
+  <main><section class="card"><label>用途<select id="kind"><option value="link">Link Inbox</option><option value="task">Task Triage</option><option value="follow-up">Follow-up Desk</option><option value="decision">Decision Log</option><option value="expense">Receipt / Expense</option><option value="daily-review">Daily Review</option></select></label><label>タイトル<input id="title" maxlength="200"/></label><label>内容<textarea id="body"></textarea></label><label>補足（JSON）<input id="meta" placeholder='{"due":"2026-09-14"}'/></label><button id="save">提案として保存</button><div id="status"></div><div class="muted">出力先: ${escapeHtml(out)}</div></section><section class="card"><h2>保存済み</h2><button id="load">認証済みデータを読む</button><div id="entries" class="muted">未読込</div></section><section class="card wide"><h2>Governed actions</h2><label>操作<select id="action"><option value="ocr">OCR</option><option value="knowledge">知識候補登録</option><option value="email">メール送信</option><option value="calendar">カレンダー変更</option></select></label><label>入力（JSON）<textarea id="actionPayload" placeholder='{"path":"active/shared/tmp/receipt.png"}'></textarea></label><label><input id="approval" type="checkbox"/> メール送信・カレンダー変更を承認する</label><button id="runAction">操作を実行</button><div class="muted">メール・カレンダーは明示承認が必要。知識は候補キューに入り、自動公開されません。</div></section></main>
+  <script>(function(){var token=${JSON.stringify(token)},status=document.getElementById('status'),entries=document.getElementById('entries');function say(x){status.textContent=x}function render(rows){entries.innerHTML=rows.length?rows.map(function(e){return '<div class="entry"><b>'+esc(e.kind)+' — '+esc(e.title)+'</b><small> '+esc(e.status)+' / '+esc(e.created_at)+'</small><p>'+esc(e.body)+'</p></div>'}).join(''):'<span class="muted">まだありません</span>'}function esc(x){return String(x||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}document.getElementById('save').onclick=function(){var meta={};try{meta=JSON.parse(document.getElementById('meta').value||'{}')}catch(e){say('補足 JSON が不正です');return}say('保存中…');fetch('/capture',{method:'POST',headers:{'Content-Type':'application/json','X-PW-Token':token},body:JSON.stringify({kind:document.getElementById('kind').value,title:document.getElementById('title').value,body:document.getElementById('body').value,metadata:meta})}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})}).then(function(x){if(!x.ok||!x.j.ok)throw Error(x.j.error||'保存失敗');say('保存しました（人間承認待ち）');document.getElementById('title').value='';document.getElementById('body').value='';return fetch('/load',{method:'POST',headers:{'X-PW-Token':token},body:'{}'})}).then(function(r){return r.json()}).then(function(j){if(j.ok)render(j.entries||[])}).catch(function(e){say(e.message||'保存失敗')});};document.getElementById('load').onclick=function(){say('読込中…');fetch('/load',{method:'POST',headers:{'X-PW-Token':token},body:'{}'}).then(function(r){return r.json()}).then(function(j){if(!j.ok)throw Error(j.error||'読込失敗');render(j.entries||[]);say('読込完了')}).catch(function(e){say(e.message||'読込失敗')})};document.getElementById('runAction').onclick=function(){var payload={};try{payload=JSON.parse(document.getElementById('actionPayload').value||'{}')}catch(e){say('操作 JSON が不正です');return}say('実行中…');fetch('/action',{method:'POST',headers:{'Content-Type':'application/json','X-PW-Token':token},body:JSON.stringify({action:document.getElementById('action').value,payload:payload,approved:document.getElementById('approval').checked})}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})}).then(function(x){if(!x.ok||!x.j.ok)throw Error(x.j.error||'操作失敗');say('完了: '+JSON.stringify(x.j.result))}).catch(function(e){say(e.message||'操作失敗')})};})();</script></body></html>`;
 }
 
 function escapeHtml(value: string): string {
@@ -216,7 +217,7 @@ export async function main(
     }
     return true;
   }
-  function persist(payload: WorkbenchPayload): Record<string, unknown> {
+  async function persist(payload: WorkbenchPayload): Promise<Record<string, unknown>> {
     if (!isKind(payload.kind))
       throw new Error('kind must be link, task, follow-up, decision, expense, or daily-review');
     const title = typeof payload.title === 'string' ? payload.title.trim().slice(0, 200) : '';
@@ -235,6 +236,16 @@ export async function main(
     safeWriteFile(indexPath, JSON.stringify(entries, null, 2), { mkdir: true, encoding: 'utf8' });
     const sessionDir = localPadSessionDir(out, entry.id);
     safeMkdir(sessionDir, { recursive: true });
+    const sessionHandoff = path.join(sessionDir, 'handoff.json');
+    const automaticKnowledge =
+      payload.kind === 'decision' || payload.kind === 'daily-review'
+        ? await executePersonalWorkbenchAction({
+            action: 'knowledge',
+            payload: { summary: `${entry.title}: ${entry.body}` },
+            context,
+            evidenceRef: portableProtocolServicePathRef(sessionHandoff),
+          })
+        : undefined;
     const handoffBody = {
       kind: 'personal-workbench-handoff',
       version: 1,
@@ -242,9 +253,13 @@ export async function main(
       artifact_ref: portableProtocolServicePathRef(context.artifact_ref),
       viewer_principal: context.viewer_principal,
       scope: context.scope,
-      processing: { status: 'proposed', requires_human_approval: true, external_effects: false },
+      processing: {
+        status: 'proposed',
+        requires_human_approval: true,
+        external_effects: false,
+        ...(automaticKnowledge ? { knowledge_candidate: automaticKnowledge } : {}),
+      },
     };
-    const sessionHandoff = path.join(sessionDir, 'handoff.json');
     safeWriteFile(sessionHandoff, JSON.stringify(handoffBody, null, 2), {
       mkdir: true,
       encoding: 'utf8',
@@ -281,6 +296,7 @@ export async function main(
       entry,
       handoff_path: portableProtocolServicePathRef(handoff),
       requires_human_approval: true,
+      ...(automaticKnowledge ? { knowledge_candidate: automaticKnowledge } : {}),
     };
   }
   const server = http.createServer((req, res) => {
@@ -297,7 +313,10 @@ export async function main(
       res.end('ok');
       return;
     }
-    if (req.method === 'POST' && (req.url === '/capture' || req.url === '/load')) {
+    if (
+      req.method === 'POST' &&
+      (req.url === '/capture' || req.url === '/load' || req.url === '/action')
+    ) {
       if (!authorized(req, res)) return;
       void (async () => {
         try {
@@ -313,7 +332,35 @@ export async function main(
             jsonResponse(res, 400, { ok: false, error: 'invalid json' });
             return;
           }
-          jsonResponse(res, 200, persist(payload));
+          if (req.url === '/action') {
+            if (
+              payload === null ||
+              typeof payload !== 'object' ||
+              !['email', 'calendar', 'ocr', 'knowledge'].includes(
+                String((payload as Record<string, unknown>).action)
+              )
+            ) {
+              jsonResponse(res, 400, {
+                ok: false,
+                error: 'action must be email, calendar, ocr, or knowledge',
+              });
+              return;
+            }
+            const actionPayload = payload as Record<string, unknown>;
+            const result = await executePersonalWorkbenchAction({
+              action: String(actionPayload.action) as PersonalWorkbenchAction,
+              payload:
+                actionPayload.payload && typeof actionPayload.payload === 'object'
+                  ? (actionPayload.payload as Record<string, unknown>)
+                  : {},
+              approved: actionPayload.approved === true,
+              context,
+              evidenceRef: portableProtocolServicePathRef(handoff),
+            });
+            jsonResponse(res, 200, { ok: true, action: actionPayload.action, result });
+            return;
+          }
+          jsonResponse(res, 200, await persist(payload));
         } catch (error) {
           const tooLarge = error instanceof LocalPadRequestBodyTooLargeError;
           jsonResponse(res, tooLarge ? 413 : 400, {
