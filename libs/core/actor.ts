@@ -26,8 +26,16 @@
  * module instead of being re-implemented per call site.
  */
 
-import { parseNhiId } from './agent-identity.js';
-import { isValidMemberId } from './member-registry.js';
+// Import the dependency-free grammar leaf modules directly (not
+// `agent-identity.js` / `member-registry.js`): those modules pull in
+// `authority.js` / `governed-catalog.js`, which transitively depend on
+// `secure-io.js` — and `secure-io.js` depends on `audit-chain.js`, which
+// depends on this module for its optional `actor` field. Importing the
+// "rich" modules here would close that cycle back on itself at module-load
+// time (surfaced as `TypeError: __name is not a function` deep inside
+// `governed-catalog.ts`, a re-entrant-circular-import symptom).
+import { parseNhiId } from './nhi-id.js';
+import { isValidMemberId } from './member-id-grammar.js';
 
 // ---------------------------------------------------------------------------
 // Model
