@@ -5,8 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Kyberion Onboarding Studio</title>
     <link rel="stylesheet" href="/onboarding.css" />
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/front-desk-rail.css" />
   </head>
   <body>
+    <div class="fd-layout">
+      <nav id="front-desk-rail" class="front-desk-rail"></nav>
+      <div class="fd-content">
     <div class="grain"></div>
     <main class="shell">
       <aside class="rail">
@@ -277,6 +283,17 @@
         </footer>
       </section>
     </main>
+      </div>
+    </div>
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script src="/front-desk-rail.js"></script>
+    <script>
+      if (window.FrontDeskRail) {
+        window.FrontDeskRail.mount(document.getElementById('front-desk-rail'), {
+          current: 'settings',
+        });
+      }
+    </script>
     <script type="module" src="/onboarding.js"></script>
   </body>
 </html>
