@@ -100,6 +100,7 @@ export class PulseAudioBus implements AudioBus {
 
   async open(format: AudioFormat): Promise<void> {
     if (this.opened) return;
+    if (this.closed) throw new Error('[pulse-audio-bus] cannot reopen a closed bus');
     if (format.encoding !== 'pcm_s16le') {
       throw new Error(
         `[pulse-audio-bus] only pcm_s16le is supported in this driver; got ${format.encoding}`
@@ -109,100 +110,105 @@ export class PulseAudioBus implements AudioBus {
     if (!probe.available) throw new Error(`[pulse-audio-bus] not available: ${probe.reason}`);
     this.format = format;
 
-    // 1. Create the virtual sink the meeting client will play into.
-    const sinkArgs = [
-      'load-module',
-      'module-null-sink',
-      `sink_name=${this.sink}`,
-      `sink_properties=device.description=${this.sink}`,
-    ];
-    const sinkId = Number((safeExec(this.pactlBin, sinkArgs) as string).trim());
-    if (!Number.isNaN(sinkId)) this.moduleIds.push(sinkId);
+    try {
+      // 1. Create the virtual sink the meeting client will play into.
+      const sinkArgs = [
+        'load-module',
+        'module-null-sink',
+        `sink_name=${this.sink}`,
+        `sink_properties=device.description=${this.sink}`,
+      ];
+      const sinkId = Number((safeExec(this.pactlBin, sinkArgs) as string).trim());
+      if (!Number.isNaN(sinkId)) this.moduleIds.push(sinkId);
 
-    // 2. Create the virtual source the meeting client uses as a mic.
-    const srcArgs = [
-      'load-module',
-      'module-null-sink',
-      `sink_name=${this.source}`,
-      `sink_properties=device.description=${this.source}`,
-    ];
-    const srcId = Number((safeExec(this.pactlBin, srcArgs) as string).trim());
-    if (!Number.isNaN(srcId)) this.moduleIds.push(srcId);
+      // 2. Create the virtual source the meeting client uses as a mic.
+      const srcArgs = [
+        'load-module',
+        'module-null-sink',
+        `sink_name=${this.source}`,
+        `sink_properties=device.description=${this.source}`,
+      ];
+      const srcId = Number((safeExec(this.pactlBin, srcArgs) as string).trim());
+      if (!Number.isNaN(srcId)) this.moduleIds.push(srcId);
 
-    const channels = String(format.channels);
-    const rate = String(format.sample_rate_hz);
+      const channels = String(format.channels);
+      const rate = String(format.sample_rate_hz);
 
-    // Input: read what the meeting client is playing into `${this.sink}`
-    // (the .monitor source).
-    this.inputProc = spawn(
-      this.ffmpegBin,
-      [
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-f',
-        'pulse',
-        '-i',
-        `${this.sink}.monitor`,
-        '-ac',
-        channels,
-        '-ar',
-        rate,
-        '-f',
-        's16le',
-        '-',
-      ],
-      { stdio: ['ignore', 'pipe', 'pipe'], env: buildSafeExecEnv(), detached: true }
-    );
-    this.inputProc.stdout?.on('data', (buf: Buffer) => this.handleInbound(buf));
-    this.inputProc.on('error', (error) => {
-      this.status = 'degraded';
-      this.reason = error.message;
-    });
-    this.inputProc.on('exit', (code) => {
-      logger.info(`[pulse-audio-bus] input ffmpeg exited with code ${code}`);
-      if (!this.closed) {
+      // Input: read what the meeting client is playing into `${this.sink}`
+      // (the .monitor source).
+      this.inputProc = spawn(
+        this.ffmpegBin,
+        [
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-f',
+          'pulse',
+          '-i',
+          `${this.sink}.monitor`,
+          '-ac',
+          channels,
+          '-ar',
+          rate,
+          '-f',
+          's16le',
+          '-',
+        ],
+        { stdio: ['ignore', 'pipe', 'pipe'], env: buildSafeExecEnv(), detached: true }
+      );
+      this.inputProc.stdout?.on('data', (buf: Buffer) => this.handleInbound(buf));
+      this.inputProc.on('error', (error) => {
         this.status = 'degraded';
-        this.reason = `input process exited code=${String(code)}`;
-      }
-      this.inboundQueue.close();
-    });
+        this.reason = error.message;
+      });
+      this.inputProc.on('exit', (code) => {
+        logger.info(`[pulse-audio-bus] input ffmpeg exited with code ${code}`);
+        if (!this.closed) {
+          this.status = 'degraded';
+          this.reason = `input process exited code=${String(code)}`;
+        }
+        this.inboundQueue.close();
+      });
 
-    // Output: write s16le into the source sink so the client picks it up.
-    this.outputProc = spawn(
-      this.ffmpegBin,
-      [
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-f',
-        's16le',
-        '-ac',
-        channels,
-        '-ar',
-        rate,
-        '-i',
-        'pipe:0',
-        '-f',
-        'pulse',
-        this.source,
-      ],
-      { stdio: ['pipe', 'ignore', 'pipe'], env: buildSafeExecEnv(), detached: true }
-    );
-    this.outputProc.on('error', (error) => {
-      this.status = 'degraded';
-      this.reason = error.message;
-    });
-    this.outputProc.on('exit', (code) => {
-      logger.info(`[pulse-audio-bus] output ffmpeg exited with code ${code}`);
-      if (!this.closed && code !== 0) {
+      // Output: write s16le into the source sink so the client picks it up.
+      this.outputProc = spawn(
+        this.ffmpegBin,
+        [
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-f',
+          's16le',
+          '-ac',
+          channels,
+          '-ar',
+          rate,
+          '-i',
+          'pipe:0',
+          '-f',
+          'pulse',
+          this.source,
+        ],
+        { stdio: ['pipe', 'ignore', 'pipe'], env: buildSafeExecEnv(), detached: true }
+      );
+      this.outputProc.on('error', (error) => {
         this.status = 'degraded';
-        this.reason = `output process exited code=${String(code)}`;
-      }
-    });
+        this.reason = error.message;
+      });
+      this.outputProc.on('exit', (code) => {
+        logger.info(`[pulse-audio-bus] output ffmpeg exited with code ${code}`);
+        if (!this.closed && code !== 0) {
+          this.status = 'degraded';
+          this.reason = `output process exited code=${String(code)}`;
+        }
+      });
 
-    this.opened = true;
-    this.status = 'healthy';
+      this.opened = true;
+      this.status = 'healthy';
+    } catch (error) {
+      await this.close();
+      throw error;
+    }
   }
 
   async close(): Promise<void> {
@@ -224,6 +230,11 @@ export class PulseAudioBus implements AudioBus {
     }
     this.moduleIds = [];
     this.inboundQueue.close();
+    this.inputProc = null;
+    this.outputProc = null;
+    this.opened = false;
+    this.format = null;
+    this.status = 'closed';
   }
 
   async *inputStream(): AsyncIterable<AudioChunk> {
