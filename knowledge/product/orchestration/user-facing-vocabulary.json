@@ -5921,6 +5921,26 @@
         "ja": "接続済み",
         "qps-ploc": "⟦ƈőññėƈŧėḓ ŀőř⟧"
       },
+      "setup.connect_oauth": {
+        "en": "Connect",
+        "ja": "連携する",
+        "qps-ploc": "⟦Ƈőññėƈŧ ŀőř⟧"
+      },
+      "setup.connect_oauth_hint": {
+        "en": "Opens the provider consent screen. Keep the OAuth callback surface on :8787 running.",
+        "ja": "プロバイダの同意画面を開きます。OAuth callback（:8787）を起動したままにしてください。",
+        "qps-ploc": "⟦Őṗėñş ŧħė ṗřőṽïḓėř ƈőñşėñŧ şƈřėėñ. Ķėėṗ ŧħė ŐȦůŧħ ƈȧŀŀƀȧƈķ şůřƒȧƈė őñ :8787 řůññïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "setup.connect_oauth_started": {
+        "en": "Authorization opened for {service}. Complete consent in the new tab.",
+        "ja": "{service} の認可を開きました。新しいタブで同意を完了してください。",
+        "qps-ploc": "⟦Ȧůŧħőřïẑȧŧïőñ őṗėñėḓ ƒőř {service}. Ƈőɱṗŀėŧė ƈőñşėñŧ ïñ ŧħė ñėẇ ŧȧƀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "setup.connect_oauth_failed": {
+        "en": "Could not start OAuth for {service}: {error}",
+        "ja": "{service} の OAuth を開始できませんでした: {error}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şŧȧřŧ ŐȦůŧħ ƒőř {service}: {error} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "setup.save_connections": {
         "en": "Save connection preparation",
         "ja": "接続準備を保存",
@@ -6475,6 +6495,11 @@
         "en": "Voice",
         "ja": "音声",
         "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
+      },
+      "service.notion": {
+        "en": "Notion",
+        "ja": "Notion",
+        "qps-ploc": "⟦Ñőŧïőñ ŀőř⟧"
       },
       "auth.oauth": {
         "en": "OAuth",
@@ -10523,6 +10548,838 @@
         "en": "A hands-on mirror for the current browser and terminal work.",
         "ja": "作業の手元ミラー — ブラウザ/ターミナルの現在の手元",
         "qps-ploc": "⟦Ȧ ħȧñḓş-őñ ɱïřřőř ƒőř ŧħė ƈůřřėñŧ ƀřőẇşėř ȧñḓ ŧėřɱïñȧŀ ẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      }
+    },
+    "front_desk": {
+      "nav_home": {
+        "en": "Home",
+        "ja": "ホーム",
+        "qps-ploc": "⟦Ħőɱė ŀőř⟧"
+      },
+      "nav_home_sub": {
+        "en": "Today at a glance",
+        "ja": "今日の要点",
+        "qps-ploc": "⟦Ŧőḓȧẏ ȧŧ ȧ ɠŀȧñƈė ŀőřėɱ⟧"
+      },
+      "nav_ask": {
+        "en": "Ask",
+        "ja": "頼む",
+        "qps-ploc": "⟦Ȧşķ ŀőř⟧"
+      },
+      "nav_ask_sub": {
+        "en": "Talk or type",
+        "ja": "話す・書く",
+        "qps-ploc": "⟦Ŧȧŀķ őř ŧẏṗė ŀőř⟧"
+      },
+      "nav_decide": {
+        "en": "Decide",
+        "ja": "決める",
+        "qps-ploc": "⟦Ḓėƈïḓė ŀőř⟧"
+      },
+      "nav_decide_sub": {
+        "en": "Approvals and exceptions",
+        "ja": "承認・例外",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ȧñḓ ėẋƈėṗŧïőñş ŀőřėɱ ï⟧"
+      },
+      "nav_progress": {
+        "en": "Progress",
+        "ja": "進み具合",
+        "qps-ploc": "⟦Ṗřőɠřėşş ŀőř⟧"
+      },
+      "nav_progress_sub": {
+        "en": "In progress and delivered",
+        "ja": "進行中・できたもの",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş ȧñḓ ḓėŀïṽėřėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "nav_settings": {
+        "en": "Settings",
+        "ja": "設定",
+        "qps-ploc": "⟦Şėŧŧïñɠş ŀőř⟧"
+      },
+      "nav_settings_sub": {
+        "en": "Connections, voice, notifications",
+        "ja": "連携・声・通知",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñş, ṽőïƈė, ñőŧïƒïƈȧŧïőñş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "nav_help": {
+        "en": "How to use",
+        "ja": "使い方を見る",
+        "qps-ploc": "⟦Ħőẇ ŧő ůşė ŀőř⟧"
+      },
+      "nav_aria_label": {
+        "en": "Main menu",
+        "ja": "メインメニュー",
+        "qps-ploc": "⟦Ɱȧïñ ɱėñů ŀőř⟧"
+      },
+      "brand_tagline": {
+        "en": "Your companion",
+        "ja": "あなたの相棒",
+        "qps-ploc": "⟦Ẏőůř ƈőɱṗȧñïőñ ŀőřė⟧"
+      },
+      "tenant_switch_aria": {
+        "en": "Switch the tenant you are viewing",
+        "ja": "いま見ているテナントを切り替える",
+        "qps-ploc": "⟦Şẇïŧƈħ ŧħė ŧėñȧñŧ ẏőů ȧřė ṽïėẇïñɠ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "tenant_viewing_summary": {
+        "en": "You: {role} · {count} tenants",
+        "ja": "あなた：{role} · {count}テナント",
+        "qps-ploc": "⟦Ẏőů: {role} · {count} ŧėñȧñŧş ŀőřėɱ ïṗş⟧"
+      },
+      "tenant_viewing_single": {
+        "en": "You: {role}",
+        "ja": "あなた：{role}",
+        "qps-ploc": "⟦Ẏőů: {role} ŀőř⟧"
+      },
+      "role_owner": {
+        "en": "Owner",
+        "ja": "オーナー",
+        "qps-ploc": "⟦Őẇñėř ŀőř⟧"
+      },
+      "role_approver": {
+        "en": "Approver",
+        "ja": "承認者",
+        "qps-ploc": "⟦Ȧṗṗřőṽėř ŀőř⟧"
+      },
+      "role_viewer": {
+        "en": "Viewer",
+        "ja": "閲覧",
+        "qps-ploc": "⟦Ṽïėẇėř ŀőř⟧"
+      },
+      "home_briefing": {
+        "en": "You have {decide} decisions waiting, {progress} in progress, and {delivered} results to pick up.",
+        "ja": "判断待ちが{decide}件、進行中が{progress}件、受け取れる成果が{delivered}件あります。",
+        "qps-ploc": "⟦Ẏőů ħȧṽė {decide} ḓėƈïşïőñş ẇȧïŧïñɠ, {progress} ïñ ṗřőɠřėşş, ȧñḓ {delivered} řėşůŀŧş ŧő ṗïƈķ ůṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "home_briefing_clear": {
+        "en": "Nothing is waiting for your decision today.",
+        "ja": "今日は判断待ちはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ẇȧïŧïñɠ ƒőř ẏőůř ḓėƈïşïőñ ŧőḓȧẏ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "home_recommend": {
+        "en": "Start with “{title}”.",
+        "ja": "まずは「{title}」から始めるのがおすすめです。",
+        "qps-ploc": "⟦Şŧȧřŧ ẇïŧħ “{title}”. ŀőřėɱ ⟧"
+      },
+      "home_ask_placeholder": {
+        "en": "What can I do for you? e.g. “Draft the board deck for next week”",
+        "ja": "なにを頼みますか？ 例：「来週の取締役会の資料を下書きして」",
+        "qps-ploc": "⟦Ẇħȧŧ ƈȧñ Ï ḓő ƒőř ẏőů? ė.ɠ. “Ḓřȧƒŧ ŧħė ƀőȧřḓ ḓėƈķ ƒőř ñėẋŧ ẇėėķ” ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "home_ask_send": {
+        "en": "Send",
+        "ja": "送る",
+        "qps-ploc": "⟦Şėñḓ ŀőř⟧"
+      },
+      "home_ask_voice": {
+        "en": "Ask by voice",
+        "ja": "声で頼む",
+        "qps-ploc": "⟦Ȧşķ ƀẏ ṽőïƈė ŀőř⟧"
+      },
+      "chip_email": {
+        "en": "Draft an email",
+        "ja": "メールを下書き",
+        "qps-ploc": "⟦Ḓřȧƒŧ ȧñ ėɱȧïŀ ŀőřė⟧"
+      },
+      "chip_minutes": {
+        "en": "Record a meeting",
+        "ja": "会議を記録",
+        "qps-ploc": "⟦Řėƈőřḓ ȧ ɱėėŧïñɠ ŀőřėɱ⟧"
+      },
+      "chip_browser": {
+        "en": "Look it up in the browser",
+        "ja": "ブラウザで調べる",
+        "qps-ploc": "⟦Ŀőőķ ïŧ ůṗ ïñ ŧħė ƀřőẇşėř ŀőřėɱ ïṗ⟧"
+      },
+      "chip_webapp": {
+        "en": "Capture web app requirements",
+        "ja": "Webアプリの要望をまとめる",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ẇėƀ ȧṗṗ řėɋůïřėɱėñŧş ŀőřėɱ ïṗş⟧"
+      },
+      "home_decide_title": {
+        "en": "Needs your decision",
+        "ja": "いま判断が必要なこと",
+        "qps-ploc": "⟦Ñėėḓş ẏőůř ḓėƈïşïőñ ŀőřėɱ ⟧"
+      },
+      "home_decide_more": {
+        "en": "See all in Decide",
+        "ja": "「決める」ですべて見る",
+        "qps-ploc": "⟦Şėė ȧŀŀ ïñ Ḓėƈïḓė ŀőřėɱ⟧"
+      },
+      "home_decide_empty": {
+        "en": "Nothing to decide right now.",
+        "ja": "判断待ちはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ŧő ḓėƈïḓė řïɠħŧ ñőẇ. ŀőřėɱ ïṗş⟧"
+      },
+      "home_progress_title": {
+        "en": "Progress",
+        "ja": "進み具合",
+        "qps-ploc": "⟦Ṗřőɠřėşş ŀőř⟧"
+      },
+      "home_progress_more": {
+        "en": "See all in Progress",
+        "ja": "「進み具合」ですべて見る",
+        "qps-ploc": "⟦Şėė ȧŀŀ ïñ Ṗřőɠřėşş ŀőřėɱ ⟧"
+      },
+      "home_progress_empty": {
+        "en": "Nothing in progress.",
+        "ja": "進行中の作業はありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïñ ṗřőɠřėşş. ŀőřėɱ ⟧"
+      },
+      "home_progress_summary": {
+        "en": "In progress {active} · Delivered {delivered}",
+        "ja": "進行中 {active} · できたもの {delivered}",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş {active} · Ḓėŀïṽėřėḓ {delivered} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "count_items": {
+        "en": "{count}",
+        "ja": "{count}件",
+        "qps-ploc": "⟦{count} ŀőř⟧"
+      },
+      "tag_approval": {
+        "en": "Approval",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ŀőř⟧"
+      },
+      "tag_exception": {
+        "en": "Exception",
+        "ja": "例外",
+        "qps-ploc": "⟦Ėẋƈėṗŧïőñ ŀőř⟧"
+      },
+      "tag_stalled": {
+        "en": "Stalled",
+        "ja": "止まっている",
+        "qps-ploc": "⟦Şŧȧŀŀėḓ ŀőř⟧"
+      },
+      "tag_memory": {
+        "en": "Memory check",
+        "ja": "記憶の確認",
+        "qps-ploc": "⟦Ɱėɱőřẏ ƈħėƈķ ŀőř⟧"
+      },
+      "tag_outcome": {
+        "en": "Deliverable",
+        "ja": "成果物",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀė ŀőř⟧"
+      },
+      "tag_in_progress": {
+        "en": "In progress",
+        "ja": "進行中",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş ŀőř⟧"
+      },
+      "tag_delivered": {
+        "en": "Delivered",
+        "ja": "できた",
+        "qps-ploc": "⟦Ḓėŀïṽėřėḓ ŀőř⟧"
+      },
+      "action_receive": {
+        "en": "Receive",
+        "ja": "受け取る",
+        "qps-ploc": "⟦Řėƈėïṽė ŀőř⟧"
+      },
+      "action_open": {
+        "en": "Open",
+        "ja": "開く",
+        "qps-ploc": "⟦Őṗėñ ŀőř⟧"
+      },
+      "action_revise": {
+        "en": "Ask for changes",
+        "ja": "直してもらう",
+        "qps-ploc": "⟦Ȧşķ ƒőř ƈħȧñɠėş ŀőřė⟧"
+      },
+      "decide_lead": {
+        "en": "Sorted by urgency. Decide here and your companion carries on.",
+        "ja": "急ぎの順に並んでいます。ここで決めれば、相棒はそのまま先へ進みます。",
+        "qps-ploc": "⟦Şőřŧėḓ ƀẏ ůřɠėñƈẏ. Ḓėƈïḓė ħėřė ȧñḓ ẏőůř ƈőɱṗȧñïőñ ƈȧřřïėş őñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "decide_filter_all": {
+        "en": "All",
+        "ja": "すべて",
+        "qps-ploc": "⟦Ȧŀŀ ŀőř⟧"
+      },
+      "decide_filter_tenant": {
+        "en": "Tenant",
+        "ja": "テナント",
+        "qps-ploc": "⟦Ŧėñȧñŧ ŀőř⟧"
+      },
+      "decide_why": {
+        "en": "Why this needs you",
+        "ja": "なぜ判断が必要か",
+        "qps-ploc": "⟦Ẇħẏ ŧħïş ñėėḓş ẏőů ŀőřėɱ⟧"
+      },
+      "decide_effect_approval": {
+        "en": "What happens if you approve",
+        "ja": "承認するとどうなるか",
+        "qps-ploc": "⟦Ẇħȧŧ ħȧṗṗėñş ïƒ ẏőů ȧṗṗřőṽė ŀőřėɱ ïṗ⟧"
+      },
+      "decide_effect_action": {
+        "en": "What happens if you act",
+        "ja": "対応するとどうなるか",
+        "qps-ploc": "⟦Ẇħȧŧ ħȧṗṗėñş ïƒ ẏőů ȧƈŧ ŀőřėɱ ï⟧"
+      },
+      "decide_options": {
+        "en": "Your options",
+        "ja": "選べること",
+        "qps-ploc": "⟦Ẏőůř őṗŧïőñş ŀőř⟧"
+      },
+      "decide_by": {
+        "en": "Decided by: {name} ({role})",
+        "ja": "決める人：{name}（{role}）",
+        "qps-ploc": "⟦Ḓėƈïḓėḓ ƀẏ: {name} ({role}) ŀőřėɱ ïṗ⟧"
+      },
+      "decide_evidence": {
+        "en": "See the evidence",
+        "ja": "根拠を見る",
+        "qps-ploc": "⟦Şėė ŧħė ėṽïḓėñƈė ŀőřėɱ⟧"
+      },
+      "decide_approve": {
+        "en": "Approve",
+        "ja": "承認する",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ŀőř⟧"
+      },
+      "decide_reject": {
+        "en": "Reject",
+        "ja": "却下",
+        "qps-ploc": "⟦Řėĵėƈŧ ŀőř⟧"
+      },
+      "decide_later": {
+        "en": "Later",
+        "ja": "あとで",
+        "qps-ploc": "⟦Ŀȧŧėř ŀőř⟧"
+      },
+      "decide_continue": {
+        "en": "Continue",
+        "ja": "続ける",
+        "qps-ploc": "⟦Ƈőñŧïñůė ŀőř⟧"
+      },
+      "decide_stop": {
+        "en": "Stop for now",
+        "ja": "いったん終了",
+        "qps-ploc": "⟦Şŧőṗ ƒőř ñőẇ ŀőř⟧"
+      },
+      "decide_remember": {
+        "en": "Remember",
+        "ja": "覚える",
+        "qps-ploc": "⟦Řėɱėɱƀėř ŀőř⟧"
+      },
+      "decide_forget": {
+        "en": "Forget",
+        "ja": "忘れる",
+        "qps-ploc": "⟦Ƒőřɠėŧ ŀőř⟧"
+      },
+      "decide_receive": {
+        "en": "Receive",
+        "ja": "受け取る",
+        "qps-ploc": "⟦Řėƈėïṽė ŀőř⟧"
+      },
+      "decide_return": {
+        "en": "Ask for changes",
+        "ja": "直してもらう",
+        "qps-ploc": "⟦Ȧşķ ƒőř ƈħȧñɠėş ŀőřė⟧"
+      },
+      "decide_reconnect": {
+        "en": "Reconnect in Settings",
+        "ja": "設定で再接続する",
+        "qps-ploc": "⟦Řėƈőññėƈŧ ïñ Şėŧŧïñɠş ŀőřėɱ ⟧"
+      },
+      "decide_empty": {
+        "en": "Nothing needs your decision right now.",
+        "ja": "いま判断することはありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ñėėḓş ẏőůř ḓėƈïşïőñ řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "decide_deferred": {
+        "en": "{count} set aside for later",
+        "ja": "あとで見る項目 {count}件",
+        "qps-ploc": "⟦{count} şėŧ ȧşïḓė ƒőř ŀȧŧėř ŀőřėɱ ïṗ⟧"
+      },
+      "decide_undefer": {
+        "en": "Bring back",
+        "ja": "戻す",
+        "qps-ploc": "⟦Ƀřïñɠ ƀȧƈķ ŀőř⟧"
+      },
+      "you": {
+        "en": "You",
+        "ja": "あなた",
+        "qps-ploc": "⟦Ẏőů ŀőř⟧"
+      },
+      "decide_due": {
+        "en": "Due {value}",
+        "ja": "期限 {value}",
+        "qps-ploc": "⟦Ḓůė {value} ŀőř⟧"
+      },
+      "progress_filter_active": {
+        "en": "In progress {count}",
+        "ja": "進行中 {count}",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş {count} ŀőřėɱ ⟧"
+      },
+      "progress_filter_delivered": {
+        "en": "Delivered {count}",
+        "ja": "できたもの {count}",
+        "qps-ploc": "⟦Ḓėŀïṽėřėḓ {count} ŀőřėɱ⟧"
+      },
+      "progress_filter_done": {
+        "en": "Finished",
+        "ja": "終わったもの",
+        "qps-ploc": "⟦Ƒïñïşħėḓ ŀőř⟧"
+      },
+      "progress_detail_requested": {
+        "en": "What you asked",
+        "ja": "頼んだこと",
+        "qps-ploc": "⟦Ẇħȧŧ ẏőů ȧşķėḓ ŀőřė⟧"
+      },
+      "progress_detail_now": {
+        "en": "What is happening now",
+        "ja": "いまやっていること",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ħȧṗṗėñïñɠ ñőẇ ŀőřėɱ ⟧"
+      },
+      "progress_detail_next": {
+        "en": "What comes next",
+        "ja": "この先",
+        "qps-ploc": "⟦Ẇħȧŧ ƈőɱėş ñėẋŧ ŀőřė⟧"
+      },
+      "progress_detail_log": {
+        "en": "Timeline",
+        "ja": "経過",
+        "qps-ploc": "⟦Ŧïɱėŀïñė ŀőř⟧"
+      },
+      "progress_action_note": {
+        "en": "Send a note",
+        "ja": "ひとこと伝える",
+        "qps-ploc": "⟦Şėñḓ ȧ ñőŧė ŀőř⟧"
+      },
+      "progress_action_stop": {
+        "en": "Stop",
+        "ja": "止める",
+        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
+      },
+      "progress_open_mirror": {
+        "en": "Watch the screen",
+        "ja": "手元の画面を見る",
+        "qps-ploc": "⟦Ẇȧŧƈħ ŧħė şƈřėėñ ŀőřėɱ⟧"
+      },
+      "progress_delivered_title": {
+        "en": "Delivered",
+        "ja": "できたもの",
+        "qps-ploc": "⟦Ḓėŀïṽėřėḓ ŀőř⟧"
+      },
+      "progress_delivered_waiting": {
+        "en": "{count} waiting to be received",
+        "ja": "受け取り待ち {count}件",
+        "qps-ploc": "⟦{count} ẇȧïŧïñɠ ŧő ƀė řėƈėïṽėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "progress_empty_active": {
+        "en": "Nothing is in progress.",
+        "ja": "進行中の作業はありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ïñ ṗřőɠřėşş. ŀőřėɱ ï⟧"
+      },
+      "progress_empty_delivered": {
+        "en": "Nothing is waiting to be received.",
+        "ja": "受け取り待ちの成果はありません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ẇȧïŧïñɠ ŧő ƀė řėƈėïṽėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "progress_select_hint": {
+        "en": "Choose an item to see its details.",
+        "ja": "項目を選ぶと詳細が見られます。",
+        "qps-ploc": "⟦Ƈħőőşė ȧñ ïŧėɱ ŧő şėė ïŧş ḓėŧȧïŀş. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "settings_nav_profile": {
+        "en": "About you",
+        "ja": "あなたのこと",
+        "qps-ploc": "⟦Ȧƀőůŧ ẏőů ŀőř⟧"
+      },
+      "settings_nav_members": {
+        "en": "Organization and members",
+        "ja": "組織とメンバー",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ȧñḓ ɱėɱƀėřş ŀőřėɱ ï⟧"
+      },
+      "settings_nav_services": {
+        "en": "Connected services",
+        "ja": "サービス連携",
+        "qps-ploc": "⟦Ƈőññėƈŧėḓ şėřṽïƈėş ŀőřėɱ⟧"
+      },
+      "settings_nav_voice": {
+        "en": "Voice and speech",
+        "ja": "声と話し方",
+        "qps-ploc": "⟦Ṽőïƈė ȧñḓ şṗėėƈħ ŀőřėɱ⟧"
+      },
+      "settings_nav_notifications": {
+        "en": "Notifications",
+        "ja": "通知",
+        "qps-ploc": "⟦Ñőŧïƒïƈȧŧïőñş ŀőřė⟧"
+      },
+      "settings_nav_plugins": {
+        "en": "Extensions",
+        "ja": "拡張機能",
+        "qps-ploc": "⟦Ėẋŧėñşïőñş ŀőř⟧"
+      },
+      "settings_nav_advanced": {
+        "en": "Advanced",
+        "ja": "詳細設定",
+        "qps-ploc": "⟦Ȧḓṽȧñƈėḓ ŀőř⟧"
+      },
+      "settings_services_lead": {
+        "en": "Once connected, your companion can read and write on your behalf.",
+        "ja": "つなぐと、相棒が代わりに読み書きできます。",
+        "qps-ploc": "⟦Őñƈė ƈőññėƈŧėḓ, ẏőůř ƈőɱṗȧñïőñ ƈȧñ řėȧḓ ȧñḓ ẇřïŧė őñ ẏőůř ƀėħȧŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "settings_service_connected": {
+        "en": "Connected",
+        "ja": "接続済み",
+        "qps-ploc": "⟦Ƈőññėƈŧėḓ ŀőř⟧"
+      },
+      "settings_service_connect": {
+        "en": "Connect",
+        "ja": "接続する",
+        "qps-ploc": "⟦Ƈőññėƈŧ ŀőř⟧"
+      },
+      "settings_service_reconnect_hint": {
+        "en": "{service} needs to be reconnected. Use “Connect” to sign in again.",
+        "ja": "{service} は認証が切れています。「接続する」で再認証できます。",
+        "qps-ploc": "⟦{service} ñėėḓş ŧő ƀė řėƈőññėƈŧėḓ. Ůşė “Ƈőññėƈŧ” ŧő şïɠñ ïñ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "settings_voice_mic": {
+        "en": "Microphone",
+        "ja": "マイク",
+        "qps-ploc": "⟦Ɱïƈřőṗħőñė ŀőř⟧"
+      },
+      "settings_voice_voice": {
+        "en": "Your companion's voice",
+        "ja": "相棒の声",
+        "qps-ploc": "⟦Ẏőůř ƈőɱṗȧñïőñ'ş ṽőïƈė ŀőřėɱ ï⟧"
+      },
+      "settings_voice_handsfree": {
+        "en": "Keep listening hands-free",
+        "ja": "ハンズフリーで聞き続ける",
+        "qps-ploc": "⟦Ķėėṗ ŀïşŧėñïñɠ ħȧñḓş-ƒřėė ŀőřėɱ ïṗ⟧"
+      },
+      "settings_voice_handsfree_hint": {
+        "en": "Say “Kyberion” to get its attention.",
+        "ja": "「Kyberion」と呼びかけると反応します。",
+        "qps-ploc": "⟦Şȧẏ “Ķẏƀėřïőñ” ŧő ɠėŧ ïŧş ȧŧŧėñŧïőñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "settings_change": {
+        "en": "Change",
+        "ja": "変える",
+        "qps-ploc": "⟦Ƈħȧñɠė ŀőř⟧"
+      },
+      "settings_try": {
+        "en": "Try",
+        "ja": "試す",
+        "qps-ploc": "⟦Ŧřẏ ŀőř⟧"
+      },
+      "settings_advanced_lead": {
+        "en": "Operating rules, models and logs. You rarely need these.",
+        "ja": "運用ルール・モデル・ログ。ふだんは触らなくて大丈夫です。",
+        "qps-ploc": "⟦Őṗėřȧŧïñɠ řůŀėş, ɱőḓėŀş ȧñḓ ŀőɠş. Ẏőů řȧřėŀẏ ñėėḓ ŧħėşė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "settings_open_chronos": {
+        "en": "Open in the operations view",
+        "ja": "運用画面（管制塔）で開く",
+        "qps-ploc": "⟦Őṗėñ ïñ ŧħė őṗėřȧŧïőñş ṽïėẇ ŀőřėɱ ïṗ⟧"
+      },
+      "settings_tenants_title": {
+        "en": "Tenants",
+        "ja": "テナント",
+        "qps-ploc": "⟦Ŧėñȧñŧş ŀőř⟧"
+      },
+      "settings_tenants_lead": {
+        "en": "Where you can look, and your role there.",
+        "ja": "あなたが見られる場所と、そこでの役割。",
+        "qps-ploc": "⟦Ẇħėřė ẏőů ƈȧñ ŀőőķ, ȧñḓ ẏőůř řőŀė ŧħėřė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "settings_tenant_current": {
+        "en": "(viewing now)",
+        "ja": "（いま見ている）",
+        "qps-ploc": "⟦(ṽïėẇïñɠ ñőẇ) ŀőřė⟧"
+      },
+      "settings_members_title": {
+        "en": "Members",
+        "ja": "メンバー",
+        "qps-ploc": "⟦Ɱėɱƀėřş ŀőř⟧"
+      },
+      "settings_members_soon": {
+        "en": "Adding members comes in a later step. For now only the local owner can sign in.",
+        "ja": "メンバーの追加は次の段階で入ります。いまはローカルのオーナーだけが使えます。",
+        "qps-ploc": "⟦Ȧḓḓïñɠ ɱėɱƀėřş ƈőɱėş ïñ ȧ ŀȧŧėř şŧėṗ. Ƒőř ñőẇ őñŀẏ ŧħė ŀőƈȧŀ őẇñėř ƈȧñ şïɠñ ïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "settings_saved": {
+        "en": "Saved.",
+        "ja": "保存しました。",
+        "qps-ploc": "⟦Şȧṽėḓ. ŀőř⟧"
+      },
+      "settings_first_run_lead": {
+        "en": "Let's set things up in order. You can come back to any section later.",
+        "ja": "順番に整えていきましょう。あとからどの項目にも戻れます。",
+        "qps-ploc": "⟦Ŀėŧ'ş şėŧ ŧħïñɠş ůṗ ïñ őřḓėř. Ẏőů ƈȧñ ƈőɱė ƀȧƈķ ŧő ȧñẏ şėƈŧïőñ ŀȧŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "ask_placeholder_followup": {
+        "en": "Keep talking, or type here",
+        "ja": "続けて話しかけるか、ここに書いてください",
+        "qps-ploc": "⟦Ķėėṗ ŧȧŀķïñɠ, őř ŧẏṗė ħėřė ŀőřėɱ ïṗ⟧"
+      },
+      "ask_about_title": {
+        "en": "About this request",
+        "ja": "この依頼について",
+        "qps-ploc": "⟦Ȧƀőůŧ ŧħïş řėɋůėşŧ ŀőřėɱ⟧"
+      },
+      "ask_understood": {
+        "en": "What I understood",
+        "ja": "理解したこと",
+        "qps-ploc": "⟦Ẇħȧŧ Ï ůñḓėřşŧőőḓ ŀőřėɱ⟧"
+      },
+      "ask_state": {
+        "en": "Current state",
+        "ja": "いまの状態",
+        "qps-ploc": "⟦Ƈůřřėñŧ şŧȧŧė ŀőřė⟧"
+      },
+      "ask_decision_point": {
+        "en": "Where your decision is needed",
+        "ja": "あなたの判断が必要になる点",
+        "qps-ploc": "⟦Ẇħėřė ẏőůř ḓėƈïşïőñ ïş ñėėḓėḓ ŀőřėɱ ïṗş⟧"
+      },
+      "ask_deliverable": {
+        "en": "What you will get",
+        "ja": "できあがるもの",
+        "qps-ploc": "⟦Ẇħȧŧ ẏőů ẇïŀŀ ɠėŧ ŀőřėɱ⟧"
+      },
+      "ask_recent": {
+        "en": "Recent requests",
+        "ja": "最近の依頼",
+        "qps-ploc": "⟦Řėƈėñŧ řėɋůėşŧş ŀőřė⟧"
+      },
+      "ask_handsfree_on": {
+        "en": "Hands-free: on",
+        "ja": "ハンズフリー：オン",
+        "qps-ploc": "⟦Ħȧñḓş-ƒřėė: őñ ŀőřė⟧"
+      },
+      "ask_handsfree_off": {
+        "en": "Hands-free: off",
+        "ja": "ハンズフリー：オフ",
+        "qps-ploc": "⟦Ħȧñḓş-ƒřėė: őƒƒ ŀőřė⟧"
+      },
+      "ask_listening": {
+        "en": "Listening…",
+        "ja": "聞いています…",
+        "qps-ploc": "⟦Ŀïşŧėñïñɠ… ŀőř⟧"
+      },
+      "ask_thinking": {
+        "en": "Thinking…",
+        "ja": "考えています…",
+        "qps-ploc": "⟦Ŧħïñķïñɠ… ŀőř⟧"
+      },
+      "ask_proceed": {
+        "en": "Go ahead",
+        "ja": "進める",
+        "qps-ploc": "⟦Ɠő ȧħėȧḓ ŀőř⟧"
+      },
+      "ask_more_detail": {
+        "en": "Tell me more",
+        "ja": "もう少し詳しく",
+        "qps-ploc": "⟦Ŧėŀŀ ɱė ɱőřė ŀőř⟧"
+      },
+      "ask_empty": {
+        "en": "Say something, or start from a chip below.",
+        "ja": "ここに話しかけるか、下のチップから始めてください。",
+        "qps-ploc": "⟦Şȧẏ şőɱėŧħïñɠ, őř şŧȧřŧ ƒřőɱ ȧ ƈħïṗ ƀėŀőẇ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ask_today": {
+        "en": "Today",
+        "ja": "今日",
+        "qps-ploc": "⟦Ŧőḓȧẏ ŀőř⟧"
+      },
+      "ask_voice_settings": {
+        "en": "Voice settings",
+        "ja": "声の設定",
+        "qps-ploc": "⟦Ṽőïƈė şėŧŧïñɠş ŀőřė⟧"
+      },
+      "ask_send_failed": {
+        "en": "I could not send that. Please try again.",
+        "ja": "送れませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ï ƈőůŀḓ ñőŧ şėñḓ ŧħȧŧ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "shape_direct_answer": {
+        "en": "Reply now",
+        "ja": "その場で回答",
+        "qps-ploc": "⟦Řėṗŀẏ ñőẇ ŀőř⟧"
+      },
+      "shape_task_session": {
+        "en": "Working on it as a task",
+        "ja": "作業として進行",
+        "qps-ploc": "⟦Ẇőřķïñɠ őñ ïŧ ȧş ȧ ŧȧşķ ŀőřėɱ ï⟧"
+      },
+      "shape_mission": {
+        "en": "Set up as a larger job",
+        "ja": "大きな仕事として編成",
+        "qps-ploc": "⟦Şėŧ ůṗ ȧş ȧ ŀȧřɠėř ĵőƀ ŀőřėɱ ï⟧"
+      },
+      "shape_project_bootstrap": {
+        "en": "Setting up a new project",
+        "ja": "新しいプロジェクトの準備",
+        "qps-ploc": "⟦Şėŧŧïñɠ ůṗ ȧ ñėẇ ṗřőĵėƈŧ ŀőřėɱ ï⟧"
+      },
+      "shape_chip_clarification": {
+        "en": "Needs a detail",
+        "ja": "確認が必要",
+        "qps-ploc": "⟦Ñėėḓş ȧ ḓėŧȧïŀ ŀőřė⟧"
+      },
+      "shape_chip_execution_preview": {
+        "en": "Plan",
+        "ja": "進め方",
+        "qps-ploc": "⟦Ṗŀȧñ ŀőř⟧"
+      },
+      "shape_chip_status_summary": {
+        "en": "Status",
+        "ja": "状況",
+        "qps-ploc": "⟦Şŧȧŧůş ŀőř⟧"
+      },
+      "shape_chip_delivery_summary": {
+        "en": "Delivered",
+        "ja": "できました",
+        "qps-ploc": "⟦Ḓėŀïṽėřėḓ ŀőř⟧"
+      },
+      "shape_chip_reply": {
+        "en": "Reply",
+        "ja": "回答",
+        "qps-ploc": "⟦Řėṗŀẏ ŀőř⟧"
+      },
+      "settings_member_add": {
+        "en": "Add a member",
+        "ja": "メンバーを追加",
+        "qps-ploc": "⟦Ȧḓḓ ȧ ɱėɱƀėř ŀőř⟧"
+      },
+      "settings_member_add_display_name": {
+        "en": "Display name",
+        "ja": "表示名",
+        "qps-ploc": "⟦Ḓïşṗŀȧẏ ñȧɱė ŀőř⟧"
+      },
+      "settings_member_add_id": {
+        "en": "Member ID",
+        "ja": "メンバーID",
+        "qps-ploc": "⟦Ɱėɱƀėř ÏḒ ŀőř⟧"
+      },
+      "settings_member_add_tenant": {
+        "en": "Tenant",
+        "ja": "テナント",
+        "qps-ploc": "⟦Ŧėñȧñŧ ŀőř⟧"
+      },
+      "settings_member_add_role": {
+        "en": "Role",
+        "ja": "役割",
+        "qps-ploc": "⟦Řőŀė ŀőř⟧"
+      },
+      "settings_member_add_issue_token": {
+        "en": "Issue an access token",
+        "ja": "アクセス用トークンを発行する",
+        "qps-ploc": "⟦Ïşşůė ȧñ ȧƈƈėşş ŧőķėñ ŀőřėɱ ⟧"
+      },
+      "settings_member_add_submit": {
+        "en": "Add",
+        "ja": "追加する",
+        "qps-ploc": "⟦Ȧḓḓ ŀőř⟧"
+      },
+      "settings_member_signin_local": {
+        "en": "Local",
+        "ja": "ローカル",
+        "qps-ploc": "⟦Ŀőƈȧŀ ŀőř⟧"
+      },
+      "settings_member_signin_token": {
+        "en": "Access token",
+        "ja": "アクセス用トークン",
+        "qps-ploc": "⟦Ȧƈƈėşş ŧőķėñ ŀőř⟧"
+      },
+      "settings_token_once": {
+        "en": "This token is shown only once. Copy it now, before you leave this screen.",
+        "ja": "このトークンはいまだけ表示されます。この画面を閉じる前に控えてください。",
+        "qps-ploc": "⟦Ŧħïş ŧőķėñ ïş şħőẇñ őñŀẏ őñƈė. Ƈőṗẏ ïŧ ñőẇ, ƀėƒőřė ẏőů ŀėȧṽė ŧħïş şƈřėėñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "settings_member_role_change": {
+        "en": "Change role",
+        "ja": "役割を変える",
+        "qps-ploc": "⟦Ƈħȧñɠė řőŀė ŀőř⟧"
+      },
+      "settings_member_suspend": {
+        "en": "Suspend",
+        "ja": "停止する",
+        "qps-ploc": "⟦Şůşṗėñḓ ŀőř⟧"
+      },
+      "settings_member_reactivate": {
+        "en": "Reactivate",
+        "ja": "再開する",
+        "qps-ploc": "⟦Řėȧƈŧïṽȧŧė ŀőř⟧"
+      },
+      "settings_member_status_active": {
+        "en": "Active",
+        "ja": "有効",
+        "qps-ploc": "⟦Ȧƈŧïṽė ŀőř⟧"
+      },
+      "settings_member_status_suspended": {
+        "en": "Suspended",
+        "ja": "停止中",
+        "qps-ploc": "⟦Şůşṗėñḓėḓ ŀőř⟧"
+      },
+      "settings_member_added": {
+        "en": "Member added.",
+        "ja": "メンバーを追加しました。",
+        "qps-ploc": "⟦Ɱėɱƀėř ȧḓḓėḓ. ŀőřė⟧"
+      },
+      "settings_member_updated": {
+        "en": "Member updated.",
+        "ja": "メンバーを更新しました。",
+        "qps-ploc": "⟦Ɱėɱƀėř ůṗḓȧŧėḓ. ŀőřė⟧"
+      },
+      "signin_title": {
+        "en": "Who's there?",
+        "ja": "どなたですか？",
+        "qps-ploc": "⟦Ẇħő'ş ŧħėřė? ŀőř⟧"
+      },
+      "signin_lead": {
+        "en": "Paste the access token you were given.",
+        "ja": "渡されたアクセス用トークンを貼り付けてください。",
+        "qps-ploc": "⟦Ṗȧşŧė ŧħė ȧƈƈėşş ŧőķėñ ẏőů ẇėřė ɠïṽėñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "signin_token_label": {
+        "en": "Access token",
+        "ja": "アクセス用トークン",
+        "qps-ploc": "⟦Ȧƈƈėşş ŧőķėñ ŀőř⟧"
+      },
+      "signin_submit": {
+        "en": "Enter",
+        "ja": "入る",
+        "qps-ploc": "⟦Ėñŧėř ŀőř⟧"
+      },
+      "signin_error": {
+        "en": "That token did not work.",
+        "ja": "そのトークンでは入れませんでした。",
+        "qps-ploc": "⟦Ŧħȧŧ ŧőķėñ ḓïḓ ñőŧ ẇőřķ. ŀőřėɱ ï⟧"
+      },
+      "settings_token_once_dismiss": {
+        "en": "Close",
+        "ja": "閉じる",
+        "qps-ploc": "⟦Ƈŀőşė ŀőř⟧"
+      },
+      "settings_member_owner_only": {
+        "en": "Member management requires the owner role.",
+        "ja": "メンバー管理はオーナーだけが行えます。",
+        "qps-ploc": "⟦Ɱėɱƀėř ɱȧñȧɠėɱėñŧ řėɋůïřėş ŧħė őẇñėř řőŀė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "settings_member_invalid_input": {
+        "en": "member_id, display_name, tenant_slug, and role are all required.",
+        "ja": "member_id・display_name・tenant_slug・role がすべて必要です。",
+        "qps-ploc": "⟦ɱėɱƀėř_ïḓ, ḓïşṗŀȧẏ_ñȧɱė, ŧėñȧñŧ_şŀůɠ, ȧñḓ řőŀė ȧřė ȧŀŀ řėɋůïřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "settings_member_already_exists": {
+        "en": "That member_id is already in use: {memberId}",
+        "ja": "その member_id はすでに使われています: {memberId}",
+        "qps-ploc": "⟦Ŧħȧŧ ɱėɱƀėř_ïḓ ïş ȧŀřėȧḓẏ ïñ ůşė: {memberId} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "settings_member_patch_invalid": {
+        "en": "Provide (tenant_slug and role) or status.",
+        "ja": "（tenant_slug と role）または status のいずれかを指定してください。",
+        "qps-ploc": "⟦Ṗřőṽïḓė (ŧėñȧñŧ_şŀůɠ ȧñḓ řőŀė) őř şŧȧŧůş. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "settings_member_not_found": {
+        "en": "That member was not found.",
+        "ja": "そのメンバーは見つかりませんでした。",
+        "qps-ploc": "⟦Ŧħȧŧ ɱėɱƀėř ẇȧş ñőŧ ƒőůñḓ. ŀőřėɱ ïṗ⟧"
       }
     }
   }

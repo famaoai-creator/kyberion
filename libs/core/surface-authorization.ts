@@ -8,7 +8,11 @@
 
 export type SurfaceAuthorizationRole = 'readonly' | 'localadmin';
 export type SurfaceAuthorizationEffect = 'read' | 'write';
-export type SurfacePermission = 'surface.headless.read' | 'surface.headless.write';
+export type SurfacePermission =
+  | 'surface.headless.read'
+  | 'surface.headless.write'
+  /** FD-07: the "approver" human role's decision-only slice of surface.headless.write (front-desk-roles.ts). */
+  | 'surface.decision.write';
 
 export interface SurfaceAuthorizationContext {
   role: SurfaceAuthorizationRole;
@@ -94,6 +98,22 @@ export function permissionsForSurfaceRole(
   return ROLE_PERMISSIONS[role];
 }
 
+/**
+ * FD-07: when a caller passes an explicit `context.permissions`, it REPLACES
+ * (never unions with) the role-derived default set. This is what lets the
+ * `approver` human role share the `localadmin` server role (for the
+ * `requiredRole` gate below) while still being denied
+ * `surface.headless.write` — without it, an approver's default `localadmin`
+ * permissions would always include full write, no matter what
+ * `front-desk-roles.ts` declares. No caller set `context.permissions` before
+ * FD-07, so this is behaviorally additive for every existing caller.
+ */
+function resolveSurfacePermissions(
+  context: SurfaceAuthorizationContext
+): ReadonlySet<SurfacePermission> {
+  return new Set(context.permissions ?? permissionsForSurfaceRole(context.role));
+}
+
 export function authorizeSurfaceOperation(input: {
   context: SurfaceAuthorizationContext;
   operation: SurfaceOperationPolicy;
@@ -126,10 +146,7 @@ export function authorizeSurfaceOperation(input: {
     );
   }
 
-  const permissions = new Set<SurfacePermission>([
-    ...permissionsForSurfaceRole(context.role),
-    ...(context.permissions || []),
-  ]);
+  const permissions = resolveSurfacePermissions(context);
   const missingPermission = operation.requiredPermissions.find(
     (permission) => !permissions.has(permission)
   );

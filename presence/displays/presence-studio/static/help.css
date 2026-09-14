@@ -1,0 +1,73 @@
+/*
+ * help.css — FD-08: the "使い方を見る" page.
+ *
+ * Tokens come from design-tokens.css (--kb-*) only. Responsive breakpoint
+ * matches front-desk-rail.css (720px: rail becomes a bottom tab bar).
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--kb-font-sans, Inter, 'Noto Sans JP', sans-serif);
+  background: var(--kb-bg-main, #ffffff);
+  color: var(--kb-text-primary, #0f172a);
+}
+
+.help-shell {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 24px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.help-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--kb-text-primary, #0f172a);
+}
+
+.help-card {
+  background: var(--kb-bg-main, #ffffff);
+  border: 1px solid var(--kb-border, #e2e8f0);
+  border-radius: 14px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.help-card-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--kb-text-primary, #0f172a);
+}
+
+.help-card-sub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--kb-muted-text, #475569);
+}
+
+.help-card-link {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--kb-primary, #0b5fff);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.help-card-link:hover {
+  opacity: 0.9;
+}

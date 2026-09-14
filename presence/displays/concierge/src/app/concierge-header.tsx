@@ -1,8 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 
+// FD-00c: the Home / 資料の取込 / Setup nav links moved to `FrontDeskRail` —
+// this header keeps only the crest/tagline and the locale switcher.
 export function ConciergeHeader() {
   const { locale, setLocale, t } = useConciergeI18n();
   return (
@@ -15,15 +16,6 @@ export function ConciergeHeader() {
         </div>
       </div>
       <div className="concierge-header-note">
-        <Link href="/" style={{ marginRight: 12 }}>
-          {t('header.home')}
-        </Link>
-        <Link href="/ingest" style={{ marginRight: 12 }}>
-          {t('header.ingest')}
-        </Link>
-        <Link href="/setup" style={{ marginRight: 12 }}>
-          {t('header.setup')}
-        </Link>
         <select
           aria-label={t('locale.label')}
           value={locale}

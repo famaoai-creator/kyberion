@@ -224,6 +224,71 @@ body {
   accent-color: var(--kb-accent, #8a6d3b);
 }
 
+.service-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 12px 0 8px;
+}
+
+.service-tile {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #d8d2c4;
+  border-radius: 14px;
+  background: #fbfaf7;
+}
+
+.service-tile-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f7f3ea;
+  background: linear-gradient(145deg, #2f4a3c, #1d2e26);
+}
+
+.service-tile[data-service='google-workspace'] .service-tile-icon {
+  background: linear-gradient(145deg, #4285f4, #34a853);
+}
+.service-tile[data-service='microsoft-365'] .service-tile-icon {
+  background: linear-gradient(145deg, #0078d4, #5059c9);
+}
+.service-tile[data-service='notion'] .service-tile-icon {
+  background: linear-gradient(145deg, #111111, #444444);
+}
+.service-tile[data-service='slack'] .service-tile-icon {
+  background: linear-gradient(145deg, #4a154b, #e01e5a);
+}
+.service-tile[data-service='github'] .service-tile-icon {
+  background: linear-gradient(145deg, #24292f, #57606a);
+}
+
+.service-tile-body {
+  display: grid;
+  gap: 8px;
+}
+
+.service-tile-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.service-connect-btn {
+  justify-self: start;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
 .status-chip {
   display: inline-block;
   font-size: 11px;
@@ -812,23 +877,15 @@ body {
   }
 }
 
-/* ---------- CS-04: unified inquiry queue ---------- */
+/* ---------- CS-04/FD-04: unified decision queue (決める) ---------- */
 .inquiry-queue {
   border-left: 3px solid var(--kb-accent, #8a6d3b);
 }
 .queue-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
   margin-bottom: 10px;
 }
-.queue-item > .item-card {
-  flex: 1;
-  margin-bottom: 0;
-}
 .queue-chip {
-  flex: 0 0 auto;
-  margin-top: 14px;
+  display: inline-block;
   padding: 2px 10px;
   border-radius: 999px;
   font-size: 0.72rem;
@@ -842,6 +899,128 @@ body {
 }
 .queue-chip.exception {
   border-style: dashed;
+}
+
+/* FD-04 (決める): header row above the queue. */
+.decide-heading {
+  margin: 0 0 4px;
+  font-size: 20px;
+  letter-spacing: 0.02em;
+}
+.decide-lead {
+  margin-bottom: 16px;
+}
+
+/* FD-04: filter chips (種類 x テナント, plan §2.1) — tenant chips are omitted
+   entirely today because no queue item type carries a tenant slug yet (see
+   FD-04 report). */
+.decide-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+.decide-filter-chip {
+  border: 1px solid #d8d2c4;
+  background: #fff;
+  color: var(--kb-text-secondary, #6b7280);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.decide-filter-chip.active {
+  border-color: var(--kb-accent, #8a6d3b);
+  color: var(--kb-accent, #8a6d3b);
+  background: var(--kb-chip-bg, rgba(138, 109, 59, 0.12));
+  font-weight: 600;
+}
+
+/* FD-04: per-card top line (kind tag / relative time / decide_by), title,
+   and the why/effect columns. */
+.decide-card-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.decide-time {
+  font-size: 11px;
+  color: var(--kb-text-secondary, #9ca3af);
+}
+.decide-by-badge {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--kb-text-secondary, #6b7280);
+  white-space: nowrap;
+}
+.decide-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.decide-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 0 0 10px;
+}
+.decide-column-label {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--kb-text-secondary, #6b7280);
+}
+.decide-column .item-body {
+  margin: 0;
+}
+.decide-evidence-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--kb-accent, #8a6d3b);
+}
+@media (max-width: 720px) {
+  .decide-columns {
+    grid-template-columns: 1fr;
+  }
+  .decide-by-badge {
+    margin-left: 0;
+  }
+}
+
+/* FD-04: あとで見る項目 — a client-side-only, collapsed disclosure; reopening
+   it never re-issues a request, it only reads back the deferred ids. */
+.decide-deferred-section {
+  margin-top: 20px;
+  border-top: 1px dashed #e7e2d8;
+  padding-top: 12px;
+}
+.decide-deferred-section summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+.decide-deferred-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #efeae0;
+}
+.decide-deferred-title {
+  flex: 1;
+  font-size: 13px;
+}
+
+/* FD-04: the response-status pane moved below the queue and is now
+   secondary — smaller heading, quieter color. */
+.response-status h2 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kb-text-secondary, #6b7280);
+  letter-spacing: 0.04em;
 }
 
 /* ---------- CS-04: command palette (⌘K) ---------- */
@@ -900,6 +1079,377 @@ body {
   font-size: 0.8rem;
   opacity: 0.7;
   margin: 0;
+}
+
+/* ---------- FD-00c/FD-01c: shared front-desk rail ---------- */
+
+.fd-layout {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.fd-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fd-rail {
+  flex: 0 0 232px;
+  width: 232px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 12px;
+  background: #e8edf3;
+  border-right: 1px solid var(--kb-border, #d8d2c4);
+}
+
+@media (prefers-color-scheme: dark) {
+  .fd-rail {
+    background: var(--kb-panel-bg, #1f2430);
+    border-right-color: var(--kb-border, rgba(255, 255, 255, 0.12));
+  }
+}
+
+.fd-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 12px;
+}
+
+.fd-brand-mark {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--kb-text-primary, #1f2937);
+  flex-shrink: 0;
+}
+
+.fd-brand-text strong {
+  display: block;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+.fd-brand-tagline {
+  font-size: 11px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.fd-tenant-block {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.fd-tenant-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--kb-border, #d8d2c4);
+  border-radius: 10px;
+  background: #ffffff;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.fd-tenant-button:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.fd-tenant-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fd-tenant-summary {
+  font-size: 11px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.fd-tenant-list {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--kb-border, #d8d2c4);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+}
+
+.fd-tenant-option {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fd-tenant-option:hover,
+.fd-tenant-option[aria-selected='true'] {
+  background: var(--kb-chip-bg, rgba(138, 109, 59, 0.12));
+}
+
+.fd-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: var(--kb-text-primary, #1f2937);
+  text-decoration: none;
+}
+
+.fd-item:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.fd-item[aria-current='page'] {
+  background: #ffffff;
+  color: var(--kb-accent, #8a6d3b);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.fd-item[aria-current='page'] svg {
+  color: var(--kb-accent, #8a6d3b);
+}
+
+.fd-item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fd-item-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fd-item-sublabel {
+  font-size: 11px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.fd-secondary-link {
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--kb-text-secondary, #6b7280);
+  text-decoration: none;
+}
+
+.fd-secondary-link:hover {
+  text-decoration: underline;
+}
+
+.fd-help-link {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--kb-text-secondary, #6b7280);
+  text-decoration: none;
+  border-top: 1px solid var(--kb-border, #d8d2c4);
+  padding-top: 12px;
+}
+
+.fd-help-link:hover {
+  color: var(--kb-text-primary, #1f2937);
+}
+
+@media (max-width: 720px) {
+  .fd-layout {
+    flex-direction: column;
+  }
+
+  .fd-rail {
+    order: 2;
+    flex: 0 0 auto;
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    gap: 0;
+    padding: 4px;
+    border-right: 0;
+    border-top: 1px solid var(--kb-border, #d8d2c4);
+    position: sticky;
+    bottom: 0;
+  }
+
+  .fd-brand,
+  .fd-tenant-block,
+  .fd-secondary-link,
+  .fd-help-link,
+  .fd-item-sublabel {
+    display: none;
+  }
+
+  .fd-content {
+    order: 1;
+  }
+
+  .fd-items {
+    flex: 1 1 auto;
+    flex-direction: row;
+    justify-content: space-around;
+  }
+
+  .fd-item {
+    flex-direction: column;
+    gap: 2px;
+    min-height: 44px;
+    min-width: 44px;
+    justify-content: center;
+    padding: 4px 6px;
+  }
+
+  .fd-item-label {
+    font-size: 10px;
+    font-weight: 500;
+  }
+}
+
+/* ---------- FD-06: 設定 (/settings) — left sub-nav + card stack ---------- */
+
+.settings-first-run-lead {
+  font-size: 13px;
+  color: var(--kb-text-secondary, #6b7280);
+  margin: 0 0 12px;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.settings-subnav {
+  position: sticky;
+  top: 16px;
+}
+
+.settings-subnav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-subnav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--kb-text-secondary, #6b7280);
+  cursor: pointer;
+}
+
+.settings-subnav-item:hover {
+  background: #f4efe6;
+}
+
+.settings-subnav-item.active {
+  background: #f4efe6;
+  color: var(--kb-text-primary, #1f2937);
+  font-weight: 600;
+}
+
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.settings-card-lead {
+  font-size: 13px;
+  color: var(--kb-text-secondary, #6b7280);
+  margin: 0 0 12px;
+}
+
+.settings-tenant-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-details {
+  border: 1px solid #efeae0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 12px;
+}
+
+.settings-details > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-details[open] > summary {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 720px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-subnav {
+    position: static;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-subnav ul {
+    flex-direction: row;
+    gap: 6px;
+    padding-bottom: 4px;
+  }
+
+  .settings-subnav-item {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
 }
 
 /* ---------- CS-04: keyboard accessibility ---------- */

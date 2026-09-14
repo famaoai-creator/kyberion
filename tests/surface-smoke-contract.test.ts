@@ -68,7 +68,9 @@ describe('surface smoke contract', () => {
     expect(computerSurface).toContain('first-run-banner');
     expect(computerSurface).toContain('identity-badge');
     expect(presenceStudio).toContain('Presence Studio');
-    expect(presenceStudio).toContain('first-run-banner');
+    // FD-08: /work dropped the first-run banner (superseded by the home
+    // page's own first-run guidance) — identity-badge stays.
+    expect(presenceStudio).not.toContain('first-run-banner');
     expect(presenceStudio).toContain('identity-badge');
   });
 });
