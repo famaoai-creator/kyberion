@@ -11560,6 +11560,81 @@
         "en": "Requirements canvas",
         "ja": "要件キャンバス",
         "qps-ploc": "⟦Řėɋůïřėɱėñŧş ƈȧñṽȧş ŀőřėɱ ⟧"
+      },
+      "hearing_handoff_button": {
+        "en": "Confirm and hand off as a request",
+        "ja": "要件を確定して依頼にする",
+        "qps-ploc": "⟦Ƈőñƒïřɱ ȧñḓ ħȧñḓ őƒƒ ȧş ȧ řėɋůėşŧ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "hearing_handoff_pending": {
+        "en": "Registering the request…",
+        "ja": "依頼として登録しています…",
+        "qps-ploc": "⟦Řėɠïşŧėřïñɠ ŧħė řėɋůėşŧ… ŀőřėɱ ï⟧"
+      },
+      "hearing_handoff_done": {
+        "en": "Registered as a request. Approve it under Decide.",
+        "ja": "依頼として登録しました。承認は「決める」で行えます。",
+        "qps-ploc": "⟦Řėɠïşŧėřėḓ ȧş ȧ řėɋůėşŧ. Ȧṗṗřőṽė ïŧ ůñḓėř Ḓėƈïḓė. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "hearing_handoff_failed": {
+        "en": "Could not register the request. Please try again.",
+        "ja": "登録できませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėɠïşŧėř ŧħė řėɋůėşŧ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "hearing_mission_label": {
+        "en": "Request {id}",
+        "ja": "依頼番号 {id}",
+        "qps-ploc": "⟦Řėɋůėşŧ {id} ŀőř⟧"
+      },
+      "hearing_open_decide": {
+        "en": "Approve in Decide",
+        "ja": "「決める」で承認する",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ïñ Ḓėƈïḓė ŀőřėɱ⟧"
+      },
+      "hearing_canvas_updating": {
+        "en": "Updating the canvas…",
+        "ja": "キャンバスを更新中…",
+        "qps-ploc": "⟦Ůṗḓȧŧïñɠ ŧħė ƈȧñṽȧş… ŀőřėɱ ⟧"
+      },
+      "hearing_canvas_generated": {
+        "en": "Draft by your companion",
+        "ja": "相棒が作った案",
+        "qps-ploc": "⟦Ḓřȧƒŧ ƀẏ ẏőůř ƈőɱṗȧñïőñ ŀőřėɱ ï⟧"
+      },
+      "hearing_canvas_template": {
+        "en": "Requirements so far",
+        "ja": "ここまでの要件",
+        "qps-ploc": "⟦Řėɋůïřėɱėñŧş şő ƒȧř ŀőřėɱ ⟧"
+      },
+      "training_mark_done": {
+        "en": "Done",
+        "ja": "できた",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "training_mark_done_recorded": {
+        "en": "Recorded.",
+        "ja": "記録しました。",
+        "qps-ploc": "⟦Řėƈőřḓėḓ. ŀőř⟧"
+      },
+      "training_mark_done_failed": {
+        "en": "Could not record that. Please try again.",
+        "ja": "記録できませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėƈőřḓ ŧħȧŧ. Ṗŀėȧşė ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "settings_training_progress": {
+        "en": "Training progress",
+        "ja": "受講の進み具合",
+        "qps-ploc": "⟦Ŧřȧïñïñɠ ṗřőɠřėşş ŀőřėɱ⟧"
+      },
+      "training_lessons_done": {
+        "en": "{done}/{total} lessons",
+        "ja": "{done}/{total} レッスン",
+        "qps-ploc": "⟦{done}/{total} ŀėşşőñş ŀőřėɱ ï⟧"
+      },
+      "training_no_progress": {
+        "en": "Not started yet",
+        "ja": "まだ始めていません",
+        "qps-ploc": "⟦Ñőŧ şŧȧřŧėḓ ẏėŧ ŀőřė⟧"
       }
     }
   }
