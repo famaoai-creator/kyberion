@@ -523,6 +523,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/mcp-facade-model.md",
+      "tier": "public",
+      "size": 3557,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/media-document-generation-boundary.md",
       "tier": "public",
       "size": 3026,
@@ -1737,7 +1743,7 @@
     {
       "path": "product/governance/mcp-tool-catalog.json",
       "tier": "public",
-      "size": 8435,
+      "size": 11521,
       "type": "json"
     },
     {
@@ -2559,7 +2565,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 17198,
+      "size": 17389,
       "type": "json"
     },
     {
@@ -7953,7 +7959,7 @@
     {
       "path": "product/schemas/mcp-tool-catalog.schema.json",
       "tier": "public",
-      "size": 1608,
+      "size": 2501,
       "type": "json"
     },
     {
@@ -12717,7 +12723,7 @@
     {
       "path": "public/tech-stack/mcp-integration-guide.md",
       "tier": "public",
-      "size": 3339,
+      "size": 3315,
       "type": "md"
     },
     {
