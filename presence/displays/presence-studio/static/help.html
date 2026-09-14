@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>使い方を見る — Kyberion</title>
+    <!-- Kyberion Design System (DS-01 canonical tokens) -->
+    <link rel="stylesheet" href="./design-system.css" />
+    <link rel="stylesheet" href="/api/design-tokens.css" />
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <link rel="stylesheet" href="/front-desk-rail.css" />
+    <!-- FD-08: help page styles -->
+    <link rel="stylesheet" href="/help.css" />
+  </head>
+  <body>
+    <div class="fd-layout">
+      <nav id="front-desk-rail" class="front-desk-rail"></nav>
+      <div class="fd-content">
+        <main class="help-shell">
+          <h1 class="help-title" id="help-title">使い方を見る</h1>
+
+          <section class="help-card">
+            <h2 class="help-card-title" id="help-ask-title">頼む</h2>
+            <p class="help-card-sub" id="help-ask-sub">話す・書く</p>
+            <a class="help-card-link" id="help-ask-link" href="/ask">頼む</a>
+          </section>
+
+          <section class="help-card">
+            <h2 class="help-card-title" id="help-decide-title">決める</h2>
+            <p class="help-card-sub" id="help-decide-sub">承認・例外</p>
+            <a class="help-card-link" id="help-decide-link" href="#">決める</a>
+          </section>
+
+          <section class="help-card">
+            <h2 class="help-card-title" id="help-progress-title">進み具合</h2>
+            <p class="help-card-sub" id="help-progress-sub">進行中・できたもの</p>
+            <a class="help-card-link" id="help-progress-link" href="/progress">進み具合</a>
+          </section>
+        </main>
+      </div>
+    </div>
+    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script src="/front-desk-rail.js"></script>
+    <script src="/help.js"></script>
+    <script>
+      if (window.FrontDeskRail) {
+        window.FrontDeskRail.mount(document.getElementById('front-desk-rail'), { current: null });
+      }
+      if (window.KyberionHelp) {
+        window.KyberionHelp.mount();
+      }
+    </script>
+  </body>
+</html>

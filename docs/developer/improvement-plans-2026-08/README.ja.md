@@ -1,12 +1,14 @@
 ---
 title: README
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-09-11
+last_updated: 2026-09-13
 status: active
 ---
 
 # コードベース改善計画 2026-08(索引)
 
+- [ヒアリングエージェントとトレーニング計画](./FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md): 相棒の「頼む」にキャンバス付きヒアリングモード(Web アプリ要件 → alignment gate → mission)、「使い方を見る」にレベル別トレーニングとテナント単位の組織展開。PR #736 の Companion Hub はデータ形(学びカタログ、要件ドラフト)だけ活かし、ページは共有レールに統合済みのため落とす(HT-00〜06)。
+- [フロントデスク再設計計画](./FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md): 秘書室 + 相棒を「ホーム / 頼む / 決める / 進み具合 / 設定」の共有レールに統合。テナント常時表示と narrowing 切替、`GET /api/me`、最小メンバー登録簿(オーナー / 承認者 / 閲覧、SSO なし)、開発者パネルの管制塔移設、人とエージェント(NHI)の役割分離(FD-00〜10)。
 - [テナントナレッジと actuator 活用の評価・改善計画](./TENANT_KNOWLEDGE_ACTUATOR_REVIEW_2026-09-11.ja.md): 配置階層の厳密化、機密テーマの tenant 限定、personal overlay の tier 分離、computer-use の操作後観測を実装。ブラウザ所有権監査と制作物の最終検証を次段として整理。
 
 > **位置づけ**: [improvement-plans-2026-07](../improvement-plans-2026-07/README.ja.md) の後続月次バックログ。命名・ステータス規約は 07 と同一(実装状況の記録は各計画文書内の「実装状況」節)。現在の状態文書の入口は本書であり、カテゴリ横断の正本・補足資料の対応は [`documentation-source-map.json`](../../documentation-source-map.json) で管理する。
@@ -36,5 +38,7 @@ status: active
 | [DSH_ADOPTION_PLAN_2026-08-17.ja.md](./DSH_ADOPTION_PLAN_2026-08-17.ja.md) | deepseek-ai/deepseek-harness(dsh、Cordis 上の「すべて plugin」)分析・採択計画(DH-01〜16)。中心は「すべて plugin」の筋の良さ評価(拡張性の 8 割は framework でなく seam 三役・可逆登録・順序非依存・event 語彙による policy 介在・生成 fail-closed 突合の規律。postmortem 2 件は framework 機構起因)、plugin 動詞の組み合わせ方、kyberion の adapter+registry(27 seam・`unregister` 0・`reset*` 116・reasoning 20 分岐 switch・op はファイル規約 dispatch・approval は call-site 42)との 12 軸比較、plugin インターフェースを seam 契約へ結ぶ設計判断。項目: op preflight waterfall(単調 guard)・`defineSeam`(可逆・多重度・曖昧は失敗)・`pnpm bindings --dump`・reasoning provider/op resolver の開放・「model-visible ⟺ logged」+ module 帰属 invariants・生成 capability-seams グラフ・plugin manifest 動詞拡張・per-worker scoped registry・pre-step chain と inbox 二境界・permission preset/sandbox 単一 home・continuable subagent・credentials 参照化・spill/repeat/timeout guard・rejected 台帳・外部 hook bridge。Cordis 導入・core 分割・model による runtime plugin mount は非採用 | P0〜P3(部分実装; DH-01〜16 の残差は本文の実装状況を正本とする) |
 | [SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md](./SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md) | シンプルさ・使いやすさ・共通化 改善計画(SX-01〜14)。6 領域監査(core/scripts/実行層/surface/governance/docs)から根本原因 5 つ(未採用 helper・方向境界の欠如・入口多重化・ガバナンス自己増殖・UX 契約非執行)を特定し、adopt-or-delete / 方向 lint / 単一 CLI / manifest-driven check / ChannelAdapter / actuator SDK / 正本一本化 / UX 契約 lint を Wave 0〜4 で実施。削減目標をラチェットで固定 | P0〜P2(EXECUTING; SX-01〜02基盤、SX-03〜11一部実装、SX-12〜14残差) |
 | [AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md](./AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md) | エージェント連携ビュー計画(AC-01〜07: 委譲イベントの相関 ID・agent→agent エッジの redaction 通過・投影の有界読み込み・`composeCollaborationTree` 純関数・terminal-hud パネル 9「連携」(木 + waiting_on + drill-down)・Chronos 同一ツリー・文書)。新規イベント源・新規投影は作らず、既存の worker-event-stream / agent-collaboration-projection の 4 ギャップ(G1〜G4)だけを埋める。ミッション `MSN-AGENT-COLLAB-VIEW-20260906` | P1(AC-01〜11 完了; 実運用受入は次の dispatch 実行時) |
+| [FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md](./FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) | フロントデスク再設計計画(FD-00〜09)。秘書室(:3050)と相棒(:3031)の人間向け UI を「人の動詞 5 つ」の共有レールに統合し、重複(承認・成果・会話・設定の二重実装)と開発者パネルの露出を解消。テナント常時表示 + narrowing 切替、`GET /api/me`、最小メンバー登録簿(オーナー / 承認者 / 閲覧、ローカル + トークン、SSO なし)、`decided_by` 記録、人とエージェント(NHI)の役割分離とアクター語彙の統一(FD-10)。ワイヤーフレーム 9 枚を設計原本とする | P0〜P2(計画) |
+| [FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md](./FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md) | ヒアリングエージェントとトレーニング計画(HT-00〜06)。相棒「頼む」のヒアリングモード(会話 + 生成キャンバス + 要件レコード → alignment gate → mission)、「使い方を見る」のレベル別トレーニング(メンバー単位の進捗、テナント単位の割り当て)。PR #736 Companion Hub の評価と rebase 方針を含む | P1〜P2(計画) |
 
 > Cloudflare OS 計画の最新実装: OS-14 に zod schema 付き Gadget typed operation の discovery / read 実行 / held side-effect 実行を追加し、OS-15 に OAuth state 境界・段階 TTL・callback self-destruct を追加済み。

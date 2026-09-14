@@ -9,7 +9,7 @@ Kyberion の操作系サーフェスの役割マップ。**各サーフェスは
 | サーフェス            | 役割                                                                                                                                                                                           | 答える問い                                     | port | 書き込み                                       | 起動                                                                        |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ---- | ---------------------------------------------- | --------------------------------------------------------------------------- |
 | **concierge(秘書室)** | **CEO秘書** — 依頼・承認・成果・例外(+ `/setup` オンボーディング/拡張設定)                                                                                                                     | 「私は今なにを判断すればよいか」               | 3050 | scoped(依頼・承認・受領・取込・プラグイン承認) | `active-surfaces.json`(`pnpm surfaces reconcile`)                           |
-| **presence-studio**   | **相棒** — いっしょに作業するワークベンチ(音声・議事録・メール・クイックアクション)                                                                                                            | 「いま一緒に何を進めるか」                     | 3031 | 実作業                                         | `active-surfaces.json`                                                      |
+| **presence-studio**   | **相棒** — ホーム(今日のブリーフィング)・頼む(会話)・進み具合・使い方を見る。`/work` は音声・メール・議事録の実行画面(開発者向けパネルは管制塔へ移設済み、FD-08)                               | 「いま一緒に何を進めるか」                     | 3031 | 実作業                                         | `active-surfaces.json`                                                      |
 | **chronos-mirror-v2** | **管制塔** — 監視と介入(プラン→起動、承認、成果物レビュー、**組織運営モデル+6つの可視化スコープ(organization / home / work_items / operations / missions / governance)による work item 投影**) | 「システムは何をしていて、どこに介入すべきか」 | 3000 | 介入                                           | `pnpm chronos:dev` / `active-surfaces.json`                                 |
 | **operator-surface**  | **監査モニタ**(読み取り専用: ミッション・監査チェーン・ヘルス)                                                                                                                                 | 「何が起きたかを証跡で確認したい」             | 3331 | なし(inbox既読化のみ例外)                      | `pnpm --dir presence/displays/operator-surface dev`(意図的にマニフェスト外) |
 | **computer-surface**  | **作業の手元ミラー** — ブラウザ/ターミナルのいまの手元を映す                                                                                                                                   | 「Kyberion はいま手元で何をしているか」        | 3040 | なし                                           | `active-surfaces.json`                                                      |
@@ -17,6 +17,27 @@ Kyberion の操作系サーフェスの役割マップ。**各サーフェスは
 > **アクセス制御**: 各 headless surface は server-side viewer principal を解決し、共通の operation permission と tenant / organization / project / tier scope を評価する。`tenant` query は許可集合を狭めるだけで、権限を拡大しない。Chronos の `KYBERION_VIEWER_SCOPE=off|warn|enforce` は移行時の監査モード名を保持するが、未認可 tenant の要求は全モードで拒否する(`warn` は audit を先に記録する)。既定値は `warn`。実装計画は [`SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md`](./developer/improvement-plans-2026-08/SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md)。これは OSS / self-hosted の内部認可であり、SaaS の hosted account management ではない。運用手順: [`docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`](./developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md)。
 
 Computer Surface の `/api/identity`・`/api/state`・`/api/stream`・`/api/os/control-plane` は read operation、`/a2ui/dispatch` は localadmin の write operation とする。remote bearer access は `KYBERION_TENANT` に server-side bind し、内部 A2UI relay は `KYBERION_LOCALADMIN_TOKEN` を使用する。
+
+## フロントデスク(共有レール)
+
+秘書室(concierge)と相棒(presence-studio)は別サーフェスのままだが、人には「人の動詞 5 つ」の 1 つのメニューに見える共有レールを持つ([FRONT_DESK_REDESIGN_PLAN](./developer/improvement-plans-2026-08/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md))。
+
+| メニュー     | 答える問い        | ホストするサーフェス  | パス        |
+| ------------ | ----------------- | --------------------- | ----------- |
+| **ホーム**   | 今日なにがある?   | 相棒(presence-studio) | `/`         |
+| **頼む**     | 話す・書く        | 相棒(presence-studio) | `/ask`      |
+| **決める**   | いま何を判断する? | 秘書室(concierge)     | `/`         |
+| **進み具合** | どこまで進んだ?   | 相棒(presence-studio) | `/progress` |
+| **設定**     | ふだんは触らない  | 秘書室(concierge)     | `/settings` |
+
+レールの実装は 1 つ(`libs/core/front-desk-nav.ts`)を両サーフェスが読む。ラベル・href・許可(role gate)はすべて `GET /api/front-desk/nav` から、「私は誰でどのテナントを見ているか」は `GET /api/me` から取得する(`?tenant=` クエリは許可集合を狭めるだけで、絶対に拡大しない)。相棒の `/help`(使い方を見る)もこのレールの一部で、5 項目のメニューには含めないヘルプリンクとして両サーフェスから同じ定義で描画される。
+
+FD-08 で廃止した旧 Companion Hub(Home / Learn / Discover / Work / Connect の英語 5 項目)の各機能は次に統合された:
+
+- **Learn** → 相棒 `/help`(使い方を見る。頼む・決める・進み具合への 1 文リンク)
+- **Discover** → 相棒「頼む」ページの依頼テンプレートチップ(Web アプリ要望ヒアリング等)
+- **Connect** → 秘書室「設定 › サービス連携」
+- **Work** → 相棒 `/work`(作業台。旧ダッシュボードの開発者向けパネルは管制塔(chronos-mirror-v2)の operations / governance スコープへ移設し、音声・メール・議事録の実行画面だけを残した)
 
 ## 会話チャネル(UI以外)
 

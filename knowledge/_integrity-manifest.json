@@ -4953,7 +4953,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 525975,
+      "size": 560337,
       "type": "json"
     },
     {
@@ -8116,6 +8116,12 @@
       "path": "product/schemas/meeting-operations-profile.schema.json",
       "tier": "public",
       "size": 4059,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/member-profile.schema.json",
+      "tier": "public",
+      "size": 1757,
       "type": "json"
     },
     {

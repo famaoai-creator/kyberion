@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
+import { frontDeskText } from '../lib/i18n';
 import {
   parseConciergeSummaryEvent,
   parseConciergeSummaryResponse,
@@ -20,12 +21,41 @@ import {
   type ConciergeOutcomePreview,
 } from '../lib/outcome-preview-response';
 import { parseConciergeMutationResponse } from '../lib/mutation-response';
+import {
+  deriveCardFields,
+  groupDecideQueue,
+  hasEffectColumn,
+  presentKinds,
+  type DecideKind,
+  type DecideQueueEntry,
+} from '../lib/decide-view';
 
 type HygieneInquiry = ConciergeHygieneInquiry;
 type MemoryQueueItem = ConciergeMemoryQueueItem;
 type ResponseStatus = ConciergeResponseStatus;
 
 type OutcomePreview = ConciergeOutcomePreview;
+
+// FD-04: the viewer identity used only to render "決める人" (decide_by) on
+// every card — the same identity every card shares, since a browser session
+// is always a single human. Read-only: this page never switches tenant, it
+// only follows whichever tenant the shared rail (front-desk-rail.tsx) last
+// stored, so the two stay consistent without duplicating the switcher UI.
+const TENANT_STORAGE_KEY = 'front-desk.tenant';
+const DEFERRED_STORAGE_KEY = 'front-desk.deferred';
+
+type DecideRole = 'owner' | 'approver' | 'viewer';
+
+interface DecideViewerInfo {
+  name: string;
+  role: DecideRole;
+}
+
+interface DecideRoleLabels {
+  owner: string;
+  approver: string;
+  viewer: string;
+}
 
 function formatWhen(value: string | undefined, locale: 'en' | 'ja'): string {
   if (!value) return '';
@@ -41,13 +71,233 @@ function formatWhen(value: string | undefined, locale: 'en' | 'ja'): string {
   }
 }
 
+// Mirrors `@agent/core/format`'s `formatRelativeTime` thresholds, but
+// implemented locally with the browser's own `Intl.RelativeTimeFormat`: the
+// shared module pulls in `secure-io`/`personal-identity-state` (node:fs,
+// node:crypto, …) at the top of the same file, which cannot be bundled for
+// the client (`next build` fails on "node:*" scheme imports) — this page is
+// `'use client'`, so it stays with the browser-only primitive instead.
+const RELATIVE_TIME_THRESHOLDS: Array<{ unit: Intl.RelativeTimeFormatUnit; ms: number }> = [
+  { unit: 'year', ms: 365 * 24 * 60 * 60 * 1000 },
+  { unit: 'month', ms: 30 * 24 * 60 * 60 * 1000 },
+  { unit: 'week', ms: 7 * 24 * 60 * 60 * 1000 },
+  { unit: 'day', ms: 24 * 60 * 60 * 1000 },
+  { unit: 'hour', ms: 60 * 60 * 1000 },
+  { unit: 'minute', ms: 60 * 1000 },
+];
+
+function relativeWhen(value: string | undefined, locale: 'en' | 'ja'): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  const diffMs = date.getTime() - Date.now();
+  const absMs = Math.abs(diffMs);
+  const formatter = new Intl.RelativeTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
+    numeric: 'auto',
+  });
+  for (const { unit, ms } of RELATIVE_TIME_THRESHOLDS) {
+    if (absMs >= ms) return formatter.format(Math.round(diffMs / ms), unit);
+  }
+  return formatter.format(Math.round(diffMs / 1000), 'second');
+}
+
+function readStoredTenant(): string | null {
+  try {
+    return window.localStorage.getItem(TENANT_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function readStoredDeferredIds(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(DEFERRED_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((value): value is string => typeof value === 'string'));
+  } catch {
+    return new Set();
+  }
+}
+
+function storeDeferredIds(ids: Set<string>): void {
+  try {
+    window.localStorage.setItem(DEFERRED_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  } catch {
+    // best-effort only — a value that cannot persist still redraws once.
+  }
+}
+
+/**
+ * FD-04 shared card frame: top line (kind tag / relative time / decide_by),
+ * title, and the why/effect columns (stacked below 720px via CSS). Every
+ * `render*Card` below builds its own action row and passes it as children so
+ * the guarded decision endpoints stay exactly where they were (CS-03/CS-04).
+ */
+function DecideCardFrame({
+  reactKey,
+  kind,
+  kindLabel,
+  timeIso,
+  timeAbsolute,
+  decideByText,
+  extraMeta,
+  title,
+  fields,
+  locale,
+  children,
+}: {
+  reactKey: string;
+  kind: DecideKind;
+  kindLabel: string;
+  timeIso: string | undefined;
+  timeAbsolute: string;
+  decideByText: string | null;
+  /** Extra top-line meta after the relative time (e.g. an approval deadline). */
+  extraMeta?: React.ReactNode;
+  title: React.ReactNode;
+  fields: ReturnType<typeof deriveCardFields>;
+  locale: 'en' | 'ja';
+  children: React.ReactNode;
+}) {
+  const relative = relativeWhen(timeIso, locale);
+  const showColumns = Boolean(fields.why) || hasEffectColumn(fields);
+  return (
+    <div key={reactKey} className="item-card decide-card">
+      <div className="decide-card-top">
+        <span className={`queue-chip ${kind}`}>{kindLabel}</span>
+        {relative ? (
+          <span className="decide-time" title={timeAbsolute || undefined}>
+            {relative}
+          </span>
+        ) : null}
+        {extraMeta ? <span className="decide-time decide-due">{extraMeta}</span> : null}
+        {decideByText ? <span className="decide-by-badge">{decideByText}</span> : null}
+      </div>
+      <p className="item-title decide-card-title">{title}</p>
+      {showColumns ? (
+        <div className="decide-columns">
+          {fields.why ? (
+            <div className="decide-column">
+              <p className="decide-column-label">{frontDeskText('decide_why', locale)}</p>
+              <p className="item-body">{fields.why}</p>
+            </div>
+          ) : null}
+          {hasEffectColumn(fields) && fields.effectLabelKey ? (
+            <div className="decide-column">
+              <p className="decide-column-label">{frontDeskText(fields.effectLabelKey, locale)}</p>
+              <p className="item-body">{fields.effect}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {children}
+      {fields.evidenceHref ? (
+        <a className="decide-evidence-link" href={fields.evidenceHref}>
+          {frontDeskText('decide_evidence', locale)}
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 export default function ConciergePage() {
-  const { locale, setLocale, t } = useConciergeI18n();
+  const { locale, t } = useConciergeI18n();
   const [summary, setSummary] = React.useState<ConciergeSummary | null>(null);
   const [notice, setNotice] = React.useState<{ text: string; error?: boolean } | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [responseStatus, setResponseStatus] = React.useState<ResponseStatus | null>(null);
+
+  // FD-04: "決める人" — who is deciding, read once from the same identity
+  // contract the rail uses (plan §2.4 `GET /api/me` + `/api/front-desk/nav`
+  // role_labels). Advisory only: a failed fetch just omits the badge.
+  const [viewer, setViewer] = React.useState<DecideViewerInfo | null>(null);
+  const [roleLabels, setRoleLabels] = React.useState<DecideRoleLabels | null>(null);
+
+  React.useEffect(() => {
+    const tenant = readStoredTenant();
+    const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
+    fetch(`/api/me${query}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: unknown) => {
+        if (
+          data &&
+          typeof data === 'object' &&
+          (data as { ok?: unknown }).ok === true &&
+          typeof (data as { member?: { display_name?: unknown } }).member?.display_name ===
+            'string' &&
+          typeof (data as { viewing?: { role?: unknown } }).viewing?.role === 'string'
+        ) {
+          const parsed = data as {
+            member: { display_name: string; member_id?: string };
+            viewing: { role: DecideRole };
+          };
+          // A synthetic principal label (no member registry yet, FD-07) is
+          // not a person's name — render "あなた" instead of `human:…`.
+          const synthetic =
+            parsed.member.display_name === parsed.member.member_id ||
+            /^(human|user|agent):/.test(parsed.member.display_name);
+          setViewer({
+            name: synthetic ? '' : parsed.member.display_name,
+            role: parsed.viewing.role,
+          });
+        }
+      })
+      .catch(() => {
+        // decide_by is advisory — its absence never blocks the queue.
+      });
+  }, []);
+
+  React.useEffect(() => {
+    fetch(`/api/front-desk/nav?locale=${locale}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: unknown) => {
+        const labels = (data as { role_labels?: DecideRoleLabels } | null)?.role_labels;
+        if (labels) setRoleLabels(labels);
+      })
+      .catch(() => {
+        // decide_by is advisory — its absence never blocks the queue.
+      });
+  }, [locale]);
+
+  const decideByText =
+    viewer && roleLabels
+      ? frontDeskText('decide_by', locale, {
+          name: viewer.name || frontDeskText('you', locale),
+          role: roleLabels[viewer.role],
+        })
+      : null;
+
+  // FD-04: "あとで見る" (decide_later) is client-side only — it moves a card
+  // into the collapsed section below and never calls a server endpoint.
+  // Persisted per browser in localStorage so a reload does not surface an
+  // item the human already set aside (but never hides it permanently either).
+  const [deferredIds, setDeferredIds] = React.useState<Set<string>>(new Set());
+  React.useEffect(() => {
+    setDeferredIds(readStoredDeferredIds());
+  }, []);
+  const deferItem = React.useCallback((id: string) => {
+    setDeferredIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      storeDeferredIds(next);
+      return next;
+    });
+  }, []);
+  const undeferItem = React.useCallback((id: string) => {
+    setDeferredIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      storeDeferredIds(next);
+      return next;
+    });
+  }, []);
+
+  const [kindFilter, setKindFilter] = React.useState<DecideKind | 'all'>('all');
 
   const refresh = React.useCallback(async () => {
     try {
@@ -328,429 +578,550 @@ export default function ConciergePage() {
     return <div className="pane-empty">{t('home.loading')}</div>;
   }
 
-  const briefing = summary.briefing;
-
-  // CS-04 「今日の伺い」— every item awaiting the human's decision is rendered
-  // by one card helper per type; the unified queue and the panes below share
-  // these helpers, so the two views can never drift apart.
-  const renderApprovalCard = (item: ConciergeSummary['approval_queue'][number]) => (
-    <div key={item.id} className="item-card">
-      <p className="item-title">{item.title}</p>
-      {item.reason ? <p className="item-body">{item.reason}</p> : null}
-      <div className="item-meta">
-        {item.mission_id ? `${item.mission_id} · ` : ''}
-        {formatWhen(item.requested_at, locale)}
-        {item.expires_at
-          ? ` · ${locale === 'ja' ? '期限' : 'expires'} ${formatWhen(item.expires_at, locale)}`
-          : ''}
-      </div>
-      <div className="button-row">
-        <button
-          type="button"
-          className="action-button"
-          disabled={busyId === item.id}
-          onClick={() => void decideApproval(item, 'approved')}
-        >
-          {t('home.approve')}
-        </button>
-        <button
-          type="button"
-          className="action-button danger"
-          disabled={busyId === item.id}
-          onClick={() => void decideApproval(item, 'rejected')}
-        >
-          {t('home.reject')}
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderHygieneCard = (item: HygieneInquiry) => (
-    <div key={item.mission_id} className="item-card">
-      <p className="item-title">{item.title}</p>
-      <p className="item-body">{t(`hygiene.reason.${item.reason}` as Parameters<typeof t>[0])}</p>
-      <div className="item-meta">
-        {item.mission_id}
-        {typeof item.age_days === 'number'
-          ? ` · ${t('hygiene.waiting_days', { count: item.age_days })}`
-          : ''}
-        {item.waiting_since
-          ? ` · ${t('hygiene.waiting_since', { value: formatWhen(item.waiting_since, locale) })}`
-          : ''}
-      </div>
-      {hygieneConfirm?.missionId === item.mission_id ? (
-        <div className="hygiene-confirm">
-          <p className="item-body">
-            {t(
-              hygieneConfirm.decision === 'start'
-                ? 'hygiene.confirm_start'
-                : 'hygiene.confirm_cancel'
-            )}
-          </p>
-          {hygieneConfirm.decision === 'cancel' ? (
-            <label className="field-label">
-              {t('hygiene.note_label')}
-              <textarea
-                value={hygieneNote}
-                rows={2}
-                onChange={(event) => setHygieneNote(event.target.value)}
-              />
-            </label>
-          ) : null}
-          <div className="button-row">
-            <button
-              type="button"
-              className="action-button"
-              disabled={hygieneBusyId === item.mission_id}
-              onClick={() => void decideHygiene(item, hygieneConfirm.decision, hygieneNote)}
-            >
-              {t('hygiene.confirm_yes')}
-            </button>
-            <button
-              type="button"
-              className="action-button secondary"
-              disabled={hygieneBusyId === item.mission_id}
-              onClick={() => {
-                setHygieneConfirm(null);
-                setHygieneNote('');
-              }}
-            >
-              {t('hygiene.confirm_back')}
-            </button>
-          </div>
-        </div>
-      ) : (
+  // CS-04/FD-04 — every item awaiting the human's decision is rendered by one
+  // card helper per kind; the unified queue is the only place these render
+  // (the four duplicate panes are gone, plan §2.1/FD-04).
+  const renderApprovalCard = (entry: Extract<DecideQueueEntry, { kind: 'approval' }>) => {
+    const item = entry.item;
+    const fields = deriveCardFields(entry);
+    return (
+      <DecideCardFrame
+        key={entry.id}
+        reactKey={entry.id}
+        kind="approval"
+        kindLabel={t('queue.type.approval')}
+        timeIso={item.requested_at}
+        timeAbsolute={formatWhen(item.requested_at, locale)}
+        decideByText={decideByText}
+        extraMeta={
+          item.expires_at
+            ? frontDeskText('decide_due', locale, {
+                value: relativeWhen(item.expires_at, locale) || formatWhen(item.expires_at, locale),
+              })
+            : null
+        }
+        title={item.title}
+        fields={fields}
+        locale={locale}
+      >
         <div className="button-row">
           <button
             type="button"
             className="action-button"
-            disabled={hygieneBusyId !== null}
-            onClick={() => {
-              setHygieneConfirm({ missionId: item.mission_id, decision: 'start' });
-              setHygieneNote('');
-            }}
+            disabled={busyId === item.id}
+            onClick={() => void decideApproval(item, 'approved')}
           >
-            {t('hygiene.start')}
+            {frontDeskText('decide_approve', locale)}
           </button>
           <button
             type="button"
             className="action-button danger"
-            disabled={hygieneBusyId !== null}
-            onClick={() => {
-              setHygieneConfirm({ missionId: item.mission_id, decision: 'cancel' });
-              setHygieneNote('');
-            }}
+            disabled={busyId === item.id}
+            onClick={() => void decideApproval(item, 'rejected')}
           >
-            {t('hygiene.cancel')}
+            {frontDeskText('decide_reject', locale)}
           </button>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderMemoryCard = (item: MemoryQueueItem) => (
-    <div key={item.id} className="item-card">
-      <p className="item-title">
-        {t(`memory.kind.${item.kind}` as Parameters<typeof t>[0])}
-        <span className="status-chip">
-          {t(`memory.tier.${item.sensitivity_tier}` as Parameters<typeof t>[0])}
-        </span>
-      </p>
-      <p className="item-body">{item.summary}</p>
-      <div className="item-meta">
-        {item.source ? `${t('memory.source', { value: item.source })} · ` : ''}
-        {formatWhen(item.queued_at, locale)}
-        {item.occurrences > 1 ? ` · ${t('memory.seen_times', { count: item.occurrences })}` : ''}
-      </div>
-      {memoryConfirm?.id === item.id ? (
-        <div className="memory-confirm">
-          <p className="item-body">
-            {t(
-              memoryConfirm.decision === 'approve'
-                ? 'memory.confirm_approve'
-                : 'memory.confirm_reject'
-            )}
-          </p>
-          <div className="button-row">
-            <button
-              type="button"
-              className="action-button"
-              disabled={memoryBusyId === item.id}
-              onClick={() => void decideMemory(item, memoryConfirm.decision)}
-            >
-              {t('memory.confirm_yes')}
-            </button>
-            <button
-              type="button"
-              className="action-button secondary"
-              disabled={memoryBusyId === item.id}
-              onClick={() => setMemoryConfirm(null)}
-            >
-              {t('memory.confirm_back')}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="button-row">
-          <button
-            type="button"
-            className="action-button"
-            disabled={memoryBusyId !== null}
-            onClick={() => setMemoryConfirm({ id: item.id, decision: 'approve' })}
-          >
-            {t('memory.approve')}
-          </button>
-          <button
-            type="button"
-            className="action-button danger"
-            disabled={memoryBusyId !== null}
-            onClick={() => setMemoryConfirm({ id: item.id, decision: 'reject' })}
-          >
-            {t('memory.reject')}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderExceptionCard = (item: ConciergeSummary['exception_feed'][number]) => (
-    <div key={item.id} className="item-card">
-      <p className="item-title">{item.title}</p>
-      {item.text ? <p className="item-body">{item.text}</p> : null}
-      <div className="item-meta">
-        {item.surface} · {formatWhen(item.created_at, locale)}
-      </div>
-    </div>
-  );
-
-  const renderOutcomeCard = (item: ConciergeSummary['outcome_feed'][number]) => (
-    <div key={item.entry_id} className="item-card">
-      <p className="item-title">
-        {item.title}
-        <span className="status-chip">
-          {t(`home.status.${item.status}` as Parameters<typeof t>[0]) || item.status}
-        </span>
-      </p>
-      {item.summary ? <p className="item-body">{item.summary}</p> : null}
-      <div className="item-meta">
-        {item.mission_id ? `${item.mission_id} · ` : ''}
-        {formatWhen(item.updated_at, locale)}
-        {item.artifact_paths.length > 0
-          ? ` · ${t('home.artifacts', { count: item.artifact_paths.length })}`
-          : ''}
-      </div>
-      <div className="button-row">
-        {item.artifact_paths.length > 0 ? (
           <button
             type="button"
             className="action-button secondary"
-            disabled={previewBusyId === item.entry_id}
-            onClick={() => void togglePreview(item)}
+            disabled={busyId === item.id}
+            onClick={() => deferItem(entry.id)}
           >
-            {previewId === item.entry_id ? t('home.preview_hide') : t('home.preview')}
+            {frontDeskText('decide_later', locale)}
           </button>
-        ) : null}
-        <button
-          type="button"
-          className="action-button"
-          disabled={busyId === item.entry_id || item.status === 'accepted'}
-          onClick={() => void recordOutcomeVerdict(item, 'accepted')}
-        >
-          {t('home.accept')}
-        </button>
-        <button
-          type="button"
-          className="action-button secondary"
-          disabled={busyId === item.entry_id}
-          onClick={() => {
-            setChangeFormId(changeFormId === item.entry_id ? null : item.entry_id);
-            setChangeNote('');
-          }}
-        >
-          {t('home.request_changes')}
-        </button>
-        <button
-          type="button"
-          className="action-button danger"
-          disabled={busyId === item.entry_id}
-          onClick={() => void recordOutcomeVerdict(item, 'rejected')}
-        >
-          {t('home.reject')}
-        </button>
-      </div>
-      {previewId === item.entry_id ? (
-        <div className="outcome-preview">
-          {previewError ? (
-            <p className="item-body">{t('home.preview_error', { error: previewError })}</p>
-          ) : null}
-          {previewData && previewData.files.length === 0 ? (
-            <p className="item-meta">{t('home.preview_empty')}</p>
-          ) : null}
-          {previewData?.files.map((file, index) => (
-            <div className="preview-file" key={`${file.name}-${index}`}>
-              <p className="preview-name">{file.name}</p>
-              {file.kind === 'image' && file.data_uri ? (
-                <img className="preview-image" src={file.data_uri} alt={file.name} />
-              ) : (file.kind === 'markdown' || file.kind === 'text') &&
-                typeof file.content === 'string' ? (
-                <pre className="preview-content">{file.content}</pre>
-              ) : (
-                <p className="item-meta">
-                  {t(
-                    file.missing
-                      ? 'home.preview_missing'
-                      : file.too_large
-                        ? 'home.preview_too_large'
-                        : 'home.preview_unsupported'
-                  )}
-                </p>
-              )}
-              {file.truncated ? <p className="item-meta">{t('home.preview_truncated')}</p> : null}
-            </div>
-          ))}
-          {previewData && previewData.total > previewData.shown ? (
-            <p className="item-meta">
-              {t('home.preview_more', { count: previewData.total - previewData.shown })}
-            </p>
-          ) : null}
         </div>
-      ) : null}
-      {changeFormId === item.entry_id ? (
-        <form
-          className="change-request-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void recordOutcomeVerdict(item, 'changes_requested', changeNote);
-          }}
-        >
-          <label className="field-label">
-            {t('home.change_prompt')}
-            <textarea
-              value={changeNote}
-              rows={3}
-              required
-              onChange={(event) => setChangeNote(event.target.value)}
-            />
-          </label>
+      </DecideCardFrame>
+    );
+  };
+
+  const renderHygieneCard = (entry: Extract<DecideQueueEntry, { kind: 'hygiene' }>) => {
+    const item = entry.item;
+    const fields = deriveCardFields(entry);
+    // `fields.why` is the raw reason code (see decide-view.ts) — translated
+    // here via the existing `hygiene.reason.<code>` key, matching the
+    // pre-FD-04 card.
+    const translatedFields = {
+      ...fields,
+      why: fields.why ? t(`hygiene.reason.${fields.why}` as Parameters<typeof t>[0]) : undefined,
+    };
+    return (
+      <DecideCardFrame
+        key={entry.id}
+        reactKey={entry.id}
+        kind="hygiene"
+        kindLabel={t('queue.type.hygiene')}
+        timeIso={item.waiting_since}
+        timeAbsolute={formatWhen(item.waiting_since, locale)}
+        decideByText={decideByText}
+        title={item.title}
+        fields={translatedFields}
+        locale={locale}
+      >
+        {hygieneConfirm?.missionId === item.mission_id ? (
+          <div className="hygiene-confirm">
+            <p className="item-body">
+              {t(
+                hygieneConfirm.decision === 'start'
+                  ? 'hygiene.confirm_start'
+                  : 'hygiene.confirm_cancel'
+              )}
+            </p>
+            {hygieneConfirm.decision === 'cancel' ? (
+              <label className="field-label">
+                {t('hygiene.note_label')}
+                <textarea
+                  value={hygieneNote}
+                  rows={2}
+                  onChange={(event) => setHygieneNote(event.target.value)}
+                />
+              </label>
+            ) : null}
+            <div className="button-row">
+              <button
+                type="button"
+                className="action-button"
+                disabled={hygieneBusyId === item.mission_id}
+                onClick={() => void decideHygiene(item, hygieneConfirm.decision, hygieneNote)}
+              >
+                {t('hygiene.confirm_yes')}
+              </button>
+              <button
+                type="button"
+                className="action-button secondary"
+                disabled={hygieneBusyId === item.mission_id}
+                onClick={() => {
+                  setHygieneConfirm(null);
+                  setHygieneNote('');
+                }}
+              >
+                {t('hygiene.confirm_back')}
+              </button>
+            </div>
+          </div>
+        ) : (
           <div className="button-row">
             <button
-              type="submit"
+              type="button"
               className="action-button"
-              disabled={busyId === item.entry_id || !changeNote.trim()}
+              disabled={hygieneBusyId !== null}
+              onClick={() => {
+                setHygieneConfirm({ missionId: item.mission_id, decision: 'start' });
+                setHygieneNote('');
+              }}
             >
-              {t('home.change_send')}
+              {frontDeskText('decide_continue', locale)}
+            </button>
+            <button
+              type="button"
+              className="action-button danger"
+              disabled={hygieneBusyId !== null}
+              onClick={() => {
+                setHygieneConfirm({ missionId: item.mission_id, decision: 'cancel' });
+                setHygieneNote('');
+              }}
+            >
+              {frontDeskText('decide_stop', locale)}
             </button>
             <button
               type="button"
               className="action-button secondary"
-              onClick={() => {
-                setChangeFormId(null);
-                setChangeNote('');
-              }}
+              disabled={hygieneBusyId !== null}
+              onClick={() => deferItem(entry.id)}
             >
-              {t('home.change_cancel')}
+              {frontDeskText('decide_later', locale)}
             </button>
           </div>
-        </form>
-      ) : null}
-    </div>
-  );
+        )}
+      </DecideCardFrame>
+    );
+  };
+
+  const renderMemoryCard = (entry: Extract<DecideQueueEntry, { kind: 'memory' }>) => {
+    const item = entry.item;
+    const fields = deriveCardFields(entry);
+    return (
+      <DecideCardFrame
+        key={entry.id}
+        reactKey={entry.id}
+        kind="memory"
+        kindLabel={t('queue.type.memory')}
+        timeIso={item.queued_at}
+        timeAbsolute={formatWhen(item.queued_at, locale)}
+        decideByText={decideByText}
+        title={
+          <>
+            {t(`memory.kind.${item.kind}` as Parameters<typeof t>[0])}
+            <span className="status-chip">
+              {t(`memory.tier.${item.sensitivity_tier}` as Parameters<typeof t>[0])}
+            </span>
+          </>
+        }
+        fields={fields}
+        locale={locale}
+      >
+        {memoryConfirm?.id === item.id ? (
+          <div className="memory-confirm">
+            <p className="item-body">
+              {t(
+                memoryConfirm.decision === 'approve'
+                  ? 'memory.confirm_approve'
+                  : 'memory.confirm_reject'
+              )}
+            </p>
+            <div className="button-row">
+              <button
+                type="button"
+                className="action-button"
+                disabled={memoryBusyId === item.id}
+                onClick={() => void decideMemory(item, memoryConfirm.decision)}
+              >
+                {t('memory.confirm_yes')}
+              </button>
+              <button
+                type="button"
+                className="action-button secondary"
+                disabled={memoryBusyId === item.id}
+                onClick={() => setMemoryConfirm(null)}
+              >
+                {t('memory.confirm_back')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="button-row">
+            <button
+              type="button"
+              className="action-button"
+              disabled={memoryBusyId !== null}
+              onClick={() => setMemoryConfirm({ id: item.id, decision: 'approve' })}
+            >
+              {frontDeskText('decide_remember', locale)}
+            </button>
+            <button
+              type="button"
+              className="action-button danger"
+              disabled={memoryBusyId !== null}
+              onClick={() => setMemoryConfirm({ id: item.id, decision: 'reject' })}
+            >
+              {frontDeskText('decide_forget', locale)}
+            </button>
+            <button
+              type="button"
+              className="action-button secondary"
+              disabled={memoryBusyId !== null}
+              onClick={() => deferItem(entry.id)}
+            >
+              {frontDeskText('decide_later', locale)}
+            </button>
+          </div>
+        )}
+      </DecideCardFrame>
+    );
+  };
+
+  const renderExceptionCard = (entry: Extract<DecideQueueEntry, { kind: 'exception' }>) => {
+    const item = entry.item;
+    const fields = deriveCardFields(entry);
+    return (
+      <DecideCardFrame
+        key={entry.id}
+        reactKey={entry.id}
+        kind="exception"
+        kindLabel={t('queue.type.exception')}
+        timeIso={item.created_at}
+        timeAbsolute={formatWhen(item.created_at, locale)}
+        decideByText={decideByText}
+        title={item.title}
+        fields={fields}
+        locale={locale}
+      >
+        <div className="button-row">
+          <button
+            type="button"
+            className="action-button secondary"
+            onClick={() => deferItem(entry.id)}
+          >
+            {frontDeskText('decide_later', locale)}
+          </button>
+        </div>
+      </DecideCardFrame>
+    );
+  };
+
+  const renderOutcomeCard = (entry: Extract<DecideQueueEntry, { kind: 'outcome' }>) => {
+    const item = entry.item;
+    const fields = deriveCardFields(entry);
+    return (
+      <DecideCardFrame
+        key={entry.id}
+        reactKey={entry.id}
+        kind="outcome"
+        kindLabel={t('queue.type.outcome')}
+        timeIso={item.updated_at}
+        timeAbsolute={formatWhen(item.updated_at, locale)}
+        decideByText={decideByText}
+        title={
+          <>
+            {item.title}
+            <span className="status-chip">
+              {t(`home.status.${item.status}` as Parameters<typeof t>[0]) || item.status}
+            </span>
+          </>
+        }
+        fields={fields}
+        locale={locale}
+      >
+        <div className="button-row">
+          {item.artifact_paths.length > 0 ? (
+            <button
+              type="button"
+              className="action-button secondary"
+              disabled={previewBusyId === item.entry_id}
+              onClick={() => void togglePreview(item)}
+            >
+              {previewId === item.entry_id
+                ? t('home.preview_hide')
+                : frontDeskText('action_open', locale)}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="action-button"
+            disabled={busyId === item.entry_id || item.status === 'accepted'}
+            onClick={() => void recordOutcomeVerdict(item, 'accepted')}
+          >
+            {frontDeskText('decide_receive', locale)}
+          </button>
+          <button
+            type="button"
+            className="action-button secondary"
+            disabled={busyId === item.entry_id}
+            onClick={() => {
+              setChangeFormId(changeFormId === item.entry_id ? null : item.entry_id);
+              setChangeNote('');
+            }}
+          >
+            {frontDeskText('decide_return', locale)}
+          </button>
+          <button
+            type="button"
+            className="action-button secondary"
+            disabled={busyId === item.entry_id}
+            onClick={() => deferItem(entry.id)}
+          >
+            {frontDeskText('decide_later', locale)}
+          </button>
+        </div>
+        {previewId === item.entry_id ? (
+          <div className="outcome-preview">
+            {previewError ? (
+              <p className="item-body">{t('home.preview_error', { error: previewError })}</p>
+            ) : null}
+            {previewData && previewData.files.length === 0 ? (
+              <p className="item-meta">{t('home.preview_empty')}</p>
+            ) : null}
+            {previewData?.files.map((file, index) => (
+              <div className="preview-file" key={`${file.name}-${index}`}>
+                <p className="preview-name">{file.name}</p>
+                {file.kind === 'image' && file.data_uri ? (
+                  <img className="preview-image" src={file.data_uri} alt={file.name} />
+                ) : (file.kind === 'markdown' || file.kind === 'text') &&
+                  typeof file.content === 'string' ? (
+                  <pre className="preview-content">{file.content}</pre>
+                ) : (
+                  <p className="item-meta">
+                    {t(
+                      file.missing
+                        ? 'home.preview_missing'
+                        : file.too_large
+                          ? 'home.preview_too_large'
+                          : 'home.preview_unsupported'
+                    )}
+                  </p>
+                )}
+                {file.truncated ? <p className="item-meta">{t('home.preview_truncated')}</p> : null}
+              </div>
+            ))}
+            {previewData && previewData.total > previewData.shown ? (
+              <p className="item-meta">
+                {t('home.preview_more', { count: previewData.total - previewData.shown })}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {changeFormId === item.entry_id ? (
+          <form
+            className="change-request-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void recordOutcomeVerdict(item, 'changes_requested', changeNote);
+            }}
+          >
+            <label className="field-label">
+              {t('home.change_prompt')}
+              <textarea
+                value={changeNote}
+                rows={3}
+                required
+                onChange={(event) => setChangeNote(event.target.value)}
+              />
+            </label>
+            <div className="button-row">
+              <button
+                type="submit"
+                className="action-button"
+                disabled={busyId === item.entry_id || !changeNote.trim()}
+              >
+                {t('home.change_send')}
+              </button>
+              <button
+                type="button"
+                className="action-button secondary"
+                onClick={() => {
+                  setChangeFormId(null);
+                  setChangeNote('');
+                }}
+              >
+                {t('home.change_cancel')}
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </DecideCardFrame>
+    );
+  };
 
   // Queue order = decision urgency: approvals block others' work, stalled
   // missions and learnings wait on the human alone, deliverables and
   // exceptions can breathe a little longer.
-  const queueItems: Array<{
-    id: string;
-    type: 'approval' | 'hygiene' | 'memory' | 'outcome' | 'exception';
-    card: React.ReactNode;
-  }> = [
-    ...summary.approval_queue.map((item) => ({
+  const allEntries: DecideQueueEntry[] = [
+    ...summary.approval_queue.map((item): DecideQueueEntry => ({
       id: `approval-${item.id}`,
-      type: 'approval' as const,
-      card: renderApprovalCard(item),
+      kind: 'approval',
+      item,
     })),
-    ...hygiene.map((item) => ({
+    ...hygiene.map((item): DecideQueueEntry => ({
       id: `hygiene-${item.mission_id}`,
-      type: 'hygiene' as const,
-      card: renderHygieneCard(item),
+      kind: 'hygiene',
+      item,
     })),
-    ...memoryQueue.map((item) => ({
+    ...memoryQueue.map((item): DecideQueueEntry => ({
       id: `memory-${item.id}`,
-      type: 'memory' as const,
-      card: renderMemoryCard(item),
+      kind: 'memory',
+      item,
     })),
-    ...summary.outcome_feed.map((item) => ({
+    ...summary.outcome_feed.map((item): DecideQueueEntry => ({
       id: `outcome-${item.entry_id}`,
-      type: 'outcome' as const,
-      card: renderOutcomeCard(item),
+      kind: 'outcome',
+      item,
     })),
-    ...summary.exception_feed.map((item) => ({
+    ...summary.exception_feed.map((item): DecideQueueEntry => ({
       id: `exception-${item.id}`,
-      type: 'exception' as const,
-      card: renderExceptionCard(item),
+      kind: 'exception',
+      item,
     })),
   ];
 
+  const { queue, deferred, countsByKind } = groupDecideQueue(allEntries, deferredIds);
+  const visibleKinds = presentKinds(countsByKind);
+  const filteredQueue =
+    kindFilter === 'all' ? queue : queue.filter((entry) => entry.kind === kindFilter);
+  const totalQueueCount = queue.length;
+
+  const renderEntry = (entry: DecideQueueEntry): React.ReactNode => {
+    switch (entry.kind) {
+      case 'approval':
+        return renderApprovalCard(entry);
+      case 'hygiene':
+        return renderHygieneCard(entry);
+      case 'memory':
+        return renderMemoryCard(entry);
+      case 'outcome':
+        return renderOutcomeCard(entry);
+      case 'exception':
+        return renderExceptionCard(entry);
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
-      <section className="briefing-card" aria-label={t('home.briefing_label')}>
-        <div className="locale-switcher">
-          <label>
-            {t('locale.label')}
-            <select
-              value={locale}
-              onChange={(event) => setLocale(event.target.value as 'en' | 'ja')}
-            >
-              <option value="ja">{t('locale.japanese')}</option>
-              <option value="en">{t('locale.english')}</option>
-            </select>
-          </label>
-        </div>
-        <p className="briefing-sentence">
-          {locale === 'ja' ? briefing.sentence_ja : t('home.briefing_fallback')}
-        </p>
-        <div className="briefing-counts">
-          <span>
-            <strong>{briefing.counts.pending_approvals}</strong>
-            {t('home.approvals_count')}
-          </span>
-          <span>
-            <strong>{briefing.counts.active_missions}</strong>
-            {t('home.missions_count')}
-          </span>
-          <span>
-            <strong>{briefing.counts.unread_outcomes}</strong>
-            {t('home.outcomes_count')}
-          </span>
-          <span>
-            <strong>{briefing.counts.exceptions}</strong>
-            {t('home.exceptions_count')}
-          </span>
-        </div>
-        {briefing.next_action_ja ? (
-          <div className="item-meta" style={{ marginTop: 8 }}>
-            {t('home.next_action', { value: briefing.next_action_ja })}
-          </div>
-        ) : null}
-      </section>
-
       {notice ? <div className={`notice${notice.error ? ' error' : ''}`}>{notice.text}</div> : null}
 
-      <section className="pane inquiry-queue" aria-label={t('queue.title')}>
-        <h2>{t('queue.title')}</h2>
-        <p className="pane-subtitle">{t('queue.description')}</p>
-        {queueItems.length === 0 ? (
-          <div className="pane-empty">{t('queue.empty')}</div>
+      <section
+        className="pane inquiry-queue decide-page"
+        aria-label={frontDeskText('nav_decide', locale)}
+      >
+        <h1 className="decide-heading">{frontDeskText('nav_decide', locale)}</h1>
+        <p className="pane-subtitle decide-lead">{frontDeskText('decide_lead', locale)}</p>
+
+        <div
+          className="decide-filter-row"
+          role="group"
+          aria-label={frontDeskText('nav_decide', locale)}
+        >
+          <button
+            type="button"
+            className={`decide-filter-chip${kindFilter === 'all' ? ' active' : ''}`}
+            onClick={() => setKindFilter('all')}
+          >
+            {frontDeskText('decide_filter_all', locale)} ·{' '}
+            {frontDeskText('count_items', locale, { count: totalQueueCount })}
+          </button>
+          {visibleKinds.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className={`decide-filter-chip${kindFilter === kind ? ' active' : ''}`}
+              onClick={() => setKindFilter(kind)}
+            >
+              {t(`queue.type.${kind}` as Parameters<typeof t>[0])} ·{' '}
+              {frontDeskText('count_items', locale, { count: countsByKind[kind] })}
+            </button>
+          ))}
+        </div>
+
+        {filteredQueue.length === 0 ? (
+          <div className="pane-empty">{frontDeskText('decide_empty', locale)}</div>
         ) : (
-          queueItems.map((entry) => (
+          filteredQueue.map((entry) => (
             <div key={entry.id} className="queue-item">
-              <span className={`queue-chip ${entry.type}`}>
-                {t(`queue.type.${entry.type}` as Parameters<typeof t>[0])}
-              </span>
-              {entry.card}
+              {renderEntry(entry)}
             </div>
           ))
         )}
+
+        {deferred.length > 0 ? (
+          <details className="decide-deferred-section">
+            <summary>
+              {frontDeskText('decide_deferred', locale, { count: deferred.length })}
+            </summary>
+            {deferred.map((entry) => {
+              const title =
+                entry.kind === 'approval' || entry.kind === 'hygiene' || entry.kind === 'exception'
+                  ? entry.item.title
+                  : entry.kind === 'outcome'
+                    ? entry.item.title
+                    : t(`memory.kind.${entry.item.kind}` as Parameters<typeof t>[0]);
+              return (
+                <div key={entry.id} className="decide-deferred-item">
+                  <span className={`queue-chip ${entry.kind}`}>
+                    {t(`queue.type.${entry.kind}` as Parameters<typeof t>[0])}
+                  </span>
+                  <span className="decide-deferred-title">{title}</span>
+                  <button
+                    type="button"
+                    className="action-button secondary"
+                    onClick={() => undeferItem(entry.id)}
+                  >
+                    {frontDeskText('decide_undefer', locale)}
+                  </button>
+                </div>
+              );
+            })}
+          </details>
+        ) : null}
       </section>
 
       {responseStatus ? (
@@ -777,76 +1148,6 @@ export default function ConciergePage() {
           ))}
         </section>
       ) : null}
-
-      <div className="pane-grid">
-        <section className="pane" aria-label={t('home.approval_title')}>
-          <h2>{t('home.approval_title')}</h2>
-          <p className="pane-subtitle">{t('home.approval_description')}</p>
-          {summary.approval_queue.length === 0 ? (
-            <div className="pane-empty">{t('home.approval_empty')}</div>
-          ) : (
-            <p className="pane-subtitle">
-              {t('home.see_queue', { count: summary.approval_queue.length })}
-            </p>
-          )}
-        </section>
-
-        <section className="pane" aria-label={t('home.request_title')}>
-          <h2>{t('home.request_title')}</h2>
-          <p className="pane-subtitle">{t('home.request_description')}</p>
-          {summary.intent_inbox.length === 0 ? (
-            <div className="pane-empty">{t('home.request_empty')}</div>
-          ) : (
-            summary.intent_inbox.map((item) => (
-              <div key={item.mission_id} className="item-card">
-                <p className="item-title">
-                  {item.title}
-                  <span className={`status-chip${item.attention_needed ? ' attention' : ''}`}>
-                    {locale === 'ja'
-                      ? item.status_ja
-                      : t(item.attention_needed ? 'home.needs_attention' : 'home.in_progress')}
-                  </span>
-                </p>
-                {item.success_condition ? (
-                  <p className="item-body">
-                    {t('home.completed_condition', { value: item.success_condition })}
-                  </p>
-                ) : null}
-                <div className="item-meta">
-                  {item.mission_id}
-                  {item.updated_at
-                    ? ` · ${t('home.last_updated', { value: formatWhen(item.updated_at, locale) })}`
-                    : ''}
-                </div>
-              </div>
-            ))
-          )}
-        </section>
-
-        <section className="pane" aria-label={t('home.outcome_title')}>
-          <h2>{t('home.outcome_title')}</h2>
-          <p className="pane-subtitle">{t('home.outcome_description')}</p>
-          {summary.outcome_feed.length === 0 ? (
-            <div className="pane-empty">{t('home.outcome_empty')}</div>
-          ) : (
-            <p className="pane-subtitle">
-              {t('home.see_queue', { count: summary.outcome_feed.length })}
-            </p>
-          )}
-        </section>
-
-        <section className="pane" aria-label={t('home.exception_title')}>
-          <h2>{t('home.exception_title')}</h2>
-          <p className="pane-subtitle">{t('home.exception_description')}</p>
-          {summary.exception_feed.length === 0 ? (
-            <div className="pane-empty">{t('home.exception_empty')}</div>
-          ) : (
-            <p className="pane-subtitle">
-              {t('home.see_queue', { count: summary.exception_feed.length })}
-            </p>
-          )}
-        </section>
-      </div>
     </>
   );
 }
