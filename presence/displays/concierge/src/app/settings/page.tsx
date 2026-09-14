@@ -160,10 +160,12 @@ export default function SettingsPage() {
   const {
     trainingTracks,
     trainingAssignments,
+    trainingProgress,
     trainingTrackId,
     setTrainingTrackId,
     refreshTrainingCatalog,
     refreshTrainingAssignments,
+    refreshTrainingProgress,
     assignTraining,
   } = useTrainingAssignments(locale, setNotice);
   const [activeSection, setActiveSection] = React.useState<SettingsSectionId>('profile');
@@ -437,6 +439,7 @@ export default function SettingsPage() {
     void refreshVoiceSelection();
     void refreshTrainingCatalog();
     void refreshTrainingAssignments();
+    void refreshTrainingProgress();
     return () => {
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -452,6 +455,7 @@ export default function SettingsPage() {
     refreshVoiceSelection,
     refreshTrainingCatalog,
     refreshTrainingAssignments,
+    refreshTrainingProgress,
   ]);
 
   React.useEffect(() => {
@@ -865,6 +869,7 @@ export default function SettingsPage() {
             onPatchMember={(memberId, patch) => void patchMember(memberId, patch)}
             trainingTracks={trainingTracks}
             trainingAssignments={trainingAssignments}
+            trainingProgress={trainingProgress}
             trainingTrackId={trainingTrackId}
             setTrainingTrackId={setTrainingTrackId}
             onAssignTraining={(memberId) =>

@@ -15,6 +15,14 @@
  * — only the track/lesson content itself (title, goal, check text) is
  * free-form catalog data from `GET /api/training/catalog`.
  *
+ * HT-04/05 second pass: a lesson that is not yet `complete` renders a "mark
+ * this done" button that POSTs `/api/training/progress`
+ * `{ lesson_id, status: 'complete' }` for the server-resolved viewer, then
+ * updates that lesson's status chip in place. `HELP_VOCABULARY_KEYS` is
+ * frozen for this wave, so the button/notice copy comes from its own
+ * `GET /api/training/vocabulary` instead (same shape as
+ * `/api/help-vocabulary`, merged into the same `vocab` lookup table).
+ *
  * See docs/developer/improvement-plans-2026-08/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md
  * FD-08 and FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md §2.3/§2.4.
  */
@@ -78,11 +86,22 @@
       fetch('/api/help-vocabulary?locale=' + encodeURIComponent(locale)).then(function (response) {
         return response.json();
       }),
+      fetch('/api/training/vocabulary?locale=' + encodeURIComponent(locale)).then(
+        function (response) {
+          return response.json();
+        }
+      ),
     ])
-      .then(function (pair) {
-        var nav = pair[0];
-        var vocabResult = pair[1];
+      .then(function (triplet) {
+        var nav = triplet[0];
+        var vocabResult = triplet[1];
+        var trainingVocabResult = triplet[2];
         if (vocabResult && vocabResult.ok) vocab = vocabResult.texts || {};
+        if (trainingVocabResult && trainingVocabResult.ok) {
+          Object.keys(trainingVocabResult.texts || {}).forEach(function (key) {
+            vocab[key] = trainingVocabResult.texts[key];
+          });
+        }
         if (!nav || !nav.ok) return;
         if (titleEl && nav.help && nav.help.label) titleEl.textContent = nav.help.label;
         var byId = {};
@@ -169,9 +188,11 @@
               var status = (lessonStatus[lesson.id] || {}).status || 'not_started';
               var statusKey = TRAINING_STATUS_KEY[status] || TRAINING_STATUS_KEY.not_started;
               return (
-                '<article class="help-lesson"><h3>' +
+                '<article class="help-lesson" data-lesson-id="' +
+                escapeHtml(lesson.id) +
+                '"><h3>' +
                 escapeHtml(lesson.title) +
-                ' <span class="status-chip">' +
+                ' <span class="status-chip" data-role="status-chip">' +
                 escapeHtml(vt(vocab, statusKey)) +
                 '</span></h3><p>' +
                 escapeHtml(lesson.goal) +
@@ -180,18 +201,82 @@
                 '">' +
                 escapeHtml(vt(vocab, 'front_desk:training_try')) +
                 '</a>' +
+                (status === 'complete'
+                  ? ''
+                  : ' <button type="button" class="help-card-link help-mark-done" data-lesson-id="' +
+                    escapeHtml(lesson.id) +
+                    '">' +
+                    escapeHtml(vt(vocab, 'front_desk:training_mark_done')) +
+                    '</button>') +
                 '<p class="help-check">' +
                 escapeHtml(vt(vocab, 'front_desk:training_done_prefix')) +
                 ' ' +
                 escapeHtml(lesson.check.text) +
-                '</p></article>'
+                '</p><p class="help-mark-done-message" data-role="mark-done-message" hidden></p></article>'
               );
             })
             .join('');
+        wireMarkDoneButtons(content, vocab);
       })
       .catch(function () {
         // The static fallback already in help.html stays visible.
       });
+  }
+
+  // HT-04/05 second pass: marks one lesson `complete` for the
+  // server-resolved viewer, then updates that lesson's status chip and
+  // shows a recorded/failed notice in place — never a page reload.
+  function wireMarkDoneButtons(content, vocab) {
+    var buttons = content.querySelectorAll('.help-mark-done');
+    for (var i = 0; i < buttons.length; i += 1) {
+      (function (button) {
+        button.addEventListener('click', function () {
+          var article = button.closest('.help-lesson');
+          var lessonId = button.getAttribute('data-lesson-id');
+          var chip = article && article.querySelector('[data-role="status-chip"]');
+          var message = article && article.querySelector('[data-role="mark-done-message"]');
+          button.disabled = true;
+          fetch('/api/training/progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lesson_id: lessonId, status: 'complete' }),
+          })
+            .then(function (response) {
+              return response
+                .json()
+                .catch(function () {
+                  return null;
+                })
+                .then(function (payload) {
+                  return response.ok && payload && payload.ok;
+                });
+            })
+            .then(function (recorded) {
+              if (recorded) {
+                if (chip) chip.textContent = vt(vocab, TRAINING_STATUS_KEY.complete);
+                if (message) {
+                  message.textContent = vt(vocab, 'front_desk:training_mark_done_recorded');
+                  message.hidden = false;
+                }
+                button.remove();
+                return;
+              }
+              button.disabled = false;
+              if (message) {
+                message.textContent = vt(vocab, 'front_desk:training_mark_done_failed');
+                message.hidden = false;
+              }
+            })
+            .catch(function () {
+              button.disabled = false;
+              if (message) {
+                message.textContent = vt(vocab, 'front_desk:training_mark_done_failed');
+                message.hidden = false;
+              }
+            });
+        });
+      })(buttons[i]);
+    }
   }
 
   window.KyberionHelp = { mount: mount };
