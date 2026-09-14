@@ -45,6 +45,7 @@ let identity: typeof import('./agent-identity.js');
 let authority: typeof import('./authority.js');
 let closure: typeof import('./mission-artifact-closure.js');
 let verification: typeof import('./nhi-actor-verification.js');
+let members: typeof import('./member-registry.js');
 
 let journalCounter = 0;
 
@@ -61,6 +62,22 @@ function issue(slug: string, affiliation: Record<string, string>, organizationId
       slug,
       accountableHumanId: 'human:founder',
       affiliation,
+    } as Parameters<typeof identity.issueAgentIdentity>[0])
+  );
+}
+
+function issueWithAccountableHuman(
+  slug: string,
+  accountableHumanId: string,
+  organizationId = 'demo-org'
+) {
+  return authority.withExecutionContext('mission_controller', () =>
+    identity.issueAgentIdentity({
+      kind: 'agent',
+      organizationId,
+      slug,
+      accountableHumanId,
+      affiliation: {},
     } as Parameters<typeof identity.issueAgentIdentity>[0])
   );
 }
@@ -105,12 +122,19 @@ beforeAll(async () => {
   for (const schema of WRITER_LEASE_SCHEMAS) {
     fs.writeFileSync(path.join(schemaTarget, schema.name), schema.content);
   }
+  // FD-10: listOrphanNhiIdentities now cross-checks accountable_human_id
+  // against the member registry, which validates against this schema.
+  fs.copyFileSync(
+    path.join(REPO_ROOT, 'knowledge/product/schemas/member-profile.schema.json'),
+    path.join(schemaTarget, 'member-profile.schema.json')
+  );
 
   governance = await import('./nhi-lifecycle-governance.js');
   identity = await import('./agent-identity.js');
   authority = await import('./authority.js');
   closure = await import('./mission-artifact-closure.js');
   verification = await import('./nhi-actor-verification.js');
+  members = await import('./member-registry.js');
 });
 
 afterAll(() => {
@@ -376,6 +400,77 @@ describe('NI-05 orphan detection', () => {
         nhi_id: orphaned.nhi_id,
       }),
     ]);
+  });
+});
+
+describe('NI-05 accountable-human orphan detection (FD-10)', () => {
+  it('flags a user:<member_id> accountable human that does not resolve to any member', () => {
+    const orphaned = issueWithAccountableHuman('worker-ghost-owner', 'user:ghost');
+    expect(governance.listOrphanNhiIdentities()).toEqual([
+      expect.objectContaining({
+        nhi_id: orphaned.nhi_id,
+        reason: 'accountable_human_unresolved',
+        missing_scope_id: 'user:ghost',
+      }),
+    ]);
+  });
+
+  it('flags a user:<member_id> accountable human that resolves but is suspended', () => {
+    members.writeMemberProfile({
+      member_id: 'suspended-owner',
+      display_name: 'Suspended Owner',
+      status: 'suspended',
+      memberships: [],
+      access_registrations: [],
+      created_at: '2026-09-14T00:00:00.000Z',
+      updated_at: '2026-09-14T00:00:00.000Z',
+    });
+    const orphaned = issueWithAccountableHuman('worker-suspended-owner', 'user:suspended-owner');
+    expect(governance.listOrphanNhiIdentities().map((o) => o.nhi_id)).toContain(orphaned.nhi_id);
+  });
+
+  it('never flags a user:<member_id> accountable human that resolves to an active member', () => {
+    members.writeMemberProfile({
+      member_id: 'active-owner',
+      display_name: 'Active Owner',
+      status: 'active',
+      memberships: [],
+      access_registrations: [],
+      created_at: '2026-09-14T00:00:00.000Z',
+      updated_at: '2026-09-14T00:00:00.000Z',
+    });
+    issueWithAccountableHuman('worker-active-owner', 'user:active-owner');
+    expect(governance.listOrphanNhiIdentities()).toEqual([]);
+  });
+
+  it('never flags a legacy synthetic accountable human label (human:operator) as an orphan', () => {
+    issueWithAccountableHuman('worker-legacy-owner', 'human:operator');
+    expect(governance.listOrphanNhiIdentities()).toEqual([]);
+  });
+
+  it('reports legacy accountable-human labels separately, never as orphans', () => {
+    const legacy = issueWithAccountableHuman('worker-legacy-listed', 'human:operator');
+    const legacyList = governance.listLegacyAccountableHumanIdentities();
+    expect(legacyList).toEqual(
+      expect.arrayContaining([{ nhi_id: legacy.nhi_id, accountable_human_id: 'human:operator' }])
+    );
+    expect(governance.listOrphanNhiIdentities().map((o) => o.nhi_id)).not.toContain(legacy.nhi_id);
+  });
+
+  it('excludes a retired identity from the legacy accountable-human list', () => {
+    const record = issueWithAccountableHuman('worker-legacy-retired', 'human:operator');
+    authority.withExecutionContext('mission_controller', () => {
+      identity.retireAgentIdentity(record.nhi_id, 'done');
+    });
+    expect(governance.listLegacyAccountableHumanIdentities().map((e) => e.nhi_id)).not.toContain(
+      record.nhi_id
+    );
+  });
+
+  it('carries legacy_accountable_human into the ledger report', () => {
+    const legacy = issueWithAccountableHuman('worker-legacy-report', 'human:operator');
+    const report = governance.buildNhiLedgerReport();
+    expect(report.legacy_accountable_human.map((e) => e.nhi_id)).toContain(legacy.nhi_id);
   });
 });
 

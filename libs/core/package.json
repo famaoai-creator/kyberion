@@ -143,6 +143,10 @@
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
     },
+    "./actor": {
+      "types": "./dist/actor.d.ts",
+      "default": "./dist/actor.js"
+    },
     "./index": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
@@ -2974,6 +2978,14 @@
     "./surface-ux-contract": {
       "types": "./dist/surface-ux-contract.d.ts",
       "default": "./dist/surface-ux-contract.js"
+    },
+    "./artifact-verification": {
+      "types": "./dist/artifact-verification.d.ts",
+      "default": "./dist/artifact-verification.js"
+    },
+    "./training-catalog": {
+      "types": "./dist/training-catalog.d.ts",
+      "default": "./dist/training-catalog.js"
     }
   },
   "dependencies": {
