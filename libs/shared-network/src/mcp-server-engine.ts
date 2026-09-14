@@ -21,6 +21,11 @@
  *
  * See knowledge/product/architecture/mcp-facade-model.md for bands and relationships.
  *
+ * The discover-band tools (scope.current, skill.list/.get, skill resource)
+ * and the act-band actuator.invoke tool live in mcp-facade-discover.ts /
+ * mcp-facade-act.ts; this file wires them in via registerGovernedTool /
+ * ensureMcpApproval injection.
+ *
  * Architecture rules (AGENTS.md):
  *   - All file I/O via secure-io (@agent/core)
  *   - Default MCP visibility: public tier only
@@ -28,7 +33,7 @@
  *   - Every pipeline run goes through the existing run_pipeline.js script
  */
 
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as nodePath from 'node:path';
@@ -60,7 +65,6 @@ import {
   listApprovalRequests,
   loadApprovalRequest,
 } from '@agent/core/approval-store';
-import { resolveScopeResolution } from '@agent/core/scope-context';
 import { formatWireError } from '@agent/core/wire-error';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
@@ -78,17 +82,9 @@ import type { EventScope } from '@agent/core/event-scope';
 import type { McpRequestContext } from '@agent/core/mcp-request-context';
 import { parseMcpTextPayload, parseSafeJsonObject } from './mcp-json.js';
 import { registerKyberionServiceCaptureTool } from './mcp-service-capture-tool.js';
-import {
-  getTransferableSkill,
-  listTransferableSkills,
-  parseSkillResourceUri,
-  readTransferableSkillBody,
-} from './mcp-skill-transfer.js';
-import {
-  invokeAllowlistedActuator,
-  readActuatorInvokeAllowlist,
-  type ActuatorInvokeAllowlistEntry,
-} from './mcp-actuator-invoke.js';
+import { registerMcpFacadeDiscoverTools } from './mcp-facade-discover.js';
+import { registerMcpFacadeActTools } from './mcp-facade-act.js';
+import type { ActuatorInvokeAllowlistEntry } from './mcp-actuator-invoke.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SERVER_NAME = 'kyberion-mcp-server';
@@ -117,13 +113,14 @@ const AUDIT_EXPORT_SCRIPT = nodePath.join(REPO_ROOT, 'dist/scripts/export_audit.
 
 // ─── Catalog helpers ──────────────────────────────────────────────────────────
 
-interface ToolCatalog {
+/** Exported for injection into the split-out mcp-facade-*.ts modules. */
+export interface ToolCatalog {
   pipeline_run_allowlist: string[];
   tools?: ToolCatalogEntry[];
   actuator_invoke_allowlist?: ActuatorInvokeAllowlistEntry[];
 }
 
-interface ToolCatalogEntry {
+export interface ToolCatalogEntry {
   name: string;
   allowed_caller_roles?: string[];
   allowed_tiers?: string[];
@@ -246,6 +243,9 @@ function ensureMcpApproval(params: {
   }
   return { allowed: true, status: 'approved' };
 }
+
+/** Injected into the split-out mcp-facade-*.ts modules; owned here. */
+export type EnsureMcpApproval = typeof ensureMcpApproval;
 
 function loadCatalog(): ToolCatalog {
   return mcpToolCatalog.load();
@@ -380,6 +380,9 @@ function registerGovernedTool(
     }
   );
 }
+
+/** Injected into the split-out mcp-facade-*.ts modules; owned here. */
+export type RegisterGovernedTool = typeof registerGovernedTool;
 
 function isPipelineAllowed(inputPath: string, catalog: ToolCatalog): boolean {
   const normalised = inputPath.replace(/\\/g, '/').replace(/^\.\//, '');
@@ -695,43 +698,8 @@ export function createKyberionMcpServer(): McpServer {
     }
   );
 
-  // ── kyberion.pipeline.list ────────────────────────────────────────────────
-  // ── kyberion.scope.current ────────────────────────────────────────────────
-  registerGovernedTool(
-    server,
-    catalog,
-    'kyberion.scope.current',
-    'Resolve the effective Kyberion scope, its provenance, and the positive knowledge roots available to this process.',
-    {},
-    async () => {
-      const context = resolveMcpRequestContext();
-      const scopeInput = {
-        tier: context.scope.tier,
-        ...(context.scope.tenant_slug ? { tenant_slug: context.scope.tenant_slug } : {}),
-        ...(context.scope.organization_id
-          ? { organization_id: context.scope.organization_id }
-          : {}),
-        ...(context.scope.project_id ? { project_id: context.scope.project_id } : {}),
-        ...(context.scope.mission_id ? { mission_id: context.scope.mission_id } : {}),
-        ...(context.scope.task_id ? { task_id: context.scope.task_id } : {}),
-      };
-      const resolution = resolveScopeResolution(
-        scopeInput,
-        {
-          KYBERION_TIER: context.scope.tier,
-          KYBERION_TENANT: context.scope.tenant_slug,
-          KYBERION_ORGANIZATION_ID: context.scope.organization_id,
-          KYBERION_PROJECT_ID: context.scope.project_id,
-          MISSION_ID: context.scope.mission_id,
-          KYBERION_TASK_ID: context.scope.task_id,
-        },
-        { includePersisted: false, inferFromMission: false, inferFromCwd: false }
-      );
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(resolution, null, 2) }],
-      };
-    }
-  );
+  // ── discover-band facade tools (scope.current, skill.list/.get, resource) ──
+  registerMcpFacadeDiscoverTools({ server, catalog, registerGovernedTool });
 
   // ── kyberion.knowledge.feedback ──────────────────────────────────────────
   registerGovernedTool(
@@ -1528,256 +1496,8 @@ export function createKyberionMcpServer(): McpServer {
     }
   );
 
-  // ── kyberion.skill.list / .get (discover band — transferable SKILL.md) ────
-  registerGovernedTool(
-    server,
-    catalog,
-    'kyberion.skill.list',
-    'List transferable first-party Kyberion skills (SKILL.md) for MCP clients.',
-    {
-      plugin_id: z
-        .string()
-        .optional()
-        .describe('Optional plugin id filter (e.g. kyberion, kyberion-agent-plugin)'),
-    },
-    async ({ plugin_id }) => {
-      try {
-        let skills = listTransferableSkills();
-        if (typeof plugin_id === 'string' && plugin_id.trim()) {
-          const needle = plugin_id.trim();
-          skills = skills.filter((skill) => skill.plugin_id === needle);
-        }
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  skills: skills.map(({ plugin_id: p, skill_id, title, description, uri }) => ({
-                    plugin_id: p,
-                    skill_id,
-                    title,
-                    description,
-                    uri,
-                  })),
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      } catch (err) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: formatWireError(err, 'Failed to list transferable skills'),
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  registerGovernedTool(
-    server,
-    catalog,
-    'kyberion.skill.get',
-    'Fetch a transferable skill body (SKILL.md) by plugin_id and skill_id.',
-    {
-      plugin_id: z.string().min(1).describe('Plugin id (e.g. kyberion)'),
-      skill_id: z.string().min(1).describe('Skill id (often same as plugin_id for root SKILL.md)'),
-    },
-    async ({ plugin_id, skill_id }) => {
-      try {
-        const skill = getTransferableSkill(plugin_id, skill_id);
-        if (!skill) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: `Skill not found: ${plugin_id}/${skill_id}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-        const body = readTransferableSkillBody(skill);
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  plugin_id: skill.plugin_id,
-                  skill_id: skill.skill_id,
-                  title: skill.title,
-                  description: skill.description,
-                  uri: skill.uri,
-                  mime_type: 'text/markdown',
-                  body,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      } catch (err) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: formatWireError(err, 'Failed to get transferable skill'),
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  // ── kyberion.actuator.invoke (act band — allowlisted; default dry_run) ────
-  registerGovernedTool(
-    server,
-    catalog,
-    'kyberion.actuator.invoke',
-    'Invoke an allowlisted actuator op. Default mode is dry_run; live requires operator role.',
-    {
-      actuator: z.string().min(1).describe('Actuator id (e.g. file-actuator)'),
-      op: z.string().min(1).describe('Actuator op (e.g. pipeline, preset)'),
-      params: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('Op parameters (validated against actuator contract when dry_run)'),
-      mode: z
-        .enum(['dry_run', 'live'])
-        .optional()
-        .default('dry_run')
-        .describe('dry_run (default) or live (operator only; allowlist execution path)'),
-      tenant: z.string().optional().describe('Optional tenant scope for the request context'),
-      approval_ref: z
-        .string()
-        .optional()
-        .describe(
-          'Approved request_id from kyberion.approval.list_pending for live gated operations'
-        ),
-    },
-    async ({ actuator, op, params, mode, tenant, approval_ref }) => {
-      try {
-        const live = mode === 'live';
-        const context = resolveMcpRequestContext({
-          requested_tenant: tenant,
-          require_tenant: live,
-        });
-        const allowlist = readActuatorInvokeAllowlist(catalog);
-        const allowlistEntry = allowlist.find(
-          (entry) => entry.actuator === actuator && entry.op === op
-        );
-        let approvalGranted = false;
-        if (live && allowlistEntry?.requires_approval === true) {
-          const approval = ensureMcpApproval({
-            context,
-            approvalRef: approval_ref,
-            payload: {
-              operation: 'actuator.invoke',
-              actuator,
-              op,
-              params: params ?? {},
-              tenant: context.scope.tenant_slug,
-            },
-            effectBinding: `actuator.invoke:${actuator}:${op}`,
-            title: `Invoke actuator '${actuator}:${op}'`,
-            summary: `MCP caller '${context.principal}' requested a live actuator operation.`,
-            details: JSON.stringify(params ?? {}),
-          });
-          if (!approval.allowed) {
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify(
-                    { status: approval.status, request_id: approval.request_id },
-                    null,
-                    2
-                  ),
-                },
-              ],
-            };
-          }
-          approvalGranted = true;
-        }
-        const result = await invokeAllowlistedActuator({
-          actuator,
-          op,
-          params: params ?? {},
-          mode: live ? 'live' : 'dry_run',
-          allowlist,
-          callerRole: context.caller_role,
-          approvalGranted,
-        });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
-        return {
-          content: [
-            { type: 'text' as const, text: formatWireError(err, 'Actuator invoke failed') },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  // ── MCP Resources: transferable skills ────────────────────────────────────
-  server.registerResource(
-    'kyberion-skill',
-    new ResourceTemplate('kyberion://skill/{plugin}/{skill}', {
-      list: async () => ({
-        resources: listTransferableSkills().map((skill) => ({
-          uri: skill.uri,
-          name: `${skill.plugin_id}/${skill.skill_id}`,
-          description: skill.description || skill.title,
-          mimeType: 'text/markdown',
-        })),
-      }),
-    }),
-    {
-      description: 'First-party transferable Kyberion SKILL.md guides',
-      mimeType: 'text/markdown',
-    },
-    async (uri, variables) => {
-      const plugin =
-        typeof variables.plugin === 'string'
-          ? variables.plugin
-          : Array.isArray(variables.plugin)
-            ? String(variables.plugin[0] ?? '')
-            : '';
-      const skillId =
-        typeof variables.skill === 'string'
-          ? variables.skill
-          : Array.isArray(variables.skill)
-            ? String(variables.skill[0] ?? '')
-            : '';
-      const fromUri = parseSkillResourceUri(uri.href);
-      const pluginId = plugin || fromUri?.plugin_id || '';
-      const resolvedSkillId = skillId || fromUri?.skill_id || '';
-      const skill = getTransferableSkill(pluginId, resolvedSkillId);
-      if (!skill) {
-        throw new Error(`Skill resource not found: ${uri.href}`);
-      }
-      return {
-        contents: [
-          {
-            uri: skill.uri,
-            mimeType: 'text/markdown',
-            text: readTransferableSkillBody(skill),
-          },
-        ],
-      };
-    }
-  );
+  // ── act-band facade tool (kyberion.actuator.invoke) ────────────────────────
+  registerMcpFacadeActTools({ server, catalog, registerGovernedTool, ensureMcpApproval });
 
   return server;
 }
