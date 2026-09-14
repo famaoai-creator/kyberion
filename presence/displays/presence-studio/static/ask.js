@@ -138,7 +138,17 @@
     handsFree: false,
     hearingMode: false,
     hearingRecord: null,
+    // HT-02: bounded retry while the record's canvas is still `pending`.
+    hearingCanvasPollTries: 0,
+    // HT-03 (2nd half): local hand-off UI state — `null` before the operator
+    // clicks the button; `{ pending: true }` mid-request; then either
+    // `{ refId, href }` (server request id + same-tab decide link) or
+    // `{ failed: true }`.
+    hearingHandoff: null,
   };
+
+  var HEARING_CANVAS_POLL_INTERVAL_MS = 3000;
+  var HEARING_CANVAS_POLL_MAX_TRIES = 10;
 
   var recognition = null;
   var suppressRecognitionRestart = false;
@@ -445,6 +455,63 @@
     });
   }
 
+  // HT-02: one-line status under the canvas iframe from the record's
+  // `canvas_generation` field (`'pending' | 'generated' | 'template'`,
+  // absent on old records treated the same as `'template'`).
+  function hearingCanvasStatusKey(record) {
+    var generation = record && record.canvas_generation;
+    if (generation === 'pending') return 'front_desk:hearing_canvas_updating';
+    if (generation === 'generated') return 'front_desk:hearing_canvas_generated';
+    return 'front_desk:hearing_canvas_template';
+  }
+
+  function renderHearingCanvasStatus(record) {
+    var statusEl = document.getElementById('hearing-canvas-status');
+    if (!statusEl) return;
+    statusEl.textContent = record ? vt(state.vocab, hearingCanvasStatusKey(record)) : '';
+  }
+
+  // HT-03 (2nd half): the hand-off button + its own local request/result
+  // state, independent from the hearing record itself (the record only
+  // learns the server ids on the next full reload — this keeps the button
+  // responsive without waiting on that round trip).
+  function renderHearingHandoff(record, ready) {
+    var button = document.getElementById('hearing-handoff');
+    var statusEl = document.getElementById('hearing-handoff-status');
+    var linkEl = document.getElementById('hearing-handoff-link');
+    if (!button || !statusEl || !linkEl) return;
+    button.textContent = vt(state.vocab, 'front_desk:hearing_handoff_button');
+    var handoff = state.hearingHandoff;
+    var alreadyHandedOff =
+      Boolean(handoff && handoff.refId) || Boolean(record && record.mission_id);
+    button.classList.toggle('hidden', !ready || alreadyHandedOff);
+    statusEl.classList.add('hidden');
+    linkEl.classList.add('hidden');
+    if (!handoff) return;
+    if (handoff.pending) {
+      statusEl.textContent = vt(state.vocab, 'front_desk:hearing_handoff_pending');
+      statusEl.classList.remove('hidden');
+      return;
+    }
+    if (handoff.failed) {
+      statusEl.textContent = vt(state.vocab, 'front_desk:hearing_handoff_failed');
+      statusEl.classList.remove('hidden');
+      return;
+    }
+    if (handoff.refId) {
+      statusEl.textContent =
+        vt(state.vocab, 'front_desk:hearing_handoff_done') +
+        ' ' +
+        formatTemplate(vt(state.vocab, 'front_desk:hearing_mission_label'), { id: handoff.refId });
+      statusEl.classList.remove('hidden');
+      if (handoff.href) {
+        linkEl.textContent = vt(state.vocab, 'front_desk:hearing_open_decide');
+        linkEl.setAttribute('href', handoff.href);
+        linkEl.classList.remove('hidden');
+      }
+    }
+  }
+
   function renderHearing() {
     var card = document.getElementById('hearing-card');
     if (!card) return;
@@ -459,6 +526,7 @@
     var decide = document.getElementById('hearing-decide');
     if (decide) decide.textContent = vt(state.vocab, 'front_desk:hearing_decide');
     var coverage = document.getElementById('hearing-coverage');
+    var ready = false;
     if (coverage) {
       if (!record) {
         coverage.textContent = vt(state.vocab, 'front_desk:hearing_pending');
@@ -467,6 +535,7 @@
           return Boolean(item.answer);
         }).length;
         var total = record.requirements.length;
+        ready = done === total && total > 0 && Boolean(record.decided_at);
         coverage.textContent = formatTemplate(vt(state.vocab, 'front_desk:hearing_coverage'), {
           done: done,
           total: total,
@@ -477,6 +546,24 @@
     if (canvas && record && record.canvas_url && canvas.getAttribute('src') !== record.canvas_url) {
       canvas.setAttribute('src', record.canvas_url);
     }
+    renderHearingCanvasStatus(record);
+    renderHearingHandoff(record, ready);
+  }
+
+  // HT-02: the record's canvas may still be generating when this page first
+  // reads it — reload every ~3s (bounded) until `canvas_generation` leaves
+  // `pending`, so the iframe picks up the new `canvas_url` without a manual
+  // refresh. `renderHearing` already swaps the iframe `src` whenever
+  // `canvas_url` changes.
+  function maybeScheduleHearingCanvasPoll() {
+    var record = state.hearingRecord;
+    if (!record || record.canvas_generation !== 'pending') {
+      state.hearingCanvasPollTries = 0;
+      return;
+    }
+    if (state.hearingCanvasPollTries >= HEARING_CANVAS_POLL_MAX_TRIES) return;
+    state.hearingCanvasPollTries += 1;
+    window.setTimeout(loadHearing, HEARING_CANVAS_POLL_INTERVAL_MS);
   }
 
   function loadHearing() {
@@ -491,6 +578,7 @@
         if (result.ok && result.body && result.body.ok) {
           state.hearingRecord = result.body.record;
           renderHearing();
+          maybeScheduleHearingCanvasPoll();
         }
       })
       .catch(function () {
@@ -519,6 +607,43 @@
       })
       .catch(function () {
         /* the record remains available for retry */
+      });
+  }
+
+  // HT-03 (2nd half): "confirm and hand off as a request" — carries the
+  // decided hearing record into the governed request/approval flow behind
+  // `POST /api/hearing/:session/handoff`. Idempotent server-side: a second
+  // click after success returns the same ids instead of registering twice.
+  function handoffHearing() {
+    if (!state.hearingMode || !state.hearingRecord) return;
+    if (state.hearingHandoff && state.hearingHandoff.pending) return;
+    state.hearingHandoff = { pending: true };
+    renderHearing();
+    fetchJson(
+      '/api/hearing/' +
+        encodeURIComponent(state.sessionId) +
+        '/handoff?locale=' +
+        encodeURIComponent(state.locale),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      }
+    )
+      .then(function (result) {
+        if (result.ok && result.body && result.body.ok) {
+          state.hearingHandoff = {
+            refId: result.body.mission_id,
+            href: result.body.next_action && result.body.next_action.href,
+          };
+        } else {
+          state.hearingHandoff = { failed: true };
+        }
+        renderHearing();
+      })
+      .catch(function () {
+        state.hearingHandoff = { failed: true };
+        renderHearing();
       });
   }
 
@@ -749,6 +874,8 @@
   function wireHearingDecision() {
     var button = document.getElementById('hearing-decide');
     if (button) button.addEventListener('click', decideHearing);
+    var handoffButton = document.getElementById('hearing-handoff');
+    if (handoffButton) handoffButton.addEventListener('click', handoffHearing);
   }
 
   function wireChips() {
