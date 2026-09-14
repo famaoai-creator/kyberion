@@ -193,7 +193,9 @@ function toApprovalItem(
     channel: String(record.channel || 'chronos'),
     storage_channel: String(record.storageChannel || record.channel || 'chronos'),
     title: String(record.title || record.sourceText || '承認のご依頼'),
-    reason: String(record.justification?.summary || record.sourceText || record.title || ''),
+    reason: String(
+      record.justification?.summary || record.summary || record.sourceText || record.title || ''
+    ),
     requested_at: String(record.requestedAt || ''),
     expires_at: record.expiresAt ? String(record.expiresAt) : undefined,
     mission_id: record.requestedByContext?.missionId

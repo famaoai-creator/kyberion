@@ -6,7 +6,8 @@ import {
 } from '@agent/core/deliverable-inbox';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
-import { conciergeErrorResponse } from '../../../../lib/viewer-context';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { resolveConciergeDecidedBy } from '../../../../lib/front-desk-member';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,10 @@ function isAllowedStatus(value: unknown): value is DeliverableInboxStatus {
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
+  // FD-07: best-effort `decided_by` context; an unresolved viewer keeps the
+  // pre-FD-07 'human:concierge' / 'concierge' identity below unchanged.
+  const resolved = resolveConciergeViewer(req);
+  const decidedBy = resolved.context ? resolveConciergeDecidedBy(resolved.context) : null;
 
   try {
     const { id } = await context.params;
@@ -42,14 +47,14 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       status === 'accepted'
         ? acceptInboxEntryWithHumanReceipt({
             entryId: id,
-            actorId: 'human:concierge',
+            actorId: decidedBy?.id ?? 'human:concierge',
             authenticated: true,
             authMethod: 'surface_session',
             responsibilityStatement: 'I accept this deliverable on behalf of the operator.',
           })
         : markInboxEntry(id, status, {
             verdictNote: typeof body?.note === 'string' ? body.note : undefined,
-            reviewedBy: 'concierge',
+            reviewedBy: decidedBy?.id ?? 'concierge',
           });
     if (!updated) {
       return NextResponse.json(

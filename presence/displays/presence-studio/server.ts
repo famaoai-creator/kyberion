@@ -1,17 +1,13 @@
 import { appendJsonLine, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
+import { ensureOwnerMember } from '@agent/core/member-registry';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
 } from '@agent/core/personal-identity-reader';
 import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
-import {
-  applyBrowserOnboarding,
-  getBrowserOnboardingState,
-  previewBrowserOnboarding,
-} from '@agent/core/browser-onboarding';
 import {
   createBrowserConversationSession,
   listBrowserConversationSessions,
@@ -20,11 +16,6 @@ import {
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/approval-store';
 import { listArtifactRecords } from '@agent/core/artifact-record';
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
-import { listAgentRuntimeSnapshots } from '@agent/core/agent-runtime-supervisor';
-import {
-  getSurfaceAgentCatalogEntry,
-  listSurfaceAgentCatalog,
-} from '@agent/core/surface-agent-catalog';
 import {
   listSurfaceAsyncRequestsAcrossChannels,
   listSurfaceNotificationsAcrossChannels,
@@ -41,7 +32,6 @@ import { listMissionSeedRecords } from '@agent/core/mission-seed-registry';
 import { listDistillCandidateRecords } from '@agent/core/distill-candidate-registry';
 import { getActiveTaskSession, listTaskSessions } from '@agent/core/task-session';
 import { pathResolver } from '@agent/core/path-resolver';
-import { probeMicCapture } from '@agent/core/mic-capture';
 import {
   getVoiceSelectionSnapshot,
   saveVoiceSelectionPreferences,
@@ -84,23 +74,13 @@ import {
   readEmailDraftArtifact as readSharedEmailDraftArtifact,
 } from '@agent/core/email-workflow';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
-
-function safeParsePresenceStudioRequestBody(body: unknown, label: string): unknown {
-  if (body === undefined) return undefined;
-  try {
-    return parseSafeJsonObjectValue(body, label);
-  } catch {
-    return null;
-  }
-}
+import { registerFrontDeskRoutes } from './front-desk-routes.js';
+import { PRESENCE_STUDIO_VOCABULARY_KEYS } from './front-desk-pages.js';
 
 presenceStudioData.app.get('/api/ui-vocabulary', (req, res) => {
   const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
   const texts = Object.fromEntries(
-    presenceStudioData.PRESENCE_STUDIO_VOCABULARY_KEYS.map((key) => [
-      key,
-      catalogT(key, undefined, locale),
-    ])
+    PRESENCE_STUDIO_VOCABULARY_KEYS.map((key) => [key, catalogT(key, undefined, locale)])
   );
   res.setHeader('Cache-Control', 'no-store');
   res.json({ ok: true, locale, texts });
@@ -139,49 +119,14 @@ presenceStudioData.app.get('/api/identity', (_req, res) => {
   }
 });
 
-presenceStudioData.app.get('/api/onboarding/browser-state', (_req, res) => {
-  try {
-    const mic = probeMicCapture();
-    res.json({ ...getBrowserOnboardingState(), readiness: { microphone: mic } });
-  } catch (error: unknown) {
-    res.status(500).json(presenceStudioData.presenceStudioWireError(error, 500));
-  }
-});
-
-presenceStudioData.app.post('/api/onboarding/preview', (req, res) => {
-  try {
-    res.json(
-      previewBrowserOnboarding(
-        parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding preview body')
-      )
-    );
-  } catch (error: any) {
-    res.status(400).json(presenceStudioData.presenceStudioWireError(error, 400));
-  }
-});
-
-presenceStudioData.app.post('/api/onboarding/apply', async (req, res) => {
-  try {
-    const result = await applyBrowserOnboarding(
-      parseSafeJsonObjectValue(req.body ?? {}, 'browser onboarding apply body')
-    );
-    logger.info(
-      presenceStudioData.presenceStudioAuditLine(req, 'onboarding/apply.complete', {
-        artifacts: result.artifacts.length,
-        status: 200,
-      })
-    );
-    res.json(result);
-  } catch (error: any) {
-    logger.warn(
-      presenceStudioData.presenceStudioAuditLine(req, 'onboarding/apply.reject', {
-        status: 400,
-        error: error?.message || String(error),
-      })
-    );
-    res.status(400).json(presenceStudioData.presenceStudioWireError(error, 400));
-  }
-});
+// Front-desk API routes (GET /api/me, /api/front-desk/nav, home/progress/ask
+// vocabulary + pages, POST /api/outcomes/:id/verdict, POST /api/conversation,
+// /api/onboarding/*) live in `front-desk-routes.ts` — split out purely to
+// keep this file under the repo's `max-file-lines` gate. Registered here, at
+// the same position these routes were inline before the split, so the
+// `/api` + `/a2ui` guard and rate limiter (presence-studio-runtime-data.ts)
+// still run ahead of every route it registers.
+registerFrontDeskRoutes(presenceStudioData.app);
 
 presenceStudioData.app.get('/health', (_req, res) => {
   res.json({
@@ -206,49 +151,6 @@ presenceStudioData.app.get('/api/email-draft', (_req, res) => {
 
 presenceStudioData.app.get('/api/email-auth-status', (_req, res) => {
   res.json({ accounts: listEmailAccountProviders() });
-});
-
-presenceStudioData.app.get('/api/surface-agents', (_req, res) => {
-  const currentAgentId =
-    typeof presenceStudioData.state.surfaces['presence-studio']?.data?.agentId === 'string'
-      ? (presenceStudioData.state.surfaces['presence-studio']?.data?.agentId as string)
-      : 'presence-surface-agent';
-  const currentRuntime = listAgentRuntimeSnapshots().find(
-    (entry) => entry.agent.agentId === currentAgentId
-  );
-  const providerResolution =
-    currentRuntime?.agent?.metadata && typeof currentRuntime.agent.metadata === 'object'
-      ? (currentRuntime.agent.metadata.provider_resolution as Record<string, unknown> | undefined)
-      : undefined;
-  const currentCatalogEntry = getSurfaceAgentCatalogEntry(currentAgentId);
-  res.json({
-    ok: true,
-    currentAgentId,
-    current: currentCatalogEntry
-      ? {
-          ...currentCatalogEntry,
-          resolvedProvider: currentRuntime?.agent?.provider,
-          resolvedModelId: currentRuntime?.agent?.modelId,
-          providerResolution: providerResolution
-            ? {
-                preferredProvider:
-                  typeof providerResolution.preferredProvider === 'string'
-                    ? providerResolution.preferredProvider
-                    : undefined,
-                preferredModelId:
-                  typeof providerResolution.preferredModelId === 'string'
-                    ? providerResolution.preferredModelId
-                    : undefined,
-                strategy:
-                  typeof providerResolution.strategy === 'string'
-                    ? providerResolution.strategy
-                    : undefined,
-              }
-            : undefined,
-        }
-      : null,
-    agents: listSurfaceAgentCatalog(),
-  });
 });
 
 presenceStudioData.app.get('/api/standard-intents', (_req, res) => {
@@ -408,7 +310,7 @@ presenceStudioData.app.get('/api/os/control-plane', (req, res) => {
 presenceStudioData.app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
   const actionId = readPresenceStudioStringParam(req.params.actionId);
   const parsed = presenceStudioApprovalDecisionSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'held action decision body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'held action decision body')
   );
   if (!actionId || !parsed.success) {
     return res.status(400).json({
@@ -510,7 +412,7 @@ presenceStudioData.app.get('/api/approvals', (_req, res) => {
 presenceStudioData.app.post('/api/approvals/:requestId/decision', (req, res) => {
   const requestId = readPresenceStudioStringParam(req.params.requestId);
   const parsed = presenceStudioApprovalDecisionSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'approval decision body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'approval decision body')
   );
   if (!requestId) {
     logger.warn(
@@ -706,7 +608,7 @@ presenceStudioData.app.get('/api/task-sessions/:sessionId/artifact', (req, res) 
 
 presenceStudioData.app.post('/api/browser-conversation-sessions/bootstrap', (req, res) => {
   const parsed = presenceStudioBrowserBootstrapSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'browser bootstrap body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'browser bootstrap body')
   );
   if (!parsed.success) {
     logger.warn(
@@ -855,7 +757,7 @@ presenceStudioData.app.post('/a2ui/dispatch', (req, res) => {
 
 presenceStudioData.app.post('/api/voice/stimuli', (req, res) => {
   const parsed = presenceStudioVoiceStimulusSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'voice stimulus body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'voice stimulus body')
   );
   if (!parsed.success) {
     logger.warn(
@@ -899,7 +801,7 @@ presenceStudioData.app.post('/api/voice/stimuli', (req, res) => {
 
 presenceStudioData.app.post('/api/voice/ingest', async (req, res) => {
   const parsed = presenceStudioVoiceIngestSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'voice ingest body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'voice ingest body')
   );
   if (!parsed.success) {
     logger.warn(
@@ -955,7 +857,7 @@ presenceStudioData.app.post('/api/voice/ingest', async (req, res) => {
 
 presenceStudioData.app.post('/api/voice/minutes', async (req, res) => {
   const parsed = presenceStudioVoiceMinutesSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'voice minutes body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'voice minutes body')
   );
   if (!parsed.success) {
     logger.warn(
@@ -1097,7 +999,7 @@ presenceStudioData.app.post('/api/voice/minutes', async (req, res) => {
 
 presenceStudioData.app.post('/api/email-draft', async (req, res) => {
   const parsed = presenceStudioEmailDraftSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'email draft body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'email draft body')
   );
   if (!parsed.success) {
     logger.warn(
@@ -1176,7 +1078,7 @@ presenceStudioData.app.post('/api/email-draft', async (req, res) => {
 
 presenceStudioData.app.post('/api/email-deliver', async (req, res) => {
   const parsed = presenceStudioEmailDeliverSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'email deliver body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'email deliver body')
   );
   if (!parsed.success) {
     logger.warn(
@@ -1251,7 +1153,7 @@ presenceStudioData.app.post('/api/email-deliver', async (req, res) => {
 
 presenceStudioData.app.post('/api/voice/native-listen', async (req, res) => {
   const parsed = presenceStudioVoiceNativeListenSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'voice native listen body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'voice native listen body')
   );
   if (!parsed.success) {
     logger.warn(
@@ -1337,7 +1239,7 @@ presenceStudioData.app.get('/api/voice/selection', (_req, res) => {
 
 presenceStudioData.app.post('/api/voice/selection', (req, res) => {
   const parsed = presenceStudioVoiceSelectionSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'voice selection body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'voice selection body')
   );
   if (!parsed.success) {
     logger.warn(
@@ -1427,7 +1329,7 @@ presenceStudioData.app.get('/api/context/location', (_req, res) => {
 
 presenceStudioData.app.post('/api/context/location', (req, res) => {
   const parsed = presenceStudioLocationSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'location body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'location body')
   );
   if (!parsed.success) {
     logger.warn(
@@ -1460,7 +1362,7 @@ presenceStudioData.app.post('/api/context/location', (req, res) => {
 
 presenceStudioData.app.post('/api/voice/stop-speaking', async (req, res) => {
   const parsed = presenceStudioVoiceStopSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'voice stop body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'voice stop body')
   );
   if (!parsed.success) {
     return res
@@ -1480,7 +1382,7 @@ presenceStudioData.app.post('/api/voice/stop-speaking', async (req, res) => {
 
 presenceStudioData.app.post('/api/demo/frame', (req, res) => {
   const parsed = presenceStudioDemoFrameSchema.safeParse(
-    safeParsePresenceStudioRequestBody(req.body, 'demo frame body')
+    presenceStudioData.safeParsePresenceStudioRequestBody(req.body, 'demo frame body')
   );
   if (!parsed.success) {
     return res
@@ -1531,6 +1433,14 @@ presenceStudioData.server.listen(presenceStudioData.PORT, presenceStudioData.HOS
   setTimeout(() => {
     presenceStudioData.ensurePresenceBrowserConversationSession();
   }, 0);
+  // FD-07: provision the local owner member idempotently at boot so the
+  // loopback viewer is a registered member (same lazy step the concierge
+  // performs on its first /api/me). Best-effort: never blocks startup.
+  try {
+    withExecutionContext('sovereign_concierge', () => ensureOwnerMember());
+  } catch (error) {
+    logger.warn(`[presence-studio] could not provision the owner member: ${String(error)}`);
+  }
 });
 
 setInterval(() => {

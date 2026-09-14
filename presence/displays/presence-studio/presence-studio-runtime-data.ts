@@ -7,7 +7,6 @@ import {
   parseSafeJsonObjectValue,
   setRegisteredEnv,
 } from '@agent/core/foundation';
-import { type VocabularyKey } from '@agent/core/t';
 import { CloudflareOsSurface } from '@agent/core/cloudflare-os-surface';
 import {
   createBrowserConversationSession,
@@ -72,6 +71,7 @@ import {
 import { probeMicCapture } from '@agent/core/mic-capture';
 import { resolveEmailTriagePath } from '@agent/core/email-workflow';
 import { collectDoctorReport } from '../../../scripts/run_doctor.js';
+import { registerFrontDeskAuxPages, registerFrontDeskHomeWorkPages } from './front-desk-pages.js';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('presence-studio');
@@ -401,6 +401,20 @@ export interface EmailTriageArtifact {
 
 export function validationErrorMessage(error: z.ZodError): string {
   return error.issues[0]?.message || 'Invalid request body';
+}
+
+/** Shared by every schema-backed route across `server.ts` and
+ * `front-desk-routes.ts`: never hand a raw `req.body` to `zod`'s
+ * `safeParse` — normalize it through the safe JSON boundary first so a
+ * malformed or prototype-polluting body fails validation instead of
+ * throwing or bypassing schema checks. */
+export function safeParsePresenceStudioRequestBody(body: unknown, label: string): unknown {
+  if (body === undefined) return undefined;
+  try {
+    return parseSafeJsonObjectValue(body, label);
+  } catch {
+    return null;
+  }
 }
 
 export function toBoolean(value: unknown): boolean {
@@ -1097,6 +1111,14 @@ app.post(
   }
 );
 
+// FD-02: `/` is now the human home page; the pre-FD-02 workbench moved to
+// `/work` unchanged. Both are explicit routes registered ahead of
+// `express.static` below so its default `index: 'index.html'` behavior for
+// `GET /` never wins the race against `home.html`. (Route bodies live in
+// `front-desk-pages.ts`, split out to keep this file under the
+// `max-file-lines` gate.)
+registerFrontDeskHomeWorkPages(app, staticDir);
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(staticDir));
 app.use(['/api', '/a2ui'], requirePresenceStudioRateLimit(), requirePresenceStudioAccess());
@@ -1159,9 +1181,12 @@ app.get('/api/headless/a2ui/overview', (req, res) => {
   }
 });
 
-app.get('/onboarding', (_req, res) => {
-  res.sendFile(path.join(staticDir, 'onboarding.html'));
-});
+// FD-06/03/05/08: `/onboarding` (redirect), `/ask`, `/progress`, `/help` —
+// `express.static` (registered above) never intercepts these; a literal path
+// with no extension only matches a static file of that exact name, never the
+// `.html` file the route serves. (Route bodies live in `front-desk-pages.ts`,
+// split out to keep this file under the `max-file-lines` gate.)
+registerFrontDeskAuxPages(app, staticDir);
 
 // Browsers always probe /favicon.ico — return 204 to silence noisy console 404.
 app.get('/favicon.ico', (_req, res) => {
@@ -1304,63 +1329,3 @@ app.get('/api/design-tokens.css', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.send(body);
 });
-
-export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
-  'presence_studio:record_mission_placeholder',
-  'presence_studio:record_start',
-  'presence_studio:record_stop',
-  'presence_studio:live_transcript',
-  'presence_studio:record_hint',
-  'presence_studio:record_panel_label',
-  'presence_studio:notes_panel_label',
-  'presence_studio:notes_placeholder',
-  'presence_studio:meeting_title_placeholder',
-  'presence_studio:create_minutes',
-  'presence_studio:copy_notes',
-  'presence_studio:restore_draft',
-  'presence_studio:clear_notes',
-  'presence_studio:notes_hint',
-  'presence_studio:email_triage_label',
-  'presence_studio:email_triage_empty',
-  'presence_studio:refresh_triage',
-  'presence_studio:copy_draft',
-  'presence_studio:email_triage_hint',
-  'presence_studio:email_reply_label',
-  'presence_studio:email_auth_checking',
-  'presence_studio:account_auto',
-  'presence_studio:recipient_placeholder',
-  'presence_studio:subject_placeholder',
-  'presence_studio:tone_clear',
-  'presence_studio:tone_warm',
-  'presence_studio:tone_firm',
-  'presence_studio:reply_message_id_placeholder',
-  'presence_studio:mode_new',
-  'presence_studio:mode_reply',
-  'presence_studio:mode_reply_all',
-  'presence_studio:email_draft_empty',
-  'presence_studio:create_reply_draft',
-  'presence_studio:create_account_draft',
-  'presence_studio:send_approved_email',
-  'presence_studio:refresh_auth',
-  'presence_studio:reload_draft',
-  'presence_studio:copy_reply',
-  'presence_studio:email_draft_hint',
-  'presence_studio:approval_label',
-  'presence_studio:outcomes_label',
-  'presence_studio:requested_work_label',
-  'presence_studio:browser_label',
-  'presence_studio:prepare_browser',
-  'presence_studio:browser_task_hint',
-  'presence_studio:recording_started',
-  'presence_studio:recording_stopping',
-  'presence_studio:minutes_created',
-  'presence_studio:recording_short',
-  'tui:tui_cockpit_authority_autonomous',
-  'tui:tui_cockpit_authority_approval',
-  'tui:tui_cockpit_authority_clarification',
-  'tui:tui_cockpit_outcome_answer',
-  'tui:tui_cockpit_outcome_artifact',
-  'tui:tui_cockpit_outcome_approval_ready_plan',
-  'tui:tui_cockpit_outcome_service_change',
-  'tui:tui_cockpit_outcome_status_report',
-] as const satisfies readonly VocabularyKey[];

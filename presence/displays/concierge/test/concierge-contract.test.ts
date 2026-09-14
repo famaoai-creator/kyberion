@@ -37,21 +37,40 @@ describe('concierge surface contract', () => {
   });
 
   it('exposes the personal-secretary onboarding controls', () => {
-    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
+    // FD-06 file split (KP gate: max-file-lines): each card's JSX now lives
+    // in its own file under settings/sections/ — the page still owns every
+    // handler (getUserMedia/MediaRecorder/action:'save_management' below).
+    const profileSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/ProfileSection.tsx'),
+      'utf8'
+    );
+    const voiceSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/VoiceSection.tsx'),
+      'utf8'
+    );
+    const servicesSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/ServicesSection.tsx'),
+      'utf8'
+    );
+    const advancedSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/AdvancedSection.tsx'),
+      'utf8'
+    );
     const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
     );
-    expect(setupPage).toContain("t('setup.save_profile')");
-    expect(setupPage).toContain("t('setup.image_label')");
-    expect(setupPage).toContain("t('setup.save_voice')");
+    expect(profileSection).toContain("t('setup.save_profile')");
+    expect(voiceSection).toContain("t('setup.image_label')");
+    expect(voiceSection).toContain("t('setup.save_voice')");
     expect(setupPage).toContain('getUserMedia');
     expect(setupPage).toContain('MediaRecorder');
-    expect(setupPage).toContain("t('setup.capture_avatar')");
-    expect(setupPage).toContain("t('setup.camera_fallback')");
-    expect(setupPage).toContain("t('setup.services_title')");
-    expect(setupPage).toContain("t('setup.management_title')");
+    expect(voiceSection).toContain("t('setup.capture_avatar')");
+    expect(voiceSection).toContain("t('setup.camera_fallback')");
+    expect(servicesSection).toContain("t('setup.services_title')");
+    expect(advancedSection).toContain("t('setup.management_title')");
     expect(setupPage).toContain("action: 'save_management'");
     expect(messages).toContain('プロフィールと接続準備を保存');
     expect(messages).toContain('アバター画像');
@@ -225,7 +244,7 @@ describe('concierge surface contract', () => {
 
   it('renders actionable setup diagnostics that jump to in-page sections (CS-03)', () => {
     const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
-    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -237,13 +256,16 @@ describe('concierge surface contract', () => {
     // The page renders the checklist and attention items jump to their section.
     expect(setupPage).toContain("t('setup.readiness_title')");
     expect(setupPage).toContain('scrollIntoView');
-    for (const anchor of [
-      'setup-profile',
-      'setup-media',
-      'setup-services',
-      'setup-notifications',
-    ]) {
-      expect(setupPage).toContain(`id="${anchor}"`);
+    // The 4 anchors now live in their own section files (FD-06 file split).
+    const anchorFiles: Record<string, string> = {
+      'setup-profile': 'ProfileSection.tsx',
+      'setup-media': 'VoiceSection.tsx',
+      'setup-services': 'ServicesSection.tsx',
+      'setup-notifications': 'NotificationsSection.tsx',
+    };
+    for (const [anchor, file] of Object.entries(anchorFiles)) {
+      const section = fs.readFileSync(path.join(appDir, 'src/app/settings/sections', file), 'utf8');
+      expect(section).toContain(`id="${anchor}"`);
     }
     // ceo-ux.md: items with an in-app section no longer print shell commands,
     // and pipeline IDs are not exposed as UI copy.
@@ -265,7 +287,12 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/notification-preferences/route.ts'),
       'utf8'
     );
-    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
+    // FD-06 file split: the notifications card's JSX moved into its own file.
+    const notificationsSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/NotificationsSection.tsx'),
+      'utf8'
+    );
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -282,7 +309,7 @@ describe('concierge surface contract', () => {
     expect(route).toContain('requireConciergeMutationAccess');
     expect(route).not.toMatch(/export (async )?function (PUT|DELETE|PATCH)/);
     // The setup page exposes the section and reports it in the checklist.
-    expect(setupPage).toContain("t('setup.notifications_title')");
+    expect(notificationsSection).toContain("t('setup.notifications_title')");
     expect(setupPage).toContain("fetch('/api/notification-preferences'");
     expect(messages).toContain('通知設定を保存');
   });
@@ -364,8 +391,11 @@ describe('concierge surface contract', () => {
     expect(route).toContain('MAX_IMAGE_BYTES');
 
     // The outcome card fetches on demand and degrades politely for formats
-    // it cannot show inline.
-    expect(page).toContain("t('home.preview')");
+    // it cannot show inline. FD-04: the trigger button now reads
+    // `front_desk:action_open` (the shared "決める" action-row vocabulary);
+    // the toggled-open "hide" state keeps the pre-FD-04 `home.preview_hide`.
+    expect(page).toContain("frontDeskText('action_open', locale)");
+    expect(page).toContain("t('home.preview_hide')");
     expect(page).toContain('/preview');
     expect(page).toContain('data_uri');
     expect(messages).toContain('このファイル形式はここでは表示できません');
@@ -375,7 +405,10 @@ describe('concierge surface contract', () => {
   it('runs document intake as an explicit one-shot ingest ceremony (CS-03)', () => {
     const route = fs.readFileSync(path.join(appDir, 'src/app/api/ingest/route.ts'), 'utf8');
     const page = fs.readFileSync(path.join(appDir, 'src/app/ingest/page.tsx'), 'utf8');
-    const header = fs.readFileSync(path.join(appDir, 'src/app/concierge-header.tsx'), 'utf8');
+    // FD-00c: the header's own nav links (Home / 資料の取込 / Setup) moved to
+    // the shared front-desk rail — see test/front-desk-contract.test.ts for
+    // the rail's own ingest-reachability assertion.
+    const rail = fs.readFileSync(path.join(appDir, 'src/app/front-desk-rail.tsx'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -411,7 +444,7 @@ describe('concierge surface contract', () => {
     expect(page).toContain("t('ingest.drop_hint')");
     expect(page).toContain('setDryRun] = React.useState(true)');
     expect(page).toContain("t('ingest.commit_after_preview')");
-    expect(header).toContain("t('header.ingest')");
+    expect(rail).toContain("t('header.ingest')");
     expect(messages).toContain('資料の取込');
     expect(messages).toContain('まず内容を確認する');
   });
@@ -475,7 +508,12 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/plugins/[id]/route.ts'),
       'utf8'
     );
-    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
+    // FD-06 file split: the plugins card's JSX moved into its own file.
+    const pluginsSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/PluginsSection.tsx'),
+      'utf8'
+    );
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -507,10 +545,10 @@ describe('concierge surface contract', () => {
 
     // The setup section shows status chips, decides via inline confirm only,
     // and carries the trust caveat (third-party code runs only after approval).
-    expect(setupPage).toContain('id="setup-plugins"');
-    expect(setupPage).toContain("t('setup.plugins_caveat')");
-    expect(setupPage).toContain("'setup.plugin_confirm_approve'");
-    expect(setupPage).toContain("'setup.plugin_confirm_deny'");
+    expect(pluginsSection).toContain('id="setup-plugins"');
+    expect(pluginsSection).toContain("t('setup.plugins_caveat')");
+    expect(pluginsSection).toContain("'setup.plugin_confirm_approve'");
+    expect(pluginsSection).toContain("'setup.plugin_confirm_deny'");
     expect(setupPage).not.toContain('window.confirm');
     expect(messages).toContain('稼働可能');
     expect(messages).toContain('承認待ち');
@@ -523,7 +561,13 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/api/config-missions/route.ts'),
       'utf8'
     );
-    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/setup/page.tsx'), 'utf8');
+    const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
+    // FD-06 file split: the governance sub-pane's JSX now lives in the
+    // 詳細設定 (advanced) section file, inside its own <details>.
+    const advancedSection = fs.readFileSync(
+      path.join(appDir, 'src/app/settings/sections/AdvancedSection.tsx'),
+      'utf8'
+    );
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -551,8 +595,8 @@ describe('concierge surface contract', () => {
 
     // The setup section is preset-picker → declared inputs → inline confirm,
     // and the copy says the change takes effect only after approval.
-    expect(setupPage).toContain('id="setup-governance"');
-    expect(setupPage).toContain("t('setup.governance_confirm')");
+    expect(advancedSection).toContain('id="setup-governance"');
+    expect(advancedSection).toContain("t('setup.governance_confirm')");
     expect(setupPage).not.toContain('window.confirm');
     expect(messages).toContain('反映はご承認を通ってからになります');
     expect(messages).toContain('変更依頼を起票する');
@@ -592,27 +636,42 @@ describe('concierge surface contract', () => {
     expect(route).toContain('peekPersistedDelegationChildrenRegistry');
     expect(route).toContain('staleChildCount');
   });
-  it('CS-04: presents one prioritized inquiry queue whose cards are shared with the panes', () => {
+  it('CS-04/FD-04: presents one prioritized decision queue (決める) whose cards call the guarded decision endpoints', () => {
     const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
     // One queue section, ordered by decision urgency, rendered from the same
-    // card helpers the detail panes use (no duplicated action UI).
+    // card helpers the (now removed) detail panes used to duplicate.
     expect(page).toContain('inquiry-queue');
-    expect(page).toContain("t('queue.title')");
+    // FD-04: `/` is the 決める page — the heading is the shared
+    // `front_desk:nav_decide` rail label, not the old `queue.title`.
+    expect(page).toContain("frontDeskText('nav_decide', locale)");
+    expect(page).toContain("frontDeskText('decide_lead', locale)");
     expect(page).toContain('renderApprovalCard');
     expect(page).toContain('renderHygieneCard');
     expect(page).toContain('renderMemoryCard');
     expect(page).toContain('renderOutcomeCard');
     expect(page).toContain('renderExceptionCard');
-    // The panes now defer to the queue instead of duplicating the cards.
-    expect(page).toContain("t('home.see_queue'");
+    // FD-04: the four duplicate panes (and their "see all in the queue"
+    // links) and the briefing card are gone — the queue is the only place
+    // these cards render.
+    expect(page).not.toContain("t('home.approval_title')");
+    expect(page).not.toContain("t('home.request_title')");
+    expect(page).not.toContain("t('home.outcome_title')");
+    expect(page).not.toContain("t('home.exception_title')");
+    expect(page).not.toContain("t('home.see_queue'");
+    expect(page).not.toContain("t('home.briefing_label')");
     expect(page).not.toContain('window.prompt');
+    expect(page).not.toContain('window.confirm');
   });
 
   it('CS-04: command palette is keyboard-first, dialog-labelled, and never performs decisions', () => {
     const palette = fs.readFileSync(path.join(appDir, 'src/app/command-palette.tsx'), 'utf8');
     const layout = fs.readFileSync(path.join(appDir, 'src/app/layout.tsx'), 'utf8');
     const css = fs.readFileSync(path.join(appDir, 'src/app/globals.css'), 'utf8');
-    expect(layout).toContain('<CommandPalette />');
+    // FD-00c follow-up: CommandPalette takes a `frontDeskPorts` prop
+    // (manifest-resolved, read server-side in layout.tsx) instead of a bare
+    // `<CommandPalette />` — see test/front-desk-contract.test.ts for the
+    // no-hardcoded-port assertion.
+    expect(layout).toContain('<CommandPalette frontDeskPorts={frontDeskPorts} />');
     expect(palette).toContain('role="dialog"');
     expect(palette).toContain('aria-modal');
     expect(palette).toContain('prefers-reduced-motion');

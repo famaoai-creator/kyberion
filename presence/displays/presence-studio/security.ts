@@ -8,9 +8,11 @@ import {
   resolveSurfaceViewerScope,
   SurfaceViewerScopeError,
   resolveSurfaceViewerToken,
+  type SurfaceViewerScope,
 } from '@agent/core/surface-mutation-guard';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+import type { EventScopeInput } from '@agent/core/event-scope';
 export {
   parsePersonalAgentIdentity as parsePresenceStudioAgentIdentity,
   parsePersonalSovereignIdentity as parsePresenceStudioSovereignIdentity,
@@ -241,6 +243,54 @@ export function toSurfaceAuthorizationContext(
   };
 }
 
+/**
+ * FD-01: shape the server-resolved viewer as the framework-neutral
+ * `SurfaceViewerScope` that `@agent/core/front-desk-identity` expects. Same
+ * role/tier derivation as `presenceStudioHeadlessScope` /
+ * `toSurfaceAuthorizationContext` above — a member-registry-aware `approver`
+ * role has no server-side counterpart yet (FD-07).
+ */
+export function toFrontDeskViewerScope(viewer: PresenceStudioViewerContext): SurfaceViewerScope {
+  return {
+    role: viewer.source === 'loopback' ? 'localadmin' : 'readonly',
+    tenantSlugs: viewer.tenantSlugs,
+    organizationIds: 'all',
+    projectIds: 'all',
+    tierAccess:
+      viewer.source === 'loopback'
+        ? ['personal', 'confidential', 'public']
+        : ['confidential', 'public'],
+    source: viewer.source,
+    principalId: viewer.principalId,
+  };
+}
+
+/**
+ * FD-03: the `EventScopeInput` `runSurfaceMessageConversation` (and the
+ * voice-hub `/api/ingest-text` proxy) expect, derived from the same
+ * viewer-scope fields `toFrontDeskViewerScope` reads — ported from the
+ * concierge's `conciergeConversationScope`
+ * (`presence/displays/concierge/src/lib/viewer-context.ts`). A single-tenant
+ * viewer gets a `tenant` scope; a multi-tenant/`'all'` viewer (token access)
+ * falls back to the `system` scope, same as the concierge does for its
+ * equivalent multi-tenant case.
+ */
+export function presenceStudioConversationScope(
+  viewer: PresenceStudioViewerContext
+): EventScopeInput {
+  const tenant =
+    viewer.tenantSlugs !== 'all' && viewer.tenantSlugs.length === 1
+      ? viewer.tenantSlugs[0]
+      : undefined;
+  // Both loopback and token viewers carry `confidential` tier access on this
+  // surface (see `toFrontDeskViewerScope` above); the multi-tenant/'all' case
+  // falls back to the `system` scope with `public` tier, same as the
+  // concierge's `conciergeConversationScope` fallback.
+  return tenant
+    ? { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant }
+    : { scope_kind: 'system', tier: 'public' };
+}
+
 function recordTenant(value: unknown): string | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const record = value as Record<string, unknown>;
@@ -345,8 +395,32 @@ export function requirePresenceStudioAccess(): RequestHandler {
       return res.status(auth.status).json({ ok: false, error: auth.reason });
     }
     const remote = !isLoopbackAddress(getPresenceStudioClientAddress(req));
-    const path = String(req.originalUrl || req.url || '');
-    const remoteSafe = path.startsWith('/api/headless/') || path.startsWith('/api/os/');
+    const rawPath = String(req.originalUrl || req.url || '');
+    const path = rawPath.split('?')[0] || rawPath;
+    // FD-01: /api/me and /api/front-desk/nav are read-only and viewer-scoped
+    // (never widened by a client-supplied ?tenant=), so they join the same
+    // remote-safe allowlist as the headless and OS control-plane APIs.
+    // FD-02: /api/home and /api/home-vocabulary are the same shape (read-only,
+    // viewer-scoped, no client-supplied widening) so they join it too.
+    // FD-05: /api/progress, /api/progress/:id, and /api/progress-vocabulary
+    // are read-only and viewer-scoped the same way — the mutating
+    // /api/outcomes/:id/verdict route deliberately does NOT join this list
+    // (it requires `requirePresenceStudioLocalAdmin`, i.e. loopback only).
+    // FD-03: /api/ask-vocabulary is the same read-only shape and joins the
+    // list too; /api/conversation is a write (asking is a mutation) and
+    // deliberately does NOT join it — it requires
+    // `requirePresenceStudioLocalAdmin`, same as /api/outcomes/:id/verdict.
+    const remoteSafe =
+      path.startsWith('/api/headless/') ||
+      path.startsWith('/api/os/') ||
+      path === '/api/me' ||
+      path === '/api/front-desk/nav' ||
+      path === '/api/home' ||
+      path === '/api/home-vocabulary' ||
+      path === '/api/progress' ||
+      path.startsWith('/api/progress/') ||
+      path === '/api/progress-vocabulary' ||
+      path === '/api/ask-vocabulary';
     if (remote && auth.reason === 'token' && !remoteSafe) {
       return res.status(403).json({
         ok: false,
@@ -549,6 +623,27 @@ export const presenceStudioBrowserBootstrapSchema = z
 export const presenceStudioApprovalDecisionSchema = z
   .object({
     decision: z.enum(['approved', 'rejected']),
+  })
+  .strict();
+
+/** FD-05: `POST /api/outcomes/:id/verdict` — `:id` is a deliverable-inbox
+ * `entry_id` (see `progress.ts`'s module doc on the artifact-record vs
+ * deliverable-inbox store gap). Only the two human-facing verdicts the
+ * "進み具合" page offers (受け取る / 直してもらう) — never `changes_requested`,
+ * which this surface never renders a control for. */
+export const presenceStudioOutcomeVerdictSchema = z
+  .object({
+    status: z.enum(['accepted', 'rejected']),
+    note: z.string().trim().min(1).max(4000).optional(),
+  })
+  .strict();
+
+/** FD-03: `POST /api/conversation` — the 頼む conversation turn. */
+export const presenceStudioConversationSchema = z
+  .object({
+    text: z.string().trim().min(1, 'text is required').max(4000, 'text is too long'),
+    locale: z.string().trim().min(2).max(32).optional(),
+    session_id: z.string().trim().min(1).max(128).optional(),
   })
   .strict();
 
