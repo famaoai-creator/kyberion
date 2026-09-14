@@ -122,6 +122,55 @@ export function readTrainingAssignments(tenantSlug: string): TrainingAssignments
     ASSIGNMENTS_SCHEMA
   );
 }
+export interface TrainingProgressSummary {
+  member_id: string;
+  assignment?: { track_id: string; status: TrainingStatus };
+  lessons_done: number;
+  lessons_total: number;
+  last_completed_at?: string;
+}
+
+/**
+ * HT-05 second pass: pure summary of every member's training standing —
+ * catalog lesson totals + each member's own progress record — for the
+ * per-member progress overview a route/handler then joins with display
+ * names and member ids to keep this function free of member-registry I/O.
+ * `progressByMember`'s keys are exactly the member set to summarize (the
+ * caller filters to the tenant-narrowed membership before calling this), so
+ * a member with no lessons started still appears with zeroed counts. When a
+ * member carries more than one assignment, the most recently assigned one
+ * wins (ties broken by catalog order).
+ */
+export function summarizeTrainingProgress(
+  catalog: TrainingCatalog,
+  assignments: TrainingAssignment[],
+  progressByMember: Record<string, TrainingProgress>
+): TrainingProgressSummary[] {
+  const lessonsTotal = catalog.tracks.reduce((sum, track) => sum + track.lessons.length, 0);
+  return Object.entries(progressByMember).map(([member_id, progress]) => {
+    const lessonEntries = Object.values(progress.lessons);
+    const lessonsDone = lessonEntries.filter((lesson) => lesson.status === 'complete').length;
+    const completedAts = lessonEntries
+      .filter((lesson) => lesson.status === 'complete' && lesson.completed_at)
+      .map((lesson) => lesson.completed_at as string)
+      .sort();
+    const lastCompletedAt = completedAts[completedAts.length - 1];
+    const memberAssignments = assignments
+      .filter((item) => item.member_id === member_id)
+      .sort((a, b) => (a.assigned_at ?? '').localeCompare(b.assigned_at ?? ''));
+    const assignment = memberAssignments[memberAssignments.length - 1];
+    return {
+      member_id,
+      ...(assignment
+        ? { assignment: { track_id: assignment.track_id, status: assignment.status } }
+        : {}),
+      lessons_done: lessonsDone,
+      lessons_total: lessonsTotal,
+      ...(lastCompletedAt ? { last_completed_at: lastCompletedAt } : {}),
+    };
+  });
+}
+
 export function upsertTrainingAssignment(
   tenantSlug: string,
   memberId: string,

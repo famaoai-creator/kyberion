@@ -16,6 +16,7 @@ import {
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/approval-store';
 import { listArtifactRecords } from '@agent/core/artifact-record';
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
 import {
   listSurfaceAsyncRequestsAcrossChannels,
   listSurfaceNotificationsAcrossChannels,
@@ -76,8 +77,26 @@ import {
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 import { registerFrontDeskRoutes } from './front-desk-routes.js';
 import { registerHearingRoutes } from './hearing-routes.js';
+import { registerHearingMissionRoutes } from './hearing-mission-routes.js';
 import { registerTrainingRoutes } from './training-routes.js';
 import { PRESENCE_STUDIO_VOCABULARY_KEYS } from './front-desk-pages.js';
+
+// Install the real reasoning/intent/voice backend chain before any route
+// registers — without this, `getReasoningBackend()` (the `/api/conversation`
+// orchestrator fallback, the voice-minutes path, and the hearing canvas)
+// always resolves to the stub even when `KYBERION_REASONING_BACKEND` selects
+// a real provider (mirrors `scripts/mission_controller.ts` / `scripts/cli.ts`,
+// the other two long-lived processes that call this at startup).
+// `installReasoningBackends()` itself honors `KYBERION_REASONING_BACKEND=stub`;
+// this call must never fail startup, so any error is logged and swallowed.
+try {
+  const nonStub = installReasoningBackends();
+  logger.info(`[presence-studio] reasoning backend ${nonStub ? 'installed' : 'stub'}`);
+} catch (error) {
+  logger.warn(
+    `[presence-studio] installReasoningBackends failed, continuing with stub: ${error instanceof Error ? error.message : String(error)}`
+  );
+}
 
 presenceStudioData.app.get('/api/ui-vocabulary', (req, res) => {
   const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
@@ -134,6 +153,7 @@ registerFrontDeskRoutes(presenceStudioData.app);
 // their own modules for the same reason and registered at the same position
 // (same guard order) — see hearing-routes.ts / training-routes.ts module docs.
 registerHearingRoutes(presenceStudioData.app);
+registerHearingMissionRoutes(presenceStudioData.app);
 registerTrainingRoutes(presenceStudioData.app);
 
 presenceStudioData.app.get('/health', (_req, res) => {

@@ -9,6 +9,7 @@ import type {
   SettingsRole,
   SettingsTenantView,
   TrainingAssignments,
+  TrainingProgressSummary,
   TrainingTrack,
 } from '../../../lib/settings-types';
 
@@ -63,6 +64,7 @@ export type MembersSectionProps = {
   ) => void;
   trainingTracks: TrainingTrack[];
   trainingAssignments: TrainingAssignments[];
+  trainingProgress: TrainingProgressSummary[];
   trainingTrackId: string;
   setTrainingTrackId: (value: string) => void;
   onAssignTraining: (memberId: string) => void;
@@ -85,6 +87,7 @@ export function MembersSection({
   onPatchMember,
   trainingTracks,
   trainingAssignments,
+  trainingProgress,
   trainingTrackId,
   setTrainingTrackId,
   onAssignTraining,
@@ -224,6 +227,7 @@ export function MembersSection({
               ?.assignments.find(
                 (item) => item.member_id === member.member_id && item.track_id === trainingTrackId
               );
+            const progress = trainingProgress.find((item) => item.member_id === member.member_id);
             return (
               <div className="button-row" key={`training-${member.member_id}`}>
                 <span>
@@ -232,6 +236,18 @@ export function MembersSection({
                     TRAINING_STATUS_LABEL_KEYS[assignment?.status ?? 'not_started'],
                     locale
                   )}
+                </span>
+                {/* HT-05 second pass: per-member progress, reusing the
+                    `training_lessons_done` key `static/help.js` shares —
+                    never a section-local count string. */}
+                <span className="item-meta">
+                  {frontDeskText('settings_training_progress', locale)}:{' '}
+                  {progress
+                    ? frontDeskText('training_lessons_done', locale, {
+                        done: progress.lessons_done,
+                        total: progress.lessons_total,
+                      })
+                    : frontDeskText('training_no_progress', locale)}
                 </span>
                 <button
                   className="action-button"
