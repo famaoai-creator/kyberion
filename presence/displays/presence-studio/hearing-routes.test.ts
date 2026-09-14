@@ -27,10 +27,24 @@ vi.mock('@agent/core/member-registry', async () => {
   return { ...actual, resolveMemberByPrincipal: vi.fn() };
 });
 
+// HT-02: `/answer` fires `generateHearingCanvas` off the request thread —
+// mock it so this file can drive its pending -> generated / pending ->
+// template transitions deterministically, without depending on a reasoning
+// backend or a real 20s timeout.
+vi.mock('./hearing-canvas.js', async () => {
+  const actual = await vi.importActual<typeof import('./hearing-canvas.js')>('./hearing-canvas.js');
+  return { ...actual, generateHearingCanvas: vi.fn() };
+});
+
 import { resolveMemberByPrincipal } from '@agent/core/member-registry';
 import { applyHearingTurn, createHearingRecord, type HearingRecord } from './hearing.js';
 import { hearingNamespace, loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
+import { generateHearingCanvas } from './hearing-canvas.js';
 import { registerHearingRoutes } from './hearing-routes.js';
+
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
 
 function readRepoFile(relativePath: string): string {
   return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }));
@@ -242,5 +256,137 @@ describe('POST /api/hearing/:session/decide', () => {
       display_name: 'ZZ Hearing Tester',
       role: 'approver',
     });
+  });
+});
+
+describe('POST /api/hearing/:session/answer canvas generation (HT-02)', () => {
+  let savedTenant: string | undefined;
+  const { app, handlers } = createFakeApp();
+  registerHearingRoutes(app);
+  const answer = handlers.get('POST /api/hearing/:session/answer')!;
+
+  beforeEach(() => {
+    savedTenant = process.env.KYBERION_TENANT;
+    process.env.KYBERION_TENANT = TEST_TENANT;
+    vi.mocked(generateHearingCanvas).mockReset();
+  });
+
+  afterEach(() => {
+    if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = savedTenant;
+    safeRmSync(pathResolver.sharedTmp(`hearing/${TEST_TENANT}`), {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  it('responds with the template canvas immediately, marked pending, without waiting for generation', () => {
+    let releaseGeneration: (value: { source: 'generated'; html: string }) => void = () => {};
+    vi.mocked(generateHearingCanvas).mockReturnValue(
+      new Promise((resolve) => {
+        releaseGeneration = resolve;
+      })
+    );
+
+    const sessionId = `sess-${randomUUID()}`;
+    const res = fakeResponse();
+    answer(fakeRequest({ params: { session: sessionId }, body: { text: 'Freelancers.' } }), res);
+
+    expect(res.statusCode).toBe(200);
+    const body = res.body as { ok: boolean; record: HearingRecord; canvas_url: string };
+    expect(body.ok).toBe(true);
+    expect(body.record.canvas_generation).toBe('pending');
+    expect(body.record.canvas_versions).toEqual(['v1']);
+    expect(body.canvas_url).toContain(sessionId);
+
+    // Release the never-settled promise so this test does not leak a
+    // dangling handler into the next one.
+    releaseGeneration({ source: 'generated', html: '<html><head></head><body>ok</body></html>' });
+  });
+
+  it('persists a new canvas version and flips canvas_generation to "generated" once the async generation resolves', async () => {
+    vi.mocked(generateHearingCanvas).mockResolvedValue({
+      source: 'generated',
+      html: '<html><head></head><body>model drawn</body></html>',
+    });
+
+    const sessionId = `sess-${randomUUID()}`;
+    const namespace = hearingNamespace([TEST_TENANT]);
+    const res = fakeResponse();
+    answer(fakeRequest({ params: { session: sessionId }, body: { text: 'Freelancers.' } }), res);
+
+    expect((res.body as { record: HearingRecord }).record.canvas_generation).toBe('pending');
+    await flushMicrotasks();
+
+    const persisted = loadHearingRecord(namespace, sessionId);
+    expect(persisted?.canvas_generation).toBe('generated');
+    expect(persisted?.canvas_versions).toEqual(['v1', 'v2']);
+    expect(persisted?.canvas_version_sources).toMatchObject({ v1: 'template', v2: 'generated' });
+  });
+
+  it('flips canvas_generation to "template" (without adding a version) when generation falls back', async () => {
+    vi.mocked(generateHearingCanvas).mockResolvedValue({
+      source: 'template',
+      html: '<html><head></head><body>fallback</body></html>',
+      reason: 'forbidden_pattern:script_tag',
+    });
+
+    const sessionId = `sess-${randomUUID()}`;
+    const namespace = hearingNamespace([TEST_TENANT]);
+    const res = fakeResponse();
+    answer(fakeRequest({ params: { session: sessionId }, body: { text: 'Freelancers.' } }), res);
+    await flushMicrotasks();
+
+    const persisted = loadHearingRecord(namespace, sessionId);
+    expect(persisted?.canvas_generation).toBe('template');
+    expect(persisted?.canvas_versions).toEqual(['v1']);
+  });
+
+  it('never lets a stale generation overwrite a newer answer (latest answer wins)', async () => {
+    let releaseFirst: (value: { source: 'generated'; html: string }) => void = () => {};
+    vi.mocked(generateHearingCanvas).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirst = resolve;
+        })
+    );
+
+    const sessionId = `sess-${randomUUID()}`;
+    const namespace = hearingNamespace([TEST_TENANT]);
+    const firstRes = fakeResponse();
+    answer(
+      fakeRequest({ params: { session: sessionId }, body: { text: 'First answer.' } }),
+      firstRes
+    );
+
+    // A second answer arrives while the first generation is still in
+    // flight — its own generation is queued, not started overlapping.
+    vi.mocked(generateHearingCanvas).mockResolvedValueOnce({
+      source: 'generated',
+      html: '<html><head></head><body>second draft</body></html>',
+    });
+    const secondRes = fakeResponse();
+    answer(
+      fakeRequest({ params: { session: sessionId }, body: { text: 'Second answer.' } }),
+      secondRes
+    );
+    expect(vi.mocked(generateHearingCanvas)).toHaveBeenCalledTimes(1);
+
+    // The stale first generation resolves after the second answer already
+    // moved `updated_at` forward — it must be discarded.
+    releaseFirst({
+      source: 'generated',
+      html: '<html><head></head><body>stale draft</body></html>',
+    });
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    const persisted = loadHearingRecord(namespace, sessionId);
+    // v1 (first answer's template), v2 (second answer's template), v3 (the
+    // queued second-answer generation) -- the stale first generation never
+    // wrote a version.
+    expect(persisted?.canvas_versions).toEqual(['v1', 'v2', 'v3']);
+    expect(persisted?.canvas_generation).toBe('generated');
+    expect(vi.mocked(generateHearingCanvas)).toHaveBeenCalledTimes(2);
   });
 });
