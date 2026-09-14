@@ -60,6 +60,15 @@ export interface HearingDecidedBy {
   role: 'owner' | 'approver' | 'viewer';
 }
 
+/** HT-02: coarse status of the model-generated canvas for the *current*
+ * (latest) `canvas_versions` entry — never persisted per past version, only
+ * the current one, so a rollback to an older `vN` via `?version=vN` does not
+ * need to rewrite history. `canvas_version_sources` is the optional per-
+ * version record of which path produced each `vN` (additive; older records
+ * without it stay valid — callers must treat a missing entry as unknown,
+ * not as `template`). */
+export type HearingCanvasGenerationState = 'pending' | 'generated' | 'template';
+
 export interface HearingRecord {
   session_id: string;
   scenario: string;
@@ -68,6 +77,8 @@ export interface HearingRecord {
   updated_at: string;
   decided_by?: HearingDecidedBy;
   decided_at?: string;
+  canvas_generation?: HearingCanvasGenerationState;
+  canvas_version_sources?: Record<string, 'template' | 'generated'>;
 }
 
 export interface HearingTurn {
