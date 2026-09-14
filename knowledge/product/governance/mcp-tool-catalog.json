@@ -1,7 +1,7 @@
 {
   "$schema": "https://kyberion.internal/schemas/mcp-tool-catalog/v1.json",
   "version": "1.0.0",
-  "description": "Allowlist and schema definitions for Kyberion MCP server tools exposed to Cowork and other MCP clients.",
+  "description": "Allowlist and schema for Kyberion MCP facade tools (discover/act/govern bands, skill transfer, bounded actuator.invoke).",
   "default_tier_visibility": ["public"],
   "tools": [
     {
@@ -11,7 +11,8 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public", "confidential", "personal"],
-      "allowed_caller_roles": ["operator", "agent", "cowork"]
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
     },
     {
       "name": "kyberion.knowledge.feedback",
@@ -20,7 +21,8 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public", "confidential", "personal"],
-      "allowed_caller_roles": ["operator", "cowork"]
+      "allowed_caller_roles": ["operator", "cowork"],
+      "band": "act"
     },
     {
       "name": "kyberion.pipeline.list",
@@ -29,7 +31,8 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public"],
-      "allowed_caller_roles": ["operator", "agent", "cowork"]
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
     },
     {
       "name": "kyberion.pipeline.run",
@@ -39,7 +42,9 @@
       "requires_approval": false,
       "allowed_tiers": ["public"],
       "allowed_caller_roles": ["operator", "agent", "cowork"],
-      "notes": "Only pipelines on the explicit allowlist may be run via MCP. Risky-op pipelines require approval gate. daily-routine is allowlisted as the operator daily journal/TODO path (local working-memory writes, not SaaS writes)."
+      "notes": "Only pipelines on the explicit allowlist may be run via MCP. Risky-op pipelines require approval gate. daily-routine is allowlisted as the operator daily journal/TODO path (local working-memory writes, not SaaS writes).",
+      "band": "act",
+      "related_actuators": []
     },
     {
       "name": "kyberion.pipeline.job_status",
@@ -49,7 +54,8 @@
       "requires_approval": false,
       "allowed_tiers": ["public"],
       "allowed_caller_roles": ["operator", "agent", "cowork"],
-      "notes": "Read-only status/output tail. Jobs are scoped to the MCP server session."
+      "notes": "Read-only status/output tail. Jobs are scoped to the MCP server session.",
+      "band": "discover"
     },
     {
       "name": "kyberion.knowledge.search",
@@ -59,7 +65,8 @@
       "requires_approval": false,
       "allowed_tiers": ["public"],
       "allowed_caller_roles": ["operator", "agent", "cowork"],
-      "notes": "confidential tier requires explicit project scope grant via allowed_confidential_projects."
+      "notes": "confidential tier requires explicit project scope grant via allowed_confidential_projects.",
+      "band": "discover"
     },
     {
       "name": "kyberion.mission.create",
@@ -68,7 +75,8 @@
       "risk_class": "medium",
       "requires_approval": true,
       "allowed_tiers": ["public"],
-      "allowed_caller_roles": ["operator", "cowork"]
+      "allowed_caller_roles": ["operator", "cowork"],
+      "band": "govern"
     },
     {
       "name": "kyberion.mission.status",
@@ -77,7 +85,8 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public"],
-      "allowed_caller_roles": ["operator", "agent", "cowork"]
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
     },
     {
       "name": "kyberion.mission.journal",
@@ -86,7 +95,8 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public"],
-      "allowed_caller_roles": ["operator", "agent", "cowork"]
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
     },
     {
       "name": "kyberion.capability.list",
@@ -95,7 +105,9 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public"],
-      "allowed_caller_roles": ["operator", "agent", "cowork"]
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover",
+      "related_actuators": ["*"]
     },
     {
       "name": "kyberion.capability.search",
@@ -105,7 +117,9 @@
       "requires_approval": false,
       "allowed_tiers": ["public"],
       "allowed_caller_roles": ["operator", "agent", "cowork"],
-      "notes": "Deferred-tool discovery surface; results are descriptions only and do not execute an operation."
+      "notes": "Deferred-tool discovery surface; results are descriptions only and do not execute an operation.",
+      "band": "discover",
+      "related_actuators": ["*"]
     },
     {
       "name": "kyberion.service.capture",
@@ -115,7 +129,9 @@
       "requires_approval": false,
       "allowed_tiers": ["public", "confidential", "personal"],
       "allowed_caller_roles": ["operator", "agent", "cowork"],
-      "notes": "Capture-only. kind=capture and risk=read operations only. Writes stay on kyberion.service.actuate (approval-gated, disabled by default)."
+      "notes": "Capture-only. kind=capture and risk=read operations only. Writes stay on kyberion.service.actuate (approval-gated, disabled by default).",
+      "band": "act",
+      "related_actuators": ["service-actuator"]
     },
     {
       "name": "kyberion.service.actuate",
@@ -125,7 +141,9 @@
       "requires_approval": true,
       "allowed_tiers": ["confidential", "personal"],
       "allowed_caller_roles": ["operator"],
-      "notes": "Disabled by default; requires a server-bound tenant and an explicit service-actuation gate."
+      "notes": "Disabled by default; requires a server-bound tenant and an explicit service-actuation gate.",
+      "band": "govern",
+      "related_actuators": ["service-actuator"]
     },
     {
       "name": "kyberion.approval.list_pending",
@@ -134,7 +152,8 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public"],
-      "allowed_caller_roles": ["operator", "cowork"]
+      "allowed_caller_roles": ["operator", "cowork"],
+      "band": "discover"
     },
     {
       "name": "kyberion.approval.decide",
@@ -144,7 +163,8 @@
       "requires_approval": false,
       "allowed_tiers": ["public"],
       "allowed_caller_roles": ["operator"],
-      "notes": "Two-step required: list_pending first, then decide. Operator role only."
+      "notes": "Two-step required: list_pending first, then decide. Operator role only.",
+      "band": "govern"
     },
     {
       "name": "kyberion.audit.export",
@@ -153,7 +173,8 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public"],
-      "allowed_caller_roles": ["operator", "cowork"]
+      "allowed_caller_roles": ["operator", "cowork"],
+      "band": "discover"
     },
     {
       "name": "kyberion.surface.cowork.deliver",
@@ -162,7 +183,8 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public"],
-      "allowed_caller_roles": ["operator", "agent", "cowork"]
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "act"
     },
     {
       "name": "kyberion.surface.cowork.list",
@@ -171,7 +193,8 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public"],
-      "allowed_caller_roles": ["operator", "agent", "cowork"]
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "band": "discover"
     },
     {
       "name": "kyberion.audit.verify",
@@ -180,7 +203,8 @@
       "risk_class": "low",
       "requires_approval": false,
       "allowed_tiers": ["public"],
-      "allowed_caller_roles": ["operator", "cowork"]
+      "allowed_caller_roles": ["operator", "cowork"],
+      "band": "discover"
     },
     {
       "name": "kyberion.knowledge.cowork_sync",
@@ -190,7 +214,44 @@
       "requires_approval": false,
       "allowed_tiers": ["public"],
       "allowed_caller_roles": ["operator", "cowork"],
-      "notes": "Only public tier knowledge flows to Cowork. Cowork artifacts are enqueued for memory promotion, never directly written to confidential/personal."
+      "notes": "Only public tier knowledge flows to Cowork. Cowork artifacts are enqueued for memory promotion, never directly written to confidential/personal.",
+      "band": "act"
+    },
+    {
+      "name": "kyberion.skill.list",
+      "description": "List transferable first-party Kyberion skills (SKILL.md) for MCP clients.",
+      "category": "skill",
+      "band": "discover",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "related_actuators": [],
+      "notes": "Skills are guides for LLMs; they are not executable tools by themselves."
+    },
+    {
+      "name": "kyberion.skill.get",
+      "description": "Fetch a transferable skill body (SKILL.md) by plugin_id and skill_id.",
+      "category": "skill",
+      "band": "discover",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "related_actuators": [],
+      "notes": "Same content as MCP Resource kyberion://skill/{plugin}/{skill}."
+    },
+    {
+      "name": "kyberion.actuator.invoke",
+      "description": "Invoke an allowlisted actuator op. Default mode is dry_run; live requires operator role.",
+      "category": "capability",
+      "band": "act",
+      "risk_class": "medium",
+      "requires_approval": false,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "related_actuators": ["*"],
+      "notes": "Only pairs on actuator_invoke_allowlist. Prefer capability.search then invoke. Live writes may still require approval when the allowlist entry sets requires_approval."
     }
   ],
   "pipeline_run_allowlist": [
@@ -203,5 +264,31 @@
     "pipelines/baseline-check.json",
     "pipelines/cowork-integration-review.json",
     "pipelines/daily-routine.json"
+  ],
+  "actuator_invoke_allowlist": [
+    {
+      "actuator": "service-actuator",
+      "op": "preset",
+      "risk_class": "medium",
+      "requires_approval": true,
+      "execution": "service_preset",
+      "notes": "Live path uses executeServicePreset; prefer service.capture for reads."
+    },
+    {
+      "actuator": "file-actuator",
+      "op": "pipeline",
+      "risk_class": "low",
+      "requires_approval": false,
+      "execution": "dry_run",
+      "notes": "Dry-run validation only via MCP unless allowlist execution is raised later."
+    },
+    {
+      "actuator": "modeling-actuator",
+      "op": "pipeline",
+      "risk_class": "low",
+      "requires_approval": false,
+      "execution": "dry_run",
+      "notes": "Dry-run validation of modeling-actuator pipeline op via MCP facade."
+    }
   ]
 }

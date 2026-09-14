@@ -4,80 +4,56 @@ category: Tech-stack
 tags: [tech-stack, mcp, integration, guide, protocol]
 importance: 5
 author: Ecosystem Architect
-last_updated: 2026-03-06
+last_updated: 2026-09-13
 ---
 
 # MCP (Model Context Protocol) Integration Guide
 
 ## 1. Overview
 
-Model Context Protocol (MCP) is an open standard that enables AI models to interact with external tools and data sources seamlessly. In the context of the Kyberion Monorepo, MCP provides a standardized way to export our "Skills" as "MCP Tools," making them usable by any MCP-compliant LLM client (like Claude Desktop or other agents).
+Model Context Protocol (MCP) is an open standard that enables AI models to interact with external tools and data sources seamlessly. Kyberion exposes a **curated MCP facade** (`pnpm mcp:server` / `mcp-server-cowork`) — not a 1:1 dump of every actuator op as a tool.
 
-## 2. Core Concepts for Skills
+Canonical relationship model (tools ↔ skills ↔ actuators, discover/act/govern bands):
 
-To align Kyberion with MCP, we must map our current architecture to MCP primitives:
+→ [mcp-facade-model](../../product/architecture/mcp-facade-model.md)
 
-- **Resources**: Map to our `knowledge/` tier data.
-- **Tools**: Map to our `scripts/`, actuator manifests, and procedure definitions.
-- **Prompts**: Map to our `templates/` or `intent_mapping.yaml`.
+Tool allowlist and bands live in `knowledge/product/governance/mcp-tool-catalog.json`. Connector expectations sync via `plugins/kyberion/connector.json`.
+
+## 2. Core Concepts
+
+| MCP primitive         | Kyberion mapping                                                                                                                                   |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tools**             | Curated facade tools in three bands: discover / act / govern                                                                                       |
+| **Resources**         | Transferable first-party `SKILL.md` at `kyberion://skill/{plugin}/{skill}`                                                                         |
+| **Skills (transfer)** | `kyberion.skill.list` / `kyberion.skill.get` — guides for LLMs, not unrestricted executors                                                         |
+| **Actuators**         | Discovered via `kyberion.capability.*`; executed via `service.*`, allowlisted pipelines, or bounded `kyberion.actuator.invoke` (default `dry_run`) |
 
 ## 3. Implementation Patterns
 
-### Pattern A: Skill-to-Tool Wrapper
+### Pattern A: Facade tools (preferred)
 
-Every Kyberion capability that follows the `runCapability()` pattern can be automatically wrapped as an MCP Tool.
+Clients call the allowlisted facade. Prefer `capability.search` → choose a path → `service.capture` / `pipeline.run` / `actuator.invoke` (dry_run first).
 
-```javascript
-// Example: Converting a Kyberion Skill to an MCP Tool definition
-{
-  "name": "doc-type-classifier",
-  "description": "Classifies document types (meeting-notes, spec, etc.)",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "path": { "type": "string" }
-    },
-    "required": ["path"]
-  }
-}
-```
+### Pattern B: Skill transfer (not tool sprawl)
 
-### Pattern B: Sovereign Context Injection
+Do **not** promote every plugin skill to an MCP tool. Expose skill bodies as Resources + `skill.list` / `skill.get` so the LLM can load operating guidance on demand.
 
-MCP allows for dynamic context injection. Kyberion's **3-Tier Model** should be used to filter what information is sent to the LLM via MCP:
+### Pattern C: Tier visibility
 
 1. **Personal Tier**: Never exported via MCP unless explicitly whitelisted.
-2. **Confidential Tier**: Masked or summarized before sending.
-3. **Public Tier**: Fully accessible as MCP Resources.
+2. **Confidential Tier**: Tenant-scoped; only when server-side scope allows.
+3. **Public Tier**: Default MCP visibility.
 
-### Pattern C: MCP Connector Wrapper (Approach B)
+### Pattern D: MCP Connector Wrapper
 
-For high-demand public MCP servers, we create individual connector capabilities that wrap the MCP server execution. This ensures strict schema validation and better discoverability via manifests and procedure cards.
+For high-demand public MCP servers, connector capabilities wrap MCP server execution with schema validation. Shared client logic lives in the shared-network MCP client engine.
 
-- **Shared Engine**: a shared MCP client engine provides the common MCP client logic behind connector capabilities.
-- **Individual Skills**:
-  - `mcp-aws-knowledge-connector`: Wraps `@modelcontextprotocol/server-aws-kb-retrieval` (npx).
-  - `mcp-terraform-connector`: Wraps `terraform-mcp-server` (npx).
+## 4. Benefits
 
-Example execution:
+- **Governance**: Allowlists, caller roles, and approval gates stay on the facade.
+- **Discoverability**: LLMs browse tools via `list_tools` and skills via Resources / `skill.list`.
+- **Bounded actuation**: `actuator.invoke` is allowlist-only; live mode requires operator role.
 
-```bash
-pnpm kyberion run mcp-terraform-connector --action call_tool --name providerDetails --arguments '{"provider": "aws", "namespace": "hashicorp"}'
-```
+## 5. Roadmap notes
 
-## 4. Strategic Value for Autonomy
-
-By adopting MCP, the Kyberion Ecosystem gains:
-
-- **Interoperability**: Skills can be used by external agents without modification.
-- **Discoverability**: LLMs can "browse" available skills via the MCP `list_tools` capability.
-- **Scalability**: New skills added to this monorepo are instantly available to any MCP-enabled environment.
-
-## 5. Action Plan for Evolution
-
-1. **MCP Exporter**: Create a new capability `mcp-gateway` that reads actuator manifests and procedure cards and serves them via an MCP server.
-2. **Dynamic Tool Loading**: Allow `mission-control` to consume external MCP tools, effectively making our agent capable of using tools it wasn't originally programmed with.
-
----
-
-_Created by Autonomous Knowledge Refiner_
+Historical “export every capability as a tool” ideas are superseded by the curated facade. Extend the catalog + allowlists rather than generating unbounded tool surfaces.

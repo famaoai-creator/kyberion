@@ -7,6 +7,8 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 const root = process.cwd();
 export const WIRE_ERROR_BOUNDARY_FILES = [
   'libs/shared-network/src/mcp-server-engine.ts',
+  'libs/shared-network/src/mcp-facade-discover.ts',
+  'libs/shared-network/src/mcp-facade-act.ts',
   'libs/shared-network/src/mcp-service-capture-tool.ts',
   'libs/core/peer-messaging.ts',
   'presence/displays/chronos-mirror-v2/src/lib/viewer-context.ts',

@@ -13,8 +13,18 @@
  *   kyberion.mission.status         — query mission status
  *   kyberion.mission.journal        — read mission journal
  *   kyberion.capability.list        — list actuator capabilities
+ *   kyberion.capability.search      — search actuator capabilities
+ *   kyberion.skill.list / .get      — transferable SKILL.md guides
+ *   kyberion.actuator.invoke        — allowlisted actuator op (default dry_run)
  *   kyberion.surface.cowork.deliver — deliver artifact to Cowork outbox (Phase 1)
  *   kyberion.surface.cowork.list    — list pending Cowork outbox deliveries (Phase 1)
+ *
+ * See knowledge/product/architecture/mcp-facade-model.md for bands and relationships.
+ *
+ * The discover-band tools (scope.current, skill.list/.get, skill resource)
+ * and the act-band actuator.invoke tool live in mcp-facade-discover.ts /
+ * mcp-facade-act.ts; this file wires them in via registerGovernedTool /
+ * ensureMcpApproval injection.
  *
  * Architecture rules (AGENTS.md):
  *   - All file I/O via secure-io (@agent/core)
@@ -55,7 +65,6 @@ import {
   listApprovalRequests,
   loadApprovalRequest,
 } from '@agent/core/approval-store';
-import { resolveScopeResolution } from '@agent/core/scope-context';
 import { formatWireError } from '@agent/core/wire-error';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
@@ -73,9 +82,13 @@ import type { EventScope } from '@agent/core/event-scope';
 import type { McpRequestContext } from '@agent/core/mcp-request-context';
 import { parseMcpTextPayload, parseSafeJsonObject } from './mcp-json.js';
 import { registerKyberionServiceCaptureTool } from './mcp-service-capture-tool.js';
+import { registerMcpFacadeDiscoverTools } from './mcp-facade-discover.js';
+import { registerMcpFacadeActTools } from './mcp-facade-act.js';
+import type { ActuatorInvokeAllowlistEntry } from './mcp-actuator-invoke.js';
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SERVER_NAME = 'kyberion-mcp-server';
-const SERVER_VERSION = '0.1.0';
+const SERVER_VERSION = '0.2.0';
 
 /** Resolve the absolute path to the Kyberion repo root. */
 const REPO_ROOT = pathResolver.rootDir();
@@ -100,16 +113,20 @@ const AUDIT_EXPORT_SCRIPT = nodePath.join(REPO_ROOT, 'dist/scripts/export_audit.
 
 // ─── Catalog helpers ──────────────────────────────────────────────────────────
 
-interface ToolCatalog {
+/** Exported for injection into the split-out mcp-facade-*.ts modules. */
+export interface ToolCatalog {
   pipeline_run_allowlist: string[];
   tools?: ToolCatalogEntry[];
+  actuator_invoke_allowlist?: ActuatorInvokeAllowlistEntry[];
 }
 
-interface ToolCatalogEntry {
+export interface ToolCatalogEntry {
   name: string;
   allowed_caller_roles?: string[];
   allowed_tiers?: string[];
   requires_approval?: boolean;
+  band?: 'discover' | 'act' | 'govern';
+  related_actuators?: string[];
 }
 
 const mcpToolCatalog = defineCatalog<ToolCatalog>({
@@ -226,6 +243,9 @@ function ensureMcpApproval(params: {
   }
   return { allowed: true, status: 'approved' };
 }
+
+/** Injected into the split-out mcp-facade-*.ts modules; owned here. */
+export type EnsureMcpApproval = typeof ensureMcpApproval;
 
 function loadCatalog(): ToolCatalog {
   return mcpToolCatalog.load();
@@ -360,6 +380,9 @@ function registerGovernedTool(
     }
   );
 }
+
+/** Injected into the split-out mcp-facade-*.ts modules; owned here. */
+export type RegisterGovernedTool = typeof registerGovernedTool;
 
 function isPipelineAllowed(inputPath: string, catalog: ToolCatalog): boolean {
   const normalised = inputPath.replace(/\\/g, '/').replace(/^\.\//, '');
@@ -675,43 +698,8 @@ export function createKyberionMcpServer(): McpServer {
     }
   );
 
-  // ── kyberion.pipeline.list ────────────────────────────────────────────────
-  // ── kyberion.scope.current ────────────────────────────────────────────────
-  registerGovernedTool(
-    server,
-    catalog,
-    'kyberion.scope.current',
-    'Resolve the effective Kyberion scope, its provenance, and the positive knowledge roots available to this process.',
-    {},
-    async () => {
-      const context = resolveMcpRequestContext();
-      const scopeInput = {
-        tier: context.scope.tier,
-        ...(context.scope.tenant_slug ? { tenant_slug: context.scope.tenant_slug } : {}),
-        ...(context.scope.organization_id
-          ? { organization_id: context.scope.organization_id }
-          : {}),
-        ...(context.scope.project_id ? { project_id: context.scope.project_id } : {}),
-        ...(context.scope.mission_id ? { mission_id: context.scope.mission_id } : {}),
-        ...(context.scope.task_id ? { task_id: context.scope.task_id } : {}),
-      };
-      const resolution = resolveScopeResolution(
-        scopeInput,
-        {
-          KYBERION_TIER: context.scope.tier,
-          KYBERION_TENANT: context.scope.tenant_slug,
-          KYBERION_ORGANIZATION_ID: context.scope.organization_id,
-          KYBERION_PROJECT_ID: context.scope.project_id,
-          MISSION_ID: context.scope.mission_id,
-          KYBERION_TASK_ID: context.scope.task_id,
-        },
-        { includePersisted: false, inferFromMission: false, inferFromCwd: false }
-      );
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(resolution, null, 2) }],
-      };
-    }
-  );
+  // ── discover-band facade tools (scope.current, skill.list/.get, resource) ──
+  registerMcpFacadeDiscoverTools({ server, catalog, registerGovernedTool });
 
   // ── kyberion.knowledge.feedback ──────────────────────────────────────────
   registerGovernedTool(
@@ -1507,6 +1495,9 @@ export function createKyberionMcpServer(): McpServer {
       }
     }
   );
+
+  // ── act-band facade tool (kyberion.actuator.invoke) ────────────────────────
+  registerMcpFacadeActTools({ server, catalog, registerGovernedTool, ensureMcpApproval });
 
   return server;
 }

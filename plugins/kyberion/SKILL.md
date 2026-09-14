@@ -5,67 +5,61 @@ description: Kyberion sovereign operator system — governed mission control, pi
 
 # Kyberion Skill
 
-Kyberion is a sovereign operator AI system with governance, audit, and 3-tier knowledge isolation. This skill exposes its core capabilities as MCP tools accessible from Cowork.
+Kyberion is a sovereign operator AI system with governance, audit, and 3-tier knowledge isolation. This skill documents the **curated MCP facade** (`pnpm mcp:server`) for Cowork and other MCP clients.
 
-## Available Capabilities
+Relationship model: discover / act / govern bands — see `knowledge/product/architecture/mcp-facade-model.md`.
 
-### Pipeline Execution
-- **kyberion.pipeline.list** — List all available pipeline definitions in the Kyberion system.
-- **kyberion.pipeline.run** — Execute a named pipeline by file path. Only pipelines on the explicit allowlist are permitted.
+## Band: Discover
 
-  ```
-  kyberion.pipeline.run(input: "pipelines/vital-check.json")
-  ```
+- **kyberion.capability.list** / **kyberion.capability.search** — Browse actuator capabilities before acting.
+- **kyberion.skill.list** / **kyberion.skill.get** — Transferable `SKILL.md` guides (also MCP Resources `kyberion://skill/{plugin}/{skill}`).
+- **kyberion.knowledge.search** — Search the public knowledge base.
+- **kyberion.scope.current** — Show the active MCP caller scope.
+- **kyberion.knowledge.feedback** — Record human feedback on knowledge retrieval.
 
-### Mission Control
-- **kyberion.mission.create** — Create a new Kyberion mission with a goal and context.
-- **kyberion.mission.status** — Check the status of a running mission by ID.
-- **kyberion.mission.journal** — Read the journal entries for a mission.
+## Band: Act
 
-  Mission results are automatically delivered to the Cowork outbox via `kyberion.surface.cowork.deliver`.
-
-### Knowledge
-- **kyberion.knowledge.search** — Search the public knowledge base with a natural language query.
-- **kyberion.knowledge.cowork_sync** — Bidirectional sync between Cowork artifacts and Kyberion knowledge. Respects 3-tier isolation: only `public` tier leaves Kyberion.
+- **kyberion.pipeline.list** / **kyberion.pipeline.run** / **kyberion.pipeline.job_status** — Allowlisted pipeline execution.
+- **kyberion.service.capture** — Read-oriented service capture (preferred for Notion etc.).
+- **kyberion.service.actuate** — Write-oriented service ops (**operator**, approval, usually disabled).
+- **kyberion.actuator.invoke** — Bounded allowlisted actuator op; **default `dry_run`**; live needs operator.
 
   ```
-  kyberion.knowledge.cowork_sync(direction: "both", cowork_artifact_paths: ["outputs/summary.md"])
+  kyberion.actuator.invoke(actuator: "file-actuator", op: "pipeline", mode: "dry_run")
   ```
 
-### Approval Gate
-- **kyberion.approval.list_pending** — List all pending approval requests. Returns request IDs, severity, and summaries.
-- **kyberion.approval.decide** — Apply an approved/rejected decision to a pending request. **High-risk — operator role required.**
+## Band: Govern
 
-  Workflow: `list_pending` → present via AskUserQuestion → `decide` with user's response.
-
-### Audit Chain
-- **kyberion.audit.export** — Export the append-only audit chain to a NDJSON file. Optionally filter by mission ID or date range.
-- **kyberion.audit.verify** — Verify the integrity of the audit chain (SHA-256 hash-linked). Use for compliance checks.
-
-### Surface Delivery
-- **kyberion.surface.cowork.deliver** — Deliver a Kyberion artifact packet to the Cowork outbox. Used internally by mission completion hooks.
-- **kyberion.surface.cowork.list** — List previously delivered artifacts in the Cowork outbox.
+- **kyberion.mission.create** / **status** / **journal** — Mission control.
+- **kyberion.approval.list_pending** / **kyberion.approval.decide** — Approval gate (`decide` is operator-only).
+- **kyberion.audit.export** / **kyberion.audit.verify** — Audit chain.
+- **kyberion.surface.cowork.deliver** / **list** — Cowork outbox.
+- **kyberion.knowledge.cowork_sync** — Bidirectional Cowork ↔ Kyberion knowledge sync (public tier outbound).
 
 ## Governance Rules
 
-1. **All tools are read-only or low-risk by default.** High-risk tools (`approval.decide`) require explicit operator confirmation.
-2. **Tier isolation is enforced.** Only `public` tier content is accessible via MCP. Confidential/personal data never leaves Kyberion.
-3. **Pipeline execution is allowlisted.** Only pipelines in the `mcp-tool-catalog.json` allowlist can be run via MCP.
-4. **All operations are audit-logged.** Every MCP tool call that mutates state is recorded in the Kyberion audit chain.
+1. **All tools are read-only or low-risk by default.** High-risk tools (`approval.decide`, live `actuator.invoke`, `service.actuate`) require operator confirmation / role.
+2. **Tier isolation is enforced.** Only `public` tier content is accessible via MCP by default. Confidential/personal data never leaves Kyberion unless server-side scope allows.
+3. **Pipeline and actuator execution are allowlisted.** Only entries in `mcp-tool-catalog.json` (`pipeline_run_allowlist` / `actuator_invoke_allowlist`) can run via MCP.
+4. **Skills are guides, not tools.** Prefer Resources / `skill.get` over inventing new tools per skill.
+5. **All operations are audit-logged.** Every MCP tool call that mutates state is recorded in the Kyberion audit chain.
 
 ## Quick Start
 
 To check system health:
+
 ```
 kyberion.pipeline.run(input: "pipelines/vital-check.json")
 ```
 
 To search knowledge:
+
 ```
 kyberion.knowledge.search(query: "how to onboard a new tenant", max_results: 5)
 ```
 
 To sync knowledge from your Cowork work folder:
+
 ```
 kyberion.knowledge.cowork_sync(direction: "cowork-to-kyberion", cowork_artifact_paths: ["outputs/meeting-notes.md"])
 ```
@@ -73,6 +67,7 @@ kyberion.knowledge.cowork_sync(direction: "cowork-to-kyberion", cowork_artifact_
 ## Customer Customization
 
 Enterprise deployments can extend this plugin via `customer/{slug}/plugin-overrides/kyberion.json` to:
+
 - Expand `permissions.tier_visibility` to include specific `confidential/{project}` tiers
 - Override `mcp_server.env` for tenant-specific personas
 - Restrict or expand the tool list per deployment

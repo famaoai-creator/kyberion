@@ -2,7 +2,7 @@
   "$id": "https://kyberion.internal/schemas/mcp-tool-catalog.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "MCP tool catalog",
-  "description": "Governed MCP tool visibility and pipeline execution allowlist.",
+  "description": "Governed MCP tool visibility, bands, skill transfer, and bounded actuator invoke allowlist.",
   "type": "object",
   "required": ["pipeline_run_allowlist"],
   "properties": {
@@ -17,6 +17,10 @@
     "pipeline_run_allowlist": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
+    },
+    "actuator_invoke_allowlist": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/actuatorInvokeEntry" }
     }
   },
   "additionalProperties": false,
@@ -26,6 +30,7 @@
       "type": "array",
       "items": { "$ref": "#/$defs/tier" }
     },
+    "band": { "enum": ["discover", "act", "govern"] },
     "tool": {
       "type": "object",
       "required": ["name", "allowed_tiers", "allowed_caller_roles"],
@@ -33,6 +38,7 @@
         "name": { "type": "string", "minLength": 1 },
         "description": { "type": "string" },
         "category": { "type": "string", "minLength": 1 },
+        "band": { "$ref": "#/$defs/band" },
         "risk_class": { "enum": ["low", "medium", "high", "critical"] },
         "requires_approval": { "type": "boolean" },
         "allowed_tiers": { "$ref": "#/$defs/tiers" },
@@ -40,9 +46,26 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         },
+        "related_actuators": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "notes": { "type": "string" }
       },
       "additionalProperties": false
+    },
+    "actuatorInvokeEntry": {
+      "type": "object",
+      "required": ["actuator", "op"],
+      "additionalProperties": false,
+      "properties": {
+        "actuator": { "type": "string", "minLength": 1 },
+        "op": { "type": "string", "minLength": 1 },
+        "risk_class": { "enum": ["low", "medium", "high", "critical"] },
+        "requires_approval": { "type": "boolean" },
+        "execution": { "enum": ["dry_run", "service_preset", "actuator_cli"] },
+        "notes": { "type": "string" }
+      }
     }
   }
 }
