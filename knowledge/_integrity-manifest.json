@@ -1077,7 +1077,7 @@
     {
       "path": "product/governance/active-surfaces.json",
       "tier": "public",
-      "size": 7346,
+      "size": 7336,
       "type": "json"
     },
     {
@@ -2511,7 +2511,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 21530,
+      "size": 21594,
       "type": "json"
     },
     {
@@ -2751,7 +2751,7 @@
     {
       "path": "product/governance/surfaces/mcp-server-cowork.json",
       "tier": "public",
-      "size": 642,
+      "size": 632,
       "type": "json"
     },
     {
@@ -4927,6 +4927,12 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/training-catalog.json",
+      "tier": "public",
+      "size": 2825,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/travel-planning-playbook.md",
       "tier": "public",
       "size": 9106,
@@ -4953,7 +4959,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 560337,
+      "size": 567555,
       "type": "json"
     },
     {
@@ -8127,7 +8133,7 @@
     {
       "path": "product/schemas/memory-candidate.schema.json",
       "tier": "public",
-      "size": 3954,
+      "size": 4344,
       "type": "json"
     },
     {
@@ -8397,7 +8403,7 @@
     {
       "path": "product/schemas/mission-state.schema.json",
       "tier": "public",
-      "size": 5934,
+      "size": 6390,
       "type": "json"
     },
     {
@@ -9021,7 +9027,7 @@
     {
       "path": "product/schemas/personal-agent-identity.schema.json",
       "tier": "public",
-      "size": 363,
+      "size": 1806,
       "type": "json"
     },
     {
@@ -10228,6 +10234,24 @@
       "path": "product/schemas/tracker-sheet-policy.schema.json",
       "tier": "public",
       "size": 584,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/training-assignments.schema.json",
+      "tier": "public",
+      "size": 951,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/training-catalog.schema.json",
+      "tier": "public",
+      "size": 2176,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/training-progress.schema.json",
+      "tier": "public",
+      "size": 825,
       "type": "json"
     },
     {

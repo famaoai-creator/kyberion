@@ -338,6 +338,9 @@ export * from './visual-review.js';
 
 export * from './visual-review-loop.js';
 
+export * from './artifact-verification.js';
+export * from './training-catalog.js';
+
 export * from './media-brief-lock.js';
 
 export * from './house-style-distillation.js';

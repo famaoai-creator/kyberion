@@ -22,6 +22,7 @@ import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { scopeContextKey } from './scope-context.js';
 import { auditChain } from './audit-chain.js';
 import { physicalScopedPath } from './physical-namespace.js';
+import type { HumanDecidedBy } from './mission-types.js';
 
 export type MemoryCandidateSourceType = 'mission' | 'task_session' | 'artifact' | 'incident';
 export type MemoryCandidateKind =
@@ -45,6 +46,8 @@ export interface MemoryCandidate {
   last_seen?: string;
   ratified_at?: string;
   ratification_note?: string;
+  /** FD-10 wave 1b: the human member who approved/rejected this candidate. */
+  decided_by?: HumanDecidedBy;
   promoted_ref?: string;
   /** Hash-chain audit entry created when this candidate was first enqueued. */
   audit_ref?: string;
@@ -400,6 +403,8 @@ export function updateMemoryPromotionCandidateStatus(input: {
   scope?: MemoryScopeEnvelope;
   /** Update every physical duplicate in the selected scope. */
   allMatching?: boolean;
+  /** FD-10 wave 1b: the human member who made this approve/reject decision. */
+  decidedBy?: HumanDecidedBy;
 }): MemoryCandidate | null {
   const requestedScopeKey = input.scope ? resolveScopeKey(input.scope) : undefined;
   const candidateQueuePath = input.scope ? resolveQueuePath(input.scope) : undefined;
@@ -455,6 +460,7 @@ export function updateMemoryPromotionCandidateStatus(input: {
           : {}),
         ...(input.ratificationNote ? { ratification_note: input.ratificationNote.trim() } : {}),
         ...(input.promotedRef ? { promoted_ref: input.promotedRef.trim() } : {}),
+        ...(input.decidedBy ? { decided_by: input.decidedBy } : {}),
       };
       const validation = validateMemoryPromotionCandidate(next);
       if (!validation.valid) {

@@ -26,8 +26,10 @@ import {
   safeWriteFile,
   assertSafeRepositoryPath,
 } from './secure-io.js';
+import { isValidMemberId } from './member-id-grammar.js';
 
-const MEMBER_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
+export { isValidMemberId };
+
 const OWNER_MEMBER_ID = 'owner';
 // Resolved at module load against the real repo root on purpose (same
 // rationale as tenant-registry.ts): the schema is tracked source, not
@@ -77,10 +79,6 @@ function validateMemberProfile(
     path: sourcePath,
     schema: MEMBER_PROFILE_SCHEMA_PATH,
   }).validate(profile, sourcePath);
-}
-
-export function isValidMemberId(value: string): boolean {
-  return MEMBER_ID_RE.test(value);
 }
 
 function assertMemberId(id: string): void {
@@ -266,6 +264,34 @@ export interface ResolveMemberByPrincipalInput {
  * null so callers fall back to their pre-FD-07 behavior (backward
  * compatible, additive).
  */
+/** Canonical actor id (`actor.ts` `humanActor`) of the owner member. */
+export function ownerAccountableHumanId(): string {
+  return `user:${OWNER_MEMBER_ID}`;
+}
+
+/**
+ * FD-10 item 4 / FD-07 item 7 (§2.5 principle 3): resolve an
+ * `accountable_human_id` to the member it names. Accepts either the actor id
+ * (`user:<member_id>`) or a bare member id; anything else (legacy synthetic
+ * labels like `human:operator`, or a member id that does not exist) resolves
+ * to `null` rather than throwing — orphan/legacy detection reads this as "did
+ * not resolve", not as an error.
+ */
+export function resolveAccountableHuman(
+  id: string,
+  options: MemberRegistryPathOptions = {}
+): MemberProfile | null {
+  const trimmed = String(id || '').trim();
+  if (!trimmed) return null;
+  const memberId = trimmed.startsWith('user:') ? trimmed.slice('user:'.length) : trimmed;
+  if (!isValidMemberId(memberId)) return null;
+  try {
+    return readMemberProfile(memberId, options);
+  } catch {
+    return null;
+  }
+}
+
 export function resolveMemberByPrincipal(
   input: ResolveMemberByPrincipalInput,
   options: MemberRegistryPathOptions = {}
