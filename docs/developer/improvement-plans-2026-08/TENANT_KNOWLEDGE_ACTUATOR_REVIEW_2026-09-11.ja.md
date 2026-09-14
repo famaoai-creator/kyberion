@@ -93,6 +93,12 @@ KA-02 の scope はホストの canonical execution scope から取得する。�
   接続を整えた環境で、テナント別のブラウザ操作と制作サンプルを同じ brief から再実行し、
   費用・所要時間・承認回数・成果物の品質を記録する。未実施を成功扱いしない。
 
+- **KA-06 第 1 段実装（2026-09-14）**: `libs/core/artifact-verification.ts` に、ジョブ受理・
+  ファイル生成・内容検証・視覚レビュー・人による公開承認を分離して評価する純関数を追加した。
+  視覚レビューの `skipped` / `failed` は fail-closed で `blocked`、前段が通って承認待ちの状態は
+  `ready_for_approval`、明示的な人の承認後だけ `approved` / `publication_allowed=true` となる。
+  PPTX / doc / video の実レンダー接続と公開経路への統合は次段に残す。
+
 ## 検証記録
 
 2026-09-11 の実行結果:

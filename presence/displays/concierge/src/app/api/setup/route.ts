@@ -98,6 +98,7 @@ export function GET(req: NextRequest) {
       kind: agent.kind,
       display_name: agent.display_name,
       lifecycle_status: agent.lifecycle_status,
+      accountable_human_id: agent.accountable_human_id,
       organization_id: agent.affiliation.organization_id,
       provider_hint: agent.provider_hint || '',
       model_hint: agent.model_hint || '',

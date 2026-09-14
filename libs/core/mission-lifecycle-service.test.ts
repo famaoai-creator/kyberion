@@ -225,6 +225,38 @@ describe('mission-lifecycle-service — shared audit record', () => {
     expect(typeof cliEntry.metadata.actor).toBe('string');
     expect(typeof surfaceEntry.metadata.actor).toBe('string');
   });
+
+  it('FD-10 wave 1b: threads options.decidedBy through to the underlying pauseMission call', async () => {
+    const stub = makeStubSystem();
+    const facade = buildMissionLifecycleService(stub);
+    const decidedBy = {
+      kind: 'human' as const,
+      id: 'user:owner-1',
+      display_name: 'Owner One',
+      role: 'owner' as const,
+    };
+
+    await withExecutionContext('mission_controller', () =>
+      facade.pause('MSN-SO01-DECIDED-BY-001', 'operator paused it', { decidedBy })
+    );
+
+    expect(stub.pauseMission).toHaveBeenCalledWith(
+      'MSN-SO01-DECIDED-BY-001',
+      'operator paused it',
+      decidedBy
+    );
+
+    // Omitting decidedBy (legacy / non-human callers) stays valid — pauseMission
+    // is called with `undefined` as the third argument, not a placeholder.
+    await withExecutionContext('mission_controller', () =>
+      facade.pause('MSN-SO01-DECIDED-BY-002', 'no decision maker')
+    );
+    expect(stub.pauseMission).toHaveBeenLastCalledWith(
+      'MSN-SO01-DECIDED-BY-002',
+      'no decision maker',
+      undefined
+    );
+  });
 });
 
 describe('mission-lifecycle-service — archive verb (AL-03)', () => {

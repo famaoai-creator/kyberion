@@ -64,6 +64,7 @@ export type Setup = {
       kind: string;
       display_name: string;
       lifecycle_status: string;
+      accountable_human_id?: string;
       organization_id: string;
       provider_hint: string;
       model_hint: string;

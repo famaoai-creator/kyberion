@@ -90,6 +90,11 @@ const CHECKS: CatalogCheck[] = [
     dataPath: 'knowledge/product/orchestration/user-facing-vocabulary.json',
   },
   {
+    id: 'training-catalog',
+    schemaPath: 'knowledge/product/schemas/training-catalog.schema.json',
+    dataPath: 'knowledge/product/orchestration/training-catalog.json',
+  },
+  {
     id: 'specialist-catalog',
     schemaPath: 'knowledge/product/schemas/specialist-catalog.schema.json',
     dataPath: 'knowledge/product/orchestration/specialist-catalog.json',

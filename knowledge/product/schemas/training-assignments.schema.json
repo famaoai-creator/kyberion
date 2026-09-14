@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "training-assignments.schema.json",
+  "title": "Tenant Training Assignments",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "tenant_slug", "assignments"],
+  "properties": {
+    "version": { "type": "string" },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "assignments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["member_id", "track_id", "status"],
+        "properties": {
+          "member_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+          "track_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,40}$" },
+          "status": { "type": "string", "enum": ["not_started", "in_progress", "complete"] },
+          "assigned_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

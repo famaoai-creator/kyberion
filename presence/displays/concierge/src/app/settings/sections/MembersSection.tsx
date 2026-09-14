@@ -3,16 +3,37 @@
 import * as React from 'react';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale, ConciergeMessageKey, FrontDeskMessageKey } from '../../../lib/i18n';
-import type { SettingsMember, SettingsRole, SettingsTenantView } from '../../../lib/settings-types';
+import type {
+  Setup,
+  SettingsMember,
+  SettingsRole,
+  SettingsTenantView,
+  TrainingAssignments,
+  TrainingTrack,
+} from '../../../lib/settings-types';
 
-/** FD-06/FD-07 組織とメンバー pane (`#settings-members`) — tenants list,
- * member list, and the add-member form. Extracted from settings/page.tsx;
- * all state, refresh, and mutation handlers stay owned by the page. */
+/** FD-06/FD-07/HT-05 組織とメンバー pane (`#settings-members`) — tenants list,
+ * member list, add-member form, the accountable-agents list, and the
+ * training-track assignment UI. Extracted from settings/page.tsx; all
+ * state, refresh, and mutation handlers stay owned by the page (or its
+ * use-training-assignments hook). */
 
 const ROLE_LABEL_KEYS: Record<SettingsRole, FrontDeskMessageKey> = {
   owner: 'role_owner',
   approver: 'role_approver',
   viewer: 'role_viewer',
+};
+
+// HT-06 (i18n gate): training status labels resolve through the shared
+// `front_desk:training_status_*` vocabulary keys (same ones `static/help.js`
+// renders) instead of an inline stand-in map.
+const TRAINING_STATUS_LABEL_KEYS: Record<
+  'not_started' | 'in_progress' | 'complete',
+  FrontDeskMessageKey
+> = {
+  not_started: 'training_status_not_started',
+  in_progress: 'training_status_in_progress',
+  complete: 'training_status_complete',
 };
 
 export type MemberFormState = {
@@ -26,6 +47,7 @@ export type MemberFormState = {
 export type MembersSectionProps = {
   locale: ConciergeLocale;
   t: (key: ConciergeMessageKey, params?: Record<string, string | number>) => string;
+  setup: Setup;
   meTenants: SettingsTenantView[];
   meViewing: SettingsTenantView | null;
   members: SettingsMember[];
@@ -39,12 +61,18 @@ export type MembersSectionProps = {
     memberId: string,
     patch: { tenant_slug: string; role: SettingsRole } | { status: 'active' | 'suspended' }
   ) => void;
+  trainingTracks: TrainingTrack[];
+  trainingAssignments: TrainingAssignments[];
+  trainingTrackId: string;
+  setTrainingTrackId: (value: string) => void;
+  onAssignTraining: (memberId: string) => void;
   sectionRef: (element: HTMLElement | null) => void;
 };
 
 export function MembersSection({
   locale,
   t,
+  setup,
   meTenants,
   meViewing,
   members,
@@ -55,8 +83,14 @@ export function MembersSection({
   setIssuedToken,
   onAddMember,
   onPatchMember,
+  trainingTracks,
+  trainingAssignments,
+  trainingTrackId,
+  setTrainingTrackId,
+  onAssignTraining,
   sectionRef,
 }: MembersSectionProps) {
+  const activeTenantSlug = meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug;
   return (
     <section
       className="pane"
@@ -94,9 +128,7 @@ export function MembersSection({
       ) : (
         <ul className="settings-tenant-list">
           {members.map((member) => {
-            const membership = member.memberships.find(
-              (m) => m.tenant_slug === (meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug)
-            );
+            const membership = member.memberships.find((m) => m.tenant_slug === activeTenantSlug);
             return (
               <li className="item-card settings-tenant-item" key={member.member_id}>
                 <p className="item-title">
@@ -129,10 +161,9 @@ export function MembersSection({
                     defaultValue={membership?.role ?? 'viewer'}
                     disabled={memberBusy}
                     onChange={(event) => {
-                      const tenantSlug = meViewing?.tenant_slug ?? meTenants[0]?.tenant_slug;
-                      if (!tenantSlug) return;
+                      if (!activeTenantSlug) return;
                       onPatchMember(member.member_id, {
-                        tenant_slug: tenantSlug,
+                        tenant_slug: activeTenantSlug,
                         role: event.target.value as SettingsRole,
                       });
                     }}
@@ -166,84 +197,172 @@ export function MembersSection({
         </ul>
       )}
 
-      <h3 className="pane-subheading">{frontDeskText('settings_member_add', locale)}</h3>
-      <label>
-        {frontDeskText('settings_member_add_display_name', locale)}
-        <input
-          type="text"
-          value={memberForm.display_name}
-          onChange={(event) => setMemberForm({ ...memberForm, display_name: event.target.value })}
-        />
-      </label>
-      <label>
-        {frontDeskText('settings_member_add_id', locale)}
-        <input
-          type="text"
-          value={memberForm.member_id}
-          onChange={(event) => setMemberForm({ ...memberForm, member_id: event.target.value })}
-        />
-      </label>
-      <label>
-        {frontDeskText('settings_member_add_tenant', locale)}
-        <select
-          value={memberForm.tenant_slug}
-          onChange={(event) => setMemberForm({ ...memberForm, tenant_slug: event.target.value })}
-        >
-          {meTenants.map((tenant) => (
-            <option key={tenant.tenant_slug} value={tenant.tenant_slug}>
-              {tenant.display_name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {frontDeskText('settings_member_add_role', locale)}
-        <select
-          value={memberForm.role}
-          onChange={(event) =>
-            setMemberForm({ ...memberForm, role: event.target.value as SettingsRole })
-          }
-        >
-          {(['owner', 'approver', 'viewer'] as SettingsRole[]).map((role) => (
-            <option key={role} value={role}>
-              {frontDeskText(ROLE_LABEL_KEYS[role], locale)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={memberForm.issue_token}
-          onChange={(event) => setMemberForm({ ...memberForm, issue_token: event.target.checked })}
-        />
-        {frontDeskText('settings_member_add_issue_token', locale)}
-      </label>
-      <div className="button-row">
-        <button
-          className="action-button"
-          disabled={
-            memberBusy ||
-            !memberForm.display_name ||
-            !memberForm.member_id ||
-            !memberForm.tenant_slug
-          }
-          onClick={onAddMember}
-        >
-          {frontDeskText('settings_member_add_submit', locale)}
-        </button>
-      </div>
-      {issuedToken ? (
-        <div className="notice" role="alert">
-          <p>{frontDeskText('settings_token_once', locale)}</p>
-          <code>{issuedToken}</code>
-          <div className="button-row">
-            <button className="action-button" onClick={() => setIssuedToken(null)}>
-              {frontDeskText('settings_token_once_dismiss', locale)}
-            </button>
-          </div>
+      {/* HT-05/HT-06: track catalog comes from /api/training/catalog (never
+          hardcoded here), so track titles stay a single source of truth with
+          knowledge/product/orchestration/training-catalog.json; the fixed
+          chrome (heading, field label, statuses, button) is vocabulary. */}
+      <h3 className="pane-subheading">{frontDeskText('settings_training_title', locale)}</h3>
+      <p className="pane-subtitle">{frontDeskText('settings_training_lead', locale)}</p>
+      {trainingTracks.length > 0 ? (
+        <div className="item-card settings-member-form">
+          <label className="field-label">
+            {frontDeskText('settings_training_track', locale)}
+            <select
+              value={trainingTrackId}
+              onChange={(event) => setTrainingTrackId(event.target.value)}
+            >
+              {trainingTracks.map((track) => (
+                <option key={track.id} value={track.id}>
+                  {track.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          {members.map((member) => {
+            const assignment = trainingAssignments
+              .find((item) => item.tenant_slug === activeTenantSlug)
+              ?.assignments.find(
+                (item) => item.member_id === member.member_id && item.track_id === trainingTrackId
+              );
+            return (
+              <div className="button-row" key={`training-${member.member_id}`}>
+                <span>
+                  {member.display_name} ·{' '}
+                  {frontDeskText(
+                    TRAINING_STATUS_LABEL_KEYS[assignment?.status ?? 'not_started'],
+                    locale
+                  )}
+                </span>
+                <button
+                  className="action-button"
+                  disabled={memberBusy}
+                  onClick={() => onAssignTraining(member.member_id)}
+                >
+                  {frontDeskText('settings_training_assign', locale)}
+                </button>
+              </div>
+            );
+          })}
         </div>
+      ) : (
+        <p className="pane-empty">{t('setup.loading')}</p>
+      )}
+
+      {/* FD-10: accountable agents (display name + accountable member only —
+          never the nhi_id, per plan §2.5 principle 6). */}
+      <h3 className="pane-subheading">{t('setup.agent_display_name')}</h3>
+      <p className="pane-subtitle">
+        {t('setup.agent_registry_count', {
+          count: setup.agent_management.durable_identities.length,
+        })}
+      </p>
+      {setup.agent_management.durable_identities.length > 0 ? (
+        <ul className="settings-tenant-list">
+          {setup.agent_management.durable_identities.map((agent) => {
+            const ownerId = agent.accountable_human_id?.replace(/^user:/, '');
+            const owner = members.find((member) => member.member_id === ownerId);
+            return (
+              <li className="item-card settings-tenant-item" key={agent.nhi_id}>
+                <p className="item-title">{agent.display_name}</p>
+                <p className="item-meta">
+                  {owner?.display_name || frontDeskText('settings_members_title', locale)}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
       ) : null}
+
+      <h3 className="pane-subheading">{frontDeskText('settings_member_add', locale)}</h3>
+      <div className="item-card settings-member-form">
+        <div className="field-row">
+          <label className="field-label">
+            {frontDeskText('settings_member_add_display_name', locale)}
+            <input
+              type="text"
+              value={memberForm.display_name}
+              onChange={(event) =>
+                setMemberForm({ ...memberForm, display_name: event.target.value })
+              }
+            />
+          </label>
+          <label className="field-label">
+            {frontDeskText('settings_member_add_id', locale)}
+            <input
+              type="text"
+              value={memberForm.member_id}
+              onChange={(event) => setMemberForm({ ...memberForm, member_id: event.target.value })}
+            />
+          </label>
+        </div>
+        <div className="field-row">
+          <label className="field-label">
+            {frontDeskText('settings_member_add_tenant', locale)}
+            <select
+              value={memberForm.tenant_slug}
+              onChange={(event) =>
+                setMemberForm({ ...memberForm, tenant_slug: event.target.value })
+              }
+            >
+              {meTenants.map((tenant) => (
+                <option key={tenant.tenant_slug} value={tenant.tenant_slug}>
+                  {tenant.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field-label">
+            {frontDeskText('settings_member_add_role', locale)}
+            <select
+              value={memberForm.role}
+              onChange={(event) =>
+                setMemberForm({ ...memberForm, role: event.target.value as SettingsRole })
+              }
+            >
+              {(['owner', 'approver', 'viewer'] as SettingsRole[]).map((role) => (
+                <option key={role} value={role}>
+                  {frontDeskText(ROLE_LABEL_KEYS[role], locale)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className="checkbox-field">
+          <input
+            type="checkbox"
+            checked={memberForm.issue_token}
+            onChange={(event) =>
+              setMemberForm({ ...memberForm, issue_token: event.target.checked })
+            }
+          />
+          {frontDeskText('settings_member_add_issue_token', locale)}
+        </label>
+        <div className="button-row">
+          <button
+            className="action-button"
+            disabled={
+              memberBusy ||
+              !memberForm.display_name.trim() ||
+              !memberForm.member_id.trim() ||
+              !memberForm.tenant_slug
+            }
+            onClick={onAddMember}
+          >
+            {frontDeskText('settings_member_add_submit', locale)}
+          </button>
+        </div>
+        {issuedToken ? (
+          <div className="notice" role="alert">
+            <p>{frontDeskText('settings_token_once', locale)}</p>
+            <code>{issuedToken}</code>
+            <div className="button-row">
+              <button className="action-button" onClick={() => setIssuedToken(null)}>
+                {frontDeskText('settings_token_once_dismiss', locale)}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }

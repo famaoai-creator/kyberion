@@ -213,6 +213,37 @@ body {
   margin-bottom: 10px;
 }
 
+.field-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-member-form {
+  margin-top: 8px;
+}
+
+.settings-member-form .field-row {
+  margin-bottom: 0;
+}
+
+.settings-member-form .field-label {
+  margin-bottom: 10px;
+}
+
+.checkbox-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 12px;
+  font-size: 12px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.checkbox-field input {
+  accent-color: var(--kb-accent, #8a6d3b);
+}
+
 .service-row {
   display: flex;
   align-items: center;

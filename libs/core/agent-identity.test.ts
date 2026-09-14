@@ -16,6 +16,7 @@ import {
   buildNhiId,
   deriveAgentNhiId,
   ensureAgentIdentityBestEffort,
+  ensureAgentIdentityProvisioned,
   getAgentIdentity,
   issueAgentIdentity,
   listAgentIdentities,
@@ -194,6 +195,27 @@ describe('agent-identity — accountable ownership and uniqueness', () => {
         })
       )
     ).toThrow(AgentIdentityAccountabilityError);
+  });
+
+  it('ensureAgentIdentityProvisioned defaults accountable_human_id to the owner member (user:owner) when the caller omits one and the organization profile is still the legacy human:operator default', () => {
+    const record = withExecutionContext('mission_controller', () =>
+      ensureAgentIdentityProvisioned({
+        slug: 'owner-default-agent',
+        organizationId: 'demo-org',
+      })
+    );
+    expect(record.accountable_human_id).toBe('user:owner');
+  });
+
+  it('ensureAgentIdentityProvisioned keeps an explicitly provided accountable_human_id', () => {
+    const record = withExecutionContext('mission_controller', () =>
+      ensureAgentIdentityProvisioned({
+        slug: 'explicit-owner-agent',
+        organizationId: 'demo-org',
+        accountableHumanId: 'human:founder',
+      })
+    );
+    expect(record.accountable_human_id).toBe('human:founder');
   });
 
   it('slug format is validated at issuance', () => {

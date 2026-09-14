@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "training-progress.schema.json",
+  "title": "Member Training Progress",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "member_id", "lessons"],
+  "properties": {
+    "version": { "type": "string" },
+    "member_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "lessons": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status"],
+        "properties": {
+          "status": { "type": "string", "enum": ["not_started", "in_progress", "complete"] },
+          "completed_at": { "type": "string", "format": "date-time" },
+          "evidence": { "type": "string", "maxLength": 2000 }
+        }
+      }
+    }
+  }
+}

@@ -265,6 +265,16 @@ body {
   overflow-y: auto;
 }
 
+.hearing-canvas {
+  display: block;
+  width: 100%;
+  min-height: 360px;
+  margin-top: 14px;
+  border: 1px solid var(--kb-border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--kb-bg-main, #ffffff);
+}
+
 .ask-card {
   background: var(--kb-bg-main, #ffffff);
   border: 1px solid var(--kb-border, #e2e8f0);

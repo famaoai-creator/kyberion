@@ -16,6 +16,7 @@ import {
   type ConciergeMessageKey,
 } from '../../../../lib/i18n';
 import { resolveConciergeViewer } from '../../../../lib/viewer-context';
+import { resolveConciergeDecidedBy } from '../../../../lib/front-desk-member';
 
 export const dynamic = 'force-dynamic';
 
@@ -99,10 +100,24 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       return NextResponse.json({ ok: false, error: t('api.memory.failed') }, { status: 503 });
     }
 
+    // FD-10 wave 1b: resolve the human member behind this decision, same
+    // best-effort fallback as FD-07's decidedBy seam — an unresolved
+    // principal (legacy synthetic identity) simply omits the flags, and the
+    // CLI keeps working without them.
+    const decidedBy = resolveConciergeDecidedBy(resolved.context);
+    const decidedByArgs = decidedBy
+      ? [
+          '--decided-by',
+          decidedBy.id,
+          '--decided-by-name',
+          decidedBy.display_name,
+          ...(decidedBy.role ? ['--decided-by-role', decidedBy.role] : []),
+        ]
+      : [];
     const subcommand = decision === 'approve' ? 'memory-approve' : 'memory-reject';
     const result = safeExecResult(
       process.execPath,
-      [CONTROLLER_RELATIVE, subcommand, candidate.candidate_id],
+      [CONTROLLER_RELATIVE, subcommand, candidate.candidate_id, ...decidedByArgs],
       {
         env: { ...process.env, MISSION_ROLE: 'mission_controller' },
         cwd: rootDir,

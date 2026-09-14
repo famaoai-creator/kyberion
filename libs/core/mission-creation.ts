@@ -39,7 +39,7 @@ import {
 } from './mission-state.js';
 import { syncRoleProcedure } from './mission-governance.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
-import type { MissionState } from './mission-types.js';
+import type { HumanDecidedBy, MissionState } from './mission-types.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
@@ -537,6 +537,8 @@ export async function startMission(args: {
   force?: boolean;
   ephemeral?: boolean;
   intentGoal?: string;
+  /** FD-10 wave 1b: stamped on the ACTIVATE/RESUME history entry. */
+  decidedBy?: HumanDecidedBy;
 }): Promise<void> {
   const {
     id,
@@ -552,6 +554,7 @@ export async function startMission(args: {
     force = false,
     ephemeral,
     intentGoal,
+    decidedBy,
   } = args;
 
   if (!id) {
@@ -621,6 +624,7 @@ export async function startMission(args: {
           ts: nowIso(),
           event: 'ACTIVATE',
           note: 'Mission activated.',
+          ...(decidedBy ? { decided_by: decidedBy } : {}),
         });
         await saveState(upperId, state);
       }
@@ -687,6 +691,7 @@ export async function startMission(args: {
         ts: nowIso(),
         event: 'RESUME',
         note: 'Mission resumed.',
+        ...(decidedBy ? { decided_by: decidedBy } : {}),
       });
       await saveState(upperId, state);
     }

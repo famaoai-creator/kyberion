@@ -17,7 +17,9 @@ import {
   isValidMemberId,
   listMemberIds,
   memberProfilePath,
+  ownerAccountableHumanId,
   readMemberProfile,
+  resolveAccountableHuman,
   resolveMemberByPrincipal,
   writeMemberProfile,
   type MemberProfile,
@@ -251,6 +253,36 @@ describe('member-registry', () => {
       expect(
         resolveMemberByPrincipal({ source: 'anonymous' }, { rootDir: fixtureRoot })
       ).toBeNull();
+    });
+  });
+
+  describe('ownerAccountableHumanId', () => {
+    it('is the owner actor id', () => {
+      expect(ownerAccountableHumanId()).toBe('user:owner');
+    });
+  });
+
+  describe('resolveAccountableHuman', () => {
+    it('resolves a user:<member_id> actor id to the member', () => {
+      const resolved = resolveAccountableHuman('user:alice', { rootDir: fixtureRoot });
+      expect(resolved?.member_id).toBe('alice');
+    });
+
+    it('resolves a bare member id to the member', () => {
+      const resolved = resolveAccountableHuman('alice', { rootDir: fixtureRoot });
+      expect(resolved?.member_id).toBe('alice');
+    });
+
+    it('returns null for a member that does not exist', () => {
+      expect(resolveAccountableHuman('user:ghost', { rootDir: fixtureRoot })).toBeNull();
+    });
+
+    it('returns null for a legacy synthetic label (never throws)', () => {
+      expect(resolveAccountableHuman('human:operator', { rootDir: fixtureRoot })).toBeNull();
+    });
+
+    it('returns null for an empty id', () => {
+      expect(resolveAccountableHuman('', { rootDir: fixtureRoot })).toBeNull();
     });
   });
 });

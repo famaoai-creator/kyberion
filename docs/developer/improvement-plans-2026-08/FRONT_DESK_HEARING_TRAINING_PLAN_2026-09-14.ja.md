@@ -105,3 +105,6 @@ status: active
 ## 5. 実装状況
 
 - 2026-09-14: 計画作成(#736 の評価と、FD 計画上の置き場を確定)。
+- 2026-09-14: **HT-01 部分実装** — `presence/displays/presence-studio/hearing.ts` にシナリオ定義から要件レコードを生成する純関数、会話ターン適用、充足率計算を追加。Web アプリ要件 7 項目はデフォルトとして維持し、シナリオごとに項目・表示名・別名を差し替え可能にした。空ターンから回答を捏造しない契約を 3 テストで固定。UI/API の接続とキャンバス生成は未着手。
+- 2026-09-14: **HT-01/HT-02 第1段** — `/ask?mode=hearing` の会話横キャンバス、viewer スコープ付き `GET /api/hearing/:session` / `canvas`、localadmin 限定の回答更新を接続。キャンバスは外部リソースなし・escape 済み・sandbox iframe で描画し、回答ごとの `vN` HTML を `active/shared/tmp/hearing/` に保存して過去版を `?version=vN` で再表示できる。alignment gate、確定受け渡し、トレーニング、組織展開、公開経路への KA-06 接続は未完了。
+- 2026-09-14: **HT-03 第 1 段 / HT-04 / HT-05 第 1 段** — `POST /api/hearing/:session/decide`(全項目回答済みのときだけ、`decided_by` = 解決したメンバー `user:<member_id>`、未登録 principal は 403、次の一手は語彙キー)。`libs/core/training-catalog.ts` + `training-catalog.json`(schema 付き)、`/help` のトラック一覧と `/help/<track>` のレッスン、メンバー単位の進捗(`GET/POST /api/training/progress`)、テナント単位の割り当て(`/api/training/assignments`、秘書室の設定 › 組織とメンバーから割り当て)。**未完了**: alignment gate への受け渡しと mission 作成(HT-03 後半)、キャンバスのモデル生成(HT-02 はテンプレート描画 + バージョン保存まで)、KA-06 の公開経路接続、進捗一覧の表示。
