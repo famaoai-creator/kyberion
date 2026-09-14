@@ -68,6 +68,7 @@ export function playPcmAudioStream(
   let settled = false;
   let interrupted = false;
   let firstChunk = true;
+  let inputCompleted = false;
   let resolveDone: (result: PlaybackResult) => void = () => undefined;
   const done = new Promise<PlaybackResult>((resolve) => {
     resolveDone = resolve;
@@ -141,6 +142,7 @@ export function playPcmAudioStream(
         }
       }
       child?.stdin.end();
+      inputCompleted = true;
       if (!child) settle({ ok: true, interrupted: false });
     } catch (error) {
       if (!interrupted)
@@ -149,6 +151,14 @@ export function playPcmAudioStream(
           interrupted: false,
           error: error instanceof Error ? error.message : String(error),
         });
+      if (!inputCompleted && child && child.exitCode === null && child.signalCode === null) {
+        try {
+          child.stdin.end();
+          child.kill('SIGTERM');
+        } catch {
+          /* already stopped */
+        }
+      }
     }
   };
   void pump();

@@ -186,16 +186,23 @@ export class CoreAudioOutputBridge implements AudioOutputPort {
     if (this.closing) return;
     this.closing = true;
     const child = this.process;
-    if (child?.stdin && !child.stdin.destroyed) child.stdin.end();
-    if (child && child.exitCode === null && child.signalCode === null) {
-      await waitForClose(child, this.options.drain_timeout_ms ?? 10_000);
-      if (child.exitCode === null && child.signalCode === null) terminateProcessGroup(child);
+    let closeError: unknown;
+    try {
+      if (child?.stdin && !child.stdin.destroyed) child.stdin.end();
+      if (child && child.exitCode === null && child.signalCode === null) {
+        await waitForClose(child, this.options.drain_timeout_ms ?? 10_000);
+        if (child.exitCode === null && child.signalCode === null) terminateProcessGroup(child);
+      }
+    } catch (error) {
+      closeError = error;
+    } finally {
+      this.process = null;
+      if (this.resourceId) stopManagedProcess(this.resourceId, child);
+      this.resourceId = null;
+      this.opened = false;
+      this.status = 'closed';
     }
-    this.process = null;
-    if (this.resourceId) stopManagedProcess(this.resourceId, child);
-    this.resourceId = null;
-    this.opened = false;
-    this.status = 'closed';
+    if (closeError) throw closeError;
   }
 
   health(): AudioRouteHealth {

@@ -253,6 +253,10 @@ export class BlackHoleAudioBus implements AudioBus {
       await waitForStartup(inputProc, this.opts.startup_timeout_ms ?? 250);
       await output.open(format, this.outputDevice);
     } catch (error) {
+      // output.open() can fail after allocating a CoreAudio helper. Always
+      // close that helper before tearing down capture, while preserving the
+      // original open error for the caller.
+      await output.close().catch(() => undefined);
       await terminateProcess(inputProc, this.opts.cleanup_timeout_ms ?? 1500);
       stopManagedProcess(inputResourceId, inputProc);
       this.inputProc = null;
@@ -300,19 +304,31 @@ export class BlackHoleAudioBus implements AudioBus {
     if (this.closing) return;
     // Keep capture alive while the CoreAudio output helper drains its final
     // buffers. Stopping capture first can discard the tail of the loopback.
-    await this.output?.close();
-    this.output = null;
-    this.closing = true;
-    this.inputQueue?.close();
-    if (this.inputProc) {
-      await terminateProcess(this.inputProc, this.opts.cleanup_timeout_ms ?? 1500);
-      if (this.inputResourceId) stopManagedProcess(this.inputResourceId, this.inputProc);
+    let closeError: unknown;
+    try {
+      await this.output?.close();
+    } catch (error) {
+      // The output helper may already have failed or disappeared. Capture and
+      // lease cleanup must still run, otherwise a failed loopback can leave the
+      // input route alive and continue monitoring microphone audio.
+      closeError = error;
+    } finally {
+      this.closing = true;
+      this.output = null;
+      this.inputQueue?.close();
+      if (this.inputProc) {
+        await terminateProcess(this.inputProc, this.opts.cleanup_timeout_ms ?? 1500);
+        if (this.inputResourceId) stopManagedProcess(this.inputResourceId, this.inputProc);
+      }
+      this.inputProc = null;
+      this.inputResourceId = null;
+      this.releaseLeases();
+      this.opened = false;
+      this.status = 'closed';
     }
-    this.inputProc = null;
-    this.inputResourceId = null;
-    this.releaseLeases();
-    this.opened = false;
-    this.status = 'closed';
+    if (closeError) {
+      throw closeError;
+    }
   }
 
   health(): AudioRouteHealth {
