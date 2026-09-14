@@ -276,3 +276,54 @@ export function parseTrainingAssignmentsResponse(
   if (!record.assignments.every(isTrainingAssignments)) return undefined;
   return record.assignments;
 }
+
+// HT-05 second pass: per-member progress overview
+// (`/api/training/progress`, owner-only, tenant-narrowed server-side) — same
+// shape as `libs/core/training-catalog.ts`'s `summarizeTrainingProgress`
+// output plus the joined `display_name`.
+export type TrainingProgressSummary = {
+  member_id: string;
+  display_name: string;
+  assignment?: { track_id: string; status: TrainingAssignmentStatus };
+  lessons_done: number;
+  lessons_total: number;
+  last_completed_at?: string;
+};
+
+function isTrainingProgressSummary(value: unknown): value is TrainingProgressSummary {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.member_id !== 'string' ||
+    typeof record.display_name !== 'string' ||
+    typeof record.lessons_done !== 'number' ||
+    typeof record.lessons_total !== 'number'
+  ) {
+    return false;
+  }
+  if (record.assignment !== undefined) {
+    const assignment = record.assignment as Record<string, unknown>;
+    if (
+      !assignment ||
+      typeof assignment !== 'object' ||
+      typeof assignment.track_id !== 'string' ||
+      !isTrainingAssignmentStatus(assignment.status)
+    ) {
+      return false;
+    }
+  }
+  if (record.last_completed_at !== undefined && typeof record.last_completed_at !== 'string') {
+    return false;
+  }
+  return true;
+}
+
+export function parseTrainingProgressOverviewResponse(
+  value: unknown
+): TrainingProgressSummary[] | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  if (record.ok !== true || !Array.isArray(record.overview)) return undefined;
+  if (!record.overview.every(isTrainingProgressSummary)) return undefined;
+  return record.overview;
+}
