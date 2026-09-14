@@ -1141,6 +1141,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/audio-route-resource-lifecycle.md",
+      "tier": "public",
+      "size": 5110,
+      "type": "md"
+    },
+    {
       "path": "product/governance/audit-ledger-recovery.md",
       "tier": "public",
       "size": 1374,
