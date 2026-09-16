@@ -65,6 +65,15 @@ describe('GeminiApiBackend', () => {
     expect(backend?.egressEndpoint).toBe('https://generativelanguage.googleapis.com/v1beta');
   });
 
+  it('prefers KYBERION_GEMINI_API_KEY over community aliases', () => {
+    const backend = buildGeminiApiBackendFromEnv({
+      KYBERION_GEMINI_API_KEY: 'kyberion-gemini-key',
+      GEMINI_API_KEY: 'community-gemini-key',
+      GOOGLE_API_KEY: 'community-google-key',
+    });
+    expect(backend).toBeInstanceOf(GeminiApiBackend);
+  });
+
   it('sends the native generateContent shape with X-Goog-Api-Key', async () => {
     const request = vi.fn().mockResolvedValue({
       candidates: [{ content: { parts: [{ text: 'AI is pattern learning.' }] } }],

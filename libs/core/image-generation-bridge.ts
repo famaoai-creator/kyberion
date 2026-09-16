@@ -31,6 +31,7 @@ import {
   generateImageWithWindowsNativeApi,
   probeWindowsNativeImageGeneration,
 } from './windows-native-image-generation-bridge.js';
+import { resolveGeminiApiKey } from './gemini-api-backend.js';
 
 function getFallbackTargetPath(request: ImageGenerationRequest): string {
   const filename = `generated-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.jpg`;
@@ -273,7 +274,7 @@ export class GeminiFastImageGenerationProvider implements ImageGenerationProvide
   readonly executionLocality = 'remote';
 
   async isAvailable(): Promise<boolean> {
-    if (!getRegisteredEnvText('GEMINI_API_KEY')) return false;
+    if (!resolveGeminiApiKey()) return false;
     try {
       resolveServiceBinding('gemini', 'secret-guard');
       return true;
@@ -332,7 +333,7 @@ export class GeminiServiceImageGenerationProvider implements ImageGenerationProv
   readonly executionLocality = 'remote';
 
   async isAvailable(): Promise<boolean> {
-    if (!getRegisteredEnvText('GEMINI_API_KEY')) return false;
+    if (!resolveGeminiApiKey()) return false;
     try {
       resolveServiceBinding('gemini', 'secret-guard');
       return true;
@@ -389,14 +390,12 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
   readonly executionLocality = 'remote';
 
   async isAvailable(): Promise<boolean> {
-    return Boolean(
-      getRegisteredEnvText('GEMINI_API_KEY') || getRegisteredEnvText('OPENAI_API_KEY')
-    );
+    return Boolean(resolveGeminiApiKey() || getRegisteredEnvText('OPENAI_API_KEY'));
   }
 
   async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
     const startedAt = Date.now();
-    const apiKeyGemini = getRegisteredEnvText('GEMINI_API_KEY');
+    const apiKeyGemini = resolveGeminiApiKey();
     const apiKeyOpenAI = getRegisteredEnvText('OPENAI_API_KEY');
 
     const order = request.providerPreference || ['gemini', 'openai'];

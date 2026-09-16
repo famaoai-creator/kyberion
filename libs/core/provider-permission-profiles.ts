@@ -362,7 +362,7 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
   // Grok Build primarily uses OAuth via `grok login`; optional direct API key
   // still allowed through when present.
   grok: ['XAI_API_KEY'],
-  gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+  gemini: ['KYBERION_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
   cursor: ['CURSOR_API_KEY'],
   // OpenCode primarily uses its login session; no provider API key passes through.
   opencode: [],
