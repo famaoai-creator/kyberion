@@ -31,6 +31,34 @@ function deriveTags(adf: KyberionMusicGenerationADF): string {
   return parts.filter(Boolean).join(', ');
 }
 
+/**
+ * Derive a lightweight text-to-music prompt from an ADF without compiling a
+ * ComfyUI workflow. Used by local CLI backends such as MusicGen/MLX.
+ */
+export function buildMusicPromptFromAdf(adf: KyberionMusicGenerationADF): {
+  prompt: string;
+  durationSec: number;
+  targetPath?: string;
+  format?: string;
+} {
+  if (adf.kind !== 'music-generation-adf') {
+    throw new Error(`Unsupported ADF kind: ${adf.kind}`);
+  }
+  let prompt = deriveTags(adf);
+  const lyricsMode = adf.lyrics?.mode || 'instrumental';
+  if (lyricsMode === 'instrumental') {
+    if (!/\bno vocals\b/i.test(prompt)) prompt = `${prompt}, no vocals`;
+  } else if (adf.lyrics?.text?.trim()) {
+    prompt = `${prompt}. lyrical theme: ${adf.lyrics.text.trim().slice(0, 240)}`;
+  }
+  return {
+    prompt,
+    durationSec: adf.composition.duration_sec,
+    ...(typeof adf.output.target_path === 'string' ? { targetPath: adf.output.target_path } : {}),
+    ...(typeof adf.output.format === 'string' ? { format: adf.output.format } : {}),
+  };
+}
+
 function resolveLyrics(adf: KyberionMusicGenerationADF): string {
   const mode = adf.lyrics?.mode || 'instrumental';
   if (mode === 'instrumental') return '';

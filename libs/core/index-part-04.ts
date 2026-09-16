@@ -33,6 +33,12 @@ export * from './image-generation-types.js';
 
 export * from './image-generation-policy.js';
 
+export * from './music-generation-bridge.js';
+
+export * from './music-generation-types.js';
+
+export * from './music-generation-policy.js';
+
 export * from './tool-runtime-policy.js';
 
 export * from './tool-runtime-registry.js';

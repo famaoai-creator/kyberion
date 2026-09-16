@@ -635,7 +635,8 @@ export class ApplePlaygroundImageGenerationProvider implements ImageGenerationPr
   }
 }
 
-type HostBridgeVariant = 'host_agent' | 'codex_host_bridge' | 'agy_host_bridge';
+type HostBridgeVariant =
+  'host_agent' | 'codex_host_bridge' | 'agy_host_bridge' | 'cursor_host_bridge';
 
 interface HostBridgeProviderConfig {
   id: HostBridgeVariant;
@@ -764,6 +765,19 @@ export class AgyHostBridgeImageGenerationProvider extends BaseHostBridgeImageGen
   };
 }
 
+export class CursorHostBridgeImageGenerationProvider extends BaseHostBridgeImageGenerationProvider {
+  readonly id = 'cursor_host_bridge';
+
+  protected readonly config: HostBridgeProviderConfig = {
+    id: 'cursor_host_bridge',
+    displayName: 'Cursor host bridge',
+    requestFileName: 'cursor_host_bridge_image_request.json',
+    errorCode: 'HOST_BRIDGE_IMAGE_GENERATION_REQUIRED',
+    availability: () =>
+      envAnyEnabled(['CURSOR_CLI', 'CURSOR_AGENT', 'KYBERION_CURSOR_CLI_BIN', 'CURSOR_API_KEY']),
+  };
+}
+
 export class AdaptivePolicyRouter {
   private providers: Map<string, ImageGenerationProvider> = new Map();
   private fallbackGraph: Map<string, string> = new Map();
@@ -784,6 +798,7 @@ export class AdaptivePolicyRouter {
         'media-generation.gemini.imagen-3-fast': 'gemini_fast',
         'media-generation.gemini': 'gemini_service',
         'media-generation.host_agent': 'host_agent',
+        'media-generation.cursor_host_bridge': 'cursor_host_bridge',
         'media-generation.local_flux': 'local_flux',
         'media-generation.apple_playground': 'apple_playground',
       };
@@ -846,10 +861,12 @@ export class AdaptivePolicyRouter {
         'local_flux',
         'comfyui',
         'llm_api',
+        'cursor_host_bridge',
         'host_agent',
       ];
     } else if (mode === 'artistic') {
       defaultChain = [
+        'cursor_host_bridge',
         'codex_host_bridge',
         'agy_host_bridge',
         'host_agent',
@@ -864,6 +881,7 @@ export class AdaptivePolicyRouter {
     } else {
       // balanced
       defaultChain = [
+        'cursor_host_bridge',
         'codex_host_bridge',
         'agy_host_bridge',
         'host_agent',
@@ -959,6 +977,7 @@ function getRouter(): AdaptivePolicyRouter {
       new WindowsNativeImageGenerationProvider(),
       new LocalDiffusionImageGenerationProvider(),
       new ApplePlaygroundImageGenerationProvider(),
+      new CursorHostBridgeImageGenerationProvider(),
       new CodexHostBridgeImageGenerationProvider(),
       new AgyHostBridgeImageGenerationProvider(),
       new HostAgentImageGenerationProvider(),

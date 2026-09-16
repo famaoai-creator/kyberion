@@ -212,7 +212,15 @@ export function getMediaBackendRecord(
           ? 'media-generation.local_flux'
           : modality === 'image' && resolvedId === 'apple_playground'
             ? 'media-generation.apple_playground'
-            : resolvedId;
+            : modality === 'music' &&
+                (resolvedId === 'musicgen_mlx' || resolvedId === 'media-generation.musicgen_mlx')
+              ? 'media-generation.musicgen_mlx'
+              : modality === 'music' &&
+                  (resolvedId === 'stable_audio_3' ||
+                    resolvedId === 'stable_audio_3_small_music' ||
+                    resolvedId === 'media-generation.stable_audio_3_small_music')
+                ? 'media-generation.stable_audio_3_small_music'
+                : resolvedId;
 
   const voiceBackendMatch =
     aliasId.startsWith('voice.') &&
@@ -281,6 +289,26 @@ async function probeMediaBackendAvailabilityUncached(
   }
   if (backend.provider === 'mflux') {
     const resolution = probeToolRuntime('mflux', 'trial', platform);
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: resolution.selected_action !== 'install',
+      probe_kind: 'tool_runtime',
+      reason: resolution.reason,
+    };
+  }
+  if (backend.provider === 'musicgen_mlx') {
+    const resolution = probeToolRuntime('musicgen_mlx', 'trial', platform);
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: resolution.selected_action !== 'install',
+      probe_kind: 'tool_runtime',
+      reason: resolution.reason,
+    };
+  }
+  if (backend.provider === 'stable_audio_3') {
+    const resolution = probeToolRuntime('stable_audio_3', 'trial', platform);
     return {
       backend_id: backend.backend_id,
       modality: backend.modality,

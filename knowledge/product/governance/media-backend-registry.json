@@ -192,6 +192,46 @@
       "notes": "Compatibility-specific music contract for the shared ComfyUI runtime."
     },
     {
+      "backend_id": "media-generation.musicgen_mlx",
+      "modality": "music",
+      "display_name": "Local MusicGen (MLX)",
+      "kind": "cli",
+      "provider": "musicgen_mlx",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supports": {
+        "artifact_formats": ["wav"],
+        "async": false
+      },
+      "command": "uvx",
+      "args": ["--from", "mlx-audiocraft", "musicgen-mlx"],
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "fallback_backend_id": "media-generation.comfyui.music",
+      "notes": "Apple Silicon local MusicGen via mlx-audiocraft tool runtime. Prefer facebook/musicgen-small; weights are CC BY-NC. Tuned via KYBERION_MUSICGEN_*. Install: uv tool install mlx-audiocraft (or trial via uvx)."
+    },
+    {
+      "backend_id": "media-generation.stable_audio_3_small_music",
+      "modality": "music",
+      "display_name": "Local Stable Audio 3 Small-Music",
+      "kind": "cli",
+      "provider": "stable_audio_3",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["wav"],
+        "async": false
+      },
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/Stability-AI/stable-audio-3.git", "stable-audio"],
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "fallback_backend_id": "media-generation.musicgen_mlx",
+      "notes": "Stable Audio 3 small-music via tool runtime (CPU/MPS friendly, up to ~120s). Hugging Face gated weights require HF_TOKEN. Tuned via KYBERION_STABLE_AUDIO_*. Install: uv tool install git+https://github.com/Stability-AI/stable-audio-3.git."
+    },
+    {
       "backend_id": "media-generation.gemini.imagen-3-fast",
       "modality": "image",
       "display_name": "Google AI Studio Imagen 3 Fast (Free Tier)",
@@ -247,6 +287,23 @@
       "data_policy": "zero_retention",
       "execution_locality": "local",
       "notes": "Requests the outer agent/host environment (e.g. agy / Antigravity IDE) to generate the image via its native tool and stores it."
+    },
+    {
+      "backend_id": "media-generation.cursor_host_bridge",
+      "modality": "image",
+      "display_name": "Cursor Host Bridge Image Generation",
+      "kind": "agent_tool",
+      "provider": "cursor",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["jpg", "jpeg", "png", "webp"],
+        "async": false
+      },
+      "cost_tier": "environment",
+      "data_policy": "zero_retention",
+      "execution_locality": "local",
+      "notes": "Requests the Cursor agent host to generate the image via its GenerateImage tool and store it at the governed target path."
     },
     {
       "backend_id": "media-generation.local_flux",
