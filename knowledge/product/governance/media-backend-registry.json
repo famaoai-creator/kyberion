@@ -57,7 +57,7 @@
       "status": "active",
       "platforms": ["any"],
       "model": "veo-3.1-generate-preview",
-      "api_key_env": "KYBERION_GEMINI_VIDEO_API_KEY|GEMINI_API_KEY",
+      "api_key_env": "KYBERION_GEMINI_VIDEO_API_KEY|KYBERION_GEMINI_API_KEY|GEMINI_API_KEY|GOOGLE_API_KEY",
       "endpoint_env": "KYBERION_GEMINI_VIDEO_URL",
       "supports": {
         "artifact_formats": ["mp4"],

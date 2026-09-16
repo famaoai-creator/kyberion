@@ -40,6 +40,19 @@ function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
 }
 
+/**
+ * Resolve the Google AI Studio / Gemini API key.
+ * Prefer the Kyberion-namespaced secret, then community aliases.
+ */
+export function resolveGeminiApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  return (
+    envText(env, 'KYBERION_GEMINI_API_KEY')?.trim() ||
+    envText(env, 'GEMINI_API_KEY')?.trim() ||
+    envText(env, 'GOOGLE_API_KEY')?.trim() ||
+    undefined
+  );
+}
+
 export interface GeminiApiBackendOptions {
   apiKey: string;
   model: string;
@@ -604,7 +617,7 @@ export function buildGeminiApiBackendFromEnv(
   modelOverride?: string,
   samplingParams?: Pick<SamplingParams, 'stop'>
 ): GeminiApiBackend | null {
-  const apiKey = envText(env, 'GEMINI_API_KEY')?.trim() || envText(env, 'GOOGLE_API_KEY')?.trim();
+  const apiKey = resolveGeminiApiKey(env);
   if (!apiKey) return null;
   return new GeminiApiBackend({
     apiKey,
@@ -623,9 +636,12 @@ export function buildGeminiApiBackendFromEnv(
 export async function probeGeminiApiBackendAvailability(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<{ available: boolean; reason?: string }> {
-  const apiKey = envText(env, 'GEMINI_API_KEY')?.trim() || envText(env, 'GOOGLE_API_KEY')?.trim();
+  const apiKey = resolveGeminiApiKey(env);
   if (!apiKey) {
-    return { available: false, reason: 'GEMINI_API_KEY or GOOGLE_API_KEY is not set' };
+    return {
+      available: false,
+      reason: 'KYBERION_GEMINI_API_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY is not set',
+    };
   }
   const baseURL = normalizeBaseUrl(
     envText(env, 'KYBERION_GEMINI_URL')?.trim() || GEMINI_API_DEFAULT_BASE_URL

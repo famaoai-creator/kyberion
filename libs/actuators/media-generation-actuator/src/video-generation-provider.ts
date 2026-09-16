@@ -209,7 +209,12 @@ class GoogleVeoProvider implements VideoGenerationProvider {
   private readonly requestByJob = new Map<string, VideoGenerationRequest>();
 
   private apiKey(): string {
-    return requireEnv('KYBERION_GEMINI_VIDEO_API_KEY', 'GEMINI_API_KEY');
+    return requireEnv(
+      'KYBERION_GEMINI_VIDEO_API_KEY',
+      'KYBERION_GEMINI_API_KEY',
+      'GEMINI_API_KEY',
+      'GOOGLE_API_KEY'
+    );
   }
 
   private baseUrl(): string {
