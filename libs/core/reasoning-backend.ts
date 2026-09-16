@@ -674,13 +674,20 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     assertDistillationTextEgress(prompt);
     throwIfReasoningAborted(options?.signal);
     enforceSpendGuardForReasoning();
+    recordReasoningPromptVisibility(prompt, options, 'reasoning_stream_prompt');
     const candidates = this.candidates.slice(0, this.failoverPolicy.max_attempts);
     const demotedProviders = new Set(listDemotedProviders());
+    let primaryCandidate: ReasoningBackendCandidate | undefined;
+    const errors: string[] = [];
     for (const candidate of candidates) {
       const provider = normalizeProviderName(candidate.provider);
       if (provider && demotedProviders.has(provider)) continue;
       const stream = candidate.backend.streamPrompt;
       if (!stream) continue;
+      if (!primaryCandidate) primaryCandidate = candidate;
+      const label = candidateLabel(candidate);
+      const isSwitch = this.lastServedLabel !== null && label !== this.lastServedLabel;
+      if (isSwitch) await this.resetBackendSession(label, 'incoming');
       let yielded = false;
       try {
         throwIfReasoningAborted(options?.signal);
@@ -688,13 +695,22 @@ export class FailoverReasoningBackend implements ReasoningBackend {
           .egressEndpoint;
         if (endpoint) assertReasoningEgressAllowedAtEndpoint(candidate.backend.name, endpoint);
         else assertReasoningEgressAllowed(candidate.backend.name);
-        recordReasoningPromptVisibility(prompt, options, 'reasoning_stream_prompt');
         for await (const delta of stream.call(
           candidate.backend,
           prompt,
           optionsForCandidate(this.candidates, candidate, options)
         )) {
-          yielded = true;
+          if (!yielded) {
+            yielded = true;
+            if (provider) reportProviderHealthy(provider);
+            if (primaryCandidate) {
+              recordCandidateServed('streamPrompt', primaryCandidate, candidate, errors);
+            }
+            if (isSwitch && this.lastServedLabel) {
+              await this.resetBackendSession(this.lastServedLabel, 'outgoing');
+            }
+            this.lastServedLabel = label;
+          }
           yield delta;
         }
         if (yielded) return;
@@ -702,9 +718,20 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         // Once output has reached the caller, replaying on another provider
         // would duplicate speech. Before the first delta, try the next route.
         if (yielded) throw error;
+        if (options?.signal?.aborted) throw error;
+        const message = reasoningFailureMessage(error);
+        const classification = classifyReasoningFailure(error);
+        errors.push(`${label}: [${classification.class}] ${message}`);
         logger.warn(
-          `[reasoning-backend] streaming candidate ${candidateLabel(candidate)} failed before output: ${error instanceof Error ? error.message : String(error)}`
+          `[reasoning-backend:failover] streamPrompt failed on ${label}${provider ? ` (${provider})` : ''}; class=${classification.class}: ${message}`
         );
+        if (provider && classification.demoteProvider) {
+          reportProviderTemporarilyUnhealthy(provider, {
+            reason: `streamPrompt:${message}`,
+            retryAfterMs: resolveDemotionRetryAfterMs(message),
+          });
+        }
+        if (!classification.allowFailover) throw error;
       }
     }
 

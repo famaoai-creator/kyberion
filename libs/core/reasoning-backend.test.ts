@@ -5,9 +5,11 @@ import {
   delegateBestOf,
   delegateStructured,
   getReasoningBackend,
+  getLastServedReasoningMode,
   requestPeerAdvice,
   registerReasoningBackend,
   resetReasoningBackend,
+  resetReasoningFailoverTracking,
   stubReasoningBackend,
   type ReasoningBackend,
 } from './reasoning-backend.js';
@@ -121,6 +123,42 @@ describe('reasoning-backend', () => {
 
     await expect(backend.prompt('hello')).resolves.toBe('ok');
     expect(calls).toEqual(['primary', 'fallback']);
+  });
+
+  it('records streaming failover provenance and demotes a failed provider', async () => {
+    resetReasoningFailoverTracking();
+    const chunks: string[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        label: 'primary-stream',
+        provider: 'codex',
+        backend: {
+          ...stubReasoningBackend,
+          async *streamPrompt() {
+            throw new Error('authentication failed: invalid api key');
+          },
+        },
+      },
+      {
+        label: 'fallback-stream',
+        provider: 'gemini',
+        backend: {
+          ...stubReasoningBackend,
+          async *streamPrompt() {
+            yield 'served';
+          },
+        },
+      },
+    ]);
+
+    for await (const chunk of backend.streamPrompt('hello')) chunks.push(chunk);
+
+    expect(chunks).toEqual(['served']);
+    expect(getLastServedReasoningMode()).toEqual({
+      mode: 'fallback-stream',
+      provider: 'gemini',
+      failover: true,
+    });
   });
 
   it('does not send a provider-bound exact model to a different failover provider', async () => {

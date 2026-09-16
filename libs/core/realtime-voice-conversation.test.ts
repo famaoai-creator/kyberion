@@ -282,6 +282,77 @@ describe('realtime voice conversation', () => {
     });
   });
 
+  it('revalidates strict personal voice policy when reusing a fallback session', () => {
+    safeMkdir(TMP_DIR, { recursive: true });
+    safeWriteFile(
+      PROFILE_REGISTRY_PATH,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'fallback-me',
+        profiles: [
+          {
+            profile_id: 'fallback-me',
+            display_name: 'Fallback Me',
+            tier: 'personal',
+            languages: ['ja'],
+            default_engine_id: 'local_say',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      ENGINE_REGISTRY_PATH,
+      JSON.stringify({
+        version: 'test',
+        default_engine_id: 'local_say',
+        engines: [
+          {
+            engine_id: 'local_say',
+            display_name: 'Local TTS',
+            kind: 'native_local',
+            provider: 'test',
+            status: 'active',
+            platforms: ['any'],
+            supports: {
+              list_voices: true,
+              playback: true,
+              artifact_formats: ['wav'],
+            },
+          },
+        ],
+      })
+    );
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = PROFILE_REGISTRY_PATH;
+    process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = ENGINE_REGISTRY_PATH;
+
+    expect(
+      ensureRealtimeVoiceConversationSession({
+        sessionId: 'rtc-fallback-policy',
+        profileId: 'fallback-me',
+        personalVoiceMode: 'allow_fallback',
+      }).profile_id
+    ).toBe('fallback-me');
+
+    expect(() =>
+      ensureRealtimeVoiceConversationSession({
+        sessionId: 'rtc-fallback-policy',
+        personalVoiceMode: 'require_personal_voice',
+      })
+    ).toThrow(/cannot satisfy strict personal voice mode/u);
+
+    expect(() =>
+      buildRealtimeVoiceGenerationPayload({
+        sessionId: 'rtc-direct-strict-policy',
+        profileId: 'fallback-me',
+        language: 'ja',
+        text: 'strict check',
+        deliveryMode: 'artifact',
+        personalVoiceMode: 'require_personal_voice',
+      })
+    ).toThrow(/cannot satisfy strict personal voice mode/u);
+  });
+
   it('bounds provider output to a short spoken reply', () => {
     const normalized = normalizeRealtimeVoiceReply(
       'これは一文目です。これは二文目です。これは音声会話では不要な三文目です。'

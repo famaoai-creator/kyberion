@@ -129,6 +129,26 @@ describe('cursor-cli-reasoning-backend', () => {
     );
   });
 
+  it('forwards abort signals through the ordinary prompt path', async () => {
+    const envelope = JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: 'cancel-aware',
+    });
+    spawnMock.mockReturnValueOnce(createChild(envelope));
+    const controller = new AbortController();
+    const backend = new CursorCliReasoningBackend({ bin: 'cursor-agent' });
+
+    await expect(backend.prompt('hello', { signal: controller.signal })).resolves.toBe(
+      'cancel-aware'
+    );
+    expect(withWallClockBudgetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ signal: controller.signal }),
+      expect.any(Function)
+    );
+  });
+
   it('streams partial assistant messages without repeating Cursor final output', async () => {
     const stream = [
       {
