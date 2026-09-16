@@ -709,6 +709,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/realtime-media-session-architecture.md",
+      "tier": "public",
+      "size": 11765,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/runtime-surface-lifecycle-model.md",
       "tier": "public",
       "size": 3305,

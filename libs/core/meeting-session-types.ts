@@ -65,6 +65,15 @@ export interface TranscriptChunk {
   text: string;
   /** Best-effort speaker attribution (driver-dependent). */
   speaker_label?: string;
+  /** Stable session-local speaker identity, when the bridge provides one. */
+  speaker_id?: string;
+  /** Whether the speaker attribution is tentative or authoritative. */
+  speaker_status?: 'tentative' | 'authoritative';
+  /** Provenance of the speaker attribution. */
+  speaker_source?: 'caption' | 'diarization' | 'manual' | 'unknown';
+  /** Optional utterance offsets from the meeting/session clock. */
+  start_ms?: number;
+  end_ms?: number;
   /** STT confidence ∈ [0, 1]; absent when the backend doesn't expose one. */
   confidence?: number;
   /** Wall-clock ISO at the time of emission (audit-anchor). */

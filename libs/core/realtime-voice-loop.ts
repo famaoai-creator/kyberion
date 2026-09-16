@@ -24,8 +24,10 @@
  * metrics (listen/stt/llm/first-audio/speak).
  */
 
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { nowIso } from './foundation/time.js';
 import { checkMeetingParticipationConsent } from './meeting-participation-coordinator.js';
 import { startMicCapture, type MicCaptureOptions } from './mic-capture.js';
 import { pcmToWav } from './pcm-wav.js';
@@ -43,6 +45,11 @@ import { BargeInController } from './barge-in-controller.js';
 import type { TraceContext } from './src/trace.js';
 import type { StreamingSpeechToTextBridge } from './streaming-stt-bridge.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
+import {
+  MediaEventBuffer,
+  transcriptChunkToMediaEvent,
+  type MediaEvent,
+} from './realtime-media-session.js';
 
 export type RealtimeVoiceLoopState = 'listening' | 'thinking' | 'speaking';
 
@@ -138,6 +145,10 @@ export interface RealtimeVoiceLoopOptions {
   maxSegmentChars?: number;
   onEvent?: (event: RealtimeVoiceLoopEvent) => void;
   onTurn?: (turn: RealtimeVoiceLoopTurnResult) => void | Promise<void>;
+  /** Optional canonical event buffer factory for live projections. */
+  mediaEventBufferFactory?: (sessionId: string) => MediaEventBuffer;
+  /** Stable session id for the canonical event stream; generated when omitted. */
+  sessionId?: string;
 }
 
 export interface RealtimeVoiceLoopReport {
@@ -244,9 +255,29 @@ export async function startRealtimeVoiceLoop(
   const bargeInMinSpeechMs = options.bargeIn?.minSpeechMs ?? 250;
   const idleTimeoutMs = options.idleTimeoutMs ?? 120_000;
   const play = options.play ?? ((audioPath: string) => playAudioFile(audioPath));
+  const trace = options.trace;
+  const sessionId = options.sessionId?.trim() || `realtime-voice-${randomUUID()}`;
+  const mediaEventBuffer = options.mediaEventBufferFactory?.(sessionId);
+  const publishMediaEvent = (event: MediaEvent): void => {
+    try {
+      mediaEventBuffer?.append(event);
+    } catch (err: unknown) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logger.warn(`[realtime-voice-loop] media event observer failed: ${reason}`);
+      trace?.addEvent('realtime_voice.media_event_failed', { reason });
+    }
+  };
 
   const mic = await startMicCapture({ ...options.mic, sampleRateHz });
-  const trace = options.trace;
+  const loopStartedAt = Date.now();
+  publishMediaEvent({
+    event_id: `${sessionId}:started`,
+    session_id: sessionId,
+    type: 'session_started',
+    at_ms: 0,
+    emitted_at: nowIso(),
+    source: 'realtime-voice-loop',
+  });
   trace?.addEvent('realtime_voice.loop_start', {
     barge_in: bargeInEnabled,
     streaming_stt: Boolean(options.streamingStt),
@@ -335,6 +366,25 @@ export async function startRealtimeVoiceLoop(
       emitState(state);
       return;
     }
+    publishMediaEvent(
+      transcriptChunkToMediaEvent({
+        session_id: sessionId,
+        event_id: `${sessionId}:transcript:${turnIndex + 1}`,
+        segment_id: `${sessionId}:segment:${turnIndex + 1}`,
+        source:
+          sttMode === 'streaming'
+            ? options.streamingStt?.bridge_id || 'streaming-stt'
+            : 'batch-stt',
+        at_ms: Math.max(0, Date.now() - loopStartedAt),
+        chunk: {
+          utterance_id: `${sessionId}:utterance:${turnIndex + 1}`,
+          is_final: true,
+          text: userText,
+          emitted_at: nowIso(),
+          speaker_source: 'unknown',
+        },
+      })
+    );
 
     // 2. Assistant reply.
     const llmStartedAt = Date.now();
@@ -393,6 +443,17 @@ export async function startRealtimeVoiceLoop(
       emitState(state);
       return;
     }
+    publishMediaEvent({
+      event_id: `${sessionId}:assistant:${turnIndex + 1}`,
+      session_id: sessionId,
+      type: 'assistant_text_delta',
+      at_ms: Math.max(0, Date.now() - loopStartedAt),
+      emitted_at: nowIso(),
+      source: 'realtime-voice-loop',
+      text: assistantText,
+      is_final: true,
+      turn_id: `${sessionId}:turn:${turnIndex + 1}`,
+    });
 
     // 3. Speak, sentence-pipelined; barge-in watches the mic meanwhile.
     if (!speechResult) {
@@ -433,6 +494,16 @@ export async function startRealtimeVoiceLoop(
         speak_ms: speechResult.metrics.total_ms,
       },
     };
+    publishMediaEvent({
+      event_id: `${sessionId}:turn-completed:${turnIndex + 1}`,
+      session_id: sessionId,
+      type: 'turn_completed',
+      at_ms: Math.max(0, Date.now() - loopStartedAt),
+      emitted_at: nowIso(),
+      source: 'realtime-voice-loop',
+      turn_id: `${sessionId}:turn:${turnIndex + 1}`,
+      interrupted: speechResult.interrupted,
+    });
     trace?.addEvent('realtime_voice.turn', {
       turn: turnIndex,
       stt_mode: sttMode,
@@ -563,6 +634,15 @@ export async function startRealtimeVoiceLoop(
       if (speech) await speech.stop();
       if (pendingTurn) await pendingTurn;
       await segmenter.dispose();
+      publishMediaEvent({
+        event_id: `${sessionId}:ended`,
+        session_id: sessionId,
+        type: 'session_ended',
+        at_ms: Math.max(0, Date.now() - loopStartedAt),
+        emitted_at: nowIso(),
+        source: 'realtime-voice-loop',
+        reason: endedBy,
+      });
     }
     if (stopping && endedBy === 'stream_end') endedBy = 'stopped';
     trace?.addEvent('realtime_voice.loop_end', {
