@@ -7,6 +7,7 @@ status: active
 
 # コードベース改善計画 2026-08(索引)
 
+- [Local Pads 統合・永続化・デザイン改善計画](./LOCAL_PADS_UNIFICATION_PLAN_2026-09-14.ja.md): 8 pad を単一サーバーへ統合し、tenant・tier・本人境界に沿う保存先と履歴、共通 UI、既存データの copy 移行を LP-01〜08 に分割（MVP 実装済み、専用 adapter 統合は継続）。
 - [ヒアリングエージェントとトレーニング計画](./FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md): 相棒の「頼む」にキャンバス付きヒアリングモード(Web アプリ要件 → alignment gate → mission)、「使い方を見る」にレベル別トレーニングとテナント単位の組織展開。PR #736 の Companion Hub はデータ形(学びカタログ、要件ドラフト)だけ活かし、ページは共有レールに統合済みのため落とす(HT-00〜06)。
 - [フロントデスク再設計計画](./FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md): 秘書室 + 相棒を「ホーム / 頼む / 決める / 進み具合 / 設定」の共有レールに統合。テナント常時表示と narrowing 切替、`GET /api/me`、最小メンバー登録簿(オーナー / 承認者 / 閲覧、SSO なし)、開発者パネルの管制塔移設、人とエージェント(NHI)の役割分離(FD-00〜10)。
 - [テナントナレッジと actuator 活用の評価・改善計画](./TENANT_KNOWLEDGE_ACTUATOR_REVIEW_2026-09-11.ja.md): 配置階層の厳密化、機密テーマの tenant 限定、personal overlay の tier 分離、computer-use の操作後観測を実装。ブラウザ所有権監査と制作物の最終検証を次段として整理。
