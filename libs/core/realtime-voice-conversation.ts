@@ -74,6 +74,10 @@ export interface RealtimeVoiceConversationTurnInput {
   sourceId?: string;
   deliveryMode?: 'none' | 'artifact' | 'artifact_and_playback';
   personalVoiceMode?: 'allow_fallback' | 'require_personal_voice';
+  /** Optional governed reasoning tier; `fast` is appropriate for live speech. */
+  reasoningModelTier?: 'fast' | 'standard' | 'deep';
+  /** Optional provider-supported effort hint for latency-sensitive replies. */
+  reasoningEffort?: 'low' | 'medium' | 'high';
 }
 
 export interface RealtimeVoiceConversationTurnResult {
@@ -308,6 +312,13 @@ export interface RealtimeVoiceSynthesisInput {
   requestTag?: string;
 }
 
+export interface RealtimeVoiceReplyOptions {
+  /** Forward the governed model tier to the active reasoning route. */
+  modelTier?: 'fast' | 'standard' | 'deep';
+  /** Forward the provider-supported effort hint to the active reasoning route. */
+  effort?: 'low' | 'medium' | 'high';
+}
+
 /**
  * Executes a voice-actuator payload and returns its parsed JSON result.
  * The default spawns the actuator one-shot; a warm serve-mode client
@@ -422,15 +433,23 @@ async function synthesizeAssistantVoice(input: {
  */
 export async function generateRealtimeAssistantReply(
   sessionId: string,
-  userText: string
+  userText: string,
+  options?: RealtimeVoiceReplyOptions
 ): Promise<string> {
   const session = loadRealtimeVoiceConversationSession(normalizeSessionId(sessionId));
   if (!session) {
     throw new Error(`Realtime voice conversation session not found: ${sessionId}`);
   }
   const backend = getReasoningBackend();
+  const reasoningOptions = {
+    ...(options?.modelTier ? { model_tier: options.modelTier } : {}),
+    ...(options?.effort ? { effort: options.effort } : {}),
+  };
   const assistantText = normalizeRealtimeVoiceReply(
-    await backend.prompt(buildRealtimeVoiceReplyPrompt(session, userText))
+    await backend.prompt(
+      buildRealtimeVoiceReplyPrompt(session, userText),
+      Object.keys(reasoningOptions).length ? reasoningOptions : undefined
+    )
   );
   if (!assistantText) {
     throw new Error(
@@ -449,7 +468,8 @@ export async function streamRealtimeAssistantReply(
   sessionId: string,
   userText: string,
   onSegment: RealtimeVoiceReplySegmentHandler,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: RealtimeVoiceReplyOptions
 ): Promise<string> {
   const session = loadRealtimeVoiceConversationSession(normalizeSessionId(sessionId));
   if (!session) {
@@ -457,10 +477,21 @@ export async function streamRealtimeAssistantReply(
   }
   const backend = getReasoningBackend();
   const prompt = buildRealtimeVoiceReplyPrompt(session, userText);
+  const reasoningOptions = {
+    ...(options?.modelTier ? { model_tier: options.modelTier } : {}),
+    ...(options?.effort ? { effort: options.effort } : {}),
+    ...(signal ? { signal } : {}),
+  };
   const source = backend.streamPrompt
-    ? backend.streamPrompt(prompt, signal ? { signal } : undefined)
+    ? backend.streamPrompt(
+        prompt,
+        Object.keys(reasoningOptions).length ? reasoningOptions : undefined
+      )
     : (async function* fallback(): AsyncGenerator<string> {
-        yield await backend.prompt(prompt, signal ? { signal } : undefined);
+        yield await backend.prompt(
+          prompt,
+          Object.keys(reasoningOptions).length ? reasoningOptions : undefined
+        );
       })();
 
   let rawText = '';
@@ -561,8 +592,15 @@ export async function runRealtimeVoiceConversationTurn(
   }
 
   const backend = getReasoningBackend();
+  const reasoningOptions = {
+    ...(input.reasoningModelTier ? { model_tier: input.reasoningModelTier } : {}),
+    ...(input.reasoningEffort ? { effort: input.reasoningEffort } : {}),
+  };
   const assistantText = normalizeRealtimeVoiceReply(
-    await backend.prompt(buildRealtimeVoiceReplyPrompt(session, userText))
+    await backend.prompt(
+      buildRealtimeVoiceReplyPrompt(session, userText),
+      Object.keys(reasoningOptions).length ? reasoningOptions : undefined
+    )
   );
   if (!assistantText) {
     throw new Error(
