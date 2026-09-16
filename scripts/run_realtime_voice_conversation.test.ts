@@ -92,6 +92,17 @@ describe('run_realtime_voice_conversation cli', () => {
     ).toThrow(/--speech-segment-chars/);
   });
 
+  it('preserves fractional fixed-record durations instead of truncating them to zero', () => {
+    const parsed = parseRealtimeVoiceConversationCli({
+      'session-id': 'rtc-fractional-record',
+      interactive: true,
+      mission: 'MSN-CLI-TEST-FRACTIONAL',
+      'record-seconds': 0.5,
+    });
+
+    expect(parsed.recordSeconds).toBe(0.5);
+  });
+
   it('parses VAD recorder overrides and rejects invalid values', () => {
     const parsed = parseRealtimeVoiceConversationCli({
       'session-id': 'rtc-2',
