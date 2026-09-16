@@ -129,6 +129,42 @@ describe('cursor-cli-reasoning-backend', () => {
     );
   });
 
+  it('streams partial assistant messages without repeating Cursor final output', async () => {
+    const stream = [
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: '準備' }] },
+        session_id: 'sess-stream',
+        timestamp_ms: 1,
+      },
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'できています。' }] },
+        session_id: 'sess-stream',
+        timestamp_ms: 2,
+      },
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: '準備できています。' }] },
+        session_id: 'sess-stream',
+      },
+      { type: 'result', subtype: 'success', is_error: false, result: '準備できています。' },
+    ]
+      .map((entry) => JSON.stringify(entry))
+      .join('\n');
+    spawnMock.mockReturnValueOnce(createChild(`${stream}\n`));
+
+    const backend = new CursorCliReasoningBackend({ bin: 'cursor-agent', model: 'auto' });
+    const deltas: string[] = [];
+    for await (const delta of backend.streamPrompt('hello')) deltas.push(delta);
+
+    expect(deltas).toEqual(['準備', 'できています。']);
+    const [, args] = spawnMock.mock.calls[0];
+    expect(args).toEqual(
+      expect.arrayContaining(['--output-format', 'stream-json', '--stream-partial-output'])
+    );
+  });
+
   it('parses structured JSON from the envelope result field', async () => {
     const envelope = JSON.stringify({
       type: 'result',

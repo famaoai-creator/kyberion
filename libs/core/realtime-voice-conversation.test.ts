@@ -204,17 +204,21 @@ describe('realtime voice conversation', () => {
     };
     registerSpeechToTextBridge(fakeStt);
     let promptText = '';
+    let promptOptions: unknown;
+    let streamOptions: unknown;
     registerReasoningBackend({
       ...stubReasoningBackend,
       name: 'fake-reasoner',
+      async prompt(prompt, options) {
+        promptText = prompt;
+        promptOptions = options;
+        return '今日はレビューと実装を進めます。';
+      },
       async delegateTask() {
         throw new Error('realtime voice must use the low-latency prompt path');
       },
-      async prompt(prompt) {
-        promptText = prompt;
-        return '今日はレビューと実装を進めます。';
-      },
-      async *streamPrompt() {
+      async *streamPrompt(_prompt, options) {
+        streamOptions = options;
         yield 'ストリームの';
         yield '返答です。';
       },
@@ -232,6 +236,7 @@ describe('realtime voice conversation', () => {
       sessionId: 'rtc-1',
       audioPath: 'active/shared/tmp/fake-input.wav',
       deliveryMode: 'none',
+      reasoningModelTier: 'fast',
     });
 
     expect(result.user_text).toBe('今日の予定を教えて');
@@ -239,6 +244,7 @@ describe('realtime voice conversation', () => {
     expect(promptText).toContain('160 characters');
     expect(promptText).toContain('Do not mention internal processing');
     expect(result.profile_id).toBe('me-ja');
+    expect(promptOptions).toEqual({ model_tier: 'fast' });
     const saved = JSON.parse(
       safeReadFile(result.transcript_path, { encoding: 'utf8' }) as string
     ) as {
@@ -248,11 +254,16 @@ describe('realtime voice conversation', () => {
     expect(saved.transcript?.[1]?.speaker).toBe('assistant');
 
     const streamedSegments: string[] = [];
-    const streamed = await streamRealtimeAssistantReply('rtc-1', '続けて', (segment) =>
-      streamedSegments.push(segment)
+    const streamed = await streamRealtimeAssistantReply(
+      'rtc-1',
+      '続けて',
+      (segment) => streamedSegments.push(segment),
+      undefined,
+      { modelTier: 'fast' }
     );
     expect(streamed).toBe('ストリームの返答です。');
     expect(streamedSegments).toEqual(['ストリームの返答です。']);
+    expect(streamOptions).toEqual({ model_tier: 'fast' });
   });
 
   it('bounds provider output to a short spoken reply', () => {

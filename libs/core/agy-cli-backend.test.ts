@@ -125,6 +125,37 @@ describe('agy-cli-backend', () => {
     );
   });
 
+  it('streams AGY agent_response deltas and suppresses the final duplicate', async () => {
+    const stream = [
+      {
+        event: 'step_update',
+        step_update: {
+          step_type: 'agent_response',
+          text_delta: '準備',
+        },
+      },
+      {
+        event: 'step_update',
+        step_update: {
+          step_type: 'agent_response',
+          text_delta: 'できています。',
+        },
+      },
+      { event: 'result', result: { response: '準備できています。' } },
+    ]
+      .map((entry) => JSON.stringify(entry))
+      .join('\n');
+    spawnMock.mockReturnValueOnce(createChild(`${stream}\n`));
+
+    const backend = new AgyCliBackend({ bin: 'agy', model: 'agy' });
+    const deltas: string[] = [];
+    for await (const delta of backend.streamPrompt('hello')) deltas.push(delta);
+
+    expect(deltas).toEqual(['準備', 'できています。']);
+    const [, args] = spawnMock.mock.calls[0];
+    expect(args).toEqual(expect.arrayContaining(['--output-format', 'stream-json']));
+  });
+
   it('rejects dangerous keys in structured AGY CLI output before schema access', async () => {
     spawnMock.mockReturnValueOnce(
       createChild('{"structured_output":{"constructor":{"polluted":true}}}')

@@ -57,6 +57,7 @@ import { parseSafeJsonInput } from './lib/json-input.js';
 type DeliveryMode = 'none' | 'artifact' | 'artifact_and_playback';
 type PersonalVoiceMode = 'allow_fallback' | 'require_personal_voice';
 type RecorderMode = 'vad' | 'fixed';
+type LatencyProfile = 'low_latency' | 'balanced';
 
 export interface RealtimeVoiceConversationCliOptions {
   sessionId: string;
@@ -69,6 +70,8 @@ export interface RealtimeVoiceConversationCliOptions {
   sourceId: string;
   deliveryMode: DeliveryMode;
   personalVoiceMode: PersonalVoiceMode;
+  /** Low-latency selects the governed fast reasoning tier and shorter turn/TTS boundaries. */
+  latencyProfile?: LatencyProfile;
   interactive: boolean;
   /** 'vad': endpoint-driven capture via mic-capture + EnergyVad. 'fixed': legacy fixed-duration python bridge. */
   recorder: RecorderMode;
@@ -105,6 +108,16 @@ export interface RealtimeVoiceConversationLoopDeps {
   recordTurnAudio?: (turnIndex: number) => Promise<string>;
   runTurn?: typeof runRealtimeVoiceConversationTurn;
   promptForContinue?: (message: string) => Promise<void>;
+}
+
+function reasoningModelTierForLatencyProfile(
+  profile: LatencyProfile | undefined
+): 'fast' | undefined {
+  return profile !== 'balanced' ? 'fast' : undefined;
+}
+
+function reasoningEffortForLatencyProfile(profile: LatencyProfile | undefined): 'low' | undefined {
+  return profile !== 'balanced' ? 'low' : undefined;
 }
 
 function resolvePythonBin(env: NodeJS.ProcessEnv = process.env): string {
@@ -398,6 +411,8 @@ export async function runRealtimeVoiceConversationInteractive(
       sourceId: options.sourceId,
       deliveryMode: options.deliveryMode,
       personalVoiceMode: options.personalVoiceMode,
+      reasoningModelTier: reasoningModelTierForLatencyProfile(options.latencyProfile),
+      reasoningEffort: reasoningEffortForLatencyProfile(options.latencyProfile),
     });
 
     print(`User: ${result.user_text}`);
@@ -595,9 +610,16 @@ export async function runRealtimeVoiceConversationLoop(
       consent: { missionId: options.mission },
       ...(streamingStt ? { streamingStt } : {}),
       transcribe: async (audioPath) => (await sttBridge.transcribe({ audioPath, language })).text,
-      reply: (userText) => generateRealtimeAssistantReply(session.session_id, userText),
+      reply: (userText) =>
+        generateRealtimeAssistantReply(session.session_id, userText, {
+          modelTier: reasoningModelTierForLatencyProfile(options.latencyProfile),
+          effort: reasoningEffortForLatencyProfile(options.latencyProfile),
+        }),
       streamReply: (userText, _turn, onSegment, signal) =>
-        streamRealtimeAssistantReply(session.session_id, userText, onSegment, signal),
+        streamRealtimeAssistantReply(session.session_id, userText, onSegment, signal, {
+          modelTier: reasoningModelTierForLatencyProfile(options.latencyProfile),
+          effort: reasoningEffortForLatencyProfile(options.latencyProfile),
+        }),
       synthesizeSegment,
       ...(streamingTts
         ? {
@@ -662,6 +684,8 @@ async function runOneShotConversation(
     sourceId: options.sourceId,
     deliveryMode: options.deliveryMode,
     personalVoiceMode: options.personalVoiceMode,
+    reasoningModelTier: reasoningModelTierForLatencyProfile(options.latencyProfile),
+    reasoningEffort: reasoningEffortForLatencyProfile(options.latencyProfile),
   });
   print(JSON.stringify(result, null, 2));
 }
@@ -681,6 +705,13 @@ export function parseRealtimeVoiceConversationCli(
     throw new Error('--mission is required for interactive recording consent');
   }
 
+  const latencyProfile = String(argv['latency-profile'] ?? 'low_latency') as LatencyProfile;
+  if (latencyProfile !== 'low_latency' && latencyProfile !== 'balanced') {
+    throw new Error(
+      `--latency-profile must be 'low_latency' or 'balanced' (got ${String(argv['latency-profile'])})`
+    );
+  }
+
   const recordSeconds = Number(argv['record-seconds'] ?? 8);
   if (!Number.isFinite(recordSeconds) || recordSeconds <= 0) {
     throw new Error('--record-seconds must be a positive number');
@@ -696,7 +727,9 @@ export function parseRealtimeVoiceConversationCli(
     throw new Error('--max-utterance-seconds must be a positive number');
   }
 
-  const vadEndpointMs = Number(argv['vad-endpoint-ms'] ?? 700);
+  const vadEndpointMs = Number(
+    argv['vad-endpoint-ms'] ?? (latencyProfile === 'low_latency' ? 500 : 700)
+  );
   if (!Number.isFinite(vadEndpointMs) || vadEndpointMs <= 0) {
     throw new Error('--vad-endpoint-ms must be a positive number');
   }
@@ -725,6 +758,7 @@ export function parseRealtimeVoiceConversationCli(
     deliveryMode: (argv['delivery-mode'] as DeliveryMode) || 'artifact_and_playback',
     personalVoiceMode:
       (argv['personal-voice-mode'] as PersonalVoiceMode) || 'require_personal_voice',
+    latencyProfile,
     interactive,
     recorder,
     recordSeconds: Math.floor(recordSeconds),
@@ -745,7 +779,9 @@ export function parseRealtimeVoiceConversationCli(
       return value;
     })(),
     speechSegmentChars: (() => {
-      const value = Number(argv['speech-segment-chars'] ?? 120);
+      const value = Number(
+        argv['speech-segment-chars'] ?? (latencyProfile === 'low_latency' ? 80 : 120)
+      );
       if (!Number.isFinite(value) || value <= 0) {
         throw new Error('--speech-segment-chars must be a positive number');
       }
@@ -798,6 +834,13 @@ export async function main(
       choices: ['allow_fallback', 'require_personal_voice'] as const,
       default: 'require_personal_voice',
     })
+    .option('latency-profile', {
+      type: 'string',
+      choices: ['low_latency', 'balanced'] as const,
+      default: 'low_latency',
+      describe:
+        'low_latency uses the governed fast reasoning tier; balanced keeps the configured default model',
+    })
     .option('interactive', { type: 'boolean', default: false })
     .option('recorder', {
       type: 'string',
@@ -822,8 +865,8 @@ export async function main(
     })
     .option('vad-endpoint-ms', {
       type: 'number',
-      default: 700,
-      describe: 'Silence duration that ends an utterance in VAD mode',
+      describe:
+        'Silence duration that ends an utterance; low_latency defaults to 500ms, balanced to 700ms',
     })
     .option('mic-device', {
       type: 'string',
@@ -852,8 +895,8 @@ export async function main(
     })
     .option('speech-segment-chars', {
       type: 'number',
-      default: 120,
-      describe: 'Max characters per sentence-level TTS segment',
+      describe:
+        'Max characters per sentence-level TTS segment; low_latency defaults to 80, balanced to 120',
     })
     .option('mission', {
       type: 'string',

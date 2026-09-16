@@ -19,6 +19,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import * as readline from 'node:readline';
 import { childDelegationEnv } from './operation-policy-gate.js';
 import {
   buildProviderChildEnv,
@@ -56,6 +57,7 @@ import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import type {
   ReasoningBackend,
   ReasoningCallOptions,
+  ReasoningTextStream,
   DivergeHypothesisInput,
   HypothesisSketch,
   CritiqueInput,
@@ -472,6 +474,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
        */
       profile?: ProviderPermissionProfileName;
       advisory?: boolean;
+      effort?: 'low' | 'medium' | 'high';
       signal?: AbortSignal;
     }
   ): Promise<string> {
@@ -485,6 +488,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       `${instruction}\n\nContext: ${context ?? 'none'}`,
       '--model',
       model,
+      ...(options?.effort ? ['--effort', options.effort] : []),
       ...permissionArgs,
       ...this.extraArgs,
     ];
@@ -496,9 +500,145 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     options?: {
       model_tier?: 'fast' | 'standard' | 'deep';
       profile?: ProviderPermissionProfileName;
+      effort?: 'low' | 'medium' | 'high';
     }
   ): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
+  }
+
+  /**
+   * Stream text deltas from the Claude CLI when the installed CLI supports
+   * partial messages. Keeping this in the provider adapter lets the realtime
+   * voice loop begin sentence-level TTS before the whole answer is complete.
+   */
+  streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
+    return this.streamPromptFromCli(prompt, options);
+  }
+
+  private async *streamPromptFromCli(
+    prompt: string,
+    options?: ReasoningCallOptions
+  ): ReasoningTextStream {
+    assertReasoningEgressAllowed(this.name);
+    if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
+
+    const model = resolveClaudeModelForTier(options?.model_tier, this.model);
+    const args = [
+      '-p',
+      '--verbose',
+      '--output-format',
+      'stream-json',
+      '--include-partial-messages',
+      '--model',
+      model,
+      ...(options?.effort ? ['--effort', options.effort] : []),
+      ...this.resolvePermissionArgs(options?.advisory ? 'planner' : undefined),
+      ...this.extraArgs,
+    ];
+    const child = spawn(this.bin, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      // Keep the same provider-scoped child environment as the batch path.
+      env: { ...buildProviderChildEnv({ provider: 'claude' }), ...childDelegationEnv() },
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => {
+      stderr = `${stderr}${chunk.toString()}`.slice(-2000);
+    });
+
+    const closePromise = new Promise<number>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (code) => resolve(code ?? 1));
+    });
+    const boundedClose = withWallClockBudget(
+      {
+        provider: 'claude',
+        budgetMs: this.timeoutMs,
+        child: delegationChildHandleFromChildProcess(child),
+        signal: options?.signal,
+      },
+      () => closePromise
+    );
+    // The stream reader below observes the same process shutdown. Attaching a
+    // handler immediately prevents an early timeout from becoming an
+    // unhandled rejection before the stdout iterator reaches its end.
+    void boundedClose.catch(() => undefined);
+
+    const onAbort = (): void => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+    };
+    options?.signal?.addEventListener('abort', onAbort, { once: true });
+    let emittedPartialText = false;
+    let yielded = false;
+    try {
+      child.stdin.write(prompt);
+      child.stdin.end();
+      const lines = readline.createInterface({ input: child.stdout });
+      try {
+        for await (const line of lines) {
+          if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
+          const parsed = parseSafeJsonInput(String(line), 'Claude CLI stream response');
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+          const record = parsed as Record<string, unknown>;
+          const event = record.event;
+          if (record.type === 'stream_event' && event && typeof event === 'object') {
+            const eventRecord = event as Record<string, unknown>;
+            const delta = eventRecord.delta;
+            if (eventRecord.type === 'content_block_delta' && delta && typeof delta === 'object') {
+              const deltaRecord = delta as Record<string, unknown>;
+              if (deltaRecord.type === 'text_delta' && typeof deltaRecord.text === 'string') {
+                emittedPartialText = true;
+                yielded = true;
+                yield deltaRecord.text;
+              }
+            }
+            continue;
+          }
+
+          // Older/newer CLI variants may omit partial events. Preserve the
+          // provider stream contract by yielding the final text exactly once.
+          if (!emittedPartialText && record.type === 'assistant') {
+            const message = record.message;
+            const content =
+              message && typeof message === 'object'
+                ? (message as Record<string, unknown>).content
+                : undefined;
+            if (Array.isArray(content)) {
+              const text = content
+                .filter((block): block is Record<string, unknown> =>
+                  Boolean(block && typeof block === 'object' && !Array.isArray(block))
+                )
+                .map((block) => (typeof block.text === 'string' ? block.text : ''))
+                .join('');
+              if (text) {
+                yielded = true;
+                yield text;
+              }
+            }
+          }
+          if (
+            !emittedPartialText &&
+            record.type === 'result' &&
+            typeof record.result === 'string'
+          ) {
+            yielded = true;
+            yield record.result;
+          }
+        }
+      } finally {
+        lines.close();
+      }
+
+      const exitCode = await boundedClose;
+      if (exitCode !== 0) {
+        throw new Error(
+          `[shell-claude-cli] streaming CLI exited with code ${exitCode}${stderr ? `. stderr: ${stderr}` : ''}`
+        );
+      }
+      if (!yielded) throw new Error('[shell-claude-cli] streaming CLI returned no text');
+    } finally {
+      options?.signal?.removeEventListener('abort', onAbort);
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+    }
   }
 
   /**
