@@ -15,6 +15,7 @@ import {
   safeExecResult,
   safeExistsSync,
   safeMkdir,
+  safeRmSync,
   safeReadFile,
   safeLstat,
   safeStat,
@@ -500,7 +501,20 @@ function renderWithSay(
   const artifactPath = resolveArtifactPath(options.requestId, options.format, options.outputPath);
   const artifactDir = path.dirname(artifactPath);
   safeMkdir(artifactDir, { recursive: true });
-  safeExec('say', ['-v', options.voice, '-r', String(options.rate), '-o', artifactPath, text]);
+  // macOS `say` cannot write WAV directly (`Opening output file failed: fmt?`).
+  // Render its native AIFF first, then transcode when the governed artifact
+  // contract asks for WAV (the default format used by realtime voice).
+  const nativeOutputPath = options.format === 'aiff' ? artifactPath : `${artifactPath}.say.aiff`;
+  safeExec('say', ['-v', options.voice, '-r', String(options.rate), '-o', nativeOutputPath, text]);
+  if (nativeOutputPath !== artifactPath) {
+    try {
+      safeExec('ffmpeg', ['-y', '-i', nativeOutputPath, '-acodec', 'pcm_s16le', artifactPath]);
+    } finally {
+      if (safeExistsSync(nativeOutputPath)) {
+        safeRmSync(nativeOutputPath, { force: true });
+      }
+    }
+  }
   return artifactPath;
 }
 
