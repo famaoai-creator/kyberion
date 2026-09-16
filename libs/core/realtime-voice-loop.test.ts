@@ -6,6 +6,7 @@ import { StubStreamingSpeechToTextBridge } from './streaming-stt-bridge.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
 import type { PlaybackHandle, PlaybackResult } from './audio-playback.js';
+import { MediaEventBuffer } from './realtime-media-session.js';
 
 const testDir = pathResolver.sharedTmp('realtime-voice-loop-test');
 
@@ -51,6 +52,7 @@ describe('realtime voice loop', () => {
     async () => {
       const turns: RealtimeVoiceLoopTurnResult[] = [];
       const synthesized: string[] = [];
+      const mediaEvents: string[] = [];
 
       const handle = await startRealtimeVoiceLoop({
         recordingDir: testDir,
@@ -71,6 +73,12 @@ describe('realtime voice loop', () => {
         onTurn: (turn) => {
           turns.push(turn);
         },
+        sessionId: 'voice-session-1',
+        mediaEventBufferFactory: (sessionId) => {
+          const buffer = new MediaEventBuffer(sessionId, 32);
+          buffer.subscribe((event) => mediaEvents.push(event.type));
+          return buffer;
+        },
       });
 
       const report = await handle.done;
@@ -84,6 +92,11 @@ describe('realtime voice loop', () => {
       expect(turns[0].interrupted).toBe(false);
       expect(turns[0].audio_path).toBe(path.join(testDir, 'turn-01.wav'));
       expect(turns[1].audio_path).toBe(path.join(testDir, 'turn-02.wav'));
+      expect(mediaEvents[0]).toBe('session_started');
+      expect(mediaEvents).toContain('transcript_final');
+      expect(mediaEvents).toContain('assistant_text_delta');
+      expect(mediaEvents).toContain('turn_completed');
+      expect(mediaEvents.at(-1)).toBe('session_ended');
       // pre-roll (≤300ms) + 400ms speech + 700ms endpoint silence
       expect(turns[0].metrics.listen_ms).toBeGreaterThanOrEqual(1000);
       expect(turns[0].metrics.listen_ms).toBeLessThanOrEqual(1600);
