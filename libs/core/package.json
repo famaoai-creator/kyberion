@@ -1023,6 +1023,10 @@
       "types": "./dist/realtime-voice-loop.d.ts",
       "default": "./dist/realtime-voice-loop.js"
     },
+    "./realtime-media-session": {
+      "types": "./dist/realtime-media-session.d.ts",
+      "default": "./dist/realtime-media-session.js"
+    },
     "./vad-turn-recorder": {
       "types": "./dist/vad-turn-recorder.d.ts",
       "default": "./dist/vad-turn-recorder.js"
@@ -2898,6 +2902,10 @@
     "./realtime-voice-conversation": {
       "types": "./dist/realtime-voice-conversation.d.ts",
       "default": "./dist/realtime-voice-conversation.js"
+    },
+    "./realtime-voice-preferences": {
+      "types": "./dist/realtime-voice-preferences.d.ts",
+      "default": "./dist/realtime-voice-preferences.js"
     },
     "./ten-vad-bridge": {
       "types": "./dist/ten-vad-bridge.d.ts",

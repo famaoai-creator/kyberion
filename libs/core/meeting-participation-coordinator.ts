@@ -41,6 +41,11 @@ import type {
   TranscriptChunk,
 } from './meeting-session-types.js';
 import { abortableAudioChunks } from './meeting-session-types.js';
+import {
+  MediaEventBuffer,
+  transcriptChunkToMediaEvent,
+  type MediaEvent,
+} from './realtime-media-session.js';
 import { BargeInController } from './barge-in-controller.js';
 import { loadVoiceConsentAtPath, validateVoiceConsentRecord } from './voice-consent.js';
 
@@ -96,6 +101,12 @@ export interface MeetingParticipationOptions {
    * Throwing here fails the run — keep handlers non-throwing.
    */
   onSession?: (session: MeetingSession) => void;
+  /**
+   * Optional canonical media-event buffer factory. The factory runs after the
+   * driver assigns its session id, so observers can subscribe before the
+   * lifecycle and transcript events are published.
+   */
+  media_event_buffer_factory?: (session_id: string) => MediaEventBuffer;
 }
 
 export interface MeetingParticipationReport {
@@ -289,6 +300,24 @@ export class MeetingParticipationCoordinator {
     }
 
     const joinedAt = session.state.joined_at ?? nowIso();
+    const mediaEventBuffer = options.media_event_buffer_factory?.(session.state.session_id);
+    const publishMediaEvent = (event: MediaEvent): void => {
+      try {
+        mediaEventBuffer?.append(event);
+      } catch (err: unknown) {
+        const reason = err instanceof Error ? err.message : String(err);
+        logger.warn(`[participation-coordinator] media event observer failed: ${reason}`);
+        this.deps.trace?.addEvent('meeting_participation.media_event_failed', { reason });
+      }
+    };
+    publishMediaEvent({
+      event_id: `meeting:${session.state.session_id}:started`,
+      session_id: session.state.session_id,
+      type: 'session_started',
+      at_ms: 0,
+      emitted_at: joinedAt,
+      source: this.deps.driver.driver_id,
+    });
 
     // 2. Pick the transcript source: local STT over the inbound audio
     //    (default), or the driver's native caption stream (captions_first).
@@ -361,6 +390,16 @@ export class MeetingParticipationCoordinator {
         }
         if (!utterance.is_final) continue;
         utterancesReceived += 1;
+        publishMediaEvent(
+          transcriptChunkToMediaEvent({
+            session_id: session.state.session_id,
+            chunk: utterance,
+            event_id: `meeting:${session.state.session_id}:transcript:${utterancesReceived}`,
+            source: useDriverCaptions
+              ? `${this.deps.driver.driver_id}:captions`
+              : this.deps.stt.bridge_id,
+          })
+        );
         this.deps.trace?.addEvent('meeting_participation.transcript', {
           utterance_index: utterancesReceived,
           chars: utterance.text.length,
@@ -375,6 +414,16 @@ export class MeetingParticipationCoordinator {
           break;
         }
         if (decision.speech) {
+          publishMediaEvent({
+            event_id: `meeting:${session.state.session_id}:assistant:${utterancesReceived}`,
+            session_id: session.state.session_id,
+            type: 'assistant_text_delta',
+            at_ms: Date.now() - startedAt,
+            emitted_at: nowIso(),
+            source: 'meeting-participation-agent',
+            text: decision.speech,
+            is_final: true,
+          });
           if (useDriverCaptions) {
             // Caption mode has no synthesized-voice path — reply over chat.
             this.deps.trace?.addEvent('meeting_participation.chat_requested', {
@@ -452,6 +501,15 @@ export class MeetingParticipationCoordinator {
         session_id: session.state.session_id,
       });
       this.recordAudit('meeting_participation.leave', target, 'allowed');
+      publishMediaEvent({
+        event_id: `meeting:${session.state.session_id}:ended`,
+        session_id: session.state.session_id,
+        type: 'session_ended',
+        at_ms: Date.now() - startedAt,
+        emitted_at: session.state.left_at ?? nowIso(),
+        source: this.deps.driver.driver_id,
+        reason: endedByTimeout ? 'timeout' : 'completed',
+      });
       try {
         await this.deps.vad?.dispose?.();
       } catch (err: unknown) {

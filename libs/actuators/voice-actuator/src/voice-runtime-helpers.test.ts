@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeStat: vi.fn(() => ({ size: 4096 })),
   safeMkdir: vi.fn(),
+  safeRmSync: vi.fn(),
   safeExecResult: vi.fn(() => ({
     status: 0,
     stdout: '{"status":"success","output_path":"/tmp/espeak-ng-fallback.wav"}',
@@ -197,6 +198,7 @@ vi.mock('@agent/core/secure-io', async () => {
     safeExecResult: mocks.safeExecResult,
     safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
+    safeRmSync: mocks.safeRmSync,
     safeReadFile: mocks.safeReadFile,
     safeLstat: mocks.safeLstat,
     safeStat: mocks.safeStat,
@@ -313,6 +315,40 @@ describe('voice runtime helpers', () => {
 
   // darwin-only: exercises the macOS say → espeak fallback chain; the engine
   // records themselves declare mlx/say as darwin platforms.
+  it.skipIf(process.platform !== 'darwin')(
+    'transcodes macOS say AIFF output to the governed WAV artifact',
+    async () => {
+      const { renderNativeArtifact } = await import('./voice-runtime-helpers.js');
+
+      const outputPath = '/tmp/kyberion-say-wav.wav';
+      const artifactPath = await renderNativeArtifact('WAVに変換します。', {
+        requestId: 'say-wav-test',
+        voice: 'Kyoko',
+        rate: 170,
+        language: 'ja',
+        format: 'wav',
+        engineId: 'local_say',
+        supportsFormats: ['wav', 'aiff'],
+        outputPath,
+      });
+
+      expect(artifactPath).toBe(outputPath);
+      expect(mocks.safeExec).toHaveBeenCalledWith(
+        'say',
+        expect.arrayContaining(['-o', `${outputPath}.say.aiff`])
+      );
+      expect(mocks.safeExec).toHaveBeenCalledWith('ffmpeg', [
+        '-y',
+        '-i',
+        `${outputPath}.say.aiff`,
+        '-acodec',
+        'pcm_s16le',
+        outputPath,
+      ]);
+      expect(mocks.safeRmSync).toHaveBeenCalledWith(`${outputPath}.say.aiff`, { force: true });
+    }
+  );
+
   it.skipIf(process.platform !== 'darwin')(
     'falls back to a configured engine when say produces a zero-length artifact',
     async () => {

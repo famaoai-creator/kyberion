@@ -1260,6 +1260,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.voice.conversation-config",
+      "script": "voice:conversation-config",
+      "command": "voice conversation-config",
+      "noun": "voice",
+      "verb": "conversation-config",
+      "audience": "operator"
+    },
+    {
       "id": "script.typecheck",
       "script": "typecheck",
       "command": "typecheck default",

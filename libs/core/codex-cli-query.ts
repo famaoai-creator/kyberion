@@ -25,6 +25,7 @@ import {
 export interface CodexCliQueryOptions {
   bin?: string;
   model?: string;
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
   timeoutMs?: number;
   extraArgs?: string[];
   cwd?: string;
@@ -116,6 +117,7 @@ class CodexCliQuery {
         ...sandboxArgs,
         '--model',
         this.model,
+        ...(this.options.effort ? ['-c', `model_reasoning_effort=${this.options.effort}`] : []),
         '--output-schema',
         schemaPath,
         '--output-last-message',
@@ -233,6 +235,15 @@ class CodexCliQuery {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return path.join(pathResolver.sharedTmp(), `kyberion-${prefix}-${id}.${extension}`);
   }
+}
+
+/** Map the provider-neutral live voice tier to Codex's fast model family. */
+export function resolveCodexModelForTier(
+  tier: 'fast' | 'standard' | 'deep' | undefined,
+  defaultModel: string
+): string {
+  if (tier === 'fast') return 'gpt-5.6-luna';
+  return defaultModel;
 }
 
 function assertRegularCodexOutputPath(outputPath: string): void {

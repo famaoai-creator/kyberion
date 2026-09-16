@@ -9,6 +9,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import * as readline from 'node:readline';
 import { z } from 'zod';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -59,6 +60,7 @@ import type {
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
   ReasoningCallOptions,
+  ReasoningTextStream,
 } from './reasoning-backend.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
@@ -108,6 +110,17 @@ export function resolveCursorModelForTier(
 
 function isNamedModelUnavailableError(message: string): boolean {
   return /named models unavailable|free plans can only use auto/iu.test(message);
+}
+
+function resolveCursorModelForEffort(
+  model: string,
+  effort?: ReasoningCallOptions['effort']
+): string {
+  if (!effort || model === 'auto') return model;
+  if (model.includes('[') && model.endsWith(']')) {
+    return `${model.slice(0, -1)},effort=${effort}]`;
+  }
+  return `${model}[effort=${effort}]`;
 }
 
 function validateExtraArgs(args: readonly string[]): string[] {
@@ -255,25 +268,143 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     return this.complete(
       STRUCTURED_REASONING_SYSTEM_PROMPT,
       [context ? `Context: ${context}` : '', `Task: ${instruction}`].filter(Boolean).join('\n\n'),
-      { profile, signal: options?.signal, model: options?.model }
+      {
+        profile,
+        signal: options?.signal,
+        model: options?.model,
+        effort: options?.effort,
+      }
     );
   }
 
-  async prompt(
-    prompt: string,
-    options?: {
-      model_tier?: 'fast' | 'standard' | 'deep';
-      profile?: ProviderPermissionProfileName;
-    }
-  ): Promise<string> {
+  async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     return this.complete(
       'You are a focused reasoning sub-agent. Return a concise, factual answer.',
       prompt,
       {
-        profile: options?.profile ?? 'planner',
-        model: resolveCursorModelForTier(options?.model_tier, this.model),
+        profile: normalizePermissionProfile(options?.profile) ?? 'planner',
+        model: resolveCursorModelForEffort(
+          options?.model ?? resolveCursorModelForTier(options?.model_tier, this.model),
+          options?.effort
+        ),
       }
     );
+  }
+
+  /**
+   * Stream Cursor's partial assistant messages for latency-sensitive callers.
+   * The final assistant message is deliberately ignored after partial output;
+   * Cursor emits that message as a complete duplicate of the partial stream.
+   */
+  streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
+    return this.streamPromptFromCli(prompt, options);
+  }
+
+  private async *streamPromptFromCli(
+    prompt: string,
+    options?: ReasoningCallOptions
+  ): ReasoningTextStream {
+    assertReasoningEgressAllowed(this.name);
+    if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
+
+    const model = resolveCursorModelForEffort(
+      options?.model ?? resolveCursorModelForTier(options?.model_tier, this.model),
+      options?.effort
+    );
+    const args = [
+      '-p',
+      '--output-format',
+      'stream-json',
+      '--stream-partial-output',
+      '--model',
+      model,
+      '--trust',
+      '--workspace',
+      this.workspaceDir,
+      ...this.resolvePermissionArgs(options?.advisory ? 'planner' : undefined),
+      ...this.extraArgs,
+      prompt,
+    ];
+    const child = spawn(this.bin, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...buildProviderChildEnv({ provider: 'cursor' }), ...childDelegationEnv() },
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => {
+      stderr = `${stderr}${chunk.toString()}`.slice(-2000);
+    });
+    const closePromise = new Promise<number>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (code) => resolve(code ?? 1));
+    });
+    const boundedClose = withWallClockBudget(
+      {
+        provider: 'cursor',
+        budgetMs: this.timeoutMs,
+        child: delegationChildHandleFromChildProcess(child),
+        signal: options?.signal,
+      },
+      () => closePromise
+    );
+    void boundedClose.catch(() => undefined);
+    const onAbort = (): void => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+    };
+    options?.signal?.addEventListener('abort', onAbort, { once: true });
+    let emittedPartialText = false;
+    let yielded = false;
+    try {
+      child.stdin.end();
+      const lines = readline.createInterface({ input: child.stdout });
+      try {
+        for await (const line of lines) {
+          if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
+          const parsed = parseSafeJsonInput(String(line), 'Cursor CLI stream response');
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+          const record = parsed as Record<string, unknown>;
+          if (typeof record.session_id === 'string' && record.session_id.trim()) {
+            this.sessionId = record.session_id.trim();
+          }
+          if (record.type !== 'assistant') continue;
+          const message = record.message;
+          const content =
+            message && typeof message === 'object'
+              ? (message as Record<string, unknown>).content
+              : undefined;
+          const text = Array.isArray(content)
+            ? content
+                .filter((block): block is Record<string, unknown> =>
+                  Boolean(block && typeof block === 'object' && !Array.isArray(block))
+                )
+                .map((block) => (typeof block.text === 'string' ? block.text : ''))
+                .join('')
+            : '';
+          if (!text) continue;
+          // Partial records carry timestamp_ms; the final assistant record
+          // does not and would otherwise repeat the complete streamed text.
+          if (typeof record.timestamp_ms === 'number') {
+            emittedPartialText = true;
+            yielded = true;
+            yield text;
+          } else if (!emittedPartialText) {
+            yielded = true;
+            yield text;
+          }
+        }
+      } finally {
+        lines.close();
+      }
+      const exitCode = await boundedClose;
+      if (exitCode !== 0) {
+        throw new Error(
+          `[cursor-cli] streaming CLI exited with code ${exitCode}${stderr ? `. stderr: ${stderr}` : ''}`
+        );
+      }
+      if (!yielded) throw new Error('[cursor-cli] streaming CLI returned no text');
+    } finally {
+      options?.signal?.removeEventListener('abort', onAbort);
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+    }
   }
 
   /** QM-06: drop the resumed CLI session on a failover switch. */
@@ -394,11 +525,15 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       profile?: ProviderPermissionProfileName;
       signal?: AbortSignal;
       model?: string;
+      effort?: ReasoningCallOptions['effort'];
       shapeHint?: string;
     }
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
-    const model = options?.model?.trim() || this.model;
+    const model = resolveCursorModelForEffort(
+      options?.model?.trim() || this.model,
+      options?.effort
+    );
     const hint = options?.shapeHint?.trim()
       ? `\n\nRespond with exactly this JSON shape (top-level keys, nesting, and field names must match): ${options.shapeHint.trim()}`
       : '';

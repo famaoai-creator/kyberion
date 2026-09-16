@@ -120,6 +120,7 @@
 - [Provider CLI Capability Report](./product/architecture/provider-cli-capability-report.md) (public | Unknown)
 - [Provider Capability Scan Framework](./product/architecture/provider-capability-scan-framework.md) (public | Unknown)
 - [Provider Native Capability Bridge](./product/architecture/provider-native-capability-bridge.md) (public | Unknown)
+- [Realtime Media Session, Meeting Intelligence, and Avatar Model](./product/architecture/realtime-media-session-architecture.md) (public | Ecosystem Architect)
 - [SDLC Gating Model](./product/architecture/sdlc-gating-model.md) (public | Kyberion)
 - [Satellite Architecture Model (Hybrid-C)](./product/architecture/satellite-model.md) (public | Unknown)
 - [Secret Mutation Approval Model](./product/architecture/secret-mutation-approval-model.md) (public | Ecosystem Architect)
@@ -599,6 +600,7 @@
 - [WebView Session Handoff](./product/schemas/README-webview-session-handoff.md) (public | Unknown)
 
 ## 📁 product/voice
+- [Realtime voice conversation operations](./product/voice/realtime-voice-conversation-operations.md) (public | Unknown)
 - [音声ペルソナ定義 (Voice Persona Definitions)](./product/voice/persona_definitions.md) (public | Ecosystem Architect)
 
 ## 📁 public/accessibility

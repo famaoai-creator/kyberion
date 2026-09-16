@@ -123,6 +123,45 @@ describe('reasoning-backend', () => {
     expect(calls).toEqual(['primary', 'fallback']);
   });
 
+  it('does not send a provider-bound exact model to a different failover provider', async () => {
+    let primaryOptions: unknown;
+    let fallbackOptions: unknown;
+    const backend = buildFailoverReasoningBackend([
+      {
+        label: 'codex-cli',
+        provider: 'codex',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async (_prompt, options) => {
+            primaryOptions = options;
+            throw new Error('selected model is unavailable');
+          },
+        },
+      },
+      {
+        label: 'claude-cli',
+        provider: 'claude',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async (_prompt, options) => {
+            fallbackOptions = options;
+            return 'fallback reply';
+          },
+        },
+      },
+    ]);
+
+    await expect(
+      backend.prompt('hello', {
+        model: 'gpt-5.6-luna',
+        model_tier: 'fast',
+        effort: 'low',
+      })
+    ).resolves.toBe('fallback reply');
+    expect(primaryOptions).toEqual({ model: 'gpt-5.6-luna', model_tier: 'fast', effort: 'low' });
+    expect(fallbackOptions).toEqual({ model_tier: 'fast', effort: 'low' });
+  });
+
   it('retries transient failures in place before demoting the provider', async () => {
     process.env.KYBERION_REASONING_RETRY_BASE_MS = '0';
     clearProviderHealth();

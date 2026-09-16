@@ -36,9 +36,10 @@ describe('run_realtime_voice_conversation cli', () => {
     expect(parsed.sessionId).toBe('rtc-1');
     expect(parsed.interactive).toBe(true);
     expect(parsed.recorder).toBe('vad');
+    expect(parsed.latencyProfile).toBe('low_latency');
     expect(parsed.recordSeconds).toBe(8);
     expect(parsed.maxUtteranceSeconds).toBe(30);
-    expect(parsed.vadEndpointMs).toBe(700);
+    expect(parsed.vadEndpointMs).toBe(500);
     expect(parsed.vadThresholdRms).toBeUndefined();
     expect(parsed.deliveryMode).toBe('artifact_and_playback');
     expect(parsed.personalVoiceMode).toBe('require_personal_voice');
@@ -46,7 +47,7 @@ describe('run_realtime_voice_conversation cli', () => {
     expect(parsed.streamingStt).toBe(true);
     expect(parsed.warmActuator).toBe(true);
     expect(parsed.idleTimeoutSeconds).toBe(120);
-    expect(parsed.speechSegmentChars).toBe(120);
+    expect(parsed.speechSegmentChars).toBe(80);
     expect(parsed.mission).toBe('MSN-CLI-TEST-001');
     expect(parsed.vadBackend).toBeUndefined();
   });
@@ -57,6 +58,7 @@ describe('run_realtime_voice_conversation cli', () => {
       interactive: true,
       'barge-in': true,
       'vad-backend': 'silero',
+      'latency-profile': 'balanced',
       'streaming-stt': false,
       'warm-actuator': false,
       mission: 'MSN-CLI-TEST-002',
@@ -64,6 +66,9 @@ describe('run_realtime_voice_conversation cli', () => {
     });
     expect(parsed.bargeIn).toBe(true);
     expect(parsed.vadBackend).toBe('silero');
+    expect(parsed.latencyProfile).toBe('balanced');
+    expect(parsed.vadEndpointMs).toBe(700);
+    expect(parsed.speechSegmentChars).toBe(120);
     expect(parsed.streamingStt).toBe(false);
     expect(parsed.warmActuator).toBe(false);
     expect(parsed.mission).toBe('MSN-CLI-TEST-002');
