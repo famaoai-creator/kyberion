@@ -139,6 +139,36 @@ describe('realtime voice loop', () => {
     expect(batchCalls).toBe(0);
   });
 
+  it('keeps capture identities unique when an empty transcript is skipped', async () => {
+    const mediaEvents: string[] = [];
+    let transcriptionCalls = 0;
+    const turns: RealtimeVoiceLoopTurnResult[] = [];
+    const handle = await startRealtimeVoiceLoop({
+      recordingDir: testDir,
+      consent: { requireRecordingConsent: false },
+      mic: { command: twoUtteranceCommand(), sampleRateHz: 16000, chunkMs: 100 },
+      vad: { rmsThreshold: 800, endpointMs: 700 },
+      maxTurns: 1,
+      transcribe: async () => (transcriptionCalls++ === 0 ? '' : '二回目'),
+      reply: async () => '了解です。',
+      synthesizeSegment: async () => '/tmp/fake.wav',
+      play: () => immediateHandle(),
+      onTurn: (turn) => turns.push(turn),
+      sessionId: 'voice-empty-transcript-session',
+      mediaEventBufferFactory: (sessionId) => {
+        const buffer = new MediaEventBuffer(sessionId, 32);
+        buffer.subscribe((event) => mediaEvents.push(event.type));
+        return buffer;
+      },
+    });
+
+    const report = await handle.done;
+    expect(report.turns_completed).toBe(1);
+    expect(turns[0]?.audio_path).toBe(path.join(testDir, 'turn-02.wav'));
+    expect(mediaEvents.filter((event) => event === 'speech_started')).toHaveLength(2);
+    expect(mediaEvents.filter((event) => event === 'speech_ended')).toHaveLength(2);
+  }, 60_000);
+
   it(
     'publishes streamed PCM output on the canonical media session event sink',
     {

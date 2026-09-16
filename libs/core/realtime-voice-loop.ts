@@ -296,6 +296,7 @@ export async function startRealtimeVoiceLoop(
 
   let stopping = false;
   let turnsCompleted = 0;
+  let segmentsCaptured = 0;
   let interruptions = 0;
   let endedBy: RealtimeVoiceLoopReport['ended_by'] = 'stream_end';
   let loopError: string | undefined;
@@ -619,7 +620,7 @@ export async function startRealtimeVoiceLoop(
           }
           if (result.onset) {
             publishMediaEvent({
-              event_id: `${sessionId}:speech-started:${turnsCompleted + 1}`,
+              event_id: `${sessionId}:speech-started:${segmentsCaptured + 1}`,
               session_id: sessionId,
               type: 'speech_started',
               at_ms: Math.max(0, Date.now() - loopStartedAt),
@@ -633,7 +634,9 @@ export async function startRealtimeVoiceLoop(
             emitState(state);
             const feed = sttFeed;
             sttFeed = null;
-            pendingTurn = processTurn(turnsCompleted, feed)
+            const turnIndex = segmentsCaptured;
+            segmentsCaptured += 1;
+            pendingTurn = processTurn(turnIndex, feed)
               .catch((err) => {
                 loopError = err instanceof Error ? err.message : String(err);
                 endedBy = 'error';

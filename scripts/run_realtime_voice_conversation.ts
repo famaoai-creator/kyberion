@@ -859,7 +859,7 @@ export function parseRealtimeVoiceConversationCli(
       : {}),
     interactive,
     recorder,
-    recordSeconds: Math.floor(recordSeconds),
+    recordSeconds,
     maxUtteranceSeconds,
     ...(vadThresholdRms !== undefined ? { vadThresholdRms } : {}),
     vadEndpointMs,
