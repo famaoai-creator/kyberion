@@ -134,6 +134,22 @@ function candidateLabel(candidate: ReasoningBackendCandidate): string {
   return candidate.label || candidate.backend.name || candidate.provider || 'unknown';
 }
 
+/** Exact model ids belong to the provider that resolved the primary route. */
+function optionsForCandidate(
+  candidates: readonly ReasoningBackendCandidate[],
+  candidate: ReasoningBackendCandidate,
+  options?: ReasoningCallOptions
+): ReasoningCallOptions | undefined {
+  if (!options?.model || candidate === candidates[0]) return options;
+  const primaryProvider = normalizeProviderName(candidates[0]?.provider);
+  const candidateProvider = normalizeProviderName(candidate.provider);
+  if (primaryProvider && candidateProvider && primaryProvider === candidateProvider) {
+    return options;
+  }
+  const { model: _model, ...providerNeutralOptions } = options;
+  return providerNeutralOptions;
+}
+
 function recordReasoningPromptVisibility(
   content: string,
   options: ReasoningCallOptions | undefined,
@@ -362,7 +378,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
 
   private async runWithFailover<T>(
     operation: string,
-    invoke: (backend: ReasoningBackend) => Promise<T>,
+    invoke: (backend: ReasoningBackend, candidate: ReasoningBackendCandidate) => Promise<T>,
     signal?: AbortSignal
   ): Promise<T> {
     throwIfReasoningAborted(signal);
@@ -423,7 +439,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     operation: string,
     candidate: ReasoningBackendCandidate,
     provider: string | undefined,
-    invoke: (backend: ReasoningBackend) => Promise<T>,
+    invoke: (backend: ReasoningBackend, candidate: ReasoningBackendCandidate) => Promise<T>,
     signal?: AbortSignal
   ): Promise<{ ok: true; result: T } | { ok: false; message: string; stop: boolean }> {
     const maxInPlaceRetries = resolveInPlaceRetryCount(this.failoverPolicy.max_in_place_retries);
@@ -434,7 +450,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
           .egressEndpoint;
         if (endpoint) assertReasoningEgressAllowedAtEndpoint(candidate.backend.name, endpoint);
         else assertReasoningEgressAllowed(candidate.backend.name);
-        const result = await invoke(candidate.backend);
+        const result = await invoke(candidate.backend, candidate);
         if (provider) reportProviderHealthy(provider);
         try {
           metrics.record('reasoning:route-served', 0, 'success', {
@@ -505,14 +521,14 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: DivergeHypothesisInput,
     options?: ReasoningCallOptions
   ): Promise<HypothesisSketch[]> {
-    return this.runWithFailover('divergePersonas', (backend) =>
-      backend.divergePersonas(input, options)
+    return this.runWithFailover('divergePersonas', (backend, candidate) =>
+      backend.divergePersonas(input, optionsForCandidate(this.candidates, candidate, options))
     );
   }
 
   crossCritique(input: CritiqueInput, options?: ReasoningCallOptions): Promise<CritiqueResult> {
-    return this.runWithFailover('crossCritique', (backend) =>
-      backend.crossCritique(input, options)
+    return this.runWithFailover('crossCritique', (backend, candidate) =>
+      backend.crossCritique(input, optionsForCandidate(this.candidates, candidate, options))
     );
   }
 
@@ -520,21 +536,23 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: PersonaSynthesisInput,
     options?: ReasoningCallOptions
   ): Promise<SynthesizedPersona> {
-    return this.runWithFailover('synthesizePersona', (backend) =>
-      backend.synthesizePersona(input, options)
+    return this.runWithFailover('synthesizePersona', (backend, candidate) =>
+      backend.synthesizePersona(input, optionsForCandidate(this.candidates, candidate, options))
     );
   }
 
   forkBranches(input: BranchForkInput, options?: ReasoningCallOptions): Promise<ForkedBranch[]> {
-    return this.runWithFailover('forkBranches', (backend) => backend.forkBranches(input, options));
+    return this.runWithFailover('forkBranches', (backend, candidate) =>
+      backend.forkBranches(input, optionsForCandidate(this.candidates, candidate, options))
+    );
   }
 
   simulateBranches(
     input: SimulationInput,
     options?: ReasoningCallOptions
   ): Promise<SimulationResult> {
-    return this.runWithFailover('simulateBranches', (backend) =>
-      backend.simulateBranches(input, options)
+    return this.runWithFailover('simulateBranches', (backend, candidate) =>
+      backend.simulateBranches(input, optionsForCandidate(this.candidates, candidate, options))
     );
   }
 
@@ -542,8 +560,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: ExtractRequirementsInput,
     options?: ReasoningCallOptions
   ): Promise<ExtractedRequirements> {
-    return this.runWithFailover('extractRequirements', (backend) =>
-      backend.extractRequirements(input, options)
+    return this.runWithFailover('extractRequirements', (backend, candidate) =>
+      backend.extractRequirements(input, optionsForCandidate(this.candidates, candidate, options))
     );
   }
 
@@ -551,8 +569,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: ExtractDesignSpecInput,
     options?: ReasoningCallOptions
   ): Promise<ExtractedDesignSpec> {
-    return this.runWithFailover('extractDesignSpec', (backend) =>
-      backend.extractDesignSpec(input, options)
+    return this.runWithFailover('extractDesignSpec', (backend, candidate) =>
+      backend.extractDesignSpec(input, optionsForCandidate(this.candidates, candidate, options))
     );
   }
 
@@ -560,8 +578,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: ExtractTestPlanInput,
     options?: ReasoningCallOptions
   ): Promise<ExtractedTestPlan> {
-    return this.runWithFailover('extractTestPlan', (backend) =>
-      backend.extractTestPlan(input, options)
+    return this.runWithFailover('extractTestPlan', (backend, candidate) =>
+      backend.extractTestPlan(input, optionsForCandidate(this.candidates, candidate, options))
     );
   }
 
@@ -569,8 +587,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: DecomposeIntoTasksInput,
     options?: ReasoningCallOptions
   ): Promise<DecomposedTaskPlan> {
-    return this.runWithFailover('decomposeIntoTasks', (backend) =>
-      backend.decomposeIntoTasks(input, options)
+    return this.runWithFailover('decomposeIntoTasks', (backend, candidate) =>
+      backend.decomposeIntoTasks(input, optionsForCandidate(this.candidates, candidate, options))
     );
   }
 
@@ -588,9 +606,13 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     let servedBackendName = '';
     const first = await this.runWithFailover(
       'delegateTask',
-      (backend) => {
+      (backend, candidate) => {
         servedBackendName = backend.name;
-        return backend.delegateTask(instruction, context, options);
+        return backend.delegateTask(
+          instruction,
+          context,
+          optionsForCandidate(this.candidates, candidate, options)
+        );
       },
       options?.signal
     );
@@ -609,10 +631,14 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     );
     return this.runWithFailover(
       'delegateTask',
-      (backend) => {
+      (backend, candidate) => {
         servedBackendName = backend.name;
         assertDistillationTextEgress([instruction, first, context].filter(Boolean).join('\n\n'));
-        return backend.delegateTask(continuationPrompt, context, options);
+        return backend.delegateTask(
+          continuationPrompt,
+          context,
+          optionsForCandidate(this.candidates, candidate, options)
+        );
       },
       options?.signal
     );
@@ -638,7 +664,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     recordReasoningPromptVisibility(prompt, options, 'reasoning_prompt');
     return this.runWithFailover(
       'prompt',
-      (backend) => backend.prompt(prompt, options),
+      (backend, candidate) =>
+        backend.prompt(prompt, optionsForCandidate(this.candidates, candidate, options)),
       options?.signal
     );
   }
@@ -662,7 +689,11 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         if (endpoint) assertReasoningEgressAllowedAtEndpoint(candidate.backend.name, endpoint);
         else assertReasoningEgressAllowed(candidate.backend.name);
         recordReasoningPromptVisibility(prompt, options, 'reasoning_stream_prompt');
-        for await (const delta of stream.call(candidate.backend, prompt, options)) {
+        for await (const delta of stream.call(
+          candidate.backend,
+          prompt,
+          optionsForCandidate(this.candidates, candidate, options)
+        )) {
           yielded = true;
           yield delta;
         }
@@ -718,8 +749,11 @@ export class FailoverReasoningBackend implements ReasoningBackend {
             effectivePrompt,
             toolPlan.active,
             toolPlan.deferred.length > 0
-              ? { ...(options || {}), deferred_tool_definitions: toolPlan.deferred }
-              : options
+              ? {
+                  ...(optionsForCandidate(this.candidates, candidate, options) || {}),
+                  deferred_tool_definitions: toolPlan.deferred,
+                }
+              : optionsForCandidate(this.candidates, candidate, options)
           )
       );
       if (attempt.ok === false) {
@@ -779,7 +813,12 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         'promptWithImages',
         candidate,
         provider,
-        (backend) => backend.promptWithImages!(prompt, images, options)
+        (backend, candidate) =>
+          backend.promptWithImages!(
+            prompt,
+            images,
+            optionsForCandidate(this.candidates, candidate, options)
+          )
       );
       if (attempt.ok === false) {
         errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);

@@ -709,6 +709,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/realtime-media-session-architecture.md",
+      "tier": "public",
+      "size": 18294,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/runtime-surface-lifecycle-model.md",
       "tier": "public",
       "size": 3305,
@@ -1311,7 +1317,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 47749,
+      "size": 47990,
       "type": "json"
     },
     {
@@ -9403,6 +9409,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/realtime-voice-conversation-preferences.schema.json",
+      "tier": "public",
+      "size": 1349,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/realtime-voice-conversation-session.schema.json",
       "tier": "public",
       "size": 1377,
@@ -10708,6 +10720,12 @@
       "path": "product/voice/persona_definitions.md",
       "tier": "public",
       "size": 1252,
+      "type": "md"
+    },
+    {
+      "path": "product/voice/realtime-voice-conversation-operations.md",
+      "tier": "public",
+      "size": 7002,
       "type": "md"
     },
     {

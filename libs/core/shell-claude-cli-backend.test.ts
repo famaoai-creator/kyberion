@@ -213,6 +213,54 @@ describe('shell-claude-cli-backend', () => {
     });
   });
 
+  describe('partial text streaming for realtime voice', () => {
+    it('forwards partial text deltas and selects the governed fast model tier', async () => {
+      spawnMock.mockReturnValueOnce(
+        createChild(
+          [
+            {
+              type: 'stream_event',
+              event: {
+                type: 'content_block_delta',
+                delta: { type: 'text_delta', text: 'こんにちは。' },
+              },
+            },
+            {
+              type: 'assistant',
+              message: { content: [{ type: 'text', text: 'こんにちは。' }] },
+            },
+            { type: 'result', result: 'こんにちは。' },
+          ]
+            .map((entry) => JSON.stringify(entry))
+            .join('\n') + '\n'
+        )
+      );
+
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
+      const deltas: string[] = [];
+      for await (const delta of backend.streamPrompt('say hello', {
+        model_tier: 'fast',
+        effort: 'low',
+      })) {
+        deltas.push(delta);
+      }
+
+      expect(deltas).toEqual(['こんにちは。']);
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toEqual(
+        expect.arrayContaining([
+          '--output-format',
+          'stream-json',
+          '--include-partial-messages',
+          '--model',
+          'haiku',
+          '--effort',
+          'low',
+        ])
+      );
+    });
+  });
+
   describe('declarative permission profile argv (XP-02 follow-up)', () => {
     afterEach(() => {
       spawnMock.mockClear();

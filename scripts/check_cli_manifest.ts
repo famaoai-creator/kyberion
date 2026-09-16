@@ -51,9 +51,8 @@ export interface CliManifestCheckOptions {
   packageScripts?: ReadonlySet<string>;
 }
 
-// The unified `pads` capture desk is a single operator entrypoint; keep the
-// ratchet explicit when adding this one governed script.
-export const MAX_PACKAGE_SCRIPTS = 121;
+// Keep the ratchet explicit as governed operator entrypoints are added.
+export const MAX_PACKAGE_SCRIPTS = 122;
 
 export function resolveCliModulePath(module: string, allowMissingLeaf = false): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(module), { allowMissingLeaf });

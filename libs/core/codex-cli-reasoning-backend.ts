@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   buildCodexCliQueryOptionsFromEnv,
   runCodexCliQuery,
+  resolveCodexModelForTier,
   type CodexCliQueryOptions,
 } from './codex-cli-query.js';
 import type {
@@ -154,7 +155,17 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
       mode: 'workspace-write',
       options: {
         ...this.options,
-        ...(options?.model ? { model: normalizeCodexModelId(options.model) } : {}),
+        ...(options?.model
+          ? { model: normalizeCodexModelId(options.model) }
+          : options?.model_tier
+            ? {
+                model: resolveCodexModelForTier(
+                  options.model_tier,
+                  this.options.model ?? 'gpt-5.6-sol'
+                ),
+              }
+            : {}),
+        ...(options?.effort ? { effort: options.effort } : {}),
         ...(options?.signal ? { signal: options.signal } : {}),
       },
     })) as z.infer<typeof schema>;
@@ -298,8 +309,8 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     return this.harnessSession;
   }
 
-  async prompt(prompt: string): Promise<string> {
-    return this.delegateTask(prompt);
+  async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
+    return this.delegateTask(prompt, undefined, options);
   }
 }
 

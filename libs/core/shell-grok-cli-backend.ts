@@ -16,6 +16,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import * as readline from 'node:readline';
 import { childDelegationEnv } from './operation-policy-gate.js';
 import {
   buildProviderChildEnv,
@@ -62,10 +63,19 @@ import type {
   ExtractedTestPlan,
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
+  ReasoningTextStream,
 } from './reasoning-backend.js';
 
 function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return getRegisteredEnvText(name, { env });
+}
+
+function normalizePermissionProfile(
+  value: string | undefined
+): ProviderPermissionProfileName | undefined {
+  if (!value) return undefined;
+  if (value === 'implementer' || value === 'explorer' || value === 'planner') return value;
+  throw new Error(`[shell-grok-cli] unsupported permission profile: ${value}`);
 }
 
 const DEFAULT_MODEL = 'grok-4.6';
@@ -191,16 +201,13 @@ export class ShellGrokCliBackend implements ReasoningBackend {
   async delegateTask(
     instruction: string,
     context?: string,
-    options?: {
-      model_tier?: 'fast' | 'standard' | 'deep';
-      profile?: ProviderPermissionProfileName;
-      advisory?: boolean;
-      signal?: AbortSignal;
-    }
+    options?: ReasoningCallOptions
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
-    const model = resolveGrokModelForTier(options?.model_tier, this.model);
-    const requestedProfile = options?.advisory ? 'planner' : options?.profile;
+    const model = options?.model ?? resolveGrokModelForTier(options?.model_tier, this.model);
+    const requestedProfile = options?.advisory
+      ? 'planner'
+      : normalizePermissionProfile(options?.profile);
     const effectiveProfile = resolveEffectiveProviderPermissionProfile('grok', requestedProfile);
     const permissionArgs = this.resolvePermissionArgs(effectiveProfile);
     // Historical default for unprofiled headless calls: auto-approve tools.
@@ -216,6 +223,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       'plain',
       '--model',
       model,
+      ...(options?.effort ? ['--reasoning-effort', options.effort] : []),
       ...defaultPermissionArgs,
       '--disable-web-search',
       '--no-subagents',
@@ -312,14 +320,144 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     return this.harnessSession;
   }
 
-  async prompt(
-    prompt: string,
-    options?: {
-      model_tier?: 'fast' | 'standard' | 'deep';
-      profile?: ProviderPermissionProfileName;
-    }
-  ): Promise<string> {
+  async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
+  }
+
+  /** Stream Grok's Anthropic-compatible text deltas for live voice replies. */
+  streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
+    return this.streamPromptFromCli(prompt, options);
+  }
+
+  private async *streamPromptFromCli(
+    prompt: string,
+    options?: ReasoningCallOptions
+  ): ReasoningTextStream {
+    assertReasoningEgressAllowed(this.name);
+    if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
+
+    const model = options?.model ?? resolveGrokModelForTier(options?.model_tier, this.model);
+    const requestedProfile: ProviderPermissionProfileName | undefined = options?.advisory
+      ? 'planner'
+      : normalizePermissionProfile(options?.profile);
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('grok', requestedProfile);
+    const permissionArgs = effectiveProfile
+      ? this.resolvePermissionArgs(effectiveProfile)
+      : ['--always-approve'];
+    const args = [
+      '-p',
+      prompt,
+      '--output-format',
+      'streaming-messages-json',
+      '--include-partial-messages',
+      '--model',
+      model,
+      ...(options?.effort ? ['--reasoning-effort', options.effort] : []),
+      '--disable-web-search',
+      ...permissionArgs,
+      ...this.extraArgs,
+    ];
+    const child = spawn(this.bin, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...buildProviderChildEnv({ provider: 'grok' }), ...childDelegationEnv() },
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => {
+      stderr = `${stderr}${chunk.toString()}`.slice(-2000);
+    });
+    const closePromise = new Promise<number>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (code) => resolve(code ?? 1));
+    });
+    const boundedClose = withWallClockBudget(
+      {
+        provider: 'grok',
+        budgetMs: this.timeoutMs,
+        child: delegationChildHandleFromChildProcess(child),
+        signal: options?.signal,
+      },
+      () => closePromise
+    );
+    void boundedClose.catch(() => undefined);
+    const onAbort = (): void => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+    };
+    options?.signal?.addEventListener('abort', onAbort, { once: true });
+    let emittedPartialText = false;
+    let yielded = false;
+    try {
+      child.stdin.end();
+      const lines = readline.createInterface({ input: child.stdout });
+      try {
+        for await (const line of lines) {
+          if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
+          const parsed = parseSafeJsonInput(String(line), 'Grok CLI stream response');
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+          const record = parsed as Record<string, unknown>;
+          const event = record.type === 'stream_event' ? record.event : record;
+          if (
+            (record.type === 'stream_event' || record.type === 'content_block_delta') &&
+            event &&
+            typeof event === 'object' &&
+            !Array.isArray(event)
+          ) {
+            const eventRecord = event as Record<string, unknown>;
+            if (eventRecord.type === 'content_block_delta') {
+              const delta = eventRecord.delta;
+              if (delta && typeof delta === 'object' && !Array.isArray(delta)) {
+                const text = (delta as Record<string, unknown>).text;
+                if (typeof text === 'string' && text) {
+                  emittedPartialText = true;
+                  yielded = true;
+                  yield text;
+                }
+              }
+              continue;
+            }
+          }
+          if (record.type === 'assistant' && !emittedPartialText) {
+            const message = record.message;
+            const content =
+              message && typeof message === 'object'
+                ? (message as Record<string, unknown>).content
+                : undefined;
+            const text = Array.isArray(content)
+              ? content
+                  .filter((block): block is Record<string, unknown> =>
+                    Boolean(block && typeof block === 'object' && !Array.isArray(block))
+                  )
+                  .map((block) => (typeof block.text === 'string' ? block.text : ''))
+                  .join('')
+              : '';
+            if (text) {
+              yielded = true;
+              yield text;
+            }
+          }
+          if (
+            record.type === 'result' &&
+            !emittedPartialText &&
+            !yielded &&
+            typeof record.result === 'string'
+          ) {
+            yielded = true;
+            yield record.result;
+          }
+        }
+      } finally {
+        lines.close();
+      }
+      const exitCode = await boundedClose;
+      if (exitCode !== 0) {
+        throw new Error(
+          `[shell-grok-cli] streaming CLI exited with code ${exitCode}${stderr ? `. stderr: ${stderr}` : ''}`
+        );
+      }
+      if (!yielded) throw new Error('[shell-grok-cli] streaming CLI returned no text');
+    } finally {
+      options?.signal?.removeEventListener('abort', onAbort);
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+    }
   }
 
   private resolvePermissionArgs(profile?: ProviderPermissionProfileName): string[] {

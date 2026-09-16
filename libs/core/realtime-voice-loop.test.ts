@@ -6,6 +6,8 @@ import { StubStreamingSpeechToTextBridge } from './streaming-stt-bridge.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
 import type { PlaybackHandle, PlaybackResult } from './audio-playback.js';
+import { MediaEventBuffer } from './realtime-media-session.js';
+import type { AudioChunk } from './meeting-session-types.js';
 
 const testDir = pathResolver.sharedTmp('realtime-voice-loop-test');
 
@@ -51,6 +53,7 @@ describe('realtime voice loop', () => {
     async () => {
       const turns: RealtimeVoiceLoopTurnResult[] = [];
       const synthesized: string[] = [];
+      const mediaEvents: string[] = [];
 
       const handle = await startRealtimeVoiceLoop({
         recordingDir: testDir,
@@ -71,6 +74,12 @@ describe('realtime voice loop', () => {
         onTurn: (turn) => {
           turns.push(turn);
         },
+        sessionId: 'voice-session-1',
+        mediaEventBufferFactory: (sessionId) => {
+          const buffer = new MediaEventBuffer(sessionId, 32);
+          buffer.subscribe((event) => mediaEvents.push(event.type));
+          return buffer;
+        },
       });
 
       const report = await handle.done;
@@ -84,11 +93,19 @@ describe('realtime voice loop', () => {
       expect(turns[0].interrupted).toBe(false);
       expect(turns[0].audio_path).toBe(path.join(testDir, 'turn-01.wav'));
       expect(turns[1].audio_path).toBe(path.join(testDir, 'turn-02.wav'));
+      expect(mediaEvents[0]).toBe('session_started');
+      expect(mediaEvents).toContain('speech_started');
+      expect(mediaEvents).toContain('speech_ended');
+      expect(mediaEvents).toContain('transcript_final');
+      expect(mediaEvents).toContain('assistant_text_delta');
+      expect(mediaEvents).toContain('turn_completed');
+      expect(mediaEvents.at(-1)).toBe('session_ended');
       // pre-roll (≤300ms) + 400ms speech + 700ms endpoint silence
       expect(turns[0].metrics.listen_ms).toBeGreaterThanOrEqual(1000);
       expect(turns[0].metrics.listen_ms).toBeLessThanOrEqual(1600);
       expect(turns[0].metrics.speak_ms).toBeGreaterThanOrEqual(0);
       expect(synthesized.length).toBeGreaterThanOrEqual(2);
+      expect(turns[0].assistant_audio_paths).toEqual(['/tmp/fake-t0-s0.wav']);
     }
   );
 
@@ -121,6 +138,55 @@ describe('realtime voice loop', () => {
     expect(turns[0].user_text).toMatch(/stub-utterance/);
     expect(batchCalls).toBe(0);
   });
+
+  it(
+    'publishes streamed PCM output on the canonical media session event sink',
+    {
+      timeout: 60_000,
+    },
+    async () => {
+      const mediaEvents: string[] = [];
+      const outputChunk: AudioChunk = {
+        format: { encoding: 'pcm_s16le', sample_rate_hz: 16000, channels: 1 },
+        payload: new Uint8Array([0, 0]),
+        ts_ms: 0,
+      };
+
+      const handle = await startRealtimeVoiceLoop({
+        recordingDir: testDir,
+        consent: { requireRecordingConsent: false },
+        mic: { command: twoUtteranceCommand(), sampleRateHz: 16000, chunkMs: 100 },
+        vad: { rmsThreshold: 800, endpointMs: 700 },
+        maxTurns: 1,
+        transcribe: async () => 'こんにちは',
+        streamReply: async (_userText, _turn, onSegment) => {
+          await onSegment('ストリーム音声です。');
+          return 'ストリーム音声です。';
+        },
+        reply: async () => 'unused',
+        synthesizeSegment: async () => '/tmp/fake.wav',
+        synthesizeAudioStream: async () =>
+          (async function* (): AsyncGenerator<AudioChunk> {
+            yield outputChunk;
+          })(),
+        playAudioStream: () => immediateHandle(),
+        onTurn: (turn) => {
+          expect(turn.assistant_audio_paths).toEqual([]);
+        },
+        sessionId: 'voice-stream-session-1',
+        mediaEventBufferFactory: (sessionId) => {
+          const buffer = new MediaEventBuffer(sessionId, 32);
+          buffer.subscribe((event) => mediaEvents.push(event.type));
+          return buffer;
+        },
+      });
+
+      const report = await handle.done;
+      expect(report.ended_by).toBe('max_turns');
+      expect(mediaEvents).toContain('assistant_text_delta');
+      expect(mediaEvents).toContain('audio_output_delta');
+    }
+  );
 
   it(
     'barge-in stops playback and captures the interrupting utterance as the next turn',

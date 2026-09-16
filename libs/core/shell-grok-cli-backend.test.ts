@@ -131,6 +131,72 @@ describe('shell-grok-cli-backend', () => {
     expect(result).toEqual({ answer: 'pong' });
   });
 
+  it('streams Grok text deltas and suppresses the duplicated final message', async () => {
+    const stream = [
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          delta: { type: 'text_delta', text: '準備' },
+        },
+      },
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          delta: { type: 'text_delta', text: 'できています。' },
+        },
+      },
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: '準備できています。' }] },
+      },
+      { type: 'result', result: '準備できています。' },
+    ]
+      .map((entry) => JSON.stringify(entry))
+      .join('\n');
+    spawnMock.mockReturnValueOnce(createChild(`${stream}\n`));
+
+    const backend = new ShellGrokCliBackend({ bin: 'grok', model: 'grok-4.6' });
+    const deltas: string[] = [];
+    for await (const delta of backend.streamPrompt('hello', {
+      model: 'grok-4.6',
+      effort: 'low',
+    }))
+      deltas.push(delta);
+
+    expect(deltas).toEqual(['準備', 'できています。']);
+    const [, args] = spawnMock.mock.calls[0];
+    expect(args).toEqual(
+      expect.arrayContaining([
+        '--output-format',
+        'streaming-messages-json',
+        '--include-partial-messages',
+      ])
+    );
+    expect(args).toContain('--reasoning-effort');
+    expect(args).toContain('low');
+  });
+
+  it('falls back to the final Grok assistant envelope when partials are absent', async () => {
+    const final = [
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: '最終応答です。' }] },
+      },
+      { type: 'result', result: '最終応答です。' },
+    ]
+      .map((entry) => JSON.stringify(entry))
+      .join('\n');
+    spawnMock.mockReturnValueOnce(createChild(`${final}\n`));
+
+    const backend = new ShellGrokCliBackend({ bin: 'grok', model: 'grok-4.6' });
+    const deltas: string[] = [];
+    for await (const delta of backend.streamPrompt('hello')) deltas.push(delta);
+
+    expect(deltas).toEqual(['最終応答です。']);
+  });
+
   it('ambient read-only sandbox removes auto-approve and applies Grok read-only flags', async () => {
     const envelope = JSON.stringify({
       structuredOutput: { answer: 'pong' },
