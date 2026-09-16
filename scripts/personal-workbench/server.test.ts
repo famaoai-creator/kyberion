@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
+import { readSafeJsonFile } from '../lib/json-input.js';
 import { isLocalPadOriginAllowed } from '../lib/local-artifact-pad.js';
 import {
   main,
@@ -9,10 +11,13 @@ import {
 } from './server.js';
 import {
   applyCalendarEvent,
+  calendarProposalPath,
   executePersonalWorkbenchAction,
+  matchCalendarReconciliationEvents,
   parseCalendarEventPayload,
   proposeCalendarEvent,
   PERSONAL_WORKBENCH_APPROVAL_CHANNEL,
+  reconcileCalendarEvent,
 } from './actions.js';
 
 describe('personal workbench', () => {
@@ -82,7 +87,41 @@ describe('personal workbench', () => {
       stage: 'propose',
       status: 'pending',
     });
+    const event = {
+      summary: 'レビュー定例',
+      start: '2026-09-14T10:00:00+09:00',
+      end: '2026-09-14T10:30:00+09:00',
+    };
+    const reconciliationProposal = {
+      event,
+      reconciliation_token: 'kyberion-calendar-test-token',
+    };
+    expect(
+      matchCalendarReconciliationEvents(reconciliationProposal, [
+        {
+          ...event,
+          start: '2026-09-14T01:00:00Z',
+          end: '2026-09-14T01:30:00Z',
+          description: '[kyberion-calendar-test-token]',
+        },
+      ])
+    ).toHaveLength(1);
+    expect(
+      matchCalendarReconciliationEvents(reconciliationProposal, [
+        { ...event, description: '[kyberion-calendar-test-token]' },
+        { ...event, summary: 'レビュー定例', description: '[kyberion-calendar-test-token]' },
+      ])
+    ).toHaveLength(2);
+    expect(
+      matchCalendarReconciliationEvents(reconciliationProposal, [
+        { ...event, summary: '別の予定', description: '[kyberion-calendar-test-token]' },
+      ])
+    ).toHaveLength(0);
+    expect(matchCalendarReconciliationEvents(reconciliationProposal, [event])).toHaveLength(0);
     expect(String(proposed.approval_request_id)).toBeTruthy();
+    expect(() => calendarProposalPath(outDir, '../other-scope')).toThrow(
+      'approval_request_id is invalid'
+    );
 
     await expect(
       applyCalendarEvent({
@@ -92,6 +131,15 @@ describe('personal workbench', () => {
         confirmed: false,
       })
     ).rejects.toThrow('confirmed=true');
+
+    await expect(
+      applyCalendarEvent({
+        payload: { approval_request_id: String(proposed.approval_request_id) },
+        context,
+        outDir,
+        confirmed: true,
+      })
+    ).resolves.toMatchObject({ status: 'approval_required' });
 
     await expect(
       executePersonalWorkbenchAction({
@@ -107,8 +155,113 @@ describe('personal workbench', () => {
       pathResolver.rootResolve('scripts/personal-workbench/actions.ts')
     );
     expect(actionsSource).toContain('draft_mode: true');
-    expect(actionsSource).toContain("authMethod: 'manual'");
+    expect(actionsSource).toContain("delivery: 'local-only'");
+    expect(actionsSource).toContain("status: 'approval_required'");
     expect(actionsSource).toContain(PERSONAL_WORKBENCH_APPROVAL_CHANNEL);
     expect(actionsSource).toContain('createCalendarEvent');
+  });
+
+  it('reconciles an uncertain provider write through an injectable fixture gateway', async () => {
+    const context = {
+      session_id: `pwb-fixture-${Date.now()}`,
+      artifact_ref: 'active/shared/tmp/personal-workbench-fixture',
+      viewer_principal: 'human:fixture',
+      scope: { scope_kind: 'tenant' as const, tier: 'personal' as const, tenant_slug: 'default' },
+    };
+    const outDir = pathResolver.sharedTmp(`personal-workbench-reconcile-${Date.now()}`);
+    const proposed = proposeCalendarEvent({
+      payload: {
+        summary: 'fixture event',
+        start: '2026-09-15T01:00:00Z',
+        end: '2026-09-15T01:30:00Z',
+      },
+      context,
+      outDir,
+      evidenceRef: `${outDir}/handoff.json`,
+    });
+    const requestId = String(proposed.approval_request_id);
+    const approval = loadApprovalRequest(PERSONAL_WORKBENCH_APPROVAL_CHANNEL, requestId);
+    expect(approval?.accountability?.payloadHash).toBeTruthy();
+    decideApprovalRequest('mission_controller', {
+      channel: PERSONAL_WORKBENCH_APPROVAL_CHANNEL,
+      requestId,
+      decision: 'approved',
+      decidedBy: 'human:fixture',
+      decidedByType: 'human',
+      authenticated: true,
+      authMethod: 'manual',
+      payloadHash: approval?.accountability?.payloadHash,
+      effectBinding: approval?.accountability?.effectBinding,
+    });
+    const gateway = {
+      createCalendarEvent: async () => {
+        throw new Error('fixture provider unavailable');
+      },
+      listCalendarAgenda: async () => ({
+        calendar_id: 'primary',
+        max_results: 50,
+        ok: true,
+        query: 'fixture event',
+        time_min: '2026-09-15T01:00:00Z',
+        time_max: '2026-09-15T01:30:00Z',
+        total_items: 1,
+        events: [
+          {
+            id: 'evt-fixture',
+            summary: 'fixture event',
+            start: '2026-09-15T01:00:00Z',
+            end: '2026-09-15T01:30:00Z',
+            description: '[kyberion-calendar-fixture]',
+            hangout_link: '',
+            html_link: '',
+            location: '',
+            status: 'confirmed',
+          },
+        ],
+      }),
+    };
+    await expect(
+      applyCalendarEvent({
+        payload: { approval_request_id: requestId },
+        context,
+        outDir,
+        confirmed: true,
+        calendar_gateway: gateway,
+      })
+    ).rejects.toThrow('fixture provider unavailable');
+    const proposal = readSafeJsonFile<{ reconciliation_token: string }>(
+      calendarProposalPath(outDir, requestId),
+      'fixture proposal'
+    );
+    gateway.listCalendarAgenda = async () => ({
+      calendar_id: 'primary',
+      max_results: 50,
+      ok: true,
+      query: 'fixture event',
+      time_min: '2026-09-15T01:00:00Z',
+      time_max: '2026-09-15T01:30:00Z',
+      total_items: 1,
+      events: [
+        {
+          id: 'evt-fixture',
+          summary: 'fixture event',
+          start: '2026-09-15T01:00:00Z',
+          end: '2026-09-15T01:30:00Z',
+          description: `[${proposal.reconciliation_token}]`,
+          hangout_link: '',
+          html_link: '',
+          location: '',
+          status: 'confirmed',
+        },
+      ],
+    });
+    await expect(
+      reconcileCalendarEvent({
+        payload: { approval_request_id: requestId },
+        context,
+        outDir,
+        calendar_gateway: gateway,
+      })
+    ).resolves.toMatchObject({ status: 'reconciled' });
   });
 });

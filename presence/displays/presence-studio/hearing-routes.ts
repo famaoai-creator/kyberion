@@ -30,6 +30,7 @@ import {
   createHearingRecord,
   validateHearingScenario,
   type HearingDecidedBy,
+  type HearingRecord,
   type HearingScenario,
 } from './hearing.js';
 import {
@@ -41,6 +42,7 @@ import {
   saveHearingCanvasVersion,
   saveHearingRecord,
 } from './hearing-runtime.js';
+import { generateHearingCanvas } from './hearing-canvas.js';
 import * as presenceStudioData from './presence-studio-runtime-data.js';
 
 class HearingRequestError extends Error {
@@ -111,6 +113,80 @@ function resolveHearingDeciderRole(
       : undefined;
   if (membership) return membership.role;
   return frontDeskRoleFromViewerScope(toFrontDeskViewerScope(viewer));
+}
+
+/** HT-02: fire-and-forget model canvas generation, keyed per hearing
+ * session so at most one `generateHearingCanvas` call runs at a time for a
+ * given session. A newer answer arriving while a generation is already in
+ * flight does not start a second overlapping call — it replaces
+ * `pending`, and once the in-flight call settles its result is applied
+ * (only if nothing newer landed meanwhile, see below) before the queued
+ * answer's own generation starts. */
+interface HearingCanvasGenerationJob {
+  namespace: string;
+  record: HearingRecord;
+  locale: SupportedLocale;
+  tenantSlug: string | undefined;
+}
+
+const hearingCanvasInFlight = new Map<string, HearingCanvasGenerationJob | undefined>();
+
+function hearingCanvasJobKey(namespace: string, sessionId: string): string {
+  return `${namespace}:${sessionId}`;
+}
+
+function tenantSlugForHearingDesign(viewer: PresenceStudioViewerContext): string | undefined {
+  return viewer.tenantSlugs !== 'all' ? viewer.tenantSlugs[0] : undefined;
+}
+
+function runHearingCanvasGeneration(key: string, job: HearingCanvasGenerationJob): void {
+  generateHearingCanvas(job.record, { locale: job.locale, tenantSlug: job.tenantSlug })
+    .then((result) => {
+      // The latest answer wins: only apply this result if the persisted
+      // record is still the exact snapshot this generation started from —
+      // a newer answer's `updated_at` means this result is stale.
+      const persisted = loadHearingRecord(job.namespace, job.record.session_id);
+      if (!persisted || persisted.updated_at !== job.record.updated_at) return;
+      if (result.source === 'generated') {
+        const version = saveHearingCanvasVersion(job.namespace, persisted, result.html);
+        saveHearingRecord(job.namespace, {
+          ...persisted,
+          canvas_versions: [...persisted.canvas_versions, version],
+          canvas_generation: 'generated',
+          canvas_version_sources: { ...persisted.canvas_version_sources, [version]: 'generated' },
+        });
+      } else {
+        saveHearingRecord(job.namespace, { ...persisted, canvas_generation: 'template' });
+      }
+    })
+    .catch((error) => {
+      logger.warn(
+        `[presence-studio] hearing canvas generation failed for ${job.record.session_id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    })
+    .finally(() => {
+      const queued = hearingCanvasInFlight.get(key);
+      if (queued) {
+        hearingCanvasInFlight.set(key, undefined);
+        runHearingCanvasGeneration(key, queued);
+      } else {
+        hearingCanvasInFlight.delete(key);
+      }
+    });
+}
+
+function scheduleHearingCanvasGeneration(job: HearingCanvasGenerationJob): void {
+  const key = hearingCanvasJobKey(job.namespace, job.record.session_id);
+  if (hearingCanvasInFlight.has(key)) {
+    // A generation is already running for this session — queue this newer
+    // answer to run once it settles instead of overlapping the backend call.
+    hearingCanvasInFlight.set(key, job);
+    return;
+  }
+  hearingCanvasInFlight.set(key, undefined);
+  runHearingCanvasGeneration(key, job);
 }
 
 export function registerHearingRoutes(app: express.Express): void {
@@ -208,17 +284,35 @@ export function registerHearingRoutes(app: express.Express): void {
         nowIso(),
         scenario || hearingScenarioFromRecord(record)
       );
+      // HT-02: save the deterministic template canvas synchronously first —
+      // `canvas_url` always works even while a model generation is pending
+      // or fails — then kick off the (possibly slow) model generation
+      // without making the caller wait for it (risk table §4).
       const canvasVersion = saveHearingCanvasVersion(
         namespace,
         next,
         renderHearingCanvas(next, locale)
       );
-      const versioned = { ...next, canvas_versions: [...next.canvas_versions, canvasVersion] };
+      const versioned: HearingRecord = {
+        ...next,
+        canvas_versions: [...next.canvas_versions, canvasVersion],
+        canvas_generation: 'pending',
+        canvas_version_sources: {
+          ...next.canvas_version_sources,
+          [canvasVersion]: 'template',
+        },
+      };
       saveHearingRecord(namespace, versioned);
       res.status(200).json({
         ok: true,
         record: withResolvedLabels(versioned, locale),
         canvas_url: `/api/hearing/${encodeURIComponent(sessionId)}/canvas`,
+      });
+      scheduleHearingCanvasGeneration({
+        namespace,
+        record: versioned,
+        locale,
+        tenantSlug: tenantSlugForHearingDesign(viewer),
       });
     } catch (error) {
       hearingResponseError(req, res, error);

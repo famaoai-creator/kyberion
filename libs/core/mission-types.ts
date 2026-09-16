@@ -349,6 +349,16 @@ export const VALUE_FLAGS = new Set([
   '--evidence',
   '--note',
   '--supersedes',
+  // HT-03 (2nd half): `scripts/lib/decided-by-args.ts`'s `--decided-by` /
+  // `--decided-by-name` / `--decided-by-role` grammar was read correctly by
+  // `resolveDecidedByFromArgv` (a direct `argv.indexOf` lookup) but, absent
+  // here, fell through this positional-argument filter as three extra
+  // "positional" tokens — corrupting `arg2`/`arg3`/... for any command that
+  // reads them (e.g. `create`'s tier-by-position check). Purely additive:
+  // every existing caller that never passes these flags is unaffected.
+  '--decided-by',
+  '--decided-by-name',
+  '--decided-by-role',
   '--execution-role',
   '--routing-decision',
   '--goal',

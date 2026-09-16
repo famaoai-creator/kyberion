@@ -28,6 +28,7 @@ import {
 } from './context.js';
 import { sketchPageHtml } from './sketch-page.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { composeLegacyCapture } from '../personal-pads/legacy.js';
 
 export interface SketchInputServerResult {
   ok: boolean;
@@ -273,6 +274,10 @@ export async function main(
               res.end('not a png');
               return;
             }
+            composeLegacyCapture('sketch-input', {
+              png_base64: b64,
+              instruction: payload.instruction,
+            });
             const instruction =
               typeof payload.instruction === 'string' ? payload.instruction.trim() : '';
             safeWriteFile(out, png, { mkdir: true });

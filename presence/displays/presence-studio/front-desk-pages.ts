@@ -193,6 +193,21 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:hearing_decide',
   'front_desk:hearing_pending',
   'front_desk:hearing_canvas_frame_title',
+  // HT-02: one-line canvas generation status under the `#hearing-canvas`
+  // iframe, driven by the hearing record's `canvas_generation` field
+  // (`'pending' | 'generated' | 'template'`, absent on old records treated
+  // as `template`).
+  'front_desk:hearing_canvas_updating',
+  'front_desk:hearing_canvas_generated',
+  'front_desk:hearing_canvas_template',
+  // HT-03 (2nd half): the "confirm and hand off as a request" action on the
+  // decided hearing card, and its result — `POST /api/hearing/:session/handoff`.
+  'front_desk:hearing_handoff_button',
+  'front_desk:hearing_handoff_pending',
+  'front_desk:hearing_handoff_done',
+  'front_desk:hearing_handoff_failed',
+  'front_desk:hearing_mission_label',
+  'front_desk:hearing_open_decide',
 ] as const satisfies readonly VocabularyKey[];
 
 // HT-06: exactly the `front_desk` keys `static/help.js` renders for the

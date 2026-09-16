@@ -303,6 +303,31 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(trainingAssignmentsRoute).not.toContain('割り当ての入力を確認してください。');
   });
 
+  it('HT-05 second pass: /api/training/progress is owner-only, the hook fetches it, and the section renders training_lessons_done', () => {
+    const progressRoute = read('src/app/api/training/progress/route.ts');
+    const useTrainingAssignments = read('src/lib/use-training-assignments.ts');
+    const membersSection = read('src/app/settings/sections/MembersSection.tsx');
+    const settingsPage = read('src/app/settings/page.tsx');
+
+    // In-process (no fetch to another surface), owner-gated the same way
+    // the assignment POST route is, reusing the pure catalog helper.
+    expect(progressRoute).toContain('resolveConciergeViewer');
+    expect(progressRoute).toContain('resolveConciergeFrontDeskRole');
+    expect(progressRoute).toContain("!== 'owner'");
+    expect(progressRoute).toContain('summarizeTrainingProgress');
+    expect(progressRoute).not.toContain('presenceStudioUrl');
+
+    expect(useTrainingAssignments).toContain("fetch('/api/training/progress'");
+    expect(useTrainingAssignments).toContain('parseTrainingProgressOverviewResponse');
+    expect(settingsPage).toContain('refreshTrainingProgress');
+    expect(settingsPage).toContain('trainingProgress={trainingProgress}');
+
+    expect(membersSection).toContain('trainingProgress');
+    expect(membersSection).toContain("frontDeskText('settings_training_progress', locale)");
+    expect(membersSection).toContain("frontDeskText('training_lessons_done', locale");
+    expect(membersSection).toContain("frontDeskText('training_no_progress', locale)");
+  });
+
   it('FD-06: resolves the 管制塔 (chronos-mirror-v2) link server-side, guarded like every other read route', () => {
     const route = read('src/app/api/front-desk/links/route.ts');
     expect(route).toContain('resolveConciergeViewer');
