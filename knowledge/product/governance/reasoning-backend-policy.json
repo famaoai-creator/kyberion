@@ -41,6 +41,10 @@
       "mode": "anthropic"
     },
     {
+      "env": "KYBERION_GEMINI_API_KEY",
+      "mode": "gemini-api"
+    },
+    {
       "env": "GEMINI_API_KEY",
       "mode": "gemini-api"
     },

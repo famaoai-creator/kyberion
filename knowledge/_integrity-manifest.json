@@ -1425,7 +1425,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 130789,
+      "size": 131305,
       "type": "json"
     },
     {
@@ -1767,7 +1767,7 @@
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 13910,
+      "size": 13949,
       "type": "json"
     },
     {
@@ -2451,7 +2451,7 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 3576,
+      "size": 3656,
       "type": "json"
     },
     {

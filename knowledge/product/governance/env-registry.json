@@ -188,7 +188,7 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "Internal bridge transport for the Antigravity SDK API key; prefer GEMINI_API_KEY or GOOGLE_API_KEY in the parent environment.",
+      "description": "Internal bridge transport for the Antigravity SDK API key; prefer KYBERION_GEMINI_API_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY in the parent environment.",
       "documented": true,
       "subsystem": "reasoning"
     },
@@ -1149,6 +1149,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_GEMINI_API_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "Google AI Studio / Gemini API key for gemini-api reasoning, Imagen, Veo, embeddings, OCR, and the AGY SDK bridge. `GEMINI_API_KEY` and `GOOGLE_API_KEY` remain accepted compatibility aliases.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
       "name": "KYBERION_GEMINI_CLI_BIN",
       "category": "path",
       "type": "path",
@@ -1209,7 +1218,7 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "API key used by the explicit Google Veo video-generation backend.",
+      "description": "API key used by the explicit Google Veo video-generation backend. Falls back to KYBERION_GEMINI_API_KEY, GEMINI_API_KEY, then GOOGLE_API_KEY when unset.",
       "subsystem": "media-generation",
       "documented": true
     },
