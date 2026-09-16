@@ -282,6 +282,28 @@
       "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
     },
     {
+      "id": "personal-pads",
+      "classification": "artifact-review-port",
+      "process_scope": "tenant-service",
+      "request_scope_mode": "server-derived-viewer-scope",
+      "health": "localhost-health",
+      "owner": "surface_runtime",
+      "binding": "pad-registry-and-scope-context",
+      "approval": "local-token-is-not-human-approval",
+      "principal_resolution": "server-side-viewer-principal",
+      "write_authority": "scope-resolved-pad-record-store",
+      "nhi_binding": "viewer-or-runtime-nhi",
+      "approval_classes": ["local-token-not-approval"],
+      "data_residency": "tier-and-tenant-partitioned-pad-records",
+      "data_paths": [
+        "active/shared/local-pads/{tier}/{tenant}/{owner}/{pad}/records/",
+        "active/shared/local-pads/{tier}/{tenant}/{owner}/{pad}/payloads/",
+        "active/shared/local-pads/{tier}/{tenant}/{owner}/{pad}/artifacts/",
+        "active/shared/local-pads/{tier}/{tenant}/{owner}/{pad}/handoffs/"
+      ],
+      "lifecycle_actions": ["start", "stop", "reconnect", "restore", "health_check"]
+    },
+    {
       "id": "backup-restore",
       "classification": "control-plane-worker",
       "process_scope": "system",

@@ -3478,6 +3478,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_WORKING_MEMORY_ROOT",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional tenant-bound working-memory root used by the unified daily-desk action; each tenant is resolved as tenant/owners/<principal-hash>.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",

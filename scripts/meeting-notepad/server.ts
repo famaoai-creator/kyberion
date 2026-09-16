@@ -31,6 +31,7 @@ import {
 import { generateMeetingMinutes } from './minutes.js';
 import { meetingNotepadPageHtml } from './notepad-page.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { composeLegacyCapture } from '../personal-pads/legacy.js';
 
 export interface MeetingNotepadServerResult {
   ok: boolean;
@@ -341,6 +342,7 @@ export async function main(
     payload: CapturePayload,
     opts: { generateMinutes: boolean }
   ): Promise<Record<string, unknown>> {
+    composeLegacyCapture('meeting-notepad', payload as Record<string, unknown>);
     const sessionId = `${notepadContext.notepad_session_id}-${randomUUID().slice(0, 8)}`;
     const sessionDir = meetingNotepadSessionDir(out, sessionId);
     safeMkdir(sessionDir, { recursive: true });
