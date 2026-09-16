@@ -149,11 +149,24 @@ describe('agy-cli-backend', () => {
 
     const backend = new AgyCliBackend({ bin: 'agy', model: 'agy' });
     const deltas: string[] = [];
-    for await (const delta of backend.streamPrompt('hello')) deltas.push(delta);
+    for await (const delta of backend.streamPrompt('hello', {
+      model: 'gemini-fast',
+      effort: 'low',
+    }))
+      deltas.push(delta);
 
     expect(deltas).toEqual(['準備', 'できています。']);
     const [, args] = spawnMock.mock.calls[0];
-    expect(args).toEqual(expect.arrayContaining(['--output-format', 'stream-json']));
+    expect(args).toEqual(
+      expect.arrayContaining([
+        '--model',
+        'gemini-fast',
+        '--effort',
+        'low',
+        '--output-format',
+        'stream-json',
+      ])
+    );
   });
 
   it('rejects dangerous keys in structured AGY CLI output before schema access', async () => {

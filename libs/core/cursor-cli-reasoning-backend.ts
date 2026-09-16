@@ -112,6 +112,17 @@ function isNamedModelUnavailableError(message: string): boolean {
   return /named models unavailable|free plans can only use auto/iu.test(message);
 }
 
+function resolveCursorModelForEffort(
+  model: string,
+  effort?: ReasoningCallOptions['effort']
+): string {
+  if (!effort || model === 'auto') return model;
+  if (model.includes('[') && model.endsWith(']')) {
+    return `${model.slice(0, -1)},effort=${effort}]`;
+  }
+  return `${model}[effort=${effort}]`;
+}
+
 function validateExtraArgs(args: readonly string[]): string[] {
   for (const arg of args) {
     const flag = arg.split('=', 1)[0];
@@ -257,23 +268,25 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     return this.complete(
       STRUCTURED_REASONING_SYSTEM_PROMPT,
       [context ? `Context: ${context}` : '', `Task: ${instruction}`].filter(Boolean).join('\n\n'),
-      { profile, signal: options?.signal, model: options?.model }
+      {
+        profile,
+        signal: options?.signal,
+        model: options?.model,
+        effort: options?.effort,
+      }
     );
   }
 
-  async prompt(
-    prompt: string,
-    options?: {
-      model_tier?: 'fast' | 'standard' | 'deep';
-      profile?: ProviderPermissionProfileName;
-    }
-  ): Promise<string> {
+  async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     return this.complete(
       'You are a focused reasoning sub-agent. Return a concise, factual answer.',
       prompt,
       {
-        profile: options?.profile ?? 'planner',
-        model: resolveCursorModelForTier(options?.model_tier, this.model),
+        profile: normalizePermissionProfile(options?.profile) ?? 'planner',
+        model: resolveCursorModelForEffort(
+          options?.model ?? resolveCursorModelForTier(options?.model_tier, this.model),
+          options?.effort
+        ),
       }
     );
   }
@@ -294,7 +307,10 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
     assertReasoningEgressAllowed(this.name);
     if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
 
-    const model = resolveCursorModelForTier(options?.model_tier, this.model);
+    const model = resolveCursorModelForEffort(
+      options?.model ?? resolveCursorModelForTier(options?.model_tier, this.model),
+      options?.effort
+    );
     const args = [
       '-p',
       '--output-format',
@@ -509,11 +525,15 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       profile?: ProviderPermissionProfileName;
       signal?: AbortSignal;
       model?: string;
+      effort?: ReasoningCallOptions['effort'];
       shapeHint?: string;
     }
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
-    const model = options?.model?.trim() || this.model;
+    const model = resolveCursorModelForEffort(
+      options?.model?.trim() || this.model,
+      options?.effort
+    );
     const hint = options?.shapeHint?.trim()
       ? `\n\nRespond with exactly this JSON shape (top-level keys, nesting, and field names must match): ${options.shapeHint.trim()}`
       : '';

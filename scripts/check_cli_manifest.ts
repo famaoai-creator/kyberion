@@ -51,7 +51,7 @@ export interface CliManifestCheckOptions {
   packageScripts?: ReadonlySet<string>;
 }
 
-export const MAX_PACKAGE_SCRIPTS = 120;
+export const MAX_PACKAGE_SCRIPTS = 121;
 
 export function resolveCliModulePath(module: string, allowMissingLeaf = false): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(module), { allowMissingLeaf });

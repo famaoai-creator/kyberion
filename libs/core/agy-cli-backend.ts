@@ -471,14 +471,13 @@ export class AgyCliBackend implements ReasoningBackend {
     return this.runPrompt(
       [instruction, context ? `Context: ${context}` : ''].filter(Boolean).join('\n\n'),
       profileName,
-      options?.signal
+      options?.signal,
+      options?.model,
+      options?.effort
     );
   }
 
-  async prompt(
-    prompt: string,
-    options?: { profile?: ProviderPermissionProfileName }
-  ): Promise<string> {
+  async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
   }
 
@@ -497,7 +496,8 @@ export class AgyCliBackend implements ReasoningBackend {
     const args = [
       '--log-file',
       this.logFile,
-      ...this.resolveModelArgs(),
+      ...this.resolveModelArgs(options?.model),
+      ...(options?.effort ? ['--effort', options.effort] : []),
       ...this.resolveAgentArgs(),
       ...this.resolvePermissionArgs(options?.advisory ? 'planner' : undefined),
       '--output-format',
@@ -665,12 +665,15 @@ export class AgyCliBackend implements ReasoningBackend {
   private async runPrompt(
     prompt: string,
     profile?: ProviderPermissionProfileName,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    model?: string,
+    effort?: 'low' | 'medium' | 'high'
   ): Promise<string> {
     const args = [
       '--log-file',
       this.logFile,
-      ...this.resolveModelArgs(),
+      ...this.resolveModelArgs(model),
+      ...(effort ? ['--effort', effort] : []),
       ...this.resolveAgentArgs(),
       ...this.resolvePermissionArgs(profile),
       '-p',
@@ -699,12 +702,13 @@ export class AgyCliBackend implements ReasoningBackend {
    * Omit `--model agy` in live non-test runs so the host agy CLI uses its active
    * configured default model, while preserving test-argv expectations.
    */
-  private resolveModelArgs(): string[] {
-    if (!this.model) return [];
-    if (this.model === 'agy' && getRegisteredEnvText('NODE_ENV') !== 'test') {
+  private resolveModelArgs(modelOverride?: string): string[] {
+    const model = modelOverride?.trim() || this.model;
+    if (!model) return [];
+    if (model === 'agy' && getRegisteredEnvText('NODE_ENV') !== 'test') {
       return [];
     }
-    return ['--model', this.model];
+    return ['--model', model];
   }
 
   /**

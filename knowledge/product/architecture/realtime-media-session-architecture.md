@@ -375,3 +375,35 @@ current loop uses playback gating and a drain window, while a production AEC
 needs the microphone reference signal and device-specific tuning. SenseVoice
 and Supertonic also require managed runtime installation and Japanese quality
 verification before replacing the currently working Apple/MLX path.
+
+## 12. Reusable conversation defaults and controlled updates (2026-09-17)
+
+The reusable operator-facing setup is documented in
+[`realtime-voice-conversation-operations.md`](../voice/realtime-voice-conversation-operations.md).
+The runtime stores only conversation defaults under the active profile's
+`onboarding/realtime-voice.json`; credentials, voice samples, and mission
+transcripts remain in their existing governed stores.
+
+The precedence is explicit:
+
+```text
+CLI flags > realtime-voice.json > latency profile > provider default
+```
+
+The configuration has separate fields for `voice_profile_id`, exact
+`reasoning_model`, `reasoning_model_tier`, and `reasoning_effort`. A voice
+profile is fixed when a session is created, so a voice change starts a new
+session. Model and effort are per-turn reasoning options and can take effect
+on the next turn. This prevents a voice identity from changing mid-session
+while still allowing a latency/cost adjustment without losing the transcript.
+
+The production conversation runner validates an `assistant` media-session
+descriptor and connects a canonical `MediaEventBuffer` to the realtime voice
+loop. Speech boundaries, final transcript, assistant text deltas, streamed PCM
+output, turn completion, and session lifecycle are therefore available to the
+same meeting/avatar projections. Artifact-based output from `voice-actuator`
+is also recorded as the assistant turn's `audio_ref`; direct PCM streaming is
+represented as `audio_output_delta` and receives the fixed session voice profile
+id explicitly. Reusing a session id with a changed voice/language/persona is
+rejected, which keeps the media session and the persisted conversation session
+bound to one identity.
