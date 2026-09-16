@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "realtime-voice-conversation-preferences.schema.json",
+  "title": "Realtime voice conversation preferences",
+  "description": "Operator-owned defaults for the reusable realtime voice conversation front.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "voice_profile_id",
+    "language",
+    "assistant_name",
+    "latency_profile",
+    "personal_voice_mode",
+    "delivery_mode"
+  ],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "voice_profile_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "language": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "assistant_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "system_prompt": { "type": "string", "maxLength": 12000 },
+    "latency_profile": { "enum": ["low_latency", "balanced"] },
+    "reasoning_model": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "reasoning_model_tier": { "enum": ["fast", "standard", "deep"] },
+    "reasoning_effort": { "enum": ["low", "medium", "high"] },
+    "personal_voice_mode": { "enum": ["allow_fallback", "require_personal_voice"] },
+    "delivery_mode": { "enum": ["none", "artifact", "artifact_and_playback"] },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

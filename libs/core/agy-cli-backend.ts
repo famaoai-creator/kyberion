@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
+import * as readline from 'node:readline';
 import * as path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
@@ -38,6 +39,7 @@ import type {
   ExtractedTestPlan,
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
+  ReasoningTextStream,
 } from './reasoning-backend.js';
 
 import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
@@ -469,15 +471,119 @@ export class AgyCliBackend implements ReasoningBackend {
     return this.runPrompt(
       [instruction, context ? `Context: ${context}` : ''].filter(Boolean).join('\n\n'),
       profileName,
-      options?.signal
+      options?.signal,
+      options?.model,
+      options?.effort
     );
   }
 
-  async prompt(
-    prompt: string,
-    options?: { profile?: ProviderPermissionProfileName }
-  ): Promise<string> {
+  async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
+  }
+
+  /** Stream AGY step_update text deltas for latency-sensitive callers. */
+  streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
+    return this.streamPromptFromCli(prompt, options);
+  }
+
+  private async *streamPromptFromCli(
+    prompt: string,
+    options?: ReasoningCallOptions
+  ): ReasoningTextStream {
+    assertReasoningEgressAllowed(this.name);
+    if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
+
+    const args = [
+      '--log-file',
+      this.logFile,
+      ...this.resolveModelArgs(options?.model),
+      ...(options?.effort ? ['--effort', options.effort] : []),
+      ...this.resolveAgentArgs(),
+      ...this.resolvePermissionArgs(options?.advisory ? 'planner' : undefined),
+      '--output-format',
+      'stream-json',
+      '-p',
+      prompt,
+      ...this.extraArgs,
+    ];
+    const child = spawn(this.bin, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: buildProviderChildEnv({ provider: 'agy' }),
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => {
+      stderr = `${stderr}${chunk.toString()}`.slice(-2000);
+    });
+    const closePromise = new Promise<number>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (code) => resolve(code ?? 1));
+    });
+    const boundedClose = withWallClockBudget(
+      {
+        provider: 'agy',
+        budgetMs: this.timeoutMs,
+        child: delegationChildHandleFromChildProcess(child),
+        signal: options?.signal,
+      },
+      () => closePromise
+    );
+    void boundedClose.catch(() => undefined);
+    const onAbort = (): void => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+    };
+    options?.signal?.addEventListener('abort', onAbort, { once: true });
+    let emittedPartialText = false;
+    let yielded = false;
+    try {
+      child.stdin.end();
+      const lines = readline.createInterface({ input: child.stdout });
+      try {
+        for await (const line of lines) {
+          if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
+          const parsed = parseSafeJsonInput(String(line), 'AGY CLI stream response');
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+          const record = parsed as Record<string, unknown>;
+          if (record.event === 'step_update') {
+            const update = record.step_update;
+            if (update && typeof update === 'object' && !Array.isArray(update)) {
+              const updateRecord = update as Record<string, unknown>;
+              if (updateRecord.step_type === 'agent_response') {
+                const delta = updateRecord.text_delta;
+                if (typeof delta === 'string' && delta) {
+                  emittedPartialText = true;
+                  yielded = true;
+                  yield delta;
+                }
+              }
+            }
+            continue;
+          }
+          if (!emittedPartialText && record.event === 'result') {
+            const result = record.result;
+            const response =
+              result && typeof result === 'object' && !Array.isArray(result)
+                ? (result as Record<string, unknown>).response
+                : undefined;
+            if (typeof response === 'string' && response.trim()) {
+              yielded = true;
+              yield response;
+            }
+          }
+        }
+      } finally {
+        lines.close();
+      }
+      const exitCode = await boundedClose;
+      if (exitCode !== 0) {
+        throw new Error(
+          `[agy-cli] streaming CLI exited with code ${exitCode}${stderr ? `. stderr: ${stderr}` : ''}`
+        );
+      }
+      if (!yielded) throw new Error('[agy-cli] streaming CLI returned no text');
+    } finally {
+      options?.signal?.removeEventListener('abort', onAbort);
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+    }
   }
 
   public async runStructured<T>(params: {
@@ -559,12 +665,15 @@ export class AgyCliBackend implements ReasoningBackend {
   private async runPrompt(
     prompt: string,
     profile?: ProviderPermissionProfileName,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    model?: string,
+    effort?: 'low' | 'medium' | 'high'
   ): Promise<string> {
     const args = [
       '--log-file',
       this.logFile,
-      ...this.resolveModelArgs(),
+      ...this.resolveModelArgs(model),
+      ...(effort ? ['--effort', effort] : []),
       ...this.resolveAgentArgs(),
       ...this.resolvePermissionArgs(profile),
       '-p',
@@ -593,12 +702,13 @@ export class AgyCliBackend implements ReasoningBackend {
    * Omit `--model agy` in live non-test runs so the host agy CLI uses its active
    * configured default model, while preserving test-argv expectations.
    */
-  private resolveModelArgs(): string[] {
-    if (!this.model) return [];
-    if (this.model === 'agy' && getRegisteredEnvText('NODE_ENV') !== 'test') {
+  private resolveModelArgs(modelOverride?: string): string[] {
+    const model = modelOverride?.trim() || this.model;
+    if (!model) return [];
+    if (model === 'agy' && getRegisteredEnvText('NODE_ENV') !== 'test') {
       return [];
     }
-    return ['--model', this.model];
+    return ['--model', model];
   }
 
   /**

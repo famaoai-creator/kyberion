@@ -16,6 +16,7 @@ import {
   type MeetingJoinDriver,
   type MeetingTarget,
   type TranscriptChunk,
+  MediaEventBuffer,
   pathResolver,
   safeMkdir,
   safeRmSync,
@@ -71,6 +72,7 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     const trace = new TraceContext('meeting_participation:test', { missionId: 'MSN-TEST-1' });
 
     const heard: TranscriptChunk[] = [];
+    const mediaEvents: string[] = [];
     const agent: ConversationAgent = {
       async onUtterance(utt) {
         heard.push(utt);
@@ -104,6 +106,11 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
       voice_profile_id: 'operator-default-v1',
       audio_format: FORMAT,
       post_playback_drain_ms: 0,
+      media_event_buffer_factory: (sessionId) => {
+        const buffer = new MediaEventBuffer(sessionId, 32);
+        buffer.subscribe((event) => mediaEvents.push(event.type));
+        return buffer;
+      },
     });
 
     expect(heard.length).toBeGreaterThanOrEqual(3);
@@ -111,6 +118,10 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     expect(report.utterances_spoken).toBeGreaterThanOrEqual(1);
     expect(report.session_id).toMatch(/^stub-/);
     expect(report.left_at).toBeDefined();
+    expect(mediaEvents[0]).toBe('session_started');
+    expect(mediaEvents).toContain('transcript_final');
+    expect(mediaEvents).toContain('assistant_text_delta');
+    expect(mediaEvents.at(-1)).toBe('session_ended');
 
     const persisted = finalizeAndPersist(trace, { dir: traceDir });
     const persistedText = fs.readFileSync(persisted.path, 'utf8');
