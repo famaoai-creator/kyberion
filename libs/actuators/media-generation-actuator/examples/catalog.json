@@ -44,6 +44,20 @@
       "tags": ["music", "adf", "comfyui", "ace-step", "country", "ja", "example"]
     },
     {
+      "id": "direct-musicgen-mlx",
+      "title": "Direct Local MusicGen (MLX)",
+      "path": "libs/actuators/media-generation-actuator/examples/direct-musicgen-mlx.json",
+      "description": "Runs Apple Silicon MusicGen through the music-generation-bridge without ComfyUI (tool-runtime: musicgen_mlx / KYBERION_MUSICGEN_*).",
+      "tags": ["music", "direct", "musicgen", "mlx", "local", "example"]
+    },
+    {
+      "id": "direct-stable-audio-3-small-music",
+      "title": "Direct Local Stable Audio 3 Small-Music",
+      "path": "libs/actuators/media-generation-actuator/examples/direct-stable-audio-3-small-music.json",
+      "description": "Runs Stable Audio 3 small-music through the music-generation-bridge without ComfyUI (tool-runtime: stable_audio_3 / KYBERION_STABLE_AUDIO_*; HF_TOKEN required for gated weights).",
+      "tags": ["music", "direct", "stable-audio", "local", "example"]
+    },
+    {
       "id": "submit-music-generation-job",
       "title": "Submit Music Generation Job",
       "path": "libs/actuators/media-generation-actuator/examples/submit-music-generation-job.json",
