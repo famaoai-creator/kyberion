@@ -195,7 +195,7 @@ Every HTTP surface resolves the viewer principal server-side and treats a client
 
 ## Local Pads — capture at your desk, hand off to Kyberion
 
-Nine small **127.0.0.1-only** pages you run from the repo. Each one captures something you already have on your desk (a sketch, meeting notes, a screenshot, a file, a clipboard, today's TODO) and writes a session folder plus `handoff.json` that Kyberion can pick up. They load zero external resources, do all file I/O through `secure-io`, and never start a mission or send anything on their own.
+The **Capture desk** is one **127.0.0.1-only** server for the eight capture pads below. Start it once with `pnpm pads`, choose a pad from the menu, and inspect its authenticated history. It captures something you already have on your desk (a sketch, meeting notes, a screenshot, a file, a clipboard, today's TODO), stores records in the server-derived tenant/tier partition, and never starts a mission or sends anything on its own. The legacy per-pad pages remain available during migration.
 
 <table>
   <tr>
@@ -218,6 +218,10 @@ Nine small **127.0.0.1-only** pages you run from the repo. Each one captures som
 Start any of them the same way and open the printed URL:
 
 ```bash
+KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant-slug> pnpm pads
+# open http://127.0.0.1:8160/
+
+# Legacy individual entry point (still supported during migration)
 KYBERION_PERSONA=sovereign KYBERION_TENANT=<tenant-slug> \
   node_modules/.bin/tsx scripts/meeting-notepad/server.ts        # or sketch-input, daily-desk, …
 
@@ -230,7 +234,7 @@ What they share:
 
 - **Loopback only.** Bind to `127.0.0.1`, reject other origins, and require the per-run token printed at startup for every write. The token is not a substitute for human approval.
 - **Tier and tenant on the command line.** `--tier public|confidential|personal --tenant <slug>` decide where the session lands; `confidential` / `personal` need a server-side `KYBERION_TENANT`, and Personal Workbench (default tier `personal`) always does.
-- **Proposal, not execution.** Output is a session folder under `active/shared/tmp/<pad>/` plus `handoff.json`. Missions, sends, calendar changes and knowledge promotion stay behind the normal approval gates. Personal Workbench's `/action` exposes only governed OCR, a knowledge-promotion _candidate_, and email _drafts_.
+- **Proposal, not execution.** The unified desk writes durable, scope-partitioned pad records and an authenticated history index. Legacy entry points continue to write their session folder under `active/shared/tmp/<pad>/` plus `handoff.json`. Missions, sends, calendar changes and knowledge promotion stay behind the normal approval gates. Personal Workbench's `/action` exposes only governed OCR, a knowledge-promotion _candidate_, and email _drafts_.
 - **One helper, many pads.** They are thin twins built on `scripts/lib/local-artifact-pad.ts` and registered in the protocol-service registry, so adding a pad is a small, reviewable change. Index: [`scripts/personal-pads/README.md`](./scripts/personal-pads/README.md).
 
 ---

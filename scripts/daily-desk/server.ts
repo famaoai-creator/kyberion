@@ -35,6 +35,7 @@ import {
 } from '../lib/local-artifact-pad.js';
 import { dailyDeskPageHtml } from './desk-page.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { composeLegacyCapture } from '../personal-pads/legacy.js';
 
 export interface DailyDeskServerResult {
   ok: boolean;
@@ -281,6 +282,7 @@ export async function main(
   }
 
   function persistDesk(payload: DeskPayload): Record<string, unknown> {
+    composeLegacyCapture('daily-desk', payload as Record<string, unknown>);
     const sessionId = `${padContext.session_id}-${randomUUID().slice(0, 8)}`;
     const sessionDir = localPadSessionDir(out, sessionId);
     safeMkdir(sessionDir, { recursive: true });

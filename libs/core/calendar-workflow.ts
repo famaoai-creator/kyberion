@@ -47,6 +47,8 @@ export interface CalendarEventSummary {
   hangout_link: string;
   html_link: string;
   id: string;
+  /** Provider event description when returned by the agenda API. */
+  description?: string;
   location: string;
   start: string;
   status: string;
@@ -150,9 +152,11 @@ function normalizeRfc3339Value(value: string, timeZone?: string): Record<string,
 
 function normalizeEvent(item: unknown): CalendarEventSummary | null {
   if (!isRecord(item) || !nonEmptyString(item.id)) return null;
+  const description = stringValue(item.description);
   return {
     id: item.id,
     summary: stringValue(item.summary),
+    ...(description ? { description } : {}),
     start: nestedStringValue(item, 'start', 'dateTime') || nestedStringValue(item, 'start', 'date'),
     end: nestedStringValue(item, 'end', 'dateTime') || nestedStringValue(item, 'end', 'date'),
     location: stringValue(item.location),
@@ -255,9 +259,14 @@ function normalizeGraphEvent(item: unknown): CalendarEventSummary | null {
   if (!isRecord(item) || !nonEmptyString(item.id)) return null;
   const location = isRecord(item.location) ? item.location : undefined;
   const onlineMeeting = isRecord(item.onlineMeeting) ? item.onlineMeeting : undefined;
+  const description =
+    nestedStringValue(item, 'body', 'content') ||
+    stringValue(item.bodyPreview) ||
+    stringValue(item.description);
   return {
     id: item.id,
     summary: stringValue(item.subject) || stringValue(item.summary),
+    ...(description ? { description } : {}),
     start: nestedStringValue(item, 'start', 'dateTime') || nestedStringValue(item, 'start', 'date'),
     end: nestedStringValue(item, 'end', 'dateTime') || nestedStringValue(item, 'end', 'date'),
     location: stringValue(location?.displayName) || stringValue(item.location),

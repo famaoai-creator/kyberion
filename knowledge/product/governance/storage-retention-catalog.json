@@ -11,6 +11,12 @@
       "note": "Formerly DEFAULT_TMP_TTL_MS (24h). Shared scratch floor — anything here is consumable by contract."
     },
     {
+      "path": "active/shared/local-pads",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Durable tenant/tier-partitioned local-pad records, payloads, artifacts, handoffs, and rebuildable indexes. Retention is policy-specific; janitor must surface for an operator decision rather than deleting capture history."
+    },
+    {
       "path": "active/shared/logs",
       "artifact_class": "log",
       "ttl_days": 30,

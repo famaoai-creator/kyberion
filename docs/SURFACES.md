@@ -62,10 +62,11 @@ FD-08 で廃止した旧 Companion Hub(Home / Learn / Discover / Work / Connect 
 
 ## ローカル pad(127.0.0.1 限定・取り込み専用)
 
-手元にあるもの(図・会議メモ・スクリーンショット・ファイル・クリップボード・今日の TODO)を取り込み、session フォルダ + `handoff.json` を書き出して Kyberion に渡す小さなローカルページ群。外部リソース読込ゼロ、ファイル I/O は `secure-io` 経由、mission の自動起動や送信は行わない。スクリーンショット付きの一覧は [README の Local Pads](../README.md#local-pads--capture-at-your-desk-hand-off-to-kyberion)、索引は [`scripts/personal-pads/README.md`](../scripts/personal-pads/README.md)。
+手元にあるもの(図・会議メモ・スクリーンショット・ファイル・クリップボード・今日の TODO)を一つの localhost capture desk から取り込み、tenant・tier ごとの管理領域へ保存して履歴を確認できる。`pnpm pads` が一つの listener とメニューを提供する。外部リソース読込ゼロ、ファイル I/O は `secure-io` 経由、mission の自動起動や送信は行わない。スクリーンショット付きの一覧は [README の Local Pads](../README.md#local-pads--capture-at-your-desk-hand-off-to-kyberion)、索引は [`scripts/personal-pads/README.md`](../scripts/personal-pads/README.md)。既存の個別ポートは移行期間の互換入口として残る。
 
 | pad                                                    | port | 取り込むもの → 出力                                                                                      |
 | ------------------------------------------------------ | ---: | -------------------------------------------------------------------------------------------------------- |
+| [personal-pads](../scripts/personal-pads/)             | 8160 | 8 種の pad をメニュー選択 → tenant/tier 分離保存 + 認証済み履歴                                          |
 | [report-review](../scripts/report-review/)             | 8137 | 任意の自己完結 HTML レポート → 編集・コメント・音声入力・直書き保存                                      |
 | [sketch-input](../scripts/sketch-input/)               | 8147 | 描画ボード → PNG + handoff                                                                               |
 | [meeting-notepad](../scripts/meeting-notepad/)         | 8148 | メモ・口述・録音・添付 → 議事録 + handoff                                                                |
@@ -76,7 +77,7 @@ FD-08 で廃止した旧 Companion Hub(Home / Learn / Discover / Work / Connect 
 | [doc-drop](../scripts/doc-drop/)                       | 8153 | pdf / 画像 / txt / md / docx のドロップ → ingest handoff                                                 |
 | [personal-workbench](../scripts/personal-workbench/)   | 8154 | Link / Task / Follow-up / Decision / Expense / Daily Review の提案 inbox(governed OCR・メール下書きのみ) |
 
-起動は共通: `KYBERION_PERSONA=sovereign KYBERION_TENANT=<slug> node_modules/.bin/tsx scripts/<pad>/server.ts [--tier …] [port]`。`confidential` / `personal` tier は server-side `KYBERION_TENANT` が必須。書き込み API は起動時に表示されるローカルトークンを要求するが、これは人間承認の代替ではない。
+統合入口は `KYBERION_PERSONA=sovereign KYBERION_TENANT=<slug> pnpm pads`（`http://127.0.0.1:8160/`）。既存の個別入口は互換用に `node_modules/.bin/tsx scripts/<pad>/server.ts [--tier …] [port]` で起動できる。`confidential` / `personal` tier は server-side `KYBERION_TENANT` が必須。書き込み API は起動時に表示されるローカルトークンを要求するが、これは人間承認の代替ではない。
 
 Related guidance:
 

@@ -33,6 +33,7 @@ import {
 } from '../lib/local-artifact-pad.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { readSafeJsonFile } from '../lib/json-input.js';
+import { composeLegacyCapture } from '../personal-pads/legacy.js';
 import { executePersonalWorkbenchAction, type PersonalWorkbenchAction } from './actions.js';
 import type { CalendarProposalRecord } from './actions.js';
 
@@ -281,6 +282,7 @@ export async function main(
     return true;
   }
   async function persist(payload: WorkbenchPayload): Promise<Record<string, unknown>> {
+    composeLegacyCapture('personal-workbench', payload as Record<string, unknown>);
     if (!isKind(payload.kind))
       throw new Error('kind must be link, task, follow-up, decision, expense, or daily-review');
     const title = typeof payload.title === 'string' ? payload.title.trim().slice(0, 200) : '';
