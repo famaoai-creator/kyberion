@@ -93,6 +93,29 @@
       "additionalProperties": false
     },
     {
+      "title": "Direct music generation",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "generate_music" },
+        "params": {
+          "type": "object",
+          "required": ["prompt"],
+          "properties": {
+            "prompt": { "type": "string", "minLength": 1 },
+            "duration_sec": { "type": "number", "minimum": 1 },
+            "await_completion": { "type": "boolean" },
+            "backend_id": { "type": "string" },
+            "target_path": { "type": "string" },
+            "output_path": { "type": "string" },
+            "no_style_pack": { "type": "boolean" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    {
       "title": "Music generation",
       "type": "object",
       "required": ["action", "params"],

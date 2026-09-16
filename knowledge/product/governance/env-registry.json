@@ -1952,6 +1952,65 @@
       "documented": true
     },
     {
+      "name": "KYBERION_MUSICGEN_DURATION_SEC",
+      "category": "runtime",
+      "type": "number",
+      "required": false,
+      "default": "10",
+      "description": "Default clip length in seconds for local MusicGen/MLX generation; clamped by KYBERION_MUSICGEN_MAX_DURATION_SEC.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSICGEN_MAX_DURATION_SEC",
+      "category": "runtime",
+      "type": "number",
+      "required": false,
+      "default": "30",
+      "description": "Upper bound in seconds for local MusicGen/MLX clip length (MusicGen practical limit is about 30 seconds).",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSICGEN_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "facebook/musicgen-small",
+      "description": "HuggingFace model id for local MusicGen/MLX generation; defaults to facebook/musicgen-small.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSICGEN_PACKAGE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "default": "mlx-audiocraft",
+      "description": "Package specification supplied to the local MusicGen/MLX runner via uvx --from.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSICGEN_SEED",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional deterministic seed passed to the local MusicGen/MLX runner when the CLI supports --seed.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_MUSICGEN_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "default": "1800000",
+      "description": "Maximum local MusicGen/MLX generation time in milliseconds; defaults to 30 minutes.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
       "name": "KYBERION_NEMOTRON_KEY",
       "category": "secret",
       "type": "string",
@@ -2812,6 +2871,84 @@
       "description": "Test-only opt-in: lets vitest exercise the reasoning-path spend guard against real history/policy (normally disabled under VITEST).",
       "documented": true,
       "subsystem": "ops"
+    },
+    {
+      "name": "KYBERION_STABLE_AUDIO_DEVICE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional device override for Stable Audio 3 local generation (cpu, mps, or cuda). Leave unset for auto-detection.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_STABLE_AUDIO_DURATION_SEC",
+      "category": "runtime",
+      "type": "number",
+      "required": false,
+      "default": "30",
+      "description": "Default clip length in seconds for local Stable Audio 3 small-music generation; clamped by KYBERION_STABLE_AUDIO_MAX_DURATION_SEC.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_STABLE_AUDIO_MAX_DURATION_SEC",
+      "category": "runtime",
+      "type": "number",
+      "required": false,
+      "default": "120",
+      "description": "Upper bound in seconds for local Stable Audio 3 small-music clip length (small models support up to about 120 seconds).",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_STABLE_AUDIO_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "small-music",
+      "description": "Stable Audio 3 model id for local generation; defaults to small-music (CPU/MPS-friendly).",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_STABLE_AUDIO_PACKAGE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "default": "git+https://github.com/Stability-AI/stable-audio-3.git",
+      "description": "Package specification supplied to the local Stable Audio 3 runner via uvx --from (git URL by default; PyPI is not published).",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_STABLE_AUDIO_SEED",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional deterministic seed passed to the local Stable Audio 3 CLI (--seed).",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_STABLE_AUDIO_STEPS",
+      "category": "runtime",
+      "type": "number",
+      "required": false,
+      "default": "8",
+      "description": "Diffusion step count for local Stable Audio 3 generation; defaults to 8.",
+      "documented": true,
+      "subsystem": "media"
+    },
+    {
+      "name": "KYBERION_STABLE_AUDIO_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "default": "1800000",
+      "description": "Maximum local Stable Audio 3 generation time in milliseconds; defaults to 30 minutes.",
+      "documented": true,
+      "subsystem": "media"
     },
     {
       "name": "KYBERION_STREAMING_STT_BRIDGE",

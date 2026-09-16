@@ -13,6 +13,7 @@ import type { GenerationJob } from '@agent/core/types/generation-job';
 import { handleCaptureAction } from './capture-actions.js';
 import { transitionGenerationJob } from './generation-job-state.js';
 import { MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
+import * as path from 'node:path';
 
 type MediaActionResult = Record<string, unknown> & Partial<GenerationJob>;
 type MediaActionInput = {
@@ -33,6 +34,9 @@ import {
   maybeCopyArtifact,
   resolveImageArtifactFormat,
   resolveImageProviderPreference,
+  isDirectMusicGenerationBackend,
+  resolveMusicProviderPreference,
+  resolveMusicBridgeRequest,
   preparePromptBasedGeneration,
   resolveAwaitCompletion,
   executePreparedGeneration,
@@ -183,6 +187,53 @@ async function handlePromptBasedGeneration(action: string, params: any) {
 
       traceCtx.endSpan('ok');
       return { ...result, ...finalizeActuatorTrace(traceCtx) };
+    }
+
+    if (action === 'generate_music') {
+      const backend = resolveGenerationBackend(action, prepared.params);
+      if (isDirectMusicGenerationBackend(backend)) {
+        const { generateMusic } = await import('@agent/core/music-generation-bridge');
+        const bridgeRequest = resolveMusicBridgeRequest(prepared.params);
+        const bridgeRes = await generateMusic({
+          prompt: bridgeRequest.prompt,
+          ...(bridgeRequest.durationSec !== undefined
+            ? { durationSec: bridgeRequest.durationSec }
+            : {}),
+          targetPath: bridgeRequest.targetPath,
+          providerPreference: resolveMusicProviderPreference(prepared.params),
+        });
+
+        const artifactExists = Boolean(
+          bridgeRes.status === 'succeeded' && bridgeRes.path && safeExistsSync(bridgeRes.path)
+        );
+        const artifact =
+          artifactExists && bridgeRes.path
+            ? {
+                id: 'primary',
+                format: path.extname(bridgeRes.path).toLowerCase().replace(/^\./, '') || 'wav',
+                path: bridgeRes.path,
+              }
+            : null;
+
+        result = {
+          status: artifactExists ? 'succeeded' : 'failed',
+          action,
+          prompt_id: 'direct_musicgen_mlx',
+          artifacts: artifact ? [artifact] : [],
+          artifact,
+          copied_to: artifact?.path,
+          output_path: artifact?.path,
+          backend_id: bridgeRes.provider || backend.backend_id,
+          resolved_backend_id: backend.backend_id,
+          backend_kind: backend.kind,
+          backend_provider: backend.provider,
+          modality: backend.modality,
+          error: bridgeRes.error,
+        };
+
+        traceCtx.endSpan(artifactExists ? 'ok' : 'error');
+        return { ...result, ...finalizeActuatorTrace(traceCtx) };
+      }
     }
 
     const { compiled, workflow } = prepared;
