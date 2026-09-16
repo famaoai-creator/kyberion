@@ -206,6 +206,13 @@ export function ensureRealtimeVoiceConversationSession(input: {
   const sessionId = normalizeSessionId(input.sessionId);
   const existing = loadRealtimeVoiceConversationSession(sessionId);
   if (existing) {
+    // Re-validate the persisted profile on every reuse. A session created with
+    // fallback (or while a profile was active) must not silently bypass the
+    // current strict personal-voice policy on a later turn.
+    assertRealtimeVoiceProfileReady(
+      existing.profile_id,
+      input.personalVoiceMode || 'require_personal_voice'
+    );
     if (input.profileId && existing.profile_id !== input.profileId) {
       throw new Error(
         `[REALTIME_VOICE_SESSION_CONFIG_MISMATCH] session ${sessionId} is bound to voice profile ${existing.profile_id}; start a new session to use ${input.profileId}`
@@ -381,7 +388,7 @@ export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesi
     Date.now().toString(36),
     randomUUID().slice(0, 8),
   ].join('-');
-  const profile = getVoiceProfileRecord(input.profileId);
+  const profile = assertRealtimeVoiceProfileReady(input.profileId, input.personalVoiceMode);
   const policy = getVoiceRuntimePolicy();
   const engine = resolveVoiceEngineForPlatform(profile.default_engine_id);
   const format = resolveVoiceArtifactFormat(

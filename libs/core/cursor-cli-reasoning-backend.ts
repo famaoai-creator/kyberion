@@ -283,6 +283,7 @@ export class CursorCliReasoningBackend implements ReasoningBackend {
       prompt,
       {
         profile: normalizePermissionProfile(options?.profile) ?? 'planner',
+        signal: options?.signal,
         model: resolveCursorModelForEffort(
           options?.model ?? resolveCursorModelForTier(options?.model_tier, this.model),
           options?.effort

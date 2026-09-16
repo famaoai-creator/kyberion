@@ -51,6 +51,10 @@ describe('unified personal pads server', () => {
     expect(page).toContain('artifactFieldRequest');
     expect(page).toContain('artifactFailedFields');
     expect(page).toContain("document.querySelectorAll('[data-field],[data-action-field]')");
+    expect(page).toContain(
+      "a.fields.map(function(field){return fieldMarkup(field,'pad','data-field')}).join('')"
+    );
+    expect(page).not.toContain('a.fields.map(fieldMarkup)');
     expect(page).toContain('描画を消去');
     expect(page).toContain('setScopeSwitching(true)');
     expect(page).toContain('履歴をコピーして編集できます');
