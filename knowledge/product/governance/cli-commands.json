@@ -556,6 +556,14 @@
   ],
   "script_commands": [
     {
+      "id": "script.pads",
+      "script": "pads",
+      "command": "pads server",
+      "noun": "pads",
+      "verb": "server",
+      "audience": "operator"
+    },
+    {
       "id": "script.test",
       "script": "test",
       "command": "test default",

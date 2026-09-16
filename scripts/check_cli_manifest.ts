@@ -51,7 +51,8 @@ export interface CliManifestCheckOptions {
   packageScripts?: ReadonlySet<string>;
 }
 
-export const MAX_PACKAGE_SCRIPTS = 121;
+// Keep the ratchet explicit as governed operator entrypoints are added.
+export const MAX_PACKAGE_SCRIPTS = 122;
 
 export function resolveCliModulePath(module: string, allowMissingLeaf = false): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(module), { allowMissingLeaf });

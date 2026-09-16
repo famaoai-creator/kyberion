@@ -1147,6 +1147,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/audio-route-resource-lifecycle.md",
+      "tier": "public",
+      "size": 5110,
+      "type": "md"
+    },
+    {
       "path": "product/governance/audit-ledger-recovery.md",
       "tier": "public",
       "size": 1374,
@@ -1311,7 +1317,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 47819,
+      "size": 47990,
       "type": "json"
     },
     {
@@ -1419,7 +1425,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 125713,
+      "size": 126034,
       "type": "json"
     },
     {
@@ -1563,7 +1569,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 7146,
+      "size": 7548,
       "type": "json"
     },
     {
@@ -2403,7 +2409,7 @@
     {
       "path": "product/governance/protocol-service-registry.json",
       "tier": "public",
-      "size": 13266,
+      "size": 14342,
       "type": "json"
     },
     {
@@ -2571,7 +2577,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 17389,
+      "size": 17862,
       "type": "json"
     },
     {
@@ -2637,7 +2643,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 22240,
+      "size": 22600,
       "type": "json"
     },
     {
@@ -4971,7 +4977,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 567555,
+      "size": 570960,
       "type": "json"
     },
     {

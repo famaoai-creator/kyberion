@@ -35,6 +35,7 @@ import {
 } from '../lib/local-artifact-pad.js';
 import { docDropPageHtml } from './drop-page.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { composeLegacyCapture } from '../personal-pads/legacy.js';
 
 export interface DocDropServerResult {
   ok: boolean;
@@ -263,6 +264,7 @@ export async function main(
   }
 
   function persistDrop(payload: DropPayload): Record<string, unknown> {
+    composeLegacyCapture('doc-drop', payload as Record<string, unknown>);
     const sessionId = `${padContext.session_id}-${randomUUID().slice(0, 8)}`;
     const sessionDir = localPadSessionDir(out, sessionId);
     safeMkdir(sessionDir, { recursive: true });

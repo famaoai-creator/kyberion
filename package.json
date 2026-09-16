@@ -108,6 +108,7 @@
     "dashboard": "node dist/scripts/sovereign_dashboard.js",
     "control": "node dist/scripts/control_plane_cli.js",
     "surfaces": "node --import ./scripts/ts-loader.mjs scripts/run_with_env.ts KYBERION_PERSONA=worker SYSTEM_ROLE=surface_runtime node dist/scripts/surface_runtime.js",
+    "pads": "node --import ./scripts/ts-loader.mjs scripts/personal-pads/server.ts",
     "config-mission": "node --import ./scripts/ts-loader.mjs scripts/run_with_env.ts KYBERION_PERSONA=worker SYSTEM_ROLE=system_configurator node dist/scripts/config_mission.js",
     "services:setup": "node dist/scripts/services_setup.js",
     "channels:list": "node dist/scripts/channel_directory.js",

@@ -256,6 +256,7 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
     });
 
     let tsMs = 0;
+    let captureCompleted = false;
     try {
       for await (const chunk of child.stdout) {
         const payload = new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength);
@@ -274,6 +275,7 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
       if (exitCode !== 0) {
         throw new Error(stderr.trim() || `ffmpeg exited with code ${exitCode}`);
       }
+      captureCompleted = true;
     } catch (error: any) {
       try {
         child.kill('SIGTERM');
@@ -283,6 +285,14 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
       throw new Error(
         `[virtual-audio-input-recording-bridge] stream capture failed: ${error?.message || String(error)}`
       );
+    } finally {
+      if (!captureCompleted && child.exitCode === null && child.signalCode === null) {
+        try {
+          child.kill('SIGTERM');
+        } catch {
+          // ignore
+        }
+      }
     }
   }
 
