@@ -682,14 +682,22 @@ describe('voice actuator', () => {
       }),
     ]);
     expect(result.progress_packets.length).toBeGreaterThan(0);
-    expect(mocks.safeExec).toHaveBeenCalledWith('say', [
+    expect(mocks.safeExec).toHaveBeenNthCalledWith(1, 'say', [
       '-v',
       'Kyoko',
       '-r',
       '180',
       '-o',
-      '/tmp/voice-generation/req-1.wav',
+      '/tmp/voice-generation/req-1.wav.say.aiff',
       'hello world',
+    ]);
+    expect(mocks.safeExec).toHaveBeenNthCalledWith(2, 'ffmpeg', [
+      '-y',
+      '-i',
+      '/tmp/voice-generation/req-1.wav.say.aiff',
+      '-acodec',
+      'pcm_s16le',
+      '/tmp/voice-generation/req-1.wav',
     ]);
     expect(mocks.createVirtualAudioOutputPlaybackBridge).toHaveBeenCalled();
     expect(mocks.retry).toHaveBeenCalled();

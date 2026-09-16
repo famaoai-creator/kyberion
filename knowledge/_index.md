@@ -599,6 +599,7 @@
 - [WebView Session Handoff](./product/schemas/README-webview-session-handoff.md) (public | Unknown)
 
 ## 📁 product/voice
+- [Realtime voice conversation operations](./product/voice/realtime-voice-conversation-operations.md) (public | Unknown)
 - [音声ペルソナ定義 (Voice Persona Definitions)](./product/voice/persona_definitions.md) (public | Ecosystem Architect)
 
 ## 📁 public/accessibility

@@ -2,6 +2,8 @@
 
 export * from './voice-selection-preferences.js';
 
+export * from './realtime-voice-preferences.js';
+
 export * from './native-speech-listen-bridge.js';
 
 export {

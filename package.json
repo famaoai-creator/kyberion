@@ -86,6 +86,7 @@
     "env:bootstrap": "node dist/scripts/bootstrap_environment.js",
     "meeting:consent": "node dist/scripts/voice_consent.js",
     "voice:route": "node dist/scripts/voice_route_cli.js",
+    "voice:conversation-config": "node dist/scripts/realtime_voice_config.js",
     "typecheck": "tsc --noEmit",
     "validate": "pnpm run build && pnpm run typecheck && pnpm run check -- --scope full",
     "doctor": "node dist/scripts/run_doctor.js",
