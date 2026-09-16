@@ -14,10 +14,7 @@ import {
   compileImageGenerationADF,
   compileVideoGenerationADF,
 } from '@agent/core/visual-workflow-compiler';
-import {
-  resolveMediaBackendForPlatform,
-  type MediaBackendRecord,
-} from '@agent/core/media-backend-registry';
+import { resolveMediaBackendForPlatform } from '@agent/core/media-backend-registry';
 import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
@@ -302,7 +299,9 @@ function resolveImageProviderPreference(params: any): string[] | undefined {
   return Array.isArray(preference) && preference.length > 0 ? preference : undefined;
 }
 
-function isDirectMusicGenerationBackend(backend: MediaBackendRecord): boolean {
+function isDirectMusicGenerationBackend(
+  backend: Pick<GenerationBackend, 'modality' | 'kind'>
+): boolean {
   return backend.modality === 'music' && backend.kind === 'cli';
 }
 
