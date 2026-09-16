@@ -201,15 +201,10 @@ export class ShellGrokCliBackend implements ReasoningBackend {
   async delegateTask(
     instruction: string,
     context?: string,
-    options?: {
-      model_tier?: 'fast' | 'standard' | 'deep';
-      profile?: ProviderPermissionProfileName;
-      advisory?: boolean;
-      signal?: AbortSignal;
-    }
+    options?: ReasoningCallOptions
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
-    const model = resolveGrokModelForTier(options?.model_tier, this.model);
+    const model = options?.model ?? resolveGrokModelForTier(options?.model_tier, this.model);
     const requestedProfile = options?.advisory
       ? 'planner'
       : normalizePermissionProfile(options?.profile);
@@ -228,6 +223,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       'plain',
       '--model',
       model,
+      ...(options?.effort ? ['--reasoning-effort', options.effort] : []),
       ...defaultPermissionArgs,
       '--disable-web-search',
       '--no-subagents',
@@ -324,13 +320,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     return this.harnessSession;
   }
 
-  async prompt(
-    prompt: string,
-    options?: {
-      model_tier?: 'fast' | 'standard' | 'deep';
-      profile?: ProviderPermissionProfileName;
-    }
-  ): Promise<string> {
+  async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
   }
 
@@ -346,7 +336,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     assertReasoningEgressAllowed(this.name);
     if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
 
-    const model = resolveGrokModelForTier(options?.model_tier, this.model);
+    const model = options?.model ?? resolveGrokModelForTier(options?.model_tier, this.model);
     const requestedProfile: ProviderPermissionProfileName | undefined = options?.advisory
       ? 'planner'
       : normalizePermissionProfile(options?.profile);
@@ -362,6 +352,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       '--include-partial-messages',
       '--model',
       model,
+      ...(options?.effort ? ['--reasoning-effort', options.effort] : []),
       '--disable-web-search',
       ...permissionArgs,
       ...this.extraArgs,

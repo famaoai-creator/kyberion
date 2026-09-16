@@ -21,6 +21,11 @@ import {
   runRealtimeVoiceConversationTurn,
   synthesizeRealtimeVoice,
 } from '@agent/core/realtime-voice-conversation';
+import { loadRealtimeVoiceConversationPreferences } from '@agent/core/realtime-voice-preferences';
+import type {
+  RealtimeVoiceReasoningEffort,
+  RealtimeVoiceReasoningTier,
+} from '@agent/core/realtime-voice-preferences';
 import type { PlaybackHandle } from '@agent/core/audio-playback';
 import type { AudioChunk } from '@agent/core/meeting-session-types';
 import {
@@ -53,6 +58,12 @@ import type { StreamingSpeechToTextBridge } from '@agent/core/streaming-stt-brid
 import type { StreamingTextToSpeechBridge } from '@agent/core/streaming-tts-bridge';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { parseSafeJsonInput } from './lib/json-input.js';
+import {
+  MediaEventBuffer,
+  validateMediaSessionDescriptor,
+  type MediaEvent,
+  type MediaSessionDescriptor,
+} from '@agent/core/realtime-media-session';
 
 type DeliveryMode = 'none' | 'artifact' | 'artifact_and_playback';
 type PersonalVoiceMode = 'allow_fallback' | 'require_personal_voice';
@@ -72,6 +83,12 @@ export interface RealtimeVoiceConversationCliOptions {
   personalVoiceMode: PersonalVoiceMode;
   /** Low-latency selects the governed fast reasoning tier and shorter turn/TTS boundaries. */
   latencyProfile?: LatencyProfile;
+  /** Optional exact provider model override; the active provider must support it. */
+  reasoningModel?: string;
+  /** Optional explicit tier override; otherwise derived from latencyProfile. */
+  reasoningModelTier?: RealtimeVoiceReasoningTier;
+  /** Optional explicit effort override; otherwise derived from latencyProfile. */
+  reasoningEffort?: RealtimeVoiceReasoningEffort;
   interactive: boolean;
   /** 'vad': endpoint-driven capture via mic-capture + EnergyVad. 'fixed': legacy fixed-duration python bridge. */
   recorder: RecorderMode;
@@ -98,6 +115,10 @@ export interface RealtimeVoiceConversationCliOptions {
   idleTimeoutSeconds: number;
   /** Max characters per pipelined TTS segment. */
   speechSegmentChars?: number;
+  /** Optional canonical media-session sink for meeting/avatar/presence projections. */
+  mediaEventBufferFactory?: (sessionId: string) => MediaEventBuffer;
+  /** Optional live observer for canonical media-session events. */
+  onMediaEvent?: (event: MediaEvent) => void;
   turns?: number;
   recordBridgePath: string;
   pythonBin: string;
@@ -110,14 +131,35 @@ export interface RealtimeVoiceConversationLoopDeps {
   promptForContinue?: (message: string) => Promise<void>;
 }
 
-function reasoningModelTierForLatencyProfile(
-  profile: LatencyProfile | undefined
-): 'fast' | undefined {
-  return profile !== 'balanced' ? 'fast' : undefined;
+function reasoningModelTierForOptions(
+  options: Pick<RealtimeVoiceConversationCliOptions, 'latencyProfile' | 'reasoningModelTier'>
+): RealtimeVoiceReasoningTier | undefined {
+  return options.reasoningModelTier ?? (options.latencyProfile !== 'balanced' ? 'fast' : undefined);
 }
 
-function reasoningEffortForLatencyProfile(profile: LatencyProfile | undefined): 'low' | undefined {
-  return profile !== 'balanced' ? 'low' : undefined;
+function reasoningEffortForOptions(
+  options: Pick<RealtimeVoiceConversationCliOptions, 'latencyProfile' | 'reasoningEffort'>
+): RealtimeVoiceReasoningEffort | undefined {
+  return options.reasoningEffort ?? (options.latencyProfile !== 'balanced' ? 'low' : undefined);
+}
+
+function reasoningOptionsFor(
+  options: Pick<
+    RealtimeVoiceConversationCliOptions,
+    'latencyProfile' | 'reasoningModel' | 'reasoningModelTier' | 'reasoningEffort'
+  >
+): {
+  model?: string;
+  modelTier?: RealtimeVoiceReasoningTier;
+  effort?: RealtimeVoiceReasoningEffort;
+} {
+  const modelTier = reasoningModelTierForOptions(options);
+  const effort = reasoningEffortForOptions(options);
+  return {
+    ...(options.reasoningModel ? { model: options.reasoningModel } : {}),
+    ...(modelTier ? { modelTier } : {}),
+    ...(effort ? { effort } : {}),
+  };
 }
 
 function resolvePythonBin(env: NodeJS.ProcessEnv = process.env): string {
@@ -411,8 +453,9 @@ export async function runRealtimeVoiceConversationInteractive(
       sourceId: options.sourceId,
       deliveryMode: options.deliveryMode,
       personalVoiceMode: options.personalVoiceMode,
-      reasoningModelTier: reasoningModelTierForLatencyProfile(options.latencyProfile),
-      reasoningEffort: reasoningEffortForLatencyProfile(options.latencyProfile),
+      reasoningModel: options.reasoningModel,
+      reasoningModelTier: reasoningModelTierForOptions(options),
+      reasoningEffort: reasoningEffortForOptions(options),
     });
 
     print(`User: ${result.user_text}`);
@@ -494,6 +537,26 @@ export async function runRealtimeVoiceConversationLoop(
     personalVoiceMode: options.personalVoiceMode,
   });
   const language = options.language || session.language;
+  const mediaSession: MediaSessionDescriptor = {
+    session_id: session.session_id,
+    mode: 'assistant',
+    participants: [
+      { participant_id: 'local-user', kind: 'human', display_label: 'User' },
+      {
+        participant_id: 'kyberion-assistant',
+        kind: 'agent',
+        display_label: session.assistant_name,
+        voice_profile_id: session.profile_id,
+      },
+    ],
+  };
+  validateMediaSessionDescriptor(mediaSession);
+  const mediaEventBuffer =
+    options.mediaEventBufferFactory?.(session.session_id) ||
+    new MediaEventBuffer(session.session_id);
+  const unsubscribeMediaEvents = options.onMediaEvent
+    ? mediaEventBuffer.subscribe(options.onMediaEvent)
+    : undefined;
 
   // VAD backend (Phase 3): silero when configured, energy otherwise.
   installSileroVadBackend();
@@ -611,16 +674,17 @@ export async function runRealtimeVoiceConversationLoop(
       ...(streamingStt ? { streamingStt } : {}),
       transcribe: async (audioPath) => (await sttBridge.transcribe({ audioPath, language })).text,
       reply: (userText) =>
-        generateRealtimeAssistantReply(session.session_id, userText, {
-          modelTier: reasoningModelTierForLatencyProfile(options.latencyProfile),
-          effort: reasoningEffortForLatencyProfile(options.latencyProfile),
-        }),
+        generateRealtimeAssistantReply(session.session_id, userText, reasoningOptionsFor(options)),
       streamReply: (userText, _turn, onSegment, signal) =>
-        streamRealtimeAssistantReply(session.session_id, userText, onSegment, signal, {
-          modelTier: reasoningModelTierForLatencyProfile(options.latencyProfile),
-          effort: reasoningEffortForLatencyProfile(options.latencyProfile),
-        }),
+        streamRealtimeAssistantReply(
+          session.session_id,
+          userText,
+          onSegment,
+          signal,
+          reasoningOptionsFor(options)
+        ),
       synthesizeSegment,
+      mediaEventBufferFactory: () => mediaEventBuffer,
       ...(streamingTts
         ? {
             streamingTts,
@@ -642,6 +706,7 @@ export async function runRealtimeVoiceConversationLoop(
           userText: turn.user_text,
           assistantText: turn.assistant_text,
           userAudioRef: turn.audio_path,
+          assistantAudioRef: turn.assistant_audio_paths[0],
         });
         print(`\nUser: ${turn.user_text}`);
         print(`${session.assistant_name}: ${turn.assistant_text}`);
@@ -662,6 +727,7 @@ export async function runRealtimeVoiceConversationLoop(
       throw new Error(report.error);
     }
   } finally {
+    unsubscribeMediaEvents?.();
     await warmClient?.dispose();
   }
 }
@@ -684,8 +750,9 @@ async function runOneShotConversation(
     sourceId: options.sourceId,
     deliveryMode: options.deliveryMode,
     personalVoiceMode: options.personalVoiceMode,
-    reasoningModelTier: reasoningModelTierForLatencyProfile(options.latencyProfile),
-    reasoningEffort: reasoningEffortForLatencyProfile(options.latencyProfile),
+    reasoningModel: options.reasoningModel,
+    reasoningModelTier: reasoningModelTierForOptions(options),
+    reasoningEffort: reasoningEffortForOptions(options),
   });
   print(JSON.stringify(result, null, 2));
 }
@@ -705,10 +772,13 @@ export function parseRealtimeVoiceConversationCli(
     throw new Error('--mission is required for interactive recording consent');
   }
 
-  const latencyProfile = String(argv['latency-profile'] ?? 'low_latency') as LatencyProfile;
+  const configured = loadRealtimeVoiceConversationPreferences();
+  const latencyProfile = String(
+    argv['latency-profile'] ?? configured?.latency_profile ?? 'low_latency'
+  ) as LatencyProfile;
   if (latencyProfile !== 'low_latency' && latencyProfile !== 'balanced') {
     throw new Error(
-      `--latency-profile must be 'low_latency' or 'balanced' (got ${String(argv['latency-profile'])})`
+      `--latency-profile must be 'low_latency' or 'balanced' (got ${latencyProfile})`
     );
   }
 
@@ -749,16 +819,44 @@ export function parseRealtimeVoiceConversationCli(
   return {
     sessionId,
     audio,
-    profileId: argv['profile-id'] ? String(argv['profile-id']) : undefined,
-    language: argv.language ? String(argv.language) : undefined,
-    assistantName: String(argv['assistant-name'] || 'Kyberion'),
-    systemPrompt: argv['system-prompt'] ? String(argv['system-prompt']) : undefined,
+    profileId:
+      argv['profile-id'] || argv['voice-profile-id']
+        ? String(argv['profile-id'] ?? argv['voice-profile-id'])
+        : configured?.voice_profile_id,
+    language: argv.language ? String(argv.language) : configured?.language,
+    assistantName: String(argv['assistant-name'] ?? configured?.assistant_name ?? 'Kyberion'),
+    systemPrompt:
+      typeof argv['system-prompt'] === 'string'
+        ? String(argv['system-prompt'])
+        : configured?.system_prompt,
     surfaceId: String(argv['surface-id'] || 'presence-studio'),
     sourceId: String(argv['source-id'] || 'local-mic'),
-    deliveryMode: (argv['delivery-mode'] as DeliveryMode) || 'artifact_and_playback',
+    deliveryMode:
+      (argv['delivery-mode'] as DeliveryMode) ??
+      configured?.delivery_mode ??
+      'artifact_and_playback',
     personalVoiceMode:
-      (argv['personal-voice-mode'] as PersonalVoiceMode) || 'require_personal_voice',
+      (argv['personal-voice-mode'] as PersonalVoiceMode) ??
+      configured?.personal_voice_mode ??
+      'require_personal_voice',
     latencyProfile,
+    ...((argv['reasoning-model'] ?? configured?.reasoning_model)
+      ? { reasoningModel: String(argv['reasoning-model'] ?? configured?.reasoning_model) }
+      : {}),
+    ...((argv['reasoning-model-tier'] ?? configured?.reasoning_model_tier)
+      ? {
+          reasoningModelTier: String(
+            argv['reasoning-model-tier'] ?? configured?.reasoning_model_tier
+          ) as RealtimeVoiceReasoningTier,
+        }
+      : {}),
+    ...((argv['reasoning-effort'] ?? configured?.reasoning_effort)
+      ? {
+          reasoningEffort: String(
+            argv['reasoning-effort'] ?? configured?.reasoning_effort
+          ) as RealtimeVoiceReasoningEffort,
+        }
+      : {}),
     interactive,
     recorder,
     recordSeconds: Math.floor(recordSeconds),
@@ -818,28 +916,40 @@ export async function main(
   const argv = await createStandardYargs(['node', 'run_realtime_voice_conversation', ...args])
     .option('session-id', { type: 'string', demandOption: true })
     .option('audio', { type: 'string' })
-    .option('profile-id', { type: 'string' })
+    .option('profile-id', { type: 'string', alias: 'voice-profile-id' })
     .option('language', { type: 'string' })
-    .option('assistant-name', { type: 'string', default: 'Kyberion' })
+    .option('assistant-name', { type: 'string' })
     .option('system-prompt', { type: 'string' })
     .option('surface-id', { type: 'string', default: 'presence-studio' })
     .option('source-id', { type: 'string', default: 'local-mic' })
     .option('delivery-mode', {
       type: 'string',
       choices: ['none', 'artifact', 'artifact_and_playback'] as const,
-      default: 'artifact_and_playback',
     })
     .option('personal-voice-mode', {
       type: 'string',
       choices: ['allow_fallback', 'require_personal_voice'] as const,
-      default: 'require_personal_voice',
     })
     .option('latency-profile', {
       type: 'string',
       choices: ['low_latency', 'balanced'] as const,
-      default: 'low_latency',
       describe:
         'low_latency uses the governed fast reasoning tier; balanced keeps the configured default model',
+    })
+    .option('reasoning-model', {
+      type: 'string',
+      describe:
+        'Exact model id override for the selected reasoning provider (for example gpt-5.6-luna)',
+    })
+    .option('reasoning-model-tier', {
+      type: 'string',
+      choices: ['fast', 'standard', 'deep'] as const,
+      describe: 'Explicit model tier override; otherwise derived from --latency-profile',
+    })
+    .option('reasoning-effort', {
+      type: 'string',
+      choices: ['low', 'medium', 'high'] as const,
+      describe: 'Explicit provider reasoning effort override',
     })
     .option('interactive', { type: 'boolean', default: false })
     .option('recorder', {

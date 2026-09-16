@@ -2903,6 +2903,10 @@
       "types": "./dist/realtime-voice-conversation.d.ts",
       "default": "./dist/realtime-voice-conversation.js"
     },
+    "./realtime-voice-preferences": {
+      "types": "./dist/realtime-voice-preferences.d.ts",
+      "default": "./dist/realtime-voice-preferences.js"
+    },
     "./ten-vad-bridge": {
       "types": "./dist/ten-vad-bridge.d.ts",
       "default": "./dist/ten-vad-bridge.js"

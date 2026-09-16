@@ -68,6 +68,8 @@ export interface RealtimeVoiceLoopTurnResult {
   user_text: string;
   assistant_text: string;
   audio_path: string;
+  /** Artifacts returned by the governed voice actuator for this reply. */
+  assistant_audio_paths: string[];
   /** True when barge-in cut the assistant reply short. */
   interrupted: boolean;
   /** 'streaming' when the streaming STT produced the transcript. */
@@ -303,6 +305,29 @@ export async function startRealtimeVoiceLoop(
   let sttFeed: SttFeed | null = null;
   let bargedDuringTurn = false;
 
+  const observeAudioStream = (
+    audio: AsyncIterable<AudioChunk>,
+    turnIndex: number,
+    source: string
+  ): AsyncIterable<AudioChunk> =>
+    (async function* (): AsyncGenerator<AudioChunk> {
+      let chunkIndex = 0;
+      for await (const chunk of audio) {
+        publishMediaEvent({
+          event_id: `${sessionId}:audio-output:${turnIndex + 1}:${chunkIndex++}`,
+          session_id: sessionId,
+          type: 'audio_output_delta',
+          at_ms: Math.max(0, Date.now() - loopStartedAt),
+          emitted_at: nowIso(),
+          source,
+          track_id: `${sessionId}:assistant:${turnIndex + 1}`,
+          chunk,
+          direction: 'output',
+        });
+        yield chunk;
+      }
+    })();
+
   // Barge-in detector state (only while SPEAKING).
   let bargeController: BargeInController | null = null;
 
@@ -322,6 +347,16 @@ export async function startRealtimeVoiceLoop(
     });
     const segment = segmenter.takeSegment();
     safeWriteFile(audioPath, pcmToWav(segment.pcm, sampleRateHz));
+    publishMediaEvent({
+      event_id: `${sessionId}:speech-ended:${turnIndex + 1}`,
+      session_id: sessionId,
+      type: 'speech_ended',
+      at_ms: Math.max(0, Date.now() - loopStartedAt),
+      emitted_at: nowIso(),
+      source: 'realtime-voice-loop',
+      segment_id: `${sessionId}:segment:${turnIndex + 1}`,
+      duration_ms: segment.durationMs,
+    });
     options.onEvent?.({
       kind: 'utterance_captured',
       turn: turnIndex,
@@ -392,19 +427,30 @@ export async function startRealtimeVoiceLoop(
     let speechResult: Awaited<SegmentedSpeechController['done']> | null = null;
     if (options.streamReply) {
       const streamedSegments: string[] = [];
+      let assistantDeltaIndex = 0;
       const streamingSpeech =
         options.streamingTts && options.voiceProfileId
           ? streamTtsAudioPlayback({
               voiceProfileId: options.voiceProfileId,
               synthesizeStream: (segments, profileId) =>
-                options.streamingTts!.synthesizeStream(segments, profileId),
+                observeAudioStream(
+                  options.streamingTts!.synthesizeStream(segments, profileId),
+                  turnIndex,
+                  `streaming-tts:${options.streamingTts!.bridge_id}`
+                ),
               ...(options.playAudioStream ? { playStream: options.playAudioStream } : {}),
             })
           : streamVoicePlayback({
-              synthesize: (segment, index, signal) =>
-                options.synthesizeAudioStream
-                  ? options.synthesizeAudioStream(segment, index, turnIndex, signal)
-                  : options.synthesizeSegment(segment, index, turnIndex, signal),
+              synthesize: async (segment, index, signal) => {
+                if (options.synthesizeAudioStream) {
+                  return observeAudioStream(
+                    await options.synthesizeAudioStream(segment, index, turnIndex, signal),
+                    turnIndex,
+                    'voice-actuator-stream'
+                  );
+                }
+                return options.synthesizeSegment(segment, index, turnIndex, signal);
+              },
               play,
             });
       speech = streamingSpeech;
@@ -419,6 +465,17 @@ export async function startRealtimeVoiceLoop(
             turnIndex,
             (segment) => {
               streamedSegments.push(segment);
+              publishMediaEvent({
+                event_id: `${sessionId}:assistant:${turnIndex + 1}:delta:${assistantDeltaIndex++}`,
+                session_id: sessionId,
+                type: 'assistant_text_delta',
+                at_ms: Math.max(0, Date.now() - loopStartedAt),
+                emitted_at: nowIso(),
+                source: 'realtime-voice-loop',
+                text: segment,
+                is_final: false,
+                turn_id: `${sessionId}:turn:${turnIndex + 1}`,
+              });
               streamingSpeech.push(segment);
             },
             streamingSpeech.signal
@@ -484,6 +541,7 @@ export async function startRealtimeVoiceLoop(
       user_text: userText,
       assistant_text: assistantText,
       audio_path: audioPath,
+      assistant_audio_paths: [...speechResult.audioPaths],
       interrupted: speechResult.interrupted,
       stt_mode: sttMode,
       metrics: {
@@ -558,6 +616,17 @@ export async function startRealtimeVoiceLoop(
             sttFeed.push(chunk);
           } else if (result.state === 'recording' && !result.onset) {
             sttFeed?.push(chunk);
+          }
+          if (result.onset) {
+            publishMediaEvent({
+              event_id: `${sessionId}:speech-started:${turnsCompleted + 1}`,
+              session_id: sessionId,
+              type: 'speech_started',
+              at_ms: Math.max(0, Date.now() - loopStartedAt),
+              emitted_at: nowIso(),
+              source: 'realtime-voice-loop',
+              segment_id: `${sessionId}:segment:${turnsCompleted + 1}`,
+            });
           }
           if (result.endpoint || result.capped) {
             state = 'thinking';

@@ -464,25 +464,18 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
   async delegateTask(
     instruction: string,
     context?: string,
-    options?: {
-      model_tier?: 'fast' | 'standard' | 'deep';
-      /**
-       * XP-02 follow-up: KD-05 capability profile. When set, its provider
-       * permission mapping (see {@link resolveProviderPermissionArgs}) is
-       * appended to argv. Omit (the historical default) to keep argv
-       * byte-identical to callers that predate this option.
-       */
-      profile?: ProviderPermissionProfileName;
-      advisory?: boolean;
-      effort?: 'low' | 'medium' | 'high';
-      signal?: AbortSignal;
-    }
+    options?: ReasoningCallOptions
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
-    const model = resolveClaudeModelForTier(options?.model_tier, this.model);
-    const permissionArgs = this.resolvePermissionArgs(
-      options?.advisory ? 'planner' : options?.profile
-    );
+    const model = options?.model ?? resolveClaudeModelForTier(options?.model_tier, this.model);
+    const permissionProfile = options?.advisory
+      ? 'planner'
+      : options?.profile === 'planner' ||
+          options?.profile === 'explorer' ||
+          options?.profile === 'implementer'
+        ? options.profile
+        : undefined;
+    const permissionArgs = this.resolvePermissionArgs(permissionProfile);
     const args = [
       '-p',
       `${instruction}\n\nContext: ${context ?? 'none'}`,
@@ -495,14 +488,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     return this.spawnCli(args, '', options?.signal);
   }
 
-  async prompt(
-    prompt: string,
-    options?: {
-      model_tier?: 'fast' | 'standard' | 'deep';
-      profile?: ProviderPermissionProfileName;
-      effort?: 'low' | 'medium' | 'high';
-    }
-  ): Promise<string> {
+  async prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
   }
 
@@ -522,7 +508,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     assertReasoningEgressAllowed(this.name);
     if (options?.signal?.aborted) throw new Error('reasoning stream aborted');
 
-    const model = resolveClaudeModelForTier(options?.model_tier, this.model);
+    const model = options?.model ?? resolveClaudeModelForTier(options?.model_tier, this.model);
     const args = [
       '-p',
       '--verbose',

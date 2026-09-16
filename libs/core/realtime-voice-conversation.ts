@@ -74,6 +74,8 @@ export interface RealtimeVoiceConversationTurnInput {
   sourceId?: string;
   deliveryMode?: 'none' | 'artifact' | 'artifact_and_playback';
   personalVoiceMode?: 'allow_fallback' | 'require_personal_voice';
+  /** Optional exact provider model override for the reasoning turn. */
+  reasoningModel?: string;
   /** Optional governed reasoning tier; `fast` is appropriate for live speech. */
   reasoningModelTier?: 'fast' | 'standard' | 'deep';
   /** Optional provider-supported effort hint for latency-sensitive replies. */
@@ -203,7 +205,29 @@ export function ensureRealtimeVoiceConversationSession(input: {
 }): RealtimeVoiceConversationSession {
   const sessionId = normalizeSessionId(input.sessionId);
   const existing = loadRealtimeVoiceConversationSession(sessionId);
-  if (existing) return existing;
+  if (existing) {
+    if (input.profileId && existing.profile_id !== input.profileId) {
+      throw new Error(
+        `[REALTIME_VOICE_SESSION_CONFIG_MISMATCH] session ${sessionId} is bound to voice profile ${existing.profile_id}; start a new session to use ${input.profileId}`
+      );
+    }
+    if (input.language && existing.language !== input.language) {
+      throw new Error(
+        `[REALTIME_VOICE_SESSION_CONFIG_MISMATCH] session ${sessionId} is bound to language ${existing.language}; start a new session to use ${input.language}`
+      );
+    }
+    if (input.assistantName && existing.assistant_name !== input.assistantName) {
+      throw new Error(
+        `[REALTIME_VOICE_SESSION_CONFIG_MISMATCH] session ${sessionId} is bound to assistant ${existing.assistant_name}; start a new session to use ${input.assistantName}`
+      );
+    }
+    if (input.systemPrompt !== undefined && existing.system_prompt !== input.systemPrompt) {
+      throw new Error(
+        `[REALTIME_VOICE_SESSION_CONFIG_MISMATCH] session ${sessionId} already has a different system prompt; start a new session to change it`
+      );
+    }
+    return existing;
+  }
 
   const profile = assertRealtimeVoiceProfileReady(
     input.profileId,
@@ -313,6 +337,8 @@ export interface RealtimeVoiceSynthesisInput {
 }
 
 export interface RealtimeVoiceReplyOptions {
+  /** Optional exact provider model override; the active provider must support it. */
+  model?: string;
   /** Forward the governed model tier to the active reasoning route. */
   modelTier?: 'fast' | 'standard' | 'deep';
   /** Forward the provider-supported effort hint to the active reasoning route. */
@@ -442,6 +468,7 @@ export async function generateRealtimeAssistantReply(
   }
   const backend = getReasoningBackend();
   const reasoningOptions = {
+    ...(options?.model ? { model: options.model } : {}),
     ...(options?.modelTier ? { model_tier: options.modelTier } : {}),
     ...(options?.effort ? { effort: options.effort } : {}),
   };
@@ -478,6 +505,7 @@ export async function streamRealtimeAssistantReply(
   const backend = getReasoningBackend();
   const prompt = buildRealtimeVoiceReplyPrompt(session, userText);
   const reasoningOptions = {
+    ...(options?.model ? { model: options.model } : {}),
     ...(options?.modelTier ? { model_tier: options.modelTier } : {}),
     ...(options?.effort ? { effort: options.effort } : {}),
     ...(signal ? { signal } : {}),
@@ -593,6 +621,7 @@ export async function runRealtimeVoiceConversationTurn(
 
   const backend = getReasoningBackend();
   const reasoningOptions = {
+    ...(input.reasoningModel ? { model: input.reasoningModel } : {}),
     ...(input.reasoningModelTier ? { model_tier: input.reasoningModelTier } : {}),
     ...(input.reasoningEffort ? { effort: input.reasoningEffort } : {}),
   };

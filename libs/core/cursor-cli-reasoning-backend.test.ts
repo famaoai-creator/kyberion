@@ -156,13 +156,18 @@ describe('cursor-cli-reasoning-backend', () => {
 
     const backend = new CursorCliReasoningBackend({ bin: 'cursor-agent', model: 'auto' });
     const deltas: string[] = [];
-    for await (const delta of backend.streamPrompt('hello')) deltas.push(delta);
+    for await (const delta of backend.streamPrompt('hello', {
+      model: 'sonnet-4-thinking',
+      effort: 'low',
+    }))
+      deltas.push(delta);
 
     expect(deltas).toEqual(['準備', 'できています。']);
     const [, args] = spawnMock.mock.calls[0];
     expect(args).toEqual(
       expect.arrayContaining(['--output-format', 'stream-json', '--stream-partial-output'])
     );
+    expect(args).toContain('sonnet-4-thinking[effort=low]');
   });
 
   it('parses structured JSON from the envelope result field', async () => {

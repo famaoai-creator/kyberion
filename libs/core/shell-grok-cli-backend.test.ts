@@ -159,7 +159,11 @@ describe('shell-grok-cli-backend', () => {
 
     const backend = new ShellGrokCliBackend({ bin: 'grok', model: 'grok-4.6' });
     const deltas: string[] = [];
-    for await (const delta of backend.streamPrompt('hello')) deltas.push(delta);
+    for await (const delta of backend.streamPrompt('hello', {
+      model: 'grok-4.6',
+      effort: 'low',
+    }))
+      deltas.push(delta);
 
     expect(deltas).toEqual(['準備', 'できています。']);
     const [, args] = spawnMock.mock.calls[0];
@@ -170,6 +174,8 @@ describe('shell-grok-cli-backend', () => {
         '--include-partial-messages',
       ])
     );
+    expect(args).toContain('--reasoning-effort');
+    expect(args).toContain('low');
   });
 
   it('falls back to the final Grok assistant envelope when partials are absent', async () => {

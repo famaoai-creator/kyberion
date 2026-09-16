@@ -231,12 +231,20 @@ describe('realtime voice conversation', () => {
       language: 'ja',
     });
     expect(session.profile_id).toBe('me-ja');
+    expect(() =>
+      ensureRealtimeVoiceConversationSession({
+        sessionId: 'rtc-1',
+        profileId: 'another-voice',
+      })
+    ).toThrow(/start a new session to use another-voice/u);
 
     const result = await runRealtimeVoiceConversationTurn({
       sessionId: 'rtc-1',
       audioPath: 'active/shared/tmp/fake-input.wav',
       deliveryMode: 'none',
+      reasoningModel: 'gpt-5.6-luna',
       reasoningModelTier: 'fast',
+      reasoningEffort: 'low',
     });
 
     expect(result.user_text).toBe('今日の予定を教えて');
@@ -244,7 +252,11 @@ describe('realtime voice conversation', () => {
     expect(promptText).toContain('160 characters');
     expect(promptText).toContain('Do not mention internal processing');
     expect(result.profile_id).toBe('me-ja');
-    expect(promptOptions).toEqual({ model_tier: 'fast' });
+    expect(promptOptions).toEqual({
+      model: 'gpt-5.6-luna',
+      model_tier: 'fast',
+      effort: 'low',
+    });
     const saved = JSON.parse(
       safeReadFile(result.transcript_path, { encoding: 'utf8' }) as string
     ) as {
@@ -259,11 +271,15 @@ describe('realtime voice conversation', () => {
       '続けて',
       (segment) => streamedSegments.push(segment),
       undefined,
-      { modelTier: 'fast' }
+      { model: 'gpt-5.6-luna', modelTier: 'fast', effort: 'low' }
     );
     expect(streamed).toBe('ストリームの返答です。');
     expect(streamedSegments).toEqual(['ストリームの返答です。']);
-    expect(streamOptions).toEqual({ model_tier: 'fast' });
+    expect(streamOptions).toEqual({
+      model: 'gpt-5.6-luna',
+      model_tier: 'fast',
+      effort: 'low',
+    });
   });
 
   it('bounds provider output to a short spoken reply', () => {
