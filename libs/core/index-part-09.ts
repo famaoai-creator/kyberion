@@ -30,6 +30,8 @@ export * from './graph-run-artifact.js';
 
 export * from './realtime-voice-conversation.js';
 
+export * from './realtime-media-session.js';
+
 export * from './surface-coordination-store.js';
 
 export * from './surface-delivery.js';

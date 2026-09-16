@@ -1023,6 +1023,10 @@
       "types": "./dist/realtime-voice-loop.d.ts",
       "default": "./dist/realtime-voice-loop.js"
     },
+    "./realtime-media-session": {
+      "types": "./dist/realtime-media-session.d.ts",
+      "default": "./dist/realtime-media-session.js"
+    },
     "./vad-turn-recorder": {
       "types": "./dist/vad-turn-recorder.d.ts",
       "default": "./dist/vad-turn-recorder.js"
