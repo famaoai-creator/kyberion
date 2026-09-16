@@ -237,6 +237,21 @@ describe('codex-cli-query', () => {
       expect(spawnOptions.env.ANTHROPIC_API_KEY).toBeUndefined();
       expect(spawnOptions.env.UNRELATED_TEST_SECRET).toBeUndefined();
     });
+
+    it('projects a low reasoning effort onto the Codex CLI config override', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+
+      await runCodexCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+        options: { bin: 'codex', model: 'gpt-5.6-luna', effort: 'low' },
+      });
+
+      const [, argv] = mocks.spawnMock.mock.calls[0];
+      expect(argv).toEqual(expect.arrayContaining(['--model', 'gpt-5.6-luna']));
+      expect(argv).toEqual(expect.arrayContaining(['-c', 'model_reasoning_effort=low']));
+    });
   });
 
   describe('declarative permission profile argv (XP-02 follow-up)', () => {

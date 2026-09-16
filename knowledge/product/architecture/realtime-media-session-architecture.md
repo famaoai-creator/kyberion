@@ -297,3 +297,81 @@ Acceptance criteria:
 - [OpenAI Realtime API](https://platform.openai.com/docs/api-reference/realtime?lang=javascript)
 - [Azure Voice Live API and visemes](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/voice-live-how-to)
 - [NVIDIA Audio2Face-3D](https://docs.nvidia.com/ace/audio2face-3d-microservice/1.0/text/getting-started/overview.html)
+
+## 11. Low-latency voice findings and adopted defaults (2026-09-16)
+
+The [GMO 次世代システム研究室の local OSS voice article](https://recruit.group.gmo/engineer/jisedai/blog/conversation_ai_local_oss/)
+reinforces the same operational conclusion as the live Kyberion check: the
+first audible response matters more than the completion time, and AEC/VAD,
+short streaming units, and fast local components must be treated as one
+latency budget. The article's concrete stack is SenseVoice → Gemma →
+Supertonic, with PBFDAF/DTD AEC and Silero VAD.
+
+The sustained local check on this branch measured STT at roughly 0.2–0.4s but
+the reasoning stage at 8.5–16.6s. The immediate bottleneck was therefore the
+configured reasoning route, not mlx-audio TTS or microphone capture. The
+realtime CLI now exposes a governed `--latency-profile`:
+
+- `low_latency` (default): forwards the governed `model_tier: fast` and
+  `effort: low`, uses a 500ms VAD endpoint default, and uses 80-character
+  sentence/TTS flush units.
+- `balanced`: preserves the configured reasoning model and the previous 700ms
+  / 120-character defaults.
+
+The fast tier reuses the existing model registry and provider adapters; it is
+not a second authorization path. The local route remains available as a
+fallback, and the canonical media events are unchanged, so meeting speaker
+attribution and avatar/viseme consumers do not depend on the selected model.
+
+The provider CLI comparison was repeated through
+`streamRealtimeAssistantReply` on 2026-09-16 with the same Japanese
+latency-check prompt, no TTS or playback work, and `fast/low` hints. Results
+are first spoken sentence segment / completed reply:
+
+| provider path | model / effort         | first segment | complete |
+| ------------- | ---------------------- | ------------: | -------: |
+| Codex CLI     | `gpt-5.6-luna` / `low` |         4.34s |    4.34s |
+| Grok CLI      | `grok-4.6` / `low`     |         6.83s |    6.83s |
+| Cursor CLI    | `auto` / `low`         |        11.54s |   11.54s |
+| AGY CLI       | configured / `low`     |        24.73s |   24.73s |
+
+The one-sentence probe makes first segment equal completion because the voice
+layer waits for a sentence boundary before handing text to TTS. Native CLI
+probes also showed partial text before completion for AGY, Cursor, and Grok;
+their adapters now expose those deltas through `ReasoningTextStream` and
+discard the duplicated final envelope. Codex's current `exec --json` adapter
+still consumes the completed structured result, so its realtime path remains
+whole-reply fallback even though the CLI emits JSONL lifecycle events. The
+Codex model spelling and effort override are explicit: `gpt-5.6-luna` with
+`-c model_reasoning_effort=low`.
+
+The following candidates were evaluated but are not silently enabled by this
+change:
+
+- [Gemini 3.8 Live](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-live)
+  is the strongest future native-audio candidate for low-latency Japanese
+  conversation. It requires an external provider transport, API-key/ephemeral
+  token handling, and a separate egress-consent path; it does not provide the
+  local personal voice clone used by the current actuator.
+- [GPT-Live 1](https://developers.openai.com/api/docs/models/gpt-live-1) and
+  [GPT-Realtime-2.1](https://developers.openai.com/api/docs/models/gpt-realtime-2.1)
+  are viable provider-native alternatives, but access, billing, and
+  transport/session lifecycle must be verified before adding them to a local
+  default. They belong behind `RealtimeVoiceTransport`, not inside the
+  meeting-analysis or avatar projection code.
+- [VibeVoice-Realtime](https://github.com/microsoft/VibeVoice/blob/main/docs/vibevoice-realtime-0.5b.md)
+  reports very low initial-audio latency, but its documented realtime TTS path
+  is single-speaker and primarily English. [VibeVoice streaming ASR](https://github.com/microsoft/VibeVoice/blob/main/docs/vibevoice-asr-streaming.md)
+  remains a good meeting/post-analysis adapter, where tentative live speaker
+  ids and authoritative post-processing are already modeled above.
+- [LiveKit turn tuning](https://docs.livekit.io/agents/logic/turns/tuning/)
+  supports preemptive generation and optional preemptive TTS. These are useful
+  next-stage optimizations once a cancellable provider-native or local token
+  stream is connected; speculative audio must never be allowed to leak into a
+  later turn after barge-in.
+
+AEC remains a follow-up implementation rather than a guessed DSP shim: the
+current loop uses playback gating and a drain window, while a production AEC
+needs the microphone reference signal and device-specific tuning. SenseVoice
+and Supertonic also require managed runtime installation and Japanese quality
+verification before replacing the currently working Apple/MLX path.
