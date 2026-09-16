@@ -51,7 +51,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_TOKEN`                 | string | no       | Bearer token used to authenticate the terminal bridge.                                                                                                                 |
 | `KYBERION_VLLM_KEY`                       | string | no       | API key for the vLLM OpenAI-compatible backend, when authentication is enabled.                                                                                        |
 
-## path (90)
+## path (91)
 
 | Variable                                                         | Type | Required | Description                                                                                                                                                                         |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -145,6 +145,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VOICE_PROFILE_REGISTRY_PATH`                           | path | no       | Explicit base voice-profile registry path; selecting it disables the automatic personal and customer overlay lookup.                                                                |
 | `KYBERION_VOICE_RUNTIME_POLICY_PATH`                             | path | no       | Override for the voice runtime policy catalog; the default is knowledge/product/governance/voice-runtime-policy.json and invalid input falls back conservatively.                   |
 | `KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH`                    | path | no       | Override for the voice sample-ingestion policy catalog; the selected file is schema-validated before profile registration.                                                          |
+| `KYBERION_WORKING_MEMORY_ROOT`                                   | path | no       | Optional tenant-bound working-memory root used by the unified daily-desk action; each tenant is resolved as tenant/owners/<principal-hash>.                                         |
 
 ## flag (20)
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BlackHoleAudioBus } from './blackhole-audio-bus.js';
 import { CoreAudioDeviceInventoryBridge } from './coreaudio-device-inventory.js';
 import type { AudioDeviceDescriptor } from './audio-route.js';
@@ -73,5 +73,31 @@ describe('BlackHoleAudioBus characterization and safety', () => {
     await expect(new BlackHoleAudioBus().open({ ...format, encoding: 'opus' })).rejects.toThrow(
       /only pcm_s16le/
     );
+  });
+
+  it('always cleans capture and leases when output close fails', async () => {
+    const bus = new BlackHoleAudioBus();
+    const inputQueue = {
+      close: vi.fn(),
+      metrics: vi.fn(() => ({ depth: 0, dropped_chunks: 0, dropped_ms: 0 })),
+    };
+    const release = vi.fn();
+    const inputProc = { exitCode: 0, signalCode: null };
+    const output = { close: vi.fn().mockRejectedValue(new Error('output helper failed')) };
+
+    Object.assign(bus as any, {
+      opened: true,
+      status: 'healthy',
+      output,
+      inputQueue,
+      inputProc,
+      leases: [{ release }],
+    });
+
+    await expect(bus.close()).rejects.toThrow('output helper failed');
+    expect(output.close).toHaveBeenCalledOnce();
+    expect(inputQueue.close).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+    expect(bus.health().status).toBe('closed');
   });
 });

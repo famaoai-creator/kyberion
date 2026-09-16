@@ -619,6 +619,16 @@ describe('front-desk-routes.ts route wiring (FD-05 Deliverable 2)', () => {
   });
 });
 
+describe('server.ts installs the real reasoning backend before routes register', () => {
+  it('calls installReasoningBackends( before registerFrontDeskRoutes(', () => {
+    const source = readRepoFile('presence/displays/presence-studio/server.ts');
+    const installCall = source.indexOf('installReasoningBackends(');
+    const frontDeskCall = source.indexOf('registerFrontDeskRoutes(');
+    expect(installCall).toBeGreaterThan(-1);
+    expect(frontDeskCall).toBeGreaterThan(installCall);
+  });
+});
+
 describe('FD-03 ask page static contract', () => {
   it('mounts the rail in ask.html as current "ask"', () => {
     const askHtml = readRepoFile('presence/displays/presence-studio/static/ask.html');
@@ -637,6 +647,16 @@ describe('FD-03 ask page static contract', () => {
     expect(combined).not.toContain('127.0.0.1');
     expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(combined)).toBe(false);
 
+    // HT-03 (2nd half): `mission_id` is the `/handoff` response's wire field
+    // name, and `front_desk:hearing_mission_label` is a vocabulary-key
+    // identifier — neither is rendered prose (the key's *value* is
+    // "Request {id}" / "依頼番号 {id}", no "mission" wording shown to the
+    // user). Strip both before scanning so an identifier substring can't
+    // trip the raw-copy guard the forbidden-word list exists for.
+    const withoutInternalIdentifiers = combined
+      .replace(/front_desk:[a-zA-Z0-9_]+/g, '')
+      .replace(/\bmission_id\b/g, '');
+
     const forbiddenWords = [
       'mission',
       'ADF',
@@ -648,7 +668,7 @@ describe('FD-03 ask page static contract', () => {
       'ports',
     ];
     for (const word of forbiddenWords) {
-      expect(combined.toLowerCase()).not.toContain(word.toLowerCase());
+      expect(withoutInternalIdentifiers.toLowerCase()).not.toContain(word.toLowerCase());
     }
   });
 
@@ -888,6 +908,19 @@ describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
     expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_decide')");
     expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_pending')");
     expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_canvas_frame_title')");
+    // HT-02: the canvas-generation status line under the iframe.
+    expect(askJs).toContain('front_desk:hearing_canvas_updating');
+    expect(askJs).toContain('front_desk:hearing_canvas_generated');
+    expect(askJs).toContain('front_desk:hearing_canvas_template');
+    expect(askJs).toContain('canvas_generation');
+    // HT-03 (2nd half): the hand-off button + its result.
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_handoff_button')");
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_handoff_pending')");
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_handoff_done')");
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_handoff_failed')");
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_mission_label')");
+    expect(askJs).toContain("vt(state.vocab, 'front_desk:hearing_open_decide')");
+    expect(askJs).toContain('/handoff?locale=');
     // The hearing endpoints carry the same `?locale=` the page already
     // sends to `/api/ask-vocabulary`.
     expect(askJs).toContain('/api/hearing/');
@@ -930,5 +963,31 @@ describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
     const helpVocabRoute = source.slice(helpVocabStart, helpVocabStart + 400);
     expect(helpVocabRoute).toContain('HELP_VOCABULARY_KEYS');
     expect(helpVocabRoute).toContain("res.setHeader('Cache-Control', 'no-store')");
+  });
+
+  it('HT-04/05 second pass: help.js marks a lesson done by posting complete, using the training_mark_done* keys and no raw copy', () => {
+    const helpJs = readRepoFile('presence/displays/presence-studio/static/help.js');
+
+    // `HELP_VOCABULARY_KEYS` is frozen for this wave, so the mark-done copy
+    // comes from a dedicated `/api/training/vocabulary` fetch instead.
+    expect(helpJs).toContain("fetch('/api/training/vocabulary?locale=");
+    expect(helpJs).toContain("fetch('/api/training/progress', {");
+    expect(helpJs).toContain("method: 'POST'");
+    expect(helpJs).toContain("status: 'complete'");
+    expect(helpJs).toContain('lesson_id: lessonId');
+    expect(helpJs).toContain("vt(vocab, 'front_desk:training_mark_done')");
+    expect(helpJs).toContain("vt(vocab, 'front_desk:training_mark_done_recorded')");
+    expect(helpJs).toContain("vt(vocab, 'front_desk:training_mark_done_failed')");
+
+    // No raw stand-in copy for the new button/notice text.
+    for (const oldText of ['できた', '記録しました', '記録できませんでした']) {
+      expect(helpJs).not.toContain(oldText);
+    }
+
+    // Same posture as every other page: no hardcoded ports, no target=,
+    // no emoji, no internal jargon leaking into the surface.
+    expect(helpJs).not.toContain('127.0.0.1');
+    expect(helpJs).not.toContain('target=');
+    expect(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(helpJs)).toBe(false);
   });
 });

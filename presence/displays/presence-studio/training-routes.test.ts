@@ -19,8 +19,9 @@ vi.mock('@agent/core/member-registry', async () => {
   return { ...actual, resolveMemberByPrincipal: vi.fn() };
 });
 
-import { resolveMemberByPrincipal } from '@agent/core/member-registry';
-import { readTrainingProgress } from '@agent/core/training-catalog';
+import { resolveMemberByPrincipal, writeMemberProfile } from '@agent/core/member-registry';
+import type { MemberProfile } from '@agent/core/member-registry';
+import { readTrainingProgress, writeTrainingProgress } from '@agent/core/training-catalog';
 import { registerTrainingRoutes } from './training-routes.js';
 
 function readRepoFile(relativePath: string): string {
@@ -213,5 +214,158 @@ describe('POST /api/training/progress is localadmin-only', () => {
     );
 
     expect(res.statusCode).toBe(400);
+  });
+});
+
+const OVERVIEW_TENANT = 'zz-train-ov-tenant';
+const OVERVIEW_OWNER_ID = 'zz-train-ov-owner';
+const OVERVIEW_MEMBER_ID = 'zz-train-ov-member';
+const OVERVIEW_OTHER_TENANT_MEMBER_ID = 'zz-train-ov-other';
+
+function overviewMemberProfile(
+  memberId: string,
+  role: 'owner' | 'viewer',
+  tenant: string
+): MemberProfile {
+  return {
+    member_id: memberId,
+    display_name: `Overview ${memberId}`,
+    status: 'active',
+    memberships: [{ tenant_slug: tenant, role }],
+    access_registrations: [],
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+describe('GET /api/training/progress/overview is owner-only and tenant-narrowed', () => {
+  const { app, handlers } = createFakeApp();
+  registerTrainingRoutes(app);
+  const getOverview = handlers.get('GET /api/training/progress/overview')!;
+  const originalToken = process.env.PRESENCE_STUDIO_TOKEN;
+  const originalTenant = process.env.KYBERION_TENANT;
+
+  beforeEach(() => {
+    vi.mocked(resolveMemberByPrincipal).mockReset();
+    process.env.KYBERION_TENANT = OVERVIEW_TENANT;
+  });
+
+  afterEach(() => {
+    if (originalToken === undefined) delete process.env.PRESENCE_STUDIO_TOKEN;
+    else process.env.PRESENCE_STUDIO_TOKEN = originalToken;
+    if (originalTenant === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = originalTenant;
+    withExecutionContext('ecosystem_architect', () => {
+      for (const memberId of [
+        OVERVIEW_OWNER_ID,
+        OVERVIEW_MEMBER_ID,
+        OVERVIEW_OTHER_TENANT_MEMBER_ID,
+      ]) {
+        safeRmSync(path.join(pathResolver.rootDir(), 'knowledge/personal/members', memberId), {
+          recursive: true,
+          force: true,
+        });
+        safeRmSync(
+          path.join(pathResolver.rootDir(), 'knowledge/personal/members', `${memberId}.json`),
+          { force: true }
+        );
+      }
+      safeRmSync(path.join(pathResolver.rootDir(), 'knowledge/confidential', OVERVIEW_TENANT), {
+        recursive: true,
+        force: true,
+      });
+    });
+  });
+
+  it('rejects a remote token viewer with 403, never reaching the member/catalog read', () => {
+    process.env.PRESENCE_STUDIO_TOKEN = 'training-overview-test-token';
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(
+      overviewMemberProfile(OVERVIEW_OWNER_ID, 'owner', OVERVIEW_TENANT)
+    );
+
+    const res = fakeResponse();
+    getOverview(
+      fakeRequest({
+        remoteAddress: '198.51.100.24',
+        authorization: 'Bearer training-overview-test-token',
+      }),
+      res
+    );
+
+    expect(res.statusCode).toBe(403);
+    expect(resolveMemberByPrincipal).not.toHaveBeenCalled();
+  });
+
+  it('rejects a local session whose own membership role for the tenant is not owner', () => {
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(
+      overviewMemberProfile(OVERVIEW_MEMBER_ID, 'viewer', OVERVIEW_TENANT)
+    );
+
+    const res = fakeResponse();
+    getOverview(fakeRequest({ remoteAddress: '127.0.0.1' }), res);
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('returns lessons_done/lessons_total for every member with a membership in the narrowed tenant', () => {
+    withExecutionContext('ecosystem_architect', () => {
+      writeMemberProfile(overviewMemberProfile(OVERVIEW_OWNER_ID, 'owner', OVERVIEW_TENANT));
+      writeMemberProfile(overviewMemberProfile(OVERVIEW_MEMBER_ID, 'viewer', OVERVIEW_TENANT));
+      writeMemberProfile(
+        overviewMemberProfile(OVERVIEW_OTHER_TENANT_MEMBER_ID, 'owner', 'zz-train-ov-else')
+      );
+      writeTrainingProgress({
+        version: '1.0.0',
+        member_id: OVERVIEW_MEMBER_ID,
+        lessons: {
+          'first-request': { status: 'complete', completed_at: '2026-09-01T00:00:00.000Z' },
+        },
+      });
+    });
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(
+      overviewMemberProfile(OVERVIEW_OWNER_ID, 'owner', OVERVIEW_TENANT)
+    );
+
+    const res = fakeResponse();
+    getOverview(fakeRequest({ remoteAddress: '127.0.0.1' }), res);
+
+    expect(res.statusCode).toBe(200);
+    const body = res.body as {
+      ok: boolean;
+      overview: Array<{
+        member_id: string;
+        display_name: string;
+        lessons_done: number;
+        lessons_total: number;
+        last_completed_at?: string;
+      }>;
+    };
+    expect(body.ok).toBe(true);
+    const ids = body.overview.map((item) => item.member_id);
+    // Tenant-narrowed: the member scoped to a different tenant never appears.
+    expect(ids).not.toContain(OVERVIEW_OTHER_TENANT_MEMBER_ID);
+    expect(ids).toContain(OVERVIEW_OWNER_ID);
+    expect(ids).toContain(OVERVIEW_MEMBER_ID);
+    const memberSummary = body.overview.find((item) => item.member_id === OVERVIEW_MEMBER_ID);
+    expect(memberSummary?.display_name).toBe(`Overview ${OVERVIEW_MEMBER_ID}`);
+    expect(memberSummary?.lessons_done).toBe(1);
+    expect(memberSummary?.lessons_total).toBeGreaterThan(0);
+    expect(memberSummary?.last_completed_at).toBe('2026-09-01T00:00:00.000Z');
+    const ownerSummary = body.overview.find((item) => item.member_id === OVERVIEW_OWNER_ID);
+    expect(ownerSummary?.lessons_done).toBe(0);
+  });
+});
+
+describe('GET /api/training/vocabulary', () => {
+  it('mirrors /api/help-vocabulary’s shape for the "mark done" copy help.js needs', () => {
+    const { app, handlers } = createFakeApp();
+    registerTrainingRoutes(app);
+    const res = fakeResponse();
+    handlers.get('GET /api/training/vocabulary')!(fakeRequest({ remoteAddress: '127.0.0.1' }), res);
+    const body = res.body as { ok: boolean; locale: string; texts: Record<string, string> };
+    expect(body.ok).toBe(true);
+    expect(body.texts['front_desk:training_mark_done']).toBeTruthy();
+    expect(body.texts['front_desk:training_mark_done_recorded']).toBeTruthy();
+    expect(body.texts['front_desk:training_mark_done_failed']).toBeTruthy();
   });
 });

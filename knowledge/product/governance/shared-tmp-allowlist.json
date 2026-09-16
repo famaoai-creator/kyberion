@@ -438,6 +438,18 @@
       "note": "default personal workflow proposal and handoff path for localhost personal-workbench pad; operator-consumed intermediate"
     },
     {
+      "file": "scripts/personal-pads/actions.ts",
+      "count": 3,
+      "classification": "legit-tmp",
+      "note": "unified pad action audio/screenshot staging and artifact download intermediates; operator-consumed"
+    },
+    {
+      "file": "scripts/personal-pads/migrate.ts",
+      "count": 3,
+      "classification": "migrate-candidate",
+      "note": "legacy local-pad root scan and safety boundary; reads shared tmp handoffs until migration cutover"
+    },
+    {
       "file": "scripts/refactor/ephemeral-actuator-call.ts",
       "count": 1,
       "classification": "legit-tmp",

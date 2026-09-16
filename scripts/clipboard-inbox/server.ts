@@ -35,6 +35,7 @@ import {
 } from './context.js';
 import { clipboardInboxPageHtml } from './page.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { composeLegacyCapture } from '../personal-pads/legacy.js';
 
 export interface ClipboardInboxServerResult {
   ok: boolean;
@@ -267,6 +268,7 @@ export async function main(
     items?: unknown;
     instruction?: string;
   }): Record<string, unknown> {
+    composeLegacyCapture('clipboard-inbox', payload as Record<string, unknown>);
     const items = normalizeItems(payload.items);
     if (items.length < 1) {
       throw new Error('items required');
