@@ -35,6 +35,7 @@ import {
 } from './context.js';
 import { memoryCapturePageHtml } from './page.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { composeLegacyCapture } from '../personal-pads/legacy.js';
 
 export interface MemoryCaptureServerResult {
   ok: boolean;
@@ -225,6 +226,9 @@ export async function main(
   }
 
   function persistExport(payload: ExportPayload): Record<string, unknown> {
+    // Normalize through the unified adapter first; this keeps the legacy route
+    // and the one-listener desk on the same field contract during migration.
+    composeLegacyCapture('memory-capture', payload as Record<string, unknown>);
     const captureId = `${padContext.session_id}-${randomUUID().slice(0, 8)}`;
     const sessionDir = memoryCaptureSessionDir(out, captureId);
     safeMkdir(sessionDir, { recursive: true });

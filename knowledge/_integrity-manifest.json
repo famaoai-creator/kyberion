@@ -1305,7 +1305,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 47578,
+      "size": 47749,
       "type": "json"
     },
     {
@@ -1413,7 +1413,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 125713,
+      "size": 126034,
       "type": "json"
     },
     {
@@ -1557,7 +1557,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 7146,
+      "size": 7548,
       "type": "json"
     },
     {
@@ -2397,7 +2397,7 @@
     {
       "path": "product/governance/protocol-service-registry.json",
       "tier": "public",
-      "size": 13266,
+      "size": 14342,
       "type": "json"
     },
     {
@@ -2631,7 +2631,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 22240,
+      "size": 22600,
       "type": "json"
     },
     {
