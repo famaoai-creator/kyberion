@@ -43,6 +43,7 @@ import {
 } from './context.js';
 import { screenshotAnnotatePageHtml } from './page.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { composeLegacyCapture } from '../personal-pads/legacy.js';
 
 export interface ScreenshotAnnotateServerResult {
   ok: boolean;
@@ -273,6 +274,10 @@ export async function main(
     if (!isPng(png)) {
       throw new Error('not a png');
     }
+    composeLegacyCapture('screenshot-annotate', {
+      png_base64: b64,
+      instruction: payload.instruction,
+    });
     const instruction = typeof payload.instruction === 'string' ? payload.instruction.trim() : '';
     const captureId = `${padContext.session_id}-${randomUUID().slice(0, 8)}`;
     const sessionDir = screenshotAnnotateSessionDir(out, captureId);
