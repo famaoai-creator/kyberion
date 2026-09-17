@@ -1,7 +1,7 @@
 # Kyberion Configuration Surface
 
 > Generated from `knowledge/product/governance/env-registry.json` by `pnpm generate:env-registry` — do not edit by hand.
-> `pnpm run check -- --scope full --only env-registry` (included in `pnpm validate`) fails when code references an unregistered `KYBERION_*` variable.
+> `pnpm run check -- --scope pr --only env-registry` (included in `pnpm check -- --scope pr` and `pnpm validate`) fails when code references an unregistered `KYBERION_*` variable.
 
 ## What belongs where
 

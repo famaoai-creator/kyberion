@@ -1311,7 +1311,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 21450,
+      "size": 21567,
       "type": "json"
     },
     {
@@ -1719,7 +1719,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 17187,
+      "size": 17482,
       "type": "md"
     },
     {
@@ -2373,7 +2373,7 @@
     {
       "path": "product/governance/pre-pr-ci-readiness-checklist.ja.md",
       "tier": "public",
-      "size": 6392,
+      "size": 10032,
       "type": "md"
     },
     {
