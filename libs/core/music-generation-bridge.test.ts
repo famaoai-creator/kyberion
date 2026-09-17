@@ -168,8 +168,10 @@ describe('LocalMusicGenMlxGenerationProvider', () => {
         '-o',
         'active/shared/tmp/local-musicgen.wav',
       ]),
-      expect.objectContaining({ timeoutMs: expect.any(Number) })
+      expect.anything()
     );
+    const execOpts = mocks.safeExecResult.mock.calls.at(-1)?.[2] as { timeoutMs?: unknown };
+    expect(typeof execOpts?.timeoutMs).toBe('number');
   });
 
   it('fails closed when the tool runtime requires install', async () => {
@@ -264,7 +266,9 @@ describe('LocalStableAudioGenerationProvider', () => {
         '--steps',
         '8',
       ]),
-      expect.objectContaining({ timeoutMs: expect.any(Number) })
+      expect.anything()
     );
+    const execOpts = mocks.safeExecResult.mock.calls.at(-1)?.[2] as { timeoutMs?: unknown };
+    expect(typeof execOpts?.timeoutMs).toBe('number');
   });
 });
