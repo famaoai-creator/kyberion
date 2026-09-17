@@ -31,7 +31,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `ingest-actuator`: DA-03/DA-04/DA-05 ingest pipeline: unstructured internal documents (docx/pdf/xlsx/html/slack threads) into governed knowledge cards — incremental sync_source change-listing (watermark store), parse/normalize/dedup capture-transforms, plus the explicit ingest:commit ceremony (Hybrid Sovereign Ledger asset records, supersede, staleness detection) (6 ops, v1.2.0)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema knowledge/product/schemas/mobile-device-pipeline.schema.json)
 - `media-actuator`: Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.2.0, schema knowledge/product/schemas/media-pipeline.schema.json)
-- `media-generation-actuator`: Generative image, video, music, and screen capture actuator (12 ops, v1.2.0, schema knowledge/product/schemas/media-generation-action.schema.json)
+- `media-generation-actuator`: Generative image, video, music, and screen capture actuator (12 ops, v1.3.0, schema knowledge/product/schemas/media-generation-action.schema.json)
 - `meeting-actuator`: Abstracted online meeting bridge (Zoom, Teams, Google Meet) (6 ops, v1.2.0, schema knowledge/product/schemas/meeting-action.schema.json)
 - `meeting-browser-driver`: Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Exposes the meeting-browser-driver join_backend label and writes captured audio to an AudioBus. (2 ops, v1.0.0)
 - `modeling-actuator`: Architectural Analysis and ADF Transformation Engine (2 ops, v1.0.0, schema knowledge/product/schemas/modeling-pipeline.schema.json)

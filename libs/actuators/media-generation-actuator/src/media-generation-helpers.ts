@@ -305,9 +305,15 @@ function isDirectMusicGenerationBackend(
   return backend.modality === 'music' && backend.kind === 'cli';
 }
 
-function resolveMusicProviderPreference(params: any): string[] | undefined {
+function resolveMusicProviderPreference(params: Record<string, unknown>): string[] | undefined {
   const explicitBackendId = String(
-    params?.backend_id || params?.music_adf?.engine?.backend_id || ''
+    params?.backend_id ||
+      (isPlainObject(params?.music_adf) &&
+      isPlainObject(params.music_adf.engine) &&
+      typeof params.music_adf.engine.backend_id === 'string'
+        ? params.music_adf.engine.backend_id
+        : '') ||
+      ''
   ).trim();
   if (explicitBackendId) {
     const backendTokens = explicitBackendId.split('.').filter(Boolean);
@@ -323,16 +329,20 @@ function resolveMusicProviderPreference(params: any): string[] | undefined {
     if (tail === 'comfyui' || explicitBackendId.includes('comfyui')) return ['comfyui'];
   }
   const preference = params?.provider_preference || params?.providerPreference;
-  return Array.isArray(preference) && preference.length > 0 ? preference : undefined;
+  return Array.isArray(preference) && preference.length > 0
+    ? preference.filter((value): value is string => typeof value === 'string')
+    : undefined;
 }
 
-function resolveMusicBridgeRequest(params: any): {
+function resolveMusicBridgeRequest(params: Record<string, unknown>): {
   prompt: string;
   durationSec?: number;
   targetPath?: string;
 } {
-  if (params?.music_adf && typeof params.music_adf === 'object') {
-    const brief = buildMusicPromptFromAdf(params.music_adf);
+  if (isPlainObject(params?.music_adf)) {
+    const brief = buildMusicPromptFromAdf(
+      params.music_adf as Parameters<typeof buildMusicPromptFromAdf>[0]
+    );
     return {
       prompt: brief.prompt,
       durationSec: brief.durationSec,
