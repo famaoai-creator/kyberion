@@ -173,8 +173,8 @@ describe('AdaptivePolicyRouter', () => {
   });
 
   it('prefers the cursor host bridge when it is available', async () => {
-    (mockCursorHostBridge.isAvailable as any).mockResolvedValue(true);
-    (mockCodexHostBridge.isAvailable as any).mockResolvedValue(true);
+    vi.mocked(mockCursorHostBridge.isAvailable).mockResolvedValue(true);
+    vi.mocked(mockCodexHostBridge.isAvailable).mockResolvedValue(true);
     const router = new AdaptivePolicyRouter([
       mockComfyUI,
       mockLocalDiffusion,
@@ -195,7 +195,7 @@ describe('AdaptivePolicyRouter', () => {
   });
 
   it('prefers the codex host bridge when it is available', async () => {
-    (mockCodexHostBridge.isAvailable as any).mockResolvedValue(true);
+    vi.mocked(mockCodexHostBridge.isAvailable).mockResolvedValue(true);
     const router = new AdaptivePolicyRouter([
       mockComfyUI,
       mockLocalDiffusion,
