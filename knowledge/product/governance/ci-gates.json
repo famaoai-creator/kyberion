@@ -343,7 +343,7 @@
     },
     {
       "id": "env-registry",
-      "scope": "full",
+      "scope": "pr",
       "executable": "node",
       "args": [
         "--import",
@@ -352,7 +352,7 @@
         "--check"
       ],
       "owner": "operations",
-      "rationale": "Checks environment registry freshness."
+      "rationale": "Checks environment registry freshness on every PR so new KYBERION_* names cannot land unregistered."
     },
     {
       "id": "knowledge-scope",
@@ -471,12 +471,12 @@
     },
     {
       "id": "contract-semver",
-      "scope": "full",
+      "scope": "pr",
       "executable": "node",
       "args": ["dist/scripts/check_contract_semver.js"],
       "baseline": "scripts/contract-baseline.json",
       "owner": "quality",
-      "rationale": "Checks actuator contract semver compatibility."
+      "rationale": "Checks actuator contract semver compatibility on every PR so manifest/schema bumps cannot skip rebaseline."
     },
     {
       "id": "pipeline-shell-independence",

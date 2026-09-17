@@ -16,9 +16,9 @@
  *
  * Usage:
  *   pnpm generate:env-registry          — rewrite the three artifacts
- *   pnpm run check -- --scope full --only env-registry
- *                                      — fail if any artifact drifted
- *   KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm run check -- --scope full --only env-registry
+ *   pnpm run check -- --scope pr --only env-registry
+ *                                      — fail if any artifact drifted (PR gate)
+ *   KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm run check -- --scope pr --only env-registry
  *                                      — also fail while entries remain undocumented
  */
 
@@ -330,7 +330,7 @@ function renderConfigurationDoc(registry: EnvRegistryFile): string {
     '# Kyberion Configuration Surface',
     '',
     '> Generated from `knowledge/product/governance/env-registry.json` by `pnpm generate:env-registry` — do not edit by hand.',
-    '> `pnpm run check -- --scope full --only env-registry` (included in `pnpm validate`) fails when code references an unregistered `KYBERION_*` variable.',
+    '> `pnpm run check -- --scope pr --only env-registry` (included in `pnpm check -- --scope pr` and `pnpm validate`) fails when code references an unregistered `KYBERION_*` variable.',
     '',
     '## What belongs where',
     '',

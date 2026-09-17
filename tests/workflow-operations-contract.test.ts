@@ -9,6 +9,27 @@ function read(relPath: string): string {
 }
 
 describe('Workflow operations contract', () => {
+  it('keeps contract-semver and env-registry on the PR gate set', () => {
+    const gates = JSON.parse(read('knowledge/product/governance/ci-gates.json')) as {
+      gates: Array<{ id: string; scope: string }>;
+    };
+    const byId = new Map(gates.gates.map((gate) => [gate.id, gate.scope]));
+    expect(byId.get('contract-semver')).toBe('pr');
+    expect(byId.get('env-registry')).toBe('pr');
+    expect(byId.get('type-ratchet')).toBe('pr');
+  });
+
+  it('wires the pre-PR readiness checklist into agent and PR entrypoints', () => {
+    const checklist = 'knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md';
+    expect(read('AGENTS.md')).toContain(checklist);
+    expect(read('CONTRIBUTING.md')).toContain(checklist);
+    expect(read('.github/PULL_REQUEST_TEMPLATE.md')).toContain(
+      'pre-pr-ci-readiness-checklist.ja.md'
+    );
+    expect(read('scripts/publish_pull_request.ts')).toContain(checklist);
+    expect(read(checklist)).toContain('pnpm check -- --scope pr');
+  });
+
   it('keeps CI aligned with built capability and runtime-surface commands', () => {
     const ci = read('.github/workflows/ci.yml');
     // commit 6a7ecf439 ("ci: reuse setup across workflows") moved the
