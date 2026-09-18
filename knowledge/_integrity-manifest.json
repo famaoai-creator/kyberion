@@ -843,7 +843,7 @@
     {
       "path": "product/architecture/tool-runtime-abstraction.md",
       "tier": "public",
-      "size": 3372,
+      "size": 4026,
       "type": "md"
     },
     {
@@ -1311,7 +1311,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 21450,
+      "size": 21567,
       "type": "json"
     },
     {
@@ -1425,7 +1425,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 126034,
+      "size": 131305,
       "type": "json"
     },
     {
@@ -1719,7 +1719,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 17187,
+      "size": 17482,
       "type": "md"
     },
     {
@@ -1767,7 +1767,7 @@
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 11550,
+      "size": 13949,
       "type": "json"
     },
     {
@@ -2373,7 +2373,7 @@
     {
       "path": "product/governance/pre-pr-ci-readiness-checklist.ja.md",
       "tier": "public",
-      "size": 6392,
+      "size": 10032,
       "type": "md"
     },
     {
@@ -2451,7 +2451,7 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 3576,
+      "size": 3656,
       "type": "json"
     },
     {
@@ -2871,7 +2871,7 @@
     {
       "path": "product/governance/tool-runtime-registry.json",
       "tier": "public",
-      "size": 22538,
+      "size": 25179,
       "type": "json"
     },
     {
@@ -8031,7 +8031,7 @@
     {
       "path": "product/schemas/media-generation-action.schema.json",
       "tier": "public",
-      "size": 9182,
+      "size": 9963,
       "type": "json"
     },
     {
@@ -12123,7 +12123,7 @@
     {
       "path": "public/procedures/media/generate-music-from-adf.md",
       "tier": "public",
-      "size": 4008,
+      "size": 5345,
       "type": "md"
     },
     {

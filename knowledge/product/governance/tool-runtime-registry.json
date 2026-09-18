@@ -32,6 +32,66 @@
       "notes": "Apple Silicon FLUX entrypoint. Trial via uvx; promote to installed state after approval."
     },
     {
+      "tool_id": "musicgen_mlx",
+      "display_name": "MLX MusicGen Local Music Generator",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "uvx",
+        "command": "uvx",
+        "args": ["--from", "mlx-audiocraft", "musicgen-mlx"],
+        "description": "Temporary local MusicGen execution on Apple Silicon without a managed install."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["tool", "install", "mlx-audiocraft"],
+        "description": "Install mlx-audiocraft into the managed Python tool environment."
+      },
+      "installed_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["tool", "run", "musicgen-mlx"],
+        "description": "Run musicgen-mlx from the managed Python tool environment."
+      },
+      "managed_env_subpath": "tool-runtimes/musicgen-mlx",
+      "notes": "Apple Silicon MusicGen entrypoint via mlx-audiocraft. Tuned via KYBERION_MUSICGEN_* env policy. Model weights remain CC BY-NC. Trial: `uvx --from mlx-audiocraft musicgen-mlx`; install: `uv tool install mlx-audiocraft`."
+    },
+    {
+      "tool_id": "stable_audio_3",
+      "display_name": "Stable Audio 3 Local Music Generator",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "uvx",
+        "command": "uvx",
+        "args": [
+          "--from",
+          "git+https://github.com/Stability-AI/stable-audio-3.git",
+          "stable-audio"
+        ],
+        "description": "Temporary Stable Audio 3 CLI trial via uvx from the upstream git repository."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["tool", "install", "git+https://github.com/Stability-AI/stable-audio-3.git"],
+        "description": "Install Stable Audio 3 into the managed Python tool environment from upstream git."
+      },
+      "installed_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["tool", "run", "stable-audio"],
+        "description": "Run stable-audio from the managed Python tool environment."
+      },
+      "managed_env_subpath": "tool-runtimes/stable-audio-3",
+      "notes": "Defaults to small-music (CPU/MPS-friendly, up to ~120s). Weights are gated on Hugging Face — accept the model license and set HF_TOKEN or HUGGING_FACE_HUB_TOKEN. Tuned via KYBERION_STABLE_AUDIO_*."
+    },
+    {
       "tool_id": "agy_sdk",
       "display_name": "Antigravity Python SDK Runtime",
       "ecosystem": "python",

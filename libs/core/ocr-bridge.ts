@@ -8,6 +8,7 @@ import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { resolveGeminiApiKey } from './gemini-api-backend.js';
 import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from './ocr-types.js';
 import {
   probeWindowsNativeImageRecognition,
@@ -305,7 +306,7 @@ export class LlmApiOcrProvider implements OcrProvider {
 
   async isAvailable(): Promise<boolean> {
     return Boolean(
-      getRegisteredEnvText('GEMINI_API_KEY') ||
+      resolveGeminiApiKey() ||
       getRegisteredEnvText('ANTHROPIC_API_KEY') ||
       getRegisteredEnvText('OPENAI_API_KEY')
     );
@@ -318,7 +319,7 @@ export class LlmApiOcrProvider implements OcrProvider {
     const base64Data = buffer.toString('base64');
     const mimeType = getMimeType(request.path);
 
-    const apiKeyGemini = getRegisteredEnvText('GEMINI_API_KEY');
+    const apiKeyGemini = resolveGeminiApiKey();
     const apiKeyClaude = getRegisteredEnvText('ANTHROPIC_API_KEY');
     const apiKeyOpenAI = getRegisteredEnvText('OPENAI_API_KEY');
 

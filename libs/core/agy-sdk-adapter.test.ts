@@ -150,7 +150,6 @@ describe('AgySdkAdapter', () => {
     );
     expect(source).not.toContain('process.env.GEMINI_API_KEY');
     expect(source).not.toContain('process.env.GOOGLE_API_KEY');
-    expect(source).toContain("getRegisteredEnvText('GEMINI_API_KEY')");
-    expect(source).toContain("getRegisteredEnvText('GOOGLE_API_KEY')");
+    expect(source).toContain('resolveGeminiApiKey');
   });
 });

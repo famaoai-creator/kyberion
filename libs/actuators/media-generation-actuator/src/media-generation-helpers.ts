@@ -6,7 +6,10 @@ import {
   loadRecoveryPolicy as loadCoreRecoveryPolicy,
 } from '@agent/core/recovery-policy';
 import { retry, sleep } from '@agent/core/async-utils';
-import { compileMusicGenerationADF } from '@agent/core/music-workflow-compiler';
+import {
+  compileMusicGenerationADF,
+  buildMusicPromptFromAdf,
+} from '@agent/core/music-workflow-compiler';
 import {
   compileImageGenerationADF,
   compileVideoGenerationADF,
@@ -296,6 +299,74 @@ function resolveImageProviderPreference(params: any): string[] | undefined {
   return Array.isArray(preference) && preference.length > 0 ? preference : undefined;
 }
 
+function isDirectMusicGenerationBackend(
+  backend: Pick<GenerationBackend, 'modality' | 'kind'>
+): boolean {
+  return backend.modality === 'music' && backend.kind === 'cli';
+}
+
+function resolveMusicProviderPreference(params: Record<string, unknown>): string[] | undefined {
+  const explicitBackendId = String(
+    params?.backend_id ||
+      (isPlainObject(params?.music_adf) &&
+      isPlainObject(params.music_adf.engine) &&
+      typeof params.music_adf.engine.backend_id === 'string'
+        ? params.music_adf.engine.backend_id
+        : '') ||
+      ''
+  ).trim();
+  if (explicitBackendId) {
+    const backendTokens = explicitBackendId.split('.').filter(Boolean);
+    const tail = backendTokens[backendTokens.length - 1] || explicitBackendId;
+    if (tail === 'musicgen_mlx' || explicitBackendId === 'musicgen_mlx') return ['musicgen_mlx'];
+    if (
+      tail === 'stable_audio_3_small_music' ||
+      tail === 'stable_audio_3' ||
+      explicitBackendId.includes('stable_audio_3')
+    ) {
+      return ['stable_audio_3'];
+    }
+    if (tail === 'comfyui' || explicitBackendId.includes('comfyui')) return ['comfyui'];
+  }
+  const preference = params?.provider_preference || params?.providerPreference;
+  return Array.isArray(preference) && preference.length > 0
+    ? preference.filter((value): value is string => typeof value === 'string')
+    : undefined;
+}
+
+function resolveMusicBridgeRequest(params: Record<string, unknown>): {
+  prompt: string;
+  durationSec?: number;
+  targetPath?: string;
+} {
+  if (isPlainObject(params?.music_adf)) {
+    const brief = buildMusicPromptFromAdf(
+      params.music_adf as Parameters<typeof buildMusicPromptFromAdf>[0]
+    );
+    return {
+      prompt: brief.prompt,
+      durationSec: brief.durationSec,
+      targetPath:
+        (typeof params.target_path === 'string' && params.target_path) ||
+        (typeof params.output_path === 'string' && params.output_path) ||
+        brief.targetPath,
+    };
+  }
+  const prompt = typeof params?.prompt === 'string' ? params.prompt.trim() : '';
+  if (!prompt) {
+    throw new Error('generate_music with musicgen_mlx requires params.prompt or params.music_adf');
+  }
+  const durationRaw = params?.duration_sec ?? params?.durationSec;
+  return {
+    prompt,
+    ...(typeof durationRaw === 'number' ? { durationSec: durationRaw } : {}),
+    targetPath:
+      (typeof params.target_path === 'string' && params.target_path) ||
+      (typeof params.output_path === 'string' && params.output_path) ||
+      undefined,
+  };
+}
+
 /**
  * E2E-02 Task 4: inject the brand/tenant style pack into generation prompts so
  * image / video / music output stays on-palette. Deterministic (vocabulary +
@@ -329,8 +400,11 @@ function applyPromptStylePack(action: string, params: any): any {
 
 function preparePromptBasedGeneration(action: string, input: any): PromptGenerationRequest {
   const params = applyPromptStylePack(action, input);
+  const musicBackend =
+    action === 'generate_music' ? resolveGenerationBackend(action, params) : undefined;
+  const directMusic = Boolean(musicBackend && isDirectMusicGenerationBackend(musicBackend));
   const compiled =
-    action === 'generate_music' && params.music_adf
+    action === 'generate_music' && params.music_adf && !directMusic
       ? compileMusicGenerationADF(params.music_adf)
       : action === 'generate_image' && params.image_adf
         ? compileImageGenerationADF(params.image_adf)
@@ -347,16 +421,25 @@ function preparePromptBasedGeneration(action: string, input: any): PromptGenerat
     !hasWorkflowPath &&
     !params.video_adf &&
     isDirectVideoGenerationBackend(resolveVideoGenerationBackend(params));
-  if (!workflow && !hasWorkflowPath && !directImage && !directVideo) {
+  if (!workflow && !hasWorkflowPath && !directImage && !directVideo && !directMusic) {
     const message =
       action === 'generate_music'
-        ? 'generate_music requires either params.workflow or params.music_adf'
+        ? 'generate_music requires params.workflow, params.music_adf, or a direct music backend with params.prompt'
         : action === 'generate_image'
           ? 'generate_image requires params.workflow, params.workflow_path, or params.image_adf'
           : action === 'generate_video'
             ? 'generate_video requires params.workflow, params.workflow_path, or params.video_adf'
             : `${action} requires params.workflow or params.workflow_path`;
     throw new Error(message);
+  }
+  if (
+    directMusic &&
+    !params.music_adf &&
+    !(typeof params.prompt === 'string' && params.prompt.trim())
+  ) {
+    throw new Error(
+      'generate_music with a direct music backend requires params.prompt or params.music_adf'
+    );
   }
   return { action, params, compiled, workflow };
 }
@@ -501,6 +584,9 @@ export {
   maybeCopyArtifact,
   resolveImageArtifactFormat,
   resolveImageProviderPreference,
+  isDirectMusicGenerationBackend,
+  resolveMusicProviderPreference,
+  resolveMusicBridgeRequest,
   preparePromptBasedGeneration,
   resolveAwaitCompletion,
   executePreparedGeneration,
