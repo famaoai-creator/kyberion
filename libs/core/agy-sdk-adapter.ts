@@ -7,6 +7,7 @@ import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
+import { resolveGeminiApiKey } from './gemini-api-backend.js';
 
 interface BridgeResponse {
   id?: string;
@@ -149,8 +150,7 @@ export class AgySdkAdapter {
         resolveManagedToolPythonBin('agy_sdk') ??
         'python3';
       const script = this.options.scriptPath ?? pathResolver.scripts('agy_sdk_subagent_bridge.py');
-      const sdkApiKey =
-        getRegisteredEnvText('GEMINI_API_KEY') ?? getRegisteredEnvText('GOOGLE_API_KEY');
+      const sdkApiKey = resolveGeminiApiKey();
       child = (this.options.spawnProcess ?? spawn)(python, [script], {
         cwd: this.options.cwd,
         env: {

@@ -24,14 +24,19 @@ For deeper setup (voice, surfaces, customer overlay), see [`docs/QUICKSTART.md`]
 
 ## Pre-PR checklist
 
-Before opening a PR:
+Before opening a PR, follow the canonical runbook
+[`knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md`](./knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md).
+Minimum bar:
 
-- [ ] `pnpm check -- --scope pr` is green locally; use the [PR前CI準備チェックリスト](./knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md) for change-specific exceptions.
+- [ ] `pnpm check -- --scope pr` is green locally (same gate set as PR Validation; includes `type-ratchet`, `contract-semver`, and `env-registry`).
+- [ ] Exception-table rows for your changed paths are green (actuator rebaseline + component-inventory, `build:actuators` for core/actuator type boundaries, etc.).
+- [ ] Prefer `pnpm kyberion pr create` — it runs the readiness gate unless `--skip-readiness` is passed.
 - [ ] New code has at least one test (unit, integration, or contract — whatever fits).
 - [ ] You've read [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) — your change does not silently modify a Stable surface without a semver bump.
-- [ ] If you touched an actuator manifest or schema, you ran `pnpm tsx scripts/check_contract_semver.ts -- --rebaseline` and committed the updated baseline.
+- [ ] If you touched an actuator manifest or schema, you ran `pnpm check:contract-semver -- --rebaseline` and committed the updated baseline.
 - [ ] If you touched a user-visible behavior, you added a `[Unreleased]` entry to `CHANGELOG.md`.
 - [ ] Commit titles use Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `build:`, `ci:`, `chore:`, `breaking:`).
+- [ ] After push, `gh pr checks <number>` is fully green — do not count pending as pass.
 
 ## What to work on
 

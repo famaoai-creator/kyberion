@@ -269,7 +269,11 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   if (Boolean(kyberionEnv('ANTHROPIC_API_KEY'))) {
     return { available: true };
   }
-  if (kyberionEnv('GEMINI_API_KEY') || kyberionEnv('GOOGLE_API_KEY')) {
+  if (
+    kyberionEnv('KYBERION_GEMINI_API_KEY') ||
+    kyberionEnv('GEMINI_API_KEY') ||
+    kyberionEnv('GOOGLE_API_KEY')
+  ) {
     const geminiProbe = await probeGeminiApiBackendAvailability(process.env);
     if (geminiProbe.available) return { available: true };
   }

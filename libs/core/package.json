@@ -1367,6 +1367,18 @@
       "types": "./dist/image-generation-policy.d.ts",
       "default": "./dist/image-generation-policy.js"
     },
+    "./music-generation-bridge": {
+      "types": "./dist/music-generation-bridge.d.ts",
+      "default": "./dist/music-generation-bridge.js"
+    },
+    "./music-generation-types": {
+      "types": "./dist/music-generation-types.d.ts",
+      "default": "./dist/music-generation-types.js"
+    },
+    "./music-generation-policy": {
+      "types": "./dist/music-generation-policy.d.ts",
+      "default": "./dist/music-generation-policy.js"
+    },
     "./tool-runtime-policy": {
       "types": "./dist/tool-runtime-policy.d.ts",
       "default": "./dist/tool-runtime-policy.js"
