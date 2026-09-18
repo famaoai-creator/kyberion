@@ -87,6 +87,14 @@ describe('media backend registry', () => {
       registry.backends.some((backend) => backend.backend_id === 'media-generation.local_flux')
     ).toBe(true);
     expect(
+      registry.backends.some((backend) => backend.backend_id === 'media-generation.musicgen_mlx')
+    ).toBe(true);
+    expect(
+      registry.backends.some(
+        (backend) => backend.backend_id === 'media-generation.stable_audio_3_small_music'
+      )
+    ).toBe(true);
+    expect(
       registry.backends.some(
         (backend) => backend.backend_id === 'media-generation.apple_playground'
       )
@@ -112,6 +120,12 @@ describe('media backend registry', () => {
     expect(resolveVoiceBackend().backend_id).toBe('voice.local_say');
     expect(resolveVideoBackend().backend_id).toBe('video.hyperframes_cli');
     expect(resolveMusicBackend().backend_id).toBe('media-generation.comfyui.music');
+    expect(resolveMusicBackend('musicgen_mlx', 'darwin').backend_id).toBe(
+      'media-generation.musicgen_mlx'
+    );
+    expect(resolveMusicBackend('stable_audio_3_small_music', 'darwin').backend_id).toBe(
+      'media-generation.stable_audio_3_small_music'
+    );
   });
 
   it('does not return an exact backend record from a different modality', () => {

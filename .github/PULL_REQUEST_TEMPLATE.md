@@ -39,12 +39,12 @@
 
 ## Test plan
 
-<!-- How did you verify? List concrete commands run. -->
+<!-- How did you verify? List concrete commands run. Follow knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md -->
 
 ```bash
-# e.g.
-pnpm vitest run libs/core/foo.test.ts
-pnpm doctor
+# Required before open:
+pnpm check -- --scope pr
+# Plus any exception-table rows for your changed paths (actuator rebaseline, env-registry, build:actuators, …)
 ```
 
 ## Migration (breaking changes only)
@@ -62,9 +62,9 @@ N/A.
 
 ## Checklist
 
+- [ ] Followed [`pre-pr-ci-readiness-checklist.ja.md`](../knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md) (standard `pnpm check -- --scope pr` + exception-table rows)
 - [ ] Mission / workitem references are included when applicable
 - [ ] Evidence paths or trace IDs are included when applicable
-- [ ] `pnpm validate` is green locally
 - [ ] Tests added (or existing tests updated)
 - [ ] CHANGELOG.md updated under `[Unreleased]` (for user-visible changes)
 - [ ] PR title and commit titles follow [Conventional Commits](https://www.conventionalcommits.org/)

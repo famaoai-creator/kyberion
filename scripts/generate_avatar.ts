@@ -26,9 +26,14 @@ function splitPreference(value: string | boolean | undefined, fallback: string[]
   if (typeof value !== 'string') return fallback;
   const trimmed = value.trim();
   if (!trimmed || trimmed === 'auto') return fallback;
-  if (trimmed === 'host') return ['host_agent', 'codex_host_bridge', 'agy_host_bridge'];
-  if (trimmed === 'codex') return ['codex_host_bridge', 'host_agent', 'agy_host_bridge'];
-  if (trimmed === 'agy') return ['agy_host_bridge', 'host_agent', 'codex_host_bridge'];
+  if (trimmed === 'host')
+    return ['host_agent', 'cursor_host_bridge', 'codex_host_bridge', 'agy_host_bridge'];
+  if (trimmed === 'cursor')
+    return ['cursor_host_bridge', 'host_agent', 'codex_host_bridge', 'agy_host_bridge'];
+  if (trimmed === 'codex')
+    return ['codex_host_bridge', 'host_agent', 'cursor_host_bridge', 'agy_host_bridge'];
+  if (trimmed === 'agy')
+    return ['agy_host_bridge', 'host_agent', 'cursor_host_bridge', 'codex_host_bridge'];
   if (trimmed === 'local') return ['local_flux', 'comfyui', 'gemini_service', 'llm_api'];
   return trimmed
     .split(',')
@@ -38,13 +43,18 @@ function splitPreference(value: string | boolean | undefined, fallback: string[]
 
 function deriveAutoPreference(requireHostBridge: boolean): string[] {
   const bridgePreference =
-    getRegisteredEnvText('CODEX_CLI') ||
-    getRegisteredEnvText('CODEX_VERSION') ||
-    getRegisteredEnvText('TERM_PROGRAM') === 'codex'
-      ? ['codex_host_bridge', 'agy_host_bridge', 'host_agent']
-      : getRegisteredEnvText('AGY_CLI') || getRegisteredEnvText('ANTIGRAVITY_CLI')
-        ? ['agy_host_bridge', 'codex_host_bridge', 'host_agent']
-        : ['host_agent', 'codex_host_bridge', 'agy_host_bridge'];
+    getRegisteredEnvText('CURSOR_CLI') ||
+    getRegisteredEnvText('CURSOR_AGENT') ||
+    getRegisteredEnvText('KYBERION_CURSOR_CLI_BIN') ||
+    getRegisteredEnvText('CURSOR_API_KEY')
+      ? ['cursor_host_bridge', 'codex_host_bridge', 'agy_host_bridge', 'host_agent']
+      : getRegisteredEnvText('CODEX_CLI') ||
+          getRegisteredEnvText('CODEX_VERSION') ||
+          getRegisteredEnvText('TERM_PROGRAM') === 'codex'
+        ? ['codex_host_bridge', 'cursor_host_bridge', 'agy_host_bridge', 'host_agent']
+        : getRegisteredEnvText('AGY_CLI') || getRegisteredEnvText('ANTIGRAVITY_CLI')
+          ? ['agy_host_bridge', 'cursor_host_bridge', 'codex_host_bridge', 'host_agent']
+          : ['host_agent', 'cursor_host_bridge', 'codex_host_bridge', 'agy_host_bridge'];
   if (requireHostBridge) return bridgePreference;
   return [...bridgePreference, 'local_flux', 'comfyui', 'gemini_service', 'llm_api'];
 }

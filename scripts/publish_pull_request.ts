@@ -3,7 +3,9 @@
  * Validate and open a pull request with a Conventional Commit title.
  *
  * This is a narrow wrapper around `gh pr create` that fails fast when the
- * requested PR title does not satisfy the repository's PR-title policy.
+ * requested PR title does not satisfy the repository's PR-title policy, and
+ * (by default) runs the PR-scope readiness gate before create so agents and
+ * operators follow knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md.
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
@@ -14,12 +16,16 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
 
+export const PRE_PR_READINESS_CHECKLIST =
+  'knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md';
+
 interface PublishOptions {
   title?: string;
   bodyFile?: string;
   base?: string;
   draft: boolean;
   fill: boolean;
+  skipReadiness: boolean;
 }
 
 function readHeadSubject(): string {
@@ -50,7 +56,7 @@ export function parseDefaultBranchResponse(raw: string): string {
 }
 
 export function parsePublishArgs(argv: string[]): PublishOptions {
-  const options: PublishOptions = { draft: true, fill: true };
+  const options: PublishOptions = { draft: true, fill: true, skipReadiness: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--title') options.title = argv[++i];
@@ -60,6 +66,7 @@ export function parsePublishArgs(argv: string[]): PublishOptions {
     else if (arg === '--no-fill') options.fill = false;
     else if (arg === '--draft') options.draft = true;
     else if (arg === '--fill') options.fill = true;
+    else if (arg === '--skip-readiness') options.skipReadiness = true;
   }
   return options;
 }
@@ -100,11 +107,35 @@ export function buildGhArgs(
   return args;
 }
 
+export function runPrePrReadiness(print: Print = () => undefined): void {
+  print(
+    [
+      '[pr:publish] Running PR readiness gate (pnpm check -- --scope pr).',
+      `[pr:publish] Canonical checklist: ${PRE_PR_READINESS_CHECKLIST}`,
+      '[pr:publish] Apply exception-table rows for actuator/env/core boundaries before create.',
+      '[pr:publish] Pass --skip-readiness only for an explicit emergency bypass.',
+    ].join('\n')
+  );
+  safeExec('pnpm', ['check', '--', '--scope', 'pr'], {
+    cwd: pathResolver.rootDir(),
+    timeoutMs: 1_800_000,
+  });
+  print('[pr:publish] PR readiness gate passed.');
+}
+
 async function main(argv: string[], print: Print = () => undefined): Promise<void> {
   const options = parsePublishArgs(argv);
 
   safeExec('gh', ['--version'], { cwd: pathResolver.rootDir() });
   safeExec('gh', ['auth', 'status'], { cwd: pathResolver.rootDir() });
+
+  if (options.skipReadiness) {
+    print(
+      `[pr:publish] Skipping readiness gate (--skip-readiness). Still follow ${PRE_PR_READINESS_CHECKLIST}.`
+    );
+  } else {
+    runPrePrReadiness(print);
+  }
 
   const args = buildGhArgs(options);
   const output = safeExec('gh', args, { cwd: pathResolver.rootDir() });

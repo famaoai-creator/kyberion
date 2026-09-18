@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   compileImageGenerationADF: vi.fn(),
   compileVideoGenerationADF: vi.fn(),
   generateImage: vi.fn(),
+  generateMusic: vi.fn(),
   secureFetch: vi.fn(),
   retry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
   safeCopyFileSync: vi.fn(),
@@ -77,6 +78,11 @@ vi.mock('@agent/core/image-generation-bridge', async (importOriginal) => ({
   generateImage: mocks.generateImage,
 }));
 
+vi.mock('@agent/core/music-generation-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/music-generation-bridge')>()),
+  generateMusic: mocks.generateMusic,
+}));
+
 vi.mock('@agent/core/network', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/network')>()),
   secureFetch: mocks.secureFetch,
@@ -84,16 +90,51 @@ vi.mock('@agent/core/network', async (importOriginal) => ({
 
 vi.mock('@agent/core/media-backend-registry', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/media-backend-registry')>()),
-  resolveMediaBackendForPlatform: (modality: 'image' | 'video' | 'music', backendId?: string) => ({
-    backend_id: backendId || `media-generation.comfyui.${modality}`,
-    modality,
-    display_name: `test ${modality} backend`,
-    kind: 'service_preset' as const,
-    provider: 'comfyui',
-    status: 'active' as const,
-    platforms: ['any' as const],
-    supports: { async: true },
-  }),
+  resolveMediaBackendForPlatform: (modality: 'image' | 'video' | 'music', backendId?: string) => {
+    const resolvedId = backendId || `media-generation.comfyui.${modality}`;
+    if (
+      modality === 'music' &&
+      (resolvedId === 'media-generation.musicgen_mlx' || resolvedId === 'musicgen_mlx')
+    ) {
+      return {
+        backend_id: 'media-generation.musicgen_mlx',
+        modality: 'music' as const,
+        display_name: 'Local MusicGen (MLX)',
+        kind: 'cli' as const,
+        provider: 'musicgen_mlx',
+        status: 'active' as const,
+        platforms: ['darwin' as const],
+        supports: { artifact_formats: ['wav'], async: false },
+      };
+    }
+    if (
+      modality === 'music' &&
+      (resolvedId === 'media-generation.stable_audio_3_small_music' ||
+        resolvedId === 'stable_audio_3' ||
+        resolvedId === 'stable_audio_3_small_music')
+    ) {
+      return {
+        backend_id: 'media-generation.stable_audio_3_small_music',
+        modality: 'music' as const,
+        display_name: 'Local Stable Audio 3 Small-Music',
+        kind: 'cli' as const,
+        provider: 'stable_audio_3',
+        status: 'active' as const,
+        platforms: ['any' as const],
+        supports: { artifact_formats: ['wav'], async: false },
+      };
+    }
+    return {
+      backend_id: resolvedId,
+      modality,
+      display_name: `test ${modality} backend`,
+      kind: 'service_preset' as const,
+      provider: 'comfyui',
+      status: 'active' as const,
+      platforms: ['any' as const],
+      supports: { async: true },
+    };
+  },
 }));
 
 vi.mock('@agent/core/recovery-policy', async (importOriginal) => {
@@ -157,6 +198,7 @@ function resetTestDoubles(): void {
   mocks.compileImageGenerationADF.mockReset();
   mocks.compileVideoGenerationADF.mockReset();
   mocks.generateImage.mockReset();
+  mocks.generateMusic.mockReset();
   mocks.secureFetch.mockReset();
   mocks.retry.mockReset();
   mocks.retry.mockImplementation(async (fn: () => Promise<unknown>) => fn());
@@ -476,6 +518,92 @@ describe('media-generation-actuator', () => {
     expect(helpers.resolveGenerationBackend('generate_music', {})).toEqual(
       expect.objectContaining({ modality: 'music' })
     );
+    expect(
+      helpers.resolveGenerationBackend('generate_music', {
+        backend_id: 'media-generation.musicgen_mlx',
+      })
+    ).toEqual(
+      expect.objectContaining({
+        backend_id: 'media-generation.musicgen_mlx',
+        modality: 'music',
+        kind: 'cli',
+        provider: 'musicgen_mlx',
+      })
+    );
+  });
+
+  it('routes direct MusicGen/MLX music generation through the music bridge', async () => {
+    mocks.generateMusic.mockResolvedValue({
+      status: 'succeeded',
+      provider: 'musicgen_mlx',
+      path: 'active/shared/tmp/musicgen-mlx-demo.wav',
+      elapsedMs: 12,
+    });
+    mocks.safeExistsSync.mockReturnValue(true);
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'generate_music',
+      params: {
+        backend_id: 'media-generation.musicgen_mlx',
+        prompt: 'calm piano, no vocals',
+        duration_sec: 10,
+        target_path: 'active/shared/tmp/musicgen-mlx-demo.wav',
+      },
+    });
+
+    expect(mocks.compileMusicGenerationADF).not.toHaveBeenCalled();
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+    expect(mocks.generateMusic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('calm piano, no vocals'),
+        durationSec: 10,
+        targetPath: 'active/shared/tmp/musicgen-mlx-demo.wav',
+        providerPreference: ['musicgen_mlx'],
+      })
+    );
+    expect(result.status).toBe('succeeded');
+    expect(result.backend_provider).toBe('musicgen_mlx');
+    expect(result.artifact).toEqual(
+      expect.objectContaining({
+        path: 'active/shared/tmp/musicgen-mlx-demo.wav',
+        format: 'wav',
+      })
+    );
+  });
+
+  it('routes Stable Audio 3 small-music through the music bridge', async () => {
+    mocks.generateMusic.mockResolvedValue({
+      status: 'succeeded',
+      provider: 'stable_audio_3',
+      path: 'active/shared/tmp/stable-audio-3-small-music-demo.wav',
+      elapsedMs: 20,
+    });
+    mocks.safeExistsSync.mockReturnValue(true);
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'generate_music',
+      params: {
+        backend_id: 'media-generation.stable_audio_3_small_music',
+        prompt: 'lo-fi hip hop beat',
+        duration_sec: 30,
+        target_path: 'active/shared/tmp/stable-audio-3-small-music-demo.wav',
+      },
+    });
+
+    expect(mocks.compileMusicGenerationADF).not.toHaveBeenCalled();
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+    expect(mocks.generateMusic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('lo-fi hip hop beat'),
+        durationSec: 30,
+        targetPath: 'active/shared/tmp/stable-audio-3-small-music-demo.wav',
+        providerPreference: ['stable_audio_3'],
+      })
+    );
+    expect(result.status).toBe('succeeded');
+    expect(result.backend_provider).toBe('stable_audio_3');
   });
 
   it('does not mark a job succeeded when artifact collection fails', async () => {

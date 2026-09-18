@@ -4,6 +4,7 @@ import {
   ComfyUiImageGenerationProvider,
   CodexHostBridgeImageGenerationProvider,
   AgyHostBridgeImageGenerationProvider,
+  CursorHostBridgeImageGenerationProvider,
   ApplePlaygroundImageGenerationProvider,
   GeminiFastImageGenerationProvider,
   GeminiServiceImageGenerationProvider,
@@ -73,6 +74,7 @@ describe('AdaptivePolicyRouter', () => {
   let mockLlmApi: ImageGenerationProvider;
   let mockCodexHostBridge: ImageGenerationProvider;
   let mockAgyHostBridge: ImageGenerationProvider;
+  let mockCursorHostBridge: ImageGenerationProvider;
   let mockHostAgent: ImageGenerationProvider;
 
   beforeEach(() => {
@@ -103,6 +105,11 @@ describe('AdaptivePolicyRouter', () => {
     };
     mockAgyHostBridge = {
       id: 'agy_host_bridge',
+      isAvailable: vi.fn().mockResolvedValue(false),
+      generate: vi.fn(),
+    };
+    mockCursorHostBridge = {
+      id: 'cursor_host_bridge',
       isAvailable: vi.fn().mockResolvedValue(false),
       generate: vi.fn(),
     };
@@ -165,13 +172,36 @@ describe('AdaptivePolicyRouter', () => {
     expect(provider.id).toBe('local_flux');
   });
 
-  it('prefers the codex host bridge when it is available', async () => {
-    (mockCodexHostBridge.isAvailable as any).mockResolvedValue(true);
+  it('prefers the cursor host bridge when it is available', async () => {
+    vi.mocked(mockCursorHostBridge.isAvailable).mockResolvedValue(true);
+    vi.mocked(mockCodexHostBridge.isAvailable).mockResolvedValue(true);
     const router = new AdaptivePolicyRouter([
       mockComfyUI,
       mockLocalDiffusion,
       mockLocalFlux,
       mockLlmApi,
+      mockCursorHostBridge,
+      mockCodexHostBridge,
+      mockAgyHostBridge,
+      mockHostAgent,
+    ]);
+
+    const provider = await router.selectProvider({
+      prompt: 'a cat',
+      mode: 'artistic',
+    });
+
+    expect(provider.id).toBe('cursor_host_bridge');
+  });
+
+  it('prefers the codex host bridge when it is available', async () => {
+    vi.mocked(mockCodexHostBridge.isAvailable).mockResolvedValue(true);
+    const router = new AdaptivePolicyRouter([
+      mockComfyUI,
+      mockLocalDiffusion,
+      mockLocalFlux,
+      mockLlmApi,
+      mockCursorHostBridge,
       mockCodexHostBridge,
       mockAgyHostBridge,
       mockHostAgent,
@@ -863,5 +893,40 @@ describe('AgyHostBridgeImageGenerationProvider', () => {
     process.env.AGY_CLI = '1';
     const provider = new AgyHostBridgeImageGenerationProvider();
     await expect(provider.isAvailable()).resolves.toBe(true);
+  });
+});
+
+describe('CursorHostBridgeImageGenerationProvider', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    delete process.env.CURSOR_CLI;
+    delete process.env.CURSOR_AGENT;
+    delete process.env.CURSOR_API_KEY;
+    delete process.env.KYBERION_CURSOR_CLI_BIN;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('reports available in a Cursor agent environment', async () => {
+    process.env.CURSOR_AGENT = '1';
+    const provider = new CursorHostBridgeImageGenerationProvider();
+    await expect(provider.isAvailable()).resolves.toBe(true);
+  });
+
+  it('throws a host bridge required error when no request output exists', async () => {
+    process.env.CURSOR_CLI = '1';
+    mocks.safeExistsSync.mockReturnValue(false);
+
+    const provider = new CursorHostBridgeImageGenerationProvider();
+    await expect(
+      provider.generate({
+        prompt: 'test prompt',
+        targetPath: 'needs-cursor-gen.png',
+      })
+    ).rejects.toThrow('HOST_BRIDGE_IMAGE_GENERATION_REQUIRED');
   });
 });

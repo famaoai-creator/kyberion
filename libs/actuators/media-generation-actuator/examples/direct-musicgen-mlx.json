@@ -1,0 +1,10 @@
+{
+  "action": "generate_music",
+  "params": {
+    "backend_id": "media-generation.musicgen_mlx",
+    "prompt": "warm acoustic country, soft guitar, gentle tempo, no vocals",
+    "duration_sec": 12,
+    "target_path": "active/shared/tmp/musicgen-mlx-demo.wav",
+    "await_completion": true
+  }
+}

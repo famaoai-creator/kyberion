@@ -34,6 +34,7 @@ Concepts are intentionally not explained here — follow the `→` links when yo
 - **Apply the working philosophy.** Read before write; one change, one verification; never retry unchanged without a new hypothesis; "done" requires evidence. Full rules: [working-philosophy](./knowledge/product/governance/working-philosophy.md) (auto-injected into worker prompts via `libs/core/working-principles.ts`).
 - **Adopt externally completed mission work through the governed gate.** Use `mission_controller reconcile-work <ID> --generate` to scaffold from the current git commit, fill hash-bound evidence, run `--dry-run`, then apply; never mark `NEXT_TASKS.json` complete by hand.
 - **Changing this repo? Follow the development practices.** Registration ceremonies (boundary-test allowlists), cross-platform determinism, hermetic tests, build order: [kyberion-development-practices](./knowledge/product/governance/kyberion-development-practices.md).
+- **Before opening a PR:** follow [pre-pr-ci-readiness-checklist.ja.md](./knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md). Run `pnpm check -- --scope pr`, apply the exception-table rows for changed paths (actuator rebaseline, env-registry, `build:actuators`, type-ratchet mocks, …), then prefer `pnpm kyberion pr create` (runs the readiness gate). Never treat pending CI as green.
 
 → Concepts: [GLOSSARY](./docs/GLOSSARY.md) · [PRODUCTIZATION_ROADMAP](./docs/PRODUCTIZATION_ROADMAP.md) (dog-food rationale)
 

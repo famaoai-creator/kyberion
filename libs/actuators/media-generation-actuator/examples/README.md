@@ -6,6 +6,7 @@
 - `media-generation-actuator` 専用の検証・再現・テンプレート入力は `libs/actuators/media-generation-actuator/examples/` に置く
 - `catalog.json` に登録された action fixture は `knowledge/product/schemas/media-generation-action.schema.json` の discriminated contract で検証する
 - direct image と image/video/music ADF は同じ preparation/style/backend 境界を通り、job lifecycle fixture は submit → get → wait → collect の compatibility surface を示す
+- local music CLI backends (`musicgen_mlx`, `stable_audio_3`) は ComfyUI を経由せず `music-generation-bridge` に短絡する
 - ジョブの既定 retry は `manifest.json` の `recovery_policy` と `retry_policy` で制御する
 - `secureFetch` 系の履歴取得は transient failure に対して自動再試行される
 
@@ -13,6 +14,8 @@
 
 ```bash
 node dist/libs/actuators/media-generation-actuator/src/index.js --input libs/actuators/media-generation-actuator/examples/music-adf-anniversary-country-ja.json
+node dist/libs/actuators/media-generation-actuator/src/index.js --input libs/actuators/media-generation-actuator/examples/direct-musicgen-mlx.json
+node dist/libs/actuators/media-generation-actuator/src/index.js --input libs/actuators/media-generation-actuator/examples/direct-stable-audio-3-small-music.json
 ```
 
 job submit 例:
@@ -25,6 +28,8 @@ node dist/libs/actuators/media-generation-actuator/src/index.js --input libs/act
 
 利用可能な examples:
 
+- `direct-image-generation.json`:
+  direct image bridge 経由の画像生成
 - `image-adf-country-cover.json`:
   `image-generation-adf` から SDXL 系 text-to-image workflow を組み立てて画像生成する
 - `video-adf-drive-clip.json`:
@@ -35,6 +40,10 @@ node dist/libs/actuators/media-generation-actuator/src/index.js --input libs/act
   `video-generation-adf` を long-running `generation-job` として submit し、後で status / wait / collect できるようにする
 - `music-adf-anniversary-country-ja.json`:
   `music-generation-adf` を使って、日本語の女性ボーカル・カントリー調アニバーサリー曲を ACE-Step 用 workflow にコンパイルし、ComfyUI に投入する
+- `direct-musicgen-mlx.json`:
+  Apple Silicon の MusicGen (`media-generation.musicgen_mlx`) を ComfyUI なしで直接実行する
+- `direct-stable-audio-3-small-music.json`:
+  Stable Audio 3 small-music (`media-generation.stable_audio_3_small_music`) を ComfyUI なしで直接実行する（HF gated weights + `HF_TOKEN`）
 - `submit-music-generation-job.json`:
   同じ `music-generation-adf` を long-running `generation-job` として submit し、後で status / wait / collect できるようにする
 - `music-generation-schedule-anniversary.json`:

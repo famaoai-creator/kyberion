@@ -16,14 +16,14 @@
  *   `stub`          — keep deterministic stubs. Offline/dev default.
  *
  *   `gemini-api`  — use the Google AI Studio Gemini REST API. Requires
- *                   GEMINI_API_KEY or GOOGLE_API_KEY.
+ *                   KYBERION_GEMINI_API_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY.
  *   `grok-api`    — use the xAI Grok REST API (OpenAI-compatible). Requires
  *                   XAI_API_KEY or KYBERION_GROK_API_KEY.
  *
  * Auto-selection when mode is unset:
- *   - If ANTHROPIC_API_KEY / GEMINI_API_KEY / KYBERION_NEMOTRON_URL /
- *     KYBERION_LOCAL_LLM_URL / OPENROUTER_API_KEY / KYBERION_OPENROUTER_KEY are present, the first
- *     matching policy rule wins.
+ *   - If ANTHROPIC_API_KEY / KYBERION_GEMINI_API_KEY / GEMINI_API_KEY /
+ *     KYBERION_NEMOTRON_URL / KYBERION_LOCAL_LLM_URL / OPENROUTER_API_KEY /
+ *     KYBERION_OPENROUTER_KEY are present, the first matching policy rule wins.
  *   - OpenRouter model selection defaults to the zero-cost `openrouter/free`
  *     router. Pinned free models or paid models must be declared through the
  *     OpenRouter model policy; paid inference requires an explicit

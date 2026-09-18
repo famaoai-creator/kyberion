@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 import {
+  PRE_PR_READINESS_CHECKLIST,
   buildGhArgs,
   parseDefaultBranchResponse,
   parsePublishArgs,
@@ -13,6 +14,16 @@ describe('publish_pull_request', () => {
     expect(options.title).toBe('fix(pr): validate before publish');
     expect(options.fill).toBe(false);
     expect(options.draft).toBe(true);
+    expect(options.skipReadiness).toBe(false);
+  });
+
+  it('parses --skip-readiness for emergency bypass', () => {
+    const options = parsePublishArgs([
+      '--title',
+      'fix(pr): validate before publish',
+      '--skip-readiness',
+    ]);
+    expect(options.skipReadiness).toBe(true);
   });
 
   it('rejects a non-conventional PR title before publish', () => {
@@ -21,7 +32,12 @@ describe('publish_pull_request', () => {
 
   it('builds a guarded gh pr create command', () => {
     const args = buildGhArgs(
-      { title: 'fix(pr): validate before publish', draft: true, fill: true },
+      {
+        title: 'fix(pr): validate before publish',
+        draft: true,
+        fill: true,
+        skipReadiness: false,
+      },
       { head: 'codex/pr-guard', defaultBranch: 'main' }
     );
 
@@ -46,7 +62,7 @@ describe('publish_pull_request', () => {
     ).toThrow('dangerous JSON key');
   });
 
-  it('routes gh output through the shared harness printer', () => {
+  it('routes gh output through the shared harness printer and wires readiness', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('scripts/publish_pull_request.ts'), {
         encoding: 'utf8',
@@ -56,5 +72,9 @@ describe('publish_pull_request', () => {
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
     expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).toContain('runPrePrReadiness');
+    expect(source).toContain('--skip-readiness');
+    expect(source).toContain(PRE_PR_READINESS_CHECKLIST);
+    expect(source).toContain("['check', '--', '--scope', 'pr']");
   });
 });
