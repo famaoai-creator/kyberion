@@ -9,6 +9,7 @@ import {
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveManagedToolPythonBin } from '@agent/core/tool-runtime-registry';
+import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool-binary-resolvers';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -264,7 +265,7 @@ async function runPythonTtsBridge(
   // Auto-trim output based on text duration from end (remove reference audio context)
   if (refAudio && safeExistsSync(safeOutputPath) && safeLstat(safeOutputPath).isFile()) {
     try {
-      const probeTotal = safeExec('ffprobe', [
+      const probeTotal = safeExec(resolveFfprobeBin(), [
         '-v',
         'error',
         '-show_entries',
@@ -280,7 +281,7 @@ async function runPythonTtsBridge(
         const tempPath = assertSafeRepositoryPath(`${safeOutputPath}.tmp.wav`, {
           allowMissingLeaf: true,
         });
-        safeExec('ffmpeg', [
+        safeExec(resolveFfmpegBin(), [
           '-y',
           '-sseof',
           `-${estimatedDuration.toFixed(2)}`,
@@ -484,7 +485,7 @@ async function renderWithEspeakNg(
     tempWav,
     text,
   ]);
-  safeExec('ffmpeg', ['-y', '-i', tempWav, artifactPath]);
+  safeExec(resolveFfmpegBin(), ['-y', '-i', tempWav, artifactPath]);
   return artifactPath;
 }
 
@@ -508,7 +509,14 @@ function renderWithSay(
   safeExec('say', ['-v', options.voice, '-r', String(options.rate), '-o', nativeOutputPath, text]);
   if (nativeOutputPath !== artifactPath) {
     try {
-      safeExec('ffmpeg', ['-y', '-i', nativeOutputPath, '-acodec', 'pcm_s16le', artifactPath]);
+      safeExec(resolveFfmpegBin(), [
+        '-y',
+        '-i',
+        nativeOutputPath,
+        '-acodec',
+        'pcm_s16le',
+        artifactPath,
+      ]);
     } finally {
       if (safeExistsSync(nativeOutputPath)) {
         safeRmSync(nativeOutputPath, { force: true });
@@ -532,7 +540,7 @@ async function isRenderableAudioArtifact(artifactPath: string): Promise<boolean>
   }
 
   try {
-    const durationText = safeExec('ffprobe', [
+    const durationText = safeExec(resolveFfprobeBin(), [
       '-v',
       'error',
       '-show_entries',

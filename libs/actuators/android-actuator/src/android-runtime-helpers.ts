@@ -8,6 +8,7 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
+import { resolveAdbBin } from '@agent/core/tool-binary-resolvers';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolvePipelineContextValues } from '@agent/core/logic-utils';
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
@@ -792,10 +793,10 @@ async function opApply(
 
 function collectAdbHealth(ctx: Record<string, any>, options?: AndroidAction['options']) {
   try {
-    const version = safeExec('adb', ['version'], {
+    const version = safeExec(resolveAdbBin(), ['version'], {
       timeoutMs: options?.timeout_ms || 15000,
     }).trim();
-    const devicesOutput = safeExec('adb', ['devices'], {
+    const devicesOutput = safeExec(resolveAdbBin(), ['devices'], {
       timeoutMs: options?.timeout_ms || 15000,
     }).trim();
     const devices = parseAdbDevices(devicesOutput);
@@ -841,7 +842,7 @@ function resolvePrimitive(val: any): any {
 
 function runAdb(args: string[], serial: string, options?: AndroidAction['options']): string {
   const finalArgs = serial ? ['-s', serial, ...args] : args;
-  return safeExec('adb', finalArgs, { timeoutMs: options?.timeout_ms || 30000 }).trim();
+  return safeExec(resolveAdbBin(), finalArgs, { timeoutMs: options?.timeout_ms || 30000 }).trim();
 }
 
 function parseAdbDevices(output: string): Array<{ serial: string; state: string }> {

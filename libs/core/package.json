@@ -1391,6 +1391,10 @@
       "types": "./dist/tool-runtime-registry.d.ts",
       "default": "./dist/tool-runtime-registry.js"
     },
+    "./tool-binary-resolvers": {
+      "types": "./dist/tool-binary-resolvers.d.ts",
+      "default": "./dist/tool-binary-resolvers.js"
+    },
     "./service-runtime-policy": {
       "types": "./dist/service-runtime-policy.d.ts",
       "default": "./dist/service-runtime-policy.js"

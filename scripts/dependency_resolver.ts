@@ -32,6 +32,8 @@ import {
   discoverLocalSttBackends,
   selectPreferredLocalSttBackend,
 } from '@agent/core/local-stt-discovery';
+import { isLinux, isMacOS, isWindows } from '@agent/core/platform';
+import { resolveFfmpegBin } from '@agent/core/tool-binary-resolvers';
 
 export type DependencyLevel = 'must' | 'should' | 'nice';
 export type DependencyStatus = 'ok' | 'missing' | 'degraded';
@@ -143,7 +145,7 @@ const FFMPEG: Dependency = {
   name: 'ffmpeg',
   level: 'should',
   check: async () => {
-    const r = checkBinary('ffmpeg');
+    const r = checkBinary(resolveFfmpegBin());
     return { ok: r.ok, version: r.version, detail: r.ok ? undefined : 'ffmpeg not in PATH' };
   },
   installCommand: 'brew install ffmpeg  # macOS; or apt install ffmpeg',
@@ -231,11 +233,10 @@ const NATIVE_TTS: Dependency = {
   name: 'OS native TTS (say / espeak / powershell)',
   level: 'must',
   check: async () => {
-    const platform = process.platform;
-    if (platform === 'darwin') {
+    if (isMacOS()) {
       const r = tryExec('which say');
       return { ok: r.ok, version: 'macOS say', detail: r.ok ? undefined : 'say not found' };
-    } else if (platform === 'linux') {
+    } else if (isLinux()) {
       const r = tryExec('which espeak');
       if (r.ok) return { ok: true, version: 'espeak' };
       const r2 = tryExec('which espeak-ng');
@@ -244,10 +245,10 @@ const NATIVE_TTS: Dependency = {
         version: r2.ok ? 'espeak-ng' : undefined,
         detail: r2.ok ? undefined : 'espeak/espeak-ng not found',
       };
-    } else if (platform === 'win32') {
+    } else if (isWindows()) {
       return { ok: true, version: 'Windows SAPI (powershell)' };
     }
-    return { ok: false, detail: `unsupported platform: ${platform}` };
+    return { ok: false, detail: `unsupported platform: ${process.platform}` };
   },
   installCommand: 'sudo apt install espeak-ng  # Linux only',
   fallbackMode: 'voice output falls back to text-only',

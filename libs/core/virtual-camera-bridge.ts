@@ -10,6 +10,7 @@ import {
   safeRmSync,
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { resolveFfmpegBin } from './tool-binary-resolvers.js';
 import { nowIso } from './foundation/time.js';
 import type { VideoFrame } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
@@ -87,7 +88,6 @@ export interface VirtualCameraBridge {
 }
 
 const DEFAULT_IMAGESNAP_BIN = 'imagesnap';
-const DEFAULT_FFMPEG_BIN = 'ffmpeg';
 const DEFAULT_LIBCAMERA_STILL_BIN = 'libcamera-still';
 
 interface CameraCaptureAdapter {
@@ -173,7 +173,7 @@ function chooseBackend(input: {
         : { backend: 'imagesnap', available: false, reason: `${bin} not available` };
     }
     if (preferred === 'ffmpeg') {
-      const bin = input.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
+      const bin = input.ffmpeg_bin ?? resolveFfmpegBin();
       return isAvailableCommand(bin, ['-version'])
         ? { backend: 'ffmpeg', available: true }
         : { backend: 'ffmpeg', available: false, reason: `${bin} not available` };
@@ -197,12 +197,12 @@ function chooseBackend(input: {
     const swiftBin = input.swift_bin ?? 'swift';
     if (isAvailableCommand(swiftBin, ['--version']))
       return { backend: 'swift-avfoundation', available: true };
-    const ffmpegBin = input.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
+    const ffmpegBin = input.ffmpeg_bin ?? resolveFfmpegBin();
     if (isAvailableCommand(ffmpegBin, ['-version'])) return { backend: 'ffmpeg', available: true };
   }
 
   if (process.platform === 'linux' || process.platform === 'win32') {
-    const ffmpegBin = input.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
+    const ffmpegBin = input.ffmpeg_bin ?? resolveFfmpegBin();
     const libcameraBin = input.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
     if (input.device_preference || safeExistsSync('/dev/video0')) {
       if (isAvailableCommand(ffmpegBin, ['-version']))
@@ -362,7 +362,7 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
       };
     }
 
-    const bin = this.opts.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
+    const bin = this.opts.ffmpeg_bin ?? resolveFfmpegBin();
     const adapter = resolveCameraCaptureAdapter(process.platform);
     const device = adapter.deviceArg(selectedCamera || devicePreference);
     safeExec(

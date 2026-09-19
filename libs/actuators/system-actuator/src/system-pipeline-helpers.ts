@@ -36,6 +36,7 @@ import {
   clipboardWrite,
 } from '@agent/core/os-automation';
 import { osAutomationBridge } from '@agent/core/os-automation-bridge';
+import { isMacOS } from '@agent/core/platform';
 import * as path from 'node:path';
 import {
   assertUnsafeShellAllowed,
@@ -160,7 +161,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'voice_input_toggle': {
-      if (process.platform !== 'darwin') {
+      if (!isMacOS()) {
         throw new Error('voice_input_toggle is only supported on macOS');
       }
       const dictationKeycode = Number(resolve(params.dictation_keycode ?? 176));
@@ -172,7 +173,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       if (!application) {
         throw new Error('Application name is required for activate_application');
       }
-      if (process.platform === 'darwin') {
+      if (isMacOS()) {
         activateApplication(application);
       }
       break;

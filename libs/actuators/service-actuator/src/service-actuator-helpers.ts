@@ -248,16 +248,21 @@ const buildPipelineRetryPolicy = createGovernedRetryOptionsBuilder({
 });
 
 function resolveServiceBaseUrl(serviceId: string): string {
+  let catalog: ReturnType<typeof loadServiceEndpointsCatalog>;
   try {
-    const catalog = loadServiceEndpointsCatalog();
-    const baseUrl = catalog?.services?.[serviceId]?.base_url;
-    if (typeof baseUrl === 'string' && baseUrl.trim()) return baseUrl.trim();
-    const pattern = typeof catalog?.default_pattern === 'string' ? catalog.default_pattern : '';
-    if (pattern.includes('{service_id}')) return pattern.replace('{service_id}', serviceId);
+    catalog = loadServiceEndpointsCatalog();
   } catch (err) {
-    logger.warn(`[service-actuator-helpers] suppressed error in resolveServiceBaseUrl: ${err}`);
+    throw new Error(
+      `[SERVICE_BASE_URL_UNRESOLVED] service endpoints catalog unavailable for service "${serviceId}": ${err instanceof Error ? err.message : String(err)}`
+    );
   }
-  return `https://api.${serviceId}.com/v1`;
+  const baseUrl = catalog?.services?.[serviceId]?.base_url;
+  if (typeof baseUrl === 'string' && baseUrl.trim()) return baseUrl.trim();
+  const pattern = typeof catalog?.default_pattern === 'string' ? catalog.default_pattern : '';
+  if (pattern.includes('{service_id}')) return pattern.replace('{service_id}', serviceId);
+  throw new Error(
+    `[SERVICE_BASE_URL_UNRESOLVED] no base_url or default_pattern for service "${serviceId}" (never synthesize external URLs)`
+  );
 }
 
 function registerServiceRuntime(serviceId: string, pid: number | undefined, manifestPath?: string) {

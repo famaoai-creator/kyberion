@@ -1,4 +1,5 @@
-import { parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { getRegisteredEnvText, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { getControlPlaneBaseUrl } from '@agent/core/control-plane-client';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -30,7 +31,12 @@ async function main(print: Print = () => undefined) {
     ],
   };
 
-  const response = await fetch('http://127.0.0.1:3031/api/timeline/dispatch', {
+  const bridgeBaseUrl = String(
+    getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL')?.split(',')[0]?.trim() ||
+      getControlPlaneBaseUrl('presence')
+  ).replace(/\/$/, '');
+
+  const response = await fetch(`${bridgeBaseUrl}/api/timeline/dispatch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(timeline),

@@ -17,6 +17,7 @@ import {
   recordProtocolServiceLifecycle,
 } from '@agent/core/protocol-service-lifecycle';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { isLinux, isMacOS } from '@agent/core/platform';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveTenant } from '@agent/core/tenant-registry';
 import {
@@ -96,7 +97,7 @@ export async function readOsClipboardText(): Promise<
   { ok: true; text: string } | { ok: false; error: string }
 > {
   try {
-    if (process.platform === 'darwin') {
+    if (isMacOS()) {
       const result = await safeExecResultAsync('pbpaste', [], {
         timeout: 5_000,
         maxOutputMB: 2,
@@ -104,7 +105,7 @@ export async function readOsClipboardText(): Promise<
       if (result.status !== 0) throw result.error ?? new Error(result.stderr || 'pbpaste failed');
       return { ok: true, text: result.stdout };
     }
-    if (process.platform === 'linux') {
+    if (isLinux()) {
       try {
         const result = await safeExecResultAsync('xclip', ['-o', '-selection', 'clipboard'], {
           timeout: 5_000,

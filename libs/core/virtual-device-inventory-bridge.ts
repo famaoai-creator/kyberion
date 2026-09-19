@@ -1,6 +1,7 @@
 import { safeExecResult } from './secure-io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { resolveFfmpegBin } from './tool-binary-resolvers.js';
 
 export const VIRTUAL_DEVICE_INVENTORY_BRIDGE_ID = 'virtual-device-inventory-bridge' as const;
 
@@ -57,7 +58,6 @@ export interface VirtualDeviceInventoryOptions {
 }
 
 const DEFAULT_SYSTEM_PROFILER = 'system_profiler';
-const DEFAULT_FFMPEG = 'ffmpeg';
 const DEFAULT_PACTL = 'pactl';
 const DEFAULT_POWERSHELL = 'powershell.exe';
 
@@ -461,7 +461,7 @@ class DarwinVirtualDeviceAdapter implements VirtualDevicePlatformAdapter {
     const cameras = collectMacCameraDevices(
       options,
       options.system_profiler_bin ?? DEFAULT_SYSTEM_PROFILER,
-      options.ffmpeg_bin ?? DEFAULT_FFMPEG
+      options.ffmpeg_bin ?? resolveFfmpegBin()
     );
     inventory.cameras.push(...cameras.filter((record) => record.kind === 'camera'));
     inventory.virtual_cameras.push(...cameras.filter((record) => record.kind === 'virtual-camera'));
@@ -479,7 +479,7 @@ class LinuxVirtualDeviceAdapter implements VirtualDevicePlatformAdapter {
       ...audio.filter((record) => record.kind === 'virtual-audio')
     );
     inventory.cameras.push(
-      ...collectLinuxCameraDevices(options, options.ffmpeg_bin ?? DEFAULT_FFMPEG)
+      ...collectLinuxCameraDevices(options, options.ffmpeg_bin ?? resolveFfmpegBin())
     );
     return inventory;
   }
