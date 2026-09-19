@@ -182,9 +182,12 @@ export {
   getSpeechToTextBridge,
   getSpeechToTextBridges,
   getSpeechToTextCapabilities,
+  installAvailableSpeechToTextBridges,
   installFluidAudioSpeechToTextBridgeIfAvailable,
   installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
   installShellSpeechToTextBridgeIfAvailable,
+  installWhisperKitSpeechToTextBridgeIfAvailable,
+  buildWhisperKitTranscribeArgs,
   NO_TIMESTAMP_STT_CAPABILITIES,
   registerSpeechToTextBridge,
   normalizeSpeechToTextResult,
@@ -192,6 +195,19 @@ export {
   ShellSpeechToTextBridge,
   stubSpeechToTextBridge,
 } from './speech-to-text-bridge.js';
+
+export {
+  discoverLocalSttBackends,
+  loadLocalSttDiscoveryRegistry,
+  selectPreferredLocalSttBackend,
+} from './local-stt-discovery.js';
+
+export type {
+  LocalSttBackend,
+  LocalSttCandidate,
+  LocalSttDiscoveryOptions,
+  LocalSttSource,
+} from './local-stt-discovery.js';
 
 export type {
   ShellSpeechToTextBridgeOptions,

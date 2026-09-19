@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/local-stt-discovery-registry.schema.json",
+  "title": "Local STT Discovery Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "backends"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "backends": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "backend_id",
+          "display_name",
+          "status",
+          "priority",
+          "platforms",
+          "source",
+          "verification",
+          "probe",
+          "connection",
+          "detail"
+        ],
+        "properties": {
+          "backend_id": { "type": "string", "minLength": 1 },
+          "display_name": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["active", "disabled"] },
+          "priority": { "type": "integer" },
+          "platforms": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "enum": ["any", "darwin", "linux", "win32"] }
+          },
+          "source": { "type": "string", "minLength": 1 },
+          "verification": {
+            "type": "string",
+            "enum": ["executable", "python-module", "native-script"]
+          },
+          "probe": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "commands"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["executable", "python_module", "managed_python_module", "native_script"]
+              },
+              "commands": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "version_args": { "type": "array", "items": { "type": "string" } },
+              "module": { "type": "string", "minLength": 1 },
+              "script_path": { "type": "string", "minLength": 1 },
+              "tool_id": { "type": "string", "minLength": 1 }
+            }
+          },
+          "connection": { "type": "object" },
+          "detail": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

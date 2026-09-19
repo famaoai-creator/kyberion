@@ -771,6 +771,10 @@
       "types": "./dist/service-engine-helpers.d.ts",
       "default": "./dist/service-engine-helpers.js"
     },
+    "./local-stt-discovery": {
+      "types": "./dist/local-stt-discovery.d.ts",
+      "default": "./dist/local-stt-discovery.js"
+    },
     "./surface-runtime-router": {
       "types": "./dist/surface-runtime-router.d.ts",
       "default": "./dist/surface-runtime-router.js"

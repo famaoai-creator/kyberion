@@ -32,6 +32,7 @@ import {
   type TranscribeInput,
   type TranscribeResult,
 } from './speech-to-text-bridge.js';
+import { discoverLocalSttBackends } from './local-stt-discovery.js';
 
 export const APPLE_SPEECH_FILE_BRIDGE_NAME = 'apple-speech-file';
 
@@ -88,8 +89,9 @@ function parseLastJsonLine(stdout: string): NativeSttPayload | null {
 }
 
 export function isAppleSpeechFileTranscriptionSupported(): boolean {
-  if (process.platform !== 'darwin') return false;
-  return safeExistsSync(assertSafeRepositoryPath(pathResolver.resolve(SCRIPT_PATH)));
+  return discoverLocalSttBackends().some(
+    (candidate) => candidate.connection.apple_speech_available === true
+  );
 }
 
 export function transcribeAudioFileWithAppleSpeech(
@@ -131,10 +133,13 @@ export function transcribeAudioFileWithAppleSpeech(
 }
 
 export function createAppleSpeechFileToTextBridge(): SpeechToTextBridge {
+  const priority =
+    discoverLocalSttBackends().find(
+      (candidate) => candidate.connection.apple_speech_available === true
+    )?.priority ?? 0;
   return {
     name: APPLE_SPEECH_FILE_BRIDGE_NAME,
-    // Lower than the managed runtimes: those give word timings, this does not.
-    priority: 50,
+    priority,
     capabilities: { timestamps: false, granularity: 'none', local_only: true },
     async transcribe(input: TranscribeInput): Promise<TranscribeResult> {
       const { text, locale } = transcribeAudioFileWithAppleSpeech(input.audioPath, {
