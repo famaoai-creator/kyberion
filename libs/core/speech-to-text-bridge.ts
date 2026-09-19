@@ -31,7 +31,7 @@ import {
 } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
 import { resolveLocale } from './locale.js';
-import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
+import { discoverLocalSttBackends, selectPreferredLocalSttBackend } from './local-stt-discovery.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface TranscribeInput {
@@ -395,6 +395,9 @@ export function installFluidAudioSpeechToTextBridgeIfAvailable(
   if (envText(env, 'KYBERION_STT_COMMAND')?.trim()) return false;
   const command = envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim();
   if (!command) return false;
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'fluid-audio-parakeet')) {
+    return true;
+  }
   const timeoutText = envText(env, 'KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS');
   registerSpeechToTextBridge(
     new ShellSpeechToTextBridge({
@@ -420,6 +423,7 @@ export function installShellSpeechToTextBridgeIfAvailable(
 ): boolean {
   const command = envText(env, 'KYBERION_STT_COMMAND')?.trim();
   if (!command) return false;
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'shell')) return true;
   let capabilities: SpeechToTextCapabilities | undefined;
   const capabilitiesText = envText(env, 'KYBERION_STT_CAPABILITIES')?.trim();
   if (capabilitiesText) {
@@ -449,6 +453,78 @@ export function installShellSpeechToTextBridgeIfAvailable(
   return true;
 }
 
+export function buildWhisperKitTranscribeArgs(audioPath: string, language?: string): string[] {
+  return [
+    'transcribe',
+    '--audio-path',
+    audioPath,
+    ...(language ? ['--language', language] : []),
+    '--without-timestamps',
+  ];
+}
+
+/**
+ * Register the Apple Silicon WhisperKit CLI when it is available from the
+ * current OS PATH. The same detector feeds onboarding/service registration;
+ * the executable is passed as an argv command, never interpolated into a
+ * shell string.
+ */
+export function installWhisperKitSpeechToTextBridgeIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (
+    getSpeechToTextBridges().some((bridge) => bridge.name === 'whisperkit-cli') ||
+    envText(env, 'KYBERION_STT_COMMAND')?.trim() ||
+    envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
+  ) {
+    return false;
+  }
+  const detected = discoverLocalSttBackends().find(
+    (candidate) => typeof candidate.connection.whisperkit_cli_path === 'string'
+  );
+  const executable = detected?.executable;
+  if (!executable) return false;
+
+  registerSpeechToTextBridge({
+    name: 'whisperkit-cli',
+    priority: detected?.priority ?? 0,
+    capabilities: { timestamps: false, granularity: 'none', local_only: true },
+    async transcribe(input) {
+      const audioAbs = resolveAudioPath(input.audioPath);
+      if (!safeExistsSync(audioAbs)) {
+        throw new Error(`[stt-bridge:whisperkit-cli] audio file not found: ${input.audioPath}`);
+      }
+      assertRegularFile(audioAbs, 'audio input');
+      const result = safeExecResult(
+        executable,
+        buildWhisperKitTranscribeArgs(audioAbs, input.language),
+        {
+          timeoutMs: 5 * 60 * 1000,
+          maxOutputMB: 64,
+        }
+      );
+      if (result.error || result.status !== 0) {
+        throw new Error(
+          `[stt-bridge:whisperkit-cli] backend failed: ${result.stderr || result.error?.message || `exit ${result.status}`}`
+        );
+      }
+      const text = result.stdout.trim();
+      if (!text) throw new Error('[stt-bridge:whisperkit-cli] backend returned empty text');
+      const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
+      safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
+      return {
+        text,
+        language: input.language || resolveLocale(),
+        written_to: outputPath,
+        backend: 'whisperkit-cli',
+        capabilities: { timestamps: false, granularity: 'none', local_only: true },
+      };
+    },
+  });
+  logger.success(`[stt-bridge] installed WhisperKit CLI bridge (${executable})`);
+  return true;
+}
+
 /**
  * Use the governed MLX Whisper runtime when no explicit STT adapter was set.
  * This keeps the model process behind the SpeechToTextBridge boundary while
@@ -463,7 +539,13 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   ) {
     return false;
   }
-  const pythonBin = resolveManagedToolPythonBin('mlx_whisper');
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'mlx_whisper')) return true;
+  const detected = discoverLocalSttBackends().filter(
+    (candidate) => candidate.verification === 'python-module' && Boolean(candidate.python_bin)
+  );
+  const selected = selectPreferredLocalSttBackend(detected);
+  const pythonBin = selected?.python_bin;
+  const priority = selected?.priority ?? 0;
   const bridgeScript = assertSafeRepositoryPath(
     rootResolve('libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py')
   );
@@ -471,7 +553,7 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
 
   registerSpeechToTextBridge({
     name: 'mlx_whisper',
-    priority: 90,
+    priority,
     capabilities: { timestamps: true, granularity: 'segment', local_only: true },
     async transcribe(input) {
       const audioAbs = resolveAudioPath(input.audioPath);
@@ -515,4 +597,21 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   });
   logger.success('[stt-bridge] installed managed mlx_whisper SpeechToTextBridge');
   return true;
+}
+
+/**
+ * Register all locally available synchronous STT bridges, then let the seam
+ * select the winner from the governed discovery catalog priorities. Explicit
+ * operator commands remain an intentional configuration override; discovered
+ * backends are never ordered by this caller.
+ */
+export function installAvailableSpeechToTextBridges(
+  env: NodeJS.ProcessEnv = process.env
+): SpeechToTextBridge {
+  if (installShellSpeechToTextBridgeIfAvailable(env)) return getSpeechToTextBridge();
+  if (installFluidAudioSpeechToTextBridgeIfAvailable(env)) return getSpeechToTextBridge();
+
+  installWhisperKitSpeechToTextBridgeIfAvailable(env);
+  installManagedMlxWhisperSpeechToTextBridgeIfAvailable(env);
+  return getSpeechToTextBridge();
 }
