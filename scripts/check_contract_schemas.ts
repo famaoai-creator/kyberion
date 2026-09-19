@@ -772,8 +772,21 @@ function createChecks(): ContractCheck[] {
             comfyui: {
               required_keys_any: ['base_url', 'output_dir'],
             },
+            whisper: {
+              required_keys_any: [
+                'whisperkit_base_url',
+                'whisperkit_cli_path',
+                'whisper_cli_path',
+                'whisper_python_bin',
+                'apple_speech_available',
+              ],
+            },
             voice: {
               required_keys_any: ['voice_python_bin', 'voice_name'],
+            },
+            meeting: {
+              required_keys_any: ['meeting_python_bin'],
+              required: false,
             },
           },
         },
@@ -784,6 +797,19 @@ function createChecks(): ContractCheck[] {
           required_services: {
             comfyui: {},
           },
+        },
+      ],
+    },
+    {
+      id: 'local-stt-discovery-registry',
+      schemaPath: 'knowledge/product/schemas/local-stt-discovery-registry.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/product/governance/local-stt-discovery-registry.json'),
+      ],
+      invalidPayloads: [
+        {
+          version: '1.0.0',
+          backends: [{ backend_id: 'broken' }],
         },
       ],
     },

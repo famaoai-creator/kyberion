@@ -7,6 +7,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { discoverLocalSttBackends } from '@agent/core/local-stt-discovery';
 
 const VOICE_TOOL_IDS = [
   'mlx_audio',
@@ -234,6 +235,18 @@ export function formatVoiceSetupReport(rows: VoiceSetupRow[], apply: boolean): s
     }
   }
   lines.push('');
+  const localStt = discoverLocalSttBackends();
+  if (localStt.length > 0) {
+    lines.push('Local STT detected');
+    for (const backend of localStt) {
+      lines.push(
+        `  [OK] ${backend.backend} via ${backend.source}${backend.executable ? `: ${backend.executable}` : backend.python_bin ? `: ${backend.python_bin}` : ''}`
+      );
+    }
+  } else {
+    lines.push('Local STT detected: none');
+  }
+  lines.push('');
   if (!apply && rows.some((row) => row.status === 'needs_install')) {
     lines.push('Next step: `pnpm kyberion voice setup --apply`');
   }
@@ -257,27 +270,30 @@ export async function runVoiceSetup(options: { apply: boolean }): Promise<VoiceS
   return rows;
 }
 
-export async function main(
-  args: string[] = []
-): Promise<{ rows: VoiceSetupRow[]; apply: boolean }> {
+export async function main(args: string[] = []): Promise<{
+  rows: VoiceSetupRow[];
+  apply: boolean;
+  localStt: ReturnType<typeof discoverLocalSttBackends>;
+}> {
   const argv = await createStandardYargs(['node', 'voice_setup', ...args])
     .option('apply', { type: 'boolean', default: false })
     .parseSync();
 
   const rows = await runVoiceSetup({ apply: Boolean(argv.apply) });
-  return { rows, apply: Boolean(argv.apply) };
+  return { rows, apply: Boolean(argv.apply), localStt: discoverLocalSttBackends() };
 }
 
 export const runVoiceSetupScript = defineScript({
   name: 'voice setup',
   flags: ['json', 'quiet'],
   run: async (context) => {
-    const { rows, apply } = await main(context.argv);
+    const { rows, apply, localStt } = await main(context.argv);
     if (context.json) {
       context.print({
         status: rows.some((row) => row.status === 'needs_install') ? 'needs_install' : 'ready',
         apply,
         rows,
+        local_stt: localStt,
       });
     } else {
       context.print(formatVoiceSetupReport(rows, apply).join('\n'));

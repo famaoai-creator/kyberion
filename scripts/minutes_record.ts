@@ -14,9 +14,8 @@
  */
 
 import {
-  installFluidAudioSpeechToTextBridgeIfAvailable,
-  installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
-  installShellSpeechToTextBridgeIfAvailable,
+  getSpeechToTextBridge,
+  installAvailableSpeechToTextBridges,
 } from '@agent/core/speech-to-text-bridge';
 import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
 import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
@@ -56,24 +55,17 @@ async function main(argv: string[] = []): Promise<void> {
     logger.error(`❌ ${catalogT('minutes_record:mic_capture_failed', { reason: probe.reason })}`);
     throw new ScriptExitError(1, '', true);
   }
-  // Register every on-device STT backend, not just the shell one. Each
-  // installer no-ops when a higher-priority backend is already configured, so
-  // this is ordered best-first. Recording a whole meeting only to find the stub
-  // was in charge is the expensive failure here, so say which one won up front.
-  const sttBackend = installShellSpeechToTextBridgeIfAvailable()
-    ? 'shell (KYBERION_STT_COMMAND)'
-    : installFluidAudioSpeechToTextBridgeIfAvailable()
-      ? 'fluid-audio-parakeet'
-      : installManagedMlxWhisperSpeechToTextBridgeIfAvailable()
-        ? 'mlx_whisper'
-        : // Apple's on-device recognizers need no install and no model
-          // download. SpeechAnalyzer first (better output, macOS 26+), then
-          // SFSpeechRecognizer, which covers every macOS back to 10.15.
-          (await installAppleSpeechToTextBridgeIfAvailable())
-          ? 'apple-speech'
-          : installAppleSpeechFileToTextBridgeIfAvailable()
-            ? 'apple-speech-file'
-            : null;
+  // Register available local backends; the seam selects by catalog priority.
+  // Apple's native recognizers are asynchronous probes, so they are added
+  // only when no synchronous backend registered above.
+  installAvailableSpeechToTextBridges();
+  let sttBackend = getSpeechToTextBridge().name !== 'stub' ? getSpeechToTextBridge().name : null;
+  if (!sttBackend && (await installAppleSpeechToTextBridgeIfAvailable())) {
+    sttBackend = getSpeechToTextBridge().name;
+  }
+  if (!sttBackend && installAppleSpeechFileToTextBridgeIfAvailable()) {
+    sttBackend = getSpeechToTextBridge().name;
+  }
   if (!sttBackend) {
     logger.warn(`⚠️  ${catalogT('minutes_record:stt_unavailable')}`);
   }
