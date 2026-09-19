@@ -32,6 +32,7 @@ import {
   safeExec,
 } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isMacOS, isWindows } from './platform.js';
 import { normalizePersistedAuditEntry } from './audit-chain.js';
 
 function kyberionEnv(name: string): string | undefined {
@@ -487,8 +488,8 @@ export function playwrightBrowsersDir(env: NodeJS.ProcessEnv = process.env): str
     return pathResolver.rootResolve('node_modules/playwright-core/.local-browsers');
   }
   const home = os.homedir();
-  if (process.platform === 'darwin') return path.join(home, 'Library', 'Caches', 'ms-playwright');
-  if (process.platform === 'win32') {
+  if (isMacOS()) return path.join(home, 'Library', 'Caches', 'ms-playwright');
+  if (isWindows()) {
     return path.join(env.LOCALAPPDATA ?? path.join(home, 'AppData', 'Local'), 'ms-playwright');
   }
   return path.join(env.XDG_CACHE_HOME ?? path.join(home, '.cache'), 'ms-playwright');

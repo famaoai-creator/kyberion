@@ -8,6 +8,7 @@ import { safeExecResult } from '@agent/core/secure-io';
 import { secretGuard } from '@agent/core/secret-guard';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
+import { isMacOS } from '@agent/core/platform';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export type AppPreflightStatus = 'pass' | 'fail' | 'warn';
@@ -46,7 +47,7 @@ function probeBinary(id: string, binary: string, fix: string): AppPreflightItem 
 }
 
 function probeIosRuntimes(): AppPreflightItem {
-  if (process.platform !== 'darwin') {
+  if (!isMacOS()) {
     return item(
       'ios.runtime',
       'warn',

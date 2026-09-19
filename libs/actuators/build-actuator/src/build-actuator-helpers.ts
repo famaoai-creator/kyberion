@@ -14,6 +14,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { resolveXcodebuildBin } from '@agent/core/tool-binary-resolvers';
 import { runOpPreflight } from '@agent/core/op-preflight';
 
 /**
@@ -104,7 +105,7 @@ export function buildCommandForOp(input: BuildActuatorInput): {
       // the *device* platform components to be installed even for simulator
       // builds on recent Xcode — target/sdk builds work with just the SDK.
       return {
-        command: 'xcodebuild',
+        command: resolveXcodebuildBin(),
         args: [
           ...detectXcodeContainer(projectDir),
           ...(input.scheme ? ['-target', input.scheme] : []),
@@ -117,7 +118,7 @@ export function buildCommandForOp(input: BuildActuatorInput): {
       };
     case 'ios_test':
       return {
-        command: 'xcodebuild',
+        command: resolveXcodebuildBin(),
         args: [
           'test',
           ...detectXcodeContainer(projectDir),
@@ -129,7 +130,7 @@ export function buildCommandForOp(input: BuildActuatorInput): {
       };
     case 'ios_archive':
       return {
-        command: 'xcodebuild',
+        command: resolveXcodebuildBin(),
         args: [
           'archive',
           ...detectXcodeContainer(projectDir),

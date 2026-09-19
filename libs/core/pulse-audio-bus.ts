@@ -21,6 +21,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { logger } from './core.js';
 import { buildSafeExecEnv, safeExec } from './secure-io.js';
+import { resolveFfmpegBin } from './tool-binary-resolvers.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
 import type { AudioBus, AudioBusProbe } from './audio-bus.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
@@ -69,7 +70,7 @@ export class PulseAudioBus implements AudioBus {
   constructor(opts: PulseAudioBusOptions = {}) {
     this.source = opts.source_name ?? DEFAULTS.source_name;
     this.sink = opts.sink_name ?? DEFAULTS.sink_name;
-    this.ffmpegBin = opts.ffmpeg_bin ?? 'ffmpeg';
+    this.ffmpegBin = opts.ffmpeg_bin ?? resolveFfmpegBin();
     this.pactlBin = opts.pactl_bin ?? 'pactl';
     this.inboundQueue = new BoundedAudioQueue(opts.buffer_policy ?? DEFAULT_AUDIO_BUFFER_POLICY);
   }
