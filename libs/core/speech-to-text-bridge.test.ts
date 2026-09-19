@@ -29,6 +29,8 @@ import {
   parseSpeechToTextCapabilities,
   stubSpeechToTextBridge,
   ShellSpeechToTextBridge,
+  buildWhisperKitTranscribeArgs,
+  installAvailableSpeechToTextBridges,
   installFluidAudioSpeechToTextBridgeIfAvailable,
   installShellSpeechToTextBridgeIfAvailable,
   type SpeechToTextBridge,
@@ -258,6 +260,17 @@ describe('speech-to-text-bridge', () => {
     expect(getSpeechToTextBridge().name).toBe('fluid-audio-parakeet');
   });
 
+  it('builds WhisperKit argv without a shell command or whisper.cpp flags', () => {
+    expect(buildWhisperKitTranscribeArgs('/repo/audio.wav', 'ja')).toEqual([
+      'transcribe',
+      '--audio-path',
+      '/repo/audio.wav',
+      '--language',
+      'ja',
+      '--without-timestamps',
+    ]);
+  });
+
   it('keeps explicit shell STT ahead of the FluidAudio fallback', () => {
     expect(
       installFluidAudioSpeechToTextBridgeIfAvailable({
@@ -265,6 +278,15 @@ describe('speech-to-text-bridge', () => {
         KYBERION_FLUID_AUDIO_STT_COMMAND: 'parakeet --audio {{audio}}',
       })
     ).toBe(false);
+  });
+
+  it('keeps shared STT registration idempotent while preserving explicit configuration', () => {
+    const env = {
+      KYBERION_STT_COMMAND: 'whisper --file {{audio}}',
+      KYBERION_FLUID_AUDIO_STT_COMMAND: 'parakeet --audio {{audio}}',
+    };
+    expect(installAvailableSpeechToTextBridges(env).name).toBe('shell');
+    expect(installAvailableSpeechToTextBridges(env).name).toBe('shell');
   });
 
   it('routes STT environment reads through the governed accessor', () => {

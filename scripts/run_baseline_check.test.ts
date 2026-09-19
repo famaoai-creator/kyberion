@@ -97,6 +97,25 @@ describe('run_baseline_check', () => {
     });
   });
 
+  it('preserves an explicit opt-out (required: false) without degrading', () => {
+    const result = parseConnectionReadinessConfig(
+      JSON.stringify({
+        required_services: {
+          meeting: { required_keys_any: ['meeting_python_bin'], required: false },
+        },
+      }),
+      'fixture.json'
+    );
+
+    expect(result).toEqual({
+      requiredServices: {
+        meeting: { required_keys_any: ['meeting_python_bin'], required: false },
+      },
+      tenantGuard: { requireZeroDrift: true },
+      configDegraded: false,
+    });
+  });
+
   it('returns needs_attention when janitor maintenance is pending', () => {
     const status = deriveBaselineStatus(
       { success: true, failedLayer: null },

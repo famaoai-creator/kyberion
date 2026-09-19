@@ -1,9 +1,9 @@
 import path from 'node:path';
 import { startMicCapture } from '@agent/core/mic-capture';
+import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
 import {
   getSpeechToTextBridge,
-  installFluidAudioSpeechToTextBridgeIfAvailable,
-  installShellSpeechToTextBridgeIfAvailable,
+  installAvailableSpeechToTextBridges,
   type TranscribeResult,
 } from '@agent/core/speech-to-text-bridge';
 import { pcmToWav } from '@agent/core/pcm-wav';
@@ -22,8 +22,10 @@ function ensureSttBridges(): void {
   if (bridgesInstalled) return;
   bridgesInstalled = true;
   try {
-    installFluidAudioSpeechToTextBridgeIfAvailable();
-    installShellSpeechToTextBridgeIfAvailable();
+    installAvailableSpeechToTextBridges();
+    if (getSpeechToTextBridge().name === 'stub') {
+      installAppleSpeechFileToTextBridgeIfAvailable();
+    }
   } catch {
     // bridge installation is best-effort; getSpeechToTextBridge falls back
   }

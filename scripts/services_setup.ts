@@ -19,6 +19,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { formatSetupHintLine, formatSetupSummaryLine } from './setup-report-format.js';
+import { discoverLocalSttBackends } from '@agent/core/local-stt-discovery';
 
 export type ServiceSetupRow = {
   service: string;
@@ -32,6 +33,7 @@ export type ServiceSetupRow = {
   secrets: string;
   cli: string;
   hint: string;
+  localSttDetected?: string[];
   nextAction?: ReturnType<typeof buildNextAction>;
 };
 
@@ -174,6 +176,13 @@ export function printServiceSetupReport(
     );
     if (row.auth === 'missing' || row.connection === 'missing' || !row.connectionReady) {
       print(formatSetupHintLine(row.hint));
+      if (row.service === 'whisper' && row.localSttDetected?.length) {
+        print(
+          formatSetupHintLine(
+            `Local STT detected (${row.localSttDetected.join(', ')}); register it with ${buildServiceConnectionSetupCommand('whisper')}`
+          )
+        );
+      }
       if (row.connection === 'missing' || !row.connectionReady) {
         print(
           formatSetupHintLine(
@@ -220,6 +229,10 @@ export async function setupServices(options: { quiet?: boolean; print?: Print } 
           secrets: auth?.requiredSecrets.join(', ') || '',
           cli: auth?.cliFallbacks.join(', ') || '',
           hint: auth?.setupHint || 'Host-managed service or no preset path.',
+          localSttDetected:
+            serviceId === 'whisper'
+              ? discoverLocalSttBackends().map((candidate) => candidate.backend)
+              : undefined,
           nextAction:
             auth && !auth.valid
               ? buildServiceAuthNextAction(serviceId, auth)

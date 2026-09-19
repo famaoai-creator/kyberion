@@ -4,6 +4,8 @@ import { safeExistsSync } from './secure-io.js';
 
 export type ServiceConnectionReadinessRule = {
   required_keys_any?: string[];
+  /** Explicit opt-out: false = intentionally unused, skipped by readiness gates. Default true. */
+  required?: boolean;
 };
 
 export type ServiceConnectionReadinessConfig = {
@@ -41,6 +43,11 @@ export function requiredServiceConnectionKeys(serviceId: string): string[] {
   return Array.isArray(keys) ? keys.filter((key): key is string => typeof key === 'string') : [];
 }
 
+/** False only when the service is explicitly opted out (`required: false`). Absent flag = required. */
+export function isServiceConnectionRequired(serviceId: string): boolean {
+  return loadServiceConnectionReadinessConfig()?.required_services?.[serviceId]?.required !== false;
+}
+
 /** Shared readiness predicate: empty strings are not usable connection values. */
 export function hasRequiredServiceConnectionValue(
   payload: Record<string, unknown>,
@@ -58,6 +65,8 @@ export function isServiceConnectionReady(
   serviceId: string,
   payload: Record<string, unknown>
 ): boolean {
+  // Explicitly opted-out services are vacuously ready (intentionally unused).
+  if (!isServiceConnectionRequired(serviceId)) return true;
   const requiredKeys = requiredServiceConnectionKeys(serviceId);
   return requiredKeys.length === 0 || hasRequiredServiceConnectionValue(payload, requiredKeys);
 }

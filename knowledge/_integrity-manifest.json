@@ -1735,6 +1735,12 @@
       "type": "md"
     },
     {
+      "path": "product/governance/local-stt-discovery-registry.json",
+      "tier": "public",
+      "size": 2945,
+      "type": "json"
+    },
+    {
       "path": "product/governance/maintenance-schedule.json",
       "tier": "public",
       "size": 355,
@@ -2553,7 +2559,7 @@
     {
       "path": "product/governance/service-connection-readiness.json",
       "tier": "public",
-      "size": 509,
+      "size": 653,
       "type": "json"
     },
     {
@@ -4689,7 +4695,7 @@
     {
       "path": "product/orchestration/service-presets/whisper.json",
       "tier": "public",
-      "size": 1790,
+      "size": 2749,
       "type": "json"
     },
     {
@@ -7891,6 +7897,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/local-stt-discovery-registry.schema.json",
+      "tier": "public",
+      "size": 2378,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/maintenance-schedule.schema.json",
       "tier": "public",
       "size": 705,
@@ -9663,7 +9675,7 @@
     {
       "path": "product/schemas/service-connection-readiness.schema.json",
       "tier": "public",
-      "size": 1003,
+      "size": 1219,
       "type": "json"
     },
     {

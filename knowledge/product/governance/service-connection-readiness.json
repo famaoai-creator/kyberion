@@ -9,13 +9,20 @@
       "required_keys_any": ["base_url", "output_dir"]
     },
     "whisper": {
-      "required_keys_any": ["whisperkit_base_url", "whisper_cli_path"]
+      "required_keys_any": [
+        "whisperkit_base_url",
+        "whisperkit_cli_path",
+        "whisper_cli_path",
+        "whisper_python_bin",
+        "apple_speech_available"
+      ]
     },
     "voice": {
       "required_keys_any": ["voice_python_bin", "voice_name"]
     },
     "meeting": {
-      "required_keys_any": ["meeting_python_bin"]
+      "required_keys_any": ["meeting_python_bin"],
+      "required": false
     }
   }
 }

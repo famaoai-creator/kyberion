@@ -61,10 +61,7 @@ import {
   resetIntentExtractor,
 } from './intent-extractor.js';
 import { buildFailoverVoiceBridge, registerVoiceBridge, resetVoiceBridge } from './voice-bridge.js';
-import {
-  installFluidAudioSpeechToTextBridgeIfAvailable,
-  installShellSpeechToTextBridgeIfAvailable,
-} from './speech-to-text-bridge.js';
+import { installAvailableSpeechToTextBridges } from './speech-to-text-bridge.js';
 import { installAppleSpeechToTextBridgeIfAvailable } from './apple-intelligence-bridge.js';
 import {
   installShellDeploymentAdapterFromConfigIfAvailable,
@@ -491,9 +488,8 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   refreshCapabilityRegistryIfRequested(effectiveOptions);
 
   // Common infrastructure (order matters: voice bridge runs after reasoning backend)
-  const shellSttInstalled =
-    installShellSpeechToTextBridgeIfAvailable() || installFluidAudioSpeechToTextBridgeIfAvailable();
-  if (!shellSttInstalled) {
+  const sttBridge = installAvailableSpeechToTextBridges();
+  if (sttBridge.name === 'stub') {
     // Fire-and-forget: on Apple Silicon macOS this upgrades the stub to
     // on-device transcription; elsewhere the probe declines instantly.
     // An explicit KYBERION_STT_COMMAND always wins (checked above).
