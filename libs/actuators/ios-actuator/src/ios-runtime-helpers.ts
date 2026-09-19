@@ -1,4 +1,5 @@
 import { logger } from '@agent/core/core';
+import { resolveXcrunBin } from '@agent/core/tool-binary-resolvers';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -422,8 +423,8 @@ async function opApply(
 function collectSimctlHealth(ctx: Record<string, any>, options?: IOSAction['options']) {
   try {
     const timeoutMs = options?.timeout_ms || 60000;
-    const xcrunVersion = safeExec('xcrun', ['--version'], { timeoutMs }).trim();
-    const devicesOutput = safeExec('xcrun', ['simctl', 'list', 'devices', '--json'], {
+    const xcrunVersion = safeExec(resolveXcrunBin(), ['--version'], { timeoutMs }).trim();
+    const devicesOutput = safeExec(resolveXcrunBin(), ['simctl', 'list', 'devices', '--json'], {
       timeoutMs,
     }).trim();
     const devices = parseSimctlDevices(devicesOutput);
@@ -488,7 +489,9 @@ function ensureSimctlAvailable(ctx: Record<string, any>, options?: IOSAction['op
 }
 
 function runSimctl(args: string[], options?: IOSAction['options']): string {
-  return safeExec('xcrun', ['simctl', ...args], { timeoutMs: options?.timeout_ms || 30000 }).trim();
+  return safeExec(resolveXcrunBin(), ['simctl', ...args], {
+    timeoutMs: options?.timeout_ms || 30000,
+  }).trim();
 }
 
 function resolveDeviceUdid(

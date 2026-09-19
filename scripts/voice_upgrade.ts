@@ -36,6 +36,8 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { nowIso } from '@agent/core/foundation';
+import { isWindows } from '@agent/core/platform';
+import { resolveFfmpegBin } from '@agent/core/tool-binary-resolvers';
 import {
   defineScript,
   isDirectScript,
@@ -144,14 +146,14 @@ function checkTier1(): { name: string; ok: boolean; detail?: string }[] {
 function checkTier2(): { name: string; ok: boolean; detail?: string }[] {
   const { spawnSync } = require('node:child_process') as typeof import('node:child_process');
   function whichOk(cmd: string): boolean {
-    const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], {
+    const r = spawnSync(isWindows() ? 'where' : 'which', [cmd], {
       stdio: 'ignore',
     });
     return r.status === 0;
   }
   return [
     { name: 'python3', ok: whichOk('python3'), detail: 'Required for Style-Bert-VITS2 + Whisper' },
-    { name: 'ffmpeg', ok: whichOk('ffmpeg'), detail: 'Required for audio I/O' },
+    { name: 'ffmpeg', ok: whichOk(resolveFfmpegBin()), detail: 'Required for audio I/O' },
     {
       name: 'Style-Bert-VITS2 server',
       ok: false,

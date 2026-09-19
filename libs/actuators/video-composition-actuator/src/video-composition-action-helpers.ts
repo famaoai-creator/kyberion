@@ -14,6 +14,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
+import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool-binary-resolvers';
 import { compileNarratedVideoBriefToCompositionADF } from '@agent/core/narrated-video-brief-compiler';
 import {
   compileVideoCompositionADF,
@@ -521,7 +522,7 @@ async function verifyRenderedVideoArtifact(params: {
   const requireVideo = params.require_video !== false;
   const probeStream = (selector: string) =>
     safeExec(
-      'ffprobe',
+      resolveFfprobeBin(),
       [
         '-v',
         'error',
@@ -616,7 +617,7 @@ async function validateNarratedVideoArtifact(params: {
     ['-y', '-ss', '00:00:11', '-i', videoPath, '-vframes', '1', framePaths[2]],
   ];
   for (const args of frameCommands) {
-    safeExec('ffmpeg', args, { cwd: rootDir, timeoutMs: 120_000 });
+    safeExec(resolveFfmpegBin(), args, { cwd: rootDir, timeoutMs: 120_000 });
   }
   for (const framePath of framePaths) {
     if (!safeExistsSync(framePath)) {
@@ -625,7 +626,7 @@ async function validateNarratedVideoArtifact(params: {
   }
 
   const blackFrameCheck = safeExecResult(
-    'ffmpeg',
+    resolveFfmpegBin(),
     [
       '-hide_banner',
       '-i',
@@ -650,7 +651,7 @@ async function validateNarratedVideoArtifact(params: {
 
   const probeDuration = (artifactPath: string) => {
     const output = safeExec(
-      'ffprobe',
+      resolveFfprobeBin(),
       ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', artifactPath],
       { cwd: rootDir, timeoutMs: 30_000 }
     ).trim();
@@ -702,7 +703,7 @@ async function isRenderableVideoArtifact(artifactPath: string): Promise<boolean>
   }
 
   try {
-    const hasVideo = safeExec('ffprobe', [
+    const hasVideo = safeExec(resolveFfprobeBin(), [
       '-v',
       'error',
       '-select_streams',
@@ -717,7 +718,7 @@ async function isRenderableVideoArtifact(artifactPath: string): Promise<boolean>
       return false;
     }
 
-    const hasAudio = safeExec('ffprobe', [
+    const hasAudio = safeExec(resolveFfprobeBin(), [
       '-v',
       'error',
       '-select_streams',

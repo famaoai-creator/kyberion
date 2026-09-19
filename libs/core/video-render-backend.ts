@@ -16,6 +16,7 @@ import { platform } from './platform.js';
 import { pathResolver } from './path-resolver.js';
 import { createLogger } from './logger.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { resolveFfmpegBin, resolveFfprobeBin, resolvePython3Bin } from './tool-binary-resolvers.js';
 import { resolveVideoBackend, type MediaBackendRecord } from './media-backend-registry.js';
 
 const logger = createLogger('video-render-backend');
@@ -271,7 +272,7 @@ export async function renderNarratedFallbackVideo(
     const sceneTitle = segment.title || `Scene ${sceneNumber}`;
     const sceneSubtitle = segment.subtitle || `${Math.max(1, Math.round(segment.duration_sec))}s`;
     safeExec(
-      'python3',
+      resolvePython3Bin(),
       [
         resolveRepositoryScript('scripts/make_video_cover.py'),
         '--out',
@@ -288,7 +289,7 @@ export async function renderNarratedFallbackVideo(
     );
 
     safeExec(
-      'ffmpeg',
+      resolveFfmpegBin(),
       [
         '-y',
         '-loop',
@@ -324,7 +325,7 @@ export async function renderNarratedFallbackVideo(
   );
 
   safeExec(
-    'ffmpeg',
+    resolveFfmpegBin(),
     ['-y', '-f', 'concat', '-safe', '0', '-i', concatListPath, '-c', 'copy', silentPath],
     {
       cwd: rootDir,
@@ -344,7 +345,7 @@ export async function renderNarratedFallbackVideo(
       plan.output_format,
       plan.duration_sec
     );
-    safeExec('ffmpeg', muxArgs, {
+    safeExec(resolveFfmpegBin(), muxArgs, {
       cwd: rootDir,
       timeoutMs: 60_000,
     });
@@ -388,10 +389,10 @@ export async function renderNarratedFallbackVideo(
     backend: 'ffmpeg_fallback',
     output_path: outputPath,
     command: [
-      'python3',
+      resolvePython3Bin(),
       resolveRepositoryScript('scripts/make_video_cover.py'),
-      'ffmpeg',
-      'ffmpeg',
+      resolveFfmpegBin(),
+      resolveFfmpegBin(),
     ],
     reason: cause
       ? `hyperframes backend failed; fallback rendered instead: ${cause.message}`
@@ -597,7 +598,7 @@ function hasRequiredStreams(
 ): boolean {
   try {
     if (requireVideo) {
-      const videoProbe = safeExec('ffprobe', [
+      const videoProbe = safeExec(resolveFfprobeBin(), [
         '-v',
         'error',
         '-select_streams',
@@ -611,7 +612,7 @@ function hasRequiredStreams(
       if (!videoProbe) return false;
     }
     if (requireAudio) {
-      const audioProbe = safeExec('ffprobe', [
+      const audioProbe = safeExec(resolveFfprobeBin(), [
         '-v',
         'error',
         '-select_streams',
@@ -653,7 +654,7 @@ function runDirectMuxRetry(
   durationSec: number
 ): void {
   const args = buildMuxArgs(inputVideoPath, audioPath, outputPath, outputFormat, durationSec);
-  const result = spawnSync('ffmpeg', args, {
+  const result = spawnSync(resolveFfmpegBin(), args, {
     cwd,
     env: buildSafeExecEnv(),
     stdio: ['ignore', 'pipe', 'pipe'],

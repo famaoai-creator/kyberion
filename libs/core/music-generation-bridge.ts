@@ -7,6 +7,7 @@ import {
   safeMkdir,
 } from './secure-io.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
+import { isAppleSilicon } from './platform.js';
 import {
   clampMusicGenDurationSec,
   clampStableAudioDurationSec,
@@ -24,10 +25,6 @@ function getFallbackTargetPath(request: MusicGenerationRequest): string {
   const candidate = request.targetPath || pathResolver.resolve(`active/shared/tmp/${filename}`);
   assertSafeRepositoryPath(pathResolver.resolve(candidate), { allowMissingLeaf: true });
   return candidate;
-}
-
-function isAppleSiliconMac(): boolean {
-  return process.platform === 'darwin' && process.arch === 'arm64';
 }
 
 function ensureWavTargetPath(targetPath: string): string {
@@ -224,7 +221,7 @@ export class LocalMusicGenMlxGenerationProvider implements MusicGenerationProvid
   readonly executionLocality = 'local';
 
   async isAvailable(): Promise<boolean> {
-    return isAppleSiliconMac() && probeToolRuntime('musicgen_mlx').selected_action !== 'install';
+    return isAppleSilicon() && probeToolRuntime('musicgen_mlx').selected_action !== 'install';
   }
 
   async generate(request: MusicGenerationRequest): Promise<MusicGenerationResult> {
@@ -257,7 +254,7 @@ export async function generateMusic(
 ): Promise<MusicGenerationResult> {
   const preference = request.providerPreference?.length
     ? request.providerPreference
-    : isAppleSiliconMac()
+    : isAppleSilicon()
       ? ['musicgen_mlx', 'stable_audio_3']
       : ['stable_audio_3', 'musicgen_mlx'];
 

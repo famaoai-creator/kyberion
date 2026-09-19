@@ -10,6 +10,7 @@
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { AudioChunk } from './meeting-session-types.js';
+import { resolveFfmpegBin } from './tool-binary-resolvers.js';
 
 export interface MicCaptureOptions {
   /** Input device: avfoundation index (":0") on darwin, ALSA device on linux. */
@@ -48,14 +49,14 @@ interface MicCapturePlatformAdapter {
 
 class DarwinMicCaptureAdapter implements MicCapturePlatformAdapter {
   backend = 'ffmpeg-avfoundation' as const;
-  binary = 'ffmpeg';
+  binary = resolveFfmpegBin();
   resolveDevice(explicit?: string): string {
     if (explicit?.trim()) return explicit.trim();
     return detectMacPhysicalAudioDevice() || ':0';
   }
   command(device: string, sampleRateHz: number): string[] {
     return [
-      'ffmpeg',
+      resolveFfmpegBin(),
       '-hide_banner',
       '-loglevel',
       'error',
@@ -98,13 +99,13 @@ class LinuxMicCaptureAdapter implements MicCapturePlatformAdapter {
 
 class WindowsMicCaptureAdapter implements MicCapturePlatformAdapter {
   backend = 'ffmpeg-dshow' as const;
-  binary = 'ffmpeg';
+  binary = resolveFfmpegBin();
   resolveDevice(explicit?: string): string {
     return explicit?.trim() || 'default';
   }
   command(device: string, sampleRateHz: number): string[] {
     return [
-      'ffmpeg',
+      resolveFfmpegBin(),
       '-hide_banner',
       '-loglevel',
       'error',
@@ -158,7 +159,7 @@ export function selectMacPhysicalAudioDevice(listing: string): string | undefine
 
 function detectMacPhysicalAudioDevice(): string | undefined {
   const probe = spawnSync(
-    'ffmpeg',
+    resolveFfmpegBin(),
     ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', ''],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
   );

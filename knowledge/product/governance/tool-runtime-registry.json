@@ -688,6 +688,135 @@
       },
       "managed_env_subpath": "tool-runtimes/localai",
       "notes": "LocalAI multi-modal OpenAI-compatible server."
+    },
+    {
+      "tool_id": "ffprobe",
+      "display_name": "FFprobe Media Probe",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "ffprobe",
+        "args": ["-version"],
+        "description": "Probe FFprobe availability without any install step."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "ffmpeg"],
+        "description": "FFprobe ships with FFmpeg; install FFmpeg through Homebrew on macOS."
+      },
+      "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "Gyan.FFmpeg",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "FFprobe ships with FFmpeg; install FFmpeg through WinGet on Windows."
+        }
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "ffprobe",
+        "args": ["-version"],
+        "description": "Re-check the installed FFprobe binary."
+      },
+      "managed_env_subpath": "tool-runtimes/ffprobe",
+      "notes": "Ships with the ffmpeg install; probe companion for capture and composition flows."
+    },
+    {
+      "tool_id": "adb",
+      "display_name": "Android Debug Bridge",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "adb",
+        "args": ["version"],
+        "description": "Probe adb availability without any install step."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "--cask", "android-platform-tools"],
+        "description": "Install Android SDK platform-tools through Homebrew on macOS."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "adb",
+        "args": ["version"],
+        "description": "Re-check the installed adb binary."
+      },
+      "managed_env_subpath": "tool-runtimes/adb",
+      "notes": "Android SDK platform-tools entrypoint. Resolvers prefer KYBERION_ADB_BIN, then ANDROID_HOME / ANDROID_SDK_ROOT platform-tools."
+    },
+    {
+      "tool_id": "xcrun",
+      "display_name": "Xcode Command Line Runner",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "xcrun",
+        "args": ["--version"],
+        "description": "Probe xcrun availability without any install step."
+      },
+      "install_backend": {
+        "kind": "system",
+        "command": "xcode-select",
+        "args": ["--install"],
+        "description": "Install the Xcode command line tools via xcode-select."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "xcrun",
+        "args": ["--version"],
+        "description": "Re-check the installed xcrun binary."
+      },
+      "managed_env_subpath": "tool-runtimes/xcrun",
+      "notes": "Darwin-only simctl entrypoint resolved through the xcode-select path."
+    },
+    {
+      "tool_id": "xcodebuild",
+      "display_name": "Xcode Build System",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "xcodebuild",
+        "args": ["-version"],
+        "description": "Probe xcodebuild availability without any install step."
+      },
+      "install_backend": {
+        "kind": "system",
+        "command": "xcode-select",
+        "args": ["--install"],
+        "description": "Install the Xcode command line tools via xcode-select."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "xcodebuild",
+        "args": ["-version"],
+        "description": "Re-check the installed xcodebuild binary."
+      },
+      "managed_env_subpath": "tool-runtimes/xcodebuild",
+      "notes": "Darwin-only Xcode build entrypoint resolved through the xcode-select path."
     }
   ]
 }

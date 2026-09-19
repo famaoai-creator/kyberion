@@ -19,6 +19,7 @@ import {
 import { pathResolver, assertSafeRepositoryPath } from '@agent/core/path-resolver';
 import { getSpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isLinux, isMacOS } from '@agent/core/platform';
 import type { LocalPadContext } from '../lib/local-artifact-pad.js';
 import { readOsClipboardText } from '../clipboard-inbox/server.js';
 import { generateMeetingMinutes } from '../meeting-notepad/minutes.js';
@@ -574,7 +575,7 @@ export function getPadActionAvailability(
           message: '設定済み PNG を取り込めます',
         };
       }
-      return process.platform === 'darwin'
+      return isMacOS()
         ? {
             action_id: action.id,
             status: 'permission_required',
@@ -586,7 +587,7 @@ export function getPadActionAvailability(
             message: 'この OS の画面キャプチャは未対応です',
           };
     case 'os-clipboard':
-      return process.platform === 'darwin' || process.platform === 'linux'
+      return isMacOS() || isLinux()
         ? {
             action_id: action.id,
             status: 'permission_required',

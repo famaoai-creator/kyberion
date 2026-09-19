@@ -6,6 +6,7 @@ import {
   type VirtualDeviceInventoryBridge,
 } from './virtual-device-inventory-bridge.js';
 import { pathResolver } from './path-resolver.js';
+import { resolveFfmpegBin } from './tool-binary-resolvers.js';
 import { nowIso } from './foundation/time.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 import {
@@ -66,7 +67,6 @@ export interface VirtualAudioInputRecordingBridge {
   }>;
 }
 
-const DEFAULT_FFMPEG_BIN = 'ffmpeg';
 const DEFAULT_SOX_BIN = 'sox';
 const DEFAULT_STREAM_FORMAT: AudioFormat = {
   encoding: 'pcm_s16le',
@@ -166,7 +166,8 @@ function pickInputIndex(
 
 async function collectStreamInputIndex(
   inventoryBridge: VirtualDeviceInventoryBridge,
-  target?: string
+  target?: string,
+  ffmpegBin = resolveFfmpegBin()
 ): Promise<{ name: string; index: number } | undefined> {
   const inventory = await inventoryBridge.probe();
   const selectedName =
@@ -174,7 +175,7 @@ async function collectStreamInputIndex(
   if (!selectedName) return undefined;
   if (process.platform === 'win32') return { name: selectedName, index: -1 };
   const ffmpegList = safeExecResult(
-    'ffmpeg',
+    ffmpegBin,
     ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', '""'],
     { maxOutputMB: 5 }
   );
@@ -219,14 +220,14 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
     }
 
     const durationSec = Number(request.duration_sec || 0) > 0 ? Number(request.duration_sec) : 3;
-    const selected = await collectStreamInputIndex(this.inventoryBridge, target);
+    const ffmpegBin = this.opts.ffmpeg_bin ?? resolveFfmpegBin();
+    const selected = await collectStreamInputIndex(this.inventoryBridge, target, ffmpegBin);
     if (!selected) {
       throw new Error(
         '[virtual-audio-input-recording-bridge] no audio input available for stream capture'
       );
     }
 
-    const ffmpegBin = this.opts.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
     const adapter = resolveAudioInputAdapter(process.platform);
     const child = spawn(
       ffmpegBin,
@@ -325,7 +326,7 @@ export class VirtualAudioInputRecordingBridgeImpl implements VirtualAudioInputRe
 
     const durationSec = Number(request.duration_sec || 0) > 0 ? Number(request.duration_sec) : 3;
     const results: VirtualAudioInputRecordingTargetResult[] = [];
-    const ffmpegBin = this.opts.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
+    const ffmpegBin = this.opts.ffmpeg_bin ?? resolveFfmpegBin();
     const soxBin = this.opts.sox_bin ?? DEFAULT_SOX_BIN;
     const adapter = resolveAudioInputAdapter(process.platform);
     const ffmpegList =
