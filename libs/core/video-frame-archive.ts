@@ -13,6 +13,7 @@ import {
 import { pathResolver } from './path-resolver.js';
 import { clamp } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
+import { resolveFfmpegBin } from './tool-binary-resolvers.js';
 import type { VideoFrame, VideoFormat } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
 
@@ -28,8 +29,6 @@ export interface VideoFrameArchiveResult {
   fps: number;
   format: VideoFormat;
 }
-
-const DEFAULT_FFMPEG_BIN = 'ffmpeg';
 
 function normalizeFps(frames: VideoFrame[], requested?: number): number {
   if (requested && Number.isFinite(requested) && requested > 0) {
@@ -88,7 +87,7 @@ export async function writeVideoFramesToMp4(
     }
   }
 
-  const ffmpegBin = options.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
+  const ffmpegBin = options.ffmpeg_bin ?? resolveFfmpegBin();
   const fps = normalizeFps(frames, options.fps);
   const tempDir = assertSafeRepositoryPath(resolveArchiveTempDir('encode'), {
     allowMissingLeaf: true,
@@ -152,7 +151,7 @@ export async function* readVideoFramesFromMp4(
   if (!safeLstat(safeInputPath).isFile()) {
     throw new Error(`[VIDEO_FRAME_ARCHIVE_RESOURCE] input must be a regular file: ${inputPath}`);
   }
-  const ffmpegBin = options.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
+  const ffmpegBin = options.ffmpeg_bin ?? resolveFfmpegBin();
   const tempDir = assertSafeRepositoryPath(resolveArchiveTempDir('decode'), {
     allowMissingLeaf: true,
   });

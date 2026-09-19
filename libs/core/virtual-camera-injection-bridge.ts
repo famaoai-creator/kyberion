@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { assertSafeRepositoryPath, safeExec, safeMkdir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { resolveFfmpegBin } from './tool-binary-resolvers.js';
 import type { VideoFrame } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
 import { readVideoFramesFromMp4, writeVideoFramesToMp4 } from './video-frame-archive.js';
@@ -87,8 +88,6 @@ export interface VirtualCameraInjectionBridge {
     request?: VirtualCameraInjectionRequest
   ): Promise<VirtualCameraInjectionResult>;
 }
-
-const DEFAULT_FFMPEG_BIN = 'ffmpeg';
 
 function normalizePreference(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
@@ -188,7 +187,7 @@ export class VirtualCameraInjectionBridgeImpl implements VirtualCameraInjectionB
       request.device_preference ?? this.opts.device_preference
     );
     const selectedDevicePath = normalizePreference(request.device_path ?? this.opts.device_path);
-    const ffmpegBin = this.opts.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
+    const ffmpegBin = this.opts.ffmpeg_bin ?? resolveFfmpegBin();
     const ffmpegAvailable = isAvailableCommand(ffmpegBin, ['-version']);
     const actualDeviceReady =
       process.platform === 'linux' && Boolean(selectedDevicePath) && ffmpegAvailable;

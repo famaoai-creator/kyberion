@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import { pathResolver } from './path-resolver.js';
+import { isWindows } from './platform.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 
@@ -88,12 +89,12 @@ function buildWindowsSpeechCommand(request: NativeSpeechListenRequest): {
 export async function listenNativeSpeech(
   request: NativeSpeechListenRequest
 ): Promise<NativeSpeechListenResult> {
-  const isWindows = process.platform === 'win32';
+  const isWindowsHost = isWindows();
   const scriptPath =
     request.scriptPath?.trim() || pathResolver.resolve('satellites/voice-hub/native-stt.swift');
 
   return new Promise((resolve, reject) => {
-    const windowsCommand = isWindows ? buildWindowsSpeechCommand(request) : null;
+    const windowsCommand = isWindowsHost ? buildWindowsSpeechCommand(request) : null;
     const command = windowsCommand?.command || 'swift';
     const args = windowsCommand?.args || [
       scriptPath,

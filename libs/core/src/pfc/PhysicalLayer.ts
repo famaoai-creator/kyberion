@@ -1,14 +1,14 @@
 /* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { execSync } from 'node:child_process';
-import * as os from 'node:os';
+import { isWindows } from '../../platform.js';
 
 /**
  * Checks if a given CLI binary exists in the system PATH.
  */
 export function checkBinary(bin: string): boolean {
   try {
-    const isWindows = os.platform() === 'win32';
-    const command = isWindows ? `where ${bin}` : `command -v ${bin}`;
+    const windowsHost = isWindows();
+    const command = windowsHost ? `where ${bin}` : `command -v ${bin}`;
     execSync(command, { stdio: 'ignore' });
     return true;
   } catch (error) {

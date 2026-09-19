@@ -10,6 +10,7 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isWindows } from '@agent/core/platform';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const TOOL_ID = 'agy_sdk';
@@ -26,7 +27,7 @@ interface SetupReport {
 }
 
 function resolvePythonCandidates(managedEnvPath: string): string[] {
-  if (process.platform === 'win32') {
+  if (isWindows()) {
     return [
       path.join(managedEnvPath, 'Scripts', 'python.exe'),
       path.join(managedEnvPath, 'Scripts', 'python3.exe'),
