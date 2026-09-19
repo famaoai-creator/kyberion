@@ -10,6 +10,7 @@
  */
 
 import { coreSeamCatalog, createSeam } from './seam.js';
+import type { VideoRouteHealth, VideoRouteMetrics } from './video-route.js';
 
 export interface CameraOutputCapabilities {
   /** Whether frames reach a real OS virtual-camera device. */
@@ -46,6 +47,8 @@ export interface CameraOutputBridge {
   probe(): Promise<CameraOutputProbe>;
   startAvatarOutput(input: AvatarOutputRequest): Promise<AvatarOutputResult>;
   stopAvatarOutput(): Promise<void>;
+  health?(): VideoRouteHealth;
+  metrics?(): VideoRouteMetrics;
 }
 
 const cameraOutputSeam = createSeam<CameraOutputBridge>({

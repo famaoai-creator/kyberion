@@ -9,6 +9,8 @@ export type {
   MeetingSessionStatus,
   MeetingTarget,
   TranscriptChunk,
+  VideoFormat,
+  VideoFrame,
 } from './meeting-session-types.js';
 
 export { abortableAudioChunks } from './meeting-session-types.js';
@@ -47,7 +49,18 @@ export * from './audio-device-lease.js';
 
 export { StubVideoFrameBus } from './video-frame-bus.js';
 
-export type { VideoFrameBus, VideoFrameBusProbe } from './video-frame-bus.js';
+export type {
+  VideoFrameBus,
+  VideoFrameBusProbe,
+  VideoFrameBusId,
+  StubVideoFrameBusOptions,
+} from './video-frame-bus.js';
+
+export * from './video-route.js';
+
+export * from './bounded-video-queue.js';
+
+export * from './video-device-lease.js';
 
 export {
   pipeMp4ToVideoFrameBus,
