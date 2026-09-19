@@ -32,6 +32,7 @@ import {
   probeWindowsNativeImageGeneration,
 } from './windows-native-image-generation-bridge.js';
 import { resolveGeminiApiKey } from './gemini-api-backend.js';
+import { isAppleSilicon } from './platform.js';
 
 function getFallbackTargetPath(request: ImageGenerationRequest): string {
   const filename = `generated-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.jpg`;
@@ -44,10 +45,6 @@ export function isRateLimitOrQuotaError(error: unknown): boolean {
   if (!error) return false;
   const msg = error instanceof Error ? error.message : String(error);
   return /429|resource_exhausted|rate\s*limit|quota/i.test(msg);
-}
-
-function isAppleSiliconMac(): boolean {
-  return process.platform === 'darwin' && process.arch === 'arm64';
 }
 
 function imageBytesFromResponse(value: unknown): string | undefined {
@@ -522,7 +519,7 @@ export class LocalDiffusionImageGenerationProvider implements ImageGenerationPro
   readonly executionLocality = 'local';
 
   async isAvailable(): Promise<boolean> {
-    return isAppleSiliconMac() && probeToolRuntime('mflux').selected_action !== 'install';
+    return isAppleSilicon() && probeToolRuntime('mflux').selected_action !== 'install';
   }
 
   async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
@@ -537,7 +534,7 @@ export class LocalFluxImageGenerationProvider implements ImageGenerationProvider
   readonly executionLocality = 'local';
 
   async isAvailable(): Promise<boolean> {
-    return isAppleSiliconMac() && probeToolRuntime('mflux').selected_action !== 'install';
+    return isAppleSilicon() && probeToolRuntime('mflux').selected_action !== 'install';
   }
 
   async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {

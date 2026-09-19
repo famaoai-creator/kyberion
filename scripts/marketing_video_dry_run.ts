@@ -21,6 +21,7 @@ import {
 } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { parseSafeJsonObjectInput, readTextFile } from '@agent/core/foundation';
+import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool-binary-resolvers';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface ProbeResult {
@@ -159,7 +160,7 @@ export function runMarketingVideoDryRun(input: {
     'WEBVTT\n\n00:00:00.000 --> 00:00:02.800\nKyberion governed marketing dry-run.'
   );
 
-  safeExec('ffmpeg', [
+  safeExec(resolveFfmpegBin(), [
     '-hide_banner',
     '-loglevel',
     'error',
@@ -181,7 +182,7 @@ export function runMarketingVideoDryRun(input: {
     '-shortest',
     videoPath,
   ]);
-  safeExec('ffmpeg', [
+  safeExec(resolveFfmpegBin(), [
     '-hide_banner',
     '-loglevel',
     'error',
@@ -194,11 +195,19 @@ export function runMarketingVideoDryRun(input: {
   ]);
 
   const probe = parseSafeJsonObjectInput(
-    safeExec('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', videoPath]),
+    safeExec(resolveFfprobeBin(), [
+      '-v',
+      'error',
+      '-show_streams',
+      '-show_format',
+      '-of',
+      'json',
+      videoPath,
+    ]),
     'ffprobe video output'
   ) as ProbeResult;
   const blackDetection = safeExecResult(
-    'ffmpeg',
+    resolveFfmpegBin(),
     [
       '-hide_banner',
       '-i',
@@ -213,7 +222,7 @@ export function runMarketingVideoDryRun(input: {
     { timeoutMs: 30_000 }
   );
   const silenceDetection = safeExecResult(
-    'ffmpeg',
+    resolveFfmpegBin(),
     [
       '-hide_banner',
       '-i',
@@ -235,7 +244,7 @@ export function runMarketingVideoDryRun(input: {
     /silence_duration:\s*([0-9.]+)/g
   );
   const imageProbe = parseSafeJsonObjectInput(
-    safeExec('ffprobe', [
+    safeExec(resolveFfprobeBin(), [
       '-v',
       'error',
       '-show_entries',

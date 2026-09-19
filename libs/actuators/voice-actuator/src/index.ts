@@ -35,6 +35,7 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { recordInteraction } from '@agent/core/relationship-graph-store';
 import { listToolRuntimeInventory } from '@agent/core/tool-runtime-registry';
+import { resolveFfmpegBin } from '@agent/core/tool-binary-resolvers';
 import { recordVoiceSample } from '@agent/core/voice-sample-recorder';
 import { verifyVoiceTranscript } from '@agent/core/voice-transcript-alignment';
 import { resolveVoicePath } from '@agent/core/voice-path-policy';
@@ -792,7 +793,7 @@ function spliceVoiceRepairSegments(
   filters.push(`[0:a]atrim=start=${cursor},asetpts=PTS-STARTPTS[part${outputIndex}]`);
   labels.push(`[part${outputIndex}]`);
   const filter = `${filters.join(';')};${labels.join('')}concat=n=${labels.length}:v=0:a=1[out]`;
-  safeExec('ffmpeg', [
+  safeExec(resolveFfmpegBin(), [
     '-y',
     '-hide_banner',
     '-loglevel',

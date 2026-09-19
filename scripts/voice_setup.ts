@@ -6,6 +6,7 @@ import { markToolRuntimeInstalled, probeToolRuntime } from '@agent/core/tool-run
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isWindows } from '@agent/core/platform';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { discoverLocalSttBackends } from '@agent/core/local-stt-discovery';
 
@@ -34,14 +35,14 @@ export type VoiceSetupRow = {
 };
 
 function resolveManagedPythonPath(managedEnvPath: string): string {
-  if (process.platform === 'win32') {
+  if (isWindows()) {
     return path.join(managedEnvPath, 'Scripts', 'python.exe');
   }
   return path.join(managedEnvPath, 'bin', 'python');
 }
 
 function resolveManagedPythonCandidates(managedEnvPath: string): string[] {
-  if (process.platform === 'win32') {
+  if (isWindows()) {
     return [
       path.join(managedEnvPath, 'Scripts', 'python.exe'),
       path.join(managedEnvPath, 'Scripts', 'python3.exe'),

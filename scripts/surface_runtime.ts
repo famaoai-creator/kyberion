@@ -22,6 +22,7 @@ import {
   type SurfaceRuntimeKind,
 } from '@agent/core/surface-runtime';
 import { logger } from '@agent/core/core';
+import { isLinux, isMacOS } from '@agent/core/platform';
 import { pathResolver } from '@agent/core/path-resolver';
 import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import { safeOpenAppendFile } from '@agent/core/secure-io';
@@ -77,7 +78,7 @@ const execFileAsync = promisify(execFile);
 async function describePortHolder(
   port: number
 ): Promise<{ pid: number; cwd: string | null } | null> {
-  if (process.platform !== 'darwin' && process.platform !== 'linux') return null;
+  if (!isMacOS() && !isLinux()) return null;
   try {
     const { stdout } = await execFileAsync('lsof', [
       '-nP',

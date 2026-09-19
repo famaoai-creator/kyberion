@@ -1425,7 +1425,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 131305,
+      "size": 132994,
       "type": "json"
     },
     {
@@ -2877,7 +2877,7 @@
     {
       "path": "product/governance/tool-runtime-registry.json",
       "tier": "public",
-      "size": 25179,
+      "size": 29717,
       "type": "json"
     },
     {

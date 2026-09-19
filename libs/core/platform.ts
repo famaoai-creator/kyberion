@@ -1,5 +1,6 @@
 import * as os from 'node:os';
 import { safeExec } from './secure-io.js';
+import { resolveFfmpegBin, resolveFfprobeBin } from './tool-binary-resolvers.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('platform');
@@ -10,6 +11,35 @@ const logger = createLogger('platform');
  */
 
 export type Platform = 'darwin' | 'win32' | 'linux' | 'unknown';
+
+/**
+ * Normalize a raw `process.platform` / `os.platform()` value to the
+ * closed Platform union. Unknown values collapse to 'unknown'.
+ */
+export function normalizePlatform(value: string): Platform {
+  if (value === 'darwin' || value === 'win32' || value === 'linux') return value;
+  return 'unknown';
+}
+
+/** Pure, injectable OS predicates — prefer these over raw platform checks. */
+export function isMacOS(platform: string = os.platform()): boolean {
+  return normalizePlatform(platform) === 'darwin';
+}
+
+export function isWindows(platform: string = os.platform()): boolean {
+  return normalizePlatform(platform) === 'win32';
+}
+
+export function isLinux(platform: string = os.platform()): boolean {
+  return normalizePlatform(platform) === 'linux';
+}
+
+export function isAppleSilicon(
+  platform: string = os.platform(),
+  arch: string = os.arch()
+): boolean {
+  return isMacOS(platform) && arch === 'arm64';
+}
 
 export interface PlatformCapabilities {
   hasSpeech: boolean;
@@ -24,12 +54,16 @@ export interface PlatformCapabilities {
  */
 async function commandExists(cmd: string): Promise<boolean> {
   try {
-    const checkCmd = os.platform() === 'win32' ? 'where' : 'which';
+    const checkCmd = isWindows() ? 'where' : 'which';
     await safeExec(checkCmd, [cmd]);
     return true;
   } catch (_) {
     return false;
   }
+}
+
+function resolveMediaToolBin(tool: 'ffmpeg' | 'ffprobe'): string {
+  return tool === 'ffmpeg' ? resolveFfmpegBin() : resolveFfprobeBin();
 }
 
 export interface OSDriver {
@@ -125,16 +159,17 @@ class MacOSDriver implements OSDriver {
       hasSpeech: await commandExists('say'),
       hasScreenCapture: await commandExists('screencapture'),
       hasAudioPlayback: await commandExists('afplay'),
-      hasFFmpeg: await commandExists('ffmpeg'),
+      hasFFmpeg: await commandExists(resolveFfmpegBin()),
       nativeTerminal: 'Terminal.app',
     };
   }
 
   async runMediaCommand(tool: 'ffmpeg' | 'ffprobe', args: string[]): Promise<string> {
-    if (!(await this.checkBinary(tool))) {
+    const binary = resolveMediaToolBin(tool);
+    if (!(await this.checkBinary(binary))) {
       throw new Error(`${tool} not found. Please install via 'brew install ffmpeg'`);
     }
-    return safeExec(tool, args);
+    return safeExec(binary, args);
   }
 }
 
@@ -147,10 +182,10 @@ class WindowsDriver implements OSDriver {
   }
 
   async captureScreen(outputPath: string): Promise<void> {
-    if (!(await commandExists('ffmpeg'))) {
+    if (!(await commandExists(resolveFfmpegBin()))) {
       throw new Error('ffmpeg not found; install FFmpeg to capture Windows screens');
     }
-    await safeExec('ffmpeg', [
+    await safeExec(resolveFfmpegBin(), [
       '-hide_banner',
       '-loglevel',
       'error',
@@ -168,14 +203,14 @@ class WindowsDriver implements OSDriver {
   }
 
   async captureFocusedWindow(outputPath: string): Promise<void> {
-    if (!(await commandExists('ffmpeg'))) {
+    if (!(await commandExists(resolveFfmpegBin()))) {
       throw new Error('ffmpeg not found; install FFmpeg to capture Windows screens');
     }
     // gdigrab's `title=` selector captures the foreground window without
     // introducing a platform-specific Win32 dependency in the Node process.
     const title = await this.getForegroundWindowTitle();
     if (!title) return this.captureScreen(outputPath);
-    await safeExec('ffmpeg', [
+    await safeExec(resolveFfmpegBin(), [
       '-hide_banner',
       '-loglevel',
       'error',
@@ -255,18 +290,19 @@ class WindowsDriver implements OSDriver {
   async getCapabilities(): Promise<PlatformCapabilities> {
     return {
       hasSpeech: true,
-      hasScreenCapture: await commandExists('ffmpeg'),
+      hasScreenCapture: await commandExists(resolveFfmpegBin()),
       hasAudioPlayback: true,
-      hasFFmpeg: await commandExists('ffmpeg'),
+      hasFFmpeg: await commandExists(resolveFfmpegBin()),
       nativeTerminal: 'powershell.exe',
     };
   }
 
   async runMediaCommand(tool: 'ffmpeg' | 'ffprobe', args: string[]): Promise<string> {
-    if (!(await this.checkBinary(tool))) {
+    const binary = resolveMediaToolBin(tool);
+    if (!(await this.checkBinary(binary))) {
       throw new Error(`${tool} not found. Please install ffmpeg and add it to your PATH.`);
     }
-    return safeExec(tool, args);
+    return safeExec(binary, args);
   }
 }
 
@@ -335,16 +371,17 @@ class LinuxDriver implements OSDriver {
       hasSpeech: await commandExists('espeak'),
       hasScreenCapture: await commandExists('import'),
       hasAudioPlayback: await commandExists('aplay'),
-      hasFFmpeg: await commandExists('ffmpeg'),
+      hasFFmpeg: await commandExists(resolveFfmpegBin()),
       nativeTerminal: 'xterm',
     };
   }
 
   async runMediaCommand(tool: 'ffmpeg' | 'ffprobe', args: string[]): Promise<string> {
-    if (!(await this.checkBinary(tool))) {
+    const binary = resolveMediaToolBin(tool);
+    if (!(await this.checkBinary(binary))) {
       throw new Error(`${tool} not found. Please install via 'sudo apt install ffmpeg'`);
     }
-    return safeExec(tool, args);
+    return safeExec(binary, args);
   }
 }
 
@@ -379,9 +416,9 @@ class UnknownDriver implements OSDriver {
  */
 export function getPlatformDriver(): OSDriver {
   const p = os.platform();
-  if (p === 'darwin') return new MacOSDriver();
-  if (p === 'win32') return new WindowsDriver();
-  if (p === 'linux') return new LinuxDriver();
+  if (isMacOS(p)) return new MacOSDriver();
+  if (isWindows(p)) return new WindowsDriver();
+  if (isLinux(p)) return new LinuxDriver();
   return new UnknownDriver();
 }
 

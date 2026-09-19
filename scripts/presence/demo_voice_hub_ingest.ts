@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { getRegisteredEnvText, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from '../lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -9,7 +9,8 @@ export function parseVoiceHubIngestResponse(payload: unknown): Record<string, un
 }
 
 async function main(print: Print = () => undefined) {
-  const response = await fetch('http://127.0.0.1:3032/api/ingest-text', {
+  const voiceHubPort = String(getRegisteredEnvText('KYBERION_VOICE_HUB_PORT') || '3032').trim();
+  const response = await fetch(`http://127.0.0.1:${voiceHubPort}/api/ingest-text`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

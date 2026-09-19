@@ -52,10 +52,11 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_TOKEN`                 | string | no       | Bearer token used to authenticate the terminal bridge.                                                                                                                                         |
 | `KYBERION_VLLM_KEY`                       | string | no       | API key for the vLLM OpenAI-compatible backend, when authentication is enabled.                                                                                                                |
 
-## path (91)
+## path (96)
 
 | Variable                                                         | Type | Required | Description                                                                                                                                                                         |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `KYBERION_ADB_BIN`                                               | path | no       | Optional executable path override for Android Debug Bridge; when unset, the resolver checks ANDROID_HOME and ANDROID_SDK_ROOT before PATH.                                          |
 | `KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH`                    | path | no       | Lock-file path used to prevent duplicate agent runtime supervisor daemons; keep it in the governed runtime area.                                                                    |
 | `KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH`                  | path | no       | Unix-domain socket path for local agent runtime supervisor RPC; keep it under the governed runtime area.                                                                            |
 | `KYBERION_AGY_CLI_BIN`                                           | path | no       | Optional path override for agy cli bin; keep it inside governed repository or runtime storage.                                                                                      |
@@ -80,6 +81,8 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_DELEGATION_TRACE_PATH`                                 | path | no       | Override path for delegated-task trace records used for observability and replay; keep it in governed runtime storage.                                                              |
 | `KYBERION_DEPLOY_CONFIG_PATH`                                    | path | no       | Optional path override for deploy config path; keep it inside governed repository or runtime storage.                                                                               |
 | `KYBERION_EGRESS_POLICY_PATH`                                    | path | no       | Optional path to the governed egress-policy catalog; keep it in an approved knowledge or deployment configuration location.                                                         |
+| `KYBERION_FFMPEG_BIN`                                            | path | no       | Optional executable path override for ffmpeg; when unset, media operations use the governed tool-runtime registry command.                                                          |
+| `KYBERION_FFPROBE_BIN`                                           | path | no       | Optional executable path override for ffprobe; when unset, media probes use the governed tool-runtime registry command.                                                             |
 | `KYBERION_GEMINI_CLI_BIN`                                        | path | no       | Optional path override for gemini cli bin; keep it inside governed repository or runtime storage.                                                                                   |
 | `KYBERION_GROK_CLI_BIN`                                          | path | no       | Optional path override for grok cli bin; keep it inside governed repository or runtime storage.                                                                                     |
 | `KYBERION_HINTS_ARCHIVE_DIR`                                     | path | no       | Optional path override for hints archive dir; keep it inside governed repository or runtime storage.                                                                                |
@@ -147,6 +150,8 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VOICE_RUNTIME_POLICY_PATH`                             | path | no       | Override for the voice runtime policy catalog; the default is knowledge/product/governance/voice-runtime-policy.json and invalid input falls back conservatively.                   |
 | `KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH`                    | path | no       | Override for the voice sample-ingestion policy catalog; the selected file is schema-validated before profile registration.                                                          |
 | `KYBERION_WORKING_MEMORY_ROOT`                                   | path | no       | Optional tenant-bound working-memory root used by the unified daily-desk action; each tenant is resolved as tenant/owners/<principal-hash>.                                         |
+| `KYBERION_XCODEBUILD_BIN`                                        | path | no       | Optional executable path override for xcodebuild; leave unset to resolve it from the host toolchain.                                                                                |
+| `KYBERION_XCRUN_BIN`                                             | path | no       | Optional executable path override for xcrun; leave unset to resolve it from the host toolchain.                                                                                     |
 
 ## flag (20)
 
@@ -173,7 +178,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SPEND_GUARD_TEST`                        | boolean                | no       | Test-only opt-in: lets vitest exercise the reasoning-path spend guard against real history/policy (normally disabled under VITEST).                                                                                                         |
 | `KYBERION_TRUST_PROXY`                             | boolean                | no       | Trust x-forwarded-for and x-real-ip as the client peer for local-surface detection. Keep disabled unless a trusted reverse proxy overwrites these headers.                                                                                  |
 
-## tuning (47)
+## tuning (48)
 
 | Variable                                       | Type   | Required | Description                                                                                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -223,6 +228,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_STT_WINDOW_SEC`                      | number | no       | Audio window length in seconds for streaming Whisper adapters; defaults are adapter-specific.                                                                           |
 | `KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS`      | number | no       | Optional numeric tuning value for terminal disconnect timeout ms; leave unset to use the governed default.                                                              |
 | `KYBERION_TERMINAL_SESSION_RETENTION_MS`       | number | no       | Optional numeric tuning value for terminal session retention ms; leave unset to use the governed default.                                                               |
+| `KYBERION_VOICE_HUB_PORT`                      | number | no       | Port used by the local Voice Hub text-ingest demo; defaults to 3032.                                                                                                    |
 | `KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS`        | number | no       | Maximum milliseconds a mission work item waits for one provider response before recording a blocked result.                                                             |
 
 ## provider (83)

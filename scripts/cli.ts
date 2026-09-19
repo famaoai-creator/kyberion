@@ -32,7 +32,7 @@ import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governa
 import { createProjectTrustApprovalRequest } from '@agent/core/project-trust';
 import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
-import * as os from 'node:os';
+import { isMacOS, isWindows } from '@agent/core/platform';
 import chalk from 'chalk';
 import {
   getRegisteredEnvText,
@@ -541,11 +541,10 @@ function printArtifactInfo(targetPath: string) {
 }
 
 function resolveOpenArtifactCommand(targetPath: string): { command: string; args: string[] } {
-  const platform = os.platform();
-  if (platform === 'darwin') {
+  if (isMacOS()) {
     return { command: 'open', args: [targetPath] };
   }
-  if (platform === 'win32') {
+  if (isWindows()) {
     return { command: 'cmd', args: ['/c', 'start', '', targetPath] };
   }
   return { command: 'xdg-open', args: [targetPath] };

@@ -4,6 +4,11 @@ import { parseSafeJsonInput, getRegisteredEnvText } from '@agent/core/foundation
 import { getPresenceAvatarProfile } from '@agent/core/presence-avatar';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExec, safeExecResult, safeMkdir } from '@agent/core/secure-io';
+import {
+  resolveFfmpegBin,
+  resolveFfprobeBin,
+  resolvePython3Bin,
+} from '@agent/core/tool-binary-resolvers';
 import { resolveVoicePath } from '@agent/core/voice-path-policy';
 import { installObsVirtualCameraOutputBridge } from '@agent/core/obs-virtual-camera-output';
 import { installV4l2VirtualCameraOutputBridge } from '@agent/core/v4l2-virtual-camera-output';
@@ -21,7 +26,7 @@ interface AudioStreamProbe {
 
 function probeAudioFile(audioPath: string): AudioStreamProbe {
   const result = safeExecResult(
-    'ffprobe',
+    resolveFfprobeBin(),
     [
       '-v',
       'error',
@@ -78,7 +83,7 @@ export function ensureSttReadyAudio(audioPath: string): { path: string; converte
     'recording-output'
   );
   safeMkdir(path.dirname(outputPath), { recursive: true });
-  safeExec('ffmpeg', [
+  safeExec(resolveFfmpegBin(), [
     '-y',
     '-hide_banner',
     '-loglevel',
@@ -119,7 +124,7 @@ export function normalizeAudioSample(input: {
     : ensureSttReadyAudio(audioPath).path;
   if (requested) {
     safeMkdir(path.dirname(outputPath), { recursive: true });
-    safeExec('ffmpeg', [
+    safeExec(resolveFfmpegBin(), [
       '-y',
       '-hide_banner',
       '-loglevel',
@@ -247,7 +252,7 @@ export function renderTalkingAvatar(input: {
   pushFlag('--mouth-y', input.mouth_y);
   pushFlag('--mouth-w', input.mouth_w);
   pushFlag('--eyes-y', input.eyes_y);
-  const result = safeExecResult('python3', args, { timeoutMs: 10 * 60 * 1000 });
+  const result = safeExecResult(resolvePython3Bin(), args, { timeoutMs: 10 * 60 * 1000 });
   if (result.error || result.status !== 0) {
     throw new Error(
       `[VOICE] talking-avatar render failed: ${result.error?.message || result.stderr?.slice(0, 500) || `exit ${result.status}`}`
