@@ -14,8 +14,29 @@
         },
         {
           "type": "cli",
+          "command": "{{whisperkit_cli_path}}",
+          "args": [
+            "transcribe",
+            "--audio-path",
+            "{{audio_path}}",
+            "--language",
+            "{{language}}",
+            "--without-timestamps"
+          ],
+          "description": "Apple Silicon WhisperKit CLI transcription"
+        },
+        {
+          "type": "cli",
           "command": "{{whisper_cli_path}}",
-          "args": ["--model", "{{whisper_model_path}}", "--file", "{{audio_path}}", "--language", "{{language}}", "--output-json"],
+          "args": [
+            "--model",
+            "{{whisper_model_path}}",
+            "--file",
+            "{{audio_path}}",
+            "--language",
+            "{{language}}",
+            "--output-json"
+          ],
           "description": "Local whisper.cpp CLI transcription"
         }
       ]
@@ -32,8 +53,29 @@
         },
         {
           "type": "cli",
+          "command": "{{whisperkit_cli_path}}",
+          "args": [
+            "transcribe",
+            "--audio-path",
+            "{{audio_path}}",
+            "--language",
+            "{{language}}",
+            "--without-timestamps"
+          ],
+          "description": "Intent-aligned batch audio transcription via Apple Silicon WhisperKit"
+        },
+        {
+          "type": "cli",
           "command": "{{whisper_cli_path}}",
-          "args": ["--model", "{{whisper_model_path}}", "--file", "{{audio_path}}", "--language", "{{language}}", "--output-json"],
+          "args": [
+            "--model",
+            "{{whisper_model_path}}",
+            "--file",
+            "{{audio_path}}",
+            "--language",
+            "{{language}}",
+            "--output-json"
+          ],
           "description": "Intent-aligned batch audio transcription via whisper.cpp CLI"
         }
       ]

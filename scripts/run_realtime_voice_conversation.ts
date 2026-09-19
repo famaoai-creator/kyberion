@@ -30,11 +30,12 @@ import type { PlaybackHandle } from '@agent/core/audio-playback';
 import type { AudioChunk } from '@agent/core/meeting-session-types';
 import {
   getSpeechToTextBridge,
-  installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
+  installAvailableSpeechToTextBridges,
 } from '@agent/core/speech-to-text-bridge';
 import { getStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
 import { getStreamingTtsBridge } from '@agent/core/streaming-tts-bridge';
 import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
+import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
 import {
   installManagedMlxWhisperStreamingSttBridgeIfAvailable,
   installShellStreamingSttBridgeFromEnv,
@@ -901,16 +902,12 @@ export async function main(
   print: (value: unknown) => void = () => undefined
 ): Promise<void> {
   await installReasoningBackends();
-  // The general bootstrap probes Apple Speech asynchronously. Await it here so
-  // the realtime CLI can use macOS-native STT before falling back to MLX.
-  if (
-    !getRegisteredEnvText('KYBERION_STT_COMMAND')?.trim() &&
-    !getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
-  ) {
+  installAvailableSpeechToTextBridges();
+  if (getSpeechToTextBridge().name === 'stub') {
     await installAppleSpeechToTextBridgeIfAvailable().catch(() => false);
   }
   if (getSpeechToTextBridge().name === 'stub') {
-    installManagedMlxWhisperSpeechToTextBridgeIfAvailable();
+    installAppleSpeechFileToTextBridgeIfAvailable();
   }
 
   const argv = await createStandardYargs(['node', 'run_realtime_voice_conversation', ...args])

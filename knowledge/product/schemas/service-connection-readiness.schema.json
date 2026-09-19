@@ -24,6 +24,10 @@
             "type": "array",
             "items": { "type": "string", "minLength": 1 },
             "minItems": 1
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Set to false to explicitly opt out of a service (intentionally unused). Opted-out services are skipped by baseline L5."
           }
         },
         "required": ["required_keys_any"],

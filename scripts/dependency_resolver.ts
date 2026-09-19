@@ -28,6 +28,10 @@ import {
   type ActuatorDependencyBundleEntry,
 } from '@agent/core/actuator-dependency-bundles';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import {
+  discoverLocalSttBackends,
+  selectPreferredLocalSttBackend,
+} from '@agent/core/local-stt-discovery';
 
 export type DependencyLevel = 'must' | 'should' | 'nice';
 export type DependencyStatus = 'ok' | 'missing' | 'degraded';
@@ -197,14 +201,26 @@ const COMFYUI: Dependency = {
 
 const WHISPER: Dependency = {
   id: 'whisper',
-  name: 'Whisper STT (faster-whisper or openai-whisper)',
+  name: 'Whisper STT (WhisperKit, MLX, faster-whisper, or openai-whisper)',
   level: 'should',
   check: async () => {
+    const local = discoverLocalSttBackends();
+    if (local.length > 0) {
+      const preferred = selectPreferredLocalSttBackend(local)!;
+      return {
+        ok: true,
+        version: preferred.version,
+        detail: `${preferred.backend} detected via ${preferred.source}`,
+      };
+    }
     const r1 = checkBinary('whisper');
     if (r1.ok) return { ok: true, version: r1.version };
     const r2 = tryExec('python3 -c "import faster_whisper; print(faster_whisper.__version__)"');
     if (r2.ok) return { ok: true, version: `faster-whisper ${r2.stdout}` };
-    return { ok: false, detail: 'neither whisper CLI nor faster_whisper python module found' };
+    return {
+      ok: false,
+      detail: 'no WhisperKit/MLX/faster-whisper/openai-whisper backend found',
+    };
   },
   installCommand: 'pnpm kyberion voice setup --apply',
   fallbackMode: 'voice transcription unavailable; use cloud STT',

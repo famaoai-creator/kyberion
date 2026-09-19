@@ -14,6 +14,11 @@ import {
 import { resolveOnboardingSummaryPolicy } from '@agent/core/onboarding-summary-policy';
 import { resolveVocabularyLocale } from '@agent/core/ux-vocabulary';
 import { isServiceConnectionReady } from '@agent/core/service-connection-readiness';
+import {
+  discoverLocalSttBackends,
+  selectPreferredLocalSttBackend,
+} from '@agent/core/local-stt-discovery';
+import { writeServiceConnectionAtPath } from '@agent/core/service-engine-helpers';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import type { SupportedLocale } from '@agent/core/locale';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
@@ -646,15 +651,49 @@ async function promptComfyuiConnection(): Promise<Record<string, unknown> | null
 }
 
 async function promptWhisperConnection(): Promise<Record<string, unknown> | null> {
+  const detected = discoverLocalSttBackends();
+  const preferred = selectPreferredLocalSttBackend(
+    detected.filter((candidate) => candidate.verification !== 'native-script')
+  );
   const whisperkitBaseUrl = await ask('WhisperKit base URL [optional]: ');
-  const whisperCliPath = await ask('Whisper CLI path [optional]: ');
+  const detectedCliPath = preferred?.executable || '';
+  const detectedPythonBin = preferred?.python_bin || '';
+  const whisperCliPath = await ask(
+    `Whisper CLI path${detectedCliPath ? ` [detected: ${detectedCliPath}]` : ' [optional]'}: `,
+    detectedCliPath
+  );
+  const whisperPythonBin = await ask(
+    `Whisper Python binary${detectedPythonBin ? ` [detected: ${detectedPythonBin}]` : ' [optional]'}: `,
+    detectedPythonBin
+  );
+  const appleSpeechDetected = detected.some(
+    (candidate) => candidate.connection.apple_speech_available === true
+  );
+  const useAppleSpeech =
+    !whisperCliPath &&
+    !whisperPythonBin &&
+    appleSpeechDetected &&
+    isAffirmative(await ask('Use detected Apple Speech native backend? (Y/n): ', 'y'));
   const notes = await ask('Whisper notes [optional]: ');
-  if (!whisperkitBaseUrl && !whisperCliPath && !notes) return null;
+  if (!whisperkitBaseUrl && !whisperCliPath && !whisperPythonBin && !useAppleSpeech && !notes) {
+    return null;
+  }
+  const selectedDetected = detected.find(
+    (candidate) =>
+      candidate.verification !== 'native-script' &&
+      (candidate.executable === whisperCliPath || candidate.python_bin === whisperPythonBin)
+  );
+  const appleSpeechConnection =
+    detected.find((candidate) => candidate.connection.apple_speech_available === true)
+      ?.connection || {};
   return {
     whisperkit_base_url: whisperkitBaseUrl || undefined,
     whisper_cli_path: whisperCliPath || undefined,
+    whisper_python_bin: whisperPythonBin || undefined,
+    ...(selectedDetected?.connection || {}),
+    ...(useAppleSpeech ? appleSpeechConnection : {}),
     notes: notes || undefined,
-    source: 'onboarding',
+    source: detected.length > 0 ? 'onboarding:local-detection' : 'onboarding',
   };
 }
 
@@ -767,7 +806,7 @@ async function runServicesPhase(
           ? 'base_url'
           : payload?.output_dir
             ? 'output_dir'
-            : payload?.cli_path
+            : payload?.cli_path || payload?.whisperkit_cli_path || payload?.whisper_python_bin
               ? 'cli_path'
               : payload
                 ? 'custom'
@@ -775,23 +814,31 @@ async function runServicesPhase(
         captured_at: capturedAt,
         ...(payload?.base_url ? { base_url: String(payload.base_url) } : {}),
         ...(payload?.output_dir ? { output_dir: String(payload.output_dir) } : {}),
-        ...(payload?.cli_path ? { cli_path: String(payload.cli_path) } : {}),
+        ...(payload?.cli_path || payload?.whisperkit_cli_path || payload?.whisper_python_bin
+          ? {
+              cli_path: String(
+                payload.cli_path || payload.whisperkit_cli_path || payload.whisper_python_bin
+              ),
+            }
+          : {}),
         ...(payload?.notes ? { notes: String(payload.notes) } : {}),
       };
 
       candidates.push(candidate);
 
       if (payload) {
-        await writeJsonArtifact(
-          path.join(connDir, `${serviceId}.json`),
-          {
-            service_id: serviceId,
-            status: ready ? 'ready' : 'blocked',
-            captured_at: capturedAt,
-            ...payload,
-          },
-          `onboarding-connection-${serviceId}`
-        );
+        await withLock(`onboarding-connection-${serviceId}`, async () => {
+          withExecutionContext('sovereign_concierge', () => {
+            withSensitivePathMediation(() => {
+              writeServiceConnectionAtPath(path.join(connDir, `${serviceId}.json`), {
+                service_id: serviceId,
+                status: ready ? 'ready' : 'blocked',
+                captured_at: capturedAt,
+                ...payload,
+              });
+            });
+          });
+        });
       }
     }
   }
