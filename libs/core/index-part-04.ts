@@ -43,6 +43,8 @@ export * from './tool-runtime-policy.js';
 
 export * from './tool-runtime-registry.js';
 
+export * from './tool-binary-resolvers.js';
+
 export * from './service-runtime-policy.js';
 
 export * from './service-runtime-registry.js';

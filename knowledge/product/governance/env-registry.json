@@ -29,6 +29,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_ADB_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for Android Debug Bridge; when unset, the resolver checks ANDROID_HOME and ANDROID_SDK_ROOT before PATH.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_AGENT_BOOT_READY_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
@@ -1104,6 +1112,22 @@
       "description": "Generator-only strictness: when enabled, the env-registry drift check also fails while any registry entry remains undocumented. Off by default; independent of KYBERION_ENV_REGISTRY_STRICT (CLI startup validation).",
       "documented": true,
       "default": "0"
+    },
+    {
+      "name": "KYBERION_FFMPEG_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for ffmpeg; when unset, media operations use the governed tool-runtime registry command.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_FFPROBE_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for ffprobe; when unset, media probes use the governed tool-runtime registry command.",
+      "documented": true
     },
     {
       "name": "KYBERION_FIRST_WIN_LIVE",
@@ -3479,6 +3503,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_VOICE_HUB_PORT",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Port used by the local Voice Hub text-ingest demo; defaults to 3032.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_VOICE_HUB_TTS_CONFIG_PATH",
       "category": "path",
       "type": "path",
@@ -3637,6 +3669,22 @@
       "type": "number",
       "required": false,
       "description": "Maximum milliseconds a mission work item waits for one provider response before recording a blocked result.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_XCODEBUILD_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for xcodebuild; leave unset to resolve it from the host toolchain.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_XCRUN_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for xcrun; leave unset to resolve it from the host toolchain.",
       "documented": true
     }
   ]

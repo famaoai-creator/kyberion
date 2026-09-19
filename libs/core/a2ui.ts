@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { getControlPlaneBaseUrl } from './control-plane-client.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { redactSensitiveObject } from './network.js';
 
@@ -293,7 +294,7 @@ export const a2uiDispatcher = new A2UIDispatcher();
  */
 function createBridgeTransport(
   bridgeUrl = getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL') ||
-    'http://127.0.0.1:3031,http://127.0.0.1:3040'
+    `${getControlPlaneBaseUrl('presence')},http://127.0.0.1:3040`
 ): A2UITransport {
   const targets = bridgeUrl
     .split(',')

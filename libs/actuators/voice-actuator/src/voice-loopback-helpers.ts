@@ -3,6 +3,7 @@ import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVoiceEngineForPlatform } from '@agent/core/voice-engine-registry';
 import { safeExec, safeMkdir, safeReadFile, safeRmSync } from '@agent/core/secure-io';
+import { resolveFfmpegBin } from '@agent/core/tool-binary-resolvers';
 import type { AudioChunk, AudioFormat } from '@agent/core/meeting-session-types';
 import type { TtsLoopbackVerificationRequest, TtsSource } from '@agent/core/tts-loopback-verifier';
 import { isRecord, nowIso } from '@agent/core/foundation';
@@ -150,7 +151,7 @@ export function createNativeArtifactTtsSource(options: {
       const rawPath = pathResolver.sharedTmp(`voice-loopback/${options.requestId}.pcm`);
       safeMkdir(path.dirname(rawPath), { recursive: true });
       try {
-        safeExec('ffmpeg', [
+        safeExec(resolveFfmpegBin(), [
           '-y',
           '-hide_banner',
           '-loglevel',

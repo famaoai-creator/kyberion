@@ -1,4 +1,3 @@
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -15,6 +14,7 @@ import {
   type TranscribeResult,
 } from './speech-to-text-bridge.js';
 import { rootResolve } from './path-resolver.js';
+import { isAppleSilicon } from './platform.js';
 import { safeWriteFile } from './secure-io.js';
 
 /**
@@ -221,7 +221,7 @@ export async function probeAppleIntelligence(): Promise<AppleIntelligenceAvailab
 
 async function probeUncached(): Promise<AppleIntelligenceAvailability> {
   if (bridgeDisabledByEnv()) return { available: false, reason: 'disabled via KYBERION_APPLE_FM' };
-  if (process.platform !== 'darwin' || os.arch() !== 'arm64') {
+  if (!isAppleSilicon()) {
     return { available: false, reason: 'requires Apple Silicon macOS' };
   }
   const binary = await ensureAfmBinary();
@@ -340,7 +340,7 @@ export async function recognizeImageLocallyWithAppleVision(
   options: { timeoutMs?: number } = {}
 ): Promise<AppleVisionResult | null> {
   if (bridgeDisabledByEnv()) return null;
-  if (process.platform !== 'darwin' || os.arch() !== 'arm64') return null;
+  if (!isAppleSilicon()) return null;
   const binary = await ensureAfmBinary();
   if (!binary) return null;
   const result = await runner(binary, ['vision', '--image', imagePath], {
@@ -406,7 +406,7 @@ export async function transcribeAudioLocallyWithAppleSpeech(
   options: { locale?: string; timeoutMs?: number } = {}
 ): Promise<string | null> {
   if (bridgeDisabledByEnv()) return null;
-  if (process.platform !== 'darwin' || os.arch() !== 'arm64') return null;
+  if (!isAppleSilicon()) return null;
   const binary = await ensureAfmBinary();
   if (!binary) return null;
   const timeoutMs = options.timeoutMs ?? 300_000;
@@ -481,7 +481,7 @@ export async function probeAppleImageGeneration(): Promise<AppleImageGenerationA
   let value: AppleImageGenerationAvailability;
   if (bridgeDisabledByEnv()) {
     value = { available: false, reason: 'disabled via KYBERION_APPLE_FM' };
-  } else if (process.platform !== 'darwin' || os.arch() !== 'arm64') {
+  } else if (!isAppleSilicon()) {
     value = { available: false, reason: 'requires Apple Silicon macOS' };
   } else {
     const binary = await ensureAfmBinary();
@@ -521,7 +521,7 @@ export async function generateImageLocallyWithApplePlayground(
   options: { style?: string; timeoutMs?: number } = {}
 ): Promise<AppleImageGenerationResult | null> {
   if (bridgeDisabledByEnv()) return null;
-  if (process.platform !== 'darwin' || os.arch() !== 'arm64') return null;
+  if (!isAppleSilicon()) return null;
   const binary = await ensureAfmBinary();
   if (!binary) return null;
   const timeoutMs = options.timeoutMs ?? 300_000;

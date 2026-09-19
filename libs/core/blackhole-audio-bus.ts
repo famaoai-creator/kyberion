@@ -9,6 +9,7 @@
 
 import { logger } from './core.js';
 import { buildSafeExecEnv, safeExecResult } from './secure-io.js';
+import { resolveFfmpegBin } from './tool-binary-resolvers.js';
 import {
   spawnManagedProcess,
   stopManagedProcess,
@@ -200,7 +201,7 @@ export class BlackHoleAudioBus implements AudioBus {
     }
     this.format = format;
     this.inputQueue = new BoundedAudioQueue(this.opts.buffer_policy ?? DEFAULT_AUDIO_BUFFER_POLICY);
-    const ffmpeg = this.opts.ffmpeg_bin ?? 'ffmpeg';
+    const ffmpeg = this.opts.ffmpeg_bin ?? resolveFfmpegBin();
     const channels = String(format.channels);
     const rate = String(format.sample_rate_hz);
     const captureDevice = this.inputDevice.display_name;
@@ -371,8 +372,8 @@ export class BlackHoleAudioBus implements AudioBus {
   private ffmpegDeviceListing(): string {
     const args = ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', '""'];
     const result = this.opts.ffmpeg_runner
-      ? this.opts.ffmpeg_runner(this.opts.ffmpeg_bin ?? 'ffmpeg', args)
-      : safeExecResult(this.opts.ffmpeg_bin ?? 'ffmpeg', args, {
+      ? this.opts.ffmpeg_runner(this.opts.ffmpeg_bin ?? resolveFfmpegBin(), args)
+      : safeExecResult(this.opts.ffmpeg_bin ?? resolveFfmpegBin(), args, {
           timeoutMs: 20_000,
           maxOutputMB: 2,
         });
