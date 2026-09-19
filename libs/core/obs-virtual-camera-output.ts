@@ -350,6 +350,11 @@ export interface ObsVirtualCameraBridgeOptions extends ObsVirtualCameraOptions {
 export class ObsVirtualCameraOutputBridge implements CameraOutputBridge {
   readonly bridge_id = OBS_VIRTUAL_CAMERA_BRIDGE_ID;
   readonly capabilities = OBS_VIRTUAL_CAMERA_CAPABILITIES;
+  private started = false;
+  private activeResult: AvatarOutputResult | null = null;
+  private status: 'healthy' | 'degraded' | 'failed' | 'closed' = 'closed';
+  private reason: string | undefined;
+  private lastOutputAt: number | undefined;
 
   constructor(private readonly options: ObsVirtualCameraBridgeOptions = {}) {}
 
@@ -374,19 +379,69 @@ export class ObsVirtualCameraOutputBridge implements CameraOutputBridge {
     }
   }
 
-  startAvatarOutput(input: AvatarOutputRequest): Promise<AvatarOutputResult> {
-    return this.clientWithTimeout(10_000).startAvatarOutput({
-      videoPath: input.videoPath,
-      ...(input.sceneName ? { sceneName: input.sceneName } : {}),
-      ...(input.sourceName ? { sourceName: input.sourceName } : {}),
-      ...(input.loop !== undefined ? { loop: input.loop } : {}),
-    });
+  async startAvatarOutput(input: AvatarOutputRequest): Promise<AvatarOutputResult> {
+    if (this.started && this.activeResult) return this.activeResult;
+    try {
+      const result = await this.clientWithTimeout(10_000).startAvatarOutput({
+        videoPath: input.videoPath,
+        ...(input.sceneName ? { sceneName: input.sceneName } : {}),
+        ...(input.sourceName ? { sourceName: input.sourceName } : {}),
+        ...(input.loop !== undefined ? { loop: input.loop } : {}),
+      });
+      this.activeResult = result;
+      this.started = true;
+      this.status = 'healthy';
+      this.reason = undefined;
+      this.lastOutputAt = Date.now();
+      return result;
+    } catch (error) {
+      this.started = false;
+      this.activeResult = null;
+      this.status = 'failed';
+      this.reason = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
   }
 
-  stopAvatarOutput(): Promise<void> {
-    return this.clientWithTimeout(10_000)
-      .stopAvatarOutput()
-      .then(() => undefined);
+  async stopAvatarOutput(): Promise<void> {
+    try {
+      await this.clientWithTimeout(10_000).stopAvatarOutput();
+      this.started = false;
+      this.activeResult = null;
+      this.status = 'closed';
+      this.reason = undefined;
+    } catch (error) {
+      this.status = 'failed';
+      this.reason = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
+  }
+
+  health(): import('./video-route.js').VideoRouteHealth {
+    return {
+      status: this.status,
+      input_process_alive: false,
+      output_process_alive: this.started,
+      ...(this.lastOutputAt ? { last_output_frame_at_ms: this.lastOutputAt } : {}),
+      queue_depth: 0,
+      dropped_frames: 0,
+      underrun_count: 0,
+      device_disconnected: this.status === 'failed' || this.status === 'degraded',
+      lease_held: false,
+      ...(this.reason ? { reason: this.reason } : {}),
+    };
+  }
+
+  metrics(): import('./video-route.js').VideoRouteMetrics {
+    return {
+      frames_in: 0,
+      // OBS does not expose per-frame counters through this bridge.
+      frames_out: 0,
+      dropped_frames: 0,
+      dropped_ms: 0,
+      underrun_count: 0,
+      scaled: false,
+    };
   }
 }
 
