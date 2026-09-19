@@ -19,6 +19,8 @@ import {
   type VirtualCameraInjectionBridge,
 } from './virtual-camera-injection-bridge.js';
 import { safeExec } from './secure-io.js';
+import { VideoDeviceLeaseManager, type VideoDeviceLease } from './video-device-lease.js';
+import type { VideoRouteHealth, VideoRouteMetrics } from './video-route.js';
 
 export const V4L2_VIRTUAL_CAMERA_BRIDGE_ID = 'v4l2-virtual-cam' as const;
 
@@ -27,6 +29,9 @@ export interface V4l2VirtualCameraOutputOptions {
   devicePreference?: string;
   ffmpegBin?: string;
   injectionBridge?: VirtualCameraInjectionBridge;
+  session_id?: string;
+  lease_ttl_ms?: number;
+  lease_manager?: VideoDeviceLeaseManager;
 }
 
 export const V4L2_VIRTUAL_CAMERA_CAPABILITIES: CameraOutputCapabilities = {
@@ -49,6 +54,16 @@ export class V4l2VirtualCameraOutputBridge implements CameraOutputBridge {
   readonly bridge_id = V4L2_VIRTUAL_CAMERA_BRIDGE_ID;
   readonly capabilities = V4L2_VIRTUAL_CAMERA_CAPABILITIES;
   private readonly injectionBridge: VirtualCameraInjectionBridge;
+  private readonly leaseManager: VideoDeviceLeaseManager;
+  private readonly sessionId: string;
+  private readonly leaseTtlMs: number;
+  private leases: VideoDeviceLease[] = [];
+  private started = false;
+  private activeResult: AvatarOutputResult | null = null;
+  private status: VideoRouteHealth['status'] = 'closed';
+  private reason: string | undefined;
+  private lastOutputAt: number | undefined;
+  private framesOut = 0;
 
   constructor(private readonly options: V4l2VirtualCameraOutputOptions = {}) {
     this.injectionBridge =
@@ -58,6 +73,9 @@ export class V4l2VirtualCameraOutputBridge implements CameraOutputBridge {
         device_preference: options.devicePreference,
         ffmpeg_bin: options.ffmpegBin,
       });
+    this.leaseManager = options.lease_manager ?? new VideoDeviceLeaseManager();
+    this.sessionId = options.session_id ?? `v4l2-${process.pid}-${Date.now()}`;
+    this.leaseTtlMs = options.lease_ttl_ms ?? 30_000;
   }
 
   async probe(): Promise<CameraOutputProbe> {
@@ -81,29 +99,104 @@ export class V4l2VirtualCameraOutputBridge implements CameraOutputBridge {
   }
 
   async startAvatarOutput(input: AvatarOutputRequest): Promise<AvatarOutputResult> {
+    if (this.started && this.activeResult) return this.activeResult;
     if (input.loop) {
       throw new Error(
         'v4l2 virtual-camera output does not support a persistent loop; use OBS for looping sources'
       );
     }
-    const result = await this.injectionBridge.injectFromMp4(input.videoPath, {
-      device_path: this.options.devicePath,
-      device_preference: input.sourceName || this.options.devicePreference,
-    });
-    if (result.status !== 'succeeded') {
-      throw new Error(result.reason || 'v4l2 virtual-camera injection was blocked');
+    const probe = await this.probe();
+    if (!probe.available) {
+      throw new Error(`[v4l2-virtual-camera] not available: ${probe.reason || 'unknown reason'}`);
     }
-    return {
-      scene: 'v4l2',
-      source: result.selected_device_path || this.options.devicePath || 'v4l2',
-      virtualCamStarted: true,
-    };
+    const deviceUid = this.options.devicePath || input.sourceName || 'v4l2';
+    try {
+      this.leases.push(this.leaseManager.acquire(deviceUid, this.sessionId, this.leaseTtlMs));
+    } catch (error) {
+      this.releaseLeases();
+      throw error;
+    }
+    try {
+      const result = await this.injectionBridge.injectFromMp4(input.videoPath, {
+        device_path: this.options.devicePath,
+        device_preference: input.sourceName || this.options.devicePreference,
+      });
+      if (result.status !== 'succeeded') {
+        throw new Error(result.reason || 'v4l2 virtual-camera injection was blocked');
+      }
+      for (const lease of this.leases) lease.heartbeat();
+      this.activeResult = {
+        scene: 'v4l2',
+        source: result.selected_device_path || this.options.devicePath || 'v4l2',
+        virtualCamStarted: true,
+      };
+      this.started = true;
+      this.status = 'healthy';
+      this.reason = undefined;
+      this.framesOut += result.injected_frame_count ?? 0;
+      this.lastOutputAt = Date.now();
+      return this.activeResult;
+    } catch (error) {
+      this.started = false;
+      this.activeResult = null;
+      this.status = 'failed';
+      this.reason = error instanceof Error ? error.message : String(error);
+      throw error;
+    } finally {
+      // injectFromMp4 is a bounded foreground operation; there is no live
+      // writer process after it returns, so do not retain the device lease.
+      this.releaseLeases();
+    }
   }
 
   async stopAvatarOutput(): Promise<void> {
-    // The current ffmpeg injection is a bounded foreground operation. Once it
-    // returns, the device is no longer being fed; there is no persistent
-    // process handle to terminate here.
+    // Bounded foreground ffmpeg injection leaves no persistent process handle,
+    // but the device lease must still be released idempotently so a failed or
+    // finished injection cannot hold the v4l2 node forever.
+    try {
+      this.started = false;
+      this.activeResult = null;
+      this.status = 'closed';
+      this.reason = undefined;
+    } finally {
+      this.releaseLeases();
+    }
+  }
+
+  health(): VideoRouteHealth {
+    return {
+      status: this.status,
+      input_process_alive: false,
+      output_process_alive: this.started,
+      ...(this.lastOutputAt ? { last_output_frame_at_ms: this.lastOutputAt } : {}),
+      queue_depth: 0,
+      dropped_frames: 0,
+      underrun_count: 0,
+      device_disconnected: this.status === 'failed' || this.status === 'degraded',
+      lease_held: this.leases.length > 0 && this.started,
+      ...(this.reason ? { reason: this.reason } : {}),
+    };
+  }
+
+  metrics(): VideoRouteMetrics {
+    return {
+      frames_in: 0,
+      frames_out: this.framesOut,
+      dropped_frames: 0,
+      dropped_ms: 0,
+      underrun_count: 0,
+      scaled: false,
+    };
+  }
+
+  private releaseLeases(): void {
+    for (const lease of this.leases.splice(0)) {
+      try {
+        lease.release();
+      } catch {
+        /* release must not mask the original error */
+      }
+    }
   }
 }
 

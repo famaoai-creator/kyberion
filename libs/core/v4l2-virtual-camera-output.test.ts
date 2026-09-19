@@ -4,6 +4,11 @@ import {
   V4l2VirtualCameraOutputBridge,
 } from './v4l2-virtual-camera-output.js';
 import type { VirtualCameraInjectionBridge } from './virtual-camera-injection-bridge.js';
+import { safeRmSync } from './secure-io.js';
+import * as pathResolver from './path-resolver.js';
+import { VideoDeviceLeaseManager } from './video-device-lease.js';
+
+const leaseDir = pathResolver.sharedTmp('v4l2-virtual-camera-output-tests');
 
 function fakeInjectionBridge(backend: 'ffmpeg-v4l2' | 'stub'): VirtualCameraInjectionBridge {
   return {
@@ -33,6 +38,7 @@ describe('v4l2 virtual-camera output seam backend', () => {
 
   afterEach(() => {
     Object.defineProperty(process, 'platform', { value: originalPlatform });
+    safeRmSync(leaseDir, { recursive: true, force: true });
   });
 
   it('exposes the existing Linux injection path through camera-output-bridge', async () => {
@@ -42,6 +48,7 @@ describe('v4l2 virtual-camera output seam backend', () => {
       devicePath: '/dev/video2',
       ffmpegBin: 'true',
       injectionBridge: injection,
+      lease_manager: new VideoDeviceLeaseManager({ lease_dir: leaseDir }),
     });
 
     await expect(bridge.probe()).resolves.toEqual({ available: true });
@@ -56,6 +63,7 @@ describe('v4l2 virtual-camera output seam backend', () => {
       'active/shared/tmp/avatar.mp4',
       expect.objectContaining({ device_path: '/dev/video2' })
     );
+    expect(bridge.health()?.lease_held).toBe(false);
   });
 
   it('reports setup guidance when no Linux v4l2 device is selected', async () => {
