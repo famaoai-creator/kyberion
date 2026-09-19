@@ -79,6 +79,7 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 
 type ReadinessRule = {
   required_keys_any?: string[];
+  required?: boolean;
 };
 
 const BASELINE_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -440,6 +441,8 @@ function checkServiceConnectionReadiness(
       if (Object.keys(readinessRules).length === 0) return false;
 
       for (const [serviceId, rule] of Object.entries(readinessRules)) {
+        // Explicit opt-out (`required: false`) = intentionally unused, skip.
+        if (rule?.required === false) continue;
         const service = services[serviceId];
         if (!service?.preset_path) return false;
         const presetPath = pathResolver.rootResolve(String(service.preset_path));

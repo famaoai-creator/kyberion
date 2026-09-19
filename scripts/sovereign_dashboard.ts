@@ -417,7 +417,11 @@ function readConnectionReview() {
   });
 
   const blocked = Object.entries(readiness?.required_services || {})
-    .filter(([serviceId]) => !services.some((entry) => entry.serviceId === serviceId))
+    .filter(
+      ([serviceId]) =>
+        readiness?.required_services?.[serviceId]?.required !== false &&
+        !services.some((entry) => entry.serviceId === serviceId)
+    )
     .map(([serviceId]) => ({
       serviceId,
       status: 'missing',
@@ -683,7 +687,9 @@ function drawOnboardingHome() {
     if (payload) serviceMap.set(serviceId, payload);
   }
 
-  const requiredServices = Object.entries(readiness?.required_services || {});
+  const requiredServices = Object.entries(readiness?.required_services || {}).filter(
+    ([, rule]) => rule.required !== false
+  );
   const readyServices: string[] = [];
   const blockedServices: string[] = [];
   for (const [serviceId] of requiredServices) {
