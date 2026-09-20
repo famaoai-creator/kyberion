@@ -9,6 +9,7 @@ import {
 import { resolveSelectionHints } from './agent-manifest.js';
 import { resolveTeamRoleSelectionHints } from './team-role-selection.js';
 import { resolveModelProvider } from './reasoning-model-routing.js';
+import { loadProviderConfig } from './provider-config.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
 import { resolveWorkforceLoad, type WorkforceLoadIndex } from './workforce-load.js';
 import { workerLoadPenalty } from './worker-assignment-policy.js';
@@ -210,10 +211,23 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
               : {}),
           }
         : profile.selection_hints;
+      const providerConfig = loadProviderConfig();
+      const fallbackProvider =
+        providerPreference?.provider ||
+        profile.selection_hints?.preferred_provider ||
+        routedProvider ||
+        providerConfig.default_priority[0] ||
+        'claude';
+      const fallbackModel =
+        providerPreference?.modelId ||
+        profile.selection_hints?.preferred_modelId ||
+        selectionHints.preferred_models[0] ||
+        routedModelId ||
+        providerConfig.default_models[fallbackProvider];
       const { provider: selectionProvider, modelId: selectionModel } = resolveSelectionHints(
         agentSelectionHints,
-        routedProvider as any,
-        selectionHints.preferred_models[0] || routedModelId,
+        fallbackProvider as any,
+        fallbackModel,
         agentId
       );
       const resolvedTarget = resolveAgentProviderTarget({

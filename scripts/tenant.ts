@@ -1,5 +1,6 @@
 import { mutateTenant, type TenantLifecycleVerb, listTenants } from '@agent/core/tenant-governance';
 import { readTenantProfile, recordTenantProviderAttestation } from '@agent/core/tenant-registry';
+import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Args = {
@@ -71,7 +72,7 @@ function usage(): string {
     'Usage: pnpm tenant <create|update|suspend|resume|archive|list|show|attest-provider> [slug] [options]',
     '  attest-provider records how this installation is contracted with a provider:',
     '    --provider <id> --training-use <none|used|unknown> [--plan <text>] [--basis <url|ref>]',
-    '    [--attested-by <who>] [--valid-for-days <n>]   (requires --apply)',
+    '    [--attested-by <who>] [--valid-for-days <n>]   (none requires all three evidence fields; --apply)',
     '  Attestations are written to the tenant profile under knowledge/personal/, which is',
     '  outside git: a contract is a fact about your account, not about the project.',
     '  create/update require --apply to write; without it they are dry-run only.',
@@ -105,6 +106,24 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
     if (trainingUse !== 'none' && trainingUse !== 'used' && trainingUse !== 'unknown') {
       throw new Error('attest-provider requires --training-use <none|used|unknown>');
     }
+    if (trainingUse === 'none') {
+      const missing = [
+        !args.plan?.trim() ? '--plan' : '',
+        !args.basis?.trim() ? '--basis' : '',
+        !args.attestedBy?.trim() ? '--attested-by' : '',
+      ].filter(Boolean);
+      if (missing.length > 0) {
+        throw new Error(
+          `attest-provider --training-use none requires ${missing.join(', ')} for evidence and attribution`
+        );
+      }
+    }
+    if (
+      args.validForDays !== undefined &&
+      (!Number.isFinite(args.validForDays) || args.validForDays <= 0)
+    ) {
+      throw new Error('attest-provider requires --valid-for-days to be a finite positive number');
+    }
     if (!args.apply) {
       print(
         JSON.stringify(
@@ -115,17 +134,17 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
       );
       return;
     }
-    const profile = recordTenantProviderAttestation({
-      slug: args.slug,
-      provider: args.provider,
-      training_use: trainingUse,
-      ...(args.plan ? { plan: args.plan } : {}),
-      ...(args.basis ? { basis: args.basis } : {}),
-      ...(args.attestedBy ? { attested_by: args.attestedBy } : {}),
-      ...(typeof args.validForDays === 'number' && args.validForDays > 0
-        ? { valid_for_days: args.validForDays }
-        : {}),
-    });
+    const profile = withExecutionContext('sovereign_concierge', () =>
+      recordTenantProviderAttestation({
+        slug: args.slug!,
+        provider: args.provider!,
+        training_use: trainingUse,
+        ...(args.plan ? { plan: args.plan } : {}),
+        ...(args.basis ? { basis: args.basis } : {}),
+        ...(args.attestedBy ? { attested_by: args.attestedBy } : {}),
+        ...(typeof args.validForDays === 'number' ? { valid_for_days: args.validForDays } : {}),
+      })
+    );
     print(JSON.stringify(profile.provider_attestations?.[args.provider], null, 2));
     return;
   }

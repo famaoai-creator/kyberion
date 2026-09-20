@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
 
 const mocks = vi.hoisted(() => ({ sendOpsAlert: vi.fn() }));
 vi.mock('./ops-alert.js', () => ({ sendOpsAlert: mocks.sendOpsAlert }));
@@ -420,6 +421,19 @@ describe('tenant provider attestations (plan-scoped training use)', () => {
     expect(resolved.status).toBe('absent');
     expect(resolved.training_use).toBe('unknown');
   });
+
+  it('treats a malformed explicit expiry as expired rather than extending it', () => {
+    const resolved = resolveTenantProviderAttestation({
+      profile: {
+        provider_attestations: {
+          vendor: { training_use: 'none', attested_at: iso(-1), expires_at: 'not-a-date' },
+        },
+      },
+      provider: 'vendor',
+    });
+    expect(resolved.status).toBe('expired');
+    expect(resolved.training_use).toBe('unknown');
+  });
 });
 
 describe('the gate reads the tenant profile as its own policy input', () => {
@@ -441,7 +455,17 @@ describe('the gate reads the tenant profile as its own policy input', () => {
         provider_attestations: {
           clean: { training_use: 'none', attested_at: new Date().toISOString() },
           dirty: { training_use: 'used', attested_at: new Date().toISOString() },
+          unlisted: { training_use: 'none', attested_at: new Date().toISOString() },
         },
+      })
+    );
+    fs.writeFileSync(
+      path.join(dir, 'other.json'),
+      JSON.stringify({
+        tenant_slug: 'other',
+        display_name: 'Other',
+        status: 'active',
+        assigned_role: 'owner',
       })
     );
     writePolicy({
@@ -486,5 +510,33 @@ describe('the gate reads the tenant profile as its own policy input', () => {
     });
     expect(denied.allowed).toBe(false);
     expect(denied.reason).toContain('used');
+  });
+
+  it('does not let an attestation invent an undeclared provider', () => {
+    const denied = checkProviderEgress({
+      provider: 'unlisted',
+      dataTier: 'confidential',
+      tenant_slug: 'acme',
+      tenant_registry_root_dir: fixtureRoot,
+    });
+    expect(denied.allowed).toBe(false);
+    expect(denied.reason).toContain('not declared');
+  });
+
+  it('rejects a tenant policy lookup that conflicts with the active tenant scope', () => {
+    const denied = withExecutionContext(
+      'mission_controller',
+      () =>
+        checkProviderEgress({
+          provider: 'clean',
+          dataTier: 'confidential',
+          tenant_slug: 'acme',
+          tenant_registry_root_dir: fixtureRoot,
+        }),
+      undefined,
+      'other'
+    );
+    expect(denied.allowed).toBe(false);
+    expect(denied.reason).toContain('conflicts with the active tenant scope');
   });
 });

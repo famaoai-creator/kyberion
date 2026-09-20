@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "provider-egress-policy.schema.json",
   "title": "Provider Egress Policy",
-  "description": "XP-03: tier x provider egress gate for the delegation face (a task contract / context pack handed to an external LLM CLI), as opposed to egress-policy.json (SA-04, network/domain face). Declares, per provider, whether inference stays on this machine (local-only) or is sent to a vendor API (external-api) and, when it is sent, whether the vendor uses that material to train models. Tiers above confidential are never sent off the machine; confidential may be sent only to a provider whose material is not trained on. Consumed by libs/core/provider-egress-gate.ts's checkProviderEgress.",
+  "description": "XP-03: tier x provider egress gate for the delegation face (a task contract / context pack handed to an external LLM CLI), as opposed to egress-policy.json (SA-04, network/domain face). Declares, per provider, whether inference stays on this machine (local-only) or is sent to a vendor API (external-api) and, when it is sent, whether the vendor uses that material to train models. Confidential and personal material may be sent only to a provider whose applicable plan is not used for training, or under an explicit audited exception. Consumed by libs/core/provider-egress-gate.ts's checkProviderEgress.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -23,19 +23,12 @@
         "properties": {
           "egress": {
             "type": "string",
-            "enum": [
-              "external-api",
-              "local-only"
-            ],
+            "enum": ["external-api", "local-only"],
             "description": "'external-api': the provider's CLI sends the payload to a vendor-hosted API. 'local-only': inference stays on this machine."
           },
           "training_use": {
             "type": "string",
-            "enum": [
-              "none",
-              "used",
-              "unknown"
-            ],
+            "enum": ["none", "used", "unknown"],
             "description": "Whether the vendor uses material sent to this provider to train models. 'none': contractually not trained on. 'used': trained on. 'unknown': not established -- treated as 'used' by the gate, so an undeclared provider fails closed. The same API can differ by plan, so declare `plan` alongside this."
           },
           "plan": {
@@ -47,9 +40,7 @@
             "description": "Where the training_use claim was verified -- a terms URL, contract reference or ticket. A 'none' claim with no basis is an assertion, not a fact."
           }
         },
-        "required": [
-          "egress"
-        ]
+        "required": ["egress"]
       }
     },
     "tier_policy": {
@@ -70,14 +61,11 @@
                 "type": "string",
                 "minLength": 1
               },
-              "description": "Provider ids allowed to receive confidential material regardless of their declared training use. Every entry here is an operator exception that the coverage report names, not a derived approval."
+              "description": "Provider ids allowed to receive confidential material when no tenant attestation has already denied the provider. Every entry here is an operator exception that the coverage report names, not a derived approval."
             }
           },
-          "required": [
-            "mode",
-            "approved_providers"
-          ],
-          "description": "Confidential material may leave the machine only for a provider declared `training_use: none`. `approved_providers` remains as an explicit, audited operator exception for providers that are not (yet) declared so."
+          "required": ["mode", "approved_providers"],
+          "description": "Confidential material may leave the machine only for a provider declared `training_use: none`, a valid tenant attestation for that provider, or an explicit audited `approved_providers` exception."
         },
         "personal": {
           "type": "object",
@@ -92,20 +80,14 @@
                 "type": "string",
                 "minLength": 1
               },
-              "description": "Provider ids allowed to receive personal material regardless of their declared training use. Every entry is an operator exception that fails no gate but is named in reports."
+              "description": "Provider ids allowed to receive personal material when no tenant attestation has already denied the provider. Every entry is an operator exception that is named in reports."
             }
           },
-          "required": [
-            "mode",
-            "approved_providers"
-          ],
+          "required": ["mode", "approved_providers"],
           "description": "Personal material may leave the machine only for a provider that does not train on it -- the same bar as confidential. Keeping it on the machine is one way to satisfy that, not a separate requirement: personal work has real uses (trip research, say) that need a model, and a rule that forbids them is a rule that gets bypassed."
         }
       },
-      "required": [
-        "confidential",
-        "personal"
-      ]
+      "required": ["confidential", "personal"]
     },
     "attestation_ttl_days": {
       "type": "integer",
@@ -114,9 +96,5 @@
       "description": "How long a tenant provider attestation stays valid without an explicit expires_at. A plan can be downgraded and vendor terms can change without anyone touching this repository, so a claim that is never re-verified must decay to 'unknown' rather than hold forever."
     }
   },
-  "required": [
-    "version",
-    "providers",
-    "tier_policy"
-  ]
+  "required": ["version", "providers", "tier_policy"]
 }
