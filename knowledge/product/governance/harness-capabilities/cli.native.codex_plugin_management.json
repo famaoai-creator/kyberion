@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.codex_plugin_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "plugin",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session"],
+        "intents": ["plugin-management", "install-plugin"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "Codex plugin management is useful for controlled extension installation and inspection."
+    }
+  ]
+}

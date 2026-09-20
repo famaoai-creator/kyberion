@@ -1,0 +1,49 @@
+{
+  "version": "1.0.0",
+  "description": "IT デリバリ／運用の標準ゲーティング会議体(会議体)カタログ。各会議体は開催事前条件(preconditions)・アジェンダ(agenda)・入口/出口クライテリア(entry/exit_criteria)・決裁者(decision_owner)・定足数(quorum)・所管ゲート(gates_owned)を定義する。SDLC ゲートは gate-profiles/sdlc.json、インシデントゲートは gate-profiles/incident.json と対応。固有(顧客/テナント)情報は含めない — テナント個別の会議体運用は knowledge/confidential/{tenant}/ に置く。",
+  "decision_outcomes": {
+    "go": "GO — 次フェーズへ進行を承認。exit_criteria を全て満たす。",
+    "conditional_go": "CONDITIONAL GO — 条件付き進行。未充足項目に担当・期限つきの条件を付す。",
+    "no_go": "NO-GO — 差し戻し。前フェーズで是正し再判定。",
+    "hold": "HOLD — 判定保留。追加情報・追加検証の取得後に再開催。"
+  },
+  "bodies": [
+    {
+      "id": "steering-committee",
+      "name_ja": "ステアリングコミッティ",
+      "name_en": "Steering Committee",
+      "purpose": "プロジェクト横断の統制・優先順位・例外承認・エスカレーションの最終意思決定を行う。",
+      "scope": "portfolio",
+      "trigger": {
+        "kind": "cadence",
+        "detail": "定例(隔週/月次)。加えて各ゲートからのエスカレーション時。"
+      },
+      "decision_owner": "ceo",
+      "quorum": {
+        "required_roles": ["ceo", "business_owner", "pmo_governance"],
+        "optional_roles": ["finance_controller", "solution_architect", "customer_success"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "各トラックのゲート状況サマリが事前配布されている",
+        "エスカレーション事項に論点と選択肢が整理されている"
+      ],
+      "agenda": [
+        "ポートフォリオ全体のゲート状況・進捗",
+        "重大リスク・課題とエスカレーション事項",
+        "優先順位・リソース配分の調整",
+        "ゲート例外(exception)の承認可否",
+        "意思決定と次アクション"
+      ],
+      "entry_criteria": ["portfolio-gate-status-summary", "escalation-register"],
+      "exit_criteria": [
+        "エスカレーション事項に決定と担当・期限がある",
+        "ゲート例外の承認/却下が記録されている"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": [],
+      "escalation": "sovereign",
+      "tier": "product"
+    }
+  ]
+}

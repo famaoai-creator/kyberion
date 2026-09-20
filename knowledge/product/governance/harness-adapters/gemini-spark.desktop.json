@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "gemini-spark.desktop",
+      "provider": "gemini-app",
+      "surface_kind": "provider_runtime",
+      "capability_id": "provider.runtime.gemini_spark_desktop",
+      "contract_kind": "agent_session",
+      "observation_kind": "proactive_brief+local_files+voice+desktop_workflow",
+      "result_kind": "response+session_ref+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "reasoning-backend / structured-query",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Gemini Spark is a multimodal desktop agent surface and should remain a provider-runtime adapter, not a hard-coded ADF primitive."
+    }
+  ]
+}

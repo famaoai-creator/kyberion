@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.gemini.imagen-3-fast",
+      "modality": "image",
+      "display_name": "Google AI Studio Imagen 3 Fast (Free Tier)",
+      "kind": "service_preset",
+      "provider": "gemini_api",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["jpg", "jpeg", "png", "webp"],
+        "async": false
+      },
+      "service_id": "gemini",
+      "action": "generate_image_fast",
+      "cost_tier": "free",
+      "data_policy": "training_eligible",
+      "execution_locality": "remote",
+      "fallback_backend_id": "media-generation.gemini",
+      "notes": "Routes image generation through Google AI Studio Imagen 3 Fast free tier (training-eligible, rate-limited)."
+    }
+  ]
+}

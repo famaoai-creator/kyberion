@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "xcodebuild",
+      "display_name": "Xcode Build System",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "xcodebuild",
+        "args": ["-version"],
+        "description": "Probe xcodebuild availability without any install step."
+      },
+      "install_backend": {
+        "kind": "system",
+        "command": "xcode-select",
+        "args": ["--install"],
+        "description": "Install the Xcode command line tools via xcode-select."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "xcodebuild",
+        "args": ["-version"],
+        "description": "Re-check the installed xcodebuild binary."
+      },
+      "managed_env_subpath": "tool-runtimes/xcodebuild",
+      "notes": "Darwin-only Xcode build entrypoint resolved through the xcode-select path."
+    }
+  ]
+}

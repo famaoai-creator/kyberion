@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "bundles": [
+    {
+      "bundle_id": "browser-exploration-governed",
+      "status": "conceptual",
+      "kind": "capability-bundle",
+      "summary": "Explore a website through the host browser surface and distill the findings into a governed Kyberion artifact.",
+      "harness_capability_refs": ["cli.native.browser_interactive"],
+      "required_actuators": ["browser-actuator"],
+      "intents": ["browser-step", "open-site"],
+      "references": [
+        "knowledge/product/architecture/cli-harness-coordination-model.md",
+        "knowledge/product/architecture/capability-bundle-model.md"
+      ]
+    }
+  ]
+}

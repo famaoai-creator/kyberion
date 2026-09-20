@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "codex-cli.plugin",
+      "provider": "codex-cli",
+      "surface_kind": "provider_runtime",
+      "capability_id": "cli.native.codex_plugin_management",
+      "contract_kind": "deterministic_utility",
+      "observation_kind": "plugin_listing+metadata",
+      "result_kind": "plugin_action_result+trace_ref",
+      "approval_behavior": "none",
+      "replayability": "deterministic",
+      "fallback_contract": "orchestrator-actuator",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Plugin management is a discovery and installation surface; keep it low-risk and auditable."
+    }
+  ]
+}

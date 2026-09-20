@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "order": [
+    "initiation-review",
+    "requirements-review-board",
+    "design-review-board",
+    "change-advisory-board",
+    "validation-review",
+    "release-readiness-review",
+    "closure-review",
+    "incident-command",
+    "post-incident-review",
+    "steering-committee"
+  ]
+}

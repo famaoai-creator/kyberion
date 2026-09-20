@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.claude_agent_loop",
+      "source": {
+        "type": "cli_native",
+        "provider": "claude-cli",
+        "name": "agent-loop",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "high",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "high_risk_only"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["agent-session", "resume-session", "interactive-reason"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "agent-actuator"
+      },
+      "status": "active",
+      "notes": "Interactive Claude Code session with full tool surface (Edit, Bash, Read, etc.) and resumable state. High-risk by virtue of mutating tools; execution receipts must record the resume session id."
+    }
+  ]
+}

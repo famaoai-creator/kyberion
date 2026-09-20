@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.github_api_access",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "api",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "medium",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["direct_reply", "task_session"],
+        "intents": ["github-api-query", "github-api-mutation"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "service-actuator"
+      },
+      "status": "active",
+      "notes": "GitHub API requests are deterministic enough for discovery and read-only flows, but mutations still need policy review."
+    }
+  ]
+}

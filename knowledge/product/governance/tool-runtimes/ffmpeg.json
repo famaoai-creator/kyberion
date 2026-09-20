@@ -1,0 +1,51 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "ffmpeg",
+      "display_name": "FFmpeg Media Toolkit",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "ffmpeg",
+        "args": ["-version"],
+        "description": "Probe FFmpeg availability without any install step."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "ffmpeg"],
+        "description": "Install FFmpeg through Homebrew on macOS."
+      },
+      "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "Gyan.FFmpeg",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "Install FFmpeg through WinGet on Windows."
+        }
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "ffmpeg",
+        "args": ["-version"],
+        "description": "Re-check the installed FFmpeg binary."
+      },
+      "managed_env_subpath": "tool-runtimes/ffmpeg",
+      "notes": "System media example for capture and composition flows."
+    }
+  ]
+}

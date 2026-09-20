@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.comfyui.music",
+      "modality": "music",
+      "display_name": "ComfyUI Music Generation",
+      "kind": "service_preset",
+      "provider": "comfyui",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["mp3", "wav", "flac"],
+        "async": true
+      },
+      "service_id": "media-generation",
+      "action": "generate_music",
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "notes": "Compatibility-specific music contract for the shared ComfyUI runtime."
+    }
+  ]
+}

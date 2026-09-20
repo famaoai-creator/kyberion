@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "description": "IT デリバリ／運用の標準ゲーティング会議体(会議体)カタログ。各会議体は開催事前条件(preconditions)・アジェンダ(agenda)・入口/出口クライテリア(entry/exit_criteria)・決裁者(decision_owner)・定足数(quorum)・所管ゲート(gates_owned)を定義する。SDLC ゲートは gate-profiles/sdlc.json、インシデントゲートは gate-profiles/incident.json と対応。固有(顧客/テナント)情報は含めない — テナント個別の会議体運用は knowledge/confidential/{tenant}/ に置く。",
+  "decision_outcomes": {
+    "go": "GO — 次フェーズへ進行を承認。exit_criteria を全て満たす。",
+    "conditional_go": "CONDITIONAL GO — 条件付き進行。未充足項目に担当・期限つきの条件を付す。",
+    "no_go": "NO-GO — 差し戻し。前フェーズで是正し再判定。",
+    "hold": "HOLD — 判定保留。追加情報・追加検証の取得後に再開催。"
+  },
+  "bodies": [
+    {
+      "id": "incident-command",
+      "name_ja": "インシデント対応会議",
+      "name_en": "Incident Command",
+      "purpose": "発生中インシデントの重大度確定・封じ込め・恒久対応の実行判断を行う。速報性を最優先する。",
+      "scope": "track",
+      "trigger": {
+        "kind": "event",
+        "detail": "重大インシデント検知時に即時招集 (SEV0/SEV1 は必須)"
+      },
+      "decision_owner": "incident_commander",
+      "quorum": {
+        "required_roles": ["incident_commander", "reliability_engineer"],
+        "optional_roles": [
+          "cyber_security",
+          "software_developer",
+          "customer_success",
+          "pmo_governance"
+        ],
+        "min_attendees": 2
+      },
+      "preconditions": [
+        "incident-intake(対象・事象・発生日時・影響)が記録されている",
+        "重大度(SEV)判定の初期情報が揃っている",
+        "招集チャネル(通話/チャット)が確立している"
+      ],
+      "agenda": [
+        "事象と影響範囲の共有",
+        "重大度(SEV)の確定と対応体制の決定",
+        "封じ込め(暫定対応)の実行判断",
+        "顧客・関係者への連絡方針",
+        "恒久対応と復旧確認の計画"
+      ],
+      "entry_criteria": ["incident-intake", "triage-assessment"],
+      "exit_criteria": [
+        "重大度と対応体制が確定している",
+        "封じ込め手順の実行が承認されている",
+        "連絡方針と次アクションの担当・期限がある"
+      ],
+      "decisions": ["go", "conditional_go", "hold"],
+      "gates_owned": [
+        "gate-incident-severity",
+        "gate-incident-containment",
+        "gate-incident-remediation"
+      ],
+      "escalation": "steering-committee",
+      "tier": "product"
+    }
+  ]
+}

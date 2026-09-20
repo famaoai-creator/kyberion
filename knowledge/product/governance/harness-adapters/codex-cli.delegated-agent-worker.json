@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "codex-cli.delegated-agent-worker",
+      "provider": "codex-cli",
+      "surface_kind": "provider_runtime",
+      "capability_id": "cli.native.delegated_agent_worker",
+      "contract_kind": "delegated_task",
+      "observation_kind": "task_trace+result_summary",
+      "result_kind": "delegation_trace+artifact_ref",
+      "approval_behavior": "none",
+      "replayability": "partial",
+      "fallback_contract": "pipelines/a2a-task-contract.json",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Bounded sidecar execution should still produce a delegation trace and evidence references."
+    }
+  ]
+}

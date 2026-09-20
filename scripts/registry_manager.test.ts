@@ -63,11 +63,11 @@ describe('registry manager catalog boundaries', () => {
 
   it('loads both persisted registry types through their registry schemas', () => {
     const harnessRegistry = loadCapabilityRegistryAtPath(
-      pathResolver.knowledge('product/governance/harness-capability-registry.json'),
+      pathResolver.knowledge('product/governance/harness-capabilities'),
       'harness'
     );
     const gatewayRegistry = loadCapabilityRegistryAtPath(
-      pathResolver.knowledge('product/governance/gateway-capability-registry.json'),
+      pathResolver.knowledge('product/governance/gateway-capabilities'),
       'gateway'
     );
 

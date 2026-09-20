@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.gemini",
+      "modality": "image",
+      "display_name": "Google AI Studio Gemini Image Generation",
+      "kind": "service_preset",
+      "provider": "gemini_api",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["jpg", "jpeg", "png", "webp"],
+        "async": false
+      },
+      "service_id": "gemini",
+      "action": "generate_image",
+      "cost_tier": "paid",
+      "data_policy": "zero_retention",
+      "execution_locality": "remote",
+      "fallback_backend_id": "media-generation.host_agent",
+      "notes": "Routes image generation through the Gemini API / AI Studio service preset using GEMINI_API_KEY."
+    }
+  ]
+}

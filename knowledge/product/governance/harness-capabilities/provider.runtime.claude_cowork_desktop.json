@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "provider.runtime.claude_cowork_desktop",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "claude-desktop",
+        "name": "cowork",
+        "version": "2026.04"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["knowledge-work", "parallel-tasks", "scheduled-ops"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "experimental",
+      "notes": "Claude Cowork is the desktop knowledge-work surface with tasks, skills, plugins, connectors, analytics, telemetry, and RBAC controls."
+    }
+  ]
+}

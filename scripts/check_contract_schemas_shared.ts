@@ -34,7 +34,7 @@ function safeGovernanceJsonEntries(relativeDir: string): string[] {
     });
     if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) return [];
     return safeReaddir(dir)
-      .filter((entry) => entry.endsWith('.json'))
+      .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
       .filter((entry) => {
         try {
           const candidate = assertSafeRepositoryPath(path.join(dir, entry));
@@ -77,6 +77,38 @@ export function findUnmanagedGoldenScenarioCatalogs(): string[] {
     })
     .map((entry) => `knowledge/product/governance/${entry}`)
     .sort();
+}
+
+export function readCapabilityBundlePayloads(): unknown[] {
+  return readGovernanceJsonDirectory('knowledge/product/governance/capability-bundles');
+}
+
+export function readHarnessCapabilityPayloads(): unknown[] {
+  return readGovernanceJsonDirectory('knowledge/product/governance/harness-capabilities');
+}
+
+export function readHarnessAdapterPayloads(): unknown[] {
+  return readGovernanceJsonDirectory('knowledge/product/governance/harness-adapters');
+}
+
+export function readToolRuntimePayloads(): unknown[] {
+  return readGovernanceJsonDirectory('knowledge/product/governance/tool-runtimes');
+}
+
+export function readServiceRuntimePayloads(): unknown[] {
+  return readGovernanceJsonDirectory('knowledge/product/governance/service-runtimes');
+}
+
+export function readMediaBackendPayloads(): unknown[] {
+  return readGovernanceJsonDirectory('knowledge/product/governance/media-backends');
+}
+
+export function readReasoningProviderPayloads(): unknown[] {
+  return readGovernanceJsonDirectory('knowledge/product/governance/reasoning-providers');
+}
+
+export function readGovernanceBodyPayloads(): unknown[] {
+  return readGovernanceJsonDirectory('knowledge/product/governance/governance-bodies');
 }
 
 export function readSurfaceManifestPayloads(): unknown[] {

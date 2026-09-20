@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "gh-cli.agent-task",
+      "provider": "gh",
+      "surface_kind": "host_native",
+      "capability_id": "cli.native.github_agent_task",
+      "contract_kind": "delegated_task",
+      "observation_kind": "task_listing+status",
+      "result_kind": "agent_task_result+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "pipelines/a2a-task-contract.json",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "GitHub agent-task is preview-only and should remain an explicit opt-in surface."
+    }
+  ]
+}
