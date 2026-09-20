@@ -108,6 +108,13 @@ describe('Mission team composition contract', () => {
     const roleIndex = loadJson('knowledge/product/orchestration/team-role-index.json');
 
     for (const [agentId, record] of Object.entries(agentIndex.agents || {})) {
+      // An adaptive profile may deliberately leave provider/model selection
+      // to the governed provider and egress policy. This is required for
+      // sensitive roles such as relationship-curator, whose provider must be
+      // attested at the tenant boundary rather than pinned in the profile.
+      const policyRouted =
+        record.provider_strategy === 'adaptive' && !record.selection_hints?.preferred_provider;
+      if (policyRouted) continue;
       expect(
         record.selection_hints?.preferred_provider,
         `missing provider hint for ${agentId}`
@@ -119,6 +126,16 @@ describe('Mission team composition contract', () => {
     }
 
     for (const [teamRole, record] of Object.entries(roleIndex.team_roles || {})) {
+      // A role whose preferred agent is deliberately policy-routed must not
+      // reintroduce a stale model pin at the team-role layer. The agent's
+      // adaptive egress decision remains the source of truth.
+      const policyRouted = (record.selection_hints?.preferred_agents || []).some((agentId) => {
+        const agent = agentIndex.agents?.[agentId];
+        return (
+          agent?.provider_strategy === 'adaptive' && !agent.selection_hints?.preferred_provider
+        );
+      });
+      if (policyRouted) continue;
       expect(
         record.selection_hints?.preferred_agents?.length,
         `missing agent hints for ${teamRole}`

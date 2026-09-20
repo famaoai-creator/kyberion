@@ -28,6 +28,7 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
       '../libs/core/agent-registry.js',
       '../libs/core/agent-runtime-supervisor.js',
       '../libs/core/agent-runtime-supervisor-client.js',
+      '../libs/core/mission-team-binding.js',
     ],
   ],
   ['tests/approval-gate-summary.test.ts', ['../libs/core/approval-gate-summary.js']],
