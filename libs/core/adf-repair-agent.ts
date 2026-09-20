@@ -277,7 +277,8 @@ async function buildAdfRepairKnowledgeContext(
   schemaName: string,
   errorSummary: string,
   hints: string,
-  backendName: string
+  backendName: string,
+  tenantSlug?: string
 ): Promise<string> {
   const baseContext = `ADF Repair: ${adfPath}`;
   try {
@@ -295,7 +296,11 @@ async function buildAdfRepairKnowledgeContext(
       const providerId = providerIdForReasoningIdentifier(backendName);
       if (providerId) {
         const dataTier = highestTierForPaths(entries.map((entry) => entry.path));
-        const egressCheck = checkProviderEgress({ provider: providerId, dataTier });
+        const egressCheck = checkProviderEgress({
+          provider: providerId,
+          dataTier,
+          ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        });
         if (!egressCheck.allowed) {
           logger.warn(
             `[KP-02][XP-03] ADF repair knowledge egress denied for provider=${providerId} tier=${dataTier}: ${egressCheck.reason}`
@@ -393,14 +398,22 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
   try {
     assertAdfRepairFile(adfPath);
     const originalContent = readTextFile(adfPath);
+    const workItem = options.workItemId ? getWorkItem(options.workItemId) : null;
+    const tenantSlug = workItem?.context?.tenant_slug?.trim();
     const repairContext = await gaps.measure('knowledge_slice', () =>
-      buildAdfRepairKnowledgeContext(adfPath, schemaName, errorSummary, hints, backend.name)
+      buildAdfRepairKnowledgeContext(
+        adfPath,
+        schemaName,
+        errorSummary,
+        hints,
+        backend.name,
+        tenantSlug
+      )
     );
     const report = await gaps.measure('backend_dispatch', async () => {
       if (!options.workItemId) {
         return backend.delegateTask(instruction, repairContext, options.delegationOptions);
       }
-      const workItem = getWorkItem(options.workItemId);
       const scope = workItem?.context;
       const tenantId = scope?.tenant_slug?.trim();
       if (!tenantId || !isValidTenantSlug(tenantId)) {

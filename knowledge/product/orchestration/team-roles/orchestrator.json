@@ -15,7 +15,7 @@
   "required_scope_classes": ["mission_state"],
   "ownership_scope": "Owns orchestration-event sequencing, graph/run health, retry/replay decisions, provider degradation response, and owner escalation; never rewrites planner contracts or authors mission deliverables.",
   "selection_hints": {
-    "preferred_agents": ["mission-orchestrator", "control-plane-agent", "nerve-agent"],
+    "preferred_agents": ["mission-orchestrator"],
     "preferred_models": ["openai:gpt-5.6-luna", "auto-gemini-3"]
   },
   "autonomy_level": "high"

@@ -12,6 +12,13 @@ import {
   type TeamProviderPreference,
 } from './team-role-assignment-selection.js';
 import { resolveTaskModelHint } from './reasoning-model-routing.js';
+import { collectWorkforceLoad } from './workforce-load.js';
+import {
+  matchTeamCompositionObligations,
+  resolveAlwaysStaffedRoles,
+  resolveRosterHeadroom,
+  type MatchedTeamCompositionObligation,
+} from './team-composition-obligations.js';
 import {
   mapMissionClassToMissionTypeTemplate,
   resolveMissionClassification,
@@ -107,13 +114,23 @@ export interface MissionTeamLifecyclePolicy {
 export interface MissionTeamCompositionSummary {
   required_roles: string[];
   optional_roles: string[];
+  /** Roles staffed right now (status `assigned`). */
   assigned_roles: string[];
+  /** TC-01: roster roles with a resolved candidate that are not staffed yet. */
+  standby_roles?: string[];
+  /** Required roles with no compatible actor in the pool — a real gap. */
   unfilled_required_roles: string[];
 }
 
 export interface MissionTeamGovernance {
   lifecycle: MissionTeamLifecyclePolicy;
   composition: MissionTeamCompositionSummary;
+  /**
+   * TC-04: the obligations this mission's classification matched, so an audit
+   * reads why each derived role is on the roster instead of inferring it from
+   * the template name.
+   */
+  obligations?: MatchedTeamCompositionObligation[];
 }
 
 interface MissionTeamTemplateRecord {
@@ -184,11 +201,13 @@ function normalizeTeamProviderPreference(
 
 function buildTeamGovernance(
   template: MissionTeamTemplateRecord,
-  assignments: MissionTeamAssignment[]
+  assignments: MissionTeamAssignment[],
+  obligations: MatchedTeamCompositionObligation[] = []
 ): MissionTeamGovernance {
+  const rosterSize = template.required_roles.length + template.optional_roles.length;
   const lifecycle: MissionTeamLifecyclePolicy = {
     max_parallel_members: template.required_roles.length,
-    max_members: template.required_roles.length + template.optional_roles.length,
+    max_members: rosterSize,
     max_messages_per_run: 40,
     max_wall_clock_minutes: 120,
     max_member_turns: 8,
@@ -200,18 +219,32 @@ function buildTeamGovernance(
     cooldown_minutes: 5,
     ...template.lifecycle,
   };
+  // TC-06: every authored template declares `max_members` equal to its own
+  // roster size, which makes the cap unreachable by construction and blocks
+  // any legitimate mid-mission restaffing. Derive a real ceiling instead:
+  // the declared value or the composed roster plus the governed headroom,
+  // whichever is larger. This also keeps the cap coherent when obligations
+  // add roles the template never listed.
+  lifecycle.max_members = Math.max(lifecycle.max_members, rosterSize + resolveRosterHeadroom());
   const assignedRoles = assignments
     .filter((entry) => entry.status === 'assigned')
     .map((entry) => entry.team_role);
+  const standbyRoles = assignments
+    .filter((entry) => entry.status === 'standby')
+    .map((entry) => entry.team_role);
+  // TC-01: a standby role is staffed on demand and is not a gap. Only a role
+  // with no compatible actor in the pool counts as unfilled.
   const unfilledRequiredRoles = assignments
-    .filter((entry) => entry.required && entry.status !== 'assigned')
+    .filter((entry) => entry.required && entry.status === 'unfilled')
     .map((entry) => entry.team_role);
   return {
     lifecycle,
+    ...(obligations.length > 0 ? { obligations } : {}),
     composition: {
       required_roles: [...template.required_roles],
       optional_roles: [...template.optional_roles],
       assigned_roles: assignedRoles,
+      standby_roles: standbyRoles,
       unfilled_required_roles: unfilledRequiredRoles,
     },
   };
@@ -275,6 +308,74 @@ export function summarizeMissionOrganizationProfile(
   };
 }
 
+interface RoleHolder {
+  agentId: string | null;
+  provider: string | null;
+}
+
+/**
+ * Separation-of-duties pairs, declared once.
+ *
+ * `hard` means the roles must be different actors (with a staffing fallback at
+ * composition time, and no fallback when restaffing); `soft` only penalizes
+ * the overlap. Coverage checks read the same table, so "can this pair ever be
+ * independent with the current pool?" is answered against the rules the
+ * selector actually applies rather than a second copy of them.
+ */
+export const SEPARATION_ROLE_PAIRS: ReadonlyArray<{
+  role: string;
+  mustDifferFrom: string;
+  strength: 'hard' | 'soft';
+  /** Prefer a different provider so a different model family reviews the work. */
+  avoidSameProvider: boolean;
+}> = [
+  { role: 'researcher', mustDifferFrom: 'owner', strength: 'hard', avoidSameProvider: true },
+  { role: 'reviewer', mustDifferFrom: 'implementer', strength: 'hard', avoidSameProvider: true },
+  { role: 'tester', mustDifferFrom: 'reviewer', strength: 'soft', avoidSameProvider: false },
+];
+
+/**
+ * Separation-of-duties constraints derived from the roles a plan has already
+ * filled. Shared by initial composition and by TC-06 restaffing so a member
+ * added mid-mission is held to the same independence rules as one selected at
+ * creation.
+ */
+function resolveRoleSeparation(
+  role: string,
+  holders: Map<string, RoleHolder>
+): RoleSeparationConstraints | undefined {
+  const pair = SEPARATION_ROLE_PAIRS.find((entry) => entry.role === role);
+  if (!pair) return undefined;
+  const counterpart = holders.get(pair.mustDifferFrom);
+  if (!counterpart) return undefined;
+  return {
+    ...(pair.strength === 'hard'
+      ? { excludeAgents: [counterpart.agentId] }
+      : { avoidAgents: [counterpart.agentId] }),
+    ...(pair.avoidSameProvider ? { avoidProviders: [counterpart.provider] } : {}),
+  };
+}
+
+/**
+ * TC-01: demand-driven staffing.
+ *
+ * Composition resolves a candidate actor for every roster role — that is what
+ * keeps a staffing gap visible at creation time — but only the structural
+ * roles start staffed. Everything else waits on standby until work demands
+ * it, so a mission no longer carries staffing records, provisioned identities
+ * and runtime slots for roles it never uses. Promotion is a pure state
+ * transition over the already-selected candidate (see
+ * `promoteMissionTeamPlanRoles`), so it never re-runs selection.
+ */
+function applyStaffingPolicy(assignments: MissionTeamAssignment[]): MissionTeamAssignment[] {
+  const alwaysStaffedRoles = resolveAlwaysStaffedRoles();
+  return assignments.map((assignment) =>
+    assignment.status === 'assigned' && !alwaysStaffedRoles.has(assignment.team_role)
+      ? { ...assignment, status: 'standby' as const }
+      : assignment
+  );
+}
+
 export function composeMissionTeamPlan(input: {
   missionId: string;
   missionType?: string;
@@ -329,6 +430,9 @@ export function composeMissionTeamPlan(input: {
     (organizationDefaultTemplate ? templates[organizationDefaultTemplate] : undefined) ||
     templates.default) as MissionTeamTemplateRecord;
   const assignments: MissionTeamAssignment[] = [];
+  // TC-09: one pass over the work-item store for the whole composition, so
+  // every role is scored against the same observed load snapshot.
+  const loadIndex = collectWorkforceLoad();
   const preferredAgentId = organizationProfile?.mission_defaults?.default_agent_profile
     ?.trim()
     .toLowerCase();
@@ -353,36 +457,9 @@ export function composeMissionTeamPlan(input: {
     risk: missionClassification.risk_profile,
   });
 
-  // Separation-of-duties constraints derived from roles already assigned in
-  // this plan: the reviewer must be a different actor than the implementer
-  // (hard, with staffing fallback) and prefers a different provider so a
-  // different model family reviews the work; the tester prefers a different
-  // actor than the reviewer.
-  const assignedByRole = new Map<string, { agentId: string | null; provider: string | null }>();
-  const separationForRole = (role: string): RoleSeparationConstraints | undefined => {
-    if (role === 'researcher') {
-      const owner = assignedByRole.get('owner');
-      if (!owner) return undefined;
-      return {
-        excludeAgents: [owner.agentId],
-        avoidProviders: [owner.provider],
-      };
-    }
-    if (role === 'reviewer') {
-      const implementer = assignedByRole.get('implementer');
-      if (!implementer) return undefined;
-      return {
-        excludeAgents: [implementer.agentId],
-        avoidProviders: [implementer.provider],
-      };
-    }
-    if (role === 'tester') {
-      const reviewer = assignedByRole.get('reviewer');
-      if (!reviewer) return undefined;
-      return { avoidAgents: [reviewer.agentId] };
-    }
-    return undefined;
-  };
+  const assignedByRole = new Map<string, RoleHolder>();
+  const separationForRole = (role: string): RoleSeparationConstraints | undefined =>
+    resolveRoleSeparation(role, assignedByRole);
   const recordAssignment = (
     role: string,
     assignment: { agent_id: string | null; provider: string | null }
@@ -393,9 +470,62 @@ export function composeMissionTeamPlan(input: {
     });
   };
 
-  for (const role of template.required_roles) {
+  // TC-04: the roster is the template (an organization's preference) plus the
+  // roles the governed obligations catalog derives from this mission's
+  // classification. An obligation role is required even when the template
+  // lists it as optional or omits it entirely, so a template or organization
+  // overlay cannot drop a role that governance requires.
+  const matchedObligations = matchTeamCompositionObligations({
+    classification: missionClassification,
+    tier: input.tier,
+  });
+  const obligatoryRoles = new Set(
+    matchedObligations.flatMap((obligation) => obligation.require_roles)
+  );
+  const structuralRoles = resolveAlwaysStaffedRoles();
+  // Structural roles are a governance invariant, not an organization-level
+  // preference. Put them in the roster even when an overlay replaces the
+  // template role list. Keep the template's remaining order so
+  // separation-of-duties stays resolvable (a reviewer is selected after the
+  // implementer it must be independent of); roles that only an obligation
+  // contributes are appended in catalog order.
+  const effectiveRequiredRoles = [
+    ...Array.from(structuralRoles),
+    ...template.required_roles.filter((role) => !structuralRoles.has(role)),
+    ...Array.from(obligatoryRoles).filter(
+      (role) => !structuralRoles.has(role) && !template.required_roles.includes(role)
+    ),
+  ];
+  const effectiveOptionalRoles = template.optional_roles.filter(
+    (role) => !effectiveRequiredRoles.includes(role)
+  );
+  const effectiveTemplate: MissionTeamTemplateRecord = {
+    ...template,
+    required_roles: effectiveRequiredRoles,
+    optional_roles: effectiveOptionalRoles,
+  };
+
+  const resolveRoleSources = (role: string): NonNullable<MissionTeamAssignment['role_sources']> => {
+    const sources: NonNullable<MissionTeamAssignment['role_sources']> = [];
+    if (structuralRoles.has(role)) sources.push('structural');
+    if (obligatoryRoles.has(role)) sources.push('obligation');
+    if (template.required_roles.includes(role) || template.optional_roles.includes(role)) {
+      sources.push('template');
+    }
+    return sources.length > 0 ? sources : ['template'];
+  };
+
+  const roster = [
+    ...effectiveRequiredRoles.map((role) => ({ role, required: true })),
+    ...effectiveOptionalRoles.map((role) => ({ role, required: false })),
+  ];
+
+  for (const { role, required } of roster) {
     const roleRecord = teamRoles[role];
     if (!roleRecord) {
+      // An unknown optional role is simply absent; an unknown required role is
+      // a declared gap the mission must see.
+      if (!required) continue;
       assignments.push({
         team_role: role,
         required: true,
@@ -408,39 +538,44 @@ export function composeMissionTeamPlan(input: {
         required_capabilities: [],
         notes: 'Team role not found in team-role-index',
         model_hint: missionTaskModelHint,
+        role_sources: resolveRoleSources(role),
       });
       continue;
     }
-    const selectedRequired = selectAgentForTeamRole(
-      role,
-      preferredAgentId && !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
-        ? {
-            ...roleRecord,
-            selection_hints: {
-              ...(roleRecord.selection_hints || {}),
-              preferred_agents: [
-                preferredAgentId,
-                ...(roleRecord.selection_hints?.preferred_agents || []).filter(
-                  (agent) => agent !== preferredAgentId
-                ),
-              ],
-            },
-          }
-        : roleRecord,
+
+    const selected = selectAgentForTeamRole({
+      teamRole: role,
+      teamRoleRecord:
+        preferredAgentId &&
+        !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
+          ? {
+              ...roleRecord,
+              selection_hints: {
+                ...(roleRecord.selection_hints || {}),
+                preferred_agents: [
+                  preferredAgentId,
+                  ...(roleRecord.selection_hints?.preferred_agents || []).filter(
+                    (agent) => agent !== preferredAgentId
+                  ),
+                ],
+              },
+            }
+          : roleRecord,
       authorityRoles,
       agents,
-      missionTaskModelHint,
-      separationForRole(role),
-      organizationProfile?.organization_id,
-      providerPreference
-    );
-    recordAssignment(role, selectedRequired);
+      routingHint: missionTaskModelHint,
+      separation: separationForRole(role),
+      organizationId: organizationProfile?.organization_id,
+      providerPreference,
+      loadIndex,
+    });
+    recordAssignment(role, selected);
+    selected.required = required;
+    selected.model_hint = missionTaskModelHint;
+    selected.role_sources = resolveRoleSources(role);
     assignments.push(
       enrichAssignmentContext({
-        assignment: {
-          ...selectedRequired,
-          model_hint: missionTaskModelHint,
-        },
+        assignment: selected,
         missionId: input.missionId,
         tier: input.tier,
         tenantId: tenantSlug,
@@ -449,45 +584,7 @@ export function composeMissionTeamPlan(input: {
     );
   }
 
-  for (const role of template.optional_roles) {
-    const roleRecord = teamRoles[role];
-    if (!roleRecord) continue;
-    const assignment = selectAgentForTeamRole(
-      role,
-      preferredAgentId && !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
-        ? {
-            ...roleRecord,
-            selection_hints: {
-              ...(roleRecord.selection_hints || {}),
-              preferred_agents: [
-                preferredAgentId,
-                ...(roleRecord.selection_hints?.preferred_agents || []).filter(
-                  (agent) => agent !== preferredAgentId
-                ),
-              ],
-            },
-          }
-        : roleRecord,
-      authorityRoles,
-      agents,
-      missionTaskModelHint,
-      separationForRole(role),
-      organizationProfile?.organization_id,
-      providerPreference
-    );
-    recordAssignment(role, assignment);
-    assignment.required = false;
-    assignment.model_hint = missionTaskModelHint;
-    assignments.push(
-      enrichAssignmentContext({
-        assignment,
-        missionId: input.missionId,
-        tier: input.tier,
-        tenantId: tenantSlug,
-        risk: missionClassification.risk_profile,
-      })
-    );
-  }
+  const staffedAssignments = applyStaffingPolicy(assignments);
 
   return {
     mission_id: input.missionId,
@@ -515,8 +612,8 @@ export function composeMissionTeamPlan(input: {
     organization_chart: organizationChart,
     mission_classification: missionClassification,
     generated_at: nowIso(),
-    team_governance: buildTeamGovernance(template, assignments),
-    assignments,
+    team_governance: buildTeamGovernance(effectiveTemplate, staffedAssignments, matchedObligations),
+    assignments: staffedAssignments,
   };
 }
 
@@ -589,7 +686,7 @@ export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {
     expectedTenant &&
     plan.assignments.some(
       (assignment) =>
-        assignment.status === 'assigned' && assignment.security_scope?.tenant_id !== expectedTenant
+        assignment.status !== 'unfilled' && assignment.security_scope?.tenant_id !== expectedTenant
     )
   ) {
     return null;
@@ -597,7 +694,7 @@ export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {
   if (
     plan.assignments.some(
       (assignment) =>
-        assignment.status === 'assigned' &&
+        assignment.status !== 'unfilled' &&
         isObsoleteAgentRuntimeProvider(assignment.provider || undefined)
     )
   ) {
@@ -612,7 +709,7 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
   const existing = input.forceRefresh ? null : loadMissionTeamPlan(missionId);
   if (existing && (!tenantSlug || existing.tenant_slug === tenantSlug)) return existing;
 
-  return composeMissionTeamPlan({
+  const recomposed = composeMissionTeamPlan({
     missionId,
     missionType: input.missionType,
     intentId: input.intentId,
@@ -627,6 +724,347 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
     organizationProfile: input.organizationProfile,
     providerPreference: input.providerPreference,
   });
+
+  // TC-01: recomposition must not un-staff members who are already working.
+  // A refresh re-derives the roster and may re-select actors, but a role the
+  // mission had already staffed stays staffed.
+  const previousPlan = existing ?? loadMissionTeamPlan(missionId);
+  if (!previousPlan) return recomposed;
+
+  // TC-06: a restaffed member is a recorded governance decision with a ledger
+  // entry behind it, not an artifact of the template. Recomposition derives
+  // the roster from template + obligations, which would silently drop it, so
+  // carry it across.
+  const carriedRestaffed = previousPlan.assignments.filter(
+    (assignment) =>
+      assignment.role_sources?.includes('restaff') &&
+      !recomposed.assignments.some((entry) => entry.team_role === assignment.team_role)
+  );
+  const withRestaffed: MissionTeamPlan = carriedRestaffed.length
+    ? {
+        ...recomposed,
+        assignments: [...recomposed.assignments, ...carriedRestaffed],
+        ...(recomposed.team_governance
+          ? {
+              team_governance: {
+                ...recomposed.team_governance,
+                lifecycle: {
+                  ...recomposed.team_governance.lifecycle,
+                  max_members: Math.max(
+                    recomposed.team_governance.lifecycle.max_members,
+                    recomposed.assignments.length + carriedRestaffed.length
+                  ),
+                },
+                composition: {
+                  ...recomposed.team_governance.composition,
+                  required_roles: [
+                    ...recomposed.team_governance.composition.required_roles,
+                    ...carriedRestaffed.map((assignment) => assignment.team_role),
+                  ],
+                  assigned_roles: [...recomposed.assignments, ...carriedRestaffed]
+                    .filter((assignment) => assignment.status === 'assigned')
+                    .map((assignment) => assignment.team_role),
+                  standby_roles: [...recomposed.assignments, ...carriedRestaffed]
+                    .filter((assignment) => assignment.status === 'standby')
+                    .map((assignment) => assignment.team_role),
+                },
+              },
+            }
+          : {}),
+      }
+    : recomposed;
+
+  const previouslyStaffedRoles = previousPlan.assignments
+    .filter((assignment) => assignment.status === 'assigned')
+    .map((assignment) => assignment.team_role);
+  return previouslyStaffedRoles.length > 0
+    ? promoteMissionTeamPlanRoles(withRestaffed, previouslyStaffedRoles).plan
+    : withRestaffed;
+}
+
+export interface MissionTeamRoleGap {
+  team_role: string;
+  kind: 'none' | 'role_not_on_roster' | 'role_unfilled' | 'no_capable_actor';
+  /** Required capabilities no eligible actor holds. */
+  missing_capabilities: string[];
+  /** Actors eligible for the role once exclusions are applied. */
+  eligible_agent_ids: string[];
+}
+
+/**
+ * TC-07: name the reason a role cannot take a task.
+ *
+ * Dispatch used to collapse every staffing failure into
+ * `blocked(unassigned_role)` with the advice "assign an agent for role X",
+ * which is the same message whether the role is simply missing from the
+ * roster (restaffable — TC-06) or whether no actor in the pool holds the
+ * capabilities the task needs (a real pool gap a human must close). This
+ * distinguishes them so the caller can act instead of escalating blindly.
+ */
+export function diagnoseMissionTeamRoleGap(input: {
+  missionId: string;
+  teamRole: string;
+  requiredCapabilities?: string[];
+  excludedAgentIds?: string[];
+}): MissionTeamRoleGap {
+  const teamRole = input.teamRole;
+  const requiredCapabilities = Array.from(
+    new Set(
+      (input.requiredCapabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
+    )
+  );
+  const excludedAgentIds = new Set(
+    (input.excludedAgentIds || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
+  );
+  const base: MissionTeamRoleGap = {
+    team_role: teamRole,
+    kind: 'none',
+    missing_capabilities: [],
+    eligible_agent_ids: [],
+  };
+
+  const plan = loadMissionTeamPlan(input.missionId.toUpperCase());
+  const assignment = plan ? getMissionTeamAssignment(plan, teamRole) : null;
+  if (!assignment) {
+    return { ...base, kind: 'role_not_on_roster' };
+  }
+
+  const agents = loadAgentProfileIndex();
+  const eligible = Object.entries(agents).filter(
+    ([agentId, profile]) =>
+      profile.team_roles.includes(teamRole) && !excludedAgentIds.has(agentId.toLowerCase())
+  );
+  const eligibleAgentIds = eligible.map(([agentId]) => agentId).sort();
+  if (eligible.length === 0) {
+    return {
+      ...base,
+      kind: assignment.status === 'unfilled' ? 'role_unfilled' : 'no_capable_actor',
+      missing_capabilities: requiredCapabilities,
+      eligible_agent_ids: [],
+    };
+  }
+
+  const missingCapabilities = requiredCapabilities.filter(
+    (capability) =>
+      !eligible.some(([, profile]) =>
+        (profile.capabilities || []).some((entry) => entry.trim().toLowerCase() === capability)
+      )
+  );
+  if (assignment.status === 'unfilled') {
+    return {
+      ...base,
+      kind: 'role_unfilled',
+      missing_capabilities: missingCapabilities,
+      eligible_agent_ids: eligibleAgentIds,
+    };
+  }
+  if (missingCapabilities.length > 0) {
+    return {
+      ...base,
+      kind: 'no_capable_actor',
+      missing_capabilities: missingCapabilities,
+      eligible_agent_ids: eligibleAgentIds,
+    };
+  }
+  return { ...base, eligible_agent_ids: eligibleAgentIds };
+}
+
+export type ExtendMissionTeamRosterRefusal =
+  'already_on_roster' | 'unknown_team_role' | 'max_members_reached' | 'no_compatible_actor';
+
+export interface ExtendMissionTeamRosterResult {
+  plan: MissionTeamPlan;
+  added: MissionTeamAssignment | null;
+  refusal?: ExtendMissionTeamRosterRefusal;
+}
+
+/**
+ * TC-06: add a role the roster does not have, mid-mission.
+ *
+ * Composition derives the roster from the template and the obligations that
+ * match at creation time. Real work sometimes demands a role neither of them
+ * anticipated — a review that needs an independent actor the roster cannot
+ * supply, a task whose capabilities nobody on the team holds. Before this
+ * existed the only outcome was a blocked task and a note asking a human to
+ * "assign an agent".
+ *
+ * Restaffing is bounded rather than free-form: it refuses past the lifecycle
+ * `max_members` cap, it runs the same capability/authority/scope-class match
+ * as initial composition, and it applies the same separation-of-duties
+ * constraints against the roles the plan has already filled. A restaffed
+ * member is marked `role_sources: ['restaff']`, so an audit can tell a
+ * derived member from a planned one.
+ */
+export function extendMissionTeamPlanRoster(
+  plan: MissionTeamPlan,
+  input: {
+    teamRole: string;
+    requiredCapabilities?: string[];
+    excludeAgentIds?: string[];
+  }
+): ExtendMissionTeamRosterResult {
+  const teamRole = input.teamRole.trim();
+  if (plan.assignments.some((assignment) => assignment.team_role === teamRole)) {
+    return { plan, added: null, refusal: 'already_on_roster' };
+  }
+
+  const maxMembers = plan.team_governance?.lifecycle.max_members;
+  if (typeof maxMembers === 'number' && plan.assignments.length >= maxMembers) {
+    return { plan, added: null, refusal: 'max_members_reached' };
+  }
+
+  const roleRecord = loadTeamRoleIndex()[teamRole];
+  if (!roleRecord) {
+    return { plan, added: null, refusal: 'unknown_team_role' };
+  }
+
+  const holders = new Map<string, RoleHolder>();
+  for (const assignment of plan.assignments) {
+    if (assignment.status === 'unfilled') continue;
+    holders.set(assignment.team_role, {
+      agentId: assignment.agent_id,
+      provider: assignment.provider,
+    });
+  }
+  const separation = resolveRoleSeparation(teamRole, holders);
+  const excludeAgents = [...(separation?.excludeAgents || []), ...(input.excludeAgentIds || [])];
+
+  const requiredCapabilities = Array.from(
+    new Set([...(roleRecord.required_capabilities || []), ...(input.requiredCapabilities || [])])
+  );
+  const selected = selectAgentForTeamRole({
+    teamRole,
+    teamRoleRecord: { ...roleRecord, required_capabilities: requiredCapabilities },
+    authorityRoles: loadAuthorityRoleIndex(),
+    agents: loadAgentProfileIndex(),
+    // The mission-level routing hint is shared by every member, so carry it
+    // over instead of re-deriving it from a classification that has moved on.
+    routingHint: plan.assignments.find((assignment) => assignment.model_hint)?.model_hint,
+    separation: { ...(separation || {}), excludeAgents },
+    organizationId: plan.organization_profile?.organization_id,
+    loadIndex: collectWorkforceLoad(),
+  });
+  if (selected.status !== 'assigned' || !selected.agent_id) {
+    return { plan, added: null, refusal: 'no_compatible_actor' };
+  }
+  // `selectAgentForTeamRole` falls back to an excluded actor rather than
+  // leaving a role unstaffed. That trade is right at composition time; it is
+  // wrong here, because a caller restaffs precisely BECAUSE the excluded
+  // actors are disqualified (an implementer cannot review their own work).
+  // Capability shortfalls are likewise scored, not enforced, so both are
+  // hard-checked before the member joins the roster.
+  const excludedAgentIds = new Set(
+    excludeAgents
+      .filter((entry): entry is string => Boolean(entry))
+      .map((entry) => entry.toLowerCase())
+  );
+  if (excludedAgentIds.has(selected.agent_id.toLowerCase())) {
+    return { plan, added: null, refusal: 'no_compatible_actor' };
+  }
+  const selectedCapabilities = new Set(
+    (loadAgentProfileIndex()[selected.agent_id]?.capabilities || []).map((entry) =>
+      entry.trim().toLowerCase()
+    )
+  );
+  const missingCapability = requiredCapabilities
+    .map((entry) => entry.trim().toLowerCase())
+    .find((capability) => capability && !selectedCapabilities.has(capability));
+  if (missingCapability) {
+    return { plan, added: null, refusal: 'no_compatible_actor' };
+  }
+
+  const added = enrichAssignmentContext({
+    assignment: {
+      ...selected,
+      required: true,
+      role_sources: ['restaff'],
+      model_hint: plan.assignments.find((assignment) => assignment.model_hint)?.model_hint,
+    },
+    missionId: plan.mission_id,
+    tier: plan.tier as 'personal' | 'confidential' | 'public',
+    tenantId: plan.tenant_slug || 'default',
+    risk: plan.mission_classification?.risk_profile || 'low',
+  });
+
+  const assignments = [...plan.assignments, added];
+  const team_governance = plan.team_governance
+    ? {
+        ...plan.team_governance,
+        composition: {
+          ...plan.team_governance.composition,
+          required_roles: [...plan.team_governance.composition.required_roles, teamRole],
+          assigned_roles: assignments
+            .filter((assignment) => assignment.status === 'assigned')
+            .map((assignment) => assignment.team_role),
+          standby_roles: assignments
+            .filter((assignment) => assignment.status === 'standby')
+            .map((assignment) => assignment.team_role),
+        },
+      }
+    : undefined;
+
+  return {
+    plan: {
+      ...plan,
+      assignments,
+      ...(team_governance ? { team_governance } : {}),
+    },
+    added,
+  };
+}
+
+/**
+ * TC-02: promote standby roles to staffed, in place, without re-running
+ * selection. The candidate actor, authority role, delegation contract and
+ * security scope were all resolved at composition time, so a promotion is a
+ * pure state transition over the recorded plan — the same mission always
+ * promotes the same actor for the same role.
+ *
+ * Roles that are `unfilled` (no compatible actor in the pool) are not
+ * promotable and are reported by the caller as gaps.
+ */
+export function promoteMissionTeamPlanRoles(
+  plan: MissionTeamPlan,
+  teamRoles: string[]
+): { plan: MissionTeamPlan; promoted: string[] } {
+  const requestedRoles = new Set(teamRoles);
+  const promoted: string[] = [];
+  const assignments = plan.assignments.map((assignment) => {
+    if (
+      assignment.status !== 'standby' ||
+      !requestedRoles.has(assignment.team_role) ||
+      !assignment.agent_id
+    ) {
+      return assignment;
+    }
+    promoted.push(assignment.team_role);
+    return { ...assignment, status: 'assigned' as const };
+  });
+  if (promoted.length === 0) return { plan, promoted };
+
+  const team_governance = plan.team_governance
+    ? {
+        ...plan.team_governance,
+        composition: {
+          ...plan.team_governance.composition,
+          assigned_roles: assignments
+            .filter((entry) => entry.status === 'assigned')
+            .map((entry) => entry.team_role),
+          standby_roles: assignments
+            .filter((entry) => entry.status === 'standby')
+            .map((entry) => entry.team_role),
+        },
+      }
+    : undefined;
+
+  return {
+    plan: {
+      ...plan,
+      assignments,
+      ...(team_governance ? { team_governance } : {}),
+    },
+    promoted,
+  };
 }
 
 export function getMissionTeamAssignment(
@@ -645,7 +1083,12 @@ export function resolveMissionTeamReceiver(input: {
   const plan = loadMissionTeamPlan(input.missionId);
   if (!plan) return null;
   const assignment = getMissionTeamAssignment(plan, input.teamRole);
-  if (!assignment || assignment.status !== 'assigned' || !assignment.agent_id) return null;
+  // TC-01: resolving "who holds this role" is a read of the roster, not a
+  // staffing act. A standby role already has its candidate resolved, so
+  // readers (dispatch routing, review independence, context packs) keep
+  // working; staffing stays a separate governed step
+  // (`staffMissionTeamRoles`).
+  if (!assignment || assignment.status === 'unfilled' || !assignment.agent_id) return null;
   const excludedAgentIds = new Set(
     (input.excludedAgentIds || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
   );
@@ -673,18 +1116,19 @@ export function resolveMissionTeamReceiver(input: {
   const eligibleAgents = Object.fromEntries(
     Object.entries(agents).filter(([agentId]) => !excludedAgentIds.has(agentId.toLowerCase()))
   );
-  const selected = selectAgentForTeamRole(
-    input.teamRole,
-    {
+  const selected = selectAgentForTeamRole({
+    teamRole: input.teamRole,
+    teamRoleRecord: {
       ...roleRecord,
       required_capabilities: Array.from(
         new Set([...(roleRecord.required_capabilities || []), ...requiredCapabilities])
       ),
     },
-    loadAuthorityRoleIndex(),
-    eligibleAgents,
-    assignment.model_hint
-  );
+    authorityRoles: loadAuthorityRoleIndex(),
+    agents: eligibleAgents,
+    routingHint: assignment.model_hint,
+    loadIndex: collectWorkforceLoad(),
+  });
   if (selected.status !== 'assigned' || !selected.agent_id) return null;
   const selectedCapabilities = new Set(
     (eligibleAgents[selected.agent_id]?.capabilities || []).map((entry) =>
@@ -716,7 +1160,8 @@ export type {
 export function buildMissionTeamView(plan: MissionTeamPlan): Record<string, string> {
   const view: Record<string, string> = {};
   for (const assignment of plan.assignments) {
-    if (assignment.status === 'assigned' && assignment.agent_id) {
+    // The view is the roster (who holds each role), not the staffed subset.
+    if (assignment.status !== 'unfilled' && assignment.agent_id) {
       view[assignment.team_role] = assignment.agent_id;
     }
   }
