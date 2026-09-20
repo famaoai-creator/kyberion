@@ -2,6 +2,7 @@ import {
   buildTeamDecisionSupportReport,
   formatTeamDecisionSupportReport,
 } from '@agent/core/team-decision-support-metrics';
+import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 /**
@@ -18,7 +19,12 @@ export const runReportTeamDecisionSupport = defineScript({
   flags: [],
   run(context) {
     const json = context.argv.includes('--json');
-    const report = buildTeamDecisionSupportReport();
+    // Mission search includes the personal tier. Keep the read-only report on
+    // the same governed mission-controller path as the mission CLI so a
+    // normal direct invocation does not fail while scanning its own missions.
+    const report = withExecutionContext('mission_controller', () =>
+      buildTeamDecisionSupportReport()
+    );
     context.print(json ? JSON.stringify(report, null, 2) : formatTeamDecisionSupportReport(report));
     return report;
   },

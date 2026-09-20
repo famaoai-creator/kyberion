@@ -1,7 +1,9 @@
 import { logger } from './core.js';
+import { validateReasoningEgress } from './context-security-scope.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { loadMissionTeamPlan } from './mission-team-plan-composer.js';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
+import { withReasoningPayloadScope } from './reasoning-egress-scope.js';
 import type { ReasoningParticipant } from './reasoning-participant.js';
 import type { MissionTeamAssignment } from './team-role-assignment-selection.js';
 
@@ -160,7 +162,8 @@ export async function consultMissionAdvisors(input: {
     opinions: [],
     surviving_opinions: [],
   };
-  if (!loadMissionTeamPlan(missionId)) {
+  const plan = loadMissionTeamPlan(missionId);
+  if (!plan) {
     return { ...base, status: 'mission_plan_not_found' };
   }
 
@@ -172,27 +175,49 @@ export async function consultMissionAdvisors(input: {
   });
   if (panel.length === 0) return base;
 
-  const advisors = panel.map((advisor) => ({
+  const backend = getReasoningBackend();
+  // The panel carries the participant scope, but merely checking read_tiers
+  // is not enough: the following prompt and critique calls are the actual
+  // egress boundary. Filter backends that the participant forbids before any
+  // prompt is constructed, then also install the ambient payload scope below
+  // so provider adapters enforce the same tier at the transport boundary.
+  const eligiblePanel = panel.filter((advisor) => {
+    const egress = validateReasoningEgress(advisor.participant.security_scope, backend.name);
+    if (egress.allowed) return true;
+    logger.warn(
+      `[advisory] ${missionId}: ${advisor.team_role} excluded from ${backend.name}: ${egress.reason}`
+    );
+    return false;
+  });
+  if (eligiblePanel.length === 0) return base;
+
+  const advisors = eligiblePanel.map((advisor) => ({
     team_role: advisor.team_role,
     agent_id: advisor.agent_id,
     staffing_state: advisor.staffing_state,
   }));
 
-  const backend = getReasoningBackend();
   if (backend.name === 'stub') {
     return { ...base, status: 'backend_unavailable', advisors };
   }
 
   const opinions: AdvisoryOpinion[] = [];
-  for (const advisor of panel) {
+  const payloadScope = {
+    tier: plan.tier as 'personal' | 'confidential' | 'public',
+    ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
+    purpose: `mission advisory:${input.topic}`,
+  } as const;
+  for (const advisor of eligiblePanel) {
     try {
-      const answer = await backend.prompt(
-        buildAdvisorPrompt({
-          advisor,
-          topic: input.topic,
-          question: input.question,
-          ...(input.context ? { context: input.context } : {}),
-        })
+      const answer = await withReasoningPayloadScope(payloadScope, () =>
+        backend.prompt(
+          buildAdvisorPrompt({
+            advisor,
+            topic: input.topic,
+            question: input.question,
+            ...(input.context ? { context: input.context } : {}),
+          })
+        )
       );
       opinions.push({
         team_role: advisor.team_role,
@@ -218,15 +243,17 @@ export async function consultMissionAdvisors(input: {
   // the decision as if it had.
   if (!input.skipCritique && opinions.length > 1) {
     try {
-      const critique = await backend.crossCritique({
-        topic: input.topic,
-        hypotheses: opinions.map((opinion, index) => ({
-          id: `${index}`,
-          proposed_by: opinion.participant_id,
-          content: opinion.opinion,
-        })),
-        personas: opinions.map((opinion) => opinion.participant_id),
-      });
+      const critique = await withReasoningPayloadScope(payloadScope, () =>
+        backend.crossCritique({
+          topic: input.topic,
+          hypotheses: opinions.map((opinion, index) => ({
+            id: `${index}`,
+            proposed_by: opinion.participant_id,
+            content: opinion.opinion,
+          })),
+          personas: opinions.map((opinion) => opinion.participant_id),
+        })
+      );
       for (const [index, opinion] of opinions.entries()) {
         const verdict = critique.hypotheses.find((entry) => entry.id === `${index}`);
         if (!verdict) continue;

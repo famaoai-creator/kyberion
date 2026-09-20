@@ -3,6 +3,7 @@ import {
   evaluateRoleFitnessResponse,
   listRoleFitnessProbes,
   loadRoleFitnessProbeCatalog,
+  normalizeFitnessProviderId,
   type RoleFitnessProbe,
 } from './model-role-fitness.js';
 
@@ -10,6 +11,15 @@ const REVIEWER_PROBE = listRoleFitnessProbes('reviewer')[0]!;
 const PLANNER_PROBE = listRoleFitnessProbes('planner')[0]!;
 
 describe('role fitness probe catalog (TC-15)', () => {
+  it('normalizes model catalog and backend provider identifiers', () => {
+    expect(normalizeFitnessProviderId('anthropic')).toBe('claude');
+    expect(normalizeFitnessProviderId('openai')).toBe('codex');
+    expect(normalizeFitnessProviderId('xai')).toBe('grok');
+    expect(normalizeFitnessProviderId('gemini-api')).toBe('gemini');
+    expect(normalizeFitnessProviderId('  custom-provider ')).toBe('custom-provider');
+    expect(normalizeFitnessProviderId(undefined)).toBeUndefined();
+  });
+
   it('covers the roles a mission actually dispatches work to', () => {
     const roles = new Set(loadRoleFitnessProbeCatalog().probes.map((probe) => probe.team_role));
     for (const role of ['reviewer', 'planner', 'implementer', 'tester']) {
