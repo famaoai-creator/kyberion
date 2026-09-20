@@ -144,7 +144,7 @@ describe('mission-runtime organization defaults', () => {
       )
     );
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[team] assignments=0 required=0 assigned=0 unfilled_required=0')
+      expect.stringContaining('[team] roster=0 required=0 staffed=0 standby=0 unfilled_required=0')
     );
     expect(coreMocks.writeMissionTeamPlan).toHaveBeenCalledWith('/tmp/MISSION', expect.any(Object));
     expect(coreMocks.initializeMissionTeamBindings).toHaveBeenCalledWith(
@@ -204,7 +204,7 @@ describe('mission-runtime organization defaults', () => {
       )
     );
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[staff] spawned=0 already_ready=0 unfilled=0 failed=0')
+      expect.stringContaining('[staff] spawned=0 already_ready=0 standby=0 unfilled=0 failed=0')
     );
     expect(coreMocks.writeMissionTeamPlan).toHaveBeenCalledWith('/tmp/MISSION', expect.any(Object));
     expect(coreMocks.initializeMissionTeamBindings).toHaveBeenCalledWith(
@@ -223,7 +223,7 @@ describe('mission-runtime organization defaults', () => {
       )
     );
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[staff] spawned=0 already_ready=0 unfilled=0 failed=0')
+      expect.stringContaining('[staff] spawned=0 already_ready=0 standby=0 unfilled=0 failed=0')
     );
     expect(returnedRuntimePlan).toMatchObject({
       organization_profile: expect.objectContaining({ organization_id: 'acme' }),
@@ -267,7 +267,7 @@ describe('mission-runtime organization defaults', () => {
       )
     );
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[team] assignments=0 required=0 assigned=0 unfilled_required=0')
+      expect.stringContaining('[team] roster=0 required=0 staffed=0 standby=0 unfilled_required=0')
     );
     expect(returnedPlan).toMatchObject({
       mission_id: 'MSN-3',
