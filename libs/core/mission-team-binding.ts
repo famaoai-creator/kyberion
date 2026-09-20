@@ -1,4 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
+import { readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { defineCatalog } from './foundation/governed-catalog.js';
@@ -7,7 +8,21 @@ import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
+import {
+  extendMissionTeamPlanRoster,
+  getMissionTeamPlanPath,
+  loadMissionTeamPlan,
+  promoteMissionTeamPlanRoles,
+  writeMissionTeamPlan,
+  type ExtendMissionTeamRosterRefusal,
+} from './mission-team-plan-composer.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
+import {
+  buildAvailabilityRecord,
+  buildCostProfileRecord,
+  collectWorkforceLoad,
+  type WorkforceLoadIndex,
+} from './workforce-load.js';
 import {
   provisionMissionEntry,
   writeProvisionedJson,
@@ -201,7 +216,8 @@ function resolveAgentRuntimeIdentity(
 
 function resourceFromLegacyAssignment(
   assignment: MissionTeamPlan['assignments'][number],
-  organizationId?: string
+  organizationId?: string,
+  loadIndex?: WorkforceLoadIndex
 ): WorkforceResourceRef | null {
   const actorId = assignment.agent_id?.trim();
   if (!actorId) return null;
@@ -212,8 +228,13 @@ function resourceFromLegacyAssignment(
     display_name: actorId,
     authority_roles: assignment.authority_role ? [assignment.authority_role] : [],
     capabilities: assignment.required_capabilities || [],
-    availability: { status: 'available' },
-    cost_profile: {},
+    // TC-08: observed load and governed model rates instead of the constants
+    // this record used to carry.
+    availability: buildAvailabilityRecord(actorId, loadIndex),
+    cost_profile: buildCostProfileRecord({
+      provider: assignment.provider,
+      modelId: assignment.modelId,
+    }),
     status: 'active',
     // Legacy fixtures predate accountable ownership. New resource refs enforce this at input time.
     accountable_human_id: assignment.accountable_human_id || null,
@@ -230,7 +251,8 @@ function resourceFromLegacyAssignment(
 
 function resolveAssignmentResource(
   assignment: MissionTeamPlan['assignments'][number],
-  organizationId?: string
+  organizationId?: string,
+  loadIndex?: WorkforceLoadIndex
 ): WorkforceResourceRef | null {
   const resource = assignment.resource;
   if (resource) {
@@ -251,7 +273,7 @@ function resolveAssignmentResource(
     }
     return resource;
   }
-  return resourceFromLegacyAssignment(assignment, organizationId);
+  return resourceFromLegacyAssignment(assignment, organizationId, loadIndex);
 }
 
 /**
@@ -301,10 +323,12 @@ export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlu
 
 export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionStaffingAssignments {
   const organizationId = plan.organization_profile?.organization_id;
+  // One pass over the work-item store for the whole staffing rebuild.
+  const loadIndex = collectWorkforceLoad();
   const assignments: MissionStaffingAssignment[] = plan.assignments
     .filter((assignment) => assignment.status === 'assigned')
     .flatMap((assignment) => {
-      const resource = resolveAssignmentResource(assignment, organizationId);
+      const resource = resolveAssignmentResource(assignment, organizationId, loadIndex);
       if (!resource) return [];
       // NI-01: staffed agents get a durable 'provisioned' identity in the
       // ledger (resolve-or-issue, best-effort — see helper docs).
@@ -388,6 +412,171 @@ export function initializeMissionTeamBindings(
     });
   }
   return paths;
+}
+
+export interface StaffMissionTeamRolesResult {
+  plan: MissionTeamPlan | null;
+  /** Standby roles promoted to staffed by this call. */
+  promoted: string[];
+  /** Requested roles with no compatible actor in the pool. */
+  unfilled: string[];
+}
+
+/**
+ * TC-02: staff roster roles on demand.
+ *
+ * Mission creation staffs only the structural roles (TC-01); every other
+ * roster role waits on standby. This is the single governed entry point that
+ * turns a standby role into a staffed one: it promotes the recorded
+ * candidate, rewrites the team plan and staffing bindings from it, and
+ * appends one `team_role_staffed` entry per promotion to the mission
+ * execution ledger so an audit can see when each member joined and why.
+ */
+export function staffMissionTeamRoles(input: {
+  missionId: string;
+  teamRoles: string[];
+  missionPathHint?: string;
+  requestedBy?: string;
+  reason?: string;
+}): StaffMissionTeamRolesResult {
+  const missionId = normalizeMissionId(input.missionId);
+  const requestedRoles = Array.from(new Set(input.teamRoles.filter(Boolean)));
+  const existing = loadMissionTeamPlan(missionId);
+  if (!existing || requestedRoles.length === 0) {
+    return { plan: existing, promoted: [], unfilled: [] };
+  }
+
+  const unfilled = existing.assignments
+    .filter((entry) => entry.status === 'unfilled' && requestedRoles.includes(entry.team_role))
+    .map((entry) => entry.team_role);
+
+  const { plan, promoted } = promoteMissionTeamPlanRoles(existing, requestedRoles);
+  if (promoted.length === 0) {
+    return { plan, promoted, unfilled };
+  }
+
+  const planPath = getMissionTeamPlanPath(missionId);
+  if (!planPath) {
+    return { plan: existing, promoted: [], unfilled };
+  }
+  const missionDir = path.dirname(planPath);
+  writeMissionTeamPlan(missionDir, plan);
+  initializeMissionTeamBindings(missionDir, plan);
+
+  for (const teamRole of promoted) {
+    const assignment = plan.assignments.find((entry) => entry.team_role === teamRole);
+    appendMissionExecutionLedgerEntry({
+      mission_id: missionId,
+      mission_path_hint: input.missionPathHint || missionDir,
+      event_type: 'team_role_staffed',
+      team_role: teamRole,
+      actor_id: assignment?.agent_id || undefined,
+      actor_type: assignment?.actor_type || 'agent',
+      runtime_identity: assignment?.runtime_identity || undefined,
+      decision: input.reason || 'Role demanded by mission work.',
+      payload: {
+        requested_by: input.requestedBy || 'mission_team_orchestrator',
+        provider: assignment?.provider || null,
+        model_id: assignment?.modelId || null,
+        promoted_from: 'standby',
+      },
+    });
+  }
+
+  return { plan, promoted, unfilled };
+}
+
+export interface RestaffMissionTeamRoleResult {
+  plan: MissionTeamPlan | null;
+  /** The member added to the roster, or null when nothing was added. */
+  added: MissionTeamAssignment | null;
+  /** Set when the role was already on the roster and only needed staffing. */
+  promoted: boolean;
+  refusal?: ExtendMissionTeamRosterRefusal | 'mission_plan_not_found';
+}
+
+/**
+ * TC-06: the governed way to put a role on a mission's roster mid-flight.
+ *
+ * A role already on the roster is staffed through the normal promotion path;
+ * a role that is missing is selected, bounded by the lifecycle `max_members`
+ * cap and held to the same capability, authority and separation-of-duties
+ * checks as initial composition. Either way the plan, the staffing bindings
+ * and one execution-ledger entry move together, so the roster change is
+ * auditable rather than implicit.
+ */
+export function restaffMissionTeamRole(input: {
+  missionId: string;
+  teamRole: string;
+  requiredCapabilities?: string[];
+  excludeAgentIds?: string[];
+  missionPathHint?: string;
+  requestedBy?: string;
+  reason?: string;
+}): RestaffMissionTeamRoleResult {
+  const missionId = normalizeMissionId(input.missionId);
+  const existing = loadMissionTeamPlan(missionId);
+  if (!existing) {
+    return { plan: null, added: null, promoted: false, refusal: 'mission_plan_not_found' };
+  }
+
+  const onRoster = existing.assignments.some(
+    (assignment) => assignment.team_role === input.teamRole
+  );
+  if (onRoster) {
+    const staffed = staffMissionTeamRoles({
+      missionId,
+      teamRoles: [input.teamRole],
+      missionPathHint: input.missionPathHint,
+      requestedBy: input.requestedBy,
+      reason: input.reason,
+    });
+    return {
+      plan: staffed.plan,
+      added: null,
+      promoted: staffed.promoted.length > 0,
+      ...(staffed.promoted.length === 0 ? { refusal: 'already_on_roster' as const } : {}),
+    };
+  }
+
+  const { plan, added, refusal } = extendMissionTeamPlanRoster(existing, {
+    teamRole: input.teamRole,
+    ...(input.requiredCapabilities ? { requiredCapabilities: input.requiredCapabilities } : {}),
+    ...(input.excludeAgentIds ? { excludeAgentIds: input.excludeAgentIds } : {}),
+  });
+  if (!added) {
+    return { plan: existing, added: null, promoted: false, refusal };
+  }
+
+  const planPath = getMissionTeamPlanPath(missionId);
+  if (!planPath) {
+    return { plan: existing, added: null, promoted: false, refusal: 'mission_plan_not_found' };
+  }
+  const missionDir = path.dirname(planPath);
+  writeMissionTeamPlan(missionDir, plan);
+  initializeMissionTeamBindings(missionDir, plan);
+
+  appendMissionExecutionLedgerEntry({
+    mission_id: missionId,
+    mission_path_hint: input.missionPathHint || missionDir,
+    event_type: 'team_role_restaffed',
+    team_role: added.team_role,
+    actor_id: added.agent_id || undefined,
+    actor_type: added.actor_type || 'agent',
+    runtime_identity: added.runtime_identity || undefined,
+    decision: input.reason || 'Role demanded by mission work but absent from the roster.',
+    payload: {
+      requested_by: input.requestedBy || 'mission_orchestration_worker',
+      provider: added.provider || null,
+      model_id: added.modelId || null,
+      required_capabilities: input.requiredCapabilities || [],
+      excluded_agent_ids: input.excludeAgentIds || [],
+      roster_size: plan.assignments.length,
+      max_members: plan.team_governance?.lifecycle.max_members ?? null,
+    },
+  });
+
+  return { plan, added, promoted: false };
 }
 
 export function loadMissionStaffingAssignments(
@@ -508,6 +697,31 @@ function resolveMissionLedgerScope(
     mission_id: missionId,
     ...(input.task_id ? { task_id: input.task_id, scope_kind: 'task' } : { scope_kind: 'mission' }),
   });
+}
+
+/**
+ * Read a mission's execution ledger. The writer has existed since staffing
+ * became auditable; nothing read it back, so recorded outcomes could not be
+ * measured (TC-13). Malformed lines are skipped rather than failing the read:
+ * a ledger is an append-only record, and one bad line must not hide the rest.
+ */
+export function readMissionExecutionLedger(
+  missionId: string,
+  missionPathHint?: string
+): MissionExecutionLedgerEntry[] {
+  const paths = resolveMissionBindingPaths(normalizeMissionId(missionId), missionPathHint);
+  if (!safeExistsSync(paths.executionLedgerPath)) return [];
+  const entries: MissionExecutionLedgerEntry[] = [];
+  for (const line of readTextFile(paths.executionLedgerPath).split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      entries.push(JSON.parse(trimmed) as MissionExecutionLedgerEntry);
+    } catch {
+      continue;
+    }
+  }
+  return entries;
 }
 
 export function appendMissionExecutionLedgerEntry(

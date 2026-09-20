@@ -1,7 +1,33 @@
+import { loadWorkforceCapacityPolicy, type WorkforceLoadSnapshot } from './workforce-load.js';
+
+/**
+ * TC-09: the single place that decides what being busy costs a candidate.
+ *
+ * This module already scored lease count, in-flight task count and scope
+ * conflicts, but nothing called it — team composition scored load not at all,
+ * so the repository carried two answers to the same question, one of them
+ * dead. It is now the shared implementation: `recommendWorkerAssignments`
+ * uses it per task, and `selectAgentForTeamRole` uses it per candidate, both
+ * reading the governed thresholds in `workforce-capacity-policy.json`.
+ */
+export function workerLoadPenalty(load: {
+  active_work_items?: number;
+  queued_work_items?: number;
+  status?: WorkforceLoadSnapshot['status'];
+}): number {
+  const policy = loadWorkforceCapacityPolicy().selection;
+  const active = Math.max(0, Number(load.active_work_items || 0));
+  const queued = Math.max(0, Number(load.queued_work_items || 0));
+  const penalty =
+    active * policy.load_penalty_per_active_item +
+    queued * policy.queued_penalty_per_item +
+    (load.status === 'saturated' ? policy.saturated_penalty : 0);
+  const ceiling = policy.max_load_penalty;
+  return typeof ceiling === 'number' ? Math.min(penalty, ceiling) : penalty;
+}
+
 export type WorkerAssignmentMode =
-  | 'direct_specialist'
-  | 'lease_aware_capability'
-  | 'dependency_first';
+  'direct_specialist' | 'lease_aware_capability' | 'dependency_first';
 
 export interface WorkerCapabilityProfile {
   agent_id: string;
@@ -30,9 +56,7 @@ export interface WorkerAssignmentDecision {
 }
 
 function normalizeSet(values?: string[]): string[] {
-  return Array.isArray(values)
-    ? values.map((value) => String(value).trim()).filter(Boolean)
-    : [];
+  return Array.isArray(values) ? values.map((value) => String(value).trim()).filter(Boolean) : [];
 }
 
 function overlapsScope(scope: string | undefined, leasedScopes: string[]): boolean {
@@ -40,7 +64,11 @@ function overlapsScope(scope: string | undefined, leasedScopes: string[]): boole
   return leasedScopes.some((leased) => leased === scope);
 }
 
-function scoreWorker(task: WorkerAssignableTask, worker: WorkerCapabilityProfile, policy: WorkerAssignmentMode): WorkerAssignmentDecision {
+function scoreWorker(
+  task: WorkerAssignableTask,
+  worker: WorkerCapabilityProfile,
+  policy: WorkerAssignmentMode
+): WorkerAssignmentDecision {
   const requiredCapabilities = normalizeSet(task.required_capabilities);
   const workerCapabilities = normalizeSet(worker.capabilities);
   const teamRoles = normalizeSet(worker.team_roles);
@@ -48,7 +76,9 @@ function scoreWorker(task: WorkerAssignableTask, worker: WorkerCapabilityProfile
   const rationale: string[] = [];
   let score = 0;
 
-  const capabilityHits = requiredCapabilities.filter((capability) => workerCapabilities.includes(capability));
+  const capabilityHits = requiredCapabilities.filter((capability) =>
+    workerCapabilities.includes(capability)
+  );
   if (capabilityHits.length > 0) {
     score += capabilityHits.length * 10;
     rationale.push(`matched capabilities: ${capabilityHits.join(', ')}`);
@@ -61,13 +91,15 @@ function scoreWorker(task: WorkerAssignableTask, worker: WorkerCapabilityProfile
 
   const activeLeaseCount = Math.max(0, Number(worker.active_lease_count || 0));
   const currentTaskCount = Math.max(0, Number(worker.current_task_count || 0));
-  score -= activeLeaseCount * 3;
-  score -= currentTaskCount * 2;
-  if (activeLeaseCount > 0) {
-    rationale.push(`penalized active leases: ${activeLeaseCount}`);
-  }
-  if (currentTaskCount > 0) {
-    rationale.push(`penalized active tasks: ${currentTaskCount}`);
+  const loadPenalty = workerLoadPenalty({
+    active_work_items: currentTaskCount,
+    queued_work_items: activeLeaseCount,
+  });
+  score -= loadPenalty;
+  if (loadPenalty > 0) {
+    rationale.push(
+      `penalized load: ${currentTaskCount} active task(s), ${activeLeaseCount} lease(s) (-${loadPenalty})`
+    );
   }
 
   if (overlapsScope(task.scope, leasedScopes)) {
@@ -83,7 +115,12 @@ function scoreWorker(task: WorkerAssignableTask, worker: WorkerCapabilityProfile
     }
   }
 
-  if (policy === 'direct_specialist' && requiredCapabilities.length === 0 && task.preferred_team_role && teamRoles.includes(task.preferred_team_role)) {
+  if (
+    policy === 'direct_specialist' &&
+    requiredCapabilities.length === 0 &&
+    task.preferred_team_role &&
+    teamRoles.includes(task.preferred_team_role)
+  ) {
     score += 5;
   }
 

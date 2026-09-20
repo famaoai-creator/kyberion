@@ -6,12 +6,16 @@ import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js'
 import { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-brief-composer.js';
 import {
   composeMissionTeamPlan,
+  diagnoseMissionTeamRoleGap,
+  extendMissionTeamPlanRoster,
   loadMissionTeamPlan,
+  promoteMissionTeamPlanRoles,
   resolveMissionTeamReceiver,
   resolveMissionTeamPlan,
   writeMissionTeamPlan,
 } from './mission-team-plan-composer.js';
 import { discoverProviders } from './provider-discovery.js';
+import { loadAgentProfileIndex } from './mission-team-index.js';
 
 describe('mission-team-composer classification integration', () => {
   it('derives mission type from mission classification when missionType is omitted', () => {
@@ -61,7 +65,7 @@ describe('mission-team-composer classification integration', () => {
     expect(plan.template).toBe('research');
     const owner = plan.assignments.find((assignment) => assignment.team_role === 'owner');
     const researcher = plan.assignments.find((assignment) => assignment.team_role === 'researcher');
-    expect(researcher?.status).toBe('assigned');
+    expect(researcher?.status).toBe('standby');
     expect(researcher?.agent_id).toBeTruthy();
     expect(researcher?.agent_id).not.toBe(owner?.agent_id);
     expect(researcher?.delegation_contract?.ownership_scope).toContain('research packet');
@@ -94,7 +98,18 @@ describe('mission-team-composer classification integration', () => {
 
     expect(plan.template).toBe('development');
     expect(plan.organization_profile?.team_template_catalog_id).toBe('demo-org');
-    expect(plan.team_governance?.composition.optional_roles).toContain('surface_liaison');
+    // TC-04: this mission classifies as approval_required, so the
+    // `human-approval-routing` obligation lifts surface_liaison out of the
+    // template's optional list into the required roster.
+    expect(plan.team_governance?.composition.required_roles).toContain('surface_liaison');
+    expect(plan.team_governance?.composition.optional_roles).not.toContain('surface_liaison');
+    expect(
+      plan.assignments.find((assignment) => assignment.team_role === 'surface_liaison')
+        ?.role_sources
+    ).toEqual(['obligation', 'template']);
+    expect(plan.team_governance?.obligations?.map((entry) => entry.id)).toContain(
+      'human-approval-routing'
+    );
     expect(plan.team_governance?.lifecycle.max_messages_per_run).toBe(75);
     const planner = plan.assignments.find((assignment) => assignment.team_role === 'planner');
     expect(planner?.agent_id).toBe('planner-agent');
@@ -399,8 +414,14 @@ describe('mission-team-composer classification integration', () => {
         requiredCapabilities: ['review', 'documentation', 'analysis'],
       });
 
-      expect(selected?.agent_id).toBe('reasoning-worker');
+      // The contract is "capable and not the excluded actor", not "this
+      // particular agent". Which qualified candidate wins is a preference and
+      // scoring detail that legitimately moves as the pool grows.
+      expect(selected?.agent_id).toBeTruthy();
       expect(selected?.agent_id).not.toBe(implementationAgentId);
+      expect(loadAgentProfileIndex()[selected!.agent_id!]?.capabilities).toEqual(
+        expect.arrayContaining(['review', 'documentation', 'analysis'])
+      );
       expect(selected?.required_capabilities).toEqual(
         expect.arrayContaining(['review', 'documentation', 'analysis'])
       );
@@ -446,6 +467,288 @@ describe('mission-team-composer classification integration', () => {
 
       expect(receiptTargets.targetPath).toBe(`${missionPath}/evidence/team-composition-brief.json`);
       expect(receiptTargets.targets).toContain('evidence/team-composition-brief.json');
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
+  });
+});
+
+describe('demand-driven staffing (TC-01/TC-02)', () => {
+  const composeDevelopmentPlan = () =>
+    composeMissionTeamPlan({
+      missionId: 'MSN-STAFFING-001',
+      missionType: 'development',
+      tier: 'public',
+    });
+
+  it('staffs only the structural roles and keeps the rest on standby', () => {
+    const plan = composeDevelopmentPlan();
+
+    expect(plan.team_governance?.composition.assigned_roles).toEqual(['owner', 'orchestrator']);
+    const nonStructural = plan.assignments.filter(
+      (assignment) => !['owner', 'orchestrator'].includes(assignment.team_role)
+    );
+    expect(nonStructural.length).toBeGreaterThan(0);
+    for (const assignment of nonStructural) {
+      expect(assignment.status).toBe('standby');
+      // The candidate is resolved at composition time, so a staffing gap is
+      // visible now and promotion never has to re-run selection.
+      expect(assignment.agent_id).toBeTruthy();
+      expect(assignment.authority_role).toBeTruthy();
+    }
+  });
+
+  it('does not count standby roles as unfilled required roles', () => {
+    const plan = composeDevelopmentPlan();
+    expect(plan.team_governance?.composition.unfilled_required_roles).toEqual([]);
+    expect(plan.team_governance?.composition.standby_roles).toEqual(
+      expect.arrayContaining(['implementer', 'reviewer'])
+    );
+  });
+
+  it('composes the same candidates on every run', () => {
+    const first = composeDevelopmentPlan();
+    const second = composeDevelopmentPlan();
+    expect(
+      second.assignments.map((entry) => [entry.team_role, entry.status, entry.agent_id])
+    ).toEqual(first.assignments.map((entry) => [entry.team_role, entry.status, entry.agent_id]));
+  });
+
+  it('promotes only the demanded standby roles', () => {
+    const plan = composeDevelopmentPlan();
+    const before = plan.assignments.find((entry) => entry.team_role === 'implementer');
+
+    const { plan: promotedPlan, promoted } = promoteMissionTeamPlanRoles(plan, ['implementer']);
+
+    expect(promoted).toEqual(['implementer']);
+    const implementer = promotedPlan.assignments.find((entry) => entry.team_role === 'implementer');
+    expect(implementer?.status).toBe('assigned');
+    // Promotion is a pure state transition over the recorded candidate.
+    expect(implementer?.agent_id).toBe(before?.agent_id);
+    expect(implementer?.provider).toBe(before?.provider);
+    expect(promotedPlan.team_governance?.composition.assigned_roles).toContain('implementer');
+    expect(promotedPlan.team_governance?.composition.standby_roles).not.toContain('implementer');
+    expect(promotedPlan.assignments.find((entry) => entry.team_role === 'reviewer')?.status).toBe(
+      'standby'
+    );
+  });
+
+  it('leaves the plan untouched when nothing is promotable', () => {
+    const plan = composeDevelopmentPlan();
+    const { plan: unchanged, promoted } = promoteMissionTeamPlanRoles(plan, ['owner']);
+    expect(promoted).toEqual([]);
+    expect(unchanged).toBe(plan);
+  });
+});
+
+describe('staffing state across recomposition (TC-01)', () => {
+  it('keeps already staffed roles staffed when the plan is refreshed', () => {
+    const missionId = 'MSN-STAFFING-REFRESH';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(missionPath, { recursive: true });
+        const initial = composeMissionTeamPlan({
+          missionId,
+          missionType: 'development',
+          tier: 'public',
+        });
+        const { plan: staffed } = promoteMissionTeamPlanRoles(initial, ['implementer']);
+        writeMissionTeamPlan(missionPath, staffed);
+
+        const refreshed = resolveMissionTeamPlan({ missionId, forceRefresh: true });
+        expect(
+          refreshed.assignments.find((entry) => entry.team_role === 'implementer')?.status
+        ).toBe('assigned');
+        expect(refreshed.assignments.find((entry) => entry.team_role === 'tester')?.status).toBe(
+          'standby'
+        );
+      });
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
+  });
+});
+
+describe('mid-mission restaffing (TC-06)', () => {
+  const developmentPlan = () =>
+    composeMissionTeamPlan({
+      missionId: 'MSN-RESTAFF-001',
+      missionType: 'development',
+      tier: 'public',
+    });
+
+  it('adds a role the roster does not carry', () => {
+    const plan = developmentPlan();
+    expect(plan.assignments.some((entry) => entry.team_role === 'researcher')).toBe(false);
+
+    const {
+      plan: extended,
+      added,
+      refusal,
+    } = extendMissionTeamPlanRoster(plan, {
+      teamRole: 'researcher',
+    });
+
+    expect(refusal).toBeUndefined();
+    expect(added?.team_role).toBe('researcher');
+    expect(added?.agent_id).toBeTruthy();
+    expect(added?.role_sources).toEqual(['restaff']);
+    // A restaffed member is demanded now, so it joins staffed rather than on standby.
+    expect(added?.status).toBe('assigned');
+    expect(extended.team_governance?.composition.assigned_roles).toContain('researcher');
+    expect(extended.team_governance?.composition.required_roles).toContain('researcher');
+  });
+
+  it('applies the same separation-of-duties rules as composition', () => {
+    const plan = developmentPlan();
+    const owner = plan.assignments.find((entry) => entry.team_role === 'owner');
+    const { added } = extendMissionTeamPlanRoster(plan, { teamRole: 'researcher' });
+    // researcher must be independent of the owner
+    expect(added?.agent_id).not.toBe(owner?.agent_id);
+  });
+
+  it('leaves the lifecycle cap real headroom above the composed roster', () => {
+    const plan = developmentPlan();
+    // Every authored template declares max_members == its own roster size,
+    // which made the cap unreachable and blocked all restaffing.
+    expect(plan.team_governance?.lifecycle.max_members).toBeGreaterThan(plan.assignments.length);
+  });
+
+  it('refuses a role that is already on the roster', () => {
+    const plan = developmentPlan();
+    const { added, refusal } = extendMissionTeamPlanRoster(plan, { teamRole: 'reviewer' });
+    expect(added).toBeNull();
+    expect(refusal).toBe('already_on_roster');
+  });
+
+  it('refuses an unknown team role', () => {
+    const { added, refusal } = extendMissionTeamPlanRoster(developmentPlan(), {
+      teamRole: 'chief-vibes-officer',
+    });
+    expect(added).toBeNull();
+    expect(refusal).toBe('unknown_team_role');
+  });
+
+  it('refuses past the lifecycle max_members cap', () => {
+    const plan = developmentPlan();
+    const capped = {
+      ...plan,
+      team_governance: plan.team_governance && {
+        ...plan.team_governance,
+        lifecycle: { ...plan.team_governance.lifecycle, max_members: plan.assignments.length },
+      },
+    };
+    const { added, refusal } = extendMissionTeamPlanRoster(capped, { teamRole: 'researcher' });
+    expect(added).toBeNull();
+    expect(refusal).toBe('max_members_reached');
+  });
+
+  it('never falls back to an excluded actor', () => {
+    const plan = developmentPlan();
+    // Exclude every agent eligible for the role: composition would fall back
+    // to an excluded actor rather than leave the role unstaffed; restaffing
+    // must refuse instead.
+    const probe = extendMissionTeamPlanRoster(plan, { teamRole: 'researcher' });
+    expect(probe.added?.agent_id).toBeTruthy();
+    const { added, refusal } = extendMissionTeamPlanRoster(plan, {
+      teamRole: 'researcher',
+      excludeAgentIds: ['sovereign-brain', 'control-plane-agent', 'reasoning-worker'],
+    });
+    expect(added).toBeNull();
+    expect(refusal).toBe('no_compatible_actor');
+  });
+
+  it('refuses when no eligible actor holds a demanded capability', () => {
+    const { added, refusal } = extendMissionTeamPlanRoster(developmentPlan(), {
+      teamRole: 'researcher',
+      requiredCapabilities: ['time-travel'],
+    });
+    expect(added).toBeNull();
+    expect(refusal).toBe('no_compatible_actor');
+  });
+});
+
+describe('role gap diagnosis (TC-07)', () => {
+  const missionId = 'MSN-ROLE-GAP-001';
+  const missionPath = pathResolver.missionDir(missionId, 'public');
+
+  const withPersistedPlan = (run: () => void) => {
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(missionPath, { recursive: true });
+        writeMissionTeamPlan(
+          missionPath,
+          composeMissionTeamPlan({ missionId, missionType: 'development', tier: 'public' })
+        );
+        run();
+      });
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
+  };
+
+  it('reports a role the roster does not carry as restaffable', () => {
+    withPersistedPlan(() => {
+      const gap = diagnoseMissionTeamRoleGap({ missionId, teamRole: 'researcher' });
+      expect(gap.kind).toBe('role_not_on_roster');
+    });
+  });
+
+  it('reports no gap for a role the roster carries', () => {
+    withPersistedPlan(() => {
+      expect(diagnoseMissionTeamRoleGap({ missionId, teamRole: 'reviewer' }).kind).toBe('none');
+    });
+  });
+
+  it('names the capabilities no eligible actor holds', () => {
+    withPersistedPlan(() => {
+      const gap = diagnoseMissionTeamRoleGap({
+        missionId,
+        teamRole: 'reviewer',
+        requiredCapabilities: ['time-travel'],
+      });
+      expect(gap.kind).toBe('no_capable_actor');
+      expect(gap.missing_capabilities).toEqual(['time-travel']);
+      expect(gap.eligible_agent_ids.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe('restaffed members survive recomposition (TC-06)', () => {
+  it('keeps a restaffed role when the plan is refreshed', () => {
+    const missionId = 'MSN-RESTAFF-REFRESH';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(missionPath, { recursive: true });
+        const initial = composeMissionTeamPlan({
+          missionId,
+          missionType: 'development',
+          tier: 'public',
+        });
+        const { plan: extended, added } = extendMissionTeamPlanRoster(initial, {
+          teamRole: 'researcher',
+        });
+        expect(added).not.toBeNull();
+        writeMissionTeamPlan(missionPath, extended);
+
+        // Recomposition derives the roster from template + obligations, which
+        // does not contain `researcher` — the recorded staffing decision must
+        // not be silently dropped.
+        const refreshed = resolveMissionTeamPlan({ missionId, forceRefresh: true });
+        const researcher = refreshed.assignments.find((entry) => entry.team_role === 'researcher');
+        expect(researcher?.status).toBe('assigned');
+        expect(researcher?.agent_id).toBe(added?.agent_id);
+        expect(researcher?.role_sources).toEqual(['restaff']);
+        expect(refreshed.team_governance?.composition.assigned_roles).toContain('researcher');
+      });
     } finally {
       withExecutionContext('mission_controller', () => {
         safeRmSync(missionPath, { recursive: true, force: true });
