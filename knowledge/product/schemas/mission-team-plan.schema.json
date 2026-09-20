@@ -16,6 +16,18 @@
       "type": "object",
       "required": ["lifecycle", "composition"],
       "properties": {
+        "obligations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "reason", "require_roles"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 },
+              "require_roles": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+            }
+          }
+        },
         "lifecycle": {
           "type": "object",
           "required": [

@@ -95,7 +95,18 @@ describe('mission-team-composer classification integration', () => {
 
     expect(plan.template).toBe('development');
     expect(plan.organization_profile?.team_template_catalog_id).toBe('demo-org');
-    expect(plan.team_governance?.composition.optional_roles).toContain('surface_liaison');
+    // TC-04: this mission classifies as approval_required, so the
+    // `human-approval-routing` obligation lifts surface_liaison out of the
+    // template's optional list into the required roster.
+    expect(plan.team_governance?.composition.required_roles).toContain('surface_liaison');
+    expect(plan.team_governance?.composition.optional_roles).not.toContain('surface_liaison');
+    expect(
+      plan.assignments.find((assignment) => assignment.team_role === 'surface_liaison')
+        ?.role_sources
+    ).toEqual(['obligation', 'template']);
+    expect(plan.team_governance?.obligations?.map((entry) => entry.id)).toContain(
+      'human-approval-routing'
+    );
     expect(plan.team_governance?.lifecycle.max_messages_per_run).toBe(75);
     const planner = plan.assignments.find((assignment) => assignment.team_role === 'planner');
     expect(planner?.agent_id).toBe('planner-agent');
@@ -520,5 +531,36 @@ describe('demand-driven staffing (TC-01/TC-02)', () => {
     const { plan: unchanged, promoted } = promoteMissionTeamPlanRoles(plan, ['owner']);
     expect(promoted).toEqual([]);
     expect(unchanged).toBe(plan);
+  });
+});
+
+describe('staffing state across recomposition (TC-01)', () => {
+  it('keeps already staffed roles staffed when the plan is refreshed', () => {
+    const missionId = 'MSN-STAFFING-REFRESH';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(missionPath, { recursive: true });
+        const initial = composeMissionTeamPlan({
+          missionId,
+          missionType: 'development',
+          tier: 'public',
+        });
+        const { plan: staffed } = promoteMissionTeamPlanRoles(initial, ['implementer']);
+        writeMissionTeamPlan(missionPath, staffed);
+
+        const refreshed = resolveMissionTeamPlan({ missionId, forceRefresh: true });
+        expect(
+          refreshed.assignments.find((entry) => entry.team_role === 'implementer')?.status
+        ).toBe('assigned');
+        expect(refreshed.assignments.find((entry) => entry.team_role === 'tester')?.status).toBe(
+          'standby'
+        );
+      });
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
   });
 });
