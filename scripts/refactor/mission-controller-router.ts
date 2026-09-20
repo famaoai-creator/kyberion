@@ -350,6 +350,11 @@ export interface MissionControllerRoutingContext {
     teamRolesArg?: string,
     organizationId?: string
   ) => Awaitable<unknown>;
+  proposeMissionRoster: (
+    id: string,
+    options: { missionContext?: string; force?: boolean },
+    organizationId?: string
+  ) => Awaitable<unknown>;
   restaffMissionTeam: (
     id: string,
     teamRole: string,
@@ -1183,6 +1188,22 @@ export async function runMissionControllerAction(
       );
       if (prewarmSummary !== undefined) {
         context.print?.(JSON.stringify(prewarmSummary, null, 2));
+      }
+      break;
+    }
+    case 'propose-roster': {
+      const proposalView = await context.proposeMissionRoster(
+        arg1!,
+        {
+          ...(getValue('--context', context.argv)
+            ? { missionContext: getValue('--context', context.argv)! }
+            : {}),
+          ...(context.argv.includes('--force') ? { force: true } : {}),
+        },
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+      );
+      if (proposalView !== undefined) {
+        context.print?.(JSON.stringify(proposalView, null, 2));
       }
       break;
     }

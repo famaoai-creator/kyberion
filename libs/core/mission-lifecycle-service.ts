@@ -174,6 +174,7 @@ export type MissionLifecycleUnderlyingSystem = Pick<
   | 'staffMissionTeam'
   | 'prewarmMissionTeam'
   | 'restaffMissionTeam'
+  | 'proposeMissionRoster'
   | 'dispatchMissionWorkItems'
   | 'pauseMission'
   | 'resumeMission'
@@ -338,6 +339,15 @@ export function buildMissionLifecycleService(
     ) {
       return runGovernedVerb('restaff', normalizeMissionId(id), options, () =>
         resolveSystem(explicitSystem).restaffMissionTeam(id, teamRole, restaffOptions)
+      );
+    },
+    async proposeRoster(
+      id: string,
+      proposalOptions?: { missionContext?: string; force?: boolean },
+      options?: MissionLifecycleVerbOptions
+    ) {
+      return runGovernedVerb('propose-roster', normalizeMissionId(id), options, () =>
+        resolveSystem(explicitSystem).proposeMissionRoster(id, proposalOptions)
       );
     },
     async prewarm(id: string, teamRolesArg?: string, options?: MissionLifecycleVerbOptions) {

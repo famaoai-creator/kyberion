@@ -1,4 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
+import { readTextFile } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { defineCatalog } from './foundation/governed-catalog.js';
@@ -696,6 +697,31 @@ function resolveMissionLedgerScope(
     mission_id: missionId,
     ...(input.task_id ? { task_id: input.task_id, scope_kind: 'task' } : { scope_kind: 'mission' }),
   });
+}
+
+/**
+ * Read a mission's execution ledger. The writer has existed since staffing
+ * became auditable; nothing read it back, so recorded outcomes could not be
+ * measured (TC-13). Malformed lines are skipped rather than failing the read:
+ * a ledger is an append-only record, and one bad line must not hide the rest.
+ */
+export function readMissionExecutionLedger(
+  missionId: string,
+  missionPathHint?: string
+): MissionExecutionLedgerEntry[] {
+  const paths = resolveMissionBindingPaths(normalizeMissionId(missionId), missionPathHint);
+  if (!safeExistsSync(paths.executionLedgerPath)) return [];
+  const entries: MissionExecutionLedgerEntry[] = [];
+  for (const line of readTextFile(paths.executionLedgerPath).split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      entries.push(JSON.parse(trimmed) as MissionExecutionLedgerEntry);
+    } catch {
+      continue;
+    }
+  }
+  return entries;
 }
 
 export function appendMissionExecutionLedgerEntry(
