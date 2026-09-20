@@ -427,6 +427,10 @@
       "types": "./dist/staffing-coverage.d.ts",
       "default": "./dist/staffing-coverage.js"
     },
+    "./backend-capability-honesty": {
+      "types": "./dist/backend-capability-honesty.d.ts",
+      "default": "./dist/backend-capability-honesty.js"
+    },
     "./model-role-fitness": {
       "types": "./dist/model-role-fitness.d.ts",
       "default": "./dist/model-role-fitness.js"
