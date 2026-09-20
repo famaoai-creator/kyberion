@@ -152,4 +152,52 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 
 ## 6. 実装状況
 
-(実装に伴い追記する)
+| ID           | 状態    | 備考                                                                                                                                          |
+| ------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-01        | DONE    | `status: 'standby'` を導入。構造役割のみ作成時に充当                                                                                          |
+| TC-02        | DONE    | `staffMissionTeamRoles` + `ensureMissionTeamRuntime` の役割スコープ昇格、`team_role_staffed` 台帳                                             |
+| TC-03        | DONE    | `team-composition-obligations.json`(5 義務)と導出器                                                                                           |
+| TC-04        | DONE    | 役割集合 = テンプレート ∪ 義務、`role_sources` と `team_governance.obligations`                                                               |
+| TC-05        | PARTIAL | `[team] roster/required/staffed/standby/unfilled_required` のサマリ行と `composition.standby_roles` で 4 区分は判別可能。専用レンダラは未実装 |
+| TC-06〜TC-14 | TODO    | Wave 2 以降                                                                                                                                   |
+
+### 2026-09-20: Wave 1(TC-01〜TC-04)
+
+**TC-01/TC-02 — 需要駆動の充当**
+
+- `MissionTeamAssignment.status` を `assigned | standby | unfilled` の 3 値へ拡張(`team-role-assignment-selection.ts`)。候補アクター・authority role・delegation contract・security scope は **standby でも compose 時に解決**するため、充当ギャップは従来どおり作成時に検出される。
+- 作成時に充当するのは `always_staffed_roles`(`owner`, `orchestrator`)のみ(`applyStaffingPolicy`)。
+- 昇格の唯一の入口は `staffMissionTeamRoles`(`mission-team-binding.ts`)。plan と staffing bindings を書き直し、昇格ごとに `team_role_staffed` を `execution-ledger.jsonl` へ追記する。`promoteMissionTeamPlanRoles` は純関数で、記録済み候補に対する状態遷移のみを行う(再選抜しない)。
+- 役割スコープ付き `ensureMissionTeamRuntime` が充当要求そのもの。**スコープ無しの ensure は名簿全体を充当しない**(ここを緩めると eager staffing に戻る)。
+- 名簿の読み取り(`resolveMissionTeamReceiver`、`buildMissionTeamView`)は standby の保持者を返し続けるため、dispatch のルーティングとレビュー独立性判定は無変更。
+- `unfilled_required_roles` の判定を `required && status === 'unfilled'` へ変更(standby は欠員ではない)。
+- 副産物の欠陥修正: `resolveMissionTeamPlan({ forceRefresh })` が作り直しで**稼働中メンバーを standby に戻していた**。refresh は以前の staffed 役割を引き継ぐようにした。
+
+**TC-03/TC-04 — 義務導出の役割集合**
+
+- `knowledge/product/governance/team-composition-obligations.json`(schema 付き governed catalog)に 5 義務: `independent-review`(review_required 以上 → reviewer)、`executed-verification`(出荷系 mission_class × review_required 以上 → tester)、`cross-system-operations`(cross_system_change → operator)、`human-approval-routing`(approval_required 以上 → surface_liaison)、`decision-divergence`(decision_support → devils_advocate)。
+- 役割集合 = `template.required_roles ∪ 適合義務の require_roles`。義務由来の役割はテンプレートが optional に置いていても、そもそも記載していなくても **required になる**。テンプレート順を先に並べることで職務分離(implementer の後に reviewer を選抜)の解決順を維持している。
+- `role_sources`(`structural` / `obligation` / `template`)と `team_governance.obligations`(id + 理由)を plan に記録。
+
+### 受入証跡(ミッション `MSN-TEAM-COMPOSITION-20260920`、実機)
+
+| 観測                                  | 変更前                                                                                    | 変更後                                                                                                      |
+| ------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 作成時の staffing レコード            | 8(owner, orchestrator, planner, implementer, reviewer, tester, operator, surface_liaison) | **2**(owner, orchestrator)                                                                                  |
+| `[team]` サマリ                       | `assignments=8 required=6 assigned=8 unfilled_required=0`                                 | `roster=8 required=6 staffed=2 standby=6 unfilled_required=0`                                               |
+| `prewarm <ID> planner,implementer` 後 | (概念なし)                                                                                | staffed=4、`team_role_staffed` 台帳 2 件、残り 4 役割は standby のまま                                      |
+| `team <ID> --refresh` 後              | 全員 assigned                                                                             | 稼働中の planner / implementer は staffed のまま、reviewer / tester / operator / surface_liaison は standby |
+| `role_sources`                        | (無し)                                                                                    | reviewer / tester = `obligation,template`、owner / orchestrator = `structural,template`                     |
+| approval_required 分類のミッション    | surface_liaison は optional                                                               | **required**(`role_sources: obligation,template`、`obligations: human-approval-routing`)                    |
+
+### テスト
+
+- `libs/core/team-composition-obligations.test.ts`(新規 9 件): 構造役割、facet の AND/OR、テンプレートが言及しない役割の導出、義務の理由、reviewer 規則が tester 規則より前に並ぶこと。
+- `libs/core/mission-team-composer.test.ts`: 充当方針、standby の決定論、需要役割のみの昇格、refresh での staffing 引き継ぎ。
+- `tests/mission-team-orchestrator.test.ts`: 役割スコープ ensure が充当要求であること、スコープ無し ensure が名簿を充当しないこと。
+- 回帰: 10 files / 67 tests(team 系)、25 files / 242 tests(mission 系)、tests/ の mission contract 6 files / 42 tests。
+
+### 既知の残件
+
+- `staffMissionTeamRoles` の `max_members` 上限チェックは TC-06 で入れる(現在の名簿はテンプレート ∪ 義務の範囲に閉じているため超過しない)。
+- TC-05 の専用レンダラ(名簿 / 稼働 / 待機 / 欠員の表示)は未実装。
