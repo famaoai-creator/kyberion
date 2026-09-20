@@ -6,7 +6,7 @@
  * it is registered here so future requests can auto-resolve the source.
  *
  * Storage:
- *   Seed (read-only): knowledge/product/orchestration/external-service-registry.json
+ *   Seed (read-only): knowledge/product/orchestration/external-services/{service_id}.json
  *   Runtime (mutable): active/shared/runtime/external-service-registry.json
  */
 
@@ -14,6 +14,7 @@ import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { loadRegistryDirectory, type RegistryDirectoryOptions } from './registry-directory.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -48,7 +49,10 @@ interface ServiceProviderCatalog {
 // ─── Paths ──────────────────────────────────────────────────────────────────
 
 /** Org-wide defaults (Kyberion-managed, read-only). */
-const PUBLIC_SEED_PATH = pathResolver.knowledge(
+const PUBLIC_SEED_DIR = pathResolver.knowledge('product/orchestration/external-services');
+
+/** Legacy single-file seed (removed; kept as read fallback until RSP migration completes). */
+const LEGACY_PUBLIC_SEED_PATH = pathResolver.knowledge(
   'product/orchestration/external-service-registry.json'
 );
 
@@ -78,6 +82,30 @@ const EMPTY_PROVIDER_CATALOG: ServiceProviderCatalog = { version: '1.0.0', provi
 
 // ─── Internal Helpers ───────────────────────────────────────────────────────
 
+const publicSeedDirectoryOptions: RegistryDirectoryOptions = {
+  id: 'external-service-registry',
+  dirPath: PUBLIC_SEED_DIR,
+  schemaPath: REGISTRY_SCHEMA_PATH,
+  arrayKey: 'services',
+  idKey: 'service_id',
+  envDirVar: 'KYBERION_EXTERNAL_SERVICE_REGISTRY_DIR',
+  allowEmpty: true,
+};
+
+function parsePublicSeed(): ExternalServiceRegistry {
+  try {
+    const { headers, items } = loadRegistryDirectory<ExternalServiceEntry>(
+      publicSeedDirectoryOptions
+    );
+    return {
+      version: String(headers['version'] ?? '1.0.0'),
+      services: items,
+    };
+  } catch {
+    return parseRegistry(LEGACY_PUBLIC_SEED_PATH);
+  }
+}
+
 function parseRegistry(filePath: string, optional = false): ExternalServiceRegistry {
   if (optional && !safeExistsSync(filePath)) return EMPTY_REGISTRY;
   return defineCatalog<ExternalServiceRegistry>({
@@ -92,7 +120,7 @@ function parseRegistry(filePath: string, optional = false): ExternalServiceRegis
  * Later tiers win on same service_id. Priority: runtime > personal > public.
  */
 function loadMerged(): ExternalServiceRegistry {
-  const publicSeed = parseRegistry(PUBLIC_SEED_PATH);
+  const publicSeed = parsePublicSeed();
   const personalSeed = parseRegistry(PERSONAL_SEED_PATH, true);
   const runtime = parseRegistry(RUNTIME_PATH, true);
 

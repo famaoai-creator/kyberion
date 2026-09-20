@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "provider.runtime.hermes_hook_pipeline",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "hermes-agent",
+        "name": "hooks",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "capability"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["hook-management", "tool-interception", "context-injection"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "experimental",
+      "notes": "Hermes-style hooks are a reference for governed lifecycle interception, but Kyberion should keep explicit policy and receipts."
+    }
+  ]
+}

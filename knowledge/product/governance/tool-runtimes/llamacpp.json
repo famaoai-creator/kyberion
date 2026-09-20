@@ -1,0 +1,51 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "llamacpp",
+      "display_name": "llama.cpp C++ LLM Engine",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "llama-server",
+        "args": ["--version"],
+        "description": "Probe llama-server CLI availability."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "llama.cpp"],
+        "description": "Install llama.cpp binaries via Homebrew."
+      },
+      "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "ggml.llamacpp",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "Install llama.cpp through WinGet on Windows."
+        }
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "llama-server",
+        "args": ["--port", "8080"],
+        "description": "Run llama-server process."
+      },
+      "managed_env_subpath": "tool-runtimes/llamacpp",
+      "notes": "llama.cpp server runtime for GGUF model inference."
+    }
+  ]
+}

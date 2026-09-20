@@ -1,8 +1,11 @@
 import { getRegisteredEnvText } from './foundation/env.js';
 import { clamp } from './foundation/text.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath } from './secure-io.js';
+import {
+  loadRegistryDirectory,
+  resolveRegistryDirectory,
+  type RegistryDirectoryOptions,
+} from './registry-directory.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
 import { probeAppleImageGeneration } from './apple-intelligence-bridge.js';
@@ -98,24 +101,22 @@ function defaultMediaBackendProbeTtlMs(): number {
   return Number.isFinite(configured) ? clamp(configured, 1_000, 300_000) : 30_000;
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
-  'product/governance/media-backend-registry.json'
+const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('product/governance/media-backends');
+const MEDIA_BACKEND_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/media-backend-registry.schema.json'
 );
-let cachedRegistryPath: string | null = null;
+let cachedRegistryKey: string | null = null;
 let cachedRegistry: MediaBackendRegistry | null = null;
 
-function getRegistryPath(): string {
-  return assertSafeRepositoryPath(
-    getRegisteredEnvText('KYBERION_MEDIA_BACKEND_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH,
-    { allowMissingLeaf: true }
-  );
-}
-
-const mediaBackendRegistryCatalog = defineCatalog<MediaBackendRegistry>({
+const mediaBackendDirectoryOptions: RegistryDirectoryOptions = {
   id: 'media-backend-registry',
-  path: getRegistryPath,
-  schema: pathResolver.knowledge('product/schemas/media-backend-registry.schema.json'),
-});
+  dirPath: DEFAULT_REGISTRY_DIR,
+  schemaPath: MEDIA_BACKEND_REGISTRY_SCHEMA_PATH,
+  arrayKey: 'backends',
+  idKey: 'backend_id',
+  envDirVar: 'KYBERION_MEDIA_BACKEND_REGISTRY_DIR',
+  envPathVar: 'KYBERION_MEDIA_BACKEND_REGISTRY_PATH',
+};
 
 function inferVoiceBackendRecords(): MediaBackendRecord[] {
   return getVoiceEngineRegistry().engines.map((engine) => mapVoiceEngineToBackend(engine));
@@ -165,13 +166,17 @@ function resolveVoiceBackendRecord(
 }
 
 function getRegistry(): MediaBackendRegistry {
-  const registryPath = getRegistryPath();
-  if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
-  const parsed = mediaBackendRegistryCatalog.load();
-  cachedRegistryPath = registryPath;
+  const { dir, singleFile } = resolveRegistryDirectory(mediaBackendDirectoryOptions);
+  const registryKey = singleFile || (dir as string);
+  if (cachedRegistryKey === registryKey && cachedRegistry) return cachedRegistry;
+  const { headers, items } = loadRegistryDirectory<MediaBackendRecord>(
+    mediaBackendDirectoryOptions
+  );
+  cachedRegistryKey = registryKey;
   cachedRegistry = {
-    ...parsed,
-    backends: mergeVoiceBackends(parsed.backends || []),
+    version: String(headers['version'] ?? '1.0.0'),
+    default_backend_ids: headers['default_backend_ids'] as Record<MediaBackendModality, string>,
+    backends: mergeVoiceBackends(items),
   };
   return cachedRegistry;
 }
@@ -181,9 +186,8 @@ export function getMediaBackendRegistry(): MediaBackendRegistry {
 }
 
 export function resetMediaBackendRegistryCache(): void {
-  cachedRegistryPath = null;
+  cachedRegistryKey = null;
   cachedRegistry = null;
-  mediaBackendRegistryCatalog.reset();
 }
 
 export function listMediaBackends(modality?: MediaBackendModality): MediaBackendRecord[] {

@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.gemini_extension_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gemini-cli",
+        "name": "extensions",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session"],
+        "intents": ["extension-management", "discover-extensions"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "Gemini extension management should stay discovery-oriented and auditable."
+    }
+  ]
+}

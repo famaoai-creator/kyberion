@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "bundles": [
+    {
+      "bundle_id": "voice-speech-governed",
+      "status": "active",
+      "kind": "capability-bundle",
+      "summary": "Generate governed speech from the speaker's voice profile using the voice actuator and a voice-artifact delivery path.",
+      "intents": ["speak-with-my-voice"],
+      "required_actuators": ["voice-actuator", "artifact-actuator"],
+      "references": [
+        "knowledge/public/procedures/media/realtime-voice-conversation.md",
+        "knowledge/product/orchestration/supported-actuators.md"
+      ]
+    }
+  ]
+}

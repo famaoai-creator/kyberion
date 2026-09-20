@@ -4,6 +4,11 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
+  loadRegistryDirectory,
+  resolveRegistryDirectory,
+  type RegistryDirectoryOptions,
+} from './registry-directory.js';
+import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
@@ -124,8 +129,9 @@ export interface ServiceRuntimeInventory {
   items: ServiceRuntimeInventoryItem[];
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
-  'product/governance/service-runtime-registry.json'
+const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('product/governance/service-runtimes');
+const SERVICE_RUNTIME_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-runtime-registry.schema.json'
 );
 const STATE_VERSION = '1.0.0';
 const SERVICE_RUNTIME_STATE_SCHEMA_PATH = pathResolver.knowledge(
@@ -141,27 +147,31 @@ const serviceRuntimeStateCatalog = defineCatalog<ServiceRuntimeState>({
 let cachedRegistryPath: string | null = null;
 let cachedRegistry: ServiceRuntimeRegistry | null = null;
 
-function getRegistryPath(): string {
-  return assertSafeRepositoryPath(
-    getRegisteredEnvText('KYBERION_SERVICE_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH,
-    { allowMissingLeaf: true }
-  );
-}
-
-const serviceRuntimeRegistryCatalog = defineCatalog<ServiceRuntimeRegistry>({
+const serviceRuntimeDirectoryOptions: RegistryDirectoryOptions = {
   id: 'service-runtime-registry',
-  path: getRegistryPath,
-  schema: pathResolver.knowledge('product/schemas/service-runtime-registry.schema.json'),
-});
+  dirPath: DEFAULT_REGISTRY_DIR,
+  schemaPath: SERVICE_RUNTIME_REGISTRY_SCHEMA_PATH,
+  arrayKey: 'services',
+  idKey: 'service_id',
+  envDirVar: 'KYBERION_SERVICE_RUNTIME_REGISTRY_DIR',
+  envPathVar: 'KYBERION_SERVICE_RUNTIME_REGISTRY_PATH',
+};
 
 function getRegistry(): ServiceRuntimeRegistry {
-  const registryPath = getRegistryPath();
-  if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
+  const { dir, singleFile } = resolveRegistryDirectory(serviceRuntimeDirectoryOptions);
+  const registryKey = singleFile || (dir as string);
+  if (cachedRegistryPath === registryKey && cachedRegistry) return cachedRegistry;
 
-  const parsed = serviceRuntimeRegistryCatalog.load();
-  cachedRegistryPath = registryPath;
-  cachedRegistry = parsed;
-  return parsed;
+  const { headers, items } = loadRegistryDirectory<ServiceRuntimeRecord>(
+    serviceRuntimeDirectoryOptions
+  );
+  cachedRegistryPath = registryKey;
+  cachedRegistry = {
+    version: String(headers['version'] ?? '1.0.0'),
+    default_service_id: String(headers['default_service_id'] ?? ''),
+    services: items,
+  };
+  return cachedRegistry;
 }
 
 function isSupportedPlatform(record: ServiceRuntimeRecord, platform: NodeJS.Platform): boolean {
@@ -368,7 +378,6 @@ async function runHttpProbe(
 export function _resetServiceRuntimeRegistryCacheForTests(): void {
   cachedRegistryPath = null;
   cachedRegistry = null;
-  serviceRuntimeRegistryCatalog.reset();
 }
 
 export function getServiceRuntimeRegistry(): ServiceRuntimeRegistry {

@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.computer_use",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "computer-use-runtime",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "critical",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["browser-step", "inspect-service"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/browser-session-simulation.json"
+      },
+      "status": "experimental",
+      "notes": "Use with approval-aware boundaries for high-risk UI actions. Action trails and receipt traces must remain visible."
+    }
+  ]
+}

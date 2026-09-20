@@ -3,6 +3,7 @@ import {
   readGovernanceJson,
   readServiceEndpointPayloads,
   readServicePresetPayloads,
+  readServiceRuntimePayloads,
 } from './check_contract_schemas_shared.js';
 
 export function createServiceChecks(): ContractCheck[] {
@@ -95,9 +96,7 @@ export function createServiceChecks(): ContractCheck[] {
     {
       id: 'service-runtime-registry',
       schemaPath: 'knowledge/product/schemas/service-runtime-registry.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/service-runtime-registry.json'),
-      ],
+      validPayloads: readServiceRuntimePayloads(),
       invalidPayloads: [
         {
           version: '1.0.0',

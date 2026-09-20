@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "hermes-skills.bundle-registry",
+      "provider": "hermes-agent",
+      "surface_kind": "provider_runtime",
+      "capability_id": "provider.runtime.hermes_skill_bundle_registry",
+      "contract_kind": "capability_bundle",
+      "observation_kind": "bundle_listing+skill_refs",
+      "result_kind": "bundle_result+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "deterministic",
+      "fallback_contract": "orchestrator-actuator",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Hermes skills map well to Kyberion capability bundles and progressive-disclosure task profiles."
+    }
+  ]
+}

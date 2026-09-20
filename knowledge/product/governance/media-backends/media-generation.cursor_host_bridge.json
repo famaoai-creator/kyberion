@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.cursor_host_bridge",
+      "modality": "image",
+      "display_name": "Cursor Host Bridge Image Generation",
+      "kind": "agent_tool",
+      "provider": "cursor",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["jpg", "jpeg", "png", "webp"],
+        "async": false
+      },
+      "cost_tier": "environment",
+      "data_policy": "zero_retention",
+      "execution_locality": "local",
+      "notes": "Requests the Cursor agent host to generate the image via its GenerateImage tool and store it at the governed target path."
+    }
+  ]
+}

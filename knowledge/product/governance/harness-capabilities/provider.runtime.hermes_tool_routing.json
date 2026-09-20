@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "provider.runtime.hermes_tool_routing",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "hermes-agent",
+        "name": "tool-gateway",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["tool-routing", "gateway-vs-direct", "cost-visibility"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "experimental",
+      "notes": "Hermes Tool Gateway is a useful per-tool routing reference, but Kyberion should keep the provider-neutral routing contract."
+    }
+  ]
+}

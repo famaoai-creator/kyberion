@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "bundles": [
+    {
+      "bundle_id": "manim-video-recipes-governed",
+      "status": "conceptual",
+      "kind": "capability-bundle",
+      "summary": "Reusable Manim-style explainer video recipes for math, algorithm, architecture, and paper explainers.",
+      "required_actuators": ["video-composition-actuator", "artifact-actuator"],
+      "references": [
+        "knowledge/public/procedures/media/compose-video-from-adf.md",
+        "knowledge/public/external-wisdom/hermes-agent-absorption-plan-2026-06.md",
+        "knowledge/product/architecture/hyperframes-video-absorption-assessment.md"
+      ]
+    }
+  ]
+}

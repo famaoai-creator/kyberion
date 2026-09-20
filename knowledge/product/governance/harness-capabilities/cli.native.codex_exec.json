@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.codex_exec",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "exec",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["reason-over-code", "generate-patch"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "active",
+      "notes": "Non-interactive Codex execution should be traced and registered as a provider-native reasoning surface."
+    }
+  ]
+}

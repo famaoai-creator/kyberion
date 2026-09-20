@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "grok-api",
+      "provider": "grok-api",
+      "module": "./reasoning-api-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "input_modalities": ["text", "image"]
+      },
+      "env_keys": ["XAI_API_KEY", "KYBERION_GROK_API_KEY"]
+    }
+  ]
+}

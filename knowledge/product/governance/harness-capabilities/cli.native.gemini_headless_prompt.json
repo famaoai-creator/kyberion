@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.gemini_headless_prompt",
+      "source": {
+        "type": "cli_native",
+        "provider": "gemini-cli",
+        "name": "prompt",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["direct_reply", "task_session", "mission"],
+        "intents": ["reason-over-code", "structured-query", "headless-prompt"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "active",
+      "notes": "Gemini headless prompt mode is the primary non-interactive reasoning surface."
+    }
+  ]
+}

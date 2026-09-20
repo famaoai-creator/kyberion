@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "bundles": [
+    {
+      "bundle_id": "meeting-operations-governed",
+      "status": "active",
+      "kind": "capability-bundle",
+      "summary": "Run a governed live meeting workflow through the meeting bridge, browser driver, and follow-up tracking stack.",
+      "intents": ["meeting-operations"],
+      "required_actuators": ["meeting-actuator", "meeting-browser-driver", "wisdom-actuator"],
+      "references": [
+        "knowledge/product/orchestration/meeting-operations-playbook.md",
+        "knowledge/product/orchestration/service-presets/meeting.json"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "gh-cli.repo",
+      "provider": "gh",
+      "surface_kind": "host_native",
+      "capability_id": "cli.native.github_repo_management",
+      "contract_kind": "github_management",
+      "observation_kind": "repo_metadata+config",
+      "result_kind": "repo_action_result+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "service-actuator / github REST preset",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Repository operations can be powerful; keep them routed through governed surfaces."
+    }
+  ]
+}

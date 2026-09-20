@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "provider.runtime.hermes_cron_scheduler",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "hermes-agent",
+        "name": "cron",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["scheduled-workflow", "no-agent-job", "context-chaining"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "knowledge/product/orchestration/schedule-delivery-protocol.md"
+      },
+      "status": "experimental",
+      "notes": "Hermes Cron is a useful reference for pinned scheduled jobs, no-agent checks, and wake-agent style gates."
+    }
+  ]
+}

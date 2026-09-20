@@ -6,6 +6,10 @@ import {
   findUnmanagedGoldenScenarioCatalogs,
   readAgentProfilePayloads,
   readAuthorityRolePayloads,
+  readCapabilityBundlePayloads,
+  readHarnessAdapterPayloads,
+  readHarnessCapabilityPayloads,
+  readToolRuntimePayloads,
   readGovernanceJson,
   readSurfaceManifestPayloads,
   readTeamRolePayloads,
@@ -473,9 +477,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'harness-capability-registry',
       schemaPath: 'knowledge/product/schemas/harness-capability-registry.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/harness-capability-registry.json'),
-      ],
+      validPayloads: readHarnessCapabilityPayloads(),
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -485,9 +487,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'harness-adapter-registry',
       schemaPath: 'knowledge/product/schemas/harness-adapter-registry.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/harness-adapter-registry.json'),
-      ],
+      validPayloads: readHarnessAdapterPayloads(),
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -523,9 +523,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'capability-bundle-registry',
       schemaPath: 'knowledge/product/schemas/capability-bundle-registry.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/capability-bundle-registry.json'),
-      ],
+      validPayloads: readCapabilityBundlePayloads(),
       invalidPayloads: [
         {
           version: '1.0.0',
@@ -606,9 +604,7 @@ function createChecks(): ContractCheck[] {
     {
       id: 'tool-runtime-registry',
       schemaPath: 'knowledge/product/schemas/tool-runtime-registry.schema.json',
-      validPayloads: [
-        readGovernanceJson('knowledge/product/governance/tool-runtime-registry.json'),
-      ],
+      validPayloads: readToolRuntimePayloads(),
       invalidPayloads: [
         {
           version: '1.0.0',

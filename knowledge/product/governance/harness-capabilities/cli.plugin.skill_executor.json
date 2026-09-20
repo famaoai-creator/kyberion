@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.plugin.skill_executor",
+      "source": {
+        "type": "plugin",
+        "provider": "codex-cli",
+        "name": "plugin-skill-executor",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["direct_reply", "task_session"],
+        "intents": ["knowledge-query", "live-query"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "Use for deterministic utility operations exposed by managed plugins."
+    }
+  ]
+}

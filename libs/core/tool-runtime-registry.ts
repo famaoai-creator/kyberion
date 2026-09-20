@@ -1,9 +1,13 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
+import {
+  loadRegistryDirectory,
+  resolveRegistryDirectory,
+  type RegistryDirectoryOptions,
+} from './registry-directory.js';
 import {
   assertSafeRepositoryPath,
   safeExecResult,
@@ -123,9 +127,7 @@ export interface ToolRuntimeInventory {
   items: ToolRuntimeInventoryItem[];
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
-  'product/governance/tool-runtime-registry.json'
-);
+const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('product/governance/tool-runtimes');
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/tool-runtime-registry.schema.json'
 );
@@ -134,17 +136,23 @@ const TOOL_RUNTIME_STATE_SCHEMA_PATH = pathResolver.knowledge(
 );
 const STATE_VERSION = '1.0.0';
 
-function getRegistryPath(): string {
-  const configured =
-    getRegisteredEnvText('KYBERION_TOOL_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH;
-  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
+const toolRuntimeDirectoryOptions: RegistryDirectoryOptions = {
+  id: 'tool-runtime-registry',
+  dirPath: DEFAULT_REGISTRY_DIR,
+  schemaPath: REGISTRY_SCHEMA_PATH,
+  arrayKey: 'tools',
+  idKey: 'tool_id',
+  envDirVar: 'KYBERION_TOOL_RUNTIME_REGISTRY_DIR',
+  envPathVar: 'KYBERION_TOOL_RUNTIME_REGISTRY_PATH',
+};
+
+function directoryCacheKey(): string {
+  const { dir, singleFile } = resolveRegistryDirectory(toolRuntimeDirectoryOptions);
+  return singleFile || (dir as string);
 }
 
-const toolRuntimeRegistryCatalog = defineCatalog<ToolRuntimeRegistry>({
-  id: 'tool-runtime-registry',
-  path: getRegistryPath,
-  schema: REGISTRY_SCHEMA_PATH,
-});
+let cachedRegistryKey: string | null = null;
+let cachedRegistry: ToolRuntimeRegistry | null = null;
 
 const toolRuntimeStateCatalog = defineCatalog<ToolRuntimeState>({
   id: 'tool-runtime-state',
@@ -215,7 +223,19 @@ function normalizeToolId(toolId?: string): string {
 }
 
 function getRegistry(): ToolRuntimeRegistry {
-  return toolRuntimeRegistryCatalog.load();
+  const key = directoryCacheKey();
+  if (cachedRegistryKey !== key || !cachedRegistry) {
+    const { headers, items } = loadRegistryDirectory<ToolRuntimeRecord>(
+      toolRuntimeDirectoryOptions
+    );
+    cachedRegistryKey = key;
+    cachedRegistry = {
+      version: String(headers['version'] ?? '1.0.0'),
+      default_tool_id: String(headers['default_tool_id'] ?? ''),
+      tools: items,
+    };
+  }
+  return cachedRegistry;
 }
 
 function statePathForTool(tool: ToolRuntimeRecord): string {
@@ -225,7 +245,8 @@ function statePathForTool(tool: ToolRuntimeRecord): string {
 }
 
 export function _resetToolRuntimeRegistryCacheForTests(): void {
-  toolRuntimeRegistryCatalog.reset();
+  cachedRegistryKey = null;
+  cachedRegistry = null;
 }
 
 export function getToolRuntimeRegistry(): ToolRuntimeRegistry {

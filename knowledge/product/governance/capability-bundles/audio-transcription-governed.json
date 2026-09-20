@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "bundles": [
+    {
+      "bundle_id": "audio-transcription-governed",
+      "status": "active",
+      "kind": "capability-bundle",
+      "summary": "Transcribe governed audio into a text transcript through the STT bridge and wisdom actuator.",
+      "intents": ["transcribe-audio"],
+      "required_actuators": ["wisdom-actuator", "artifact-actuator"],
+      "references": [
+        "knowledge/public/procedures/media/realtime-voice-conversation.md",
+        "knowledge/product/orchestration/supported-actuators.md"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "order": [
+    "claude-cli",
+    "codex-cli",
+    "claude-agent",
+    "anthropic",
+    "gemini-cli",
+    "gemini-api",
+    "agy-cli",
+    "grok-cli",
+    "grok-api",
+    "copilot",
+    "cursor-cli",
+    "opencode-cli",
+    "local",
+    "ollama",
+    "vllm",
+    "lmstudio",
+    "llamacpp",
+    "mlx",
+    "localai",
+    "nemotron-api",
+    "openrouter",
+    "stub"
+  ]
+}

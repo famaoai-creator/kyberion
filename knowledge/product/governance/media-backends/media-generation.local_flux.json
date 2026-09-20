@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.local_flux",
+      "modality": "image",
+      "display_name": "Local FLUX Image Generation",
+      "kind": "cli",
+      "provider": "mflux",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supports": {
+        "artifact_formats": ["png", "jpg", "jpeg", "webp"],
+        "async": false
+      },
+      "command": "uvx",
+      "args": ["--from", "mflux", "mflux-generate"],
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "fallback_backend_id": "media-generation.comfyui",
+      "notes": "Apple Silicon local FLUX generation via the governed tool runtime registry. Tuned via KYBERION_MFLUX_* env policy."
+    }
+  ]
+}

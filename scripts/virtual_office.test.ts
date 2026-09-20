@@ -48,12 +48,29 @@ describe('virtual office surface', () => {
     const REQUIRED_GOVERNED_CATALOGS = [
       'product/governance/provider-config.json',
       'public/common/project_standards.json',
-      'product/governance/reasoning-provider-registry.json',
     ];
     for (const relPath of REQUIRED_GOVERNED_CATALOGS) {
       const destPath = path.join(tmpRoot, 'knowledge', ...relPath.split('/'));
       fs.mkdirSync(path.dirname(destPath), { recursive: true });
       fs.copyFileSync(fileURLToPath(new URL(`../knowledge/${relPath}`, import.meta.url)), destPath);
+    }
+    // RSP-16: the reasoning provider registry is a canonical per-item directory now.
+    {
+      const srcDir = fileURLToPath(
+        new URL('../knowledge/product/governance/reasoning-providers', import.meta.url)
+      );
+      const destDir = path.join(
+        tmpRoot,
+        'knowledge',
+        'product',
+        'governance',
+        'reasoning-providers'
+      );
+      fs.mkdirSync(destDir, { recursive: true });
+      for (const entry of fs.readdirSync(srcDir)) {
+        if (!entry.endsWith('.json')) continue;
+        fs.copyFileSync(path.join(srcDir, entry), path.join(destDir, entry));
+      }
     }
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.KYBERION_CUSTOMER = 'acme';

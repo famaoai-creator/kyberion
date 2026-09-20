@@ -27,6 +27,10 @@ type GovernanceRuleCheck = {
   id: string;
   schemaPath: string;
   dataPath: string;
+  /** RSP-11+ split directory (canonical). When set, per-item files are merged for the rule check. */
+  dataDir?: string;
+  /** Item array key merged from the directory (e.g. 'capabilities'). */
+  arrayKey?: string;
 };
 
 const GOVERNANCE_DIR = 'knowledge/product/governance';
@@ -128,12 +132,17 @@ const CHECKS: GovernanceRuleCheck[] = [
   {
     id: 'harness-capability-registry',
     schemaPath: 'knowledge/product/schemas/harness-capability-registry.schema.json',
-    dataPath: 'knowledge/product/governance/harness-capability-registry.json',
+    dataPath:
+      'knowledge/product/governance/harness-capabilities/cli.native.browser_interactive.json',
+    dataDir: 'knowledge/product/governance/harness-capabilities',
+    arrayKey: 'capabilities',
   },
   {
     id: 'harness-adapter-registry',
     schemaPath: 'knowledge/product/schemas/harness-adapter-registry.schema.json',
-    dataPath: 'knowledge/product/governance/harness-adapter-registry.json',
+    dataPath: 'knowledge/product/governance/harness-adapters/claude-cowork.desktop.json',
+    dataDir: 'knowledge/product/governance/harness-adapters',
+    arrayKey: 'profiles',
   },
   {
     id: 'provider-capability-scan-policy',
@@ -359,11 +368,58 @@ function allGovernanceRuleChecks(): GovernanceRuleCheck[] {
   return [...checks.values()].sort((left, right) => left.dataPath.localeCompare(right.dataPath));
 }
 
+/**
+ * Read an RSP-11+ split registry directory: validate every per-item envelope
+ * against the schema and return the merged payload for the rule checks.
+ */
+function readSplitRegistryDirectory(
+  check: GovernanceRuleCheck,
+  violations: string[]
+): Record<string, unknown> | null {
+  const dir = pathResolver.rootResolve(check.dataDir as string);
+  const arrayKey = check.arrayKey as string;
+  if (!safeExistsSync(dir)) {
+    violations.push(`${check.id}: canonical directory is missing (${check.dataDir})`);
+    return null;
+  }
+  const validate = compileSchema(check.schemaPath);
+  const items: unknown[] = [];
+  let headers: Record<string, unknown> | null = null;
+  for (const file of safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
+    .sort()) {
+    const payload = readSafeJsonFile<Record<string, unknown>>(
+      path.join(dir, file),
+      `governance catalog ${check.dataDir}/${file}`
+    );
+    if (!validate(payload)) {
+      for (const error of validate.errors || []) {
+        violations.push(
+          `${check.id}: ${file}${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
+      }
+      continue;
+    }
+    const raw = payload[arrayKey];
+    if (!Array.isArray(raw)) continue;
+    items.push(...raw);
+    const fileHeaders: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      if (key !== arrayKey && key !== '$schema') fileHeaders[key] = value;
+    }
+    if (!headers) headers = fileHeaders;
+  }
+  return { ...(headers || {}), [arrayKey]: items };
+}
+
 function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
-  const data = readSafeJsonFile<Record<string, unknown>>(
-    pathResolver.rootResolve(check.dataPath),
-    `governance catalog ${check.dataPath}`
-  );
+  const data = check.dataDir
+    ? readSplitRegistryDirectory(check, violations)
+    : readSafeJsonFile<Record<string, unknown>>(
+        pathResolver.rootResolve(check.dataPath),
+        `governance catalog ${check.dataPath}`
+      );
+  if (!data) return;
   const validate = compileSchema(check.schemaPath);
   const ok = validate(data);
   if (!ok) {

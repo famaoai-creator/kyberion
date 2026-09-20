@@ -556,7 +556,7 @@
         "knowledge/product/governance/intent-domain-ontology.json",
         "knowledge/product/governance/intent-routing-map.json",
         "knowledge/product/governance/gate-profiles/gate-profile-registry.json",
-        "knowledge/product/governance/governance-body-registry.json",
+        "knowledge/product/governance/governance-bodies/",
         "active/shared/tmp/workflow-registration-proposals"
       ]
     }
