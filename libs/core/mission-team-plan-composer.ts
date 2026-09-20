@@ -12,6 +12,7 @@ import {
   type TeamProviderPreference,
 } from './team-role-assignment-selection.js';
 import { resolveTaskModelHint } from './reasoning-model-routing.js';
+import { resolveAlwaysStaffedRoles } from './team-composition-obligations.js';
 import {
   mapMissionClassToMissionTypeTemplate,
   resolveMissionClassification,
@@ -107,7 +108,11 @@ export interface MissionTeamLifecyclePolicy {
 export interface MissionTeamCompositionSummary {
   required_roles: string[];
   optional_roles: string[];
+  /** Roles staffed right now (status `assigned`). */
   assigned_roles: string[];
+  /** TC-01: roster roles with a resolved candidate that are not staffed yet. */
+  standby_roles?: string[];
+  /** Required roles with no compatible actor in the pool — a real gap. */
   unfilled_required_roles: string[];
 }
 
@@ -203,8 +208,13 @@ function buildTeamGovernance(
   const assignedRoles = assignments
     .filter((entry) => entry.status === 'assigned')
     .map((entry) => entry.team_role);
+  const standbyRoles = assignments
+    .filter((entry) => entry.status === 'standby')
+    .map((entry) => entry.team_role);
+  // TC-01: a standby role is staffed on demand and is not a gap. Only a role
+  // with no compatible actor in the pool counts as unfilled.
   const unfilledRequiredRoles = assignments
-    .filter((entry) => entry.required && entry.status !== 'assigned')
+    .filter((entry) => entry.required && entry.status === 'unfilled')
     .map((entry) => entry.team_role);
   return {
     lifecycle,
@@ -212,6 +222,7 @@ function buildTeamGovernance(
       required_roles: [...template.required_roles],
       optional_roles: [...template.optional_roles],
       assigned_roles: assignedRoles,
+      standby_roles: standbyRoles,
       unfilled_required_roles: unfilledRequiredRoles,
     },
   };
@@ -273,6 +284,26 @@ export function summarizeMissionOrganizationProfile(
     team_template_catalog_id: organizationProfile.team_defaults?.team_template_catalog_id,
     default_agent_profile: organizationProfile.mission_defaults?.default_agent_profile,
   };
+}
+
+/**
+ * TC-01: demand-driven staffing.
+ *
+ * Composition resolves a candidate actor for every roster role — that is what
+ * keeps a staffing gap visible at creation time — but only the structural
+ * roles start staffed. Everything else waits on standby until work demands
+ * it, so a mission no longer carries staffing records, provisioned identities
+ * and runtime slots for roles it never uses. Promotion is a pure state
+ * transition over the already-selected candidate (see
+ * `promoteMissionTeamPlanRoles`), so it never re-runs selection.
+ */
+function applyStaffingPolicy(assignments: MissionTeamAssignment[]): MissionTeamAssignment[] {
+  const alwaysStaffedRoles = resolveAlwaysStaffedRoles();
+  return assignments.map((assignment) =>
+    assignment.status === 'assigned' && !alwaysStaffedRoles.has(assignment.team_role)
+      ? { ...assignment, status: 'standby' as const }
+      : assignment
+  );
 }
 
 export function composeMissionTeamPlan(input: {
@@ -489,6 +520,8 @@ export function composeMissionTeamPlan(input: {
     );
   }
 
+  const staffedAssignments = applyStaffingPolicy(assignments);
+
   return {
     mission_id: input.missionId,
     mission_type: missionType,
@@ -515,8 +548,8 @@ export function composeMissionTeamPlan(input: {
     organization_chart: organizationChart,
     mission_classification: missionClassification,
     generated_at: nowIso(),
-    team_governance: buildTeamGovernance(template, assignments),
-    assignments,
+    team_governance: buildTeamGovernance(template, staffedAssignments),
+    assignments: staffedAssignments,
   };
 }
 
@@ -589,7 +622,7 @@ export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {
     expectedTenant &&
     plan.assignments.some(
       (assignment) =>
-        assignment.status === 'assigned' && assignment.security_scope?.tenant_id !== expectedTenant
+        assignment.status !== 'unfilled' && assignment.security_scope?.tenant_id !== expectedTenant
     )
   ) {
     return null;
@@ -597,7 +630,7 @@ export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {
   if (
     plan.assignments.some(
       (assignment) =>
-        assignment.status === 'assigned' &&
+        assignment.status !== 'unfilled' &&
         isObsoleteAgentRuntimeProvider(assignment.provider || undefined)
     )
   ) {
@@ -629,6 +662,60 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
   });
 }
 
+/**
+ * TC-02: promote standby roles to staffed, in place, without re-running
+ * selection. The candidate actor, authority role, delegation contract and
+ * security scope were all resolved at composition time, so a promotion is a
+ * pure state transition over the recorded plan — the same mission always
+ * promotes the same actor for the same role.
+ *
+ * Roles that are `unfilled` (no compatible actor in the pool) are not
+ * promotable and are reported by the caller as gaps.
+ */
+export function promoteMissionTeamPlanRoles(
+  plan: MissionTeamPlan,
+  teamRoles: string[]
+): { plan: MissionTeamPlan; promoted: string[] } {
+  const requestedRoles = new Set(teamRoles);
+  const promoted: string[] = [];
+  const assignments = plan.assignments.map((assignment) => {
+    if (
+      assignment.status !== 'standby' ||
+      !requestedRoles.has(assignment.team_role) ||
+      !assignment.agent_id
+    ) {
+      return assignment;
+    }
+    promoted.push(assignment.team_role);
+    return { ...assignment, status: 'assigned' as const };
+  });
+  if (promoted.length === 0) return { plan, promoted };
+
+  const team_governance = plan.team_governance
+    ? {
+        ...plan.team_governance,
+        composition: {
+          ...plan.team_governance.composition,
+          assigned_roles: assignments
+            .filter((entry) => entry.status === 'assigned')
+            .map((entry) => entry.team_role),
+          standby_roles: assignments
+            .filter((entry) => entry.status === 'standby')
+            .map((entry) => entry.team_role),
+        },
+      }
+    : undefined;
+
+  return {
+    plan: {
+      ...plan,
+      assignments,
+      ...(team_governance ? { team_governance } : {}),
+    },
+    promoted,
+  };
+}
+
 export function getMissionTeamAssignment(
   plan: MissionTeamPlan,
   teamRole: string
@@ -645,7 +732,12 @@ export function resolveMissionTeamReceiver(input: {
   const plan = loadMissionTeamPlan(input.missionId);
   if (!plan) return null;
   const assignment = getMissionTeamAssignment(plan, input.teamRole);
-  if (!assignment || assignment.status !== 'assigned' || !assignment.agent_id) return null;
+  // TC-01: resolving "who holds this role" is a read of the roster, not a
+  // staffing act. A standby role already has its candidate resolved, so
+  // readers (dispatch routing, review independence, context packs) keep
+  // working; staffing stays a separate governed step
+  // (`staffMissionTeamRoles`).
+  if (!assignment || assignment.status === 'unfilled' || !assignment.agent_id) return null;
   const excludedAgentIds = new Set(
     (input.excludedAgentIds || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
   );
@@ -716,7 +808,8 @@ export type {
 export function buildMissionTeamView(plan: MissionTeamPlan): Record<string, string> {
   const view: Record<string, string> = {};
   for (const assignment of plan.assignments) {
-    if (assignment.status === 'assigned' && assignment.agent_id) {
+    // The view is the roster (who holds each role), not the staffed subset.
+    if (assignment.status !== 'unfilled' && assignment.agent_id) {
       view[assignment.team_role] = assignment.agent_id;
     }
   }

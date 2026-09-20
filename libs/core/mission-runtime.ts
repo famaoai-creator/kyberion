@@ -34,9 +34,14 @@ function emitTeamSummary(plan: {
   const assignedRoles = plan.assignments.filter(
     (assignment) => assignment.status === 'assigned'
   ).length;
+  const standbyRoles = plan.assignments.filter(
+    (assignment) => assignment.status === 'standby'
+  ).length;
   const requiredRoles = plan.assignments.filter((assignment) => assignment.required).length;
+  // TC-01: standby is "staffed on demand", not a gap. Only a role with no
+  // compatible actor in the pool is reported as unfilled.
   const unfilledRequiredRoles = plan.assignments.filter(
-    (assignment) => assignment.required && assignment.status !== 'assigned'
+    (assignment) => assignment.required && assignment.status === 'unfilled'
   ).length;
   const organizationLabel = plan.organization_profile
     ? `${plan.organization_profile.name} (${plan.organization_profile.organization_id})`
@@ -47,7 +52,7 @@ function emitTeamSummary(plan: {
     `[team] org=${organizationLabel} template=${plan.template} default=${defaultTemplate} catalog=${catalog}`
   );
   logger.info(
-    `[team] assignments=${plan.assignments.length} required=${requiredRoles} assigned=${assignedRoles} unfilled_required=${unfilledRequiredRoles}`
+    `[team] roster=${plan.assignments.length} required=${requiredRoles} staffed=${assignedRoles} standby=${standbyRoles} unfilled_required=${unfilledRequiredRoles}`
   );
 }
 
@@ -68,6 +73,7 @@ function emitRuntimeSummary(plan: {
   const counts = {
     spawned: 0,
     already_ready: 0,
+    standby: 0,
     unfilled: 0,
     failed: 0,
   };
@@ -85,7 +91,7 @@ function emitRuntimeSummary(plan: {
     `[staff] org=${organizationLabel} default=${defaultTemplate} catalog=${catalog} assignments=${plan.assignments.length}`
   );
   logger.info(
-    `[staff] spawned=${counts.spawned} already_ready=${counts.already_ready} unfilled=${counts.unfilled} failed=${counts.failed}`
+    `[staff] spawned=${counts.spawned} already_ready=${counts.already_ready} standby=${counts.standby} unfilled=${counts.unfilled} failed=${counts.failed}`
   );
 }
 
@@ -120,7 +126,7 @@ export function showMissionTeam(
     state.tenant_slug &&
     existingPlan.assignments.some(
       (assignment) =>
-        assignment.status === 'assigned' &&
+        assignment.status !== 'unfilled' &&
         assignment.security_scope?.tenant_id !== state.tenant_slug
     )
   );
@@ -192,7 +198,7 @@ export async function staffMissionTeam(
     state.tenant_slug &&
     existingPlan.assignments.some(
       (assignment) =>
-        assignment.status === 'assigned' &&
+        assignment.status !== 'unfilled' &&
         assignment.security_scope?.tenant_id !== state.tenant_slug
     )
   );

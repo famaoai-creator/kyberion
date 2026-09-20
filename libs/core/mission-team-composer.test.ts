@@ -7,6 +7,7 @@ import { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-b
 import {
   composeMissionTeamPlan,
   loadMissionTeamPlan,
+  promoteMissionTeamPlanRoles,
   resolveMissionTeamReceiver,
   resolveMissionTeamPlan,
   writeMissionTeamPlan,
@@ -61,7 +62,7 @@ describe('mission-team-composer classification integration', () => {
     expect(plan.template).toBe('research');
     const owner = plan.assignments.find((assignment) => assignment.team_role === 'owner');
     const researcher = plan.assignments.find((assignment) => assignment.team_role === 'researcher');
-    expect(researcher?.status).toBe('assigned');
+    expect(researcher?.status).toBe('standby');
     expect(researcher?.agent_id).toBeTruthy();
     expect(researcher?.agent_id).not.toBe(owner?.agent_id);
     expect(researcher?.delegation_contract?.ownership_scope).toContain('research packet');
@@ -451,5 +452,73 @@ describe('mission-team-composer classification integration', () => {
         safeRmSync(missionPath, { recursive: true, force: true });
       });
     }
+  });
+});
+
+describe('demand-driven staffing (TC-01/TC-02)', () => {
+  const composeDevelopmentPlan = () =>
+    composeMissionTeamPlan({
+      missionId: 'MSN-STAFFING-001',
+      missionType: 'development',
+      tier: 'public',
+    });
+
+  it('staffs only the structural roles and keeps the rest on standby', () => {
+    const plan = composeDevelopmentPlan();
+
+    expect(plan.team_governance?.composition.assigned_roles).toEqual(['owner', 'orchestrator']);
+    const nonStructural = plan.assignments.filter(
+      (assignment) => !['owner', 'orchestrator'].includes(assignment.team_role)
+    );
+    expect(nonStructural.length).toBeGreaterThan(0);
+    for (const assignment of nonStructural) {
+      expect(assignment.status).toBe('standby');
+      // The candidate is resolved at composition time, so a staffing gap is
+      // visible now and promotion never has to re-run selection.
+      expect(assignment.agent_id).toBeTruthy();
+      expect(assignment.authority_role).toBeTruthy();
+    }
+  });
+
+  it('does not count standby roles as unfilled required roles', () => {
+    const plan = composeDevelopmentPlan();
+    expect(plan.team_governance?.composition.unfilled_required_roles).toEqual([]);
+    expect(plan.team_governance?.composition.standby_roles).toEqual(
+      expect.arrayContaining(['implementer', 'reviewer'])
+    );
+  });
+
+  it('composes the same candidates on every run', () => {
+    const first = composeDevelopmentPlan();
+    const second = composeDevelopmentPlan();
+    expect(
+      second.assignments.map((entry) => [entry.team_role, entry.status, entry.agent_id])
+    ).toEqual(first.assignments.map((entry) => [entry.team_role, entry.status, entry.agent_id]));
+  });
+
+  it('promotes only the demanded standby roles', () => {
+    const plan = composeDevelopmentPlan();
+    const before = plan.assignments.find((entry) => entry.team_role === 'implementer');
+
+    const { plan: promotedPlan, promoted } = promoteMissionTeamPlanRoles(plan, ['implementer']);
+
+    expect(promoted).toEqual(['implementer']);
+    const implementer = promotedPlan.assignments.find((entry) => entry.team_role === 'implementer');
+    expect(implementer?.status).toBe('assigned');
+    // Promotion is a pure state transition over the recorded candidate.
+    expect(implementer?.agent_id).toBe(before?.agent_id);
+    expect(implementer?.provider).toBe(before?.provider);
+    expect(promotedPlan.team_governance?.composition.assigned_roles).toContain('implementer');
+    expect(promotedPlan.team_governance?.composition.standby_roles).not.toContain('implementer');
+    expect(promotedPlan.assignments.find((entry) => entry.team_role === 'reviewer')?.status).toBe(
+      'standby'
+    );
+  });
+
+  it('leaves the plan untouched when nothing is promotable', () => {
+    const plan = composeDevelopmentPlan();
+    const { plan: unchanged, promoted } = promoteMissionTeamPlanRoles(plan, ['owner']);
+    expect(promoted).toEqual([]);
+    expect(unchanged).toBe(plan);
   });
 });
