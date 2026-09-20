@@ -22,10 +22,11 @@
  */
 
 import * as path from 'node:path';
-import { defineCatalog } from './foundation/governed-catalog.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
 
 export interface RegistryDirectoryOptions {
   /** Catalog id used for schema-bound loading (e.g. 'capability-bundle-registry'). */
@@ -55,6 +56,13 @@ export interface RegistryDirectoryResult<TItem> {
   source: string;
 }
 
+type CachedRegistryDirectoryResult = {
+  fingerprint: string;
+  result: RegistryDirectoryResult<unknown>;
+};
+
+const registryDirectoryCache = new Map<string, CachedRegistryDirectoryResult>();
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -66,6 +74,74 @@ function headerOf(envelope: Record<string, unknown>, arrayKey: string): Record<s
     headers[key] = value;
   }
   return headers;
+}
+
+function registryCacheKey(options: RegistryDirectoryOptions, source: string): string {
+  return JSON.stringify({
+    id: options.id,
+    schemaPath: options.schemaPath,
+    arrayKey: options.arrayKey,
+    idKey: options.idKey,
+    source,
+  });
+}
+
+function fileFingerprint(filePath: string): string {
+  const stat = safeLstat(filePath);
+  return `${stat.mtimeMs}:${stat.size}`;
+}
+
+function copyCachedResult<TItem>(
+  result: RegistryDirectoryResult<unknown>
+): RegistryDirectoryResult<TItem> {
+  return {
+    headers: structuredClone(result.headers),
+    items: structuredClone(result.items as TItem[]),
+    source: result.source,
+  };
+}
+
+function readCachedResult<TItem>(
+  key: string,
+  fingerprint: string
+): RegistryDirectoryResult<TItem> | undefined {
+  const cached = registryDirectoryCache.get(key);
+  if (!cached || cached.fingerprint !== fingerprint) return undefined;
+  return copyCachedResult<TItem>(cached.result);
+}
+
+function writeCachedResult<TItem>(
+  key: string,
+  fingerprint: string,
+  result: RegistryDirectoryResult<TItem>
+): void {
+  registryDirectoryCache.set(key, {
+    fingerprint,
+    result: {
+      headers: structuredClone(result.headers),
+      items: structuredClone(result.items),
+      source: result.source,
+    },
+  });
+}
+
+function createEnvelopeCatalog(
+  options: RegistryDirectoryOptions,
+  source: string
+): GovernedCatalog<Record<string, unknown>> {
+  return defineCatalog<Record<string, unknown>>({
+    id: options.id,
+    path: () => source,
+    schema: options.schemaPath,
+  });
+}
+
+function loadEnvelopeWithCatalog(
+  catalog: GovernedCatalog<Record<string, unknown>>,
+  filePath: string
+): Record<string, unknown> {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  return catalog.validate(readJson<unknown>(safePath), safePath);
 }
 
 /**
@@ -111,14 +187,23 @@ export function loadRegistryDirectory<TItem extends object>(
 ): RegistryDirectoryResult<TItem> {
   const { dir, singleFile } = resolveRegistryDirectory(options);
   if (singleFile) {
-    const envelope = loadRegistryEnvelope<Record<string, unknown>>(options, singleFile);
+    const safeSingleFile = assertSafeRepositoryPath(singleFile, { allowMissingLeaf: true });
+    const fingerprint = safeExistsSync(safeSingleFile) ? fileFingerprint(safeSingleFile) : null;
+    const key = registryCacheKey(options, safeSingleFile);
+    if (fingerprint) {
+      const cached = readCachedResult<TItem>(key, fingerprint);
+      if (cached) return cached;
+    }
+    const envelope = loadRegistryEnvelope<Record<string, unknown>>(options, safeSingleFile);
     const raw = envelope[options.arrayKey];
     if (!Array.isArray(raw)) {
       throw new Error(`[${options.id}] single-file registry has no array '${options.arrayKey}'`);
     }
     // Preserve file order: single files carry a deliberate order.
     const items = [...(raw as TItem[])];
-    return { headers: headerOf(envelope, options.arrayKey), items, source: singleFile };
+    const result = { headers: headerOf(envelope, options.arrayKey), items, source: safeSingleFile };
+    if (fingerprint) writeCachedResult(key, fingerprint, result);
+    return result;
   }
 
   const safeDir = assertSafeRepositoryPath(dir as string, { allowMissingLeaf: true });
@@ -135,14 +220,24 @@ export function loadRegistryDirectory<TItem extends object>(
     throw new Error(`[${options.id}] registry directory is empty: ${dir}`);
   }
 
+  const indexPath = path.join(safeDir, 'index.json');
+  const fingerprint = [
+    safeExistsSync(indexPath) ? `index:${fileFingerprint(indexPath)}` : 'index:missing',
+    ...files.map((file) => `${file}:${fileFingerprint(path.join(safeDir, file))}`),
+  ].join('|');
+  const key = registryCacheKey(options, safeDir);
+  const cached = readCachedResult<TItem>(key, fingerprint);
+  if (cached) return cached;
+
   const items: TItem[] = [];
   const seen = new Set<string>();
   let headers: Record<string, unknown> | null = null;
+  // One catalog instance shares the compiled AJV validator across every item
+  // file. Creating a catalog inside the loop recompiles the same schema for
+  // every provider/model/runtime entry.
+  const envelopeCatalog = createEnvelopeCatalog(options, safeDir);
   for (const file of files) {
-    const envelope = loadRegistryEnvelope<Record<string, unknown>>(
-      options,
-      path.join(safeDir, file)
-    );
+    const envelope = loadEnvelopeWithCatalog(envelopeCatalog, path.join(safeDir, file));
     const raw = envelope[options.arrayKey];
     if (!Array.isArray(raw) || raw.length !== 1) {
       throw new Error(
@@ -181,7 +276,14 @@ export function loadRegistryDirectory<TItem extends object>(
     )
   );
   applyDirectoryIndexOrder(options, safeDir, items);
-  return { headers: headers ?? {}, items, source: safeDir };
+  const result = { headers: headers ?? {}, items, source: safeDir };
+  writeCachedResult(key, fingerprint, result);
+  return result;
+}
+
+/** Clear directory-loader state between tests that reuse the same paths. */
+export function resetRegistryDirectoryCacheForTests(): void {
+  registryDirectoryCache.clear();
 }
 
 /**
