@@ -10,19 +10,7 @@
     "active/shared/observability/mission-control/",
     "active/audit/"
   ],
-  "scope_classes": [
-    "communication_surface",
-    "coordination_runtime",
-    "observability",
-    "audit"
-  ],
-  "allowed_actuators": [
-    "presence-actuator",
-    "artifact-actuator",
-    "approval-actuator"
-  ],
-  "tier_access": [
-    "public",
-    "confidential"
-  ]
+  "scope_classes": ["communication_surface", "coordination_runtime", "observability", "audit"],
+  "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
+  "tier_access": ["public", "confidential"]
 }

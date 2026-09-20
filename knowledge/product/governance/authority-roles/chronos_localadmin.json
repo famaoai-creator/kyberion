@@ -17,13 +17,6 @@
     "operations_runtime",
     "audit"
   ],
-  "allowed_actuators": [
-    "presence-actuator",
-    "artifact-actuator",
-    "approval-actuator"
-  ],
-  "tier_access": [
-    "public",
-    "confidential"
-  ]
+  "allowed_actuators": ["presence-actuator", "artifact-actuator", "approval-actuator"],
+  "tier_access": ["public", "confidential"]
 }
