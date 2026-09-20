@@ -6,6 +6,8 @@ import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js'
 import { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-brief-composer.js';
 import {
   composeMissionTeamPlan,
+  diagnoseMissionTeamRoleGap,
+  extendMissionTeamPlanRoster,
   loadMissionTeamPlan,
   promoteMissionTeamPlanRoles,
   resolveMissionTeamReceiver,
@@ -562,5 +564,152 @@ describe('staffing state across recomposition (TC-01)', () => {
         safeRmSync(missionPath, { recursive: true, force: true });
       });
     }
+  });
+});
+
+describe('mid-mission restaffing (TC-06)', () => {
+  const developmentPlan = () =>
+    composeMissionTeamPlan({
+      missionId: 'MSN-RESTAFF-001',
+      missionType: 'development',
+      tier: 'public',
+    });
+
+  it('adds a role the roster does not carry', () => {
+    const plan = developmentPlan();
+    expect(plan.assignments.some((entry) => entry.team_role === 'researcher')).toBe(false);
+
+    const {
+      plan: extended,
+      added,
+      refusal,
+    } = extendMissionTeamPlanRoster(plan, {
+      teamRole: 'researcher',
+    });
+
+    expect(refusal).toBeUndefined();
+    expect(added?.team_role).toBe('researcher');
+    expect(added?.agent_id).toBeTruthy();
+    expect(added?.role_sources).toEqual(['restaff']);
+    // A restaffed member is demanded now, so it joins staffed rather than on standby.
+    expect(added?.status).toBe('assigned');
+    expect(extended.team_governance?.composition.assigned_roles).toContain('researcher');
+    expect(extended.team_governance?.composition.required_roles).toContain('researcher');
+  });
+
+  it('applies the same separation-of-duties rules as composition', () => {
+    const plan = developmentPlan();
+    const owner = plan.assignments.find((entry) => entry.team_role === 'owner');
+    const { added } = extendMissionTeamPlanRoster(plan, { teamRole: 'researcher' });
+    // researcher must be independent of the owner
+    expect(added?.agent_id).not.toBe(owner?.agent_id);
+  });
+
+  it('leaves the lifecycle cap real headroom above the composed roster', () => {
+    const plan = developmentPlan();
+    // Every authored template declares max_members == its own roster size,
+    // which made the cap unreachable and blocked all restaffing.
+    expect(plan.team_governance?.lifecycle.max_members).toBeGreaterThan(plan.assignments.length);
+  });
+
+  it('refuses a role that is already on the roster', () => {
+    const plan = developmentPlan();
+    const { added, refusal } = extendMissionTeamPlanRoster(plan, { teamRole: 'reviewer' });
+    expect(added).toBeNull();
+    expect(refusal).toBe('already_on_roster');
+  });
+
+  it('refuses an unknown team role', () => {
+    const { added, refusal } = extendMissionTeamPlanRoster(developmentPlan(), {
+      teamRole: 'chief-vibes-officer',
+    });
+    expect(added).toBeNull();
+    expect(refusal).toBe('unknown_team_role');
+  });
+
+  it('refuses past the lifecycle max_members cap', () => {
+    const plan = developmentPlan();
+    const capped = {
+      ...plan,
+      team_governance: plan.team_governance && {
+        ...plan.team_governance,
+        lifecycle: { ...plan.team_governance.lifecycle, max_members: plan.assignments.length },
+      },
+    };
+    const { added, refusal } = extendMissionTeamPlanRoster(capped, { teamRole: 'researcher' });
+    expect(added).toBeNull();
+    expect(refusal).toBe('max_members_reached');
+  });
+
+  it('never falls back to an excluded actor', () => {
+    const plan = developmentPlan();
+    // Exclude every agent eligible for the role: composition would fall back
+    // to an excluded actor rather than leave the role unstaffed; restaffing
+    // must refuse instead.
+    const probe = extendMissionTeamPlanRoster(plan, { teamRole: 'researcher' });
+    expect(probe.added?.agent_id).toBeTruthy();
+    const { added, refusal } = extendMissionTeamPlanRoster(plan, {
+      teamRole: 'researcher',
+      excludeAgentIds: ['sovereign-brain', 'control-plane-agent', 'reasoning-worker'],
+    });
+    expect(added).toBeNull();
+    expect(refusal).toBe('no_compatible_actor');
+  });
+
+  it('refuses when no eligible actor holds a demanded capability', () => {
+    const { added, refusal } = extendMissionTeamPlanRoster(developmentPlan(), {
+      teamRole: 'researcher',
+      requiredCapabilities: ['time-travel'],
+    });
+    expect(added).toBeNull();
+    expect(refusal).toBe('no_compatible_actor');
+  });
+});
+
+describe('role gap diagnosis (TC-07)', () => {
+  const missionId = 'MSN-ROLE-GAP-001';
+  const missionPath = pathResolver.missionDir(missionId, 'public');
+
+  const withPersistedPlan = (run: () => void) => {
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(missionPath, { recursive: true });
+        writeMissionTeamPlan(
+          missionPath,
+          composeMissionTeamPlan({ missionId, missionType: 'development', tier: 'public' })
+        );
+        run();
+      });
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
+  };
+
+  it('reports a role the roster does not carry as restaffable', () => {
+    withPersistedPlan(() => {
+      const gap = diagnoseMissionTeamRoleGap({ missionId, teamRole: 'researcher' });
+      expect(gap.kind).toBe('role_not_on_roster');
+    });
+  });
+
+  it('reports no gap for a role the roster carries', () => {
+    withPersistedPlan(() => {
+      expect(diagnoseMissionTeamRoleGap({ missionId, teamRole: 'reviewer' }).kind).toBe('none');
+    });
+  });
+
+  it('names the capabilities no eligible actor holds', () => {
+    withPersistedPlan(() => {
+      const gap = diagnoseMissionTeamRoleGap({
+        missionId,
+        teamRole: 'reviewer',
+        requiredCapabilities: ['time-travel'],
+      });
+      expect(gap.kind).toBe('no_capable_actor');
+      expect(gap.missing_capabilities).toEqual(['time-travel']);
+      expect(gap.eligible_agent_ids.length).toBeGreaterThan(0);
+    });
   });
 });

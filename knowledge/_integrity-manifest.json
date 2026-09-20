@@ -3663,7 +3663,7 @@
     {
       "path": "product/governance/team-composition-obligations.json",
       "tier": "public",
-      "size": 1914,
+      "size": 1938,
       "type": "json"
     },
     {
@@ -9261,7 +9261,7 @@
     {
       "path": "product/schemas/mission-event.schema.json",
       "tier": "public",
-      "size": 2462,
+      "size": 2496,
       "type": "json"
     },
     {
@@ -9441,7 +9441,7 @@
     {
       "path": "product/schemas/mission-team-plan.schema.json",
       "tier": "public",
-      "size": 7602,
+      "size": 7653,
       "type": "json"
     },
     {
@@ -11109,7 +11109,7 @@
     {
       "path": "product/schemas/team-composition-obligations.schema.json",
       "tier": "public",
-      "size": 2222,
+      "size": 2593,
       "type": "json"
     },
     {

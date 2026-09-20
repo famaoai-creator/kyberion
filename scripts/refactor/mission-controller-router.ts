@@ -350,6 +350,12 @@ export interface MissionControllerRoutingContext {
     teamRolesArg?: string,
     organizationId?: string
   ) => Awaitable<unknown>;
+  restaffMissionTeam: (
+    id: string,
+    teamRole: string,
+    options: { requiredCapabilities?: string[]; excludeAgentIds?: string[]; reason?: string },
+    organizationId?: string
+  ) => Awaitable<unknown>;
   classifyMission: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
   selectMissionWorkflow: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
   planProcessTemplateTasks: (args: {
@@ -1177,6 +1183,38 @@ export async function runMissionControllerAction(
       );
       if (prewarmSummary !== undefined) {
         context.print?.(JSON.stringify(prewarmSummary, null, 2));
+      }
+      break;
+    }
+    case 'restaff': {
+      if (!arg2) {
+        throw new Error('[RESTAFF_ROLE_REQUIRED] Usage: restaff <MISSION_ID> <TEAM_ROLE>');
+      }
+      const csv = (value?: string) =>
+        value
+          ? value
+              .split(',')
+              .map((entry) => entry.trim())
+              .filter(Boolean)
+          : undefined;
+      const restaffSummary = await context.restaffMissionTeam(
+        arg1!,
+        arg2,
+        {
+          ...(csv(getValue('--capabilities', context.argv))
+            ? { requiredCapabilities: csv(getValue('--capabilities', context.argv))! }
+            : {}),
+          ...(csv(getValue('--exclude', context.argv))
+            ? { excludeAgentIds: csv(getValue('--exclude', context.argv))! }
+            : {}),
+          ...(getValue('--reason', context.argv)
+            ? { reason: getValue('--reason', context.argv)! }
+            : {}),
+        },
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+      );
+      if (restaffSummary !== undefined) {
+        context.print?.(JSON.stringify(restaffSummary, null, 2));
       }
       break;
     }

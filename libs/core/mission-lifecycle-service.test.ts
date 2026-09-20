@@ -35,6 +35,7 @@ function makeStubSystem(): MissionLifecycleUnderlyingSystem {
     finishMission: vi.fn(async () => undefined),
     staffMissionTeam: vi.fn(async () => ({ ok: true }) as any),
     prewarmMissionTeam: vi.fn(async () => ({ status: 'queued' }) as any),
+    restaffMissionTeam: vi.fn(async () => ({ status: 'added' }) as any),
     dispatchMissionWorkItems: vi.fn(async () => ({ ok: true }) as any),
     pauseMission: vi.fn(async () => undefined),
     resumeMission: vi.fn(async () => undefined),
@@ -110,6 +111,11 @@ describe('mission-lifecycle-service — fail-closed execution-context gate', () 
     [
       'prewarm',
       (facade: ReturnType<typeof buildMissionLifecycleService>) => facade.prewarm(missionId),
+    ],
+    [
+      'restaff',
+      (facade: ReturnType<typeof buildMissionLifecycleService>) =>
+        facade.restaff(missionId, 'reviewer'),
     ],
     [
       'dispatch',
