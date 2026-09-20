@@ -1161,7 +1161,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 11928,
+      "size": 14075,
       "type": "json"
     },
     {
@@ -2779,6 +2779,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/model-role-fitness-probes.json",
+      "tier": "public",
+      "size": 4318,
+      "type": "json"
+    },
+    {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
       "size": 5324,
@@ -3357,7 +3363,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 21583,
+      "size": 22912,
       "type": "json"
     },
     {
@@ -9586,6 +9592,12 @@
       "path": "product/schemas/model-role-feedback.schema.json",
       "tier": "public",
       "size": 811,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/model-role-fitness-probes.schema.json",
+      "tier": "public",
+      "size": 2555,
       "type": "json"
     },
     {

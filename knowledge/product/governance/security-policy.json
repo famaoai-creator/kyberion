@@ -559,6 +559,14 @@
         "knowledge/product/governance/governance-bodies/",
         "active/shared/tmp/workflow-registration-proposals"
       ]
+    },
+    "evaluate_model_role_fitness": {
+      "allow_read": [
+        "knowledge/product/governance/",
+        "knowledge/product/schemas/",
+        "active/shared/observability/retrospectives/"
+      ],
+      "allow_write": ["active/shared/observability/retrospectives/"]
     }
   },
   "authority_permissions": {

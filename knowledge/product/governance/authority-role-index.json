@@ -253,6 +253,14 @@
       "scope_classes": ["capability_registration", "tenant_configuration", "audit"],
       "allowed_actuators": ["service-actuator", "voice-actuator", "file-actuator"],
       "tier_access": ["public", "confidential"]
+    },
+    "evaluate_model_role_fitness": {
+      "description": "TC-15: role-fitness evaluator authority. Runs the governed model role-fitness probes and appends their verdicts. Its only write scope is that journal — it measures models, it never staffs, dispatches or reconfigures anything.",
+      "default_persona": "worker",
+      "write_scopes": ["active/shared/observability/retrospectives/"],
+      "scope_classes": ["observability"],
+      "allowed_actuators": [],
+      "tier_access": ["public"]
     }
   }
 }

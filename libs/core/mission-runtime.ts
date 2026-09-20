@@ -411,3 +411,38 @@ export async function proposeMissionRoster(
   );
   return { outcome, summary };
 }
+
+/**
+ * TC-18: operator entry point for consulting a mission's own team.
+ */
+export async function adviseMission(
+  id: string,
+  input: { topic: string; question: string; context?: string; roles?: string[] }
+): Promise<import('./mission-advisory-panel.js').MissionAdvisoryConsultation | undefined> {
+  if (!id || !input.question) {
+    logger.error(
+      'Usage: mission_controller advise <MISSION_ID> --question <TEXT> [--topic <TEXT>] [--roles <CSV>] [--context <TEXT>]'
+    );
+    return undefined;
+  }
+  const upperId = id.toUpperCase();
+  if (!loadState(upperId)) {
+    logger.error(`Mission ${upperId} not found. Run "list" to see available missions.`);
+    return undefined;
+  }
+  // Imported on use: the advisory panel pulls in the reasoning-backend graph
+  // (see proposeMissionRoster for the same reason).
+  const { consultMissionAdvisors } = await import('./mission-advisory-panel.js');
+  const consultation = await consultMissionAdvisors({
+    missionId: upperId,
+    topic: input.topic || input.question.slice(0, 80),
+    question: input.question,
+    ...(input.context ? { context: input.context } : {}),
+    ...(input.roles && input.roles.length > 0 ? { roles: input.roles } : {}),
+  });
+  logger.info(
+    `[advise] ${upperId} status=${consultation.status} advisors=${consultation.advisors.length} ` +
+      `surviving=${consultation.surviving_opinions.length}/${consultation.opinions.length}`
+  );
+  return consultation;
+}

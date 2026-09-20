@@ -427,6 +427,18 @@
       "types": "./dist/staffing-coverage.d.ts",
       "default": "./dist/staffing-coverage.js"
     },
+    "./model-role-fitness": {
+      "types": "./dist/model-role-fitness.d.ts",
+      "default": "./dist/model-role-fitness.js"
+    },
+    "./model-role-fitness-runner": {
+      "types": "./dist/model-role-fitness-runner.d.ts",
+      "default": "./dist/model-role-fitness-runner.js"
+    },
+    "./mission-advisory-panel": {
+      "types": "./dist/mission-advisory-panel.d.ts",
+      "default": "./dist/mission-advisory-panel.js"
+    },
     "./agent-performance-index": {
       "types": "./dist/agent-performance-index.d.ts",
       "default": "./dist/agent-performance-index.js"

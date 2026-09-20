@@ -843,6 +843,10 @@ Visibility Commands:
                                  Show or regenerate mission team composition
   staff    <ID> [--provider <ID>] [--model <ID>]
                                  Spawn or verify runtime instances for assigned mission team roles
+  advise   <ID> --question <TEXT> [--topic <TEXT>] [--roles <CSV>] [--context <TEXT>]
+                                 Consult the mission's own roster: each member answers from its role,
+                                 the panel cross-critiques the answers, and the outcome is recorded
+                                 in the mission execution ledger
   propose-roster <ID> [--context <TEXT>] [--force]
                                  Ask the reasoning backend to propose discretionary roles beyond the
                                  derived roster. Off unless the governed policy enables it (--force
@@ -1000,6 +1004,14 @@ async function staffMissionTeam(
   return withOrganizationContext(organizationId, () =>
     missionLifecycleService.staff(id, { providerPreference })
   );
+}
+
+async function adviseMission(
+  id: string,
+  input: { topic: string; question: string; context?: string; roles?: string[] },
+  organizationId?: string
+) {
+  return withOrganizationContext(organizationId, () => missionLifecycleService.advise(id, input));
 }
 
 async function proposeMissionRoster(
@@ -1489,6 +1501,7 @@ async function mainImpl(
     prewarmMissionTeam,
     restaffMissionTeam,
     proposeMissionRoster,
+    adviseMission,
     classifyMission,
     selectMissionWorkflow,
     planProcessTemplateTasks,

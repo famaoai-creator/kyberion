@@ -350,6 +350,11 @@ export interface MissionControllerRoutingContext {
     teamRolesArg?: string,
     organizationId?: string
   ) => Awaitable<unknown>;
+  adviseMission: (
+    id: string,
+    input: { topic: string; question: string; context?: string; roles?: string[] },
+    organizationId?: string
+  ) => Awaitable<unknown>;
   proposeMissionRoster: (
     id: string,
     options: { missionContext?: string; force?: boolean },
@@ -1188,6 +1193,36 @@ export async function runMissionControllerAction(
       );
       if (prewarmSummary !== undefined) {
         context.print?.(JSON.stringify(prewarmSummary, null, 2));
+      }
+      break;
+    }
+    case 'advise': {
+      const question = getValue('--question', context.argv);
+      if (!question) {
+        throw new Error('[ADVISE_QUESTION_REQUIRED] Usage: advise <MISSION_ID> --question <TEXT>');
+      }
+      const rolesValue = getValue('--roles', context.argv);
+      const consultation = await context.adviseMission(
+        arg1!,
+        {
+          question,
+          topic: getValue('--topic', context.argv) || question.slice(0, 80),
+          ...(getValue('--context', context.argv)
+            ? { context: getValue('--context', context.argv)! }
+            : {}),
+          ...(rolesValue
+            ? {
+                roles: rolesValue
+                  .split(',')
+                  .map((entry) => entry.trim())
+                  .filter(Boolean),
+              }
+            : {}),
+        },
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+      );
+      if (consultation !== undefined) {
+        context.print?.(JSON.stringify(consultation, null, 2));
       }
       break;
     }

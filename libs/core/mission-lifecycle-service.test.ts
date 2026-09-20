@@ -37,6 +37,7 @@ function makeStubSystem(): MissionLifecycleUnderlyingSystem {
     prewarmMissionTeam: vi.fn(async () => ({ status: 'queued' }) as any),
     restaffMissionTeam: vi.fn(async () => ({ status: 'added' }) as any),
     proposeMissionRoster: vi.fn(async () => ({ outcome: { status: 'disabled' } }) as any),
+    adviseMission: vi.fn(async () => ({ status: 'no_panel' }) as any),
     dispatchMissionWorkItems: vi.fn(async () => ({ ok: true }) as any),
     pauseMission: vi.fn(async () => undefined),
     resumeMission: vi.fn(async () => undefined),
@@ -121,6 +122,11 @@ describe('mission-lifecycle-service — fail-closed execution-context gate', () 
     [
       'propose-roster',
       (facade: ReturnType<typeof buildMissionLifecycleService>) => facade.proposeRoster(missionId),
+    ],
+    [
+      'advise',
+      (facade: ReturnType<typeof buildMissionLifecycleService>) =>
+        facade.advise(missionId, { topic: 't', question: 'q' }),
     ],
     [
       'dispatch',
