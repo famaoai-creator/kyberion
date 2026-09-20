@@ -6,6 +6,7 @@
   "required": ["version", "always_staffed_roles", "obligations"],
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "always_staffed_roles": {
       "description": "Structural roles staffed at mission creation. Every other roster role starts on standby and is staffed on demand.",
