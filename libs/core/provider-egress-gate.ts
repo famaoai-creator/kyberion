@@ -17,8 +17,8 @@
  * Neither knows about *provider identity* as a first-class thing (a
  * provider CLI is not a URL, and the ambient scope is opt-in per call, not
  * anchored at the shared knowledge-provisioning entry point). This module
- * adds that: `checkProviderEgress({ provider, dataTier })` is a pure,
- * synchronous, explicit check callers invoke at the exact point they are
+ * adds that: `checkProviderEgress({ provider, dataTier })` is a synchronous,
+ * explicit check callers invoke at the exact point they are
  * about to attach tiered material to a delegation (KP-01's
  * `provisionTaskKnowledge`, and the two KP-02 lower-level call sites).
  *
@@ -30,10 +30,10 @@
  * - `public` — every provider allowed. This is NOT overridable by the
  *   policy file and does not require the file to exist or be valid — a
  *   broken/missing policy must never block ordinary public-tier work.
- * - `confidential` — only providers on `tier_policy.confidential
- *   .approved_providers`.
- * - `personal` — providers declared `local-only` in `providers`, or on
- *   `tier_policy.personal.approved_providers`.
+ * - `confidential` and `personal` — external providers must be declared
+ *   `training_use: none`, or be covered by a tenant attestation for the
+ *   purchased plan. `approved_providers` remains an explicit operator
+ *   exception. Local-only providers are always safe for these tiers.
  *
  * See docs/developer/improvement-plans-2026-07/
  * CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md §XP-03.
@@ -46,7 +46,7 @@ import type { TierLevel } from './types.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { createLogger } from './logger.js';
 import { resolveTenant } from './tenant-registry.js';
-import { withExecutionContext } from './authority.js';
+import { resolveIdentityContext, withExecutionContext } from './authority.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 
 const logger = createLogger('provider-egress-gate');
@@ -157,7 +157,10 @@ export interface ProviderEgressCheckInput {
   provider: string;
   /** Highest data tier represented in the payload about to be handed to `provider`. */
   dataTier: TierLevel;
-  /** Optional tenant profile upper bound; it can only narrow global policy. */
+  /**
+   * Tenant profile upper bound; it can only narrow global policy. When an
+   * active identity already has a tenant scope, this value must match it.
+   */
   tenant_slug?: string;
   /** Alternate repository root used by hermetic tenant registries. */
   tenant_registry_root_dir?: string;
@@ -193,8 +196,8 @@ function denyAndAlert(
       context: { provider: input.provider, data_tier: input.dataTier },
       recommendation:
         'If this provider should receive this tier, add it to provider-egress-policy.json' +
-        " (tier_policy.<tier>.approved_providers), or mark it 'local-only' if it truly never" +
-        ' leaves this machine.',
+        ' (tier_policy.<tier>.approved_providers), record a tenant provider attestation with ' +
+        "'pnpm tenant attest-provider', or mark it 'local-only' if it truly never leaves this machine.",
       dedupe_key: `provider-egress-denied:${input.provider || 'unknown'}:${input.dataTier}`,
     });
   } catch (err) {
@@ -219,6 +222,11 @@ export interface ResolvedTenantProviderAttestation {
   training_use: 'none' | 'used' | 'unknown';
   expires_at?: string;
 }
+
+type TenantPolicyInput = Pick<
+  ReturnType<typeof resolveTenant>['profile'],
+  'allowed_reasoning_backends' | 'provider_attestations'
+>;
 
 /** Default lifetime of an attestation when the policy declares none. */
 export const DEFAULT_ATTESTATION_TTL_DAYS = 180;
@@ -257,7 +265,12 @@ export function resolveTenantProviderAttestation(input: {
   let expiresAt: Date | null = null;
   if (attestation.expires_at) {
     const parsed = new Date(attestation.expires_at);
-    if (!Number.isNaN(parsed.getTime())) expiresAt = parsed;
+    if (Number.isNaN(parsed.getTime())) {
+      // An explicit expiry that cannot be parsed is not evidence. Do not
+      // silently replace it with the default TTL and extend a malformed claim.
+      return { status: 'expired', training_use: 'unknown' };
+    }
+    expiresAt = parsed;
   }
   if (!expiresAt) {
     const attestedAt = new Date(attestation.attested_at);
@@ -288,17 +301,33 @@ export function resolveTenantProviderAttestation(input: {
  *
  * The elevation is narrow on purpose: it covers one synchronous read, the
  * gate extracts only what it needs to decide, and it returns allow/deny to
- * the caller — never the profile. `ecosystem_architect` is the least
- * privileged persona with personal READ and no personal write, so this cannot
- * be used to modify anything.
+ * the caller — never the profile. `mission_controller` is the narrowest
+ * existing authority role with `knowledge/personal/` read access; its
+ * governed writes do not include the tenant profile directory, so this read
+ * cannot modify the attestation.
  */
 function readTenantProfileAsPolicyInput(
   slug: string,
+  provider: string,
   rootDir?: string
-): ReturnType<typeof resolveTenant>['profile'] {
-  return withExecutionContext('ecosystem_architect', () =>
-    resolveTenant(slug, { ...(rootDir ? { rootDir } : {}) })
+): TenantPolicyInput {
+  const profile = withExecutionContext(
+    'mission_controller',
+    () => resolveTenant(slug, { ...(rootDir ? { rootDir } : {}) }),
+    undefined,
+    slug
   ).profile;
+  // Keep the policy seam narrow: the gate needs the tenant allowlist and the
+  // one provider's attestation, not a capability to hand the whole profile to
+  // a caller or downstream reasoning path.
+  return {
+    ...(profile.allowed_reasoning_backends
+      ? { allowed_reasoning_backends: [...profile.allowed_reasoning_backends] }
+      : {}),
+    ...(profile.provider_attestations?.[provider]
+      ? { provider_attestations: { [provider]: profile.provider_attestations[provider] } }
+      : {}),
+  };
 }
 
 export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEgressCheckResult {
@@ -313,15 +342,33 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
     return denyAndAlert(input, `no provider identified for a ${dataTier} payload; fail-closed.`);
   }
 
-  let tenantProfile: ReturnType<typeof resolveTenant>['profile'] | undefined;
-  if (input.tenant_slug?.trim()) {
+  const requestedTenantSlug = input.tenant_slug?.trim();
+  let activeTenantSlug: string | undefined;
+  try {
+    activeTenantSlug = resolveIdentityContext().tenantSlug?.trim();
+  } catch (error) {
+    return denyAndAlert(
+      input,
+      `active tenant scope could not be resolved: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  if (requestedTenantSlug && activeTenantSlug && requestedTenantSlug !== activeTenantSlug) {
+    return denyAndAlert(
+      input,
+      `tenant '${requestedTenantSlug}' conflicts with the active tenant scope '${activeTenantSlug}'.`
+    );
+  }
+  const tenantSlug = requestedTenantSlug || activeTenantSlug;
+  let tenantPolicyInput: TenantPolicyInput | undefined;
+  if (tenantSlug) {
     try {
-      const profile = readTenantProfileAsPolicyInput(
-        input.tenant_slug.trim(),
+      const policyInput = readTenantProfileAsPolicyInput(
+        tenantSlug,
+        provider,
         input.tenant_registry_root_dir
       );
-      tenantProfile = profile;
-      const allowed = profile.allowed_reasoning_backends;
+      tenantPolicyInput = policyInput;
+      const allowed = policyInput.allowed_reasoning_backends;
       if (allowed?.length && !allowed.includes(provider)) {
         return denyAndAlert(
           input,
@@ -357,6 +404,10 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
   // uses that need a model (trip research, say), and a rule that forbids them
   // is a rule that gets worked around.
   const declaration = policy.providers[provider];
+  const exceptions =
+    dataTier === 'confidential'
+      ? policy.tier_policy.confidential.approved_providers
+      : policy.tier_policy.personal.approved_providers;
   // Local inference never leaves the machine, so training use cannot apply.
   if (declaration?.egress === 'local-only') return { allowed: true };
 
@@ -365,23 +416,27 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
   // deliberately declares every provider `unknown`, because contracts differ
   // per installation and this file is public.
   const attestation = resolveTenantProviderAttestation({
-    profile: tenantProfile,
+    profile: tenantPolicyInput,
     provider,
     ttlDays: policy.attestation_ttl_days,
   });
-  if (attestation.status === 'valid' && attestation.training_use === 'none') {
+  if (
+    attestation.status === 'valid' &&
+    attestation.training_use === 'none' &&
+    (declaration || exceptions.includes(provider))
+  ) {
     return { allowed: true };
   }
   if (attestation.status === 'expired') {
     return denyAndAlert(
       input,
-      `'${provider}' attestation for tenant '${input.tenant_slug}' expired on ${attestation.expires_at}; re-verify the plan's training-use terms before sending ${dataTier} material.`
+      `'${provider}' attestation for tenant '${tenantSlug}' expired on ${attestation.expires_at}; re-verify the plan's training-use terms before sending ${dataTier} material.`
     );
   }
   if (attestation.status === 'valid' && attestation.training_use !== 'none') {
     return denyAndAlert(
       input,
-      `tenant '${input.tenant_slug}' attests training_use '${attestation.training_use}' for '${provider}'.`
+      `tenant '${tenantSlug}' attests training_use '${attestation.training_use}' for '${provider}'.`
     );
   }
 
@@ -389,13 +444,16 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
   // An operator may still allow a provider whose terms are not declared. That
   // is an exception, named as one in reports rather than reading like a
   // derived approval.
-  const exceptions =
-    dataTier === 'confidential'
-      ? policy.tier_policy.confidential.approved_providers
-      : policy.tier_policy.personal.approved_providers;
   if (exceptions.includes(provider)) return { allowed: true };
 
-  const trainingUse = declaration?.training_use ?? 'unknown';
+  if (!declaration) {
+    return denyAndAlert(
+      input,
+      `'${provider}' is not declared in provider-egress-policy.json; a tenant attestation alone cannot establish its egress identity.`
+    );
+  }
+
+  const trainingUse = declaration.training_use ?? 'unknown';
   return denyAndAlert(
     input,
     `'${provider}' has training_use '${trainingUse}'; ${dataTier} material may only go to a provider attested 'none' (or an explicit approved_providers exception).`

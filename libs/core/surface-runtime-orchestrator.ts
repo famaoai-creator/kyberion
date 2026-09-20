@@ -1410,6 +1410,7 @@ export async function runSurfaceMessageConversation(
       nudgeConfig: { turnThreshold: 10, toolThreshold: 10 },
       surface: input.surface,
       missionId: input.missionId,
+      ...(input.scope?.tenant_slug ? { tenantSlug: input.scope.tenant_slug } : {}),
       approvalChannel: input.channel,
       approvalThreadTs: input.threadTs,
       snapshot: [
