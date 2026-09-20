@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Workforce capacity policy",
+  "description": "Thresholds that turn observed work-item load into a workforce availability status and into selection penalties, so team composition prefers actors that are not already saturated.",
+  "type": "object",
+  "required": ["version", "thresholds", "selection"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "thresholds": {
+      "type": "object",
+      "required": ["busy_at_active_items", "saturated_at_active_items"],
+      "additionalProperties": false,
+      "properties": {
+        "busy_at_active_items": {
+          "description": "Active (claimed, in-progress) work items at which a resource is reported busy.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "saturated_at_active_items": {
+          "description": "Active work items at which a resource is reported saturated and should not take more.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "required": ["load_penalty_per_active_item", "queued_penalty_per_item", "saturated_penalty"],
+      "additionalProperties": false,
+      "properties": {
+        "load_penalty_per_active_item": { "type": "number", "minimum": 0 },
+        "queued_penalty_per_item": { "type": "number", "minimum": 0 },
+        "saturated_penalty": { "type": "number", "minimum": 0 },
+        "max_load_penalty": {
+          "description": "Ceiling on the combined load penalty so load never outweighs a capability match.",
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

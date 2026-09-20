@@ -713,3 +713,39 @@ describe('role gap diagnosis (TC-07)', () => {
     });
   });
 });
+
+describe('restaffed members survive recomposition (TC-06)', () => {
+  it('keeps a restaffed role when the plan is refreshed', () => {
+    const missionId = 'MSN-RESTAFF-REFRESH';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(missionPath, { recursive: true });
+        const initial = composeMissionTeamPlan({
+          missionId,
+          missionType: 'development',
+          tier: 'public',
+        });
+        const { plan: extended, added } = extendMissionTeamPlanRoster(initial, {
+          teamRole: 'researcher',
+        });
+        expect(added).not.toBeNull();
+        writeMissionTeamPlan(missionPath, extended);
+
+        // Recomposition derives the roster from template + obligations, which
+        // does not contain `researcher` — the recorded staffing decision must
+        // not be silently dropped.
+        const refreshed = resolveMissionTeamPlan({ missionId, forceRefresh: true });
+        const researcher = refreshed.assignments.find((entry) => entry.team_role === 'researcher');
+        expect(researcher?.status).toBe('assigned');
+        expect(researcher?.agent_id).toBe(added?.agent_id);
+        expect(researcher?.role_sources).toEqual(['restaff']);
+        expect(refreshed.team_governance?.composition.assigned_roles).toContain('researcher');
+      });
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
+  });
+});

@@ -12,6 +12,7 @@ import {
   type TeamProviderPreference,
 } from './team-role-assignment-selection.js';
 import { resolveTaskModelHint } from './reasoning-model-routing.js';
+import { collectWorkforceLoad } from './workforce-load.js';
 import {
   matchTeamCompositionObligations,
   resolveAlwaysStaffedRoles,
@@ -419,6 +420,9 @@ export function composeMissionTeamPlan(input: {
     (organizationDefaultTemplate ? templates[organizationDefaultTemplate] : undefined) ||
     templates.default) as MissionTeamTemplateRecord;
   const assignments: MissionTeamAssignment[] = [];
+  // TC-09: one pass over the work-item store for the whole composition, so
+  // every role is scored against the same observed load snapshot.
+  const loadIndex = collectWorkforceLoad();
   const preferredAgentId = organizationProfile?.mission_defaults?.default_agent_profile
     ?.trim()
     .toLowerCase();
@@ -523,29 +527,32 @@ export function composeMissionTeamPlan(input: {
       continue;
     }
 
-    const selected = selectAgentForTeamRole(
-      role,
-      preferredAgentId && !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
-        ? {
-            ...roleRecord,
-            selection_hints: {
-              ...(roleRecord.selection_hints || {}),
-              preferred_agents: [
-                preferredAgentId,
-                ...(roleRecord.selection_hints?.preferred_agents || []).filter(
-                  (agent) => agent !== preferredAgentId
-                ),
-              ],
-            },
-          }
-        : roleRecord,
+    const selected = selectAgentForTeamRole({
+      teamRole: role,
+      teamRoleRecord:
+        preferredAgentId &&
+        !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
+          ? {
+              ...roleRecord,
+              selection_hints: {
+                ...(roleRecord.selection_hints || {}),
+                preferred_agents: [
+                  preferredAgentId,
+                  ...(roleRecord.selection_hints?.preferred_agents || []).filter(
+                    (agent) => agent !== preferredAgentId
+                  ),
+                ],
+              },
+            }
+          : roleRecord,
       authorityRoles,
       agents,
-      missionTaskModelHint,
-      separationForRole(role),
-      organizationProfile?.organization_id,
-      providerPreference
-    );
+      routingHint: missionTaskModelHint,
+      separation: separationForRole(role),
+      organizationId: organizationProfile?.organization_id,
+      providerPreference,
+      loadIndex,
+    });
     recordAssignment(role, selected);
     selected.required = required;
     selected.model_hint = missionTaskModelHint;
@@ -706,12 +713,57 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
   // A refresh re-derives the roster and may re-select actors, but a role the
   // mission had already staffed stays staffed.
   const previousPlan = existing ?? loadMissionTeamPlan(missionId);
-  const previouslyStaffedRoles = (previousPlan?.assignments || [])
+  if (!previousPlan) return recomposed;
+
+  // TC-06: a restaffed member is a recorded governance decision with a ledger
+  // entry behind it, not an artifact of the template. Recomposition derives
+  // the roster from template + obligations, which would silently drop it, so
+  // carry it across.
+  const carriedRestaffed = previousPlan.assignments.filter(
+    (assignment) =>
+      assignment.role_sources?.includes('restaff') &&
+      !recomposed.assignments.some((entry) => entry.team_role === assignment.team_role)
+  );
+  const withRestaffed: MissionTeamPlan = carriedRestaffed.length
+    ? {
+        ...recomposed,
+        assignments: [...recomposed.assignments, ...carriedRestaffed],
+        ...(recomposed.team_governance
+          ? {
+              team_governance: {
+                ...recomposed.team_governance,
+                lifecycle: {
+                  ...recomposed.team_governance.lifecycle,
+                  max_members: Math.max(
+                    recomposed.team_governance.lifecycle.max_members,
+                    recomposed.assignments.length + carriedRestaffed.length
+                  ),
+                },
+                composition: {
+                  ...recomposed.team_governance.composition,
+                  required_roles: [
+                    ...recomposed.team_governance.composition.required_roles,
+                    ...carriedRestaffed.map((assignment) => assignment.team_role),
+                  ],
+                  assigned_roles: [...recomposed.assignments, ...carriedRestaffed]
+                    .filter((assignment) => assignment.status === 'assigned')
+                    .map((assignment) => assignment.team_role),
+                  standby_roles: [...recomposed.assignments, ...carriedRestaffed]
+                    .filter((assignment) => assignment.status === 'standby')
+                    .map((assignment) => assignment.team_role),
+                },
+              },
+            }
+          : {}),
+      }
+    : recomposed;
+
+  const previouslyStaffedRoles = previousPlan.assignments
     .filter((assignment) => assignment.status === 'assigned')
     .map((assignment) => assignment.team_role);
   return previouslyStaffedRoles.length > 0
-    ? promoteMissionTeamPlanRoles(recomposed, previouslyStaffedRoles).plan
-    : recomposed;
+    ? promoteMissionTeamPlanRoles(withRestaffed, previouslyStaffedRoles).plan
+    : withRestaffed;
 }
 
 export interface MissionTeamRoleGap {
@@ -864,17 +916,18 @@ export function extendMissionTeamPlanRoster(
   const requiredCapabilities = Array.from(
     new Set([...(roleRecord.required_capabilities || []), ...(input.requiredCapabilities || [])])
   );
-  const selected = selectAgentForTeamRole(
+  const selected = selectAgentForTeamRole({
     teamRole,
-    { ...roleRecord, required_capabilities: requiredCapabilities },
-    loadAuthorityRoleIndex(),
-    loadAgentProfileIndex(),
+    teamRoleRecord: { ...roleRecord, required_capabilities: requiredCapabilities },
+    authorityRoles: loadAuthorityRoleIndex(),
+    agents: loadAgentProfileIndex(),
     // The mission-level routing hint is shared by every member, so carry it
     // over instead of re-deriving it from a classification that has moved on.
-    plan.assignments.find((assignment) => assignment.model_hint)?.model_hint,
-    { ...(separation || {}), excludeAgents },
-    plan.organization_profile?.organization_id
-  );
+    routingHint: plan.assignments.find((assignment) => assignment.model_hint)?.model_hint,
+    separation: { ...(separation || {}), excludeAgents },
+    organizationId: plan.organization_profile?.organization_id,
+    loadIndex: collectWorkforceLoad(),
+  });
   if (selected.status !== 'assigned' || !selected.agent_id) {
     return { plan, added: null, refusal: 'no_compatible_actor' };
   }
@@ -1047,18 +1100,19 @@ export function resolveMissionTeamReceiver(input: {
   const eligibleAgents = Object.fromEntries(
     Object.entries(agents).filter(([agentId]) => !excludedAgentIds.has(agentId.toLowerCase()))
   );
-  const selected = selectAgentForTeamRole(
-    input.teamRole,
-    {
+  const selected = selectAgentForTeamRole({
+    teamRole: input.teamRole,
+    teamRoleRecord: {
       ...roleRecord,
       required_capabilities: Array.from(
         new Set([...(roleRecord.required_capabilities || []), ...requiredCapabilities])
       ),
     },
-    loadAuthorityRoleIndex(),
-    eligibleAgents,
-    assignment.model_hint
-  );
+    authorityRoles: loadAuthorityRoleIndex(),
+    agents: eligibleAgents,
+    routingHint: assignment.model_hint,
+    loadIndex: collectWorkforceLoad(),
+  });
   if (selected.status !== 'assigned' || !selected.agent_id) return null;
   const selectedCapabilities = new Set(
     (eligibleAgents[selected.agent_id]?.capabilities || []).map((entry) =>
