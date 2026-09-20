@@ -74,7 +74,13 @@ export function resolveRuntimeSecurityScope(
 ): ContextSecurityScope {
   if (!provider || scope.external_egress !== 'deny') return scope;
   const dataTier = scope.write_tier;
-  const providerDecision = checkProviderEgress({ provider, dataTier });
+  const providerDecision = checkProviderEgress({
+    provider,
+    dataTier,
+    ...(scope.tenant_slug || scope.tenant_id
+      ? { tenant_slug: scope.tenant_slug || scope.tenant_id }
+      : {}),
+  });
   if (!providerDecision.allowed) return scope;
   const endpointBackend =
     provider === 'claude'

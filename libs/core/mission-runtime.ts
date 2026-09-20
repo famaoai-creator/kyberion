@@ -9,7 +9,11 @@ import {
   startAgentRuntimeSupervisorForRequest,
 } from './agent-runtime-supervisor.js';
 import { findMissionPath } from './path-resolver.js';
-import { initializeMissionTeamBindings } from './mission-team-binding.js';
+import { initializeMissionTeamBindings, restaffMissionTeamRole } from './mission-team-binding.js';
+import type {
+  RosterProposalOutcome,
+  RosterProposalOutcomeSummary,
+} from './team-roster-proposal.js';
 import {
   loadMissionTeamPlan,
   enrichMissionTeamPlanWithOrganizationProfile,
@@ -34,9 +38,14 @@ function emitTeamSummary(plan: {
   const assignedRoles = plan.assignments.filter(
     (assignment) => assignment.status === 'assigned'
   ).length;
+  const standbyRoles = plan.assignments.filter(
+    (assignment) => assignment.status === 'standby'
+  ).length;
   const requiredRoles = plan.assignments.filter((assignment) => assignment.required).length;
+  // TC-01: standby is "staffed on demand", not a gap. Only a role with no
+  // compatible actor in the pool is reported as unfilled.
   const unfilledRequiredRoles = plan.assignments.filter(
-    (assignment) => assignment.required && assignment.status !== 'assigned'
+    (assignment) => assignment.required && assignment.status === 'unfilled'
   ).length;
   const organizationLabel = plan.organization_profile
     ? `${plan.organization_profile.name} (${plan.organization_profile.organization_id})`
@@ -47,7 +56,7 @@ function emitTeamSummary(plan: {
     `[team] org=${organizationLabel} template=${plan.template} default=${defaultTemplate} catalog=${catalog}`
   );
   logger.info(
-    `[team] assignments=${plan.assignments.length} required=${requiredRoles} assigned=${assignedRoles} unfilled_required=${unfilledRequiredRoles}`
+    `[team] roster=${plan.assignments.length} required=${requiredRoles} staffed=${assignedRoles} standby=${standbyRoles} unfilled_required=${unfilledRequiredRoles}`
   );
 }
 
@@ -68,6 +77,7 @@ function emitRuntimeSummary(plan: {
   const counts = {
     spawned: 0,
     already_ready: 0,
+    standby: 0,
     unfilled: 0,
     failed: 0,
   };
@@ -85,7 +95,7 @@ function emitRuntimeSummary(plan: {
     `[staff] org=${organizationLabel} default=${defaultTemplate} catalog=${catalog} assignments=${plan.assignments.length}`
   );
   logger.info(
-    `[staff] spawned=${counts.spawned} already_ready=${counts.already_ready} unfilled=${counts.unfilled} failed=${counts.failed}`
+    `[staff] spawned=${counts.spawned} already_ready=${counts.already_ready} standby=${counts.standby} unfilled=${counts.unfilled} failed=${counts.failed}`
   );
 }
 
@@ -120,7 +130,7 @@ export function showMissionTeam(
     state.tenant_slug &&
     existingPlan.assignments.some(
       (assignment) =>
-        assignment.status === 'assigned' &&
+        assignment.status !== 'unfilled' &&
         assignment.security_scope?.tenant_id !== state.tenant_slug
     )
   );
@@ -192,7 +202,7 @@ export async function staffMissionTeam(
     state.tenant_slug &&
     existingPlan.assignments.some(
       (assignment) =>
-        assignment.status === 'assigned' &&
+        assignment.status !== 'unfilled' &&
         assignment.security_scope?.tenant_id !== state.tenant_slug
     )
   );
@@ -272,4 +282,167 @@ export async function prewarmMissionTeam(
     mission_id: request.mission_id,
     team_roles: request.team_roles || [],
   };
+}
+
+export interface MissionTeamRestaffSummary {
+  mission_id: string;
+  team_role: string;
+  status: 'added' | 'promoted' | 'refused';
+  agent_id?: string | null;
+  provider?: string | null;
+  model_id?: string | null;
+  refusal?: string;
+  roster_size?: number;
+  max_members?: number | null;
+}
+
+/**
+ * TC-06: operator entry point for adding a role to a running mission's
+ * roster. The same governed path task dispatch uses, so a human and the
+ * worker leave identical evidence.
+ */
+export async function restaffMissionTeam(
+  id: string,
+  teamRole: string,
+  options: { requiredCapabilities?: string[]; excludeAgentIds?: string[]; reason?: string } = {}
+): Promise<MissionTeamRestaffSummary | undefined> {
+  if (!id || !teamRole) {
+    logger.error(
+      'Usage: mission_controller restaff <MISSION_ID> <TEAM_ROLE> [--capabilities a,b] [--exclude agent-id,...] [--reason <TEXT>]'
+    );
+    return undefined;
+  }
+
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) {
+    logger.error(`Mission ${upperId} not found. Run "list" to see available missions.`);
+    return undefined;
+  }
+
+  const result = restaffMissionTeamRole({
+    missionId: upperId,
+    teamRole,
+    ...(options.requiredCapabilities ? { requiredCapabilities: options.requiredCapabilities } : {}),
+    ...(options.excludeAgentIds ? { excludeAgentIds: options.excludeAgentIds } : {}),
+    requestedBy: 'mission_controller',
+    ...(options.reason ? { reason: options.reason } : {}),
+  });
+
+  if (!result.added && !result.promoted) {
+    logger.warn(`[restaff] ${upperId} ${teamRole} refused: ${result.refusal || 'unknown'}`);
+    return {
+      mission_id: upperId,
+      team_role: teamRole,
+      status: 'refused',
+      ...(result.refusal ? { refusal: result.refusal } : {}),
+    };
+  }
+
+  // A staffed member is only useful once its runtime exists; reuse the same
+  // role-scoped ensure the dispatch path uses.
+  await ensureMissionTeamRuntimeViaSupervisor({
+    missionId: upperId,
+    teamRoles: [teamRole],
+    requestedBy: 'mission_controller',
+    reason: options.reason || `Materialize restaffed role ${teamRole}.`,
+  });
+
+  const summary: MissionTeamRestaffSummary = {
+    mission_id: upperId,
+    team_role: teamRole,
+    status: result.added ? 'added' : 'promoted',
+    agent_id: result.added?.agent_id ?? null,
+    provider: result.added?.provider ?? null,
+    model_id: result.added?.modelId ?? null,
+    roster_size: result.plan?.assignments.length,
+    max_members: result.plan?.team_governance?.lifecycle.max_members ?? null,
+  };
+  logger.info(
+    `[restaff] ${upperId} ${teamRole} ${summary.status}` +
+      (summary.agent_id ? ` -> ${summary.agent_id}` : '') +
+      ` roster=${summary.roster_size}/${summary.max_members ?? '-'}`
+  );
+  return summary;
+}
+
+export interface MissionRosterProposalView {
+  outcome: RosterProposalOutcome;
+  summary: RosterProposalOutcomeSummary;
+}
+
+/**
+ * TC-12/TC-13: run the roster proposer for one mission and report what the
+ * recorded outcomes say about it. `force` runs it even while the governed
+ * policy keeps it disabled, which is how the feature is evaluated before
+ * anyone turns it on.
+ */
+export async function proposeMissionRoster(
+  id: string,
+  options: { missionContext?: string; force?: boolean } = {}
+): Promise<MissionRosterProposalView | undefined> {
+  if (!id) {
+    logger.error(
+      'Usage: mission_controller propose-roster <MISSION_ID> [--context <TEXT>] [--force]'
+    );
+    return undefined;
+  }
+  const upperId = id.toUpperCase();
+  if (!loadState(upperId)) {
+    logger.error(`Mission ${upperId} not found. Run "list" to see available missions.`);
+    return undefined;
+  }
+
+  // Imported on use, not on load: this module is the mission CLI's thin
+  // runtime helper, and the proposer pulls in the whole reasoning-backend
+  // graph. A static import would drag an LLM stack into every `mission_controller`
+  // invocation that never asks for one.
+  const { proposeMissionTeamRoster, summarizeRosterProposalOutcomes } =
+    await import('./team-roster-proposal.js');
+  const outcome = await proposeMissionTeamRoster({
+    missionId: upperId,
+    ...(options.missionContext ? { missionContext: options.missionContext } : {}),
+    ...(options.force ? { force: true } : {}),
+  });
+  const summary = summarizeRosterProposalOutcomes(upperId);
+  logger.info(
+    `[roster-proposal] ${upperId} status=${outcome.status} accepted=${outcome.accepted_roles.length}/${outcome.decisions.length} ` +
+      `acceptance_rate=${summary.acceptance_rate.toFixed(2)} follow_up_restaff_rate=${summary.follow_up_restaff_rate.toFixed(2)}`
+  );
+  return { outcome, summary };
+}
+
+/**
+ * TC-18: operator entry point for consulting a mission's own team.
+ */
+export async function adviseMission(
+  id: string,
+  input: { topic: string; question: string; context?: string; roles?: string[] }
+): Promise<import('./mission-advisory-panel.js').MissionAdvisoryConsultation | undefined> {
+  if (!id || !input.question) {
+    logger.error(
+      'Usage: mission_controller advise <MISSION_ID> --question <TEXT> [--topic <TEXT>] [--roles <CSV>] [--context <TEXT>]'
+    );
+    return undefined;
+  }
+  const upperId = id.toUpperCase();
+  if (!loadState(upperId)) {
+    logger.error(`Mission ${upperId} not found. Run "list" to see available missions.`);
+    return undefined;
+  }
+  // Imported on use: the advisory panel pulls in the reasoning-backend graph
+  // (see proposeMissionRoster for the same reason).
+  const { consultMissionAdvisors } = await import('./mission-advisory-panel.js');
+  const consultation = await consultMissionAdvisors({
+    missionId: upperId,
+    topic: input.topic || input.question.slice(0, 80),
+    question: input.question,
+    ...(input.context ? { context: input.context } : {}),
+    ...(input.roles && input.roles.length > 0 ? { roles: input.roles } : {}),
+  });
+  logger.info(
+    `[advise] ${upperId} status=${consultation.status} advisors=${consultation.advisors.length} ` +
+      `surviving=${consultation.surviving_opinions.length}/${consultation.opinions.length}`
+  );
+  return consultation;
 }

@@ -1,0 +1,108 @@
+{
+  "$schema": "../schemas/model-role-fitness-probes.schema.json",
+  "version": "1.1.0",
+  "pass_threshold": 0.75,
+  "probes": [
+    {
+      "id": "reviewer-defect-localization",
+      "team_role": "reviewer",
+      "rationale": "A reviewer that cannot point at the defective line cannot accept or reject work, whatever its prose quality.",
+      "prompt": "Review this function. The line numbers are given.\n\n1: function lastIndex(items) {\n2:   let index = 0;\n3:   for (let i = 0; i <= items.length; i += 1) {\n4:     index = i;\n5:   }\n6:   return index;\n7: }\n\nReport every defect as a JSON array and output nothing else:\n[{\"line\": <line number as a number>, \"issue\": \"<short description>\"}]",
+      "assertions": [
+        {
+          "kind": "json_array"
+        },
+        {
+          "kind": "min_items",
+          "count": 1
+        },
+        {
+          "kind": "required_fields",
+          "fields": ["line", "issue"]
+        },
+        {
+          "kind": "field_equals_any",
+          "field": "line",
+          "values": ["3"],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "planner-task-decomposition",
+      "team_role": "planner",
+      "rationale": "A planner's output is consumed as a dependency graph; unresolvable or cyclic dependencies break dispatch regardless of how sensible the prose is.",
+      "prompt": "Break this goal into 3 to 5 tasks: \"Add rate limiting to an existing HTTP API and prove it works.\"\n\nOutput a JSON array and nothing else:\n[{\"id\": \"t1\", \"title\": \"<short>\", \"depends_on\": [\"<id of another task>\"]}]\nEvery id in depends_on must be an id in this same list. The first task depends on nothing.",
+      "assertions": [
+        {
+          "kind": "json_array"
+        },
+        {
+          "kind": "min_items",
+          "count": 3
+        },
+        {
+          "kind": "required_fields",
+          "fields": ["id", "title", "depends_on"]
+        },
+        {
+          "kind": "acyclic_dependencies",
+          "id_field": "id",
+          "depends_field": "depends_on",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "tester-case-derivation",
+      "team_role": "tester",
+      "rationale": "A tester that omits the stated error path produces evidence that looks complete and is not.",
+      "prompt": "A function `divide(a, b)` must: (1) return a / b for non-zero b, (2) round the result to 2 decimals, (3) throw an error when b is 0.\n\nWrite one test case per stated behaviour as a JSON array and output nothing else:\n[{\"name\": \"<short>\", \"given\": \"<inputs>\", \"expect\": \"<expected result or error>\"}]",
+      "assertions": [
+        {
+          "kind": "json_array"
+        },
+        {
+          "kind": "min_items",
+          "count": 3
+        },
+        {
+          "kind": "required_fields",
+          "fields": ["name", "given", "expect"]
+        },
+        {
+          "kind": "field_contains",
+          "field": "expect",
+          "values": ["throw", "error", "raise"],
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "implementer-contract-output",
+      "team_role": "implementer",
+      "rationale": "An implementer is dispatched through a typed contract; a model that cannot keep its code inside the contract cannot be dispatched at all.",
+      "prompt": "Implement a TypeScript function `clamp(value: number, min: number, max: number): number` that returns value bounded to [min, max].\n\nOutput a JSON object and nothing else:\n{\"language\": \"typescript\", \"code\": \"<the full function source>\"}",
+      "assertions": [
+        {
+          "kind": "json_object"
+        },
+        {
+          "kind": "required_fields",
+          "fields": ["language", "code"]
+        },
+        {
+          "kind": "field_contains",
+          "field": "code",
+          "values": ["clamp"],
+          "required": true
+        },
+        {
+          "kind": "field_contains",
+          "field": "code",
+          "values": ["return"]
+        }
+      ]
+    }
+  ]
+}

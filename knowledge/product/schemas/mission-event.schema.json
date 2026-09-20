@@ -26,6 +26,7 @@
         "mission_issued",
         "mission_orchestration_started",
         "mission_team_staffed",
+        "mission_team_restaffed",
         "mission_kickoff_completed",
         "mission_plan_ready",
         "mission_followup_requested",

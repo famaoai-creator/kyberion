@@ -36,6 +36,7 @@ import {
   loadMissionTeamPlan,
   resolveMissionTeamReceiver,
 } from './mission-team-plan-composer.js';
+import { ensureMissionTeamRuntimeViaSupervisor } from './agent-runtime-supervisor.js';
 import { buildSurfaceConversationInput } from './surface-interaction-model.js';
 import { classifyTaskSessionIntent } from './task-session.js';
 import { loadPendingIntent, savePendingIntent } from './pending-intent-store.js';
@@ -851,6 +852,24 @@ async function routeMissionTeamDelegation(
   query: string,
   senderAgentId: string
 ): Promise<SurfaceDelegationResult[]> {
+  const plan = loadMissionTeamPlan(missionId);
+  const isStandby = plan?.assignments.some(
+    (assignment) => assignment.team_role === teamRole && assignment.status === 'standby'
+  );
+  if (plan && isStandby) {
+    await ensureMissionTeamRuntimeViaSupervisor({
+      missionId,
+      teamRoles: [teamRole],
+      scope: {
+        scope_kind: 'mission',
+        tier: plan.tier as 'personal' | 'confidential' | 'public',
+        mission_id: missionId,
+        ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
+      },
+      requestedBy: 'surface_runtime_orchestrator',
+      reason: 'Role demanded by surface delegation.',
+    });
+  }
   const assignment = resolveMissionTeamReceiver({ missionId, teamRole });
   if (!assignment?.agent_id) {
     return [
@@ -1391,6 +1410,7 @@ export async function runSurfaceMessageConversation(
       nudgeConfig: { turnThreshold: 10, toolThreshold: 10 },
       surface: input.surface,
       missionId: input.missionId,
+      ...(input.scope?.tenant_slug ? { tenantSlug: input.scope.tenant_slug } : {}),
       approvalChannel: input.channel,
       approvalThreadTs: input.threadTs,
       snapshot: [

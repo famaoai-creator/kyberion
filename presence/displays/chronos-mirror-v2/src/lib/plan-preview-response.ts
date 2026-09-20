@@ -2,7 +2,7 @@ import { isRecord } from '@agent/core/foundation/primitives';
 
 export type ClientPlanPreviewAssignment = {
   team_role: string;
-  status: 'assigned' | 'unfilled';
+  status: 'assigned' | 'standby' | 'unfilled';
   agent_id: string | null;
 };
 
@@ -144,7 +144,7 @@ function parseAssignment(value: unknown): ClientPlanPreviewAssignment | undefine
   if (!isRecord(value)) return undefined;
   if (
     !isNonEmptyString(value.team_role) ||
-    (value.status !== 'assigned' && value.status !== 'unfilled') ||
+    (value.status !== 'assigned' && value.status !== 'standby' && value.status !== 'unfilled') ||
     (value.agent_id !== null && !isString(value.agent_id))
   ) {
     return undefined;

@@ -4,20 +4,48 @@
   "title": "Tenant Profile",
   "description": "Definition of a tenant and the user's role within it.",
   "type": "object",
-  "required": ["tenant_slug", "display_name", "status", "assigned_role"],
+  "required": [
+    "tenant_slug",
+    "display_name",
+    "status",
+    "assigned_role"
+  ],
   "properties": {
     "tenant_slug": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{1,30}$",
-      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+      "not": {
+        "enum": [
+          "public",
+          "confidential",
+          "personal",
+          "shared"
+        ]
+      }
     },
     "tenant_id": {
       "type": "string",
       "pattern": "^[a-z0-9-]+$",
-      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+      "not": {
+        "enum": [
+          "public",
+          "confidential",
+          "personal",
+          "shared"
+        ]
+      }
     },
-    "display_name": { "type": "string" },
-    "status": { "type": "string", "enum": ["active", "suspended", "archived"] },
+    "display_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended",
+        "archived"
+      ]
+    },
     "assigned_role": {
       "type": "string",
       "description": "The user's primary role in this tenant (e.g., strategist, pm, lead)."
@@ -26,12 +54,18 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
     "isolation_policy": {
       "type": "object",
       "properties": {
-        "strict_isolation": { "type": "boolean", "default": true },
+        "strict_isolation": {
+          "type": "boolean",
+          "default": true
+        },
         "allow_cross_distillation": {
           "type": "boolean",
           "default": false,
@@ -49,15 +83,73 @@
       "description": "Ingest source systems declared for this tenant (DA-01).",
       "items": {
         "type": "object",
-        "required": ["source_system", "enabled"],
+        "required": [
+          "source_system",
+          "enabled"
+        ],
         "additionalProperties": false,
         "properties": {
-          "source_system": { "type": "string", "minLength": 1 },
-          "enabled": { "type": "boolean" },
-          "note": { "type": "string" }
+          "source_system": {
+            "type": "string",
+            "minLength": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          }
         }
       }
     },
-    "metadata": { "type": "object", "additionalProperties": true }
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "provider_attestations": {
+      "type": "object",
+      "description": "Per-provider statement of how this tenant's account is contracted, for the tier x egress gate. It governs both confidential and personal material: both may leave the machine only for a provider that does not train on them. Training use is a property of the plan that was purchased, not of the provider id, and different tenants can be on different plans — so the claim belongs here, next to the account it describes. Absent or expired is treated as 'unknown' and fails closed. Tier decides whether the question arises at all: material a tenant is happy to have trained on — open-source work, for example — belongs at the public tier, where the gate fails open and no attestation is needed. Attest here only for material that is genuinely confidential.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "training_use",
+          "attested_at"
+        ],
+        "properties": {
+          "training_use": {
+            "type": "string",
+            "enum": [
+              "none",
+              "used",
+              "unknown"
+            ],
+            "description": "Whether the vendor trains on material sent under this plan."
+          },
+          "plan": {
+            "type": "string",
+            "description": "The purchased plan this attestation covers (e.g. 'api-paid', 'team', 'free'). The same provider id behaves differently per plan, so an attestation without one is hard to re-check."
+          },
+          "basis": {
+            "type": "string",
+            "description": "Where the claim was verified: terms URL, contract reference or ticket. A 'none' claim with no basis is an assertion, not a fact."
+          },
+          "attested_by": {
+            "type": "string",
+            "description": "Who made the claim. This is an accountable statement, not a configuration value."
+          },
+          "attested_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was verified. Vendor terms and purchased plans both change, so this decays."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When re-verification is due. Defaults to attestation_ttl_days from the egress policy."
+          }
+        }
+      }
+    }
   }
 }

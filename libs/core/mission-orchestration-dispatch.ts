@@ -4,9 +4,12 @@ import { safeExistsSync } from './secure-io.js';
 import { logger } from './core.js';
 import { ensureMissionTeamRuntimeViaSupervisor } from './agent-runtime-supervisor.js';
 import {
+  diagnoseMissionTeamRoleGap,
   resolveMissionTeamPlan,
   resolveMissionTeamReceiver,
 } from './mission-team-plan-composer.js';
+import { restaffMissionTeamRole } from './mission-team-binding.js';
+import { proposeMissionTeamRoster } from './team-roster-proposal.js';
 import { resolveTaskModelHint } from './reasoning-model-routing.js';
 import { type TaskModelPhaseKind } from './reasoning-level-policy.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
@@ -110,6 +113,35 @@ export async function dispatchMissionNextTasksCore(
       reason: 'Prewarm roles required by planner-produced NEXT_TASKS.',
       timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
     });
+  }
+
+  // TC-12: the opt-in proposer runs once, before the first dispatch, when the
+  // planned work is known but nothing has been executed yet. It is gated by
+  // the governed policy (off by default), never fails dispatch, and can only
+  // add roles through the same checked restaff path a human uses.
+  try {
+    const proposal = await proposeMissionTeamRoster({
+      missionId,
+      missionContext: plannedTasks
+        .slice(0, 12)
+        .map(
+          (task) => `${task.assigned_to?.role || 'unassigned'}: ${task.description || task.task_id}`
+        )
+        .join('\n'),
+    });
+    if (proposal.accepted_roles.length > 0) {
+      await ensureMissionTeamRuntimeViaSupervisor({
+        missionId,
+        teamRoles: proposal.accepted_roles,
+        requestedBy: 'mission_orchestration_worker',
+        reason: 'Materialize roles accepted from the roster proposer.',
+        timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
+      });
+    }
+  } catch (error) {
+    logger.warn(
+      `[worker] roster proposal skipped: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 
   const dispatched: Array<{ task_id: string; team_role: string; agent_id: string }> = [];
@@ -230,16 +262,61 @@ export async function dispatchMissionNextTasksCore(
         teamRole === 'reviewer' || teamRole === 'qa'
           ? prepareArtifactReviewTask({ missionId, reviewTask: task, tasks: allTasks })
           : null;
-      const assignment = resolveMissionTeamReceiver({
-        missionId,
-        teamRole,
-        ...(reviewArtifact && task.artifact_review_profile
+      const receiverConstraints =
+        reviewArtifact && task.artifact_review_profile
           ? {
               excludedAgentIds: task.artifact_review_profile.implementer_agent_ids,
               requiredCapabilities: task.artifact_review_profile.required_reviewer_capabilities,
             }
-          : {}),
+          : {};
+      let assignment = resolveMissionTeamReceiver({
+        missionId,
+        teamRole,
+        ...receiverConstraints,
       });
+
+      // TC-06/TC-07: a role the planner demanded but the roster never had is
+      // a staffing decision, not a dead end. Restaff it through the governed
+      // path (bounded by max_members, same capability/authority/SoD checks)
+      // and retry once; anything else — an unfilled role, or a pool with no
+      // capable actor — stays a human escalation, but now a named one.
+      let roleGap = assignment?.agent_id
+        ? null
+        : diagnoseMissionTeamRoleGap({ missionId, teamRole, ...receiverConstraints });
+      if (roleGap?.kind === 'role_not_on_roster') {
+        const restaffed = restaffMissionTeamRole({
+          missionId,
+          teamRole,
+          ...receiverConstraints,
+          requestedBy: 'mission_orchestration_worker',
+          reason: `Task ${task.task_id} demands team role ${teamRole}, which the roster did not carry.`,
+        });
+        if (restaffed.added || restaffed.promoted) {
+          await ensureMissionTeamRuntimeViaSupervisor({
+            missionId,
+            teamRoles: [teamRole],
+            requestedBy: 'mission_orchestration_worker',
+            reason: `Materialize restaffed role ${teamRole}.`,
+            timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
+          });
+          assignment = resolveMissionTeamReceiver({ missionId, teamRole, ...receiverConstraints });
+          roleGap = assignment?.agent_id
+            ? null
+            : diagnoseMissionTeamRoleGap({ missionId, teamRole, ...receiverConstraints });
+        }
+        emitMissionOrchestrationObservation({
+          event_type: 'mission_team_restaffed',
+          decision: restaffed.added ? 'mission_team_restaffed' : 'mission_team_restaff_refused',
+          mission_id: missionId,
+          reason: restaffed.refusal || 'role_added',
+          payload: {
+            task_id: task.task_id,
+            team_role: teamRole,
+            agent_id: restaffed.added?.agent_id || null,
+            promoted: restaffed.promoted,
+          },
+        });
+      }
       const reviewProfile = task.artifact_review_profile;
       const reviewerIndependenceFailure =
         assignment &&
@@ -302,7 +379,19 @@ export async function dispatchMissionNextTasksCore(
       if (!assignment?.agent_id) {
         task.status = 'blocked';
         waveMadeProgress = true;
-        const summary = deps.buildUnassignedRoleSummary(task, teamRole);
+        // TC-07: say which gap this is. `no_capable_actor` means the pool has
+        // eligible actors for the role but none holding the capabilities the
+        // task needs — restaffing cannot fix that, adding the capability to
+        // an agent profile can.
+        const gap =
+          roleGap || diagnoseMissionTeamRoleGap({ missionId, teamRole, ...receiverConstraints });
+        const baseSummary = deps.buildUnassignedRoleSummary(task, teamRole);
+        const summary =
+          gap.kind === 'no_capable_actor' && gap.missing_capabilities.length > 0
+            ? `${baseSummary} No eligible actor for role ${teamRole} holds: ${gap.missing_capabilities.join(', ')}.`
+            : gap.kind === 'role_unfilled'
+              ? `${baseSummary} Role ${teamRole} is on the roster but has no compatible actor in the pool.`
+              : baseSummary;
         emitMissionTaskEvent({
           event_type: 'task_reviewed',
           mission_id: missionId,
@@ -316,17 +405,27 @@ export async function dispatchMissionNextTasksCore(
           payload: {
             description: task.description,
             deliverable: task.deliverable,
-            reason: 'blocked(unassigned_role)',
+            reason:
+              gap.kind === 'no_capable_actor'
+                ? 'blocked(capability_gap)'
+                : 'blocked(unassigned_role)',
             team_role: teamRole,
             summary,
+            role_gap: gap,
           },
         });
         deps.recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
           summary,
-          next_step: `assign an agent for role ${teamRole} before retrying the work item`,
+          next_step:
+            gap.kind === 'no_capable_actor' && gap.missing_capabilities.length > 0
+              ? `grant ${gap.missing_capabilities.join(', ')} to an agent profile eligible for role ${teamRole}, or widen the pool`
+              : `assign an agent for role ${teamRole} before retrying the work item`,
           work_item_id: task.task_id,
           team_role: teamRole,
-          reason: 'blocked(unassigned_role)',
+          reason:
+            gap.kind === 'no_capable_actor'
+              ? 'blocked(capability_gap)'
+              : 'blocked(unassigned_role)',
         });
         batchExecutors.set(task.task_id, async () => null);
         continue;

@@ -173,6 +173,9 @@ export type MissionLifecycleUnderlyingSystem = Pick<
   | 'finishMission'
   | 'staffMissionTeam'
   | 'prewarmMissionTeam'
+  | 'restaffMissionTeam'
+  | 'proposeMissionRoster'
+  | 'adviseMission'
   | 'dispatchMissionWorkItems'
   | 'pauseMission'
   | 'resumeMission'
@@ -325,6 +328,38 @@ export function buildMissionLifecycleService(
       );
     },
 
+    async restaff(
+      id: string,
+      teamRole: string,
+      restaffOptions?: {
+        requiredCapabilities?: string[];
+        excludeAgentIds?: string[];
+        reason?: string;
+      },
+      options?: MissionLifecycleVerbOptions
+    ) {
+      return runGovernedVerb('restaff', normalizeMissionId(id), options, () =>
+        resolveSystem(explicitSystem).restaffMissionTeam(id, teamRole, restaffOptions)
+      );
+    },
+    async proposeRoster(
+      id: string,
+      proposalOptions?: { missionContext?: string; force?: boolean },
+      options?: MissionLifecycleVerbOptions
+    ) {
+      return runGovernedVerb('propose-roster', normalizeMissionId(id), options, () =>
+        resolveSystem(explicitSystem).proposeMissionRoster(id, proposalOptions)
+      );
+    },
+    async advise(
+      id: string,
+      input: { topic: string; question: string; context?: string; roles?: string[] },
+      options?: MissionLifecycleVerbOptions
+    ) {
+      return runGovernedVerb('advise', normalizeMissionId(id), options, () =>
+        resolveSystem(explicitSystem).adviseMission(id, input)
+      );
+    },
     async prewarm(id: string, teamRolesArg?: string, options?: MissionLifecycleVerbOptions) {
       return runGovernedVerb('prewarm', normalizeMissionId(id), options, () =>
         resolveSystem(explicitSystem).prewarmMissionTeam(id, teamRolesArg)
