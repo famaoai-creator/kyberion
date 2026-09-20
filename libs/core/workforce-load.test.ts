@@ -93,6 +93,25 @@ describe('workforce load (TC-08)', () => {
     expect(profile.completion).toBeCloseTo(0.025 / 1000, 10);
   });
 
+  it('resolves a provider display name to its registry model', () => {
+    // Providers report display names; before this they matched nothing and
+    // silently priced at the registry default.
+    const profile = buildCostProfileRecord({
+      provider: 'agy',
+      modelId: 'Gemini 3.6 Flash (Medium)',
+    });
+    expect(profile.registry_model_id).toBe('gemini-3.6-flash');
+    expect(profile.rate_source).toBe('registry');
+    expect(profile.prompt).toBeCloseTo(0.0015 / 1000, 12);
+  });
+
+  it('still prefers the most specific registry id', () => {
+    expect(buildCostProfileRecord({ modelId: 'gpt-4o-mini' }).registry_model_id).toBe(
+      'gpt-4o-mini'
+    );
+    expect(buildCostProfileRecord({ modelId: 'GPT 4o' }).registry_model_id).toBe('gpt-4o');
+  });
+
   it('carries no cost profile when the actor has no model', () => {
     expect(buildCostProfileRecord({ provider: 'claude', modelId: null })).toEqual({});
   });

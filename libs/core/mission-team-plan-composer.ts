@@ -314,36 +314,46 @@ interface RoleHolder {
 }
 
 /**
- * Separation-of-duties constraints derived from the roles a plan has already
- * filled: the reviewer must be a different actor than the implementer (hard,
- * with a staffing fallback) and prefers a different provider so a different
- * model family reviews the work; the tester prefers a different actor than the
- * reviewer; the researcher must differ from the owner.
+ * Separation-of-duties pairs, declared once.
  *
- * Shared by initial composition and by TC-06 restaffing so a member added
- * mid-mission is held to the same independence rules as one selected at
+ * `hard` means the roles must be different actors (with a staffing fallback at
+ * composition time, and no fallback when restaffing); `soft` only penalizes
+ * the overlap. Coverage checks read the same table, so "can this pair ever be
+ * independent with the current pool?" is answered against the rules the
+ * selector actually applies rather than a second copy of them.
+ */
+export const SEPARATION_ROLE_PAIRS: ReadonlyArray<{
+  role: string;
+  mustDifferFrom: string;
+  strength: 'hard' | 'soft';
+  /** Prefer a different provider so a different model family reviews the work. */
+  avoidSameProvider: boolean;
+}> = [
+  { role: 'researcher', mustDifferFrom: 'owner', strength: 'hard', avoidSameProvider: true },
+  { role: 'reviewer', mustDifferFrom: 'implementer', strength: 'hard', avoidSameProvider: true },
+  { role: 'tester', mustDifferFrom: 'reviewer', strength: 'soft', avoidSameProvider: false },
+];
+
+/**
+ * Separation-of-duties constraints derived from the roles a plan has already
+ * filled. Shared by initial composition and by TC-06 restaffing so a member
+ * added mid-mission is held to the same independence rules as one selected at
  * creation.
  */
 function resolveRoleSeparation(
   role: string,
   holders: Map<string, RoleHolder>
 ): RoleSeparationConstraints | undefined {
-  if (role === 'researcher') {
-    const owner = holders.get('owner');
-    if (!owner) return undefined;
-    return { excludeAgents: [owner.agentId], avoidProviders: [owner.provider] };
-  }
-  if (role === 'reviewer') {
-    const implementer = holders.get('implementer');
-    if (!implementer) return undefined;
-    return { excludeAgents: [implementer.agentId], avoidProviders: [implementer.provider] };
-  }
-  if (role === 'tester') {
-    const reviewer = holders.get('reviewer');
-    if (!reviewer) return undefined;
-    return { avoidAgents: [reviewer.agentId] };
-  }
-  return undefined;
+  const pair = SEPARATION_ROLE_PAIRS.find((entry) => entry.role === role);
+  if (!pair) return undefined;
+  const counterpart = holders.get(pair.mustDifferFrom);
+  if (!counterpart) return undefined;
+  return {
+    ...(pair.strength === 'hard'
+      ? { excludeAgents: [counterpart.agentId] }
+      : { avoidAgents: [counterpart.agentId] }),
+    ...(pair.avoidSameProvider ? { avoidProviders: [counterpart.provider] } : {}),
+  };
 }
 
 /**
