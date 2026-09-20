@@ -4,7 +4,7 @@ import {
 } from '@agent/core/provider-capability-scanner';
 import { resolveProviderCliCapabilityReportPolicy } from '@agent/core/provider-cli-capability-report-policy';
 import { pathResolver } from '@agent/core/path-resolver';
-import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';
 import type { CapabilityRegistryEntry } from '@agent/core/provider-capability-scanner';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
@@ -30,9 +30,7 @@ type AdapterRegistry = {
   profiles: AdapterEntry[];
 };
 
-const ADAPTER_REGISTRY_PATH = pathResolver.knowledge(
-  'product/governance/harness-adapter-registry.json'
-);
+const ADAPTER_REGISTRY_DIR = pathResolver.knowledge('product/governance/harness-adapters');
 const ADAPTER_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/harness-adapter-registry.schema.json'
 );
@@ -40,11 +38,31 @@ const DEFAULT_REPORT_PATH = pathResolver.knowledge(
   'product/architecture/provider-cli-capability-report.md'
 );
 
-const adapterRegistryCatalog = defineCatalog<AdapterRegistry>({
-  id: 'harness-adapter-registry',
-  path: ADAPTER_REGISTRY_PATH,
-  schema: ADAPTER_REGISTRY_SCHEMA_PATH,
-});
+function loadAdapterRegistry(): AdapterRegistry {
+  const dir = assertSafeRepositoryPath(ADAPTER_REGISTRY_DIR, { allowMissingLeaf: true });
+  const profiles: AdapterEntry[] = [];
+  if (safeExistsSync(dir)) {
+    for (const file of safeReaddir(dir)
+      .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
+      .sort()) {
+      const envelope = defineCatalog<AdapterRegistry>({
+        id: 'harness-adapter-registry',
+        path: assertSafeRepositoryPath(pathResolver.resolve(`${ADAPTER_REGISTRY_DIR}/${file}`)),
+        schema: ADAPTER_REGISTRY_SCHEMA_PATH,
+      }).load();
+      if (!Array.isArray(envelope.profiles) || envelope.profiles.length !== 1) {
+        throw new Error(`Adapter registry file ${file} must contain exactly one profile`);
+      }
+      const profile = envelope.profiles[0];
+      if (`${profile.adapter_id}.json` !== file) {
+        throw new Error(`Adapter registry file ${file} must match its adapter id`);
+      }
+      profiles.push(profile);
+    }
+  }
+  profiles.sort((left, right) => left.adapter_id.localeCompare(right.adapter_id));
+  return { version: '1.0.0', profiles };
+}
 
 function parseArg(args: string[], name: string, fallback?: string): string {
   const prefixed = args.find((arg) => arg.startsWith(`${name}=`));
@@ -162,7 +180,7 @@ function buildReport(
 function render(args: string[]): GeneratedFile[] {
   const outPath = parseArg(args, '--out', DEFAULT_REPORT_PATH);
   const capabilityRegistry = loadCapabilityRegistry();
-  const adapterRegistry = adapterRegistryCatalog.load();
+  const adapterRegistry = loadAdapterRegistry();
   const capabilities = capabilityRegistry.capabilities;
   const adapters = adapterRegistry.profiles;
   const providerAvailability = probeProviderAvailability();

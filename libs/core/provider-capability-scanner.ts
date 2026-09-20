@@ -1,6 +1,7 @@
 import { assertSafeRepositoryPath, safeExec } from './secure-io.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
+import { loadRegistryDirectory, type RegistryDirectoryOptions } from './registry-directory.js';
 
 type CapabilitySource = {
   type: string;
@@ -61,7 +62,7 @@ export type ProviderScanPolicy = {
   providers: ProviderScanPolicyEntry[];
 };
 
-const CAPABILITY_REGISTRY_PATH = 'knowledge/product/governance/harness-capability-registry.json';
+const CAPABILITY_REGISTRY_DIR = 'knowledge/product/governance/harness-capabilities';
 const CAPABILITY_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/harness-capability-registry.schema.json'
 );
@@ -71,11 +72,32 @@ const PROVIDER_SCAN_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/provider-capability-scan-policy.schema.json'
 );
 
-const capabilityRegistryCatalog = defineCatalog<CapabilityRegistry>({
+const capabilityRegistryDirectoryOptions: RegistryDirectoryOptions = {
   id: 'harness-capability-registry',
-  path: () => pathResolver.rootResolve(CAPABILITY_REGISTRY_PATH),
-  schema: CAPABILITY_REGISTRY_SCHEMA_PATH,
-});
+  dirPath: pathResolver.knowledge('product/governance/harness-capabilities'),
+  schemaPath: CAPABILITY_REGISTRY_SCHEMA_PATH,
+  arrayKey: 'capabilities',
+  idKey: 'capability_id',
+  envDirVar: 'KYBERION_HARNESS_CAPABILITY_REGISTRY_DIR',
+  envPathVar: 'KYBERION_HARNESS_CAPABILITY_REGISTRY_PATH',
+};
+
+export function loadCapabilityRegistry(relativePath = CAPABILITY_REGISTRY_DIR): CapabilityRegistry {
+  if (relativePath === CAPABILITY_REGISTRY_DIR) {
+    const { headers, items } = loadRegistryDirectory<CapabilityRegistryEntry>(
+      capabilityRegistryDirectoryOptions
+    );
+    return {
+      version: String(headers['version'] ?? '1.0.0'),
+      capabilities: items,
+    };
+  }
+  return defineCatalog<CapabilityRegistry>({
+    id: 'harness-capability-registry',
+    path: assertSafeRepositoryPath(pathResolver.rootResolve(relativePath)),
+    schema: CAPABILITY_REGISTRY_SCHEMA_PATH,
+  }).load();
+}
 
 const providerCapabilityScanPolicyCatalog = defineCatalog<ProviderScanPolicy>({
   id: 'provider-capability-scan-policy',
@@ -105,17 +127,6 @@ export type DiscoveredCapability = CapabilityRegistryEntry & {
   evidence_probe?: ProbeResult;
   evidence?: string;
 };
-
-export function loadCapabilityRegistry(
-  relativePath = CAPABILITY_REGISTRY_PATH
-): CapabilityRegistry {
-  if (relativePath === CAPABILITY_REGISTRY_PATH) return capabilityRegistryCatalog.load();
-  return defineCatalog<CapabilityRegistry>({
-    id: 'harness-capability-registry',
-    path: assertSafeRepositoryPath(pathResolver.rootResolve(relativePath)),
-    schema: CAPABILITY_REGISTRY_SCHEMA_PATH,
-  }).load();
-}
 
 export function loadProviderCapabilityScanPolicy(
   relativePath = PROVIDER_SCAN_POLICY_PATH

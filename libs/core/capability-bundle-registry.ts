@@ -1,12 +1,22 @@
-import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
+import { loadRegistryDirectory, type RegistryDirectoryOptions } from './registry-directory.js';
 
 const CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/capability-bundle-registry.schema.json'
 );
-const CAPABILITY_BUNDLE_REGISTRY_PATH = pathResolver.knowledge(
-  'product/governance/capability-bundle-registry.json'
+const CAPABILITY_BUNDLE_REGISTRY_DIR = pathResolver.knowledge(
+  'product/governance/capability-bundles'
 );
+
+const capabilityBundleDirectoryOptions: RegistryDirectoryOptions = {
+  id: 'capability-bundle-registry',
+  dirPath: CAPABILITY_BUNDLE_REGISTRY_DIR,
+  schemaPath: CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH,
+  arrayKey: 'bundles',
+  idKey: 'bundle_id',
+  envDirVar: 'KYBERION_CAPABILITY_BUNDLE_REGISTRY_DIR',
+  envPathVar: 'KYBERION_CAPABILITY_BUNDLE_REGISTRY_PATH',
+};
 
 export type CapabilityBundleStatus = 'active' | 'experimental' | 'conceptual' | 'deprecated';
 
@@ -27,14 +37,14 @@ export interface CapabilityBundleRegistryFile {
   bundles: CapabilityBundleEntry[];
 }
 
-const capabilityBundleRegistryCatalog = defineCatalog<CapabilityBundleRegistryFile>({
-  id: 'capability-bundle-registry',
-  path: CAPABILITY_BUNDLE_REGISTRY_PATH,
-  schema: CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH,
-});
-
 export function loadCapabilityBundleRegistry(): CapabilityBundleRegistryFile {
-  return capabilityBundleRegistryCatalog.load();
+  const { headers, items } = loadRegistryDirectory<CapabilityBundleEntry>(
+    capabilityBundleDirectoryOptions
+  );
+  return {
+    version: String(headers['version'] || '1.0.0'),
+    bundles: items,
+  };
 }
 
 function statusRank(status: CapabilityBundleStatus): number {

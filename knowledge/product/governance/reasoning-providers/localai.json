@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "localai",
+      "provider": "localai",
+      "module": "./reasoning-openai-compatible-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "input_modalities": ["text"]
+      },
+      "env_keys": ["KYBERION_LOCALAI_URL"]
+    }
+  ]
+}

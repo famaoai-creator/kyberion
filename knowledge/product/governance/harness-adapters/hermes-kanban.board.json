@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "hermes-kanban.board",
+      "provider": "hermes-agent",
+      "surface_kind": "provider_runtime",
+      "capability_id": "provider.runtime.hermes_kanban_board",
+      "contract_kind": "delegated_task_queue",
+      "observation_kind": "task_rows+task_events+handoff_thread",
+      "result_kind": "task_result+trace_ref",
+      "approval_behavior": "none",
+      "replayability": "partial",
+      "fallback_contract": "pipelines/a2a-task-contract.json",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Hermes Kanban models durable multi-agent collaboration; keep the board semantics visible in trace and receipts."
+    }
+  ]
+}

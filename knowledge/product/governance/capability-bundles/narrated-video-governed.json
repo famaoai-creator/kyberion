@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "bundles": [
+    {
+      "bundle_id": "narrated-video-governed",
+      "status": "active",
+      "kind": "capability-bundle",
+      "summary": "Generate a narrated video artifact from a governed brief through voice synthesis, video composition, and render backends.",
+      "intents": ["generate-narrated-video"],
+      "required_actuators": ["voice-actuator", "video-composition-actuator", "artifact-actuator"],
+      "references": [
+        "knowledge/public/procedures/media/create-narrated-intro-movie.md",
+        "knowledge/public/procedures/media/compose-video-from-adf.md"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "codex-cli.exec",
+      "provider": "codex-cli",
+      "surface_kind": "provider_runtime",
+      "capability_id": "cli.native.codex_exec",
+      "contract_kind": "structured_reasoning",
+      "observation_kind": "prompt+response",
+      "result_kind": "structured_output+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "reasoning-backend / structured-query",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Non-interactive Codex execution is best treated as a provider-runtime reasoning adapter."
+    }
+  ]
+}

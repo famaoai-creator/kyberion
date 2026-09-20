@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "gemini-cli.skills",
+      "provider": "gemini-cli",
+      "surface_kind": "provider_runtime",
+      "capability_id": "cli.native.gemini_skill_management",
+      "contract_kind": "deterministic_utility",
+      "observation_kind": "skill_listing+metadata",
+      "result_kind": "skill_action_result+trace_ref",
+      "approval_behavior": "none",
+      "replayability": "deterministic",
+      "fallback_contract": "orchestrator-actuator",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Gemini skills should be treated as deterministic utility surfaces."
+    }
+  ]
+}

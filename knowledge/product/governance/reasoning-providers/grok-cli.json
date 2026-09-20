@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "grok-cli",
+      "provider": "grok",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": true,
+        "input_modalities": ["text"]
+      },
+      "env_keys": ["GROK_CLI", "GROK_VERSION"]
+    }
+  ]
+}

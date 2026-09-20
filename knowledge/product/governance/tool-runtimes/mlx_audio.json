@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "mlx_audio",
+      "display_name": "mlx-audio TTS Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import mlx_audio; print(\"ok\")"],
+        "description": "Probe mlx-audio availability through an import check."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "mlx-audio[tts]"],
+        "description": "Install the current mlx-audio TTS extras into the managed Python runtime."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import mlx_audio; print(\"ok\")"],
+        "description": "Re-check the installed mlx-audio runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/mlx-audio",
+      "notes": "Runtime dependency for the Qwen3-TTS voice engine bridge."
+    }
+  ]
+}

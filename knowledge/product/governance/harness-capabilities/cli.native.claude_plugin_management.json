@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.claude_plugin_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "claude-cli",
+        "name": "plugins",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "medium",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["plugin-management", "install-plugin", "discover-plugins"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "orchestrator-actuator"
+      },
+      "status": "active",
+      "notes": "claude plugin / plugins — install and manage Claude Code plugins. Plugin install changes the tool surface for subsequent sessions and should be approval-gated, matching gemini-cli extension management semantics."
+    }
+  ]
+}

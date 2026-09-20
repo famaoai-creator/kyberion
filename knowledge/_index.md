@@ -219,6 +219,24 @@
 ## 📁 product/governance/authority-roles
 - [Authority Roles](./product/governance/authority-roles/README.md) (public | Unknown)
 
+## 📁 product/governance/capability-bundles
+- [Capability Bundle Registry Canonical Directory](./product/governance/capability-bundles/README.md) (public | Unknown)
+
+## 📁 product/governance/gateway-capabilities
+- [Gateway Capability Registry Canonical Directory](./product/governance/gateway-capabilities/README.md) (public | Unknown)
+
+## 📁 product/governance/governance-bodies
+- [Governance Body Registry Canonical Directory](./product/governance/governance-bodies/README.md) (public | Unknown)
+
+## 📁 product/governance/harness-adapters
+- [Harness Adapter Registry Canonical Directory](./product/governance/harness-adapters/README.md) (public | Unknown)
+
+## 📁 product/governance/harness-capabilities
+- [Harness Capability Registry Canonical Directory](./product/governance/harness-capabilities/README.md) (public | Unknown)
+
+## 📁 product/governance/media-backends
+- [Media Backend Registry Canonical Directory](./product/governance/media-backends/README.md) (public | Unknown)
+
 ## 📁 product/governance/model-registry
 - [Model Registry Canonical Directory](./product/governance/model-registry/README.md) (public | Unknown)
 
@@ -232,14 +250,23 @@
 - [Phase Protocol: Recovery & Resilience](./product/governance/phases/recovery.md) (public | Unknown)
 - [Phase Protocol: Review & Distillation](./product/governance/phases/review.md) (public | Unknown)
 
+## 📁 product/governance/reasoning-providers
+- [Reasoning Provider Registry Canonical Directory](./product/governance/reasoning-providers/README.md) (public | Unknown)
+
 ## 📁 product/governance/retrospectives
 - [🧠 Retrospective: 2026-03-13 (Onboarding & First Mission)](./product/governance/retrospectives/2026-03-13_onboarding_review.md) (public | Unknown)
+
+## 📁 product/governance/service-runtimes
+- [Service Runtime Registry Canonical Directory](./product/governance/service-runtimes/README.md) (public | Unknown)
 
 ## 📁 product/governance/surface-provider-manifest-catalogs
 - [Surface Provider Manifest Catalog Directory](./product/governance/surface-provider-manifest-catalogs/README.md) (public | Unknown)
 
 ## 📁 product/governance/surfaces
 - [Surface Manifests](./product/governance/surfaces/README.md) (public | Unknown)
+
+## 📁 product/governance/tool-runtimes
+- [Tool Runtime Registry Canonical Directory](./product/governance/tool-runtimes/README.md) (public | Unknown)
 
 ## 📁 product/governance/voice-engines
 - [Voice Engines](./product/governance/voice-engines/README.md) (public | Unknown)
@@ -379,6 +406,9 @@
 
 ## 📁 product/orchestration/agent-profiles
 - [Agent Profile Directory](./product/orchestration/agent-profiles/README.md) (public | Unknown)
+
+## 📁 product/orchestration/external-services
+- [External Service Registry Seed Canonical Directory](./product/orchestration/external-services/README.md) (public | Unknown)
 
 ## 📁 product/orchestration/fusion-protocols
 - [Continuous Learning Loop Protocol](./product/orchestration/fusion-protocols/learning_loop.md) (public | Ecosystem Architect)

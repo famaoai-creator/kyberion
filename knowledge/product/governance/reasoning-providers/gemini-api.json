@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "gemini-api",
+      "provider": "gemini-api",
+      "module": "./reasoning-api-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "input_modalities": ["text", "image"]
+      },
+      "env_keys": ["GEMINI_API_KEY", "GOOGLE_API_KEY"]
+    }
+  ]
+}
