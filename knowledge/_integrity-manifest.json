@@ -3663,7 +3663,7 @@
     {
       "path": "product/governance/team-composition-obligations.json",
       "tier": "public",
-      "size": 167,
+      "size": 1914,
       "type": "json"
     },
     {
@@ -9441,7 +9441,7 @@
     {
       "path": "product/schemas/mission-team-plan.schema.json",
       "tier": "public",
-      "size": 7157,
+      "size": 7602,
       "type": "json"
     },
     {
