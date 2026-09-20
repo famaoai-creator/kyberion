@@ -9,6 +9,8 @@ import { resolveSelectionHints } from './agent-manifest.js';
 import { resolveTeamRoleSelectionHints } from './team-role-selection.js';
 import { resolveModelProvider } from './reasoning-model-routing.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
+import { resolveWorkforceLoad, type WorkforceLoadIndex } from './workforce-load.js';
+import { workerLoadPenalty } from './worker-assignment-policy.js';
 
 export interface AuthorityRoleRecord {
   description: string;
@@ -142,17 +144,36 @@ export interface TeamProviderPreference {
 const SOD_AVOID_AGENT_PENALTY = 24;
 const SOD_AVOID_PROVIDER_PENALTY = 6;
 
-export function selectAgentForTeamRole(
-  teamRole: string,
-  teamRoleRecord: TeamRoleRecord,
-  authorityRoles: Record<string, AuthorityRoleRecord>,
-  agents: Record<string, AgentProfileRecord>,
-  routingHint?: { model_id: string },
-  separation?: RoleSeparationConstraints,
+export interface SelectAgentForTeamRoleInput {
+  teamRole: string;
+  teamRoleRecord: TeamRoleRecord;
+  authorityRoles: Record<string, AuthorityRoleRecord>;
+  agents: Record<string, AgentProfileRecord>;
+  routingHint?: { model_id: string };
+  separation?: RoleSeparationConstraints;
   /** NI-01: org segment for the derived nhi_id; defaults to the active organization profile. */
-  organizationId?: string,
-  providerPreference?: TeamProviderPreference
-): MissionTeamAssignment {
+  organizationId?: string;
+  providerPreference?: TeamProviderPreference;
+  /**
+   * TC-09: observed workforce load, built once per composition pass. Selection
+   * prefers an actor that is not already carrying work; the penalty is capped
+   * so load never outweighs a capability match.
+   */
+  loadIndex?: WorkforceLoadIndex;
+}
+
+export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): MissionTeamAssignment {
+  const {
+    teamRole,
+    teamRoleRecord,
+    authorityRoles,
+    agents,
+    routingHint,
+    separation,
+    organizationId,
+    providerPreference,
+    loadIndex,
+  } = input;
   const hardExcludedAgents = new Set(
     (separation?.excludeAgents || []).filter((entry): entry is string => Boolean(entry))
   );
@@ -220,6 +241,11 @@ export function selectAgentForTeamRole(
       const separationPenalty =
         (softAvoidAgents.has(agentId) ? SOD_AVOID_AGENT_PENALTY : 0) +
         (softAvoidProviders.has(resolvedTarget.provider) ? SOD_AVOID_PROVIDER_PENALTY : 0);
+      // TC-09: observed load, scored by the shared worker-assignment policy so
+      // one module owns what "busy" costs a candidate.
+      const loadPenalty = loadIndex
+        ? workerLoadPenalty(resolveWorkforceLoad(agentId, loadIndex))
+        : 0;
       const score =
         capabilityHits * 10 -
         capabilityPenalty +
@@ -228,7 +254,8 @@ export function selectAgentForTeamRole(
         providerBonus +
         performanceBonus +
         modelPerformanceBonus -
-        separationPenalty;
+        separationPenalty -
+        loadPenalty;
 
       const requiredScopes = new Set(teamRoleRecord.required_scope_classes || []);
       const compatibleAuthorityRoles = profile.authority_roles.filter((role) =>
