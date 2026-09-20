@@ -111,6 +111,14 @@
       "allowed_actuators": ["code-actuator", "orchestrator-actuator", "artifact-actuator"],
       "tier_access": ["public", "confidential"]
     },
+    "evaluate_model_role_fitness": {
+      "description": "TC-15: role-fitness evaluator authority. Runs the governed model role-fitness probes and appends their verdicts. Its only write scope is that journal — it measures models, it never staffs, dispatches or reconfigures anything.",
+      "default_persona": "worker",
+      "write_scopes": ["active/shared/observability/retrospectives/"],
+      "scope_classes": ["observability"],
+      "allowed_actuators": [],
+      "tier_access": ["public"]
+    },
     "generation_scheduler": {
       "description": "EV-01: media-generation schedule daemon authority. Owns the generation schedule registry and its trigger deliveries; deliberately narrower than chronos_gateway, which has no write scope over media-generation state.",
       "default_persona": "worker",
@@ -253,14 +261,6 @@
       "scope_classes": ["capability_registration", "tenant_configuration", "audit"],
       "allowed_actuators": ["service-actuator", "voice-actuator", "file-actuator"],
       "tier_access": ["public", "confidential"]
-    },
-    "evaluate_model_role_fitness": {
-      "description": "TC-15: role-fitness evaluator authority. Runs the governed model role-fitness probes and appends their verdicts. Its only write scope is that journal — it measures models, it never staffs, dispatches or reconfigures anything.",
-      "default_persona": "worker",
-      "write_scopes": ["active/shared/observability/retrospectives/"],
-      "scope_classes": ["observability"],
-      "allowed_actuators": [],
-      "tier_access": ["public"]
     }
   }
 }
