@@ -175,58 +175,82 @@ export function maskComments(source: string): string {
   return chars.join('');
 }
 
-function importsFor(filePath: string, includeDynamic = false, includeTypeOnly = false): string[] {
+type ParsedImports = {
+  runtimeStatic: string[];
+  allStatic: string[];
+  dynamic: string[];
+};
+
+function parseImports(filePath: string): ParsedImports {
   const text = maskComments(readModuleBoundaryTextFile(filePath));
-  const imports: string[] = [];
+  const runtimeStatic: string[] = [];
+  const allStatic: string[] = [];
+  const dynamic: string[] = [];
   const staticPattern = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
   const dynamicPattern = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
   for (const match of text.matchAll(staticPattern)) {
+    allStatic.push(match[1]);
     // Type-only imports do not create runtime module edges or initialization
     // cycles. Keep mixed `export { type X, value }` statements as runtime
     // edges, but exclude the dedicated `import type` form.
-    if (!includeTypeOnly && /\bimport\s+type\b/u.test(match[0])) continue;
-    imports.push(match[1]);
+    if (/\bimport\s+type\b/u.test(match[0])) continue;
+    runtimeStatic.push(match[1]);
   }
   // Test-only lazy imports exercise fixtures and optional dependencies rather
   // than production module boundaries; keep the ratchet focused on runtime
   // edges while still accounting for lazy imports in production code.
-  if (includeDynamic && !filePath.endsWith('.test.ts') && !filePath.endsWith('.test.tsx')) {
+  if (!filePath.endsWith('.test.ts') && !filePath.endsWith('.test.tsx')) {
     for (const match of text.matchAll(dynamicPattern)) {
       // `typeof import('...')` is a type query, not a runtime dependency. It
       // must not manufacture a runtime cycle (or a dynamic edge) for the
       // module that owns the type.
       const prefix = text.slice(0, match.index ?? 0);
       if (/typeof\s*$/u.test(prefix.slice(-12))) continue;
-      imports.push(match[1]);
+      dynamic.push(match[1]);
     }
   }
-  return [...new Set(imports)];
+  return {
+    runtimeStatic: [...new Set(runtimeStatic)],
+    allStatic: [...new Set(allStatic)],
+    dynamic: [...new Set(dynamic)],
+  };
 }
 
-function buildGraph(files: string[], includeDynamic = false): Map<string, string[]> {
+function parseSourceImports(files: string[]): Map<string, ParsedImports> {
+  return new Map(files.map((file) => [file, parseImports(file)]));
+}
+
+function resolveTargets(importer: string, specifiers: string[]): string[] {
+  return [...new Set(specifiers)]
+    .map((specifier) => resolveImport(importer, specifier))
+    .filter((target): target is string => Boolean(target));
+}
+
+function buildGraph(
+  modules: Map<string, ParsedImports>,
+  includeDynamic = false
+): Map<string, string[]> {
   const graph = new Map<string, string[]>();
-  for (const file of files) {
-    const targets = importsFor(file, includeDynamic)
-      .map((specifier) => resolveImport(file, specifier))
-      .filter((target): target is string => Boolean(target));
-    graph.set(file, targets);
+  for (const [file, imports] of modules) {
+    graph.set(
+      file,
+      resolveTargets(
+        file,
+        includeDynamic ? [...imports.runtimeStatic, ...imports.dynamic] : imports.runtimeStatic
+      )
+    );
   }
   return graph;
 }
 
-function collectDynamicImportEdges(files: string[]): DynamicImportEdge[] {
-  const allGraph = buildGraph(files, true);
+function collectDynamicImportEdges(modules: Map<string, ParsedImports>): DynamicImportEdge[] {
   const edges: DynamicImportEdge[] = [];
-  for (const [source, targets] of allGraph) {
+  for (const [source, imports] of modules) {
     // Compare against every static import, including type-only imports. The
     // runtime graph intentionally excludes type-only edges, but they are not
     // dynamic edges and must not be reported as such here.
-    const staticTargets = new Set(
-      importsFor(source, false, true)
-        .map((specifier) => resolveImport(source, specifier))
-        .filter((target): target is string => Boolean(target))
-    );
-    for (const target of targets) {
+    const staticTargets = new Set(resolveTargets(source, imports.allStatic));
+    for (const target of resolveTargets(source, imports.dynamic)) {
       if (!staticTargets.has(target)) {
         edges.push({ source: relative(source), target: relative(target) });
       }
@@ -357,18 +381,19 @@ export function checkModuleBoundaries(): {
 } {
   const manifest = config();
   const files = sourceFiles();
-  const graph = buildGraph(files);
+  const modules = parseSourceImports(files);
+  const graph = buildGraph(modules);
   // Dynamic imports are runtime dependency edges too. Excluding them lets a
   // module hide a cycle behind `await import()` while the static graph stays
   // green. Test-only fixtures remain excluded by `buildGraph`'s production
   // edge policy.
-  const runtimeGraph = buildGraph(files, true);
+  const runtimeGraph = buildGraph(modules, true);
   const cycles = findCycles(graph);
   const runtimeCycles = findCycles(runtimeGraph);
   const maxRuntimeSccSize = maxComponentSize(runtimeCycles);
   const directionViolations = findDirectionViolations(runtimeGraph, manifest);
   const directionExceptions = findDirectionExceptions(runtimeGraph, manifest);
-  const dynamicImportEdges = collectDynamicImportEdges(files);
+  const dynamicImportEdges = collectDynamicImportEdges(modules);
   const baseline = safeExistsSync(BASELINE_PATH)
     ? readSafeJsonFile<BoundaryBaseline>(BASELINE_PATH, 'module boundary baseline')
     : {
@@ -430,7 +455,8 @@ export const runCheckModuleBoundaries = defineScript({
             {
               version: 1,
               cycles: report.cycles.length,
-              runtime_cycles: findCycles(buildGraph(sourceFiles(), true)).length,
+              runtime_cycles: findCycles(buildGraph(parseSourceImports(sourceFiles()), true))
+                .length,
               max_runtime_scc_size: report.maxRuntimeSccSize,
               direction_violations: report.directionViolations.length,
             },
