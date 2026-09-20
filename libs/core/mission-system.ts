@@ -33,6 +33,7 @@ import {
 } from './mission-project-ledger.js';
 import {
   prewarmMissionTeam as _prewarmMissionTeam,
+  restaffMissionTeam as _restaffMissionTeam,
   showMissionTeam as _showMissionTeam,
   staffMissionTeam as _staffMissionTeam,
 } from './mission-runtime.js';
@@ -313,6 +314,13 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
     },
     prewarmMissionTeam(id: string, teamRolesArg?: string) {
       return _prewarmMissionTeam(id, teamRolesArg);
+    },
+    restaffMissionTeam(
+      id: string,
+      teamRole: string,
+      options?: { requiredCapabilities?: string[]; excludeAgentIds?: string[]; reason?: string }
+    ) {
+      return _restaffMissionTeam(id, teamRole, options);
     },
     grantMissionAccess(missionId: string, serviceId: string, ttl = 30) {
       return _grantMissionAccess(missionId, serviceId, ttl);

@@ -33,6 +33,12 @@ export interface TeamCompositionObligationRule {
 
 export interface TeamCompositionObligationsCatalog {
   version: string;
+  /**
+   * TC-06: how many members a team may gain beyond its composed roster. The
+   * lifecycle `max_members` cap is derived from this, so the cap is a real
+   * ceiling instead of a restatement of the roster size.
+   */
+  roster_headroom?: number;
   always_staffed_roles: string[];
   obligations: TeamCompositionObligationRule[];
 }
@@ -47,8 +53,11 @@ const OBLIGATIONS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/team-composition-obligations.schema.json'
 );
 
+const DEFAULT_ROSTER_HEADROOM = 2;
+
 const FALLBACK: TeamCompositionObligationsCatalog = {
   version: '1.0.0',
+  roster_headroom: DEFAULT_ROSTER_HEADROOM,
   always_staffed_roles: ['owner', 'orchestrator'],
   obligations: [],
 };
@@ -66,6 +75,12 @@ export function loadTeamCompositionObligations(): TeamCompositionObligationsCata
 
 export function resetTeamCompositionObligations(): void {
   obligationsCatalog.reset();
+}
+
+/** How many members a team may gain beyond its composed roster (TC-06). */
+export function resolveRosterHeadroom(): number {
+  const headroom = loadTeamCompositionObligations().roster_headroom;
+  return typeof headroom === 'number' && headroom >= 0 ? headroom : DEFAULT_ROSTER_HEADROOM;
 }
 
 /** Structural roles a mission staffs at creation time (TC-01). */

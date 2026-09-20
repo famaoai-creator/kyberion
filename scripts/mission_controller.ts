@@ -843,6 +843,10 @@ Visibility Commands:
                                  Show or regenerate mission team composition
   staff    <ID> [--provider <ID>] [--model <ID>]
                                  Spawn or verify runtime instances for assigned mission team roles
+  restaff  <ID> <TEAM_ROLE> [--capabilities <CSV>] [--exclude <AGENT_CSV>] [--reason <TEXT>]
+                                 Add a role to a running mission's roster (bounded by max_members,
+                                 same capability / authority / separation-of-duties checks as
+                                 composition) and materialize its runtime
   classify <ID> [intent] [task]  Classify mission context into class/delivery/risk/stage
   workflow-select <ID> [intent] [task]
                                  Resolve workflow template from mission classification
@@ -997,6 +1001,17 @@ async function staffMissionTeam(
 async function prewarmMissionTeam(id: string, teamRolesArg?: string, organizationId?: string) {
   return withOrganizationContext(organizationId, () =>
     missionLifecycleService.prewarm(id, teamRolesArg)
+  );
+}
+
+async function restaffMissionTeam(
+  id: string,
+  teamRole: string,
+  options: { requiredCapabilities?: string[]; excludeAgentIds?: string[]; reason?: string },
+  organizationId?: string
+) {
+  return withOrganizationContext(organizationId, () =>
+    missionLifecycleService.restaff(id, teamRole, options)
   );
 }
 
@@ -1458,6 +1473,7 @@ async function mainImpl(
     showMissionTeam,
     staffMissionTeam,
     prewarmMissionTeam,
+    restaffMissionTeam,
     classifyMission,
     selectMissionWorkflow,
     planProcessTemplateTasks,

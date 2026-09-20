@@ -88,7 +88,10 @@
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "items": { "type": "string", "enum": ["structural", "obligation", "template"] }
+            "items": {
+              "type": "string",
+              "enum": ["structural", "obligation", "template", "restaff"]
+            }
           },
           "agent_id": { "type": ["string", "null"] },
           "actor_type": { "type": "string", "enum": ["human", "agent", "service"] },

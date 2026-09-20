@@ -8,6 +8,12 @@
   "properties": {
     "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
+    "roster_headroom": {
+      "description": "How many members a mission team may gain beyond its composed roster (TC-06 restaffing). The lifecycle max_members cap is derived as max(template-declared, roster + headroom), so the cap is a real ceiling rather than a restatement of the roster size.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10
+    },
     "always_staffed_roles": {
       "description": "Structural roles staffed at mission creation. Every other roster role starts on standby and is staffed on demand.",
       "type": "array",

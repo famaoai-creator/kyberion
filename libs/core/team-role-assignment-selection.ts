@@ -68,10 +68,12 @@ export interface MissionTeamAssignment {
    * TC-04: why this role is on the roster — `structural` (always staffed),
    * `obligation` (required by the governed obligations catalog and therefore
    * not removable by a template or organization overlay), `template`
-   * (organization preference). Audits read the roster's justification from
-   * here instead of inferring it from the template name.
+   * (organization preference), `restaff` (added mid-mission because work
+   * demanded a role the roster did not have — TC-06). Audits read the
+   * roster's justification from here instead of inferring it from the
+   * template name.
    */
-  role_sources?: Array<'structural' | 'obligation' | 'template'>;
+  role_sources?: Array<'structural' | 'obligation' | 'template' | 'restaff'>;
   agent_id: string | null;
   actor_type?: 'agent' | 'human' | 'service';
   resource?: import('./mission-team-binding.js').WorkforceResourceRef;
