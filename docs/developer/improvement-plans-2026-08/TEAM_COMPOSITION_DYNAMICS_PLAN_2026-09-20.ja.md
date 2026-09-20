@@ -168,6 +168,11 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 | TC-12 | DONE    | `proposeMissionTeamRoster`(既定 OFF、fail-closed)、dispatch 前 1 回 + `propose-roster` CLI                                                    |
 | TC-13 | DONE    | `summarizeRosterProposalOutcomes`(受理率 + 後追い restaff 率)、`readMissionExecutionLedger`                                                   |
 | TC-14 | DONE    | テンプレート到達性監査(dangling 参照は gate 失敗、未到達は報告のみ)                                                                           |
+| TC-15 | DONE    | `model-role-fitness`(役割別 governed プローブと機械採点)、`evaluate_model_role_fitness` CLI                                                   |
+| TC-16 | DONE    | 観測が沈黙している間だけ効くコールドスタート事前分布として選抜へ合流                                                                          |
+| TC-17 | TODO    | 宣言 `BACKEND_CAPABILITY_PROFILES` と実測プローブの突合(TC-11 と同型の正直性検査)                                                             |
+| TC-18 | DONE    | `mission-advisory-panel`(ロスター = 助言パネル)、`mission_controller advise`                                                                  |
+| TC-19 | TODO    | プローブ結果と助言採否の運用計測(受理率・棄却理由の推移)                                                                                      |
 
 ### 2026-09-20: Wave 1(TC-01〜TC-04)
 
@@ -294,3 +299,50 @@ team role は `required_capabilities` を、agent profile は `capabilities` を
 | `mission_controller propose-roster`(既定)                     | `status=disabled` を返しつつ、過去の受理率 0.50 / 後追い restaff 率 0.00 を表示                                         |
 
 いずれの受理も `reasoning-worker` に解決された(該当役割の候補が 1 名しかいないため)。TC-10 のプール厚み課題が実運用で現れた形である。
+
+### 2026-09-20: Wave 4(TC-15〜TC-19)— 新規モデルの役割適性と、チーム内助言
+
+起点: 「LLM プロバイダ・モデルは今後も大量に増える。実際に役割たりえるかを各モデルで評価する機構は作れるか」「アドバイザーなどエージェント間の会話の仕組みを組み込みたい」。
+
+**棚卸しの結論: どちらも土台はあり、欠けているのはチーム層との接続だった。**
+
+**TC-15/TC-16 — モデル×役割の適性評価**
+
+「このモデルはこの役割をこなせるか」への答えが 3 箇所にあり、どれも答えていなかった:
+
+| 既存                          | 実際に答えていること                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `BACKEND_CAPABILITY_PROFILES` | 手書き宣言。バックエンド**モード**単位で、モデル単位でも役割単位でもない                                           |
+| provider capability scanner   | CLI が起動するかの探査。コードレビューができるかではない                                                           |
+| `model-performance-index`     | 純粋に観測ベース。実ミッションで先に任せないと役割スコアが付かない(`MODEL_PERFORMANCE_MIN_SAMPLES` 未満は調整値 0) |
+
+新しいプロバイダ・モデルが継続的に増える以上、この**コールドスタートは例外ではなく常態**である。`model-role-fitness.ts` は役割ごとの governed プローブ(`model-role-fitness-probes.json`)を**機械的に採点**する。モデルに他モデルを評価させない — 審査員は測ろうとしている弱点をそのまま受け継ぐため。
+
+- **設計修正(実装中に発見)**: 構造的 assertion が多数派のため、**形式を満たし埋め込んだ欠陥を見逃した回答が 0.75 で合格**していた。契約遵守(採点対象)と正答(`required`)を分離し、required が落ちれば点数に関係なく不合格とした。
+- **記録の正直性**: `options.model` は要求であって保証ではなく、「実際にどのモデルが答えたか」を返すバックエンド API が無い。誤ラベルの証跡は実際の人員配置を動かすため、**要求モデルのプロバイダと稼働バックエンドのプロバイダが異なる場合は記録を拒否**する。
+- TC-16 は**観測が沈黙している間だけ**選抜に効く。プローブは「契約を守れる」証明であって「良い仕事をする」証明ではない。
+
+**TC-18 — ミッションが自分のチームに諮る**
+
+perspective fanout / typed cross critique / dissent log は既にあったが、**全て手書きの participant を取る**ため、助言会話はパイプライン作者が考えたラベル同士で行われていた。一方チーム組成は全ロスターメンバーの `participant_id` / `perspective_ids` / `reasoning_route_id` / `security_scope` を既に解決しており、それを plan ファイル以外に一切使っていなかった。
+
+`mission-advisory-panel.ts` はその欠けていた射影である: **ロスターがそのままパネル**。各メンバーが自分の役割と視点から答え、パネルが自分たちの意見を相互批判し、**ミッションの tier を読めない助言者は拒否される**(typed cross-critique と同じ規則)。
+
+**配線**: Wave 2 で「書かれているが誰も呼ばない」を指摘した以上、両機構とも入口を持つ — `evaluate_model_role_fitness`(書込スコープが fitness ジャーナルのみの専用 authority role)と `mission_controller advise`。適性スコアの読取経路が LLM スタックを引き込まないよう、プローブ実行器は採点モジュールから分離した。
+
+### Wave 4 の受入証跡(実機)
+
+| 観測                                                                  | 結果                                                                                                                                                                                                       |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `evaluate_model_role_fitness --model claude-opus-5 --provider claude` | reviewer / planner / tester / implementer **4 役割すべて PASS**(score 1.00)                                                                                                                                |
+| 同 `--model gemini-3.8-flash` を claude バックエンド下で              | **記録を拒否**(「答えていないモデル名で証跡を残さない」)                                                                                                                                                   |
+| 欠陥入りコードで line を外した整形済み回答                            | score 0.75 でも `required` 不成立により**不合格**(修正前は合格していた)                                                                                                                                    |
+| `mission_controller advise`(4 名パネル、交渉判断)                     | `value_maximizer` / `rigorous_validator` / `counterparty_modeler` / `ruthless_auditor` の**ロスター由来の視点**で相異なる意見。パネル自身の批判が **2/4 を理由付きで棄却**し、全て execution ledger に記録 |
+
+### Wave 4 で発見・修正した欠陥
+
+| #   | 症状                                                                                                                                                                                                                  | 修正                                                                                      |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 5   | `mission-runtime`(ミッション CLI の薄い補助層)が提案器経由で**推論バックエンドのグラフ全体を静的に取り込み**、2 suite の module 初期化を壊していた。毎回の `mission_controller` 実行で LLM スタックを読むことにもなる | 使用時 import へ変更。適性評価も同じ理由で実行器を分離                                    |
+| 6   | 構造的 assertion の多数決で「形式は満たすが判断を外した回答」が合格                                                                                                                                                   | 正答 assertion を `required` に分離                                                       |
+| 7   | **authority role の登録が 3 箇所**(正本ディレクトリ / `security-policy` の書込ゲート / index スナップショット)。index だけ書くとスナップショットが正本より先行し契約テストが落ちる                                    | 正本を追加し governed generator で整合(既存 8 ファイルの差分は整形のみ、パース比較で確認) |
