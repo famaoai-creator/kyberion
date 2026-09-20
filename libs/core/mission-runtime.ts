@@ -10,11 +10,9 @@ import {
 } from './agent-runtime-supervisor.js';
 import { findMissionPath } from './path-resolver.js';
 import { initializeMissionTeamBindings, restaffMissionTeamRole } from './mission-team-binding.js';
-import {
-  proposeMissionTeamRoster,
-  summarizeRosterProposalOutcomes,
-  type RosterProposalOutcome,
-  type RosterProposalOutcomeSummary,
+import type {
+  RosterProposalOutcome,
+  RosterProposalOutcomeSummary,
 } from './team-roster-proposal.js';
 import {
   loadMissionTeamPlan,
@@ -395,6 +393,12 @@ export async function proposeMissionRoster(
     return undefined;
   }
 
+  // Imported on use, not on load: this module is the mission CLI's thin
+  // runtime helper, and the proposer pulls in the whole reasoning-backend
+  // graph. A static import would drag an LLM stack into every `mission_controller`
+  // invocation that never asks for one.
+  const { proposeMissionTeamRoster, summarizeRosterProposalOutcomes } =
+    await import('./team-roster-proposal.js');
   const outcome = await proposeMissionTeamRoster({
     missionId: upperId,
     ...(options.missionContext ? { missionContext: options.missionContext } : {}),
