@@ -163,7 +163,7 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 | TC-07 | DONE    | `diagnoseMissionTeamRoleGap`、dispatch の自動増員リトライと `blocked(capability_gap)`                               |
 | TC-08 | DONE    | `workforce-load.ts`、`workforce-capacity-policy.json`、availability / cost_profile の実データ化                     |
 | TC-09 | DONE    | `workerLoadPenalty` を唯一の負荷スコアラとして採用、`selectAgentForTeamRole` へ合流                                 |
-| TC-10 | PARTIAL | `quality` 欠落の解消と cost registry の表示名解決を修正。プールの薄さ自体は報告に留める(エージェント新設は運用判断) |
+| TC-10 | DONE    | `critique-worker` / `coordination-worker`(別プロバイダ実体)、capability 宣言整合、死んだ `preferred_agents` の掃除と `dead_selection_hint` 検査 |
 | TC-11 | DONE    | `staffing-coverage.ts` + CI gate `staffing-capability-coverage`                                                     |
 | TC-12 | DONE    | `proposeMissionTeamRoster`(既定 OFF、fail-closed)、dispatch 前 1 回 + `propose-roster` CLI                          |
 | TC-13 | DONE    | `summarizeRosterProposalOutcomes`(受理率 + 後追い restaff 率)、`readMissionExecutionLedger`                         |
@@ -384,3 +384,34 @@ TC-11 と同型: 実測に**矛盾**する主張は gate 失敗、**証拠なし
 - `golden` FAILED — 当該ワークツリーで `build:actuators` 未実行だったための環境不足。コード欠陥ではない。
 
 修正後の再実行: **37/37 PASS(failed=0)**。
+
+### 2026-09-21: TC-10 プールの厚み(Codex Luna 第二次レビュー反映後)
+
+Wave 3 では「エージェント新設は実ランタイムの裏付けを要する運用判断」として報告に留めていた項目。計測すると、薄さは頭数の問題ではなく **2 つの構造問題**だった。
+
+1. **`reasoning-worker` 1 体が 12 役割の唯一 / ほぼ唯一の候補**。職務分離は「同一アクター + ソフトペナルティ」に劣化し、`SOD_AVOID_AGENT_PENALTY` のフォールバックが常時発火する状態。
+2. **全エージェントが `agy` を preferred provider にしていた**。Wave 1 で書いた「別のモデル系統がレビューする」規則(`avoidProviders`)は、宣言レベルで**満たしようがなく装飾だった**。
+
+**追加した 2 体**(manifest + profile の両方。manifest は実行時プロンプトと actuator 許可を持つ実体):
+
+| agent                 | provider | 役割                                                              | 設計意図                                                                                                                       |
+| --------------------- | -------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `critique-worker`     | claude   | reviewer, tester, devils_advocate, counterparty_persona, defender | **実装を担当しない**。レビュー対象から構造的に独立させる。claude-opus-5 は TC-15 の reviewer / tester プローブを実測で通過済み |
+| `coordination-worker` | gemini   | scribe, tracker, facilitator                                      | 記録・追跡・進行。`listening` / `tracking` / `documentation` の欠落を実体で埋める                                              |
+
+**`preferred_agents` の 40% が死んでいた**: 43 件中 17 件が、その役割を持てないエージェント名だった(`counterparty_persona` / `devils_advocate` / `relationship_curator` は選好が丸ごと無効)。死んだ選好は誰にもボーナスを与えず、選抜を黙って汎用スコアに委ねる。掃除したうえで `dead_selection_hint` 検査を追加し、差し戻して検出されることを確認した。
+
+| 指標                                    | 前    | 後                                                                 |
+| --------------------------------------- | ----- | ------------------------------------------------------------------ |
+| 能力を満たす候補が 0 の役割             | 5     | **1**(`relationship_curator`、どのテンプレート / 義務も要求しない) |
+| どのエージェントも宣言しない capability | 6     | **3**                                                              |
+| `devils_advocate`(義務必須)の充足候補   | 1     | **2**                                                              |
+| 死んだ `preferred_agents`               | 17/43 | **0**                                                              |
+
+**検査の強化**: 職務分離の独立性判定を「候補集合」から「**能力を満たす候補集合**」へ変更した(その役割を実際にこなせないアクターは独立性の担保にならない)。あわせて各役割の provider 系統と、ハード分離ペアが**別系統で成立可能か**を報告する。
+
+実機の組成: `development` テンプレートで implementer = `reasoning-worker`(agy)、reviewer = `critique-worker`(claude)。**別アクターかつ別モデル系統でのレビューが初めて成立**した。
+
+### 三度目の「正本 + スナップショット」
+
+正本ディレクトリとスナップショットの二重構造は **3 カタログ**(authority-roles / agent-profiles / team-roles)に存在し、**生成器があるのは 1 つだけ**だった。本作業でも snapshot 側を編集して空振りしている(Codex が直した TC-10 ドリフトと同じ原因)。`sync_agent_profiles.ts` を追加してこのクラスを塞いだ。team-roles には既存の `sync_team_roles.ts` がある。

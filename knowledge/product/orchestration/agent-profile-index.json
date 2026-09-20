@@ -1,17 +1,7 @@
 {
+  "$schema": "../schemas/agent-profile-index.schema.json",
   "version": "1.0.0",
   "agents": {
-    "cli-surface-agent": {
-      "authority_roles": ["surface_runtime"],
-      "team_roles": ["surface_liaison"],
-      "capabilities": ["cli", "surface", "conversation", "delegation"],
-      "selection_hints": {
-        "preferred_provider": "codex",
-        "preferred_modelId": "codex"
-      },
-      "provider_strategy": "adaptive",
-      "fallback_providers": ["claude", "grok", "copilot"]
-    },
     "attacker": {
       "authority_roles": ["cyber_security", "mission_controller", "ecosystem_architect"],
       "team_roles": ["attacker"],
@@ -33,6 +23,17 @@
       "provider_strategy": "adaptive",
       "fallback_providers": ["claude", "copilot", "codex"]
     },
+    "cli-surface-agent": {
+      "authority_roles": ["surface_runtime"],
+      "team_roles": ["surface_liaison"],
+      "capabilities": ["cli", "surface", "conversation", "delegation"],
+      "selection_hints": {
+        "preferred_provider": "codex",
+        "preferred_modelId": "codex"
+      },
+      "provider_strategy": "adaptive",
+      "fallback_providers": ["claude", "grok", "copilot"]
+    },
     "control-plane-agent": {
       "authority_roles": ["mission_controller", "ecosystem_architect", "knowledge_steward"],
       "team_roles": [
@@ -51,6 +52,7 @@
         "analysis",
         "planning",
         "strategy",
+        "product",
         "facilitation",
         "listening"
       ],
@@ -59,6 +61,54 @@
         "preferred_modelId": "Gemini 3.6 Flash (Medium)"
       },
       "provider_strategy": "adaptive"
+    },
+    "coordination-worker": {
+      "authority_roles": ["mission_controller", "knowledge_steward", "ecosystem_architect"],
+      "team_roles": ["scribe", "tracker", "facilitator"],
+      "capabilities": [
+        "reasoning",
+        "analysis",
+        "coordination",
+        "facilitation",
+        "listening",
+        "documentation",
+        "summarization",
+        "tracking"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "gemini-3.8-flash"
+      },
+      "provider_strategy": "preferred",
+      "fallback_providers": ["claude", "codex"]
+    },
+    "critique-worker": {
+      "authority_roles": [
+        "ruthless_auditor",
+        "qa_lead",
+        "cyber_security",
+        "ecosystem_architect",
+        "mission_controller"
+      ],
+      "team_roles": ["reviewer", "tester", "devils_advocate", "counterparty_persona", "defender"],
+      "capabilities": [
+        "reasoning",
+        "analysis",
+        "architecture",
+        "review",
+        "testing",
+        "quality",
+        "critique",
+        "security",
+        "role_play",
+        "persona_modeling"
+      ],
+      "selection_hints": {
+        "preferred_provider": "claude",
+        "preferred_modelId": "claude-opus-5"
+      },
+      "provider_strategy": "preferred",
+      "fallback_providers": ["codex", "gemini"]
     },
     "defender": {
       "authority_roles": ["cyber_security", "mission_controller", "ecosystem_architect"],
@@ -195,6 +245,7 @@
         "analysis",
         "planning",
         "strategy",
+        "product",
         "architecture",
         "code",
         "implementation",
@@ -245,7 +296,7 @@
         "tracker",
         "defender"
       ],
-      "capabilities": ["reasoning", "strategy", "coordination", "analysis", "security"],
+      "capabilities": ["reasoning", "strategy", "product", "coordination", "analysis", "security"],
       "selection_hints": {
         "preferred_provider": "agy",
         "preferred_modelId": "Gemini 3.6 Flash (Medium)"

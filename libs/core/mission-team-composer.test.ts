@@ -15,6 +15,7 @@ import {
   writeMissionTeamPlan,
 } from './mission-team-plan-composer.js';
 import { discoverProviders } from './provider-discovery.js';
+import { loadAgentProfileIndex } from './mission-team-index.js';
 
 describe('mission-team-composer classification integration', () => {
   it('derives mission type from mission classification when missionType is omitted', () => {
@@ -413,8 +414,14 @@ describe('mission-team-composer classification integration', () => {
         requiredCapabilities: ['review', 'documentation', 'analysis'],
       });
 
-      expect(selected?.agent_id).toBe('reasoning-worker');
+      // The contract is "capable and not the excluded actor", not "this
+      // particular agent". Which qualified candidate wins is a preference and
+      // scoring detail that legitimately moves as the pool grows.
+      expect(selected?.agent_id).toBeTruthy();
       expect(selected?.agent_id).not.toBe(implementationAgentId);
+      expect(loadAgentProfileIndex()[selected!.agent_id!]?.capabilities).toEqual(
+        expect.arrayContaining(['review', 'documentation', 'analysis'])
+      );
       expect(selected?.required_capabilities).toEqual(
         expect.arrayContaining(['review', 'documentation', 'analysis'])
       );
