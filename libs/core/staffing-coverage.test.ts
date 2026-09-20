@@ -83,3 +83,42 @@ describe('mission-team template reachability (TC-14)', () => {
     }
   });
 });
+
+describe('separation of duties readiness (TC-10)', () => {
+  const report = buildStaffingCoverageReport();
+  const readiness = report.separation_readiness;
+
+  it('reports readiness for every declared separation pair', () => {
+    expect(readiness.length).toBeGreaterThan(0);
+    for (const entry of readiness) {
+      expect(['hard', 'soft']).toContain(entry.strength);
+      const roleCoverage = report.roles.find((role) => role.team_role === entry.role);
+      for (const agentId of entry.independent_agent_ids) {
+        // Independence is judged among actors that can actually do the role.
+        expect(roleCoverage?.fully_capable_agent_ids).toContain(agentId);
+      }
+    }
+  });
+
+  it('can field an independent reviewer for the implementer', () => {
+    const reviewer = readiness.find(
+      (entry) => entry.role === 'reviewer' && entry.must_differ_from === 'implementer'
+    );
+    expect(reviewer?.independent_agent_ids.length).toBeGreaterThan(0);
+  });
+
+  it('can field a reviewer from a different model family than the implementer', () => {
+    // The heterogeneous-review rule in selection prefers a different provider.
+    // While every profile preferred the same one, that preference could never
+    // be satisfied and the rule was decorative.
+    const reviewer = readiness.find(
+      (entry) => entry.role === 'reviewer' && entry.must_differ_from === 'implementer'
+    );
+    expect(reviewer?.provider_independent).toBe(true);
+  });
+
+  it('records the provider families behind each role', () => {
+    const reviewer = report.roles.find((role) => role.team_role === 'reviewer');
+    expect(reviewer?.provider_families.length).toBeGreaterThan(1);
+  });
+});

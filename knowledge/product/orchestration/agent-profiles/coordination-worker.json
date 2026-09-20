@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "coordination-worker": {
+      "authority_roles": ["mission_controller", "knowledge_steward", "ecosystem_architect"],
+      "team_roles": ["scribe", "tracker", "facilitator"],
+      "capabilities": [
+        "reasoning",
+        "analysis",
+        "coordination",
+        "facilitation",
+        "listening",
+        "documentation",
+        "summarization",
+        "tracking"
+      ],
+      "selection_hints": {
+        "preferred_provider": "gemini",
+        "preferred_modelId": "gemini-3.8-flash"
+      },
+      "provider_strategy": "preferred",
+      "fallback_providers": ["claude", "codex"]
+    }
+  }
+}

@@ -8,12 +8,7 @@
   "required_scope_classes": ["mission_state"],
   "ownership_scope": "Owns decomposition, sequencing, contract completeness, dependency handoff, and the boundary between research findings and executable tasks.",
   "selection_hints": {
-    "preferred_agents": [
-      "planner-agent",
-      "nerve-agent",
-      "implementation-architect",
-      "sovereign-brain"
-    ],
+    "preferred_agents": ["planner-agent", "implementation-architect", "sovereign-brain"],
     "preferred_models": ["openai:gpt-5.6-luna", "auto-gemini-3"]
   },
   "autonomy_level": "high"
