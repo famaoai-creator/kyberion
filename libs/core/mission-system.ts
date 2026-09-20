@@ -33,6 +33,7 @@ import {
 } from './mission-project-ledger.js';
 import {
   prewarmMissionTeam as _prewarmMissionTeam,
+  adviseMission as _adviseMission,
   proposeMissionRoster as _proposeMissionRoster,
   restaffMissionTeam as _restaffMissionTeam,
   showMissionTeam as _showMissionTeam,
@@ -325,6 +326,12 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
     },
     proposeMissionRoster(id: string, options?: { missionContext?: string; force?: boolean }) {
       return _proposeMissionRoster(id, options);
+    },
+    adviseMission(
+      id: string,
+      input: { topic: string; question: string; context?: string; roles?: string[] }
+    ) {
+      return _adviseMission(id, input);
     },
     grantMissionAccess(missionId: string, serviceId: string, ttl = 30) {
       return _grantMissionAccess(missionId, serviceId, ttl);
