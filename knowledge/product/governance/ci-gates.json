@@ -638,6 +638,18 @@
       ],
       "owner": "quality",
       "rationale": "TC-11: fails when the agent pool cannot supply a role the obligations catalog can require or a mission-team template declares required, and when a hard separation-of-duties pair can never be independent. Team roles and agent profiles declared capabilities that were never compared, so an uncoverable role was still filled by the least-bad candidate."
+    },
+    {
+      "id": "backend-capability-honesty",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check_backend_capability_honesty.ts"
+      ],
+      "owner": "quality",
+      "rationale": "TC-17: fails when a declared backend utility_fit claim is contradicted by a recorded role-fitness probe, or when the governed reasoning-backend policy allows a mode no capability profile describes. Every CLI and API backend claims judge/divergent capability by default argument and nothing checked it."
     }
   ],
   "workflow_exceptions": [
