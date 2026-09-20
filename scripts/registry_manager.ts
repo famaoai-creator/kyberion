@@ -1,10 +1,11 @@
 import * as path from 'node:path';
 import {
   assertSafeRepositoryPath,
-  safeWriteFile,
   safeExistsSync,
   safeLstat,
   safeMkdir,
+  safeReaddir,
+  safeWriteFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineCatalog, nowIso } from '@agent/core/foundation';
@@ -44,11 +45,83 @@ export function loadCapabilityRegistryAtPath(
   registryPath: string,
   type: RegistryType
 ): CapabilityRegistry {
+  const absPath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
+  if (safeExistsSync(absPath) && safeLstat(absPath).isDirectory()) {
+    return loadCapabilityRegistryDirectory(absPath, type);
+  }
+  if (!safeExistsSync(absPath)) {
+    return { version: '1.0.0', capabilities: [] };
+  }
   return defineCatalog<CapabilityRegistry>({
     id: `registry-manager-${type}-registry`,
-    path: assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true }),
+    path: absPath,
     schema: REGISTRY_SCHEMA_PATHS[type],
   }).load();
+}
+
+/** Merge every per-item envelope in a registry directory (RSP-11+ canonical). */
+export function loadCapabilityRegistryDirectory(
+  dirPath: string,
+  type: RegistryType
+): CapabilityRegistry {
+  const absDir = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
+  const merged: CapabilityRegistry = { version: '1.0.0', capabilities: [] };
+  if (!safeExistsSync(absDir)) return merged;
+  const files = safeReaddir(absDir)
+    .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
+    .sort();
+  for (const file of files) {
+    const envelope = defineCatalog<CapabilityRegistry>({
+      id: `registry-manager-${type}-registry`,
+      path: assertSafeRepositoryPath(path.join(absDir, file)),
+      schema: REGISTRY_SCHEMA_PATHS[type],
+    }).load();
+    if (!Array.isArray(envelope.capabilities) || envelope.capabilities.length !== 1) {
+      throw new Error(`Registry file ${file} must contain exactly one capability`);
+    }
+    const item = envelope.capabilities[0] as Record<string, unknown>;
+    const itemId = String(item.capability_id || '');
+    if (!itemId || `${itemId}.json` !== file) {
+      throw new Error(`Registry file ${file} must match its capability_id (${itemId})`);
+    }
+    if (merged.capabilities.some((entry) => entry.capability_id === itemId)) {
+      throw new Error(`Duplicate capability_id in registry directory: ${itemId}`);
+    }
+    merged.version = String(
+      (envelope as unknown as Record<string, unknown>)['version'] || merged.version
+    );
+    merged.capabilities.push(item);
+  }
+  merged.capabilities.sort((left, right) =>
+    String(left.capability_id).localeCompare(String(right.capability_id))
+  );
+  return merged;
+}
+
+/** Persist one capability as a per-item envelope file in the registry directory. */
+export function writeCapabilityRegistryItem(
+  dirPath: string,
+  type: RegistryType,
+  version: string,
+  item: Record<string, unknown>
+): string {
+  const absDir = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
+  const itemId = String(item.capability_id || '');
+  if (!itemId) throw new Error('Capability item missing capability_id');
+  safeMkdir(absDir, { recursive: true });
+  const envelope = { version, capabilities: [item] };
+  const validated = defineCatalog<CapabilityRegistry>({
+    id: `registry-manager-${type}-registry`,
+    path: assertSafeRepositoryPath(path.join(absDir, `${itemId}.json`), {
+      allowMissingLeaf: true,
+    }),
+    schema: REGISTRY_SCHEMA_PATHS[type],
+  }).validate(envelope, `${itemId}.json`);
+  const target = assertSafeRepositoryPath(path.join(absDir, `${itemId}.json`), {
+    allowMissingLeaf: true,
+  });
+  safeWriteFile(target, JSON.stringify(validated, null, 2));
+  return target;
 }
 
 export function validateCapabilityRegistry(
@@ -101,11 +174,11 @@ export async function main(args: string[] = [], print: Print = () => undefined) 
     throw new Error('Payload missing capability_id');
   }
 
-  // Determine target directory based on tier
+  // Determine target directory based on tier (RSP-11+: per-item canonical files).
   const tierDir =
     argv.tier === 'public' ? 'knowledge/product/governance' : `knowledge/${argv.tier}/governance`;
-  const registryPath = `${tierDir}/${argv.type}-capability-registry.json`;
-  const absRegistryPath = assertSafeRepositoryPath(pathResolver.rootResolve(registryPath), {
+  const registryDirRel = `${tierDir}/${argv.type}-capabilities`;
+  const absRegistryDir = assertSafeRepositoryPath(pathResolver.rootResolve(registryDirRel), {
     allowMissingLeaf: true,
   });
   const absTierDir = assertSafeRepositoryPath(pathResolver.rootResolve(tierDir), {
@@ -116,26 +189,17 @@ export async function main(args: string[] = [], print: Print = () => undefined) 
     safeMkdir(absTierDir, { recursive: true });
   }
 
-  if (safeExistsSync(absRegistryPath)) {
-    if (!safeLstat(absRegistryPath).isFile()) {
-      throw new Error(`Capability registry must be a regular file: ${absRegistryPath}`);
-    }
-  }
-  let registry: CapabilityRegistry = safeExistsSync(absRegistryPath)
-    ? loadCapabilityRegistryAtPath(absRegistryPath, type)
-    : { version: '1.0.0', capabilities: [] };
+  let registry: CapabilityRegistry = loadCapabilityRegistryDirectory(absRegistryDir, type);
 
   const existingIndex = registry.capabilities.findIndex(
     (c: any) => c.capability_id === capabilityId
   );
 
   if (type === 'harness') {
-    // Harness capabilities are stored inline
-    if (existingIndex >= 0) {
-      registry.capabilities[existingIndex] = payload;
-    } else {
-      registry.capabilities.push(payload);
-    }
+    // Harness capabilities are stored as per-item envelopes
+    const next =
+      existingIndex >= 0 ? { ...registry.capabilities[existingIndex], ...payload } : payload;
+    writeCapabilityRegistryItem(absRegistryDir, type, registry.version, next);
   } else if (type === 'gateway') {
     // Gateway capabilities store the profile as a separate artifact and point to it
     const adaptersDir = `${tierDir}/adapters`;
@@ -165,17 +229,15 @@ export async function main(args: string[] = [], print: Print = () => undefined) 
     };
 
     if (existingIndex >= 0) {
-      registry.capabilities[existingIndex] = {
+      writeCapabilityRegistryItem(absRegistryDir, type, registry.version, {
         ...registry.capabilities[existingIndex],
         ...newEntry,
-      };
+      });
     } else {
-      registry.capabilities.push(newEntry);
+      writeCapabilityRegistryItem(absRegistryDir, type, registry.version, newEntry);
     }
   }
 
-  registry = validateCapabilityRegistry(absRegistryPath, type, registry);
-  safeWriteFile(absRegistryPath, JSON.stringify(registry, null, 2));
   print(
     `[REGISTRY_MANAGER] Successfully registered ${capabilityId} into ${argv.tier} tier (${argv.type} registry).`
   );

@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "openrouter",
+      "provider": "openrouter",
+      "module": "./reasoning-api-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "input_modalities": ["text"]
+      },
+      "env_keys": ["OPENROUTER_API_KEY", "KYBERION_OPENROUTER_KEY"]
+    }
+  ]
+}

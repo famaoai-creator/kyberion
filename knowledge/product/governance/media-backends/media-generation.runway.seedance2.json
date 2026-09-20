@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.runway.seedance2",
+      "modality": "video",
+      "display_name": "Runway Seedance 2 Video Generation API",
+      "kind": "api",
+      "provider": "runway",
+      "status": "active",
+      "platforms": ["any"],
+      "model": "seedance2",
+      "api_key_env": "KYBERION_RUNWAY_API_KEY|RUNWAYML_API_SECRET",
+      "endpoint_env": "KYBERION_RUNWAY_VIDEO_URL",
+      "supports": {
+        "artifact_formats": ["mp4"],
+        "async": true
+      },
+      "cost_tier": "paid",
+      "data_policy": "zero_retention",
+      "execution_locality": "remote",
+      "notes": "Same provider abstraction as Gen-4.5; model selection stays in the governed backend registry."
+    }
+  ]
+}

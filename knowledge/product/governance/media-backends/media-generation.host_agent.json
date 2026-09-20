@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.host_agent",
+      "modality": "image",
+      "display_name": "Host Agent Tool Image Generation",
+      "kind": "agent_tool",
+      "provider": "antigravity",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["jpg", "jpeg", "png", "webp"],
+        "async": false
+      },
+      "cost_tier": "environment",
+      "data_policy": "zero_retention",
+      "execution_locality": "local",
+      "notes": "Requests the outer agent/host environment (e.g. agy / Antigravity IDE) to generate the image via its native tool and stores it."
+    }
+  ]
+}

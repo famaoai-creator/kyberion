@@ -4349,7 +4349,7 @@
       "id": "feature-expansion-delivery",
       "playbook_ref": "knowledge/product/orchestration/mission-playbooks/it-delivery-operations-governance.md",
       "pattern": "stage_gated_delivery",
-      "description": "既存サービスの機能拡張プロジェクトを顧客要件ヒアリングからリリースまで進めるステージゲート型プロセス。企画(G1)→要件ヒアリング→要件定義(G2)→基本設計(G3)→設計審査→実装(G4)→検証(G5)→受入(UAT)→リリース(G6)→振り返り(G7)。各ゲートは gate-profiles/sdlc.json と governance-body-registry.json の会議体(企画審査会/要件定義レビュー会/設計審査会/CAB/検証判定会/リリース判定会議/クローズレビュー)に対応。判断フェーズは semantic brief、実装/検証は既存 code-change 系パイプラインを再利用。顧客固有情報は knowledge/confidential/{tenant}/ に置く。",
+      "description": "既存サービスの機能拡張プロジェクトを顧客要件ヒアリングからリリースまで進めるステージゲート型プロセス。企画(G1)→要件ヒアリング→要件定義(G2)→基本設計(G3)→設計審査→実装(G4)→検証(G5)→受入(UAT)→リリース(G6)→振り返り(G7)。各ゲートは gate-profiles/sdlc.json と governance-bodies/ directory の会議体(企画審査会/要件定義レビュー会/設計審査会/CAB/検証判定会/リリース判定会議/クローズレビュー)に対応。判断フェーズは semantic brief、実装/検証は既存 code-change 系パイプラインを再利用。顧客固有情報は knowledge/confidential/{tenant}/ に置く。",
       "match": {
         "mission_classes": ["product_delivery"],
         "delivery_shapes": ["multi_artifact_pipeline"],
@@ -4727,7 +4727,7 @@
       "id": "incident-response",
       "playbook_ref": "knowledge/product/orchestration/mission-playbooks/it-delivery-operations-governance.md",
       "pattern": "stage_gated_delivery",
-      "description": "インシデント発生時の対応をエンドツーエンドで進めるステージゲート型プロセス。検知・受付 → トリアージ/重大度判定(SEV) → 封じ込め → 恒久対応 → 復旧確認 → ポストモーテム → 振り返りレビュー → 報告・クローズ。速報性を優先し intake/classification は省略。重大度判定は incident-severity-model.md、封じ込め/恒久対応/振り返りの判定は governance-body-registry.json の incident-command / post-incident-review 会議体に対応。封じ込めは security-incident-containment フラグメント、根本原因分析は incident-post-mortem パイプラインを再利用。顧客固有情報は knowledge/confidential/{tenant}/ に置く。",
+      "description": "インシデント発生時の対応をエンドツーエンドで進めるステージゲート型プロセス。検知・受付 → トリアージ/重大度判定(SEV) → 封じ込め → 恒久対応 → 復旧確認 → ポストモーテム → 振り返りレビュー → 報告・クローズ。速報性を優先し intake/classification は省略。重大度判定は incident-severity-model.md、封じ込め/恒久対応/振り返りの判定は governance-bodies/ directory の incident-command / post-incident-review 会議体に対応。封じ込めは security-incident-containment フラグメント、根本原因分析は incident-post-mortem パイプラインを再利用。顧客固有情報は knowledge/confidential/{tenant}/ に置く。",
       "match": {
         "mission_classes": ["operations_and_release"],
         "delivery_shapes": ["cross_system_change", "multi_artifact_pipeline"],

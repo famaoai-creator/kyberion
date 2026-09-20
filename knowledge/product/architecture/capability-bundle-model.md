@@ -46,15 +46,15 @@ primitive.
 
 ## Existing Contracts To Reuse
 
-| Role | Existing contract |
-|---|---|
-| User request normalization | [`intent-contract.schema.json`](../schemas/intent-contract.schema.json) |
-| Candidate resolution | [`intent-resolution-packet.schema.json`](../schemas/intent-resolution-packet.schema.json) |
-| Execution bundle | [`actuator-pipeline-bundle.schema.json`](../schemas/actuator-pipeline-bundle.schema.json) |
-| Executable plan | [`actuator-resolution-plan.schema.json`](../schemas/actuator-resolution-plan.schema.json) |
-| Runtime session state | [`task-session.schema.json`](../schemas/task-session.schema.json) |
+| Role                        | Existing contract                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------- |
+| User request normalization  | [`intent-contract.schema.json`](../schemas/intent-contract.schema.json)                         |
+| Candidate resolution        | [`intent-resolution-packet.schema.json`](../schemas/intent-resolution-packet.schema.json)       |
+| Execution bundle            | [`actuator-pipeline-bundle.schema.json`](../schemas/actuator-pipeline-bundle.schema.json)       |
+| Executable plan             | [`actuator-resolution-plan.schema.json`](../schemas/actuator-resolution-plan.schema.json)       |
+| Runtime session state       | [`task-session.schema.json`](../schemas/task-session.schema.json)                               |
 | External capability catalog | [`harness-capability-registry.schema.json`](../schemas/harness-capability-registry.schema.json) |
-| Outcomes | [`../governance/outcome-catalog.json`](../governance/outcome-catalog.json) |
+| Outcomes                    | [`../governance/outcome-catalog.json`](../governance/outcome-catalog.json)                      |
 
 ## Why Not Add A New Large Schema Yet
 
@@ -158,9 +158,7 @@ shape in Kyberion:
           }
         }
       },
-      "outputs": [
-        "active/shared/exports/KyberionDriveClip.mp4"
-      ]
+      "outputs": ["active/shared/exports/KyberionDriveClip.mp4"]
     }
   ]
 }
@@ -197,7 +195,7 @@ They should stay distinct:
 - `capability bundle` answers "what governed Kyberion package can we reuse?"
 
 The current example registry lives at
-[`knowledge/product/governance/capability-bundle-registry.json`](../governance/capability-bundle-registry.json).
+[`knowledge/product/governance/capability-bundles/`](../governance/capability-bundles/README.md).
 
 When a capability bundle depends on a host-native surface, the bundle
 should reference the relevant harness capability entry instead of
@@ -205,12 +203,12 @@ redefining it.
 
 Practical mapping:
 
-| Layer | Example responsibility |
-|---|---|
-| Harness capability registry | Declare a host-native browser, model, or delegated execution surface |
-| Capability bundle | Wrap Kyberion actuators and pipelines that use that surface in a governed way |
-| Intent contract | Decide whether the user request should route into that bundle |
-| Task session | Track the live execution state, missing inputs, and artifacts |
+| Layer                       | Example responsibility                                                        |
+| --------------------------- | ----------------------------------------------------------------------------- |
+| Harness capability registry | Declare a host-native browser, model, or delegated execution surface          |
+| Capability bundle           | Wrap Kyberion actuators and pipelines that use that surface in a governed way |
+| Intent contract             | Decide whether the user request should route into that bundle                 |
+| Task session                | Track the live execution state, missing inputs, and artifacts                 |
 
 If a future bundle needs to point at a host-native surface, the bundle can
 carry the registry reference in `references` or `notes`, while the harness
@@ -243,9 +241,7 @@ A corresponding Kyberion capability bundle could look like this:
           "expected_behavior": "interactive_loop"
         }
       },
-      "outputs": [
-        "knowledge/confidential/evaluations/browser-findings.md"
-      ]
+      "outputs": ["knowledge/confidential/evaluations/browser-findings.md"]
     }
   ]
 }

@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "voice.local_say",
+      "modality": "voice",
+      "display_name": "Local System TTS",
+      "kind": "local",
+      "provider": "system_tts",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "supports": {
+        "playback": true,
+        "artifact_formats": ["wav", "aiff"]
+      },
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "notes": "Local fallback voice backend for playback and artifact generation."
+    }
+  ]
+}

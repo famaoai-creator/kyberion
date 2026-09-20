@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "gh-cli.issue",
+      "provider": "gh",
+      "surface_kind": "host_native",
+      "capability_id": "cli.native.github_issue_management",
+      "contract_kind": "github_management",
+      "observation_kind": "issue_listing+body",
+      "result_kind": "issue_action_result+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "service-actuator / github REST preset",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Issue workflows are common enough to merit first-class adapter registration."
+    }
+  ]
+}

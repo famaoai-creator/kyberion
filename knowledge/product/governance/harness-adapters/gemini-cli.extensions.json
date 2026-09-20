@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "gemini-cli.extensions",
+      "provider": "gemini-cli",
+      "surface_kind": "provider_runtime",
+      "capability_id": "cli.native.gemini_extension_management",
+      "contract_kind": "deterministic_utility",
+      "observation_kind": "extension_listing+metadata",
+      "result_kind": "extension_action_result+trace_ref",
+      "approval_behavior": "none",
+      "replayability": "deterministic",
+      "fallback_contract": "orchestrator-actuator",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Gemini extension management is discovery-oriented and should stay auditable."
+    }
+  ]
+}

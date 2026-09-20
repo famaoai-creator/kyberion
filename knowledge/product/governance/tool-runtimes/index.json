@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "order": [
+    "mflux",
+    "musicgen_mlx",
+    "stable_audio_3",
+    "agy_sdk",
+    "playwright",
+    "ffmpeg",
+    "sox",
+    "tesseract",
+    "mlx_audio",
+    "mlx_whisper",
+    "faster_whisper",
+    "kokoro_tts",
+    "pocket_tts",
+    "ten_vad",
+    "silero_vad",
+    "claude_real_video",
+    "ollama",
+    "vllm",
+    "llamacpp",
+    "mlx_lm",
+    "localai",
+    "ffprobe",
+    "adb",
+    "xcrun",
+    "xcodebuild"
+  ]
+}

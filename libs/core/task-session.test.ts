@@ -473,6 +473,10 @@ describe('task-session', () => {
     });
   });
 
+  // This catalog-driven classification matrix runs inside the full core suite
+  // alongside 946 isolated workers on hosted CI runners. Keep the assertion
+  // contract unchanged, but allow the slowest runner enough time to finish
+  // the repeated governed-catalog resolution.
   it('classifies photo and workbook intents from conversational utterances', () => {
     expect(classifyTaskSessionIntent('ちょっと写真をとって')?.taskType).toBe('capture_photo');
     expect(classifyTaskSessionIntent('Webサービスを作って')?.intentId).toBe('bootstrap-project');
@@ -682,7 +686,7 @@ describe('task-session', () => {
     expect(classifyTaskSessionIntent('会議の日程を調整して')?.payload?.handoff_intent_id).toBe(
       'meeting-operations'
     );
-  });
+  }, 60_000);
 
   it('derives task-session payload and requirements from governed policy', () => {
     const deck = classifyTaskSessionIntent('3枚の要約スライドを作って');

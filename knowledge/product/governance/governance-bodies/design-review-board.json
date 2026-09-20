@@ -1,0 +1,58 @@
+{
+  "version": "1.0.0",
+  "description": "IT デリバリ／運用の標準ゲーティング会議体(会議体)カタログ。各会議体は開催事前条件(preconditions)・アジェンダ(agenda)・入口/出口クライテリア(entry/exit_criteria)・決裁者(decision_owner)・定足数(quorum)・所管ゲート(gates_owned)を定義する。SDLC ゲートは gate-profiles/sdlc.json、インシデントゲートは gate-profiles/incident.json と対応。固有(顧客/テナント)情報は含めない — テナント個別の会議体運用は knowledge/confidential/{tenant}/ に置く。",
+  "decision_outcomes": {
+    "go": "GO — 次フェーズへ進行を承認。exit_criteria を全て満たす。",
+    "conditional_go": "CONDITIONAL GO — 条件付き進行。未充足項目に担当・期限つきの条件を付す。",
+    "no_go": "NO-GO — 差し戻し。前フェーズで是正し再判定。",
+    "hold": "HOLD — 判定保留。追加情報・追加検証の取得後に再開催。"
+  },
+  "bodies": [
+    {
+      "id": "design-review-board",
+      "name_ja": "設計審査会",
+      "name_en": "Design Review Board",
+      "purpose": "『どう作るか(How)』の目標アーキテクチャと運用設計を実装着手前に承認する。",
+      "scope": "track",
+      "trigger": {
+        "kind": "gate",
+        "detail": "基本設計/詳細設計フェーズ完了時 (G3)"
+      },
+      "decision_owner": "solution_architect",
+      "quorum": {
+        "required_roles": ["solution_architect", "cyber_security", "reliability_engineer"],
+        "optional_roles": ["qa_lead", "software_developer", "integration_steward"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "basic-design / architecture-design が事前配布されている",
+        "セキュリティ設計とデータフローが記載されている",
+        "設計リスクと対応方針が起票されている"
+      ],
+      "agenda": [
+        "アーキテクチャと機能設計のレビュー",
+        "セキュリティ・データ保護設計の確認",
+        "運用設計(監視・障害復旧・移行)の確認",
+        "統制要件(compliance-control-matrix)との対応",
+        "設計リスクの処理方針と判定"
+      ],
+      "entry_criteria": [
+        "basic-design",
+        "architecture-design",
+        "detailed-design",
+        "operational-design",
+        "data-flow-lifecycle-map",
+        "compliance-control-matrix"
+      ],
+      "exit_criteria": [
+        "設計が機能・運用・セキュリティ・データの各観点を網羅",
+        "統制義務が設計・手順の参照に対応づけられている",
+        "オープンな設計リスクに担当と処理方針がある"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": ["gate-design-approval"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    }
+  ]
+}

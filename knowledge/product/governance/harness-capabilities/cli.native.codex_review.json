@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.codex_review",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "review",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["code-review", "review-pr"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "active",
+      "notes": "Codex review should be used for structured code review prompts, not as an uncontrolled editor."
+    }
+  ]
+}

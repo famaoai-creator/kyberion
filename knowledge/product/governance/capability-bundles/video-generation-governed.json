@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "bundles": [
+    {
+      "bundle_id": "video-generation-governed",
+      "status": "active",
+      "kind": "capability-bundle",
+      "summary": "Generate a governed video artifact from a video-generation-adf contract through the media generation actuator.",
+      "intents": ["generate-video"],
+      "required_actuators": ["media-generation-actuator", "artifact-actuator"],
+      "references": [
+        "knowledge/public/procedures/media/generate-video-from-adf.md",
+        "knowledge/product/orchestration/supported-actuators.md"
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "description": "Domain-agnostic gate profile registry referenced by knowledge/product/architecture/sdlc-gating-model.md. Each gate fixes required_artifacts + exit_criteria + decision_owner and binds to a governance body (governance-body-registry.json) and, where applicable, a machine-checkable mission-workflow-catalog exit_gate. Profiles are split per file; this registry indexes them.",
+  "description": "Domain-agnostic gate profile registry referenced by knowledge/product/architecture/sdlc-gating-model.md. Each gate fixes required_artifacts + exit_criteria + decision_owner and binds to a governance body (governance-bodies/ directory) and, where applicable, a machine-checkable mission-workflow-catalog exit_gate. Profiles are split per file; this registry indexes them.",
   "profile_files": {
     "sdlc": "knowledge/product/governance/gate-profiles/sdlc.json",
     "incident": "knowledge/product/governance/gate-profiles/incident.json"

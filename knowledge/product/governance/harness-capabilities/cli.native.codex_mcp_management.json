@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.codex_mcp_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "mcp",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["mcp-server-management", "connect-mcp"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/a2a-task-contract.json"
+      },
+      "status": "active",
+      "notes": "External MCP server management should be registered explicitly because it changes tool surface exposure."
+    }
+  ]
+}
