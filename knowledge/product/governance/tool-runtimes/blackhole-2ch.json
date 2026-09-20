@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "blackhole-2ch",
+      "display_name": "BlackHole 2ch Virtual Audio",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["list", "--cask", "blackhole-2ch"],
+        "description": "Probe whether the BlackHole 2ch cask is installed."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "--cask", "blackhole-2ch"],
+        "description": "Install the BlackHole 2ch virtual audio driver through Homebrew Cask. A reboot may be required."
+      },
+      "installed_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["list", "--cask", "blackhole-2ch"],
+        "description": "Re-check the BlackHole 2ch cask after install."
+      },
+      "managed_env_subpath": "tool-runtimes/blackhole-2ch",
+      "notes": "macOS virtual audio route used by the audio-bus-bridge provider id `blackhole`. Driver install may require a reboot before CoreAudio enumerates the device."
+    }
+  ]
+}

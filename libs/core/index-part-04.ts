@@ -355,6 +355,16 @@ export * from './agent-registry.js';
 
 export * from './agent-lifecycle.js';
 
+export * from './agent-pane-runtime-bridge.js';
+
+export * from './agent-exec-adapter-bridge.js';
+
+export * from './audio-bus-bridge.js';
+
+export * from './browser-automation-runtime-bridge.js';
+
+export * from './calendar-provider-bridge.js';
+
 export * from './a2a-bridge.js';
 
 export * from './a2a-conversation-store.js';

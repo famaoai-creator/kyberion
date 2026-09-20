@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "herdr",
+      "display_name": "Herdr Agent Pane Runtime",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "herdr",
+        "args": ["--version"],
+        "description": "Probe Herdr availability without mutating workspace state."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "herdr"],
+        "description": "Install Herdr through Homebrew on macOS."
+      },
+      "install_backend_platform_overrides": {
+        "linux": {
+          "kind": "system",
+          "command": "herdr",
+          "args": ["update"],
+          "description": "Linux hosts should install Herdr via the upstream release channel, then use `herdr update` to refresh."
+        }
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "herdr",
+        "args": ["--version"],
+        "description": "Re-check the installed Herdr binary."
+      },
+      "managed_env_subpath": "tool-runtimes/herdr",
+      "notes": "Terminal multiplexer used by the agent-pane-runtime-bridge provider id `herdr`. Override the binary with KYBERION_AGENT_PANE_RUNTIME_BIN when needed."
+    }
+  ]
+}
