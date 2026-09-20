@@ -3,8 +3,16 @@ agentId: relationship-curator
 capabilities: [reasoning, analysis, curation, memory_management, privacy, summarization]
 auto_spawn: false
 trust_required: 3.5
-allowed_actuators: [agent-actuator, file-actuator]
-denied_actuators: [system-actuator, browser-actuator, blockchain-actuator, code-actuator, network-actuator, deployment-actuator]
+allowed_actuators: [wisdom-actuator, artifact-actuator]
+denied_actuators:
+  [
+    system-actuator,
+    browser-actuator,
+    blockchain-actuator,
+    code-actuator,
+    network-actuator,
+    deployment-actuator,
+  ]
 ---
 
 # Relationship Curator

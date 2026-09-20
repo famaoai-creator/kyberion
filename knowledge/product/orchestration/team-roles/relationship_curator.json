@@ -8,8 +8,7 @@
   "required_scope_classes": ["knowledge_core"],
   "ownership_scope": "Owns relationship-node updates triggered by presence / voice actuator events; enforces tier boundaries.",
   "selection_hints": {
-    "preferred_agents": ["relationship-curator"],
-    "preferred_models": ["auto-gemini-3"]
+    "preferred_agents": ["relationship-curator"]
   },
   "autonomy_level": "low"
 }

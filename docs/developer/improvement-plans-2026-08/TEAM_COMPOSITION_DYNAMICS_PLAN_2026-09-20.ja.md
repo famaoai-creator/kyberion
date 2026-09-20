@@ -418,7 +418,7 @@ Wave 3 では「エージェント新設は実ランタイムの裏付けを要�
 
 ### 2026-09-21: `relationship_curator` の実体化と、egress 判定基準の作り直し
 
-**TC-10 の残件だった `relationship_curator`** に専用エージェントを作った(manifest + profile)。この役割は機密の関係グラフ(trust_level / history / outstanding_asks / ng_topics)を扱うため、manifest には「人が自分について読み返す日が来るかもしれない記録として扱う」「人格や動機を推論して保存しない」「NG トピックは境界としてのみ記録し、背景の出来事を再構成しない」を規律として置き、actuator は agent / file のみ(network・browser・code・system・deployment は拒否)。
+**TC-10 の残件だった `relationship_curator`** に専用エージェントを作った(manifest + profile)。この役割は機密の関係グラフ(trust_level / history / outstanding_asks / ng_topics)を扱うため、manifest には「人が自分について読み返す日が来るかもしれない記録として扱う」「人格や動機を推論して保存しない」「NG トピックは境界としてのみ記録し、背景の出来事を再構成しない」を規律として置き、actuator は knowledge_steward と整合する wisdom / artifact のみ(network・browser・code・system・deployment は拒否)。
 
 authority は `knowledge_steward`(`knowledge/` のみ書ける最小権限)。`ecosystem_architect` も scope class は満たすが libs/core・scripts・pipelines への書き込み権を持ち、関係グラフの管理には過大である。これに伴い役割の `compatible_authority_roles` から死んだ `mission_controller`(要求 scope class `knowledge_core` を持たない = 一度も選択され得なかった)を外した。同種の死んだ宣言は **48 件中 6 件**あり、まとめて掃除した。
 

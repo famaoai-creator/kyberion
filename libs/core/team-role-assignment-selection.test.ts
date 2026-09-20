@@ -138,4 +138,42 @@ describe('team-role assignment selection', () => {
     expect(assignment.agent_id).toBeNull();
     expect(assignment.runtime_identity).toBeUndefined();
   });
+
+  it('uses the governed provider default when an adaptive agent has no provider hint', () => {
+    const assignment = selectAgentForTeamRole({
+      teamRole: 'relationship_curator',
+      teamRoleRecord: {
+        description: 'Relationship curator role',
+        required_capabilities: ['reasoning', 'curation'],
+        compatible_authority_roles: ['knowledge_steward'],
+        allowed_delegate_team_roles: [],
+        escalation_parent_team_role: 'facilitator',
+        required_scope_classes: ['knowledge_core'],
+        ownership_scope: 'Maintains relationship knowledge.',
+        autonomy_level: 'low',
+      },
+      authorityRoles: {
+        knowledge_steward: {
+          description: 'Knowledge steward',
+          write_scopes: ['knowledge/'],
+          scope_classes: ['knowledge_core'],
+          allowed_actuators: [],
+          tier_access: ['confidential'],
+        },
+      },
+      agents: {
+        'relationship-curator': {
+          authority_roles: ['knowledge_steward'],
+          team_roles: ['relationship_curator'],
+          capabilities: ['reasoning', 'curation'],
+          provider_strategy: 'adaptive',
+        },
+      },
+    });
+
+    expect(assignment.status).toBe('assigned');
+    expect(assignment.agent_id).toBe('relationship-curator');
+    expect(assignment.provider).toBeTruthy();
+    expect(assignment.modelId).toBeTruthy();
+  });
 });

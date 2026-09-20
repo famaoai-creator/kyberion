@@ -364,8 +364,27 @@ export function recordTenantProviderAttestation(
   if (!profile) {
     throw new Error(`[tenant-registry] tenant '${input.slug}' has no profile to attest against.`);
   }
+  assertTenantOperational(profile, 'provider attestation');
   const provider = input.provider.trim();
   if (!provider) throw new Error('[tenant-registry] provider is required.');
+  if (input.training_use === 'none') {
+    const missing = [
+      !input.plan?.trim() ? 'plan' : '',
+      !input.basis?.trim() ? 'basis' : '',
+      !input.attested_by?.trim() ? 'attested_by' : '',
+    ].filter(Boolean);
+    if (missing.length > 0) {
+      throw new Error(
+        `[tenant-registry] training_use 'none' requires ${missing.join(', ')} for an attributable attestation.`
+      );
+    }
+  }
+  if (
+    input.valid_for_days !== undefined &&
+    (!Number.isFinite(input.valid_for_days) || input.valid_for_days <= 0)
+  ) {
+    throw new Error('[tenant-registry] valid_for_days must be a finite positive number.');
+  }
 
   const attestedAt = new Date();
   const attestation: NonNullable<TenantProfile['provider_attestations']>[string] = {
