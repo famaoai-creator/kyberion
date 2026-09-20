@@ -1,5 +1,6 @@
 import { performanceScoreAdjustment } from './agent-performance-index.js';
 import { modelPerformanceScoreAdjustment } from './model-performance-index.js';
+import { modelRoleFitnessScoreAdjustment } from './model-role-fitness.js';
 import { deriveAgentNhiId } from './agent-identity.js';
 import {
   resolveAgentProviderTarget,
@@ -238,6 +239,9 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
         resolvedTarget.modelId,
         teamRole
       );
+      // TC-16: measured role fitness speaks only while real outcomes are
+      // silent — the cold start every new model and provider goes through.
+      const modelFitnessBonus = modelRoleFitnessScoreAdjustment(resolvedTarget.modelId, teamRole);
       const separationPenalty =
         (softAvoidAgents.has(agentId) ? SOD_AVOID_AGENT_PENALTY : 0) +
         (softAvoidProviders.has(resolvedTarget.provider) ? SOD_AVOID_PROVIDER_PENALTY : 0);
@@ -253,7 +257,8 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
         preferredModelBonus +
         providerBonus +
         performanceBonus +
-        modelPerformanceBonus -
+        modelPerformanceBonus +
+        modelFitnessBonus -
         separationPenalty -
         loadPenalty;
 
