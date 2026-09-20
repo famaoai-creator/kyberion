@@ -8,10 +8,12 @@ import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './a
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
 import {
+  extendMissionTeamPlanRoster,
   getMissionTeamPlanPath,
   loadMissionTeamPlan,
   promoteMissionTeamPlanRoles,
   writeMissionTeamPlan,
+  type ExtendMissionTeamRosterRefusal,
 } from './mission-team-plan-composer.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
 import {
@@ -466,6 +468,99 @@ export function staffMissionTeamRoles(input: {
   }
 
   return { plan, promoted, unfilled };
+}
+
+export interface RestaffMissionTeamRoleResult {
+  plan: MissionTeamPlan | null;
+  /** The member added to the roster, or null when nothing was added. */
+  added: MissionTeamAssignment | null;
+  /** Set when the role was already on the roster and only needed staffing. */
+  promoted: boolean;
+  refusal?: ExtendMissionTeamRosterRefusal | 'mission_plan_not_found';
+}
+
+/**
+ * TC-06: the governed way to put a role on a mission's roster mid-flight.
+ *
+ * A role already on the roster is staffed through the normal promotion path;
+ * a role that is missing is selected, bounded by the lifecycle `max_members`
+ * cap and held to the same capability, authority and separation-of-duties
+ * checks as initial composition. Either way the plan, the staffing bindings
+ * and one execution-ledger entry move together, so the roster change is
+ * auditable rather than implicit.
+ */
+export function restaffMissionTeamRole(input: {
+  missionId: string;
+  teamRole: string;
+  requiredCapabilities?: string[];
+  excludeAgentIds?: string[];
+  missionPathHint?: string;
+  requestedBy?: string;
+  reason?: string;
+}): RestaffMissionTeamRoleResult {
+  const missionId = normalizeMissionId(input.missionId);
+  const existing = loadMissionTeamPlan(missionId);
+  if (!existing) {
+    return { plan: null, added: null, promoted: false, refusal: 'mission_plan_not_found' };
+  }
+
+  const onRoster = existing.assignments.some(
+    (assignment) => assignment.team_role === input.teamRole
+  );
+  if (onRoster) {
+    const staffed = staffMissionTeamRoles({
+      missionId,
+      teamRoles: [input.teamRole],
+      missionPathHint: input.missionPathHint,
+      requestedBy: input.requestedBy,
+      reason: input.reason,
+    });
+    return {
+      plan: staffed.plan,
+      added: null,
+      promoted: staffed.promoted.length > 0,
+      ...(staffed.promoted.length === 0 ? { refusal: 'already_on_roster' as const } : {}),
+    };
+  }
+
+  const { plan, added, refusal } = extendMissionTeamPlanRoster(existing, {
+    teamRole: input.teamRole,
+    ...(input.requiredCapabilities ? { requiredCapabilities: input.requiredCapabilities } : {}),
+    ...(input.excludeAgentIds ? { excludeAgentIds: input.excludeAgentIds } : {}),
+  });
+  if (!added) {
+    return { plan: existing, added: null, promoted: false, refusal };
+  }
+
+  const planPath = getMissionTeamPlanPath(missionId);
+  if (!planPath) {
+    return { plan: existing, added: null, promoted: false, refusal: 'mission_plan_not_found' };
+  }
+  const missionDir = path.dirname(planPath);
+  writeMissionTeamPlan(missionDir, plan);
+  initializeMissionTeamBindings(missionDir, plan);
+
+  appendMissionExecutionLedgerEntry({
+    mission_id: missionId,
+    mission_path_hint: input.missionPathHint || missionDir,
+    event_type: 'team_role_restaffed',
+    team_role: added.team_role,
+    actor_id: added.agent_id || undefined,
+    actor_type: added.actor_type || 'agent',
+    runtime_identity: added.runtime_identity || undefined,
+    decision: input.reason || 'Role demanded by mission work but absent from the roster.',
+    payload: {
+      requested_by: input.requestedBy || 'mission_orchestration_worker',
+      provider: added.provider || null,
+      model_id: added.modelId || null,
+      required_capabilities: input.requiredCapabilities || [],
+      excluded_agent_ids: input.excludeAgentIds || [],
+      roster_size: plan.assignments.length,
+      max_members: plan.team_governance?.lifecycle.max_members ?? null,
+    },
+  });
+
+  return { plan, added, promoted: false };
 }
 
 export function loadMissionStaffingAssignments(

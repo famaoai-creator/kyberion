@@ -9,7 +9,7 @@ import {
   startAgentRuntimeSupervisorForRequest,
 } from './agent-runtime-supervisor.js';
 import { findMissionPath } from './path-resolver.js';
-import { initializeMissionTeamBindings } from './mission-team-binding.js';
+import { initializeMissionTeamBindings, restaffMissionTeamRole } from './mission-team-binding.js';
 import {
   loadMissionTeamPlan,
   enrichMissionTeamPlanWithOrganizationProfile,
@@ -278,4 +278,86 @@ export async function prewarmMissionTeam(
     mission_id: request.mission_id,
     team_roles: request.team_roles || [],
   };
+}
+
+export interface MissionTeamRestaffSummary {
+  mission_id: string;
+  team_role: string;
+  status: 'added' | 'promoted' | 'refused';
+  agent_id?: string | null;
+  provider?: string | null;
+  model_id?: string | null;
+  refusal?: string;
+  roster_size?: number;
+  max_members?: number | null;
+}
+
+/**
+ * TC-06: operator entry point for adding a role to a running mission's
+ * roster. The same governed path task dispatch uses, so a human and the
+ * worker leave identical evidence.
+ */
+export async function restaffMissionTeam(
+  id: string,
+  teamRole: string,
+  options: { requiredCapabilities?: string[]; excludeAgentIds?: string[]; reason?: string } = {}
+): Promise<MissionTeamRestaffSummary | undefined> {
+  if (!id || !teamRole) {
+    logger.error(
+      'Usage: mission_controller restaff <MISSION_ID> <TEAM_ROLE> [--capabilities a,b] [--exclude agent-id,...] [--reason <TEXT>]'
+    );
+    return undefined;
+  }
+
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) {
+    logger.error(`Mission ${upperId} not found. Run "list" to see available missions.`);
+    return undefined;
+  }
+
+  const result = restaffMissionTeamRole({
+    missionId: upperId,
+    teamRole,
+    ...(options.requiredCapabilities ? { requiredCapabilities: options.requiredCapabilities } : {}),
+    ...(options.excludeAgentIds ? { excludeAgentIds: options.excludeAgentIds } : {}),
+    requestedBy: 'mission_controller',
+    ...(options.reason ? { reason: options.reason } : {}),
+  });
+
+  if (!result.added && !result.promoted) {
+    logger.warn(`[restaff] ${upperId} ${teamRole} refused: ${result.refusal || 'unknown'}`);
+    return {
+      mission_id: upperId,
+      team_role: teamRole,
+      status: 'refused',
+      ...(result.refusal ? { refusal: result.refusal } : {}),
+    };
+  }
+
+  // A staffed member is only useful once its runtime exists; reuse the same
+  // role-scoped ensure the dispatch path uses.
+  await ensureMissionTeamRuntimeViaSupervisor({
+    missionId: upperId,
+    teamRoles: [teamRole],
+    requestedBy: 'mission_controller',
+    reason: options.reason || `Materialize restaffed role ${teamRole}.`,
+  });
+
+  const summary: MissionTeamRestaffSummary = {
+    mission_id: upperId,
+    team_role: teamRole,
+    status: result.added ? 'added' : 'promoted',
+    agent_id: result.added?.agent_id ?? null,
+    provider: result.added?.provider ?? null,
+    model_id: result.added?.modelId ?? null,
+    roster_size: result.plan?.assignments.length,
+    max_members: result.plan?.team_governance?.lifecycle.max_members ?? null,
+  };
+  logger.info(
+    `[restaff] ${upperId} ${teamRole} ${summary.status}` +
+      (summary.agent_id ? ` -> ${summary.agent_id}` : '') +
+      ` roster=${summary.roster_size}/${summary.max_members ?? '-'}`
+  );
+  return summary;
 }
