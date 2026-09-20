@@ -152,18 +152,22 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 
 ## 6. 実装状況
 
-| ID           | 状態    | 備考                                                                                                                                          |
-| ------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| TC-01        | DONE    | `status: 'standby'` を導入。構造役割のみ作成時に充当                                                                                          |
-| TC-02        | DONE    | `staffMissionTeamRoles` + `ensureMissionTeamRuntime` の役割スコープ昇格、`team_role_staffed` 台帳                                             |
-| TC-03        | DONE    | `team-composition-obligations.json`(5 義務)と導出器                                                                                           |
-| TC-04        | DONE    | 役割集合 = テンプレート ∪ 義務、`role_sources` と `team_governance.obligations`                                                               |
-| TC-05        | PARTIAL | `[team] roster/required/staffed/standby/unfilled_required` のサマリ行と `composition.standby_roles` で 4 区分は判別可能。専用レンダラは未実装 |
-| TC-06        | DONE    | `restaffMissionTeamRole` + `mission_controller restaff`、`team_role_restaffed` 台帳                                                           |
-| TC-07        | DONE    | `diagnoseMissionTeamRoleGap`、dispatch の自動増員リトライと `blocked(capability_gap)`                                                         |
-| TC-08        | DONE    | `workforce-load.ts`、`workforce-capacity-policy.json`、availability / cost_profile の実データ化                                               |
-| TC-09        | DONE    | `workerLoadPenalty` を唯一の負荷スコアラとして採用、`selectAgentForTeamRole` へ合流                                                           |
-| TC-10〜TC-14 | TODO    | Wave 3                                                                                                                                        |
+| ID    | 状態    | 備考                                                                                                                                          |
+| ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-01 | DONE    | `status: 'standby'` を導入。構造役割のみ作成時に充当                                                                                          |
+| TC-02 | DONE    | `staffMissionTeamRoles` + `ensureMissionTeamRuntime` の役割スコープ昇格、`team_role_staffed` 台帳                                             |
+| TC-03 | DONE    | `team-composition-obligations.json`(5 義務)と導出器                                                                                           |
+| TC-04 | DONE    | 役割集合 = テンプレート ∪ 義務、`role_sources` と `team_governance.obligations`                                                               |
+| TC-05 | PARTIAL | `[team] roster/required/staffed/standby/unfilled_required` のサマリ行と `composition.standby_roles` で 4 区分は判別可能。専用レンダラは未実装 |
+| TC-06 | DONE    | `restaffMissionTeamRole` + `mission_controller restaff`、`team_role_restaffed` 台帳                                                           |
+| TC-07 | DONE    | `diagnoseMissionTeamRoleGap`、dispatch の自動増員リトライと `blocked(capability_gap)`                                                         |
+| TC-08 | DONE    | `workforce-load.ts`、`workforce-capacity-policy.json`、availability / cost_profile の実データ化                                               |
+| TC-09 | DONE    | `workerLoadPenalty` を唯一の負荷スコアラとして採用、`selectAgentForTeamRole` へ合流                                                           |
+| TC-10 | PARTIAL | `quality` 欠落の解消と cost registry の表示名解決を修正。プールの薄さ自体は報告に留める(エージェント新設は運用判断)                           |
+| TC-11 | DONE    | `staffing-coverage.ts` + CI gate `staffing-capability-coverage`                                                                               |
+| TC-12 | DONE    | `proposeMissionTeamRoster`(既定 OFF、fail-closed)、dispatch 前 1 回 + `propose-roster` CLI                                                    |
+| TC-13 | DONE    | `summarizeRosterProposalOutcomes`(受理率 + 後追い restaff 率)、`readMissionExecutionLedger`                                                   |
+| TC-14 | DONE    | テンプレート到達性監査(dangling 参照は gate 失敗、未到達は報告のみ)                                                                           |
 
 ### 2026-09-20: Wave 1(TC-01〜TC-04)
 
@@ -245,3 +249,48 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 - `libs/core/workforce-load.test.ts`(新規 6 件): 未知リソースは available、実測 availability、governed レート、モデル無しは空、ペナルティ上限、**同条件なら空いているアクターが選ばれる**。
 - `libs/core/mission-team-composer.test.ts`: 増員の成功 / 職務分離 / 4 種の拒否理由 / 上限ヘッドルーム / refresh での増員メンバー残存、gap 診断 3 件。
 - `libs/core/mission-lifecycle-service.test.ts`: `restaff` を governed verb ゲート表に追加。
+
+### 2026-09-20: Wave 3(TC-10〜TC-14)
+
+**TC-11 — 「宣言」と「プール」の突合(最も大きな発見)**
+
+team role は `required_capabilities` を、agent profile は `capabilities` を宣言していたが、**両者は一度も突き合わされていなかった**。選抜は能力不足をスコアのペナルティとして扱うだけで拒否しないため、**誰も満たせない役割も「最もマシな候補」で黙って充当される**。実測:
+
+- 19 役割中 **5 役割で「完全に能力を満たす候補が 0」**(`product_strategist`, `relationship_curator`, `scribe`, `tester`, `tracker`)
+- **6 個の capability がどの agent にも宣言されていない**(`curation`, `memory_management`, `privacy`, `product`, `quality`, `tracking`)
+- うち `tester` は `executed-verification` 義務が必須にする役割 = 出荷変更のたびに要求されるのに、能力を満たす候補がいなかった
+
+`libs/core/staffing-coverage.ts` がこれをデータ化し、CI gate `staffing-capability-coverage`(`ci-gates.json` に登録)が**システムが実際に要求する役割についてのみ失敗**する: ①義務が要求しうる役割に完全充足候補が無い、②テンプレートが required 宣言する役割に候補が 0、③ハード職務分離ペアがプール上そもそも独立になり得ない。残りの薄い役割は表に出し続ける(閉じるにはエージェント追加か宣言取り下げが必要で、これは運用判断であり、ここで能力を捏造すべきではない)。
+
+**TC-10 — 閉じられるギャップだけ閉じる**
+
+- `quality` を `implementation-architect` / `reasoning-worker` に追加(両者とも既に `testing` と `review` を宣言しており、主張として正当)。これで gate の唯一の違反が解消。
+- **コスト解決の欠陥修正**: provider は表示名("Gemini 3.6 Flash (Medium)")を返すため registry キーに一致せず、既定レートが黙って「そのアクターの価格」になっていた。英数字スケルトン比較に変更(長い候補優先は維持するので `gpt-4o-mini` が `gpt-4o` に負けない)。
+- **プールの薄さ自体は未解決のまま報告**: `orchestrator` 1、`devils_advocate` 1、`counterparty_persona` 1。エージェントの新設は実ランタイムの裏付けが要るため、ここでは行わない。
+
+**TC-14 — テンプレート到達性**
+
+未知のテンプレートは失敗せず既定チームへフォールバックするため、intent ontology や組織カタログの綴り誤りは「黙って別の布陣を出す」。dangling 参照を gate 失敗にした。自動経路が到達しないテンプレートは**報告のみ**(明示 `--mission-type` で選べるため)。現状の唯一の該当は `meeting_facilitation`。職務分離ペアは `SEPARATION_ROLE_PAIRS` として 1 箇所に宣言し、選抜と coverage 検査が同じ表を読む。
+
+**TC-12/TC-13 — 決定できない提案者**
+
+`proposeMissionTeamRoster` は ADF と同じ形(`draft → preflight → commit`):
+
+- governed な team-role index の中からしか役割を挙げられない。**捏造ロールは落とし、解析不能な応答は「提案なし」**として扱う(推測しない)。
+- 通過した提案は `restaffMissionTeamRole` 経由で commit されるため、capability / authority / scope_class / 職務分離 / `max_members` が人間の restaff と完全に同じに適用される。
+- **既定 OFF**。導出ロスターが製品の挙動であり、提案者はそれに勝たなければならない opt-in。
+- TC-13 は自己申告ではなく台帳から測る。受理率だけでは「安全な提案しかしない提案者」を過大評価するため、**`follow_up_restaff_rate`(提案器の実行後に他者が追加せざるを得なかった役割の比率)**を併せて出す。`readMissionExecutionLedger` で、書き手しかいなかった台帳をようやく読む。
+- 呼び出し元が無ければ Wave 2 で批判した「書かれているが誰も呼ばない」状態そのものになるため、**dispatch の初回波の前に 1 回(policy gated / best-effort / dispatch を失敗させない)** と **`mission_controller propose-roster <ID> [--context] [--force]`** の両端に配線した。
+
+### Wave 3 の受入証跡(実機)
+
+| 観測                                                          | 結果                                                                                                                    |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `check_staffing_capability_coverage`(修正前)                  | `[obligation_role_uncovered] tester: missing quality` で失敗                                                            |
+| 同(修正後)                                                    | violations なし。薄い役割とテンプレート経路は表として出力                                                               |
+| 提案器 @ `MSN-TEAM-COMPOSITION-20260920`(充足済みチーム)      | **提案 0 件**(「不要なメンバーは予算と注意のコスト」というプロンプト方針どおり)                                         |
+| 提案器 @ `MSN-TC-PROPOSER-PROBE-20260920`(交渉リハーサル文脈) | `counterparty_persona` と `devils_advocate` を提案 → **2/2 受理**、`role_sources: restaff`、台帳に rationale 付きで記録 |
+| 同ミッションで追加提案(議事録係が欲しい文脈)                  | `scribe` / `tracker` を提案 → **2/2 が `max_members_reached` で拒否**(roster 10/10、上限が実機で効くことの確認)         |
+| `mission_controller propose-roster`(既定)                     | `status=disabled` を返しつつ、過去の受理率 0.50 / 後追い restaff 率 0.00 を表示                                         |
+
+いずれの受理も `reasoning-worker` に解決された(該当役割の候補が 1 名しかいないため)。TC-10 のプール厚み課題が実運用で現れた形である。
