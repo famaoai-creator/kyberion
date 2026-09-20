@@ -24,7 +24,7 @@
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns synthetic persona artifacts and rehearsal transcripts; never updates relationship-graph nodes.",
       "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
+        "preferred_agents": ["critique-worker"],
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "medium"
@@ -52,7 +52,7 @@
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns dissent hypotheses, cross-critique output, and dissent-log entries.",
       "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
+        "preferred_agents": ["critique-worker"],
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "high"
@@ -66,7 +66,7 @@
       "required_scope_classes": ["codebase_core"],
       "ownership_scope": "Owns UX interaction contracts and experience-level design decisions.",
       "selection_hints": {
-        "preferred_agents": ["implementation-architect", "nerve-agent", "sovereign-brain"],
+        "preferred_agents": ["implementation-architect"],
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "medium"
@@ -80,7 +80,7 @@
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns session orchestration, dissent signal extraction, and readiness_matrix assembly.",
       "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
+        "preferred_agents": ["coordination-worker", "nerve-agent"],
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "medium"
@@ -94,7 +94,7 @@
       "required_scope_classes": ["codebase_core"],
       "ownership_scope": "Owns bounded implementation changes inside assigned modules.",
       "selection_hints": {
-        "preferred_agents": ["implementation-architect", "nerve-agent"],
+        "preferred_agents": ["implementation-architect"],
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "medium"
@@ -129,7 +129,7 @@
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns orchestration-event sequencing, graph/run health, retry/replay decisions, provider degradation response, and owner escalation; never rewrites planner contracts or authors mission deliverables.",
       "selection_hints": {
-        "preferred_agents": ["mission-orchestrator", "control-plane-agent", "nerve-agent"],
+        "preferred_agents": ["mission-orchestrator"],
         "preferred_models": ["openai:gpt-5.6-luna", "auto-gemini-3"]
       },
       "autonomy_level": "high"
@@ -171,12 +171,7 @@
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns decomposition, sequencing, contract completeness, dependency handoff, and the boundary between research findings and executable tasks.",
       "selection_hints": {
-        "preferred_agents": [
-          "planner-agent",
-          "nerve-agent",
-          "implementation-architect",
-          "sovereign-brain"
-        ],
+        "preferred_agents": ["planner-agent", "implementation-architect", "sovereign-brain"],
         "preferred_models": ["openai:gpt-5.6-luna", "auto-gemini-3"]
       },
       "autonomy_level": "high"
@@ -194,7 +189,7 @@
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns product intent framing, priorities, and scope tradeoffs.",
       "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
+        "preferred_agents": ["sovereign-brain"],
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "high"
@@ -208,7 +203,7 @@
       "required_scope_classes": ["knowledge_core"],
       "ownership_scope": "Owns relationship-node updates triggered by presence / voice actuator events; enforces tier boundaries.",
       "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
+        "preferred_agents": ["control-plane-agent"],
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "low"
@@ -240,7 +235,7 @@
       "required_scope_classes": ["knowledge_core"],
       "ownership_scope": "Owns review verdicts, risk findings, and gate readiness evidence.",
       "selection_hints": {
-        "preferred_agents": ["implementation-architect", "nerve-agent", "sovereign-brain"],
+        "preferred_agents": ["critique-worker", "implementation-architect", "sovereign-brain"],
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "medium"
@@ -254,7 +249,7 @@
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns transcripts, notes, decisions, and action-item records.",
       "selection_hints": {
-        "preferred_agents": ["nerve-agent", "sovereign-brain"],
+        "preferred_agents": ["coordination-worker", "nerve-agent"],
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "medium"
@@ -305,7 +300,7 @@
       "required_scope_classes": ["mission_state"],
       "ownership_scope": "Owns follow-up tracking, due dates, and closure state.",
       "selection_hints": {
-        "preferred_agents": ["sovereign-brain", "nerve-agent"],
+        "preferred_agents": ["coordination-worker", "sovereign-brain"],
         "preferred_models": ["auto-gemini-3"]
       },
       "autonomy_level": "low"

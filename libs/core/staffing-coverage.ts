@@ -39,10 +39,15 @@ export interface TeamRoleCoverage {
   unmet_capabilities: string[];
   obligation_required: boolean;
   template_required: boolean;
+  /** Preferred providers across the fully-capable candidates. */
+  provider_families: string[];
 }
 
 export type StaffingCoverageViolationKind =
-  'obligation_role_uncovered' | 'template_role_unstaffable' | 'separation_impossible';
+  | 'obligation_role_uncovered'
+  | 'template_role_unstaffable'
+  | 'separation_impossible'
+  | 'dead_selection_hint';
 
 export interface StaffingCoverageViolation {
   kind: StaffingCoverageViolationKind;
@@ -50,9 +55,20 @@ export interface StaffingCoverageViolation {
   detail: string;
 }
 
+export interface SeparationReadiness {
+  role: string;
+  must_differ_from: string;
+  strength: 'hard' | 'soft';
+  /** Fully-capable holders of `role` that cannot hold `must_differ_from`. */
+  independent_agent_ids: string[];
+  /** Whether a different model family can review the other side's work. */
+  provider_independent: boolean;
+}
+
 export interface StaffingCoverageReport {
   generated_at: string;
   roles: TeamRoleCoverage[];
+  separation_readiness: SeparationReadiness[];
   /** Capabilities some role requires that no agent profile declares at all. */
   unreachable_capabilities: string[];
   /** Roles with candidates but none that satisfy every requirement. */
@@ -121,10 +137,36 @@ export function buildStaffingCoverageReport(): StaffingCoverageReport {
       unmet_capabilities: unmet,
       obligation_required: obligationRoles.has(role),
       template_required: templateRequiredRoles.has(role),
+      provider_families: [
+        ...new Set(
+          fullyCapable
+            .map((agentId) => agents[agentId]?.selection_hints?.preferred_provider)
+            .filter((provider): provider is string => Boolean(provider))
+        ),
+      ].sort(),
     });
   }
 
   const violations: StaffingCoverageViolation[] = [];
+
+  for (const [role, record] of Object.entries(teamRoles)) {
+    // An operator preference naming an agent that cannot hold the role is
+    // inert: it gives its bonus to nobody and quietly leaves the choice to
+    // generic scoring. 40% of the authored preferences were in that state
+    // when this check was added, including three roles whose preference was
+    // entirely dead.
+    const preferred = record.selection_hints?.preferred_agents || [];
+    const eligible = new Set(candidatesByRole.get(role) || []);
+    const dead = preferred.filter((agentId) => !eligible.has(agentId));
+    if (dead.length > 0) {
+      violations.push({
+        kind: 'dead_selection_hint',
+        team_role: role,
+        detail: `preferred_agents names ${dead.join(', ')}, which cannot hold this role.`,
+      });
+    }
+  }
+
   for (const role of roles) {
     if (role.candidate_agent_ids.length === 0 && role.template_required) {
       violations.push({
@@ -145,17 +187,40 @@ export function buildStaffingCoverageReport(): StaffingCoverageReport {
     }
   }
 
+  const coverageByRole = new Map(roles.map((role) => [role.team_role, role]));
+  const separationReadiness: SeparationReadiness[] = [];
   for (const pair of SEPARATION_ROLE_PAIRS) {
+    const roleCoverage = coverageByRole.get(pair.role);
+    const counterpartCoverage = coverageByRole.get(pair.mustDifferFrom);
+    if (!roleCoverage || !counterpartCoverage) continue;
+
+    // Independence has to hold among the actors that can actually DO the role.
+    // Checking plain candidates passed while the only qualified holder of both
+    // sides was the same agent, which is exactly the case the rule exists for.
+    const counterpartCapable = new Set(counterpartCoverage.fully_capable_agent_ids);
+    const independent = roleCoverage.fully_capable_agent_ids.filter(
+      (agentId) => !counterpartCapable.has(agentId)
+    );
+    const counterpartProviders = new Set(counterpartCoverage.provider_families);
+    const providerIndependent = independent.some((agentId) => {
+      const provider = agents[agentId]?.selection_hints?.preferred_provider;
+      return Boolean(provider) && !counterpartProviders.has(provider!);
+    });
+    separationReadiness.push({
+      role: pair.role,
+      must_differ_from: pair.mustDifferFrom,
+      strength: pair.strength,
+      independent_agent_ids: independent,
+      provider_independent: providerIndependent,
+    });
+
     if (pair.strength !== 'hard') continue;
-    const roleCandidates = candidatesByRole.get(pair.role) || [];
-    const counterpartCandidates = new Set(candidatesByRole.get(pair.mustDifferFrom) || []);
-    if (roleCandidates.length === 0) continue;
-    const independent = roleCandidates.filter((agentId) => !counterpartCandidates.has(agentId));
+    if (roleCoverage.fully_capable_agent_ids.length === 0) continue;
     if (independent.length === 0) {
       violations.push({
         kind: 'separation_impossible',
         team_role: pair.role,
-        detail: `Every ${pair.role} candidate is also a ${pair.mustDifferFrom} candidate, so the pool can never guarantee independence.`,
+        detail: `Every qualified ${pair.role} is also a qualified ${pair.mustDifferFrom}, so the pool can never guarantee independence.`,
       });
     }
   }
@@ -163,6 +228,7 @@ export function buildStaffingCoverageReport(): StaffingCoverageReport {
   return {
     generated_at: nowIso(),
     roles,
+    separation_readiness: separationReadiness,
     unreachable_capabilities: [...unreachableCapabilities].sort(),
     partially_covered_roles: roles
       .filter(
@@ -188,6 +254,20 @@ export function formatStaffingCoverageReport(report: StaffingCoverageReport): st
         `${String(role.fully_capable_agent_ids.length).padStart(14)}  ` +
         `${role.unmet_capabilities.join(', ') || '-'}${flags ? `  [${flags}]` : ''}`
     );
+  }
+  if (report.separation_readiness.length > 0) {
+    lines.push('');
+    lines.push('separation of duties');
+    for (const entry of report.separation_readiness) {
+      lines.push(
+        `  ${entry.role} != ${entry.must_differ_from} (${entry.strength}): ` +
+          `${entry.independent_agent_ids.length} independent` +
+          (entry.independent_agent_ids.length > 0
+            ? ` (${entry.independent_agent_ids.join(', ')})`
+            : '') +
+          `, different model family ${entry.provider_independent ? 'available' : 'NOT available'}`
+      );
+    }
   }
   if (report.unreachable_capabilities.length > 0) {
     lines.push('');
