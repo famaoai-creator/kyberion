@@ -435,6 +435,10 @@
       "types": "./dist/team-decision-support-metrics.d.ts",
       "default": "./dist/team-decision-support-metrics.js"
     },
+    "./mission-team-view": {
+      "types": "./dist/mission-team-view.d.ts",
+      "default": "./dist/mission-team-view.js"
+    },
     "./model-role-fitness": {
       "types": "./dist/model-role-fitness.d.ts",
       "default": "./dist/model-role-fitness.js"
