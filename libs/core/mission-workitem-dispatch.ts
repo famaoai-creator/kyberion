@@ -5,10 +5,11 @@
 
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
+import { ensureMissionTeamRuntimeViaSupervisor } from './agent-runtime-supervisor.js';
 import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
-import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
+import { loadMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { getWorkItem, updateWorkItem, type WorkItemStatus } from './work-coordination.js';
 import { formatCognitiveRouteDecision } from './cognitive-routing.js';
 import { type TaskModelHint } from './reasoning-model-routing.js';
@@ -133,6 +134,38 @@ async function dispatchMissionWorkItemsRound(
   const mode = options.mode || 'auto';
   const limit =
     typeof options.limit === 'number' && options.limit > 0 ? options.limit : workItems.length;
+  const selectedWorkItems = workItems.slice(0, limit);
+  const demandedRoles = Array.from(
+    new Set(
+      selectedWorkItems
+        .map((item) => getTeamRole(item))
+        .filter((role): role is string => Boolean(role))
+    )
+  );
+  const plan = loadMissionTeamPlan(missionId);
+  const standbyRoles = demandedRoles.filter((role) =>
+    plan?.assignments.some(
+      (assignment) => assignment.team_role === role && assignment.status === 'standby'
+    )
+  );
+  if (standbyRoles.length > 0 && plan) {
+    await ensureMissionTeamRuntimeViaSupervisor({
+      missionId,
+      teamRoles: standbyRoles,
+      scope: {
+        scope_kind: 'mission',
+        tier: state.tier,
+        mission_id: missionId,
+        ...(state.tenant_slug ? { tenant_slug: state.tenant_slug } : {}),
+        ...(state.organization_id ? { organization_id: state.organization_id } : {}),
+        ...(state.organization_id && state.relationships?.project?.project_id
+          ? { project_id: state.relationships.project.project_id }
+          : {}),
+      },
+      requestedBy: 'mission_workitem_dispatch',
+      reason: 'Role demanded by work-item dispatch.',
+    });
+  }
 
   // Keep the round boundary explicit in the mission event stream. The
   // retrospective collector uses this event rather than inferring rounds
@@ -150,7 +183,7 @@ async function dispatchMissionWorkItemsRound(
     statuses: options.statuses || ['ready', 'backlog'],
   });
 
-  for (const item of workItems.slice(0, limit)) {
+  for (const item of selectedWorkItems) {
     const teamRole = getTeamRole(item);
     const independentReviewRequired = isIndependentReviewRequired(item);
     const executionSurfaceDecision = resolveWorkItemExecutionSurface(
