@@ -41,6 +41,27 @@ export interface TenantProfile {
   assigned_role: string;
   /** Tenant-level upper bound on providers allowed to receive its knowledge. */
   allowed_reasoning_backends?: string[];
+  /**
+   * How this tenant's account is contracted with each provider, for the
+   * tier x egress gate.
+   *
+   * Training use is a property of the plan that was purchased, not of the
+   * provider id: the same API can be trained on under a free tier and not
+   * under a paid one, and two tenants can be on different plans. So the claim
+   * lives next to the account it describes, is attributed to whoever made it,
+   * and decays — a plan can be downgraded without anyone touching this repo.
+   */
+  provider_attestations?: Record<
+    string,
+    {
+      training_use: 'none' | 'used' | 'unknown';
+      plan?: string;
+      basis?: string;
+      attested_by?: string;
+      attested_at: string;
+      expires_at?: string;
+    }
+  >;
   isolation_policy?: {
     strict_isolation?: boolean;
     allow_cross_distillation?: boolean;
@@ -314,6 +335,63 @@ export function readTenantProfile(
  * used by the registry reader. Callers that write personal-tier profiles must
  * establish a sovereign_concierge/sovereign execution context first.
  */
+export interface RecordProviderAttestationInput {
+  slug: string;
+  provider: string;
+  training_use: 'none' | 'used' | 'unknown';
+  plan?: string;
+  basis?: string;
+  attested_by?: string;
+  /** Days until re-verification is due. Omit to leave it to the policy TTL. */
+  valid_for_days?: number;
+  rootDir?: string;
+}
+
+/**
+ * Record how this installation's account with a provider is contracted.
+ *
+ * Deliberately a per-installation write: tenant profiles live under
+ * `knowledge/personal/`, which is outside git, because a contract is a fact
+ * about one operator's account and not about the project. The shipped
+ * `provider-egress-policy.json` declares every provider `unknown` for the
+ * same reason — it is a public file and cannot speak for anyone's plan.
+ */
+export function recordTenantProviderAttestation(
+  input: RecordProviderAttestationInput
+): TenantProfile {
+  const options = input.rootDir ? { rootDir: input.rootDir } : {};
+  const profile = readTenantProfile(input.slug, options);
+  if (!profile) {
+    throw new Error(`[tenant-registry] tenant '${input.slug}' has no profile to attest against.`);
+  }
+  const provider = input.provider.trim();
+  if (!provider) throw new Error('[tenant-registry] provider is required.');
+
+  const attestedAt = new Date();
+  const attestation: NonNullable<TenantProfile['provider_attestations']>[string] = {
+    training_use: input.training_use,
+    attested_at: attestedAt.toISOString(),
+    ...(input.plan?.trim() ? { plan: input.plan.trim() } : {}),
+    ...(input.basis?.trim() ? { basis: input.basis.trim() } : {}),
+    ...(input.attested_by?.trim() ? { attested_by: input.attested_by.trim() } : {}),
+    ...(typeof input.valid_for_days === 'number' && input.valid_for_days > 0
+      ? {
+          expires_at: new Date(
+            attestedAt.getTime() + input.valid_for_days * 24 * 60 * 60 * 1000
+          ).toISOString(),
+        }
+      : {}),
+  };
+
+  return writeTenantProfile(
+    {
+      ...profile,
+      provider_attestations: { ...(profile.provider_attestations || {}), [provider]: attestation },
+    },
+    options
+  );
+}
+
 export function writeTenantProfile(
   profile: TenantProfile,
   options: TenantRegistryPathOptions = {}

@@ -2,7 +2,7 @@
   "role": "operator",
   "description": "Handles runtime, deployment, and operational control surfaces.",
   "required_capabilities": ["operations", "runtime", "monitoring"],
-  "compatible_authority_roles": ["chronos_operator", "chronos_gateway", "mission_controller"],
+  "compatible_authority_roles": ["chronos_operator", "chronos_gateway"],
   "allowed_delegate_team_roles": ["surface_liaison"],
   "escalation_parent_team_role": "owner",
   "required_scope_classes": ["communication_surface"],

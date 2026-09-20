@@ -15,11 +15,10 @@
         "tracking"
       ],
       "selection_hints": {
-        "preferred_provider": "gemini",
-        "preferred_modelId": "gemini-3.8-flash"
+        "preferred_provider": "codex"
       },
       "provider_strategy": "preferred",
-      "fallback_providers": ["claude", "codex"]
+      "fallback_providers": ["claude", "agy"]
     }
   }
 }

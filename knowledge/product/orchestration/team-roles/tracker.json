@@ -2,7 +2,7 @@
   "role": "tracker",
   "description": "Tracks action items, deadlines, and follow-up closure across a meeting.",
   "required_capabilities": ["tracking", "coordination", "documentation"],
-  "compatible_authority_roles": ["mission_controller", "ecosystem_architect", "knowledge_steward"],
+  "compatible_authority_roles": ["mission_controller", "ecosystem_architect"],
   "allowed_delegate_team_roles": [],
   "escalation_parent_team_role": "facilitator",
   "required_scope_classes": ["mission_state"],

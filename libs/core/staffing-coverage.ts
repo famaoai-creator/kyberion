@@ -9,11 +9,13 @@ import {
 } from './mission-classification.js';
 import {
   loadAgentProfileIndex,
+  loadAuthorityRoleIndex,
   loadMissionTeamTemplates,
   loadTeamRoleIndex,
 } from './mission-team-index.js';
 import { SEPARATION_ROLE_PAIRS } from './mission-team-plan-composer.js';
 import { loadTeamCompositionObligations } from './team-composition-obligations.js';
+import { isObsoleteAgentRuntimeProvider } from './provider-config.js';
 
 /**
  * TC-11: does the pool actually contain what the roster asks for?
@@ -47,7 +49,9 @@ export type StaffingCoverageViolationKind =
   | 'obligation_role_uncovered'
   | 'template_role_unstaffable'
   | 'separation_impossible'
-  | 'dead_selection_hint';
+  | 'dead_selection_hint'
+  | 'dead_authority_declaration'
+  | 'obsolete_preferred_provider';
 
 export interface StaffingCoverageViolation {
   kind: StaffingCoverageViolationKind;
@@ -65,10 +69,19 @@ export interface SeparationReadiness {
   provider_independent: boolean;
 }
 
+export interface DeadAuthorityDeclaration {
+  team_role: string;
+  /** Authority roles that cannot carry the scope classes this role needs. */
+  authority_roles: string[];
+  required_scope_classes: string[];
+}
+
 export interface StaffingCoverageReport {
   generated_at: string;
   roles: TeamRoleCoverage[];
   separation_readiness: SeparationReadiness[];
+  /** Reported only — see the note where these are collected. */
+  dead_authority_declarations: DeadAuthorityDeclaration[];
   /** Capabilities some role requires that no agent profile declares at all. */
   unreachable_capabilities: string[];
   /** Roles with candidates but none that satisfy every requirement. */
@@ -82,6 +95,7 @@ function normalize(values: string[] | undefined): string[] {
 
 export function buildStaffingCoverageReport(): StaffingCoverageReport {
   const teamRoles = loadTeamRoleIndex();
+  const authorityRoles = loadAuthorityRoleIndex();
   const agents = loadAgentProfileIndex();
   const templates = loadMissionTeamTemplates();
   const obligations = loadTeamCompositionObligations();
@@ -148,6 +162,22 @@ export function buildStaffingCoverageReport(): StaffingCoverageReport {
   }
 
   const violations: StaffingCoverageViolation[] = [];
+  const deadAuthorityDeclarations: DeadAuthorityDeclaration[] = [];
+
+  for (const [agentId, profile] of Object.entries(agents)) {
+    // A profile pinned to a provider that must not be selected for agent
+    // runtime is a preference that can never be honoured — the resolver skips
+    // it and the agent quietly lands somewhere else. Same class as a dead role
+    // preference, and it is easy to write by accident.
+    const preferredProvider = profile.selection_hints?.preferred_provider;
+    if (preferredProvider && isObsoleteAgentRuntimeProvider(preferredProvider)) {
+      violations.push({
+        kind: 'obsolete_preferred_provider',
+        team_role: agentId,
+        detail: `agent profile prefers '${preferredProvider}', which is declared obsolete for agent runtime.`,
+      });
+    }
+  }
 
   for (const [role, record] of Object.entries(teamRoles)) {
     // An operator preference naming an agent that cannot hold the role is
@@ -163,6 +193,32 @@ export function buildStaffingCoverageReport(): StaffingCoverageReport {
         kind: 'dead_selection_hint',
         team_role: role,
         detail: `preferred_agents names ${dead.join(', ')}, which cannot hold this role.`,
+      });
+    }
+
+    // Selection drops any authority role that does not carry the role's
+    // required scope classes, so listing one is inert in exactly the same way
+    // a dead agent preference is — and worse, it makes the role look more
+    // widely fillable than it is.
+    const requiredScopes = record.required_scope_classes || [];
+    const deadAuthorities = (record.compatible_authority_roles || []).filter((authorityRole) => {
+      const scopes = new Set(authorityRoles[authorityRole]?.scope_classes || []);
+      return !requiredScopes.every((scopeClass) => scopes.has(scopeClass));
+    });
+    if (deadAuthorities.length > 0) {
+      // Not a judgement about which authority SHOULD carry which scope: the
+      // role itself declares what it needs, and selection already drops an
+      // authority that cannot carry it. Listing one is inert, and it makes
+      // the role look more widely fillable than it is.
+      deadAuthorityDeclarations.push({
+        team_role: role,
+        authority_roles: deadAuthorities,
+        required_scope_classes: [...requiredScopes],
+      });
+      violations.push({
+        kind: 'dead_authority_declaration',
+        team_role: role,
+        detail: `compatible_authority_roles names ${deadAuthorities.join(', ')}, which cannot carry ${requiredScopes.join(', ')}.`,
       });
     }
   }
@@ -229,6 +285,7 @@ export function buildStaffingCoverageReport(): StaffingCoverageReport {
     generated_at: nowIso(),
     roles,
     separation_readiness: separationReadiness,
+    dead_authority_declarations: deadAuthorityDeclarations,
     unreachable_capabilities: [...unreachableCapabilities].sort(),
     partially_covered_roles: roles
       .filter(
@@ -268,6 +325,11 @@ export function formatStaffingCoverageReport(report: StaffingCoverageReport): st
           `, different model family ${entry.provider_independent ? 'available' : 'NOT available'}`
       );
     }
+  }
+  for (const entry of report.dead_authority_declarations) {
+    lines.push(
+      `  note: ${entry.team_role} lists ${entry.authority_roles.join(', ')}, which cannot carry ${entry.required_scope_classes.join(', ')}`
+    );
   }
   if (report.unreachable_capabilities.length > 0) {
     lines.push('');

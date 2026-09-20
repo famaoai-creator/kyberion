@@ -78,12 +78,16 @@ export function collectMissionDecisionSupportMetrics(input: {
 }): MissionDecisionSupportMetrics {
   const metrics = emptyMissionMetrics(input.missionId);
   const entries = readMissionExecutionLedger(input.missionId, input.missionPath);
-  let lastProposalAt: string | undefined;
+  // Append position, not timestamp: two entries written in the same
+  // millisecond share a `ts`, and ordering by it silently drops a follow-up
+  // that did happen after the run. The ledger is append-only, so its order is
+  // the fact.
+  let lastProposalIndex = -1;
 
-  for (const entry of entries) {
+  for (const [index, entry] of entries.entries()) {
     if (entry.event_type === 'team_roster_proposed') {
       metrics.proposal_runs += 1;
-      lastProposalAt = entry.ts;
+      lastProposalIndex = index;
       const decisions = (entry.payload as { decisions?: RosterProposalDecision[] } | undefined)
         ?.decisions;
       for (const decision of Array.isArray(decisions) ? decisions : []) {
@@ -115,7 +119,7 @@ export function collectMissionDecisionSupportMetrics(input: {
 
   // A role added after the last proposal run, by anyone other than the
   // proposer, is a role the proposer failed to anticipate.
-  for (const entry of entries) {
+  for (const [index, entry] of entries.entries()) {
     if (entry.event_type !== 'team_role_restaffed') continue;
     if (
       (entry.payload as { requested_by?: string } | undefined)?.requested_by ===
@@ -123,7 +127,7 @@ export function collectMissionDecisionSupportMetrics(input: {
     ) {
       continue;
     }
-    if (lastProposalAt && entry.ts <= lastProposalAt) continue;
+    if (index <= lastProposalIndex) continue;
     const role = entry.team_role;
     if (role && !metrics.follow_up_restaffed_roles.includes(role)) {
       metrics.follow_up_restaffed_roles.push(role);

@@ -5,6 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
@@ -13,6 +14,7 @@ vi.mock('./ops-alert.js', () => ({ sendOpsAlert: mocks.sendOpsAlert }));
 
 import {
   assertProviderEgress,
+  resolveTenantProviderAttestation,
   checkProviderEgress,
   highestTierForPaths,
   loadProviderEgressPolicy,
@@ -261,5 +263,228 @@ describe('the checked-in default policy', () => {
     const loaded = loadProviderEgressPolicy();
     expect(loaded.status).toBe('ok');
     _resetProviderEgressPolicyCacheForTests();
+  });
+});
+
+describe('confidential egress follows declared training use', () => {
+  it('allows a provider declared not to train on what it receives', () => {
+    writePolicy({
+      version: '1.1.0',
+      providers: { vendor: { egress: 'external-api', training_use: 'none' } },
+      tier_policy: {
+        confidential: { mode: 'approved-only', approved_providers: [] },
+        personal: { mode: 'local-only-or-approved', approved_providers: [] },
+      },
+    });
+    _resetProviderEgressPolicyCacheForTests();
+    expect(checkProviderEgress({ provider: 'vendor', dataTier: 'confidential' }).allowed).toBe(
+      true
+    );
+  });
+
+  it('denies a provider that trains on what it receives', () => {
+    writePolicy({
+      version: '1.1.0',
+      providers: { vendor: { egress: 'external-api', training_use: 'used' } },
+      tier_policy: {
+        confidential: { mode: 'approved-only', approved_providers: [] },
+        personal: { mode: 'local-only-or-approved', approved_providers: [] },
+      },
+    });
+    _resetProviderEgressPolicyCacheForTests();
+    const result = checkProviderEgress({ provider: 'vendor', dataTier: 'confidential' });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('used');
+  });
+
+  it('treats an undeclared training use as trained-on and fails closed', () => {
+    writePolicy({
+      version: '1.1.0',
+      providers: { vendor: { egress: 'external-api' } },
+      tier_policy: {
+        confidential: { mode: 'approved-only', approved_providers: [] },
+        personal: { mode: 'local-only-or-approved', approved_providers: [] },
+      },
+    });
+    _resetProviderEgressPolicyCacheForTests();
+    const result = checkProviderEgress({ provider: 'vendor', dataTier: 'confidential' });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('unknown');
+  });
+
+  it('still honours an explicit operator exception', () => {
+    writePolicy({
+      version: '1.1.0',
+      providers: { vendor: { egress: 'external-api', training_use: 'used' } },
+      tier_policy: {
+        confidential: { mode: 'approved-only', approved_providers: ['vendor'] },
+        personal: { mode: 'local-only-or-approved', approved_providers: [] },
+      },
+    });
+    _resetProviderEgressPolicyCacheForTests();
+    expect(checkProviderEgress({ provider: 'vendor', dataTier: 'confidential' }).allowed).toBe(
+      true
+    );
+  });
+
+  it('lets personal material reach a provider that does not train on it', () => {
+    writePolicy({
+      version: '1.2.0',
+      providers: { vendor: { egress: 'external-api', training_use: 'none' } },
+      tier_policy: {
+        confidential: { mode: 'approved-only', approved_providers: [] },
+        personal: { mode: 'local-only-or-approved', approved_providers: [] },
+      },
+    });
+    _resetProviderEgressPolicyCacheForTests();
+    // Personal work has real uses that need a model — trip research, say — so
+    // the bar is "not trained on", not "never leaves the machine".
+    expect(checkProviderEgress({ provider: 'vendor', dataTier: 'personal' }).allowed).toBe(true);
+  });
+
+  it('keeps personal material from a provider that trains on it', () => {
+    writePolicy({
+      version: '1.2.0',
+      providers: { vendor: { egress: 'external-api', training_use: 'used' } },
+      tier_policy: {
+        confidential: { mode: 'approved-only', approved_providers: [] },
+        personal: { mode: 'local-only-or-approved', approved_providers: [] },
+      },
+    });
+    _resetProviderEgressPolicyCacheForTests();
+    const result = checkProviderEgress({ provider: 'vendor', dataTier: 'personal' });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('personal');
+  });
+});
+
+describe('tenant provider attestations (plan-scoped training use)', () => {
+  const iso = (offsetDays: number) =>
+    new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000).toISOString();
+
+  it('accepts a fresh attestation that the plan is not trained on', () => {
+    const resolved = resolveTenantProviderAttestation({
+      profile: {
+        provider_attestations: {
+          vendor: { training_use: 'none', attested_at: iso(-10) },
+        },
+      },
+      provider: 'vendor',
+      ttlDays: 180,
+    });
+    expect(resolved.status).toBe('valid');
+    expect(resolved.training_use).toBe('none');
+  });
+
+  it('expires an attestation nobody re-verified', () => {
+    // A purchased plan can be downgraded without anyone touching this repo,
+    // so a claim that is never re-checked stops counting as evidence.
+    const resolved = resolveTenantProviderAttestation({
+      profile: {
+        provider_attestations: {
+          vendor: { training_use: 'none', attested_at: iso(-400) },
+        },
+      },
+      provider: 'vendor',
+      ttlDays: 180,
+    });
+    expect(resolved.status).toBe('expired');
+    expect(resolved.training_use).toBe('unknown');
+  });
+
+  it('honours an explicit expiry over the default lifetime', () => {
+    const resolved = resolveTenantProviderAttestation({
+      profile: {
+        provider_attestations: {
+          vendor: { training_use: 'none', attested_at: iso(-1), expires_at: iso(-1) },
+        },
+      },
+      provider: 'vendor',
+      ttlDays: 180,
+    });
+    expect(resolved.status).toBe('expired');
+  });
+
+  it('treats an undatable attestation as expired rather than valid', () => {
+    const resolved = resolveTenantProviderAttestation({
+      profile: {
+        provider_attestations: { vendor: { training_use: 'none', attested_at: 'whenever' } },
+      },
+      provider: 'vendor',
+    });
+    expect(resolved.status).toBe('expired');
+  });
+
+  it('reports no attestation as absent, not as permission', () => {
+    const resolved = resolveTenantProviderAttestation({ profile: {}, provider: 'vendor' });
+    expect(resolved.status).toBe('absent');
+    expect(resolved.training_use).toBe('unknown');
+  });
+});
+
+describe('the gate reads the tenant profile as its own policy input', () => {
+  const FIXTURE_PARENT = path.join(pathResolver.rootDir(), 'active', 'shared', 'tmp');
+  let fixtureRoot = '';
+
+  beforeEach(() => {
+    fs.mkdirSync(FIXTURE_PARENT, { recursive: true });
+    fixtureRoot = fs.mkdtempSync(path.join(FIXTURE_PARENT, 'egress-tenant-'));
+    const dir = path.join(fixtureRoot, 'knowledge', 'personal', 'tenants');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'acme.json'),
+      JSON.stringify({
+        tenant_slug: 'acme',
+        display_name: 'Acme',
+        status: 'active',
+        assigned_role: 'owner',
+        provider_attestations: {
+          clean: { training_use: 'none', attested_at: new Date().toISOString() },
+          dirty: { training_use: 'used', attested_at: new Date().toISOString() },
+        },
+      })
+    );
+    writePolicy({
+      version: '1.2.0',
+      providers: {
+        clean: { egress: 'external-api', training_use: 'unknown' },
+        dirty: { egress: 'external-api', training_use: 'unknown' },
+      },
+      tier_policy: {
+        confidential: { mode: 'approved-only', approved_providers: [] },
+        personal: { mode: 'local-only-or-approved', approved_providers: [] },
+      },
+    });
+    _resetProviderEgressPolicyCacheForTests();
+  });
+
+  afterEach(() => {
+    if (fixtureRoot) fs.rmSync(fixtureRoot, { recursive: true, force: true });
+    fixtureRoot = '';
+  });
+
+  it('consults a tenant attestation from an ordinary caller context', () => {
+    // Tenant profiles live on the personal tier, which the calling persona
+    // here cannot read. Before the gate read them as policy input, every
+    // tenant-scoped call denied on an unresolvable tenant and the
+    // attestations were never consulted at all.
+    const allowed = checkProviderEgress({
+      provider: 'clean',
+      dataTier: 'confidential',
+      tenant_slug: 'acme',
+      tenant_registry_root_dir: fixtureRoot,
+    });
+    expect(allowed.allowed).toBe(true);
+  });
+
+  it('still denies a provider the same tenant attests is trained on', () => {
+    const denied = checkProviderEgress({
+      provider: 'dirty',
+      dataTier: 'personal',
+      tenant_slug: 'acme',
+      tenant_registry_root_dir: fixtureRoot,
+    });
+    expect(denied.allowed).toBe(false);
+    expect(denied.reason).toContain('used');
   });
 });
