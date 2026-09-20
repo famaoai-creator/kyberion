@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { executeServicePreset } from './service-engine.js';
 import { clamp, isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
+import { executeServicePreset } from './service-engine.js';
+import { resolveCalendarProvider, type CalendarProviderId } from './calendar-provider-bridge.js';
 
 export { readGwsAuthStatus } from './email-workflow.js';
 
-export type CalendarProvider = 'google-workspace' | 'm365';
+export type CalendarProvider = CalendarProviderId;
 
 export interface CalendarAgendaInput {
   provider?: CalendarProvider;
@@ -242,19 +243,6 @@ function extractFreeBusyWindows(payload: unknown): CalendarFreeBusyWindow[] {
     .filter((calendar) => nonEmptyString(calendar.calendar_id));
 }
 
-function resolveProvider(provider?: CalendarProvider): CalendarProvider {
-  return provider || 'google-workspace';
-}
-
-function resolveCalendarPath(calendarId: string | undefined, provider: CalendarProvider): string {
-  const trimmed = calendarId?.trim();
-  if (provider === 'm365') {
-    if (!trimmed || trimmed === 'primary' || trimmed === 'me') return 'me';
-    return `me/calendars/${trimmed}`;
-  }
-  return trimmed || 'primary';
-}
-
 function normalizeGraphEvent(item: unknown): CalendarEventSummary | null {
   if (!isRecord(item) || !nonEmptyString(item.id)) return null;
   const location = isRecord(item.location) ? item.location : undefined;
@@ -305,7 +293,7 @@ function requireCalendarEvent(value: CalendarEventSummary | null): CalendarEvent
 export async function listCalendarAgenda(
   input: CalendarAgendaInput = {}
 ): Promise<CalendarAgendaResult> {
-  const provider = resolveProvider(input.provider);
+  const bridge = resolveCalendarProvider(input.provider);
   const calendarId = input.calendar_id?.trim() || 'primary';
   const currentTime = new Date();
   const timeMin = input.time_min?.trim() || nowIso(currentTime);
@@ -320,31 +308,19 @@ export async function listCalendarAgenda(
   const encodedTimeMin = encodeURIComponent(timeMin);
   const encodedTimeMax = encodeURIComponent(timeMax);
 
-  const response =
-    provider === 'm365'
-      ? await executeServicePreset('m365', 'calendar_events_list', {
-          params: {
-            calendarPath: resolveCalendarPath(calendarId, provider),
-            timeMin: encodedTimeMin,
-            timeMax: encodedTimeMax,
-            maxResults,
-          },
-        })
-      : await executeServicePreset('google-workspace', 'calendar_events_list', {
-          params: {
-            calendarId,
-            timeMin,
-            timeMax,
-            singleEvents: true,
-            orderBy: 'startTime',
-            maxResults,
-            ...(query ? { q: query } : {}),
-            ...(timeZone ? { timeZone } : {}),
-          },
-        });
+  const response = await bridge.listEvents({
+    calendarId,
+    timeMin,
+    timeMax,
+    maxResults,
+    encodedTimeMin,
+    encodedTimeMax,
+    ...(query ? { query } : {}),
+    ...(timeZone ? { timeZone } : {}),
+  });
 
   const events = extractEventItems(response)
-    .map(provider === 'm365' ? normalizeGraphEvent : normalizeEvent)
+    .map(bridge.provider_id === 'm365' ? normalizeGraphEvent : normalizeEvent)
     .filter(isCalendarEventSummary);
 
   return {
@@ -363,15 +339,8 @@ export async function listCalendarAgenda(
 export async function listCalendars(
   provider: CalendarProvider = 'google-workspace'
 ): Promise<CalendarListResult> {
-  const resolvedProvider = resolveProvider(provider);
-  const response =
-    resolvedProvider === 'm365'
-      ? await executeServicePreset('m365', 'calendar_list', {
-          params: {},
-        })
-      : await executeServicePreset('google-workspace', 'calendar_calendarList_list', {
-          params: {},
-        });
+  const bridge = resolveCalendarProvider(provider);
+  const response = await bridge.listCalendars();
   const calendars = extractCalendarListItems(response)
     .map(normalizeCalendarListEntry)
     .filter(isCalendarListEntry);
@@ -386,7 +355,7 @@ export async function listCalendars(
 export async function queryCalendarFreeBusy(
   input: CalendarFreeBusyInput
 ): Promise<CalendarFreeBusyResult> {
-  const provider = resolveProvider(input.provider);
+  const bridge = resolveCalendarProvider(input.provider);
   const calendarIds = (
     input.calendar_ids && input.calendar_ids.length
       ? input.calendar_ids
@@ -396,30 +365,12 @@ export async function queryCalendarFreeBusy(
     .filter(Boolean);
   const timeZone = input.time_zone?.trim() || '';
 
-  const response =
-    provider === 'm365'
-      ? await executeServicePreset('m365', 'calendar_freebusy_query', {
-          body: {
-            schedules: calendarIds,
-            startTime: {
-              dateTime: input.time_min,
-              ...(timeZone ? { timeZone } : {}),
-            },
-            endTime: {
-              dateTime: input.time_max,
-              ...(timeZone ? { timeZone } : {}),
-            },
-            availabilityViewInterval: 30,
-          },
-        })
-      : await executeServicePreset('google-workspace', 'calendar_freebusy_query', {
-          body: {
-            timeMin: input.time_min,
-            timeMax: input.time_max,
-            ...(timeZone ? { timeZone } : {}),
-            items: calendarIds.map((calendarId) => ({ id: calendarId })),
-          },
-        });
+  const response = await bridge.queryFreeBusy({
+    calendarIds,
+    timeMin: input.time_min,
+    timeMax: input.time_max,
+    ...(timeZone ? { timeZone } : {}),
+  });
 
   return {
     ok: true,
@@ -433,7 +384,7 @@ export async function queryCalendarFreeBusy(
 export async function createCalendarEvent(
   input: CalendarEventCreateInput
 ): Promise<CalendarEventCreateResult> {
-  const provider = resolveProvider(input.provider);
+  const bridge = resolveCalendarProvider(input.provider);
   const calendarId = input.calendar_id?.trim() || 'primary';
   const summary = input.summary.trim();
   const start = input.start.trim();
@@ -451,73 +402,20 @@ export async function createCalendarEvent(
     ? input.conference_request_id?.trim() || randomUUID()
     : undefined;
 
-  const response =
-    provider === 'm365'
-      ? await executeServicePreset('m365', 'calendar_events_insert', {
-          params: {
-            calendarPath: resolveCalendarPath(calendarId, provider),
-          },
-          body: {
-            subject: summary,
-            start: normalizeRfc3339Value(start, timeZone || undefined),
-            end: normalizeRfc3339Value(end, timeZone || undefined),
-            ...(input.description?.trim()
-              ? { body: { contentType: 'text', content: input.description.trim() } }
-              : {}),
-            ...(input.location?.trim() ? { location: { displayName: input.location.trim() } } : {}),
-            ...(input.attendees?.length
-              ? {
-                  attendees: input.attendees
-                    .map((attendee) => attendee.trim())
-                    .filter(Boolean)
-                    .map((email) => ({
-                      emailAddress: { address: email },
-                      type: 'required',
-                    })),
-                }
-              : {}),
-            ...(withMeet
-              ? {
-                  isOnlineMeeting: true,
-                  onlineMeetingProvider: 'teamsForBusiness',
-                }
-              : {}),
-          },
-        })
-      : await executeServicePreset('google-workspace', 'calendar_events_insert', {
-          params: {
-            calendarId,
-            ...(input.send_updates ? { sendUpdates: input.send_updates } : {}),
-            ...(withMeet ? { conferenceDataVersion: 1 } : {}),
-          },
-          body: {
-            summary,
-            start: normalizeRfc3339Value(start, timeZone || undefined),
-            end: normalizeRfc3339Value(end, timeZone || undefined),
-            ...(input.description?.trim() ? { description: input.description.trim() } : {}),
-            ...(input.location?.trim() ? { location: input.location.trim() } : {}),
-            ...(input.attendees?.length
-              ? {
-                  attendees: input.attendees
-                    .map((attendee) => attendee.trim())
-                    .filter(Boolean)
-                    .map((email) => ({ email })),
-                }
-              : {}),
-            ...(withMeet && conferenceRequestId
-              ? {
-                  conferenceData: {
-                    createRequest: {
-                      requestId: conferenceRequestId,
-                      conferenceSolutionKey: {
-                        type: 'hangoutsMeet',
-                      },
-                    },
-                  },
-                }
-              : {}),
-          },
-        });
+  const attendees = input.attendees?.map((attendee) => attendee.trim()).filter(Boolean);
+
+  const response = await bridge.insertEvent({
+    calendarId,
+    summary,
+    start: normalizeRfc3339Value(start, timeZone || undefined),
+    end: normalizeRfc3339Value(end, timeZone || undefined),
+    ...(input.description?.trim() ? { description: input.description.trim() } : {}),
+    ...(input.location?.trim() ? { location: input.location.trim() } : {}),
+    ...(attendees?.length ? { attendees } : {}),
+    ...(withMeet ? { withMeet: true } : {}),
+    ...(conferenceRequestId ? { conferenceRequestId } : {}),
+    ...(input.send_updates ? { sendUpdates: input.send_updates } : {}),
+  });
 
   return {
     ok: true,
@@ -525,7 +423,7 @@ export async function createCalendarEvent(
     ...(conferenceRequestId ? { conference_request_id: conferenceRequestId } : {}),
     with_meet: withMeet,
     created_event: requireCalendarEvent(
-      provider === 'm365' ? normalizeGraphEvent(response) : normalizeEvent(response)
+      bridge.provider_id === 'm365' ? normalizeGraphEvent(response) : normalizeEvent(response)
     ),
   };
 }

@@ -141,7 +141,7 @@
     {
       "path": "product/architecture/agent-pane-runtime-backend-poc.md",
       "tier": "public",
-      "size": 2578,
+      "size": 2799,
       "type": "md"
     },
     {
@@ -279,7 +279,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 7464,
+      "size": 7463,
       "type": "md"
     },
     {
@@ -4713,7 +4713,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19918,
+      "size": 19166,
       "type": "json"
     },
     {

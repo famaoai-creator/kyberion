@@ -12,7 +12,7 @@
         "params": {
           "type": "object",
           "additionalProperties": false,
-          "properties": { "bus": { "enum": ["blackhole", "stub"] } }
+          "properties": { "bus": { "enum": ["blackhole", "pulseaudio", "stub"] } }
         }
       }
     },
@@ -27,7 +27,7 @@
           "required": ["bus"],
           "additionalProperties": false,
           "properties": {
-            "bus": { "enum": ["blackhole", "stub"] },
+            "bus": { "enum": ["blackhole", "pulseaudio", "stub"] },
             "input_device_uid": { "type": "string", "minLength": 1, "maxLength": 256 },
             "output_device_uid": { "type": "string", "minLength": 1, "maxLength": 256 },
             "expected_device_label": { "type": "string", "minLength": 1, "maxLength": 256 }
@@ -65,7 +65,7 @@
               "required": ["bus"],
               "additionalProperties": false,
               "properties": {
-                "bus": { "enum": ["blackhole", "stub"] },
+                "bus": { "enum": ["blackhole", "pulseaudio", "stub"] },
                 "input_device_uid": { "type": "string", "minLength": 1, "maxLength": 256 },
                 "output_device_uid": { "type": "string", "minLength": 1, "maxLength": 256 },
                 "expected_device_label": { "type": "string", "minLength": 1, "maxLength": 256 }

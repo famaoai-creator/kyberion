@@ -69,12 +69,51 @@
       "documented": true
     },
     {
+      "name": "KYBERION_AGENT_PANE_RUNTIME_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for the active pane-runtime provider CLI when launch mode is pane. When unset, the agent-pane-runtime provider resolves through the governed tool-runtime registry (`herdr`).",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
+      "name": "KYBERION_AGENT_PANE_RUNTIME_PROVIDER",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional agent-pane-runtime-bridge provider id when launch mode is pane (auto selects the first probed-available provider).",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
+      "name": "KYBERION_AGENT_PANE_RUNTIME_WORKSPACE_LABEL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "default": "kyberion",
+      "description": "Workspace label reused by pane-runtime providers when creating or attaching operator-visible panes.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_AGENT_RING",
       "category": "tuning",
       "type": "number",
       "required": false,
       "description": "Numeric policy ring supplied to operation-policy evaluation; higher rings may have stricter execution rules.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_AGENT_RUNTIME_BACKEND",
+      "category": "runtime",
+      "type": "enum",
+      "enum": ["pipe", "pane"],
+      "required": false,
+      "default": "pipe",
+      "description": "Default agent runtime launch mode when a spawn/ensure/A2A request does not override it. pipe (default) uses ACP/exec stdio children; pane launches interactive provider CLIs in a terminal-multiplexer pane via the agent-pane-runtime-bridge seam. Per-request override: SpawnOptions.runtimeBackend or runtimeMetadata.runtime_backend / A2A payload.context.runtime_backend.",
+      "documented": true,
+      "subsystem": "runtime"
     },
     {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST",
@@ -1414,6 +1453,15 @@
       "required": false,
       "description": "Optional runtime setting for host agent active; leave unset to use the built-in configuration.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_IMAGESNAP_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for imagesnap; when unset, virtual-camera-capture uses the governed tool-runtime registry command.",
+      "documented": true,
+      "subsystem": "runtime"
     },
     {
       "name": "KYBERION_IMESSAGE_WAKE_WORD",
@@ -3473,6 +3521,14 @@
       "type": "string",
       "required": false,
       "description": "Optional runtime setting for tui disable audit; leave unset to use the built-in configuration.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_TYPESAFE_API_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "TypeSafe API key for the typesafe-jev judgment backend. The provider is declared external-api, so personal-tier state never reaches it and confidential-tier state requires tenant approval through the provider egress policy.",
       "documented": true
     },
     {

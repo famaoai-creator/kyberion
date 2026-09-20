@@ -35,6 +35,41 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/agent-runtime-port.ts',
     consumers: ['libs/core/agent-runtime-supervisor.ts'],
   },
+  'agent-pane-runtime-bridge': {
+    declaration: 'libs/core/agent-pane-runtime-bridge.ts',
+    consumers: ['libs/core/agent-lifecycle.ts', 'libs/core/a2a-bridge.ts'],
+  },
+  'agent-exec-adapter-bridge': {
+    declaration: 'libs/core/agent-exec-adapter-bridge.ts',
+    consumers: ['libs/core/agent-lifecycle.ts'],
+  },
+  'audio-bus-bridge': {
+    declaration: 'libs/core/audio-bus-bridge.ts',
+    consumers: [
+      'libs/core/audio-bus-resolver.ts',
+      'libs/actuators/voice-actuator/src/voice-action-helpers.ts',
+    ],
+  },
+  'ocr-provider': {
+    declaration: 'libs/core/ocr-bridge.ts',
+    consumers: ['libs/core/ocr-bridge.ts'],
+  },
+  'image-generation-provider': {
+    declaration: 'libs/core/image-generation-bridge.ts',
+    consumers: ['libs/core/image-generation-bridge.ts'],
+  },
+  'virtual-camera-capture': {
+    declaration: 'libs/core/virtual-camera-bridge.ts',
+    consumers: ['libs/core/virtual-camera-bridge.ts'],
+  },
+  'calendar-provider': {
+    declaration: 'libs/core/calendar-provider-bridge.ts',
+    consumers: ['libs/core/calendar-workflow.ts'],
+  },
+  'browser-automation-runtime': {
+    declaration: 'libs/core/browser-automation-runtime-bridge.ts',
+    consumers: ['libs/actuators/browser-actuator/src/browser-runtime-helpers.ts'],
+  },
   'audit-forwarder': {
     declaration: 'libs/core/audit-forwarder.ts',
     consumers: ['libs/core/audit-chain.ts'],

@@ -33,6 +33,49 @@ import {
 } from './windows-native-image-generation-bridge.js';
 import { resolveGeminiApiKey } from './gemini-api-backend.js';
 import { isAppleSilicon } from './platform.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
+
+const imageGenerationProviderSeam = createSeam<ImageGenerationProvider>({
+  key: 'image-generation-provider',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+const imageGenerationProviderDisposers = new Map<string, () => void>();
+// Held as AdaptivePolicyRouter once classes below are constructed.
+let imageGenerationGlobalRouter: any = null;
+let imageGenerationBuiltinsRegistered = false;
+
+/** Register an image-generation backend into the image-generation-provider seam. */
+export function registerImageGenerationProvider(provider: ImageGenerationProvider): () => void {
+  const id = String(provider.id || '').trim();
+  if (!id) throw new Error('ImageGenerationProvider.id is required');
+  imageGenerationProviderDisposers.get(id)?.();
+  const disposer = imageGenerationProviderSeam.register(id, provider, {
+    provenance: 'builtin',
+    source: 'image-generation-bridge',
+  });
+  imageGenerationProviderDisposers.set(id, disposer);
+  imageGenerationGlobalRouter = null;
+  return disposer;
+}
+
+export function listImageGenerationProviders(): ImageGenerationProvider[] {
+  return imageGenerationProviderSeam.list().map((entry) => entry.implementation);
+}
+
+export function resetImageGenerationProviders(): void {
+  for (const dispose of imageGenerationProviderDisposers.values()) {
+    try {
+      dispose();
+    } catch {
+      /* noop */
+    }
+  }
+  imageGenerationProviderDisposers.clear();
+  imageGenerationGlobalRouter = null;
+  imageGenerationBuiltinsRegistered = false;
+}
 
 function getFallbackTargetPath(request: ImageGenerationRequest): string {
   const filename = `generated-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.jpg`;
@@ -960,26 +1003,33 @@ export class AdaptivePolicyRouter {
   }
 }
 
-let globalRouter: AdaptivePolicyRouter | null = null;
+function ensureBuiltinImageGenerationProviders(): void {
+  if (imageGenerationBuiltinsRegistered && listImageGenerationProviders().length > 0) return;
+  for (const provider of [
+    new ComfyUiImageGenerationProvider(),
+    new GeminiFastImageGenerationProvider(),
+    new GeminiServiceImageGenerationProvider(),
+    new LlmApiImageGenerationProvider(),
+    new LocalFluxImageGenerationProvider(),
+    new WindowsNativeImageGenerationProvider(),
+    new LocalDiffusionImageGenerationProvider(),
+    new ApplePlaygroundImageGenerationProvider(),
+    new CursorHostBridgeImageGenerationProvider(),
+    new CodexHostBridgeImageGenerationProvider(),
+    new AgyHostBridgeImageGenerationProvider(),
+    new HostAgentImageGenerationProvider(),
+  ]) {
+    registerImageGenerationProvider(provider);
+  }
+  imageGenerationBuiltinsRegistered = true;
+}
 
 function getRouter(): AdaptivePolicyRouter {
-  if (!globalRouter) {
-    globalRouter = new AdaptivePolicyRouter([
-      new ComfyUiImageGenerationProvider(),
-      new GeminiFastImageGenerationProvider(),
-      new GeminiServiceImageGenerationProvider(),
-      new LlmApiImageGenerationProvider(),
-      new LocalFluxImageGenerationProvider(),
-      new WindowsNativeImageGenerationProvider(),
-      new LocalDiffusionImageGenerationProvider(),
-      new ApplePlaygroundImageGenerationProvider(),
-      new CursorHostBridgeImageGenerationProvider(),
-      new CodexHostBridgeImageGenerationProvider(),
-      new AgyHostBridgeImageGenerationProvider(),
-      new HostAgentImageGenerationProvider(),
-    ]);
+  ensureBuiltinImageGenerationProviders();
+  if (!imageGenerationGlobalRouter) {
+    imageGenerationGlobalRouter = new AdaptivePolicyRouter(listImageGenerationProviders());
   }
-  return globalRouter;
+  return imageGenerationGlobalRouter;
 }
 
 export async function generateImage(

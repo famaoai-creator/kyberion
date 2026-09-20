@@ -24,7 +24,7 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
   list_audio_routes: {
     type: 'object',
     properties: {
-      bus: { type: 'string', enum: ['blackhole', 'stub'] },
+      bus: { type: 'string', enum: ['blackhole', 'pulseaudio', 'stub'] },
       export_as: { type: 'string' },
     },
     additionalProperties: false,
@@ -32,7 +32,7 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
   probe_audio_route: {
     type: 'object',
     properties: {
-      bus: { type: 'string', enum: ['blackhole', 'stub'] },
+      bus: { type: 'string', enum: ['blackhole', 'pulseaudio', 'stub'] },
       expected_device_label: { type: 'string' },
       input_device_uid: { type: 'string' },
       output_device_uid: { type: 'string' },
