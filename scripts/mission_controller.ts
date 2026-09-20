@@ -839,8 +839,10 @@ Visibility Commands:
   sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
   reassign-project <ID> --project-id <PROJECT_ID> [--project-path <PATH>] [--track-id <TRACK_ID>] [--dry-run] [--force]
                                  Safely move a paused/planned mission to another project and reconcile both sides
-  team     <ID> [--refresh] [--provider <ID>] [--model <ID>]
+  team     <ID> [--refresh] [--summary] [--provider <ID>] [--model <ID>]
                                  Show or regenerate mission team composition
+                                 --summary prints roster / staffed / standby / unfilled and the
+                                 obligations that shaped the roster instead of the raw plan JSON
   staff    <ID> [--provider <ID>] [--model <ID>]
                                  Spawn or verify runtime instances for assigned mission team roles
   advise   <ID> --question <TEXT> [--topic <TEXT>] [--roles <CSV>] [--context <TEXT>]

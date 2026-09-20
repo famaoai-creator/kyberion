@@ -1,3 +1,4 @@
+import { formatMissionTeamPlanView } from '@agent/core/mission-team-view';
 /**
  * scripts/refactor/mission-controller-router.ts
  * Command routing for the Mission Controller CLI.
@@ -1160,7 +1161,15 @@ export async function runMissionControllerAction(
           : undefined
       );
       if (teamPlan !== undefined) {
-        context.print?.(JSON.stringify(teamPlan, null, 2));
+        // TC-05: the roster / staffed / standby / unfilled distinction is the
+        // thing an operator is asking about, and it disappears into the raw
+        // plan JSON. `--summary` reads it out; JSON stays the default so
+        // existing consumers are untouched.
+        context.print?.(
+          context.argv.includes('--summary')
+            ? formatMissionTeamPlanView(teamPlan as Parameters<typeof formatMissionTeamPlanView>[0])
+            : JSON.stringify(teamPlan, null, 2)
+        );
       }
       break;
     }
