@@ -17,6 +17,12 @@ import {
 } from './mission-team-plan-composer.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
 import {
+  buildAvailabilityRecord,
+  buildCostProfileRecord,
+  collectWorkforceLoad,
+  type WorkforceLoadIndex,
+} from './workforce-load.js';
+import {
   provisionMissionEntry,
   writeProvisionedJson,
   writeProvisionedText,
@@ -209,7 +215,8 @@ function resolveAgentRuntimeIdentity(
 
 function resourceFromLegacyAssignment(
   assignment: MissionTeamPlan['assignments'][number],
-  organizationId?: string
+  organizationId?: string,
+  loadIndex?: WorkforceLoadIndex
 ): WorkforceResourceRef | null {
   const actorId = assignment.agent_id?.trim();
   if (!actorId) return null;
@@ -220,8 +227,13 @@ function resourceFromLegacyAssignment(
     display_name: actorId,
     authority_roles: assignment.authority_role ? [assignment.authority_role] : [],
     capabilities: assignment.required_capabilities || [],
-    availability: { status: 'available' },
-    cost_profile: {},
+    // TC-08: observed load and governed model rates instead of the constants
+    // this record used to carry.
+    availability: buildAvailabilityRecord(actorId, loadIndex),
+    cost_profile: buildCostProfileRecord({
+      provider: assignment.provider,
+      modelId: assignment.modelId,
+    }),
     status: 'active',
     // Legacy fixtures predate accountable ownership. New resource refs enforce this at input time.
     accountable_human_id: assignment.accountable_human_id || null,
@@ -238,7 +250,8 @@ function resourceFromLegacyAssignment(
 
 function resolveAssignmentResource(
   assignment: MissionTeamPlan['assignments'][number],
-  organizationId?: string
+  organizationId?: string,
+  loadIndex?: WorkforceLoadIndex
 ): WorkforceResourceRef | null {
   const resource = assignment.resource;
   if (resource) {
@@ -259,7 +272,7 @@ function resolveAssignmentResource(
     }
     return resource;
   }
-  return resourceFromLegacyAssignment(assignment, organizationId);
+  return resourceFromLegacyAssignment(assignment, organizationId, loadIndex);
 }
 
 /**
@@ -309,10 +322,12 @@ export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlu
 
 export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionStaffingAssignments {
   const organizationId = plan.organization_profile?.organization_id;
+  // One pass over the work-item store for the whole staffing rebuild.
+  const loadIndex = collectWorkforceLoad();
   const assignments: MissionStaffingAssignment[] = plan.assignments
     .filter((assignment) => assignment.status === 'assigned')
     .flatMap((assignment) => {
-      const resource = resolveAssignmentResource(assignment, organizationId);
+      const resource = resolveAssignmentResource(assignment, organizationId, loadIndex);
       if (!resource) return [];
       // NI-01: staffed agents get a durable 'provisioned' identity in the
       // ledger (resolve-or-issue, best-effort — see helper docs).

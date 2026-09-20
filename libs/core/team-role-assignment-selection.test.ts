@@ -3,9 +3,9 @@ import { selectAgentForTeamRole } from './team-role-assignment-selection.js';
 
 describe('team-role assignment selection', () => {
   it('prefers a capability-matching preferred agent', () => {
-    const assignment = selectAgentForTeamRole(
-      'owner',
-      {
+    const assignment = selectAgentForTeamRole({
+      teamRole: 'owner',
+      teamRoleRecord: {
         description: 'Owner role',
         required_capabilities: ['reasoning', 'coordination'],
         compatible_authority_roles: ['mission_controller'],
@@ -19,7 +19,7 @@ describe('team-role assignment selection', () => {
         },
         autonomy_level: 'high',
       },
-      {
+      authorityRoles: {
         mission_controller: {
           description: 'Mission controller',
           write_scopes: ['mission_state.write'],
@@ -28,7 +28,7 @@ describe('team-role assignment selection', () => {
           tier_access: ['public'],
         },
       },
-      {
+      agents: {
         'nerve-agent': {
           authority_roles: ['mission_controller'],
           team_roles: ['owner'],
@@ -39,8 +39,8 @@ describe('team-role assignment selection', () => {
           },
           provider_strategy: 'strict',
         },
-      }
-    );
+      },
+    });
 
     expect(assignment.status).toBe('assigned');
     expect(assignment.agent_id).toBe('nerve-agent');
@@ -54,9 +54,9 @@ describe('team-role assignment selection', () => {
   });
 
   it('derives runtime_identity with an explicit organization id (NI-01)', () => {
-    const assignment = selectAgentForTeamRole(
-      'owner',
-      {
+    const assignment = selectAgentForTeamRole({
+      teamRole: 'owner',
+      teamRoleRecord: {
         description: 'Owner role',
         required_capabilities: ['reasoning'],
         compatible_authority_roles: ['mission_controller'],
@@ -66,7 +66,7 @@ describe('team-role assignment selection', () => {
         ownership_scope: 'Owns the mission.',
         autonomy_level: 'high',
       },
-      {
+      authorityRoles: {
         mission_controller: {
           description: 'Mission controller',
           write_scopes: ['mission_state.write'],
@@ -75,7 +75,7 @@ describe('team-role assignment selection', () => {
           tier_access: ['public'],
         },
       },
-      {
+      agents: {
         'nerve-agent': {
           authority_roles: ['mission_controller'],
           team_roles: ['owner'],
@@ -87,19 +87,17 @@ describe('team-role assignment selection', () => {
           provider_strategy: 'strict',
         },
       },
-      undefined,
-      undefined,
-      'demo-org'
-    );
+      organizationId: 'demo-org',
+    });
 
     expect(assignment.status).toBe('assigned');
     expect(assignment.runtime_identity).toBe('kyberion://agent/demo-org/nerve-agent');
   });
 
   it('returns unfilled when no compatible agent exists', () => {
-    const assignment = selectAgentForTeamRole(
-      'owner',
-      {
+    const assignment = selectAgentForTeamRole({
+      teamRole: 'owner',
+      teamRoleRecord: {
         description: 'Owner role',
         required_capabilities: ['reasoning'],
         compatible_authority_roles: ['mission_controller'],
@@ -113,7 +111,7 @@ describe('team-role assignment selection', () => {
         },
         autonomy_level: 'high',
       },
-      {
+      authorityRoles: {
         mission_controller: {
           description: 'Mission controller',
           write_scopes: ['mission_state.write'],
@@ -122,7 +120,7 @@ describe('team-role assignment selection', () => {
           tier_access: ['public'],
         },
       },
-      {
+      agents: {
         'other-agent': {
           authority_roles: ['mission_controller'],
           team_roles: ['reviewer'],
@@ -133,8 +131,8 @@ describe('team-role assignment selection', () => {
           },
           provider_strategy: 'strict',
         },
-      }
-    );
+      },
+    });
 
     expect(assignment.status).toBe('unfilled');
     expect(assignment.agent_id).toBeNull();

@@ -4063,6 +4063,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/workforce-capacity-policy.json",
+      "tier": "public",
+      "size": 330,
+      "type": "json"
+    },
+    {
       "path": "product/governance/working-philosophy.md",
       "tier": "public",
       "size": 8862,
@@ -11662,6 +11668,12 @@
       "path": "product/schemas/workflow-registration-request.schema.json",
       "tier": "public",
       "size": 5819,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/workforce-capacity-policy.schema.json",
+      "tier": "public",
+      "size": 1756,
       "type": "json"
     },
     {

@@ -168,6 +168,36 @@ function resolvePer1kRate(reg: ModelCostRegistry, model: string, inputTokens: nu
 }
 
 /**
+ * Which registry entry a model id resolved to, or `null` when nothing matched
+ * and the registry default was used.
+ *
+ * `resolveCostRates` silently falls back to the default rate, which is right
+ * for best-effort usage accounting but misleading anywhere the rate is
+ * presented as *this actor's* price: a display name such as
+ * "Gemini 3.6 Flash (Medium)" matches no registry key and would be reported
+ * at the default rate as if it were measured. Callers that persist a price
+ * record which one they got.
+ */
+export function resolveCostRateModelKey(model: string): string | null {
+  const reg = loadModelCostRegistry();
+  const id = (model || '').trim();
+  if (!id) return null;
+  if (reg.models[id]) return id;
+  if (reg.aliases?.[id] && reg.models[reg.aliases[id]]) return reg.aliases[id];
+  const lower = id.toLowerCase();
+  const candidates = [...Object.keys(reg.models), ...Object.keys(reg.aliases ?? {})].sort(
+    (a, b) => b.length - a.length
+  );
+  for (const key of candidates) {
+    if (lower.includes(key.toLowerCase())) {
+      const target = reg.models[key] ? key : reg.aliases?.[key];
+      if (target && reg.models[target]) return target;
+    }
+  }
+  return null;
+}
+
+/**
  * Resolve per-TOKEN rates for a model id from the knowledge-tier cost registry.
  * Registry stores per-1k rates; returned rates are per-token (÷1000) for direct
  * multiplication by token counts in `record()`.
