@@ -843,6 +843,10 @@ Visibility Commands:
                                  Show or regenerate mission team composition
   staff    <ID> [--provider <ID>] [--model <ID>]
                                  Spawn or verify runtime instances for assigned mission team roles
+  propose-roster <ID> [--context <TEXT>] [--force]
+                                 Ask the reasoning backend to propose discretionary roles beyond the
+                                 derived roster. Off unless the governed policy enables it (--force
+                                 runs it anyway); every proposal must pass the same checks as restaff
   restaff  <ID> <TEAM_ROLE> [--capabilities <CSV>] [--exclude <AGENT_CSV>] [--reason <TEXT>]
                                  Add a role to a running mission's roster (bounded by max_members,
                                  same capability / authority / separation-of-duties checks as
@@ -995,6 +999,16 @@ async function staffMissionTeam(
 ) {
   return withOrganizationContext(organizationId, () =>
     missionLifecycleService.staff(id, { providerPreference })
+  );
+}
+
+async function proposeMissionRoster(
+  id: string,
+  options: { missionContext?: string; force?: boolean },
+  organizationId?: string
+) {
+  return withOrganizationContext(organizationId, () =>
+    missionLifecycleService.proposeRoster(id, options)
   );
 }
 
@@ -1474,6 +1488,7 @@ async function mainImpl(
     staffMissionTeam,
     prewarmMissionTeam,
     restaffMissionTeam,
+    proposeMissionRoster,
     classifyMission,
     selectMissionWorkflow,
     planProcessTemplateTasks,
