@@ -1,7 +1,9 @@
 import { logger } from './core.js';
+import { validateReasoningEgress } from './context-security-scope.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { loadTeamRoleIndex } from './mission-team-index.js';
 import { loadMissionTeamPlan } from './mission-team-plan-composer.js';
+import { withReasoningPayloadScope } from './reasoning-egress-scope.js';
 import {
   appendMissionExecutionLedgerEntry,
   readMissionExecutionLedger,
@@ -193,16 +195,40 @@ export async function proposeMissionTeamRoster(input: {
     return { ...base, status: 'backend_unavailable', candidate_roles: candidateRoles };
   }
 
+  const securityScope = plan.assignments.find(
+    (assignment) => assignment.security_scope
+  )?.security_scope;
+  if (!securityScope && plan.tier !== 'public') {
+    logger.warn(
+      `[roster-proposal] ${missionId}: refusing non-public mission context without a security scope`
+    );
+    return { ...base, status: 'backend_unavailable', candidate_roles: candidateRoles };
+  }
+  if (securityScope) {
+    const egress = validateReasoningEgress(securityScope, backend.name);
+    if (!egress.allowed) {
+      logger.warn(`[roster-proposal] ${missionId}: ${egress.reason}`);
+      return { ...base, status: 'backend_unavailable', candidate_roles: candidateRoles };
+    }
+  }
+  const payloadScope = {
+    tier: plan.tier as 'personal' | 'confidential' | 'public',
+    ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
+    purpose: 'mission roster proposal',
+  } as const;
+
   let raw: string;
   try {
-    raw = await backend.prompt(
-      buildPrompt({
-        missionId,
-        missionContext,
-        rosterRoles: [...onRoster].sort(),
-        candidateRoles: candidates,
-        maxProposals: policy.max_proposals,
-      })
+    raw = await withReasoningPayloadScope(payloadScope, () =>
+      backend.prompt(
+        buildPrompt({
+          missionId,
+          missionContext,
+          rosterRoles: [...onRoster].sort(),
+          candidateRoles: candidates,
+          maxProposals: policy.max_proposals,
+        })
+      )
     );
   } catch (error) {
     logger.warn(

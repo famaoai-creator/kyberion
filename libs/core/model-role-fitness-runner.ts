@@ -7,6 +7,7 @@ import {
   listRoleFitnessProbes,
   loadRoleFitnessProbeCatalog,
   recordModelRoleFitness,
+  normalizeFitnessProviderId,
   type RoleFitnessEvaluation,
 } from './model-role-fitness.js';
 
@@ -55,8 +56,12 @@ export async function runModelRoleFitnessProbes(input: {
   // only honest check available is that the active backend belongs to the
   // requested model's provider. When it does not, refuse rather than record
   // evidence we cannot stand behind.
-  const backendProvider = providerIdForReasoningIdentifier(backend.name);
-  const modelProvider = input.provider?.trim() || resolveModelProvider(input.modelId);
+  const backendProvider = normalizeFitnessProviderId(
+    providerIdForReasoningIdentifier(backend.name) || backend.name
+  );
+  const modelProvider = normalizeFitnessProviderId(
+    input.provider?.trim() || resolveModelProvider(input.modelId)
+  );
   if (backendProvider && modelProvider && backendProvider !== modelProvider) {
     return {
       ...base,
