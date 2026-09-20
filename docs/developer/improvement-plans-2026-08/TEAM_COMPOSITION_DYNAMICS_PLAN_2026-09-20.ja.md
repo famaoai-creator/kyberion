@@ -159,7 +159,11 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 | TC-03        | DONE    | `team-composition-obligations.json`(5 義務)と導出器                                                                                           |
 | TC-04        | DONE    | 役割集合 = テンプレート ∪ 義務、`role_sources` と `team_governance.obligations`                                                               |
 | TC-05        | PARTIAL | `[team] roster/required/staffed/standby/unfilled_required` のサマリ行と `composition.standby_roles` で 4 区分は判別可能。専用レンダラは未実装 |
-| TC-06〜TC-14 | TODO    | Wave 2 以降                                                                                                                                   |
+| TC-06        | DONE    | `restaffMissionTeamRole` + `mission_controller restaff`、`team_role_restaffed` 台帳                                                           |
+| TC-07        | DONE    | `diagnoseMissionTeamRoleGap`、dispatch の自動増員リトライと `blocked(capability_gap)`                                                         |
+| TC-08        | DONE    | `workforce-load.ts`、`workforce-capacity-policy.json`、availability / cost_profile の実データ化                                               |
+| TC-09        | DONE    | `workerLoadPenalty` を唯一の負荷スコアラとして採用、`selectAgentForTeamRole` へ合流                                                           |
+| TC-10〜TC-14 | TODO    | Wave 3                                                                                                                                        |
 
 ### 2026-09-20: Wave 1(TC-01〜TC-04)
 
@@ -199,5 +203,45 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 
 ### 既知の残件
 
-- `staffMissionTeamRoles` の `max_members` 上限チェックは TC-06 で入れる(現在の名簿はテンプレート ∪ 義務の範囲に閉じているため超過しない)。
 - TC-05 の専用レンダラ(名簿 / 稼働 / 待機 / 欠員の表示)は未実装。
+
+### 2026-09-20: Wave 2(TC-06〜TC-09)
+
+**TC-06/TC-07 — ガバナンス付き再編成と、名前のついた欠落**
+
+- `restaffMissionTeamRole`(`mission-team-binding.ts`)が唯一の増員経路。lifecycle の `max_members` で上限を取り、capability / authority / scope_class / 職務分離は初期組成と同じ検査を通す。`role_sources: ['restaff']` と `team_role_restaffed` 台帳を残す。CLI は `mission_controller restaff <ID> <TEAM_ROLE> [--capabilities] [--exclude] [--reason]`(governed verb として `assertMissionControllerContext` 配下)。
+- **初期組成との意図的な差**: `selectAgentForTeamRole` は「役割を空席にするくらいなら除外アクターにフォールバックする」。これは組成時には正しいが増員時には誤り(実装者が自分の成果物をレビューできない)。増員経路では caller の除外指定と要求 capability を**ハードチェック**して、満たせなければ `no_compatible_actor` で拒否する。
+- `diagnoseMissionTeamRoleGap` が欠落を分類する: `role_not_on_roster`(増員で解決可能) / `role_unfilled` / `no_capable_actor`(プールに能力が無い = 人間が閉じるべきギャップ)。task dispatch は前者を自動で増員して 1 回だけ再試行し、後者は `blocked(capability_gap)` として**不足している capability 名を添えて**停止する(従来は全て `blocked(unassigned_role)` で「役割 X にエージェントを割り当てよ」という同一文言だった)。
+
+**TC-08/TC-09 — 容量とコストの実データ化、負荷スコアラの一本化**
+
+- `workforce-load.ts`: 負荷は work-item ストアから導出する(in-process の agent registry は当該プロセスの runtime しか知らないが、work item は「そのアクターが実際に何を抱えているか」の永続・プロセス横断の記録)。`availability` は `{status, active_work_items, queued_work_items, active_leases, leased_scopes, observed_at}`、`cost_profile` は governed な model cost registry 由来の per-token レート。閾値とペナルティは `workforce-capacity-policy.json`。
+- **負荷は最適化信号であってゲートではない**: ストアが読めなければ「負荷情報なし」であって「誰も選べない」ではない。
+- `worker-assignment-policy.ts` は「書かれているが誰も呼んでいない」状態だった。削除ではなく**採用**し、`workerLoadPenalty` を負荷意味論の唯一の実装として `recommendWorkerAssignments` と `selectAgentForTeamRole` の両方が使う。ペナルティには上限があり、capability 一致を覆さない。
+- 副作用として `selectAgentForTeamRole` の 8 個の位置引数を options オブジェクトへ移行した(本番 3 + テスト 3 呼び出し)。
+
+### Wave 2 で発見・修正した欠陥(実装の流れで露出したもの)
+
+| #   | 症状                                                                                                                                                                                               | 修正                                                                                                                                                        |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **`max_members` が上限として機能していない**。12 テンプレート中 11 個が `max_members == 自身のロスター数`。構造上超えようがなく、正当な増員を必ず拒否する(実機で `max_members_reached` として露出) | `max(宣言値, ロスター + governed roster_headroom)` で導出。義務がテンプレート外の役割を足した場合の整合も取れる                                             |
+| 2   | **refresh が増員メンバーを捨てる**。recompose はテンプレート ∪ 義務からロスターを導くため、台帳付きの増員決定が黙って消える(実機で roster 9 → 8)                                                   | `role_sources` に `restaff` を含む assignment を引き継ぎ、lifecycle 上限も合わせて広げる                                                                    |
+| 3   | **コストが既定値に黙って落ちる**。provider が表示名("Gemini 3.6 Flash (Medium)")を返すため cost registry のキーに一致せず、既定レートが「そのアクターの価格」として記録される                      | `resolveCostRateModelKey` を追加し `cost_profile.rate_source` に `registry` / `registry_default` を記録。表示名 → registry id の対応付け自体は TC-10 の残件 |
+| 4   | (Wave 1 で検出)refresh が稼働中メンバーを standby に戻す                                                                                                                                           | 以前 staffed だった役割を引き継ぐ                                                                                                                           |
+
+### Wave 2 の受入証跡(実機 `MSN-TEAM-COMPOSITION-20260920`)
+
+| 観測                               | 結果                                                                                                                                                                                          |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `restaff <ID> researcher`          | `control-plane-agent` を追加(owner の `nerve-agent` とは別アクター = 職務分離が効いている)、roster 9/10、`team_role_restaffed` 台帳に provider / model / roster_size / max_members 付きで記録 |
+| 同じ役割を再度 `restaff`           | `already_on_roster` で拒否                                                                                                                                                                    |
+| 修正前の `restaff`                 | `max_members_reached`(欠陥 #1 の実機再現)                                                                                                                                                     |
+| `team --refresh` 後                | roster 9 のまま、`researcher` は `assigned` / `role_sources: restaff` で残存(欠陥 #2 修正の確認)                                                                                              |
+| staffing レコードの `availability` | `{status: available, active_work_items: 0, ..., observed_at: ...}`(定数ではなく実測)                                                                                                          |
+| staffing レコードの `cost_profile` | `{provider: agy, model_id: "Gemini 3.6 Flash (Medium)", rate_source: "registry_default", unit: per_token, ...}`(既定値であることが明示される)                                                 |
+
+### Wave 2 のテスト
+
+- `libs/core/workforce-load.test.ts`(新規 6 件): 未知リソースは available、実測 availability、governed レート、モデル無しは空、ペナルティ上限、**同条件なら空いているアクターが選ばれる**。
+- `libs/core/mission-team-composer.test.ts`: 増員の成功 / 職務分離 / 4 種の拒否理由 / 上限ヘッドルーム / refresh での増員メンバー残存、gap 診断 3 件。
+- `libs/core/mission-lifecycle-service.test.ts`: `restaff` を governed verb ゲート表に追加。
