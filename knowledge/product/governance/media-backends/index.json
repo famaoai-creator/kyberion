@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "order": [
+    "media-generation.comfyui",
+    "media-generation.comfyui.video",
+    "media-generation.google.veo-3.1",
+    "media-generation.runway.gen4.5",
+    "media-generation.runway.seedance2",
+    "media-generation.runway.gemini-omni-flash",
+    "media-generation.openai.sora-2",
+    "media-generation.minimax.hailuo-2.3",
+    "media-generation.comfyui.music",
+    "media-generation.musicgen_mlx",
+    "media-generation.stable_audio_3_small_music",
+    "media-generation.gemini.imagen-3-fast",
+    "media-generation.gemini",
+    "media-generation.host_agent",
+    "media-generation.cursor_host_bridge",
+    "media-generation.local_flux",
+    "media-generation.apple_playground",
+    "voice.local_say",
+    "video.hyperframes_cli"
+  ]
+}

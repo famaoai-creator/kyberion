@@ -1,0 +1,57 @@
+{
+  "version": "1.0.0",
+  "description": "IT デリバリ／運用の標準ゲーティング会議体(会議体)カタログ。各会議体は開催事前条件(preconditions)・アジェンダ(agenda)・入口/出口クライテリア(entry/exit_criteria)・決裁者(decision_owner)・定足数(quorum)・所管ゲート(gates_owned)を定義する。SDLC ゲートは gate-profiles/sdlc.json、インシデントゲートは gate-profiles/incident.json と対応。固有(顧客/テナント)情報は含めない — テナント個別の会議体運用は knowledge/confidential/{tenant}/ に置く。",
+  "decision_outcomes": {
+    "go": "GO — 次フェーズへ進行を承認。exit_criteria を全て満たす。",
+    "conditional_go": "CONDITIONAL GO — 条件付き進行。未充足項目に担当・期限つきの条件を付す。",
+    "no_go": "NO-GO — 差し戻し。前フェーズで是正し再判定。",
+    "hold": "HOLD — 判定保留。追加情報・追加検証の取得後に再開催。"
+  },
+  "bodies": [
+    {
+      "id": "requirements-review-board",
+      "name_ja": "要件定義レビュー会",
+      "name_en": "Requirements Review Board",
+      "purpose": "『何を作るか(What)』が十分に定義され顧客合意可能かを判定し、要件ベースラインを凍結する。",
+      "scope": "track",
+      "trigger": {
+        "kind": "gate",
+        "detail": "要件定義フェーズ完了時 (G2)"
+      },
+      "decision_owner": "product_manager",
+      "quorum": {
+        "required_roles": ["product_manager", "solution_architect", "qa_lead"],
+        "optional_roles": ["pmo_governance", "customer_success"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "requirements-definition と traceability-matrix が事前レビュー済み",
+        "顧客ヒアリングの論点(要検討事項QA)が解消または記録されている",
+        "非機能要件(NFR)と SLO/SLI 案が揃っている"
+      ],
+      "agenda": [
+        "機能要件・業務プロセスの網羅性確認",
+        "非機能要件・SLO/SLI の妥当性",
+        "要件トレーサビリティの確認",
+        "未解決論点(オープンクエスチョン)の棚卸し",
+        "顧客合意事項の確認と判定"
+      ],
+      "entry_criteria": [
+        "requirements-definition",
+        "requirements-traceability-matrix",
+        "slo-sli-definition",
+        "information-asset-registry"
+      ],
+      "exit_criteria": [
+        "要件に識別子と受入基準が付与されている",
+        "要件が設計・検証へトレース可能",
+        "情報資産とサービス目標が合意されている",
+        "blocking なオープンクエスチョンが残っていない"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": ["gate-requirements-baseline"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    }
+  ]
+}

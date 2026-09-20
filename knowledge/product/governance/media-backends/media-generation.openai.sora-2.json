@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.openai.sora-2",
+      "modality": "video",
+      "display_name": "OpenAI Sora 2 Video Generation API",
+      "kind": "api",
+      "provider": "openai_sora",
+      "status": "active",
+      "platforms": ["any"],
+      "model": "sora-2",
+      "api_key_env": "KYBERION_OPENAI_VIDEO_API_KEY|OPENAI_API_KEY",
+      "endpoint_env": "KYBERION_OPENAI_VIDEO_URL",
+      "supports": {
+        "artifact_formats": ["mp4"],
+        "async": true,
+        "mux_audio": true
+      },
+      "cost_tier": "paid",
+      "data_policy": "zero_retention",
+      "execution_locality": "remote",
+      "notes": "Direct OpenAI Videos API adapter. Verify account access before production use."
+    }
+  ]
+}

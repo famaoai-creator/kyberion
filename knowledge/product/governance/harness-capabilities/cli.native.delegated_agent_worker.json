@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.delegated_agent_worker",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "codex-cli",
+        "name": "delegated-worker-agent",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission", "project_bootstrap"],
+        "intents": ["evolve-agent-harness", "generate-report", "generate-presentation"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/a2a-task-contract.json"
+      },
+      "status": "active",
+      "notes": "Prefer for bounded sidecar execution with explicit task contracts. Delegation traces should remain auditable."
+    }
+  ]
+}

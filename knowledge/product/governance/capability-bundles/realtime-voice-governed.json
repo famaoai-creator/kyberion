@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "bundles": [
+    {
+      "bundle_id": "realtime-voice-governed",
+      "status": "active",
+      "kind": "capability-bundle",
+      "summary": "Run a governed live voice conversation using the STT bridge, voice synthesis, and reasoning backend.",
+      "intents": ["live-voice"],
+      "required_actuators": ["voice-actuator", "wisdom-actuator", "artifact-actuator"],
+      "references": [
+        "knowledge/public/procedures/media/realtime-voice-conversation.md",
+        "knowledge/public/procedures/media/promote-voice-profile.md"
+      ]
+    }
+  ]
+}

@@ -1,6 +1,0 @@
-{
-  "$schema": "../schemas/gateway-capability-registry.schema.json",
-  "documentation_only": true,
-  "version": "1.0.0",
-  "capabilities": []
-}

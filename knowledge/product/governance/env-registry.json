@@ -544,6 +544,22 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CAPABILITY_BUNDLE_REGISTRY_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional directory override for the canonical capability-bundle registry; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_CAPABILITY_BUNDLE_REGISTRY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional single-file compatibility override for the capability-bundle registry; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_CHRONOS_IDLE_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
@@ -1114,6 +1130,14 @@
       "default": "0"
     },
     {
+      "name": "KYBERION_EXTERNAL_SERVICE_REGISTRY_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional directory override for the public external-service registry seed; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_FFMPEG_BIN",
       "category": "path",
       "type": "path",
@@ -1333,6 +1357,22 @@
       "type": "number",
       "required": false,
       "description": "Optional numeric tuning value for grok cli timeout ms; leave unset to use the governed default.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_HARNESS_CAPABILITY_REGISTRY_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional directory override for the canonical harness-capability registry; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_HARNESS_CAPABILITY_REGISTRY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional single-file compatibility override for the harness-capability registry; keep it inside governed repository or runtime storage.",
       "documented": true
     },
     {
@@ -1784,6 +1824,14 @@
       "type": "number",
       "required": false,
       "description": "Optional numeric tuning value for media backend probe ttl ms; leave unset to use the governed default.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_MEDIA_BACKEND_REGISTRY_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional directory override for the canonical media-backend registry; keep it inside governed repository or runtime storage.",
       "documented": true
     },
     {
@@ -2617,6 +2665,22 @@
       "documented": true
     },
     {
+      "name": "KYBERION_REASONING_PROVIDER_REGISTRY_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional directory override for the canonical reasoning-provider registry; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_REASONING_PROVIDER_REGISTRY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional single-file compatibility override for the reasoning-provider registry; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_REASONING_RETRY_BASE_MS",
       "category": "tuning",
       "type": "number",
@@ -2780,6 +2844,14 @@
       "type": "path",
       "required": false,
       "description": "Optional path override for service runtime policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_SERVICE_RUNTIME_REGISTRY_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional directory override for the canonical service-runtime registry; keep it inside governed repository or runtime storage.",
       "documented": true
     },
     {
@@ -3343,6 +3415,14 @@
       "type": "path",
       "required": false,
       "description": "Optional path override for tool runtime policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_TOOL_RUNTIME_REGISTRY_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional directory override for the canonical tool-runtime registry; keep it inside governed repository or runtime storage.",
       "documented": true
     },
     {

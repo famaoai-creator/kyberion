@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "order": [
+    "generative-video-from-adf",
+    "voice-speech-governed",
+    "video-generation-governed",
+    "audio-transcription-governed",
+    "realtime-voice-governed",
+    "narrated-video-governed",
+    "manim-video-recipes-governed",
+    "ascii-video-recipes-governed",
+    "meeting-operations-governed",
+    "browser-exploration-governed"
+  ]
+}

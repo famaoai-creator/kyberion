@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "codex-cli.computer-use",
+      "provider": "codex-cli",
+      "surface_kind": "host_native",
+      "capability_id": "cli.native.computer_use",
+      "contract_kind": "computer_interaction",
+      "observation_kind": "screen_snapshot+action_trail",
+      "result_kind": "step_result+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "browser-actuator / computer-interaction.schema.json",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "High-risk UI actions require approval-aware tracing and a recorded action trail."
+    }
+  ]
+}

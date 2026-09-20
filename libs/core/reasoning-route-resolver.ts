@@ -339,10 +339,18 @@ function resolveAndValidateModel(input: {
 }): string | undefined {
   const model = input.model || input.modelRef;
   if (!model) return undefined;
-  const registryModel =
-    input.adapter.selection?.model_provider && !model.includes(':')
-      ? `${input.adapter.selection.model_provider}:${model}`
-      : model;
+  const modelProvider = input.adapter.selection?.model_provider;
+  const registryModel = (() => {
+    if (!modelProvider || model.includes(':')) return model;
+    // Runtime configuration for CLI providers uses the provider/model wire
+    // form (for example, OpenCode's `opencode/muse-...`), while the governed
+    // model registry uses the provider:model form. Normalize the former before
+    // checking the registry so an explicit CLI model override follows the same
+    // path as a policy model_ref.
+    const wirePrefix = `${modelProvider}/`;
+    const modelName = model.startsWith(wirePrefix) ? model.slice(wirePrefix.length) : model;
+    return `${modelProvider}:${modelName}`;
+  })();
   const registered = loadModelRegistry().models.find((entry) => entry.model_id === registryModel);
   if (registered) {
     if (registered.status === 'blocked' || registered.status === 'deprecated') {

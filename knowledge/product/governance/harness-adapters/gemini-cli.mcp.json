@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "gemini-cli.mcp",
+      "provider": "gemini-cli",
+      "surface_kind": "provider_runtime",
+      "capability_id": "cli.native.gemini_mcp_management",
+      "contract_kind": "delegated_task",
+      "observation_kind": "server_listing+config",
+      "result_kind": "mcp_change_result+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "pipelines/a2a-task-contract.json",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Gemini MCP server management changes the tool surface and should stay governed."
+    }
+  ]
+}

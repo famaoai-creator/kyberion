@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "claude-cowork.desktop",
+      "provider": "claude-desktop",
+      "surface_kind": "provider_runtime",
+      "capability_id": "provider.runtime.claude_cowork_desktop",
+      "contract_kind": "agent_session",
+      "observation_kind": "threads+skills+plugins+connectors+telemetry",
+      "result_kind": "response+session_ref+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "reasoning-backend / structured-query",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Claude Cowork should be treated as a managed desktop collaboration surface with analytics and RBAC visibility."
+    }
+  ]
+}

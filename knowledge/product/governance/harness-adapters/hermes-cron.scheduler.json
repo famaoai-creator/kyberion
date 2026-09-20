@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "hermes-cron.scheduler",
+      "provider": "hermes-agent",
+      "surface_kind": "provider_runtime",
+      "capability_id": "provider.runtime.hermes_cron_scheduler",
+      "contract_kind": "scheduled_task",
+      "observation_kind": "schedule+delivery+context",
+      "result_kind": "scheduled_result+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "knowledge/product/orchestration/schedule-delivery-protocol.md",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Hermes Cron is a useful model for pinned scheduled jobs, no-agent mode, and wake-agent style gates."
+    }
+  ]
+}

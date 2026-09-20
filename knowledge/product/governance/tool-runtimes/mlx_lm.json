@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "mlx_lm",
+      "display_name": "MLX-LM Apple Silicon LLM Engine",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import mlx_lm; print(\"ok\")"],
+        "description": "Probe mlx-lm Python package availability."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "mlx-lm"],
+        "description": "Install mlx-lm into the managed Python environment."
+      },
+      "installed_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["run", "python3", "-m", "mlx_lm.server"],
+        "description": "Run mlx-lm HTTP server."
+      },
+      "managed_env_subpath": "tool-runtimes/mlx-lm",
+      "notes": "MLX-LM Apple Silicon inference server runtime."
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.browser_interactive",
+      "source": {
+        "type": "cli_native",
+        "provider": "codex-cli",
+        "name": "browser-interactive-loop",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "high",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "high_risk_only"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["browser-step", "open-site"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "browser-actuator"
+      },
+      "status": "active",
+      "notes": "Preferred for exploratory browsing and observation-heavy loops. Execution receipts should preserve the capability_id, adapter_id, and trace_id."
+    }
+  ]
+}

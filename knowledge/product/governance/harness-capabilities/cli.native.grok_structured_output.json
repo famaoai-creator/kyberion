@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.grok_structured_output",
+      "source": {
+        "type": "cli_native",
+        "provider": "grok-cli",
+        "name": "structured-output",
+        "version": "v1"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["direct_reply", "task_session", "mission"],
+        "intents": ["structured-query", "contract-generation", "headless-prompt"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "active",
+      "notes": "Grok Build CLI structured output is used when a governed JSON contract is required."
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.musicgen_mlx",
+      "modality": "music",
+      "display_name": "Local MusicGen (MLX)",
+      "kind": "cli",
+      "provider": "musicgen_mlx",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supports": {
+        "artifact_formats": ["wav"],
+        "async": false
+      },
+      "command": "uvx",
+      "args": ["--from", "mlx-audiocraft", "musicgen-mlx"],
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "fallback_backend_id": "media-generation.comfyui.music",
+      "notes": "Apple Silicon local MusicGen via mlx-audiocraft tool runtime. Prefer facebook/musicgen-small; weights are CC BY-NC. Tuned via KYBERION_MUSICGEN_*. Install: uv tool install mlx-audiocraft (or trial via uvx)."
+    }
+  ]
+}

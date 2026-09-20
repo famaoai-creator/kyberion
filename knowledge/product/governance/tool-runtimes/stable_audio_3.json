@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "stable_audio_3",
+      "display_name": "Stable Audio 3 Local Music Generator",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "uvx",
+        "command": "uvx",
+        "args": [
+          "--from",
+          "git+https://github.com/Stability-AI/stable-audio-3.git",
+          "stable-audio"
+        ],
+        "description": "Temporary Stable Audio 3 CLI trial via uvx from the upstream git repository."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["tool", "install", "git+https://github.com/Stability-AI/stable-audio-3.git"],
+        "description": "Install Stable Audio 3 into the managed Python tool environment from upstream git."
+      },
+      "installed_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["tool", "run", "stable-audio"],
+        "description": "Run stable-audio from the managed Python tool environment."
+      },
+      "managed_env_subpath": "tool-runtimes/stable-audio-3",
+      "notes": "Defaults to small-music (CPU/MPS-friendly, up to ~120s). Weights are gated on Hugging Face — accept the model license and set HF_TOKEN or HUGGING_FACE_HUB_TOKEN. Tuned via KYBERION_STABLE_AUDIO_*."
+    }
+  ]
+}

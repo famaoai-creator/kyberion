@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "default_service_id": "comfyui",
+  "services": [
+    {
+      "service_id": "comfyui",
+      "display_name": "ComfyUI Local Service Runtime",
+      "kind": "local_service",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "default_base_url": "http://127.0.0.1:8188",
+      "trial_probe": {
+        "kind": "http",
+        "method": "GET",
+        "path": "system_stats",
+        "description": "Probe the local ComfyUI service statistics endpoint."
+      },
+      "install_plan": {
+        "kind": "service_preset",
+        "preset_path": "knowledge/product/orchestration/service-presets/comfyui.json",
+        "description": "Use the ComfyUI service preset to provision or connect the local runtime."
+      },
+      "installed_probe": {
+        "kind": "http",
+        "method": "GET",
+        "path": "system_stats",
+        "description": "Re-check the ComfyUI service after provisioning."
+      },
+      "managed_service_subpath": "service-runtimes/comfyui",
+      "service_endpoint_path": "knowledge/product/orchestration/service-endpoints/comfyui.json",
+      "service_preset_path": "knowledge/product/orchestration/service-presets/comfyui.json",
+      "notes": "ComfyUI is managed as a service runtime so availability, provisioning intent, and managed location can be tracked separately from media-generation routing."
+    }
+  ]
+}

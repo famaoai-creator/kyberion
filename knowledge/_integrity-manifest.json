@@ -225,7 +225,7 @@
     {
       "path": "product/architecture/capability-bundle-model.md",
       "tier": "public",
-      "size": 9762,
+      "size": 10342,
       "type": "md"
     },
     {
@@ -1291,9 +1291,75 @@
       "type": "json"
     },
     {
-      "path": "product/governance/capability-bundle-registry.json",
+      "path": "product/governance/capability-bundles/README.md",
       "tier": "public",
-      "size": 5712,
+      "size": 963,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/capability-bundles/ascii-video-recipes-governed.json",
+      "tier": "public",
+      "size": 589,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/capability-bundles/audio-transcription-governed.json",
+      "tier": "public",
+      "size": 562,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/capability-bundles/browser-exploration-governed.json",
+      "tier": "public",
+      "size": 645,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/capability-bundles/generative-video-from-adf.json",
+      "tier": "public",
+      "size": 619,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/capability-bundles/index.json",
+      "tier": "public",
+      "size": 378,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/capability-bundles/manim-video-recipes-governed.json",
+      "tier": "public",
+      "size": 645,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/capability-bundles/meeting-operations-governed.json",
+      "tier": "public",
+      "size": 610,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/capability-bundles/narrated-video-governed.json",
+      "tier": "public",
+      "size": 627,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/capability-bundles/realtime-voice-governed.json",
+      "tier": "public",
+      "size": 581,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/capability-bundles/video-generation-governed.json",
+      "tier": "public",
+      "size": 581,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/capability-bundles/voice-speech-governed.json",
+      "tier": "public",
+      "size": 583,
       "type": "json"
     },
     {
@@ -1425,7 +1491,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 132994,
+      "size": 136211,
       "type": "json"
     },
     {
@@ -1503,20 +1569,20 @@
     {
       "path": "product/governance/gate-profiles/gate-profile-registry.json",
       "tier": "public",
-      "size": 13588,
+      "size": 13587,
       "type": "json"
     },
     {
       "path": "product/governance/gate-profiles/sdlc.json",
       "tier": "public",
-      "size": 825,
+      "size": 824,
       "type": "json"
     },
     {
-      "path": "product/governance/gateway-capability-registry.json",
+      "path": "product/governance/gateway-capabilities/README.md",
       "tier": "public",
-      "size": 144,
-      "type": "json"
+      "size": 731,
+      "type": "md"
     },
     {
       "path": "product/governance/gateway-onboarding-protocol.md",
@@ -1531,15 +1597,81 @@
       "type": "md"
     },
     {
-      "path": "product/governance/governance-body-registry.json",
+      "path": "product/governance/governance-bodies/README.md",
       "tier": "public",
-      "size": 19086,
+      "size": 642,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/governance-bodies/change-advisory-board.json",
+      "tier": "public",
+      "size": 2878,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/governance-bodies/closure-review.json",
+      "tier": "public",
+      "size": 2564,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/governance-bodies/design-review-board.json",
+      "tier": "public",
+      "size": 2987,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/governance-bodies/incident-command.json",
+      "tier": "public",
+      "size": 2922,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/governance-bodies/index.json",
+      "tier": "public",
+      "size": 313,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/governance-bodies/initiation-review.json",
+      "tier": "public",
+      "size": 2874,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/governance-bodies/post-incident-review.json",
+      "tier": "public",
+      "size": 2750,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/governance-bodies/release-readiness-review.json",
+      "tier": "public",
+      "size": 3032,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/governance-bodies/requirements-review-board.json",
+      "tier": "public",
+      "size": 2986,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/governance-bodies/steering-committee.json",
+      "tier": "public",
+      "size": 2692,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/governance-bodies/validation-review.json",
+      "tier": "public",
+      "size": 2950,
       "type": "json"
     },
     {
       "path": "product/governance/governance-catalog-contracts.json",
       "tier": "public",
-      "size": 5471,
+      "size": 5322,
       "type": "json"
     },
     {
@@ -1549,15 +1681,447 @@
       "type": "md"
     },
     {
-      "path": "product/governance/harness-adapter-registry.json",
+      "path": "product/governance/harness-adapters/README.md",
       "tier": "public",
-      "size": 20204,
+      "size": 673,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/harness-adapters/claude-cowork.desktop.json",
+      "tier": "public",
+      "size": 747,
       "type": "json"
     },
     {
-      "path": "product/governance/harness-capability-registry.json",
+      "path": "product/governance/harness-adapters/codex-app-server.runtime.json",
       "tier": "public",
-      "size": 35345,
+      "size": 728,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/codex-cli.browser-interactive.json",
+      "tier": "public",
+      "size": 719,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/codex-cli.cloud.json",
+      "tier": "public",
+      "size": 674,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/codex-cli.computer-use.json",
+      "tier": "public",
+      "size": 691,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/codex-cli.delegated-agent-worker.json",
+      "tier": "public",
+      "size": 700,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/codex-cli.exec.json",
+      "tier": "public",
+      "size": 672,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/codex-cli.features.json",
+      "tier": "public",
+      "size": 667,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/codex-cli.mcp.json",
+      "tier": "public",
+      "size": 661,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/codex-cli.plugin.json",
+      "tier": "public",
+      "size": 686,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/codex-cli.review.json",
+      "tier": "public",
+      "size": 645,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/codex-cli.skill-executor.json",
+      "tier": "public",
+      "size": 704,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gemini-cli.extensions.json",
+      "tier": "public",
+      "size": 688,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gemini-cli.hooks.json",
+      "tier": "public",
+      "size": 661,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gemini-cli.mcp.json",
+      "tier": "public",
+      "size": 671,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gemini-cli.prompt.json",
+      "tier": "public",
+      "size": 673,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gemini-cli.skills.json",
+      "tier": "public",
+      "size": 662,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gemini-spark.desktop.json",
+      "tier": "public",
+      "size": 766,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gh-cli.agent-task.json",
+      "tier": "public",
+      "size": 655,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gh-cli.api.json",
+      "tier": "public",
+      "size": 694,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gh-cli.issue.json",
+      "tier": "public",
+      "size": 662,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gh-cli.pr.json",
+      "tier": "public",
+      "size": 687,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gh-cli.repo.json",
+      "tier": "public",
+      "size": 667,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gh-cli.run-workflow.json",
+      "tier": "public",
+      "size": 673,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/gh-cli.skill.json",
+      "tier": "public",
+      "size": 659,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/hermes-cron.scheduler.json",
+      "tier": "public",
+      "size": 738,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/hermes-hooks.pipeline.json",
+      "tier": "public",
+      "size": 716,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/hermes-kanban.board.json",
+      "tier": "public",
+      "size": 723,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/hermes-skills.bundle-registry.json",
+      "tier": "public",
+      "size": 715,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/hermes-tool-gateway.routing.json",
+      "tier": "public",
+      "size": 731,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/index.json",
+      "tier": "public",
+      "size": 869,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-adapters/openhands.control-plane.json",
+      "tier": "public",
+      "size": 755,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/README.md",
+      "tier": "public",
+      "size": 762,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.browser_interactive.json",
+      "tier": "public",
+      "size": 981,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.claude_agent_loop.json",
+      "tier": "public",
+      "size": 1042,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.claude_agents_management.json",
+      "tier": "public",
+      "size": 943,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.claude_headless_prompt.json",
+      "tier": "public",
+      "size": 1001,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.claude_mcp_management.json",
+      "tier": "public",
+      "size": 1028,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.claude_plugin_management.json",
+      "tier": "public",
+      "size": 1079,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.codex_cloud_tasks.json",
+      "tier": "public",
+      "size": 935,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.codex_exec.json",
+      "tier": "public",
+      "size": 906,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.codex_feature_flags.json",
+      "tier": "public",
+      "size": 939,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.codex_mcp_management.json",
+      "tier": "public",
+      "size": 941,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.codex_plugin_management.json",
+      "tier": "public",
+      "size": 915,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.codex_review.json",
+      "tier": "public",
+      "size": 891,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.computer_use.json",
+      "tier": "public",
+      "size": 974,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.delegated_agent_worker.json",
+      "tier": "public",
+      "size": 1018,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.gemini_extension_management.json",
+      "tier": "public",
+      "size": 918,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.gemini_headless_prompt.json",
+      "tier": "public",
+      "size": 932,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.gemini_hook_management.json",
+      "tier": "public",
+      "size": 911,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.gemini_mcp_management.json",
+      "tier": "public",
+      "size": 920,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.gemini_skill_management.json",
+      "tier": "public",
+      "size": 889,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.github_actions_inspection.json",
+      "tier": "public",
+      "size": 904,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.github_agent_task.json",
+      "tier": "public",
+      "size": 904,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.github_api_access.json",
+      "tier": "public",
+      "size": 949,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.github_issue_management.json",
+      "tier": "public",
+      "size": 885,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.github_pr_management.json",
+      "tier": "public",
+      "size": 884,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.github_repo_management.json",
+      "tier": "public",
+      "size": 890,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.github_skill_management.json",
+      "tier": "public",
+      "size": 905,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.grok_headless_prompt.json",
+      "tier": "public",
+      "size": 936,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.grok_spawn_subagent.json",
+      "tier": "public",
+      "size": 1020,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.native.grok_structured_output.json",
+      "tier": "public",
+      "size": 950,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/cli.plugin.skill_executor.json",
+      "tier": "public",
+      "size": 908,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/index.json",
+      "tier": "public",
+      "size": 1623,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/provider.runtime.claude_cowork_desktop.json",
+      "tier": "public",
+      "size": 999,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/provider.runtime.codex_app_server.json",
+      "tier": "public",
+      "size": 919,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/provider.runtime.gemini_spark_desktop.json",
+      "tier": "public",
+      "size": 958,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/provider.runtime.hermes_cron_scheduler.json",
+      "tier": "public",
+      "size": 1009,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/provider.runtime.hermes_hook_pipeline.json",
+      "tier": "public",
+      "size": 1003,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/provider.runtime.hermes_kanban_board.json",
+      "tier": "public",
+      "size": 956,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/provider.runtime.hermes_skill_bundle_registry.json",
+      "tier": "public",
+      "size": 993,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/provider.runtime.hermes_tool_routing.json",
+      "tier": "public",
+      "size": 979,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/harness-capabilities/provider.runtime.openhands_control_plane.json",
+      "tier": "public",
+      "size": 1026,
       "type": "json"
     },
     {
@@ -1771,9 +2335,129 @@
       "type": "json"
     },
     {
-      "path": "product/governance/media-backend-registry.json",
+      "path": "product/governance/media-backends/README.md",
       "tier": "public",
-      "size": 13949,
+      "size": 800,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/media-backends/index.json",
+      "tier": "public",
+      "size": 768,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.apple_playground.json",
+      "tier": "public",
+      "size": 957,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.comfyui.json",
+      "tier": "public",
+      "size": 1039,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.comfyui.music.json",
+      "tier": "public",
+      "size": 863,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.comfyui.video.json",
+      "tier": "public",
+      "size": 924,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.cursor_host_bridge.json",
+      "tier": "public",
+      "size": 865,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.gemini.imagen-3-fast.json",
+      "tier": "public",
+      "size": 990,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.gemini.json",
+      "tier": "public",
+      "size": 958,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.google.veo-3.1.json",
+      "tier": "public",
+      "size": 1078,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.host_agent.json",
+      "tier": "public",
+      "size": 865,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.local_flux.json",
+      "tier": "public",
+      "size": 967,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.minimax.hailuo-2.3.json",
+      "tier": "public",
+      "size": 939,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.musicgen_mlx.json",
+      "tier": "public",
+      "size": 1051,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.openai.sora-2.json",
+      "tier": "public",
+      "size": 956,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.runway.gemini-omni-flash.json",
+      "tier": "public",
+      "size": 988,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.runway.gen4.5.json",
+      "tier": "public",
+      "size": 917,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.runway.seedance2.json",
+      "tier": "public",
+      "size": 948,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/media-generation.stable_audio_3_small_music.json",
+      "tier": "public",
+      "size": 1146,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/video.hyperframes_cli.json",
+      "tier": "public",
+      "size": 874,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/media-backends/voice.local_say.json",
+      "tier": "public",
+      "size": 774,
       "type": "json"
     },
     {
@@ -1929,7 +2613,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 208867,
+      "size": 208865,
       "type": "json"
     },
     {
@@ -2467,9 +3151,147 @@
       "type": "json"
     },
     {
-      "path": "product/governance/reasoning-provider-registry.json",
+      "path": "product/governance/reasoning-providers/README.md",
       "tier": "public",
-      "size": 8018,
+      "size": 731,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/reasoning-providers/agy-cli.json",
+      "tier": "public",
+      "size": 393,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/anthropic.json",
+      "tier": "public",
+      "size": 402,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/claude-agent.json",
+      "tier": "public",
+      "size": 415,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/claude-cli.json",
+      "tier": "public",
+      "size": 384,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/codex-cli.json",
+      "tier": "public",
+      "size": 398,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/copilot.json",
+      "tier": "public",
+      "size": 379,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/cursor-cli.json",
+      "tier": "public",
+      "size": 445,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/gemini-api.json",
+      "tier": "public",
+      "size": 419,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/gemini-cli.json",
+      "tier": "public",
+      "size": 388,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/grok-api.json",
+      "tier": "public",
+      "size": 419,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/grok-cli.json",
+      "tier": "public",
+      "size": 393,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/index.json",
+      "tier": "public",
+      "size": 397,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/llamacpp.json",
+      "tier": "public",
+      "size": 409,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/lmstudio.json",
+      "tier": "public",
+      "size": 435,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/local.json",
+      "tier": "public",
+      "size": 404,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/localai.json",
+      "tier": "public",
+      "size": 406,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/mlx.json",
+      "tier": "public",
+      "size": 394,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/nemotron-api.json",
+      "tier": "public",
+      "size": 413,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/ollama.json",
+      "tier": "public",
+      "size": 403,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/opencode-cli.json",
+      "tier": "public",
+      "size": 439,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/openrouter.json",
+      "tier": "public",
+      "size": 423,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/stub.json",
+      "tier": "public",
+      "size": 359,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-providers/vllm.json",
+      "tier": "public",
+      "size": 397,
       "type": "json"
     },
     {
@@ -2535,7 +3357,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 21594,
+      "size": 21583,
       "type": "json"
     },
     {
@@ -2575,9 +3397,21 @@
       "type": "json"
     },
     {
-      "path": "product/governance/service-runtime-registry.json",
+      "path": "product/governance/service-runtimes/README.md",
       "tier": "public",
-      "size": 1538,
+      "size": 738,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/service-runtimes/comfyui.json",
+      "tier": "public",
+      "size": 1474,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/service-runtimes/index.json",
+      "tier": "public",
+      "size": 49,
       "type": "json"
     },
     {
@@ -2875,9 +3709,165 @@
       "type": "json"
     },
     {
-      "path": "product/governance/tool-runtime-registry.json",
+      "path": "product/governance/tool-runtimes/README.md",
       "tier": "public",
-      "size": 29717,
+      "size": 702,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/tool-runtimes/adb.json",
+      "tier": "public",
+      "size": 1118,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/agy_sdk.json",
+      "tier": "public",
+      "size": 1262,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/claude_real_video.json",
+      "tier": "public",
+      "size": 1373,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/faster_whisper.json",
+      "tier": "public",
+      "size": 1198,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/ffmpeg.json",
+      "tier": "public",
+      "size": 1489,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/ffprobe.json",
+      "tier": "public",
+      "size": 1574,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/index.json",
+      "tier": "public",
+      "size": 452,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/kokoro_tts.json",
+      "tier": "public",
+      "size": 1188,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/llamacpp.json",
+      "tier": "public",
+      "size": 1491,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/localai.json",
+      "tier": "public",
+      "size": 977,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/mflux.json",
+      "tier": "public",
+      "size": 1136,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/mlx_audio.json",
+      "tier": "public",
+      "size": 1142,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/mlx_lm.json",
+      "tier": "public",
+      "size": 1063,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/mlx_whisper.json",
+      "tier": "public",
+      "size": 1147,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/musicgen_mlx.json",
+      "tier": "public",
+      "size": 1333,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/ollama.json",
+      "tier": "public",
+      "size": 1467,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/playwright.json",
+      "tier": "public",
+      "size": 1186,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/pocket_tts.json",
+      "tier": "public",
+      "size": 1170,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/silero_vad.json",
+      "tier": "public",
+      "size": 1190,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/sox.json",
+      "tier": "public",
+      "size": 1476,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/stable_audio_3.json",
+      "tier": "public",
+      "size": 1452,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/ten_vad.json",
+      "tier": "public",
+      "size": 1211,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/tesseract.json",
+      "tier": "public",
+      "size": 1544,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/vllm.json",
+      "tier": "public",
+      "size": 1063,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/xcodebuild.json",
+      "tier": "public",
+      "size": 1080,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/xcrun.json",
+      "tier": "public",
+      "size": 1054,
       "type": "json"
     },
     {
@@ -3667,10 +4657,10 @@
       "type": "json"
     },
     {
-      "path": "product/orchestration/external-service-registry.json",
+      "path": "product/orchestration/external-services/README.md",
       "tier": "public",
-      "size": 339,
-      "type": "json"
+      "size": 738,
+      "type": "md"
     },
     {
       "path": "product/orchestration/full-graph-handoff-recovery-flow.md",

@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "codex-cli.review",
+      "provider": "codex-cli",
+      "surface_kind": "provider_runtime",
+      "capability_id": "cli.native.codex_review",
+      "contract_kind": "code_review",
+      "observation_kind": "diff+prompt",
+      "result_kind": "review_report+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "reasoning-backend / review pipeline",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Codex review should remain bounded to review-oriented prompts and evidence."
+    }
+  ]
+}

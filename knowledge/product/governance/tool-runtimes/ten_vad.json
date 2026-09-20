@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "ten_vad",
+      "display_name": "TEN VAD Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import ten_vad; print(\"ok\")"],
+        "description": "Probe the TEN VAD Python binding."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "numpy", "git+https://github.com/TEN-framework/ten-vad.git"],
+        "description": "Install the official TEN VAD Python binding and its NumPy dependency from upstream."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import ten_vad; print(\"ok\")"],
+        "description": "Re-check the TEN VAD runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/ten-vad",
+      "notes": "Optional 10/16ms-hop VAD. Review the upstream Apache-2.0 additional conditions before redistribution."
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "version": "1.0.0",
+  "description": "IT デリバリ／運用の標準ゲーティング会議体(会議体)カタログ。各会議体は開催事前条件(preconditions)・アジェンダ(agenda)・入口/出口クライテリア(entry/exit_criteria)・決裁者(decision_owner)・定足数(quorum)・所管ゲート(gates_owned)を定義する。SDLC ゲートは gate-profiles/sdlc.json、インシデントゲートは gate-profiles/incident.json と対応。固有(顧客/テナント)情報は含めない — テナント個別の会議体運用は knowledge/confidential/{tenant}/ に置く。",
+  "decision_outcomes": {
+    "go": "GO — 次フェーズへ進行を承認。exit_criteria を全て満たす。",
+    "conditional_go": "CONDITIONAL GO — 条件付き進行。未充足項目に担当・期限つきの条件を付す。",
+    "no_go": "NO-GO — 差し戻し。前フェーズで是正し再判定。",
+    "hold": "HOLD — 判定保留。追加情報・追加検証の取得後に再開催。"
+  },
+  "bodies": [
+    {
+      "id": "validation-review",
+      "name_ja": "検証判定会",
+      "name_en": "Validation Approval Review",
+      "purpose": "『できたと主張する根拠が揃っているか』を評価し、リリース判定に進める品質状態を確認する。",
+      "scope": "track",
+      "trigger": {
+        "kind": "gate",
+        "detail": "テスト/検証フェーズ完了時 (G5)"
+      },
+      "decision_owner": "qa_lead",
+      "quorum": {
+        "required_roles": ["qa_lead", "product_manager", "cyber_security"],
+        "optional_roles": ["solution_architect", "software_developer"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "test-validation-report と traceability-matrix が提出されている",
+        "セキュリティ診断結果(security-audit-report)が添付されている",
+        "残存不具合と残留リスクの一覧がある"
+      ],
+      "agenda": [
+        "テスト計画に対する実施状況と結果",
+        "要件〜テスト〜不具合のトレーサビリティ確認",
+        "セキュリティ所見と残留リスクの処理",
+        "受入(UAT)状況の確認",
+        "リリース判定への進行可否"
+      ],
+      "entry_criteria": [
+        "test-plan",
+        "test-validation-report",
+        "requirements-traceability-matrix",
+        "security-audit-report",
+        "gate-review-packet"
+      ],
+      "exit_criteria": [
+        "計画された検証が完了、または明示的例外つきで承認されている",
+        "要件がテスト証跡・不具合にトレースされている",
+        "セキュリティ所見と残留リスクが処理されている"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": ["gate-validation-approval"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    }
+  ]
+}

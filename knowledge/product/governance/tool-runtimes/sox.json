@@ -1,0 +1,51 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "sox",
+      "display_name": "SoX Audio Toolkit",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "sox",
+        "args": ["--version"],
+        "description": "Probe SoX availability without mutating workspace state."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "sox"],
+        "description": "Install SoX through Homebrew on macOS."
+      },
+      "install_backend_platform_overrides": {
+        "win32": {
+          "kind": "winget",
+          "command": "winget",
+          "args": [
+            "install",
+            "--id",
+            "ChrisBagwell.SoX",
+            "--exact",
+            "--source",
+            "winget",
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+          ],
+          "description": "Install SoX through WinGet on Windows."
+        }
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "sox",
+        "args": ["--version"],
+        "description": "Re-check the installed SoX binary."
+      },
+      "managed_env_subpath": "tool-runtimes/sox",
+      "notes": "Audio capture fallback used by the voice sample recorder."
+    }
+  ]
+}

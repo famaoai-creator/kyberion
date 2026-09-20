@@ -13,7 +13,7 @@ import type { IntentExtractorCandidate } from './intent-extractor.js';
 import type { VoiceBridgeCandidate } from './voice-bridge.js';
 import type { BackendInputModality } from './backend-capability-profile.js';
 import { pathResolver } from './path-resolver.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
+import { loadRegistryDirectory, type RegistryDirectoryOptions } from './registry-directory.js';
 import { assertModuleInvariant } from './invariants.js';
 import { isRecord } from './foundation/text.js';
 
@@ -87,12 +87,7 @@ export type ReasoningProviderFactory = (
   context: ReasoningProviderBuildContext
 ) => ReasoningProviderRuntimeBundle | null;
 
-interface RegistryFile {
-  version?: string;
-  providers: unknown[];
-}
-
-const REGISTRY_PATH = pathResolver.knowledge('product/governance/reasoning-provider-registry.json');
+const REGISTRY_DIR = pathResolver.knowledge('product/governance/reasoning-providers');
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/reasoning-provider-registry.schema.json'
 );
@@ -125,11 +120,15 @@ const KNOWN_MODES = new Set<ReasoningBackendMode>([
 
 const INPUT_MODALITIES = new Set<BackendInputModality>(['text', 'image', 'audio']);
 
-const reasoningProviderCatalog = defineCatalog<RegistryFile>({
+const reasoningProviderDirectoryOptions: RegistryDirectoryOptions = {
   id: 'reasoning-provider-registry',
-  path: REGISTRY_PATH,
-  schema: REGISTRY_SCHEMA_PATH,
-});
+  dirPath: REGISTRY_DIR,
+  schemaPath: REGISTRY_SCHEMA_PATH,
+  arrayKey: 'providers',
+  idKey: 'mode',
+  envDirVar: 'KYBERION_REASONING_PROVIDER_REGISTRY_DIR',
+  envPathVar: 'KYBERION_REASONING_PROVIDER_REGISTRY_PATH',
+};
 
 let cachedDescriptors: readonly ReasoningProviderDescriptor[] | null = null;
 const registeredFactories = new Map<ReasoningBackendMode, ReasoningProviderFactory>();
@@ -267,8 +266,10 @@ function assertConformanceEvidence(
 }
 
 function loadDescriptors(): readonly ReasoningProviderDescriptor[] {
-  const parsed = reasoningProviderCatalog.load();
-  const descriptors = parsed.providers.map((entry, index) => {
+  const { items } = loadRegistryDirectory<Record<string, unknown>>(
+    reasoningProviderDirectoryOptions
+  );
+  const descriptors = items.map((entry, index) => {
     const descriptor = parseReasoningProviderDescriptor(entry);
     if (!descriptor) {
       throw new Error(
@@ -349,5 +350,4 @@ export function buildRegisteredReasoningProvider(
 export function resetReasoningProviderRegistryForTests(): void {
   registeredFactories.clear();
   cachedDescriptors = null;
-  reasoningProviderCatalog.reset();
 }

@@ -78,7 +78,6 @@
     "knowledge-weights.json": ["defaults", "description", "tenant_overrides", "version"],
     "maintenance-schedule.json": ["default_tasks", "policy_path", "schedule", "scope"],
     "marketing-risk-policy.json": ["allowed_channels", "cta_domain_allowlist", "levels", "version"],
-    "media-backend-registry.json": ["backends", "default_backend_ids", "version"],
     "mesh-hub-policy.json": [
       "data_tier",
       "placement",
@@ -124,7 +123,6 @@
     "package-governance.json": ["ignore_deps", "normalization"],
     "protocol-service-registry.json": ["description", "entries", "version"],
     "qa-rules.json": ["rules", "version", "visual_monitoring"],
-    "reasoning-provider-registry.json": ["providers", "version"],
     "reporting-config.json": ["action", "reports"],
     "restricted-capabilities.json": ["last_updated", "restrictions", "version"],
     "restricted-skills.json": [

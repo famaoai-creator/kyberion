@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.claude_agents_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "claude-cli",
+        "name": "agents",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session"],
+        "intents": ["agent-management", "discover-agents"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "agent-actuator"
+      },
+      "status": "active",
+      "notes": "claude agents — manage background and configured agents. Mirrors gemini-cli skills/extensions for discovery semantics."
+    }
+  ]
+}

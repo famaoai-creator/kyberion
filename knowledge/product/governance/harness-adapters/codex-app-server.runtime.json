@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "codex-app-server.runtime",
+      "provider": "codex-cli",
+      "surface_kind": "provider_runtime",
+      "capability_id": "provider.runtime.codex_app_server",
+      "contract_kind": "agent_session",
+      "observation_kind": "thread_snapshot+usage+logs",
+      "result_kind": "response+thread_id+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "reasoning-backend / structured-query",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Provider runtime sessions should keep thread ids and refresh events visible in the agent-runtime observability model."
+    }
+  ]
+}

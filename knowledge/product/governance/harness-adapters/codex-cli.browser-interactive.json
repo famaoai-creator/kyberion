@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "codex-cli.browser-interactive",
+      "provider": "codex-cli",
+      "surface_kind": "host_native",
+      "capability_id": "cli.native.browser_interactive",
+      "contract_kind": "browser_interaction",
+      "observation_kind": "snapshot+screenshot+dom_ref",
+      "result_kind": "action_result+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "browser-actuator / computer-interaction.schema.json",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Exploratory browser work should record capability_id, adapter_id, and trace_id in the receipt."
+    }
+  ]
+}

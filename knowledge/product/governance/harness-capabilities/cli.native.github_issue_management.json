@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.github_issue_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "issue",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["manage-issue", "triage-issue"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "service-actuator"
+      },
+      "status": "active",
+      "notes": "Issue management is operationally useful but should stay approval-aware."
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "musicgen_mlx",
+      "display_name": "MLX MusicGen Local Music Generator",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "uvx",
+        "command": "uvx",
+        "args": ["--from", "mlx-audiocraft", "musicgen-mlx"],
+        "description": "Temporary local MusicGen execution on Apple Silicon without a managed install."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["tool", "install", "mlx-audiocraft"],
+        "description": "Install mlx-audiocraft into the managed Python tool environment."
+      },
+      "installed_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["tool", "run", "musicgen-mlx"],
+        "description": "Run musicgen-mlx from the managed Python tool environment."
+      },
+      "managed_env_subpath": "tool-runtimes/musicgen-mlx",
+      "notes": "Apple Silicon MusicGen entrypoint via mlx-audiocraft. Tuned via KYBERION_MUSICGEN_* env policy. Model weights remain CC BY-NC. Trial: `uvx --from mlx-audiocraft musicgen-mlx`; install: `uv tool install mlx-audiocraft`."
+    }
+  ]
+}
