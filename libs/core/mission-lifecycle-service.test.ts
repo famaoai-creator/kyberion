@@ -35,9 +35,12 @@ function makeStubSystem(): MissionLifecycleUnderlyingSystem {
     finishMission: vi.fn(async () => undefined),
     staffMissionTeam: vi.fn(async () => ({ ok: true }) as any),
     prewarmMissionTeam: vi.fn(async () => ({ status: 'queued' }) as any),
-    restaffMissionTeam: vi.fn(async () => ({ status: 'added' }) as any),
-    proposeMissionRoster: vi.fn(async () => ({ outcome: { status: 'disabled' } }) as any),
-    adviseMission: vi.fn(async () => ({ status: 'no_panel' }) as any),
+    // Typed `undefined` rather than a cast: the gate test only asserts the
+    // facade reaches the system, and every one of these verbs legitimately
+    // returns undefined.
+    restaffMissionTeam: vi.fn(async () => undefined),
+    proposeMissionRoster: vi.fn(async () => undefined),
+    adviseMission: vi.fn(async () => undefined),
     dispatchMissionWorkItems: vi.fn(async () => ({ ok: true }) as any),
     pauseMission: vi.fn(async () => undefined),
     resumeMission: vi.fn(async () => undefined),
