@@ -312,6 +312,27 @@ export interface ModelRoleFitnessRecord {
   failed_assertions: string[];
 }
 
+/**
+ * Model catalogs and backend/egress policy use different historical names for
+ * the same provider. Keep the normalization at the fitness evidence seam so
+ * a probe recorded by `claude-cli` can evidence an `anthropic:*` model, while
+ * the rest of the provider policy keeps its existing identifiers.
+ */
+export function normalizeFitnessProviderId(provider: string | undefined): string | undefined {
+  const normalized = provider?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return (
+    (
+      {
+        anthropic: 'claude',
+        openai: 'codex',
+        xai: 'grok',
+        'gemini-api': 'gemini',
+      } as Record<string, string>
+    )[normalized] || normalized
+  );
+}
+
 const FITNESS_JOURNAL_PATH = 'observability/retrospectives/model-role-fitness.jsonl';
 
 export function modelRoleFitnessPath(): string {

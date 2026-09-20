@@ -1,12 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync } from './secure-io.js';
-import { withExecutionContext } from './authority.js';
+import { withExecutionContext, withExecutionContextAsync } from './authority.js';
 import { composeMissionTeamPlan, writeMissionTeamPlan } from './mission-team-plan-composer.js';
 import { buildMissionAdvisoryPanel, consultMissionAdvisors } from './mission-advisory-panel.js';
+import {
+  registerReasoningBackend,
+  resetReasoningBackend,
+  stubReasoningBackend,
+  type ReasoningBackend,
+} from './reasoning-backend.js';
 
 const missionId = 'MSN-ADVISORY-PANEL';
 const missionPath = pathResolver.missionDir(missionId, 'public');
+
+afterEach(() => resetReasoningBackend());
 
 function withPlan<T>(run: () => T): T {
   try {
@@ -79,5 +87,47 @@ describe('mission advisory panel (TC-18)', () => {
     });
     expect(consultation.status).toBe('mission_plan_not_found');
     expect(consultation.opinions).toEqual([]);
+  });
+
+  it('does not send confidential context to an external backend', async () => {
+    const confidentialMissionId = 'MSN-ADVISORY-CONFIDENTIAL';
+    const confidentialMissionPath = pathResolver.missionDir(confidentialMissionId, 'confidential');
+    const prompt = vi.fn(async () => 'should not be called');
+    const externalBackend: ReasoningBackend = {
+      ...stubReasoningBackend,
+      name: 'claude-cli',
+      prompt,
+    };
+    const dispose = registerReasoningBackend(externalBackend);
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(confidentialMissionPath, { recursive: true });
+        writeMissionTeamPlan(
+          confidentialMissionPath,
+          composeMissionTeamPlan({
+            missionId: confidentialMissionId,
+            missionType: 'development',
+            tier: 'confidential',
+            tenantSlug: 'tenant-a',
+          })
+        );
+      });
+
+      const consultation = await withExecutionContextAsync('mission_controller', () =>
+        consultMissionAdvisors({
+          missionId: confidentialMissionId,
+          topic: 'confidential topic',
+          question: 'confidential question',
+          context: 'confidential context',
+        })
+      );
+      expect(consultation.status).toBe('no_panel');
+      expect(prompt).not.toHaveBeenCalled();
+    } finally {
+      dispose();
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(confidentialMissionPath, { recursive: true, force: true });
+      });
+    }
   });
 });

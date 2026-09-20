@@ -1,14 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync } from './secure-io.js';
-import { withExecutionContext } from './authority.js';
+import { withExecutionContext, withExecutionContextAsync } from './authority.js';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
+import { composeMissionTeamPlan, writeMissionTeamPlan } from './mission-team-plan-composer.js';
 import {
   parseRosterProposals,
   proposeMissionTeamRoster,
   summarizeRosterProposalOutcomes,
 } from './team-roster-proposal.js';
 import { resolveRosterProposalPolicy } from './team-composition-obligations.js';
+import {
+  registerReasoningBackend,
+  resetReasoningBackend,
+  stubReasoningBackend,
+  type ReasoningBackend,
+} from './reasoning-backend.js';
+
+afterEach(() => resetReasoningBackend());
 
 describe('roster proposer (TC-12)', () => {
   it('is off by default', () => {
@@ -51,6 +60,43 @@ describe('roster proposer (TC-12)', () => {
     expect(parseRosterProposals('[{"team_role":"tester"}]', ['tester'])).toEqual([
       { team_role: 'tester', rationale: 'No rationale given.' },
     ]);
+  });
+
+  it('does not send confidential mission context to an external backend', async () => {
+    const missionId = 'MSN-PROPOSAL-CONFIDENTIAL';
+    const missionPath = pathResolver.missionDir(missionId, 'confidential');
+    const prompt = vi.fn(async () => '[]');
+    const externalBackend: ReasoningBackend = {
+      ...stubReasoningBackend,
+      name: 'claude-cli',
+      prompt,
+    };
+    const dispose = registerReasoningBackend(externalBackend);
+    try {
+      withExecutionContext('mission_controller', () => {
+        safeMkdir(missionPath, { recursive: true });
+        writeMissionTeamPlan(
+          missionPath,
+          composeMissionTeamPlan({
+            missionId,
+            missionType: 'development',
+            tier: 'confidential',
+            tenantSlug: 'tenant-a',
+          })
+        );
+      });
+
+      const outcome = await withExecutionContextAsync('mission_controller', () =>
+        proposeMissionTeamRoster({ missionId, force: true, missionContext: 'confidential context' })
+      );
+      expect(outcome.status).toBe('backend_unavailable');
+      expect(prompt).not.toHaveBeenCalled();
+    } finally {
+      dispose();
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
   });
 });
 

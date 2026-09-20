@@ -7,7 +7,7 @@ import {
   type BackendUtilityFit,
 } from './backend-capability-profile.js';
 import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
-import { loadModelRoleFitnessRecords } from './model-role-fitness.js';
+import { loadModelRoleFitnessRecords, normalizeFitnessProviderId } from './model-role-fitness.js';
 
 /**
  * TC-17: is what we DECLARE about a backend what we have MEASURED?
@@ -85,7 +85,9 @@ export function buildBackendCapabilityHonestyReport(): BackendCapabilityHonestyR
 
   const fitnessByProviderRole = new Map<string, { passed: string[]; failed: string[] }>();
   for (const record of loadModelRoleFitnessRecords()) {
-    const provider = record.provider?.trim().toLowerCase();
+    const provider = normalizeFitnessProviderId(
+      record.provider?.trim() || providerIdForReasoningIdentifier(record.backend) || record.backend
+    );
     if (!provider) continue;
     const key = `${provider}::${record.team_role}`;
     const bucket = fitnessByProviderRole.get(key) || { passed: [], failed: [] };
@@ -100,7 +102,7 @@ export function buildBackendCapabilityHonestyReport(): BackendCapabilityHonestyR
 
   for (const mode of declaredModes.sort()) {
     const profile = BACKEND_CAPABILITY_PROFILES[mode as keyof typeof BACKEND_CAPABILITY_PROFILES];
-    const provider = providerIdForReasoningIdentifier(mode);
+    const provider = normalizeFitnessProviderId(providerIdForReasoningIdentifier(mode) || mode);
     for (const fit of profile.utility_fit) {
       const evidenceRole = UTILITY_FIT_EVIDENCE_ROLE[fit];
       if (!evidenceRole) {
