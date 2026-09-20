@@ -46,15 +46,36 @@ import type { TierLevel } from './types.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { createLogger } from './logger.js';
 import { resolveTenant } from './tenant-registry.js';
+import { withExecutionContext } from './authority.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 
 const logger = createLogger('provider-egress-gate');
 
 export type ProviderEgressLabel = 'external-api' | 'local-only';
 
+/**
+ * Whether the vendor trains on material sent to this provider.
+ *
+ * This is the property the tier rule is actually about: material above
+ * confidential never leaves the machine, and confidential may leave it only
+ * for a provider that does not train on it. `unknown` is treated as `used` —
+ * an undeclared provider fails closed rather than being assumed benign.
+ */
+export type ProviderTrainingUse = 'none' | 'used' | 'unknown';
+
 export interface ProviderEgressPolicyFile {
   version: string;
-  providers: Record<string, { egress: ProviderEgressLabel }>;
+  /** Default lifetime of a tenant provider attestation, in days. */
+  attestation_ttl_days?: number;
+  providers: Record<
+    string,
+    {
+      egress: ProviderEgressLabel;
+      training_use?: ProviderTrainingUse;
+      plan?: string;
+      basis?: string;
+    }
+  >;
   tier_policy: {
     confidential: { mode: 'approved-only'; approved_providers: string[] };
     personal: { mode: 'local-only-or-approved'; approved_providers: string[] };
@@ -191,6 +212,95 @@ function denyAndAlert(
  * are observable without every call site re-implementing that (XP-03
  * acceptance criterion 3).
  */
+export type TenantProviderAttestationStatus = 'valid' | 'expired' | 'absent';
+
+export interface ResolvedTenantProviderAttestation {
+  status: TenantProviderAttestationStatus;
+  training_use: 'none' | 'used' | 'unknown';
+  expires_at?: string;
+}
+
+/** Default lifetime of an attestation when the policy declares none. */
+export const DEFAULT_ATTESTATION_TTL_DAYS = 180;
+
+/**
+ * Resolve a tenant's provider attestation, honouring its expiry.
+ *
+ * An attestation is a statement about a purchased plan, and plans get
+ * downgraded, migrated and re-negotiated without anyone touching this
+ * repository. A claim nobody re-verifies is not evidence, so it expires and
+ * the gate falls back to `unknown` — which fails closed.
+ */
+export function resolveTenantProviderAttestation(input: {
+  profile?: {
+    provider_attestations?: Record<
+      string,
+      {
+        training_use: 'none' | 'used' | 'unknown';
+        attested_at: string;
+        expires_at?: string;
+      }
+    >;
+  };
+  provider: string;
+  ttlDays?: number;
+  now?: Date;
+}): ResolvedTenantProviderAttestation {
+  const attestation = input.profile?.provider_attestations?.[input.provider];
+  if (!attestation) return { status: 'absent', training_use: 'unknown' };
+
+  const now = input.now ?? new Date();
+  const ttlDays =
+    typeof input.ttlDays === 'number' && input.ttlDays > 0
+      ? input.ttlDays
+      : DEFAULT_ATTESTATION_TTL_DAYS;
+  let expiresAt: Date | null = null;
+  if (attestation.expires_at) {
+    const parsed = new Date(attestation.expires_at);
+    if (!Number.isNaN(parsed.getTime())) expiresAt = parsed;
+  }
+  if (!expiresAt) {
+    const attestedAt = new Date(attestation.attested_at);
+    if (Number.isNaN(attestedAt.getTime())) {
+      // An attestation we cannot date cannot be trusted to still hold.
+      return { status: 'expired', training_use: 'unknown' };
+    }
+    expiresAt = new Date(attestedAt.getTime() + ttlDays * 24 * 60 * 60 * 1000);
+  }
+  if (expiresAt.getTime() <= now.getTime()) {
+    return { status: 'expired', training_use: 'unknown', expires_at: expiresAt.toISOString() };
+  }
+  return {
+    status: 'valid',
+    training_use: attestation.training_use,
+    expires_at: expiresAt.toISOString(),
+  };
+}
+
+/**
+ * Read a tenant profile as policy input to this gate.
+ *
+ * Tenant profiles are durable authority and live on the personal tier, which
+ * an ordinary worker persona cannot read. Without this the gate would fail to
+ * resolve the tenant on every tenant-scoped call and deny it — safe, but it
+ * also means the tenant's `allowed_reasoning_backends` and its provider
+ * attestations would never be consulted at runtime, which makes both inert.
+ *
+ * The elevation is narrow on purpose: it covers one synchronous read, the
+ * gate extracts only what it needs to decide, and it returns allow/deny to
+ * the caller — never the profile. `ecosystem_architect` is the least
+ * privileged persona with personal READ and no personal write, so this cannot
+ * be used to modify anything.
+ */
+function readTenantProfileAsPolicyInput(
+  slug: string,
+  rootDir?: string
+): ReturnType<typeof resolveTenant>['profile'] {
+  return withExecutionContext('ecosystem_architect', () =>
+    resolveTenant(slug, { ...(rootDir ? { rootDir } : {}) })
+  ).profile;
+}
+
 export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEgressCheckResult {
   const provider = String(input.provider || '').trim();
   const dataTier = input.dataTier;
@@ -203,11 +313,14 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
     return denyAndAlert(input, `no provider identified for a ${dataTier} payload; fail-closed.`);
   }
 
+  let tenantProfile: ReturnType<typeof resolveTenant>['profile'] | undefined;
   if (input.tenant_slug?.trim()) {
     try {
-      const profile = resolveTenant(input.tenant_slug.trim(), {
-        ...(input.tenant_registry_root_dir ? { rootDir: input.tenant_registry_root_dir } : {}),
-      }).profile;
+      const profile = readTenantProfileAsPolicyInput(
+        input.tenant_slug.trim(),
+        input.tenant_registry_root_dir
+      );
+      tenantProfile = profile;
       const allowed = profile.allowed_reasoning_backends;
       if (allowed?.length && !allowed.includes(provider)) {
         return denyAndAlert(
@@ -238,25 +351,54 @@ export function checkProviderEgress(input: ProviderEgressCheckInput): ProviderEg
   }
 
   const { policy } = loaded;
-  if (dataTier === 'confidential') {
-    if (policy.tier_policy.confidential.approved_providers.includes(provider)) {
-      return { allowed: true };
-    }
+  // Confidential and personal ask the same question — is this material used to
+  // train the model? — because that is the harm both are protecting against.
+  // Personal is not held to "never leaves the machine": personal work has real
+  // uses that need a model (trip research, say), and a rule that forbids them
+  // is a rule that gets worked around.
+  const declaration = policy.providers[provider];
+  // Local inference never leaves the machine, so training use cannot apply.
+  if (declaration?.egress === 'local-only') return { allowed: true };
+
+  // The tenant's own attestation wins over the repository default: it is the
+  // one that knows which plan was actually purchased. The shipped policy
+  // deliberately declares every provider `unknown`, because contracts differ
+  // per installation and this file is public.
+  const attestation = resolveTenantProviderAttestation({
+    profile: tenantProfile,
+    provider,
+    ttlDays: policy.attestation_ttl_days,
+  });
+  if (attestation.status === 'valid' && attestation.training_use === 'none') {
+    return { allowed: true };
+  }
+  if (attestation.status === 'expired') {
     return denyAndAlert(
       input,
-      `'${provider}' is not on tier_policy.confidential.approved_providers.`
+      `'${provider}' attestation for tenant '${input.tenant_slug}' expired on ${attestation.expires_at}; re-verify the plan's training-use terms before sending ${dataTier} material.`
+    );
+  }
+  if (attestation.status === 'valid' && attestation.training_use !== 'none') {
+    return denyAndAlert(
+      input,
+      `tenant '${input.tenant_slug}' attests training_use '${attestation.training_use}' for '${provider}'.`
     );
   }
 
-  // personal
-  const label = policy.providers[provider]?.egress;
-  if (label === 'local-only') return { allowed: true };
-  if (policy.tier_policy.personal.approved_providers.includes(provider)) {
-    return { allowed: true };
-  }
+  if (declaration?.training_use === 'none') return { allowed: true };
+  // An operator may still allow a provider whose terms are not declared. That
+  // is an exception, named as one in reports rather than reading like a
+  // derived approval.
+  const exceptions =
+    dataTier === 'confidential'
+      ? policy.tier_policy.confidential.approved_providers
+      : policy.tier_policy.personal.approved_providers;
+  if (exceptions.includes(provider)) return { allowed: true };
+
+  const trainingUse = declaration?.training_use ?? 'unknown';
   return denyAndAlert(
     input,
-    `'${provider}' is neither declared 'local-only' nor on tier_policy.personal.approved_providers.`
+    `'${provider}' has training_use '${trainingUse}'; ${dataTier} material may only go to a provider attested 'none' (or an explicit approved_providers exception).`
   );
 }
 

@@ -323,13 +323,20 @@ export function summarizeRosterProposalOutcomes(
     refusals[key] = (refusals[key] || 0) + 1;
   }
 
-  const lastProposalAt = proposalEntries.at(-1)?.ts;
+  // Ordered by append position, not by timestamp: two entries written in the
+  // same millisecond carry the same `ts`, and comparing those silently drops
+  // a follow-up that happened after the run. The ledger is append-only, so
+  // its order is the fact.
+  const lastProposalIndex = entries.reduce(
+    (last, entry, index) => (entry.event_type === 'team_roster_proposed' ? index : last),
+    -1
+  );
   const followUp = entries.filter(
-    (entry) =>
+    (entry, index) =>
       entry.event_type === 'team_role_restaffed' &&
       (entry.payload as { requested_by?: string } | undefined)?.requested_by !==
         'team_roster_proposer' &&
-      (!lastProposalAt || entry.ts > lastProposalAt)
+      index > lastProposalIndex
   );
   const followUpRoles = [...new Set(followUp.map((entry) => entry.team_role || ''))]
     .filter(Boolean)
