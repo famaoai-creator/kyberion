@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { loadAgentProfileIndex, loadTeamRoleIndex } from './mission-team-index.js';
 import {
   buildStaffingCoverageReport,
   buildTemplateReachabilityReport,
@@ -120,5 +121,44 @@ describe('separation of duties readiness (TC-10)', () => {
   it('records the provider families behind each role', () => {
     const reviewer = report.roles.find((role) => role.team_role === 'reviewer');
     expect(reviewer?.provider_families.length).toBeGreaterThan(1);
+  });
+});
+
+describe('every declared role is staffable (TC-10)', () => {
+  const report = buildStaffingCoverageReport();
+
+  it('has a fully capable candidate for every team role', () => {
+    // A role no template or obligation requires is still a promise the
+    // catalog makes, and an unstaffable one is a promise selection quietly
+    // fills with the least-bad actor.
+    expect(report.partially_covered_roles).toEqual([]);
+  });
+
+  it('has an actor behind every capability some role requires', () => {
+    expect(report.unreachable_capabilities).toEqual([]);
+  });
+
+  it('names no authority role that cannot carry the scope the role needs', () => {
+    expect(report.dead_authority_declarations).toEqual([]);
+  });
+
+  it('keeps the relationship curator on the least-privilege authority that fits', () => {
+    // The role owns confidential relationship nodes under knowledge/.
+    // `ecosystem_architect` also satisfies its scope class but carries write
+    // access to libs/core, scripts and pipelines, which curating a
+    // relationship graph has no business holding.
+    const roleRecord = loadTeamRoleIndex().relationship_curator;
+    expect(roleRecord?.compatible_authority_roles).toContain('knowledge_steward');
+    const profile = loadAgentProfileIndex()['relationship-curator'];
+    expect(profile?.authority_roles[0]).toBe('knowledge_steward');
+    expect(profile?.team_roles).toEqual(['relationship_curator']);
+  });
+
+  it('lets the egress policy decide which provider may hold confidential data', () => {
+    // The curator declares no provider preference: which providers may receive
+    // confidential material is decided by provider-egress-policy.json and
+    // enforced at the delegation boundary.
+    const profile = loadAgentProfileIndex()['relationship-curator'];
+    expect(profile?.selection_hints?.preferred_provider).toBeUndefined();
   });
 });

@@ -31,3 +31,9 @@ what was promised, and keep a conversation moving toward a decision.
   job; deciding is not.
 - Respect tenant, data-tier and security-scope constraints in the task context.
 - You have no code, system, network or browser actuators.
+
+## Provider
+
+Pinned to a different model family than the critique worker and the default
+pool, so a mission's record keeping does not share a failure mode with the
+work being recorded.

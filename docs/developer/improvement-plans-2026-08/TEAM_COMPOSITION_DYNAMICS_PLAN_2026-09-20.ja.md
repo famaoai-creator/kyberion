@@ -152,27 +152,27 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 
 ## 6. 実装状況
 
-| ID    | 状態    | 備考                                                                                                                |
-| ----- | ------- | ------------------------------------------------------------------------------------------------------------------- |
-| TC-01 | DONE    | `status: 'standby'` を導入。構造役割のみ作成時に充当                                                                |
-| TC-02 | DONE    | `staffMissionTeamRoles` + `ensureMissionTeamRuntime` の役割スコープ昇格、`team_role_staffed` 台帳                   |
-| TC-03 | DONE    | `team-composition-obligations.json`(5 義務)と導出器                                                                 |
-| TC-04 | DONE    | 役割集合 = テンプレート ∪ 義務、`role_sources` と `team_governance.obligations`                                     |
-| TC-05 | DONE    | `mission-team-view`(名簿 / 稼働 / 待機 / 欠員 + 出所 + 義務)、`team <ID> --summary`                                 |
-| TC-06 | DONE    | `restaffMissionTeamRole` + `mission_controller restaff`、`team_role_restaffed` 台帳                                 |
-| TC-07 | DONE    | `diagnoseMissionTeamRoleGap`、dispatch の自動増員リトライと `blocked(capability_gap)`                               |
-| TC-08 | DONE    | `workforce-load.ts`、`workforce-capacity-policy.json`、availability / cost_profile の実データ化                     |
-| TC-09 | DONE    | `workerLoadPenalty` を唯一の負荷スコアラとして採用、`selectAgentForTeamRole` へ合流                                 |
-| TC-10 | DONE    | `critique-worker` / `coordination-worker`(別プロバイダ実体)、capability 宣言整合、死んだ `preferred_agents` の掃除と `dead_selection_hint` 検査 |
-| TC-11 | DONE    | `staffing-coverage.ts` + CI gate `staffing-capability-coverage`                                                     |
-| TC-12 | DONE    | `proposeMissionTeamRoster`(既定 OFF、fail-closed)、dispatch 前 1 回 + `propose-roster` CLI                          |
-| TC-13 | DONE    | `summarizeRosterProposalOutcomes`(受理率 + 後追い restaff 率)、`readMissionExecutionLedger`                         |
-| TC-14 | DONE    | テンプレート到達性監査(dangling 参照は gate 失敗、未到達は報告のみ)                                                 |
-| TC-15 | DONE    | `model-role-fitness`(役割別 governed プローブと機械採点)、`evaluate_model_role_fitness` CLI                         |
-| TC-16 | DONE    | 観測が沈黙している間だけ効くコールドスタート事前分布として選抜へ合流                                                |
-| TC-17 | DONE    | `backend-capability-honesty`(宣言 utility_fit と実測プローブの突合)+ CI gate                                        |
-| TC-18 | DONE    | `mission-advisory-panel`(ロスター = 助言パネル)、`mission_controller advise`                                        |
-| TC-19 | DONE    | `team-decision-support-metrics`(ミッション横断の受理率・後追い restaff 率・意見生存率)                              |
+| ID    | 状態 | 備考                                                                                                                                            |
+| ----- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-01 | DONE | `status: 'standby'` を導入。構造役割のみ作成時に充当                                                                                            |
+| TC-02 | DONE | `staffMissionTeamRoles` + `ensureMissionTeamRuntime` の役割スコープ昇格、`team_role_staffed` 台帳                                               |
+| TC-03 | DONE | `team-composition-obligations.json`(5 義務)と導出器                                                                                             |
+| TC-04 | DONE | 役割集合 = テンプレート ∪ 義務、`role_sources` と `team_governance.obligations`                                                                 |
+| TC-05 | DONE | `mission-team-view`(名簿 / 稼働 / 待機 / 欠員 + 出所 + 義務)、`team <ID> --summary`                                                             |
+| TC-06 | DONE | `restaffMissionTeamRole` + `mission_controller restaff`、`team_role_restaffed` 台帳                                                             |
+| TC-07 | DONE | `diagnoseMissionTeamRoleGap`、dispatch の自動増員リトライと `blocked(capability_gap)`                                                           |
+| TC-08 | DONE | `workforce-load.ts`、`workforce-capacity-policy.json`、availability / cost_profile の実データ化                                                 |
+| TC-09 | DONE | `workerLoadPenalty` を唯一の負荷スコアラとして採用、`selectAgentForTeamRole` へ合流                                                             |
+| TC-10 | DONE | `critique-worker` / `coordination-worker`(別プロバイダ実体)、capability 宣言整合、死んだ `preferred_agents` の掃除と `dead_selection_hint` 検査 |
+| TC-11 | DONE | `staffing-coverage.ts` + CI gate `staffing-capability-coverage`                                                                                 |
+| TC-12 | DONE | `proposeMissionTeamRoster`(既定 OFF、fail-closed)、dispatch 前 1 回 + `propose-roster` CLI                                                      |
+| TC-13 | DONE | `summarizeRosterProposalOutcomes`(受理率 + 後追い restaff 率)、`readMissionExecutionLedger`                                                     |
+| TC-14 | DONE | テンプレート到達性監査(dangling 参照は gate 失敗、未到達は報告のみ)                                                                             |
+| TC-15 | DONE | `model-role-fitness`(役割別 governed プローブと機械採点)、`evaluate_model_role_fitness` CLI                                                     |
+| TC-16 | DONE | 観測が沈黙している間だけ効くコールドスタート事前分布として選抜へ合流                                                                            |
+| TC-17 | DONE | `backend-capability-honesty`(宣言 utility_fit と実測プローブの突合)+ CI gate                                                                    |
+| TC-18 | DONE | `mission-advisory-panel`(ロスター = 助言パネル)、`mission_controller advise`                                                                    |
+| TC-19 | DONE | `team-decision-support-metrics`(ミッション横断の受理率・後追い restaff 率・意見生存率)                                                          |
 
 ### 2026-09-20: Wave 1(TC-01〜TC-04)
 
@@ -415,3 +415,38 @@ Wave 3 では「エージェント新設は実ランタイムの裏付けを要�
 ### 三度目の「正本 + スナップショット」
 
 正本ディレクトリとスナップショットの二重構造は **3 カタログ**(authority-roles / agent-profiles / team-roles)に存在し、**生成器があるのは 1 つだけ**だった。本作業でも snapshot 側を編集して空振りしている(Codex が直した TC-10 ドリフトと同じ原因)。`sync_agent_profiles.ts` を追加してこのクラスを塞いだ。team-roles には既存の `sync_team_roles.ts` がある。
+
+### 2026-09-21: `relationship_curator` の実体化と、egress 判定基準の作り直し
+
+**TC-10 の残件だった `relationship_curator`** に専用エージェントを作った(manifest + profile)。この役割は機密の関係グラフ(trust_level / history / outstanding_asks / ng_topics)を扱うため、manifest には「人が自分について読み返す日が来るかもしれない記録として扱う」「人格や動機を推論して保存しない」「NG トピックは境界としてのみ記録し、背景の出来事を再構成しない」を規律として置き、actuator は agent / file のみ(network・browser・code・system・deployment は拒否)。
+
+authority は `knowledge_steward`(`knowledge/` のみ書ける最小権限)。`ecosystem_architect` も scope class は満たすが libs/core・scripts・pipelines への書き込み権を持ち、関係グラフの管理には過大である。これに伴い役割の `compatible_authority_roles` から死んだ `mission_controller`(要求 scope class `knowledge_core` を持たない = 一度も選択され得なかった)を外した。同種の死んだ宣言は **48 件中 6 件**あり、まとめて掃除した。
+
+`control-plane-agent` からは `relationship_curator` の宣言を削除した。3 つの required capability をどれも宣言しておらず、`team_roles` と `capabilities` が矛盾していた。
+
+**`coordination-worker` の provider 誤り**: TC-10 で作ったこのエージェントを `gemini` に固定していたが、`provider-config.json` は `gemini` を `obsolete_agent_runtime_providers` に宣言済みだった(Gemini ACP is obsolete for personal OAuth environments)。「preferred が gemini なのに claude へ解決される」現象を観測しながらルーティング層の裁量と解釈して追わなかったのが誤り。`codex` へ振り直し、**`obsolete_preferred_provider` 検査**を追加して同種を検出できるようにした(差し戻して検出を確認済み)。
+
+### egress: 「承認リスト」から「学習に使われるか」へ
+
+`provider-egress-policy.json` の `approved_providers: ["claude"]` には**根拠が無かった**。導入コミット(`2e1166a3d`, XP-03, 2026-07-25)のメッセージ自身が "default claude only" と書いており、docs にも根拠の記述は無い。未検討の既定値である。
+
+本来の基準は**外部送信された材料がモデルの学習に使われるか**であり、それは provider の属性ではなく**購入したプランの属性**である(同じ API でも無料と有料で異なる)。作り直した形:
+
+| 置き場所                                          | 内容                                                                                                      | 理由                                                                             |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `provider-egress-policy.json`(公開・コミット対象) | `training_use` の語彙と `attestation_ttl_days`。**全 provider は `unknown`**                              | このファイルは MIT で公開される。誰の契約も代弁できない                          |
+| tenant profile(`knowledge/personal/`、git 管理外) | `provider_attestations`: `training_use` / `plan` / `basis` / `attested_by` / `attested_at` / `expires_at` | 契約は一人の運用者の口座についての事実であり、プロジェクトについての事実ではない |
+
+- `unknown` はゲート上 `used` と同じ扱い(未宣言は fail-closed)
+- **失効する**: プランは誰もリポジトリに触れないままダウングレードされ得るので、再確認されない主張は既定 180 日で `unknown` に戻る。日付が解釈できない主張も expired 扱い
+- 判定順: local-only → テナントの有効な宣言 → グローバル既定 → 明示の運用例外 → 拒否
+- `approved_providers` は残したが**「監査される運用例外」へ格下げ**し、出荷値は空にした。素の clone は attest するまで confidential / personal が全拒否になる
+- `pnpm tenant attest-provider` を追加(記名・プラン・根拠・失効つきの記録経路)
+
+**personal の要求水準を下げた**: 「外に出さない」ではなく confidential と同じ「学習されない」を基準にした。personal の作業にも模型を要する実用(旅行調査など)があり、それを禁じる規則は迂回されるだけである。
+
+**ゲートが tenant profile を自分のポリシー入力として読むようにした**: tenant profile は personal 階層にあり通常の worker ペルソナでは読めないため、テナント付きの呼び出しは**常にテナント解決に失敗して拒否**されていた。安全側ではあるが `allowed_reasoning_backends` も attestation も一度も参照されない = 両方が不活性だった(本変更以前からの性質)。昇格は同期の 1 回の読み取りに限定し、personal の **read はあるが write は無い** `ecosystem_architect` を使い、プロファイルは呼び出し元に返さない。
+
+### 同一ミリ秒の台帳エントリを取りこぼしていた(TC-13 / TC-19 の欠陥)
+
+`follow_up_restaff_rate` の算定が「最後の提案実行より後」を **ISO タイムスタンプ比較**で判定していた。台帳に同一ミリ秒で追記された増員は `ts` が同値になり、`>` が偽になって取りこぼされる。提案直後の増員はまさに同一ミリ秒になりやすく、実運用で効く欠陥である。台帳は append-only なので**追記順(位置)**で判定するよう両集計を修正した。並列実行の揺らぎがこれを顕在化させた。
