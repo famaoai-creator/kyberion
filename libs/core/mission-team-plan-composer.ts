@@ -12,7 +12,11 @@ import {
   type TeamProviderPreference,
 } from './team-role-assignment-selection.js';
 import { resolveTaskModelHint } from './reasoning-model-routing.js';
-import { resolveAlwaysStaffedRoles } from './team-composition-obligations.js';
+import {
+  matchTeamCompositionObligations,
+  resolveAlwaysStaffedRoles,
+  type MatchedTeamCompositionObligation,
+} from './team-composition-obligations.js';
 import {
   mapMissionClassToMissionTypeTemplate,
   resolveMissionClassification,
@@ -119,6 +123,12 @@ export interface MissionTeamCompositionSummary {
 export interface MissionTeamGovernance {
   lifecycle: MissionTeamLifecyclePolicy;
   composition: MissionTeamCompositionSummary;
+  /**
+   * TC-04: the obligations this mission's classification matched, so an audit
+   * reads why each derived role is on the roster instead of inferring it from
+   * the template name.
+   */
+  obligations?: MatchedTeamCompositionObligation[];
 }
 
 interface MissionTeamTemplateRecord {
@@ -189,7 +199,8 @@ function normalizeTeamProviderPreference(
 
 function buildTeamGovernance(
   template: MissionTeamTemplateRecord,
-  assignments: MissionTeamAssignment[]
+  assignments: MissionTeamAssignment[],
+  obligations: MatchedTeamCompositionObligation[] = []
 ): MissionTeamGovernance {
   const lifecycle: MissionTeamLifecyclePolicy = {
     max_parallel_members: template.required_roles.length,
@@ -218,6 +229,7 @@ function buildTeamGovernance(
     .map((entry) => entry.team_role);
   return {
     lifecycle,
+    ...(obligations.length > 0 ? { obligations } : {}),
     composition: {
       required_roles: [...template.required_roles],
       optional_roles: [...template.optional_roles],
@@ -424,9 +436,56 @@ export function composeMissionTeamPlan(input: {
     });
   };
 
-  for (const role of template.required_roles) {
+  // TC-04: the roster is the template (an organization's preference) plus the
+  // roles the governed obligations catalog derives from this mission's
+  // classification. An obligation role is required even when the template
+  // lists it as optional or omits it entirely, so a template or organization
+  // overlay cannot drop a role that governance requires.
+  const matchedObligations = matchTeamCompositionObligations({
+    classification: missionClassification,
+    tier: input.tier,
+  });
+  const obligatoryRoles = new Set(
+    matchedObligations.flatMap((obligation) => obligation.require_roles)
+  );
+  const structuralRoles = resolveAlwaysStaffedRoles();
+  // Template order first so separation-of-duties stays resolvable (a reviewer
+  // is selected after the implementer it must be independent of); roles that
+  // only an obligation contributes are appended in catalog order.
+  const effectiveRequiredRoles = [
+    ...template.required_roles,
+    ...Array.from(obligatoryRoles).filter((role) => !template.required_roles.includes(role)),
+  ];
+  const effectiveOptionalRoles = template.optional_roles.filter(
+    (role) => !effectiveRequiredRoles.includes(role)
+  );
+  const effectiveTemplate: MissionTeamTemplateRecord = {
+    ...template,
+    required_roles: effectiveRequiredRoles,
+    optional_roles: effectiveOptionalRoles,
+  };
+
+  const resolveRoleSources = (role: string): NonNullable<MissionTeamAssignment['role_sources']> => {
+    const sources: NonNullable<MissionTeamAssignment['role_sources']> = [];
+    if (structuralRoles.has(role)) sources.push('structural');
+    if (obligatoryRoles.has(role)) sources.push('obligation');
+    if (template.required_roles.includes(role) || template.optional_roles.includes(role)) {
+      sources.push('template');
+    }
+    return sources.length > 0 ? sources : ['template'];
+  };
+
+  const roster = [
+    ...effectiveRequiredRoles.map((role) => ({ role, required: true })),
+    ...effectiveOptionalRoles.map((role) => ({ role, required: false })),
+  ];
+
+  for (const { role, required } of roster) {
     const roleRecord = teamRoles[role];
     if (!roleRecord) {
+      // An unknown optional role is simply absent; an unknown required role is
+      // a declared gap the mission must see.
+      if (!required) continue;
       assignments.push({
         team_role: role,
         required: true,
@@ -439,51 +498,12 @@ export function composeMissionTeamPlan(input: {
         required_capabilities: [],
         notes: 'Team role not found in team-role-index',
         model_hint: missionTaskModelHint,
+        role_sources: resolveRoleSources(role),
       });
       continue;
     }
-    const selectedRequired = selectAgentForTeamRole(
-      role,
-      preferredAgentId && !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
-        ? {
-            ...roleRecord,
-            selection_hints: {
-              ...(roleRecord.selection_hints || {}),
-              preferred_agents: [
-                preferredAgentId,
-                ...(roleRecord.selection_hints?.preferred_agents || []).filter(
-                  (agent) => agent !== preferredAgentId
-                ),
-              ],
-            },
-          }
-        : roleRecord,
-      authorityRoles,
-      agents,
-      missionTaskModelHint,
-      separationForRole(role),
-      organizationProfile?.organization_id,
-      providerPreference
-    );
-    recordAssignment(role, selectedRequired);
-    assignments.push(
-      enrichAssignmentContext({
-        assignment: {
-          ...selectedRequired,
-          model_hint: missionTaskModelHint,
-        },
-        missionId: input.missionId,
-        tier: input.tier,
-        tenantId: tenantSlug,
-        risk: missionClassification.risk_profile,
-      })
-    );
-  }
 
-  for (const role of template.optional_roles) {
-    const roleRecord = teamRoles[role];
-    if (!roleRecord) continue;
-    const assignment = selectAgentForTeamRole(
+    const selected = selectAgentForTeamRole(
       role,
       preferredAgentId && !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
         ? {
@@ -506,12 +526,13 @@ export function composeMissionTeamPlan(input: {
       organizationProfile?.organization_id,
       providerPreference
     );
-    recordAssignment(role, assignment);
-    assignment.required = false;
-    assignment.model_hint = missionTaskModelHint;
+    recordAssignment(role, selected);
+    selected.required = required;
+    selected.model_hint = missionTaskModelHint;
+    selected.role_sources = resolveRoleSources(role);
     assignments.push(
       enrichAssignmentContext({
-        assignment,
+        assignment: selected,
         missionId: input.missionId,
         tier: input.tier,
         tenantId: tenantSlug,
@@ -548,7 +569,7 @@ export function composeMissionTeamPlan(input: {
     organization_chart: organizationChart,
     mission_classification: missionClassification,
     generated_at: nowIso(),
-    team_governance: buildTeamGovernance(template, staffedAssignments),
+    team_governance: buildTeamGovernance(effectiveTemplate, staffedAssignments, matchedObligations),
     assignments: staffedAssignments,
   };
 }
@@ -645,7 +666,7 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
   const existing = input.forceRefresh ? null : loadMissionTeamPlan(missionId);
   if (existing && (!tenantSlug || existing.tenant_slug === tenantSlug)) return existing;
 
-  return composeMissionTeamPlan({
+  const recomposed = composeMissionTeamPlan({
     missionId,
     missionType: input.missionType,
     intentId: input.intentId,
@@ -660,6 +681,17 @@ export function resolveMissionTeamPlan(input: ResolveMissionTeamOptions): Missio
     organizationProfile: input.organizationProfile,
     providerPreference: input.providerPreference,
   });
+
+  // TC-01: recomposition must not un-staff members who are already working.
+  // A refresh re-derives the roster and may re-select actors, but a role the
+  // mission had already staffed stays staffed.
+  const previousPlan = existing ?? loadMissionTeamPlan(missionId);
+  const previouslyStaffedRoles = (previousPlan?.assignments || [])
+    .filter((assignment) => assignment.status === 'assigned')
+    .map((assignment) => assignment.team_role);
+  return previouslyStaffedRoles.length > 0
+    ? promoteMissionTeamPlanRoles(recomposed, previouslyStaffedRoles).plan
+    : recomposed;
 }
 
 /**
