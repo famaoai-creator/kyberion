@@ -431,6 +431,10 @@
       "types": "./dist/backend-capability-honesty.d.ts",
       "default": "./dist/backend-capability-honesty.js"
     },
+    "./team-decision-support-metrics": {
+      "types": "./dist/team-decision-support-metrics.d.ts",
+      "default": "./dist/team-decision-support-metrics.js"
+    },
     "./model-role-fitness": {
       "types": "./dist/model-role-fitness.d.ts",
       "default": "./dist/model-role-fitness.js"
