@@ -5,11 +5,12 @@
 
 import * as nodePath from 'node:path';
 import { executeServicePreset } from './service-engine.js';
+import { ensureMissionTeamRuntimeViaSupervisor } from './agent-runtime-supervisor.js';
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { resolveTaskModelHint, type TaskModelHint } from './reasoning-model-routing.js';
-import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
+import { loadMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { safeExistsSync } from './secure-io.js';
 import { importExternalWorkItem } from './work-coordination.js';
 import { sendOpsAlert } from './ops-alert.js';
@@ -256,6 +257,38 @@ export async function dispatchMissionTickets(
     (existingManifest?.records || []).map((record) => [record.task_id, record])
   );
   const allTasks = readPlannedTasks(missionPath);
+
+  const demandedRoles = Array.from(
+    new Set(
+      plannedTasks
+        .map((task) => task.assigned_to?.role)
+        .filter((role): role is string => Boolean(role))
+    )
+  );
+  const plan = loadMissionTeamPlan(missionId);
+  const standbyRoles = demandedRoles.filter((role) =>
+    plan?.assignments.some(
+      (assignment) => assignment.team_role === role && assignment.status === 'standby'
+    )
+  );
+  if (standbyRoles.length > 0 && plan) {
+    await ensureMissionTeamRuntimeViaSupervisor({
+      missionId,
+      teamRoles: standbyRoles,
+      scope: {
+        scope_kind: 'mission',
+        tier: state.tier,
+        mission_id: missionId,
+        ...(state.tenant_slug ? { tenant_slug: state.tenant_slug } : {}),
+        ...(state.organization_id ? { organization_id: state.organization_id } : {}),
+        ...(state.organization_id && state.relationships?.project?.project_id
+          ? { project_id: state.relationships.project.project_id }
+          : {}),
+      },
+      requestedBy: 'mission_ticket_dispatch',
+      reason: 'Role demanded by ticket dispatch.',
+    });
+  }
 
   const records: MissionTicketDispatchRecord[] = [];
   for (const task of plannedTasks) {
