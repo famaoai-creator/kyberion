@@ -483,12 +483,18 @@ export function composeMissionTeamPlan(input: {
     matchedObligations.flatMap((obligation) => obligation.require_roles)
   );
   const structuralRoles = resolveAlwaysStaffedRoles();
-  // Template order first so separation-of-duties stays resolvable (a reviewer
-  // is selected after the implementer it must be independent of); roles that
-  // only an obligation contributes are appended in catalog order.
+  // Structural roles are a governance invariant, not an organization-level
+  // preference. Put them in the roster even when an overlay replaces the
+  // template role list. Keep the template's remaining order so
+  // separation-of-duties stays resolvable (a reviewer is selected after the
+  // implementer it must be independent of); roles that only an obligation
+  // contributes are appended in catalog order.
   const effectiveRequiredRoles = [
-    ...template.required_roles,
-    ...Array.from(obligatoryRoles).filter((role) => !template.required_roles.includes(role)),
+    ...Array.from(structuralRoles),
+    ...template.required_roles.filter((role) => !structuralRoles.has(role)),
+    ...Array.from(obligatoryRoles).filter(
+      (role) => !structuralRoles.has(role) && !template.required_roles.includes(role)
+    ),
   ];
   const effectiveOptionalRoles = template.optional_roles.filter(
     (role) => !effectiveRequiredRoles.includes(role)
