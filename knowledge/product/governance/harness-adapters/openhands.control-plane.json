@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "openhands.control-plane",
+      "provider": "openhands",
+      "surface_kind": "provider_runtime",
+      "capability_id": "provider.runtime.openhands_control_plane",
+      "contract_kind": "agent_control_plane",
+      "observation_kind": "policy_budget_routing+audit_trail+observability",
+      "result_kind": "policy_decision+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "management-control-plane",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "OpenHands-style control plane surfaces should be modeled as governance and observability adapters rather than execution loops."
+    }
+  ]
+}

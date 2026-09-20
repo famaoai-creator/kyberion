@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "provider.runtime.openhands_control_plane",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "openhands",
+        "name": "control-plane",
+        "version": "2026.05"
+      },
+      "kind": "reasoning",
+      "interaction_mode": "request_response",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["policy-routing", "budget-governance", "fleet-observability"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "management-control-plane"
+      },
+      "status": "experimental",
+      "notes": "OpenHands-style control plane surfaces are governance-heavy and should be modeled as policy and observability adapters, not as raw execution surfaces."
+    }
+  ]
+}

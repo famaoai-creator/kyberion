@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "provider.runtime.gemini_spark_desktop",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "gemini-app",
+        "name": "spark",
+        "version": "2026.05"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["desktop-voice", "local-files", "desktop-workflow"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "reasoning-backend"
+      },
+      "status": "experimental",
+      "notes": "Gemini Spark is the proactive desktop agent surface for local files, voice, and desktop automation."
+    }
+  ]
+}

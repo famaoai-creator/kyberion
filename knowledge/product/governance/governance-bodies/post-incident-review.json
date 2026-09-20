@@ -1,0 +1,50 @@
+{
+  "version": "1.0.0",
+  "description": "IT デリバリ／運用の標準ゲーティング会議体(会議体)カタログ。各会議体は開催事前条件(preconditions)・アジェンダ(agenda)・入口/出口クライテリア(entry/exit_criteria)・決裁者(decision_owner)・定足数(quorum)・所管ゲート(gates_owned)を定義する。SDLC ゲートは gate-profiles/sdlc.json、インシデントゲートは gate-profiles/incident.json と対応。固有(顧客/テナント)情報は含めない — テナント個別の会議体運用は knowledge/confidential/{tenant}/ に置く。",
+  "decision_outcomes": {
+    "go": "GO — 次フェーズへ進行を承認。exit_criteria を全て満たす。",
+    "conditional_go": "CONDITIONAL GO — 条件付き進行。未充足項目に担当・期限つきの条件を付す。",
+    "no_go": "NO-GO — 差し戻し。前フェーズで是正し再判定。",
+    "hold": "HOLD — 判定保留。追加情報・追加検証の取得後に再開催。"
+  },
+  "bodies": [
+    {
+      "id": "post-incident-review",
+      "name_ja": "ポストインシデントレビュー",
+      "name_en": "Post-Incident Review",
+      "purpose": "収束後に根本原因と再発防止策を blameless に検証し、学びを制度に反映する。",
+      "scope": "track",
+      "trigger": {
+        "kind": "event",
+        "detail": "インシデント復旧・収束後(通常5営業日以内)"
+      },
+      "decision_owner": "reliability_engineer",
+      "quorum": {
+        "required_roles": ["reliability_engineer", "incident_commander", "qa_lead"],
+        "optional_roles": ["software_developer", "cyber_security", "pmo_governance"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "post-mortem ドラフト(タイムライン・根本原因・再発防止策)が提出されている",
+        "インシデントの証跡(ログ・トレース)が索引化されている"
+      ],
+      "agenda": [
+        "タイムラインと検知〜収束の振り返り",
+        "根本原因分析(5-Whys/特性要因)の妥当性",
+        "再発防止策の実効性と担当・期限",
+        "類似リスクの横展開(cross-project remediation)",
+        "レビュー判定"
+      ],
+      "entry_criteria": ["post-mortem", "incident-timeline", "evidence-index"],
+      "exit_criteria": [
+        "原因と対策の因果が証跡と矛盾しない",
+        "再発防止策に担当と期限がある",
+        "blameless の原則が守られている"
+      ],
+      "decisions": ["go", "conditional_go", "hold"],
+      "gates_owned": ["gate-post-incident-review"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    }
+  ]
+}

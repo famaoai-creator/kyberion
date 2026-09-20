@@ -150,13 +150,14 @@ const CASES: GovernanceSchemaCase[] = [
   {
     name: 'harness-capability-registry',
     schemaPath: 'knowledge/product/schemas/harness-capability-registry.schema.json',
-    dataPath: 'knowledge/product/governance/harness-capability-registry.json',
+    dataPath:
+      'knowledge/product/governance/harness-capabilities/cli.native.browser_interactive.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
     name: 'capability-bundle-registry',
     schemaPath: 'knowledge/product/schemas/capability-bundle-registry.schema.json',
-    dataPath: 'knowledge/product/governance/capability-bundle-registry.json',
+    dataPath: 'knowledge/product/governance/capability-bundles/browser-exploration-governed.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
@@ -204,7 +205,7 @@ const CASES: GovernanceSchemaCase[] = [
   {
     name: 'tool-runtime-registry',
     schemaPath: 'knowledge/product/schemas/tool-runtime-registry.schema.json',
-    dataPath: 'knowledge/product/governance/tool-runtime-registry.json',
+    dataPath: 'knowledge/product/governance/tool-runtimes/mflux.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
@@ -216,7 +217,7 @@ const CASES: GovernanceSchemaCase[] = [
   {
     name: 'service-runtime-registry',
     schemaPath: 'knowledge/product/schemas/service-runtime-registry.schema.json',
-    dataPath: 'knowledge/product/governance/service-runtime-registry.json',
+    dataPath: 'knowledge/product/governance/service-runtimes/comfyui.json',
     invalidPayload: { version: '1.0.0' },
   },
   {
@@ -1115,6 +1116,144 @@ describe('governance contracts', () => {
       expect(modelRegistryFileName(modelId)).toBe(file);
     }
     expect(modelRegistryFileName('vendor:a')).not.toBe(modelRegistryFileName('vendor--a'));
+  });
+
+  it('keeps the canonical capability bundle directory complete (RSP-11, snapshot abolished)', () => {
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    const bundleSchema = compileSchemaFromPath(
+      ajv,
+      path.resolve(
+        process.cwd(),
+        'knowledge/product/schemas/capability-bundle-registry.schema.json'
+      )
+    );
+    const dir = path.resolve(process.cwd(), 'knowledge/product/governance/capability-bundles');
+    const files = safeReaddir(dir)
+      .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
+      .sort();
+    expect(files.length).toBeGreaterThan(0);
+    const seen = new Set<string>();
+    let version: string | null = null;
+    for (const file of files) {
+      if (file === 'README.md') continue;
+      const payload = JSON.parse(
+        safeReadFile(path.join(dir, file), { encoding: 'utf8' }) as string
+      ) as { version?: string; bundles?: Array<{ bundle_id?: string }> };
+      expect(bundleSchema(payload)).toBe(true);
+      expect(payload.bundles).toHaveLength(1);
+      const bundleId = String(payload.bundles?.[0]?.bundle_id || '');
+      expect(`${bundleId}.json`).toBe(file);
+      expect(seen.has(bundleId)).toBe(false);
+      seen.add(bundleId);
+      if (version === null) version = String(payload.version);
+      else expect(String(payload.version)).toBe(version);
+    }
+  });
+
+  it('keeps the RSP-11+ canonical registry directories complete (snapshot abolished)', () => {
+    const directories: Array<{
+      dir: string;
+      schema: string;
+      arrayKey: string;
+      idKey: string;
+      allowEmpty?: boolean;
+    }> = [
+      {
+        dir: 'knowledge/product/governance/harness-capabilities',
+        schema: 'knowledge/product/schemas/harness-capability-registry.schema.json',
+        arrayKey: 'capabilities',
+        idKey: 'capability_id',
+      },
+      {
+        dir: 'knowledge/product/governance/harness-adapters',
+        schema: 'knowledge/product/schemas/harness-adapter-registry.schema.json',
+        arrayKey: 'profiles',
+        idKey: 'adapter_id',
+      },
+      {
+        dir: 'knowledge/product/governance/gateway-capabilities',
+        schema: 'knowledge/product/schemas/gateway-capability-registry.schema.json',
+        arrayKey: 'capabilities',
+        idKey: 'capability_id',
+        allowEmpty: true,
+      },
+      {
+        dir: 'knowledge/product/orchestration/external-services',
+        schema: 'knowledge/product/schemas/external-service-registry.schema.json',
+        arrayKey: 'services',
+        idKey: 'service_id',
+        allowEmpty: true,
+      },
+      {
+        dir: 'knowledge/product/governance/governance-bodies',
+        schema: 'knowledge/product/schemas/governance-body-registry.schema.json',
+        arrayKey: 'bodies',
+        idKey: 'id',
+      },
+      {
+        dir: 'knowledge/product/governance/tool-runtimes',
+        schema: 'knowledge/product/schemas/tool-runtime-registry.schema.json',
+        arrayKey: 'tools',
+        idKey: 'tool_id',
+      },
+      {
+        dir: 'knowledge/product/governance/service-runtimes',
+        schema: 'knowledge/product/schemas/service-runtime-registry.schema.json',
+        arrayKey: 'services',
+        idKey: 'service_id',
+      },
+      {
+        dir: 'knowledge/product/governance/media-backends',
+        schema: 'knowledge/product/schemas/media-backend-registry.schema.json',
+        arrayKey: 'backends',
+        idKey: 'backend_id',
+      },
+      {
+        dir: 'knowledge/product/governance/reasoning-providers',
+        schema: 'knowledge/product/schemas/reasoning-provider-registry.schema.json',
+        arrayKey: 'providers',
+        idKey: 'mode',
+      },
+    ];
+    const ajv = new AjvCtor({ allErrors: true });
+    addFormats(ajv);
+    for (const entry of directories) {
+      const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), entry.schema));
+      const dir = path.resolve(process.cwd(), entry.dir);
+      const files = safeReaddir(dir)
+        .filter((name) => name.endsWith('.json') && name !== 'index.json')
+        .sort();
+      if (!entry.allowEmpty) expect(files.length).toBeGreaterThan(0);
+      const seen = new Set<string>();
+      let headers: string | null = null;
+      for (const file of files) {
+        const payload = JSON.parse(
+          safeReadFile(path.join(dir, file), { encoding: 'utf8' }) as string
+        ) as Record<string, unknown>;
+        expect(validate(payload)).toBe(true);
+        const items = payload[entry.arrayKey];
+        expect(Array.isArray(items) && (items as unknown[]).length === 1).toBe(true);
+        const id = String(((items as Array<Record<string, unknown>>)[0] || {})[entry.idKey] || '');
+        expect(`${id}.json`).toBe(file);
+        expect(seen.has(id)).toBe(false);
+        seen.add(id);
+        const fileHeaders: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(payload)) {
+          if (key !== entry.arrayKey && key !== '$schema') fileHeaders[key] = value;
+        }
+        const serialized = JSON.stringify(fileHeaders);
+        if (headers === null) headers = serialized;
+        else expect(serialized).toBe(headers);
+      }
+      if (!entry.allowEmpty) {
+        const index = JSON.parse(
+          safeReadFile(path.join(dir, 'index.json'), { encoding: 'utf8' }) as string
+        ) as { version?: string; order?: string[] };
+        expect(Array.isArray(index.order)).toBe(true);
+        expect([...(index.order as string[])].sort()).toEqual([...seen].sort());
+      }
+    }
   });
 
   it('keeps the canonical actuator manifests aligned with the runtime snapshot', () => {

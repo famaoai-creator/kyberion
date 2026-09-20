@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.github_repo_management",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "repo",
+        "version": "v1"
+      },
+      "kind": "interactive_tooling",
+      "interaction_mode": "interactive_loop",
+      "risk_class": "high",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": true,
+        "approval_scope": "action"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["manage-repo", "inspect-repo"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "service-actuator"
+      },
+      "status": "active",
+      "notes": "Repository operations can be powerful; keep them routed through governed surfaces."
+    }
+  ]
+}

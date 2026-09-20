@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "claude-agent",
+      "provider": "claude",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": true,
+        "input_modalities": ["text", "image"]
+      },
+      "env_keys": ["CLAUDECODE", "ANTHROPIC_API_KEY"]
+    }
+  ]
+}

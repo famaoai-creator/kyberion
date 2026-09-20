@@ -9,7 +9,7 @@ describe('provider CLI capability report catalog boundary', () => {
       })
     );
     expect(source).toContain('defineCatalog<AdapterRegistry>');
-    expect(source).toContain('adapterRegistryCatalog.load()');
+    expect(source).toContain('loadAdapterRegistry()');
     expect(source).toContain('defineGenerator');
     expect(source).toContain('runGenerateProviderCliCapabilityReport');
     expect(source).toContain('assertSafeRepositoryPath(');

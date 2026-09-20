@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "hermes-hooks.pipeline",
+      "provider": "hermes-agent",
+      "surface_kind": "provider_runtime",
+      "capability_id": "provider.runtime.hermes_hook_pipeline",
+      "contract_kind": "lifecycle_interceptor",
+      "observation_kind": "hook_events+transformations",
+      "result_kind": "hook_decision+trace_ref",
+      "approval_behavior": "pre_and_post",
+      "replayability": "partial",
+      "fallback_contract": "orchestrator-actuator",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Hermes hooks inform Kyberion's governed event pipeline, but Kyberion should keep explicit policy and receipts."
+    }
+  ]
+}

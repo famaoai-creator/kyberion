@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "hermes-tool-gateway.routing",
+      "provider": "hermes-agent",
+      "surface_kind": "provider_runtime",
+      "capability_id": "provider.runtime.hermes_tool_routing",
+      "contract_kind": "tool_routing_policy",
+      "observation_kind": "tool_route+provider_status",
+      "result_kind": "route_decision+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "reasoning-backend / structured-query",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Hermes Tool Gateway is a useful routing reference, but Kyberion keeps the provider-neutral contract boundary."
+    }
+  ]
+}

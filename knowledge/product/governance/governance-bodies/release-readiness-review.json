@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "description": "IT デリバリ／運用の標準ゲーティング会議体(会議体)カタログ。各会議体は開催事前条件(preconditions)・アジェンダ(agenda)・入口/出口クライテリア(entry/exit_criteria)・決裁者(decision_owner)・定足数(quorum)・所管ゲート(gates_owned)を定義する。SDLC ゲートは gate-profiles/sdlc.json、インシデントゲートは gate-profiles/incident.json と対応。固有(顧客/テナント)情報は含めない — テナント個別の会議体運用は knowledge/confidential/{tenant}/ に置く。",
+  "decision_outcomes": {
+    "go": "GO — 次フェーズへ進行を承認。exit_criteria を全て満たす。",
+    "conditional_go": "CONDITIONAL GO — 条件付き進行。未充足項目に担当・期限つきの条件を付す。",
+    "no_go": "NO-GO — 差し戻し。前フェーズで是正し再判定。",
+    "hold": "HOLD — 判定保留。追加情報・追加検証の取得後に再開催。"
+  },
+  "bodies": [
+    {
+      "id": "release-readiness-review",
+      "name_ja": "リリース判定会議",
+      "name_en": "Release Readiness Review",
+      "purpose": "本番移行と運用受け入れを許可するかの Go/No-Go を判定する。",
+      "scope": "track",
+      "trigger": {
+        "kind": "gate",
+        "detail": "リリース準備フェーズ完了時 (G6)"
+      },
+      "decision_owner": "pmo_governance",
+      "quorum": {
+        "required_roles": ["pmo_governance", "reliability_engineer", "product_manager"],
+        "optional_roles": ["cyber_security", "customer_success", "solution_architect"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "release-readiness-checklist が全項目埋まっている",
+        "rollback-plan と deployment-verification 手順が確定している",
+        "運用引き継ぎ資料(runbook)とユーザー向け資料が揃っている",
+        "リリースウィンドウと連絡体制が合意されている"
+      ],
+      "agenda": [
+        "リリース準備チェックリストの確認",
+        "切り戻し計画とデプロイ検証手順の確認",
+        "運用・サポート引き継ぎ状況",
+        "顧客/エンドユーザー影響と告知",
+        "Go / Conditional Go / No-Go 判定"
+      ],
+      "entry_criteria": [
+        "release-readiness-checklist",
+        "cutover-migration-plan",
+        "rollback-plan",
+        "deployment-verification-report",
+        "operation-runbook",
+        "user-manual-faq"
+      ],
+      "exit_criteria": [
+        "運用・デプロイ・切り戻しの準備が承認されている",
+        "デプロイ後の検証基準が明示されている",
+        "サポート・ユーザー向け引き継ぎ資料が利用可能"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": ["gate-release-readiness"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    }
+  ]
+}

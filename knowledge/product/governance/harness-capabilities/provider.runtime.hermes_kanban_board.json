@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "provider.runtime.hermes_kanban_board",
+      "source": {
+        "type": "agent_runtime",
+        "provider": "hermes-agent",
+        "name": "kanban",
+        "version": "v1"
+      },
+      "kind": "delegated_execution",
+      "interaction_mode": "delegated_task",
+      "risk_class": "medium",
+      "replayability": "partial",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["multi-agent-kanban", "task-handoff"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_pipeline",
+        "target": "pipelines/a2a-task-contract.json"
+      },
+      "status": "active",
+      "notes": "Hermes Kanban is the durable multi-agent board pattern: named workers, persistent rows, and shared handoffs."
+    }
+  ]
+}

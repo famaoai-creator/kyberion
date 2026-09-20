@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "media-generation.minimax.hailuo-2.3",
+      "modality": "video",
+      "display_name": "MiniMax Hailuo 2.3 Video Generation API",
+      "kind": "api",
+      "provider": "minimax_hailuo",
+      "status": "active",
+      "platforms": ["any"],
+      "model": "MiniMax-Hailuo-2.3",
+      "api_key_env": "KYBERION_MINIMAX_VIDEO_API_KEY|MINIMAX_API_KEY",
+      "endpoint_env": "KYBERION_MINIMAX_VIDEO_URL",
+      "supports": {
+        "artifact_formats": ["mp4"],
+        "async": true
+      },
+      "cost_tier": "paid",
+      "data_policy": "zero_retention",
+      "execution_locality": "remote",
+      "notes": "Direct MiniMax asynchronous task and file retrieval adapter."
+    }
+  ]
+}

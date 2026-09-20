@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "agy-cli",
+      "provider": "agy",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": true,
+        "input_modalities": ["text"]
+      },
+      "env_keys": ["AGY_CLI", "ANTIGRAVITY_CLI"]
+    }
+  ]
+}

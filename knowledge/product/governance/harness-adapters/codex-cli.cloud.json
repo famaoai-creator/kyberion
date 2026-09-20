@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "adapter_id": "codex-cli.cloud",
+      "provider": "codex-cli",
+      "surface_kind": "provider_runtime",
+      "capability_id": "cli.native.codex_cloud_tasks",
+      "contract_kind": "delegated_task",
+      "observation_kind": "cloud_task_listing+diff_preview",
+      "result_kind": "task_ref+trace_ref",
+      "approval_behavior": "pre_action",
+      "replayability": "partial",
+      "fallback_contract": "pipelines/a2a-task-contract.json",
+      "enabled": true,
+      "owner": "platform_architecture",
+      "notes": "Codex Cloud is useful when the provider-hosted task space is the most direct surface."
+    }
+  ]
+}

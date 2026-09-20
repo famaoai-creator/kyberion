@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "capabilities": [
+    {
+      "capability_id": "cli.native.github_actions_inspection",
+      "source": {
+        "type": "cli_native",
+        "provider": "gh",
+        "name": "run / workflow",
+        "version": "v1"
+      },
+      "kind": "deterministic_utility",
+      "interaction_mode": "deterministic_task",
+      "risk_class": "low",
+      "replayability": "deterministic",
+      "approval_hooks": {
+        "requires_pre_approval": false,
+        "approval_scope": "none"
+      },
+      "preferred_usage": {
+        "workflow_shapes": ["task_session", "mission"],
+        "intents": ["inspect-actions", "inspect-workflow"]
+      },
+      "fallback_path": {
+        "mode": "kyberion_local_actuator",
+        "target": "service-actuator"
+      },
+      "status": "active",
+      "notes": "Actions inspection is low-risk and useful for auditing CI behavior."
+    }
+  ]
+}

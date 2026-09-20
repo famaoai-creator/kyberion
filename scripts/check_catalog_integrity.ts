@@ -21,6 +21,12 @@ type CatalogCheck = {
   id: string;
   schemaPath: string;
   dataPath: string;
+  /** RSP-11+ split directory (canonical). When set, per-item files are merged for validation. */
+  dataDir?: string;
+  /** Item array key merged from the directory (e.g. 'backends'). */
+  arrayKey?: string;
+  /** Item id key checked against the file name (e.g. 'backend_id'). */
+  idKey?: string;
 };
 
 type GovernanceCatalogContracts = {
@@ -157,7 +163,10 @@ const CHECKS: CatalogCheck[] = [
   {
     id: 'media-backend-registry',
     schemaPath: 'knowledge/product/schemas/media-backend-registry.schema.json',
-    dataPath: 'knowledge/product/governance/media-backend-registry.json',
+    dataPath: 'knowledge/product/governance/media-backends/media-generation.local_flux.json',
+    dataDir: 'knowledge/product/governance/media-backends',
+    arrayKey: 'backends',
+    idKey: 'backend_id',
   },
   {
     id: 'provider-egress-policy',
@@ -192,7 +201,10 @@ const CHECKS: CatalogCheck[] = [
   {
     id: 'tool-runtime-registry',
     schemaPath: 'knowledge/product/schemas/tool-runtime-registry.schema.json',
-    dataPath: 'knowledge/product/governance/tool-runtime-registry.json',
+    dataPath: 'knowledge/product/governance/tool-runtimes/mflux.json',
+    dataDir: 'knowledge/product/governance/tool-runtimes',
+    arrayKey: 'tools',
+    idKey: 'tool_id',
   },
   {
     id: 'knowledge-feedback-policy',
@@ -211,12 +223,84 @@ const CHECKS: CatalogCheck[] = [
   },
 ];
 
+/**
+ * Read an RSP-11+ split registry directory: validate every per-item envelope
+ * against the schema, enforce exactly-one-item + filename==id + shared-header
+ * consistency, and return the merged payload for the generic contract check.
+ */
+function readSplitRegistryDirectory(
+  check: CatalogCheck,
+  validate: ReturnType<typeof compileSchema>,
+  violations: string[]
+): Record<string, unknown> | null {
+  const dir = pathResolver.rootResolve(check.dataDir as string);
+  if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) {
+    violations.push(`${check.id}: canonical directory is missing (${check.dataDir})`);
+    return null;
+  }
+  const files = safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
+    .sort();
+  if (files.length === 0) {
+    violations.push(`${check.id}: canonical directory is empty (${check.dataDir})`);
+    return null;
+  }
+  const arrayKey = check.arrayKey as string;
+  const idKey = check.idKey as string;
+  const items: unknown[] = [];
+  const seen = new Set<string>();
+  let headers: Record<string, unknown> | null = null;
+  for (const file of files) {
+    const payload = readSafeJsonFile<Record<string, unknown>>(
+      path.join(dir, file),
+      `catalog ${check.dataDir}/${file}`
+    );
+    if (!validate(payload)) {
+      for (const error of validate.errors || []) {
+        violations.push(
+          `${check.id}: ${file}${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
+      }
+      continue;
+    }
+    const raw = payload[arrayKey];
+    if (!Array.isArray(raw) || raw.length !== 1) {
+      violations.push(`${check.id}: ${file} must contain exactly one ${arrayKey} item`);
+      continue;
+    }
+    const item = raw[0] as Record<string, unknown>;
+    const id = String(item[idKey] || '');
+    if (!id || `${id}.json` !== file) {
+      violations.push(`${check.id}: ${file} must match its ${idKey} (${id})`);
+      continue;
+    }
+    if (seen.has(id)) {
+      violations.push(`${check.id}: duplicate ${idKey} in directory (${id})`);
+      continue;
+    }
+    seen.add(id);
+    items.push(item);
+    const fileHeaders: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      if (key !== arrayKey && key !== '$schema') fileHeaders[key] = value;
+    }
+    if (!headers) headers = fileHeaders;
+    else if (JSON.stringify(headers) !== JSON.stringify(fileHeaders)) {
+      violations.push(`${check.id}: ${file} has inconsistent shared headers`);
+    }
+  }
+  return { ...(headers || {}), [arrayKey]: items };
+}
+
 function validateCatalog(check: CatalogCheck, violations: string[], warnings: string[]) {
   const validate = compileSchema(pathResolver.rootResolve(check.schemaPath));
-  const data = readSafeJsonFile<Record<string, unknown>>(
-    pathResolver.rootResolve(check.dataPath),
-    `catalog ${check.dataPath}`
-  );
+  const data = check.dataDir
+    ? readSplitRegistryDirectory(check, validate, violations)
+    : readSafeJsonFile<Record<string, unknown>>(
+        pathResolver.rootResolve(check.dataPath),
+        `catalog ${check.dataPath}`
+      );
+  if (!data) return;
   const ok = validate(data);
   if (!ok) {
     for (const error of validate.errors || []) {

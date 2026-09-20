@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { safeReadFile } from '@agent/core';
+import { safeReadFile, safeReaddir } from '@agent/core';
 
 const ROOT = process.cwd();
 
@@ -10,6 +10,18 @@ function read(relPath: string): string {
 
 function readJson<T>(relPath: string): T {
   return JSON.parse(read(relPath)) as T;
+}
+
+function readRegistryDirectory<T>(relativeDir: string, arrayKey: string): T[] {
+  const dir = path.join(ROOT, relativeDir);
+  return safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
+    .sort()
+    .flatMap((entry) => {
+      const payload = readJson<Record<string, unknown>>(`${relativeDir}/${entry}`);
+      const items = payload[arrayKey];
+      return Array.isArray(items) ? (items as T[]) : [];
+    });
 }
 
 describe('harness landscape contract', () => {
@@ -45,12 +57,18 @@ describe('harness landscape contract', () => {
   });
 
   it('registers the new provider-runtime surfaces and adapter profiles', () => {
-    const capabilityRegistry = readJson<{ capabilities: Array<{ capability_id: string; status: string; fallback_path?: { target?: string } }> }>(
-      'knowledge/product/governance/harness-capability-registry.json',
-    );
-    const adapterRegistry = readJson<{ profiles: Array<{ adapter_id: string; capability_id: string; enabled: boolean }> }>(
-      'knowledge/product/governance/harness-adapter-registry.json',
-    );
+    const capabilities = readRegistryDirectory<{
+      capability_id: string;
+      status: string;
+      fallback_path?: { target?: string };
+    }>('knowledge/product/governance/harness-capabilities', 'capabilities');
+    const profiles = readRegistryDirectory<{
+      adapter_id: string;
+      capability_id: string;
+      enabled: boolean;
+    }>('knowledge/product/governance/harness-adapters', 'profiles');
+    const capabilityRegistry = { capabilities };
+    const adapterRegistry = { profiles };
 
     expect(capabilityRegistry.capabilities.map((item) => item.capability_id)).toEqual(
       expect.arrayContaining([
@@ -58,14 +76,17 @@ describe('harness landscape contract', () => {
         'provider.runtime.gemini_spark_desktop',
         'provider.runtime.hermes_kanban_board',
         'provider.runtime.openhands_control_plane',
-      ]),
+      ])
     );
 
-    expect(capabilityRegistry.capabilities.find((item) => item.capability_id === 'provider.runtime.hermes_kanban_board'))
-      .toMatchObject({
-        status: 'active',
-        fallback_path: { target: 'pipelines/a2a-task-contract.json' },
-      });
+    expect(
+      capabilityRegistry.capabilities.find(
+        (item) => item.capability_id === 'provider.runtime.hermes_kanban_board'
+      )
+    ).toMatchObject({
+      status: 'active',
+      fallback_path: { target: 'pipelines/a2a-task-contract.json' },
+    });
 
     expect(adapterRegistry.profiles.map((item) => item.adapter_id)).toEqual(
       expect.arrayContaining([
@@ -73,10 +94,12 @@ describe('harness landscape contract', () => {
         'gemini-spark.desktop',
         'hermes-kanban.board',
         'openhands.control-plane',
-      ]),
+      ])
     );
 
-    expect(adapterRegistry.profiles.find((item) => item.adapter_id === 'openhands.control-plane')).toMatchObject({
+    expect(
+      adapterRegistry.profiles.find((item) => item.adapter_id === 'openhands.control-plane')
+    ).toMatchObject({
       capability_id: 'provider.runtime.openhands_control_plane',
       enabled: true,
     });

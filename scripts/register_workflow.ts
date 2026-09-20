@@ -24,7 +24,14 @@
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { assertSafeRepositoryPath, safeWriteFile, safeMkdir } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+  safeWriteFile,
+  safeMkdir,
+} from '@agent/core/secure-io';
 import { defineCatalog } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -34,7 +41,7 @@ const INTENTS_REL = 'knowledge/product/governance/standard-intents.json';
 const ONTOLOGY_REL = 'knowledge/product/governance/intent-domain-ontology.json';
 const ROUTING_REL = 'knowledge/product/governance/intent-routing-map.json';
 const GATE_PROFILES_REL = 'knowledge/product/governance/gate-profiles/gate-profile-registry.json';
-const GOV_BODY_REL = 'knowledge/product/governance/governance-body-registry.json';
+const GOV_BODY_DIR_REL = 'knowledge/product/governance/governance-bodies';
 const SCHEMA_REL = 'knowledge/product/schemas/workflow-registration-request.schema.json';
 const CATALOG_SCHEMA_REL = 'knowledge/product/schemas/mission-workflow-catalog.schema.json';
 const INTENTS_SCHEMA_REL = 'knowledge/product/schemas/standard-intents.schema.json';
@@ -126,6 +133,50 @@ function updateGovernedCatalog(
   const next = structuredClone(catalog.load());
   update(next);
   catalog.publish(next, expectedGeneration);
+}
+
+/**
+ * Upsert governance bodies into the canonical per-item directory
+ * (RSP-15, snapshot abolished). Shared headers are preserved from the
+ * existing files; each body validates against the registry schema.
+ */
+function upsertGovernanceBodyDirectory(bodies: Json[]): void {
+  const dir = abs(GOV_BODY_DIR_REL);
+  const headers: Json = { version: '1.0.0' };
+  if (safeExistsSync(dir)) {
+    for (const file of safeReaddir(dir)
+      .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
+      .sort()) {
+      const candidate = assertSafeRepositoryPath(path.join(dir, file));
+      if (!safeLstat(candidate).isFile()) continue;
+      const envelope = defineCatalog<Json>({
+        id: `workflow-registration:${GOV_BODY_DIR_REL}/${file}`,
+        path: candidate,
+        schema: abs(GOV_BODY_SCHEMA_REL),
+      }).load();
+      for (const [key, value] of Object.entries(envelope)) {
+        if (key !== 'bodies' && key !== '$schema' && !(key in headers)) {
+          headers[key] = value;
+        }
+      }
+    }
+  } else {
+    safeMkdir(dir, { recursive: true });
+  }
+  for (const body of bodies) {
+    const id = String((body as Json).id || '').trim();
+    if (!id) throw new Error('governance body is missing id');
+    const envelope = { ...headers, bodies: [body] };
+    const validated = defineCatalog<Json>({
+      id: `workflow-registration:${GOV_BODY_DIR_REL}/${id}.json`,
+      path: assertSafeRepositoryPath(path.join(dir, `${id}.json`), { allowMissingLeaf: true }),
+      schema: abs(GOV_BODY_SCHEMA_REL),
+    }).validate(envelope, `${id}.json`);
+    safeWriteFile(
+      assertSafeRepositoryPath(path.join(dir, `${id}.json`), { allowMissingLeaf: true }),
+      `${JSON.stringify(validated, null, 2)}\n`
+    );
+  }
 }
 
 function parseArgs(argv: string[]): { mode: 'propose' | 'apply'; request: string } {
@@ -338,14 +389,10 @@ function applyToGovernedCatalogs(req: RegistrationRequest): string[] {
     touched.push(GATE_PROFILES_REL);
   }
 
-  // 6) governance bodies — optional
+  // 6) governance bodies — optional (RSP-15: per-item canonical files)
   if (req.governance_bodies && req.governance_bodies.length > 0) {
-    updateGovernedCatalog(GOV_BODY_REL, GOV_BODY_SCHEMA_REL, (reg) => {
-      let bodies = (reg.bodies as unknown[]) ?? [];
-      for (const b of req.governance_bodies!) bodies = upsertById(bodies, 'id', b as Json);
-      reg.bodies = bodies;
-    });
-    touched.push(GOV_BODY_REL);
+    upsertGovernanceBodyDirectory(req.governance_bodies);
+    touched.push(GOV_BODY_DIR_REL);
   }
 
   return touched;

@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "default_backend_ids": {
+    "image": "media-generation.comfyui",
+    "voice": "voice.local_say",
+    "video": "video.hyperframes_cli",
+    "music": "media-generation.comfyui.music"
+  },
+  "backends": [
+    {
+      "backend_id": "video.hyperframes_cli",
+      "modality": "video",
+      "display_name": "HyperFrames CLI Renderer",
+      "kind": "cli",
+      "provider": "hyperframes",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["mp4", "mov", "webm", "gif"],
+        "async": true,
+        "mux_audio": true
+      },
+      "command": "npx",
+      "args": ["hyperframes", "render"],
+      "cost_tier": "self_hosted",
+      "data_policy": "local_only",
+      "execution_locality": "local",
+      "notes": "Deterministic HTML-to-video render backend with optional narration mux."
+    }
+  ]
+}
