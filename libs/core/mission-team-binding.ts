@@ -7,6 +7,12 @@ import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
+import {
+  getMissionTeamPlanPath,
+  loadMissionTeamPlan,
+  promoteMissionTeamPlanRoles,
+  writeMissionTeamPlan,
+} from './mission-team-plan-composer.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
 import {
   provisionMissionEntry,
@@ -388,6 +394,78 @@ export function initializeMissionTeamBindings(
     });
   }
   return paths;
+}
+
+export interface StaffMissionTeamRolesResult {
+  plan: MissionTeamPlan | null;
+  /** Standby roles promoted to staffed by this call. */
+  promoted: string[];
+  /** Requested roles with no compatible actor in the pool. */
+  unfilled: string[];
+}
+
+/**
+ * TC-02: staff roster roles on demand.
+ *
+ * Mission creation staffs only the structural roles (TC-01); every other
+ * roster role waits on standby. This is the single governed entry point that
+ * turns a standby role into a staffed one: it promotes the recorded
+ * candidate, rewrites the team plan and staffing bindings from it, and
+ * appends one `team_role_staffed` entry per promotion to the mission
+ * execution ledger so an audit can see when each member joined and why.
+ */
+export function staffMissionTeamRoles(input: {
+  missionId: string;
+  teamRoles: string[];
+  missionPathHint?: string;
+  requestedBy?: string;
+  reason?: string;
+}): StaffMissionTeamRolesResult {
+  const missionId = normalizeMissionId(input.missionId);
+  const requestedRoles = Array.from(new Set(input.teamRoles.filter(Boolean)));
+  const existing = loadMissionTeamPlan(missionId);
+  if (!existing || requestedRoles.length === 0) {
+    return { plan: existing, promoted: [], unfilled: [] };
+  }
+
+  const unfilled = existing.assignments
+    .filter((entry) => entry.status === 'unfilled' && requestedRoles.includes(entry.team_role))
+    .map((entry) => entry.team_role);
+
+  const { plan, promoted } = promoteMissionTeamPlanRoles(existing, requestedRoles);
+  if (promoted.length === 0) {
+    return { plan, promoted, unfilled };
+  }
+
+  const planPath = getMissionTeamPlanPath(missionId);
+  if (!planPath) {
+    return { plan: existing, promoted: [], unfilled };
+  }
+  const missionDir = path.dirname(planPath);
+  writeMissionTeamPlan(missionDir, plan);
+  initializeMissionTeamBindings(missionDir, plan);
+
+  for (const teamRole of promoted) {
+    const assignment = plan.assignments.find((entry) => entry.team_role === teamRole);
+    appendMissionExecutionLedgerEntry({
+      mission_id: missionId,
+      mission_path_hint: input.missionPathHint || missionDir,
+      event_type: 'team_role_staffed',
+      team_role: teamRole,
+      actor_id: assignment?.agent_id || undefined,
+      actor_type: assignment?.actor_type || 'agent',
+      runtime_identity: assignment?.runtime_identity || undefined,
+      decision: input.reason || 'Role demanded by mission work.',
+      payload: {
+        requested_by: input.requestedBy || 'mission_team_orchestrator',
+        provider: assignment?.provider || null,
+        model_id: assignment?.modelId || null,
+        promoted_from: 'standby',
+      },
+    });
+  }
+
+  return { plan, promoted, unfilled };
 }
 
 export function loadMissionStaffingAssignments(

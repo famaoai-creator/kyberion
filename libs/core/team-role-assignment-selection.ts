@@ -45,10 +45,33 @@ export interface AgentProfileRecord {
   fallback_providers?: string[];
 }
 
+/**
+ * TC-01: how a roster role relates to the mission right now.
+ *
+ * - `assigned`  — staffed: an actor is bound, a staffing record exists and a
+ *                 runtime may be spawned for it.
+ * - `standby`   — on the roster with a resolved candidate actor, but not
+ *                 staffed. Promoted to `assigned` when work demands the role,
+ *                 which is a pure state transition: the candidate was already
+ *                 selected at composition time, so promotion never re-runs
+ *                 selection and stays reproducible.
+ * - `unfilled`  — no compatible actor exists in the pool. A real staffing gap,
+ *                 detected at composition time even for standby roles.
+ */
+export type MissionTeamAssignmentStatus = 'assigned' | 'standby' | 'unfilled';
+
 export interface MissionTeamAssignment {
   team_role: string;
   required: boolean;
-  status: 'assigned' | 'unfilled';
+  status: MissionTeamAssignmentStatus;
+  /**
+   * TC-04: why this role is on the roster — `structural` (always staffed),
+   * `obligation` (required by the governed obligations catalog and therefore
+   * not removable by a template or organization overlay), `template`
+   * (organization preference). Audits read the roster's justification from
+   * here instead of inferring it from the template name.
+   */
+  role_sources?: Array<'structural' | 'obligation' | 'template'>;
   agent_id: string | null;
   actor_type?: 'agent' | 'human' | 'service';
   resource?: import('./mission-team-binding.js').WorkforceResourceRef;

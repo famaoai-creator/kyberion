@@ -3661,6 +3661,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/team-composition-obligations.json",
+      "tier": "public",
+      "size": 167,
+      "type": "json"
+    },
+    {
       "path": "product/governance/tenant-onboarding-procedure.md",
       "tier": "public",
       "size": 3319,
@@ -9435,7 +9441,7 @@
     {
       "path": "product/schemas/mission-team-plan.schema.json",
       "tier": "public",
-      "size": 6843,
+      "size": 7157,
       "type": "json"
     },
     {
@@ -11098,6 +11104,12 @@
       "path": "product/schemas/task-session.schema.json",
       "tier": "public",
       "size": 14373,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/team-composition-obligations.schema.json",
+      "tier": "public",
+      "size": 2185,
       "type": "json"
     },
     {

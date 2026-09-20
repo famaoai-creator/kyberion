@@ -213,7 +213,10 @@ describe('Mission team composition contract', () => {
       false
     );
 
-    for (const assignment of plan.assignments.filter((entry) => entry.status === 'assigned')) {
+    // TC-01: every roster role with a resolved candidate (staffed or standby)
+    // must satisfy the role/authority contract — standby is a staffing state,
+    // not a weaker selection.
+    for (const assignment of plan.assignments.filter((entry) => entry.status !== 'unfilled')) {
       expect(agents[assignment.agent_id!].team_roles).toContain(assignment.team_role);
       expect(teamRoles[assignment.team_role].compatible_authority_roles).toContain(
         assignment.authority_role!
@@ -283,9 +286,15 @@ describe('Mission team composition contract', () => {
     const tracker = plan.assignments.find((entry) => entry.team_role === 'tracker');
 
     expect(plan.team_governance?.composition.unfilled_required_roles).toEqual([]);
-    expect(facilitator?.status).toBe('assigned');
-    expect(scribe?.status).toBe('assigned');
-    expect(tracker?.status).toBe('assigned');
+    // TC-01: non-structural roles join the roster on standby with their
+    // candidate already resolved, and are staffed when work demands them.
+    expect(facilitator?.status).toBe('standby');
+    expect(scribe?.status).toBe('standby');
+    expect(tracker?.status).toBe('standby');
+    expect(plan.team_governance?.composition.standby_roles).toEqual(
+      expect.arrayContaining(['facilitator', 'scribe', 'tracker'])
+    );
+    expect(plan.team_governance?.composition.assigned_roles).toEqual(['owner', 'orchestrator']);
     expect(facilitator?.agent_id).toBeTruthy();
     expect(scribe?.agent_id).toBeTruthy();
     expect(tracker?.agent_id).toBeTruthy();

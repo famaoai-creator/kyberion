@@ -1,0 +1,6 @@
+{
+  "$schema": "../schemas/team-composition-obligations.schema.json",
+  "version": "1.0.0",
+  "always_staffed_roles": ["owner", "orchestrator"],
+  "obligations": []
+}

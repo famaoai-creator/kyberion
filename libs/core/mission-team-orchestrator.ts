@@ -6,10 +6,11 @@ import {
   type MissionTeamAssignment,
   type MissionTeamOrganizationProfileSummary,
 } from './mission-team-plan-composer.js';
+import { staffMissionTeamRoles } from './mission-team-binding.js';
 import type { EventScopeInput } from './event-scope.js';
 
 export interface MissionTeamRuntimeAssignment extends MissionTeamAssignment {
-  runtime_status: 'spawned' | 'already_ready' | 'unfilled' | 'failed';
+  runtime_status: 'spawned' | 'already_ready' | 'standby' | 'unfilled' | 'failed';
   error?: string;
 }
 
@@ -49,16 +50,41 @@ export async function ensureMissionTeamRuntime(
   const runtimeOwnerType = typeof input === 'string' ? undefined : input.runtimeOwnerType;
   const requestedRoles = teamRoles ? new Set(teamRoles) : null;
 
-  const plan = loadMissionTeamPlan(missionId);
-  if (!plan) {
+  const loadedPlan = loadMissionTeamPlan(missionId);
+  if (!loadedPlan) {
     throw new Error(`Mission team plan not found for ${missionId}`);
   }
+
+  // TC-02: a role-scoped ensure IS the staffing demand — the caller (task
+  // dispatch, handoff) knows which roles the work needs. Promote those
+  // standby roles through the governed entry point so the plan, the staffing
+  // records and the execution ledger all move together. An unscoped ensure
+  // only materializes what is already staffed; it must never staff the whole
+  // roster, or demand-driven staffing would collapse back into eager
+  // staffing.
+  const plan =
+    requestedRoles && requestedRoles.size > 0
+      ? (staffMissionTeamRoles({
+          missionId,
+          teamRoles: [...requestedRoles],
+          requestedBy: runtimeOwnerType || 'mission_team_orchestrator',
+          reason: 'Role demanded by mission work dispatch.',
+        }).plan ?? loadedPlan)
+      : loadedPlan;
 
   const assignments: MissionTeamRuntimeAssignment[] = [];
   const resolvedRuntimeStatus = new Map<string, MissionTeamRuntimeAssignment>();
 
   for (const assignment of plan.assignments) {
     if (requestedRoles && !requestedRoles.has(assignment.team_role)) {
+      continue;
+    }
+
+    if (assignment.status === 'standby') {
+      assignments.push({
+        ...assignment,
+        runtime_status: 'standby',
+      });
       continue;
     }
 
