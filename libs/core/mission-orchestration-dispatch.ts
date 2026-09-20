@@ -9,6 +9,7 @@ import {
   resolveMissionTeamReceiver,
 } from './mission-team-plan-composer.js';
 import { restaffMissionTeamRole } from './mission-team-binding.js';
+import { proposeMissionTeamRoster } from './team-roster-proposal.js';
 import { resolveTaskModelHint } from './reasoning-model-routing.js';
 import { type TaskModelPhaseKind } from './reasoning-level-policy.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
@@ -112,6 +113,35 @@ export async function dispatchMissionNextTasksCore(
       reason: 'Prewarm roles required by planner-produced NEXT_TASKS.',
       timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
     });
+  }
+
+  // TC-12: the opt-in proposer runs once, before the first dispatch, when the
+  // planned work is known but nothing has been executed yet. It is gated by
+  // the governed policy (off by default), never fails dispatch, and can only
+  // add roles through the same checked restaff path a human uses.
+  try {
+    const proposal = await proposeMissionTeamRoster({
+      missionId,
+      missionContext: plannedTasks
+        .slice(0, 12)
+        .map(
+          (task) => `${task.assigned_to?.role || 'unassigned'}: ${task.description || task.task_id}`
+        )
+        .join('\n'),
+    });
+    if (proposal.accepted_roles.length > 0) {
+      await ensureMissionTeamRuntimeViaSupervisor({
+        missionId,
+        teamRoles: proposal.accepted_roles,
+        requestedBy: 'mission_orchestration_worker',
+        reason: 'Materialize roles accepted from the roster proposer.',
+        timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
+      });
+    }
+  } catch (error) {
+    logger.warn(
+      `[worker] roster proposal skipped: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 
   const dispatched: Array<{ task_id: string; team_role: string; agent_id: string }> = [];

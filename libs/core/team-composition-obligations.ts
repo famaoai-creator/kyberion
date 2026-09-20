@@ -39,6 +39,16 @@ export interface TeamCompositionObligationsCatalog {
    * ceiling instead of a restatement of the roster size.
    */
   roster_headroom?: number;
+  /**
+   * TC-12: whether a reasoning backend may propose discretionary roles. Off by
+   * default: a proposal is a suggestion, never a decision, and must survive
+   * the same checks as any other staffing change.
+   */
+  roster_proposal?: {
+    enabled: boolean;
+    max_proposals?: number;
+    excluded_roles?: string[];
+  };
   always_staffed_roles: string[];
   obligations: TeamCompositionObligationRule[];
 }
@@ -75,6 +85,25 @@ export function loadTeamCompositionObligations(): TeamCompositionObligationsCata
 
 export function resetTeamCompositionObligations(): void {
   obligationsCatalog.reset();
+}
+
+export interface RosterProposalPolicy {
+  enabled: boolean;
+  max_proposals: number;
+  excluded_roles: string[];
+}
+
+/** TC-12: the roster-proposal policy, defaulting to disabled. */
+export function resolveRosterProposalPolicy(): RosterProposalPolicy {
+  const declared = loadTeamCompositionObligations().roster_proposal;
+  return {
+    enabled: Boolean(declared?.enabled),
+    max_proposals:
+      typeof declared?.max_proposals === 'number' && declared.max_proposals > 0
+        ? declared.max_proposals
+        : 2,
+    excluded_roles: declared?.excluded_roles || [],
+  };
 }
 
 /** How many members a team may gain beyond its composed roster (TC-06). */

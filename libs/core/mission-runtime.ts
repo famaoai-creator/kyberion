@@ -11,6 +11,12 @@ import {
 import { findMissionPath } from './path-resolver.js';
 import { initializeMissionTeamBindings, restaffMissionTeamRole } from './mission-team-binding.js';
 import {
+  proposeMissionTeamRoster,
+  summarizeRosterProposalOutcomes,
+  type RosterProposalOutcome,
+  type RosterProposalOutcomeSummary,
+} from './team-roster-proposal.js';
+import {
   loadMissionTeamPlan,
   enrichMissionTeamPlanWithOrganizationProfile,
   resolveMissionTeamPlan,
@@ -360,4 +366,44 @@ export async function restaffMissionTeam(
       ` roster=${summary.roster_size}/${summary.max_members ?? '-'}`
   );
   return summary;
+}
+
+export interface MissionRosterProposalView {
+  outcome: RosterProposalOutcome;
+  summary: RosterProposalOutcomeSummary;
+}
+
+/**
+ * TC-12/TC-13: run the roster proposer for one mission and report what the
+ * recorded outcomes say about it. `force` runs it even while the governed
+ * policy keeps it disabled, which is how the feature is evaluated before
+ * anyone turns it on.
+ */
+export async function proposeMissionRoster(
+  id: string,
+  options: { missionContext?: string; force?: boolean } = {}
+): Promise<MissionRosterProposalView | undefined> {
+  if (!id) {
+    logger.error(
+      'Usage: mission_controller propose-roster <MISSION_ID> [--context <TEXT>] [--force]'
+    );
+    return undefined;
+  }
+  const upperId = id.toUpperCase();
+  if (!loadState(upperId)) {
+    logger.error(`Mission ${upperId} not found. Run "list" to see available missions.`);
+    return undefined;
+  }
+
+  const outcome = await proposeMissionTeamRoster({
+    missionId: upperId,
+    ...(options.missionContext ? { missionContext: options.missionContext } : {}),
+    ...(options.force ? { force: true } : {}),
+  });
+  const summary = summarizeRosterProposalOutcomes(upperId);
+  logger.info(
+    `[roster-proposal] ${upperId} status=${outcome.status} accepted=${outcome.accepted_roles.length}/${outcome.decisions.length} ` +
+      `acceptance_rate=${summary.acceptance_rate.toFixed(2)} follow_up_restaff_rate=${summary.follow_up_restaff_rate.toFixed(2)}`
+  );
+  return { outcome, summary };
 }

@@ -1377,7 +1377,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 23798,
+      "size": 22206,
       "type": "json"
     },
     {
@@ -3663,7 +3663,7 @@
     {
       "path": "product/governance/team-composition-obligations.json",
       "tier": "public",
-      "size": 1938,
+      "size": 2059,
       "type": "json"
     },
     {
@@ -4455,7 +4455,7 @@
     {
       "path": "product/orchestration/agent-profiles/implementation-architect.json",
       "tier": "public",
-      "size": 838,
+      "size": 766,
       "type": "json"
     },
     {
@@ -11115,7 +11115,7 @@
     {
       "path": "product/schemas/team-composition-obligations.schema.json",
       "tier": "public",
-      "size": 2593,
+      "size": 3424,
       "type": "json"
     },
     {
