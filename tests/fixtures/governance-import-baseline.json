@@ -71,6 +71,7 @@
     "libs/core/promoted-memory.test.ts",
     "libs/core/promotion-candidates.test.ts",
     "libs/core/provider-discovery.test.ts",
+    "libs/core/provider-egress-gate.test.ts",
     "libs/core/python-voice-bridge.test.ts",
     "libs/core/reasoning-backend.failover-events.test.ts",
     "libs/core/reasoning-degradation.test.ts",
