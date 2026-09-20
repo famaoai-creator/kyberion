@@ -139,6 +139,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/agent-pane-runtime-backend-poc.md",
+      "tier": "public",
+      "size": 2578,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/agent-runtime-dispatch-observability-findings.md",
       "tier": "public",
       "size": 4881,
@@ -273,7 +279,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 7463,
+      "size": 7464,
       "type": "md"
     },
     {
@@ -436,6 +442,12 @@
       "path": "product/architecture/intent-outcome-patterns.md",
       "tier": "public",
       "size": 5751,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/judgment-backend-seam.md",
+      "tier": "public",
+      "size": 8912,
       "type": "md"
     },
     {
@@ -843,7 +855,7 @@
     {
       "path": "product/architecture/tool-runtime-abstraction.md",
       "tier": "public",
-      "size": 4026,
+      "size": 4634,
       "type": "md"
     },
     {
@@ -1383,7 +1395,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 47990,
+      "size": 48171,
       "type": "json"
     },
     {
@@ -1491,7 +1503,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 136211,
+      "size": 138726,
       "type": "json"
     },
     {
@@ -3123,7 +3135,7 @@
     {
       "path": "product/governance/provider-egress-policy.json",
       "tier": "public",
-      "size": 585,
+      "size": 635,
       "type": "json"
     },
     {
@@ -3727,6 +3739,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/tool-runtimes/blackhole-2ch.json",
+      "tier": "public",
+      "size": 1262,
+      "type": "json"
+    },
+    {
       "path": "product/governance/tool-runtimes/claude_real_video.json",
       "tier": "public",
       "size": 1373,
@@ -3751,9 +3769,21 @@
       "type": "json"
     },
     {
+      "path": "product/governance/tool-runtimes/herdr.json",
+      "tier": "public",
+      "size": 1423,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/imagesnap.json",
+      "tier": "public",
+      "size": 1080,
+      "type": "json"
+    },
+    {
       "path": "product/governance/tool-runtimes/index.json",
       "tier": "public",
-      "size": 452,
+      "size": 503,
       "type": "json"
     },
     {
@@ -4683,7 +4713,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19166,
+      "size": 19918,
       "type": "json"
     },
     {
@@ -11403,7 +11433,7 @@
     {
       "path": "product/schemas/voice-action.schema.json",
       "tier": "public",
-      "size": 8087,
+      "size": 8129,
       "type": "json"
     },
     {

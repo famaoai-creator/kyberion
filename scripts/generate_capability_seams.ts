@@ -63,6 +63,10 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/intent-extractor.ts',
     consumers: ['libs/core/mission-orchestration-worker.ts', 'libs/core/reasoning-bootstrap.ts'],
   },
+  'judgment-backend': {
+    declaration: 'libs/core/judgment-backend.ts',
+    consumers: ['libs/core/organization-operating-model-persistence.ts'],
+  },
   'meeting-join-driver': {
     declaration: 'libs/core/meeting-join-driver.ts',
     consumers: ['libs/core/in-room-meeting-driver.ts'],

@@ -2843,6 +2843,10 @@
       "types": "./dist/judge-route.d.ts",
       "default": "./dist/judge-route.js"
     },
+    "./judgment-backend": {
+      "types": "./dist/judgment-backend.d.ts",
+      "default": "./dist/judgment-backend.js"
+    },
     "./tool-call-scheduler": {
       "types": "./dist/tool-call-scheduler.d.ts",
       "default": "./dist/tool-call-scheduler.js"

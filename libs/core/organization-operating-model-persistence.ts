@@ -9,6 +9,7 @@ import { resolveTenant } from './tenant-registry.js';
 import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { BUILTIN_JUDGMENT_PROVIDER, registerJudgmentBackend } from './judgment-backend.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
@@ -396,6 +397,86 @@ export function validateOrganizationLearningCandidate(
   return Boolean(validatorFor(LEARNING_SCHEMA_PATH)(value));
 }
 
+/**
+ * Terms that appear in a shape's vocabulary but are too generic to be
+ * evidence *for* that shape on their own. '今月の運用レポートを作る' trips
+ * three rules — routine on `レポート`, service on `運用`, solution on
+ * `作る` — while meaning exactly one thing, and
+ * '障害対応の月次レポートを作って承認をもらう' also trips three, while
+ * genuinely being three work items. Rule count cannot tell those apart
+ * (measured: both are 3), so competition is counted over rules that matched
+ * on something specific instead.
+ */
+const GENERIC_RULE_TERMS = new Set([
+  '作る', // i18n-exempt: classification vocabulary, not user-facing text
+  '導入', // i18n-exempt: classification vocabulary, not user-facing text
+  '新しい', // i18n-exempt: classification vocabulary, not user-facing text
+  '運用', // i18n-exempt: classification vocabulary, not user-facing text
+  'レビュー', // i18n-exempt: classification vocabulary, not user-facing text
+  '改善', // i18n-exempt: classification vocabulary, not user-facing text
+  'サービス', // i18n-exempt: classification vocabulary, not user-facing text
+  'build',
+  'make',
+  'implement',
+  'launch',
+  'develop',
+  'review',
+  'improve',
+  'optimize',
+  'project',
+]);
+
+/**
+ * Which alternatives of a rule's pattern are present. The six patterns are
+ * flat literal alternations, so splitting the source is exact.
+ */
+function matchedTerms(pattern: RegExp, normalized: string): string[] {
+  return pattern.source.split('|').filter((term) => term && normalized.includes(term));
+}
+
+/** A rule matched on at least one non-generic term. */
+function isStrongMatch(pattern: RegExp, normalized: string): boolean {
+  return matchedTerms(pattern, normalized).some((term) => !GENERIC_RULE_TERMS.has(term));
+}
+
+/**
+ * Discount for an utterance that several shapes claim *specifically*. One
+ * shape is unambiguous; three is a request that should reach a human rather
+ * than be settled by rule order.
+ */
+function competitionFactor(strongMatchCount: number): number {
+  if (strongMatchCount <= 1) return 1;
+  if (strongMatchCount === 2) return 0.85;
+  return 0.6;
+}
+
+/**
+ * Does this utterance state an action at all?
+ *
+ * Detected by predicate morphology rather than a verb list: Japanese
+ * predicates end in one of a small set of kana, and an enumerated list
+ * misses ordinary forms (an early version scored '本番障害を収束させる' as
+ * topic-only because `させる` was not in it).
+ */
+const WORK_PREDICATE_PATTERN =
+  /[るうくすつぬぶむぐいたてろよ]$|ます$|たい$|ほしい|ください|お願い|[?？]$|\b(?:do|make|fix|check|please|want)\b/;
+
+/**
+ * Discount for an utterance that names a topic without stating work.
+ * '請求まわり' matches the routine rule on 請求, but two nouns and no
+ * predicate is not a request — it is the start of one, and the honest answer
+ * is to ask. Length is a secondary signal for the same thing.
+ */
+function specificityFactor(utterance: string, normalized: string): number {
+  const trimmed = utterance.trim();
+  let factor = 1;
+  if (!WORK_PREDICATE_PATTERN.test(trimmed) && !WORK_PREDICATE_PATTERN.test(normalized)) {
+    factor *= 0.7;
+  }
+  if (trimmed.length < 8) factor *= 0.85;
+  return factor;
+}
+
 export function classifyOrganizationWork(
   utterance: string,
   selectedTaskKind?: string
@@ -404,6 +485,8 @@ export function classifyOrganizationWork(
   managementUnit: Exclude<OrganizationManagementUnit, 'task_session'>;
   confidence: number;
   reasonKey: string;
+  /** How `confidence` was reached; for audit and bench replay. */
+  signals?: Record<string, unknown>;
 } {
   const normalized = utterance.toLocaleLowerCase();
   const rules: Array<{
@@ -457,8 +540,43 @@ export function classifyOrganizationWork(
       reasonKey: 'organization:organization_resolution_reason_project',
     },
   ];
-  const matched = rules.find((rule) => rule.pattern.test(normalized));
-  if (matched) return matched;
+  // The rule order below is the shape decision and stays first-match-wins;
+  // only `confidence` is computed. Before this, every matched rule returned
+  // its own hard-coded constant (0.80 … 0.93) and every fallback returned one
+  // below the `< 0.7` human-confirmation threshold (0.40 / 0.58 / 0.62). The
+  // two sets were disjoint, so the threshold was exactly "did any regex
+  // match" and moved nowhere in (0.62, 0.80]; worse, keyword density is
+  // anti-correlated with clarity here, so the most ambiguous utterances
+  // scored highest — '請求まわり' (two nouns, no predicate) reached 0.88 and a
+  // three-shape request reached 0.93, both sailing past the gate that exists
+  // to catch them. Measured on mission JUDGMENT-SEAM-20260921,
+  // `evidence/A1-baseline-confidence-audit.md` (findings F-1, F-2).
+  //
+  // Each rule's constant is kept as a *prior* — it encodes how reliable that
+  // shape's vocabulary is — and is discounted by two signals that move in the
+  // right direction:
+  //   competition — how many other shapes also claim this utterance
+  //   specificity — whether it states an action at all, rather than naming a topic
+  const matchedRules = rules.filter((rule) => rule.pattern.test(normalized));
+  const matched = matchedRules[0];
+  if (matched) {
+    const strongMatches = matchedRules.filter((rule) => isStrongMatch(rule.pattern, normalized));
+    const competition = competitionFactor(strongMatches.length);
+    const specificity = specificityFactor(utterance, normalized);
+    return {
+      workShape: matched.workShape,
+      managementUnit: matched.managementUnit,
+      reasonKey: matched.reasonKey,
+      confidence: Math.round(matched.confidence * competition * specificity * 100) / 100,
+      signals: {
+        prior: matched.confidence,
+        matched_shapes: matchedRules.map((rule) => rule.workShape),
+        strong_shapes: strongMatches.map((rule) => rule.workShape),
+        competition,
+        specificity,
+      },
+    };
+  }
   if (selectedTaskKind === 'project_bootstrap' || selectedTaskKind === 'mission') {
     return {
       workShape: 'solution_project',
@@ -1048,4 +1166,45 @@ export function operationDirectory(
       rootDir
     )
   );
+}
+
+/**
+ * Organization-work classification, exposed on the `judgment-backend` seam.
+ *
+ * `classifyOrganizationWork` stays the synchronous path every existing caller
+ * uses — `resolveOrganizationWork` and `resolveOnboardingFirstWork` both
+ * return synchronously and making them async would ripple through the
+ * onboarding surface for no gain. This registration is the *other* face of
+ * the same rules: it lets a provider that can do better be measured against
+ * them on the same question, without any caller having to name it.
+ *
+ * It is deliberately `local-only` and permanently uncalibrated. Its
+ * confidence is a discounted table lookup, not a fitted estimate, and
+ * `resolveCalibration()` hard-codes `false` for this provider id so nothing
+ * downstream can mistake the two.
+ */
+export const ORGANIZATION_WORK_SHAPE_QUESTION = 'organization.work_shape';
+
+export function registerOrganizationWorkJudgment(): () => void {
+  return registerJudgmentBackend({
+    judgment_id: BUILTIN_JUDGMENT_PROVIDER,
+    egress: 'local-only',
+    supports(question) {
+      return question.kind === 'choice' && question.id === ORGANIZATION_WORK_SHAPE_QUESTION;
+    },
+    async judge(request) {
+      return request.questions.map((question) => {
+        const result = classifyOrganizationWork(request.state);
+        return {
+          id: question.id,
+          value: result.workShape,
+          confidence: result.confidence,
+          // Overwritten by the seam from the calibration registry; the value
+          // here is only the honest default.
+          calibrated: false,
+          signals: { ...(result.signals || {}), reason_key: result.reasonKey },
+        };
+      });
+    },
+  });
 }
