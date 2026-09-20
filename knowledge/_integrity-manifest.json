@@ -1377,7 +1377,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 21567,
+      "size": 23798,
       "type": "json"
     },
     {
@@ -4455,7 +4455,7 @@
     {
       "path": "product/orchestration/agent-profiles/implementation-architect.json",
       "tier": "public",
-      "size": 747,
+      "size": 838,
       "type": "json"
     },
     {
@@ -4497,7 +4497,7 @@
     {
       "path": "product/orchestration/agent-profiles/reasoning-worker.json",
       "tier": "public",
-      "size": 1183,
+      "size": 1202,
       "type": "json"
     },
     {

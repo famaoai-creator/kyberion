@@ -147,19 +147,35 @@ function selectTier(entry: ModelCostEntry, inputTokens: number): CostRate {
   );
 }
 
+/**
+ * Compare model ids by their alphanumeric skeleton.
+ *
+ * Providers report display names ("Gemini 3.6 Flash (Medium)", "Claude Opus
+ * 5") while the registry is keyed by model ids ("gemini-3.6-flash"). A plain
+ * substring match never connects the two, so every such actor silently
+ * resolved to the default rate. Stripping separators makes
+ * "gemini36flashmedium" contain "gemini36flash" without loosening what counts
+ * as a match: candidates are still tried longest-first, so a more specific id
+ * (gpt-4o-mini) still wins over a shorter one it contains (gpt-4o).
+ */
+function costModelSkeleton(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function resolvePer1kRate(reg: ModelCostRegistry, model: string, inputTokens: number): CostRate {
   const id = (model || '').trim();
   if (!id) return selectTier(reg.default, inputTokens);
   if (reg.models[id]) return selectTier(reg.models[id], inputTokens);
   if (reg.aliases?.[id] && reg.models[reg.aliases[id]])
     return selectTier(reg.models[reg.aliases[id]], inputTokens);
-  // Versioned ids never exact-match; take the longest model-id or alias contained in the given id.
-  const lower = id.toLowerCase();
+  // Versioned ids and provider display names never exact-match; take the
+  // longest model-id or alias contained in the given id.
+  const skeleton = costModelSkeleton(id);
   const candidates = [...Object.keys(reg.models), ...Object.keys(reg.aliases ?? {})].sort(
     (a, b) => b.length - a.length
   );
   for (const key of candidates) {
-    if (lower.includes(key.toLowerCase())) {
+    if (skeleton.includes(costModelSkeleton(key))) {
       const target = reg.models[key] ? key : reg.aliases?.[key];
       if (target && reg.models[target]) return selectTier(reg.models[target], inputTokens);
     }
@@ -184,12 +200,12 @@ export function resolveCostRateModelKey(model: string): string | null {
   if (!id) return null;
   if (reg.models[id]) return id;
   if (reg.aliases?.[id] && reg.models[reg.aliases[id]]) return reg.aliases[id];
-  const lower = id.toLowerCase();
+  const skeleton = costModelSkeleton(id);
   const candidates = [...Object.keys(reg.models), ...Object.keys(reg.aliases ?? {})].sort(
     (a, b) => b.length - a.length
   );
   for (const key of candidates) {
-    if (lower.includes(key.toLowerCase())) {
+    if (skeleton.includes(costModelSkeleton(key))) {
       const target = reg.models[key] ? key : reg.aliases?.[key];
       if (target && reg.models[target]) return target;
     }

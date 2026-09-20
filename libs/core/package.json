@@ -423,6 +423,10 @@
       "types": "./dist/mission-team-index.d.ts",
       "default": "./dist/mission-team-index.js"
     },
+    "./staffing-coverage": {
+      "types": "./dist/staffing-coverage.d.ts",
+      "default": "./dist/staffing-coverage.js"
+    },
     "./agent-performance-index": {
       "types": "./dist/agent-performance-index.d.ts",
       "default": "./dist/agent-performance-index.js"

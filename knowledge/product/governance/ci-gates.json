@@ -626,6 +626,18 @@
       "args": ["dist/scripts/check_production_evidence.js", "--require-complete"],
       "owner": "release",
       "rationale": "Prevents release promotion until external production evidence is complete."
+    },
+    {
+      "id": "staffing-capability-coverage",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check_staffing_capability_coverage.ts"
+      ],
+      "owner": "quality",
+      "rationale": "TC-11: fails when the agent pool cannot supply a role the obligations catalog can require or a mission-team template declares required, and when a hard separation-of-duties pair can never be independent. Team roles and agent profiles declared capabilities that were never compared, so an uncoverable role was still filled by the least-bad candidate."
     }
   ],
   "workflow_exceptions": [
