@@ -7,7 +7,8 @@
     "agy": { "egress": "external-api" },
     "gemini": { "egress": "external-api" },
     "copilot": { "egress": "external-api" },
-    "grok": { "egress": "external-api" }
+    "grok": { "egress": "external-api" },
+    "typesafe-jev": { "egress": "external-api" }
   },
   "tier_policy": {
     "confidential": {

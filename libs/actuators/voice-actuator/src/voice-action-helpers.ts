@@ -1,4 +1,3 @@
-import { createCoreAudioDeviceInventoryBridge } from '@agent/core/coreaudio-device-inventory';
 import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
 import { getStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
 import { getVoiceProfileRegistry } from '@agent/core/voice-profile-registry';
@@ -9,8 +8,7 @@ import { TtsLoopbackVerifier } from '@agent/core/tts-loopback-verifier';
 import { resolveVoiceBackend } from '@agent/core/media-backend-registry';
 import { resolveVoiceEngineForPlatform } from '@agent/core/voice-engine-registry';
 import { safeExec } from '@agent/core/secure-io';
-import { StubAudioBus } from '@agent/core/audio-bus';
-import { BlackHoleAudioBus } from '@agent/core/blackhole-audio-bus';
+import { resolveAudioBus, type AudioBusId } from '@agent/core/audio-bus-resolver';
 import { performPlayback } from './voice-runtime-helpers.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
@@ -153,22 +151,14 @@ export async function listVoices(): Promise<any> {
 export async function listAudioRoutes(
   params: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const requestedBus = stringParam(params, 'bus') || 'blackhole';
-  if (requestedBus === 'stub') {
-    return {
-      status: 'succeeded',
-      action: 'list_audio_routes',
-      platform: process.platform,
-      routes: [{ bus_id: 'stub', available: true }],
-    };
-  }
-  if (requestedBus !== 'blackhole')
-    throw new Error(`unsupported audio route bus '${requestedBus}'`);
-  const inventory = await createCoreAudioDeviceInventoryBridge().probe();
+  const busId = (stringParam(params, 'bus') || 'blackhole') as AudioBusId;
+  const bus = resolveAudioBus(busId);
+  const probe = await bus.probe();
   const viewModel = buildAudioRouteViewModel(
-    inventory.devices,
-    inventory.available,
-    inventory.reason
+    probe.device_descriptors ?? [],
+    probe.available,
+    probe.reason,
+    busId
   );
   return {
     status: 'succeeded',
@@ -176,10 +166,11 @@ export async function listAudioRoutes(
     platform: process.platform,
     routes: [
       {
-        bus_id: 'blackhole',
-        available: inventory.available,
-        ...(inventory.reason ? { reason: inventory.reason } : {}),
-        devices: inventory.devices,
+        bus_id: probe.bus_id,
+        available: probe.available,
+        ...(probe.reason ? { reason: probe.reason } : {}),
+        ...(probe.devices ? { devices: probe.devices } : {}),
+        ...(probe.device_descriptors ? { device_descriptors: probe.device_descriptors } : {}),
       },
     ],
     view_model: viewModel,
@@ -189,16 +180,8 @@ export async function listAudioRoutes(
 export async function probeAudioRoute(
   params: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const busId = stringParam(params, 'bus') || 'blackhole';
-  if (busId === 'stub')
-    return {
-      status: 'succeeded',
-      action: 'probe_audio_route',
-      probe: await new StubAudioBus().probe(),
-      view_model: buildAudioRouteViewModel([], true, 'stub route'),
-    };
-  if (busId !== 'blackhole') throw new Error(`unsupported audio route bus '${busId}'`);
-  const bus = new BlackHoleAudioBus({
+  const busId = (stringParam(params, 'bus') || 'blackhole') as AudioBusId;
+  const bus = resolveAudioBus(busId, {
     ...(stringParam(params, 'input_device_uid')
       ? { input_device_uid: stringParam(params, 'input_device_uid') }
       : {}),
@@ -217,7 +200,8 @@ export async function probeAudioRoute(
     view_model: buildAudioRouteViewModel(
       probe.device_descriptors ?? [],
       probe.available,
-      probe.reason
+      probe.reason,
+      busId
     ),
   };
 }
@@ -225,7 +209,8 @@ export async function probeAudioRoute(
 export function buildAudioRouteViewModel(
   devices: readonly { uid: string; display_name: string; direction: string; is_virtual: boolean }[],
   available: boolean,
-  reason?: string
+  reason?: string,
+  busId: AudioBusId = 'blackhole'
 ): Record<string, unknown> {
   return {
     screen: 'audio-route-setup',
@@ -234,7 +219,12 @@ export function buildAudioRouteViewModel(
     steps: [
       {
         id: 'driver',
-        label: 'BlackHole 2ch インストール状態',
+        label:
+          busId === 'pulseaudio'
+            ? 'PulseAudio route status'
+            : busId === 'stub'
+              ? 'Stub audio route'
+              : '仮想オーディオドライバのインストール状態',
         status: available ? 'pass' : 'action_required',
       },
       {
@@ -280,34 +270,21 @@ export async function verifyTtsLoopback(
   const profileId =
     stringParam(params, 'voice_profile_id') || getVoiceProfileRegistry().default_profile_id;
   const route = recordParam(params, 'audio_route');
-  const busId = stringParam(route, 'bus') || 'blackhole';
-  if (busId !== 'blackhole' && busId !== 'stub')
-    throw new Error(`unsupported audio route bus '${busId}'`);
+  const busId = (stringParam(route, 'bus') || 'blackhole') as AudioBusId;
   const dryRun = booleanParam(params, 'dry_run');
-  const bus =
-    busId === 'stub'
-      ? new StubAudioBus()
-      : new BlackHoleAudioBus({
-          ...(stringParam(route, 'input_device_uid')
-            ? { input_device_uid: stringParam(route, 'input_device_uid') }
-            : {}),
-          ...(stringParam(route, 'output_device_uid')
-            ? { output_device_uid: stringParam(route, 'output_device_uid') }
-            : {}),
-          ...(stringParam(route, 'expected_device_label')
-            ? { expected_device_label: stringParam(route, 'expected_device_label') }
-            : {}),
-          session_id: requestId,
-        });
-  const request = buildLoopbackRequest(
-    params,
-    requestId,
-    text,
-    language,
-    profileId,
-    busId as 'blackhole' | 'stub',
-    dryRun
-  );
+  const bus = resolveAudioBus(busId, {
+    ...(stringParam(route, 'input_device_uid')
+      ? { input_device_uid: stringParam(route, 'input_device_uid') }
+      : {}),
+    ...(stringParam(route, 'output_device_uid')
+      ? { output_device_uid: stringParam(route, 'output_device_uid') }
+      : {}),
+    ...(stringParam(route, 'expected_device_label')
+      ? { expected_device_label: stringParam(route, 'expected_device_label') }
+      : {}),
+    session_id: requestId,
+  });
+  const request = buildLoopbackRequest(params, requestId, text, language, profileId, busId, dryRun);
   const configuredSttBridge = stringParam(params, 'stt_bridge_id');
   const sttBridgeId =
     configuredSttBridge ||

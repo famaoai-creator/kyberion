@@ -1,11 +1,20 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { createVirtualCameraBridge, VIRTUAL_CAMERA_BRIDGE_ID } from './virtual-camera-bridge.js';
+import {
+  createVirtualCameraBridge,
+  registerVirtualCameraCaptureBackend,
+  resetVirtualCameraCaptureBackends,
+  VIRTUAL_CAMERA_BRIDGE_ID,
+} from './virtual-camera-bridge.js';
 import { StubVideoFrameBus } from './video-frame-bus.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 describe('createVirtualCameraBridge', () => {
+  afterEach(() => {
+    resetVirtualCameraCaptureBackends();
+  });
+
   it('exposes a stable bridge identity', async () => {
     const bridge = createVirtualCameraBridge({ preferred_backend: 'stub' });
     const probe = await bridge.probe();
@@ -30,6 +39,30 @@ describe('createVirtualCameraBridge', () => {
     const buf = safeReadFile(outPath, { encoding: null }) as Buffer;
     expect(buf.length).toBeGreaterThan(0);
     expect(buf.subarray(1, 4).toString('utf8')).toBe('PNG');
+  });
+
+  it('executes a registered capture backend instead of falling through to ffmpeg', async () => {
+    const outPath = pathResolver.sharedTmp(`camera-bridge-custom-${Date.now()}.bin`);
+    const payload = Buffer.from('custom-backend');
+    registerVirtualCameraCaptureBackend({
+      backend_id: 'test-capture-backend',
+      auto_priority: 1,
+      platforms: ['*'],
+      probe: () => ({ available: true }),
+      capture: ({ save_path }) => safeWriteFile(save_path, payload),
+    });
+
+    try {
+      const bridge = createVirtualCameraBridge({ preferred_backend: 'test-capture-backend' });
+      const probe = await bridge.probe();
+      const result = await bridge.capturePhoto({ save_path: outPath });
+
+      expect(probe.backend).toBe('test-capture-backend');
+      expect(result.backend).toBe('test-capture-backend');
+      expect(safeReadFile(outPath, { encoding: null })).toEqual(payload);
+    } finally {
+      safeRmSync(outPath, { force: true });
+    }
   });
 
   it('streams repeated frames in stub mode', async () => {

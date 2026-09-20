@@ -2,13 +2,7 @@
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { ACPMediator, ACPMediatorOptions } from './acp-mediator.js';
-import {
-  CodexAdapter,
-  CodexAppServerAdapter,
-  ClaudeAdapter,
-  AgyAdapter,
-  type AgentAdapter,
-} from './agent-adapter.js';
+import { type AgentAdapter } from './agent-adapter.js';
 import {
   agentRegistry,
   AgentRecord,
@@ -32,6 +26,17 @@ import type { TaskModelHint } from './reasoning-model-routing.js';
 import { normalizeEventScope, type EventScopeInput } from './event-scope.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isRecord } from './foundation/text.js';
+import {
+  createAgentPaneRuntimeAdapter,
+  parseAgentRuntimeLaunchMode,
+  resolveAgentRuntimeLaunchMode,
+  type AgentRuntimeLaunchMode,
+} from './agent-pane-runtime-bridge.js';
+import { createAgentExecAdapter, hasAgentExecAdapter } from './agent-exec-adapter-bridge.js';
+import './agent-exec-adapter-providers.js';
+import './agent-pane-runtime-herdr.js';
+
+export type { AgentRuntimeLaunchMode as AgentRuntimeBackend };
 
 const PROJECT_ROOT = pathResolver.rootDir();
 const AGENT_IDLE_TIMEOUT_MS = Number(
@@ -68,6 +73,12 @@ export interface SpawnOptions {
   hasUI?: boolean;
   nonInteractive?: boolean;
   runtimeMetadata?: Record<string, unknown>;
+  /**
+   * Launch substrate for this runtime. Overrides
+   * `runtimeMetadata.runtime_backend` and `KYBERION_AGENT_RUNTIME_BACKEND`.
+   * `pipe` = ACP/exec children; `pane` = interactive CLI in a terminal-mux pane.
+   */
+  runtimeBackend?: AgentRuntimeLaunchMode;
   restartPolicy?: {
     maxRestarts: number;
     windowMs: number;
@@ -296,6 +307,12 @@ class AgentLifecycleManagerImpl {
     const agentId = options.agentId || `${options.provider}-${crypto.randomUUID().slice(0, 8)}`;
     const existingHandle = this.handles.get(agentId);
     const existingRecord = agentRegistry.get(agentId);
+    const requestedRuntimeBackend = resolveAgentRuntimeLaunchMode({
+      runtimeBackend: options.runtimeBackend,
+      runtimeMetadata: options.runtimeMetadata,
+    });
+    const existingRuntimeBackend =
+      parseAgentRuntimeLaunchMode(existingRecord?.metadata?.runtime_backend) || 'pipe';
     if (
       existingHandle &&
       (existingRecord?.status === 'ready' ||
@@ -307,12 +324,15 @@ class AgentLifecycleManagerImpl {
       // be silently satisfied by a runtime still bound to the old backend.
       if (
         (!options.provider || existingRecord?.provider === options.provider) &&
-        (!options.modelId || existingRecord?.modelId === options.modelId)
+        (!options.modelId || existingRecord?.modelId === options.modelId) &&
+        existingRuntimeBackend === requestedRuntimeBackend
       ) {
         return existingHandle;
       }
       logger.info(
-        `[AGENT_LIFECYCLE] Recreating ${agentId}: held runtime ${existingRecord?.provider}/${existingRecord?.modelId} != requested ${options.provider}/${options.modelId || '-'}`
+        `[AGENT_LIFECYCLE] Recreating ${agentId}: held runtime ` +
+          `${existingRecord?.provider}/${existingRecord?.modelId}/${existingRuntimeBackend} != ` +
+          `${options.provider}/${options.modelId || '-'}/${requestedRuntimeBackend}`
       );
       await this.shutdown(agentId);
     }
@@ -401,6 +421,11 @@ class AgentLifecycleManagerImpl {
     const config = lifecycleMap[resolvedOptions.provider];
 
     // Register in registry
+    const runtimeBackend = resolveAgentRuntimeLaunchMode({
+      runtimeBackend: resolvedOptions.runtimeBackend,
+      runtimeMetadata,
+    });
+
     agentRegistry.register({
       agentId,
       provider: resolvedOptions.provider,
@@ -413,6 +438,7 @@ class AgentLifecycleManagerImpl {
       missionId: resolvedOptions.missionId,
       scope: resolvedScope,
       metadata: {
+        runtime_backend: runtimeBackend,
         provider_resolution: {
           preferredProvider: options.provider,
           preferredModelId: resolvedModelId || null,
@@ -465,54 +491,86 @@ class AgentLifecycleManagerImpl {
       );
     }
 
-    // Codex, Claude, and Agy use exec mode, not ACP
-    if (
-      resolvedOptions.provider === 'codex' ||
-      resolvedOptions.provider === 'claude' ||
-      resolvedOptions.provider === 'agy'
-    ) {
-      let adapter: CodexAdapter | CodexAppServerAdapter | ClaudeAdapter | AgyAdapter;
+    // Opt-in pane backend: interactive provider CLIs in visible terminal panes.
+    if (runtimeBackend === 'pane') {
+      const paneBackend = await createAgentPaneRuntimeAdapter({
+        agentId,
+        provider: resolvedOptions.provider,
+        modelId: resolvedOptions.modelId,
+        cwd: resolvedOptions.cwd || PROJECT_ROOT,
+        systemPrompt: resolvedOptions.systemPrompt,
+        turnTimeoutMs: resolvedOptions.turnTimeoutMs,
+      });
+      await paneBackend.boot();
+      this.execAdapters.set(agentId, paneBackend);
+      runtimeSupervisor.register({
+        resourceId: agentId,
+        kind: 'agent',
+        ownerId: resolvedOptions.runtimeOwnerId || resolvedOptions.missionId || agentId,
+        ownerType:
+          resolvedOptions.runtimeOwnerType || (resolvedOptions.missionId ? 'mission' : 'agent'),
+        idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
+        shutdownPolicy: 'idle',
+        metadata: {
+          provider: resolvedOptions.provider,
+          modelId: resolvedOptions.modelId || config?.default_model || resolvedOptions.provider,
+          scope: resolvedScope,
+          runtime_backend: 'pane',
+          ...(paneBackend.getRuntimeInfo?.() || {}),
+        },
+        cleanup: async () => this.shutdown(agentId),
+      });
+      agentRegistry.updateStatus(agentId, 'ready');
+      logger.info(`[LIFECYCLE] Agent ${agentId} (pane/${resolvedOptions.provider}) ready.`);
 
-      if (resolvedOptions.provider === 'agy') {
-        adapter = new AgyAdapter({
-          bin: 'agy',
-          cwd: resolvedOptions.cwd || PROJECT_ROOT,
-          model: resolvedOptions.modelId,
-        });
-      } else if (resolvedOptions.provider === 'claude') {
-        const taskModelHint = readTaskModelHint(runtimeMetadata);
-        // Resolve tool restrictions from manifest
-        const { allowedTools, disallowedTools } = ClaudeAdapter.resolveToolRestrictions(
-          manifest?.allowedActuators || [],
-          manifest?.deniedActuators || []
-        );
-        adapter = new ClaudeAdapter({
-          systemPrompt: resolvedOptions.systemPrompt,
-          cwd: resolvedOptions.cwd || PROJECT_ROOT,
-          model: resolvedOptions.modelId,
-          effort: taskModelHint?.effort,
-          allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
-          disallowedTools: disallowedTools.length > 0 ? disallowedTools : undefined,
-          permissionMode: 'auto',
-        });
-      } else {
-        const mode = (getRegisteredEnvText('KYBERION_CODEX_MODE') || 'app-server').toLowerCase();
-        if (mode === 'exec' || mode === 'legacy') {
-          adapter = new CodexAdapter();
-        } else {
-          adapter = new CodexAppServerAdapter({
-            model: resolvedOptions.modelId,
-            modelProvider: getRegisteredEnvText('KYBERION_CODEX_MODEL_PROVIDER'),
-            cwd: resolvedOptions.cwd || PROJECT_ROOT,
-            systemPrompt: resolvedOptions.systemPrompt,
-            approvalMode:
-              (getRegisteredEnvText('KYBERION_CODEX_APPROVAL') || 'strict').toLowerCase() ===
-              'relaxed'
-                ? 'relaxed'
-                : 'strict',
-          });
-        }
-      }
+      const handle: AgentHandle = {
+        agentId,
+        ask: async (prompt: string, askOptions: AgentHandleAskOptions = {}) => {
+          agentRegistry.updateStatus(agentId, 'busy');
+          agentRegistry.touch(agentId);
+          runtimeSupervisor.touch(agentId);
+          try {
+            const res = await paneBackend.ask(prompt, {
+              timeoutMs: askOptions.timeoutMs ?? resolvedOptions.turnTimeoutMs,
+            });
+            agentRegistry.updateStatus(agentId, 'ready');
+            this.observeSuccess(agentId, prompt, res.text, res.stopReason, askOptions.model_tier);
+            return res.text;
+          } catch (e: unknown) {
+            agentRegistry.updateStatus(agentId, 'error');
+            this.observeFailure(agentId, prompt, asError(e));
+            throw e;
+          }
+        },
+        shutdown: async () => {
+          await paneBackend.shutdown();
+          this.execAdapters.delete(agentId);
+          this.handles.delete(agentId);
+          runtimeSupervisor.unregister(agentId);
+          this.releaseIdentityInstance(agentId, 'shutdown');
+          agentRegistry.updateStatus(agentId, 'shutdown');
+          agentRegistry.unregister(agentId);
+          this.spawnOptions.delete(agentId);
+          this.runtimeMetrics.delete(agentId);
+        },
+        getRecord: () => agentRegistry.get(agentId),
+      };
+      this.handles.set(agentId, handle);
+      return handle;
+    }
+
+    // Pipe/exec adapters (Claude, Codex, Agy, …) resolve via the exec-adapter seam
+    if (await hasAgentExecAdapter(resolvedOptions.provider)) {
+      const taskModelHint = readTaskModelHint(runtimeMetadata);
+      const adapter = await createAgentExecAdapter({
+        provider: resolvedOptions.provider,
+        modelId: resolvedOptions.modelId,
+        cwd: resolvedOptions.cwd || PROJECT_ROOT,
+        systemPrompt: resolvedOptions.systemPrompt,
+        effort: taskModelHint?.effort,
+        allowedActuators: manifest?.allowedActuators,
+        deniedActuators: manifest?.deniedActuators,
+      });
 
       await adapter.boot();
       this.execAdapters.set(agentId, adapter);
@@ -528,6 +586,7 @@ class AgentLifecycleManagerImpl {
           provider: resolvedOptions.provider,
           modelId: resolvedOptions.modelId || config?.default_model || resolvedOptions.provider,
           scope: resolvedScope,
+          runtime_backend: 'pipe',
         },
         cleanup: async () => this.shutdown(agentId),
       });
@@ -633,6 +692,7 @@ class AgentLifecycleManagerImpl {
           provider: resolvedOptions.provider,
           modelId: mediatorOpts.modelId,
           scope: resolvedScope,
+          runtime_backend: 'pipe',
         },
         cleanup: async () => this.shutdown(agentId),
       });
@@ -750,6 +810,20 @@ class AgentLifecycleManagerImpl {
         const pid = typeof providerRuntime?.pid === 'number' ? providerRuntime.pid : undefined;
         if (pid && isProcessAlive(pid)) {
           results.set(record.agentId, record.status);
+        } else if (providerRuntime?.backend === 'pane') {
+          // Pane-runtime vendors own the child PTY; treat a reachable agent_status as alive.
+          const paneStatus = String(providerRuntime.agent_status || '')
+            .trim()
+            .toLowerCase();
+          if (
+            paneStatus &&
+            !['error', 'failed', 'dead', 'stopped', 'exited', 'terminated'].includes(paneStatus)
+          ) {
+            results.set(record.agentId, record.status);
+          } else {
+            agentRegistry.updateStatus(record.agentId, 'error');
+            results.set(record.agentId, 'error');
+          }
         } else if (providerRuntime?.stateless === true) {
           results.set(record.agentId, record.status);
         } else {

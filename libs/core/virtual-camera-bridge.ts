@@ -10,7 +10,7 @@ import {
   safeRmSync,
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { resolveFfmpegBin } from './tool-binary-resolvers.js';
+import { resolveFfmpegBin, resolveImagesnapBin } from './tool-binary-resolvers.js';
 import { nowIso } from './foundation/time.js';
 import type { VideoFrame } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
@@ -18,12 +18,80 @@ import type {
   VirtualDeviceInventory,
   VirtualDeviceInventoryBridge,
 } from './virtual-device-inventory-bridge.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export const VIRTUAL_CAMERA_BRIDGE_ID = 'virtual-camera-bridge' as const;
 
 export type VirtualCameraBackendId = 'stub' | 'imagesnap' | 'ffmpeg' | 'libcamera-still';
 // `swift-avfoundation` is macOS-native AVFoundation capture via the helper script.
 export type VirtualCameraBackendIdExtended = VirtualCameraBackendId | 'swift-avfoundation';
+
+export interface VirtualCameraCaptureBackendProbeInput {
+  imagesnap_bin?: string;
+  swift_bin?: string;
+  ffmpeg_bin?: string;
+  libcamera_still_bin?: string;
+  device_preference?: string;
+}
+
+export interface VirtualCameraCaptureBackend {
+  /** Backend ids are open for runtime extensions; builtins use the ids above. */
+  readonly backend_id: string;
+  /** Lower numbers are preferred when auto-selecting on a given platform. */
+  readonly auto_priority: number;
+  /** Platforms this backend may auto-select on. Empty = never auto. */
+  readonly platforms: ReadonlyArray<NodeJS.Platform | '*'>;
+  probe(input: VirtualCameraCaptureBackendProbeInput): {
+    available: boolean;
+    reason?: string;
+  };
+  /** Capture one frame after the bridge has validated the destination path. */
+  capture(input: VirtualCameraCaptureBackendCaptureInput): void;
+}
+
+export interface VirtualCameraCaptureBackendCaptureInput extends VirtualCameraCaptureBackendProbeInput {
+  save_path: string;
+  selected_camera?: string;
+}
+
+const virtualCameraCaptureSeam = createSeam<VirtualCameraCaptureBackend>({
+  key: 'virtual-camera-capture',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+const virtualCameraCaptureDisposers = new Map<string, () => void>();
+let virtualCameraCaptureBuiltinsRegistered = false;
+
+export function registerVirtualCameraCaptureBackend(
+  backend: VirtualCameraCaptureBackend
+): () => void {
+  const id = String(backend.backend_id || '').trim();
+  if (!id) throw new Error('VirtualCameraCaptureBackend.backend_id is required');
+  virtualCameraCaptureDisposers.get(id)?.();
+  const disposer = virtualCameraCaptureSeam.register(id, backend, {
+    provenance: 'builtin',
+    source: 'virtual-camera-bridge',
+  });
+  virtualCameraCaptureDisposers.set(id, disposer);
+  return disposer;
+}
+
+export function listVirtualCameraCaptureBackends(): VirtualCameraCaptureBackend[] {
+  return virtualCameraCaptureSeam.list().map((entry) => entry.implementation);
+}
+
+export function resetVirtualCameraCaptureBackends(): void {
+  for (const dispose of virtualCameraCaptureDisposers.values()) {
+    try {
+      dispose();
+    } catch {
+      /* noop */
+    }
+  }
+  virtualCameraCaptureDisposers.clear();
+  virtualCameraCaptureBuiltinsRegistered = false;
+}
 
 export interface VirtualCameraCaptureRequest {
   /** Optional output path; defaults to a governed shared temp path. */
@@ -48,7 +116,8 @@ export interface VirtualCameraCaptureStreamRequest {
 }
 
 export interface VirtualCameraBridgeOptions {
-  preferred_backend?: VirtualCameraBackendIdExtended;
+  /** Builtin ids are documented above; registered extension ids are accepted too. */
+  preferred_backend?: string;
   device_preference?: string;
   imagesnap_bin?: string;
   swift_bin?: string;
@@ -60,7 +129,7 @@ export interface VirtualCameraBridgeOptions {
 export interface VirtualCameraBridgeProbe {
   bridge_id: typeof VIRTUAL_CAMERA_BRIDGE_ID;
   platform: NodeJS.Platform;
-  backend: VirtualCameraBackendIdExtended;
+  backend: string;
   available: boolean;
   reason?: string;
   device_preference?: string;
@@ -71,7 +140,7 @@ export interface VirtualCameraBridgeProbe {
 export interface VirtualCameraCaptureResult {
   bridge_id: typeof VIRTUAL_CAMERA_BRIDGE_ID;
   platform: NodeJS.Platform;
-  backend: VirtualCameraBackendIdExtended;
+  backend: string;
   save_path: string;
   device_preference?: string;
   selected_camera?: string;
@@ -87,7 +156,6 @@ export interface VirtualCameraBridge {
   pipeTo(bus: VideoFrameBus, input?: VirtualCameraCaptureStreamRequest): Promise<void>;
 }
 
-const DEFAULT_IMAGESNAP_BIN = 'imagesnap';
 const DEFAULT_LIBCAMERA_STILL_BIN = 'libcamera-still';
 
 interface CameraCaptureAdapter {
@@ -156,61 +224,188 @@ function isAvailableCommand(command: string, args: string[]): boolean {
   }
 }
 
+function ensureBuiltinVirtualCameraCaptureBackends(): void {
+  if (virtualCameraCaptureBuiltinsRegistered && listVirtualCameraCaptureBackends().length > 0) {
+    return;
+  }
+  registerVirtualCameraCaptureBackend({
+    backend_id: 'imagesnap',
+    auto_priority: 10,
+    platforms: ['darwin'],
+    probe(input) {
+      const bin = input.imagesnap_bin ?? resolveImagesnapBin();
+      return isAvailableCommand(bin, ['-h'])
+        ? { available: true }
+        : { available: false, reason: `${bin} not available` };
+    },
+    capture(input) {
+      const bin = input.imagesnap_bin ?? resolveImagesnapBin();
+      const args = input.selected_camera
+        ? ['-d', input.selected_camera, input.save_path]
+        : input.device_preference
+          ? ['-d', input.device_preference, input.save_path]
+          : [input.save_path];
+      safeExec(bin, args, { env: process.env });
+    },
+  });
+  registerVirtualCameraCaptureBackend({
+    backend_id: 'swift-avfoundation',
+    auto_priority: 20,
+    platforms: ['darwin'],
+    probe(input) {
+      const bin = input.swift_bin ?? 'swift';
+      return isAvailableCommand(bin, ['--version'])
+        ? { available: true }
+        : { available: false, reason: `${bin} not available` };
+    },
+    capture(input) {
+      const bin = input.swift_bin ?? 'swift';
+      const script = assertSafeRepositoryPath(
+        pathResolver.rootResolve('libs/core/virtual-camera-capture.swift')
+      );
+      const tempCapture = assertSafeRepositoryPath(
+        path.join(
+          path.dirname(input.save_path),
+          `${path.basename(input.save_path, path.extname(input.save_path))}-${Date.now()}.jpg`
+        ),
+        { allowMissingLeaf: true }
+      );
+      const deviceArg = input.selected_camera ?? input.device_preference;
+      const args = [script, '--output', tempCapture];
+      if (deviceArg) args.push('--device', deviceArg);
+      try {
+        safeExec(bin, args, { env: process.env, timeoutMs: 120000 });
+        if (/\.png$/i.test(input.save_path)) {
+          safeExec('sips', ['-s', 'format', 'png', tempCapture, '--out', input.save_path], {
+            env: process.env,
+          });
+        } else if (tempCapture !== input.save_path) {
+          safeExec('cp', [tempCapture, input.save_path], { env: process.env });
+        }
+      } finally {
+        safeRmSync(tempCapture, { force: true });
+      }
+    },
+  });
+  registerVirtualCameraCaptureBackend({
+    backend_id: 'ffmpeg',
+    auto_priority: 30,
+    platforms: ['darwin', 'linux', 'win32'],
+    probe(input) {
+      const bin = input.ffmpeg_bin ?? resolveFfmpegBin();
+      return isAvailableCommand(bin, ['-version'])
+        ? { available: true }
+        : { available: false, reason: `${bin} not available` };
+    },
+    capture(input) {
+      const bin = input.ffmpeg_bin ?? resolveFfmpegBin();
+      const adapter = resolveCameraCaptureAdapter(process.platform);
+      const device = adapter.deviceArg(input.selected_camera || input.device_preference);
+      safeExec(
+        bin,
+        [
+          '-y',
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-f',
+          adapter.inputFormat,
+          '-i',
+          device,
+          '-frames:v',
+          '1',
+          input.save_path,
+        ],
+        { env: process.env }
+      );
+    },
+  });
+  registerVirtualCameraCaptureBackend({
+    backend_id: 'libcamera-still',
+    auto_priority: 25,
+    platforms: ['linux'],
+    probe(input) {
+      const bin = input.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
+      return isAvailableCommand(bin, ['--help'])
+        ? { available: true }
+        : { available: false, reason: `${bin} not available` };
+    },
+    capture(input) {
+      const bin = input.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
+      safeExec(bin, ['-n', '-o', input.save_path], { env: process.env });
+    },
+  });
+  registerVirtualCameraCaptureBackend({
+    backend_id: 'stub',
+    auto_priority: 1000,
+    platforms: ['*'],
+    probe() {
+      return { available: true, reason: 'no real camera backend detected; using stub' };
+    },
+    capture(input) {
+      safeWriteFile(input.save_path, PLACEHOLDER_PNG);
+    },
+  });
+  virtualCameraCaptureBuiltinsRegistered = true;
+}
+
 function chooseBackend(input: {
-  preferred_backend?: VirtualCameraBackendIdExtended;
+  preferred_backend?: string;
   device_preference?: string;
   imagesnap_bin?: string;
   swift_bin?: string;
   ffmpeg_bin?: string;
   libcamera_still_bin?: string;
-}): { backend: VirtualCameraBackendIdExtended; available: boolean; reason?: string } {
+}): { backend: string; available: boolean; reason?: string } {
+  ensureBuiltinVirtualCameraCaptureBackends();
+  const backends = listVirtualCameraCaptureBackends();
+  const probeInput: VirtualCameraCaptureBackendProbeInput = {
+    imagesnap_bin: input.imagesnap_bin,
+    swift_bin: input.swift_bin,
+    ffmpeg_bin: input.ffmpeg_bin,
+    libcamera_still_bin: input.libcamera_still_bin,
+    device_preference: input.device_preference,
+  };
+
   const preferred = input.preferred_backend;
-  if (preferred && preferred !== 'stub') {
-    if (preferred === 'imagesnap') {
-      const bin = input.imagesnap_bin ?? DEFAULT_IMAGESNAP_BIN;
-      return isAvailableCommand(bin, ['-h'])
-        ? { backend: 'imagesnap', available: true }
-        : { backend: 'imagesnap', available: false, reason: `${bin} not available` };
+  if (preferred) {
+    const exact = backends.find((backend) => backend.backend_id === preferred);
+    if (!exact) {
+      return {
+        backend: preferred,
+        available: false,
+        reason: `unknown virtual-camera capture backend '${preferred}'`,
+      };
     }
-    if (preferred === 'ffmpeg') {
-      const bin = input.ffmpeg_bin ?? resolveFfmpegBin();
-      return isAvailableCommand(bin, ['-version'])
-        ? { backend: 'ffmpeg', available: true }
-        : { backend: 'ffmpeg', available: false, reason: `${bin} not available` };
-    }
-    if (preferred === 'swift-avfoundation') {
-      const bin = input.swift_bin ?? 'swift';
-      return isAvailableCommand(bin, ['--version'])
-        ? { backend: 'swift-avfoundation', available: true }
-        : { backend: 'swift-avfoundation', available: false, reason: `${bin} not available` };
-    }
-    const bin = input.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
-    return isAvailableCommand(bin, ['--help'])
-      ? { backend: 'libcamera-still', available: true }
-      : { backend: 'libcamera-still', available: false, reason: `${bin} not available` };
-  }
-  if (preferred === 'stub') return { backend: 'stub', available: true };
-
-  if (process.platform === 'darwin') {
-    const bin = input.imagesnap_bin ?? DEFAULT_IMAGESNAP_BIN;
-    if (isAvailableCommand(bin, ['-h'])) return { backend: 'imagesnap', available: true };
-    const swiftBin = input.swift_bin ?? 'swift';
-    if (isAvailableCommand(swiftBin, ['--version']))
-      return { backend: 'swift-avfoundation', available: true };
-    const ffmpegBin = input.ffmpeg_bin ?? resolveFfmpegBin();
-    if (isAvailableCommand(ffmpegBin, ['-version'])) return { backend: 'ffmpeg', available: true };
+    const probe = exact.probe(probeInput);
+    return { backend: preferred, available: probe.available, reason: probe.reason };
   }
 
-  if (process.platform === 'linux' || process.platform === 'win32') {
-    const ffmpegBin = input.ffmpeg_bin ?? resolveFfmpegBin();
-    const libcameraBin = input.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
-    if (input.device_preference || safeExistsSync('/dev/video0')) {
-      if (isAvailableCommand(ffmpegBin, ['-version']))
-        return { backend: 'ffmpeg', available: true };
+  const platformBackends = backends
+    .filter(
+      (backend) =>
+        backend.backend_id !== 'stub' &&
+        (backend.platforms.includes('*') || backend.platforms.includes(process.platform))
+    )
+    .sort((left, right) => left.auto_priority - right.auto_priority);
+
+  for (const backend of platformBackends) {
+    if (
+      backend.backend_id === 'ffmpeg' &&
+      (process.platform === 'linux' || process.platform === 'win32') &&
+      !(input.device_preference || safeExistsSync('/dev/video0'))
+    ) {
+      continue;
     }
-    if (isAvailableCommand(libcameraBin, ['--help']))
-      return { backend: 'libcamera-still', available: true };
-    if (isAvailableCommand(ffmpegBin, ['-version'])) return { backend: 'ffmpeg', available: true };
+    const probe = backend.probe(probeInput);
+    if (probe.available) return { backend: backend.backend_id, available: true };
+  }
+
+  // Second pass: allow ffmpeg even without an explicit device hint.
+  for (const backend of platformBackends) {
+    if (backend.backend_id !== 'ffmpeg') continue;
+    const probe = backend.probe(probeInput);
+    if (probe.available) return { backend: 'ffmpeg', available: true };
   }
 
   return {
@@ -273,119 +468,25 @@ export class VirtualCameraBridgeImpl implements VirtualCameraBridge {
 
     safeMkdir(path.dirname(savePath), { recursive: true });
 
-    if (chosen.backend === 'stub') {
-      safeWriteFile(savePath, PLACEHOLDER_PNG);
-      return {
-        bridge_id: VIRTUAL_CAMERA_BRIDGE_ID,
-        platform: process.platform,
-        backend: 'stub',
-        save_path: savePath,
-        device_preference: devicePreference,
-        selected_camera: selectedCamera,
-        camera_intent: input.camera_intent,
-        subject_hint: input.subject_hint,
-      };
-    }
-
-    if (chosen.backend === 'imagesnap') {
-      const bin = this.opts.imagesnap_bin ?? DEFAULT_IMAGESNAP_BIN;
-      const args = selectedCamera
-        ? ['-d', selectedCamera, savePath]
-        : devicePreference
-          ? ['-d', devicePreference, savePath]
-          : [savePath];
-      safeExec(bin, args, { env: process.env });
-      return {
-        bridge_id: VIRTUAL_CAMERA_BRIDGE_ID,
-        platform: process.platform,
-        backend: 'imagesnap',
-        save_path: savePath,
-        device_preference: devicePreference,
-        selected_camera: selectedCamera,
-        camera_intent: input.camera_intent,
-        subject_hint: input.subject_hint,
-      };
-    }
-
-    if (chosen.backend === 'swift-avfoundation') {
-      const bin = this.opts.swift_bin ?? 'swift';
-      const script = assertSafeRepositoryPath(
-        pathResolver.rootResolve('libs/core/virtual-camera-capture.swift')
-      );
-      const tempCapture = assertSafeRepositoryPath(
-        path.join(
-          path.dirname(savePath),
-          `${path.basename(savePath, path.extname(savePath))}-${Date.now()}.jpg`
-        ),
-        { allowMissingLeaf: true }
-      );
-      const deviceArg = selectedCamera ?? devicePreference;
-      const args = [script, '--output', tempCapture];
-      if (deviceArg) {
-        args.push('--device', deviceArg);
-      }
-      safeExec(bin, args, { env: process.env, timeoutMs: 120000 });
-      if (/\.png$/i.test(savePath)) {
-        const sips = 'sips';
-        safeExec(sips, ['-s', 'format', 'png', tempCapture, '--out', savePath], {
-          env: process.env,
-        });
-        safeRmSync(tempCapture, { force: true });
-      } else if (tempCapture !== savePath) {
-        safeExec('cp', [tempCapture, savePath], { env: process.env });
-        safeRmSync(tempCapture, { force: true });
-      }
-      return {
-        bridge_id: VIRTUAL_CAMERA_BRIDGE_ID,
-        platform: process.platform,
-        backend: 'swift-avfoundation',
-        save_path: savePath,
-        device_preference: devicePreference,
-        selected_camera: selectedCamera,
-        camera_intent: input.camera_intent,
-        subject_hint: input.subject_hint,
-      };
-    }
-
-    if (chosen.backend === 'libcamera-still') {
-      const bin = this.opts.libcamera_still_bin ?? DEFAULT_LIBCAMERA_STILL_BIN;
-      safeExec(bin, ['-n', '-o', savePath], { env: process.env });
-      return {
-        bridge_id: VIRTUAL_CAMERA_BRIDGE_ID,
-        platform: process.platform,
-        backend: 'libcamera-still',
-        save_path: savePath,
-        device_preference: devicePreference,
-        selected_camera: selectedCamera,
-        camera_intent: input.camera_intent,
-        subject_hint: input.subject_hint,
-      };
-    }
-
-    const bin = this.opts.ffmpeg_bin ?? resolveFfmpegBin();
-    const adapter = resolveCameraCaptureAdapter(process.platform);
-    const device = adapter.deviceArg(selectedCamera || devicePreference);
-    safeExec(
-      bin,
-      [
-        '-y',
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-f',
-        adapter.inputFormat,
-        '-i',
-        device,
-        '-frames:v',
-        '1',
-        savePath,
-      ],
-      { env: process.env }
+    const backend = listVirtualCameraCaptureBackends().find(
+      (candidate) => candidate.backend_id === chosen.backend
     );
+    if (!backend) {
+      throw new Error(`[virtual-camera-bridge] backend '${chosen.backend}' is not registered`);
+    }
+    backend.capture({
+      save_path: savePath,
+      selected_camera: selectedCamera,
+      device_preference: devicePreference,
+      imagesnap_bin: this.opts.imagesnap_bin,
+      swift_bin: this.opts.swift_bin,
+      ffmpeg_bin: this.opts.ffmpeg_bin,
+      libcamera_still_bin: this.opts.libcamera_still_bin,
+    });
     return {
       bridge_id: VIRTUAL_CAMERA_BRIDGE_ID,
       platform: process.platform,
-      backend: 'ffmpeg',
+      backend: chosen.backend,
       save_path: savePath,
       device_preference: devicePreference,
       selected_camera: selectedCamera,
