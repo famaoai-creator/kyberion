@@ -15,7 +15,8 @@
         "tracking"
       ],
       "selection_hints": {
-        "preferred_provider": "codex"
+        "preferred_provider": "codex",
+        "preferred_modelId": "codex"
       },
       "provider_strategy": "preferred",
       "fallback_providers": ["claude", "agy"]

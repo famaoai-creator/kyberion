@@ -2811,7 +2811,7 @@
     {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 5324,
+      "size": 5321,
       "type": "json"
     },
     {
@@ -4443,7 +4443,7 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 10579,
+      "size": 10617,
       "type": "json"
     },
     {
@@ -4479,7 +4479,7 @@
     {
       "path": "product/orchestration/agent-profiles/coordination-worker.json",
       "tier": "public",
-      "size": 602,
+      "size": 640,
       "type": "json"
     },
     {
