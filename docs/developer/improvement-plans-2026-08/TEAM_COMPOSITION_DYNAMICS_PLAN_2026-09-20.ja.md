@@ -152,27 +152,27 @@ agent profile は 17 件、うち 7 件が surface 系。**組成アルゴリズ
 
 ## 6. 実装状況
 
-| ID    | 状態    | 備考                                                                                                                                          |
-| ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| TC-01 | DONE    | `status: 'standby'` を導入。構造役割のみ作成時に充当                                                                                          |
-| TC-02 | DONE    | `staffMissionTeamRoles` + `ensureMissionTeamRuntime` の役割スコープ昇格、`team_role_staffed` 台帳                                             |
-| TC-03 | DONE    | `team-composition-obligations.json`(5 義務)と導出器                                                                                           |
-| TC-04 | DONE    | 役割集合 = テンプレート ∪ 義務、`role_sources` と `team_governance.obligations`                                                               |
-| TC-05 | PARTIAL | `[team] roster/required/staffed/standby/unfilled_required` のサマリ行と `composition.standby_roles` で 4 区分は判別可能。専用レンダラは未実装 |
-| TC-06 | DONE    | `restaffMissionTeamRole` + `mission_controller restaff`、`team_role_restaffed` 台帳                                                           |
-| TC-07 | DONE    | `diagnoseMissionTeamRoleGap`、dispatch の自動増員リトライと `blocked(capability_gap)`                                                         |
-| TC-08 | DONE    | `workforce-load.ts`、`workforce-capacity-policy.json`、availability / cost_profile の実データ化                                               |
-| TC-09 | DONE    | `workerLoadPenalty` を唯一の負荷スコアラとして採用、`selectAgentForTeamRole` へ合流                                                           |
-| TC-10 | PARTIAL | `quality` 欠落の解消と cost registry の表示名解決を修正。プールの薄さ自体は報告に留める(エージェント新設は運用判断)                           |
-| TC-11 | DONE    | `staffing-coverage.ts` + CI gate `staffing-capability-coverage`                                                                               |
-| TC-12 | DONE    | `proposeMissionTeamRoster`(既定 OFF、fail-closed)、dispatch 前 1 回 + `propose-roster` CLI                                                    |
-| TC-13 | DONE    | `summarizeRosterProposalOutcomes`(受理率 + 後追い restaff 率)、`readMissionExecutionLedger`                                                   |
-| TC-14 | DONE    | テンプレート到達性監査(dangling 参照は gate 失敗、未到達は報告のみ)                                                                           |
-| TC-15 | DONE    | `model-role-fitness`(役割別 governed プローブと機械採点)、`evaluate_model_role_fitness` CLI                                                   |
-| TC-16 | DONE    | 観測が沈黙している間だけ効くコールドスタート事前分布として選抜へ合流                                                                          |
-| TC-17 | TODO    | 宣言 `BACKEND_CAPABILITY_PROFILES` と実測プローブの突合(TC-11 と同型の正直性検査)                                                             |
-| TC-18 | DONE    | `mission-advisory-panel`(ロスター = 助言パネル)、`mission_controller advise`                                                                  |
-| TC-19 | TODO    | プローブ結果と助言採否の運用計測(受理率・棄却理由の推移)                                                                                      |
+| ID    | 状態    | 備考                                                                                                                |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| TC-01 | DONE    | `status: 'standby'` を導入。構造役割のみ作成時に充当                                                                |
+| TC-02 | DONE    | `staffMissionTeamRoles` + `ensureMissionTeamRuntime` の役割スコープ昇格、`team_role_staffed` 台帳                   |
+| TC-03 | DONE    | `team-composition-obligations.json`(5 義務)と導出器                                                                 |
+| TC-04 | DONE    | 役割集合 = テンプレート ∪ 義務、`role_sources` と `team_governance.obligations`                                     |
+| TC-05 | DONE    | `mission-team-view`(名簿 / 稼働 / 待機 / 欠員 + 出所 + 義務)、`team <ID> --summary`                                 |
+| TC-06 | DONE    | `restaffMissionTeamRole` + `mission_controller restaff`、`team_role_restaffed` 台帳                                 |
+| TC-07 | DONE    | `diagnoseMissionTeamRoleGap`、dispatch の自動増員リトライと `blocked(capability_gap)`                               |
+| TC-08 | DONE    | `workforce-load.ts`、`workforce-capacity-policy.json`、availability / cost_profile の実データ化                     |
+| TC-09 | DONE    | `workerLoadPenalty` を唯一の負荷スコアラとして採用、`selectAgentForTeamRole` へ合流                                 |
+| TC-10 | PARTIAL | `quality` 欠落の解消と cost registry の表示名解決を修正。プールの薄さ自体は報告に留める(エージェント新設は運用判断) |
+| TC-11 | DONE    | `staffing-coverage.ts` + CI gate `staffing-capability-coverage`                                                     |
+| TC-12 | DONE    | `proposeMissionTeamRoster`(既定 OFF、fail-closed)、dispatch 前 1 回 + `propose-roster` CLI                          |
+| TC-13 | DONE    | `summarizeRosterProposalOutcomes`(受理率 + 後追い restaff 率)、`readMissionExecutionLedger`                         |
+| TC-14 | DONE    | テンプレート到達性監査(dangling 参照は gate 失敗、未到達は報告のみ)                                                 |
+| TC-15 | DONE    | `model-role-fitness`(役割別 governed プローブと機械採点)、`evaluate_model_role_fitness` CLI                         |
+| TC-16 | DONE    | 観測が沈黙している間だけ効くコールドスタート事前分布として選抜へ合流                                                |
+| TC-17 | DONE    | `backend-capability-honesty`(宣言 utility_fit と実測プローブの突合)+ CI gate                                        |
+| TC-18 | DONE    | `mission-advisory-panel`(ロスター = 助言パネル)、`mission_controller advise`                                        |
+| TC-19 | DONE    | `team-decision-support-metrics`(ミッション横断の受理率・後追い restaff 率・意見生存率)                              |
 
 ### 2026-09-20: Wave 1(TC-01〜TC-04)
 
@@ -346,3 +346,41 @@ perspective fanout / typed cross critique / dissent log は既にあったが、
 | 5   | `mission-runtime`(ミッション CLI の薄い補助層)が提案器経由で**推論バックエンドのグラフ全体を静的に取り込み**、2 suite の module 初期化を壊していた。毎回の `mission_controller` 実行で LLM スタックを読むことにもなる | 使用時 import へ変更。適性評価も同じ理由で実行器を分離                                    |
 | 6   | 構造的 assertion の多数決で「形式は満たすが判断を外した回答」が合格                                                                                                                                                   | 正答 assertion を `required` に分離                                                       |
 | 7   | **authority role の登録が 3 箇所**(正本ディレクトリ / `security-policy` の書込ゲート / index スナップショット)。index だけ書くとスナップショットが正本より先行し契約テストが落ちる                                    | 正本を追加し governed generator で整合(既存 8 ファイルの差分は整形のみ、パース比較で確認) |
+
+### 2026-09-21: Wave 5(TC-05 / TC-17 / TC-19)と Codex Luna レビューの取り込み
+
+Codex Luna が Waves 1〜4 をレビューしている間、別ワークツリー(`kyberion-tc-wave5` / `agent/team-composition-wave5-20260921`)で Wave 5 を進めた。Codex は `kyberion-team-comp` 内で直接作業していたため、multi-provider co-execution contract(write = claim holder のみ)に従い、そのワークツリーには読み取り以外行っていない。
+
+**TC-17 — 宣言された能力と実測の突合**
+
+`BACKEND_CAPABILITY_PROFILES` の `utility_fit` は「このバックエンドは judge できる」= モデルをレビュアーとして信用してよいかを決める、この表で最も強い主張である。そしてその値は**デフォルト引数で生成**されていた — 手で上書きしない限り全 CLI/API バックエンドが `judge, classify, summarize, divergent` を名乗る。TC-15 以前はそもそも突き合わせる実測が存在しなかった。
+
+TC-11 と同型: 実測に**矛盾**する主張は gate 失敗、**証拠なし**は報告に留める(unproven は見るべき事実であってブロックすべき欠陥ではない)。プローブの無い classify / summarize / divergent は代理指標を当てず `unmeasurable` と名指しする。副産物として `nemotron` が governed policy の許可モードに無い宣言プロファイル(死んだ宣言)であることも検出した(報告のみ)。
+
+**TC-19 — 決定支援機構のミッション横断計測**
+
+提案器(TC-12)と助言パネル(TC-18)はどちらも「無くても動いていた経路に推論呼び出しを足す」機能である。継続可否を決めるのは「このミッションで何が起きたか」ではなく「元が取れているか」で、per-mission 要約では答えられない。**都合の悪い指標を先頭に置く**: `follow_up_restaff_rate`(提案器の実行後に他者が追加せざるを得なかった役割 — 安全で自明な提案しかしない提案器が隠れられない)と `opinion_survival_rate`(全部生き残るパネルは議論しておらず、全部落ちるパネルは助言していない)。すべて台帳の記録から読み、両機能の自己申告は使わない。
+
+**TC-05 — 4 区分のレンダラ**
+
+`team <ID> --summary` が、ロスター対 lifecycle 上限、役割ごとの状態と出所(structural / obligation / template / restaff)、ロスターを形作った義務とその理由、そして「本当に人間が要る状態か」を出す。JSON は既定のまま(既存の消費者を壊さない)。
+
+### Codex Luna レビューの指摘(4 件すべて実バグ)
+
+| #   | 症状                                                                                                                                                                                                                                                                        | 影響                                                              |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 1   | **構造役割をテンプレート依存として扱っていた**。owner / orchestrator が `required_roles` に必ずあるという前提。組織 overlay がその配列を差し替えると、ロスターに両者が無く、`applyStaffingPolicy` は構造役割だけを充当するため**誰も staffed されないミッション**が生まれる | 重大。ガバナンス不変条件と組織選好の混同                          |
+| 2   | **TC-02 の配線がタスク dispatch 1 経路だけだった**。ticket dispatch / work-item dispatch / surface delegation も役割で受け手を解決して仕事を流すが、TC-01 以降それらの役割は standby。**staffing レコードも runtime も台帳記録も無いアクターに仕事が渡る**                  | 重大。「dispatch」を 1 ファイルと思い込み、他の入口を探さなかった |
+| 3   | chronos plan-preview クライアントが独自の狭いパーサを持ち `standby` を拒否。standby を含む plan は UI でパース失敗                                                                                                                                                          | スキーマを広げて消費者を探さなかった                              |
+| 4   | `agent-profile-index.json`(正本ディレクトリの fallback スナップショット)が TC-10 の `quality` 追加に追随せずドリフト                                                                                                                                                        | `check_governance_rules` が検出する違反                           |
+
+**#4 はプロセスの穴を突いている**: 毎 Wave で core スイート(最大 955 files / 7,689 tests)を回しながら、**PR ゲート一式を一度も回していなかった**。取り込み前の `check_governance_rules` は実際に 2 件の違反を報告していた。
+
+### PR ゲート(初回実行)
+
+37 ゲート中 35 PASS / 2 FAILED。新規 2 ゲート(`staffing-capability-coverage`、`backend-capability-honesty`)はいずれも PASS。
+
+- `type-ratchet` FAILED — テストのスタブで `as any` を 3 箇所増やしていた。SX の教訓(「checker を緑に調整する方向の修正」は批判対象)に従い**ラチェットは据え置き、型を直した**(3 つとも正当に `undefined` を返す verb でキャスト不要)。
+- `golden` FAILED — 当該ワークツリーで `build:actuators` 未実行だったための環境不足。コード欠陥ではない。
+
+修正後の再実行: **37/37 PASS(failed=0)**。
