@@ -1677,6 +1677,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.seam.select",
+      "module": "scripts/seam_selection.ts",
+      "command": "seam select",
+      "noun": "seam",
+      "verb": "select",
+      "audience": "operator"
+    },
+    {
       "id": "script.reasoning.setup",
       "script": "reasoning:setup",
       "command": "reasoning setup",

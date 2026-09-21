@@ -2903,6 +2903,14 @@
       "types": "./dist/provider-pins-store.d.ts",
       "default": "./dist/provider-pins-store.js"
     },
+    "./seam-selection-rules": {
+      "types": "./dist/seam-selection-rules.d.ts",
+      "default": "./dist/seam-selection-rules.js"
+    },
+    "./seam-calibration": {
+      "types": "./dist/seam-calibration.d.ts",
+      "default": "./dist/seam-calibration.js"
+    },
     "./seam-provider-selection": {
       "types": "./dist/seam-provider-selection.d.ts",
       "default": "./dist/seam-provider-selection.js"

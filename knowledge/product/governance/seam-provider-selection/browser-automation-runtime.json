@@ -5,6 +5,7 @@
     {
       "seam_id": "browser-automation-runtime",
       "default_provider": "playwright-chromium",
+      "fallback_purpose": "throughput",
       "traits": {
         "fidelity": "Real layout and rendering: screenshots, video and visual review are trustworthy evidence.",
         "speed": "Wall-clock per page load / pipeline.",
