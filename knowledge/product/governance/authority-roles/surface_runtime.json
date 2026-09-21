@@ -14,17 +14,7 @@
     "active/shared/coordination/channels/telegram/",
     "active/audit/"
   ],
-  "scope_classes": [
-    "communication_surface",
-    "operations_runtime",
-    "audit"
-  ],
-  "allowed_actuators": [
-    "presence-actuator",
-    "artifact-actuator"
-  ],
-  "tier_access": [
-    "public",
-    "confidential"
-  ]
+  "scope_classes": ["communication_surface", "operations_runtime", "audit"],
+  "allowed_actuators": ["presence-actuator", "artifact-actuator"],
+  "tier_access": ["public", "confidential"]
 }

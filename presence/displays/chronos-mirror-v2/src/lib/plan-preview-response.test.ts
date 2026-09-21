@@ -42,6 +42,22 @@ describe('parsePlanPreviewResponse', () => {
     expect(parsePlanPreviewResponse({ preview })).toEqual({ preview });
   });
 
+  it('accepts standby assignments from demand-driven mission rosters', () => {
+    const standbyPreview = {
+      ...preview,
+      team: {
+        ...preview.team,
+        assignments: [
+          ...preview.team.assignments,
+          { team_role: 'reviewer', status: 'standby', agent_id: 'agent-2' },
+        ],
+      },
+    };
+    expect(parsePlanPreviewResponse({ preview: standbyPreview })).toEqual({
+      preview: standbyPreview,
+    });
+  });
+
   it.each([
     ['missing preview', {}],
     ['invalid confidence', { preview: { ...preview, confidence: 2 } }],

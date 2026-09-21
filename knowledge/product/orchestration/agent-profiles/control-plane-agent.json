@@ -9,8 +9,7 @@
         "researcher",
         "product_strategist",
         "tracker",
-        "facilitator",
-        "relationship_curator"
+        "facilitator"
       ],
       "capabilities": [
         "reasoning",
@@ -19,6 +18,7 @@
         "analysis",
         "planning",
         "strategy",
+        "product",
         "facilitation",
         "listening"
       ],

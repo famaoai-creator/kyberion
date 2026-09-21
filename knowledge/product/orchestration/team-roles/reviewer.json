@@ -8,7 +8,7 @@
   "required_scope_classes": ["knowledge_core"],
   "ownership_scope": "Owns review verdicts, risk findings, and gate readiness evidence.",
   "selection_hints": {
-    "preferred_agents": ["implementation-architect", "nerve-agent", "sovereign-brain"],
+    "preferred_agents": ["critique-worker", "implementation-architect", "sovereign-brain"],
     "preferred_models": ["auto-gemini-3"]
   },
   "autonomy_level": "medium"

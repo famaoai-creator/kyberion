@@ -31,6 +31,18 @@
       "type": "md"
     },
     {
+      "path": "product/agents/coordination-worker.agent.md",
+      "tier": "public",
+      "size": 1572,
+      "type": "md"
+    },
+    {
+      "path": "product/agents/critique-worker.agent.md",
+      "tier": "public",
+      "size": 1823,
+      "type": "md"
+    },
+    {
       "path": "product/agents/discord-surface-agent.agent.md",
       "tier": "public",
       "size": 1342,
@@ -82,6 +94,12 @@
       "path": "product/agents/reasoning-worker.agent.md",
       "tier": "public",
       "size": 1420,
+      "type": "md"
+    },
+    {
+      "path": "product/agents/relationship-curator.agent.md",
+      "tier": "public",
+      "size": 2303,
       "type": "md"
     },
     {
@@ -1173,7 +1191,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 11928,
+      "size": 12435,
       "type": "json"
     },
     {
@@ -1191,7 +1209,7 @@
     {
       "path": "product/governance/authority-roles/chronos_localadmin.json",
       "tier": "public",
-      "size": 752,
+      "size": 724,
       "type": "json"
     },
     {
@@ -1203,7 +1221,7 @@
     {
       "path": "product/governance/authority-roles/chronos_operator.json",
       "tier": "public",
-      "size": 358,
+      "size": 330,
       "type": "json"
     },
     {
@@ -1231,6 +1249,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/authority-roles/evaluate_model_role_fitness.json",
+      "tier": "public",
+      "size": 484,
+      "type": "json"
+    },
+    {
       "path": "product/governance/authority-roles/generation_scheduler.json",
       "tier": "public",
       "size": 715,
@@ -1239,7 +1263,7 @@
     {
       "path": "product/governance/authority-roles/knowledge_steward.json",
       "tier": "public",
-      "size": 374,
+      "size": 334,
       "type": "json"
     },
     {
@@ -1269,31 +1293,31 @@
     {
       "path": "product/governance/authority-roles/slack_bridge.json",
       "tier": "public",
-      "size": 699,
+      "size": 651,
       "type": "json"
     },
     {
       "path": "product/governance/authority-roles/software_developer.json",
       "tier": "public",
-      "size": 476,
+      "size": 416,
       "type": "json"
     },
     {
       "path": "product/governance/authority-roles/sovereign_concierge.json",
       "tier": "public",
-      "size": 558,
+      "size": 490,
       "type": "json"
     },
     {
       "path": "product/governance/authority-roles/surface_runtime.json",
       "tier": "public",
-      "size": 865,
+      "size": 825,
       "type": "json"
     },
     {
       "path": "product/governance/authority-roles/system_configurator.json",
       "tier": "public",
-      "size": 865,
+      "size": 821,
       "type": "json"
     },
     {
@@ -1389,7 +1413,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 21567,
+      "size": 22793,
       "type": "json"
     },
     {
@@ -2791,9 +2815,15 @@
       "type": "json"
     },
     {
+      "path": "product/governance/model-role-fitness-probes.json",
+      "tier": "public",
+      "size": 4030,
+      "type": "json"
+    },
+    {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 5324,
+      "size": 5321,
       "type": "json"
     },
     {
@@ -3135,7 +3165,7 @@
     {
       "path": "product/governance/provider-egress-policy.json",
       "tier": "public",
-      "size": 635,
+      "size": 1135,
       "type": "json"
     },
     {
@@ -3369,7 +3399,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 21583,
+      "size": 21860,
       "type": "json"
     },
     {
@@ -3670,6 +3700,12 @@
       "path": "product/governance/task-session-policy.json",
       "tier": "public",
       "size": 51823,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/team-composition-obligations.json",
+      "tier": "public",
+      "size": 2059,
       "type": "json"
     },
     {
@@ -4087,6 +4123,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/workforce-capacity-policy.json",
+      "tier": "public",
+      "size": 330,
+      "type": "json"
+    },
+    {
       "path": "product/governance/working-philosophy.md",
       "tier": "public",
       "size": 8862,
@@ -4431,7 +4473,7 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 8797,
+      "size": 10617,
       "type": "json"
     },
     {
@@ -4461,7 +4503,19 @@
     {
       "path": "product/orchestration/agent-profiles/control-plane-agent.json",
       "tier": "public",
-      "size": 733,
+      "size": 720,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/agent-profiles/coordination-worker.json",
+      "tier": "public",
+      "size": 640,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/agent-profiles/critique-worker.json",
+      "tier": "public",
+      "size": 794,
       "type": "json"
     },
     {
@@ -4473,7 +4527,7 @@
     {
       "path": "product/orchestration/agent-profiles/implementation-architect.json",
       "tier": "public",
-      "size": 747,
+      "size": 766,
       "type": "json"
     },
     {
@@ -4515,7 +4569,13 @@
     {
       "path": "product/orchestration/agent-profiles/reasoning-worker.json",
       "tier": "public",
-      "size": 1183,
+      "size": 1221,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/agent-profiles/relationship-curator.json",
+      "tier": "public",
+      "size": 401,
       "type": "json"
     },
     {
@@ -4527,7 +4587,7 @@
     {
       "path": "product/orchestration/agent-profiles/sovereign-brain.json",
       "tier": "public",
-      "size": 688,
+      "size": 699,
       "type": "json"
     },
     {
@@ -5841,7 +5901,7 @@
     {
       "path": "product/orchestration/team-role-index.json",
       "tier": "public",
-      "size": 15403,
+      "size": 14996,
       "type": "json"
     },
     {
@@ -5853,55 +5913,55 @@
     {
       "path": "product/orchestration/team-roles/attacker.json",
       "tier": "public",
-      "size": 675,
+      "size": 653,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/counterparty_persona.json",
       "tier": "public",
-      "size": 805,
+      "size": 724,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/defender.json",
       "tier": "public",
-      "size": 669,
+      "size": 647,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/devils_advocate.json",
       "tier": "public",
-      "size": 742,
+      "size": 661,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/experience_designer.json",
       "tier": "public",
-      "size": 698,
+      "size": 664,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/facilitator.json",
       "tier": "public",
-      "size": 821,
+      "size": 751,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/implementer.json",
       "tier": "public",
-      "size": 695,
+      "size": 614,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/operator.json",
       "tier": "public",
-      "size": 784,
+      "size": 678,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/orchestrator.json",
       "tier": "public",
-      "size": 1104,
+      "size": 1066,
       "type": "json"
     },
     {
@@ -5913,19 +5973,19 @@
     {
       "path": "product/orchestration/team-roles/planner.json",
       "tier": "public",
-      "size": 974,
+      "size": 929,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/product_strategist.json",
       "tier": "public",
-      "size": 781,
+      "size": 663,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/relationship_curator.json",
       "tier": "public",
-      "size": 791,
+      "size": 671,
       "type": "json"
     },
     {
@@ -5937,19 +5997,19 @@
     {
       "path": "product/orchestration/team-roles/reviewer.json",
       "tier": "public",
-      "size": 676,
+      "size": 680,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/scribe.json",
       "tier": "public",
-      "size": 715,
+      "size": 653,
       "type": "json"
     },
     {
       "path": "product/orchestration/team-roles/surface_liaison.json",
       "tier": "public",
-      "size": 830,
+      "size": 764,
       "type": "json"
     },
     {
@@ -5961,7 +6021,7 @@
     {
       "path": "product/orchestration/team-roles/tracker.json",
       "tier": "public",
-      "size": 728,
+      "size": 645,
       "type": "json"
     },
     {
@@ -9285,7 +9345,7 @@
     {
       "path": "product/schemas/mission-event.schema.json",
       "tier": "public",
-      "size": 2462,
+      "size": 2496,
       "type": "json"
     },
     {
@@ -9465,7 +9525,7 @@
     {
       "path": "product/schemas/mission-team-plan.schema.json",
       "tier": "public",
-      "size": 6843,
+      "size": 7653,
       "type": "json"
     },
     {
@@ -9604,6 +9664,12 @@
       "path": "product/schemas/model-role-feedback.schema.json",
       "tier": "public",
       "size": 811,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/model-role-fitness-probes.schema.json",
+      "tier": "public",
+      "size": 2555,
       "type": "json"
     },
     {
@@ -10383,7 +10449,7 @@
     {
       "path": "product/schemas/provider-egress-policy.schema.json",
       "tier": "public",
-      "size": 3102,
+      "size": 5459,
       "type": "json"
     },
     {
@@ -11131,6 +11197,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/team-composition-obligations.schema.json",
+      "tier": "public",
+      "size": 3424,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/team-role-index.schema.json",
       "tier": "public",
       "size": 1521,
@@ -11181,7 +11253,7 @@
     {
       "path": "product/schemas/tenant-profile.schema.json",
       "tier": "public",
-      "size": 2261,
+      "size": 5082,
       "type": "json"
     },
     {
@@ -11680,6 +11752,12 @@
       "path": "product/schemas/workflow-registration-request.schema.json",
       "tier": "public",
       "size": 5819,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/workforce-capacity-policy.schema.json",
+      "tier": "public",
+      "size": 1756,
       "type": "json"
     },
     {

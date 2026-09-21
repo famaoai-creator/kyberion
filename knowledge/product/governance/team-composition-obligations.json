@@ -1,0 +1,46 @@
+{
+  "$schema": "../schemas/team-composition-obligations.schema.json",
+  "version": "1.3.0",
+  "roster_headroom": 2,
+  "roster_proposal": {
+    "enabled": false,
+    "max_proposals": 2,
+    "excluded_roles": ["relationship_curator"]
+  },
+  "always_staffed_roles": ["owner", "orchestrator"],
+  "obligations": [
+    {
+      "id": "independent-review",
+      "when": { "risk_profile": ["review_required", "approval_required", "high_stakes"] },
+      "require_roles": ["reviewer"],
+      "reason": "A deliverable at review-required risk or above may only be accepted by a reviewer independent of the implementer; the roster must therefore contain a reviewer regardless of which template was selected."
+    },
+    {
+      "id": "executed-verification",
+      "when": {
+        "mission_class": ["code_change", "product_delivery", "operations_and_release"],
+        "risk_profile": ["review_required", "approval_required", "high_stakes"]
+      },
+      "require_roles": ["tester"],
+      "reason": "Changes to shipped behaviour are verified by execution, not by declaration, so the roster must carry a tester that can produce that evidence."
+    },
+    {
+      "id": "cross-system-operations",
+      "when": { "delivery_shape": ["cross_system_change"] },
+      "require_roles": ["operator"],
+      "reason": "A change that spans systems needs an operator accountable for rollout, rollback and the runtime state it touches."
+    },
+    {
+      "id": "human-approval-routing",
+      "when": { "risk_profile": ["approval_required", "high_stakes"] },
+      "require_roles": ["surface_liaison"],
+      "reason": "An approval that never reaches a human is not an approval; a liaison owns getting the decision request to a surface and the decision back."
+    },
+    {
+      "id": "decision-divergence",
+      "when": { "mission_class": ["decision_support"] },
+      "require_roles": ["devils_advocate"],
+      "reason": "Decision-support work converges too early without a role whose job is to argue the opposing position before the recommendation is written."
+    }
+  ]
+}

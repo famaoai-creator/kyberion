@@ -64,6 +64,12 @@ function buildProfile(input: TenantMutationInput, current: TenantProfile | null)
     knowledge_root:
       input.knowledgeRoot?.trim() || current?.knowledge_root || defaultTenantKnowledgeRoot(slug),
     ...(current?.isolation_policy ? { isolation_policy: current.isolation_policy } : {}),
+    ...(current?.allowed_reasoning_backends
+      ? { allowed_reasoning_backends: current.allowed_reasoning_backends }
+      : {}),
+    ...(current?.provider_attestations
+      ? { provider_attestations: current.provider_attestations }
+      : {}),
     ...(current?.ingest_sources ? { ingest_sources: current.ingest_sources } : {}),
     ...(input.metadata || current?.metadata
       ? { metadata: { ...(current?.metadata || {}), ...(input.metadata || {}) } }

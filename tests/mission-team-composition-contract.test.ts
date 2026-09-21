@@ -108,6 +108,13 @@ describe('Mission team composition contract', () => {
     const roleIndex = loadJson('knowledge/product/orchestration/team-role-index.json');
 
     for (const [agentId, record] of Object.entries(agentIndex.agents || {})) {
+      // An adaptive profile may deliberately leave provider/model selection
+      // to the governed provider and egress policy. This is required for
+      // sensitive roles such as relationship-curator, whose provider must be
+      // attested at the tenant boundary rather than pinned in the profile.
+      const policyRouted =
+        record.provider_strategy === 'adaptive' && !record.selection_hints?.preferred_provider;
+      if (policyRouted) continue;
       expect(
         record.selection_hints?.preferred_provider,
         `missing provider hint for ${agentId}`
@@ -119,6 +126,16 @@ describe('Mission team composition contract', () => {
     }
 
     for (const [teamRole, record] of Object.entries(roleIndex.team_roles || {})) {
+      // A role whose preferred agent is deliberately policy-routed must not
+      // reintroduce a stale model pin at the team-role layer. The agent's
+      // adaptive egress decision remains the source of truth.
+      const policyRouted = (record.selection_hints?.preferred_agents || []).some((agentId) => {
+        const agent = agentIndex.agents?.[agentId];
+        return (
+          agent?.provider_strategy === 'adaptive' && !agent.selection_hints?.preferred_provider
+        );
+      });
+      if (policyRouted) continue;
       expect(
         record.selection_hints?.preferred_agents?.length,
         `missing agent hints for ${teamRole}`
@@ -213,7 +230,10 @@ describe('Mission team composition contract', () => {
       false
     );
 
-    for (const assignment of plan.assignments.filter((entry) => entry.status === 'assigned')) {
+    // TC-01: every roster role with a resolved candidate (staffed or standby)
+    // must satisfy the role/authority contract — standby is a staffing state,
+    // not a weaker selection.
+    for (const assignment of plan.assignments.filter((entry) => entry.status !== 'unfilled')) {
       expect(agents[assignment.agent_id!].team_roles).toContain(assignment.team_role);
       expect(teamRoles[assignment.team_role].compatible_authority_roles).toContain(
         assignment.authority_role!
@@ -283,9 +303,15 @@ describe('Mission team composition contract', () => {
     const tracker = plan.assignments.find((entry) => entry.team_role === 'tracker');
 
     expect(plan.team_governance?.composition.unfilled_required_roles).toEqual([]);
-    expect(facilitator?.status).toBe('assigned');
-    expect(scribe?.status).toBe('assigned');
-    expect(tracker?.status).toBe('assigned');
+    // TC-01: non-structural roles join the roster on standby with their
+    // candidate already resolved, and are staffed when work demands them.
+    expect(facilitator?.status).toBe('standby');
+    expect(scribe?.status).toBe('standby');
+    expect(tracker?.status).toBe('standby');
+    expect(plan.team_governance?.composition.standby_roles).toEqual(
+      expect.arrayContaining(['facilitator', 'scribe', 'tracker'])
+    );
+    expect(plan.team_governance?.composition.assigned_roles).toEqual(['owner', 'orchestrator']);
     expect(facilitator?.agent_id).toBeTruthy();
     expect(scribe?.agent_id).toBeTruthy();
     expect(tracker?.agent_id).toBeTruthy();

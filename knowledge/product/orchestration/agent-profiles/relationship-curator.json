@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "relationship-curator": {
+      "authority_roles": ["knowledge_steward", "ecosystem_architect"],
+      "team_roles": ["relationship_curator"],
+      "capabilities": [
+        "reasoning",
+        "analysis",
+        "curation",
+        "memory_management",
+        "privacy",
+        "summarization"
+      ],
+      "provider_strategy": "adaptive"
+    }
+  }
+}

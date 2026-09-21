@@ -839,10 +839,24 @@ Visibility Commands:
   sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
   reassign-project <ID> --project-id <PROJECT_ID> [--project-path <PATH>] [--track-id <TRACK_ID>] [--dry-run] [--force]
                                  Safely move a paused/planned mission to another project and reconcile both sides
-  team     <ID> [--refresh] [--provider <ID>] [--model <ID>]
+  team     <ID> [--refresh] [--summary] [--provider <ID>] [--model <ID>]
                                  Show or regenerate mission team composition
+                                 --summary prints roster / staffed / standby / unfilled and the
+                                 obligations that shaped the roster instead of the raw plan JSON
   staff    <ID> [--provider <ID>] [--model <ID>]
                                  Spawn or verify runtime instances for assigned mission team roles
+  advise   <ID> --question <TEXT> [--topic <TEXT>] [--roles <CSV>] [--context <TEXT>]
+                                 Consult the mission's own roster: each member answers from its role,
+                                 the panel cross-critiques the answers, and the outcome is recorded
+                                 in the mission execution ledger
+  propose-roster <ID> [--context <TEXT>] [--force]
+                                 Ask the reasoning backend to propose discretionary roles beyond the
+                                 derived roster. Off unless the governed policy enables it (--force
+                                 runs it anyway); every proposal must pass the same checks as restaff
+  restaff  <ID> <TEAM_ROLE> [--capabilities <CSV>] [--exclude <AGENT_CSV>] [--reason <TEXT>]
+                                 Add a role to a running mission's roster (bounded by max_members,
+                                 same capability / authority / separation-of-duties checks as
+                                 composition) and materialize its runtime
   classify <ID> [intent] [task]  Classify mission context into class/delivery/risk/stage
   workflow-select <ID> [intent] [task]
                                  Resolve workflow template from mission classification
@@ -994,9 +1008,38 @@ async function staffMissionTeam(
   );
 }
 
+async function adviseMission(
+  id: string,
+  input: { topic: string; question: string; context?: string; roles?: string[] },
+  organizationId?: string
+) {
+  return withOrganizationContext(organizationId, () => missionLifecycleService.advise(id, input));
+}
+
+async function proposeMissionRoster(
+  id: string,
+  options: { missionContext?: string; force?: boolean },
+  organizationId?: string
+) {
+  return withOrganizationContext(organizationId, () =>
+    missionLifecycleService.proposeRoster(id, options)
+  );
+}
+
 async function prewarmMissionTeam(id: string, teamRolesArg?: string, organizationId?: string) {
   return withOrganizationContext(organizationId, () =>
     missionLifecycleService.prewarm(id, teamRolesArg)
+  );
+}
+
+async function restaffMissionTeam(
+  id: string,
+  teamRole: string,
+  options: { requiredCapabilities?: string[]; excludeAgentIds?: string[]; reason?: string },
+  organizationId?: string
+) {
+  return withOrganizationContext(organizationId, () =>
+    missionLifecycleService.restaff(id, teamRole, options)
   );
 }
 
@@ -1458,6 +1501,9 @@ async function mainImpl(
     showMissionTeam,
     staffMissionTeam,
     prewarmMissionTeam,
+    restaffMissionTeam,
+    proposeMissionRoster,
+    adviseMission,
     classifyMission,
     selectMissionWorkflow,
     planProcessTemplateTasks,

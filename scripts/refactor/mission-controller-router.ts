@@ -1,3 +1,4 @@
+import { formatMissionTeamPlanView } from '@agent/core/mission-team-view';
 /**
  * scripts/refactor/mission-controller-router.ts
  * Command routing for the Mission Controller CLI.
@@ -348,6 +349,22 @@ export interface MissionControllerRoutingContext {
   prewarmMissionTeam: (
     id: string,
     teamRolesArg?: string,
+    organizationId?: string
+  ) => Awaitable<unknown>;
+  adviseMission: (
+    id: string,
+    input: { topic: string; question: string; context?: string; roles?: string[] },
+    organizationId?: string
+  ) => Awaitable<unknown>;
+  proposeMissionRoster: (
+    id: string,
+    options: { missionContext?: string; force?: boolean },
+    organizationId?: string
+  ) => Awaitable<unknown>;
+  restaffMissionTeam: (
+    id: string,
+    teamRole: string,
+    options: { requiredCapabilities?: string[]; excludeAgentIds?: string[]; reason?: string },
     organizationId?: string
   ) => Awaitable<unknown>;
   classifyMission: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
@@ -1144,7 +1161,15 @@ export async function runMissionControllerAction(
           : undefined
       );
       if (teamPlan !== undefined) {
-        context.print?.(JSON.stringify(teamPlan, null, 2));
+        // TC-05: the roster / staffed / standby / unfilled distinction is the
+        // thing an operator is asking about, and it disappears into the raw
+        // plan JSON. `--summary` reads it out; JSON stays the default so
+        // existing consumers are untouched.
+        context.print?.(
+          context.argv.includes('--summary')
+            ? formatMissionTeamPlanView(teamPlan as Parameters<typeof formatMissionTeamPlanView>[0])
+            : JSON.stringify(teamPlan, null, 2)
+        );
       }
       break;
     }
@@ -1177,6 +1202,84 @@ export async function runMissionControllerAction(
       );
       if (prewarmSummary !== undefined) {
         context.print?.(JSON.stringify(prewarmSummary, null, 2));
+      }
+      break;
+    }
+    case 'advise': {
+      const question = getValue('--question', context.argv);
+      if (!question) {
+        throw new Error('[ADVISE_QUESTION_REQUIRED] Usage: advise <MISSION_ID> --question <TEXT>');
+      }
+      const rolesValue = getValue('--roles', context.argv);
+      const consultation = await context.adviseMission(
+        arg1!,
+        {
+          question,
+          topic: getValue('--topic', context.argv) || question.slice(0, 80),
+          ...(getValue('--context', context.argv)
+            ? { context: getValue('--context', context.argv)! }
+            : {}),
+          ...(rolesValue
+            ? {
+                roles: rolesValue
+                  .split(',')
+                  .map((entry) => entry.trim())
+                  .filter(Boolean),
+              }
+            : {}),
+        },
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+      );
+      if (consultation !== undefined) {
+        context.print?.(JSON.stringify(consultation, null, 2));
+      }
+      break;
+    }
+    case 'propose-roster': {
+      const proposalView = await context.proposeMissionRoster(
+        arg1!,
+        {
+          ...(getValue('--context', context.argv)
+            ? { missionContext: getValue('--context', context.argv)! }
+            : {}),
+          ...(context.argv.includes('--force') ? { force: true } : {}),
+        },
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+      );
+      if (proposalView !== undefined) {
+        context.print?.(JSON.stringify(proposalView, null, 2));
+      }
+      break;
+    }
+    case 'restaff': {
+      if (!arg2) {
+        throw new Error('[RESTAFF_ROLE_REQUIRED] Usage: restaff <MISSION_ID> <TEAM_ROLE>');
+      }
+      const csv = (value?: string) =>
+        value
+          ? value
+              .split(',')
+              .map((entry) => entry.trim())
+              .filter(Boolean)
+          : undefined;
+      const restaffSummary = await context.restaffMissionTeam(
+        arg1!,
+        arg2,
+        {
+          ...(csv(getValue('--capabilities', context.argv))
+            ? { requiredCapabilities: csv(getValue('--capabilities', context.argv))! }
+            : {}),
+          ...(csv(getValue('--exclude', context.argv))
+            ? { excludeAgentIds: csv(getValue('--exclude', context.argv))! }
+            : {}),
+          ...(getValue('--reason', context.argv)
+            ? { reason: getValue('--reason', context.argv)! }
+            : {}),
+        },
+        getValue('--organization-id', context.argv) || getValue('--org', context.argv)
+      );
+      if (restaffSummary !== undefined) {
+        context.print?.(JSON.stringify(restaffSummary, null, 2));
       }
       break;
     }

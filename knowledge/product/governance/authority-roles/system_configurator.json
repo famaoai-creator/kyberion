@@ -10,18 +10,7 @@
     "active/audit/",
     "active/shared/logs/"
   ],
-  "scope_classes": [
-    "capability_registration",
-    "tenant_configuration",
-    "audit"
-  ],
-  "allowed_actuators": [
-    "service-actuator",
-    "voice-actuator",
-    "file-actuator"
-  ],
-  "tier_access": [
-    "public",
-    "confidential"
-  ]
+  "scope_classes": ["capability_registration", "tenant_configuration", "audit"],
+  "allowed_actuators": ["service-actuator", "voice-actuator", "file-actuator"],
+  "tier_access": ["public", "confidential"]
 }

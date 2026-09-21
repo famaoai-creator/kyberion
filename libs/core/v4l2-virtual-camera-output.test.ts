@@ -79,4 +79,27 @@ describe('v4l2 virtual-camera output seam backend', () => {
       reason: expect.stringMatching(/v4l2/iu),
     });
   });
+
+  it('does not retain foreground output state after injection completes', async () => {
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    const injection = fakeInjectionBridge('ffmpeg-v4l2');
+    const bridge = new V4l2VirtualCameraOutputBridge({
+      ffmpegBin: 'true',
+      injectionBridge: injection,
+    });
+
+    await bridge.startAvatarOutput({ videoPath: 'active/shared/tmp/first.mp4' });
+    expect(injection.injectFromMp4).toHaveBeenCalledWith(
+      'active/shared/tmp/first.mp4',
+      expect.objectContaining({ device_path: '/dev/video2' })
+    );
+    expect(bridge.health()).toMatchObject({
+      status: 'healthy',
+      output_process_alive: false,
+      lease_held: false,
+    });
+
+    await bridge.startAvatarOutput({ videoPath: 'active/shared/tmp/second.mp4' });
+    expect(injection.injectFromMp4).toHaveBeenCalledTimes(2);
+  });
 });

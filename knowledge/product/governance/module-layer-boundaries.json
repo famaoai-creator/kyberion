@@ -59,7 +59,7 @@
     { "layer": "contracts", "pattern": "libs/core/entity-scope.ts" },
     { "layer": "contracts", "pattern": "libs/core/vocabulary-keys.generated.ts" },
     { "layer": "contracts", "pattern": "libs/core/channel-surface-types.ts" },
-    { "layer": "contracts", "pattern": "libs/core/worker-assignment-policy.ts" },
+    { "layer": "domain", "pattern": "libs/core/worker-assignment-policy.ts" },
     { "layer": "domain", "pattern": "libs/core/intent-clarification-format.ts" },
     { "layer": "contracts", "pattern": "libs/core/intent-compilation-events.ts" },
     { "layer": "contracts", "pattern": "libs/core/intent-contract-types.ts" },

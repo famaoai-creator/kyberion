@@ -16,6 +16,18 @@
       "type": "object",
       "required": ["lifecycle", "composition"],
       "properties": {
+        "obligations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "reason", "require_roles"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 },
+              "require_roles": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+            }
+          }
+        },
         "lifecycle": {
           "type": "object",
           "required": [
@@ -57,6 +69,7 @@
             "required_roles": { "type": "array", "items": { "type": "string" } },
             "optional_roles": { "type": "array", "items": { "type": "string" } },
             "assigned_roles": { "type": "array", "items": { "type": "string" } },
+            "standby_roles": { "type": "array", "items": { "type": "string" } },
             "unfilled_required_roles": { "type": "array", "items": { "type": "string" } }
           }
         }
@@ -70,7 +83,16 @@
         "properties": {
           "team_role": { "type": "string" },
           "required": { "type": "boolean" },
-          "status": { "enum": ["assigned", "unfilled"] },
+          "status": { "enum": ["assigned", "standby", "unfilled"] },
+          "role_sources": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": ["structural", "obligation", "template", "restaff"]
+            }
+          },
           "agent_id": { "type": ["string", "null"] },
           "actor_type": { "type": "string", "enum": ["human", "agent", "service"] },
           "resource": { "$ref": "#/definitions/workforce_resource_ref" },

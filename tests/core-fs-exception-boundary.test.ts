@@ -138,6 +138,7 @@ const allowedCoreFsImports = [
   'libs/core/procedure-self-repair.test.ts',
   'libs/core/promotion-candidates.test.ts',
   'libs/core/provider-discovery.test.ts',
+  'libs/core/provider-egress-gate.test.ts',
 ].sort((a, b) => a.localeCompare(b));
 
 function normalize(relPath: string): string {
