@@ -20685,6 +20685,9 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "allow_host_handoff": {
+                "type": "boolean"
+              },
               "aspectRatio": {
                 "type": "string"
               },
@@ -20726,6 +20729,9 @@
               },
               "providerPreference": {
                 "type": "array"
+              },
+              "purpose": {
+                "type": "string"
               },
               "reference_images": {
                 "type": "array"
@@ -30370,6 +30376,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "purpose": {
+                "type": "string"
               }
             },
             "additionalProperties": false,
@@ -30416,6 +30425,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "purpose": {
+                "type": "string"
               }
             },
             "additionalProperties": false,
@@ -30463,6 +30475,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "purpose": {
+                "type": "string"
               }
             },
             "additionalProperties": false,
@@ -30547,6 +30562,9 @@
               "output_path": {
                 "type": "string"
               },
+              "purpose": {
+                "type": "string"
+              },
               "request_id": {
                 "type": "string"
               }
@@ -30573,6 +30591,9 @@
                 "type": "string"
               },
               "output_path": {
+                "type": "string"
+              },
+              "purpose": {
                 "type": "string"
               },
               "request_id": {

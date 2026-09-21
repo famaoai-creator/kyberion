@@ -10,6 +10,7 @@ import {
   getSpeechToTextBridges,
   registerSpeechToTextBridge,
   type SpeechToTextBridge,
+  type SpeechToTextCapabilities,
   type TranscribeInput,
   type TranscribeResult,
 } from './speech-to-text-bridge.js';
@@ -545,6 +546,13 @@ export async function generateImageLocallyWithApplePlayground(
 
 // ----- SpeechToTextBridge adapter (meeting minutes / requirements audio) -----
 
+/** On-device SpeechAnalyzer: audio never leaves the machine. */
+const APPLE_SPEECH_CAPABILITIES: SpeechToTextCapabilities = {
+  timestamps: false,
+  granularity: 'none',
+  local_only: true,
+};
+
 /**
  * Adapts the on-device STT lane to the repo-wide SpeechToTextBridge
  * contract, so in-room minutes recording and requirements-elicitation
@@ -554,7 +562,7 @@ export async function generateImageLocallyWithApplePlayground(
 export function createAppleSpeechToTextBridge(): SpeechToTextBridge {
   return {
     name: 'apple-speech',
-    capabilities: { timestamps: false, granularity: 'none' },
+    capabilities: APPLE_SPEECH_CAPABILITIES,
     async transcribe(input: TranscribeInput): Promise<TranscribeResult> {
       const audioAbs = rootResolve(input.audioPath);
       if (!safeExistsSync(audioAbs)) {
@@ -577,7 +585,7 @@ export function createAppleSpeechToTextBridge(): SpeechToTextBridge {
         language,
         written_to: outputPath,
         backend: 'apple-speech',
-        capabilities: { timestamps: false, granularity: 'none' },
+        capabilities: APPLE_SPEECH_CAPABILITIES,
       };
     },
   };

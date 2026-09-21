@@ -1,4 +1,9 @@
 {
   "version": "1.0.0",
-  "order": ["browser-automation-runtime", "image-generation-provider", "ocr-provider"]
+  "order": [
+    "browser-automation-runtime",
+    "image-generation-provider",
+    "ocr-provider",
+    "speech-to-text-bridge"
+  ]
 }

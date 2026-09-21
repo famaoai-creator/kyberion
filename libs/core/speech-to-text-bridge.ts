@@ -33,6 +33,11 @@ import { rootResolve } from './path-resolver.js';
 import { resolveLocale } from './locale.js';
 import { discoverLocalSttBackends, selectPreferredLocalSttBackend } from './local-stt-discovery.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
+import {
+  listSeamSelectionPurposes,
+  resolveSeamProviderDecision,
+  type SeamProviderDecision,
+} from './seam-provider-selection.js';
 
 export interface TranscribeInput {
   audioPath: string;
@@ -124,6 +129,103 @@ export function getSpeechToTextBridge(): SpeechToTextBridge {
 export function getSpeechToTextBridges(): SpeechToTextBridge[] {
   const bridges = speechToTextSeam.list().map((provider) => provider.implementation);
   return bridges.length > 0 ? bridges : [stubSpeechToTextBridge];
+}
+
+export const SPEECH_TO_TEXT_SEAM = 'speech-to-text-bridge';
+
+/** Hard needs of a transcription task; a bridge that cannot meet them is never chosen. */
+export interface SpeechToTextRequirements {
+  /** Minimum timestamp granularity the bridge must declare. Unset: timestamps not required. */
+  timestamps?: 'segment' | 'word';
+  /** Audio must stay on this machine (bridge declares `local_only: true`). */
+  localOnly?: boolean;
+  /** Allow synthetic output (the sidecar-only stub). Default false. */
+  allowSynthetic?: boolean;
+}
+
+export interface SelectSpeechToTextBridgesOptions {
+  purpose: string;
+  requires?: SpeechToTextRequirements;
+  /** Bridges to choose from. Default: every registered bridge (or the stub). */
+  bridges?: SpeechToTextBridge[];
+}
+
+export interface SpeechToTextSelection {
+  /** Eligible bridges, best first for the purpose. */
+  bridges: SpeechToTextBridge[];
+  decision: SeamProviderDecision;
+}
+
+/** Thrown when no bridge can meet the requirements; carries the audited decision. */
+export class SpeechToTextSelectionError extends Error {
+  constructor(readonly decision: SeamProviderDecision) {
+    super(`[STT_SELECTION] ${decision.rationale}`);
+    this.name = 'SpeechToTextSelectionError';
+  }
+}
+
+const GRANULARITY_RANK: Record<SpeechToTextCapabilities['granularity'], number> = {
+  none: 0,
+  segment: 1,
+  word: 2,
+};
+
+function unmetSpeechToTextRequirements(
+  bridge: SpeechToTextBridge,
+  requires: SpeechToTextRequirements
+): string[] {
+  const capabilities = getSpeechToTextCapabilities(bridge);
+  const unmet: string[] = [];
+  if (bridge.name === stubSpeechToTextBridge.name && !requires.allowSynthetic) {
+    unmet.push('synthetic output not allowed');
+  }
+  if (
+    requires.timestamps &&
+    (!capabilities.timestamps ||
+      GRANULARITY_RANK[capabilities.granularity] < GRANULARITY_RANK[requires.timestamps])
+  ) {
+    unmet.push(`timestamps (${requires.timestamps})`);
+  }
+  if (requires.localOnly && capabilities.local_only !== true) unmet.push('local_only');
+  return unmet;
+}
+
+/**
+ * Purpose-driven bridge choice. Requirements decide eligibility from the
+ * bridges' declared capabilities; the governed selection policy ranks the
+ * eligible ones by purpose; the decision is audited and pinned per mission.
+ * Callers without a purpose keep using getSpeechToTextBridge() (priority).
+ */
+export function selectSpeechToTextBridges(
+  options: SelectSpeechToTextBridgesOptions
+): SpeechToTextSelection {
+  const purpose = String(options.purpose || '').trim();
+  const requires = options.requires ?? {};
+  const bridges = options.bridges ?? getSpeechToTextBridges();
+  const candidates = bridges.map((bridge) => {
+    const unmet = unmetSpeechToTextRequirements(bridge, requires);
+    return { id: bridge.name, eligible: unmet.length === 0, unmet };
+  });
+  const decision = resolveSeamProviderDecision({
+    seam: SPEECH_TO_TEXT_SEAM,
+    candidates,
+    purpose,
+    decisionKey: purpose,
+  });
+  if (decision.strategy === 'unresolved') {
+    const known = listSeamSelectionPurposes(SPEECH_TO_TEXT_SEAM);
+    if (!known.includes(purpose)) {
+      throw new Error(
+        `[STT_SELECTION] unknown purpose '${purpose}' for seam '${SPEECH_TO_TEXT_SEAM}' (known: ${known.join(', ')})`
+      );
+    }
+    throw new SpeechToTextSelectionError(decision);
+  }
+  const byName = new Map(bridges.map((bridge) => [bridge.name, bridge]));
+  return {
+    bridges: decision.ranked.flatMap((id) => byName.get(id) ?? []),
+    decision,
+  };
 }
 
 export function resetSpeechToTextBridge(): void {

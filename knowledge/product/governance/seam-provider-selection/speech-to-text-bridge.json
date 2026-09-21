@@ -1,0 +1,147 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "speech-to-text-bridge",
+      "default_provider": "whisperkit-cli",
+      "traits": {
+        "accuracy": "Transcript quality on multilingual (incl. Japanese) meeting and requirements audio.",
+        "latency": "Wall-clock from audio file to transcript (model warm-up included).",
+        "privacy": "Confidence that audio never leaves the machine (on-device execution by construction)."
+      },
+      "providers": {
+        "fluid-audio-parakeet": {
+          "traits": {
+            "accuracy": 0.75,
+            "latency": 1,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/speech-to-text-bridge.ts (installFluidAudioSpeechToTextBridgeIfAvailable: segment timestamps, local_only)",
+            "docs/VOICE_LOCAL_BACKENDS.md"
+          ]
+        },
+        "whisperkit-cli": {
+          "traits": {
+            "accuracy": 0.85,
+            "latency": 0.7,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/speech-to-text-bridge.ts (buildWhisperKitTranscribeArgs runs --without-timestamps)",
+            "knowledge/product/governance/local-stt-discovery-registry.json (priority 100)"
+          ]
+        },
+        "mlx_whisper": {
+          "traits": {
+            "accuracy": 0.9,
+            "latency": 0.5,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py (default model whisper-large-v3-turbo, segment timestamps)",
+            "knowledge/product/governance/local-stt-discovery-registry.json (priority 90 managed / 80 os-python)"
+          ]
+        },
+        "apple-speech": {
+          "traits": {
+            "accuracy": 0.7,
+            "latency": 0.8,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/apple-intelligence-bridge.ts (createAppleSpeechToTextBridge: on-device SpeechAnalyzer, macOS 26+)"
+          ]
+        },
+        "apple-speech-file": {
+          "traits": {
+            "accuracy": 0.5,
+            "latency": 0.55,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/apple-speech-file-stt-bridge.ts (SFSpeechRecognizer with on-device recognition enforced)"
+          ]
+        },
+        "shell": {
+          "traits": {
+            "accuracy": 0.5,
+            "latency": 0.5,
+            "privacy": 0.3
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/speech-to-text-bridge.ts (ShellSpeechToTextBridge: operator command from KYBERION_STT_COMMAND; may be a cloud CLI, capabilities from KYBERION_STT_CAPABILITIES)"
+          ]
+        },
+        "stub": {
+          "traits": {
+            "accuracy": 0,
+            "latency": 0,
+            "privacy": 0
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/speech-to-text-bridge.ts (stubSpeechToTextBridge returns a pre-made sidecar transcript; synthetic, eligible only when synthetic output is allowed, always ranked last)"
+          ]
+        }
+      },
+      "purposes": {
+        "accuracy": {
+          "description": "Minutes, requirements transcripts and other text that people will read and act on.",
+          "weights": {
+            "accuracy": 1
+          }
+        },
+        "latency": {
+          "description": "Interactive turns where the transcript is needed quickly and a slightly weaker transcript is acceptable.",
+          "weights": {
+            "latency": 0.8,
+            "accuracy": 0.2
+          }
+        },
+        "privacy": {
+          "description": "Sensitive audio: prefer backends that are on-device by construction. Use the local_only requirement when remote processing must be impossible rather than merely unlikely.",
+          "weights": {
+            "privacy": 0.7,
+            "accuracy": 0.3
+          }
+        }
+      }
+    }
+  ]
+}
