@@ -5,13 +5,28 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
-    "version": { "type": "string", "minLength": 1 },
-    "missionId": { "type": "string", "minLength": 1 },
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "missionId": {
+      "type": "string",
+      "minLength": 1
+    },
     "pins": {
       "type": "object",
       "additionalProperties": {
         "$ref": "#/definitions/pinnedEntry"
+      }
+    },
+    "seam_pins": {
+      "type": "object",
+      "description": "Seam provider selections frozen for the mission, keyed by '<seam>:<decisionKey>'.",
+      "additionalProperties": {
+        "$ref": "#/definitions/seamPinnedEntry"
       }
     }
   },
@@ -21,17 +36,58 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "provider": { "type": "string", "minLength": 1 },
-        "modelId": { "type": "string", "minLength": 1 },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modelId": {
+          "type": "string",
+          "minLength": 1
+        },
         "instance": {
           "type": ["string", "null"],
           "minLength": 1
         },
-        "orchestration": { "enum": ["leaf", "managed_workflow"] },
-        "pinnedAt": { "type": "string", "format": "date-time" },
-        "by": { "type": "string", "minLength": 1 }
+        "orchestration": {
+          "enum": ["leaf", "managed_workflow"]
+        },
+        "pinnedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "by": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "required": ["provider", "modelId", "instance", "orchestration", "pinnedAt", "by"]
+    },
+    "seamPinnedEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seam": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pinnedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "by": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["seam", "provider_id", "pinnedAt", "by"]
     }
   }
 }

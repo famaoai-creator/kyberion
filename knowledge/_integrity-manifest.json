@@ -249,7 +249,7 @@
     {
       "path": "product/architecture/browser-execution-substrate-howto.md",
       "tier": "public",
-      "size": 10888,
+      "size": 11091,
       "type": "md"
     },
     {
@@ -537,7 +537,7 @@
     {
       "path": "product/architecture/lightpanda-browser-runtime-evaluation.md",
       "tier": "public",
-      "size": 6462,
+      "size": 6733,
       "type": "md"
     },
     {
@@ -772,6 +772,12 @@
       "path": "product/architecture/sdlc-gating-model.md",
       "tier": "public",
       "size": 3947,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/seam-provider-selection.md",
+      "tier": "public",
+      "size": 3786,
       "type": "md"
     },
     {
@@ -3412,6 +3418,12 @@
       "path": "product/governance/sdlc-gate-catalog.json",
       "tier": "public",
       "size": 4675,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection-policy.json",
+      "tier": "public",
+      "size": 2209,
       "type": "json"
     },
     {
@@ -10497,7 +10509,7 @@
     {
       "path": "product/schemas/provider-pins.schema.json",
       "tier": "public",
-      "size": 1152,
+      "size": 2180,
       "type": "json"
     },
     {
@@ -10708,6 +10720,12 @@
       "path": "product/schemas/sdlc-gate-catalog.schema.json",
       "tier": "public",
       "size": 1562,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/seam-provider-selection-policy.schema.json",
+      "tier": "public",
+      "size": 2514,
       "type": "json"
     },
     {

@@ -203,6 +203,12 @@ const CASES: GovernanceSchemaCase[] = [
     invalidPayload: { version: '1.0.0' },
   },
   {
+    name: 'seam-provider-selection-policy',
+    schemaPath: 'knowledge/product/schemas/seam-provider-selection-policy.schema.json',
+    dataPath: 'knowledge/product/governance/seam-provider-selection-policy.json',
+    invalidPayload: { version: '1.0.0', seams: {} },
+  },
+  {
     name: 'tool-runtime-registry',
     schemaPath: 'knowledge/product/schemas/tool-runtime-registry.schema.json',
     dataPath: 'knowledge/product/governance/tool-runtimes/mflux.json',

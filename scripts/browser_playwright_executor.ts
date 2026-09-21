@@ -35,6 +35,8 @@ export interface BrowserPipelineRunOptions {
   recordVideo?: boolean;
   /** browser-automation-runtime provider id; omitted = default Chromium. */
   browserRuntime?: string;
+  /** Let the governed selection policy pick a runtime for this purpose. */
+  browserPurpose?: string;
   context?: Record<string, unknown>;
 }
 
@@ -143,6 +145,7 @@ export function createExecuteBrowserPipeline(
       ...(defaults.cdpUrl ? { cdp_url: defaults.cdpUrl } : {}),
       ...(defaults.cdpPort ? { cdp_port: defaults.cdpPort } : {}),
       ...(defaults.browserRuntime ? { browser_runtime: defaults.browserRuntime } : {}),
+      ...(defaults.browserPurpose ? { runtime_purpose: defaults.browserPurpose } : {}),
     };
     const actuatorResult = await handleAction({
       action: 'pipeline',
