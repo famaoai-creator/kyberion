@@ -60,7 +60,10 @@ describe('classifyErrorAssisted', () => {
     registerOrganizationWorkJudgment();
     registerJudgmentBackend(provider('invalid_input'));
 
-    const result = await classifyErrorAssisted(UNMATCHED);
+    // Explicitly opting out of the calibration requirement, which is on by
+    // default here because an uncalibrated provider was measured being
+    // confidently wrong on exactly this question.
+    const result = await classifyErrorAssisted(UNMATCHED, { requireCalibrated: false });
     expect(result.category).toBe('invalid_input');
     expect(result.source).toBe('judgment');
     expect(result.ruleId).toBe('judgment');
@@ -76,10 +79,20 @@ describe('classifyErrorAssisted', () => {
     expect(result.source).toBe('rules');
   });
 
+  it('keeps unknown by default, because nothing is calibrated for this question', async () => {
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend(provider('network', 0.998));
+    const result = await classifyErrorAssisted(UNMATCHED);
+    expect(result.category).toBe('unknown');
+    // A confidence floor would have let 0.998 through; requiring a fit is
+    // what stops a confidently wrong answer.
+    expect(result.judgment_reason).toMatch(/not calibrated/);
+  });
+
   it('keeps unknown when the provider is unsure', async () => {
     registerOrganizationWorkJudgment();
     registerJudgmentBackend(provider('network', 0.3));
-    const result = await classifyErrorAssisted(UNMATCHED);
+    const result = await classifyErrorAssisted(UNMATCHED, { requireCalibrated: false });
     expect(result.category).toBe('unknown');
     expect(result.judgment_reason).toMatch(/confidence below/);
   });
@@ -89,7 +102,7 @@ describe('classifyErrorAssisted', () => {
     // 'unknown' is a real ErrorCategory but not a classification; an answer
     // outside the offered options is a provider bug, not a category.
     registerJudgmentBackend(provider('unknown'));
-    const result = await classifyErrorAssisted(UNMATCHED);
+    const result = await classifyErrorAssisted(UNMATCHED, { requireCalibrated: false });
     expect(result.category).toBe('unknown');
     expect(result.judgment_reason).toMatch(/declined/);
   });
@@ -102,7 +115,7 @@ describe('classifyErrorAssisted', () => {
         throw new Error('worker exploded');
       },
     });
-    const result = await classifyErrorAssisted(UNMATCHED);
+    const result = await classifyErrorAssisted(UNMATCHED, { requireCalibrated: false });
     expect(result.category).toBe('unknown');
   });
 

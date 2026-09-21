@@ -2923,6 +2923,10 @@
       "types": "./dist/browser-judgment.d.ts",
       "default": "./dist/browser-judgment.js"
     },
+    "./judgment-calibration-fit": {
+      "types": "./dist/judgment-calibration-fit.d.ts",
+      "default": "./dist/judgment-calibration-fit.js"
+    },
     "./tool-call-scheduler": {
       "types": "./dist/tool-call-scheduler.d.ts",
       "default": "./dist/tool-call-scheduler.js"
