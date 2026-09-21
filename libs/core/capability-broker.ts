@@ -57,10 +57,20 @@ interface PinnedEntry {
   by: string;
 }
 
+/** A seam provider choice frozen for the mission (see seam-provider-selection.ts). */
+export interface SeamPinnedEntry {
+  seam: string;
+  provider_id: string;
+  purpose?: string;
+  pinnedAt: string;
+  by: string;
+}
+
 interface PinFile {
   version: string;
   missionId?: string;
   pins: Record<string, PinnedEntry>;
+  seam_pins?: Record<string, SeamPinnedEntry>;
 }
 
 const PIN_FILE_VERSION = '1.0';
@@ -151,6 +161,44 @@ export function pinProviderDecision(decisionKey: string, decision: ProviderDecis
   file.pins[decisionKey] = entry;
   writePinFile(file);
   return entry;
+}
+
+function seamPinKey(seam: string, decisionKey: string): string {
+  return `${seam}:${decisionKey}`;
+}
+
+export function loadSeamProviderPin(seam: string, decisionKey: string): SeamPinnedEntry | null {
+  return readPinFile().seam_pins?.[seamPinKey(seam, decisionKey)] ?? null;
+}
+
+export function pinSeamProviderDecision(
+  seam: string,
+  decisionKey: string,
+  providerId: string,
+  purpose?: string
+): SeamPinnedEntry {
+  const file = readPinFile();
+  const entry: SeamPinnedEntry = {
+    seam,
+    provider_id: providerId,
+    ...(purpose ? { purpose } : {}),
+    pinnedAt: nowIso(),
+    by: actorId(),
+  };
+  file.version = PIN_FILE_VERSION;
+  file.missionId = getRegisteredEnvText('MISSION_ID');
+  file.seam_pins = { ...(file.seam_pins ?? {}), [seamPinKey(seam, decisionKey)]: entry };
+  writePinFile(file);
+  return entry;
+}
+
+export function unpinSeamProviderDecision(seam: string, decisionKey: string): void {
+  const file = readPinFile();
+  const key = seamPinKey(seam, decisionKey);
+  if (file.seam_pins?.[key]) {
+    delete file.seam_pins[key];
+    writePinFile(file);
+  }
 }
 
 export function unpinProviderDecision(decisionKey: string): void {
