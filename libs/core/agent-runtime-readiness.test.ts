@@ -19,6 +19,15 @@ Antigravity CLI requires permission to read, edit, and execute files here.
   No, exit
 `;
 
+
+/**
+ * Real idle panes, captured from a mission's prewarm on 2026-09-21. The first
+ * version of the ready signatures was written without looking at one and
+ * classified all three of these as `starting`.
+ */
+const REAL_AGY_READY = "\n\n\n\n\n\n\n  Antigravity CLI 1.2.7\n  famaoai@gmail.com (Google AI Pro)\n  Gemini 3.8 Flash (Low)\n  /Volumes/data/forcheck/kyberion-lay\n\n─────────────────────────────────────\n>\n─────────────────────────────────────\n? for shortcuts";
+const REAL_CLAUDE_READY = "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n────────────────────────────────────────────────────\n❯ \n────────────────────────────────────────────────────\n  ⏵⏵ auto mode on (shift+tab to cycle) · ← for ag…";
+
 describe('classifyAgentReadiness', () => {
   it('names the trust prompt and quotes it back', () => {
     const readiness = classifyAgentReadiness(TRUST_PROMPT);
@@ -43,6 +52,21 @@ describe('classifyAgentReadiness', () => {
     const readiness = classifyAgentReadiness('Proceed with the unusual thing? (y/n)');
     expect(readiness.state).toBe('awaiting_human');
     expect(readiness.signatureId).toBe('generic_confirm');
+  });
+
+
+  it('recognises a real idle agy pane as ready', () => {
+    expect(classifyAgentReadiness(REAL_AGY_READY).state).toBe('ready');
+  });
+
+  it('recognises a real idle claude pane as ready', () => {
+    expect(classifyAgentReadiness(REAL_CLAUDE_READY).state).toBe('ready');
+  });
+
+  it('does not mistake the trust prompt caret for an idle input', () => {
+    // "> Yes, I trust this folder" has a caret too; it is a question, not an
+    // empty input, and must stay awaiting_human.
+    expect(classifyAgentReadiness(TRUST_PROMPT).state).toBe('awaiting_human');
   });
 
   it('recognises an agent that is accepting work', () => {
