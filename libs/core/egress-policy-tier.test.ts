@@ -159,3 +159,57 @@ describe('defaults', () => {
     expect(decision.verdict).toBe('deny');
   });
 });
+
+describe('tenant-approved providers', () => {
+  it('resolves an approved provider to the hosts it declares', () => {
+    writePolicy({
+      version: '1',
+      mode: 'warn',
+      tenant_allowed_providers: { 'aster-bank': ['agy'] },
+    });
+    const decision = evaluateEgressPolicy(
+      'https://generativelanguage.googleapis.com/v1beta/models',
+      { tier: 'confidential', tenant_slug: 'aster-bank' }
+    );
+    expect(decision.verdict).toBe('allow');
+  });
+
+  it('does not extend one provider approval to another provider', () => {
+    writePolicy({
+      version: '1',
+      mode: 'warn',
+      tenant_allowed_providers: { 'aster-bank': ['agy'] },
+    });
+    const decision = evaluateEgressPolicy('https://api.openai.com/v1/responses', {
+      tier: 'confidential',
+      tenant_slug: 'aster-bank',
+    });
+    expect(decision.verdict).toBe('deny');
+  });
+
+  it('does not extend one tenant approval to another tenant', () => {
+    writePolicy({
+      version: '1',
+      mode: 'warn',
+      tenant_allowed_providers: { 'aster-bank': ['claude'] },
+    });
+    const decision = evaluateEgressPolicy('https://api.anthropic.com/v1/messages', {
+      tier: 'confidential',
+      tenant_slug: 'other-bank',
+    });
+    expect(decision.verdict).toBe('deny');
+  });
+
+  it('approves nothing for a provider with no declared hosts', () => {
+    writePolicy({
+      version: '1',
+      mode: 'warn',
+      tenant_allowed_providers: { 'aster-bank': ['no-such-provider'] },
+    });
+    const decision = evaluateEgressPolicy('https://no-such-provider.example/x', {
+      tier: 'confidential',
+      tenant_slug: 'aster-bank',
+    });
+    expect(decision.verdict).toBe('deny');
+  });
+});

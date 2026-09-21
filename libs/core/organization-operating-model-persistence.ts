@@ -9,7 +9,11 @@ import { resolveTenant } from './tenant-registry.js';
 import { getRegisteredEnvText, isVitestProcess } from './foundation/env.js';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { BUILTIN_JUDGMENT_PROVIDER, registerJudgmentBackend } from './judgment-backend.js';
+import {
+  BUILTIN_JUDGMENT_PROVIDER,
+  registerJudgmentBackend,
+  stateText,
+} from './judgment-backend.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
@@ -1194,7 +1198,9 @@ export function registerOrganizationWorkJudgment(): () => void {
     },
     async judge(request) {
       return request.questions.map((question) => {
-        const result = classifyOrganizationWork(request.state);
+        // Text-only by construction; `acceptsImages` is absent so the seam
+        // never routes an image here.
+        const result = classifyOrganizationWork(stateText(request.state));
         return {
           id: question.id,
           value: result.workShape,

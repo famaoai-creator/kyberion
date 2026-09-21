@@ -47,6 +47,10 @@ constants as `confidence`, and `onboarding-context.ts` branched on
 `knowledge/product/governance/judgment-calibration.json`; a provider is
 calibrated only where a fitted entry exists for that question id, and `false`
 everywhere else, including when the registry is missing or unreadable.
+The registry may store a legacy provider-wide `temperature`, or a
+question-specific `temperatures` map; when both are present, the exact
+question entry wins. This keeps separate fits for questions whose confidence
+scales differ while remaining readable by older registry entries.
 
 This is not bureaucracy. Both obvious sources of a model's confidence are
 uncalibrated in different ways, measured on the same twelve cases:
@@ -124,6 +128,68 @@ a human never sees it. Both of Jev's misses route to a human. For a gate whose
 purpose is catching what should be asked, the second failure mode is the
 better one, and the raw count inverts the ranking.
 
+## Two families of provider, and only one of them discriminates
+
+The open implementations of this idea split by architecture, and the split
+matters more than any individual project:
+
+| family                          | examples                                                         | separation measured here | determinism  |
+| ------------------------------- | ---------------------------------------------------------------- | ------------------------ | ------------ |
+| reads logits from a general LLM | Simple Jev, System One Lite, SemIf, LocalJev, System One Adapter | **-0.003**               | not measured |
+| trained judgment head           | Laya, kev, typed-decisions                                       | **+0.36**                | **total**    |
+
+The first family is the easy one to reach for: no new model, constrained
+decoding over the LLM already installed. A provider was built that way here
+before the family was recognised, and it produced well-formed typed answers
+whose confidence was identical on clear and ambiguous input — structure
+without discrimination. Prefer the second family for anything that gates,
+and measure separation before trusting either.
+
+## Which Laya checkpoint
+
+`laya-mlx` ships three. For Japanese there is only one real option, and it
+happens to be the small one:
+
+| checkpoint                                         | noul | choice  | p50      |
+| -------------------------------------------------- | ---- | ------- | -------- |
+| `aac6fef/laya-multilingual-mlx` (mmBERT-base 322M) | 7/8  | **6/6** | **14ms** |
+| `aac6fef/laya-mlx` (ModernBERT-large 421M)         | 5/8  | 2/6     | 33ms     |
+| `aac6fef/laya-typed-decisions-mlx` (DeBERTa)       | 6/8  | 2/6     | 33ms     |
+
+The English checkpoints score near chance on Japanese choices and sit at
+~0.5 on nouls, which is no signal at all. Both are larger and slower.
+
+The noul head needs its `{true, false}` descriptions as much as a choice
+needs its options described — asked without them it called
+'月次レポートを作って' not a work request at 0.002, and asked with them it
+is right on seven of eight.
+
+## A state may carry an image, and `acceptsImages` decides who sees it
+
+`JudgmentState` is a string, or text plus a base64 image. The text-only
+version was a real limit rather than an omission: `judgePageReadiness` can
+read a page's words but not see a spinner, a half-painted layout, or a modal
+over the content — the cases where "is it ready" is genuinely in doubt.
+`judgePageReadiness` takes a `screenshotBase64` for that.
+
+Seeing pixels is a property of the provider, not of the question, so it is a
+capability flag rather than something `supports()` could express. **Absent
+means no**, and `selectJudgmentBackend` filters on it at all three paths
+that can reach a provider — selection, the built-in floor, and the
+failure-degradation path. A text-only provider handed an image would answer
+from the caption and look like it had looked at the picture; instead the
+caller gets its baseline and a reason saying nothing can see images.
+
+Providers that take pixels exist. PlayJev-0.8B reads one 448px frame and
+returns a distribution over the listed options in a single forward pass with
+nothing generated, which is exactly this seam's shape; openvons covers text,
+images and Japanese voice, and answers the escape-option problem a third way
+— it scores a _free hypothesis_ alongside the candidates rather than adding
+"none of these" as an option that competes for the same probability mass.
+Neither has been measured against a call site here, so neither is
+registered: per the evaluation rule above, an unmeasured provider is treated
+exactly like a bad one.
+
 ## Adding a provider
 
 1. Implement `JudgmentBackend`: `judgment_id`, an honest `egress` label,
@@ -143,15 +209,88 @@ better one, and the raw count inverts the ranking.
    `judgment-calibration.json`. Until then it reports `calibrated: false`,
    which is correct and does not stop it being used.
 
+## Criteria text is not optional in practice
+
+`JudgmentQuestion.optionDescriptions` is typed optional and behaves like it is
+required. Asked with bare identifiers (`incident_response`,
+`routine_operation`, …), the Laya-MLX provider got **1 of 6** unambiguous
+Japanese requests right. The same six utterances, same model, same threshold,
+with one sentence of description per option: **6 of 6** — better than the
+rules (5/6) and better than Jev (4/6).
+
+An identifier is legible to whoever named it and to nobody else. Write the
+descriptions.
+
+The earlier Jev measurements in this document were taken _before_ this was
+understood, with option names passed as their own descriptions, so they
+understate it. Both providers now go through `describeChoiceOptions()`.
+
+## Providers measured so far
+
+All three asked the same question, with option descriptions:
+
+|                       | decisions | silent errors | shape on clear input | runs that varied | latency   | tiers reachable |
+| --------------------- | --------- | ------------- | -------------------- | ---------------- | --------- | --------------- |
+| built-in rules        | 11/12     | 1             | 5/6                  | 0/12             | ~0ms      | all             |
+| local 4B (generative) | —         | —             | 3/6                  | not measured     | 294ms     | all             |
+| TypeSafe Jev          | 9/12      | 3             | **6/6**              | **7/12**         | 235-278ms | public only     |
+| Laya-MLX              | 9/12      | 1             | **6/6**              | **0/12**         | 24ms      | **all**         |
+
+Jev was re-measured after the description finding, and the correction runs
+both ways. Its classification was understated — 4/6 became 6/6, matching
+Laya. Its behaviour as a gate was overstated: descriptions made every option
+look plausible, so it stopped abstaining, and silent errors went from 0 to 3
+while the runs that varied went from a handful to 7 of 12. Descriptions help
+recognition and hurt abstention; Laya took the same descriptions without
+losing its reticence.
+
+Read the columns, not the totals. Laya and Jev tie on decisions and on
+classification; they differ where it matters for a gate — one silent error
+against three, and no variance against seven runs in twelve. Laya's two
+misses are correct shapes at 0.63 and 0.67 refused by the 0.7 threshold,
+which is a calibration problem rather than a comprehension one.
+
+The rules still win overall and remain the built-in provider. Their single
+miss is the expensive kind: a wrong shape at 0.80, which nobody is asked
+about.
+
+## Every integration goes through `assistWithJudgment`
+
+`judgment-assist.ts` is the only place a judgment is allowed to influence
+anything, so the rules that keep a model from breaking the system are
+written and tested once instead of at each call site. It never throws, caps
+the call in time, keeps the caller's deterministic result below a confidence
+floor, declines everything while `requireCalibrated` is set, and lets the
+caller refuse an answer it should not act on.
+
+The direction of safety is per call site, and the four that exist differ:
+
+| call site                       | baseline             | a judgment may                                                                             |
+| ------------------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
+| `error-classifier-judgment`     | the rules' category  | fill in `unknown` only; never override a matched rule                                      |
+| `knowledge-relevance-judgment`  | keep every document  | drop one it is _confidently sure_ is irrelevant, never a pinned one, never below `minKeep` |
+| `browser-judgment` failure kind | the heuristics' kind | fill in `unknown` only                                                                     |
+| `browser-judgment` readiness    | the caller's gate    | add "not ready"; never turn a failed gate into a pass                                      |
+
+The pattern is the same each time: a judgment adds information where there
+was none, or adds a restriction, and can never remove one. A call site whose
+natural baseline is permissive — the context pack, which keeps everything —
+gets the asymmetric guards instead, because there a wrong judgment removes
+something the worker needed and nobody is asked about it.
+
 ## Nothing is calibrated yet, deliberately
 
 `judgment-calibration.json` does not exist, so every provider reports
 `calibrated: false`. That is the accurate state, not an oversight.
 
-TypeSafe Jev is the strongest candidate measured so far and is still not
-eligible: its answers move between identical runs, twelve synthetic cases
-over three runs cannot estimate calibration error, and those cases were
-written for the bench rather than drawn from real traffic. A fit needs a
+Laya-MLX is the first eligible candidate and is still not calibrated: twelve
+synthetic cases cannot estimate calibration error, and those cases were
+written for the bench rather than drawn from real traffic. What it does have
+is the precondition — twelve utterances judged five times each returned
+byte-identical choices, confidences and noul values, so a fit would describe
+something stable. TypeSafe Jev does not clear that bar: asked the same
+utterance three times it returned three answers, two of them different
+shapes. A fit needs a
 labelled corpus of real utterances, repeated runs to measure variance, and a
 demonstrated improvement in calibration error.
 

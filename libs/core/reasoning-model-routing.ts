@@ -84,6 +84,12 @@ export interface TaskModelHintInput {
   model_id?: string;
 }
 
+const TASK_MODEL_TIER_ORDER: Record<TaskModelTier, number> = {
+  small: 0,
+  standard: 1,
+  large: 2,
+};
+
 let cachedRegistry: ModelRegistryFile | null = null;
 let cachedRegistryPath: string | null = null;
 
@@ -425,6 +431,31 @@ export function resolveTaskModelHint(
     effort: routed.choice.effort,
     model_id: model.model_id,
     route_reason: routed.route_reason,
+  };
+}
+
+/**
+ * Raise a deterministic hint after a previous attempt proved that a lower
+ * tier could not complete the task. The model registry remains the source of
+ * the actual model id; callers cannot smuggle an arbitrary provider/model in
+ * through retry metadata.
+ */
+export function raiseTaskModelHintToTier(
+  hint: TaskModelHint,
+  minimumTier: TaskModelTier,
+  options: { registry?: ModelRegistryFile } = {}
+): TaskModelHint {
+  if (TASK_MODEL_TIER_ORDER[hint.tier] >= TASK_MODEL_TIER_ORDER[minimumTier]) {
+    return hint;
+  }
+  const registry = options.registry ?? loadModelRegistry();
+  const model = findTaskModelForTier(registry, minimumTier);
+  return {
+    tier: minimumTier,
+    execution_tier: tierToExecutionTier(minimumTier),
+    effort: tierToEffort(minimumTier),
+    model_id: model.model_id,
+    route_reason: `${hint.route_reason}; escalated after retry to ${minimumTier}/${tierToEffort(minimumTier)}`,
   };
 }
 

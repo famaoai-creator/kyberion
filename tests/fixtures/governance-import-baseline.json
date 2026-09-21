@@ -183,6 +183,7 @@
     "libs/core/gemini-cli-backend.ts",
     "libs/core/in-room-meeting-driver.ts",
     "libs/core/in-room-minutes-recorder.ts",
+    "libs/core/laya-mlx-judgment-backend.ts",
     "libs/core/managed-process.ts",
     "libs/core/mic-capture.ts",
     "libs/core/mlx-embedding-backend.ts",

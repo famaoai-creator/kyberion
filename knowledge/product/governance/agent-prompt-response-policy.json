@@ -1,0 +1,12 @@
+{
+  "$schema": "../schemas/agent-prompt-response-policy.schema.json",
+  "version": "1.0.0",
+  "launch_args": {},
+  "auto_answer": [],
+  "relay_keys": {
+    "default": { "approve": ["enter"], "reject": ["esc"] },
+    "generic_confirm": { "approve": ["y", "enter"], "reject": ["n", "enter"] }
+  },
+  "escalation_wait_ms": 300000,
+  "_meta": "What a pane agent does when it stops to ask. Product default: answer nothing automatically; escalate every prompt as an approval request (pnpm kyberion approvals / approve / reject) and relay the decision with relay_keys. Installations add auto_answer rules and launch_args in knowledge/personal/governance/agent-prompt-response-policy.json. sign_in, device_code and terms_or_consent are never auto-answered, whatever a rule says."
+}

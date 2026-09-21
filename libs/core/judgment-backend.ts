@@ -57,15 +57,71 @@ export const BUILTIN_JUDGMENT_PROVIDER = 'builtin-rules';
  * `instructions` states what is being asked in one line. A rule provider can
  * ignore it — its question is baked into its patterns — but a model provider
  * needs it, so it belongs on the question rather than in provider config.
+ *
+ * `optionDescriptions` gives each choice option a sentence, and is worth far
+ * more than its optionality suggests: asked with bare identifiers, the
+ * Laya-MLX provider got 1 of 6 unambiguous Japanese requests right; asked
+ * with a description per option, 6 of 6. Options named `incident_response` /
+ * `routine_operation` are legible to whoever named them and to nobody else.
  */
 export type JudgmentQuestion =
-  | { kind: 'choice'; id: string; options: readonly string[]; instructions?: string }
+  | {
+      kind: 'choice';
+      id: string;
+      options: readonly string[];
+      /** One sentence per option; keys outside `options` are ignored. */
+      optionDescriptions?: Readonly<Record<string, string>>;
+      instructions?: string;
+    }
   | { kind: 'bool'; id: string; instructions?: string }
   | { kind: 'score'; id: string; range: readonly [number, number]; instructions?: string };
 
+/**
+ * `{option: description}` for a model provider, falling back to an option's
+ * own identifier where no description was supplied.
+ */
+export function describeChoiceOptions(
+  question: JudgmentQuestion & { kind: 'choice' }
+): Record<string, string> {
+  return Object.fromEntries(
+    question.options.map((option) => [option, question.optionDescriptions?.[option] || option])
+  );
+}
+
+/**
+ * The material being judged.
+ *
+ * Text was the only shape for a while, and it was a real limit rather than an
+ * omission: `judgePageReadiness` can read a page's words but cannot see a
+ * spinner, a half-painted layout, or a modal covering the content — exactly
+ * the cases a screenshot settles at a glance. Providers that take pixels
+ * exist (PlayJev reads one 448px frame and returns a distribution over the
+ * options in a single forward pass), so the type carries an image now and
+ * `acceptsImages` decides who may see it.
+ */
+export type JudgmentState =
+  | string
+  | {
+      text?: string;
+      /** Raw image bytes, base64, without a data: prefix. */
+      imageBase64: string;
+      /** Media type of `imageBase64`, e.g. 'image/png'. */
+      imageMediaType?: string;
+    };
+
+/** Whether this state carries anything a text-only provider cannot read. */
+export function stateHasImage(state: JudgmentState): boolean {
+  return typeof state !== 'string' && Boolean(state?.imageBase64);
+}
+
+/** The text of a state, for a provider or a log that only handles words. */
+export function stateText(state: JudgmentState): string {
+  return typeof state === 'string' ? state : state?.text || '';
+}
+
 export interface JudgmentRequest {
-  /** The material being judged. */
-  state: string;
+  /** The material being judged; a string, or text and an image. */
+  state: JudgmentState;
   /** Independent questions asked together over the same `state`. */
   questions: readonly JudgmentQuestion[];
   /** Highest data tier represented in `state`; drives provider eligibility. */
@@ -99,6 +155,16 @@ export interface JudgmentResult {
 export interface JudgmentBackend {
   readonly judgment_id: string;
   readonly egress: ProviderEgressLabel;
+  /**
+   * Whether this provider can see an image in the state.
+   *
+   * Absent means no, which is the safe default: a text-only provider handed
+   * an image would answer from the text alone and look like it had looked at
+   * the picture. `selectJudgmentBackend` filters on this, so a caller that
+   * sends a screenshot to a repository where nothing accepts one gets its
+   * baseline back rather than a confident answer about the caption.
+   */
+  readonly acceptsImages?: boolean;
   /** Whether this provider can answer a given question shape at all. */
   supports(question: JudgmentQuestion): boolean;
   /**
@@ -157,6 +223,10 @@ export interface JudgmentCalibrationEntry {
   /** Bench the fit was produced from; recorded for audit, not read back. */
   fitted_from: string;
   fitted_at: string;
+  /** Legacy provider-wide temperature, used when no question-specific value exists. */
+  temperature?: number;
+  /** Question-specific temperatures; these take precedence over `temperature`. */
+  temperatures?: Readonly<Record<string, number>>;
 }
 
 interface JudgmentCalibrationFile {
@@ -191,10 +261,37 @@ function loadCalibrationFile(): JudgmentCalibrationFile {
  * was built to stop.
  */
 export function resolveCalibration(providerId: string, questionId: string): boolean {
-  if (providerId === BUILTIN_JUDGMENT_PROVIDER) return false;
+  return Boolean(resolveCalibrationEntry(providerId, questionId));
+}
+
+/** Resolve a question-specific fit, with support for the legacy default. */
+export function resolveCalibrationTemperature(
+  entry: JudgmentCalibrationEntry,
+  questionId: string
+): number | undefined {
+  if (!Array.isArray(entry.questions)) return undefined;
+  const covered = entry.questions.includes('*') || entry.questions.includes(questionId);
+  if (!covered) return undefined;
+
+  const temperatures =
+    entry.temperatures &&
+    typeof entry.temperatures === 'object' &&
+    !Array.isArray(entry.temperatures)
+      ? entry.temperatures
+      : undefined;
+  const candidate = temperatures?.[questionId] ?? temperatures?.['*'] ?? entry.temperature;
+  return Number.isFinite(candidate) && candidate > 0 ? candidate : undefined;
+}
+
+function resolveCalibrationEntry(
+  providerId: string,
+  questionId: string
+): (JudgmentCalibrationEntry & { temperature: number }) | undefined {
+  if (providerId === BUILTIN_JUDGMENT_PROVIDER) return undefined;
   const entry = loadCalibrationFile().providers?.[providerId];
-  if (!entry || !Array.isArray(entry.questions)) return false;
-  return entry.questions.includes('*') || entry.questions.includes(questionId);
+  if (!entry) return undefined;
+  const temperature = resolveCalibrationTemperature(entry, questionId);
+  return temperature === undefined ? undefined : { ...entry, temperature };
 }
 
 // --- selection --------------------------------------------------------------
@@ -217,8 +314,13 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
     .map((entry) => entry.implementation)
     .filter((backend) => backend.judgment_id !== BUILTIN_JUDGMENT_PROVIDER);
 
+  const needsImage = stateHasImage(request.state);
   const rejected: string[] = [];
   for (const backend of candidates) {
+    if (needsImage && !backend.acceptsImages) {
+      rejected.push(`${backend.judgment_id}: cannot see images`);
+      continue;
+    }
     const unsupported = request.questions.filter((question) => !backend.supports(question));
     if (unsupported.length > 0) {
       rejected.push(`${backend.judgment_id}: cannot answer ${unsupported[0].kind}`);
@@ -239,15 +341,37 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
     };
   }
 
+  const why = rejected.length > 0 ? `; rejected: ${rejected.join('; ')}` : '';
+
   if (!builtin) {
     // Registration is explicit rather than an import side effect, so this is
     // reachable from a caller that never registered anything. Name the fix.
     throw new Error(
       `[JUDGMENT_BACKEND] no provider available: '${BUILTIN_JUDGMENT_PROVIDER}' is not registered. ` +
-        'Call registerOrganizationWorkJudgment() (or register your own floor provider) during setup.'
+        `Call registerOrganizationWorkJudgment() (or register your own floor provider) during setup.${why}`
     );
   }
-  const why = rejected.length > 0 ? `; rejected: ${rejected.join('; ')}` : '';
+
+  // The floor is a floor, not a universal answerer. It was possible for the
+  // built-in rules to receive a question they do not support and answer it
+  // anyway — an organization work shape at 0.40 in reply to a question about
+  // error categories. A provider that cannot answer must produce no answer,
+  // because a wrong one is worse than none: the whole point of this seam is
+  // that callers keep their deterministic result when judgment is not
+  // available, and a confident-looking wrong answer denies them that.
+  if (needsImage && !builtin.acceptsImages) {
+    throw new Error(`[JUDGMENT_BACKEND] no provider can see images at tier=${request.tier}${why}`);
+  }
+
+  const unsupported = request.questions.filter((question) => !builtin.supports(question));
+  if (unsupported.length > 0) {
+    throw new Error(
+      `[JUDGMENT_BACKEND] no provider can answer ${unsupported
+        .map((question) => `'${question.id}' (${question.kind})`)
+        .join(', ')} at tier=${request.tier}${why}`
+    );
+  }
+
   return {
     backend: builtin,
     reason: `fell back to '${BUILTIN_JUDGMENT_PROVIDER}' for tier=${request.tier}${why}`,
@@ -262,8 +386,8 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
  * throws degrades to the built-in one rather than failing the caller.
  */
 export async function judge(request: JudgmentRequest): Promise<JudgmentResult> {
-  if (!request || typeof request.state !== 'string') {
-    throw new TypeError('JudgmentRequest.state must be a string');
+  if (!request || (typeof request.state !== 'string' && !request.state?.imageBase64)) {
+    throw new TypeError('JudgmentRequest.state must be a string or carry an image');
   }
   if (!Array.isArray(request.questions) || request.questions.length === 0) {
     throw new TypeError('JudgmentRequest.questions must be a non-empty array');
@@ -275,29 +399,93 @@ export async function judge(request: JudgmentRequest): Promise<JudgmentResult> {
   let answers: readonly JudgmentAnswer[];
 
   try {
-    answers = await backend.judge(request);
+    answers = validateJudgmentAnswers(await backend.judge(request), request.questions);
   } catch (error: unknown) {
     const builtin = judgmentSeam.getOptional(BUILTIN_JUDGMENT_PROVIDER);
     if (!builtin || backend.judgment_id === BUILTIN_JUDGMENT_PROVIDER) throw error;
+    // Same rule as selection, and it has to be repeated here because this is
+    // a second way to reach the floor. Degrading to a provider that cannot
+    // answer the question produces an answer to a different question — the
+    // rules replied to 'test.category' with an organization work shape —
+    // which is worse than the failure being degraded from.
+    if (request.questions.some((question) => !builtin.supports(question))) throw error;
+    if (stateHasImage(request.state) && !builtin.acceptsImages) throw error;
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(
       `[judgment-backend] provider '${backend.judgment_id}' failed; degrading to '${BUILTIN_JUDGMENT_PROVIDER}': ${message}`
     );
     reason = `${reason}; then '${backend.judgment_id}' failed (${message}) and degraded to '${BUILTIN_JUDGMENT_PROVIDER}'`;
     backend = builtin;
-    answers = await builtin.judge(request);
+    answers = validateJudgmentAnswers(await builtin.judge(request), request.questions);
   }
 
   const providerId = backend.judgment_id;
   return {
     provider_id: providerId,
     reason,
-    answers: answers.map((answer) => ({
-      ...answer,
-      confidence: clampConfidence(answer.confidence),
-      calibrated: resolveCalibration(providerId, answer.id),
-    })),
+    answers: answers.map((answer) => {
+      const rawConfidence = clampConfidence(answer.confidence);
+      const calibration = resolveCalibrationEntry(providerId, answer.id);
+      return {
+        ...answer,
+        confidence: calibration
+          ? applyCalibrationTemperature(rawConfidence, calibration.temperature)
+          : rawConfidence,
+        calibrated: Boolean(calibration),
+      };
+    }),
   };
+}
+
+/** Apply the same logit temperature scaling used by the calibration fitter. */
+export function applyCalibrationTemperature(confidence: number, temperature: number): number {
+  if (!Number.isFinite(temperature) || temperature <= 0) return clampConfidence(confidence);
+  const bounded = Math.min(0.999999, Math.max(0.000001, clampConfidence(confidence)));
+  const logit = Math.log(bounded / (1 - bounded));
+  return clampConfidence(1 / (1 + Math.exp(-logit / temperature)));
+}
+
+function validateJudgmentAnswers(
+  answers: readonly JudgmentAnswer[],
+  questions: readonly JudgmentQuestion[]
+): readonly JudgmentAnswer[] {
+  if (!Array.isArray(answers) || answers.length !== questions.length) {
+    throw new Error(
+      `[JUDGMENT_BACKEND] provider returned ${Array.isArray(answers) ? answers.length : 'non-array'} answers for ${questions.length} questions`
+    );
+  }
+  const expected = new Map(questions.map((question) => [question.id, question]));
+  const seen = new Set<string>();
+  for (const answer of answers) {
+    if (!answer || typeof answer.id !== 'string' || !expected.has(answer.id)) {
+      throw new Error(`[JUDGMENT_BACKEND] provider returned an answer for an unknown question`);
+    }
+    if (seen.has(answer.id)) {
+      throw new Error(`[JUDGMENT_BACKEND] provider returned duplicate answer '${answer.id}'`);
+    }
+    seen.add(answer.id);
+    if (typeof answer.confidence !== 'number' || !Number.isFinite(answer.confidence)) {
+      throw new Error(`[JUDGMENT_BACKEND] provider returned invalid confidence for '${answer.id}'`);
+    }
+    const question = expected.get(answer.id)!;
+    if (question.kind === 'choice') {
+      if (typeof answer.value !== 'string' || !question.options.includes(answer.value)) {
+        throw new Error(`[JUDGMENT_BACKEND] provider returned invalid choice for '${answer.id}'`);
+      }
+    } else if (question.kind === 'bool') {
+      if (typeof answer.value !== 'boolean') {
+        throw new Error(`[JUDGMENT_BACKEND] provider returned invalid boolean for '${answer.id}'`);
+      }
+    } else if (
+      typeof answer.value !== 'number' ||
+      !Number.isFinite(answer.value) ||
+      answer.value < question.range[0] ||
+      answer.value > question.range[1]
+    ) {
+      throw new Error(`[JUDGMENT_BACKEND] provider returned invalid score for '${answer.id}'`);
+    }
+  }
+  return answers;
 }
 
 function clampConfidence(value: unknown): number {

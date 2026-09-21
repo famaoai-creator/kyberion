@@ -29,6 +29,7 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/email-bridge.ts',
   'libs/core/environment-capability.ts',
   'libs/core/gemini-cli-backend.ts',
+  'libs/core/laya-mlx-judgment-backend.ts',
   'libs/core/managed-process.ts',
   'libs/core/mlx-embedding-backend.ts',
   'libs/core/native-speech-listen-bridge.ts',

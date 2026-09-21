@@ -1,43 +1,56 @@
 {
   "$schema": "../schemas/provider-egress-policy.schema.json",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "attestation_ttl_days": 180,
   "providers": {
     "claude": {
       "egress": "external-api",
-      "training_use": "unknown"
+      "training_use": "unknown",
+      "endpoint_domains": ["api.anthropic.com"]
     },
     "codex": {
       "egress": "external-api",
-      "training_use": "unknown"
+      "training_use": "unknown",
+      "endpoint_domains": ["api.openai.com"]
     },
     "agy": {
       "egress": "external-api",
-      "training_use": "unknown"
+      "training_use": "unknown",
+      "endpoint_domains": ["generativelanguage.googleapis.com"]
     },
     "gemini": {
       "egress": "external-api",
-      "training_use": "unknown"
+      "training_use": "unknown",
+      "endpoint_domains": ["generativelanguage.googleapis.com"]
     },
     "copilot": {
       "egress": "external-api",
-      "training_use": "unknown"
+      "training_use": "unknown",
+      "endpoint_domains": ["api.githubcopilot.com"]
     },
     "grok": {
       "egress": "external-api",
-      "training_use": "unknown"
+      "training_use": "unknown",
+      "endpoint_domains": ["api.x.ai"]
     },
     "typesafe-jev": {
       "egress": "external-api",
-      "training_use": "unknown"
+      "training_use": "unknown",
+      "endpoint_domains": ["api.typesafe.ai"]
+    },
+    "laya-mlx": {
+      "egress": "local-only",
+      "training_use": "none"
     },
     "cursor": {
       "egress": "external-api",
-      "training_use": "unknown"
+      "training_use": "unknown",
+      "endpoint_domains": ["api2.cursor.sh", "api.cursor.com"]
     },
     "opencode": {
       "egress": "external-api",
-      "training_use": "unknown"
+      "training_use": "unknown",
+      "endpoint_domains": ["opencode.ai"]
     }
   },
   "tier_policy": {

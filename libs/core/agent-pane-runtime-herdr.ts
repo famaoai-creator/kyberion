@@ -14,6 +14,23 @@ import { safeExecResult } from './secure-io.js';
 import { resolveHerdrBin } from './tool-binary-resolvers.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import {
+  classifyAgentReadiness,
+  describeAgentReadiness,
+  type AgentReadiness,
+} from './agent-runtime-readiness.js';
+import {
+  decideAgentPromptResponse,
+  loadAgentPromptResponsePolicy,
+  resolveAgentLaunchArgs,
+  type AgentPromptResponsePolicy,
+} from './agent-prompt-response.js';
+import {
+  getAgentPromptApprovalPort,
+  type AgentPromptApprovalPort,
+  type AgentPromptApprovalStatus,
+} from './agent-prompt-approval-port.js';
+import { auditChain } from './audit-chain.js';
+import {
   registerAgentPaneRuntimeBridge,
   type AgentPaneRuntimeBridge,
   type AgentPaneRuntimeProbe,
@@ -365,6 +382,35 @@ export class HerdrRuntimeClient {
     return agent;
   }
 
+  sendKeys(target: string, keys: string[]): void {
+    const envelope = this.run(['agent', 'send-keys', target, ...keys]);
+    if (envelope.error)
+      throw new Error(`[pane-runtime] agent send-keys failed: ${envelope.error.message}`);
+  }
+
+  /** Wait until the agent is idle, done or blocked again. */
+  waitAgent(target: string, timeoutMs: number): HerdrAgentInfo | null {
+    const envelope = this.run(
+      [
+        'agent',
+        'wait',
+        target,
+        '--until',
+        'idle',
+        '--until',
+        'done',
+        '--until',
+        'blocked',
+        '--timeout',
+        String(timeoutMs),
+      ],
+      timeoutMs + 5_000
+    );
+    if (envelope.error)
+      throw new Error(`[pane-runtime] agent wait failed: ${envelope.error.message}`);
+    return isRecord(envelope.result) ? asAgentInfo(envelope.result.agent) : null;
+  }
+
   readAgent(target: string, lines = 80): string {
     const result = this.exec(
       this.bin,
@@ -447,6 +493,51 @@ export function extractPaneAssistantText(screen: string, prompt: string): string
 /** @deprecated Prefer extractPaneAssistantText. */
 export const extractHerdrAssistantText = extractPaneAssistantText;
 
+/** Answers per turn before giving up; stops an agent that asks forever. */
+const MAX_PROMPT_ROUNDS = 5;
+
+export interface PromptAuditEntry {
+  agentName: string;
+  signatureId: string;
+  result: 'allowed' | 'denied';
+  reason: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface HerdrPromptHandlingOptions {
+  /** Defaults to the product policy overlaid by the personal one. */
+  promptPolicy?: AgentPromptResponsePolicy;
+  /** Defaults to the registered port (the approval store, when its module is loaded). */
+  promptApprovals?: AgentPromptApprovalPort;
+  /** Defaults to the audit chain. */
+  promptAudit?: (entry: PromptAuditEntry) => void;
+  /** Pause after sending keys before waiting on the agent. */
+  settleDelayMs?: number;
+}
+
+function recordPromptAudit(entry: PromptAuditEntry): void {
+  try {
+    auditChain.record({
+      agentId: entry.agentName,
+      action: 'agent_prompt_response',
+      operation: entry.signatureId,
+      result: entry.result,
+      reason: entry.reason,
+      metadata: entry.metadata,
+    });
+  } catch (error: unknown) {
+    logger.warn(
+      `[pane-runtime] audit of prompt response failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 class HerdrPaneAgentAdapter implements AgentAdapter {
   private readonly client: HerdrRuntimeClient;
   private readonly agentId: string;
@@ -459,6 +550,10 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
   private readonly turnTimeoutMs: number;
   private readonly paneAgentName: string;
   private readonly kind: HerdrProviderKind;
+  private readonly promptPolicy: AgentPromptResponsePolicy;
+  private readonly promptApprovals: AgentPromptApprovalPort | null;
+  private readonly promptAudit: (entry: PromptAuditEntry) => void;
+  private readonly settleDelayMs: number;
 
   private workspaceId: string | null = null;
   private paneId: string | null = null;
@@ -466,7 +561,10 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
   private createdPane = false;
   private booted = false;
 
-  constructor(options: AgentPaneRuntimeSpawnRequest & { client?: HerdrRuntimeClient }) {
+  constructor(
+    options: AgentPaneRuntimeSpawnRequest &
+      HerdrPromptHandlingOptions & { client?: HerdrRuntimeClient }
+  ) {
     const kind = mapProviderToHerdrKind(options.provider);
     if (!kind) {
       throw new Error(
@@ -484,6 +582,10 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
     this.bootTimeoutMs = options.bootTimeoutMs ?? 60_000;
     this.turnTimeoutMs = options.turnTimeoutMs ?? 180_000;
     this.paneAgentName = sanitizeHerdrAgentName(options.agentId);
+    this.promptPolicy = options.promptPolicy ?? loadAgentPromptResponsePolicy();
+    this.promptApprovals = options.promptApprovals ?? getAgentPromptApprovalPort();
+    this.promptAudit = options.promptAudit ?? recordPromptAudit;
+    this.settleDelayMs = options.settleDelayMs ?? 1_500;
   }
 
   async boot(): Promise<void> {
@@ -523,6 +625,8 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
       }
     }
 
+    extraArgs.push(...resolveAgentLaunchArgs(this.promptPolicy, this.provider, this.kind));
+
     this.client.startAgent({
       name: this.paneAgentName,
       kind: this.kind,
@@ -530,6 +634,10 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
       timeoutMs: this.bootTimeoutMs,
       extraArgs: extraArgs.length > 0 ? extraArgs : undefined,
     });
+
+    // First-run prompts (workspace trust, sign-in) appear here, and herdr
+    // reports the agent started: it is at an input, just not ours.
+    await this.settlePrompts(this.readScreen(), false);
 
     if (this.systemPrompt && this.systemPrompt.trim()) {
       try {
@@ -594,11 +702,178 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
       screen = before;
     }
 
+    // An agent that stops mid-turn to ask something — "allow this tool?",
+    // a clarifying question, a trust prompt — is not finished. `prompt --wait`
+    // returns as soon as herdr sees it `blocked`, and this used to read the
+    // screen and hand the question back as the agent's answer: dispatch then
+    // treated "Allow edits to this file? (y/n)" as completed work.
+    //
+    // Two checks, because neither is enough alone. herdr's own `blocked`
+    // status is authoritative for the prompts it understands; for the ones it
+    // does not, the pane reads `idle` — an agent sitting on a trust prompt was
+    // reported exactly that way — so the screen is classified as well.
+    const nativeBlocked = String(promptResult.agent_status || '').toLowerCase() === 'blocked';
+    screen = await this.settlePrompts(screen, nativeBlocked);
+
     const text = extractPaneAssistantText(screen, prompt) || screen.trim();
     if (!text || text === prompt.trim()) {
       throw new Error(`[pane-runtime] agent '${this.paneAgentName}' returned no assistant text`);
     }
     return { text, stopReason: 'completed' };
+  }
+
+  private readScreen(lines = 120): string {
+    try {
+      return this.client.readAgent(this.paneAgentName, lines);
+    } catch {
+      return '';
+    }
+  }
+
+  private promptOnScreen(screen: string, blocked: boolean): AgentReadiness | null {
+    const onScreen = classifyAgentReadiness(screen);
+    if (onScreen.state === 'awaiting_human') return onScreen;
+    if (!blocked) return null;
+    return {
+      state: 'awaiting_human',
+      reason: `agent is waiting for a person: herdr reports '${this.paneAgentName}' as blocked`,
+      promptExcerpt: screen.split('\n').slice(-12).join('\n').trim(),
+      signatureId: 'agent_blocked',
+    };
+  }
+
+  /**
+   * Resolve whatever the agent has stopped on, and return the screen once it
+   * has moved on. Allowlisted prompts are answered; the rest go to a person
+   * as an approval request and their decision is relayed. Throws
+   * `[AGENT_RUNTIME_AWAITING_HUMAN]` when no decision is available yet and
+   * `[AGENT_RUNTIME_PROMPT_DECLINED]` when a person said no.
+   */
+  private async settlePrompts(initialScreen: string, initiallyBlocked: boolean): Promise<string> {
+    let screen = initialScreen;
+    let blocked = initiallyBlocked;
+    for (let round = 0; round < MAX_PROMPT_ROUNDS; round++) {
+      const prompt = this.promptOnScreen(screen, blocked);
+      if (!prompt) return screen;
+      const signatureId = prompt.signatureId || 'agent_blocked';
+      const excerpt = prompt.promptExcerpt || screen.split('\n').slice(-12).join('\n').trim();
+      const decision = decideAgentPromptResponse(this.promptPolicy, {
+        signatureId,
+        provider: this.provider,
+        kind: this.kind,
+        cwd: this.cwd,
+        excerpt,
+      });
+
+      if (decision.action === 'human_only') {
+        throw new Error(`[AGENT_RUNTIME_AWAITING_HUMAN] ${describeAgentReadiness(prompt)}`);
+      }
+
+      let keys: string[];
+      if (decision.action === 'auto_answer') {
+        keys = decision.keys;
+        this.promptAudit({
+          agentName: this.paneAgentName,
+          signatureId,
+          result: 'allowed',
+          reason: decision.reason,
+          metadata: { rule_id: decision.ruleId, keys, cwd: this.cwd, provider: this.provider },
+        });
+      } else {
+        if (!this.promptApprovals) {
+          throw new Error(
+            `[AGENT_RUNTIME_AWAITING_HUMAN] ${describeAgentReadiness(prompt)} ` +
+              'No approval channel is registered in this process, so the prompt cannot be escalated; answer it in the pane.'
+          );
+        }
+        const { id } = this.promptApprovals.open({
+          agentName: this.paneAgentName,
+          provider: this.provider,
+          signatureId,
+          cwd: this.cwd,
+          excerpt,
+        });
+        const status = await this.awaitPromptDecision(id, decision.waitMs);
+        if (status === 'pending' || status === 'closed') {
+          throw new Error(
+            `[AGENT_RUNTIME_AWAITING_HUMAN] ${describeAgentReadiness(prompt)} ` +
+              `Approval request ${id} is ${status === 'pending' ? 'open' : 'not usable'}: ` +
+              `\`pnpm kyberion approve ${id}\` or \`pnpm kyberion reject ${id}\`; ` +
+              'the next turn relays the decision.'
+          );
+        }
+        keys = status === 'approved' ? decision.relay.approve : decision.relay.reject;
+        this.client.sendKeys(this.paneAgentName, keys);
+        this.promptApprovals.consume(id, true);
+        this.promptAudit({
+          agentName: this.paneAgentName,
+          signatureId,
+          result: status === 'approved' ? 'allowed' : 'denied',
+          reason: `relayed a person's ${status} decision (approval ${id})`,
+          metadata: { approval_id: id, keys, cwd: this.cwd, provider: this.provider },
+        });
+        if (status === 'rejected') {
+          throw new Error(
+            `[AGENT_RUNTIME_PROMPT_DECLINED] a person declined '${signatureId}' for agent '${this.paneAgentName}' (approval ${id}).`
+          );
+        }
+        ({ screen, blocked } = await this.afterAnswer(excerpt));
+        continue;
+      }
+
+      this.client.sendKeys(this.paneAgentName, keys);
+      ({ screen, blocked } = await this.afterAnswer(excerpt));
+    }
+    throw new Error(
+      `[AGENT_RUNTIME_AWAITING_HUMAN] agent '${this.paneAgentName}' stopped on ${MAX_PROMPT_ROUNDS} prompts in a row; a person should look at the pane.`
+    );
+  }
+
+  /**
+   * Let the answer land, then wait for the agent to settle. If the same
+   * prompt is still on screen the answer did not take — resending would
+   * answer twice, so that is a stop, not a retry.
+   */
+  private async afterAnswer(answered: string): Promise<{ screen: string; blocked: boolean }> {
+    await sleep(this.settleDelayMs);
+    let status: string | undefined;
+    try {
+      status = this.client.waitAgent(this.paneAgentName, this.turnTimeoutMs)?.agent_status;
+    } catch (error: unknown) {
+      logger.warn(
+        `[pane-runtime] wait after answering failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+    const screen = this.readScreen();
+    const still = this.promptOnScreen(screen, false);
+    if (still?.promptExcerpt && still.promptExcerpt === answered) {
+      throw new Error(
+        `[AGENT_RUNTIME_AWAITING_HUMAN] the answer sent to '${this.paneAgentName}' did not take effect; the prompt is still on screen:\n${answered}`
+      );
+    }
+    return { screen, blocked: String(status || '').toLowerCase() === 'blocked' };
+  }
+
+  private async awaitPromptDecision(
+    id: string,
+    waitMs: number
+  ): Promise<AgentPromptApprovalStatus> {
+    const deadline = Date.now() + Math.max(0, waitMs);
+    const approvals = this.promptApprovals;
+    if (!approvals) return 'closed';
+    let status = approvals.status(id);
+    if (status === 'pending' && waitMs > 0) {
+      logger.warn(
+        `[pane-runtime] ${this.paneAgentName} is waiting on a prompt; approval ${id} is open (waiting up to ${Math.round(waitMs / 1000)}s): pnpm kyberion approve ${id}`
+      );
+    }
+    while (status === 'pending' && Date.now() < deadline) {
+      await sleep(Math.min(2_000, Math.max(10, deadline - Date.now())));
+      status = approvals.status(id);
+    }
+    return status;
   }
 
   async shutdown(): Promise<void> {
@@ -656,7 +931,9 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
 export class HerdrAgentPaneRuntimeBridge implements AgentPaneRuntimeBridge {
   readonly bridge_id = HERDR_AGENT_PANE_RUNTIME_BRIDGE_ID;
 
-  constructor(private readonly options: { bin?: string; exec?: HerdrExecFn } = {}) {}
+  constructor(
+    private readonly options: { bin?: string; exec?: HerdrExecFn } & HerdrPromptHandlingOptions = {}
+  ) {}
 
   async probe(): Promise<AgentPaneRuntimeProbe> {
     const runtime = probeToolRuntime('herdr', 'trial');
@@ -677,9 +954,11 @@ export class HerdrAgentPaneRuntimeBridge implements AgentPaneRuntimeBridge {
   }
 
   createAdapter(request: AgentPaneRuntimeSpawnRequest): AgentAdapter {
+    const { bin, exec, ...promptHandling } = this.options;
     return new HerdrPaneAgentAdapter({
       ...request,
-      client: new HerdrRuntimeClient(this.options),
+      ...promptHandling,
+      client: new HerdrRuntimeClient({ bin, exec }),
     });
   }
 }
