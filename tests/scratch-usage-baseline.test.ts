@@ -5,13 +5,16 @@ import { getAllFiles } from '@agent/core/fs-utils';
 
 const rootDir = process.cwd();
 
+/** Runtime / policy roots only — full-repo walks exceed the CI 30s budget. */
+const SCAN_ROOTS = ['libs', 'scripts', 'presence', 'pipelines', 'tests', 'knowledge/product'];
+
 function normalize(relPath: string): string {
   return relPath.split(path.sep).join('/');
 }
 
 describe('Governed temp hierarchy', () => {
   it('keeps scratch/ out of runtime source and policy files', () => {
-    const actual = getAllFiles(rootDir)
+    const actual = SCAN_ROOTS.flatMap((root) => getAllFiles(path.join(rootDir, root)))
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
       .filter((relPath) => !relPath.startsWith('dist/'))
       .filter((relPath) => !relPath.includes('/.next/'))
@@ -19,7 +22,9 @@ describe('Governed temp hierarchy', () => {
       .filter((relPath) => safeExistsSync(path.join(rootDir, relPath)))
       .filter((relPath) => {
         try {
-          const content = safeReadFile(path.join(rootDir, relPath), { encoding: 'utf8' }) as string;
+          const content = safeReadFile(path.join(rootDir, relPath), {
+            encoding: 'utf8',
+          }) as string;
           return content.includes('scratch/');
         } catch (error: any) {
           if (String(error?.message || '').includes('File not found:')) {
@@ -28,15 +33,9 @@ describe('Governed temp hierarchy', () => {
           throw error;
         }
       })
-      .filter((relPath) => !relPath.startsWith('knowledge/public/'))
-      .filter((relPath) => !relPath.startsWith('knowledge/confidential/'))
-      .filter((relPath) => !relPath.startsWith('knowledge/personal/'))
-      .filter((relPath) => !relPath.startsWith('docs/'))
-      .filter((relPath) => !['CLAUDE.md', 'CODEX.md', 'GEMINI.md'].includes(relPath))
-      .filter((relPath) => relPath !== 'eslint.config.js')
       .filter((relPath) => relPath !== 'tests/scratch-usage-baseline.test.ts')
       .sort((a, b) => a.localeCompare(b));
 
     expect(actual).toEqual([]);
-  });
+  }, 60_000);
 });
