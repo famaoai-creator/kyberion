@@ -4,6 +4,7 @@ import * as React from 'react';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale, ConciergeMessageKey } from '../../../lib/i18n';
 import type { Setup } from '../../../lib/settings-types';
+import { IntroduceSecretPanel } from './IntroduceSecretPanel';
 
 /** FD-06 サービス連携 pane (`#setup-services`) — extracted from
  * settings/page.tsx; OAuth connect + save-connections handlers stay owned
@@ -95,6 +96,13 @@ export function ServicesSection({
           {t('setup.save_connections')}
         </button>
       </div>
+      <IntroduceSecretPanel
+        busy={busy}
+        services={setup.service_catalog.map((service) => ({
+          id: service.id,
+          label: service.label,
+        }))}
+      />
     </section>
   );
 }

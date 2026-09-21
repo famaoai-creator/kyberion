@@ -56,6 +56,8 @@ export interface Payload {
     requiresStrongAuth: boolean;
     pendingRoles: string[];
     kind?: 'secret_mutation' | 'computer_action';
+    phase?: 'pending' | 'apply_pending';
+    status?: string;
   }>;
   a2aHandoffs: Array<{
     ts: string;

@@ -1,7 +1,7 @@
 {
   "actuator_id": "secret-actuator",
-  "version": "1.1.0",
-  "description": "OS Native Secret Manager Bridge",
+  "version": "1.2.0",
+  "description": "OS Native Secret Manager Bridge. Prefer kyberion secret introduce / Concierge for value collection.",
   "contract_schema": "knowledge/product/schemas/secret-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {

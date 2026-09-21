@@ -486,6 +486,12 @@
       "note": "default PNG+handoff export path for localhost screenshot-annotate pad; operator-consumed intermediate"
     },
     {
+      "file": "scripts/secret_introduce.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "restricts --from-file secret material to active/shared/tmp/ so values never appear on argv"
+    },
+    {
       "file": "scripts/setup_oauth.ts",
       "count": 1,
       "classification": "legit-tmp",

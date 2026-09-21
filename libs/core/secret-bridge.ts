@@ -15,12 +15,20 @@ import {
 } from './secure-io.js';
 import { SecretProvider, RegistryEntry } from './secret-types.js';
 
-const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.json');
-const FILE_SECRETS_PATH = pathResolver.vault('secrets/file-secrets.json');
-const KEYCHAIN_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/keychain-registry.schema.json'
-);
-const FILE_SECRETS_SCHEMA_PATH = pathResolver.knowledge('product/schemas/file-secrets.schema.json');
+// Resolve vault/knowledge paths lazily so importing this module (via
+// secret-guard fallthrough) does not require a fully-mocked pathResolver.
+function keychainRegistryPath(): string {
+  return pathResolver.vault('secrets/keychain-registry.json');
+}
+function fileSecretsPath(): string {
+  return pathResolver.vault('secrets/file-secrets.json');
+}
+function keychainRegistrySchemaPath(): string {
+  return pathResolver.knowledge('product/schemas/keychain-registry.schema.json');
+}
+function fileSecretsSchemaPath(): string {
+  return pathResolver.knowledge('product/schemas/file-secrets.schema.json');
+}
 
 // Helper to manage the registry catalog
 interface KeychainRegistry {
@@ -30,8 +38,8 @@ interface KeychainRegistry {
 function keychainRegistryCatalog() {
   return defineCatalog<KeychainRegistry>({
     id: 'keychain-registry',
-    path: KEYCHAIN_REGISTRY_PATH,
-    schema: KEYCHAIN_REGISTRY_SCHEMA_PATH,
+    path: keychainRegistryPath(),
+    schema: keychainRegistrySchemaPath(),
   });
 }
 
@@ -39,12 +47,13 @@ function fileSecretsCatalog(filePath: string) {
   return defineCatalog<Record<string, Record<string, string>>>({
     id: 'file-secrets',
     path: filePath,
-    schema: FILE_SECRETS_SCHEMA_PATH,
+    schema: fileSecretsSchemaPath(),
   });
 }
 
 function loadRegistry(): KeychainRegistry {
-  if (!safeExistsSync(KEYCHAIN_REGISTRY_PATH)) return { entries: [] };
+  const registryPath = keychainRegistryPath();
+  if (!safeExistsSync(registryPath)) return { entries: [] };
   try {
     return keychainRegistryCatalog().load();
   } catch {
@@ -53,10 +62,11 @@ function loadRegistry(): KeychainRegistry {
 }
 
 function saveRegistry(registry: KeychainRegistry): void {
-  const dir = path.dirname(KEYCHAIN_REGISTRY_PATH);
+  const registryPath = keychainRegistryPath();
+  const dir = path.dirname(registryPath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  const validated = keychainRegistryCatalog().validate(registry, KEYCHAIN_REGISTRY_PATH);
-  safeWriteFile(KEYCHAIN_REGISTRY_PATH, JSON.stringify(validated, null, 2));
+  const validated = keychainRegistryCatalog().validate(registry, registryPath);
+  safeWriteFile(registryPath, JSON.stringify(validated, null, 2));
 }
 
 export function registryAdd(service: string, account: string): void {
@@ -116,22 +126,45 @@ export class MacKeychainSecretProvider implements SecretProvider {
     // Delete first to overwrite safely
     await this.delete(service, account);
 
+    // Write via a short-lived Swift helper that reads service/account/value from
+    // stdin — never place the secret on process argv (unlike `security -w`).
+    const script = [
+      'import Foundation',
+      'import Security',
+      'guard let service = readLine(), let account = readLine() else { exit(2) }',
+      'let passwordData = FileHandle.standardInput.readDataToEndOfFile()',
+      'guard !passwordData.isEmpty else { exit(3) }',
+      'let query: [String: Any] = [',
+      '  kSecClass as String: kSecClassGenericPassword,',
+      '  kSecAttrService as String: service,',
+      '  kSecAttrAccount as String: account,',
+      ']',
+      'SecItemDelete(query as CFDictionary)',
+      'var add = query',
+      'add[kSecValueData as String] = passwordData',
+      'let status = SecItemAdd(add as CFDictionary, nil)',
+      'exit(status == errSecSuccess ? 0 : Int32(status))',
+    ].join('\n');
+
     return new Promise((resolve, reject) => {
-      const child = spawn(
-        'security',
-        ['add-generic-password', '-a', account, '-s', service, '-w', value],
-        {
-          stdio: ['ignore', 'ignore', 'pipe'],
-        }
-      );
+      const child = spawn('swift', ['-e', script], {
+        stdio: ['pipe', 'ignore', 'pipe'],
+      });
+      let stderr = '';
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
+      child.on('error', (err) => reject(err));
       child.on('close', (code) => {
         if (code === 0) {
           registryAdd(service, account);
           resolve();
         } else {
-          reject(new Error(`macOS Keychain write failed with code ${code}`));
+          reject(new Error(`macOS Keychain write failed with code ${code}: ${stderr}`));
         }
       });
+      child.stdin?.write(`${service}\n${account}\n${value}`);
+      child.stdin?.end();
     });
   }
 
@@ -252,7 +285,7 @@ finally {
 export class FileSecretProvider implements SecretProvider {
   readonly id = 'file_secrets';
 
-  constructor(private readonly secretsPath = FILE_SECRETS_PATH) {}
+  constructor(private readonly secretsPath = fileSecretsPath()) {}
 
   async isAvailable(): Promise<boolean> {
     // Opt-in only. Never a silent default on darwin/win32 (keychain wins first
@@ -390,6 +423,38 @@ export async function fetchSecret(service: string, account: string): Promise<str
   const router = getRouter();
   const provider = await router.selectProvider();
   return await provider.get(service, account);
+}
+
+/**
+ * Synchronous lookup for secret-guard fallthrough. Prefer async {@link fetchSecret}
+ * for new call sites. Never logs the value.
+ */
+export function fetchSecretSync(service: string, account: string): string | null {
+  if (process.platform === 'darwin') {
+    const result = safeExecResult(
+      'security',
+      ['find-generic-password', '-a', account, '-s', service, '-w'],
+      { timeoutMs: 10_000, maxOutputMB: 1 }
+    );
+    if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
+  }
+
+  if (getRegisteredEnvBool('KYBERION_ALLOW_FILE_SECRETS') === true) {
+    try {
+      const provider = new FileSecretProvider();
+      // FileSecretProvider.get is async but the body is sync I/O; drive via deasync-free path.
+      const secrets = (
+        provider as unknown as { readSecretsFile: () => Record<string, Record<string, string>> }
+      ).readSecretsFile();
+      const value = secrets[service]?.[account];
+      if (typeof value === 'string' && value.length > 0) return value;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const envKey = `SECRET_${service.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${account.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+  return getRegisteredEnvText(envKey) || null;
 }
 
 export async function storeSecret(service: string, account: string, value: string): Promise<void> {

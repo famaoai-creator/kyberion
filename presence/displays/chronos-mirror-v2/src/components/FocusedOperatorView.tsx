@@ -1139,10 +1139,49 @@ export function FocusedOperatorView({
                   </div>
                 </div>
                 <div className="mt-3 text-[10px] leading-5 kb-text-muted">
-                  Terminal approval:{' '}
-                  <span className="font-mono kb-text-secondary">
-                    pnpm kyberion approve {request.id}
-                  </span>
+                  {request.phase === 'apply_pending' ? (
+                    <>
+                      Apply pending — paste the secret in Concierge:{' '}
+                      <a
+                        className="font-mono kb-text-secondary underline"
+                        href="/settings#secret-introduce"
+                        onClick={(event) => {
+                          // Chronos and Concierge are different surfaces; prefer absolute when known.
+                          const conciergePort =
+                            typeof window !== 'undefined'
+                              ? window.localStorage.getItem('kyberion.conciergePort')
+                              : null;
+                          if (conciergePort) {
+                            event.preventDefault();
+                            window.open(
+                              `http://127.0.0.1:${conciergePort}/settings#secret-introduce`,
+                              '_blank',
+                              'noopener,noreferrer'
+                            );
+                          }
+                        }}
+                      >
+                        Concierge → Settings → Introduce secret
+                      </a>
+                      <div className="mt-1 font-mono kb-text-secondary">
+                        approval id {request.id}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      Terminal approval:{' '}
+                      <span className="font-mono kb-text-secondary">
+                        pnpm kyberion approve {request.id}
+                      </span>
+                      <div className="mt-1">
+                        After approval, collect the value in{' '}
+                        <span className="font-mono kb-text-secondary">
+                          Concierge → Settings → Introduce secret
+                        </span>{' '}
+                        (Chronos never collects secret values).
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             ))
