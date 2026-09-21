@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const applySecretIntroduction = vi.fn(async () => {
-  throw new Error('[SECRET_INTRODUCTION] approval x must be approved before apply');
-});
+const applySecretIntroduction = vi.fn(
+  async (_input: { approvalId: string; value: string }): Promise<never> => {
+    throw new Error('[SECRET_INTRODUCTION] approval x must be approved before apply');
+  }
+);
 
 vi.mock('@agent/core/secret-introduction', () => ({
   applySecretIntroduction,
