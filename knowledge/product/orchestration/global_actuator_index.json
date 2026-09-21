@@ -292,9 +292,9 @@
     {
       "n": "secret-actuator",
       "path": "libs/actuators/secret-actuator",
-      "d": "OS Native Secret Manager Bridge",
+      "d": "OS Native Secret Manager Bridge. Prefer kyberion secret introduce / Concierge for value collection.",
       "s": "implemented",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "capability_count": 4,
       "ops": ["delete", "get", "list", "set"],
       "contract_schema": "knowledge/product/schemas/secret-action.schema.json",
