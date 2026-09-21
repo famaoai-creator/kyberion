@@ -25,10 +25,10 @@ import {
   type AgentPromptResponsePolicy,
 } from './agent-prompt-response.js';
 import {
-  createApprovalStorePromptPort,
+  getAgentPromptApprovalPort,
   type AgentPromptApprovalPort,
   type AgentPromptApprovalStatus,
-} from './agent-prompt-approval.js';
+} from './agent-prompt-approval-port.js';
 import { auditChain } from './audit-chain.js';
 import {
   registerAgentPaneRuntimeBridge,
@@ -507,7 +507,7 @@ export interface PromptAuditEntry {
 export interface HerdrPromptHandlingOptions {
   /** Defaults to the product policy overlaid by the personal one. */
   promptPolicy?: AgentPromptResponsePolicy;
-  /** Defaults to the approval store (channel `agent-runtime`). */
+  /** Defaults to the registered port (the approval store, when its module is loaded). */
   promptApprovals?: AgentPromptApprovalPort;
   /** Defaults to the audit chain. */
   promptAudit?: (entry: PromptAuditEntry) => void;
@@ -551,7 +551,7 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
   private readonly paneAgentName: string;
   private readonly kind: HerdrProviderKind;
   private readonly promptPolicy: AgentPromptResponsePolicy;
-  private readonly promptApprovals: AgentPromptApprovalPort;
+  private readonly promptApprovals: AgentPromptApprovalPort | null;
   private readonly promptAudit: (entry: PromptAuditEntry) => void;
   private readonly settleDelayMs: number;
 
@@ -583,7 +583,7 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
     this.turnTimeoutMs = options.turnTimeoutMs ?? 180_000;
     this.paneAgentName = sanitizeHerdrAgentName(options.agentId);
     this.promptPolicy = options.promptPolicy ?? loadAgentPromptResponsePolicy();
-    this.promptApprovals = options.promptApprovals ?? createApprovalStorePromptPort();
+    this.promptApprovals = options.promptApprovals ?? getAgentPromptApprovalPort();
     this.promptAudit = options.promptAudit ?? recordPromptAudit;
     this.settleDelayMs = options.settleDelayMs ?? 1_500;
   }
@@ -780,6 +780,12 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
           metadata: { rule_id: decision.ruleId, keys, cwd: this.cwd, provider: this.provider },
         });
       } else {
+        if (!this.promptApprovals) {
+          throw new Error(
+            `[AGENT_RUNTIME_AWAITING_HUMAN] ${describeAgentReadiness(prompt)} ` +
+              'No approval channel is registered in this process, so the prompt cannot be escalated; answer it in the pane.'
+          );
+        }
         const { id } = this.promptApprovals.open({
           agentName: this.paneAgentName,
           provider: this.provider,
@@ -855,7 +861,9 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
     waitMs: number
   ): Promise<AgentPromptApprovalStatus> {
     const deadline = Date.now() + Math.max(0, waitMs);
-    let status = this.promptApprovals.status(id);
+    const approvals = this.promptApprovals;
+    if (!approvals) return 'closed';
+    let status = approvals.status(id);
     if (status === 'pending' && waitMs > 0) {
       logger.warn(
         `[pane-runtime] ${this.paneAgentName} is waiting on a prompt; approval ${id} is open (waiting up to ${Math.round(waitMs / 1000)}s): pnpm kyberion approve ${id}`
@@ -863,7 +871,7 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
     }
     while (status === 'pending' && Date.now() < deadline) {
       await sleep(Math.min(2_000, Math.max(10, deadline - Date.now())));
-      status = this.promptApprovals.status(id);
+      status = approvals.status(id);
     }
     return status;
   }
