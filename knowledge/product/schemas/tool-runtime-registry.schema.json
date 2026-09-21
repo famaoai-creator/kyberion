@@ -94,6 +94,7 @@
           },
           "fallback_tool_id": { "type": "string", "minLength": 1 },
           "managed_env_subpath": { "type": "string", "minLength": 1 },
+          "managed_binary": { "$ref": "#/$defs/managed_binary" },
           "notes": { "type": "string" }
         },
         "required": [
@@ -110,6 +111,32 @@
   },
   "required": ["version", "default_tool_id", "tools"],
   "$defs": {
+    "managed_binary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "relative_path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$"
+        },
+        "artifacts": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^(darwin|linux|win32)-(arm64|x64)$" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "url": { "type": "string", "pattern": "^https://" },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            },
+            "required": ["url", "sha256"]
+          }
+        }
+      },
+      "required": ["version", "relative_path", "artifacts"]
+    },
     "backend": {
       "type": "object",
       "additionalProperties": false,

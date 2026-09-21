@@ -67,6 +67,16 @@ Principles:
   generic language when concrete facts are not provided.
 - Output JSON only, matching the json_schema. No markdown fences, no prose.`;
 
+const NATIVE_SUBAGENT_OFF_VALUES = new Set(['0', 'false', 'off', 'no', 'disabled']);
+
+function resolveNativeSubagentEnabled(explicit?: boolean): boolean {
+  if (explicit !== undefined) return explicit;
+  const configured = String(getRegisteredEnvText('KYBERION_CLAUDE_NATIVE_SUBAGENT') ?? '')
+    .trim()
+    .toLowerCase();
+  return !NATIVE_SUBAGENT_OFF_VALUES.has(configured);
+}
+
 const HypothesisSketchSchema = z.object({
   id: z.string(),
   proposed_by: z.string(),
@@ -308,7 +318,8 @@ export interface ClaudeAgentReasoningBackendOptions {
   /**
    * CN-05: run delegations as real SDK sub-agents (`Options.agents` + the
    * delegation tool) and fail closed when the turn does not start one.
-   * Defaults to `KYBERION_CLAUDE_NATIVE_SUBAGENT === '1'`.
+   * Defaults to enabled. Set `KYBERION_CLAUDE_NATIVE_SUBAGENT=off` (or `0`,
+   * `false`, `no`, or `disabled`) to explicitly turn it off.
    */
   nativeSubagent?: boolean;
 }
@@ -322,8 +333,7 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
 
   constructor(options: ClaudeAgentReasoningBackendOptions = {}) {
     this.model = options.model ?? 'opus';
-    this.nativeSubagentEnabled =
-      options.nativeSubagent ?? getRegisteredEnvText('KYBERION_CLAUDE_NATIVE_SUBAGENT') === '1';
+    this.nativeSubagentEnabled = resolveNativeSubagentEnabled(options.nativeSubagent);
     this.nativeSubagentAdopter = {
       id: 'claude-agent-sdk',
       dispatch: (instruction, context, callOptions) =>
@@ -693,16 +703,18 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
           }
         : {}),
       effort: options?.effort ?? 'medium',
+      totalCostUsd: result.totalCostUsd,
+      numTurns: result.numTurns,
     };
     return result.text;
   }
 
-  getNativeSubagentAdopter(): NativeSubagentAdopter {
-    return this.nativeSubagentAdopter;
+  getNativeSubagentAdopter(): NativeSubagentAdopter | null {
+    return this.nativeSubagentEnabled ? this.nativeSubagentAdopter : null;
   }
 
   requiresNativeSubagent(): boolean {
-    return true;
+    return this.nativeSubagentEnabled;
   }
 
   async prompt(prompt: string): Promise<string> {

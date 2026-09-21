@@ -173,7 +173,8 @@
         "active/INDEX.volatile.md",
         "active/INDEX.volatile.json",
         "active/projects/",
-        "active/personal/"
+        "active/personal/",
+        "evidence/browser/"
       ]
     },
     "worker": {
@@ -338,7 +339,8 @@
         "active/shared/observability/mission-control/",
         "active/shared/observability/retrospectives/",
         "presence/bridge/runtime/",
-        "active/audit/"
+        "active/audit/",
+        "evidence/browser/"
       ]
     },
     "software_developer": {

@@ -54,7 +54,24 @@ export interface ToolRuntimeRecord {
   installed_backend?: ToolRuntimeBackendCommand;
   fallback_tool_id?: string;
   managed_env_subpath?: string;
+  managed_binary?: ToolRuntimeManagedBinary;
   notes?: string;
+}
+
+/** Checksum-pinned upstream binary for one `{platform}-{arch}` host (e.g. `darwin-arm64`). */
+export interface ToolRuntimeManagedBinaryArtifact {
+  url: string;
+  sha256: string;
+}
+
+/**
+ * A single-file upstream release installed into the tool's managed env
+ * (`{managed_env_path}/{relative_path}`) instead of through a package manager.
+ */
+export interface ToolRuntimeManagedBinary {
+  version: string;
+  relative_path: string;
+  artifacts: Record<string, ToolRuntimeManagedBinaryArtifact>;
 }
 
 export interface ToolRuntimeRegistry {
@@ -500,6 +517,36 @@ export function probeToolRuntime(
     available_commands: availableCommands,
     reason,
   };
+}
+
+export function resolveManagedBinaryArtifact(
+  toolId: string,
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch
+): ToolRuntimeManagedBinaryArtifact | null {
+  const record = getToolRuntimeRecord(toolId);
+  if (record.tool_id !== toolId || !record.managed_binary) return null;
+  return record.managed_binary.artifacts[`${platform}-${arch}`] ?? null;
+}
+
+/** Target path of a tool's managed binary, or null when the tool declares none. */
+export function resolveManagedBinaryPath(toolId: string): string | null {
+  const record = getToolRuntimeRecord(toolId);
+  if (record.tool_id !== toolId || !record.managed_binary) return null;
+  return assertManagedRuntimePath(
+    resolveManagedEnvPath(record),
+    path.join(resolveManagedEnvPath(record), record.managed_binary.relative_path)
+  );
+}
+
+/** Installed managed binary path, or null when absent (callers fall back to PATH). */
+export function findInstalledManagedBinary(toolId: string): string | null {
+  try {
+    const binPath = resolveManagedBinaryPath(toolId);
+    return binPath && safeExistsSync(binPath) ? binPath : null;
+  } catch {
+    return null;
+  }
 }
 
 export function getToolRuntimeModePreference(toolId?: string): ToolRuntimeModePreference {

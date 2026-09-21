@@ -99,29 +99,37 @@ describe('ClaudeAgentReasoningBackend', () => {
     expect(call.userPrompt).toBe('Task: do work');
   });
 
-  it('exposes governed Claude delegation through the provider-neutral adopter', async () => {
-    mocks.runClaudeAgentTask.mockResolvedValue({ text: 'native done', sessionId: 'claude-s1' });
+  it('does not expose the native adopter when explicitly disabled', () => {
+    const backend = new ClaudeAgentReasoningBackend({ nativeSubagent: false });
 
-    const backend = new ClaudeAgentReasoningBackend();
-    const adopter = backend.getNativeSubagentAdopter?.();
-    const answer = await adopter?.dispatch('inspect the task', 'mission ctx', {
-      profile: 'explorer',
-      effort: 'medium',
+    expect(backend.getNativeSubagentAdopter()).toBeNull();
+    expect(backend.requiresNativeSubagent()).toBe(false);
+  });
+
+  it('enables native SDK sub-agents by default and exposes SDK statistics', async () => {
+    mocks.runClaudeAgentTask.mockResolvedValue({
+      text: 'native done',
+      sessionId: 'claude-default',
+      totalCostUsd: 0.042,
+      numTurns: 4,
+      nativeSubagent: {
+        toolUseId: 'toolu-default',
+        subagentType: 'kyberion-implementer',
+        background: false,
+        completed: true,
+      },
     });
 
-    expect(answer).toBe('native done');
-    expect(mocks.runClaudeAgentTask).toHaveBeenCalledTimes(1);
-    const call = mocks.runClaudeAgentTask.mock.calls[0][0];
-    expect(call.allowedTools).toEqual(['Read']);
-    expect(call.userPrompt).toBe('Task: inspect the task');
-    expect(backend.requiresNativeSubagent?.()).toBe(true);
+    const backend = new ClaudeAgentReasoningBackend();
+    const adopter = backend.getNativeSubagentAdopter();
+    await adopter?.dispatch('inspect it', undefined, { profile: 'implementer' });
+
+    expect(backend.requiresNativeSubagent()).toBe(true);
     expect(adopter?.getInfo?.()).toMatchObject({
-      provider: 'claude',
-      threadId: 'claude-s1',
-      // Without CN-05 native mode this is one governed agent turn, and it is
-      // labeled as such rather than as a provider-native sub-agent.
-      mode: 'agent-sdk-single-turn',
-      effort: 'medium',
+      mode: 'agent-sdk-subagent',
+      threadId: 'claude-default',
+      totalCostUsd: 0.042,
+      numTurns: 4,
     });
   });
 
@@ -264,6 +272,14 @@ describe('ClaudeAgentReasoningBackend', () => {
       await backend.getNativeSubagentAdopter()?.dispatch('go');
 
       expect(mocks.runClaudeAgentTask.mock.calls[0][0].agents).toBeDefined();
+    });
+
+    it('turns off only when explicitly configured off', () => {
+      process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT = 'off';
+      const backend = new ClaudeAgentReasoningBackend();
+
+      expect(backend.getNativeSubagentAdopter()).toBeNull();
+      expect(backend.requiresNativeSubagent()).toBe(false);
     });
   });
 

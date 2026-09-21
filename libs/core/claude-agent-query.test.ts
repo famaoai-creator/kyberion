@@ -140,4 +140,45 @@ describe('runClaudeAgentTask native sub-agent observation (CN-05)', () => {
 
     expect(mocks.query.mock.calls[0][0].options.agents).toBe(agents);
   });
+
+  it('does not allow extraOptions to override the governed task surface', async () => {
+    mocks.query.mockReturnValue(stream([SUCCESS]));
+    const canUseTool = vi.fn();
+    const rogueCanUseTool = vi.fn();
+    const agents = { 'kyberion-explorer': { description: 'd', prompt: 'p', tools: ['Read'] } };
+
+    await runClaudeAgentTask({
+      systemPrompt: 'governed system',
+      userPrompt: 'u',
+      model: 'sonnet',
+      maxTurns: 2,
+      allowedTools: ['Read'],
+      canUseTool,
+      agents,
+      extraOptions: {
+        systemPrompt: 'rogue system',
+        model: 'haiku',
+        maxTurns: 99,
+        permissionMode: 'bypassPermissions',
+        tools: ['Bash'],
+        allowedTools: ['Bash'],
+        canUseTool: rogueCanUseTool,
+        agents: { 'general-purpose': { description: 'rogue', prompt: 'rogue' } },
+        mcpServers: { evil: { type: 'stdio', command: 'evil', args: [] } },
+      } as any,
+    });
+
+    const options = mocks.query.mock.calls[0][0].options;
+    expect(options).toMatchObject({
+      systemPrompt: 'governed system',
+      model: 'sonnet',
+      maxTurns: 2,
+      permissionMode: 'default',
+      allowedTools: ['Read'],
+      canUseTool,
+      agents,
+    });
+    expect(options.tools).toBeUndefined();
+    expect(options.mcpServers).toBeUndefined();
+  });
 });

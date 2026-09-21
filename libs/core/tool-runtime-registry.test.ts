@@ -4,6 +4,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   clearToolRuntimeState,
+  findInstalledManagedBinary,
   getToolRuntimeRecord,
   getToolRuntimeInventoryItem,
   getToolRuntimeRegistry,
@@ -12,6 +13,8 @@ import {
   markToolRuntimeInstalled,
   listToolRuntimeInventory,
   probeToolRuntime,
+  resolveManagedBinaryArtifact,
+  resolveManagedBinaryPath,
   resolveManagedToolPythonBin,
   _resetToolRuntimeRegistryCacheForTests,
 } from './tool-runtime-registry.js';
@@ -520,6 +523,58 @@ describe('tool runtime registry', () => {
     safeWriteFile(path.join(runtimeRoot, pythonName), '', { encoding: 'utf8' });
 
     expect(resolveManagedToolPythonBin('mlx_audio')).toBe(path.join(runtimeRoot, pythonName));
+  });
+
+  function addManagedBinaryTool(relativePath = 'bin/panda'): void {
+    const registry = JSON.parse(String(safeReadFile(registryPath, { encoding: 'utf8' }))) as {
+      tools: Array<Record<string, unknown>>;
+    };
+    registry.tools.push({
+      tool_id: 'panda',
+      display_name: 'Panda Browser',
+      ecosystem: 'system',
+      status: 'active',
+      platforms: ['darwin', 'linux'],
+      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
+      trial_backend: { kind: 'system', command: 'panda', args: ['version'] },
+      managed_env_subpath: 'tool-runtimes/panda',
+      managed_binary: {
+        version: '1.2.3',
+        relative_path: relativePath,
+        artifacts: {
+          'darwin-arm64': { url: 'https://example.test/panda-macos', sha256: 'a'.repeat(64) },
+        },
+      },
+    });
+    safeWriteFile(registryPath, JSON.stringify(registry), { encoding: 'utf8' });
+    _resetToolRuntimeRegistryCacheForTests();
+  }
+
+  it('resolves managed binary artifacts per platform-arch inside the managed env', () => {
+    addManagedBinaryTool();
+    expect(resolveManagedBinaryArtifact('panda', 'darwin', 'arm64')?.sha256).toBe('a'.repeat(64));
+    expect(resolveManagedBinaryArtifact('panda', 'linux', 'x64')).toBeNull();
+    expect(resolveManagedBinaryArtifact('mflux', 'darwin', 'arm64')).toBeNull();
+    expect(resolveManagedBinaryPath('panda')).toBe(
+      path.join(managedRoot, 'tool-runtimes', 'panda', 'bin', 'panda')
+    );
+    expect(resolveManagedBinaryPath('mflux')).toBeNull();
+  });
+
+  it('reports an installed managed binary only when it exists on disk', () => {
+    addManagedBinaryTool();
+    const binDir = path.join(managedRoot, 'tool-runtimes', 'panda', 'bin');
+    safeRmSync(binDir, { recursive: true, force: true });
+    expect(findInstalledManagedBinary('panda')).toBeNull();
+    safeMkdir(binDir, { recursive: true });
+    safeWriteFile(path.join(binDir, 'panda'), '', { encoding: 'utf8' });
+    expect(findInstalledManagedBinary('panda')).toBe(path.join(binDir, 'panda'));
+    expect(findInstalledManagedBinary('unknown-tool')).toBeNull();
+  });
+
+  it('rejects a managed binary relative path that climbs out of the managed env', () => {
+    addManagedBinaryTool('../escape/panda');
+    expect(() => getToolRuntimeRegistry()).toThrow();
   });
 
   it('rejects a registry managed environment path that escapes the repository', () => {
