@@ -65,6 +65,11 @@
           "additionalProperties": {
             "$ref": "#/definitions/purpose"
           }
+        },
+        "fallback_purpose": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Purpose used to rank eligible providers when no purpose is given and the default provider cannot run the task."
         }
       },
       "required": ["seam_id", "default_provider", "traits", "providers", "purposes"]

@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "seam-selection-rules.schema.json",
+  "title": "Operator seam selection rules",
+  "description": "Human-set provider preferences and measured trait values that override the product seam selection policy for this operator (stored under the active profile's onboarding/ directory).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": "1.0.0" },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/rule" }
+    },
+    "trait_overrides": {
+      "type": "object",
+      "description": "seam → provider → measured trait values.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "$ref": "#/definitions/traitOverride" }
+      }
+    },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["version", "rules"],
+  "definitions": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "seam": { "type": "string", "minLength": 1 },
+        "when": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "purpose": { "type": "string", "minLength": 1 },
+            "context": {
+              "type": "object",
+              "additionalProperties": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "prefer": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "note": { "type": "string" },
+        "evidence": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "set_by": { "type": "string", "minLength": 1 },
+        "set_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["rule_id", "seam", "when", "prefer", "set_by", "set_at"]
+    },
+    "traitOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "traits": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "evidence": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "set_by": { "type": "string", "minLength": 1 },
+        "set_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["traits", "set_by", "set_at"]
+    }
+  }
+}

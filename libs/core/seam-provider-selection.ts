@@ -3,18 +3,20 @@
  * when several offer the same function with different capabilities and
  * traits (e.g. browser-automation-runtime: Chromium vs Lightpanda).
  *
- * Deterministic, in three steps:
+ * Deterministic, in order:
  *   1. hard filter — the seam's caller marks each candidate eligible or not
  *      from what the task actually needs (capabilities are code truth);
- *   2. purpose ranking — the caller states a purpose ("evidence",
- *      "throughput", ...) and eligible providers are scored with the trait
- *      weights of the governed policy (one file per seam under
- *      knowledge/product/governance/seam-provider-selection/);
- *   3. record — the decision is written to the audit chain and, when a
- *      decision key is given inside a mission, pinned so replays reproduce it.
- *
- * No purpose means "the seam default": selection never silently moves a task
- * off the default provider unless the task asked for a purpose.
+ *   2. mission pin — a choice frozen earlier in the mission is reused;
+ *   3. operator rule — a human-set preference for this purpose / context
+ *      (seam-selection-rules.ts, usually set after a calibration run);
+ *   4. purpose ranking — eligible providers are scored with the trait weights
+ *      of the governed policy (one file per seam under
+ *      knowledge/product/governance/seam-provider-selection/), using measured
+ *      operator trait values where they exist;
+ *   5. default — no purpose means the seam default; if the default cannot run
+ *      the task, the policy's `fallback_purpose` ranks the eligible ones.
+ * Every decision is written to the audit chain and, with a decision key
+ * inside a mission, pinned so replays reproduce it.
  */
 
 import { auditChain } from './audit-chain.js';
@@ -26,6 +28,11 @@ import {
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { loadRegistryDirectory, type RegistryDirectoryOptions } from './registry-directory.js';
+import {
+  getSeamTraitOverrides,
+  matchSeamSelectionRule,
+  type SeamSelectionRule,
+} from './seam-selection-rules.js';
 
 export type SeamTraitBasis = 'measured' | 'declared';
 
@@ -43,6 +50,7 @@ export interface SeamSelectionPurpose {
 export interface SeamSelectionPolicy {
   seam_id: string;
   default_provider: string;
+  fallback_purpose?: string;
   traits: Record<string, string>;
   providers: Record<string, SeamProviderProfile>;
   purposes: Record<string, SeamSelectionPurpose>;
@@ -62,7 +70,8 @@ export interface SeamProviderScore {
   breakdown: string[];
 }
 
-export type SeamSelectionStrategy = 'pinned' | 'purpose' | 'default' | 'unresolved';
+export type SeamSelectionStrategy =
+  'pinned' | 'rule' | 'purpose' | 'default' | 'fallback' | 'unresolved';
 
 export interface SeamProviderDecision {
   seam: string;
@@ -74,6 +83,8 @@ export interface SeamProviderDecision {
   ranked: string[];
   strategy: SeamSelectionStrategy;
   purpose?: string;
+  context?: Record<string, string>;
+  rule_id?: string;
   eligible: string[];
   excluded: Array<{ id: string; unmet: string[] }>;
   scores: SeamProviderScore[];
@@ -86,12 +97,16 @@ export interface ResolveSeamProviderOptions {
   seam: string;
   candidates: SeamProviderCandidate[];
   purpose?: string;
+  /** Request facts operator rules may match on, e.g. { language: 'ja' }. */
+  context?: Record<string, string>;
   /** Stable logical slot; enables reuse of / pinning to a mission pin. */
   decisionKey?: string;
   /** Pin a fresh decision under decisionKey. Default: only inside a mission. */
   pin?: boolean;
   /** Record the decision to the audit chain. Default true. */
   record?: boolean;
+  /** Ignore operator rules and measured overrides (calibration / explain baselines). */
+  ignoreOperatorOverlay?: boolean;
 }
 
 const policyDirectoryOptions: RegistryDirectoryOptions = {
@@ -114,12 +129,38 @@ export function listSeamSelectionPurposes(seam: string): string[] {
   return Object.keys(getSeamSelectionPolicy(seam)?.purposes ?? {}).sort();
 }
 
-function scoreCandidate(
+/** Product profiles with the operator's measured trait values applied. */
+export function effectiveSeamProviderProfiles(
   policy: SeamSelectionPolicy,
+  withOverrides = true
+): Record<string, SeamProviderProfile> {
+  const overrides = withOverrides ? getSeamTraitOverrides(policy.seam_id) : {};
+  const ids = new Set([...Object.keys(policy.providers), ...Object.keys(overrides)]);
+  const profiles: Record<string, SeamProviderProfile> = {};
+  for (const id of ids) {
+    const base = policy.providers[id] ?? { traits: {}, trait_basis: {} };
+    const measured = overrides[id];
+    if (!measured) {
+      profiles[id] = base;
+      continue;
+    }
+    const basis = { ...base.trait_basis };
+    for (const trait of Object.keys(measured.traits)) basis[trait] = 'measured';
+    profiles[id] = {
+      traits: { ...base.traits, ...measured.traits },
+      trait_basis: basis,
+      evidence: [...(base.evidence ?? []), ...(measured.evidence ?? [])],
+    };
+  }
+  return profiles;
+}
+
+function scoreCandidate(
+  profiles: Record<string, SeamProviderProfile>,
   purpose: SeamSelectionPurpose,
   id: string
 ): SeamProviderScore {
-  const profile = policy.providers[id];
+  const profile = profiles[id];
   let score = 0;
   const breakdown: string[] = [];
   for (const [trait, weight] of Object.entries(purpose.weights).sort(([a], [b]) =>
@@ -153,6 +194,8 @@ function recordDecision(decision: SeamProviderDecision): void {
       provider_id: decision.provider_id,
       strategy: decision.strategy,
       purpose: decision.purpose,
+      context: decision.context,
+      rule_id: decision.rule_id,
       pinned: decision.pinned,
       decision_key: decision.decision_key,
       eligible: decision.eligible,
@@ -168,6 +211,8 @@ function decide(
   pin: SeamPinnedEntry | null
 ): SeamProviderDecision {
   const { seam, purpose, decisionKey } = options;
+  const context =
+    options.context && Object.keys(options.context).length > 0 ? options.context : undefined;
   const policy = getSeamSelectionPolicy(seam);
   const eligible = options.candidates.filter((c) => c.eligible).map((c) => c.id);
   const excluded = options.candidates
@@ -176,14 +221,15 @@ function decide(
   const base = {
     seam,
     ...(purpose ? { purpose } : {}),
+    ...(context ? { context } : {}),
     eligible,
     excluded,
-    scores: [] as SeamProviderScore[],
     pinned: false,
     ...(decisionKey ? { decision_key: decisionKey } : {}),
   };
   const unresolved = (rationale: string): SeamProviderDecision => ({
     ...base,
+    scores: [],
     provider_id: null,
     ranked: [],
     strategy: 'unresolved',
@@ -195,50 +241,101 @@ function decide(
     const reasons = excluded.map((e) => `${e.id}: ${e.unmet.join(', ') || 'ineligible'}`);
     return unresolved(`no provider can run this task (${reasons.join('; ')})`);
   }
-
   const purposeSpec = purpose ? policy.purposes[purpose] : undefined;
   if (purpose && !purposeSpec) {
     return unresolved(
       `unknown purpose '${purpose}' for seam '${seam}' (known: ${Object.keys(policy.purposes).sort().join(', ')})`
     );
   }
-  // Eligible providers best-first: by purpose score, else seam default first;
-  // ties go to the seam default, then id.
+
+  const withOverlay = !options.ignoreOperatorOverlay;
+  const profiles = effectiveSeamProviderProfiles(policy, withOverlay);
+  const defaultEligible = eligible.includes(policy.default_provider);
+  // Without a purpose the default leads; if it cannot run the task the
+  // policy's fallback purpose ranks what can.
+  const rankingPurposeName =
+    purpose ?? (!defaultEligible ? policy.fallback_purpose : undefined) ?? undefined;
+  const rankingPurpose = rankingPurposeName ? policy.purposes[rankingPurposeName] : undefined;
   const tieBreak = (a: string, b: string) =>
     Number(b === policy.default_provider) - Number(a === policy.default_provider) ||
     a.localeCompare(b);
-  const scores = purposeSpec
+  const scores = rankingPurpose
     ? eligible
-        .map((id) => scoreCandidate(policy, purposeSpec, id))
+        .map((id) => scoreCandidate(profiles, rankingPurpose, id))
         .sort((a, b) => b.score - a.score || tieBreak(a.id, b.id))
     : [];
-  const byPreference = purposeSpec ? scores.map((score) => score.id) : [...eligible].sort(tieBreak);
+  const byPreference = rankingPurpose
+    ? scores.map((score) => score.id)
+    : [...eligible].sort(tieBreak);
   const withScores = { ...base, scores };
+  const leading = (first: string[]) => [
+    ...first,
+    ...byPreference.filter((id) => !first.includes(id)),
+  ];
 
   if (pin && eligible.includes(pin.provider_id)) {
     return {
       ...withScores,
       provider_id: pin.provider_id,
-      ranked: [pin.provider_id, ...byPreference.filter((id) => id !== pin.provider_id)],
+      ranked: leading([pin.provider_id]),
       strategy: 'pinned',
       pinned: true,
       rationale: `mission pin '${decisionKey}' (pinned ${pin.pinnedAt} by ${pin.by})`,
     };
   }
-  const pinNote = pin ? `; mission pin '${pin.provider_id}' cannot run this task` : '';
+  const notes: string[] = [];
+  if (pin) notes.push(`mission pin '${pin.provider_id}' cannot run this task`);
+
+  const rule: SeamSelectionRule | null = withOverlay
+    ? matchSeamSelectionRule(seam, { purpose, context })
+    : null;
+  if (rule) {
+    const preferred = rule.prefer.filter((id) => eligible.includes(id));
+    if (preferred.length > 0) {
+      return {
+        ...withScores,
+        rule_id: rule.rule_id,
+        provider_id: preferred[0]!,
+        ranked: leading(preferred),
+        strategy: 'rule',
+        rationale:
+          `operator rule '${rule.rule_id}' (set ${rule.set_at} by ${rule.set_by}) prefers ${rule.prefer.join(' > ')}` +
+          (preferred.length < rule.prefer.length
+            ? `; skipped ineligible ${rule.prefer.filter((id) => !preferred.includes(id)).join(', ')}`
+            : '') +
+          (notes.length ? `; ${notes.join('; ')}` : ''),
+      };
+    }
+    notes.push(`operator rule '${rule.rule_id}' prefers only ineligible providers`);
+  }
+  const suffix = notes.length ? `; ${notes.join('; ')}` : '';
 
   if (!purposeSpec) {
-    return eligible.includes(policy.default_provider)
-      ? {
-          ...withScores,
-          provider_id: policy.default_provider,
-          ranked: byPreference,
-          strategy: 'default',
-          rationale: `no purpose given; seam default '${policy.default_provider}'${pinNote}`,
-        }
-      : unresolved(
-          `the seam default '${policy.default_provider}' cannot run this task and no purpose was given`
-        );
+    if (defaultEligible) {
+      return {
+        ...withScores,
+        provider_id: policy.default_provider,
+        ranked: leading([policy.default_provider]),
+        strategy: 'default',
+        rationale: `no purpose given; seam default '${policy.default_provider}'${suffix}`,
+      };
+    }
+    if (!rankingPurpose) {
+      return unresolved(
+        `the seam default '${policy.default_provider}' cannot run this task and no purpose was given`
+      );
+    }
+    const winner = scores[0]!;
+    return {
+      ...withScores,
+      provider_id: winner.id,
+      ranked: byPreference,
+      strategy: 'fallback',
+      rationale:
+        `seam default '${policy.default_provider}' cannot run this task; fallback purpose ` +
+        `'${rankingPurposeName}': ${winner.id} scored ${winner.score} [${winner.breakdown.join(', ')}]` +
+        suffix,
+    };
   }
 
   const winner = scores[0]!;
@@ -252,7 +349,7 @@ function decide(
       `purpose '${purpose}': ${winner.id} scored ${winner.score} [${winner.breakdown.join(', ')}]` +
       (runnerUp ? ` over ${runnerUp.id} ${runnerUp.score}` : ' (only eligible provider)') +
       (excluded.length ? `; excluded ${excluded.map((e) => e.id).join(', ')}` : '') +
-      pinNote,
+      suffix,
   };
 }
 
@@ -271,7 +368,7 @@ export function resolveSeamProviderDecision(
     !existingPin &&
     shouldPin &&
     decision.provider_id &&
-    (decision.strategy === 'purpose' || decision.strategy === 'default')
+    decision.strategy !== 'unresolved'
   ) {
     pinSeamProviderDecision(
       options.seam,
@@ -283,4 +380,14 @@ export function resolveSeamProviderDecision(
   }
   if (options.record !== false) recordDecision(decision);
   return decision;
+}
+
+/** Explain what would be chosen, without recording or pinning. */
+export function explainSeamProviderDecision(
+  options: Omit<ResolveSeamProviderOptions, 'record' | 'pin'>
+): SeamProviderDecision {
+  const existingPin = options.decisionKey
+    ? loadSeamProviderPin(options.seam, options.decisionKey)
+    : null;
+  return decide(options, existingPin);
 }
