@@ -62,7 +62,13 @@ export function computeReliability(
     (sample) => Number.isFinite(sample.confidence) && typeof sample.correct === 'boolean'
   );
   if (usable.length === 0) {
-    return { samples: 0, accuracy: Number.NaN, ece: Number.NaN, overconfidence: Number.NaN, bins: [] };
+    return {
+      samples: 0,
+      accuracy: Number.NaN,
+      ece: Number.NaN,
+      overconfidence: Number.NaN,
+      bins: [],
+    };
   }
 
   const bins: ReliabilityBin[] = [];
@@ -112,7 +118,8 @@ export function computeReliability(
  */
 export function fitTemperature(samples: readonly CalibrationSample[]): number {
   const usable = samples.filter(
-    (sample) => sample.confidence > 0 && sample.confidence < 1 && typeof sample.correct === 'boolean'
+    (sample) =>
+      sample.confidence > 0 && sample.confidence < 1 && typeof sample.correct === 'boolean'
   );
   if (usable.length === 0) return 1;
 
@@ -161,7 +168,7 @@ export interface CalibrationProposal {
     questions: string[];
     fitted_from: string;
     fitted_at: string;
-    temperature: number;
+    temperatures: Record<string, number>;
   };
 }
 
@@ -170,9 +177,7 @@ export interface CalibrationProposal {
  *
  * Refusing is the expected result until a corpus exists.
  */
-export function proposeCalibrationEntry(
-  input: CalibrationProposalInput
-): CalibrationProposal {
+export function proposeCalibrationEntry(input: CalibrationProposalInput): CalibrationProposal {
   const minSamples = input.minSamples ?? 100;
   const minPerBin = input.minPerBin ?? 10;
   const maxEce = input.maxEce ?? 0.1;
@@ -239,7 +244,7 @@ export function proposeCalibrationEntry(
       questions: [input.questionId],
       fitted_from: input.fittedFrom,
       fitted_at: new Date().toISOString(),
-      temperature,
+      temperatures: { [input.questionId]: temperature },
     },
   };
 }

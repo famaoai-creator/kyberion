@@ -6,10 +6,7 @@ import { parseSafeJsonObjectValue } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { appendSupervisorEvent } from './agent-runtime-events.js';
 import { registerAgentRuntimeEnsurer } from './agent-runtime-port.js';
-import {
-  classifyAgentReadiness,
-  describeAgentReadiness,
-} from './agent-runtime-readiness.js';
+import { classifyAgentReadiness, describeAgentReadiness } from './agent-runtime-readiness.js';
 import type { EnsureAgentRuntimeOptions } from './agent-runtime-contracts.js';
 import {
   ensureMissionTeamRuntime,
@@ -472,7 +469,8 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
   });
   const handle = await agentLifecycle.spawn({ ...options, scope: runtimeScope });
   const runtimeRecord = runtimeSupervisor.get(options.agentId || handle.agentId);
-  const snapshot = getAgentRuntimeSnapshot(options.agentId || handle.agentId, 20);
+  const resolvedAgentId = options.agentId || handle.agentId;
+  const snapshot = getAgentRuntimeSnapshot(resolvedAgentId, 20);
   const actualModelId = snapshot?.agent.modelId || handle.getRecord()?.modelId || options.modelId;
   if (runtimeRecord) {
     runtimeSupervisor.update(runtimeRecord.resourceId, {
@@ -485,20 +483,18 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
       },
     });
   }
-  // A spawned process is not a working agent. This reported completion four
-  // seconds after launch while the agent sat on "Do you trust the contents of
-  // this project?" — a first-run prompt on any path it has not seen, which is
-  // every new worktree — and dispatch then waited out its ten-minute budget
-  // for a reply that was never coming. The runtime's own status was no help:
-  // herdr reported `idle` and `interactive_ready: true` for that agent, the
-  // same as a healthy one. The difference is only visible on its screen.
+  // Keep this as a one-shot check. ACP, stateless CLI and app-server
+  // runtimes do not expose a pane transcript here; their logs can remain
+  // empty until the first prompt. Adapter-level settlePrompts owns startup
+  // prompts, so waiting for a generic ready marker here would make those
+  // runtimes fail after an arbitrary timeout.
   const readiness = classifyAgentReadiness(
     (snapshot?.logs || []).map((entry) => entry.content).join('\n')
   );
   if (readiness.state === 'awaiting_human') {
     appendSupervisorEvent({
       decision: 'agent_runtime_awaiting_human',
-      agent_id: options.agentId || handle.agentId,
+      agent_id: resolvedAgentId,
       mission_id: options.missionId,
       scope: runtimeScope,
       requested_by: options.requestedBy,
@@ -514,7 +510,7 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
 
   appendSupervisorEvent({
     decision: 'agent_runtime_ensure_completed',
-    agent_id: options.agentId || handle.agentId,
+    agent_id: resolvedAgentId,
     mission_id: options.missionId,
     scope: runtimeScope,
     requested_by: options.requestedBy,

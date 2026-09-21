@@ -19,14 +19,15 @@ Antigravity CLI requires permission to read, edit, and execute files here.
   No, exit
 `;
 
-
 /**
  * Real idle panes, captured from a mission's prewarm on 2026-09-21. The first
  * version of the ready signatures was written without looking at one and
  * classified all three of these as `starting`.
  */
-const REAL_AGY_READY = "\n\n\n\n\n\n\n  Antigravity CLI 1.2.7\n  famaoai@gmail.com (Google AI Pro)\n  Gemini 3.8 Flash (Low)\n  /Volumes/data/forcheck/kyberion-lay\n\n─────────────────────────────────────\n>\n─────────────────────────────────────\n? for shortcuts";
-const REAL_CLAUDE_READY = "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n────────────────────────────────────────────────────\n❯ \n────────────────────────────────────────────────────\n  ⏵⏵ auto mode on (shift+tab to cycle) · ← for ag…";
+const REAL_AGY_READY =
+  '\n\n\n\n\n\n\n  Antigravity CLI 1.2.7\n  famaoai@gmail.com (Google AI Pro)\n  Gemini 3.8 Flash (Low)\n  /Volumes/data/forcheck/kyberion-lay\n\n─────────────────────────────────────\n>\n─────────────────────────────────────\n? for shortcuts';
+const REAL_CLAUDE_READY =
+  '\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n────────────────────────────────────────────────────\n❯ \n────────────────────────────────────────────────────\n  ⏵⏵ auto mode on (shift+tab to cycle) · ← for ag…';
 
 describe('classifyAgentReadiness', () => {
   it('names the trust prompt and quotes it back', () => {
@@ -53,7 +54,6 @@ describe('classifyAgentReadiness', () => {
     expect(readiness.state).toBe('awaiting_human');
     expect(readiness.signatureId).toBe('generic_confirm');
   });
-
 
   it('recognises a real idle agy pane as ready', () => {
     expect(classifyAgentReadiness(REAL_AGY_READY).state).toBe('ready');
@@ -82,6 +82,10 @@ describe('classifyAgentReadiness', () => {
     // The failure this exists to stop: output exists, nothing says ready,
     // and the runtime reports success because a process is alive.
     expect(classifyAgentReadiness('some unrelated chatter').state).toBe('starting');
+  });
+
+  it('does not treat a negative readiness message as ready', () => {
+    expect(classifyAgentReadiness('agent is not ready yet').state).toBe('starting');
   });
 
   it('lets a prompt override an earlier ready line', () => {

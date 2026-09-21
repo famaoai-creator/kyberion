@@ -149,7 +149,8 @@ describe('proposeCalibrationEntry', () => {
     });
     expect(proposal.accepted).toBe(true);
     expect(proposal.entry?.questions).toEqual(['error.category']);
-    expect(proposal.entry?.temperature).toBeGreaterThan(1);
+    expect(proposal.entry?.temperatures?.['error.category']).toBeGreaterThan(1);
+    expect(proposal.entry?.temperatures?.['error.category']).toBe(proposal.temperature);
     expect(proposal.entry?.fitted_from).toBe('unclassified-error-registry');
     expect(proposal.reason).toMatch(/ECE .* -> /);
   });

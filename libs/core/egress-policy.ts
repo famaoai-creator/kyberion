@@ -65,6 +65,12 @@ let cachedPolicy: EgressPolicyFile | null = null;
 let cachedAllowedDomains: string[] | null = null;
 const egressContextStorage = new AsyncLocalStorage<EgressPayloadContext>();
 
+const EGRESS_TIER_ORDER: Record<'public' | 'confidential' | 'personal', number> = {
+  public: 0,
+  confidential: 1,
+  personal: 2,
+};
+
 const policyCatalog = defineCatalog<EgressPolicyFile>({
   id: 'egress-policy',
   path: () => getEgressPolicyPath(),
@@ -322,13 +328,50 @@ export function resolveEgressPayloadContext(
   const ambient = getEgressPayloadContext();
   if (!ambient) return explicit;
   if (!explicit) return ambient;
+  if (ambient.tenant_slug && explicit.tenant_slug && ambient.tenant_slug !== explicit.tenant_slug) {
+    throw new Error(
+      `[TENANT_SCOPE_CONFLICT] ambient tenant '${ambient.tenant_slug}' conflicts with explicit tenant '${explicit.tenant_slug}'`
+    );
+  }
+  const ambientTier = ambient.tier;
+  const explicitTier = explicit.tier;
+  const tier =
+    ambientTier && explicitTier
+      ? EGRESS_TIER_ORDER[ambientTier] >= EGRESS_TIER_ORDER[explicitTier]
+        ? ambientTier
+        : explicitTier
+      : ambientTier || explicitTier;
   return {
     ...ambient,
     ...explicit,
-    ...(explicit.tier === undefined ? { tier: ambient.tier } : {}),
+    ...(tier ? { tier } : {}),
     ...(explicit.tenant_slug === undefined ? { tenant_slug: ambient.tenant_slug } : {}),
     ...(explicit.purpose === undefined ? { purpose: ambient.purpose } : {}),
-    ...(explicit.provenance === undefined ? { provenance: ambient.provenance } : {}),
+    provenance: mergeEgressProvenance(ambient.provenance, explicit.provenance),
+  };
+}
+
+function mergeEgressProvenance(
+  ambient: ProvenanceTaint | undefined,
+  explicit: ProvenanceTaint | undefined
+): ProvenanceTaint | undefined {
+  if (!ambient) return explicit;
+  if (!explicit) return ambient;
+  const tenants =
+    ambient.tenants.length > 0 && explicit.tenants.length > 0
+      ? ambient.tenants.filter((tenant) => explicit.tenants.includes(tenant))
+      : ambient.tenants.length > 0
+        ? ambient.tenants
+        : explicit.tenants;
+  return {
+    missionId: ambient.missionId,
+    highestTier:
+      EGRESS_TIER_ORDER[ambient.highestTier] >= EGRESS_TIER_ORDER[explicit.highestTier]
+        ? ambient.highestTier
+        : explicit.highestTier,
+    tenants: tenants.length > 0 ? tenants : ['__provenance_scope_conflict__'],
+    prohibitExternal: ambient.prohibitExternal || explicit.prohibitExternal,
+    observationIds: Array.from(new Set([...ambient.observationIds, ...explicit.observationIds])),
   };
 }
 

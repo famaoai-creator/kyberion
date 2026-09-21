@@ -123,7 +123,7 @@ const READY_SIGNATURES = new RegExp(
     'auto mode (on|off)',
     'shift\\+tab to cycle',
     // Generic phrasing some CLIs use.
-    'ready',
+    '^\\s*(?:agent\\s+)?ready\\s*$',
     'awaiting (input|instructions)',
     'how can i help',
     'what would you like',

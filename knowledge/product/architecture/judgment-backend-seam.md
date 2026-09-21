@@ -47,6 +47,10 @@ constants as `confidence`, and `onboarding-context.ts` branched on
 `knowledge/product/governance/judgment-calibration.json`; a provider is
 calibrated only where a fitted entry exists for that question id, and `false`
 everywhere else, including when the registry is missing or unreadable.
+The registry may store a legacy provider-wide `temperature`, or a
+question-specific `temperatures` map; when both are present, the exact
+question entry wins. This keeps separate fits for questions whose confidence
+scales differ while remaining readable by older registry entries.
 
 This is not bureaucracy. Both obvious sources of a model's confidence are
 uncalibrated in different ways, measured on the same twelve cases:
@@ -129,10 +133,10 @@ better one, and the raw count inverts the ranking.
 The open implementations of this idea split by architecture, and the split
 matters more than any individual project:
 
-| family | examples | separation measured here | determinism |
-| --- | --- | --- | --- |
-| reads logits from a general LLM | Simple Jev, System One Lite, SemIf, LocalJev, System One Adapter | **-0.003** | not measured |
-| trained judgment head | Laya, kev, typed-decisions | **+0.36** | **total** |
+| family                          | examples                                                         | separation measured here | determinism  |
+| ------------------------------- | ---------------------------------------------------------------- | ------------------------ | ------------ |
+| reads logits from a general LLM | Simple Jev, System One Lite, SemIf, LocalJev, System One Adapter | **-0.003**               | not measured |
+| trained judgment head           | Laya, kev, typed-decisions                                       | **+0.36**                | **total**    |
 
 The first family is the easy one to reach for: no new model, constrained
 decoding over the LLM already installed. A provider was built that way here
@@ -146,11 +150,11 @@ and measure separation before trusting either.
 `laya-mlx` ships three. For Japanese there is only one real option, and it
 happens to be the small one:
 
-| checkpoint | noul | choice | p50 |
-| --- | --- | --- | --- |
-| `aac6fef/laya-multilingual-mlx` (mmBERT-base 322M) | 7/8 | **6/6** | **14ms** |
-| `aac6fef/laya-mlx` (ModernBERT-large 421M) | 5/8 | 2/6 | 33ms |
-| `aac6fef/laya-typed-decisions-mlx` (DeBERTa) | 6/8 | 2/6 | 33ms |
+| checkpoint                                         | noul | choice  | p50      |
+| -------------------------------------------------- | ---- | ------- | -------- |
+| `aac6fef/laya-multilingual-mlx` (mmBERT-base 322M) | 7/8  | **6/6** | **14ms** |
+| `aac6fef/laya-mlx` (ModernBERT-large 421M)         | 5/8  | 2/6     | 33ms     |
+| `aac6fef/laya-typed-decisions-mlx` (DeBERTa)       | 6/8  | 2/6     | 33ms     |
 
 The English checkpoints score near chance on Japanese choices and sit at
 ~0.5 on nouls, which is no signal at all. Both are larger and slower.
@@ -180,7 +184,7 @@ Providers that take pixels exist. PlayJev-0.8B reads one 448px frame and
 returns a distribution over the listed options in a single forward pass with
 nothing generated, which is exactly this seam's shape; openvons covers text,
 images and Japanese voice, and answers the escape-option problem a third way
-— it scores a *free hypothesis* alongside the candidates rather than adding
+— it scores a _free hypothesis_ alongside the candidates rather than adding
 "none of these" as an option that competes for the same probability mass.
 Neither has been measured against a call site here, so neither is
 registered: per the evaluation rule above, an unmeasured provider is treated
@@ -217,7 +221,7 @@ rules (5/6) and better than Jev (4/6).
 An identifier is legible to whoever named it and to nobody else. Write the
 descriptions.
 
-The earlier Jev measurements in this document were taken *before* this was
+The earlier Jev measurements in this document were taken _before_ this was
 understood, with option names passed as their own descriptions, so they
 understate it. Both providers now go through `describeChoiceOptions()`.
 
@@ -225,12 +229,12 @@ understate it. Both providers now go through `describeChoiceOptions()`.
 
 All three asked the same question, with option descriptions:
 
-| | decisions | silent errors | shape on clear input | runs that varied | latency | tiers reachable |
-| --- | --- | --- | --- | --- | --- | --- |
-| built-in rules | 11/12 | 1 | 5/6 | 0/12 | ~0ms | all |
-| local 4B (generative) | — | — | 3/6 | not measured | 294ms | all |
-| TypeSafe Jev | 9/12 | 3 | **6/6** | **7/12** | 235-278ms | public only |
-| Laya-MLX | 9/12 | 1 | **6/6** | **0/12** | 24ms | **all** |
+|                       | decisions | silent errors | shape on clear input | runs that varied | latency   | tiers reachable |
+| --------------------- | --------- | ------------- | -------------------- | ---------------- | --------- | --------------- |
+| built-in rules        | 11/12     | 1             | 5/6                  | 0/12             | ~0ms      | all             |
+| local 4B (generative) | —         | —             | 3/6                  | not measured     | 294ms     | all             |
+| TypeSafe Jev          | 9/12      | 3             | **6/6**              | **7/12**         | 235-278ms | public only     |
+| Laya-MLX              | 9/12      | 1             | **6/6**              | **0/12**         | 24ms      | **all**         |
 
 Jev was re-measured after the description finding, and the correction runs
 both ways. Its classification was understated — 4/6 became 6/6, matching
@@ -261,12 +265,12 @@ caller refuse an answer it should not act on.
 
 The direction of safety is per call site, and the four that exist differ:
 
-| call site | baseline | a judgment may |
-| --- | --- | --- |
-| `error-classifier-judgment` | the rules' category | fill in `unknown` only; never override a matched rule |
-| `knowledge-relevance-judgment` | keep every document | drop one it is *confidently sure* is irrelevant, never a pinned one, never below `minKeep` |
-| `browser-judgment` failure kind | the heuristics' kind | fill in `unknown` only |
-| `browser-judgment` readiness | the caller's gate | add "not ready"; never turn a failed gate into a pass |
+| call site                       | baseline             | a judgment may                                                                             |
+| ------------------------------- | -------------------- | ------------------------------------------------------------------------------------------ |
+| `error-classifier-judgment`     | the rules' category  | fill in `unknown` only; never override a matched rule                                      |
+| `knowledge-relevance-judgment`  | keep every document  | drop one it is _confidently sure_ is irrelevant, never a pinned one, never below `minKeep` |
+| `browser-judgment` failure kind | the heuristics' kind | fill in `unknown` only                                                                     |
+| `browser-judgment` readiness    | the caller's gate    | add "not ready"; never turn a failed gate into a pass                                      |
 
 The pattern is the same each time: a judgment adds information where there
 was none, or adds a restriction, and can never remove one. A call site whose

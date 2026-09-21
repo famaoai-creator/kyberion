@@ -115,6 +115,36 @@ describe('secureFetch', () => {
     expect(mocks.axios).not.toHaveBeenCalled();
   });
 
+  it('does not let an inner public context weaken an ambient personal scope', async () => {
+    const { secureFetch } = await import('./network.js');
+
+    await expect(
+      withEgressPayloadContext({ tier: 'personal', tenant_slug: 'tenant-a' }, () =>
+        secureFetch({
+          url: 'https://docs.example.com/write',
+          method: 'POST',
+          kyberion_egress_context: { tier: 'public', tenant_slug: 'tenant-a' },
+        })
+      )
+    ).rejects.toThrow('TIER_EGRESS_DENIED');
+    expect(mocks.axios).not.toHaveBeenCalled();
+  });
+
+  it('rejects conflicting ambient and explicit tenant scopes before network I/O', async () => {
+    const { secureFetch } = await import('./network.js');
+
+    await expect(
+      withEgressPayloadContext({ tier: 'confidential', tenant_slug: 'tenant-a' }, () =>
+        secureFetch({
+          url: 'https://docs.example.com/write',
+          method: 'POST',
+          kyberion_egress_context: { tier: 'confidential', tenant_slug: 'tenant-b' },
+        })
+      )
+    ).rejects.toThrow('TENANT_SCOPE_CONFLICT');
+    expect(mocks.axios).not.toHaveBeenCalled();
+  });
+
   it('redacts sensitive payload fields and headers before dispatching', async () => {
     mocks.axios.mockResolvedValue({ data: { ok: true } });
     const { secureFetch } = await import('./network.js');
