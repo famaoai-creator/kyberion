@@ -10,6 +10,14 @@ export * from './typesafe-jev-judgment-backend.js';
 
 export * from './laya-mlx-judgment-backend.js';
 
+export * from './judgment-assist.js';
+
+export * from './error-classifier-judgment.js';
+
+export * from './knowledge-relevance-judgment.js';
+
+export * from './browser-judgment.js';
+
 export * from './plugin-source-trust.js';
 
 export * from './plugin-managed-install.js';

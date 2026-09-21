@@ -26,7 +26,8 @@
           "last_seen": { "type": "string", "format": "date-time" },
           "occurrence_count": { "type": "integer", "minimum": 1 },
           "reconciled": { "type": "boolean" },
-          "reconciled_at": { "type": "string", "format": "date-time" }
+          "reconciled_at": { "type": "string", "format": "date-time" },
+          "reconciled_category": { "type": "string", "minLength": 1 }
         }
       }
     }

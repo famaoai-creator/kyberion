@@ -161,23 +161,56 @@ understate it. Both providers now go through `describeChoiceOptions()`.
 
 ## Providers measured so far
 
-| | decisions | silent errors | shape on clear input | determinism | latency | tiers reachable |
-| --- | --- | --- | --- | --- | --- | --- |
-| built-in rules | 11/12 | 1 | 5/6 | total | ~0ms | all |
-| local 4B (generative) | — | — | 3/6 | not measured | 294ms | all |
-| TypeSafe Jev | 10/12 | 0 | 4/6 | **varies between runs** | 235-278ms | public only |
-| Laya-MLX | 9/12 | 1 | **6/6** | **total** | 24ms | **all** |
+All three asked the same question, with option descriptions:
 
-Read the columns, not the totals. Laya's decision score is the lowest of the
-three model providers while its *classification* is the best: two correct
-answers land at 0.63 and 0.67 and are refused by the 0.7 threshold. That is a
-calibration problem, not a comprehension one — and it is the first such
-problem here worth fixing, because Laya is the first provider whose answers
-do not move between runs.
+| | decisions | silent errors | shape on clear input | runs that varied | latency | tiers reachable |
+| --- | --- | --- | --- | --- | --- | --- |
+| built-in rules | 11/12 | 1 | 5/6 | 0/12 | ~0ms | all |
+| local 4B (generative) | — | — | 3/6 | not measured | 294ms | all |
+| TypeSafe Jev | 9/12 | 3 | **6/6** | **7/12** | 235-278ms | public only |
+| Laya-MLX | 9/12 | 1 | **6/6** | **0/12** | 24ms | **all** |
+
+Jev was re-measured after the description finding, and the correction runs
+both ways. Its classification was understated — 4/6 became 6/6, matching
+Laya. Its behaviour as a gate was overstated: descriptions made every option
+look plausible, so it stopped abstaining, and silent errors went from 0 to 3
+while the runs that varied went from a handful to 7 of 12. Descriptions help
+recognition and hurt abstention; Laya took the same descriptions without
+losing its reticence.
+
+Read the columns, not the totals. Laya and Jev tie on decisions and on
+classification; they differ where it matters for a gate — one silent error
+against three, and no variance against seven runs in twelve. Laya's two
+misses are correct shapes at 0.63 and 0.67 refused by the 0.7 threshold,
+which is a calibration problem rather than a comprehension one.
 
 The rules still win overall and remain the built-in provider. Their single
 miss is the expensive kind: a wrong shape at 0.80, which nobody is asked
 about.
+
+## Every integration goes through `assistWithJudgment`
+
+`judgment-assist.ts` is the only place a judgment is allowed to influence
+anything, so the rules that keep a model from breaking the system are
+written and tested once instead of at each call site. It never throws, caps
+the call in time, keeps the caller's deterministic result below a confidence
+floor, declines everything while `requireCalibrated` is set, and lets the
+caller refuse an answer it should not act on.
+
+The direction of safety is per call site, and the four that exist differ:
+
+| call site | baseline | a judgment may |
+| --- | --- | --- |
+| `error-classifier-judgment` | the rules' category | fill in `unknown` only; never override a matched rule |
+| `knowledge-relevance-judgment` | keep every document | drop one it is *confidently sure* is irrelevant, never a pinned one, never below `minKeep` |
+| `browser-judgment` failure kind | the heuristics' kind | fill in `unknown` only |
+| `browser-judgment` readiness | the caller's gate | add "not ready"; never turn a failed gate into a pass |
+
+The pattern is the same each time: a judgment adds information where there
+was none, or adds a restriction, and can never remove one. A call site whose
+natural baseline is permissive — the context pack, which keeps everything —
+gets the asymmetric guards instead, because there a wrong judgment removes
+something the worker needed and nobody is asked about it.
 
 ## Nothing is calibrated yet, deliberately
 

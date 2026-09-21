@@ -264,15 +264,33 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
     };
   }
 
+  const why = rejected.length > 0 ? `; rejected: ${rejected.join('; ')}` : '';
+
   if (!builtin) {
     // Registration is explicit rather than an import side effect, so this is
     // reachable from a caller that never registered anything. Name the fix.
     throw new Error(
       `[JUDGMENT_BACKEND] no provider available: '${BUILTIN_JUDGMENT_PROVIDER}' is not registered. ` +
-        'Call registerOrganizationWorkJudgment() (or register your own floor provider) during setup.'
+        `Call registerOrganizationWorkJudgment() (or register your own floor provider) during setup.${why}`
     );
   }
-  const why = rejected.length > 0 ? `; rejected: ${rejected.join('; ')}` : '';
+
+  // The floor is a floor, not a universal answerer. It was possible for the
+  // built-in rules to receive a question they do not support and answer it
+  // anyway — an organization work shape at 0.40 in reply to a question about
+  // error categories. A provider that cannot answer must produce no answer,
+  // because a wrong one is worse than none: the whole point of this seam is
+  // that callers keep their deterministic result when judgment is not
+  // available, and a confident-looking wrong answer denies them that.
+  const unsupported = request.questions.filter((question) => !builtin.supports(question));
+  if (unsupported.length > 0) {
+    throw new Error(
+      `[JUDGMENT_BACKEND] no provider can answer ${unsupported
+        .map((question) => `'${question.id}' (${question.kind})`)
+        .join(', ')} at tier=${request.tier}${why}`
+    );
+  }
+
   return {
     backend: builtin,
     reason: `fell back to '${BUILTIN_JUDGMENT_PROVIDER}' for tier=${request.tier}${why}`,
