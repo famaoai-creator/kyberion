@@ -9,6 +9,7 @@
       "provider": "kyutai",
       "status": "active",
       "platforms": ["darwin", "linux", "win32"],
+      "languages": ["en"],
       "model_id": "kyutai/pocket-tts",
       "bridge_script": "libs/actuators/voice-actuator/scripts/pocket_tts_bridge.py",
       "tts_adapter_id": "python_bridge",
@@ -22,7 +23,8 @@
         "artifact_formats": ["wav"]
       },
       "fallback_engine_id": "local_say",
-      "notes": "CPU streaming TTS and consent-gated voice cloning. Current upstream language packs do not include Japanese."
+      "notes": "CPU streaming TTS and consent-gated voice cloning. Current upstream language packs do not include Japanese.",
+      "language_notes": "Bridge rejects Japanese; upstream packs for fr/de/pt/it/es exist but the bridge does not select a language pack, so only en is declared."
     }
   ]
 }
