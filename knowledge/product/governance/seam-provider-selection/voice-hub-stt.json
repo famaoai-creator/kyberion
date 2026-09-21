@@ -1,0 +1,130 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "voice-hub-stt",
+      "default_provider": "server",
+      "traits": {
+        "accuracy": "Transcript quality of short live utterances (incl. Japanese) captured by voice-hub.",
+        "latency": "Time from end of speech to transcript for one listen-once turn.",
+        "privacy": "Confidence that audio never leaves the machine (on-device execution by construction)."
+      },
+      "providers": {
+        "server": {
+          "traits": {
+            "accuracy": 0.85,
+            "latency": 0.7,
+            "privacy": 0.4
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/voice-stt.ts (resolveVoiceSttServerConfig: WhisperKit / mlx-audio / OpenAI-compatible server; the base URL may be local or remote, so privacy is not guaranteed)"
+          ]
+        },
+        "fluid_audio": {
+          "traits": {
+            "accuracy": 0.75,
+            "latency": 1,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "docs/VOICE_LOCAL_BACKENDS.md (local FluidAudio / Parakeet bridge on macOS via KYBERION_FLUID_AUDIO_STT_COMMAND)"
+          ]
+        },
+        "mlx_whisper": {
+          "traits": {
+            "accuracy": 0.9,
+            "latency": 0.5,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/voice-selection-preferences.ts (managed mlx-whisper runtime on Apple Silicon)",
+            "libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py (default model whisper-large-v3-turbo)"
+          ]
+        },
+        "faster_whisper": {
+          "traits": {
+            "accuracy": 0.85,
+            "latency": 0.5,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/voice-selection-preferences.ts (faster-whisper Python runtime on Windows, KYBERION_WINDOWS_STT_BACKEND=faster_whisper)"
+          ]
+        },
+        "whisper_cpp": {
+          "traits": {
+            "accuracy": 0.7,
+            "latency": 0.5,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/voice-selection-preferences.ts (whisper.cpp CLI with the ggml-small model under active/shared/tmp/whisper.cpp)"
+          ]
+        },
+        "native_speech": {
+          "traits": {
+            "accuracy": 0.6,
+            "latency": 0.9,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "satellites/voice-hub/native-stt.swift (host OS speech API; requiresOnDeviceRecognition = true and fails when the locale has no on-device model)"
+          ]
+        }
+      },
+      "purposes": {
+        "accuracy": {
+          "description": "Dictation and requests whose wording matters.",
+          "weights": {
+            "accuracy": 1
+          }
+        },
+        "latency": {
+          "description": "Quick conversational turns where a slightly weaker transcript is acceptable.",
+          "weights": {
+            "latency": 0.8,
+            "accuracy": 0.2
+          }
+        },
+        "privacy": {
+          "description": "Sensitive speech: prefer backends that are on-device by construction.",
+          "weights": {
+            "privacy": 0.7,
+            "accuracy": 0.3
+          }
+        }
+      }
+    }
+  ]
+}

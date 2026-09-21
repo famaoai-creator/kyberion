@@ -5,6 +5,9 @@
     "image-generation-provider",
     "ocr-provider",
     "speech-to-text-bridge",
+    "voice.vad-backend",
+    "streaming-stt-bridge",
+    "voice-hub-stt",
     "music-generation-provider",
     "video-generation-provider"
   ]
