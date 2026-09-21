@@ -15,6 +15,11 @@ import {
   recognizeTextWithWindowsNativeApi,
 } from './windows-native-image-recognition-bridge.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
+import {
+  resolveSeamProviderDecision,
+  type SeamProviderCandidate,
+} from './seam-provider-selection.js';
+import { matchSeamSelectionRule } from './seam-selection-rules.js';
 
 const ocrProviderSeam = createSeam<OcrProvider>({
   key: 'ocr-provider',
@@ -172,6 +177,31 @@ export function parseLocalVlmOcrResponse(value: unknown): string | undefined {
   return isRecord(value) ? nonEmptyString(value.response) : undefined;
 }
 
+/** BCP-47 primary subtags → tesseract traineddata codes (3-letter codes pass through). */
+const TESSERACT_LANGUAGE_CODES: Record<string, string> = {
+  en: 'eng',
+  ja: 'jpn',
+  zh: 'chi_sim',
+  ko: 'kor',
+  de: 'deu',
+  fr: 'fra',
+  es: 'spa',
+  it: 'ita',
+  pt: 'por',
+};
+
+export function toTesseractLanguage(language?: string): string {
+  const raw = String(language || '').trim();
+  if (!raw) return 'eng';
+  return raw
+    .split('+')
+    .map((part) => {
+      const primary = part.trim().toLowerCase().split(/[-_]/u)[0] ?? '';
+      return TESSERACT_LANGUAGE_CODES[primary] ?? part.trim();
+    })
+    .join('+');
+}
+
 export class TesseractOcrProvider implements OcrProvider {
   readonly id = 'tesseract';
   readonly dataEgress = 'none' as const; // tesseract.js, in-process
@@ -188,12 +218,18 @@ export class TesseractOcrProvider implements OcrProvider {
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
     const resolvedPath = resolveOcrImagePath(request.path);
-    const lang = request.language || 'eng';
+    const lang = toTesseractLanguage(request.language);
     let worker: any = null;
 
     try {
       const { createWorker } = await import('tesseract.js');
-      worker = await createWorker(lang);
+      // Without an errorHandler tesseract.js rethrows worker failures (e.g. a
+      // missing traineddata download) as an uncaught exception that kills the
+      // process; with it they reject createWorker/recognize and land below.
+      worker = await createWorker(lang, undefined, {
+        errorHandler: (error: unknown) =>
+          logger.warn(`[ocr_bridge] Tesseract worker error: ${String(error)}`),
+      });
       const result = await worker.recognize(resolvedPath);
 
       return {
@@ -657,7 +693,84 @@ export class AdaptivePolicyRouter {
     });
   }
 
+  /**
+   * Hard-eligible providers for `request.mode`: allowed by the egress filter
+   * and available right now. This is the same eligibility test resolveCandidates
+   * uses by default; purpose-driven selection reuses it instead of a second
+   * notion of "can run this task". Public so the 'ocr-provider' seam
+   * calibration adapter (scripts/lib/seam-calibration/ocr-provider.ts) can
+   * reuse it instead of re-deriving eligibility.
+   */
+  async eligibleCandidates(request: OcrRequest): Promise<SeamProviderCandidate[]> {
+    const mode = request.mode || 'balanced';
+    const allowed = this.allowedEgress(mode);
+    const candidates: SeamProviderCandidate[] = [];
+    for (const provider of this.providers.values()) {
+      if (!allowed.has(provider.dataEgress)) {
+        candidates.push({
+          id: provider.id,
+          eligible: false,
+          unmet: [`dataEgress '${provider.dataEgress}' not permitted by mode '${mode}'`],
+        });
+        continue;
+      }
+      const available = await provider.isAvailable();
+      candidates.push(
+        available
+          ? { id: provider.id, eligible: true }
+          : { id: provider.id, eligible: false, unmet: ['provider not available'] }
+      );
+    }
+    return candidates;
+  }
+
+  /**
+   * Purpose-driven order: hard mode/availability eligibility (above) filters,
+   * then the governed ocr-provider selection policy ranks who runs the task.
+   * Used when the caller asked for a purpose, or (with no purpose) when an
+   * operator rule matches this request (decisionKey 'default'). Request language,
+   * when set, is passed as selection context so a rule can match on it.
+   * Only used when the caller did not already pin an explicit
+   * providerPreference — an explicit choice always wins.
+   */
+  private async resolvePurposeChain(request: OcrRequest, purpose?: string): Promise<OcrProvider[]> {
+    const candidates = await this.eligibleCandidates(request);
+    const context = request.language ? { language: request.language } : undefined;
+    const decision = resolveSeamProviderDecision({
+      seam: ocrProviderSeam.key,
+      candidates,
+      ...(purpose ? { purpose } : {}),
+      ...(context ? { context } : {}),
+      decisionKey: purpose || 'default',
+    });
+    if (decision.strategy === 'unresolved') {
+      throw new Error(`[OCR_PROVIDER_SELECTION] ${decision.rationale}`);
+    }
+    logger.info(
+      `[ocr_bridge] ${purpose ? `purpose '${purpose}'` : 'rule-driven'} provider chain (${decision.strategy}): ${decision.ranked.join(' > ')} — ${decision.rationale}`
+    );
+    return decision.ranked
+      .map((id) => this.providers.get(id))
+      .filter((provider): provider is OcrProvider => Boolean(provider));
+  }
+
   async resolveCandidates(request: OcrRequest): Promise<OcrProvider[]> {
+    const hasProviderPreference = Boolean(
+      request.providerPreference && request.providerPreference.length > 0
+    );
+    // Without a purpose, only an operator rule that matches this request
+    // takes the selection path; otherwise the per-mode chain stays as is.
+    const ruleApplies =
+      !request.purpose &&
+      Boolean(
+        matchSeamSelectionRule(ocrProviderSeam.key, {
+          ...(request.language ? { context: { language: request.language } } : {}),
+        })
+      );
+    if (!hasProviderPreference && (request.purpose || ruleApplies)) {
+      return this.resolvePurposeChain(request, request.purpose);
+    }
+
     const allowed = this.allowedEgress(request.mode || 'balanced');
     const candidates: OcrProvider[] = [];
     for (const id of this.getProviderIds(request)) {
@@ -684,7 +797,8 @@ export class AdaptivePolicyRouter {
   }
 }
 
-function ensureBuiltinOcrProviders(): void {
+/** Register the built-in OCR providers (idempotent); callers listing providers need this first. */
+export function ensureBuiltinOcrProviders(): void {
   if (ocrBuiltinsRegistered && listOcrProviders().length > 0) return;
   registerOcrProvider(new WindowsNativeOcrProvider());
   registerOcrProvider(new AppleVisionOcrProvider());
