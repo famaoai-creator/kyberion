@@ -3,6 +3,7 @@ import { logger } from './core.js';
 import { ledger } from './ledger.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
+import { createRequire } from 'node:module';
 import { resolveSecretSync } from './secret-resolver.js';
 import {
   decryptConnectionDocument,
@@ -20,6 +21,8 @@ import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
  * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
  * Implements Personal Knowledge Connection Mapping with Secure-IO and Temporal Authority.
  */
+
+const requireSecretModules = createRequire(import.meta.url);
 
 const SECRETS_FILE = pathResolver.resolve('vault/secrets/secrets.json');
 const PERSONAL_CONNECTIONS_DIR = pathResolver.resolve('knowledge/personal/connections');
@@ -329,6 +332,31 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
     if (value.length > 8) _activeSecrets.add(value);
     return value;
   }
+
+  // Fall through to OS keychain / file vault via canonical secret identity.
+  // Dual-write from secret-introduction is the primary path; this recovers
+  // keychain-only entries for service consumers. Lazy-require keeps
+  // secret-bridge / secret-identity off the hot import graph for callers
+  // that only need env / connection resolution (and for hermetic mocks).
+  try {
+    const { parseEnvSecretName } = requireSecretModules(
+      './secret-identity.js'
+    ) as typeof import('./secret-identity.js');
+    const { fetchSecretSync } = requireSecretModules(
+      './secret-bridge.js'
+    ) as typeof import('./secret-bridge.js');
+    const identity = parseEnvSecretName(key, scope);
+    if (identity) {
+      const bridged = fetchSecretSync(identity.keychainService, identity.keychainAccount);
+      if (bridged && bridged.length > 0) {
+        if (bridged.length > 8) _activeSecrets.add(bridged);
+        return bridged;
+      }
+    }
+  } catch {
+    /* fallthrough miss stays null */
+  }
+
   return null;
 };
 
