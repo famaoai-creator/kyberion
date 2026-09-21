@@ -3427,9 +3427,27 @@
       "type": "json"
     },
     {
+      "path": "product/governance/seam-provider-selection/image-generation-provider.json",
+      "tier": "public",
+      "size": 5317,
+      "type": "json"
+    },
+    {
       "path": "product/governance/seam-provider-selection/index.json",
       "tier": "public",
-      "size": 68,
+      "size": 158,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/ocr-provider.json",
+      "tier": "public",
+      "size": 4524,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/speech-to-text-bridge.json",
+      "tier": "public",
+      "size": 4960,
       "type": "json"
     },
     {
@@ -4455,7 +4473,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1435244,
+      "size": 1435795,
       "type": "json"
     },
     {

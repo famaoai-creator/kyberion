@@ -18,6 +18,8 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+vi.mock('./local-stt-discovery.js', () => ({ discoverLocalSttBackends: () => [] }));
+
 describe('apple speech file stt bridge', () => {
   it('routes Apple Speech environment reads through the governed accessor', () => {
     const source = String(
@@ -65,5 +67,18 @@ describe('apple speech file stt bridge', () => {
       '[RESOURCE_PATH_SCOPE]'
     );
     expect(mocks.safeExecResult).not.toHaveBeenCalled();
+  });
+
+  it('keeps the declared local_only capability in the transcription result', async () => {
+    const { createAppleSpeechFileToTextBridge } = await import('./apple-speech-file-stt-bridge.js');
+    const bridge = createAppleSpeechFileToTextBridge();
+    const result = await bridge.transcribe({ audioPath: 'AGENTS.md', language: 'en' });
+    expect(bridge.capabilities?.local_only).toBe(true);
+    expect(result.capabilities).toEqual({
+      timestamps: false,
+      granularity: 'none',
+      local_only: true,
+    });
+    expect(mocks.safeWriteFile).toHaveBeenCalled();
   });
 });
