@@ -249,7 +249,7 @@
     {
       "path": "product/architecture/browser-execution-substrate-howto.md",
       "tier": "public",
-      "size": 10381,
+      "size": 10888,
       "type": "md"
     },
     {
@@ -532,6 +532,12 @@
       "path": "product/architecture/kyberion-surface-ux-architecture.md",
       "tier": "public",
       "size": 6527,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/lightpanda-browser-runtime-evaluation.md",
+      "tier": "public",
+      "size": 6462,
       "type": "md"
     },
     {
@@ -879,7 +885,7 @@
     {
       "path": "product/architecture/tool-runtime-abstraction.md",
       "tier": "public",
-      "size": 4634,
+      "size": 5871,
       "type": "md"
     },
     {
@@ -1203,7 +1209,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 12435,
+      "size": 12464,
       "type": "json"
     },
     {
@@ -1323,7 +1329,7 @@
     {
       "path": "product/governance/authority-roles/surface_runtime.json",
       "tier": "public",
-      "size": 825,
+      "size": 850,
       "type": "json"
     },
     {
@@ -1539,7 +1545,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 140304,
+      "size": 140660,
       "type": "json"
     },
     {
@@ -3411,7 +3417,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 21860,
+      "size": 21918,
       "type": "json"
     },
     {
@@ -3831,7 +3837,7 @@
     {
       "path": "product/governance/tool-runtimes/index.json",
       "tier": "public",
-      "size": 519,
+      "size": 537,
       "type": "json"
     },
     {
@@ -3844,6 +3850,12 @@
       "path": "product/governance/tool-runtimes/laya_mlx.json",
       "tier": "public",
       "size": 1432,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/lightpanda.json",
+      "tier": "public",
+      "size": 2728,
       "type": "json"
     },
     {
@@ -11361,7 +11373,7 @@
     {
       "path": "product/schemas/tool-runtime-registry.schema.json",
       "tier": "public",
-      "size": 4406,
+      "size": 5365,
       "type": "json"
     },
     {

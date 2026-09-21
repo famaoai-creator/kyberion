@@ -6,7 +6,7 @@ authority: reference
 phase: [execution]
 tags: [browser, actuator, playwright, chrome-extension, execution_substrate, security]
 owner: ecosystem_architect
-last_updated: 2026-09-06
+last_updated: 2026-09-21
 ---
 
 # Browser Execution Substrate — How To
@@ -87,6 +87,16 @@ The production host boundary that wires `@agent/browser-actuator` `handleAction`
 
 Both launch Chromium through browser-actuator. They do **not** require a live Chrome
 extension tab. Need Node `>=24` and a built `dist/` (`pnpm build` or `pnpm build:actuators`).
+
+### Lightweight runtime (Lightpanda)
+
+For read-mostly procedures (navigate, fill, click, extract) add
+`--browser-runtime lightpanda` to `pnpm kyberion browser run` /
+`pnpm kyberion procedure run` to run on Lightpanda instead of Chromium
+(install once with `pnpm tool:setup -- --tool lightpanda --apply`). Pipelines
+that need tabs, screenshots, passkeys, CDP attach or Chrome profiles are
+rejected before launch. Details:
+[lightpanda-browser-runtime-evaluation](./lightpanda-browser-runtime-evaluation.md).
 
 ## Security model — read before enabling this for anything high-value
 

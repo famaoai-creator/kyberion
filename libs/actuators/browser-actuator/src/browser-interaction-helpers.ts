@@ -60,6 +60,8 @@ interface BrowserAction {
     keep_alive?: boolean;
     user_data_dir?: string;
     browser_channel?: 'chromium' | 'chrome';
+    /** browser-automation-runtime provider id (`playwright-chromium` default, `lightpanda`). */
+    browser_runtime?: string;
     profile_directory?: string;
     launch_args?: string[];
     connect_over_cdp?: boolean;
@@ -507,7 +509,7 @@ export function createBrowserInteractionHelpers(deps: {
     );
     const ctx = (result as any).context || {};
     deps.emitComputerSurfacePatch({
-      sessionId: browserAction.session_id || 'default',
+      sessionId: ctx.session_id || browserAction.session_id || 'default',
       executor: 'browser',
       status: String((result as any).status || 'unknown'),
       latestAction: input.action.type,

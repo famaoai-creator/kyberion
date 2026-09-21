@@ -1684,6 +1684,15 @@
       "subsystem": "reasoning"
     },
     {
+      "name": "KYBERION_LIGHTPANDA_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for the Lightpanda headless browser; when unset, the governed tool-runtime registry command (`lightpanda`) is used.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_LIVE_BLACKHOLE_TEST",
       "category": "runtime",
       "type": "string",

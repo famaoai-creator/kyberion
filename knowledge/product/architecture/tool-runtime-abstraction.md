@@ -49,6 +49,22 @@ For local FLUX image generation, the runtime can:
 The image generation bridge asks the runtime layer for the launch plan instead of hardcoding `uvx`.
 Higher-level surfaces can call `listToolRuntimeInventory()` to present the current lifecycle of all governed tools in one place.
 
+## Example: `managed_binary` (single-file upstream releases)
+
+When upstream ships a self-contained binary per OS/arch, a record may declare
+`managed_binary` (`version`, `relative_path`, and `artifacts` keyed by
+`{platform}-{arch}` with an `https` URL and pinned `sha256`).
+`pnpm tool:setup -- --tool <id> --apply` then downloads through `secureFetch`,
+verifies the checksum, and installs into
+`active/shared/runtime/tool-runtimes/<id>/<relative_path>` — no package manager
+or host toolchain involved. The package-manager `install_backend` stays as the
+fallback for hosts without a matching artifact. `resolveExternalToolBin()`
+resolves env override → installed managed binary → registry command → literal.
+Reference record: `lightpanda` (see
+[lightpanda-browser-runtime-evaluation](./lightpanda-browser-runtime-evaluation.md)).
+Bumping the version means updating `version`, every artifact URL and every
+`sha256` together.
+
 ## Example: local music CLIs
 
 Music generation follows the same pattern as `mflux`, via `music-generation-bridge`:
@@ -82,6 +98,10 @@ The registry is intentionally not limited to Python tools:
   - Terminal multiplexer for the agent-pane-runtime seam (`pane` launch mode)
   - Trial probe through `herdr --version`
   - Install through `brew install herdr` (or `pnpm tool:setup -- --tool herdr --apply`)
+- `lightpanda`
+  - Lightweight CDP headless browser, candidate `browser-automation-runtime` provider
+  - Trial probe through `lightpanda version`
+  - Install through `pnpm tool:setup -- --tool lightpanda --apply` (checksum-pinned `managed_binary`; `brew install lightpanda-io/browser/lightpanda` fallback)
 - `imagesnap`
   - macOS still-capture backend for virtual-camera-capture
   - Trial probe through `imagesnap -h`
