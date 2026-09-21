@@ -208,6 +208,29 @@ async function dispatchMissionWorkItemsRound(
       : resolveAssigneePeerId({ missionId, item, teamRole });
     const routing = await getTaskModelHintAssisted(item);
     const taskModelHint = routing.hint;
+    /**
+     * The label, derived from however this item ended up.
+     *
+     * A failure is the most valuable label there is — "this tier was chosen
+     * and could not finish the task" is exactly what a router needs to learn
+     * — so this must run on every exit from the loop, not only the reviewed
+     * ones. Recorded whether or not a judgment narrowed the tier, because a
+     * baseline run that succeeded is evidence about that tier too.
+     */
+    const recordRouting = (): void => {
+      recordRoutingOutcome({
+        task: [item.title, item.description].filter(Boolean).join('\n'),
+        phase_kind: 'implement',
+        baseline_tier: routing.baseline.tier,
+        chosen_tier: taskModelHint.tier,
+        chosen_by: routing.downgraded ? 'judgment' : 'baseline',
+        succeeded:
+          record.status !== 'failed' &&
+          record.work_item_status_after !== 'blocked' &&
+          record.reviewer_status !== 'refuted' &&
+          record.reviewer_status !== 'blocked',
+      });
+    };
     const teamAssignment = teamRole
       ? resolveMissionTeamReceiver({ missionId, teamRole })
       : undefined;
@@ -255,6 +278,7 @@ async function dispatchMissionWorkItemsRound(
         },
         'blocked'
       );
+      recordRouting();
       records.push(record);
       appendDispatchEvent(dispatchEventPath(missionPath), {
         event_type: 'workitem_dispatch_blocked',
@@ -268,6 +292,7 @@ async function dispatchMissionWorkItemsRound(
     }
 
     if (!validation.ok) {
+      recordRouting();
       records.push(record);
       appendDispatchEvent(dispatchEventPath(missionPath), {
         event_type: 'workitem_dispatch_failed',
@@ -291,7 +316,8 @@ async function dispatchMissionWorkItemsRound(
         record.notes.push(
           `entry gate ${entryGate.gateId} not passed: ${entryGate.reasons.join('; ') || 'checks failed'}`
         );
-        records.push(record);
+        recordRouting();
+      records.push(record);
         appendDispatchEvent(dispatchEventPath(missionPath), {
           event_type: 'workitem_dispatch_deferred',
           mission_id: missionId,
@@ -398,6 +424,7 @@ async function dispatchMissionWorkItemsRound(
           : 'failed',
         next_action: 'inspect provider/session and re-dispatch after recovery',
       });
+      recordRouting();
       records.push(record);
       continue;
     }
@@ -442,19 +469,6 @@ async function dispatchMissionWorkItemsRound(
         ...(reviewerResult.verdict.rationale ? [reviewerResult.verdict.rationale] : []),
         ...reviewerResult.verdict.findings,
       ].filter(Boolean);
-      // The label. Written whether or not a judgment narrowed the tier: a
-      // baseline run that succeeded is evidence about that tier too, so the
-      // ledger fills from ordinary dispatch with no judgment provider
-      // registered at all. Across retry rounds the same task accumulates,
-      // and `exportRoutingCorpus()` takes the smallest tier that finished it.
-      recordRoutingOutcome({
-        task: [item.title, item.description].filter(Boolean).join('\n'),
-        phase_kind: 'implement',
-        baseline_tier: routing.baseline.tier,
-        chosen_tier: taskModelHint.tier,
-        chosen_by: routing.downgraded ? 'judgment' : 'baseline',
-        succeeded: reviewerResult.verdict.approved,
-      });
       if (!reviewerResult.verdict.approved) {
         record.notes.push(
           `independent reviewer ${record.reviewer_status || 'blocked'}: ${
