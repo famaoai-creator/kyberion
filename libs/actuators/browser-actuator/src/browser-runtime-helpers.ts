@@ -22,12 +22,16 @@ import { secureFetch } from '@agent/core/network';
 import { pathResolver } from '@agent/core/path-resolver';
 import { normalizeBrowserPipelineOp } from '@agent/core/op-vocabulary';
 import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
-import { resolveBrowserAutomationRuntime } from '@agent/core/browser-automation-runtime-bridge';
+import {
+  getBrowserAutomationRuntimeCapabilities,
+  resolveBrowserAutomationRuntime,
+} from '@agent/core/browser-automation-runtime-bridge';
 import type { Browser, BrowserContext, Page } from '@playwright/test';
 import * as path from 'node:path';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import './browser-automation-runtime-playwright.js';
+import './browser-automation-runtime-lightpanda.js';
 import { completeBrowserOperatorApproval } from './browser-approval-records.js';
 import { parseChromeCdpVersionResponse } from './browser-cdp-response.js';
 import {
@@ -1389,6 +1393,7 @@ export const browserRuntimeHelpers = {
       return existing.runtime.context;
     }
 
+    const automationRuntime = resolveBrowserAutomationRuntime(options.browser_runtime);
     const persistedMetadata = loadBrowserSessionMetadata(sessionMetadataPath);
     assertPersistedBrowserSessionOwner(
       persistedMetadata,
@@ -1406,9 +1411,7 @@ export const browserRuntimeHelpers = {
     ) {
       try {
         logger.info(`🔁 [BROWSER] Reattaching to persisted session via CDP: ${persistedCdpUrl}`);
-        const browser = (await resolveBrowserAutomationRuntime().connectOverCDP(
-          persistedCdpUrl
-        )) as Browser;
+        const browser = (await automationRuntime.connectOverCDP(persistedCdpUrl)) as Browser;
         const context = browser.contexts()[0];
         if (!context) {
           await browser.close();
@@ -1450,7 +1453,7 @@ export const browserRuntimeHelpers = {
         );
       }
       logger.info(`🔌 [BROWSER] Attaching to existing Chrome via CDP: ${cdpUrl}`);
-      const browser = (await resolveBrowserAutomationRuntime().connectOverCDP(cdpUrl)) as Browser;
+      const browser = (await automationRuntime.connectOverCDP(cdpUrl)) as Browser;
       const context = browser.contexts()[0];
       if (!context) {
         await browser.close();
@@ -1471,9 +1474,9 @@ export const browserRuntimeHelpers = {
     }
 
     logger.info(
-      `🚀 [BROWSER] Launching session: ${sessionId} (Headless: ${options.headless !== false})`
+      `🚀 [BROWSER] Launching session: ${sessionId} (runtime: ${automationRuntime.bridge_id}, headless: ${options.headless !== false})`
     );
-    const context = (await resolveBrowserAutomationRuntime().launchPersistentContext(userDataDir, {
+    const context = (await automationRuntime.launchPersistentContext(userDataDir, {
       channel: options.browser_channel === 'chrome' ? 'chrome' : undefined,
       headless: options.headless !== false,
       viewport: options.viewport || { width: 1280, height: 720 },
@@ -1486,7 +1489,12 @@ export const browserRuntimeHelpers = {
       ],
     })) as BrowserContext;
 
-    const cdpEndpoint = await waitForCdpEndpoint(userDataDir);
+    // Only Chrome profiles publish DevToolsActivePort; other providers own
+    // their endpoint and are not reattached across processes.
+    const cdpEndpoint = getBrowserAutomationRuntimeCapabilities(automationRuntime)
+      .persistent_profile
+      ? await waitForCdpEndpoint(userDataDir)
+      : null;
     browserRuntimeLeases.set(sessionId, {
       runtime: createBrowserRuntime(context, options.navigation_policy),
       userDataDir,

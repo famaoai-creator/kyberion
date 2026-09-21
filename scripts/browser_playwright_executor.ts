@@ -33,6 +33,8 @@ export interface BrowserPipelineRunOptions {
   cdpPort?: number;
   recordTrace?: boolean;
   recordVideo?: boolean;
+  /** browser-automation-runtime provider id; omitted = default Chromium. */
+  browserRuntime?: string;
   context?: Record<string, unknown>;
 }
 
@@ -114,6 +116,7 @@ const HOST_OWNED_OPTION_KEYS = [
   'headless',
   'record_trace',
   'record_video',
+  'browser_runtime',
 ] as const;
 
 function omitHostOwnedOptions(
@@ -139,6 +142,7 @@ export function createExecuteBrowserPipeline(
       record_video: defaults.recordVideo !== false,
       ...(defaults.cdpUrl ? { cdp_url: defaults.cdpUrl } : {}),
       ...(defaults.cdpPort ? { cdp_port: defaults.cdpPort } : {}),
+      ...(defaults.browserRuntime ? { browser_runtime: defaults.browserRuntime } : {}),
     };
     const actuatorResult = await handleAction({
       action: 'pipeline',

@@ -949,6 +949,7 @@ async function handleProcedureRun(
     tabId?: string;
     cdpUrl?: string;
     cdpPort?: number;
+    browserRuntime?: string;
     headed?: boolean;
     recordVideo?: boolean;
     recordTrace?: boolean;
@@ -1051,6 +1052,7 @@ async function handleProcedureRun(
         cdpPort: argv.cdpPort,
         recordTrace: argv.recordTrace !== false,
         recordVideo: argv.recordVideo !== false,
+        browserRuntime: argv.browserRuntime,
         context: {
           procedure_id: entry.procedure_id,
           mission_id: missionId,
@@ -1258,6 +1260,11 @@ async function mainImpl(args: string[] = []): Promise<void> {
       type: 'number',
       description: 'Chrome DevTools port for CLI browser execution',
     })
+    .option('browser-runtime', {
+      type: 'string',
+      description:
+        'browser runtime provider (default Chromium; `lightpanda` for read-mostly flows)',
+    })
     .option('record-video', {
       type: 'boolean',
       default: true,
@@ -1389,6 +1396,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
           headed: Boolean(argv.headed),
           cdpUrl: argv['cdp-url'] ? String(argv['cdp-url']) : undefined,
           cdpPort: typeof argv['cdp-port'] === 'number' ? Number(argv['cdp-port']) : undefined,
+          browserRuntime: argv['browser-runtime'] ? String(argv['browser-runtime']) : undefined,
           recordVideo: argv['record-video'] !== false,
           recordTrace: argv['record-trace'] !== false,
           json: Boolean(argv.json),

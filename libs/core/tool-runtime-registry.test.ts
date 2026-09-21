@@ -563,8 +563,9 @@ describe('tool runtime registry', () => {
 
   it('reports an installed managed binary only when it exists on disk', () => {
     addManagedBinaryTool();
-    expect(findInstalledManagedBinary('panda')).toBeNull();
     const binDir = path.join(managedRoot, 'tool-runtimes', 'panda', 'bin');
+    safeRmSync(binDir, { recursive: true, force: true });
+    expect(findInstalledManagedBinary('panda')).toBeNull();
     safeMkdir(binDir, { recursive: true });
     safeWriteFile(path.join(binDir, 'panda'), '', { encoding: 'utf8' });
     expect(findInstalledManagedBinary('panda')).toBe(path.join(binDir, 'panda'));

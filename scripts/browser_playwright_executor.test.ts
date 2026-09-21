@@ -123,6 +123,24 @@ describe('browser_playwright_executor', () => {
     });
   });
 
+  it('passes the host-selected browser runtime and ignores dispatcher overrides', async () => {
+    const handleAction = vi.fn().mockResolvedValue({ status: 'succeeded', results: [] });
+    await createExecuteBrowserPipeline(handleAction, { browserRuntime: 'lightpanda' })({
+      steps: [],
+      options: { browser_runtime: 'playwright-chromium' },
+    });
+    expect(handleAction.mock.calls[0][0].options.browser_runtime).toBe('lightpanda');
+
+    await createExecuteBrowserPipeline(
+      handleAction,
+      {}
+    )({
+      steps: [],
+      options: { browser_runtime: 'lightpanda' },
+    });
+    expect(handleAction.mock.calls[1][0].options).not.toHaveProperty('browser_runtime');
+  });
+
   it('maps non-success actuator status to failed', async () => {
     const execute = createExecuteBrowserPipeline(
       vi.fn().mockResolvedValue({ status: 'failed', errors: ['click_ref failed'] })

@@ -60,6 +60,8 @@ interface BrowserAction {
     keep_alive?: boolean;
     user_data_dir?: string;
     browser_channel?: 'chromium' | 'chrome';
+    /** browser-automation-runtime provider id (`playwright-chromium` default, `lightpanda`). */
+    browser_runtime?: string;
     profile_directory?: string;
     launch_args?: string[];
     connect_over_cdp?: boolean;

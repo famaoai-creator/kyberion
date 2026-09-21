@@ -19,6 +19,14 @@ import { decideFromObservation, executeLlmDecideOp } from '@agent/core/semantic-
 import { getSecret } from '@agent/core/secret-guard';
 import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import {
+  getBrowserAutomationRuntimeCapabilities,
+  resolveBrowserAutomationRuntime,
+} from '@agent/core/browser-automation-runtime-bridge';
+import {
+  formatBrowserRuntimePreflightError,
+  preflightBrowserRuntimePipeline,
+} from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import { opControl } from './browser-control-helpers.js';
@@ -107,6 +115,32 @@ function resolveBrowserRepositoryPath(ref: unknown, allowMissingLeaf = true): st
   });
 }
 
+/**
+ * Reject pipelines the selected browser runtime cannot run before anything is
+ * launched; host-default extras it cannot provide (video) are dropped.
+ */
+function preflightAutomationRuntime(steps: unknown, options: Record<string, any>) {
+  const runtime = resolveBrowserAutomationRuntime(options.browser_runtime);
+  const { blocking, degraded } = preflightBrowserRuntimePipeline(
+    steps,
+    options,
+    getBrowserAutomationRuntimeCapabilities(runtime)
+  );
+  if (blocking.length > 0) {
+    throw new Error(formatBrowserRuntimePreflightError(runtime.bridge_id, blocking));
+  }
+  if (degraded.length === 0) return options;
+  const adjusted = { ...options };
+  for (const issue of degraded) {
+    if (!issue.option) continue;
+    logger.warn(
+      `[BROWSER] browser_runtime '${runtime.bridge_id}' lacks ${issue.capability}; ignoring option '${issue.option}'.`
+    );
+    adjusted[issue.option] = false;
+  }
+  return adjusted;
+}
+
 function buildRetryOptions(stepParams: Record<string, any>) {
   const explicitRetry =
     stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
@@ -122,12 +156,13 @@ function buildRetryOptions(stepParams: Record<string, any>) {
 export async function executePipeline(
   inputSteps: PipelineStep[],
   sessionId: string,
-  options: any,
+  inputOptions: any,
   initialCtx: any = {}
 ) {
   const steps = inputSteps.map((step) =>
     step && typeof step === 'object' && step.op === 'navigate' ? { ...step, op: 'goto' } : step
   );
+  const options = preflightAutomationRuntime(steps, inputOptions ?? {});
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || 300000;
 
