@@ -559,7 +559,7 @@ async function isRenderableAudioArtifact(artifactPath: string): Promise<boolean>
 function resolveVoiceArtifactCandidates(
   requestedEngineId: string,
   format: VoiceArtifactFormat,
-  options: { requireVoiceClone?: boolean } = {}
+  options: { requireVoiceClone?: boolean; candidateEngineIds?: string[] } = {}
 ): Array<ReturnType<typeof getVoiceEngineRecord>> {
   const registry = getVoiceEngineRegistry();
   const visited = new Set<string>();
@@ -579,6 +579,15 @@ function resolveVoiceArtifactCandidates(
       return;
     candidates.push(engine);
   };
+
+  // A governed selection (voice-tts-engine seam) already ranked every engine
+  // that can run this request; walk that order instead of the fallback chain.
+  if (options.candidateEngineIds?.length) {
+    for (const engineId of options.candidateEngineIds) {
+      addCandidate(registry.engines.find((engine) => engine.engine_id === engineId));
+    }
+    return candidates;
+  }
 
   let current = getVoiceEngineRecord(requestedEngineId);
   while (current && !visited.has(current.engine_id)) {
@@ -647,6 +656,8 @@ async function renderNativeArtifact(
     outputPath?: string;
     profile?: any;
     requireVoiceClone?: boolean;
+    /** Ranked engines from a governed selection; replaces the fallback-chain walk. */
+    candidateEngineIds?: string[];
   }
 ): Promise<string> {
   if (!options.supportsFormats.includes(options.format)) {
@@ -660,6 +671,9 @@ async function renderNativeArtifact(
 
   const candidates = resolveVoiceArtifactCandidates(options.engineId, options.format, {
     requireVoiceClone: options.requireVoiceClone,
+    ...(options.candidateEngineIds?.length
+      ? { candidateEngineIds: options.candidateEngineIds }
+      : {}),
   });
   if (candidates.length === 0) {
     const cloneRequirement = options.requireVoiceClone ? ' with learned-voice support' : '';
@@ -705,6 +719,7 @@ async function performPlayback(
     engineId: string;
     profile?: any;
     requireVoiceClone?: boolean;
+    candidateEngineIds?: string[];
   },
   playbackSourcePath?: string
 ): Promise<{
@@ -790,6 +805,7 @@ async function renderVoicePlaybackSource(
     engineId: string;
     profile?: any;
     requireVoiceClone?: boolean;
+    candidateEngineIds?: string[];
   }
 ): Promise<string> {
   const playbackRequestId = `${randomUUID()}-playback`;
@@ -809,6 +825,9 @@ async function renderVoicePlaybackSource(
     supportsFormats: playbackEngine.supports.artifact_formats,
     profile: options.profile,
     requireVoiceClone: options.requireVoiceClone,
+    ...(options.candidateEngineIds?.length
+      ? { candidateEngineIds: options.candidateEngineIds }
+      : {}),
   });
 }
 

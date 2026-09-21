@@ -10,6 +10,16 @@ import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 
+// Params transcribeVoiceSample reads beyond the base contract (both the
+// `transcribe` and `transcribe_voice_sample` ops dispatch to it).
+const STT_HANDLER_PARAMS: Record<string, InputSchema> = {
+  backend: { type: 'string', enum: ['auto', 'bridge', 'fluid_audio', 'mlx_whisper'] },
+  prefer_timestamps: { type: 'boolean' },
+  allow_synthetic: { type: 'boolean' },
+  write_sidecar: { type: 'boolean' },
+  model: { type: 'string' },
+};
+
 const VOICE_CONTRACTS: Record<string, InputSchema> = {
   health: {
     type: 'object',
@@ -47,6 +57,7 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
       output_path: { type: 'string' },
       purpose: { type: 'string' },
       request_id: { type: 'string' },
+      ...STT_HANDLER_PARAMS,
     },
     additionalProperties: false,
   },
@@ -101,6 +112,7 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
       output_path: { type: 'string' },
       purpose: { type: 'string' },
       request_id: { type: 'string' },
+      ...STT_HANDLER_PARAMS,
       sample_id: { type: 'string' },
     },
     additionalProperties: false,
@@ -198,6 +210,8 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
     properties: {
       engine_id: { type: 'string' },
       language: { type: 'string' },
+      local_only: { type: 'boolean' },
+      purpose: { type: 'string' },
       rate: { type: 'number' },
       text: { type: 'string' },
       voice: { type: 'string' },
@@ -209,14 +223,30 @@ const VOICE_CONTRACTS: Record<string, InputSchema> = {
     properties: {
       audio_route: { type: 'object' },
       dry_run: { type: 'boolean' },
+      expected_text: { type: 'string' },
+      format: { type: 'object' },
       language: { type: 'string' },
+      mission_id: { type: 'string' },
+      operator_confirmed: { type: 'boolean' },
+      persistence: { type: 'object' },
+      quality: { type: 'object' },
       request_id: { type: 'string' },
+      stt_bridge_id: { type: 'string' },
+      tenant_slug: { type: 'string' },
       text: { type: 'string' },
+      timing: { type: 'object' },
       voice_profile_id: { type: 'string' },
     },
     additionalProperties: false,
   },
 };
+
+/**
+ * Typed input declarations. Ops listed in actuator-sdk LEGACY_OPEN_OPERATION_IDS
+ * (e.g. speak_local, generate_voice, verify_tts_loopback) are still served an
+ * open contract; these declarations are what they migrate to.
+ */
+export const VOICE_OP_INPUT_CONTRACTS: Readonly<Record<string, InputSchema>> = VOICE_CONTRACTS;
 
 const VOICE_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   health: [{}],

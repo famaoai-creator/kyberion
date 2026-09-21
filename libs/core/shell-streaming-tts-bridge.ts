@@ -27,6 +27,7 @@ import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from './bounded-audio-
 import {
   registerStreamingTtsBridge,
   type StreamingTextToSpeechBridge,
+  type StreamingTtsCapabilities,
 } from './streaming-tts-bridge.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 
@@ -38,7 +39,17 @@ export interface ShellStreamingTtsOptions {
   format?: AudioFormat;
   max_queued_chunks?: number;
   max_buffer_ms?: number;
+  /**
+   * What the operator's command can do. Default: languages ['*'] (the command
+   * decides) and not local_only (it may be a cloud CLI).
+   */
+  capabilities?: StreamingTtsCapabilities;
 }
+
+const DEFAULT_SHELL_CAPABILITIES: StreamingTtsCapabilities = {
+  languages: ['*'],
+  local_only: false,
+};
 
 const DEFAULT_FORMAT: AudioFormat = {
   encoding: 'pcm_s16le',
@@ -49,9 +60,11 @@ const DEFAULT_FORMAT: AudioFormat = {
 export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBridge {
   readonly bridge_id: string;
   readonly format: AudioFormat;
+  readonly capabilities: StreamingTtsCapabilities;
   constructor(private readonly opts: ShellStreamingTtsOptions) {
     this.bridge_id = opts.bridge_id;
     this.format = opts.format ?? DEFAULT_FORMAT;
+    this.capabilities = opts.capabilities ?? DEFAULT_SHELL_CAPABILITIES;
   }
 
   async *synthesizeStream(

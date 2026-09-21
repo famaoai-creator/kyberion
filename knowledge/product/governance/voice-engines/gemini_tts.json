@@ -9,6 +9,7 @@
       "provider": "gemini_api",
       "status": "active",
       "platforms": ["any"],
+      "languages": ["en", "ja"],
       "tts_adapter_id": "external_provider",
       "live_presence": false,
       "supports": {
@@ -16,7 +17,8 @@
         "playback": true,
         "artifact_formats": ["wav"]
       },
-      "notes": "Gemini 3.1 Flash TTS preview through Google AI Studio / Gemini API using GEMINI_API_KEY."
+      "notes": "Gemini 3.1 Flash TTS preview through Google AI Studio / Gemini API using GEMINI_API_KEY.",
+      "language_notes": "Upstream Gemini TTS auto-detects many languages; only en/ja are exercised in this repository, so only those are declared."
     }
   ]
 }

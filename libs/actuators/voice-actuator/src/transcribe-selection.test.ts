@@ -43,6 +43,14 @@ vi.mock('./voice-media-output-helpers.js', async () => {
 
 const { registerSpeechToTextBridge, resetSpeechToTextBridge } =
   await import('@agent/core/speech-to-text-bridge');
+const { setSeamSelectionRule } = await import('@agent/core/seam-selection-rules');
+const { pathResolver } = await import('@agent/core/path-resolver');
+const secureIo = await import('@agent/core/secure-io');
+const realSecureIo =
+  await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+const { safeRmSync } = secureIo;
+const rulesDir = pathResolver.sharedTmp('voice-actuator-transcribe-rules-test');
+const rulesFile = `${rulesDir}/rules.json`;
 type Bridge = import('@agent/core/speech-to-text-bridge').SpeechToTextBridge;
 const { handleAction } = await import('./index.js');
 
@@ -76,6 +84,9 @@ describe('voice-actuator purpose-driven STT selection', () => {
     mocks.pinWrites.mockClear();
     mocks.safeExecResult.mockClear();
     vi.stubEnv('MISSION_ID', '');
+    // Hermetic: never read the operator's real seam-selection rules.
+    vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', rulesFile);
+    safeRmSync(rulesDir, { recursive: true, force: true });
     registerSpeechToTextBridge(bridge('fluid-audio-parakeet', 100, true));
     registerSpeechToTextBridge(bridge('mlx_whisper', 90, true));
     registerSpeechToTextBridge(bridge('whisperkit-cli', 100, false));
@@ -83,6 +94,35 @@ describe('voice-actuator purpose-driven STT selection', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     resetSpeechToTextBridge();
+    safeRmSync(rulesDir, { recursive: true, force: true });
+  });
+
+  it('applies operator rules for the seam even without a purpose', async () => {
+    // The file-wide secure-io double drops writes; persist the rule for real.
+    vi.mocked(secureIo.safeMkdir).mockImplementationOnce(realSecureIo.safeMkdir);
+    vi.mocked(secureIo.safeWriteFile).mockImplementationOnce(realSecureIo.safeWriteFile);
+    setSeamSelectionRule({
+      rule_id: 'ja-mlx',
+      seam: 'speech-to-text-bridge',
+      when: { context: { language: 'ja' } },
+      prefer: ['mlx_whisper'],
+      set_by: 'user:test',
+    });
+    const result = await transcribe({ language: 'ja' });
+    expect(result.backend).toBe('mlx_whisper');
+    expect(calls).toEqual(['mlx_whisper']);
+    expect(mocks.record.mock.calls[0]![0].metadata).toMatchObject({
+      strategy: 'rule',
+      rule_id: 'ja-mlx',
+      context: { language: 'ja' },
+    });
+    // A rule that does not match the request keeps today's priority order.
+    calls.length = 0;
+    mocks.record.mockClear();
+    const english = await transcribe({ language: 'en' });
+    expect(english.backend).toBe('fluid-audio-parakeet');
+    expect(calls).toEqual(['fluid-audio-parakeet']);
+    expect(mocks.record).not.toHaveBeenCalled();
   });
 
   it('keeps the priority order without a purpose', async () => {

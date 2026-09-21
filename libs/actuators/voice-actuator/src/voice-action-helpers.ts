@@ -11,6 +11,7 @@ import { safeExec } from '@agent/core/secure-io';
 import { resolveAudioBus, type AudioBusId } from '@agent/core/audio-bus-resolver';
 import { performPlayback } from './voice-runtime-helpers.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
 import {
   booleanParam,
   buildLoopbackRequest,
@@ -21,6 +22,7 @@ import {
   stringParam,
 } from './voice-loopback-helpers.js';
 import { registerVoiceLoopbackSttAdapter } from './voice-stt-backend-adapters.js';
+import { routeVoiceEngine } from './voice-engine-selection.js';
 
 import { compileSchema } from '@agent/core/foundation';
 
@@ -341,23 +343,42 @@ export async function speakLocal(params: Record<string, unknown>): Promise<any> 
   const text = String(params.text || '').trim();
   if (!text) throw new Error('speak_local requires params.text');
 
-  const language =
-    String(params.language || '')
-      .trim()
-      .toLowerCase() || 'en';
+  const explicitLanguage = String(params.language || '')
+    .trim()
+    .toLowerCase();
+  const namedEngineId = String(params.engine_id || '').trim();
+  const requestedEngineId = namedEngineId || 'local_say';
+  const baselineEngine = resolveVoiceEngineForPlatform(requestedEngineId);
+  const routing = routeVoiceEngine({
+    text,
+    baselineEngine,
+    explicit: Boolean(namedEngineId),
+    purpose: typeof params.purpose === 'string' ? params.purpose : undefined,
+    language: explicitLanguage,
+    requires: {
+      platform: process.platform,
+      ...(params.local_only === true ? { localOnly: true } : {}),
+    },
+  });
+  // Without an explicit language the op historically spoke 'en'; once
+  // selection chose the engine, speak the detected language it was chosen for.
+  const language = explicitLanguage || (routing.selection ? routing.language : 'en');
   const defaults = getVoiceTtsLanguageConfig(language);
   const voice =
     typeof params.voice === 'string' && params.voice.trim() ? params.voice.trim() : defaults.voice;
   const rate = Number.isFinite(params.rate) ? Number(params.rate) : defaults.rate;
-  const requestedEngineId = String(params.engine_id || 'local_say').trim() || 'local_say';
-  const engine = resolveVoiceEngineForPlatform(requestedEngineId);
-  const backend = resolveVoiceBackend(requestedEngineId);
+  const engine = routing.engine;
+  const backend = resolveVoiceBackend(
+    engine.engine_id === baselineEngine.engine_id ? requestedEngineId : engine.engine_id
+  );
+  for (const warning of routing.warnings) logger.warn(`[VOICE] ${warning}`);
 
   const playback = await performPlayback(text, {
     language,
     voice,
     rate,
     engineId: engine.engine_id,
+    ...(routing.candidateEngineIds ? { candidateEngineIds: routing.candidateEngineIds } : {}),
   });
   return {
     status: 'succeeded',
@@ -371,6 +392,8 @@ export async function speakLocal(params: Record<string, unknown>): Promise<any> 
     language,
     voice,
     rate,
+    ...(routing.selection ? { engine_selection: routing.selection } : {}),
+    ...(routing.warnings.length ? { warnings: routing.warnings } : {}),
     speaker_verification: playback,
   };
 }

@@ -20783,6 +20783,9 @@
               "backend_id": {
                 "type": "string"
               },
+              "duration_sec": {
+                "type": "number"
+              },
               "format": {
                 "type": "string"
               },
@@ -20812,6 +20815,9 @@
               },
               "providerPreference": {
                 "type": "array"
+              },
+              "purpose": {
+                "type": "string"
               },
               "request_id": {
                 "type": "string"
@@ -20851,6 +20857,9 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "aspect_ratio": {
+                "type": "string"
+              },
               "await_completion": {
                 "type": "boolean"
               },
@@ -20862,6 +20871,9 @@
               },
               "format": {
                 "type": "string"
+              },
+              "generate_audio": {
+                "type": "boolean"
               },
               "input_video": {
                 "type": "string"
@@ -20892,6 +20904,9 @@
               },
               "providerPreference": {
                 "type": "array"
+              },
+              "purpose": {
+                "type": "string"
               },
               "reference_images": {
                 "type": "array"
@@ -30567,6 +30582,22 @@
               },
               "request_id": {
                 "type": "string"
+              },
+              "backend": {
+                "type": "string",
+                "enum": ["auto", "bridge", "fluid_audio", "mlx_whisper"]
+              },
+              "prefer_timestamps": {
+                "type": "boolean"
+              },
+              "allow_synthetic": {
+                "type": "boolean"
+              },
+              "write_sidecar": {
+                "type": "boolean"
+              },
+              "model": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -30597,6 +30628,22 @@
                 "type": "string"
               },
               "request_id": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string",
+                "enum": ["auto", "bridge", "fluid_audio", "mlx_whisper"]
+              },
+              "prefer_timestamps": {
+                "type": "boolean"
+              },
+              "allow_synthetic": {
+                "type": "boolean"
+              },
+              "write_sidecar": {
+                "type": "boolean"
+              },
+              "model": {
                 "type": "string"
               },
               "sample_id": {

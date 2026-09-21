@@ -3435,7 +3435,13 @@
     {
       "path": "product/governance/seam-provider-selection/index.json",
       "tier": "public",
-      "size": 158,
+      "size": 350,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/music-generation-provider.json",
+      "tier": "public",
+      "size": 2116,
       "type": "json"
     },
     {
@@ -3447,7 +3453,43 @@
     {
       "path": "product/governance/seam-provider-selection/speech-to-text-bridge.json",
       "tier": "public",
-      "size": 4960,
+      "size": 4998,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/streaming-stt-bridge.json",
+      "tier": "public",
+      "size": 3907,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/streaming-tts-bridge.json",
+      "tier": "public",
+      "size": 2779,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/video-generation-provider.json",
+      "tier": "public",
+      "size": 7527,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/voice-hub-stt.json",
+      "tier": "public",
+      "size": 4170,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/voice-tts-engine.json",
+      "tier": "public",
+      "size": 5102,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/voice.vad-backend.json",
+      "tier": "public",
+      "size": 2773,
       "type": "json"
     },
     {
@@ -4041,55 +4083,55 @@
     {
       "path": "product/governance/voice-engine-registry.json",
       "tier": "public",
-      "size": 4882,
+      "size": 6283,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/README.md",
       "tier": "public",
-      "size": 392,
+      "size": 3812,
       "type": "md"
     },
     {
       "path": "product/governance/voice-engines/espeak_ng.json",
       "tier": "public",
-      "size": 663,
+      "size": 871,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/gemini_tts.json",
       "tier": "public",
-      "size": 604,
+      "size": 786,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/kokoro.json",
       "tier": "public",
-      "size": 771,
+      "size": 974,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/local_say.json",
       "tier": "public",
-      "size": 619,
+      "size": 886,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/mlx_audio_qwen3.json",
       "tier": "public",
-      "size": 1155,
+      "size": 1344,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/open_voice_clone.json",
       "tier": "public",
-      "size": 647,
+      "size": 808,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/pocket_tts.json",
       "tier": "public",
-      "size": 883,
+      "size": 1074,
       "type": "json"
     },
     {
@@ -4473,7 +4515,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1435795,
+      "size": 1437166,
       "type": "json"
     },
     {
@@ -11601,13 +11643,13 @@
     {
       "path": "product/schemas/voice-engine-registry.schema.json",
       "tier": "public",
-      "size": 2393,
+      "size": 2893,
       "type": "json"
     },
     {
       "path": "product/schemas/voice-generation-adf.schema.json",
       "tier": "public",
-      "size": 2986,
+      "size": 3565,
       "type": "json"
     },
     {

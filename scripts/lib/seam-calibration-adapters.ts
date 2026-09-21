@@ -11,6 +11,7 @@ import { streamingSttBridgeCalibrationAdapter } from './seam-calibration/streami
 import { imageGenerationProviderCalibrationAdapter } from './seam-calibration/image-generation-provider.js';
 import { musicGenerationProviderCalibrationAdapter } from './seam-calibration/music-generation-provider.js';
 import { videoGenerationProviderCalibrationAdapter } from './seam-calibration/video-generation-provider.js';
+import { voiceTtsEngineCalibrationAdapter } from './seam-calibration/voice-tts-engine.js';
 
 let registered = false;
 
@@ -24,4 +25,5 @@ export function registerSeamCalibrationAdapters(): void {
   registerSeamCalibrationAdapter(imageGenerationProviderCalibrationAdapter);
   registerSeamCalibrationAdapter(musicGenerationProviderCalibrationAdapter);
   registerSeamCalibrationAdapter(videoGenerationProviderCalibrationAdapter);
+  registerSeamCalibrationAdapter(voiceTtsEngineCalibrationAdapter);
 }

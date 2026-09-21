@@ -23,7 +23,20 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "engine_id": { "type": "string", "minLength": 1 },
+        "engine_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Named engine (always used as named), or 'auto' = the profile default subject to governed selection (voice-tts-engine seam)."
+        },
+        "purpose": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "voice-tts-engine selection purpose (naturalness / latency / privacy); only used with engine_id 'auto'."
+        },
+        "local_only": {
+          "type": "boolean",
+          "description": "Hard requirement for engine_id 'auto': the text must not leave the machine."
+        },
         "model_size": { "type": "string", "minLength": 1 },
         "supports_instruct": { "type": "boolean" }
       },
