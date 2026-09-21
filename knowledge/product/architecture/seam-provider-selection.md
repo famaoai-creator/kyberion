@@ -18,8 +18,8 @@ Choosing between them is **deterministic**, **audited** and **pinned per
 mission**; it is not an LLM judgment.
 
 Code: `libs/core/seam-provider-selection.ts` (pins via
-`libs/core/capability-broker.ts`). Policy:
-`knowledge/product/governance/seam-provider-selection-policy.json`.
+`libs/core/capability-broker.ts`). Policy: one file per seam under
+`knowledge/product/governance/seam-provider-selection/<seam>.json`.
 
 ## The three steps
 
@@ -66,9 +66,11 @@ kept); `evidence` picks Chromium; a re-run reuses the mission pin.
 ## Adding another seam
 
 1. Give its providers capability declarations the caller can check.
-2. Add `seams.<seam>` to the policy: `default_provider`, `traits`,
-   `providers` (traits + basis + evidence), `purposes`.
+2. Add `knowledge/product/governance/seam-provider-selection/<seam>.json`
+   (`seam_id`, `default_provider`, `traits`, `providers` with traits + basis +
+   evidence, `purposes`).
 3. In the caller, build `{ id, eligible, unmet }` candidates and call
    `resolveSeamProviderDecision({ seam, candidates, purpose, decisionKey })`.
    Write the chosen id back where downstream code reads it so nested calls do
-   not re-select.
+   not re-select. Seams that run a fallback chain walk `decision.ranked`
+   (eligible providers, best first) instead of using only `provider_id`.

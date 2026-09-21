@@ -777,7 +777,7 @@
     {
       "path": "product/architecture/seam-provider-selection.md",
       "tier": "public",
-      "size": 3786,
+      "size": 3994,
       "type": "md"
     },
     {
@@ -3421,9 +3421,15 @@
       "type": "json"
     },
     {
-      "path": "product/governance/seam-provider-selection-policy.json",
+      "path": "product/governance/seam-provider-selection/browser-automation-runtime.json",
       "tier": "public",
-      "size": 2209,
+      "size": 2423,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/index.json",
+      "tier": "public",
+      "size": 68,
       "type": "json"
     },
     {
@@ -10725,7 +10731,7 @@
     {
       "path": "product/schemas/seam-provider-selection-policy.schema.json",
       "tier": "public",
-      "size": 2514,
+      "size": 3079,
       "type": "json"
     },
     {
