@@ -1,0 +1,14 @@
+{
+  "$schema": "../schemas/workforce-capacity-policy.schema.json",
+  "version": "1.0.0",
+  "thresholds": {
+    "busy_at_active_items": 1,
+    "saturated_at_active_items": 3
+  },
+  "selection": {
+    "load_penalty_per_active_item": 4,
+    "queued_penalty_per_item": 1,
+    "saturated_penalty": 12,
+    "max_load_penalty": 18
+  }
+}

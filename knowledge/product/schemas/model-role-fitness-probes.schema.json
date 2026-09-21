@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Model role fitness probes",
+  "description": "Deterministic probes that ask whether a model can actually perform a team role, before any mission trusts it with one. Assertions are mechanical checks on the response, never another model's opinion.",
+  "type": "object",
+  "required": ["version", "pass_threshold", "probes"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "pass_threshold": {
+      "description": "Fraction of assertions a response must satisfy to count as a pass.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "probes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "team_role", "prompt", "assertions"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "team_role": { "type": "string", "minLength": 1 },
+          "prompt": { "type": "string", "minLength": 1 },
+          "rationale": { "type": "string" },
+          "assertions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["kind"],
+              "additionalProperties": false,
+              "properties": {
+                "required": {
+                  "description": "Must pass regardless of the overall score. Contract-shape assertions are scored; the assertion that checks whether the model got the answer RIGHT is marked required, so structural compliance alone can never reach the bar.",
+                  "type": "boolean"
+                },
+                "kind": {
+                  "enum": [
+                    "json_array",
+                    "json_object",
+                    "min_items",
+                    "required_fields",
+                    "field_equals_any",
+                    "field_contains",
+                    "acyclic_dependencies"
+                  ]
+                },
+                "field": { "type": "string" },
+                "fields": { "type": "array", "items": { "type": "string" } },
+                "values": { "type": "array", "items": { "type": "string" } },
+                "count": { "type": "integer", "minimum": 1 },
+                "id_field": { "type": "string" },
+                "depends_field": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

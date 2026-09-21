@@ -50,6 +50,12 @@ function hasFfmpeg(ffmpegBin: string): boolean {
   }
 }
 
+interface V4l2ProbeDetails {
+  available: boolean;
+  selectedDevicePath?: string;
+  reason?: string;
+}
+
 export class V4l2VirtualCameraOutputBridge implements CameraOutputBridge {
   readonly bridge_id = V4L2_VIRTUAL_CAMERA_BRIDGE_ID;
   readonly capabilities = V4L2_VIRTUAL_CAMERA_CAPABILITIES;
@@ -78,7 +84,7 @@ export class V4l2VirtualCameraOutputBridge implements CameraOutputBridge {
     this.leaseTtlMs = options.lease_ttl_ms ?? 30_000;
   }
 
-  async probe(): Promise<CameraOutputProbe> {
+  private async probeDetails(): Promise<V4l2ProbeDetails> {
     if (process.platform !== 'linux') {
       return { available: false, reason: 'v4l2 virtual-camera output requires Linux' };
     }
@@ -95,30 +101,36 @@ export class V4l2VirtualCameraOutputBridge implements CameraOutputBridge {
           'no writable v4l2 device path selected; configure a v4l2loopback device such as /dev/video2',
       };
     }
-    return { available: true };
+    return { available: true, selectedDevicePath: probe.selected_device_path };
+  }
+
+  async probe(): Promise<CameraOutputProbe> {
+    const details = await this.probeDetails();
+    return details.available
+      ? { available: true }
+      : { available: false, ...(details.reason ? { reason: details.reason } : {}) };
   }
 
   async startAvatarOutput(input: AvatarOutputRequest): Promise<AvatarOutputResult> {
-    if (this.started && this.activeResult) return this.activeResult;
+    if (this.started) {
+      throw new Error('v4l2 virtual-camera output is already processing a video');
+    }
     if (input.loop) {
       throw new Error(
         'v4l2 virtual-camera output does not support a persistent loop; use OBS for looping sources'
       );
     }
-    const probe = await this.probe();
-    if (!probe.available) {
-      throw new Error(`[v4l2-virtual-camera] not available: ${probe.reason || 'unknown reason'}`);
-    }
-    const deviceUid = this.options.devicePath || input.sourceName || 'v4l2';
+    this.started = true;
     try {
+      const probe = await this.probeDetails();
+      if (!probe.available) {
+        throw new Error(`[v4l2-virtual-camera] not available: ${probe.reason || 'unknown reason'}`);
+      }
+      const devicePath = probe.selectedDevicePath;
+      const deviceUid = devicePath || this.options.devicePath || input.sourceName || 'v4l2';
       this.leases.push(this.leaseManager.acquire(deviceUid, this.sessionId, this.leaseTtlMs));
-    } catch (error) {
-      this.releaseLeases();
-      throw error;
-    }
-    try {
       const result = await this.injectionBridge.injectFromMp4(input.videoPath, {
-        device_path: this.options.devicePath,
+        device_path: this.options.devicePath || devicePath,
         device_preference: input.sourceName || this.options.devicePreference,
       });
       if (result.status !== 'succeeded') {
@@ -137,7 +149,6 @@ export class V4l2VirtualCameraOutputBridge implements CameraOutputBridge {
       this.lastOutputAt = Date.now();
       return this.activeResult;
     } catch (error) {
-      this.started = false;
       this.activeResult = null;
       this.status = 'failed';
       this.reason = error instanceof Error ? error.message : String(error);
@@ -146,6 +157,7 @@ export class V4l2VirtualCameraOutputBridge implements CameraOutputBridge {
       // injectFromMp4 is a bounded foreground operation; there is no live
       // writer process after it returns, so do not retain the device lease.
       this.releaseLeases();
+      this.started = false;
     }
   }
 

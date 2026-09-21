@@ -8,7 +8,7 @@
   "required_scope_classes": ["codebase_core"],
   "ownership_scope": "Owns UX interaction contracts and experience-level design decisions.",
   "selection_hints": {
-    "preferred_agents": ["implementation-architect", "nerve-agent", "sovereign-brain"],
+    "preferred_agents": ["implementation-architect"],
     "preferred_models": ["auto-gemini-3"]
   },
   "autonomy_level": "medium"
