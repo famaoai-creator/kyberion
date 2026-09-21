@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   buildEnvSecretName,
   parseEnvSecretName,
@@ -47,7 +47,9 @@ describe('secret-bridge macOS stdin write contract', () => {
   });
 
   it('uses swift stdin helper instead of security -w value', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'libs/core/secret-bridge.ts'), 'utf8');
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/secret-bridge.ts'), { encoding: 'utf8' })
+    );
     expect(source).toMatch(/spawn\(\s*'swift'/);
     expect(source).not.toMatch(/'add-generic-password'[\s\S]{0,120}'-w',\s*value/);
   });

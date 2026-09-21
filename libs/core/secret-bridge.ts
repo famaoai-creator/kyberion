@@ -15,12 +15,20 @@ import {
 } from './secure-io.js';
 import { SecretProvider, RegistryEntry } from './secret-types.js';
 
-const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.json');
-const FILE_SECRETS_PATH = pathResolver.vault('secrets/file-secrets.json');
-const KEYCHAIN_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/keychain-registry.schema.json'
-);
-const FILE_SECRETS_SCHEMA_PATH = pathResolver.knowledge('product/schemas/file-secrets.schema.json');
+// Resolve vault/knowledge paths lazily so importing this module (via
+// secret-guard fallthrough) does not require a fully-mocked pathResolver.
+function keychainRegistryPath(): string {
+  return pathResolver.vault('secrets/keychain-registry.json');
+}
+function fileSecretsPath(): string {
+  return pathResolver.vault('secrets/file-secrets.json');
+}
+function keychainRegistrySchemaPath(): string {
+  return pathResolver.knowledge('product/schemas/keychain-registry.schema.json');
+}
+function fileSecretsSchemaPath(): string {
+  return pathResolver.knowledge('product/schemas/file-secrets.schema.json');
+}
 
 // Helper to manage the registry catalog
 interface KeychainRegistry {
@@ -30,8 +38,8 @@ interface KeychainRegistry {
 function keychainRegistryCatalog() {
   return defineCatalog<KeychainRegistry>({
     id: 'keychain-registry',
-    path: KEYCHAIN_REGISTRY_PATH,
-    schema: KEYCHAIN_REGISTRY_SCHEMA_PATH,
+    path: keychainRegistryPath(),
+    schema: keychainRegistrySchemaPath(),
   });
 }
 
@@ -39,12 +47,13 @@ function fileSecretsCatalog(filePath: string) {
   return defineCatalog<Record<string, Record<string, string>>>({
     id: 'file-secrets',
     path: filePath,
-    schema: FILE_SECRETS_SCHEMA_PATH,
+    schema: fileSecretsSchemaPath(),
   });
 }
 
 function loadRegistry(): KeychainRegistry {
-  if (!safeExistsSync(KEYCHAIN_REGISTRY_PATH)) return { entries: [] };
+  const registryPath = keychainRegistryPath();
+  if (!safeExistsSync(registryPath)) return { entries: [] };
   try {
     return keychainRegistryCatalog().load();
   } catch {
@@ -53,10 +62,11 @@ function loadRegistry(): KeychainRegistry {
 }
 
 function saveRegistry(registry: KeychainRegistry): void {
-  const dir = path.dirname(KEYCHAIN_REGISTRY_PATH);
+  const registryPath = keychainRegistryPath();
+  const dir = path.dirname(registryPath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  const validated = keychainRegistryCatalog().validate(registry, KEYCHAIN_REGISTRY_PATH);
-  safeWriteFile(KEYCHAIN_REGISTRY_PATH, JSON.stringify(validated, null, 2));
+  const validated = keychainRegistryCatalog().validate(registry, registryPath);
+  safeWriteFile(registryPath, JSON.stringify(validated, null, 2));
 }
 
 export function registryAdd(service: string, account: string): void {
@@ -275,7 +285,7 @@ finally {
 export class FileSecretProvider implements SecretProvider {
   readonly id = 'file_secrets';
 
-  constructor(private readonly secretsPath = FILE_SECRETS_PATH) {}
+  constructor(private readonly secretsPath = fileSecretsPath()) {}
 
   async isAvailable(): Promise<boolean> {
     // Opt-in only. Never a silent default on darwin/win32 (keychain wins first
