@@ -488,6 +488,42 @@ describe('media-generation-actuator', () => {
     );
   });
 
+  it('forwards an image purpose and host hand-off opt-in to the bridge', async () => {
+    mocks.generateImage.mockResolvedValue({
+      status: 'submitted',
+      provider: 'gemini_fast',
+      promptId: 'bridge-purpose-1',
+    });
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      action: 'generate_image',
+      params: { prompt: 'draft', purpose: 'speed', await_completion: false },
+    });
+    expect(mocks.generateImage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ purpose: 'speed', allowHostHandoff: false })
+    );
+
+    await handleAction({
+      action: 'generate_image',
+      params: {
+        prompt: 'hero',
+        purpose: 'quality',
+        allow_host_handoff: true,
+        await_completion: false,
+      },
+    });
+    expect(mocks.generateImage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ purpose: 'quality', allowHostHandoff: true })
+    );
+
+    await handleAction({
+      action: 'generate_image',
+      params: { prompt: 'plain', await_completion: false },
+    });
+    expect(mocks.generateImage.mock.lastCall?.[0]).not.toHaveProperty('purpose');
+  });
+
   it('preserves a submitted bridge result and never fabricates a missing artifact', async () => {
     mocks.generateImage.mockResolvedValue({
       status: 'submitted',
