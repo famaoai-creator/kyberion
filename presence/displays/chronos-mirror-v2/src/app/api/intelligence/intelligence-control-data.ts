@@ -747,6 +747,30 @@ export function collectPendingSecretApprovals(
   tenantSlugs: string[] | 'all',
   tierAccess?: readonly string[]
 ): intelligenceData.SecretApprovalSummary[] {
+  const mapSecret = (
+    request: ReturnType<typeof listApprovalRequests>[number],
+    phase: 'pending' | 'apply_pending'
+  ): intelligenceData.SecretApprovalSummary => ({
+    id: request.id,
+    title: request.title,
+    summary: request.summary,
+    storageChannel: request.storageChannel,
+    requestedAt: request.requestedAt,
+    requestedBy: request.requestedBy,
+    serviceId: request.target?.serviceId || 'unknown',
+    secretKey: request.target?.secretKey || 'unknown',
+    mutation: request.target?.mutation || 'set',
+    riskLevel: request.risk?.level || 'medium',
+    requiresStrongAuth: request.risk?.requiresStrongAuth === true,
+    pendingRoles:
+      request.workflow?.approvals
+        .filter((approval) => approval.status === 'pending')
+        .map((approval) => approval.role) || [],
+    kind: 'secret_mutation' as const,
+    phase,
+    status: request.status,
+  });
+
   const secretApprovals = listApprovalRequests({
     kind: 'secret_mutation',
     status: 'pending',
@@ -761,24 +785,24 @@ export function collectPendingSecretApprovals(
         tierAccess
       )
     )
-    .map((request) => ({
-      id: request.id,
-      title: request.title,
-      summary: request.summary,
-      storageChannel: request.storageChannel,
-      requestedAt: request.requestedAt,
-      requestedBy: request.requestedBy,
-      serviceId: request.target?.serviceId || 'unknown',
-      secretKey: request.target?.secretKey || 'unknown',
-      mutation: request.target?.mutation || 'set',
-      riskLevel: request.risk?.level || 'medium',
-      requiresStrongAuth: request.risk?.requiresStrongAuth === true,
-      pendingRoles:
-        request.workflow?.approvals
-          .filter((approval) => approval.status === 'pending')
-          .map((approval) => approval.role) || [],
-      kind: 'secret_mutation' as const,
-    }));
+    .map((request) => mapSecret(request, 'pending'));
+
+  const applyPending = listApprovalRequests({
+    kind: 'secret_mutation',
+    status: 'approved',
+  })
+    .filter((request) => request.applyResult?.result !== 'success')
+    .filter((request) =>
+      approvalVisibleToScope(
+        {
+          tenantSlug: resolveApprovalTenant(request) || undefined,
+          missionId: request.requestedByContext?.missionId,
+        },
+        tenantSlugs,
+        tierAccess
+      )
+    )
+    .map((request) => mapSecret(request, 'apply_pending'));
 
   const computerApprovals = listApprovalRequests({
     storageChannels: ['computer'],
@@ -812,9 +836,11 @@ export function collectPendingSecretApprovals(
           .filter((approval) => approval.status === 'pending')
           .map((approval) => approval.role) || [],
       kind: 'computer_action' as const,
+      phase: 'pending' as const,
+      status: request.status,
     }));
 
-  return [...secretApprovals, ...computerApprovals]
+  return [...secretApprovals, ...applyPending, ...computerApprovals]
     .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
     .slice(0, 20);
 }

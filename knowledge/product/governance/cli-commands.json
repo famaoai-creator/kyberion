@@ -1092,6 +1092,33 @@
       "audience": "operator"
     },
     {
+      "id": "script.secret.introduce",
+      "module": "scripts/secret_introduce.ts",
+      "command": "secret introduce",
+      "noun": "secret",
+      "verb": "introduce",
+      "audience": "operator",
+      "args": ["introduce"]
+    },
+    {
+      "id": "script.secret.status",
+      "module": "scripts/secret_introduce.ts",
+      "command": "secret status",
+      "noun": "secret",
+      "verb": "status",
+      "audience": "operator",
+      "args": ["status"]
+    },
+    {
+      "id": "script.secret.apply",
+      "module": "scripts/secret_introduce.ts",
+      "command": "secret apply",
+      "noun": "secret",
+      "verb": "apply",
+      "audience": "operator",
+      "args": ["apply"]
+    },
+    {
       "id": "script.cost.report",
       "script": "cost:report",
       "command": "cost report",

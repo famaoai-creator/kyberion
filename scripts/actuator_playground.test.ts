@@ -108,4 +108,25 @@ describe('actuator playground JSON input boundary', () => {
       '--params contains a dangerous JSON key'
     );
   });
+
+  it('blocks live secret-actuator set with a value', async () => {
+    await expect(
+      runPlayground(
+        [
+          '--actuator',
+          'secret-actuator',
+          '--op',
+          'set',
+          '--params',
+          '{"service":"s","account":"a","value":"secret"}',
+        ],
+        {
+          json: true,
+          quiet: true,
+          resolveExecutable: () => '/tmp/fake-secret-actuator.js',
+          executeActuator: vi.fn(() => '{"status":"ok"}'),
+        }
+      )
+    ).rejects.toThrow(/PLAYGROUND_SECRET_SET_BLOCKED/);
+  });
 });

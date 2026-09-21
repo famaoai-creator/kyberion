@@ -781,9 +781,15 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/secret-introduction-model.md",
+      "tier": "public",
+      "size": 3221,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/secret-mutation-approval-model.md",
       "tier": "public",
-      "size": 4512,
+      "size": 4755,
       "type": "md"
     },
     {
@@ -1443,7 +1449,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 48370,
+      "size": 49077,
       "type": "json"
     },
     {
@@ -10803,7 +10809,7 @@
     {
       "path": "product/schemas/secret-action.schema.json",
       "tier": "public",
-      "size": 271,
+      "size": 1512,
       "type": "json"
     },
     {

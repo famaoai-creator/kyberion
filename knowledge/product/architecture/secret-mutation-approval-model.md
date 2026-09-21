@@ -196,3 +196,9 @@ without also showing:
 - what restart or delivery impact is expected
 
 That context is the real approval UX.
+
+## Secret introduction
+
+Operators introduce credentials through the two-phase flow in
+[secret-introduction-model.md](./secret-introduction-model.md)
+(Concierge / `kyberion secret introduce`), not by pasting values into playground `--params`.

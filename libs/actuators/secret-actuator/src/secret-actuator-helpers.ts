@@ -22,8 +22,10 @@ import { runOpPreflight } from '@agent/core/op-preflight';
 import * as path from 'node:path';
 
 /**
- * Secret-Actuator v1.0.0 [SOVEREIGN NATIVE BRIDGE]
- * Integrates with OS Native Secret Managers (macOS Keychain, etc.)
+ * Secret-Actuator v1.2.0 [SOVEREIGN NATIVE BRIDGE]
+ * Integrates with OS Native Secret Managers (macOS Keychain, etc.).
+ * Prefer `pnpm kyberion secret introduce` / Concierge Introduce secret for
+ * collecting values — do not paste secrets into playground --params.
  */
 
 const SECRET_MANIFEST_PATH = pathResolver.rootResolve(

@@ -140,7 +140,9 @@ function parseSecretApproval(value: unknown): Payload['secretApprovals'][number]
     !stringArray(value.pendingRoles) ||
     (value.kind !== undefined &&
       value.kind !== 'secret_mutation' &&
-      value.kind !== 'computer_action')
+      value.kind !== 'computer_action') ||
+    (value.phase !== undefined && value.phase !== 'pending' && value.phase !== 'apply_pending') ||
+    (value.status !== undefined && typeof value.status !== 'string')
   ) {
     return undefined;
   }
@@ -158,6 +160,8 @@ function parseSecretApproval(value: unknown): Payload['secretApprovals'][number]
     requiresStrongAuth: value.requiresStrongAuth,
     pendingRoles: value.pendingRoles,
     ...(value.kind !== undefined ? { kind: value.kind } : {}),
+    ...(value.phase !== undefined ? { phase: value.phase } : {}),
+    ...(value.status !== undefined ? { status: value.status } : {}),
   };
 }
 

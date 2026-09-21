@@ -116,22 +116,45 @@ export class MacKeychainSecretProvider implements SecretProvider {
     // Delete first to overwrite safely
     await this.delete(service, account);
 
+    // Write via a short-lived Swift helper that reads service/account/value from
+    // stdin — never place the secret on process argv (unlike `security -w`).
+    const script = [
+      'import Foundation',
+      'import Security',
+      'guard let service = readLine(), let account = readLine() else { exit(2) }',
+      'let passwordData = FileHandle.standardInput.readDataToEndOfFile()',
+      'guard !passwordData.isEmpty else { exit(3) }',
+      'let query: [String: Any] = [',
+      '  kSecClass as String: kSecClassGenericPassword,',
+      '  kSecAttrService as String: service,',
+      '  kSecAttrAccount as String: account,',
+      ']',
+      'SecItemDelete(query as CFDictionary)',
+      'var add = query',
+      'add[kSecValueData as String] = passwordData',
+      'let status = SecItemAdd(add as CFDictionary, nil)',
+      'exit(status == errSecSuccess ? 0 : Int32(status))',
+    ].join('\n');
+
     return new Promise((resolve, reject) => {
-      const child = spawn(
-        'security',
-        ['add-generic-password', '-a', account, '-s', service, '-w', value],
-        {
-          stdio: ['ignore', 'ignore', 'pipe'],
-        }
-      );
+      const child = spawn('swift', ['-e', script], {
+        stdio: ['pipe', 'ignore', 'pipe'],
+      });
+      let stderr = '';
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
+      child.on('error', (err) => reject(err));
       child.on('close', (code) => {
         if (code === 0) {
           registryAdd(service, account);
           resolve();
         } else {
-          reject(new Error(`macOS Keychain write failed with code ${code}`));
+          reject(new Error(`macOS Keychain write failed with code ${code}: ${stderr}`));
         }
       });
+      child.stdin?.write(`${service}\n${account}\n${value}`);
+      child.stdin?.end();
     });
   }
 
@@ -390,6 +413,38 @@ export async function fetchSecret(service: string, account: string): Promise<str
   const router = getRouter();
   const provider = await router.selectProvider();
   return await provider.get(service, account);
+}
+
+/**
+ * Synchronous lookup for secret-guard fallthrough. Prefer async {@link fetchSecret}
+ * for new call sites. Never logs the value.
+ */
+export function fetchSecretSync(service: string, account: string): string | null {
+  if (process.platform === 'darwin') {
+    const result = safeExecResult(
+      'security',
+      ['find-generic-password', '-a', account, '-s', service, '-w'],
+      { timeoutMs: 10_000, maxOutputMB: 1 }
+    );
+    if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
+  }
+
+  if (getRegisteredEnvBool('KYBERION_ALLOW_FILE_SECRETS') === true) {
+    try {
+      const provider = new FileSecretProvider();
+      // FileSecretProvider.get is async but the body is sync I/O; drive via deasync-free path.
+      const secrets = (
+        provider as unknown as { readSecretsFile: () => Record<string, Record<string, string>> }
+      ).readSecretsFile();
+      const value = secrets[service]?.[account];
+      if (typeof value === 'string' && value.length > 0) return value;
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const envKey = `SECRET_${service.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_${account.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+  return getRegisteredEnvText(envKey) || null;
 }
 
 export async function storeSecret(service: string, account: string, value: string): Promise<void> {
