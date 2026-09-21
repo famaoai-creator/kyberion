@@ -2935,6 +2935,10 @@
       "types": "./dist/task-routing-judgment.d.ts",
       "default": "./dist/task-routing-judgment.js"
     },
+    "./agent-runtime-readiness": {
+      "types": "./dist/agent-runtime-readiness.d.ts",
+      "default": "./dist/agent-runtime-readiness.js"
+    },
     "./tool-call-scheduler": {
       "types": "./dist/tool-call-scheduler.d.ts",
       "default": "./dist/tool-call-scheduler.js"
