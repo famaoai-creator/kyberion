@@ -124,6 +124,52 @@ a human never sees it. Both of Jev's misses route to a human. For a gate whose
 purpose is catching what should be asked, the second failure mode is the
 better one, and the raw count inverts the ranking.
 
+## Two families of provider, and only one of them discriminates
+
+The open implementations of this idea split by architecture, and the split
+matters more than any individual project:
+
+| family | examples | separation measured here | determinism |
+| --- | --- | --- | --- |
+| reads logits from a general LLM | Simple Jev, System One Lite, SemIf, LocalJev, System One Adapter | **-0.003** | not measured |
+| trained judgment head | Laya, kev, typed-decisions | **+0.36** | **total** |
+
+The first family is the easy one to reach for: no new model, constrained
+decoding over the LLM already installed. A provider was built that way here
+before the family was recognised, and it produced well-formed typed answers
+whose confidence was identical on clear and ambiguous input — structure
+without discrimination. Prefer the second family for anything that gates,
+and measure separation before trusting either.
+
+## Which Laya checkpoint
+
+`laya-mlx` ships three. For Japanese there is only one real option, and it
+happens to be the small one:
+
+| checkpoint | noul | choice | p50 |
+| --- | --- | --- | --- |
+| `aac6fef/laya-multilingual-mlx` (mmBERT-base 322M) | 7/8 | **6/6** | **14ms** |
+| `aac6fef/laya-mlx` (ModernBERT-large 421M) | 5/8 | 2/6 | 33ms |
+| `aac6fef/laya-typed-decisions-mlx` (DeBERTa) | 6/8 | 2/6 | 33ms |
+
+The English checkpoints score near chance on Japanese choices and sit at
+~0.5 on nouls, which is no signal at all. Both are larger and slower.
+
+The noul head needs its `{true, false}` descriptions as much as a choice
+needs its options described — asked without them it called
+'月次レポートを作って' not a work request at 0.002, and asked with them it
+is right on seven of eight.
+
+## State is text only
+
+`JudgmentRequest.state` is a string, so nothing here can judge an image or
+audio. That is a real limitation rather than an omission waiting to be
+tidied: `judgePageReadiness` can read a page's text but cannot see a
+spinner or a broken layout, which is exactly the case a screenshot would
+settle. Implementations that take images and audio exist (openvons,
+PlayJev); widening the type is small and additive and should follow a
+provider that can use it, not precede one.
+
 ## Adding a provider
 
 1. Implement `JudgmentBackend`: `judgment_id`, an honest `egress` label,
