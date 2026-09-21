@@ -1,5 +1,6 @@
 import { performanceScoreAdjustment } from './agent-performance-index.js';
 import { modelPerformanceScoreAdjustment } from './model-performance-index.js';
+import { modelRoleFitnessScoreAdjustment } from './model-role-fitness.js';
 import { deriveAgentNhiId } from './agent-identity.js';
 import {
   resolveAgentProviderTarget,
@@ -8,7 +9,10 @@ import {
 import { resolveSelectionHints } from './agent-manifest.js';
 import { resolveTeamRoleSelectionHints } from './team-role-selection.js';
 import { resolveModelProvider } from './reasoning-model-routing.js';
+import { loadProviderConfig } from './provider-config.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
+import { resolveWorkforceLoad, type WorkforceLoadIndex } from './workforce-load.js';
+import { workerLoadPenalty } from './worker-assignment-policy.js';
 
 export interface AuthorityRoleRecord {
   description: string;
@@ -45,10 +49,35 @@ export interface AgentProfileRecord {
   fallback_providers?: string[];
 }
 
+/**
+ * TC-01: how a roster role relates to the mission right now.
+ *
+ * - `assigned`  — staffed: an actor is bound, a staffing record exists and a
+ *                 runtime may be spawned for it.
+ * - `standby`   — on the roster with a resolved candidate actor, but not
+ *                 staffed. Promoted to `assigned` when work demands the role,
+ *                 which is a pure state transition: the candidate was already
+ *                 selected at composition time, so promotion never re-runs
+ *                 selection and stays reproducible.
+ * - `unfilled`  — no compatible actor exists in the pool. A real staffing gap,
+ *                 detected at composition time even for standby roles.
+ */
+export type MissionTeamAssignmentStatus = 'assigned' | 'standby' | 'unfilled';
+
 export interface MissionTeamAssignment {
   team_role: string;
   required: boolean;
-  status: 'assigned' | 'unfilled';
+  status: MissionTeamAssignmentStatus;
+  /**
+   * TC-04: why this role is on the roster — `structural` (always staffed),
+   * `obligation` (required by the governed obligations catalog and therefore
+   * not removable by a template or organization overlay), `template`
+   * (organization preference), `restaff` (added mid-mission because work
+   * demanded a role the roster did not have — TC-06). Audits read the
+   * roster's justification from here instead of inferring it from the
+   * template name.
+   */
+  role_sources?: Array<'structural' | 'obligation' | 'template' | 'restaff'>;
   agent_id: string | null;
   actor_type?: 'agent' | 'human' | 'service';
   resource?: import('./mission-team-binding.js').WorkforceResourceRef;
@@ -117,17 +146,36 @@ export interface TeamProviderPreference {
 const SOD_AVOID_AGENT_PENALTY = 24;
 const SOD_AVOID_PROVIDER_PENALTY = 6;
 
-export function selectAgentForTeamRole(
-  teamRole: string,
-  teamRoleRecord: TeamRoleRecord,
-  authorityRoles: Record<string, AuthorityRoleRecord>,
-  agents: Record<string, AgentProfileRecord>,
-  routingHint?: { model_id: string },
-  separation?: RoleSeparationConstraints,
+export interface SelectAgentForTeamRoleInput {
+  teamRole: string;
+  teamRoleRecord: TeamRoleRecord;
+  authorityRoles: Record<string, AuthorityRoleRecord>;
+  agents: Record<string, AgentProfileRecord>;
+  routingHint?: { model_id: string };
+  separation?: RoleSeparationConstraints;
   /** NI-01: org segment for the derived nhi_id; defaults to the active organization profile. */
-  organizationId?: string,
-  providerPreference?: TeamProviderPreference
-): MissionTeamAssignment {
+  organizationId?: string;
+  providerPreference?: TeamProviderPreference;
+  /**
+   * TC-09: observed workforce load, built once per composition pass. Selection
+   * prefers an actor that is not already carrying work; the penalty is capped
+   * so load never outweighs a capability match.
+   */
+  loadIndex?: WorkforceLoadIndex;
+}
+
+export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): MissionTeamAssignment {
+  const {
+    teamRole,
+    teamRoleRecord,
+    authorityRoles,
+    agents,
+    routingHint,
+    separation,
+    organizationId,
+    providerPreference,
+    loadIndex,
+  } = input;
   const hardExcludedAgents = new Set(
     (separation?.excludeAgents || []).filter((entry): entry is string => Boolean(entry))
   );
@@ -163,10 +211,23 @@ export function selectAgentForTeamRole(
               : {}),
           }
         : profile.selection_hints;
+      const providerConfig = loadProviderConfig();
+      const fallbackProvider =
+        providerPreference?.provider ||
+        profile.selection_hints?.preferred_provider ||
+        routedProvider ||
+        providerConfig.default_priority[0] ||
+        'claude';
+      const fallbackModel =
+        providerPreference?.modelId ||
+        profile.selection_hints?.preferred_modelId ||
+        selectionHints.preferred_models[0] ||
+        routedModelId ||
+        providerConfig.default_models[fallbackProvider];
       const { provider: selectionProvider, modelId: selectionModel } = resolveSelectionHints(
         agentSelectionHints,
-        routedProvider as any,
-        selectionHints.preferred_models[0] || routedModelId,
+        fallbackProvider as any,
+        fallbackModel,
         agentId
       );
       const resolvedTarget = resolveAgentProviderTarget({
@@ -192,9 +253,17 @@ export function selectAgentForTeamRole(
         resolvedTarget.modelId,
         teamRole
       );
+      // TC-16: measured role fitness speaks only while real outcomes are
+      // silent — the cold start every new model and provider goes through.
+      const modelFitnessBonus = modelRoleFitnessScoreAdjustment(resolvedTarget.modelId, teamRole);
       const separationPenalty =
         (softAvoidAgents.has(agentId) ? SOD_AVOID_AGENT_PENALTY : 0) +
         (softAvoidProviders.has(resolvedTarget.provider) ? SOD_AVOID_PROVIDER_PENALTY : 0);
+      // TC-09: observed load, scored by the shared worker-assignment policy so
+      // one module owns what "busy" costs a candidate.
+      const loadPenalty = loadIndex
+        ? workerLoadPenalty(resolveWorkforceLoad(agentId, loadIndex))
+        : 0;
       const score =
         capabilityHits * 10 -
         capabilityPenalty +
@@ -202,8 +271,10 @@ export function selectAgentForTeamRole(
         preferredModelBonus +
         providerBonus +
         performanceBonus +
-        modelPerformanceBonus -
-        separationPenalty;
+        modelPerformanceBonus +
+        modelFitnessBonus -
+        separationPenalty -
+        loadPenalty;
 
       const requiredScopes = new Set(teamRoleRecord.required_scope_classes || []);
       const compatibleAuthorityRoles = profile.authority_roles.filter((role) =>

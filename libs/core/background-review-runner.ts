@@ -158,6 +158,8 @@ export interface BackgroundReviewForkInput {
   surface: SurfaceAsyncChannel;
   snapshot: string;
   missionId?: string;
+  /** Tenant scope for provider attestation lookup when this fork has one. */
+  tenantSlug?: string;
   workItemId?: string;
   approvalChannel?: string;
   approvalThreadTs?: string;
@@ -290,7 +292,15 @@ async function buildBackgroundReviewKnowledgeContext(
       const providerId = providerIdForReasoningIdentifier(backendName);
       if (providerId) {
         const dataTier = highestTierForPaths(entries.map((entry) => entry.path));
-        const egressCheck = checkProviderEgress({ provider: providerId, dataTier });
+        const workItemTenant = input.workItemId
+          ? getWorkItem(input.workItemId)?.context?.tenant_slug
+          : undefined;
+        const tenantSlug = input.tenantSlug?.trim() || workItemTenant?.trim();
+        const egressCheck = checkProviderEgress({
+          provider: providerId,
+          dataTier,
+          ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+        });
         if (!egressCheck.allowed) {
           logger.warn(
             `[KP-02][XP-03] Background review knowledge egress denied for provider=${providerId} tier=${dataTier}: ${egressCheck.reason}`

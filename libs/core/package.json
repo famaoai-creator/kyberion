@@ -447,6 +447,34 @@
       "types": "./dist/mission-team-index.d.ts",
       "default": "./dist/mission-team-index.js"
     },
+    "./staffing-coverage": {
+      "types": "./dist/staffing-coverage.d.ts",
+      "default": "./dist/staffing-coverage.js"
+    },
+    "./backend-capability-honesty": {
+      "types": "./dist/backend-capability-honesty.d.ts",
+      "default": "./dist/backend-capability-honesty.js"
+    },
+    "./team-decision-support-metrics": {
+      "types": "./dist/team-decision-support-metrics.d.ts",
+      "default": "./dist/team-decision-support-metrics.js"
+    },
+    "./mission-team-view": {
+      "types": "./dist/mission-team-view.d.ts",
+      "default": "./dist/mission-team-view.js"
+    },
+    "./model-role-fitness": {
+      "types": "./dist/model-role-fitness.d.ts",
+      "default": "./dist/model-role-fitness.js"
+    },
+    "./model-role-fitness-runner": {
+      "types": "./dist/model-role-fitness-runner.d.ts",
+      "default": "./dist/model-role-fitness-runner.js"
+    },
+    "./mission-advisory-panel": {
+      "types": "./dist/mission-advisory-panel.d.ts",
+      "default": "./dist/mission-advisory-panel.js"
+    },
     "./agent-performance-index": {
       "types": "./dist/agent-performance-index.d.ts",
       "default": "./dist/agent-performance-index.js"

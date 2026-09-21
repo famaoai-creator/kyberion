@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "critique-worker": {
+      "authority_roles": [
+        "ruthless_auditor",
+        "qa_lead",
+        "cyber_security",
+        "ecosystem_architect",
+        "mission_controller"
+      ],
+      "team_roles": ["reviewer", "tester", "devils_advocate", "counterparty_persona", "defender"],
+      "capabilities": [
+        "reasoning",
+        "analysis",
+        "architecture",
+        "review",
+        "testing",
+        "quality",
+        "critique",
+        "security",
+        "role_play",
+        "persona_modeling"
+      ],
+      "selection_hints": {
+        "preferred_provider": "claude",
+        "preferred_modelId": "claude-opus-5"
+      },
+      "provider_strategy": "preferred",
+      "fallback_providers": ["codex", "gemini"]
+    }
+  }
+}

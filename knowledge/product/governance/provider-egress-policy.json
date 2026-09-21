@@ -1,19 +1,49 @@
 {
   "$schema": "../schemas/provider-egress-policy.schema.json",
-  "version": "1.0.0",
+  "version": "1.2.0",
+  "attestation_ttl_days": 180,
   "providers": {
-    "claude": { "egress": "external-api" },
-    "codex": { "egress": "external-api" },
-    "agy": { "egress": "external-api" },
-    "gemini": { "egress": "external-api" },
-    "copilot": { "egress": "external-api" },
-    "grok": { "egress": "external-api" },
-    "typesafe-jev": { "egress": "external-api" }
+    "claude": {
+      "egress": "external-api",
+      "training_use": "unknown"
+    },
+    "codex": {
+      "egress": "external-api",
+      "training_use": "unknown"
+    },
+    "agy": {
+      "egress": "external-api",
+      "training_use": "unknown"
+    },
+    "gemini": {
+      "egress": "external-api",
+      "training_use": "unknown"
+    },
+    "copilot": {
+      "egress": "external-api",
+      "training_use": "unknown"
+    },
+    "grok": {
+      "egress": "external-api",
+      "training_use": "unknown"
+    },
+    "typesafe-jev": {
+      "egress": "external-api",
+      "training_use": "unknown"
+    },
+    "cursor": {
+      "egress": "external-api",
+      "training_use": "unknown"
+    },
+    "opencode": {
+      "egress": "external-api",
+      "training_use": "unknown"
+    }
   },
   "tier_policy": {
     "confidential": {
       "mode": "approved-only",
-      "approved_providers": ["claude"]
+      "approved_providers": []
     },
     "personal": {
       "mode": "local-only-or-approved",
