@@ -9,9 +9,11 @@
  *
  *   resolveAudioBus()                    → BlackHole / PulseAudio / stub
  *   getMeetingJoinDriver(driver_id)      → browser-playwright by default
- *   getStreamingSttBridge()              → stub or KYBERION_STT_COMMAND
+ *   selectStreamingSttBridge()           → stub, or a real bridge when the
+ *                                          transport needs real STT (seam policy)
  *   getStreamingTtsBridge()              → stub or KYBERION_TTS_COMMAND
- *   EnergyVad                             → built-in VAD
+ *   EnergyVad                             → built-in VAD (seam-selected with
+ *                                          --vad-purpose or operator rules)
  *   MeetingParticipationCoordinator      → owns the loop
  *
  * Usage:
@@ -34,10 +36,14 @@ import {
 } from '@agent/core/meeting-join-driver';
 import { installInRoomMeetingJoinDriver } from '@agent/core/in-room-meeting-driver';
 import { installChromeExtensionMeetingJoinDriver } from '@agent/core/chrome-extension-meeting-driver';
-import { getStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
+import { selectStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
 import { getStreamingTtsBridge } from '@agent/core/streaming-tts-bridge';
 import { getVoiceProfileRegistry } from '@agent/core/voice-profile-registry';
 import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell-streaming-stt-bridge';
+import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
+import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
+import { resolveVadBackend, shouldSelectVadBackend } from '@agent/core/vad-registry';
+import type { VoiceActivityDetector } from '@agent/core/voice-activity-detector';
 import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell-streaming-tts-bridge';
 import { loadEnvironmentManifest, verifyReady } from '@agent/core/environment-capability';
 import { resolveAudioBus } from '@agent/core/audio-bus-resolver';
@@ -355,6 +361,15 @@ async function main(args: string[] = []): Promise<void> {
       default: 'transcribe_first',
     })
     .option('dry-run', { type: 'boolean', default: false })
+    .option('stt-purpose', {
+      type: 'string',
+      describe:
+        'Streaming STT selection purpose (streaming-stt-bridge policy: accuracy, latency, privacy)',
+    })
+    .option('vad-purpose', {
+      type: 'string',
+      describe: 'VAD backend selection purpose (voice.vad-backend policy: accuracy, light)',
+    })
     .option('microphone-device', { type: 'string' })
     .option('speaker-device', { type: 'string' })
     .option('camera-device', { type: 'string' })
@@ -548,16 +563,41 @@ async function main(args: string[] = []): Promise<void> {
         bus_id: bus.bus_id,
       });
     }
-    const stt = getStreamingSttBridge();
+    const sttSelection = selectStreamingSttBridge({
+      ...(argv['stt-purpose'] ? { purpose: String(argv['stt-purpose']) } : {}),
+      requires: { allowSynthetic: !runtimePlan.require_streaming_stt },
+    });
+    if (sttSelection.decision) {
+      logger.info(
+        `[participate-cli] streaming STT ${sttSelection.bridge_id} (${sttSelection.decision.strategy}: ${sttSelection.decision.rationale})`
+      );
+    }
+    const stt = sttSelection.bridge;
     const tts = getStreamingTtsBridge();
     assertMeetingParticipationRuntime({ runtimePlan, bus, busProbe, stt, tts });
+    const vadPurpose = argv['vad-purpose'] ? String(argv['vad-purpose']) : undefined;
+    let vad: VoiceActivityDetector = new EnergyVad();
+    if (shouldSelectVadBackend(vadPurpose ? { purpose: vadPurpose } : {})) {
+      installSileroVadBackend();
+      installTenVadBackend();
+      const resolvedVad = resolveVadBackend(undefined, {
+        ...(vadPurpose ? { purpose: vadPurpose } : {}),
+      });
+      if (resolvedVad.degradedFrom) {
+        logger.warn(
+          `[participate-cli] VAD '${resolvedVad.degradedFrom}' unavailable (${resolvedVad.degradedReason}); using 'energy'`
+        );
+      }
+      logger.info(`[participate-cli] VAD backend ${resolvedVad.backend.backend_id}`);
+      vad = resolvedVad.backend.create({ rmsThreshold: null, endpointMs: 700 });
+    }
 
     const coordinator = new MeetingParticipationCoordinator({
       driver,
       bus,
       stt,
       tts,
-      vad: new EnergyVad(),
+      vad,
       agent: new ReasoningBackendAgent(missionId, String(argv.persona)),
       trace,
     });

@@ -9,6 +9,7 @@
       "provider": "system_tts",
       "status": "active",
       "platforms": ["darwin", "linux", "win32"],
+      "languages": ["*"],
       "tts_adapter_id": "native_tts",
       "live_presence": true,
       "supports": {
@@ -17,7 +18,8 @@
         "artifact_formats": ["wav", "aiff"]
       },
       "fallback_engine_id": "espeak_ng",
-      "notes": "Uses OS-native speech engines through secure shell execution."
+      "notes": "Uses OS-native speech engines through secure shell execution.",
+      "language_notes": "Language coverage follows the host's installed OS voices (macOS say / Linux espeak / Windows SAPI); declared '*' because the voice list, not the engine, decides it (voice chosen per language via voice-tts-config)."
     }
   ]
 }

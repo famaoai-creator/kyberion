@@ -1,0 +1,150 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "voice-tts-engine",
+      "default_provider": "local_say",
+      "fallback_purpose": "privacy",
+      "traits": {
+        "naturalness": "How human the synthesised speech sounds (prosody, pronunciation) for the languages the engine declares.",
+        "latency": "Wall-clock from text to a playable artifact, model load included.",
+        "privacy": "Confidence that the text never leaves the machine (on-device engines by construction)."
+      },
+      "providers": {
+        "local_say": {
+          "traits": {
+            "naturalness": 0.4,
+            "latency": 0.9,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/voice-engines/local_say.json (native OS voices, languages ['*'])",
+            "libs/actuators/voice-actuator/src/voice-runtime-helpers.ts (renderWithSay / native adapters)"
+          ]
+        },
+        "espeak_ng": {
+          "traits": {
+            "naturalness": 0.15,
+            "latency": 1,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/voice-engines/espeak_ng.json (formant synthesis, languages en/ja)",
+            "libs/actuators/voice-actuator/scripts/espeak_ng_tts_bridge.py"
+          ]
+        },
+        "kokoro": {
+          "traits": {
+            "naturalness": 0.7,
+            "latency": 0.7,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/voice-engines/kokoro.json (82M local model, languages ja/en)",
+            "docs/VOICE_LOCAL_BACKENDS.md"
+          ]
+        },
+        "mlx_audio_qwen3": {
+          "traits": {
+            "naturalness": 0.85,
+            "latency": 0.35,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/voice-engines/mlx_audio_qwen3.json (1.7B 8-bit Qwen3-TTS on Apple Silicon, ICL voice clone, languages ja/en)"
+          ]
+        },
+        "pocket_tts": {
+          "traits": {
+            "naturalness": 0.6,
+            "latency": 0.75,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/voice-engines/pocket_tts.json (CPU streaming TTS, voice clone, language en)",
+            "docs/VOICE_LOCAL_BACKENDS.md"
+          ]
+        },
+        "gemini_tts": {
+          "traits": {
+            "naturalness": 0.9,
+            "latency": 0.4,
+            "privacy": 0.1
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/voice-engines/gemini_tts.json (Gemini API cloud TTS via GEMINI_API_KEY, external_provider)"
+          ]
+        },
+        "open_voice_clone": {
+          "traits": {
+            "naturalness": 0.5,
+            "latency": 0.4,
+            "privacy": 0.1
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/voice-engines/open_voice_clone.json (shadow external_provider placeholder; traits unknown, kept low)"
+          ]
+        }
+      },
+      "purposes": {
+        "naturalness": {
+          "description": "Narration, demos and other speech people listen to closely: the most natural voice among the eligible engines.",
+          "weights": {
+            "naturalness": 1
+          }
+        },
+        "latency": {
+          "description": "Interactive turns where speech must start quickly and a plainer voice is acceptable.",
+          "weights": {
+            "latency": 0.8,
+            "naturalness": 0.2
+          }
+        },
+        "privacy": {
+          "description": "Sensitive text: prefer on-device engines by construction, then speed and naturalness. Also the fallback when the requested engine cannot speak the text's language. Use the local_only requirement when remote synthesis must be impossible rather than merely unlikely.",
+          "weights": {
+            "privacy": 0.6,
+            "latency": 0.2,
+            "naturalness": 0.2
+          }
+        }
+      }
+    }
+  ]
+}

@@ -18,6 +18,13 @@ export interface OcrRequest {
   mode?: OcrRoutingMode;
   providerPreference?: string[];
   extractStructure?: boolean;
+  /**
+   * Governed seam-provider-selection purpose (e.g. 'accuracy', 'speed',
+   * 'privacy', 'cost'). Ignored when providerPreference is set — an explicit
+   * choice always wins. `mode` still decides what is eligible; purpose only
+   * orders the eligible providers.
+   */
+  purpose?: string;
 }
 
 export interface OcrTextLine {

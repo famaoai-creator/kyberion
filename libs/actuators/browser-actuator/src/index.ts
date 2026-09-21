@@ -55,6 +55,8 @@ interface BrowserAction {
     browser_channel?: 'chromium' | 'chrome';
     /** browser-automation-runtime provider id (`playwright-chromium` default, `lightpanda`). */
     browser_runtime?: string;
+    /** With no explicit browser_runtime: choose one by purpose (see seam-provider-selection-policy). */
+    runtime_purpose?: string;
     profile_directory?: string;
     launch_args?: string[];
     connect_over_cdp?: boolean;

@@ -1,0 +1,116 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "streaming-stt-bridge",
+      "default_provider": "stub",
+      "fallback_purpose": "latency",
+      "traits": {
+        "accuracy": "Transcript quality of live speech (incl. Japanese) as delivered by the stream.",
+        "latency": "How soon transcript text arrives relative to the speech (partials during the utterance score highest).",
+        "privacy": "Confidence that audio never leaves the machine (on-device execution by construction)."
+      },
+      "providers": {
+        "stub": {
+          "traits": {
+            "accuracy": 0,
+            "latency": 0,
+            "privacy": 0
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/streaming-stt-bridge.ts (StubStreamingSpeechToTextBridge emits synthetic 'stub-utterance-<n>' text; eligible only when synthetic output is allowed)"
+          ]
+        },
+        "shell": {
+          "traits": {
+            "accuracy": 0.5,
+            "latency": 0.6,
+            "privacy": 0.3
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/shell-streaming-stt-bridge.ts (operator command from KYBERION_STT_COMMAND; may be a cloud CLI such as deepgram, so local_only is not declared)"
+          ]
+        },
+        "managed_mlx_whisper": {
+          "traits": {
+            "accuracy": 0.7,
+            "latency": 0.8,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "scripts/stt_mlx_whisper_stream.py (resident whisper-large-v3-turbo, one final per 1.5 s window: text during speech, window cuts cost some accuracy)"
+          ]
+        },
+        "mlx_whisper": {
+          "traits": {
+            "accuracy": 0.85,
+            "latency": 0.3,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/actuators/voice-actuator/src/voice-stt-backend-adapters.ts (loopback adapter: buffers the whole stream, then one mlx_whisper transcription)"
+          ]
+        },
+        "faster_whisper": {
+          "traits": {
+            "accuracy": 0.8,
+            "latency": 0.3,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/actuators/voice-actuator/src/voice-stt-backend-adapters.ts (loopback adapter: buffers the whole stream, then one faster-whisper transcription)"
+          ]
+        }
+      },
+      "purposes": {
+        "accuracy": {
+          "description": "Live minutes and captions people will read later; text may arrive after the utterance.",
+          "weights": {
+            "accuracy": 0.8,
+            "latency": 0.2
+          }
+        },
+        "latency": {
+          "description": "Conversational turns and barge-in, where text must arrive during or right after the utterance.",
+          "weights": {
+            "latency": 0.7,
+            "accuracy": 0.3
+          }
+        },
+        "privacy": {
+          "description": "Sensitive conversations: prefer on-device streams. Use the local_only requirement when remote processing must be impossible.",
+          "weights": {
+            "privacy": 0.7,
+            "accuracy": 0.3
+          }
+        }
+      }
+    }
+  ]
+}

@@ -44,6 +44,9 @@ const USAGE = [
   '--browser-runtime lightpanda runs on the lightweight Lightpanda engine',
   '(read-mostly flows; no tabs, screenshots or passkeys). Install it with',
   '`pnpm tool:setup -- --tool lightpanda --apply`.',
+  '--browser-purpose <evidence|throughput|authenticated> lets the governed',
+  'selection policy pick the runtime that can run the steps (audited, pinned',
+  'per mission); an explicit --browser-runtime always wins.',
   '',
   'Governed recording/procedure runs use the same approval gate and origin',
   'allowlist as the Chrome extension path.',
@@ -101,6 +104,7 @@ async function bindExecutor(
     cdpUrl?: string;
     cdpPort?: number;
     browserRuntime?: string;
+    browserPurpose?: string;
     context: Record<string, unknown>;
   }
 ): Promise<ExecuteBrowserPipeline> {
@@ -146,6 +150,11 @@ export async function main(
       type: 'string',
       description: 'Optional session/tab id when attaching with --cdp-url/--cdp-port',
     })
+    .option('browser-purpose', {
+      type: 'string',
+      description:
+        'Let the runtime selection policy choose the browser runtime (evidence | throughput | authenticated)',
+    })
     .option('browser-runtime', {
       type: 'string',
       description:
@@ -187,6 +196,7 @@ export async function main(
   const tabId = argv['tab-id'] ? String(argv['tab-id']) : undefined;
   const connectOverCdp = Boolean(cdpUrl || cdpPort);
   const browserRuntime = argv['browser-runtime'] ? String(argv['browser-runtime']) : undefined;
+  const browserPurpose = argv['browser-purpose'] ? String(argv['browser-purpose']) : undefined;
   const missionId =
     (argv['mission-id'] ? String(argv['mission-id']) : '') ||
     deps.missionId ||
@@ -223,6 +233,7 @@ export async function main(
           ...(cdpUrl ? { cdp_url: cdpUrl } : {}),
           ...(cdpPort ? { cdp_port: cdpPort } : {}),
           ...(browserRuntime ? { browser_runtime: browserRuntime } : {}),
+          ...(browserPurpose ? { runtime_purpose: browserPurpose } : {}),
         },
         context: {
           ...((adf.context as Record<string, unknown> | undefined) || {}),
@@ -300,6 +311,7 @@ export async function main(
     cdpUrl,
     cdpPort,
     browserRuntime,
+    browserPurpose,
     context: {
       procedure_id: entry.procedure_id,
       mission_id: missionId,

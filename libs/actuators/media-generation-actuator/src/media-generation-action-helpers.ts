@@ -34,7 +34,12 @@ import {
   maybeCopyArtifact,
   resolveImageArtifactFormat,
   resolveImageProviderPreference,
+  resolveImageProviderPurpose,
   isDirectMusicGenerationBackend,
+  describeGeneratedBackend,
+  musicBackendIdForProvider,
+  resolveMusicProviderPurpose,
+  resolveMusicRequestedFormat,
   resolveMusicProviderPreference,
   resolveMusicBridgeRequest,
   preparePromptBasedGeneration,
@@ -48,6 +53,7 @@ import {
 import { getGenerationHistoryAdapterForAction } from './generation-artifact-adapters.js';
 import { createGenerationProviderHistoryClient } from './generation-provider-clients.js';
 import {
+  applyVideoProviderSelection,
   isDirectVideoGenerationBackend,
   refreshDirectVideoGeneration,
   resolveVideoGenerationBackend,
@@ -130,6 +136,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
   });
   let result: any = null;
   try {
+    if (action === 'generate_video') params = await applyVideoProviderSelection(params);
     const prepared = preparePromptBasedGeneration(action, params);
     if (
       action === 'generate_image' &&
@@ -137,7 +144,8 @@ async function handlePromptBasedGeneration(action: string, params: any) {
       !prepared.params.workflow_path &&
       !prepared.params.image_adf
     ) {
-      const { generateImage } = await import('@agent/core/image-generation-bridge');
+      const { generateImage, imageGenerationBackendIdForProvider } =
+        await import('@agent/core/image-generation-bridge');
       const backend = resolveGenerationBackend(action, prepared.params);
       const bridgeRes = await generateImage({
         prompt: typeof prepared.params.prompt === 'string' ? prepared.params.prompt : '',
@@ -145,6 +153,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
         mode: prepared.params.mode,
         style: typeof prepared.params.style === 'string' ? prepared.params.style : undefined,
         providerPreference: resolveImageProviderPreference(prepared.params),
+        ...resolveImageProviderPurpose(prepared.params),
         targetPath: prepared.params.target_path || prepared.params.targetPath,
         awaitCompletion: resolveAwaitCompletion(action, prepared.params),
       });
@@ -168,6 +177,12 @@ async function handlePromptBasedGeneration(action: string, params: any) {
               path: bridgeRes.path,
             }
           : null;
+      // Report the provider that generated, not the requested default backend.
+      const generatedBy = describeGeneratedBackend(
+        backend,
+        bridgeRes.provider,
+        bridgeRes.provider ? imageGenerationBackendIdForProvider(bridgeRes.provider) : undefined
+      );
 
       result = {
         status,
@@ -178,9 +193,10 @@ async function handlePromptBasedGeneration(action: string, params: any) {
         artifact,
         copied_to: artifact?.path,
         backend_id: bridgeRes.provider || backend.backend_id,
-        resolved_backend_id: backend.backend_id,
-        backend_kind: backend.kind,
-        backend_provider: backend.provider,
+        resolved_backend_id: generatedBy.backend_id,
+        requested_backend_id: backend.backend_id,
+        backend_kind: generatedBy.kind,
+        backend_provider: generatedBy.provider,
         modality: backend.modality,
         error: bridgeRes.error,
       };
@@ -191,9 +207,13 @@ async function handlePromptBasedGeneration(action: string, params: any) {
 
     if (action === 'generate_music') {
       const backend = resolveGenerationBackend(action, prepared.params);
-      if (isDirectMusicGenerationBackend(backend)) {
+      // A purpose without a named backend routes to the direct bridge, which
+      // ranks the local providers; no purpose keeps the ComfyUI default.
+      const musicPurpose = resolveMusicProviderPurpose(prepared.params);
+      if (isDirectMusicGenerationBackend(backend) || musicPurpose) {
         const { generateMusic } = await import('@agent/core/music-generation-bridge');
         const bridgeRequest = resolveMusicBridgeRequest(prepared.params);
+        const format = musicPurpose ? resolveMusicRequestedFormat(prepared.params) : undefined;
         const bridgeRes = await generateMusic({
           prompt: bridgeRequest.prompt,
           ...(bridgeRequest.durationSec !== undefined
@@ -201,7 +221,14 @@ async function handlePromptBasedGeneration(action: string, params: any) {
             : {}),
           targetPath: bridgeRequest.targetPath,
           providerPreference: resolveMusicProviderPreference(prepared.params),
+          ...(musicPurpose ? { purpose: musicPurpose } : {}),
+          ...(format ? { format } : {}),
         });
+        const generatedBy = describeGeneratedBackend(
+          backend,
+          bridgeRes.provider,
+          bridgeRes.provider ? musicBackendIdForProvider(bridgeRes.provider) : undefined
+        );
 
         const artifactExists = Boolean(
           bridgeRes.status === 'succeeded' && bridgeRes.path && safeExistsSync(bridgeRes.path)
@@ -224,9 +251,10 @@ async function handlePromptBasedGeneration(action: string, params: any) {
           copied_to: artifact?.path,
           output_path: artifact?.path,
           backend_id: bridgeRes.provider || backend.backend_id,
-          resolved_backend_id: backend.backend_id,
-          backend_kind: backend.kind,
-          backend_provider: backend.provider,
+          resolved_backend_id: generatedBy.backend_id,
+          requested_backend_id: backend.backend_id,
+          backend_kind: generatedBy.kind,
+          backend_provider: generatedBy.provider,
           modality: backend.modality,
           error: bridgeRes.error,
         };
@@ -311,8 +339,14 @@ async function submitGenerationJob(params: any) {
       throw new Error(`submit_generation requires a prompt-based action. Received: ${action}`);
     }
 
-    const { compiled, workflow } = preparePromptBasedGeneration(action, params.params || {});
-    const requestParams = { ...(params.params || {}), workflow };
+    // Video: a purpose / operator rule picks the backend here and is persisted
+    // as backend_id in the job request, so refresh addresses the same backend.
+    const innerParams: Record<string, any> =
+      action === 'generate_video'
+        ? await applyVideoProviderSelection(params.params || {})
+        : params.params || {};
+    const { compiled, workflow } = preparePromptBasedGeneration(action, innerParams);
+    const requestParams = { ...innerParams, workflow };
     const result = await executePreparedGeneration(action, {
       ...compiled,
       action,
@@ -331,7 +365,7 @@ async function submitGenerationJob(params: any) {
       throw new Error(`submit_generation failed to receive prompt_id for ${action}`);
     }
 
-    const backend = resolveGenerationBackend(action, params.params || {});
+    const backend = resolveGenerationBackend(action, innerParams);
     const scope = params.scope ? normalizeEventScope(params.scope) : undefined;
     const resultRecord = result as Record<string, unknown>;
     const providerMetadata = isPlainObject(resultRecord.provider_metadata)
@@ -358,11 +392,11 @@ async function submitGenerationJob(params: any) {
       },
       request: {
         ...requestParams,
-        target_path: params.params?.target_path || params.params?.music_adf?.output?.target_path,
-        music_adf: params.params?.music_adf,
-        image_adf: params.params?.image_adf,
-        video_adf: params.params?.video_adf,
-        workflow_path: params.params?.workflow_path,
+        target_path: innerParams.target_path || innerParams.music_adf?.output?.target_path,
+        music_adf: innerParams.music_adf,
+        image_adf: innerParams.image_adf,
+        video_adf: innerParams.video_adf,
+        workflow_path: innerParams.workflow_path,
       },
       result: {
         compiled_music_adf: compiled?.resolved,

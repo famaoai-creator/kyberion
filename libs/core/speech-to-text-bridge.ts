@@ -33,6 +33,18 @@ import { rootResolve } from './path-resolver.js';
 import { resolveLocale } from './locale.js';
 import { discoverLocalSttBackends, selectPreferredLocalSttBackend } from './local-stt-discovery.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
+import {
+  getSeamSelectionPolicy,
+  listSeamSelectionPurposes,
+  resolveSeamProviderDecision,
+  type SeamProviderDecision,
+} from './seam-provider-selection.js';
+import { matchSeamSelectionRule } from './seam-selection-rules.js';
+import {
+  primaryLanguageSubtag,
+  supportsSpeechLanguage,
+  WHISPER_LANGUAGES,
+} from './speech-languages.js';
 
 export interface TranscribeInput {
   audioPath: string;
@@ -51,7 +63,14 @@ export interface SpeechToTextCapabilities {
   local_only?: boolean;
   /** Whether the backend exposes a confidence score for its output. */
   confidence?: boolean;
+  /**
+   * Primary language subtags (ISO 639, lowercase) the backend can transcribe.
+   * Unset means "not declared": the backend is not filtered by language.
+   */
+  languages?: string[];
 }
+
+export { WHISPER_LANGUAGES, primaryLanguageSubtag, supportsSpeechLanguage };
 
 export interface TranscriptSegment {
   start_sec: number;
@@ -126,6 +145,189 @@ export function getSpeechToTextBridges(): SpeechToTextBridge[] {
   return bridges.length > 0 ? bridges : [stubSpeechToTextBridge];
 }
 
+/** The bridge the seam's priority select would pick among `bridges`. */
+function highestPriorityBridge(bridges: SpeechToTextBridge[]): SpeechToTextBridge | undefined {
+  return [...bridges].sort(
+    (left, right) =>
+      (right.priority ?? 0) - (left.priority ?? 0) || left.name.localeCompare(right.name)
+  )[0];
+}
+
+/**
+ * The bridge a caller without an explicit choice should use: the selected
+ * one when shouldSelectSpeechToTextBridges() says so, else the priority
+ * default. Throws like selectSpeechToTextBridges() when selection finds none.
+ */
+export function resolveSpeechToTextBridge(
+  options: SelectSpeechToTextBridgesOptions = {}
+): SpeechToTextBridge {
+  if (!shouldSelectSpeechToTextBridges(options)) {
+    return options.bridges?.length
+      ? highestPriorityBridge(options.bridges)!
+      : getSpeechToTextBridge();
+  }
+  return selectSpeechToTextBridges(options).bridges[0]!;
+}
+
+export const SPEECH_TO_TEXT_SEAM = 'speech-to-text-bridge';
+
+/** Hard needs of a transcription task; a bridge that cannot meet them is never chosen. */
+export interface SpeechToTextRequirements {
+  /** Minimum timestamp granularity the bridge must declare. Unset: timestamps not required. */
+  timestamps?: 'segment' | 'word';
+  /** Audio must stay on this machine (bridge declares `local_only: true`). */
+  localOnly?: boolean;
+  /** Allow synthetic output (the sidecar-only stub). Default false. */
+  allowSynthetic?: boolean;
+  /**
+   * BCP-47 language of the audio. Bridges that declare `languages` without it
+   * are ineligible; bridges that declare none are not filtered.
+   */
+  language?: string;
+}
+
+export interface SelectSpeechToTextBridgesOptions {
+  /** Governed purpose (see the seam policy). Unset: operator rules, then the seam default. */
+  purpose?: string;
+  requires?: SpeechToTextRequirements;
+  /**
+   * Request facts operator rules may match on. `language` defaults to the
+   * primary subtag of `requires.language`.
+   */
+  context?: Record<string, string>;
+  /** Bridges to choose from. Default: every registered bridge (or the stub). */
+  bridges?: SpeechToTextBridge[];
+}
+
+export interface SpeechToTextSelection {
+  /** Eligible bridges, best first for the purpose. */
+  bridges: SpeechToTextBridge[];
+  decision: SeamProviderDecision;
+}
+
+/** Thrown when no bridge can meet the requirements; carries the audited decision. */
+export class SpeechToTextSelectionError extends Error {
+  constructor(readonly decision: SeamProviderDecision) {
+    super(`[STT_SELECTION] ${decision.rationale}`);
+    this.name = 'SpeechToTextSelectionError';
+  }
+}
+
+const GRANULARITY_RANK: Record<SpeechToTextCapabilities['granularity'], number> = {
+  none: 0,
+  segment: 1,
+  word: 2,
+};
+
+function unmetSpeechToTextRequirements(
+  bridge: SpeechToTextBridge,
+  requires: SpeechToTextRequirements
+): string[] {
+  const capabilities = getSpeechToTextCapabilities(bridge);
+  const unmet: string[] = [];
+  if (bridge.name === stubSpeechToTextBridge.name && !requires.allowSynthetic) {
+    unmet.push('synthetic output not allowed');
+  }
+  if (
+    requires.timestamps &&
+    (!capabilities.timestamps ||
+      GRANULARITY_RANK[capabilities.granularity] < GRANULARITY_RANK[requires.timestamps])
+  ) {
+    unmet.push(`timestamps (${requires.timestamps})`);
+  }
+  if (requires.localOnly && capabilities.local_only !== true) unmet.push('local_only');
+  if (!supportsSpeechLanguage(capabilities.languages, requires.language)) {
+    unmet.push(`language (${primaryLanguageSubtag(requires.language)})`);
+  }
+  return unmet;
+}
+
+/** Selection candidates (id, eligible, unmet) for a task's requirements. */
+export function listSpeechToTextCandidates(
+  requires: SpeechToTextRequirements = {},
+  bridges: SpeechToTextBridge[] = getSpeechToTextBridges()
+): Array<{ id: string; eligible: boolean; unmet: string[] }> {
+  return bridges.map((bridge) => {
+    const unmet = unmetSpeechToTextRequirements(bridge, requires);
+    return { id: bridge.name, eligible: unmet.length === 0, unmet };
+  });
+}
+
+function selectionContext(options: {
+  requires?: SpeechToTextRequirements;
+  context?: Record<string, string>;
+}): Record<string, string> | undefined {
+  const language = primaryLanguageSubtag(options.requires?.language);
+  const context = { ...(language ? { language } : {}), ...(options.context ?? {}) };
+  return Object.keys(context).length > 0 ? context : undefined;
+}
+
+/**
+ * Whether a caller without an explicit bridge should go through
+ * selectSpeechToTextBridges() rather than the priority default
+ * (getSpeechToTextBridge()): a purpose was given, an operator rule matches
+ * this request, or the priority default cannot meet the requirements and the
+ * policy names a fallback purpose. Otherwise the priority default stays.
+ */
+export function shouldSelectSpeechToTextBridges(
+  options: Omit<SelectSpeechToTextBridgesOptions, 'bridges'> & {
+    bridges?: SpeechToTextBridge[];
+  } = {}
+): boolean {
+  if (String(options.purpose || '').trim()) return true;
+  if (matchSeamSelectionRule(SPEECH_TO_TEXT_SEAM, { context: selectionContext(options) })) {
+    return true;
+  }
+  const requires = options.requires ?? {};
+  const bridges = options.bridges ?? getSpeechToTextBridges();
+  const priorityDefault = options.bridges
+    ? highestPriorityBridge(bridges)
+    : getSpeechToTextBridge();
+  if (!priorityDefault) return false;
+  if (unmetSpeechToTextRequirements(priorityDefault, requires).length === 0) return false;
+  return Boolean(getSeamSelectionPolicy(SPEECH_TO_TEXT_SEAM)?.fallback_purpose);
+}
+
+/**
+ * Purpose-driven bridge choice. Requirements decide eligibility from the
+ * bridges' declared capabilities; the governed selection policy ranks the
+ * eligible ones by purpose; the decision is audited and pinned per mission.
+ * Without a purpose, operator rules (matched on `context`) and then the seam
+ * default / fallback purpose decide (decision key `default`). Callers that
+ * have neither a purpose nor a reason to select (shouldSelectSpeechToTextBridges)
+ * keep using getSpeechToTextBridge() (priority).
+ */
+export function selectSpeechToTextBridges(
+  options: SelectSpeechToTextBridgesOptions = {}
+): SpeechToTextSelection {
+  const purpose = String(options.purpose || '').trim();
+  const requires = options.requires ?? {};
+  const bridges = options.bridges ?? getSpeechToTextBridges();
+  const candidates = listSpeechToTextCandidates(requires, bridges);
+  const context = selectionContext(options);
+  const decision = resolveSeamProviderDecision({
+    seam: SPEECH_TO_TEXT_SEAM,
+    candidates,
+    ...(purpose ? { purpose } : {}),
+    ...(context ? { context } : {}),
+    decisionKey: purpose || 'default',
+  });
+  if (decision.strategy === 'unresolved') {
+    const known = listSeamSelectionPurposes(SPEECH_TO_TEXT_SEAM);
+    if (purpose && !known.includes(purpose)) {
+      throw new Error(
+        `[STT_SELECTION] unknown purpose '${purpose}' for seam '${SPEECH_TO_TEXT_SEAM}' (known: ${known.join(', ')})`
+      );
+    }
+    throw new SpeechToTextSelectionError(decision);
+  }
+  const byName = new Map(bridges.map((bridge) => [bridge.name, bridge]));
+  return {
+    bridges: decision.ranked.flatMap((id) => byName.get(id) ?? []),
+    decision,
+  };
+}
+
 export function resetSpeechToTextBridge(): void {
   for (const dispose of registeredDisposers.values()) dispose();
   registeredDisposers.clear();
@@ -174,6 +376,11 @@ export function parseSpeechToTextCapabilities(
     granularity: value.granularity,
     ...(typeof value.local_only === 'boolean' ? { local_only: value.local_only } : {}),
     ...(typeof value.confidence === 'boolean' ? { confidence: value.confidence } : {}),
+    ...(Array.isArray(value.languages) &&
+    value.languages.length > 0 &&
+    value.languages.every((entry) => typeof entry === 'string' && entry.trim())
+      ? { languages: value.languages.map((entry) => primaryLanguageSubtag(entry as string)) }
+      : {}),
   };
 }
 
@@ -453,6 +660,20 @@ export function installShellSpeechToTextBridgeIfAvailable(
   return true;
 }
 
+const WHISPERKIT_CAPABILITIES: SpeechToTextCapabilities = {
+  timestamps: false,
+  granularity: 'none',
+  local_only: true,
+  languages: [...WHISPER_LANGUAGES],
+};
+
+const MLX_WHISPER_CAPABILITIES: SpeechToTextCapabilities = {
+  timestamps: true,
+  granularity: 'segment',
+  local_only: true,
+  languages: [...WHISPER_LANGUAGES],
+};
+
 export function buildWhisperKitTranscribeArgs(audioPath: string, language?: string): string[] {
   return [
     'transcribe',
@@ -488,7 +709,7 @@ export function installWhisperKitSpeechToTextBridgeIfAvailable(
   registerSpeechToTextBridge({
     name: 'whisperkit-cli',
     priority: detected?.priority ?? 0,
-    capabilities: { timestamps: false, granularity: 'none', local_only: true },
+    capabilities: WHISPERKIT_CAPABILITIES,
     async transcribe(input) {
       const audioAbs = resolveAudioPath(input.audioPath);
       if (!safeExistsSync(audioAbs)) {
@@ -517,7 +738,7 @@ export function installWhisperKitSpeechToTextBridgeIfAvailable(
         language: input.language || resolveLocale(),
         written_to: outputPath,
         backend: 'whisperkit-cli',
-        capabilities: { timestamps: false, granularity: 'none', local_only: true },
+        capabilities: WHISPERKIT_CAPABILITIES,
       };
     },
   });
@@ -554,7 +775,7 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   registerSpeechToTextBridge({
     name: 'mlx_whisper',
     priority,
-    capabilities: { timestamps: true, granularity: 'segment', local_only: true },
+    capabilities: MLX_WHISPER_CAPABILITIES,
     async transcribe(input) {
       const audioAbs = resolveAudioPath(input.audioPath);
       if (!safeExistsSync(audioAbs)) {
@@ -584,11 +805,7 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
         language: String(response.language || input.language || resolveLocale()),
         written_to: outputPath,
         backend: 'mlx_whisper',
-        capabilities: response.capabilities || {
-          timestamps: true,
-          granularity: 'segment',
-          local_only: true,
-        },
+        capabilities: response.capabilities || MLX_WHISPER_CAPABILITIES,
         ...(Array.isArray(response.segments)
           ? { segments: response.segments as TranscriptSegment[] }
           : {}),

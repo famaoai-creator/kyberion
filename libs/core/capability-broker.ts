@@ -1,14 +1,11 @@
-import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
-import { pathResolver } from './path-resolver.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
 import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-  safeWriteFile,
-} from './secure-io.js';
+  PIN_FILE_VERSION,
+  pinActorId as actorId,
+  readPinFile,
+  updatePinFile,
+  type PinnedEntry,
+} from './provider-pins-store.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
@@ -48,96 +45,18 @@ export interface ResolveProviderDecisionOptions extends CapabilityResolveOptions
   now?: number;
 }
 
-interface PinnedEntry {
-  provider: string;
-  modelId: string;
-  instance: string | null;
-  orchestration: HealthAwareResolution['orchestration'];
-  pinnedAt: string;
-  by: string;
-}
-
-interface PinFile {
-  version: string;
-  missionId?: string;
-  pins: Record<string, PinnedEntry>;
-}
-
-const PIN_FILE_VERSION = '1.0';
-const PROVIDER_PINS_SCHEMA_PATH = pathResolver.rootResolve(
-  'knowledge/product/schemas/provider-pins.schema.json'
-);
-
-function actorId(): string {
-  return (
-    getRegisteredEnvText('KYBERION_PERSONA') ||
-    getRegisteredEnvText('MISSION_ROLE') ||
-    'capability-broker'
-  );
-}
-
-/**
- * Where pins live. Inside the mission's own repo when MISSION_ID resolves to one (so they roll back
- * atomically with the mission); otherwise a shared runtime file keyed by mission id.
- */
-function pinFilePath(): string {
-  const missionId = getRegisteredEnvText('MISSION_ID');
-  if (missionId) {
-    for (const tier of ['personal', 'confidential', 'public']) {
-      const missionDir = pathResolver.rootResolve(path.join('active/missions', tier, missionId));
-      const missionStatePath = assertSafeRepositoryPath(
-        path.join(missionDir, 'mission-state.json'),
-        { allowMissingLeaf: true }
-      );
-      if (safeExistsSync(missionStatePath)) {
-        return assertSafeRepositoryPath(path.join(missionDir, 'provider-pins.json'), {
-          allowMissingLeaf: true,
-        });
-      }
-    }
-    return assertSafeRepositoryPath(
-      pathResolver.rootResolve(
-        path.join('active/shared/runtime/provider-pins', `${missionId}.json`)
-      ),
-      { allowMissingLeaf: true }
-    );
-  }
-  return assertSafeRepositoryPath(
-    pathResolver.rootResolve('active/shared/runtime/provider-pins/default.json'),
-    { allowMissingLeaf: true }
-  );
-}
-
-const providerPinsCatalog = defineCatalog<PinFile>({
-  id: 'provider-pins',
-  path: pinFilePath,
-  schema: PROVIDER_PINS_SCHEMA_PATH,
-});
-
-function readPinFile(): PinFile {
-  try {
-    const filePath = pinFilePath();
-    if (!safeLstat(filePath).isFile()) return { version: PIN_FILE_VERSION, pins: {} };
-    return providerPinsCatalog.load();
-  } catch {
-    /* treat as empty */
-  }
-  return { version: PIN_FILE_VERSION, pins: {} };
-}
-
-function writePinFile(file: PinFile): void {
-  const filePath = pinFilePath();
-  const dir = path.dirname(filePath);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(file, null, 2), { encoding: 'utf8' });
-}
+export type { PinnedEntry, SeamPinnedEntry } from './provider-pins-store.js';
+export {
+  loadSeamProviderPin,
+  pinSeamProviderDecision,
+  unpinSeamProviderDecision,
+} from './provider-pins-store.js';
 
 export function loadPinnedDecision(decisionKey: string): PinnedEntry | null {
   return readPinFile().pins[decisionKey] ?? null;
 }
 
 export function pinProviderDecision(decisionKey: string, decision: ProviderDecision): PinnedEntry {
-  const file = readPinFile();
   const entry: PinnedEntry = {
     provider: decision.provider,
     modelId: decision.modelId,
@@ -146,19 +65,20 @@ export function pinProviderDecision(decisionKey: string, decision: ProviderDecis
     pinnedAt: nowIso(),
     by: actorId(),
   };
-  file.version = PIN_FILE_VERSION;
-  file.missionId = getRegisteredEnvText('MISSION_ID');
-  file.pins[decisionKey] = entry;
-  writePinFile(file);
+  updatePinFile((file) => {
+    file.version = PIN_FILE_VERSION;
+    file.missionId = getRegisteredEnvText('MISSION_ID');
+    file.pins[decisionKey] = entry;
+    return file;
+  });
   return entry;
 }
 
 export function unpinProviderDecision(decisionKey: string): void {
-  const file = readPinFile();
-  if (file.pins[decisionKey]) {
-    delete file.pins[decisionKey];
-    writePinFile(file);
-  }
+  updatePinFile((file) => {
+    if (file.pins[decisionKey]) delete file.pins[decisionKey];
+    return file;
+  });
 }
 
 function recordDecision(decision: ProviderDecision): void {

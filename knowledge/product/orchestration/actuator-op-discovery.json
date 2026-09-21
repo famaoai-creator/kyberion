@@ -20685,6 +20685,9 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "allow_host_handoff": {
+                "type": "boolean"
+              },
               "aspectRatio": {
                 "type": "string"
               },
@@ -20726,6 +20729,9 @@
               },
               "providerPreference": {
                 "type": "array"
+              },
+              "purpose": {
+                "type": "string"
               },
               "reference_images": {
                 "type": "array"
@@ -20777,6 +20783,9 @@
               "backend_id": {
                 "type": "string"
               },
+              "duration_sec": {
+                "type": "number"
+              },
               "format": {
                 "type": "string"
               },
@@ -20806,6 +20815,9 @@
               },
               "providerPreference": {
                 "type": "array"
+              },
+              "purpose": {
+                "type": "string"
               },
               "request_id": {
                 "type": "string"
@@ -20845,6 +20857,9 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "aspect_ratio": {
+                "type": "string"
+              },
               "await_completion": {
                 "type": "boolean"
               },
@@ -20856,6 +20871,9 @@
               },
               "format": {
                 "type": "string"
+              },
+              "generate_audio": {
+                "type": "boolean"
               },
               "input_video": {
                 "type": "string"
@@ -20886,6 +20904,9 @@
               },
               "providerPreference": {
                 "type": "array"
+              },
+              "purpose": {
+                "type": "string"
               },
               "reference_images": {
                 "type": "array"
@@ -30370,6 +30391,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "purpose": {
+                "type": "string"
               }
             },
             "additionalProperties": false,
@@ -30416,6 +30440,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "purpose": {
+                "type": "string"
               }
             },
             "additionalProperties": false,
@@ -30463,6 +30490,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "purpose": {
+                "type": "string"
               }
             },
             "additionalProperties": false,
@@ -30547,7 +30577,26 @@
               "output_path": {
                 "type": "string"
               },
+              "purpose": {
+                "type": "string"
+              },
               "request_id": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string",
+                "enum": ["auto", "bridge", "fluid_audio", "mlx_whisper"]
+              },
+              "prefer_timestamps": {
+                "type": "boolean"
+              },
+              "allow_synthetic": {
+                "type": "boolean"
+              },
+              "write_sidecar": {
+                "type": "boolean"
+              },
+              "model": {
                 "type": "string"
               }
             },
@@ -30575,7 +30624,26 @@
               "output_path": {
                 "type": "string"
               },
+              "purpose": {
+                "type": "string"
+              },
               "request_id": {
+                "type": "string"
+              },
+              "backend": {
+                "type": "string",
+                "enum": ["auto", "bridge", "fluid_audio", "mlx_whisper"]
+              },
+              "prefer_timestamps": {
+                "type": "boolean"
+              },
+              "allow_synthetic": {
+                "type": "boolean"
+              },
+              "write_sidecar": {
+                "type": "boolean"
+              },
+              "model": {
                 "type": "string"
               },
               "sample_id": {

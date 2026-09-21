@@ -9,6 +9,7 @@
       "provider": "mlx_audio",
       "status": "active",
       "platforms": ["darwin"],
+      "languages": ["ja", "en"],
       "model_id": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
       "bridge_script": "libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py",
       "tts_adapter_id": "python_bridge",
@@ -23,7 +24,8 @@
         "icl_ref_audio": true
       },
       "fallback_engine_id": "local_say",
-      "notes": "8-bit quantized Qwen3-TTS 1.7B via mlx-audio. ICL voice cloning using ref_audio + ref_text — no fine-tuning required. Requires Apple Silicon (M1+) and governed tool-runtime entries for mlx-audio and mlx-whisper. Shadow until governance promotion."
+      "notes": "8-bit quantized Qwen3-TTS 1.7B via mlx-audio. ICL voice cloning using ref_audio + ref_text — no fine-tuning required. Requires Apple Silicon (M1+) and governed tool-runtime entries for mlx-audio and mlx-whisper. Shadow until governance promotion.",
+      "language_notes": "Upstream Qwen3-TTS covers more languages, but the runtime passes only lang_code ja/en to the bridge, so only ja/en are declared."
     }
   ]
 }

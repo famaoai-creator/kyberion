@@ -6,7 +6,7 @@ authority: reference
 phase: [execution]
 tags: [browser, actuator, playwright, chrome-extension, execution_substrate, security]
 owner: ecosystem_architect
-last_updated: 2026-09-21
+last_updated: 2026-09-22
 ---
 
 # Browser Execution Substrate — How To
@@ -95,7 +95,9 @@ For read-mostly procedures (navigate, fill, click, extract) add
 `pnpm kyberion procedure run` to run on Lightpanda instead of Chromium
 (install once with `pnpm tool:setup -- --tool lightpanda --apply`). Pipelines
 that need tabs, screenshots, passkeys, CDP attach or Chrome profiles are
-rejected before launch. Details:
+rejected before launch. Or pass `--browser-purpose throughput|evidence|authenticated`
+and let the [selection policy](./seam-provider-selection.md) choose among the
+runtimes that can run the steps (audited, pinned per mission). Details:
 [lightpanda-browser-runtime-evaluation](./lightpanda-browser-runtime-evaluation.md).
 
 ## Security model — read before enabling this for anything high-value

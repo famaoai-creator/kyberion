@@ -67,9 +67,15 @@
     },
     {
       "file": "libs/actuators/voice-actuator/src/index.ts",
-      "count": 8,
+      "count": 7,
       "classification": "migrate-candidate",
       "note": "mixed: loopback/STT intermediates (legit) plus voice samples, repairs, receipts (profile-scoped artifacts)"
+    },
+    {
+      "file": "libs/actuators/voice-actuator/src/voice-transcribe.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "transcript sidecar for the STT intermediate; consumable by the transcription flow"
     },
     {
       "file": "libs/actuators/voice-actuator/src/voice-loopback-helpers.ts",
@@ -244,6 +250,12 @@
       "count": 1,
       "classification": "migrate-candidate",
       "note": "screen-frame OCR/redaction intermediate; frame-scoped artifact"
+    },
+    {
+      "file": "libs/core/seam-calibration.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "mission-less calibration probe output; mission-bound runs use mission evidence"
     },
     {
       "file": "libs/core/spill-result.ts",

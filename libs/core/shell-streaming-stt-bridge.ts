@@ -31,7 +31,9 @@ import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import {
   registerStreamingSttBridge,
   type StreamingSpeechToTextBridge,
+  type StreamingSttCapabilities,
 } from './streaming-stt-bridge.js';
+import { WHISPER_LANGUAGES } from './speech-languages.js';
 import type { AudioChunk, TranscriptChunk } from './meeting-session-types.js';
 
 export interface ShellStreamingSttOptions {
@@ -40,6 +42,8 @@ export interface ShellStreamingSttOptions {
   args?: readonly string[];
   /** Optional env additions for the subprocess. */
   env?: Record<string, string>;
+  /** Declared capabilities for seam selection; unset = not declared (may be cloud). */
+  capabilities?: StreamingSttCapabilities;
 }
 
 /** Parse one untrusted NDJSON transcript emitted by the configured STT process. */
@@ -184,7 +188,11 @@ function terminateProcess(proc: ChildProcessWithoutNullStreams): void {
 }
 
 export function installShellStreamingSttBridge(opts: ShellStreamingSttOptions): void {
-  registerStreamingSttBridge(opts.bridge_id, () => new ShellStreamingSpeechToTextBridge(opts));
+  registerStreamingSttBridge(
+    opts.bridge_id,
+    () => new ShellStreamingSpeechToTextBridge(opts),
+    opts.capabilities
+  );
 }
 
 /**
@@ -218,7 +226,12 @@ export function installManagedMlxWhisperStreamingSttBridgeIfAvailable(
     return { installed: false, reason: 'managed mlx_whisper stream runtime is unavailable' };
   }
   const bridgeId = 'managed_mlx_whisper';
-  installShellStreamingSttBridge({ bridge_id: bridgeId, command, args: [script] });
+  installShellStreamingSttBridge({
+    bridge_id: bridgeId,
+    command,
+    args: [script],
+    capabilities: { local_only: true, languages: [...WHISPER_LANGUAGES] },
+  });
   logger.success('[stt-bridge] installed managed mlx_whisper streaming bridge');
   return { installed: true, bridge_id: bridgeId };
 }

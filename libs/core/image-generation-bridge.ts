@@ -34,6 +34,16 @@ import {
 import { resolveGeminiApiKey } from './gemini-api-backend.js';
 import { isAppleSilicon } from './platform.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
+import {
+  explainSeamProviderDecision,
+  listSeamSelectionPurposes,
+  resolveSeamProviderDecision,
+  type ResolveSeamProviderOptions,
+  type SeamProviderCandidate,
+} from './seam-provider-selection.js';
+import { matchSeamSelectionRule } from './seam-selection-rules.js';
+
+const IMAGE_GENERATION_PROVIDER_SEAM = 'image-generation-provider';
 
 const imageGenerationProviderSeam = createSeam<ImageGenerationProvider>({
   key: 'image-generation-provider',
@@ -725,6 +735,7 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
   readonly costTier = 'environment';
   readonly dataPolicy = 'zero_retention';
   readonly executionLocality = 'local';
+  readonly requiresInteractiveHandoff = true;
   protected abstract readonly config: HostBridgeProviderConfig;
 
   async isAvailable(): Promise<boolean> {
@@ -817,6 +828,34 @@ export class CursorHostBridgeImageGenerationProvider extends BaseHostBridgeImage
   };
 }
 
+/** Media backend registry id → image provider id (bridge providers without a record are absent). */
+const IMAGE_BACKEND_ID_TO_PROVIDER_ID: Record<string, string> = {
+  'media-generation.comfyui': 'comfyui',
+  'media-generation.gemini.imagen-3-fast': 'gemini_fast',
+  'media-generation.gemini': 'gemini_service',
+  'media-generation.host_agent': 'host_agent',
+  'media-generation.cursor_host_bridge': 'cursor_host_bridge',
+  'media-generation.local_flux': 'local_flux',
+  'media-generation.apple_playground': 'apple_playground',
+};
+
+/**
+ * The media backend registry id of an image provider (the id a generation
+ * result reports), or undefined for providers without a registry record.
+ */
+export function imageGenerationBackendIdForProvider(providerId: string): string | undefined {
+  return Object.entries(IMAGE_BACKEND_ID_TO_PROVIDER_ID).find(([, id]) => id === providerId)?.[0];
+}
+
+/** Request facts operator rules may match on (e.g. `{ mode: 'fast' }`). */
+function imageSelectionContext(request: ImageGenerationRequest): Record<string, string> {
+  const context: Record<string, string> = {};
+  if (request.mode) context.mode = request.mode;
+  const aspectRatio = request.aspectRatio?.trim();
+  if (aspectRatio) context.aspect_ratio = aspectRatio;
+  return context;
+}
+
 export class AdaptivePolicyRouter {
   private providers: Map<string, ImageGenerationProvider> = new Map();
   private fallbackGraph: Map<string, string> = new Map();
@@ -832,15 +871,7 @@ export class AdaptivePolicyRouter {
     try {
       const registry = getMediaBackendRegistry();
       const backends = registry.backends.filter((b) => b.modality === 'image');
-      const aliasToProviderId: Record<string, string> = {
-        'media-generation.comfyui': 'comfyui',
-        'media-generation.gemini.imagen-3-fast': 'gemini_fast',
-        'media-generation.gemini': 'gemini_service',
-        'media-generation.host_agent': 'host_agent',
-        'media-generation.cursor_host_bridge': 'cursor_host_bridge',
-        'media-generation.local_flux': 'local_flux',
-        'media-generation.apple_playground': 'apple_playground',
-      };
+      const aliasToProviderId = IMAGE_BACKEND_ID_TO_PROVIDER_ID;
       for (const b of backends) {
         if (b.fallback_backend_id) {
           const fromId = aliasToProviderId[b.backend_id] || b.backend_id;
@@ -853,31 +884,131 @@ export class AdaptivePolicyRouter {
     }
   }
 
+  /** Why the request's mode forbids this provider (hard constraint), or null. */
+  private modeViolation(
+    request: ImageGenerationRequest,
+    provider: ImageGenerationProvider
+  ): string | null {
+    if (
+      (request.mode === 'privacy_first' || request.mode === 'local_only') &&
+      provider.dataPolicy === 'training_eligible'
+    ) {
+      return `mode ${request.mode} excludes training_eligible data policy`;
+    }
+    if (request.mode === 'local_only' && provider.executionLocality !== 'local') {
+      return `mode local_only excludes ${provider.executionLocality ?? 'unknown'} execution`;
+    }
+    return null;
+  }
+
+  /**
+   * Eligibility of every registered provider for this request: the mode's
+   * hard constraints, availability and (unless allowed) interactive hand-off.
+   */
+  private async selectionCandidates(
+    request: ImageGenerationRequest,
+    allowHostHandoff: boolean
+  ): Promise<SeamProviderCandidate[]> {
+    const candidates: SeamProviderCandidate[] = [];
+    for (const provider of this.providers.values()) {
+      const unmet: string[] = [];
+      const violation = this.modeViolation(request, provider);
+      if (violation) unmet.push(violation);
+      if (provider.requiresInteractiveHandoff && !allowHostHandoff) {
+        unmet.push('interactive host hand-off not allowed (allow_host_handoff)');
+      }
+      if (unmet.length === 0 && !(await provider.isAvailable())) unmet.push('unavailable');
+      candidates.push({ id: provider.id, eligible: unmet.length === 0, unmet });
+    }
+    return candidates;
+  }
+
+  /** Candidates with eligibility for this request (hand-off only when allowed); for calibration. */
+  async listCandidates(request: ImageGenerationRequest): Promise<SeamProviderCandidate[]> {
+    return this.selectionCandidates(request, request.allowHostHandoff === true);
+  }
+
+  /**
+   * Purpose-driven chain: every registered provider is filtered by the mode's
+   * hard constraints, availability and (unless allowed) interactive hand-off;
+   * the eligible ones are ranked by the governed seam policy. The decision is
+   * audited and pinned per mission under the purpose.
+   */
+  private async resolvePurposeChain(
+    request: ImageGenerationRequest,
+    purpose: string
+  ): Promise<ImageGenerationProvider[]> {
+    const known = listSeamSelectionPurposes(IMAGE_GENERATION_PROVIDER_SEAM);
+    if (!known.includes(purpose)) {
+      throw new Error(
+        `[IMAGE_GENERATION_SELECTION] unknown purpose '${purpose}' for seam '${IMAGE_GENERATION_PROVIDER_SEAM}' (known: ${known.join(', ')})`
+      );
+    }
+    const candidates = await this.selectionCandidates(request, request.allowHostHandoff === true);
+    const decision = resolveSeamProviderDecision({
+      seam: IMAGE_GENERATION_PROVIDER_SEAM,
+      candidates,
+      purpose,
+      context: imageSelectionContext(request),
+      decisionKey: purpose,
+    });
+    if (!decision.provider_id) {
+      throw new Error(`[IMAGE_GENERATION_SELECTION] ${decision.rationale}`);
+    }
+    logger.info(
+      `[image_generation_bridge] provider '${decision.provider_id}' selected (${decision.strategy}): ${decision.rationale}`
+    );
+    return decision.ranked.map((id) => this.providers.get(id)!);
+  }
+
+  /**
+   * Without a purpose, an operator rule matching this request picks the
+   * provider that leads the mode chain (a mission pin it produced is reused).
+   * A request no rule matches keeps the mode chain unchanged — nothing is
+   * recorded or pinned for it. Hand-off providers stay eligible, as in the
+   * mode chain.
+   */
+  private async resolveOperatorRuleLead(request: ImageGenerationRequest): Promise<string[]> {
+    const context = imageSelectionContext(request);
+    if (!matchSeamSelectionRule(IMAGE_GENERATION_PROVIDER_SEAM, { context })) return [];
+    const options: ResolveSeamProviderOptions = {
+      seam: IMAGE_GENERATION_PROVIDER_SEAM,
+      candidates: await this.selectionCandidates(request, request.allowHostHandoff === true),
+      context,
+      decisionKey: 'default',
+    };
+    // A matching rule whose providers are all ineligible keeps the mode chain.
+    const preview = explainSeamProviderDecision(options);
+    if (preview.strategy !== 'rule' && preview.strategy !== 'pinned') return [];
+    const decision = resolveSeamProviderDecision(options);
+    if (!decision.provider_id) return [];
+    logger.info(
+      `[image_generation_bridge] provider '${decision.provider_id}' leads the ${request.mode || 'balanced'} chain (${decision.strategy}): ${decision.rationale}`
+    );
+    return [decision.provider_id];
+  }
+
   async resolveCandidateChain(request: ImageGenerationRequest): Promise<ImageGenerationProvider[]> {
+    const purpose = request.purpose?.trim();
+    const hasPreference = Boolean(request.providerPreference && request.providerPreference.length);
+    if (purpose && !hasPreference) {
+      return await this.resolvePurposeChain(request, purpose);
+    }
+    const ruleLead = hasPreference ? [] : await this.resolveOperatorRuleLead(request);
     const candidates: ImageGenerationProvider[] = [];
     const seenIds = new Set<string>();
 
     const addIfAvailableAndCompliant = async (provider: ImageGenerationProvider | undefined) => {
       if (!provider || seenIds.has(provider.id)) return;
-      if (
-        (request.mode === 'privacy_first' || request.mode === 'local_only') &&
-        provider.dataPolicy === 'training_eligible'
-      ) {
-        return;
-      }
-      if (request.mode === 'local_only' && provider.executionLocality !== 'local') {
-        return;
-      }
+      if (this.modeViolation(request, provider)) return;
       if (await provider.isAvailable()) {
         candidates.push(provider);
         seenIds.add(provider.id);
       }
     };
 
-    if (request.providerPreference && request.providerPreference.length > 0) {
-      for (const id of request.providerPreference) {
-        await addIfAvailableAndCompliant(this.providers.get(id));
-      }
+    for (const id of [...ruleLead, ...(request.providerPreference ?? [])]) {
+      await addIfAvailableAndCompliant(this.providers.get(id));
     }
 
     const mode = request.mode || 'balanced';
@@ -1030,6 +1161,22 @@ function getRouter(): AdaptivePolicyRouter {
     imageGenerationGlobalRouter = new AdaptivePolicyRouter(listImageGenerationProviders());
   }
   return imageGenerationGlobalRouter;
+}
+
+/** A registered image provider by id (built-ins included), e.g. to run one provider in isolation. */
+export function getImageGenerationProvider(id: string): ImageGenerationProvider | undefined {
+  ensureBuiltinImageGenerationProviders();
+  return listImageGenerationProviders().find((provider) => provider.id === id);
+}
+
+/**
+ * Every registered image provider with whether it can run this request
+ * unattended here and now (mode filters, availability, hand-off opt-in).
+ */
+export async function listImageGenerationCandidates(
+  request: ImageGenerationRequest
+): Promise<SeamProviderCandidate[]> {
+  return await getRouter().listCandidates(request);
 }
 
 export async function generateImage(

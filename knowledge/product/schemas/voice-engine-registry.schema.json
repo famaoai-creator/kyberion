@@ -24,6 +24,14 @@
             "minItems": 1,
             "items": { "type": "string", "enum": ["any", "darwin", "linux", "win32"] }
           },
+          "languages": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "Languages the engine can speak through Kyberion's runtime path: BCP-47 primary subtags (e.g. ja, en), or [\"*\"] when coverage depends on the host's installed voices. Missing = undeclared (never excluded by language).",
+            "items": { "type": "string", "pattern": "^([a-z]{2,3}|\\*)$" }
+          },
+          "language_notes": { "type": "string" },
           "supports": {
             "type": "object",
             "additionalProperties": false,

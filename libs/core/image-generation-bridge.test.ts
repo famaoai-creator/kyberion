@@ -1,4 +1,6 @@
+import * as path from 'node:path';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { pathResolver } from './path-resolver.js';
 import {
   AdaptivePolicyRouter,
   ComfyUiImageGenerationProvider,
@@ -64,6 +66,20 @@ vi.mock('./secure-io.js', async () => {
     safeMkdir: mocks.safeMkdir,
   };
 });
+
+const selectionMocks = vi.hoisted(() => ({
+  record: vi.fn(),
+  pinSeamProviderDecision: vi.fn(),
+}));
+
+vi.mock('./audit-chain.js', () => ({
+  auditChain: { record: selectionMocks.record },
+}));
+
+vi.mock('./provider-pins-store.js', () => ({
+  loadSeamProviderPin: () => null,
+  pinSeamProviderDecision: selectionMocks.pinSeamProviderDecision,
+}));
 
 const globalFetch = global.fetch;
 
@@ -928,5 +944,275 @@ describe('CursorHostBridgeImageGenerationProvider', () => {
         targetPath: 'needs-cursor-gen.png',
       })
     ).rejects.toThrow('HOST_BRIDGE_IMAGE_GENERATION_REQUIRED');
+  });
+});
+
+describe('AdaptivePolicyRouter purpose-driven selection', () => {
+  const provider = (
+    id: string,
+    traits: Partial<ImageGenerationProvider> = {},
+    available = true
+  ): ImageGenerationProvider => ({
+    id,
+    ...traits,
+    isAvailable: vi.fn().mockResolvedValue(available),
+    generate: vi.fn().mockResolvedValue({ status: 'succeeded', provider: id, elapsedMs: 1 }),
+  });
+  const local: Partial<ImageGenerationProvider> = {
+    costTier: 'self_hosted',
+    dataPolicy: 'local_only',
+    executionLocality: 'local',
+  };
+  const zeroRetention: Partial<ImageGenerationProvider> = {
+    costTier: 'paid',
+    dataPolicy: 'zero_retention',
+    executionLocality: 'remote',
+  };
+  const training: Partial<ImageGenerationProvider> = {
+    costTier: 'free',
+    dataPolicy: 'training_eligible',
+    executionLocality: 'remote',
+  };
+  const hostBridge: Partial<ImageGenerationProvider> = {
+    costTier: 'environment',
+    dataPolicy: 'zero_retention',
+    executionLocality: 'local',
+    requiresInteractiveHandoff: true,
+  };
+  const build = (overrides: Record<string, boolean> = {}) =>
+    new AdaptivePolicyRouter([
+      provider('comfyui', local, overrides.comfyui ?? true),
+      provider('gemini_fast', training, overrides.gemini_fast ?? true),
+      provider('gemini_service', zeroRetention, overrides.gemini_service ?? true),
+      provider('local_flux', local, overrides.local_flux ?? true),
+      provider('apple_playground', local, overrides.apple_playground ?? true),
+      provider('cursor_host_bridge', hostBridge, overrides.cursor_host_bridge ?? true),
+    ]);
+  const ids = (chain: ImageGenerationProvider[]) => chain.map((p) => p.id);
+
+  beforeEach(async () => {
+    vi.stubEnv('MISSION_ID', '');
+    // The governed policy is read from disk; other suites stub safeExistsSync.
+    const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+    mocks.safeExistsSync.mockReset().mockImplementation(actual.safeExistsSync);
+    selectionMocks.record.mockClear();
+    selectionMocks.pinSeamProviderDecision.mockClear();
+  });
+  afterEach(() => {
+    mocks.safeExistsSync.mockReset();
+    vi.unstubAllEnvs();
+  });
+
+  it('orders the whole chain by the purpose ranking and records the decision', async () => {
+    expect(ids(await build().resolveCandidateChain({ prompt: 'x', purpose: 'speed' }))).toEqual([
+      'gemini_fast',
+      'gemini_service',
+      'apple_playground',
+      'comfyui',
+      'local_flux',
+    ]);
+    expect(ids(await build().resolveCandidateChain({ prompt: 'x', purpose: 'quality' }))[0]).toBe(
+      'gemini_service'
+    );
+    expect(
+      ids(await build().resolveCandidateChain({ prompt: 'x', purpose: 'privacy' })).slice(0, 2)
+    ).toEqual(['comfyui', 'local_flux']);
+    expect(selectionMocks.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'provider_selection' })
+    );
+    expect(selectionMocks.pinSeamProviderDecision).not.toHaveBeenCalled();
+  });
+
+  it('keeps the mode hard filters and availability as eligibility', async () => {
+    const chain = await build({ gemini_service: false }).resolveCandidateChain({
+      prompt: 'x',
+      purpose: 'speed',
+      mode: 'local_only',
+    });
+    expect(ids(chain)).toEqual(['apple_playground', 'comfyui', 'local_flux']);
+    const decision = selectionMocks.record.mock.calls.at(-1)?.[0]?.metadata;
+    expect(decision.excluded).toEqual(
+      expect.arrayContaining([
+        { id: 'gemini_fast', unmet: ['mode local_only excludes training_eligible data policy'] },
+        { id: 'gemini_service', unmet: ['mode local_only excludes remote execution'] },
+      ])
+    );
+  });
+
+  it('excludes interactive host bridges unless hand-off is explicitly allowed', async () => {
+    const unattended = await build().resolveCandidateChain({ prompt: 'x', purpose: 'quality' });
+    expect(ids(unattended)).not.toContain('cursor_host_bridge');
+    const excluded = selectionMocks.record.mock.calls.at(-1)?.[0]?.metadata.excluded;
+    expect(excluded).toContainEqual({
+      id: 'cursor_host_bridge',
+      unmet: ['interactive host hand-off not allowed (allow_host_handoff)'],
+    });
+
+    const handoff = await build().resolveCandidateChain({
+      prompt: 'x',
+      purpose: 'quality',
+      allowHostHandoff: true,
+    });
+    expect(ids(handoff)).toContain('cursor_host_bridge');
+  });
+
+  it('lets an explicit provider preference win over the purpose', async () => {
+    const chain = await build().resolveCandidateChain({
+      prompt: 'x',
+      purpose: 'speed',
+      providerPreference: ['local_flux'],
+    });
+    expect(ids(chain)[0]).toBe('local_flux');
+    expect(selectionMocks.record).not.toHaveBeenCalled();
+  });
+
+  it('leaves the chain unchanged when no purpose is given', async () => {
+    const chain = await build().resolveCandidateChain({ prompt: 'x' });
+    expect(ids(chain)[0]).toBe('cursor_host_bridge');
+    expect(selectionMocks.record).not.toHaveBeenCalled();
+  });
+
+  it('throws on an unknown purpose naming the known ones', async () => {
+    await expect(build().resolveCandidateChain({ prompt: 'x', purpose: 'vibes' })).rejects.toThrow(
+      /unknown purpose 'vibes'.*known: cost, privacy, quality, speed/
+    );
+  });
+
+  it('throws when no provider is eligible for the purpose', async () => {
+    const router = new AdaptivePolicyRouter([provider('gemini_fast', training)]);
+    await expect(
+      router.resolveCandidateChain({ prompt: 'x', purpose: 'speed', mode: 'privacy_first' })
+    ).rejects.toThrow(/no provider can run this task/);
+  });
+
+  describe('operator rules without a purpose', () => {
+    const rulesDir = path.join(
+      pathResolver.sharedTmp('image-generation-rules-test'),
+      String(process.pid)
+    );
+    const rulesFile = path.join(rulesDir, 'rules.json');
+    const writeRules = async (rules: Array<Record<string, unknown>>) => {
+      const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+      actual.safeMkdir(rulesDir, { recursive: true });
+      actual.safeWriteFile(
+        rulesFile,
+        JSON.stringify({
+          version: '1.0.0',
+          rules: rules.map((rule) => ({
+            seam: 'image-generation-provider',
+            set_by: 'test',
+            set_at: '2026-09-22T00:00:00.000Z',
+            ...rule,
+          })),
+        })
+      );
+    };
+    beforeEach(() => vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', rulesFile));
+    afterEach(async () => {
+      const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+      actual.safeRmSync(rulesDir, { recursive: true, force: true });
+    });
+
+    it('lets a matching rule lead the mode chain and records it under the default key', async () => {
+      await writeRules([
+        { rule_id: 'fast-local', when: { context: { mode: 'fast' } }, prefer: ['local_flux'] },
+      ]);
+      const chain = await build().resolveCandidateChain({ prompt: 'x', mode: 'fast' });
+      expect(ids(chain)).toEqual([
+        'local_flux',
+        'gemini_fast',
+        'gemini_service',
+        'apple_playground',
+        'comfyui',
+        'cursor_host_bridge',
+      ]);
+      const decision = selectionMocks.record.mock.calls.at(-1)?.[0]?.metadata;
+      expect(decision).toEqual(
+        expect.objectContaining({
+          strategy: 'rule',
+          rule_id: 'fast-local',
+          decision_key: 'default',
+          context: { mode: 'fast' },
+        })
+      );
+    });
+
+    it('keeps the mode chain and records nothing when no rule matches', async () => {
+      await writeRules([
+        { rule_id: 'quality-only', when: { purpose: 'quality' }, prefer: ['comfyui'] },
+      ]);
+      const chain = await build().resolveCandidateChain({ prompt: 'x' });
+      expect(ids(chain)[0]).toBe('cursor_host_bridge');
+      expect(selectionMocks.record).not.toHaveBeenCalled();
+    });
+
+    it('keeps the mode chain when the matching rule prefers only ineligible providers', async () => {
+      await writeRules([{ rule_id: 'native-only', when: {}, prefer: ['windows_native'] }]);
+      const chain = await build().resolveCandidateChain({ prompt: 'x' });
+      expect(ids(chain)[0]).toBe('cursor_host_bridge');
+      expect(selectionMocks.record).not.toHaveBeenCalled();
+    });
+
+    it('does not let an operator rule bypass the interactive hand-off gate', async () => {
+      await writeRules([{ rule_id: 'host-only', when: {}, prefer: ['cursor_host_bridge'] }]);
+
+      const unattended = await build().resolveCandidateChain({
+        prompt: 'x',
+        mode: 'local_only',
+      });
+      expect(ids(unattended)).not.toContain('cursor_host_bridge');
+
+      const handoff = await build().resolveCandidateChain({
+        prompt: 'x',
+        mode: 'local_only',
+        allowHostHandoff: true,
+      });
+      expect(ids(handoff)[0]).toBe('cursor_host_bridge');
+    });
+
+    it('lets an explicit provider preference win over a rule', async () => {
+      await writeRules([{ rule_id: 'always-flux', when: {}, prefer: ['local_flux'] }]);
+      const chain = await build().resolveCandidateChain({
+        prompt: 'x',
+        providerPreference: ['comfyui'],
+      });
+      expect(ids(chain)[0]).toBe('comfyui');
+      expect(selectionMocks.record).not.toHaveBeenCalled();
+    });
+
+    it('passes request context to rules on the purpose path', async () => {
+      await writeRules([
+        {
+          rule_id: 'square-speed',
+          when: { purpose: 'speed', context: { aspect_ratio: '1:1' } },
+          prefer: ['comfyui'],
+        },
+      ]);
+      const square = await build().resolveCandidateChain({
+        prompt: 'x',
+        purpose: 'speed',
+        aspectRatio: '1:1',
+      });
+      expect(ids(square)[0]).toBe('comfyui');
+      const wide = await build().resolveCandidateChain({
+        prompt: 'x',
+        purpose: 'speed',
+        aspectRatio: '16:9',
+      });
+      expect(ids(wide)[0]).toBe('gemini_fast');
+    });
+  });
+
+  it('keeps rate-limit fallback along the ranked chain', async () => {
+    const router = build();
+    const [first, second] = await router.resolveCandidateChain({ prompt: 'x', purpose: 'speed' });
+    vi.mocked(first.generate).mockResolvedValue({
+      status: 'failed',
+      provider: first.id,
+      elapsedMs: 1,
+      error: '429 rate limit',
+    });
+    const result = await router.generateWithFallback({ prompt: 'x', purpose: 'speed' });
+    expect(result.provider).toBe(second.id);
   });
 });
