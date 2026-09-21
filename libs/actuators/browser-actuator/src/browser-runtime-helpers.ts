@@ -22,10 +22,12 @@ import { secureFetch } from '@agent/core/network';
 import { pathResolver } from '@agent/core/path-resolver';
 import { normalizeBrowserPipelineOp } from '@agent/core/op-vocabulary';
 import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
-import { chromium, type BrowserContext, type Page } from '@playwright/test';
+import { resolveBrowserAutomationRuntime } from '@agent/core/browser-automation-runtime-bridge';
+import type { Browser, BrowserContext, Page } from '@playwright/test';
 import * as path from 'node:path';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
+import './browser-automation-runtime-playwright.js';
 import { completeBrowserOperatorApproval } from './browser-approval-records.js';
 import { parseChromeCdpVersionResponse } from './browser-cdp-response.js';
 import {
@@ -1404,7 +1406,9 @@ export const browserRuntimeHelpers = {
     ) {
       try {
         logger.info(`🔁 [BROWSER] Reattaching to persisted session via CDP: ${persistedCdpUrl}`);
-        const browser = await chromium.connectOverCDP(persistedCdpUrl);
+        const browser = (await resolveBrowserAutomationRuntime().connectOverCDP(
+          persistedCdpUrl
+        )) as Browser;
         const context = browser.contexts()[0];
         if (!context) {
           await browser.close();
@@ -1446,7 +1450,7 @@ export const browserRuntimeHelpers = {
         );
       }
       logger.info(`🔌 [BROWSER] Attaching to existing Chrome via CDP: ${cdpUrl}`);
-      const browser = await chromium.connectOverCDP(cdpUrl);
+      const browser = (await resolveBrowserAutomationRuntime().connectOverCDP(cdpUrl)) as Browser;
       const context = browser.contexts()[0];
       if (!context) {
         await browser.close();
@@ -1469,7 +1473,7 @@ export const browserRuntimeHelpers = {
     logger.info(
       `🚀 [BROWSER] Launching session: ${sessionId} (Headless: ${options.headless !== false})`
     );
-    const context = await chromium.launchPersistentContext(userDataDir, {
+    const context = (await resolveBrowserAutomationRuntime().launchPersistentContext(userDataDir, {
       channel: options.browser_channel === 'chrome' ? 'chrome' : undefined,
       headless: options.headless !== false,
       viewport: options.viewport || { width: 1280, height: 720 },
@@ -1480,7 +1484,7 @@ export const browserRuntimeHelpers = {
         ...(options.profile_directory ? [`--profile-directory=${options.profile_directory}`] : []),
         '--remote-debugging-port=0',
       ],
-    });
+    })) as BrowserContext;
 
     const cdpEndpoint = await waitForCdpEndpoint(userDataDir);
     browserRuntimeLeases.set(sessionId, {

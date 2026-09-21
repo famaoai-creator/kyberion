@@ -157,6 +157,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/agent-pane-runtime-backend-poc.md",
+      "tier": "public",
+      "size": 2799,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/agent-runtime-dispatch-observability-findings.md",
       "tier": "public",
       "size": 4881,
@@ -454,6 +460,12 @@
       "path": "product/architecture/intent-outcome-patterns.md",
       "tier": "public",
       "size": 5751,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/judgment-backend-seam.md",
+      "tier": "public",
+      "size": 8912,
       "type": "md"
     },
     {
@@ -861,7 +873,7 @@
     {
       "path": "product/architecture/tool-runtime-abstraction.md",
       "tier": "public",
-      "size": 4026,
+      "size": 4634,
       "type": "md"
     },
     {
@@ -1407,7 +1419,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 47990,
+      "size": 48171,
       "type": "json"
     },
     {
@@ -1515,7 +1527,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 136211,
+      "size": 138726,
       "type": "json"
     },
     {
@@ -3153,7 +3165,7 @@
     {
       "path": "product/governance/provider-egress-policy.json",
       "tier": "public",
-      "size": 1042,
+      "size": 1135,
       "type": "json"
     },
     {
@@ -3447,7 +3459,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 17862,
+      "size": 18087,
       "type": "json"
     },
     {
@@ -3763,6 +3775,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/tool-runtimes/blackhole-2ch.json",
+      "tier": "public",
+      "size": 1262,
+      "type": "json"
+    },
+    {
       "path": "product/governance/tool-runtimes/claude_real_video.json",
       "tier": "public",
       "size": 1373,
@@ -3787,9 +3805,21 @@
       "type": "json"
     },
     {
+      "path": "product/governance/tool-runtimes/herdr.json",
+      "tier": "public",
+      "size": 1423,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/imagesnap.json",
+      "tier": "public",
+      "size": 1080,
+      "type": "json"
+    },
+    {
       "path": "product/governance/tool-runtimes/index.json",
       "tier": "public",
-      "size": 452,
+      "size": 503,
       "type": "json"
     },
     {
@@ -11475,7 +11505,7 @@
     {
       "path": "product/schemas/voice-action.schema.json",
       "tier": "public",
-      "size": 8087,
+      "size": 8129,
       "type": "json"
     },
     {

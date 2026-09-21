@@ -45,7 +45,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `terminal-actuator`: PTY-driven Terminal Actuator (5 ops, v1.0.0, schema knowledge/product/schemas/terminal-action.schema.json)
 - `video-composition-actuator`: Governed deterministic composed-video bundle preparation actuator (9 ops, v1.1.0)
 - `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (3 ops, v1.4.0, schema knowledge/product/schemas/vision-action.schema.json)
-- `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (12 ops, v1.7.0, schema knowledge/product/schemas/voice-action.schema.json)
+- `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (12 ops, v1.8.0, schema knowledge/product/schemas/voice-action.schema.json)
 - `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (81 ops, v1.6.0, schema knowledge/product/schemas/wisdom-action.schema.json)
 - `working-memory-actuator`: Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>'). (15 ops, v1.2.0, schema knowledge/product/schemas/working-memory-action.schema.json)
 

@@ -59,7 +59,7 @@ export function buildLoopbackRequest(
   text: string,
   language: string,
   profileId: string,
-  bus: 'blackhole' | 'stub',
+  bus: 'blackhole' | 'pulseaudio' | 'stub',
   dryRun: boolean
 ): TtsLoopbackVerificationRequest {
   const route = recordParam(params, 'audio_route');

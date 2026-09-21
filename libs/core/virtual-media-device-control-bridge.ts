@@ -4,7 +4,6 @@ import {
 } from './virtual-audio-device-bridge.js';
 import {
   createVirtualCameraBridge,
-  type VirtualCameraBackendIdExtended,
   type VirtualCameraBridgeOptions,
 } from './virtual-camera-bridge.js';
 import {
@@ -12,7 +11,8 @@ import {
   type VirtualDeviceInventoryBridge,
 } from './virtual-device-inventory-bridge.js';
 
-export const VIRTUAL_MEDIA_DEVICE_CONTROL_BRIDGE_ID = 'virtual-media-device-control-bridge' as const;
+export const VIRTUAL_MEDIA_DEVICE_CONTROL_BRIDGE_ID =
+  'virtual-media-device-control-bridge' as const;
 
 export type VirtualMediaDeviceControlAction = 'select' | 'add' | 'remove';
 export type VirtualMediaDeviceControlScope = 'audio' | 'camera' | 'all';
@@ -23,7 +23,7 @@ export interface VirtualMediaDeviceControlRequest {
   input_device_preference?: string;
   output_device_preference?: string;
   camera_device_preference?: string;
-  preferred_camera_backend?: VirtualCameraBackendIdExtended;
+  preferred_camera_backend?: string;
 }
 
 export interface VirtualMediaDeviceSelection {
@@ -37,7 +37,7 @@ export interface VirtualMediaDeviceSelection {
   };
   camera?: {
     bridge_id: string;
-    backend: VirtualCameraBackendIdExtended;
+    backend: string;
     available: boolean;
     reason?: string;
     device_preference?: string;
@@ -83,7 +83,11 @@ function normalizeScope(scope?: VirtualMediaDeviceControlScope): VirtualMediaDev
   return scope || 'all';
 }
 
-function buildHostPlan(scope: VirtualMediaDeviceControlScope): { audio?: string[]; camera?: string[]; notes: string[] } {
+function buildHostPlan(scope: VirtualMediaDeviceControlScope): {
+  audio?: string[];
+  camera?: string[];
+  notes: string[];
+} {
   const notes = [
     'Runtime selection is supported, but host-level add/remove requires OS-specific setup.',
   ];
@@ -157,7 +161,9 @@ export class VirtualMediaDeviceControlBridgeImpl {
     };
   }
 
-  async control(request: VirtualMediaDeviceControlRequest): Promise<VirtualMediaDeviceControlResult> {
+  async control(
+    request: VirtualMediaDeviceControlRequest
+  ): Promise<VirtualMediaDeviceControlResult> {
     const scope = normalizeScope(request.scope);
     const selection = await this.probe();
     if (request.action === 'select') {
@@ -179,13 +185,14 @@ export class VirtualMediaDeviceControlBridgeImpl {
       status: 'blocked',
       selection: selection.selection,
       host_plan: buildHostPlan(scope),
-      reason: 'host-level add/remove is not performed by the runtime bridge; use the host provisioning plan',
+      reason:
+        'host-level add/remove is not performed by the runtime bridge; use the host provisioning plan',
     };
   }
 }
 
 export function createVirtualMediaDeviceControlBridge(
-  opts: VirtualMediaDeviceControlBridgeOptions = {},
+  opts: VirtualMediaDeviceControlBridgeOptions = {}
 ): VirtualMediaDeviceControlBridgeImpl {
   return new VirtualMediaDeviceControlBridgeImpl(opts);
 }

@@ -17,6 +17,12 @@ import {
   type DelegationChain,
 } from './delegation-chain.js';
 import { type AgentHandle } from './agent-lifecycle.js';
+import {
+  parseAgentRuntimeLaunchMode,
+  resolveAgentRuntimeLaunchMode,
+  type AgentRuntimeLaunchMode,
+} from './agent-pane-runtime-bridge.js';
+import './agent-pane-runtime-herdr.js';
 import { getAgentManifest, resolveAgentSelectionHints } from './agent-manifest.js';
 import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
 import { listDemotedProviders } from './provider-health-registry.js';
@@ -686,12 +692,18 @@ class A2ABridgeImpl {
     const existing = supervisorHandle || this.handles.get(agentId);
     const requestedProvider = this.extractProvider(payload) || provider;
     const requestedModelId = this.extractProviderModelId(payload);
+    const requestedBackend = resolveAgentRuntimeLaunchMode({
+      runtimeBackend: this.extractRuntimeBackend(payload),
+    });
     const existingHandleRecord =
       existing && typeof existing.getRecord === 'function' ? existing.getRecord() : undefined;
     const existingRecord = existingHandleRecord || agentRegistry.get(agentId);
+    const existingBackend =
+      parseAgentRuntimeLaunchMode(existingRecord?.metadata?.runtime_backend) || 'pipe';
     const runtimeMatches =
       (!requestedProvider || existingRecord?.provider === requestedProvider) &&
-      (!requestedModelId || existingRecord?.modelId === requestedModelId);
+      (!requestedModelId || existingRecord?.modelId === requestedModelId) &&
+      existingBackend === requestedBackend;
     if (existing && this.runtimeContexts.get(agentId) === runtimeContextKey) {
       const record = agentRegistry.get(agentId);
       if (record && ['ready', 'busy', 'booting'].includes(record.status)) {
@@ -705,7 +717,11 @@ class A2ABridgeImpl {
         }
         logger.info(
           `[A2A_BRIDGE] Recreating ${agentId}: ${
-            providerDemoted ? `provider ${record.provider} is demoted` : 'runtime target changed'
+            providerDemoted
+              ? `provider ${record.provider} is demoted`
+              : existingBackend !== requestedBackend
+                ? `runtime backend changed (${existingBackend} → ${requestedBackend})`
+                : 'runtime target changed'
           }.`
         );
         try {
@@ -785,6 +801,7 @@ class A2ABridgeImpl {
       agentId,
       provider: resolvedProvider,
       modelId: resolvedModelId,
+      runtimeBackend: requestedBackend,
       ...(runtimeMissionId ? { missionId: runtimeMissionId } : {}),
       ...(runtimeScope ? { scope: runtimeScope } : {}),
       systemPrompt: manifest.systemPrompt,
@@ -796,6 +813,7 @@ class A2ABridgeImpl {
       runtimeOwnerType: typeof payloadContext?.mission_id === 'string' ? 'mission' : 'agent',
       runtimeMetadata: {
         lease_kind: 'a2a',
+        runtime_backend: requestedBackend,
         execution_mode: this.extractExecutionMode(payload) || 'default',
         mission_id:
           typeof payloadContext?.mission_id === 'string' ? payloadContext.mission_id : undefined,
@@ -907,6 +925,15 @@ class A2ABridgeImpl {
     const context = isRecord(payload.context) ? payload.context : undefined;
     const executionMode = context?.execution_mode;
     return typeof executionMode === 'string' ? executionMode : undefined;
+  }
+
+  /** Optional per-message launch substrate: `pipe` | `pane`. */
+  private extractRuntimeBackend(payload: unknown): AgentRuntimeLaunchMode | undefined {
+    if (!isRecord(payload)) return undefined;
+    const top = parseAgentRuntimeLaunchMode(payload.runtime_backend);
+    if (top) return top;
+    const context = isRecord(payload.context) ? payload.context : undefined;
+    return parseAgentRuntimeLaunchMode(context?.runtime_backend);
   }
 
   private extractSecurityScope(payload: unknown): ContextSecurityScope | undefined {

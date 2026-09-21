@@ -79,3 +79,13 @@ export function resolveXcodebuildBin(): string {
 export function resolvePython3Bin(): string {
   return firstConfiguredEnv('KYBERION_PYTHON_BIN', 'KYBERION_PYTHON') ?? 'python3';
 }
+
+/** Pane-runtime multiplexer CLI (Herdr). Env override wins over registry. */
+export function resolveHerdrBin(): string {
+  return resolveExternalToolBin('herdr', ['KYBERION_AGENT_PANE_RUNTIME_BIN'], 'herdr');
+}
+
+/** macOS ImageSnap still-capture CLI for virtual-camera-capture. */
+export function resolveImagesnapBin(): string {
+  return resolveExternalToolBin('imagesnap', ['KYBERION_IMAGESNAP_BIN'], 'imagesnap');
+}

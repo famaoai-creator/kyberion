@@ -14,6 +14,49 @@ import {
   probeWindowsNativeImageRecognition,
   recognizeTextWithWindowsNativeApi,
 } from './windows-native-image-recognition-bridge.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
+
+const ocrProviderSeam = createSeam<OcrProvider>({
+  key: 'ocr-provider',
+  multiplicity: 'named',
+  catalog: coreSeamCatalog,
+});
+
+const ocrProviderDisposers = new Map<string, () => void>();
+// Held as AdaptivePolicyRouter once classes below are constructed.
+let ocrGlobalRouter: any = null;
+let ocrBuiltinsRegistered = false;
+
+/** Register an OCR backend into the ocr-provider seam. */
+export function registerOcrProvider(provider: OcrProvider): () => void {
+  const id = String(provider.id || '').trim();
+  if (!id) throw new Error('OcrProvider.id is required');
+  ocrProviderDisposers.get(id)?.();
+  const disposer = ocrProviderSeam.register(id, provider, {
+    provenance: 'builtin',
+    source: 'ocr-bridge',
+  });
+  ocrProviderDisposers.set(id, disposer);
+  ocrGlobalRouter = null;
+  return disposer;
+}
+
+export function listOcrProviders(): OcrProvider[] {
+  return ocrProviderSeam.list().map((entry) => entry.implementation);
+}
+
+export function resetOcrProviders(): void {
+  for (const dispose of ocrProviderDisposers.values()) {
+    try {
+      dispose();
+    } catch {
+      /* noop */
+    }
+  }
+  ocrProviderDisposers.clear();
+  ocrGlobalRouter = null;
+  ocrBuiltinsRegistered = false;
+}
 
 export class WindowsNativeOcrProvider implements OcrProvider {
   readonly id = 'windows_native';
@@ -641,19 +684,22 @@ export class AdaptivePolicyRouter {
   }
 }
 
-let globalRouter: AdaptivePolicyRouter | null = null;
+function ensureBuiltinOcrProviders(): void {
+  if (ocrBuiltinsRegistered && listOcrProviders().length > 0) return;
+  registerOcrProvider(new WindowsNativeOcrProvider());
+  registerOcrProvider(new AppleVisionOcrProvider());
+  registerOcrProvider(new LlmApiOcrProvider());
+  registerOcrProvider(new LocalVlmOcrProvider());
+  registerOcrProvider(new TesseractOcrProvider());
+  ocrBuiltinsRegistered = true;
+}
 
 function getRouter(): AdaptivePolicyRouter {
-  if (!globalRouter) {
-    globalRouter = new AdaptivePolicyRouter([
-      new WindowsNativeOcrProvider(),
-      new AppleVisionOcrProvider(),
-      new LlmApiOcrProvider(),
-      new LocalVlmOcrProvider(),
-      new TesseractOcrProvider(),
-    ]);
+  ensureBuiltinOcrProviders();
+  if (!ocrGlobalRouter) {
+    ocrGlobalRouter = new AdaptivePolicyRouter(listOcrProviders());
   }
-  return globalRouter;
+  return ocrGlobalRouter;
 }
 
 export async function ocrImage(request: OcrRequest): Promise<OcrResult> {

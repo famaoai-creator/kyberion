@@ -116,6 +116,7 @@
     "chronos": "node dist/scripts/chronos_daemon.js",
     "ops:alerts": "node --import ./scripts/ts-loader.mjs scripts/ops_alerts.ts",
     "agy:sdk:setup": "node --import ./scripts/ts-loader.mjs scripts/agy_sdk_setup.ts",
+    "tool:setup": "node --import ./scripts/ts-loader.mjs scripts/tool_runtime_setup.ts",
     "reasoning:setup": "node dist/scripts/reasoning_setup.js",
     "reasoning:config": "node dist/scripts/reasoning_config.js",
     "customer:create": "node --import ./scripts/ts-loader.mjs scripts/customer_create.ts",
