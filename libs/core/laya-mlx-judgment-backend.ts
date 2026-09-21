@@ -199,9 +199,11 @@ function spawnLayaWorker(options: LayaMlxOptions): LayaWorker {
   };
   process.once('exit', killOnExit);
   child.unref();
-  child.stdin.unref();
-  child.stdout.unref();
-  child.stderr.unref();
+  // With stdio 'pipe' these are Sockets at runtime and each holds the event
+  // loop open on its own, but the stream types do not declare `unref`.
+  for (const stream of [child.stdin, child.stdout, child.stderr]) {
+    (stream as unknown as { unref?: () => void }).unref?.();
+  }
 
   const pending: Array<(reply: LayaWorkerReply) => void> = [];
   let buffer = '';

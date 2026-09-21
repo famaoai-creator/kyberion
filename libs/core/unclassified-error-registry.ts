@@ -14,6 +14,14 @@ export interface UnclassifiedErrorEntry {
   occurrence_count: number;
   reconciled: boolean;
   reconciled_at?: string;
+  /**
+   * The category this entry was resolved to. Without it the registry records
+   * *that* something was reconciled but not *to what*, which leaves it a
+   * queue of inputs rather than a labelled corpus — and a labelled corpus
+   * from real traffic is the one thing calibration needs and synthetic
+   * benches cannot supply.
+   */
+  reconciled_category?: string;
 }
 
 interface UnclassifiedErrorRegistry {
@@ -126,7 +134,7 @@ export function listUnclassifiedErrors(): UnclassifiedErrorEntry[] {
   return readRegistry().entries;
 }
 
-export function markReconciled(excerpts: string[]): void {
+export function markReconciled(excerpts: string[], category?: string): void {
   try {
     const set = new Set(excerpts);
     const registry = readRegistry();
@@ -135,6 +143,7 @@ export function markReconciled(excerpts: string[]): void {
       if (set.has(entry.message_excerpt)) {
         entry.reconciled = true;
         entry.reconciled_at = now;
+        if (category?.trim()) entry.reconciled_category = category.trim();
       }
     }
     writeRegistry(registry);

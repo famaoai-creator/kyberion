@@ -2907,6 +2907,22 @@
       "types": "./dist/laya-mlx-judgment-backend.d.ts",
       "default": "./dist/laya-mlx-judgment-backend.js"
     },
+    "./judgment-assist": {
+      "types": "./dist/judgment-assist.d.ts",
+      "default": "./dist/judgment-assist.js"
+    },
+    "./error-classifier-judgment": {
+      "types": "./dist/error-classifier-judgment.d.ts",
+      "default": "./dist/error-classifier-judgment.js"
+    },
+    "./knowledge-relevance-judgment": {
+      "types": "./dist/knowledge-relevance-judgment.d.ts",
+      "default": "./dist/knowledge-relevance-judgment.js"
+    },
+    "./browser-judgment": {
+      "types": "./dist/browser-judgment.d.ts",
+      "default": "./dist/browser-judgment.js"
+    },
     "./tool-call-scheduler": {
       "types": "./dist/tool-call-scheduler.d.ts",
       "default": "./dist/tool-call-scheduler.js"
