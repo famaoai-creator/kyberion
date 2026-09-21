@@ -4,6 +4,7 @@ import {
   resolveExternalToolBin,
   resolveFfmpegBin,
   resolveFfprobeBin,
+  resolveLightpandaBin,
   resolvePython3Bin,
   resolveXcodebuildBin,
   resolveXcrunBin,
@@ -44,6 +45,13 @@ describe('tool binary resolvers', () => {
 
     vi.stubEnv('KYBERION_PYTHON_BIN', '/opt/current/python');
     expect(resolvePython3Bin()).toBe('/opt/current/python');
+  });
+
+  it('resolves Lightpanda through its env override, then the registry command', () => {
+    vi.stubEnv('KYBERION_LIGHTPANDA_BIN', '/opt/kyberion/bin/lightpanda');
+    expect(resolveLightpandaBin()).toBe('/opt/kyberion/bin/lightpanda');
+    vi.stubEnv('KYBERION_LIGHTPANDA_BIN', '');
+    expect(resolveLightpandaBin()).toMatch(/lightpanda$/);
   });
 
   it('falls back to the literal only when the registry record is unavailable', () => {
