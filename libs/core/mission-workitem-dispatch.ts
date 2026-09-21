@@ -60,7 +60,7 @@ import {
   buildClarificationArtifactPath,
   obtainTaskResultResponse,
 } from './mission-workitem-dispatch-internals.js';
-import { recordRoutingOutcome } from './task-routing-judgment.js';
+import { classifyDispatchFailure, recordRoutingOutcome } from './task-routing-judgment.js';
 import type {
   MissionWorkItemDispatchOptions,
   MissionWorkItemDispatchRecord,
@@ -218,6 +218,8 @@ async function dispatchMissionWorkItemsRound(
      * baseline run that succeeded is evidence about that tier too.
      */
     const recordRouting = (): void => {
+      // A refusal before the model runs is not the model failing.
+      const blockedBy = classifyDispatchFailure(record.notes || []);
       recordRoutingOutcome({
         task: [item.title, item.description].filter(Boolean).join('\n'),
         phase_kind: 'implement',
@@ -225,10 +227,13 @@ async function dispatchMissionWorkItemsRound(
         chosen_tier: taskModelHint.tier,
         chosen_by: routing.downgraded ? 'judgment' : 'baseline',
         succeeded:
+          !blockedBy &&
           record.status !== 'failed' &&
           record.work_item_status_after !== 'blocked' &&
           record.reviewer_status !== 'refuted' &&
           record.reviewer_status !== 'blocked',
+        outcome: blockedBy ? 'not_attempted' : 'attempted',
+        ...(blockedBy ? { not_attempted_reason: blockedBy } : {}),
       });
     };
     const teamAssignment = teamRole

@@ -100,9 +100,38 @@ const PROMPT_SIGNATURES: PromptSignature[] = [
 const STARTING_SIGNATURES =
   /starting|loading|initializ|connecting|booting|installing|downloading|fetching|起動中|読み込み中/i;
 
-/** Output that means the agent is taking work. */
-const READY_SIGNATURES =
-  /ready|awaiting (input|instructions)|how can i help|what would you like|type a message|›\s*$|待機中/i;
+/**
+ * Output that means the agent is taking work.
+ *
+ * Taken from real panes, because the first version was written from
+ * imagination and missed every agent that was actually running: all three
+ * of a mission's ready agents classified as `starting`. None of them says
+ * "ready" or "how can I help". They show an input caret and a hint line:
+ *
+ *     agy (Antigravity CLI)      >            ? for shortcuts
+ *     claude (Claude Code)       ❯            ⏵⏵ auto mode on (shift+tab to cycle)
+ *
+ * The caret alone on a line is the strongest signal; the hint lines are the
+ * second, and survive a pane too narrow to render the caret row cleanly.
+ */
+const READY_SIGNATURES = new RegExp(
+  [
+    // An input caret alone on its line: > (agy), ❯ (claude), › (others).
+    '^\\s*[>❯›]\\s*$',
+    // Hint lines printed under an idle input.
+    '\\? for shortcuts',
+    'auto mode (on|off)',
+    'shift\\+tab to cycle',
+    // Generic phrasing some CLIs use.
+    'ready',
+    'awaiting (input|instructions)',
+    'how can i help',
+    'what would you like',
+    'type a message',
+    '待機中',
+  ].join('|'),
+  'im'
+);
 
 /**
  * Classify what a pane's recent output means.

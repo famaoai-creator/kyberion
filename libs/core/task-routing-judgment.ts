@@ -159,6 +159,33 @@ export async function routeTaskWithJudgment(input: RouteTaskInput): Promise<Rout
 
 // --- outcome ledger ----------------------------------------------------------
 
+/**
+ * Failures that happen before any model sees the task.
+ *
+ * Matched on the codes dispatch already emits. Anything unrecognised is
+ * treated as attempted — misfiling a real model failure as infrastructure
+ * would hide exactly the signal the corpus exists to collect, so the list
+ * only grows when a code is known to fire before the model runs.
+ */
+const NOT_ATTEMPTED_CODES = [
+  'CONTEXT_EGRESS_DENIED',
+  'PROVIDER_EGRESS_DENIED',
+  'EXECUTION_SURFACE_UNAVAILABLE',
+  'AGENT_RUNTIME_AWAITING_HUMAN',
+  'MISSION_WORKITEM_SCOPE_REQUIRED',
+  'SCOPE_CONTEXT_INVALID',
+];
+
+/** The code that stopped dispatch before the model, if any. */
+export function classifyDispatchFailure(notes: readonly string[]): string | undefined {
+  for (const note of notes) {
+    for (const code of NOT_ATTEMPTED_CODES) {
+      if (note.includes(`[${code}]`)) return code;
+    }
+  }
+  return undefined;
+}
+
 export interface RoutingOutcome {
   /** Task text, truncated; the input half of a labelled pair. */
   task_excerpt: string;
@@ -170,6 +197,24 @@ export interface RoutingOutcome {
   chosen_by: 'baseline' | 'judgment';
   /** Whether the chosen tier completed the task. */
   succeeded: boolean;
+  /**
+   * Whether the model was ever asked.
+   *
+   * A dispatch that fails before the model runs says nothing about the
+   * model. The first six entries this ledger ever held were all like that —
+   * four with no A2A route and two refused by the egress gate — and every
+   * one was recorded as the small tier failing a task it never saw. Those
+   * are infrastructure and policy outcomes, and treating them as model
+   * failures would teach a router that small models are bad at things they
+   * were not allowed to attempt.
+   *
+   * `not_attempted` entries stay in the ledger, because they are useful for
+   * seeing what keeps blocking dispatch, and `exportRoutingCorpus()` ignores
+   * them. Absent on older entries; read as `attempted`.
+   */
+  outcome?: 'attempted' | 'not_attempted';
+  /** Why a `not_attempted` entry never reached the model. */
+  not_attempted_reason?: string;
   /** The tier that did complete it, when the chosen one did not. */
   escalated_to?: TaskModelTier;
   recorded_at: string;
@@ -206,6 +251,10 @@ export function recordRoutingOutcome(
       chosen_tier: outcome.chosen_tier,
       chosen_by: outcome.chosen_by,
       succeeded: outcome.succeeded,
+      ...(outcome.outcome ? { outcome: outcome.outcome } : {}),
+      ...(outcome.not_attempted_reason
+        ? { not_attempted_reason: outcome.not_attempted_reason }
+        : {}),
       ...(outcome.escalated_to ? { escalated_to: outcome.escalated_to } : {}),
       recorded_at: nowIso(),
     };
@@ -259,6 +308,8 @@ export interface RoutingCorpusItem {
 export function exportRoutingCorpus(): RoutingCorpusItem[] {
   const byTask = new Map<string, RoutingOutcome[]>();
   for (const outcome of loadRoutingOutcomes()) {
+    // A policy refusal or a missing route is not evidence about any tier.
+    if (outcome.outcome === 'not_attempted') continue;
     const list = byTask.get(outcome.task_excerpt) || [];
     list.push(outcome);
     byTask.set(outcome.task_excerpt, list);
