@@ -12,6 +12,7 @@ import {
 } from '@agent/core/browser-automation-runtime-bridge';
 import { logger } from '@agent/core/core';
 import { resolveSeamProviderDecision } from '@agent/core/seam-provider-selection';
+import { matchSeamSelectionRule } from '@agent/core/seam-selection-rules';
 import { isRecord } from '@agent/core/foundation';
 
 type Capability = keyof BrowserAutomationRuntimeCapabilities;
@@ -171,18 +172,20 @@ const BROWSER_RUNTIME_SEAM = 'browser-automation-runtime';
 
 /**
  * Purpose-driven runtime choice: only when the caller named no runtime (or
- * `auto`) and stated `runtime_purpose`. Every registered runtime is filtered
- * by what this pipeline needs, the rest are ranked by the governed selection
- * policy, and the decision is audited and pinned per mission. The chosen id
- * is written back as `browser_runtime`, so nested calls do not re-select.
+ * `auto`) and either stated `runtime_purpose` or an operator rule matches
+ * (so a rule can still apply to an otherwise-default choice). Every registered runtime is filtered by what this pipeline needs,
+ * the rest are ranked by the governed selection policy, and the decision is
+ * audited and pinned per mission. The chosen id is written back as
+ * `browser_runtime`, so nested calls do not re-select.
  */
 export function selectBrowserAutomationRuntime(
   steps: unknown,
   options: Record<string, any>
 ): string | undefined {
   const explicit = String(options.browser_runtime ?? '').trim();
+  if (explicit && explicit !== 'auto') return undefined;
   const purpose = String(options.runtime_purpose ?? '').trim();
-  if ((explicit && explicit !== 'auto') || !purpose) return undefined;
+  if (!purpose && !matchSeamSelectionRule(BROWSER_RUNTIME_SEAM, {})) return undefined;
   const candidates = listBrowserAutomationRuntimeBridges().map((bridge) => {
     const { blocking } = preflightBrowserRuntimePipeline(
       steps,
@@ -198,8 +201,8 @@ export function selectBrowserAutomationRuntime(
   const decision = resolveSeamProviderDecision({
     seam: BROWSER_RUNTIME_SEAM,
     candidates,
-    purpose,
-    decisionKey: purpose,
+    ...(purpose ? { purpose } : {}),
+    decisionKey: purpose || 'default',
   });
   if (!decision.provider_id) {
     throw new Error(`[BROWSER_RUNTIME_SELECTION] ${decision.rationale}`);
