@@ -19,6 +19,7 @@ import { decideFromObservation, executeLlmDecideOp } from '@agent/core/semantic-
 import { getSecret } from '@agent/core/secret-guard';
 import { clamp, isRecord, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import { opControl } from './browser-control-helpers.js';
@@ -121,12 +122,17 @@ function buildRetryOptions(stepParams: Record<string, any>) {
 
 export async function executePipeline(
   inputSteps: PipelineStep[],
-  sessionId: string,
-  options: any,
+  inputSessionId: string,
+  inputOptions: any,
   initialCtx: any = {}
 ) {
   const steps = inputSteps.map((step) =>
     step && typeof step === 'object' && step.op === 'navigate' ? { ...step, op: 'goto' } : step
+  );
+  const { sessionId, options } = preflightAutomationRuntime(
+    steps,
+    inputSessionId,
+    inputOptions ?? {}
   );
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || 300000;

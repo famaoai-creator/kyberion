@@ -22,6 +22,7 @@ import {
   runActuatorCliEntryPoint,
 } from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
+import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 
 /**
  * Browser-Actuator v2.2.0 [TRACE & RECORD ENABLED]
@@ -52,6 +53,8 @@ interface BrowserAction {
     keep_alive?: boolean;
     user_data_dir?: string;
     browser_channel?: 'chromium' | 'chrome';
+    /** browser-automation-runtime provider id (`playwright-chromium` default, `lightpanda`). */
+    browser_runtime?: string;
     profile_directory?: string;
     launch_args?: string[];
     connect_over_cdp?: boolean;
@@ -118,6 +121,12 @@ async function handleAction(input: unknown) {
     );
   }
   if (input.steps?.length === 1 && input.steps[0]?.op === 'extension_session') {
+    // This import/preflight path intentionally does not launch a browser, but
+    // an explicitly selected runtime still owns the capability contract. In
+    // particular, Lightpanda cannot attach to the live extension tab.
+    if (input.options?.browser_runtime) {
+      preflightAutomationRuntime(input.steps, input.session_id || 'default', input.options);
+    }
     return handleExtensionSessionPreflight(input.steps[0].params || {}, input.context || {});
   }
   return await executeBrowserPipeline(

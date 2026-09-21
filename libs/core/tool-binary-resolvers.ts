@@ -1,14 +1,15 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync } from './secure-io.js';
-import { getToolRuntimeRecord } from './tool-runtime-registry.js';
+import { findInstalledManagedBinary, getToolRuntimeRecord } from './tool-runtime-registry.js';
 
 /**
  * Governed external-tool binary resolvers (WS1).
  *
  * Override order mirrors the blackhole-audio-bus reference pattern
  * (`opts.ffmpeg_bin ?? 'ffmpeg'`): explicit KYBERION_*_BIN env override
- * first, governed registry command second, hardcoded literal last so every
+ * first, an installed `managed_binary` in the tool's managed env second,
+ * governed registry command third, hardcoded literal last so every
  * call site stays behavior-preserving when neither is configured.
  */
 
@@ -31,12 +32,25 @@ function registryCommand(toolId: string): string | null {
   }
 }
 
+function managedBinary(toolId: string): string | null {
+  try {
+    return findInstalledManagedBinary(toolId);
+  } catch {
+    return null;
+  }
+}
+
 export function resolveExternalToolBin(
   toolId: string,
   envNames: string[],
   literalFallback: string
 ): string {
-  return firstConfiguredEnv(...envNames) ?? registryCommand(toolId) ?? literalFallback;
+  return (
+    firstConfiguredEnv(...envNames) ??
+    managedBinary(toolId) ??
+    registryCommand(toolId) ??
+    literalFallback
+  );
 }
 
 export function resolveFfmpegBin(): string {
@@ -88,4 +102,9 @@ export function resolveHerdrBin(): string {
 /** macOS ImageSnap still-capture CLI for virtual-camera-capture. */
 export function resolveImagesnapBin(): string {
   return resolveExternalToolBin('imagesnap', ['KYBERION_IMAGESNAP_BIN'], 'imagesnap');
+}
+
+/** Lightpanda headless browser (CDP server) for the browser-automation-runtime seam. */
+export function resolveLightpandaBin(): string {
+  return resolveExternalToolBin('lightpanda', ['KYBERION_LIGHTPANDA_BIN'], 'lightpanda');
 }

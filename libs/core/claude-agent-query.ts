@@ -99,6 +99,38 @@ export interface ClaudeAgentQueryResult<T> {
   numTurns: number;
 }
 
+/**
+ * Options that define the Kyberion governance boundary. Callers may provide
+ * harmless SDK tuning through `extraOptions`, but they must not be able to
+ * replace the prompt, tools, permission gate, MCP servers, or turn budget that
+ * this wrapper establishes.
+ */
+const GOVERNED_EXTRA_OPTION_KEYS = [
+  'systemPrompt',
+  'model',
+  'tools',
+  'maxTurns',
+  'permissionMode',
+  'outputFormat',
+  'abortController',
+  'mcpServers',
+  'allowedTools',
+  'canUseTool',
+  'agents',
+  'settingSources',
+  'settings',
+  'plugins',
+  'hooks',
+  'cwd',
+  'env',
+] as const;
+
+function sanitizeClaudeAgentExtraOptions(extraOptions?: Partial<Options>): Partial<Options> {
+  const sanitized = { ...(extraOptions ?? {}) } as Record<string, unknown>;
+  for (const key of GOVERNED_EXTRA_OPTION_KEYS) delete sanitized[key];
+  return sanitized as Partial<Options>;
+}
+
 export class ClaudeAgentQueryError extends Error {
   constructor(
     message: string,
@@ -126,6 +158,7 @@ export async function runClaudeAgentQuery<T>(
   if ('$schema' in jsonSchema) delete jsonSchema['$schema'];
 
   const options: Options = {
+    ...sanitizeClaudeAgentExtraOptions(params.extraOptions),
     systemPrompt: params.systemPrompt,
     model: params.model ?? 'opus',
     tools: [],
@@ -136,7 +169,6 @@ export async function runClaudeAgentQuery<T>(
     permissionMode: 'dontAsk',
     outputFormat: { type: 'json_schema', schema: jsonSchema },
     abortController: params.abortController,
-    ...(params.extraOptions ?? {}),
   };
 
   const iterator = query({ prompt: params.userPrompt, options });
@@ -268,6 +300,7 @@ export async function runClaudeAgentTask(
 ): Promise<ClaudeAgentTaskResult> {
   assertReasoningEgressAllowed('claude-agent');
   const options: Options = {
+    ...sanitizeClaudeAgentExtraOptions(params.extraOptions),
     systemPrompt: params.systemPrompt,
     model: params.model ?? 'opus',
     maxTurns: params.maxTurns ?? 8,
@@ -277,7 +310,6 @@ export async function runClaudeAgentTask(
     ...(params.canUseTool ? { canUseTool: params.canUseTool } : {}),
     ...(params.agents ? { agents: params.agents } : {}),
     abortController: params.abortController,
-    ...(params.extraOptions ?? {}),
   };
 
   const iterator = query({ prompt: params.userPrompt, options });
