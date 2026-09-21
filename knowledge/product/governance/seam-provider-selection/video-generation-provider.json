@@ -1,0 +1,173 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "video-generation-provider",
+      "default_provider": "media-generation.comfyui.video",
+      "traits": {
+        "quality": "Visual fidelity, motion coherence and prompt adherence of the generated clip.",
+        "speed": "Wall-clock from submission to a downloaded clip (provider queue + render).",
+        "cost": "Marginal money cost per clip: self-hosted is cheap, free-tier quota next, billed APIs lowest. Derived from the backend's declared cost_tier.",
+        "privacy": "How far the prompt and reference frames travel: local_only > zero_retention (remote, not retained) > training_eligible (remote, may be used for training). Derived from the backend's declared data_policy / execution_locality."
+      },
+      "providers": {
+        "media-generation.comfyui.video": {
+          "traits": {
+            "quality": 0.5,
+            "speed": 0.2,
+            "cost": 0.9,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "cost": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/media-backends/media-generation.comfyui.video.json (service_preset, self_hosted, local_only; runs a ComfyUI workflow, so eligible only with params.workflow / workflow_path / video_adf)",
+            "quality/speed: declared estimate, not measured — run `pnpm kyberion seam select calibrate --seam video-generation-provider --providers <id>` (cloud, billed) and record the result"
+          ]
+        },
+        "media-generation.google.veo-3.1": {
+          "traits": {
+            "quality": 0.9,
+            "speed": 0.5,
+            "cost": 0.8,
+            "privacy": 0
+          },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "cost": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/media-backends/media-generation.google.veo-3.1.json (api, cost_tier free (free-tier quota), data_policy training_eligible, native audio (mux_audio))",
+            "quality/speed: declared estimate, not measured — run `pnpm kyberion seam select calibrate --seam video-generation-provider --providers <id>` (cloud, billed) and record the result"
+          ]
+        },
+        "media-generation.openai.sora-2": {
+          "traits": {
+            "quality": 0.85,
+            "speed": 0.4,
+            "cost": 0.2,
+            "privacy": 0.6
+          },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "cost": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/media-backends/media-generation.openai.sora-2.json (api, cost_tier paid, zero_retention, native audio (mux_audio); adapter sends size (resolution), not aspect_ratio)",
+            "quality/speed: declared estimate, not measured — run `pnpm kyberion seam select calibrate --seam video-generation-provider --providers <id>` (cloud, billed) and record the result"
+          ]
+        },
+        "media-generation.runway.gen4.5": {
+          "traits": {
+            "quality": 0.85,
+            "speed": 0.6,
+            "cost": 0.2,
+            "privacy": 0.6
+          },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "cost": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/media-backends/media-generation.runway.gen4.5.json (api, cost_tier paid, zero_retention; adapter uses image_to_video, so a first_frame_image is required)",
+            "quality/speed: declared estimate, not measured — run `pnpm kyberion seam select calibrate --seam video-generation-provider --providers <id>` (cloud, billed) and record the result"
+          ]
+        },
+        "media-generation.runway.seedance2": {
+          "traits": {
+            "quality": 0.75,
+            "speed": 0.6,
+            "cost": 0.2,
+            "privacy": 0.6
+          },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "cost": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/media-backends/media-generation.runway.seedance2.json (api, cost_tier paid, zero_retention; adapter uses image_to_video, so a first_frame_image is required)",
+            "quality/speed: declared estimate, not measured — run `pnpm kyberion seam select calibrate --seam video-generation-provider --providers <id>` (cloud, billed) and record the result"
+          ]
+        },
+        "media-generation.runway.gemini-omni-flash": {
+          "traits": {
+            "quality": 0.7,
+            "speed": 0.8,
+            "cost": 0.2,
+            "privacy": 0.6
+          },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "cost": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/media-backends/media-generation.runway.gemini-omni-flash.json (api, cost_tier paid, zero_retention, native audio (mux_audio); adapter uses image_to_video, so a first_frame_image is required)",
+            "quality/speed: declared estimate, not measured — run `pnpm kyberion seam select calibrate --seam video-generation-provider --providers <id>` (cloud, billed) and record the result"
+          ]
+        },
+        "media-generation.minimax.hailuo-2.3": {
+          "traits": {
+            "quality": 0.75,
+            "speed": 0.6,
+            "cost": 0.2,
+            "privacy": 0.6
+          },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "cost": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/media-backends/media-generation.minimax.hailuo-2.3.json (api, cost_tier paid, zero_retention; adapter sends resolution, not aspect_ratio)",
+            "quality/speed: declared estimate, not measured — run `pnpm kyberion seam select calibrate --seam video-generation-provider --providers <id>` (cloud, billed) and record the result"
+          ]
+        }
+      },
+      "purposes": {
+        "quality": {
+          "description": "Visual fidelity matters most (hero shots, deliverables); billed cloud providers are acceptable.",
+          "weights": {
+            "quality": 1
+          }
+        },
+        "speed": {
+          "description": "Drafts and previews where time to a downloaded clip matters most.",
+          "weights": {
+            "speed": 0.8,
+            "quality": 0.2
+          }
+        },
+        "cost": {
+          "description": "Keep marginal spend low: self-hosted first, then free-tier quota, then billed APIs.",
+          "weights": {
+            "cost": 0.8,
+            "quality": 0.2
+          }
+        },
+        "privacy": {
+          "description": "Prefer keeping prompt and frames on the machine (ComfyUI workflow), then zero-retention APIs; training-eligible providers last.",
+          "weights": {
+            "privacy": 0.8,
+            "quality": 0.2
+          }
+        }
+      }
+    }
+  ]
+}

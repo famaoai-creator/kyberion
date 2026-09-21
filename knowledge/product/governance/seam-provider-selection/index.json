@@ -4,6 +4,8 @@
     "browser-automation-runtime",
     "image-generation-provider",
     "ocr-provider",
-    "speech-to-text-bridge"
+    "speech-to-text-bridge",
+    "music-generation-provider",
+    "video-generation-provider"
   ]
 }

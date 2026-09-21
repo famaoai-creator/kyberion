@@ -14,7 +14,10 @@ import {
   compileImageGenerationADF,
   compileVideoGenerationADF,
 } from '@agent/core/visual-workflow-compiler';
-import { resolveMediaBackendForPlatform } from '@agent/core/media-backend-registry';
+import {
+  getMediaBackendRecord,
+  resolveMediaBackendForPlatform,
+} from '@agent/core/media-backend-registry';
 import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
@@ -312,6 +315,48 @@ function resolveImageProviderPurpose(params: any): {
   return { purpose, allowHostHandoff: params?.allow_host_handoff === true };
 }
 
+/**
+ * The backend that actually generated a bridge result. The requested backend
+ * (backend_id, default ComfyUI) is only what the caller asked for; the bridge
+ * may route to another provider (purpose, operator rule, mode chain,
+ * rate-limit fallback). `registryBackendId` is the provider's media backend
+ * registry id when it has one; providers without a record report their own id
+ * with kind `bridge`.
+ */
+function describeGeneratedBackend(
+  requested: GenerationBackend,
+  providerId: string | undefined,
+  registryBackendId: string | undefined
+): GenerationBackend {
+  if (!providerId) return requested;
+  if (registryBackendId && requested.modality !== 'workflow') {
+    const record = getMediaBackendRecord(registryBackendId, requested.modality);
+    if (record.backend_id === registryBackendId) {
+      return {
+        backend_id: record.backend_id,
+        modality: requested.modality,
+        kind: record.kind,
+        provider: record.provider,
+        status: record.status,
+        supports: record.supports,
+      };
+    }
+  }
+  if (requested.provider === providerId) return requested;
+  return {
+    backend_id: providerId,
+    modality: requested.modality,
+    kind: 'bridge',
+    provider: providerId,
+  };
+}
+
+/** Registry id of a music bridge provider (musicgen_mlx / stable_audio_3), if any. */
+function musicBackendIdForProvider(providerId: string): string | undefined {
+  const record = getMediaBackendRecord(providerId, 'music');
+  return record.provider === providerId ? record.backend_id : undefined;
+}
+
 function isDirectMusicGenerationBackend(
   backend: Pick<GenerationBackend, 'modality' | 'kind'>
 ): boolean {
@@ -344,6 +389,31 @@ function resolveMusicProviderPreference(params: Record<string, unknown>): string
   const preference = params?.provider_preference || params?.providerPreference;
   return Array.isArray(preference) && preference.length > 0
     ? preference.filter((value): value is string => typeof value === 'string')
+    : undefined;
+}
+
+/**
+ * Purpose-driven music provider choice (seam `music-generation-provider`).
+ * Only without a named backend (backend_id / music_adf.engine.backend_id):
+ * then the request goes to the direct music bridge, which ranks the local
+ * providers, instead of the ComfyUI default. No purpose keeps ComfyUI.
+ */
+function resolveMusicProviderPurpose(params: Record<string, unknown>): string | undefined {
+  const adf = isPlainObject(params?.music_adf) ? params.music_adf : undefined;
+  const engine = adf && isPlainObject(adf.engine) ? adf.engine : undefined;
+  const explicit = String(params?.backend_id || engine?.backend_id || '').trim();
+  if (explicit) return undefined;
+  const purpose = typeof params?.purpose === 'string' ? params.purpose.trim() : '';
+  return purpose || undefined;
+}
+
+/** Requested music format (params.format or music_adf.output.format). */
+function resolveMusicRequestedFormat(params: Record<string, unknown>): string | undefined {
+  if (typeof params?.format === 'string' && params.format.trim()) return params.format.trim();
+  const adf = isPlainObject(params?.music_adf) ? params.music_adf : undefined;
+  const output = adf && isPlainObject(adf.output) ? adf.output : undefined;
+  return typeof output?.format === 'string' && output.format.trim()
+    ? output.format.trim()
     : undefined;
 }
 
@@ -415,7 +485,10 @@ function preparePromptBasedGeneration(action: string, input: any): PromptGenerat
   const params = applyPromptStylePack(action, input);
   const musicBackend =
     action === 'generate_music' ? resolveGenerationBackend(action, params) : undefined;
-  const directMusic = Boolean(musicBackend && isDirectMusicGenerationBackend(musicBackend));
+  const directMusic = Boolean(
+    musicBackend &&
+    (isDirectMusicGenerationBackend(musicBackend) || resolveMusicProviderPurpose(params))
+  );
   const compiled =
     action === 'generate_music' && params.music_adf && !directMusic
       ? compileMusicGenerationADF(params.music_adf)
@@ -599,6 +672,10 @@ export {
   resolveImageProviderPreference,
   resolveImageProviderPurpose,
   isDirectMusicGenerationBackend,
+  describeGeneratedBackend,
+  musicBackendIdForProvider,
+  resolveMusicProviderPurpose,
+  resolveMusicRequestedFormat,
   resolveMusicProviderPreference,
   resolveMusicBridgeRequest,
   preparePromptBasedGeneration,

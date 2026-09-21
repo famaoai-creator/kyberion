@@ -1,9 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   LocalMusicGenMlxGenerationProvider,
   LocalStableAudioGenerationProvider,
   generateMusic,
+  listMusicGenerationCandidates,
 } from './music-generation-bridge.js';
+import { pathResolver } from './path-resolver.js';
 import {
   clampMusicGenDurationSec,
   clampStableAudioDurationSec,
@@ -33,6 +36,27 @@ vi.mock('./secure-io.js', async () => {
 
 vi.mock('./tool-runtime-registry.js', () => ({
   probeToolRuntime: mocks.probeToolRuntime,
+}));
+
+const selectionMocks = vi.hoisted(() => ({
+  isAppleSilicon: vi.fn<() => boolean>(),
+  record: vi.fn(),
+  pinSeamProviderDecision: vi.fn(),
+}));
+
+vi.mock('./platform.js', async () => {
+  const actual = await vi.importActual<typeof import('./platform.js')>('./platform.js');
+  selectionMocks.isAppleSilicon.mockImplementation(actual.isAppleSilicon);
+  return { ...actual, isAppleSilicon: selectionMocks.isAppleSilicon };
+});
+
+vi.mock('./audit-chain.js', () => ({
+  auditChain: { record: selectionMocks.record },
+}));
+
+vi.mock('./provider-pins-store.js', () => ({
+  loadSeamProviderPin: () => null,
+  pinSeamProviderDecision: selectionMocks.pinSeamProviderDecision,
 }));
 
 describe('music-generation-policy', () => {
@@ -270,5 +294,146 @@ describe('LocalStableAudioGenerationProvider', () => {
     );
     const execOpts = mocks.safeExecResult.mock.calls.at(-1)?.[2] as { timeoutMs?: unknown };
     expect(typeof execOpts?.timeoutMs).toBe('number');
+  });
+});
+
+describe('generateMusic provider selection', () => {
+  const runnable = {
+    selected_action: 'run_trial',
+    selected_backend: { kind: 'uvx', command: 'uvx', args: [] },
+    trial_backend: { kind: 'uvx', command: 'uvx', args: [] },
+  };
+  const succeeded = (provider: string) => ({
+    status: 'succeeded' as const,
+    provider,
+    path: `active/shared/tmp/${provider}.wav`,
+    elapsedMs: 1,
+  });
+  const rulesDir = path.join(
+    pathResolver.sharedTmp('music-generation-rules-test'),
+    String(process.pid)
+  );
+  const rulesFile = path.join(rulesDir, 'rules.json');
+  let musicgen: ReturnType<typeof vi.spyOn>;
+  let stableAudio: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', rulesFile);
+    const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+    // The governed policy and the rules overlay are read from disk.
+    mocks.safeExistsSync.mockImplementation(actual.safeExistsSync);
+    mocks.probeToolRuntime.mockReturnValue(runnable);
+    selectionMocks.isAppleSilicon.mockReturnValue(true);
+    musicgen = vi
+      .spyOn(LocalMusicGenMlxGenerationProvider.prototype, 'generate')
+      .mockResolvedValue(succeeded('musicgen_mlx'));
+    stableAudio = vi
+      .spyOn(LocalStableAudioGenerationProvider.prototype, 'generate')
+      .mockResolvedValue(succeeded('stable_audio_3'));
+  });
+  afterEach(async () => {
+    musicgen.mockRestore();
+    stableAudio.mockRestore();
+    vi.unstubAllEnvs();
+    const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+    actual.safeRmSync(rulesDir, { recursive: true, force: true });
+  });
+
+  it('ranks eligible providers by purpose and records the decision', async () => {
+    const result = await generateMusic({ prompt: 'calm piano', purpose: 'quality' });
+    expect(result.provider).toBe('stable_audio_3');
+    expect(musicgen).not.toHaveBeenCalled();
+    expect(selectionMocks.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'provider_selection' })
+    );
+    const decision = selectionMocks.record.mock.calls.at(-1)?.[0]?.metadata;
+    expect(decision).toEqual(
+      expect.objectContaining({ strategy: 'purpose', purpose: 'quality', decision_key: 'quality' })
+    );
+  });
+
+  it('treats declared duration and format limits as hard requirements', async () => {
+    const candidates = await listMusicGenerationCandidates({ durationSec: 60, format: 'mp3' });
+    expect(candidates).toEqual([
+      {
+        id: 'musicgen_mlx',
+        eligible: false,
+        unmet: ['format mp3 (writes wav)', 'duration 60s exceeds max 30s'],
+      },
+      { id: 'stable_audio_3', eligible: false, unmet: ['format mp3 (writes wav)'] },
+    ]);
+    const tooLong = await generateMusic({ prompt: 'x', purpose: 'speed', durationSec: 500 });
+    expect(tooLong.status).toBe('failed');
+    expect(tooLong.error).toMatch(/no provider can run this task.*duration 500s exceeds max 120s/);
+    expect(stableAudio).not.toHaveBeenCalled();
+  });
+
+  it('skips unavailable providers without a purpose instead of running them', async () => {
+    mocks.probeToolRuntime.mockImplementation((toolId: string) =>
+      toolId === 'musicgen_mlx' ? { selected_action: 'install' } : runnable
+    );
+    const result = await generateMusic({ prompt: 'x' });
+    expect(result.provider).toBe('stable_audio_3');
+    expect(musicgen).not.toHaveBeenCalled();
+    expect(selectionMocks.record).not.toHaveBeenCalled();
+
+    mocks.probeToolRuntime.mockReturnValue({ selected_action: 'install' });
+    const none = await generateMusic({ prompt: 'x' });
+    expect(none.status).toBe('failed');
+    expect(none.error).toMatch(/musicgen_mlx: unavailable; stable_audio_3: unavailable/);
+  });
+
+  it('keeps the platform order without a purpose', async () => {
+    expect((await generateMusic({ prompt: 'x' })).provider).toBe('musicgen_mlx');
+    selectionMocks.isAppleSilicon.mockReturnValue(false);
+    expect((await generateMusic({ prompt: 'x' })).provider).toBe('stable_audio_3');
+  });
+
+  it('lets a matching operator rule lead the platform order without a purpose', async () => {
+    const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+    actual.safeMkdir(rulesDir, { recursive: true });
+    actual.safeWriteFile(
+      rulesFile,
+      JSON.stringify({
+        version: '1.0.0',
+        rules: [
+          {
+            rule_id: 'prefer-stable',
+            seam: 'music-generation-provider',
+            when: {},
+            prefer: ['stable_audio_3'],
+            set_by: 'test',
+            set_at: '2026-09-22T00:00:00.000Z',
+          },
+        ],
+      })
+    );
+    const result = await generateMusic({ prompt: 'x' });
+    expect(result.provider).toBe('stable_audio_3');
+    expect(selectionMocks.record.mock.calls.at(-1)?.[0]?.metadata).toEqual(
+      expect.objectContaining({
+        strategy: 'rule',
+        rule_id: 'prefer-stable',
+        decision_key: 'default',
+      })
+    );
+  });
+
+  it('lets a named provider win over the purpose', async () => {
+    const result = await generateMusic({
+      prompt: 'x',
+      purpose: 'quality',
+      providerPreference: ['musicgen_mlx'],
+    });
+    expect(result.provider).toBe('musicgen_mlx');
+    expect(selectionMocks.record).not.toHaveBeenCalled();
+  });
+
+  it('throws on an unknown purpose naming the known ones', async () => {
+    await expect(generateMusic({ prompt: 'x', purpose: 'vibes' })).rejects.toThrow(
+      /unknown purpose 'vibes'.*known: quality, speed/
+    );
   });
 });

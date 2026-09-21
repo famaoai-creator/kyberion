@@ -1,4 +1,6 @@
+import * as path from 'node:path';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { pathResolver } from './path-resolver.js';
 import {
   AdaptivePolicyRouter,
   ComfyUiImageGenerationProvider,
@@ -1081,6 +1083,107 @@ describe('AdaptivePolicyRouter purpose-driven selection', () => {
     await expect(
       router.resolveCandidateChain({ prompt: 'x', purpose: 'speed', mode: 'privacy_first' })
     ).rejects.toThrow(/no provider can run this task/);
+  });
+
+  describe('operator rules without a purpose', () => {
+    const rulesDir = path.join(
+      pathResolver.sharedTmp('image-generation-rules-test'),
+      String(process.pid)
+    );
+    const rulesFile = path.join(rulesDir, 'rules.json');
+    const writeRules = async (rules: Array<Record<string, unknown>>) => {
+      const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+      actual.safeMkdir(rulesDir, { recursive: true });
+      actual.safeWriteFile(
+        rulesFile,
+        JSON.stringify({
+          version: '1.0.0',
+          rules: rules.map((rule) => ({
+            seam: 'image-generation-provider',
+            set_by: 'test',
+            set_at: '2026-09-22T00:00:00.000Z',
+            ...rule,
+          })),
+        })
+      );
+    };
+    beforeEach(() => vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', rulesFile));
+    afterEach(async () => {
+      const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+      actual.safeRmSync(rulesDir, { recursive: true, force: true });
+    });
+
+    it('lets a matching rule lead the mode chain and records it under the default key', async () => {
+      await writeRules([
+        { rule_id: 'fast-local', when: { context: { mode: 'fast' } }, prefer: ['local_flux'] },
+      ]);
+      const chain = await build().resolveCandidateChain({ prompt: 'x', mode: 'fast' });
+      expect(ids(chain)).toEqual([
+        'local_flux',
+        'gemini_fast',
+        'gemini_service',
+        'apple_playground',
+        'comfyui',
+        'cursor_host_bridge',
+      ]);
+      const decision = selectionMocks.record.mock.calls.at(-1)?.[0]?.metadata;
+      expect(decision).toEqual(
+        expect.objectContaining({
+          strategy: 'rule',
+          rule_id: 'fast-local',
+          decision_key: 'default',
+          context: { mode: 'fast' },
+        })
+      );
+    });
+
+    it('keeps the mode chain and records nothing when no rule matches', async () => {
+      await writeRules([
+        { rule_id: 'quality-only', when: { purpose: 'quality' }, prefer: ['comfyui'] },
+      ]);
+      const chain = await build().resolveCandidateChain({ prompt: 'x' });
+      expect(ids(chain)[0]).toBe('cursor_host_bridge');
+      expect(selectionMocks.record).not.toHaveBeenCalled();
+    });
+
+    it('keeps the mode chain when the matching rule prefers only ineligible providers', async () => {
+      await writeRules([{ rule_id: 'native-only', when: {}, prefer: ['windows_native'] }]);
+      const chain = await build().resolveCandidateChain({ prompt: 'x' });
+      expect(ids(chain)[0]).toBe('cursor_host_bridge');
+      expect(selectionMocks.record).not.toHaveBeenCalled();
+    });
+
+    it('lets an explicit provider preference win over a rule', async () => {
+      await writeRules([{ rule_id: 'always-flux', when: {}, prefer: ['local_flux'] }]);
+      const chain = await build().resolveCandidateChain({
+        prompt: 'x',
+        providerPreference: ['comfyui'],
+      });
+      expect(ids(chain)[0]).toBe('comfyui');
+      expect(selectionMocks.record).not.toHaveBeenCalled();
+    });
+
+    it('passes request context to rules on the purpose path', async () => {
+      await writeRules([
+        {
+          rule_id: 'square-speed',
+          when: { purpose: 'speed', context: { aspect_ratio: '1:1' } },
+          prefer: ['comfyui'],
+        },
+      ]);
+      const square = await build().resolveCandidateChain({
+        prompt: 'x',
+        purpose: 'speed',
+        aspectRatio: '1:1',
+      });
+      expect(ids(square)[0]).toBe('comfyui');
+      const wide = await build().resolveCandidateChain({
+        prompt: 'x',
+        purpose: 'speed',
+        aspectRatio: '16:9',
+      });
+      expect(ids(wide)[0]).toBe('gemini_fast');
+    });
   });
 
   it('keeps rate-limit fallback along the ranked chain', async () => {
