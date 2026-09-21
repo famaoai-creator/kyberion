@@ -92,6 +92,8 @@ describe('vad backend seam selection', () => {
       prefer: ['silero', 'ten_vad'],
       set_by: 'user:test',
     });
+    // Rule changes are audited too; assertions below are about selection.
+    record.mockClear();
     const resolved = resolveVadBackend();
     expect(resolved.backend.backend_id).toBe('ten_vad');
     expect(resolved.decision?.strategy).toBe('rule');
@@ -107,6 +109,8 @@ describe('vad backend seam selection', () => {
       prefer: ['silero'],
       set_by: 'user:test',
     });
+    // Rule changes are audited too; assertions below are about selection.
+    record.mockClear();
     expect(shouldSelectVadBackend()).toBe(false);
     const quiet = resolveVadBackend();
     expect(quiet.backend.backend_id).toBe('energy');
