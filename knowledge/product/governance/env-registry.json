@@ -2852,7 +2852,7 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "Optional path override for the operator seam selection rules overlay (human-set provider preferences and measured trait values); default <profile>/onboarding/seam-selection-rules.json.",
+      "description": "Optional path override for the operator seam selection rules overlay (human-set provider preferences and measured trait values); default active/shared/runtime/seam-selection/rules.json. Not forwarded by `pnpm kyberion` (safe-exec env allowlist); for direct script runs and tests.",
       "documented": true,
       "subsystem": "runtime"
     },

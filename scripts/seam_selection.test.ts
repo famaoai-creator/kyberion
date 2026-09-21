@@ -1,5 +1,8 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Rule changes and decisions are audited; keep the real audit log untouched.
+vi.mock('@agent/core/audit-chain', () => ({ auditChain: { record: vi.fn() } }));
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { getSeamTraitOverrides } from '@agent/core/seam-selection-rules';
@@ -14,12 +17,21 @@ import { runSeamSelection } from './seam_selection.js';
 const workDir = pathResolver.sharedTmp('seam-selection-cli-test');
 const rulesFile = path.join(workDir, 'rules.json');
 
-function lastPrintedJson(logSpy: ReturnType<typeof vi.spyOn>): any {
+interface ListOutput {
+  seams: Array<{ seam: string; purposes: string[]; calibration: boolean }>;
+  calibration_adapters: Array<{ seam: string }>;
+  rules: Array<{ rule_id: string }>;
+}
+
+/** Parsed CLI output; callers name the shape they read. */
+type Json = Record<string, unknown>;
+
+function lastPrintedJson<T = Json>(logSpy: ReturnType<typeof vi.spyOn>): T {
   const calls = logSpy.mock.calls;
   for (let i = calls.length - 1; i >= 0; i -= 1) {
     const raw = String(calls[i]![0] ?? '');
     try {
-      return JSON.parse(raw);
+      return JSON.parse(raw) as T;
     } catch {
       // Not a JSON line (e.g. an [INFO]/[SUCCESS] diagnostic) — keep looking.
     }
@@ -50,21 +62,21 @@ describe('seam_selection CLI', () => {
   it('lists seams, calibration adapters and (empty) operator rules', async () => {
     process.exitCode = undefined;
     await runSeamSelection(['list']);
-    const printed = lastPrintedJson(logSpy);
+    const printed = lastPrintedJson<ListOutput>(logSpy);
 
-    const ocrSeam = printed.seams.find((s: any) => s.seam === 'ocr-provider');
+    const ocrSeam = printed.seams.find((s) => s.seam === 'ocr-provider');
     expect(ocrSeam).toMatchObject({ default_provider: 'apple_vision', calibration: true });
     expect(ocrSeam.purposes).toEqual(
       expect.arrayContaining(['accuracy', 'speed', 'privacy', 'cost'])
     );
 
-    const browserSeam = printed.seams.find((s: any) => s.seam === 'browser-automation-runtime');
+    const browserSeam = printed.seams.find((s) => s.seam === 'browser-automation-runtime');
     expect(browserSeam).toMatchObject({
       default_provider: 'playwright-chromium',
       calibration: true,
     });
 
-    expect(printed.calibration_adapters.map((a: any) => a.seam)).toEqual(
+    expect(printed.calibration_adapters.map((a) => a.seam)).toEqual(
       expect.arrayContaining(['ocr-provider', 'browser-automation-runtime'])
     );
     expect(printed.rules).toEqual([]);
@@ -120,8 +132,8 @@ describe('seam_selection CLI', () => {
     });
 
     await runSeamSelection(['rules', 'list', '--seam', 'ocr-provider']);
-    const listed = lastPrintedJson(logSpy);
-    expect(listed.rules.map((r: any) => r.rule_id)).toContain('cli-test-rule');
+    const listed = lastPrintedJson<ListOutput>(logSpy);
+    expect(listed.rules.map((r) => r.rule_id)).toContain('cli-test-rule');
 
     // The rule now wins over the purpose ranking that would otherwise pick llm_api.
     await runSeamSelection([
@@ -260,7 +272,12 @@ describe('seam_selection CLI', () => {
         '--repeats',
         '1',
       ]);
-      const report = lastPrintedJson(logSpy);
+      const report = lastPrintedJson<{
+        seam: string;
+        providers: unknown[];
+        suggested_traits: Record<string, unknown>;
+        report_json: string;
+      }>(logSpy);
 
       expect(report.seam).toBe('ocr-provider');
       expect(report.providers).toEqual(

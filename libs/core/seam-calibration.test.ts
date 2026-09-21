@@ -129,4 +129,20 @@ describe('seam calibration', () => {
       /no calibration adapter/
     );
   });
+
+  it('treats providers that measure the same as equally good', () => {
+    const summary = (id: string) => ({
+      provider_id: id,
+      eligible: true,
+      runs: [],
+      success_rate: 1,
+      latency_ms_median: 100,
+      metrics_mean: { char_error_rate: 0 },
+    });
+    expect(
+      suggestTraitValues([summary('a'), summary('b')], {
+        accuracy: { metric: 'char_error_rate', higher_is_better: false },
+      })
+    ).toEqual({ accuracy: { a: 1, b: 1 } });
+  });
 });
