@@ -322,6 +322,12 @@ export async function judge(request: JudgmentRequest): Promise<JudgmentResult> {
   } catch (error: unknown) {
     const builtin = judgmentSeam.getOptional(BUILTIN_JUDGMENT_PROVIDER);
     if (!builtin || backend.judgment_id === BUILTIN_JUDGMENT_PROVIDER) throw error;
+    // Same rule as selection, and it has to be repeated here because this is
+    // a second way to reach the floor. Degrading to a provider that cannot
+    // answer the question produces an answer to a different question — the
+    // rules replied to 'test.category' with an organization work shape —
+    // which is worse than the failure being degraded from.
+    if (request.questions.some((question) => !builtin.supports(question))) throw error;
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(
       `[judgment-backend] provider '${backend.judgment_id}' failed; degrading to '${BUILTIN_JUDGMENT_PROVIDER}': ${message}`

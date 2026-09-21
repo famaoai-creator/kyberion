@@ -101,6 +101,29 @@ export interface BrowserJudgmentOptions {
   tenantSlug?: string;
   minConfidence?: number;
   timeoutMs?: number;
+  /**
+   * Require a fitted provider before acting on a judgment.
+   *
+   * **Defaults to true, from measurement rather than caution.** Evaluated on
+   * twelve hand-labelled cases per call site with the Laya provider:
+   *
+   * | question | accuracy | above floor | of those, wrong | unstable |
+   * | --- | --- | --- | --- | --- |
+   * | `error.category` | 42% | 5/12 | 2 (40%) | 0 |
+   * | `browser.failure_kind` | 58% | 5/12 | 1 (20%) | 0 |
+   * | `knowledge.relevant` | 67% | 5/12 | 2 (40%) | 0 |
+   *
+   * Every site exceeded its tolerated confidently-wrong rate, and every site
+   * had too few confident answers for the rate to be worth much either — so
+   * both halves of `recommendRequireCalibrated` agree. Accuracy tracked
+   * distance from the provider's training domain, and determinism did not:
+   * 36 cases over 3 runs each produced zero disagreements while being wrong
+   * a third of the time. Being deterministic is a precondition for a fit, not
+   * evidence of one.
+   *
+   * Turning a site on is therefore a measurement landing in
+   * `judgment-calibration.json`, not an edit here.
+   */
   requireCalibrated?: boolean;
 }
 
@@ -130,7 +153,8 @@ export async function classifyBrowserFailure(
     ...(options.tenantSlug ? { tenantSlug: options.tenantSlug } : {}),
     ...(options.minConfidence !== undefined ? { minConfidence: options.minConfidence } : {}),
     ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
-    ...(options.requireCalibrated ? { requireCalibrated: true } : {}),
+    // Opt-out rather than opt-in; see the option's documentation.
+    requireCalibrated: options.requireCalibrated !== false,
     label: BROWSER_FAILURE_QUESTION,
     accept(answers) {
       const answer = choiceAnswer(answers, BROWSER_FAILURE_QUESTION);
@@ -198,7 +222,8 @@ export async function judgePageReadiness(
     ...(options.tenantSlug ? { tenantSlug: options.tenantSlug } : {}),
     ...(options.minConfidence !== undefined ? { minConfidence: options.minConfidence } : {}),
     ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
-    ...(options.requireCalibrated ? { requireCalibrated: true } : {}),
+    // Opt-out rather than opt-in; see the option's documentation.
+    requireCalibrated: options.requireCalibrated !== false,
     label: BROWSER_READY_QUESTION,
     accept(answers) {
       const answer = answers.find((each) => each.id === BROWSER_READY_QUESTION);
