@@ -3,7 +3,7 @@
  *
  *   KYBERION_AGENT_RUNTIME_BACKEND=pane \
  *   KYBERION_AGENT_PANE_RUNTIME_WORKSPACE_LABEL=kyberion-live \
- *   pnpm exec tsx scripts/demo_agent_pane_runtime_live.ts
+ *   pnpm exec tsx scripts/demos/demo_agent_pane_runtime_live.ts
  */
 
 import { agentLifecycle } from '@agent/core/agent-lifecycle';
