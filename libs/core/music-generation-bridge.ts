@@ -6,8 +6,17 @@ import {
   safeExecResult,
   safeMkdir,
 } from './secure-io.js';
+import { logger } from './core.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { isAppleSilicon } from './platform.js';
+import {
+  explainSeamProviderDecision,
+  listSeamSelectionPurposes,
+  resolveSeamProviderDecision,
+  type ResolveSeamProviderOptions,
+  type SeamProviderCandidate,
+} from './seam-provider-selection.js';
+import { matchSeamSelectionRule } from './seam-selection-rules.js';
 import {
   clampMusicGenDurationSec,
   clampStableAudioDurationSec,
@@ -219,6 +228,11 @@ export class LocalMusicGenMlxGenerationProvider implements MusicGenerationProvid
   readonly costTier = 'self_hosted';
   readonly dataPolicy = 'local_only';
   readonly executionLocality = 'local';
+  readonly outputFormats = ['wav'] as const;
+
+  maxDurationSec(): number {
+    return resolveLocalMusicGenMlxGenerationPolicy().maxDurationSec;
+  }
 
   async isAvailable(): Promise<boolean> {
     return isAppleSilicon() && probeToolRuntime('musicgen_mlx').selected_action !== 'install';
@@ -234,6 +248,11 @@ export class LocalStableAudioGenerationProvider implements MusicGenerationProvid
   readonly costTier = 'self_hosted';
   readonly dataPolicy = 'local_only';
   readonly executionLocality = 'local';
+  readonly outputFormats = ['wav'] as const;
+
+  maxDurationSec(): number {
+    return resolveLocalStableAudioGenerationPolicy().maxDurationSec;
+  }
 
   async isAvailable(): Promise<boolean> {
     return probeToolRuntime('stable_audio_3').selected_action !== 'install';
@@ -244,19 +263,131 @@ export class LocalStableAudioGenerationProvider implements MusicGenerationProvid
   }
 }
 
+const MUSIC_GENERATION_PROVIDER_SEAM = 'music-generation-provider';
+
 const providers: MusicGenerationProvider[] = [
   new LocalMusicGenMlxGenerationProvider(),
   new LocalStableAudioGenerationProvider(),
 ];
 
+export function listMusicGenerationProviders(): MusicGenerationProvider[] {
+  return [...providers];
+}
+
+export function getMusicGenerationProvider(id: string): MusicGenerationProvider | undefined {
+  return providers.find((provider) => provider.id === id);
+}
+
+/** Order used without a purpose: MLX first on Apple Silicon, Stable Audio elsewhere. */
+function platformOrder(): string[] {
+  return isAppleSilicon() ? ['musicgen_mlx', 'stable_audio_3'] : ['stable_audio_3', 'musicgen_mlx'];
+}
+
+/**
+ * Which providers can run this request here and now: availability
+ * (isAvailable) plus the declared duration and output-format limits.
+ */
+export async function listMusicGenerationCandidates(
+  request: Pick<MusicGenerationRequest, 'durationSec' | 'format'>
+): Promise<SeamProviderCandidate[]> {
+  const format = request.format?.trim().toLowerCase().replace(/^\./u, '');
+  const candidates: SeamProviderCandidate[] = [];
+  for (const provider of providers) {
+    const unmet: string[] = [];
+    if (format && provider.outputFormats && !provider.outputFormats.includes(format)) {
+      unmet.push(`format ${format} (writes ${provider.outputFormats.join(', ')})`);
+    }
+    const maxDurationSec = provider.maxDurationSec?.();
+    if (
+      typeof request.durationSec === 'number' &&
+      maxDurationSec !== undefined &&
+      request.durationSec > maxDurationSec
+    ) {
+      unmet.push(`duration ${request.durationSec}s exceeds max ${maxDurationSec}s`);
+    }
+    if (unmet.length === 0 && !(await provider.isAvailable())) unmet.push('unavailable');
+    candidates.push({ id: provider.id, eligible: unmet.length === 0, unmet });
+  }
+  return candidates;
+}
+
+function failedSelection(provider: string, error: string): MusicGenerationResult {
+  return { status: 'failed', provider, elapsedMs: 0, error };
+}
+
+/**
+ * Without a purpose an operator rule matching the request may lead the
+ * platform order (a mission pin it produced is reused); requests no rule
+ * matches keep that order and record nothing.
+ */
+function operatorRuleLead(candidates: SeamProviderCandidate[]): string[] {
+  if (!matchSeamSelectionRule(MUSIC_GENERATION_PROVIDER_SEAM, {})) return [];
+  const options: ResolveSeamProviderOptions = {
+    seam: MUSIC_GENERATION_PROVIDER_SEAM,
+    candidates,
+    decisionKey: 'default',
+  };
+  const preview = explainSeamProviderDecision(options);
+  if (preview.strategy !== 'rule' && preview.strategy !== 'pinned') return [];
+  const decision = resolveSeamProviderDecision(options);
+  return decision.provider_id ? [decision.provider_id] : [];
+}
+
+/** Which providers to try, in order; a string is a selection failure. */
+async function resolveMusicProviderChain(
+  request: MusicGenerationRequest
+): Promise<string[] | string> {
+  const purpose = request.purpose?.trim();
+  if (purpose) {
+    const known = listSeamSelectionPurposes(MUSIC_GENERATION_PROVIDER_SEAM);
+    if (!known.includes(purpose)) {
+      throw new Error(
+        `[MUSIC_GENERATION_SELECTION] unknown purpose '${purpose}' for seam '${MUSIC_GENERATION_PROVIDER_SEAM}' (known: ${known.join(', ')})`
+      );
+    }
+  }
+  const candidates = await listMusicGenerationCandidates(request);
+  if (purpose) {
+    const decision = resolveSeamProviderDecision({
+      seam: MUSIC_GENERATION_PROVIDER_SEAM,
+      candidates,
+      purpose,
+      decisionKey: purpose,
+    });
+    if (!decision.provider_id) return `[MUSIC_GENERATION_SELECTION] ${decision.rationale}`;
+    logger.info(
+      `[music_generation_bridge] provider '${decision.provider_id}' selected (${decision.strategy}): ${decision.rationale}`
+    );
+    return decision.ranked;
+  }
+  const eligible = new Set(candidates.filter((c) => c.eligible).map((c) => c.id));
+  const lead = operatorRuleLead(candidates);
+  const chain = [
+    ...lead,
+    ...platformOrder().filter((id) => eligible.has(id) && !lead.includes(id)),
+  ];
+  if (chain.length > 0) return chain;
+  const reasons = candidates.map((c) => `${c.id}: ${(c.unmet ?? []).join(', ') || 'ineligible'}`);
+  return `No available Music Generation provider could be resolved (${reasons.join('; ')})`;
+}
+
+/**
+ * Generate music. A named provider (providerPreference) runs as asked, with
+ * its own error on failure. Otherwise only providers that can run the
+ * request are tried: ranked by `purpose` (seam music-generation-provider),
+ * or in platform order led by a matching operator rule.
+ */
 export async function generateMusic(
   request: MusicGenerationRequest
 ): Promise<MusicGenerationResult> {
-  const preference = request.providerPreference?.length
-    ? request.providerPreference
-    : isAppleSilicon()
-      ? ['musicgen_mlx', 'stable_audio_3']
-      : ['stable_audio_3', 'musicgen_mlx'];
+  const explicit = Boolean(request.providerPreference?.length);
+  const resolved = explicit
+    ? request.providerPreference!
+    : await resolveMusicProviderChain(request);
+  if (typeof resolved === 'string') {
+    return failedSelection(platformOrder()[0]!, resolved);
+  }
+  const preference = resolved;
 
   let lastError: string | undefined;
   for (const providerId of preference) {

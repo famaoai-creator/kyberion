@@ -141,6 +141,15 @@ describe('browser_playwright_executor', () => {
     expect(handleAction.mock.calls[1][0].options).not.toHaveProperty('browser_runtime');
   });
 
+  it('passes the host browser purpose over any dispatcher purpose', async () => {
+    const handleAction = vi.fn().mockResolvedValue({ status: 'succeeded', results: [] });
+    await createExecuteBrowserPipeline(handleAction, { browserPurpose: 'throughput' })({
+      steps: [],
+      options: { runtime_purpose: 'evidence' },
+    });
+    expect(handleAction.mock.calls[0][0].options.runtime_purpose).toBe('throughput');
+  });
+
   it('maps non-success actuator status to failed', async () => {
     const execute = createExecuteBrowserPipeline(
       vi.fn().mockResolvedValue({ status: 'failed', errors: ['click_ref failed'] })

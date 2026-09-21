@@ -5,12 +5,18 @@ import type { ProviderInfo } from './provider-discovery.js';
 // virtual fs below must serve the real artifact and its schema.
 import providerConfig from '../../knowledge/product/governance/provider-config.json';
 import providerConfigSchema from '../../knowledge/product/schemas/provider-config.schema.json';
+import providerPinsSchema from '../../knowledge/product/schemas/provider-pins.schema.json';
 
 const recordMock = vi.fn();
 const files = new Map<string, string>();
 const nonRegularPaths = new Set<string>();
+// Monotonic across tests so a rewritten path never reuses an old catalog cache key.
+const fileVersions = new Map<string, number>();
 
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: recordMock } }));
+vi.mock('./src/lock-utils.js', () => ({
+  withLockSync: <T>(_resourceId: string, fn: () => T): T => fn(),
+}));
 
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
@@ -49,6 +55,7 @@ vi.mock('./secure-io.js', () => ({
   },
   safeWriteFile: (p: string, data: string) => {
     files.set(p, data);
+    fileVersions.set(p, (fileVersions.get(p) ?? 0) + 1);
   },
   safeMkdir: () => undefined,
   safeRmSync: (p: string) => {
@@ -70,7 +77,8 @@ vi.mock('./foundation/io.js', () => ({
     appendFile: () => undefined,
     exists: (p: string) => files.has(p),
     readFile: (p: string) => files.get(p) || '',
-    stat: () => ({ mtimeMs: 1, size: 1 }),
+    // Catalog caches key on stat, so it must change whenever a file is rewritten.
+    stat: (p: string) => ({ mtimeMs: fileVersions.get(p) ?? 1, size: (files.get(p) ?? '').length }),
     writeFile: (p: string, data: string) => files.set(p, data),
   }),
   registerFoundationIo: vi.fn(),
@@ -109,31 +117,7 @@ describe('capability-broker', () => {
     nonRegularPaths.clear();
     files.set(
       '/repo/knowledge/product/schemas/provider-pins.schema.json',
-      JSON.stringify({
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          version: { type: 'string', minLength: 1 },
-          missionId: { type: 'string', minLength: 1 },
-          pins: {
-            type: 'object',
-            additionalProperties: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                provider: { type: 'string', minLength: 1 },
-                modelId: { type: 'string', minLength: 1 },
-                instance: { type: ['string', 'null'], minLength: 1 },
-                orchestration: { enum: ['leaf', 'managed_workflow'] },
-                pinnedAt: { type: 'string', format: 'date-time' },
-                by: { type: 'string', minLength: 1 },
-              },
-              required: ['provider', 'modelId', 'instance', 'orchestration', 'pinnedAt', 'by'],
-            },
-          },
-        },
-        required: ['version', 'pins'],
-      })
+      JSON.stringify(providerPinsSchema)
     );
     files.set(
       '/repo/knowledge/product/governance/provider-config.json',
@@ -196,6 +180,35 @@ describe('capability-broker', () => {
     expect(reused.provider).toBe('codex');
     expect(reused.pinned).toBe(true);
     expect(reused.rationale).toMatch(/pinned/);
+  });
+
+  it('stores seam provider pins next to model pins without disturbing them', async () => {
+    const {
+      resolveProviderDecision,
+      pinProviderDecision,
+      loadPinnedDecision,
+      loadSeamProviderPin,
+      pinSeamProviderDecision,
+      unpinSeamProviderDecision,
+    } = await import('./capability-broker.js');
+    const decision = resolveProviderDecision(
+      { requiredCapabilities: ['code'], decisionKey: 'role-z', record: false },
+      FLEET
+    );
+    pinProviderDecision('role-z', decision);
+
+    expect(loadSeamProviderPin('browser-automation-runtime', 'throughput')).toBeNull();
+    pinSeamProviderDecision('browser-automation-runtime', 'throughput', 'lightpanda', 'throughput');
+    expect(loadSeamProviderPin('browser-automation-runtime', 'throughput')).toMatchObject({
+      seam: 'browser-automation-runtime',
+      provider_id: 'lightpanda',
+      purpose: 'throughput',
+    });
+    expect(loadPinnedDecision('role-z')?.provider).toBe(decision.provider);
+
+    unpinSeamProviderDecision('browser-automation-runtime', 'throughput');
+    expect(loadSeamProviderPin('browser-automation-runtime', 'throughput')).toBeNull();
+    expect(loadPinnedDecision('role-z')).not.toBeNull();
   });
 
   it('falls through to fresh resolution when a pin is stale (provider gone)', async () => {

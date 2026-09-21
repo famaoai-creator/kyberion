@@ -1,0 +1,73 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "browser-automation-runtime",
+      "default_provider": "playwright-chromium",
+      "fallback_purpose": "throughput",
+      "traits": {
+        "fidelity": "Real layout and rendering: screenshots, video and visual review are trustworthy evidence.",
+        "speed": "Wall-clock per page load / pipeline.",
+        "footprint": "Memory and process weight per session (parallelism headroom).",
+        "authenticated_sessions": "Can carry a signed-in state: persistent profiles, attach to a live browser, passkeys."
+      },
+      "providers": {
+        "playwright-chromium": {
+          "traits": {
+            "fidelity": 1,
+            "speed": 0.3,
+            "footprint": 0.1,
+            "authenticated_sessions": 1
+          },
+          "trait_basis": {
+            "fidelity": "measured",
+            "speed": "declared",
+            "footprint": "declared",
+            "authenticated_sessions": "measured"
+          },
+          "evidence": ["knowledge/product/architecture/browser-execution-substrate-howto.md"]
+        },
+        "lightpanda": {
+          "traits": {
+            "fidelity": 0.1,
+            "speed": 1,
+            "footprint": 1,
+            "authenticated_sessions": 0.2
+          },
+          "trait_basis": {
+            "fidelity": "measured",
+            "speed": "declared",
+            "footprint": "declared",
+            "authenticated_sessions": "measured"
+          },
+          "evidence": [
+            "knowledge/product/architecture/lightpanda-browser-runtime-evaluation.md",
+            "https://github.com/lightpanda-io/browser (upstream benchmark: ~9x faster, ~16x less memory than headless Chrome)"
+          ]
+        }
+      },
+      "purposes": {
+        "evidence": {
+          "description": "The run must leave visual evidence or reproduce what a person sees.",
+          "weights": {
+            "fidelity": 1
+          }
+        },
+        "throughput": {
+          "description": "Read-mostly navigation and extraction where speed and parallelism matter.",
+          "weights": {
+            "speed": 0.6,
+            "footprint": 0.4
+          }
+        },
+        "authenticated": {
+          "description": "The flow depends on a signed-in state or passkeys.",
+          "weights": {
+            "authenticated_sessions": 1
+          }
+        }
+      }
+    }
+  ]
+}

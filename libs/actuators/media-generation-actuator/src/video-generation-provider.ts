@@ -1,4 +1,18 @@
-import { getMediaBackendRecord, type MediaBackendRecord } from '@agent/core/media-backend-registry';
+import { logger } from '@agent/core/core';
+import {
+  getMediaBackendRecord,
+  listMediaBackends,
+  probeMediaBackendAvailability,
+  type MediaBackendRecord,
+} from '@agent/core/media-backend-registry';
+import {
+  explainSeamProviderDecision,
+  listSeamSelectionPurposes,
+  resolveSeamProviderDecision,
+  type ResolveSeamProviderOptions,
+  type SeamProviderCandidate,
+} from '@agent/core/seam-provider-selection';
+import { matchSeamSelectionRule } from '@agent/core/seam-selection-rules';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { secureFetch } from '@agent/core/network';
@@ -701,4 +715,185 @@ export async function collectDirectVideoArtifactForJob(
     copied_to: artifact.path,
     output_path: artifact.path,
   };
+}
+
+export const VIDEO_GENERATION_PROVIDER_SEAM = 'video-generation-provider';
+
+/** What each direct adapter actually sends to its API (code truth for eligibility). */
+interface DirectVideoFeatures {
+  /** How a first / last frame can be passed: any URI, only a data: URI, or not at all. */
+  first_frame_image: 'any' | 'data_uri' | false;
+  last_frame_image: 'any' | 'data_uri' | false;
+  /** Aspect ratios the adapter sends; false = it sends resolution (size) only. */
+  aspect_ratios: readonly string[] | false;
+  /** Set when the adapter cannot run without a first frame. */
+  requires_first_frame?: string;
+}
+
+const DIRECT_VIDEO_FEATURES: Record<string, DirectVideoFeatures> = {
+  google_veo: {
+    first_frame_image: 'data_uri',
+    last_frame_image: 'data_uri',
+    aspect_ratios: ['16:9', '9:16'],
+  },
+  runway: {
+    first_frame_image: 'any',
+    last_frame_image: 'any',
+    aspect_ratios: ['16:9', '9:16', '1:1'],
+    requires_first_frame: 'first_frame_image (the Runway adapter uses image_to_video)',
+  },
+  openai_sora: { first_frame_image: 'data_uri', last_frame_image: false, aspect_ratios: false },
+  minimax_hailuo: { first_frame_image: 'any', last_frame_image: 'any', aspect_ratios: false },
+};
+
+function textParam(params: JsonRecord, key: string): string | undefined {
+  const value = params[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function explicitVideoBackendId(params: VideoGenerationParams): string {
+  return String(params.backend_id || params.video_adf?.engine?.backend_id || '').trim();
+}
+
+function frameUnmet(
+  name: 'first_frame_image' | 'last_frame_image',
+  value: string | undefined,
+  support: DirectVideoFeatures['first_frame_image'],
+  provider: string
+): string | null {
+  if (!value) return null;
+  if (!support) return `${name} (not sent by the ${provider} adapter)`;
+  if (support === 'data_uri' && !value.startsWith('data:')) return `${name} must be a data: URI`;
+  return null;
+}
+
+/**
+ * Text-to-video candidates for a request (hyperframes is render-only and
+ * never a candidate): each governed API backend with a direct adapter plus
+ * the ComfyUI workflow backend. Eligible = the request's features are sent
+ * by the adapter, and the backend is available (credentials / service probe).
+ */
+export async function listVideoGenerationCandidates(
+  params: VideoGenerationParams,
+  platform: NodeJS.Platform = process.platform
+): Promise<SeamProviderCandidate[]> {
+  const firstFrame = textParam(params, 'first_frame_image');
+  const lastFrame = textParam(params, 'last_frame_image');
+  const aspectRatio = textParam(params, 'aspect_ratio');
+  const resolution = textParam(params, 'resolution');
+  const wantsAudio = params.generate_audio === true;
+  const referenceImages =
+    Array.isArray(params.reference_images) && params.reference_images.length > 0;
+  const inputVideo = Boolean(textParam(params, 'input_video'));
+  const hasWorkflow = Boolean(params.workflow || params.workflow_path || params.video_adf);
+
+  const candidates: SeamProviderCandidate[] = [];
+  for (const backend of listMediaBackends('video')) {
+    const direct = isDirectVideoGenerationBackend(backend);
+    if (!direct && backend.provider !== 'comfyui') continue;
+    const unmet: string[] = [];
+    if (direct) {
+      const features = DIRECT_VIDEO_FEATURES[backend.provider]!;
+      const first = frameUnmet(
+        'first_frame_image',
+        firstFrame,
+        features.first_frame_image,
+        backend.provider
+      );
+      if (first) unmet.push(first);
+      else if (!firstFrame && features.requires_first_frame)
+        unmet.push(features.requires_first_frame);
+      const last = frameUnmet(
+        'last_frame_image',
+        lastFrame,
+        features.last_frame_image,
+        backend.provider
+      );
+      if (last) unmet.push(last);
+      if (aspectRatio && !resolution) {
+        if (!features.aspect_ratios) {
+          unmet.push(`aspect_ratio (the ${backend.provider} adapter sends resolution only)`);
+        } else if (!features.aspect_ratios.includes(aspectRatio)) {
+          unmet.push(`aspect_ratio ${aspectRatio} (supports ${features.aspect_ratios.join(', ')})`);
+        }
+      }
+      if (referenceImages) unmet.push('reference_images (not sent by any direct adapter)');
+      if (inputVideo) unmet.push('input_video (not sent by any direct adapter)');
+    } else {
+      if (!hasWorkflow) {
+        unmet.push('needs params.workflow, workflow_path or video_adf (ComfyUI runs workflows)');
+      }
+      if (firstFrame || lastFrame)
+        unmet.push('first/last frame images (not passed to ComfyUI workflows)');
+    }
+    if (wantsAudio && !backend.supports.mux_audio) unmet.push('generate_audio (no native audio)');
+    if (unmet.length === 0) {
+      const availability = await probeMediaBackendAvailability(
+        backend.backend_id,
+        'video',
+        platform
+      );
+      if (!availability.available) unmet.push(`unavailable (${availability.reason})`);
+    }
+    candidates.push({ id: backend.backend_id, eligible: unmet.length === 0, unmet });
+  }
+  return candidates;
+}
+
+/** Request facts operator rules may match on. */
+function videoSelectionContext(params: VideoGenerationParams): Record<string, string> {
+  const context: Record<string, string> = {};
+  const aspectRatio = textParam(params, 'aspect_ratio');
+  if (aspectRatio) context.aspect_ratio = aspectRatio;
+  if (typeof params.generate_audio === 'boolean') context.audio = String(params.generate_audio);
+  if (textParam(params, 'first_frame_image')) context.image_to_video = 'true';
+  return context;
+}
+
+/**
+ * Purpose-driven video provider choice (seam `video-generation-provider`).
+ * A named backend (backend_id / video_adf.engine.backend_id) always wins.
+ * With a purpose, eligible backends are ranked by the governed policy; without
+ * one, only an operator rule matching the request picks a backend (a mission
+ * pin it produced is reused) — otherwise the request is returned unchanged. The choice is written
+ * back as `backend_id`, so submission, job refresh and artifact collection all
+ * address the same backend.
+ */
+export async function applyVideoProviderSelection<T extends VideoGenerationParams>(
+  params: T
+): Promise<T> {
+  if (explicitVideoBackendId(params)) return params;
+  const purpose = textParam(params, 'purpose');
+  const context = videoSelectionContext(params);
+  if (!purpose && !matchSeamSelectionRule(VIDEO_GENERATION_PROVIDER_SEAM, { context })) {
+    return params;
+  }
+  if (purpose) {
+    const known = listSeamSelectionPurposes(VIDEO_GENERATION_PROVIDER_SEAM);
+    if (!known.includes(purpose)) {
+      throw new Error(
+        `[VIDEO_GENERATION_SELECTION] unknown purpose '${purpose}' for seam '${VIDEO_GENERATION_PROVIDER_SEAM}' (known: ${known.join(', ')})`
+      );
+    }
+  }
+  const options: ResolveSeamProviderOptions = {
+    seam: VIDEO_GENERATION_PROVIDER_SEAM,
+    candidates: await listVideoGenerationCandidates(params),
+    ...(purpose ? { purpose } : {}),
+    context,
+    decisionKey: purpose || 'default',
+  };
+  // A matching rule whose backends are all ineligible leaves the request unchanged.
+  if (!purpose) {
+    const preview = explainSeamProviderDecision(options);
+    if (preview.strategy !== 'rule' && preview.strategy !== 'pinned') return params;
+  }
+  const decision = resolveSeamProviderDecision(options);
+  if (!decision.provider_id) {
+    throw new Error(`[VIDEO_GENERATION_SELECTION] ${decision.rationale}`);
+  }
+  logger.info(
+    `[video_generation_provider] backend '${decision.provider_id}' selected (${decision.strategy}): ${decision.rationale}`
+  );
+  return { ...params, backend_id: decision.provider_id };
 }

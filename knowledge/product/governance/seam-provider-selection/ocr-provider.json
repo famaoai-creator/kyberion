@@ -1,0 +1,129 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "ocr-provider",
+      "default_provider": "apple_vision",
+      "traits": {
+        "accuracy": "How correctly the provider reads complex or layout-heavy documents.",
+        "latency": "Wall-clock per recognize() call.",
+        "privacy": "How little the image travels: none-egress providers score highest, loopback services score lower, remote vendor APIs score lowest.",
+        "cost": "Per-call spend: free/local providers score highest, metered vendor APIs score lowest."
+      },
+      "providers": {
+        "windows_native": {
+          "traits": {
+            "accuracy": 0.65,
+            "latency": 0.85,
+            "privacy": 1,
+            "cost": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          },
+          "evidence": [
+            "libs/core/ocr-bridge.ts (WindowsNativeOcrProvider: dataEgress 'none', in-process Windows OCR API)"
+          ]
+        },
+        "tesseract": {
+          "traits": {
+            "accuracy": 0.5,
+            "latency": 0.55,
+            "privacy": 1,
+            "cost": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          },
+          "evidence": [
+            "libs/core/ocr-bridge.ts (TesseractOcrProvider: dataEgress 'none', tesseract.js in-process; classic OCR engine, weaker than modern vision models on noisy or handwritten text)"
+          ]
+        },
+        "apple_vision": {
+          "traits": {
+            "accuracy": 0.75,
+            "latency": 0.75,
+            "privacy": 1,
+            "cost": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          },
+          "evidence": [
+            "libs/core/ocr-bridge.ts (AppleVisionOcrProvider: dataEgress 'none', macOS Vision framework, on-device)"
+          ]
+        },
+        "llm_api": {
+          "traits": {
+            "accuracy": 0.9,
+            "latency": 0.3,
+            "privacy": 0,
+            "cost": 0.15
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          },
+          "evidence": [
+            "libs/core/ocr-bridge.ts (LlmApiOcrProvider: dataEgress 'external', uploads the image to a vendor API; general vision-language models read layout and context best but pay a network round trip and per-call fee)"
+          ]
+        },
+        "local_vlm": {
+          "traits": {
+            "accuracy": 0.55,
+            "latency": 0.35,
+            "privacy": 0.5,
+            "cost": 0.8
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          },
+          "evidence": [
+            "libs/core/ocr-bridge.ts (LocalVlmOcrProvider: dataEgress resolved from OLLAMA_HOST, 'loopback' by default but 'external' once pointed off-machine; self-hosted so no per-call fee, but small local vision models trail commercial APIs on accuracy and can be slow without a GPU)"
+          ]
+        }
+      },
+      "purposes": {
+        "accuracy": {
+          "description": "Complex or layout-heavy documents where getting the text right matters more than speed or cost.",
+          "weights": {
+            "accuracy": 1
+          }
+        },
+        "speed": {
+          "description": "Time-sensitive OCR where turnaround matters more than best-possible accuracy.",
+          "weights": {
+            "latency": 1
+          }
+        },
+        "privacy": {
+          "description": "Prefer the image to travel as little as possible: none-egress over loopback over an external vendor API. The hard floor (never external) is still enforced by mode 'local_only' / 'privacy_first', not by this purpose.",
+          "weights": {
+            "privacy": 1
+          }
+        },
+        "cost": {
+          "description": "Minimize per-call spend: prefer free or self-hosted providers over metered vendor APIs.",
+          "weights": {
+            "cost": 1
+          }
+        }
+      }
+    }
+  ]
+}
