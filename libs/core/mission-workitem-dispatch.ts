@@ -43,6 +43,7 @@ import {
   getTeamRole,
   getTaskDescription,
   getTaskModelHint,
+  getTaskModelHintAssisted,
   isIndependentReviewRequired,
   runIndependentReviewerReview,
   getWorkItemTaskId,
@@ -59,6 +60,7 @@ import {
   buildClarificationArtifactPath,
   obtainTaskResultResponse,
 } from './mission-workitem-dispatch-internals.js';
+import { recordRoutingOutcome } from './task-routing-judgment.js';
 import type {
   MissionWorkItemDispatchOptions,
   MissionWorkItemDispatchRecord,
@@ -204,7 +206,8 @@ async function dispatchMissionWorkItemsRound(
     const assigneePeerId = isResolvedArtifactReviewContext(artifactReviewContext)
       ? artifactReviewContext.reviewerAgentId
       : resolveAssigneePeerId({ missionId, item, teamRole });
-    const taskModelHint = getTaskModelHint(item);
+    const routing = await getTaskModelHintAssisted(item);
+    const taskModelHint = routing.hint;
     const teamAssignment = teamRole
       ? resolveMissionTeamReceiver({ missionId, teamRole })
       : undefined;
@@ -439,6 +442,19 @@ async function dispatchMissionWorkItemsRound(
         ...(reviewerResult.verdict.rationale ? [reviewerResult.verdict.rationale] : []),
         ...reviewerResult.verdict.findings,
       ].filter(Boolean);
+      // The label. Written whether or not a judgment narrowed the tier: a
+      // baseline run that succeeded is evidence about that tier too, so the
+      // ledger fills from ordinary dispatch with no judgment provider
+      // registered at all. Across retry rounds the same task accumulates,
+      // and `exportRoutingCorpus()` takes the smallest tier that finished it.
+      recordRoutingOutcome({
+        task: [item.title, item.description].filter(Boolean).join('\n'),
+        phase_kind: 'implement',
+        baseline_tier: routing.baseline.tier,
+        chosen_tier: taskModelHint.tier,
+        chosen_by: routing.downgraded ? 'judgment' : 'baseline',
+        succeeded: reviewerResult.verdict.approved,
+      });
       if (!reviewerResult.verdict.approved) {
         record.notes.push(
           `independent reviewer ${record.reviewer_status || 'blocked'}: ${

@@ -40,6 +40,7 @@ import {
   saveMissionContextPack,
 } from './mission-context-pack.js';
 import { resolveTaskModelHint, type TaskModelHint } from './reasoning-model-routing.js';
+import { routeTaskWithJudgment } from './task-routing-judgment.js';
 import { type TaskResultBlock } from './channel-surface-types.js';
 import { type OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { HarnessSubagentDispatcher } from './agent-dispatch.js';
@@ -670,6 +671,37 @@ export function getTaskModelHint(
     ...(estimatedScope ? { estimated_scope: estimatedScope } : {}),
     ...(modelId ? { model_id: modelId } : {}),
   });
+}
+
+/**
+ * `getTaskModelHint()` plus a judgment that may narrow the tier.
+ *
+ * The deterministic hint is the baseline and is never exceeded. A judgment
+ * can only move it down, and dispatch's own escalation covers the case where
+ * that was wrong — which is why this is the one judgment call site allowed to
+ * act without a calibration fit. See `task-routing-judgment.ts`.
+ *
+ * Inert until a judgment provider is registered, which nothing does by
+ * default; `KYBERION_TASK_ROUTING_JUDGMENT=off` turns it off even then.
+ */
+export async function getTaskModelHintAssisted(
+  item: WorkItem,
+  phaseKind: 'implement' | 'review' = 'implement'
+): Promise<{ hint: TaskModelHint; baseline: TaskModelHint; downgraded: boolean }> {
+  const baseline = getTaskModelHint(item, phaseKind);
+  if (getRegisteredEnvText('KYBERION_TASK_ROUTING_JUDGMENT') === 'off') {
+    return { hint: baseline, baseline, downgraded: false };
+  }
+  const result = await routeTaskWithJudgment({
+    task: [item.title, item.description].filter(Boolean).join('\n'),
+    baseline,
+    phaseKind,
+  });
+  return {
+    hint: result.hint,
+    baseline,
+    downgraded: result.source === 'judgment',
+  };
 }
 
 export function isFastTierTaskModelHint(taskModelHint?: TaskModelHint): boolean {

@@ -3491,6 +3491,15 @@
       "subsystem": "surfaces"
     },
     {
+      "name": "KYBERION_TASK_ROUTING_JUDGMENT",
+      "category": "flag",
+      "type": "string",
+      "required": false,
+      "description": "Set to 'off' to stop work-item dispatch asking a judgment provider whether a task fits a smaller model tier. Already inert unless a judgment provider is registered; a judgment may only lower the tier, never raise it, and dispatch escalation covers a tier chosen too small.",
+      "documented": true,
+      "subsystem": "missions"
+    },
+    {
       "name": "KYBERION_TTS_ARGS",
       "category": "runtime",
       "type": "string",
