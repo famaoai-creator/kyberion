@@ -8,6 +8,24 @@ export * from './judgment-backend.js';
 
 export * from './typesafe-jev-judgment-backend.js';
 
+export * from './laya-mlx-judgment-backend.js';
+
+export * from './judgment-assist.js';
+
+export * from './error-classifier-judgment.js';
+
+export * from './knowledge-relevance-judgment.js';
+
+export * from './browser-judgment.js';
+
+export * from './judgment-calibration-fit.js';
+
+export * from './judgment-callsite-eval.js';
+
+export * from './task-routing-judgment.js';
+
+export * from './agent-runtime-readiness.js';
+
 export * from './plugin-source-trust.js';
 
 export * from './plugin-managed-install.js';

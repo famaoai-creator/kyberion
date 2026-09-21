@@ -74,6 +74,8 @@ export interface ProviderEgressPolicyFile {
       training_use?: ProviderTrainingUse;
       plan?: string;
       basis?: string;
+      /** Hosts this provider sends payloads to; empty for local-only. */
+      endpoint_domains?: string[];
     }
   >;
   tier_policy: {

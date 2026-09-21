@@ -6,6 +6,7 @@ import { parseSafeJsonObjectValue } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { appendSupervisorEvent } from './agent-runtime-events.js';
 import { registerAgentRuntimeEnsurer } from './agent-runtime-port.js';
+import { classifyAgentReadiness, describeAgentReadiness } from './agent-runtime-readiness.js';
 import type { EnsureAgentRuntimeOptions } from './agent-runtime-contracts.js';
 import {
   ensureMissionTeamRuntime,
@@ -19,6 +20,7 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
+  safeOpenAppendFile,
   safeWriteFile,
 } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
@@ -323,9 +325,35 @@ export async function processMissionTeamPrewarmRequest(
   return validatedResult;
 }
 
+/**
+ * Where a detached supervisor's own output goes.
+ *
+ * It used to go nowhere. The supervisor ran with `stdio: 'ignore'`, so when it
+ * died partway through starting a team — after splitting panes and launching
+ * agents, before delivering them anything or writing a result — its
+ * `[pane-runtime]` lines and the stack trace of whatever killed it went to
+ * /dev/null. Dispatch then polled ten minutes for a result, the agents sat
+ * idle with empty inputs, the panes it had split stayed behind as bare
+ * shells, and there was nothing anywhere to say why.
+ */
+export function getAgentRuntimeSupervisorLogPath(requestId: string): string {
+  return pathResolver.shared(`logs/agent-runtime-supervisor/${requestId}.log`);
+}
+
 export function startAgentRuntimeSupervisorForRequest(request: AgentRuntimeEnsureRequest): string {
   const requestPath = getAgentRuntimeEnsureRequestPath(request.request_id);
   const resourceId = `agent-runtime-supervisor:${request.request_id}`;
+  let logFd: number | 'ignore' = 'ignore';
+  try {
+    logFd = safeOpenAppendFile(getAgentRuntimeSupervisorLogPath(request.request_id));
+  } catch (error: unknown) {
+    // Never block a start on logging; say so in the event stream instead.
+    appendSupervisorEvent({
+      decision: 'agent_runtime_supervisor_log_unavailable',
+      request_id: request.request_id,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
   spawnManagedProcess({
     resourceId,
     kind: 'service',
@@ -337,7 +365,7 @@ export function startAgentRuntimeSupervisorForRequest(request: AgentRuntimeEnsur
       cwd: rootDir(),
       env: process.env,
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', logFd, logFd],
     },
     shutdownPolicy: 'detached',
     metadata: {
@@ -441,7 +469,8 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
   });
   const handle = await agentLifecycle.spawn({ ...options, scope: runtimeScope });
   const runtimeRecord = runtimeSupervisor.get(options.agentId || handle.agentId);
-  const snapshot = getAgentRuntimeSnapshot(options.agentId || handle.agentId, 20);
+  const resolvedAgentId = options.agentId || handle.agentId;
+  const snapshot = getAgentRuntimeSnapshot(resolvedAgentId, 20);
   const actualModelId = snapshot?.agent.modelId || handle.getRecord()?.modelId || options.modelId;
   if (runtimeRecord) {
     runtimeSupervisor.update(runtimeRecord.resourceId, {
@@ -454,15 +483,41 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
       },
     });
   }
+  // Keep this as a one-shot check. ACP, stateless CLI and app-server
+  // runtimes do not expose a pane transcript here; their logs can remain
+  // empty until the first prompt. Adapter-level settlePrompts owns startup
+  // prompts, so waiting for a generic ready marker here would make those
+  // runtimes fail after an arbitrary timeout.
+  const readiness = classifyAgentReadiness(
+    (snapshot?.logs || []).map((entry) => entry.content).join('\n')
+  );
+  if (readiness.state === 'awaiting_human') {
+    appendSupervisorEvent({
+      decision: 'agent_runtime_awaiting_human',
+      agent_id: resolvedAgentId,
+      mission_id: options.missionId,
+      scope: runtimeScope,
+      requested_by: options.requestedBy,
+      provider: options.provider,
+      signature_id: readiness.signatureId,
+      prompt_excerpt: readiness.promptExcerpt,
+    });
+    // Fail here rather than let a caller wait. Nothing about waiting longer
+    // answers a question, and the message carries the screen so whoever
+    // reads it can act.
+    throw new Error(`[AGENT_RUNTIME_AWAITING_HUMAN] ${describeAgentReadiness(readiness)}`);
+  }
+
   appendSupervisorEvent({
     decision: 'agent_runtime_ensure_completed',
-    agent_id: options.agentId || handle.agentId,
+    agent_id: resolvedAgentId,
     mission_id: options.missionId,
     scope: runtimeScope,
     requested_by: options.requestedBy,
     provider: options.provider,
     model_id: actualModelId,
     task_model_hint: taskModelHint,
+    readiness: readiness.state,
   });
   return handle;
 }

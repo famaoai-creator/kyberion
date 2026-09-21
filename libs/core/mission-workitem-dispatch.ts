@@ -42,7 +42,7 @@ import {
   readManifest,
   getTeamRole,
   getTaskDescription,
-  getTaskModelHint,
+  getTaskModelHintAssisted,
   isIndependentReviewRequired,
   runIndependentReviewerReview,
   getWorkItemTaskId,
@@ -59,6 +59,12 @@ import {
   buildClarificationArtifactPath,
   obtainTaskResultResponse,
 } from './mission-workitem-dispatch-internals.js';
+import {
+  classifyDispatchFailure,
+  nextTaskModelTier,
+  recordRoutingOutcome,
+  routingOutcomeLedgerPath,
+} from './task-routing-judgment.js';
 import type {
   MissionWorkItemDispatchOptions,
   MissionWorkItemDispatchRecord,
@@ -204,7 +210,39 @@ async function dispatchMissionWorkItemsRound(
     const assigneePeerId = isResolvedArtifactReviewContext(artifactReviewContext)
       ? artifactReviewContext.reviewerAgentId
       : resolveAssigneePeerId({ missionId, item, teamRole });
-    const taskModelHint = getTaskModelHint(item);
+    const routing = await getTaskModelHintAssisted(item, 'implement', {
+      tier: state.tier,
+      ...(state.tenant_slug || item.context?.tenant_slug
+        ? { tenantSlug: state.tenant_slug || item.context?.tenant_slug }
+        : {}),
+    });
+    const taskModelHint = routing.hint;
+    /**
+     * The label, derived from however this item ended up.
+     *
+     * A failure is the most valuable label there is — "this tier was chosen
+     * and could not finish the task" is exactly what a router needs to learn
+     * — so this must run on every exit from the loop, not only the reviewed
+     * ones. Recorded whether or not a judgment narrowed the tier, because a
+     * baseline run that succeeded is evidence about that tier too.
+     */
+    const recordRouting = (input: { attempted: boolean; succeeded: boolean }): void => {
+      // A refusal before the model runs is not the model failing.
+      const blockedBy = classifyDispatchFailure(record.notes || []);
+      recordRoutingOutcome(
+        {
+          task: [item.title, item.description].filter(Boolean).join('\n'),
+          phase_kind: 'implement',
+          baseline_tier: routing.baseline.tier,
+          chosen_tier: taskModelHint.tier,
+          chosen_by: routing.downgraded ? 'judgment' : 'baseline',
+          succeeded: input.succeeded,
+          outcome: input.attempted ? 'attempted' : 'not_attempted',
+          ...(!input.attempted ? { not_attempted_reason: blockedBy || 'dispatch_preflight' } : {}),
+        },
+        { ledgerPath: routingOutcomeLedgerPath(missionPath) }
+      );
+    };
     const teamAssignment = teamRole
       ? resolveMissionTeamReceiver({ missionId, teamRole })
       : undefined;
@@ -252,6 +290,7 @@ async function dispatchMissionWorkItemsRound(
         },
         'blocked'
       );
+      recordRouting({ attempted: false, succeeded: false });
       records.push(record);
       appendDispatchEvent(dispatchEventPath(missionPath), {
         event_type: 'workitem_dispatch_blocked',
@@ -265,6 +304,7 @@ async function dispatchMissionWorkItemsRound(
     }
 
     if (!validation.ok) {
+      recordRouting({ attempted: false, succeeded: false });
       records.push(record);
       appendDispatchEvent(dispatchEventPath(missionPath), {
         event_type: 'workitem_dispatch_failed',
@@ -288,6 +328,7 @@ async function dispatchMissionWorkItemsRound(
         record.notes.push(
           `entry gate ${entryGate.gateId} not passed: ${entryGate.reasons.join('; ') || 'checks failed'}`
         );
+        recordRouting({ attempted: false, succeeded: false });
         records.push(record);
         appendDispatchEvent(dispatchEventPath(missionPath), {
           event_type: 'workitem_dispatch_deferred',
@@ -368,12 +409,22 @@ async function dispatchMissionWorkItemsRound(
           ? 'next action: inspect the provider/session and re-dispatch after recovery'
           : 'next action: inspect the provider error before re-dispatching'
       );
+      const blockedBy = classifyDispatchFailure(record.notes);
+      const escalatedTo = blockedBy ? undefined : nextTaskModelTier(taskModelHint.tier);
+      const catchMetadata = {
+        ...((getWorkItem(item.item_id)?.metadata || item.metadata || {}) as Record<
+          string,
+          unknown
+        >),
+      };
+      delete catchMetadata.routing_minimum_tier;
+      if (escalatedTo) catchMetadata.routing_minimum_tier = escalatedTo;
       updateWorkItem({
         itemId: item.item_id,
         status: 'blocked',
         assigneePeerId: assigneePeerId || item.assignee_peer_id,
         metadata: {
-          ...(item.metadata || {}),
+          ...catchMetadata,
           last_dispatch_at: nowIso(),
           last_dispatch_mission_id: missionId,
           last_dispatch_error: reason,
@@ -394,6 +445,10 @@ async function dispatchMissionWorkItemsRound(
           ? 'timed_out'
           : 'failed',
         next_action: 'inspect provider/session and re-dispatch after recovery',
+      });
+      recordRouting({
+        attempted: !blockedBy,
+        succeeded: false,
       });
       records.push(record);
       continue;
@@ -508,6 +563,21 @@ async function dispatchMissionWorkItemsRound(
             : independentReviewRequired && reviewerResult && !reviewerResult.verdict.approved
               ? 'review'
               : finalStatus;
+    const routingSucceeded =
+      Boolean(response.taskResult) &&
+      response.parseErrors.length === 0 &&
+      taskResultNeeds.length === 0 &&
+      !response.repairRequiresReview &&
+      !driftWatchdog.shouldStop &&
+      (!artifactReviewReceipt || artifactReviewReceipt.receipt.verdict === 'approved') &&
+      (!independentReviewRequired || Boolean(reviewerResult?.verdict.approved));
+    // A clarification request is a valid model outcome, not evidence that
+    // the chosen tier lacked capability. Keep the item blocked for input, but
+    // do not spend more compute on a higher tier for the same missing facts.
+    const nextRoutingTier =
+      routingSucceeded || taskResultNeeds.length > 0
+        ? undefined
+        : nextTaskModelTier(taskModelHint.tier);
     record.execution_mode = response.executionMode;
     record.execution_surface_used = response.executionSurfaceUsed;
     record.notes.push(...response.notes);
@@ -659,12 +729,15 @@ async function dispatchMissionWorkItemsRound(
       string,
       unknown
     >;
+    const nextMetadata = { ...currentMetadata };
+    delete nextMetadata.routing_minimum_tier;
+    if (nextRoutingTier) nextMetadata.routing_minimum_tier = nextRoutingTier;
     updateWorkItem({
       itemId: item.item_id,
       status: reflection.ticketState,
       assigneePeerId: assigneePeerId || item.assignee_peer_id,
       metadata: {
-        ...currentMetadata,
+        ...nextMetadata,
         last_dispatch_at: nowIso(),
         last_dispatch_mode: response.executionMode,
         execution_surface: executionSurfaceDecision.surface,
@@ -800,6 +873,10 @@ async function dispatchMissionWorkItemsRound(
     });
     record.status = 'updated';
     record.work_item_status_after = reflection.ticketState;
+    recordRouting({
+      attempted: true,
+      succeeded: routingSucceeded,
+    });
     records.push(record);
   }
 

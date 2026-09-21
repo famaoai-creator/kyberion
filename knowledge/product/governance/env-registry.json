@@ -1657,6 +1657,33 @@
       "documented": true
     },
     {
+      "name": "KYBERION_LAYA_DTYPE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Weight dtype for the laya-mlx judgment worker (default float16). Read by the Python bridge; lower precision trades accuracy for memory.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_LAYA_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Hugging Face model id the laya-mlx judgment worker loads (default aac6fef/laya-multilingual-mlx). Set by the TypeScript backend for its child process.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_LAYA_PYTHON",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Python interpreter for the laya-mlx judgment worker. Defaults to the governed tool runtime's venv for laya_mlx; set only to point at another environment with mlx installed.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
       "name": "KYBERION_LIVE_BLACKHOLE_TEST",
       "category": "runtime",
       "type": "string",
@@ -3323,6 +3350,15 @@
       "description": "Task model-hint policy: advisory records routing hints without changing the manifest choice, while enforce applies a validated task model hint when present.",
       "documented": true,
       "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_TASK_ROUTING_JUDGMENT",
+      "category": "flag",
+      "type": "string",
+      "required": false,
+      "description": "Set to 'off' to stop work-item dispatch asking a judgment provider whether a task fits a smaller model tier. Already inert unless a judgment provider is registered; a judgment may only lower the tier, never raise it, and dispatch escalation covers a tier chosen too small.",
+      "documented": true,
+      "subsystem": "missions"
     },
     {
       "name": "KYBERION_TASK_SCENARIO_DIR",

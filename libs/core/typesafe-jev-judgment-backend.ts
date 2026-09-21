@@ -26,7 +26,9 @@
  */
 
 import {
+  describeChoiceOptions,
   registerJudgmentBackend,
+  stateText,
   type JudgmentAnswer,
   type JudgmentBackend,
   type JudgmentQuestion,
@@ -80,9 +82,11 @@ function questionPayload(question: JudgmentQuestion): Record<string, unknown> {
     return {
       type: 'choice',
       instructions,
-      // Jev wants a description per option; the option name is the honest
-      // default when the caller supplied nothing richer.
-      criteria: Object.fromEntries(question.options.map((option) => [option, option])),
+      // Jev wants a description per option. Measured on the Laya provider,
+      // which takes the same shape, bare identifiers cost most of the
+      // accuracy (1/6 vs 6/6 on the same six utterances) — so callers should
+      // supply `optionDescriptions`, and the identifier is only a fallback.
+      criteria: describeChoiceOptions(question),
     };
   }
   if (question.kind === 'bool') {
@@ -155,7 +159,7 @@ export function createTypeSafeJevBackend(options: TypeSafeJevOptions = {}): Judg
             'content-type': 'application/json',
           },
           body: JSON.stringify({
-            state: request.state,
+            state: stateText(request.state),
             model,
             // Independent questions over the same state go in one call; that
             // is the shape Jev is built for and it costs one round trip.
