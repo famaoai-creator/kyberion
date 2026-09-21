@@ -18,9 +18,8 @@ vi.mock('@agent/core/provider-pins-store', () => ({
   loadSeamProviderPin: () => null,
   pinSeamProviderDecision: (...args: unknown[]) => mocks.pinWrites(...args),
 }));
-vi.mock('@agent/core/src/trace', async () => {
-  const actual =
-    await vi.importActual<typeof import('@agent/core/src/trace')>('@agent/core/src/trace');
+vi.mock('@agent/core/trace', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/trace')>('@agent/core/trace');
   return { ...actual, persistTrace: vi.fn(() => 'trace-not-persisted-in-tests') };
 });
 vi.mock('@agent/core/voice-profile-registry', async () => {
