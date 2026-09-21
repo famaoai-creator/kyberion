@@ -63,6 +63,29 @@ export interface SelectRelevantKnowledgeInput {
   /** Candidates per judgment call. Default 8. */
   chunkSize?: number;
   timeoutMs?: number;
+  /**
+   * Require a fitted provider before dropping anything.
+   *
+   * **Defaults to true, from measurement rather than caution.** Evaluated on
+   * twelve hand-labelled cases per call site with the Laya provider:
+   *
+   * | question | accuracy | above floor | of those, wrong | unstable |
+   * | --- | --- | --- | --- | --- |
+   * | `error.category` | 42% | 5/12 | 2 (40%) | 0 |
+   * | `browser.failure_kind` | 58% | 5/12 | 1 (20%) | 0 |
+   * | `knowledge.relevant` | 67% | 5/12 | 2 (40%) | 0 |
+   *
+   * Every site exceeded its tolerated confidently-wrong rate, and every site
+   * had too few confident answers for the rate to be worth much either — so
+   * both halves of `recommendRequireCalibrated` agree. Accuracy tracked
+   * distance from the provider's training domain, and determinism did not:
+   * 36 cases over 3 runs each produced zero disagreements while being wrong
+   * a third of the time. Being deterministic is a precondition for a fit, not
+   * evidence of one.
+   *
+   * Turning a site on is therefore a measurement landing in
+   * `judgment-calibration.json`, not an edit here.
+   */
   requireCalibrated?: boolean;
 }
 
@@ -144,7 +167,8 @@ export async function selectRelevantKnowledge(
       ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
       minConfidence,
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
-      ...(input.requireCalibrated ? { requireCalibrated: true } : {}),
+      // Opt-out rather than opt-in; see the option's documentation.
+      requireCalibrated: input.requireCalibrated !== false,
       label: 'knowledge.relevance',
       accept(answers) {
         const drops = new Set<string>();

@@ -2927,6 +2927,10 @@
       "types": "./dist/judgment-calibration-fit.d.ts",
       "default": "./dist/judgment-calibration-fit.js"
     },
+    "./judgment-callsite-eval": {
+      "types": "./dist/judgment-callsite-eval.d.ts",
+      "default": "./dist/judgment-callsite-eval.js"
+    },
     "./tool-call-scheduler": {
       "types": "./dist/tool-call-scheduler.d.ts",
       "default": "./dist/tool-call-scheduler.js"
