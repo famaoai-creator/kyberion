@@ -950,6 +950,7 @@ async function handleProcedureRun(
     cdpUrl?: string;
     cdpPort?: number;
     browserRuntime?: string;
+    browserPurpose?: string;
     headed?: boolean;
     recordVideo?: boolean;
     recordTrace?: boolean;
@@ -1053,6 +1054,7 @@ async function handleProcedureRun(
         recordTrace: argv.recordTrace !== false,
         recordVideo: argv.recordVideo !== false,
         browserRuntime: argv.browserRuntime,
+        browserPurpose: argv.browserPurpose,
         context: {
           procedure_id: entry.procedure_id,
           mission_id: missionId,
@@ -1260,6 +1262,11 @@ async function mainImpl(args: string[] = []): Promise<void> {
       type: 'number',
       description: 'Chrome DevTools port for CLI browser execution',
     })
+    .option('browser-purpose', {
+      type: 'string',
+      description:
+        'let the runtime selection policy choose the browser runtime (evidence | throughput | authenticated)',
+    })
     .option('browser-runtime', {
       type: 'string',
       description:
@@ -1397,6 +1404,7 @@ async function mainImpl(args: string[] = []): Promise<void> {
           cdpUrl: argv['cdp-url'] ? String(argv['cdp-url']) : undefined,
           cdpPort: typeof argv['cdp-port'] === 'number' ? Number(argv['cdp-port']) : undefined,
           browserRuntime: argv['browser-runtime'] ? String(argv['browser-runtime']) : undefined,
+          browserPurpose: argv['browser-purpose'] ? String(argv['browser-purpose']) : undefined,
           recordVideo: argv['record-video'] !== false,
           recordTrace: argv['record-trace'] !== false,
           json: Boolean(argv.json),

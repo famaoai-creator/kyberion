@@ -367,3 +367,5 @@ export type {
   ReadinessReport,
   SetupReceipt,
 } from './environment-capability.js';
+
+export * from './seam-provider-selection.js';

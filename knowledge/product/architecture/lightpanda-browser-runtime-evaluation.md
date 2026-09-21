@@ -74,6 +74,10 @@ lightpanda` (also `pnpm kyberion procedure run`). `auto` resolution never
   picks a provider that declares `capabilities`, so the Chromium default is
   unaffected. `browser_runtime` is host-owned: dispatcher/recording options
   cannot switch it.
+- **Purpose-driven choice.** Instead of naming the runtime, a pipeline can
+  state `runtime_purpose` (CLI `--browser-purpose`) and let the governed
+  policy pick among the runtimes that can run its steps — see
+  [seam-provider-selection](./seam-provider-selection.md).
 - **Process model.** Each session spawns its own `lightpanda serve` on a free
   loopback port (via `safeSpawn`, telemetry disabled) and works in a fresh
   `browser.newContext()` — never the default context's phantom page. Closing

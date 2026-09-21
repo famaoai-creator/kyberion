@@ -2899,6 +2899,10 @@
       "types": "./dist/judgment-backend.d.ts",
       "default": "./dist/judgment-backend.js"
     },
+    "./seam-provider-selection": {
+      "types": "./dist/seam-provider-selection.d.ts",
+      "default": "./dist/seam-provider-selection.js"
+    },
     "./typesafe-jev-judgment-backend": {
       "types": "./dist/typesafe-jev-judgment-backend.d.ts",
       "default": "./dist/typesafe-jev-judgment-backend.js"
