@@ -43,7 +43,11 @@ describe('seam provider selection', () => {
 
   it('keeps the seam default when no purpose is given', () => {
     const decision = resolveSeamProviderDecision({ seam: SEAM, candidates: BOTH });
-    expect(decision).toMatchObject({ provider_id: 'playwright-chromium', strategy: 'default' });
+    expect(decision).toMatchObject({
+      provider_id: 'playwright-chromium',
+      strategy: 'default',
+      ranked: ['playwright-chromium', 'lightpanda'],
+    });
   });
 
   it('ranks eligible providers by the purpose weights and explains the score', () => {
@@ -53,6 +57,7 @@ describe('seam provider selection', () => {
       purpose: 'throughput',
     });
     expect(fast.provider_id).toBe('lightpanda');
+    expect(fast.ranked).toEqual(['lightpanda', 'playwright-chromium']);
     expect(fast.strategy).toBe('purpose');
     expect(fast.rationale).toMatch(/speed=0\.6×1 \(declared\)/);
     const evidence = resolveSeamProviderDecision({
@@ -81,7 +86,7 @@ describe('seam provider selection', () => {
   it('fails closed on unknown purposes and when nothing is eligible', () => {
     expect(
       resolveSeamProviderDecision({ seam: SEAM, candidates: BOTH, purpose: 'cheapest' })
-    ).toMatchObject({ provider_id: null, strategy: 'unresolved' });
+    ).toMatchObject({ provider_id: null, strategy: 'unresolved', ranked: [] });
     const none = resolveSeamProviderDecision({
       seam: SEAM,
       purpose: 'throughput',
@@ -108,6 +113,7 @@ describe('seam provider selection', () => {
       decisionKey: 'throughput',
     });
     expect(again.strategy).toBe('pinned');
+    expect(again.ranked[0]).toBe('lightpanda');
 
     const fallback = resolveSeamProviderDecision({
       seam: SEAM,
