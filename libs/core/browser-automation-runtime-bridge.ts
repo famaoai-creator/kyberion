@@ -120,7 +120,14 @@ export function resolveBrowserAutomationRuntime(
   }
   // Capability-restricted providers (e.g. lightpanda) are opt-in only: 'auto'
   // never silently downgrades a session, whatever the registration order.
-  return bridges.find((bridge) => !bridge.capabilities) ?? bridges[0]!;
+  const full = bridges.find((bridge) => !bridge.capabilities);
+  if (!full) {
+    throw new Error(
+      '[browser-automation-runtime] no full-capability provider is registered; ' +
+        'select a restricted provider explicitly by id'
+    );
+  }
+  return full;
 }
 
 export function getBrowserAutomationRuntimeCapabilities(

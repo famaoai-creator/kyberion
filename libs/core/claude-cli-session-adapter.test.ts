@@ -403,6 +403,10 @@ describe('ClaudeCliSessionAdapter (CN-01)', () => {
 
     it('enforces the per-turn wall-clock budget', async () => {
       const { child } = createFakeChild();
+      child.kill.mockImplementation(() => {
+        child.emit('close', null, 'SIGTERM');
+        return true;
+      });
       const adapter = new ClaudeCliSessionAdapter({
         profile: 'explorer',
         timeoutMs: 20,

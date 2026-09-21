@@ -36,6 +36,11 @@ describe('browser-automation-runtime bridge', () => {
     expect(resolveBrowserAutomationRuntime('auto').bridge_id).toBe('z-full');
   });
 
+  it('fails closed when auto has only capability-restricted providers', () => {
+    registerBrowserAutomationRuntimeBridge(bridge('a-restricted', RESTRICTED));
+    expect(() => resolveBrowserAutomationRuntime()).toThrow(/no full-capability provider/);
+  });
+
   it('selects a restricted provider when requested by id', () => {
     registerBrowserAutomationRuntimeBridge(bridge('a-restricted', RESTRICTED));
     registerBrowserAutomationRuntimeBridge(bridge('z-full'));
