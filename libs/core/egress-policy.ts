@@ -7,6 +7,7 @@ import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { getActiveSandboxPolicy } from './sandbox-policy.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
+import { providerEndpointDomains } from './provider-egress-gate.js';
 
 export type EgressPolicyMode = 'warn' | 'enforce';
 
@@ -21,6 +22,16 @@ export interface EgressPolicyFile {
    * default — tenant data has nowhere approved to go until someone says so.
    */
   tenant_allowed_domains?: Record<string, string[]>;
+  /**
+   * Providers approved for a tenant's confidential/personal material, keyed
+   * like `tenant_allowed_domains`. The hosts come from each provider's
+   * `endpoint_domains` in provider-egress-policy.json, so approving "agy"
+   * does not mean knowing that agy talks to generativelanguage.googleapis.com.
+   * Separate from `tenant_allowed_domains` because that table is also the
+   * customer-message link floor, and approving a model API for egress must
+   * not restrict which links a customer can be sent.
+   */
+  tenant_allowed_providers?: Record<string, string[]>;
   /**
    * QM-11: operator policy for LINKS SHARED IN MESSAGES — deliberately
    * separate from the network-egress allowlist above (mentioning a URL to a
@@ -221,6 +232,10 @@ export function loadEgressPolicy(): EgressPolicyFile {
     tenant_allowed_domains:
       parsed.tenant_allowed_domains && typeof parsed.tenant_allowed_domains === 'object'
         ? parsed.tenant_allowed_domains
+        : {},
+    tenant_allowed_providers:
+      parsed.tenant_allowed_providers && typeof parsed.tenant_allowed_providers === 'object'
+        ? parsed.tenant_allowed_providers
         : {},
     ...(Array.isArray(parsed.link_allowed_domains)
       ? { link_allowed_domains: parsed.link_allowed_domains }
@@ -449,20 +464,23 @@ export function evaluateEgressPolicy(
  * may be sent there.
  */
 function loadTenantEgressDomains(policy: EgressPolicyFile, tenantSlug?: string): string[] {
-  const table = policy.tenant_allowed_domains ?? {};
   const domains = new Set<string>();
-  for (const domain of table['*'] ?? []) {
+  const add = (domain: string | undefined | null) => {
     const normalized = normalizeDomain(domain);
     if (normalized) domains.add(normalized);
-  }
-  if (tenantSlug && isValidTenantSlug(tenantSlug)) {
-    const tenantDomains = Object.prototype.hasOwnProperty.call(table, tenantSlug)
-      ? table[tenantSlug]
-      : [];
-    for (const domain of tenantDomains ?? []) {
-      const normalized = normalizeDomain(domain);
-      if (normalized) domains.add(normalized);
+  };
+  const entriesFor = (table: Record<string, string[]> | undefined): string[] => {
+    const rows = [...(table?.['*'] ?? [])];
+    if (tenantSlug && isValidTenantSlug(tenantSlug) && table) {
+      if (Object.prototype.hasOwnProperty.call(table, tenantSlug)) {
+        rows.push(...(table[tenantSlug] ?? []));
+      }
     }
+    return rows;
+  };
+  for (const domain of entriesFor(policy.tenant_allowed_domains)) add(domain);
+  for (const provider of entriesFor(policy.tenant_allowed_providers)) {
+    for (const domain of providerEndpointDomains(provider)) add(domain);
   }
   return Array.from(domains);
 }
