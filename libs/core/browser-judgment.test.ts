@@ -139,6 +139,45 @@ describe('judgePageReadiness', () => {
     expect((await judgePageReadiness('x', true, 'y')).ready).toBe(true);
   });
 
+  it('refuses a screenshot when no provider can see one, leaving the gate intact', async () => {
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend(provider(false));
+    const verdict = await judgePageReadiness('読み込み中...', true, '一覧', {
+      requireCalibrated: false,
+      screenshotBase64: 'aGVsbG8=',
+      screenshotMediaType: 'image/png',
+    });
+    // Not answered from the text as if the picture had been looked at.
+    expect(verdict.ready).toBe(true);
+    expect(verdict.source).toBe('baseline');
+    expect(verdict.reason).toMatch(/no provider can see images/);
+  });
+
+  it('sends the screenshot to a provider that can see one', async () => {
+    registerOrganizationWorkJudgment();
+    let sawImage = false;
+    registerJudgmentBackend({
+      ...provider(false),
+      judgment_id: 'laya-mlx',
+      acceptsImages: true,
+      async judge(request) {
+        sawImage = typeof request.state !== 'string' && Boolean(request.state.imageBase64);
+        return request.questions.map((question) => ({
+          id: question.id,
+          value: false,
+          confidence: 0.95,
+          calibrated: false,
+        }));
+      },
+    });
+    const verdict = await judgePageReadiness('読み込み中...', true, '一覧', {
+      requireCalibrated: false,
+      screenshotBase64: 'aGVsbG8=',
+    });
+    expect(sawImage).toBe(true);
+    expect(verdict.ready).toBe(false);
+  });
+
   it('asks its question under a stable id', async () => {
     registerOrganizationWorkJudgment();
     let askedId: string | undefined;

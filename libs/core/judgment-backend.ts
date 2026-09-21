@@ -88,9 +88,40 @@ export function describeChoiceOptions(
   );
 }
 
+/**
+ * The material being judged.
+ *
+ * Text was the only shape for a while, and it was a real limit rather than an
+ * omission: `judgePageReadiness` can read a page's words but cannot see a
+ * spinner, a half-painted layout, or a modal covering the content — exactly
+ * the cases a screenshot settles at a glance. Providers that take pixels
+ * exist (PlayJev reads one 448px frame and returns a distribution over the
+ * options in a single forward pass), so the type carries an image now and
+ * `acceptsImages` decides who may see it.
+ */
+export type JudgmentState =
+  | string
+  | {
+      text?: string;
+      /** Raw image bytes, base64, without a data: prefix. */
+      imageBase64: string;
+      /** Media type of `imageBase64`, e.g. 'image/png'. */
+      imageMediaType?: string;
+    };
+
+/** Whether this state carries anything a text-only provider cannot read. */
+export function stateHasImage(state: JudgmentState): boolean {
+  return typeof state !== 'string' && Boolean(state?.imageBase64);
+}
+
+/** The text of a state, for a provider or a log that only handles words. */
+export function stateText(state: JudgmentState): string {
+  return typeof state === 'string' ? state : state?.text || '';
+}
+
 export interface JudgmentRequest {
-  /** The material being judged. */
-  state: string;
+  /** The material being judged; a string, or text and an image. */
+  state: JudgmentState;
   /** Independent questions asked together over the same `state`. */
   questions: readonly JudgmentQuestion[];
   /** Highest data tier represented in `state`; drives provider eligibility. */
@@ -124,6 +155,16 @@ export interface JudgmentResult {
 export interface JudgmentBackend {
   readonly judgment_id: string;
   readonly egress: ProviderEgressLabel;
+  /**
+   * Whether this provider can see an image in the state.
+   *
+   * Absent means no, which is the safe default: a text-only provider handed
+   * an image would answer from the text alone and look like it had looked at
+   * the picture. `selectJudgmentBackend` filters on this, so a caller that
+   * sends a screenshot to a repository where nothing accepts one gets its
+   * baseline back rather than a confident answer about the caption.
+   */
+  readonly acceptsImages?: boolean;
   /** Whether this provider can answer a given question shape at all. */
   supports(question: JudgmentQuestion): boolean;
   /**
@@ -242,8 +283,13 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
     .map((entry) => entry.implementation)
     .filter((backend) => backend.judgment_id !== BUILTIN_JUDGMENT_PROVIDER);
 
+  const needsImage = stateHasImage(request.state);
   const rejected: string[] = [];
   for (const backend of candidates) {
+    if (needsImage && !backend.acceptsImages) {
+      rejected.push(`${backend.judgment_id}: cannot see images`);
+      continue;
+    }
     const unsupported = request.questions.filter((question) => !backend.supports(question));
     if (unsupported.length > 0) {
       rejected.push(`${backend.judgment_id}: cannot answer ${unsupported[0].kind}`);
@@ -282,6 +328,12 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
   // because a wrong one is worse than none: the whole point of this seam is
   // that callers keep their deterministic result when judgment is not
   // available, and a confident-looking wrong answer denies them that.
+  if (needsImage && !builtin.acceptsImages) {
+    throw new Error(
+      `[JUDGMENT_BACKEND] no provider can see images at tier=${request.tier}${why}`
+    );
+  }
+
   const unsupported = request.questions.filter((question) => !builtin.supports(question));
   if (unsupported.length > 0) {
     throw new Error(
@@ -305,8 +357,8 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
  * throws degrades to the built-in one rather than failing the caller.
  */
 export async function judge(request: JudgmentRequest): Promise<JudgmentResult> {
-  if (!request || typeof request.state !== 'string') {
-    throw new TypeError('JudgmentRequest.state must be a string');
+  if (!request || (typeof request.state !== 'string' && !request.state?.imageBase64)) {
+    throw new TypeError('JudgmentRequest.state must be a string or carry an image');
   }
   if (!Array.isArray(request.questions) || request.questions.length === 0) {
     throw new TypeError('JudgmentRequest.questions must be a non-empty array');
@@ -328,6 +380,7 @@ export async function judge(request: JudgmentRequest): Promise<JudgmentResult> {
     // rules replied to 'test.category' with an organization work shape —
     // which is worse than the failure being degraded from.
     if (request.questions.some((question) => !builtin.supports(question))) throw error;
+    if (stateHasImage(request.state) && !builtin.acceptsImages) throw error;
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(
       `[judgment-backend] provider '${backend.judgment_id}' failed; degrading to '${BUILTIN_JUDGMENT_PROVIDER}': ${message}`
