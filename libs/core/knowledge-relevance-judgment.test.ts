@@ -34,13 +34,29 @@ function provider(irrelevant: string[], confidence = 0.95): JudgmentBackend {
   };
 }
 
-const base = { candidates: CANDIDATES, task: 'tier guard を直す', tier: 'personal' as const };
+// `requireCalibrated` defaults to true here (measured: this provider is
+// confidently wrong on 40% of the relevance answers it is sure about), so
+// tests that exercise dropping opt out explicitly.
+const base = {
+  candidates: CANDIDATES,
+  task: 'tier guard を直す',
+  tier: 'personal' as const,
+  requireCalibrated: false,
+};
 
 afterEach(() => {
   resetJudgmentBackends();
 });
 
 describe('selectRelevantKnowledge', () => {
+  it('keeps everything by default, because nothing is calibrated for this question', async () => {
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend(provider(['b']));
+    const result = await selectRelevantKnowledge({ ...base, requireCalibrated: undefined });
+    expect(result.kept).toHaveLength(3);
+    expect(result.source).toBe('baseline');
+  });
+
   it('keeps everything when no provider is registered', async () => {
     const result = await selectRelevantKnowledge(base);
     expect(result.kept).toHaveLength(3);

@@ -49,23 +49,23 @@ describe('classifyBrowserFailure', () => {
     expect(classifyBrowserFailureByRules(page)).toBe('unknown');
     registerOrganizationWorkJudgment();
     registerJudgmentBackend(provider('login_required'));
-    const verdict = await classifyBrowserFailure(page);
+    const verdict = await classifyBrowserFailure(page, { requireCalibrated: false });
     expect(verdict.kind).toBe('login_required');
     expect(verdict.source).toBe('judgment');
   });
 
   it('stays unknown with no provider, a weak answer, or an answer off the enum', async () => {
     const page = 'この機能をご利用いただくには、お手続きが必要です。';
-    expect((await classifyBrowserFailure(page)).kind).toBe('unknown');
+    expect((await classifyBrowserFailure(page, { requireCalibrated: false })).kind).toBe('unknown');
 
     registerOrganizationWorkJudgment();
     registerJudgmentBackend(provider('login_required', 0.3));
-    expect((await classifyBrowserFailure(page)).kind).toBe('unknown');
+    expect((await classifyBrowserFailure(page, { requireCalibrated: false })).kind).toBe('unknown');
 
     resetJudgmentBackends();
     registerOrganizationWorkJudgment();
     registerJudgmentBackend(provider('something_else'));
-    expect((await classifyBrowserFailure(page)).kind).toBe('unknown');
+    expect((await classifyBrowserFailure(page, { requireCalibrated: false })).kind).toBe('unknown');
   });
 
   it('never sends page content to an external provider by default', async () => {
@@ -77,6 +77,14 @@ describe('classifyBrowserFailure', () => {
     });
     const verdict = await classifyBrowserFailure('お手続きが必要です');
     expect(verdict.kind).toBe('unknown');
+  });
+
+  it('stays unknown by default, because nothing is calibrated for this question', async () => {
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend(provider('login_required', 0.99));
+    const verdict = await classifyBrowserFailure('お手続きが必要です');
+    expect(verdict.kind).toBe('unknown');
+    expect(verdict.reason).toMatch(/not calibrated/);
   });
 
   it('describes every offered failure kind', () => {
@@ -104,7 +112,7 @@ describe('judgePageReadiness', () => {
   it('can add "not ready" on top of a passed gate', async () => {
     registerOrganizationWorkJudgment();
     registerJudgmentBackend(provider(false));
-    const verdict = await judgePageReadiness('読み込み中...', true, '検索結果の一覧');
+    const verdict = await judgePageReadiness('読み込み中...', true, '検索結果の一覧', { requireCalibrated: false });
     expect(verdict.ready).toBe(false);
     expect(verdict.keepWaiting).toBe(true);
     expect(verdict.source).toBe('judgment');
@@ -146,7 +154,7 @@ describe('judgePageReadiness', () => {
         }));
       },
     });
-    await judgePageReadiness('読み込み中', true, '一覧');
+    await judgePageReadiness('読み込み中', true, '一覧', { requireCalibrated: false });
     expect(askedId).toBe(BROWSER_READY_QUESTION);
   });
 });
