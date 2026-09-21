@@ -299,6 +299,19 @@ function resolveImageProviderPreference(params: any): string[] | undefined {
   return Array.isArray(preference) && preference.length > 0 ? preference : undefined;
 }
 
+/**
+ * Purpose-driven image provider choice (seam `image-generation-provider`).
+ * Ignored by the bridge whenever a provider preference / backend_id is given.
+ */
+function resolveImageProviderPurpose(params: any): {
+  purpose?: string;
+  allowHostHandoff?: boolean;
+} {
+  const purpose = typeof params?.purpose === 'string' ? params.purpose.trim() : '';
+  if (!purpose) return {};
+  return { purpose, allowHostHandoff: params?.allow_host_handoff === true };
+}
+
 function isDirectMusicGenerationBackend(
   backend: Pick<GenerationBackend, 'modality' | 'kind'>
 ): boolean {
@@ -584,6 +597,7 @@ export {
   maybeCopyArtifact,
   resolveImageArtifactFormat,
   resolveImageProviderPreference,
+  resolveImageProviderPurpose,
   isDirectMusicGenerationBackend,
   resolveMusicProviderPreference,
   resolveMusicBridgeRequest,

@@ -34,6 +34,13 @@ import {
 import { resolveGeminiApiKey } from './gemini-api-backend.js';
 import { isAppleSilicon } from './platform.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
+import {
+  listSeamSelectionPurposes,
+  resolveSeamProviderDecision,
+  type SeamProviderCandidate,
+} from './seam-provider-selection.js';
+
+const IMAGE_GENERATION_PROVIDER_SEAM = 'image-generation-provider';
 
 const imageGenerationProviderSeam = createSeam<ImageGenerationProvider>({
   key: 'image-generation-provider',
@@ -725,6 +732,7 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
   readonly costTier = 'environment';
   readonly dataPolicy = 'zero_retention';
   readonly executionLocality = 'local';
+  readonly requiresInteractiveHandoff = true;
   protected abstract readonly config: HostBridgeProviderConfig;
 
   async isAvailable(): Promise<boolean> {
@@ -853,21 +861,76 @@ export class AdaptivePolicyRouter {
     }
   }
 
+  /** Why the request's mode forbids this provider (hard constraint), or null. */
+  private modeViolation(
+    request: ImageGenerationRequest,
+    provider: ImageGenerationProvider
+  ): string | null {
+    if (
+      (request.mode === 'privacy_first' || request.mode === 'local_only') &&
+      provider.dataPolicy === 'training_eligible'
+    ) {
+      return `mode ${request.mode} excludes training_eligible data policy`;
+    }
+    if (request.mode === 'local_only' && provider.executionLocality !== 'local') {
+      return `mode local_only excludes ${provider.executionLocality ?? 'unknown'} execution`;
+    }
+    return null;
+  }
+
+  /**
+   * Purpose-driven chain: every registered provider is filtered by the mode's
+   * hard constraints, availability and (unless allowed) interactive hand-off;
+   * the eligible ones are ranked by the governed seam policy. The decision is
+   * audited and pinned per mission under the purpose.
+   */
+  private async resolvePurposeChain(
+    request: ImageGenerationRequest,
+    purpose: string
+  ): Promise<ImageGenerationProvider[]> {
+    const known = listSeamSelectionPurposes(IMAGE_GENERATION_PROVIDER_SEAM);
+    if (!known.includes(purpose)) {
+      throw new Error(
+        `[IMAGE_GENERATION_SELECTION] unknown purpose '${purpose}' for seam '${IMAGE_GENERATION_PROVIDER_SEAM}' (known: ${known.join(', ')})`
+      );
+    }
+    const candidates: SeamProviderCandidate[] = [];
+    for (const provider of this.providers.values()) {
+      const unmet: string[] = [];
+      const violation = this.modeViolation(request, provider);
+      if (violation) unmet.push(violation);
+      if (provider.requiresInteractiveHandoff && !request.allowHostHandoff) {
+        unmet.push('interactive host hand-off not allowed (allow_host_handoff)');
+      }
+      if (unmet.length === 0 && !(await provider.isAvailable())) unmet.push('unavailable');
+      candidates.push({ id: provider.id, eligible: unmet.length === 0, unmet });
+    }
+    const decision = resolveSeamProviderDecision({
+      seam: IMAGE_GENERATION_PROVIDER_SEAM,
+      candidates,
+      purpose,
+      decisionKey: purpose,
+    });
+    if (!decision.provider_id) {
+      throw new Error(`[IMAGE_GENERATION_SELECTION] ${decision.rationale}`);
+    }
+    logger.info(
+      `[image_generation_bridge] provider '${decision.provider_id}' selected (${decision.strategy}): ${decision.rationale}`
+    );
+    return decision.ranked.map((id) => this.providers.get(id)!);
+  }
+
   async resolveCandidateChain(request: ImageGenerationRequest): Promise<ImageGenerationProvider[]> {
+    const purpose = request.purpose?.trim();
+    if (purpose && !(request.providerPreference && request.providerPreference.length > 0)) {
+      return await this.resolvePurposeChain(request, purpose);
+    }
     const candidates: ImageGenerationProvider[] = [];
     const seenIds = new Set<string>();
 
     const addIfAvailableAndCompliant = async (provider: ImageGenerationProvider | undefined) => {
       if (!provider || seenIds.has(provider.id)) return;
-      if (
-        (request.mode === 'privacy_first' || request.mode === 'local_only') &&
-        provider.dataPolicy === 'training_eligible'
-      ) {
-        return;
-      }
-      if (request.mode === 'local_only' && provider.executionLocality !== 'local') {
-        return;
-      }
+      if (this.modeViolation(request, provider)) return;
       if (await provider.isAvailable()) {
         candidates.push(provider);
         seenIds.add(provider.id);

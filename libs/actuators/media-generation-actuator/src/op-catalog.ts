@@ -60,6 +60,7 @@ const MEDIA_GENERATION_CONTRACTS: Record<string, InputSchema> = {
   generate_image: {
     type: 'object',
     properties: {
+      allow_host_handoff: { type: 'boolean' },
       aspectRatio: { type: 'string' },
       aspect_ratio: { type: 'string' },
       await_completion: { type: 'boolean' },
@@ -74,6 +75,7 @@ const MEDIA_GENERATION_CONTRACTS: Record<string, InputSchema> = {
       provider: { type: 'string' },
       provider_preference: { type: 'array' },
       providerPreference: { type: 'array' },
+      purpose: { type: 'string' },
       reference_images: { type: 'array' },
       request_id: { type: 'string' },
       resolution: { type: 'string' },

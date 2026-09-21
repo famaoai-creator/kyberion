@@ -65,6 +65,20 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+const selectionMocks = vi.hoisted(() => ({
+  record: vi.fn(),
+  pinSeamProviderDecision: vi.fn(),
+}));
+
+vi.mock('./audit-chain.js', () => ({
+  auditChain: { record: selectionMocks.record },
+}));
+
+vi.mock('./capability-broker.js', () => ({
+  loadSeamProviderPin: () => null,
+  pinSeamProviderDecision: selectionMocks.pinSeamProviderDecision,
+}));
+
 const globalFetch = global.fetch;
 
 describe('AdaptivePolicyRouter', () => {
@@ -928,5 +942,153 @@ describe('CursorHostBridgeImageGenerationProvider', () => {
         targetPath: 'needs-cursor-gen.png',
       })
     ).rejects.toThrow('HOST_BRIDGE_IMAGE_GENERATION_REQUIRED');
+  });
+});
+
+describe('AdaptivePolicyRouter purpose-driven selection', () => {
+  const provider = (
+    id: string,
+    traits: Partial<ImageGenerationProvider> = {},
+    available = true
+  ): ImageGenerationProvider => ({
+    id,
+    ...traits,
+    isAvailable: vi.fn().mockResolvedValue(available),
+    generate: vi.fn().mockResolvedValue({ status: 'succeeded', provider: id, elapsedMs: 1 }),
+  });
+  const local = { costTier: 'self_hosted', dataPolicy: 'local_only', executionLocality: 'local' };
+  const zeroRetention = {
+    costTier: 'paid',
+    dataPolicy: 'zero_retention',
+    executionLocality: 'remote',
+  };
+  const training = {
+    costTier: 'free',
+    dataPolicy: 'training_eligible',
+    executionLocality: 'remote',
+  };
+  const hostBridge = {
+    costTier: 'environment',
+    dataPolicy: 'zero_retention',
+    executionLocality: 'local',
+    requiresInteractiveHandoff: true,
+  };
+  const build = (overrides: Record<string, boolean> = {}) =>
+    new AdaptivePolicyRouter([
+      provider('comfyui', local as any, overrides.comfyui ?? true),
+      provider('gemini_fast', training as any, overrides.gemini_fast ?? true),
+      provider('gemini_service', zeroRetention as any, overrides.gemini_service ?? true),
+      provider('local_flux', local as any, overrides.local_flux ?? true),
+      provider('apple_playground', local as any, overrides.apple_playground ?? true),
+      provider('cursor_host_bridge', hostBridge as any, overrides.cursor_host_bridge ?? true),
+    ]);
+  const ids = (chain: ImageGenerationProvider[]) => chain.map((p) => p.id);
+
+  beforeEach(async () => {
+    vi.stubEnv('MISSION_ID', '');
+    // The governed policy is read from disk; other suites stub safeExistsSync.
+    const actual = (await vi.importActual('./secure-io.js')) as any;
+    mocks.safeExistsSync.mockReset().mockImplementation(actual.safeExistsSync);
+    selectionMocks.record.mockClear();
+    selectionMocks.pinSeamProviderDecision.mockClear();
+  });
+  afterEach(() => {
+    mocks.safeExistsSync.mockReset();
+    vi.unstubAllEnvs();
+  });
+
+  it('orders the whole chain by the purpose ranking and records the decision', async () => {
+    expect(ids(await build().resolveCandidateChain({ prompt: 'x', purpose: 'speed' }))).toEqual([
+      'gemini_fast',
+      'gemini_service',
+      'apple_playground',
+      'comfyui',
+      'local_flux',
+    ]);
+    expect(ids(await build().resolveCandidateChain({ prompt: 'x', purpose: 'quality' }))[0]).toBe(
+      'gemini_service'
+    );
+    expect(
+      ids(await build().resolveCandidateChain({ prompt: 'x', purpose: 'privacy' })).slice(0, 2)
+    ).toEqual(['comfyui', 'local_flux']);
+    expect(selectionMocks.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'provider_selection' })
+    );
+    expect(selectionMocks.pinSeamProviderDecision).not.toHaveBeenCalled();
+  });
+
+  it('keeps the mode hard filters and availability as eligibility', async () => {
+    const chain = await build({ gemini_service: false }).resolveCandidateChain({
+      prompt: 'x',
+      purpose: 'speed',
+      mode: 'local_only',
+    });
+    expect(ids(chain)).toEqual(['apple_playground', 'comfyui', 'local_flux']);
+    const decision = selectionMocks.record.mock.calls.at(-1)?.[0]?.metadata;
+    expect(decision.excluded).toEqual(
+      expect.arrayContaining([
+        { id: 'gemini_fast', unmet: ['mode local_only excludes training_eligible data policy'] },
+        { id: 'gemini_service', unmet: ['mode local_only excludes remote execution'] },
+      ])
+    );
+  });
+
+  it('excludes interactive host bridges unless hand-off is explicitly allowed', async () => {
+    const unattended = await build().resolveCandidateChain({ prompt: 'x', purpose: 'quality' });
+    expect(ids(unattended)).not.toContain('cursor_host_bridge');
+    const excluded = selectionMocks.record.mock.calls.at(-1)?.[0]?.metadata.excluded;
+    expect(excluded).toContainEqual({
+      id: 'cursor_host_bridge',
+      unmet: ['interactive host hand-off not allowed (allow_host_handoff)'],
+    });
+
+    const handoff = await build().resolveCandidateChain({
+      prompt: 'x',
+      purpose: 'quality',
+      allowHostHandoff: true,
+    });
+    expect(ids(handoff)).toContain('cursor_host_bridge');
+  });
+
+  it('lets an explicit provider preference win over the purpose', async () => {
+    const chain = await build().resolveCandidateChain({
+      prompt: 'x',
+      purpose: 'speed',
+      providerPreference: ['local_flux'],
+    });
+    expect(ids(chain)[0]).toBe('local_flux');
+    expect(selectionMocks.record).not.toHaveBeenCalled();
+  });
+
+  it('leaves the chain unchanged when no purpose is given', async () => {
+    const chain = await build().resolveCandidateChain({ prompt: 'x' });
+    expect(ids(chain)[0]).toBe('cursor_host_bridge');
+    expect(selectionMocks.record).not.toHaveBeenCalled();
+  });
+
+  it('throws on an unknown purpose naming the known ones', async () => {
+    await expect(build().resolveCandidateChain({ prompt: 'x', purpose: 'vibes' })).rejects.toThrow(
+      /unknown purpose 'vibes'.*known: cost, privacy, quality, speed/
+    );
+  });
+
+  it('throws when no provider is eligible for the purpose', async () => {
+    const router = new AdaptivePolicyRouter([provider('gemini_fast', training as any)]);
+    await expect(
+      router.resolveCandidateChain({ prompt: 'x', purpose: 'speed', mode: 'privacy_first' })
+    ).rejects.toThrow(/no provider can run this task/);
+  });
+
+  it('keeps rate-limit fallback along the ranked chain', async () => {
+    const router = build();
+    const [first, second] = await router.resolveCandidateChain({ prompt: 'x', purpose: 'speed' });
+    vi.mocked(first.generate).mockResolvedValue({
+      status: 'failed',
+      provider: first.id,
+      elapsedMs: 1,
+      error: '429 rate limit',
+    });
+    const result = await router.generateWithFallback({ prompt: 'x', purpose: 'speed' });
+    expect(result.provider).toBe(second.id);
   });
 });

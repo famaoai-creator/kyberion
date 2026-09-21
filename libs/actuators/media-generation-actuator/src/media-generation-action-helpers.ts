@@ -34,6 +34,7 @@ import {
   maybeCopyArtifact,
   resolveImageArtifactFormat,
   resolveImageProviderPreference,
+  resolveImageProviderPurpose,
   isDirectMusicGenerationBackend,
   resolveMusicProviderPreference,
   resolveMusicBridgeRequest,
@@ -145,6 +146,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
         mode: prepared.params.mode,
         style: typeof prepared.params.style === 'string' ? prepared.params.style : undefined,
         providerPreference: resolveImageProviderPreference(prepared.params),
+        ...resolveImageProviderPurpose(prepared.params),
         targetPath: prepared.params.target_path || prepared.params.targetPath,
         awaitCompletion: resolveAwaitCompletion(action, prepared.params),
       });
