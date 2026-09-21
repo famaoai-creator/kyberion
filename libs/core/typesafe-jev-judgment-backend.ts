@@ -26,6 +26,7 @@
  */
 
 import {
+  describeChoiceOptions,
   registerJudgmentBackend,
   type JudgmentAnswer,
   type JudgmentBackend,
@@ -80,9 +81,11 @@ function questionPayload(question: JudgmentQuestion): Record<string, unknown> {
     return {
       type: 'choice',
       instructions,
-      // Jev wants a description per option; the option name is the honest
-      // default when the caller supplied nothing richer.
-      criteria: Object.fromEntries(question.options.map((option) => [option, option])),
+      // Jev wants a description per option. Measured on the Laya provider,
+      // which takes the same shape, bare identifiers cost most of the
+      // accuracy (1/6 vs 6/6 on the same six utterances) — so callers should
+      // supply `optionDescriptions`, and the identifier is only a fallback.
+      criteria: describeChoiceOptions(question),
     };
   }
   if (question.kind === 'bool') {

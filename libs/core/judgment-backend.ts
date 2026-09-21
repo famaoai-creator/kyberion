@@ -57,11 +57,36 @@ export const BUILTIN_JUDGMENT_PROVIDER = 'builtin-rules';
  * `instructions` states what is being asked in one line. A rule provider can
  * ignore it — its question is baked into its patterns — but a model provider
  * needs it, so it belongs on the question rather than in provider config.
+ *
+ * `optionDescriptions` gives each choice option a sentence, and is worth far
+ * more than its optionality suggests: asked with bare identifiers, the
+ * Laya-MLX provider got 1 of 6 unambiguous Japanese requests right; asked
+ * with a description per option, 6 of 6. Options named `incident_response` /
+ * `routine_operation` are legible to whoever named them and to nobody else.
  */
 export type JudgmentQuestion =
-  | { kind: 'choice'; id: string; options: readonly string[]; instructions?: string }
+  | {
+      kind: 'choice';
+      id: string;
+      options: readonly string[];
+      /** One sentence per option; keys outside `options` are ignored. */
+      optionDescriptions?: Readonly<Record<string, string>>;
+      instructions?: string;
+    }
   | { kind: 'bool'; id: string; instructions?: string }
   | { kind: 'score'; id: string; range: readonly [number, number]; instructions?: string };
+
+/**
+ * `{option: description}` for a model provider, falling back to an option's
+ * own identifier where no description was supplied.
+ */
+export function describeChoiceOptions(
+  question: JudgmentQuestion & { kind: 'choice' }
+): Record<string, string> {
+  return Object.fromEntries(
+    question.options.map((option) => [option, question.optionDescriptions?.[option] || option])
+  );
+}
 
 export interface JudgmentRequest {
   /** The material being judged. */
