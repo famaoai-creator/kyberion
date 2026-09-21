@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Mission Execution'
 tags: [governance, lifecycle, execution]
-last_updated: 2026-08-01
+last_updated: 2026-09-22
 runtime_stages: [contract_authoring, preflight, execution]
 ---
 
@@ -63,19 +63,70 @@ note" for how that was discovered, and treat every review-kind task the same way
 forward — spawn a genuinely independent reviewer (a distinct subagent, not yourself), then
 record its verdict with `review-task`, not `record-evidence`.
 
-When the owner agent does the work **directly** rather than through `dispatch-workitems`
-(the common case for a single agent working solo through a mission), adopt non-review work
-that already happened outside this flow with:
+### Direct CLI work (worktree / subagents / external PR): the flow that reaches `finish`
 
-```
-node dist/scripts/mission_controller.js reconcile-work <MISSION_ID> --manifest <path> [--dry-run]
-```
+Most work is done **directly** — the owner agent edits code in a worktree, delegates to
+subagents, and another agent (e.g. Codex) reviews and merges the PR — not through
+`dispatch-workitems`. That path reaches `finish` without manual repair **only if each
+template task is recorded while the work happens**. Verified end to end on 2026-09-22
+(probe mission, ~2 minutes, no human approval needed):
 
-The manifest is a `mission-work-reconciliation` document (see
-`scripts/refactor/mission-work-reconciliation.ts`) listing, per task, the evidence files
-(with `sha256`), the acceptance criteria satisfied, and a verification block (command run,
-exit code). Run with `--dry-run` first to validate the manifest before it mutates
-`NEXT_TASKS.json` task status.
+1. **Start from the main checkout.** Run `mission_controller create/start` where the
+   operator profile lives (a fresh worktree has no `knowledge/personal/` onboarding and
+   `create` fails). Code can still live in a worktree. On macOS the mission repo's git needs
+   the Xcode license accepted.
+2. **Read the task deliverables first.** `NEXT_TASKS.json` fixes one `deliverable` path per
+   task (template `development`: `evidence/requirements-draft.json`,
+   `evidence/implementation-plan.json`, `evidence/design-spec.json`,
+   `evidence/implementation-report.md`, `evidence/test-report.md`,
+   `evidence/REVIEW-execution-implement.md`, `evidence/delivery-report.md`,
+   `evidence/retrospective.md`). A task closes only when _that_ file exists.
+3. **Close each task as its phase ends**, in dependency order — write the deliverable
+   (real content: requirements from the user's words, the plan, test output, PR / merge
+   commit, …) and run:
+
+   ```
+   node dist/scripts/mission_controller.js record-evidence <MISSION_ID> <TASK_ID> "<NOTE>" \
+     --evidence <deliverable,...> --actor-id <agent that did it> --team-role <planner|implementer|reviewer>
+   ```
+
+   `--actor-id` is not optional in practice: `review-task` computes reviewer independence
+   from the actor ids recorded for the review target, and without them review is rejected
+   ("implementer identity is missing").
+
+4. **Review with a different agent.** After an independent reviewer (a distinct subagent,
+   or the agent reviewing the PR) has reviewed, record its verdict, then close the review
+   task with its own deliverable:
+
+   ```
+   node dist/scripts/mission_controller.js review-task <MISSION_ID> self_review-code-review <reviewer_agent_id> \
+     --specialist-roles code-reviewer --findings '<JSON array>'
+   # review-task records the receipt but does not close the task by itself:
+   #   write evidence/REVIEW-execution-implement.md, then
+   node dist/scripts/mission_controller.js record-evidence <MISSION_ID> self_review-code-review "<NOTE>" \
+     --evidence evidence/REVIEW-execution-implement.md --actor-id <reviewer_agent_id> --team-role reviewer
+   ```
+
+5. Record delivery (PR URL, merge commit) and retrospective the same way, then
+   `verify <ID> verified "<note>"` → `distill <ID>` → `finish <ID>`.
+
+**Do not leave recording until the end and fall back to `reconcile-work`.** That verb adopts
+work produced _outside_ a mission and is deliberately strict: every evidence file must be
+tracked unchanged at the manifest's source commit, review tasks need an
+`artifact-review-receipt` whose implementer identity comes from the execution ledger (it
+cannot be self-declared), and `apply` requires an authenticated human approval
+(`--request-approval`, then `--approval-request-id`). Reaching for it at the end of direct
+work stalls the mission; use it only for genuine adoption of external work, and plan the
+human approval up front.
+
+Other traps seen on this path:
+
+- A failed `finish` returns the mission from `distilling` to `active` (the distillation
+  output is kept); fix the gate cause, then `verify` → `distill` → `finish` again.
+- `checkpoint` only appends to the ledger; it never closes a task.
+- In zsh, a multi-word command stored in a variable (`MC="node … mission_controller.ts"`;
+  `$MC verify …`) is not word-split and silently does nothing — use an array or the full
+  command.
 
 ---
 
