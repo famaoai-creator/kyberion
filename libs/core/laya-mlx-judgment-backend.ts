@@ -188,6 +188,21 @@ function spawnLayaWorker(options: LayaMlxOptions): LayaWorker {
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
+  // A resident worker must not be the reason a process cannot exit, and must
+  // not outlive it holding the weights either.
+  const killOnExit = () => {
+    try {
+      child.kill();
+    } catch {
+      /* already gone */
+    }
+  };
+  process.once('exit', killOnExit);
+  child.unref();
+  child.stdin.unref();
+  child.stdout.unref();
+  child.stderr.unref();
+
   const pending: Array<(reply: LayaWorkerReply) => void> = [];
   let buffer = '';
   let fatal: string | undefined;
@@ -248,21 +263,34 @@ function spawnLayaWorker(options: LayaMlxOptions): LayaWorker {
       return reply;
     },
     dispose() {
-      try {
-        child.kill();
-      } catch {
-        /* already gone */
-      }
+      process.removeListener('exit', killOnExit);
+      killOnExit();
     },
   };
 }
 
-export function createLayaMlxBackend(options: LayaMlxOptions = {}): JudgmentBackend {
+/**
+ * A backend plus the handle needed to stop its worker.
+ *
+ * The seam's `JudgmentBackend` has no lifecycle, which is right for a pure
+ * function over text but wrong for one that owns a child process: a resident
+ * worker keeps Node's event loop alive, so a script that judges and returns
+ * never exits. The worker is `unref`'d so it cannot hold the process open,
+ * and killed on exit so it is not orphaned holding a gigabyte of weights —
+ * but a caller that knows it is finished should say so with `dispose()`.
+ */
+export type DisposableJudgmentBackend = JudgmentBackend & { dispose(): void };
+
+export function createLayaMlxBackend(options: LayaMlxOptions = {}): DisposableJudgmentBackend {
   let worker: LayaWorker | undefined;
 
   return {
     judgment_id: LAYA_MLX_PROVIDER,
     egress: 'local-only',
+    dispose() {
+      worker?.dispose();
+      worker = undefined;
+    },
     supports(question: JudgmentQuestion) {
       if (question.kind === 'choice') return question.options.length >= 2;
       return question.kind === 'bool' || question.kind === 'score';
