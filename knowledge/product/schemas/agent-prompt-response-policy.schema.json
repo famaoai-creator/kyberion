@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-prompt-response-policy.schema.json",
+  "title": "Agent Prompt Response Policy",
+  "description": "How a pane agent runtime responds when an agent stops on a prompt (workspace trust, tool permission, confirmation). Product file ships defaults; knowledge/personal/governance/agent-prompt-response-policy.json overlays it per installation. Consumed by libs/core/agent-prompt-response.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "launch_args": {
+      "type": "object",
+      "description": "Extra CLI arguments per provider (or herdr kind) appended when the agent is started — the place for a provider's non-interactive or permission-mode flags. Empty by default: those flags widen what an agent may do without asking, so they are an installation decision.",
+      "additionalProperties": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+    },
+    "auto_answer": {
+      "type": "array",
+      "description": "Prompts answered without a person. Each rule must match the prompt signature and every condition it declares. A workspace_trust rule needs cwd_prefixes; a generic_confirm or agent_blocked rule needs excerpt_pattern — a rule that could answer any question is ignored.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "signature": {
+            "type": "string",
+            "enum": ["workspace_trust", "update_available", "generic_confirm", "agent_blocked"]
+          },
+          "providers": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "cwd_prefixes": {
+            "type": "array",
+            "description": "Absolute paths; {repo_root} and {repo_parent} are expanded. The agent's cwd must equal or sit under one of them.",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "excerpt_pattern": {
+            "type": "string",
+            "description": "Case-insensitive regular expression the prompt text must match."
+          },
+          "keys": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "herdr send-keys key names, e.g. [\"enter\"] or [\"down\", \"enter\"]."
+          },
+          "note": { "type": "string" }
+        },
+        "required": ["id", "signature", "keys"]
+      }
+    },
+    "relay_keys": {
+      "type": "object",
+      "description": "Keys sent after a person approves or rejects an escalated prompt, per signature, with 'default' as the fallback.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "approve": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "reject": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "required": ["approve", "reject"]
+      }
+    },
+    "escalation_wait_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3600000,
+      "description": "How long a turn waits for a person to decide an escalated prompt before failing as awaiting_human. The request stays open; the next turn relays a decision made later."
+    },
+    "_meta": { "type": "string" }
+  },
+  "required": ["version"]
+}
