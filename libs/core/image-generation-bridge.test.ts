@@ -74,7 +74,7 @@ vi.mock('./audit-chain.js', () => ({
   auditChain: { record: selectionMocks.record },
 }));
 
-vi.mock('./capability-broker.js', () => ({
+vi.mock('./provider-pins-store.js', () => ({
   loadSeamProviderPin: () => null,
   pinSeamProviderDecision: selectionMocks.pinSeamProviderDecision,
 }));
@@ -956,18 +956,22 @@ describe('AdaptivePolicyRouter purpose-driven selection', () => {
     isAvailable: vi.fn().mockResolvedValue(available),
     generate: vi.fn().mockResolvedValue({ status: 'succeeded', provider: id, elapsedMs: 1 }),
   });
-  const local = { costTier: 'self_hosted', dataPolicy: 'local_only', executionLocality: 'local' };
-  const zeroRetention = {
+  const local: Partial<ImageGenerationProvider> = {
+    costTier: 'self_hosted',
+    dataPolicy: 'local_only',
+    executionLocality: 'local',
+  };
+  const zeroRetention: Partial<ImageGenerationProvider> = {
     costTier: 'paid',
     dataPolicy: 'zero_retention',
     executionLocality: 'remote',
   };
-  const training = {
+  const training: Partial<ImageGenerationProvider> = {
     costTier: 'free',
     dataPolicy: 'training_eligible',
     executionLocality: 'remote',
   };
-  const hostBridge = {
+  const hostBridge: Partial<ImageGenerationProvider> = {
     costTier: 'environment',
     dataPolicy: 'zero_retention',
     executionLocality: 'local',
@@ -975,19 +979,19 @@ describe('AdaptivePolicyRouter purpose-driven selection', () => {
   };
   const build = (overrides: Record<string, boolean> = {}) =>
     new AdaptivePolicyRouter([
-      provider('comfyui', local as any, overrides.comfyui ?? true),
-      provider('gemini_fast', training as any, overrides.gemini_fast ?? true),
-      provider('gemini_service', zeroRetention as any, overrides.gemini_service ?? true),
-      provider('local_flux', local as any, overrides.local_flux ?? true),
-      provider('apple_playground', local as any, overrides.apple_playground ?? true),
-      provider('cursor_host_bridge', hostBridge as any, overrides.cursor_host_bridge ?? true),
+      provider('comfyui', local, overrides.comfyui ?? true),
+      provider('gemini_fast', training, overrides.gemini_fast ?? true),
+      provider('gemini_service', zeroRetention, overrides.gemini_service ?? true),
+      provider('local_flux', local, overrides.local_flux ?? true),
+      provider('apple_playground', local, overrides.apple_playground ?? true),
+      provider('cursor_host_bridge', hostBridge, overrides.cursor_host_bridge ?? true),
     ]);
   const ids = (chain: ImageGenerationProvider[]) => chain.map((p) => p.id);
 
   beforeEach(async () => {
     vi.stubEnv('MISSION_ID', '');
     // The governed policy is read from disk; other suites stub safeExistsSync.
-    const actual = (await vi.importActual('./secure-io.js')) as any;
+    const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
     mocks.safeExistsSync.mockReset().mockImplementation(actual.safeExistsSync);
     selectionMocks.record.mockClear();
     selectionMocks.pinSeamProviderDecision.mockClear();
@@ -1073,7 +1077,7 @@ describe('AdaptivePolicyRouter purpose-driven selection', () => {
   });
 
   it('throws when no provider is eligible for the purpose', async () => {
-    const router = new AdaptivePolicyRouter([provider('gemini_fast', training as any)]);
+    const router = new AdaptivePolicyRouter([provider('gemini_fast', training)]);
     await expect(
       router.resolveCandidateChain({ prompt: 'x', purpose: 'speed', mode: 'privacy_first' })
     ).rejects.toThrow(/no provider can run this task/);

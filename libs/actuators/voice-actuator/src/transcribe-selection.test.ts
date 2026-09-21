@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@agent/core/audit-chain', () => ({
   auditChain: { record: (...args: unknown[]) => mocks.record(...args) },
 }));
-vi.mock('@agent/core/capability-broker', () => ({
+vi.mock('@agent/core/provider-pins-store', () => ({
   loadSeamProviderPin: () => null,
   pinSeamProviderDecision: (...args: unknown[]) => mocks.pinWrites(...args),
 }));
@@ -67,7 +67,7 @@ const transcribe = (params: Record<string, unknown>) =>
   handleAction({
     action: 'transcribe_voice_sample',
     params: { audio_path: 'active/shared/tmp/sample.wav', write_sidecar: false, ...params },
-  } as any);
+  } as unknown as Parameters<typeof handleAction>[0]);
 
 describe('voice-actuator purpose-driven STT selection', () => {
   beforeEach(() => {
