@@ -81,6 +81,30 @@ export function buildPlaygroundPayload(
   };
 }
 
+/**
+ * Live secret:set with a value must go through `kyberion secret introduce` /
+ * Concierge — playground may only dry-run / check that path.
+ */
+export function assertPlaygroundSecretMutationAllowed(args: {
+  actuatorId: string;
+  operation: string;
+  params: Record<string, unknown>;
+  dryRun?: boolean;
+  check?: boolean;
+}): void {
+  const actuatorId = String(args.actuatorId || '').toLowerCase();
+  const operation = String(args.operation || '').toLowerCase();
+  if (actuatorId !== 'secret-actuator' || operation !== 'set') return;
+  if (args.dryRun === true || args.check === true) return;
+  if (typeof args.params?.value === 'string' && args.params.value.length > 0) {
+    throw new Error(
+      '[PLAYGROUND_SECRET_SET_BLOCKED] Live secret:set with a value is not allowed in playground. ' +
+        'Use `pnpm kyberion secret introduce <serviceId> <secretKey>` or Concierge Introduce secret. ' +
+        'Dry-run/check without applying a value remains available.'
+    );
+  }
+}
+
 export function evaluatePlaygroundDryRun(args: {
   actuatorId: string;
   operation: string;
@@ -326,6 +350,21 @@ export async function runPlayground(
   // 6. Construct Payload
   // Include both 'op' and 'action' for seamless compatibility across different actuator conventions
   const payload = buildPlaygroundPayload(op, paramsObject);
+
+  try {
+    assertPlaygroundSecretMutationAllowed({
+      actuatorId: manifest.actuator_id,
+      operation: op,
+      params: paramsObject,
+      dryRun: options.dryRun,
+      check: options.check,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logError(chalk.red(`\n❌ ${message}`));
+    rl.close();
+    throw new ScriptExitError(1, message);
+  }
 
   if (options.check === true || options.dryRun === true) {
     const plan = evaluatePlaygroundDryRun({

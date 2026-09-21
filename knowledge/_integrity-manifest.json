@@ -303,7 +303,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 7463,
+      "size": 7531,
       "type": "md"
     },
     {
@@ -781,9 +781,15 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/secret-introduction-model.md",
+      "tier": "public",
+      "size": 3221,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/secret-mutation-approval-model.md",
       "tier": "public",
-      "size": 4512,
+      "size": 4755,
       "type": "md"
     },
     {
@@ -1443,7 +1449,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 48370,
+      "size": 49077,
       "type": "json"
     },
     {
@@ -3555,7 +3561,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 18534,
+      "size": 18754,
       "type": "json"
     },
     {
@@ -4881,7 +4887,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19166,
+      "size": 19234,
       "type": "json"
     },
     {
@@ -10803,7 +10809,7 @@
     {
       "path": "product/schemas/secret-action.schema.json",
       "tier": "public",
-      "size": 271,
+      "size": 1512,
       "type": "json"
     },
     {
