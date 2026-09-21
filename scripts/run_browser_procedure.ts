@@ -18,7 +18,7 @@ import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
 import { compileBrowserRecording } from '@agent/core/browser-recording-compiler';
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import { loadProcedures, resolveAllowlistedRecordingRef } from '@agent/core/procedure-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
@@ -212,22 +212,25 @@ export async function main(
       );
     }
     const actuator = await (deps.loadActuator ?? loadBrowserActuator)();
-    const result = await actuator.handleAction({
-      ...adf,
-      options: {
-        ...((adf.options as Record<string, unknown> | undefined) || {}),
-        headless: headed ? false : true,
-        connect_over_cdp: connectOverCdp,
-        ...(cdpUrl ? { cdp_url: cdpUrl } : {}),
-        ...(cdpPort ? { cdp_port: cdpPort } : {}),
-        ...(browserRuntime ? { browser_runtime: browserRuntime } : {}),
-      },
-      context: {
-        ...((adf.context as Record<string, unknown> | undefined) || {}),
-        source: 'run-browser-procedure',
-        mission_id: missionId,
-      },
-    });
+    // Same governed identity as procedure runs (evidence/browser writes).
+    const result = await withExecutionContextAsync('surface_runtime', () =>
+      actuator.handleAction({
+        ...adf,
+        options: {
+          ...((adf.options as Record<string, unknown> | undefined) || {}),
+          headless: headed ? false : true,
+          connect_over_cdp: connectOverCdp,
+          ...(cdpUrl ? { cdp_url: cdpUrl } : {}),
+          ...(cdpPort ? { cdp_port: cdpPort } : {}),
+          ...(browserRuntime ? { browser_runtime: browserRuntime } : {}),
+        },
+        context: {
+          ...((adf.context as Record<string, unknown> | undefined) || {}),
+          source: 'run-browser-procedure',
+          mission_id: missionId,
+        },
+      })
+    );
     const payload = {
       mode: 'adf',
       mission_id: missionId,
@@ -304,7 +307,7 @@ export async function main(
     },
   });
 
-  const result = await withExecutionContext('surface_runtime', () =>
+  const result = await withExecutionContextAsync('surface_runtime', () =>
     dispatch({
       procedure: entry!,
       recording,

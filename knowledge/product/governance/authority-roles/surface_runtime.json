@@ -12,7 +12,8 @@
     "active/shared/coordination/channels/imessage/",
     "active/shared/coordination/channels/discord/",
     "active/shared/coordination/channels/telegram/",
-    "active/audit/"
+    "active/audit/",
+    "evidence/browser/"
   ],
   "scope_classes": ["communication_surface", "operations_runtime", "audit"],
   "allowed_actuators": ["presence-actuator", "artifact-actuator"],

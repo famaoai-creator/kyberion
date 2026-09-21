@@ -531,7 +531,7 @@
     {
       "path": "product/architecture/lightpanda-browser-runtime-evaluation.md",
       "tier": "public",
-      "size": 6039,
+      "size": 6462,
       "type": "md"
     },
     {
@@ -1317,7 +1317,7 @@
     {
       "path": "product/governance/authority-roles/surface_runtime.json",
       "tier": "public",
-      "size": 825,
+      "size": 850,
       "type": "json"
     },
     {
@@ -3405,7 +3405,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 21860,
+      "size": 21918,
       "type": "json"
     },
     {

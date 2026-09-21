@@ -58,6 +58,9 @@ tests/_tmp/
 tests/_tmp_integration/
 evidence/benchmarks/
 evidence/performance/
+# Browser-actuator traces, videos, screenshots (directory kept for governed writes)
+evidence/browser/*
+!evidence/browser/.gitkeep
 
 # Auto-generated knowledge indices and context
 knowledge/orchestration/knowledge_index.json
