@@ -15,6 +15,10 @@ import {
   recognizeTextWithWindowsNativeApi,
 } from './windows-native-image-recognition-bridge.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
+import {
+  resolveSeamProviderDecision,
+  type SeamProviderCandidate,
+} from './seam-provider-selection.js';
 
 const ocrProviderSeam = createSeam<OcrProvider>({
   key: 'ocr-provider',
@@ -657,7 +661,68 @@ export class AdaptivePolicyRouter {
     });
   }
 
+  /**
+   * Hard-eligible providers for `request.mode`: allowed by the egress filter
+   * and available right now. This is the same eligibility test resolveCandidates
+   * uses by default; purpose-driven selection reuses it instead of a second
+   * notion of "can run this task".
+   */
+  private async eligibleCandidates(request: OcrRequest): Promise<SeamProviderCandidate[]> {
+    const mode = request.mode || 'balanced';
+    const allowed = this.allowedEgress(mode);
+    const candidates: SeamProviderCandidate[] = [];
+    for (const provider of this.providers.values()) {
+      if (!allowed.has(provider.dataEgress)) {
+        candidates.push({
+          id: provider.id,
+          eligible: false,
+          unmet: [`dataEgress '${provider.dataEgress}' not permitted by mode '${mode}'`],
+        });
+        continue;
+      }
+      const available = await provider.isAvailable();
+      candidates.push(
+        available
+          ? { id: provider.id, eligible: true }
+          : { id: provider.id, eligible: false, unmet: ['provider not available'] }
+      );
+    }
+    return candidates;
+  }
+
+  /**
+   * Purpose-driven order: hard mode/availability eligibility (above) filters,
+   * then the governed ocr-provider selection policy ranks who runs the task
+   * first. Only used when the caller asked for a purpose and did not already
+   * pin an explicit providerPreference — an explicit choice always wins.
+   */
+  private async resolvePurposeChain(request: OcrRequest, purpose: string): Promise<OcrProvider[]> {
+    const candidates = await this.eligibleCandidates(request);
+    const decision = resolveSeamProviderDecision({
+      seam: ocrProviderSeam.key,
+      candidates,
+      purpose,
+      decisionKey: purpose,
+    });
+    if (decision.strategy === 'unresolved') {
+      throw new Error(`[OCR_PROVIDER_SELECTION] ${decision.rationale}`);
+    }
+    logger.info(
+      `[ocr_bridge] purpose '${purpose}' provider chain (${decision.strategy}): ${decision.ranked.join(' > ')} — ${decision.rationale}`
+    );
+    return decision.ranked
+      .map((id) => this.providers.get(id))
+      .filter((provider): provider is OcrProvider => Boolean(provider));
+  }
+
   async resolveCandidates(request: OcrRequest): Promise<OcrProvider[]> {
+    const hasProviderPreference = Boolean(
+      request.providerPreference && request.providerPreference.length > 0
+    );
+    if (request.purpose && !hasProviderPreference) {
+      return this.resolvePurposeChain(request, request.purpose);
+    }
+
     const allowed = this.allowedEgress(request.mode || 'balanced');
     const candidates: OcrProvider[] = [];
     for (const id of this.getProviderIds(request)) {
