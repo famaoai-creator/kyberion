@@ -2848,6 +2848,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_SEAM_SELECTION_RULES_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for the operator seam selection rules overlay (human-set provider preferences and measured trait values); default <profile>/onboarding/seam-selection-rules.json.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_SECRET_ENCRYPTION",
       "category": "flag",
       "type": "enum",

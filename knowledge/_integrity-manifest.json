@@ -1443,7 +1443,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 48171,
+      "size": 48370,
       "type": "json"
     },
     {
@@ -1551,7 +1551,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 140660,
+      "size": 141062,
       "type": "json"
     },
     {
@@ -3423,7 +3423,7 @@
     {
       "path": "product/governance/seam-provider-selection/browser-automation-runtime.json",
       "tier": "public",
-      "size": 2423,
+      "size": 2463,
       "type": "json"
     },
     {
@@ -10749,7 +10749,13 @@
     {
       "path": "product/schemas/seam-provider-selection-policy.schema.json",
       "tier": "public",
-      "size": 3079,
+      "size": 3328,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/seam-selection-rules.schema.json",
+      "tier": "public",
+      "size": 2575,
       "type": "json"
     },
     {

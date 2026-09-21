@@ -2,6 +2,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pins = new Map<string, { seam: string; provider_id: string; pinnedAt: string; by: string }>();
 const record = vi.fn();
+const overlay: {
+  rules: Array<Record<string, unknown>>;
+  overrides: Record<string, Record<string, { traits: Record<string, number> }>>;
+} = { rules: [], overrides: {} };
+
+vi.mock('./seam-selection-rules.js', () => ({
+  matchSeamSelectionRule: (
+    seam: string,
+    request: { purpose?: string; context?: Record<string, string> }
+  ) =>
+    (
+      overlay.rules as Array<{
+        seam: string;
+        when: { purpose?: string; context?: Record<string, string> };
+      }>
+    ).find(
+      (rule) =>
+        rule.seam === seam &&
+        (!rule.when.purpose || rule.when.purpose === request.purpose) &&
+        Object.entries(rule.when.context ?? {}).every(([k, v]) => request.context?.[k] === v)
+    ) ?? null,
+  getSeamTraitOverrides: (seam: string) => overlay.overrides[seam] ?? {},
+}));
 
 vi.mock('./audit-chain.js', () => ({
   auditChain: { record: (...args: unknown[]) => record(...args) },
@@ -33,6 +56,8 @@ describe('seam provider selection', () => {
   beforeEach(() => {
     pins.clear();
     record.mockClear();
+    overlay.rules = [];
+    overlay.overrides = {};
     vi.stubEnv('MISSION_ID', '');
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -145,5 +170,101 @@ describe('seam provider selection', () => {
         metadata: expect.objectContaining({ strategy: 'purpose', purpose: 'throughput' }),
       })
     );
+  });
+
+  const rule = (extra: Record<string, unknown>) => ({
+    rule_id: 'r1',
+    seam: SEAM,
+    when: {},
+    prefer: ['lightpanda'],
+    set_by: 'user:owner',
+    set_at: '2026-09-22T00:00:00.000Z',
+    ...extra,
+  });
+
+  it('applies an operator rule ahead of the purpose ranking', () => {
+    overlay.rules = [rule({ when: { purpose: 'evidence' } })];
+    const decision = resolveSeamProviderDecision({
+      seam: SEAM,
+      candidates: BOTH,
+      purpose: 'evidence',
+    });
+    expect(decision).toMatchObject({
+      provider_id: 'lightpanda',
+      strategy: 'rule',
+      rule_id: 'r1',
+      ranked: ['lightpanda', 'playwright-chromium'],
+    });
+    expect(decision.rationale).toMatch(/operator rule 'r1'/);
+  });
+
+  it('matches rules on request context and skips ineligible preferred providers', () => {
+    overlay.rules = [rule({ when: { context: { language: 'ja' } } })];
+    expect(
+      resolveSeamProviderDecision({ seam: SEAM, candidates: BOTH, context: { language: 'en' } })
+        .strategy
+    ).toBe('default');
+    expect(
+      resolveSeamProviderDecision({ seam: SEAM, candidates: BOTH, context: { language: 'ja' } })
+        .provider_id
+    ).toBe('lightpanda');
+    const skipped = resolveSeamProviderDecision({
+      seam: SEAM,
+      context: { language: 'ja' },
+      candidates: [
+        { id: 'lightpanda', eligible: false, unmet: ['open_tab (multi_tab)'] },
+        { id: 'playwright-chromium', eligible: true },
+      ],
+    });
+    expect(skipped.provider_id).toBe('playwright-chromium');
+    expect(skipped.rationale).toMatch(/prefers only ineligible providers/);
+  });
+
+  it('keeps a mission pin ahead of a later operator rule', () => {
+    pins.set(`${SEAM}:evidence`, {
+      seam: SEAM,
+      provider_id: 'playwright-chromium',
+      pinnedAt: '2026-09-22T00:00:00.000Z',
+      by: 'test',
+    });
+    overlay.rules = [rule({ when: { purpose: 'evidence' } })];
+    const decision = resolveSeamProviderDecision({
+      seam: SEAM,
+      candidates: BOTH,
+      purpose: 'evidence',
+      decisionKey: 'evidence',
+    });
+    expect(decision.strategy).toBe('pinned');
+    expect(decision.provider_id).toBe('playwright-chromium');
+  });
+
+  it('scores with measured operator trait values and says so', () => {
+    overlay.overrides[SEAM] = { 'playwright-chromium': { traits: { speed: 1, footprint: 1 } } };
+    const decision = resolveSeamProviderDecision({
+      seam: SEAM,
+      candidates: BOTH,
+      purpose: 'throughput',
+    });
+    expect(decision.provider_id).toBe('playwright-chromium');
+    expect(decision.rationale).toMatch(/speed=0\.6×1 \(measured\)/);
+    const baseline = resolveSeamProviderDecision({
+      seam: SEAM,
+      candidates: BOTH,
+      purpose: 'throughput',
+      ignoreOperatorOverlay: true,
+    });
+    expect(baseline.provider_id).toBe('lightpanda');
+  });
+
+  it('ranks by the fallback purpose when the default cannot run the task', () => {
+    const decision = resolveSeamProviderDecision({
+      seam: SEAM,
+      candidates: [
+        { id: 'lightpanda', eligible: true },
+        { id: 'playwright-chromium', eligible: false, unmet: ['test'] },
+      ],
+    });
+    expect(decision).toMatchObject({ provider_id: 'lightpanda', strategy: 'fallback' });
+    expect(decision.rationale).toMatch(/fallback purpose 'throughput'/);
   });
 });
