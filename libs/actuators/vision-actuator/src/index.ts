@@ -108,6 +108,9 @@ async function ocrImage(params: any) {
     mode: params.mode,
     providerPreference: params.provider_preference || params.providerPreference,
     extractStructure: params.extract_structure || params.extractStructure,
+    // Governed seam-provider-selection purpose (e.g. 'accuracy', 'speed',
+    // 'privacy', 'cost'). Ignored once a providerPreference is set.
+    purpose: params.purpose,
   });
 
   return {

@@ -17,6 +17,7 @@ const VISION_SCHEMA = {
     path: { type: 'string' },
     providerPreference: { type: 'array', items: { type: 'string' } },
     provider_preference: { type: 'array', items: { type: 'string' } },
+    purpose: { type: 'string' },
   },
   additionalProperties: false,
   required: ['path'],
