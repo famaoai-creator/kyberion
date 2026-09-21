@@ -1,55 +1,7 @@
 /**
- * Choose an AudioBus implementation for the current host.
- *
- * Order:
- *   1. Explicit `KYBERION_AUDIO_BUS=stub|blackhole|pulseaudio` wins.
- *   2. `darwin` → BlackHole; `linux` → PulseAudio; otherwise → stub.
- *
- * The returned bus is unprobed. Callers should call `probe()` and
- * fall back to `StubAudioBus` if `available=false`.
+ * Choose an AudioBus via the audio-bus-bridge seam.
+ * Kept as the stable import path for existing callers.
  */
 
-import type { AudioBus } from './audio-bus.js';
-import { StubAudioBus } from './audio-bus.js';
-import { BlackHoleAudioBus } from './blackhole-audio-bus.js';
-import { PulseAudioBus } from './pulse-audio-bus.js';
-import { getRegisteredEnv } from './foundation/env.js';
-
-function kyberionEnv(name: string): string | undefined {
-  const value = getRegisteredEnv(name);
-  if (value === undefined) return undefined;
-  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
-}
-
-export type AudioBusId = 'stub' | 'blackhole' | 'pulseaudio';
-
-type AudioBusFactory = () => AudioBus;
-
-const explicitFactories: Record<AudioBusId, AudioBusFactory> = {
-  stub: () => new StubAudioBus(),
-  blackhole: () =>
-    new BlackHoleAudioBus({
-      ...(kyberionEnv('KYBERION_BLACKHOLE_INPUT_UID')
-        ? { input_device_uid: kyberionEnv('KYBERION_BLACKHOLE_INPUT_UID') }
-        : {}),
-      ...(kyberionEnv('KYBERION_BLACKHOLE_OUTPUT_UID')
-        ? { output_device_uid: kyberionEnv('KYBERION_BLACKHOLE_OUTPUT_UID') }
-        : {}),
-      ...(kyberionEnv('KYBERION_BLACKHOLE_DEVICE_LABEL')
-        ? { expected_device_label: kyberionEnv('KYBERION_BLACKHOLE_DEVICE_LABEL') }
-        : {}),
-    }),
-  pulseaudio: () => new PulseAudioBus(),
-};
-
-const platformFactories: Partial<Record<NodeJS.Platform, AudioBusFactory>> = {
-  darwin: explicitFactories.blackhole,
-  linux: explicitFactories.pulseaudio,
-};
-
-export function resolveAudioBus(
-  preferred: AudioBusId | undefined = kyberionEnv('KYBERION_AUDIO_BUS') as AudioBusId | undefined
-): AudioBus {
-  if (preferred) return explicitFactories[preferred]();
-  return (platformFactories[process.platform] || explicitFactories.stub)();
-}
+import './audio-bus-providers.js';
+export { resolveAudioBus, type AudioBusId } from './audio-bus-bridge.js';

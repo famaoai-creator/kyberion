@@ -1669,6 +1669,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.tool.setup",
+      "script": "tool:setup",
+      "command": "tool setup",
+      "noun": "tool",
+      "verb": "setup",
+      "audience": "operator"
+    },
+    {
       "id": "script.reasoning.setup",
       "script": "reasoning:setup",
       "command": "reasoning setup",

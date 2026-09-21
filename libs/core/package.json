@@ -211,6 +211,30 @@
       "types": "./dist/agent-lifecycle.d.ts",
       "default": "./dist/agent-lifecycle.js"
     },
+    "./agent-pane-runtime-bridge": {
+      "types": "./dist/agent-pane-runtime-bridge.d.ts",
+      "default": "./dist/agent-pane-runtime-bridge.js"
+    },
+    "./agent-pane-runtime-herdr": {
+      "types": "./dist/agent-pane-runtime-herdr.d.ts",
+      "default": "./dist/agent-pane-runtime-herdr.js"
+    },
+    "./agent-exec-adapter-bridge": {
+      "types": "./dist/agent-exec-adapter-bridge.d.ts",
+      "default": "./dist/agent-exec-adapter-bridge.js"
+    },
+    "./audio-bus-bridge": {
+      "types": "./dist/audio-bus-bridge.d.ts",
+      "default": "./dist/audio-bus-bridge.js"
+    },
+    "./browser-automation-runtime-bridge": {
+      "types": "./dist/browser-automation-runtime-bridge.d.ts",
+      "default": "./dist/browser-automation-runtime-bridge.js"
+    },
+    "./calendar-provider-bridge": {
+      "types": "./dist/calendar-provider-bridge.d.ts",
+      "default": "./dist/calendar-provider-bridge.js"
+    },
     "./agent-manifest": {
       "types": "./dist/agent-manifest.d.ts",
       "default": "./dist/agent-manifest.js"
@@ -2870,6 +2894,14 @@
     "./judge-route": {
       "types": "./dist/judge-route.d.ts",
       "default": "./dist/judge-route.js"
+    },
+    "./judgment-backend": {
+      "types": "./dist/judgment-backend.d.ts",
+      "default": "./dist/judgment-backend.js"
+    },
+    "./typesafe-jev-judgment-backend": {
+      "types": "./dist/typesafe-jev-judgment-backend.d.ts",
+      "default": "./dist/typesafe-jev-judgment-backend.js"
     },
     "./tool-call-scheduler": {
       "types": "./dist/tool-call-scheduler.d.ts",
