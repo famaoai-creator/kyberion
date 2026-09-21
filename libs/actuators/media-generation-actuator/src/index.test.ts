@@ -83,6 +83,18 @@ vi.mock('@agent/core/music-generation-bridge', async (importOriginal) => ({
   generateMusic: mocks.generateMusic,
 }));
 
+const selectionRecord = vi.hoisted(() => vi.fn());
+vi.mock('@agent/core/audit-chain', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/audit-chain')>();
+  // Keep the real chain for everything else; capture provider-selection records.
+  const auditChain = Object.create(actual.auditChain) as typeof actual.auditChain;
+  auditChain.record = ((entry: Parameters<typeof actual.auditChain.record>[0]) => {
+    selectionRecord(entry);
+    return undefined as unknown as ReturnType<typeof actual.auditChain.record>;
+  }) as typeof actual.auditChain.record;
+  return { ...actual, auditChain };
+});
+
 vi.mock('@agent/core/network', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/network')>()),
   secureFetch: mocks.secureFetch,
@@ -522,6 +534,142 @@ describe('media-generation-actuator', () => {
       params: { prompt: 'plain', await_completion: false },
     });
     expect(mocks.generateImage.mock.lastCall?.[0]).not.toHaveProperty('purpose');
+  });
+
+  it('reports the provider the image bridge actually used, not the requested default', async () => {
+    mocks.generateImage.mockResolvedValue({
+      status: 'submitted',
+      provider: 'gemini_fast',
+      promptId: 'bridge-routed-1',
+    });
+    const { handleAction } = await import('./index.js');
+
+    const routed = await handleAction({
+      action: 'generate_image',
+      params: { prompt: 'draft', purpose: 'speed', await_completion: false },
+    });
+    expect(routed).toEqual(
+      expect.objectContaining({
+        backend_id: 'gemini_fast',
+        resolved_backend_id: 'media-generation.gemini.imagen-3-fast',
+        requested_backend_id: 'media-generation.comfyui',
+        backend_provider: 'gemini_api',
+        backend_kind: 'service_preset',
+      })
+    );
+
+    mocks.generateImage.mockResolvedValue({
+      status: 'submitted',
+      provider: 'llm_api',
+      promptId: 'bridge-routed-2',
+    });
+    const unregistered = await handleAction({
+      action: 'generate_image',
+      params: { prompt: 'draft', await_completion: false },
+    });
+    expect(unregistered).toEqual(
+      expect.objectContaining({
+        resolved_backend_id: 'llm_api',
+        backend_provider: 'llm_api',
+        backend_kind: 'bridge',
+      })
+    );
+  });
+
+  it('routes a music purpose without a named backend to the direct bridge', async () => {
+    mocks.generateMusic.mockResolvedValue({
+      status: 'succeeded',
+      provider: 'stable_audio_3',
+      path: 'active/shared/tmp/purpose-music.wav',
+      elapsedMs: 5,
+    });
+    mocks.safeExistsSync.mockReturnValue(true);
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'generate_music',
+      params: { prompt: 'calm piano', purpose: 'quality', duration_sec: 20, format: 'wav' },
+    });
+
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+    expect(mocks.generateMusic).toHaveBeenCalledWith(
+      expect.objectContaining({ purpose: 'quality', durationSec: 20, format: 'wav' })
+    );
+    expect(mocks.generateMusic.mock.lastCall?.[0]?.providerPreference).toBeUndefined();
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'succeeded',
+        backend_id: 'stable_audio_3',
+        resolved_backend_id: 'media-generation.stable_audio_3_small_music',
+        backend_provider: 'stable_audio_3',
+        backend_kind: 'cli',
+      })
+    );
+
+    await handleAction({
+      action: 'generate_music',
+      params: {
+        prompt: 'calm piano',
+        purpose: 'quality',
+        backend_id: 'media-generation.musicgen_mlx',
+      },
+    });
+    expect(mocks.generateMusic.mock.lastCall?.[0]).toEqual(
+      expect.objectContaining({ providerPreference: ['musicgen_mlx'] })
+    );
+    expect(mocks.generateMusic.mock.lastCall?.[0]).not.toHaveProperty('purpose');
+  });
+
+  it('persists a purpose-selected video backend in the submitted job request', async () => {
+    for (const name of [
+      'KYBERION_GEMINI_VIDEO_API_KEY',
+      'KYBERION_GEMINI_API_KEY',
+      'GEMINI_API_KEY',
+      'GOOGLE_API_KEY',
+      'KYBERION_RUNWAY_API_KEY',
+      'RUNWAYML_API_SECRET',
+      'KYBERION_MINIMAX_VIDEO_API_KEY',
+      'MINIMAX_API_KEY',
+      'OPENAI_API_KEY',
+    ]) {
+      vi.stubEnv(name, '');
+    }
+    vi.stubEnv('KYBERION_OPENAI_VIDEO_API_KEY', 'test-key');
+    vi.stubEnv('MISSION_ID', '');
+    const { resetMediaBackendAvailabilityCache } =
+      await import('@agent/core/media-backend-registry');
+    resetMediaBackendAvailabilityCache();
+    // The governed selection policy is read from disk.
+    const actualIo =
+      await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+    mocks.safeExistsSync.mockImplementation(actualIo.safeExistsSync);
+    mocks.secureFetch.mockResolvedValue({ id: 'video_sora_1', status: 'queued' });
+    const { handleAction } = await import('./index.js');
+
+    try {
+      const job = await handleAction({
+        action: 'submit_generation',
+        params: {
+          action: 'generate_video',
+          params: { prompt: 'a quiet harbour at dawn', purpose: 'speed' },
+        },
+      });
+      expect(job).toEqual(
+        expect.objectContaining({
+          status: 'submitted',
+          provider: expect.objectContaining({ provider_job_id: 'video_sora_1' }),
+          request: expect.objectContaining({ backend_id: 'media-generation.openai.sora-2' }),
+        })
+      );
+      expect(selectionRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'video-generation-provider/media-generation.openai.sora-2',
+        })
+      );
+    } finally {
+      vi.unstubAllEnvs();
+      resetMediaBackendAvailabilityCache();
+    }
   });
 
   it('preserves a submitted bridge result and never fabricates a missing artifact', async () => {
