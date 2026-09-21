@@ -161,6 +161,38 @@ describe('judgment-backend seam', () => {
     expect(result.answers[0].confidence).toBe(1);
   });
 
+  it('keeps an image away from a provider that cannot see one', async () => {
+    registerOrganizationWorkJudgment();
+    // supports() is about the question; seeing pixels is about the request,
+    // so a text-only provider must be filtered on the capability instead.
+    registerJudgmentBackend(stubBackend({ judgment_id: 'text-only' }));
+    await expect(
+      judge({
+        state: { text: '検索結果の一覧', imageBase64: 'aGVsbG8=', imageMediaType: 'image/png' },
+        questions: [QUESTION],
+        tier: 'public',
+      })
+    ).rejects.toThrow(/no provider can see images/);
+  });
+
+  it('routes an image to a provider that declares it can see one', async () => {
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend(stubBackend({ judgment_id: 'vision', acceptsImages: true }));
+    const result = await judge({
+      state: { imageBase64: 'aGVsbG8=', imageMediaType: 'image/png' },
+      questions: [QUESTION],
+      tier: 'public',
+    });
+    expect(result.provider_id).toBe('vision');
+  });
+
+  it('still routes a plain string to a text-only provider', async () => {
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend(stubBackend({ judgment_id: 'text-only' }));
+    const result = await judge({ state: '本番障害', questions: [QUESTION], tier: 'public' });
+    expect(result.provider_id).toBe('text-only');
+  });
+
   it('rejects a provider that does not declare an egress label', () => {
     expect(() =>
       registerJudgmentBackend({

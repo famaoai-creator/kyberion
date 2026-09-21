@@ -51,6 +51,7 @@ import { createLogger } from './logger.js';
 import {
   describeChoiceOptions,
   registerJudgmentBackend,
+  stateText,
   type JudgmentAnswer,
   type JudgmentBackend,
   type JudgmentQuestion,
@@ -300,7 +301,7 @@ export function createLayaMlxBackend(options: LayaMlxOptions = {}): DisposableJu
     async judge(request: JudgmentRequest): Promise<readonly JudgmentAnswer[]> {
       if (!worker) worker = (options.spawnWorker || (() => spawnLayaWorker(options)))();
       const reply = await worker.send({
-        state: request.state,
+        state: stateText(request.state),
         questions: Object.fromEntries(
           request.questions.map((question) => [question.id, questionPayload(question)])
         ),
