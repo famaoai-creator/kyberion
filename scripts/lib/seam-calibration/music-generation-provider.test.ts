@@ -60,19 +60,23 @@ describe('music-generation-provider calibration adapter', () => {
     );
     const summary = report.providers.find((p) => p.provider_id === 'stable_audio_3');
     expect(summary?.runs.map((run) => run.output?.artifact_path)).toEqual([
-      path.join(
-        outRoot,
-        'music-generation-provider',
-        'music-test',
-        'stable_audio_3',
-        'trial-1.wav'
+      pathResolver.toRepoRelative(
+        path.join(
+          outRoot,
+          'music-generation-provider',
+          'music-test',
+          'stable_audio_3',
+          'trial-1.wav'
+        )
       ),
-      path.join(
-        outRoot,
-        'music-generation-provider',
-        'music-test',
-        'stable_audio_3',
-        'trial-2.wav'
+      pathResolver.toRepoRelative(
+        path.join(
+          outRoot,
+          'music-generation-provider',
+          'music-test',
+          'stable_audio_3',
+          'trial-2.wav'
+        )
       ),
     ]);
   });

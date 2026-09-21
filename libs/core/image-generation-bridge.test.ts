@@ -1153,6 +1153,23 @@ describe('AdaptivePolicyRouter purpose-driven selection', () => {
       expect(selectionMocks.record).not.toHaveBeenCalled();
     });
 
+    it('does not let an operator rule bypass the interactive hand-off gate', async () => {
+      await writeRules([{ rule_id: 'host-only', when: {}, prefer: ['cursor_host_bridge'] }]);
+
+      const unattended = await build().resolveCandidateChain({
+        prompt: 'x',
+        mode: 'local_only',
+      });
+      expect(ids(unattended)).not.toContain('cursor_host_bridge');
+
+      const handoff = await build().resolveCandidateChain({
+        prompt: 'x',
+        mode: 'local_only',
+        allowHostHandoff: true,
+      });
+      expect(ids(handoff)[0]).toBe('cursor_host_bridge');
+    });
+
     it('lets an explicit provider preference win over a rule', async () => {
       await writeRules([{ rule_id: 'always-flux', when: {}, prefer: ['local_flux'] }]);
       const chain = await build().resolveCandidateChain({

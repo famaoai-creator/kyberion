@@ -124,7 +124,7 @@ export const streamingSttBridgeCalibrationAdapter: SeamCalibrationAdapter<Stream
       'Stream the same 16-bit mono WAV through every installed streaming STT bridge and compare final transcripts (char_error_rate against reference_text when given).',
     input_example: {
       audio_path: 'active/shared/tmp/sample-16k.wav',
-      reference_text: '本日の議題は三点です',
+      reference_text: '本日の議題は三点です', // i18n-exempt: calibration sample text for CER input, not app-facing copy
       language: 'ja',
     },
 

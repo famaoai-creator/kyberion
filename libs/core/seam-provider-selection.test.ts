@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const pins = new Map<string, { seam: string; provider_id: string; pinnedAt: string; by: string }>();
+const pins = new Map<
+  string,
+  { seam: string; provider_id: string; purpose?: string; pinnedAt: string; by: string }
+>();
 const record = vi.fn();
 const overlay: {
   rules: Array<Record<string, unknown>>;
@@ -31,10 +34,11 @@ vi.mock('./audit-chain.js', () => ({
 }));
 vi.mock('./provider-pins-store.js', () => ({
   loadSeamProviderPin: (seam: string, key: string) => pins.get(`${seam}:${key}`) ?? null,
-  pinSeamProviderDecision: (seam: string, key: string, providerId: string) => {
+  pinSeamProviderDecision: (seam: string, key: string, providerId: string, purpose?: string) => {
     const entry = {
       seam,
       provider_id: providerId,
+      ...(purpose ? { purpose } : {}),
       pinnedAt: '2026-09-22T00:00:00.000Z',
       by: 'test',
     };
@@ -224,6 +228,7 @@ describe('seam provider selection', () => {
     pins.set(`${SEAM}:evidence`, {
       seam: SEAM,
       provider_id: 'playwright-chromium',
+      purpose: 'evidence',
       pinnedAt: '2026-09-22T00:00:00.000Z',
       by: 'test',
     });
@@ -235,6 +240,25 @@ describe('seam provider selection', () => {
       decisionKey: 'evidence',
     });
     expect(decision.strategy).toBe('pinned');
+    expect(decision.provider_id).toBe('playwright-chromium');
+  });
+
+  it('does not reuse a mission pin for a different purpose on the same decision key', () => {
+    vi.stubEnv('MISSION_ID', 'MSN-TEST');
+    resolveSeamProviderDecision({
+      seam: SEAM,
+      candidates: BOTH,
+      purpose: 'throughput',
+      decisionKey: 'shared-slot',
+    });
+
+    const decision = resolveSeamProviderDecision({
+      seam: SEAM,
+      candidates: BOTH,
+      purpose: 'evidence',
+      decisionKey: 'shared-slot',
+    });
+    expect(decision.strategy).toBe('purpose');
     expect(decision.provider_id).toBe('playwright-chromium');
   });
 

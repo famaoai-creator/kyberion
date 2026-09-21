@@ -82,7 +82,9 @@ match change nothing). An explicitly named provider always wins.
 ```bash
 pnpm kyberion seam select list                       # seams, purposes, adapters, rules
 pnpm kyberion seam select calibrate --seam ocr-provider --input sample.json [--providers a,b] [--repeats 3]
-#  → active/shared/runtime/seam-calibration/[<mission>/]<seam>/<run>/report.md (+ report.json, artifacts)
+#  → active/missions/{tier}/{tenant-or-shared}/<mission>/evidence/seam-calibration/<seam>/<run>/report.md
+#    (+ report.json, artifacts); mission-less probes use active/shared/tmp/seam-calibration/
+#    and reports redact content-bearing inputs, transcripts and trial errors.
 pnpm kyberion seam select rules set --seam ocr-provider --rule-id ocr-ja --context language=ja \
      --prefer tesseract,apple_vision --evidence <report.json> --note "…"
 pnpm kyberion seam select apply-measurements --report <report.json> [--traits latency,accuracy]
