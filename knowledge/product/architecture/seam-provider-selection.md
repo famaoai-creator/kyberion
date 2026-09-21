@@ -63,6 +63,27 @@ pipeline with `throughput` runs on Lightpanda; the same purpose with a
 `screenshot` step falls back to Chromium (Lightpanda excluded, mission pin
 kept); `evidence` picks Chromium; a re-run reuses the mission pin.
 
+## Seams wired in
+
+| Seam (policy file)           | Caller option                                                                                                                          | Purposes                            | Eligibility (hard filter)                                                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `browser-automation-runtime` | pipeline `options.runtime_purpose`; CLI `--browser-purpose`                                                                            | evidence, throughput, authenticated | pipeline ops/options vs runtime capabilities                                                      |
+| `image-generation-provider`  | `ImageGenerationRequest.purpose`; media-generation `generate_image` `purpose`                                                          | quality, speed, privacy, cost       | `mode` (local_only / privacy_first), `isAvailable()`, host bridges only with `allow_host_handoff` |
+| `ocr-provider`               | `OcrRequest.purpose`; vision-actuator `ocr_image` `purpose`                                                                            | accuracy, speed, privacy, cost      | `mode` egress filter, `isAvailable()`                                                             |
+| `speech-to-text-bridge`      | `selectSpeechToTextBridges({ purpose, requires })`; voice-actuator `transcribe` / `transcribe_voice_sample` `purpose` (backend `auto`) | accuracy, latency, privacy          | declared timestamps granularity, `local_only`, synthetic (stub) only when allowed                 |
+
+In every seam an explicit provider (`browser_runtime`, `providerPreference`,
+voice `backend`) wins and skips selection, and no purpose keeps the existing
+routing. Image and OCR walk `decision.ranked` as their fallback chain.
+
+Deliberately not wired (2026-09-22): TTS / voice engines (the engine decides
+_whose_ voice speaks and is bound to voice profiles and the clone-tier
+routing policy; engines declare no languages yet), video generation (API
+models are only used when named explicitly), music (two providers with the
+same declared traits), VAD, streaming STT/TTS (no capability metadata), and
+device- or account-bound seams (camera, audio bus, calendar, meeting drivers).
+voice-hub keeps its own STT order (`libs/core/voice-stt.ts`).
+
 ## Adding another seam
 
 1. Give its providers capability declarations the caller can check.

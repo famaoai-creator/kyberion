@@ -5,7 +5,7 @@ const pinWrites = vi.fn();
 vi.mock('./audit-chain.js', () => ({
   auditChain: { record: (...args: unknown[]) => record(...args) },
 }));
-vi.mock('./capability-broker.js', () => ({
+vi.mock('./provider-pins-store.js', () => ({
   loadSeamProviderPin: () => null,
   pinSeamProviderDecision: (...args: unknown[]) => pinWrites(...args),
 }));
