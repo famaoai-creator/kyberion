@@ -192,6 +192,8 @@ describe('voice-tts-engine routing', () => {
         prefer: ['espeak_ng'],
         set_by: 'user:test',
       });
+      // Rule changes are audited too; assertions below are about selection.
+      mocks.record.mockClear();
       const english = routeVoiceEngine({
         text: 'Hello',
         baselineEngine: getVoiceEngineRecord('kokoro'),
