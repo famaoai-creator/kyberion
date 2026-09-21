@@ -8,6 +8,8 @@ import {
   getSpeechToTextBridges,
   getSpeechToTextCapabilities,
   normalizeSpeechToTextResult,
+  selectSpeechToTextBridges,
+  SpeechToTextSelectionError,
 } from '@agent/core/speech-to-text-bridge';
 import {
   getVoiceEngineRecord,
@@ -1277,6 +1279,8 @@ async function transcribeVoiceSample(input: {
   prefer_timestamps?: boolean;
   backend?: 'auto' | 'bridge' | 'fluid_audio' | 'mlx_whisper';
   allow_synthetic?: boolean;
+  /** Governed selection purpose (accuracy / latency / privacy); only used with backend 'auto'. */
+  purpose?: string;
 }): Promise<any> {
   const audioPath = resolveVoicePath(String(input.audio_path || '').trim(), 'audio-input');
   // Smartphone m4a / Zoom mp4 / mp3 arrive here untouched — normalize to the
@@ -1394,7 +1398,48 @@ async function transcribeVoiceSample(input: {
     (bridge) => !getSpeechToTextCapabilities(bridge).timestamps
   );
 
-  if (backendPreference === 'mlx_whisper') {
+  const purpose = String(input.purpose || '').trim();
+  // Purpose-driven order (backend 'auto' only): prefer_timestamps becomes a
+  // hard requirement, the seam policy ranks the eligible bridges, and the
+  // direct mlx path stays the non-seam last resort — as in the default path.
+  let purposeOrder: any[] | null = null;
+  let selectionError: Error | null = null;
+  if (purpose && backendPreference === 'auto') {
+    try {
+      purposeOrder = selectSpeechToTextBridges({
+        purpose,
+        bridges,
+        requires: {
+          ...(preferTimestamps ? { timestamps: 'segment' as const } : {}),
+          allowSynthetic: Boolean(input.allow_synthetic),
+        },
+      }).bridges;
+    } catch (error) {
+      if (!(error instanceof SpeechToTextSelectionError)) throw error;
+      selectionError = error;
+      purposeOrder = [];
+    }
+  }
+
+  if (purposeOrder) {
+    for (const bridge of purposeOrder) {
+      const result = await transcribeWithBridge(bridge);
+      if (result && (!preferTimestamps || result.capabilities?.timestamps)) break;
+    }
+    if (
+      preferTimestamps
+        ? !candidates.some((candidate) => candidate.capabilities?.timestamps)
+        : candidates.length === 0
+    ) {
+      transcribeWithMlxWhisper();
+    }
+    if (selectionError && candidates.length === 0) {
+      throw new Error(
+        `[VOICE] no usable STT backend: ${selectionError.message}` +
+          (mlxError ? `; ${(mlxError as Error).message}` : '')
+      );
+    }
+  } else if (backendPreference === 'mlx_whisper') {
     transcribeWithMlxWhisper();
   } else if (backendPreference === 'fluid_audio') {
     const bridge = usableBridges.find((candidate) => candidate.name === 'fluid-audio-parakeet');

@@ -159,7 +159,7 @@ export function createAppleSpeechFileToTextBridge(): SpeechToTextBridge {
         language: locale,
         written_to: safeOutputPath,
         backend: APPLE_SPEECH_FILE_BRIDGE_NAME,
-        capabilities: { timestamps: false, granularity: 'none' },
+        capabilities: { timestamps: false, granularity: 'none', local_only: true },
       };
     },
   };
