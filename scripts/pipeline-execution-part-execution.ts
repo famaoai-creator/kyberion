@@ -378,7 +378,7 @@ export async function runStepsInternal(
           suspended.storage_channel,
           suspended.approval_request_id
         );
-        if (existing?.status === 'approved') {
+        if (existing?.status === 'approved' || existing?.status === 'applied') {
           return {
             ...ctx,
             [String(params.export_as || 'decision')]: {

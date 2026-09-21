@@ -1143,12 +1143,17 @@ export function recordApprovalApplyResult(
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
   const record = loadApprovalRequest(storageChannel, params.requestId);
   if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  // Only secret_mutation advances status into applied/failed. Pipeline and
+  // steering resumes keep status=approved so await_decision / hasBoundApproval
+  // still recognize the grant after the async apply receipt lands.
   const nextStatus: ApprovalRequestRecord['status'] =
-    params.applyResult.result === 'success'
-      ? 'applied'
-      : params.applyResult.result === 'failed'
-        ? 'failed'
-        : record.status;
+    record.kind === 'secret_mutation'
+      ? params.applyResult.result === 'success'
+        ? 'applied'
+        : params.applyResult.result === 'failed'
+          ? 'failed'
+          : record.status
+      : record.status;
   const updated: ApprovalRequestRecord = {
     ...record,
     status: nextStatus,
