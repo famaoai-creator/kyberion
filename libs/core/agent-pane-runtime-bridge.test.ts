@@ -201,13 +201,27 @@ describe('agent-pane-runtime herdr provider', () => {
  * completed work.
  */
 describe('pane adapter: an agent that stops to ask is not finished', () => {
-  function fakeHerdr(opts: { status: string; screen: string }) {
+  const TRUST =
+    'Do you trust the contents of this project?\n> Yes, I trust this folder\n  No, exit';
+  const EDIT_ASK = '● Edit(src/app.ts)\n  Do you want to make this edit?\n  ❯ 1. Yes\n    2. No';
+  const ANSWER = '> update the header\n\n● Updated the header in src/app.ts.\n\n❯ \n';
+
+  /**
+   * A herdr that shows `screens` in order: each send-keys advances one step,
+   * which is what answering a prompt looks like from outside.
+   */
+  function fakeHerdr(opts: { status: string; screens: string[] }) {
+    let step = 0;
+    const sent: string[][] = [];
     const exec = vi.fn((_command: string, args: string[] = []) => {
       const joined = args.join(' ');
       const ok = (result: unknown) => ({
         status: 0,
         stdout: JSON.stringify({ result }),
         stderr: '',
+      });
+      const agent = (status: string) => ({
+        agent: { name: 'worker', agent_status: status, pane_id: 'w9:p1', workspace_id: 'w9' },
       });
       if (joined.startsWith('workspace list')) {
         return ok({ workspaces: [{ workspace_id: 'w9', label: 'kyberion', pane_count: 1 }] });
@@ -222,61 +236,194 @@ describe('pane adapter: an agent that stops to ask is not finished', () => {
         return ok({ panes: [{ pane_id: 'w9:p1', workspace_id: 'w9' }] });
       }
       if (joined.startsWith('agent list')) return ok({ agents: [] });
-      if (joined.startsWith('agent start')) {
-        return ok({
-          agent: { name: 'worker', agent_status: 'idle', pane_id: 'w9:p1', workspace_id: 'w9' },
-        });
+      if (joined.startsWith('agent start')) return ok(agent('idle'));
+      if (joined.startsWith('agent send-keys')) {
+        sent.push(args.slice(3));
+        step = Math.min(step + 1, opts.screens.length - 1);
+        return ok({});
       }
+      if (joined.startsWith('agent wait')) return ok(agent('idle'));
       if (joined.startsWith('agent read')) {
-        return { status: 0, stdout: opts.screen, stderr: '' };
+        return { status: 0, stdout: opts.screens[step], stderr: '' };
       }
-      if (joined.startsWith('agent prompt')) {
-        return ok({
-          agent: {
-            name: 'worker',
-            agent_status: opts.status,
-            pane_id: 'w9:p1',
-            workspace_id: 'w9',
-          },
-        });
-      }
+      if (joined.startsWith('agent prompt')) return ok(agent(step === 0 ? opts.status : 'idle'));
       return ok({});
     });
-    return exec;
+    return { exec, sent };
   }
 
-  const adapterFor = (exec: ReturnType<typeof fakeHerdr>) =>
-    new HerdrAgentPaneRuntimeBridge({ exec: exec as never }).createAdapter({
+  function fakeApprovals(decision: 'pending' | 'approved' | 'rejected') {
+    const opened: string[] = [];
+    const consumed: string[] = [];
+    return {
+      opened,
+      consumed,
+      port: {
+        open: (request: { signatureId: string }) => {
+          opened.push(request.signatureId);
+          return { id: 'req-1', created: true };
+        },
+        status: () => decision,
+        consume: (id: string) => {
+          consumed.push(id);
+        },
+      },
+    };
+  }
+
+  const adapterFor = (
+    exec: unknown,
+    options: {
+      policy?: Record<string, unknown>;
+      approvals?: ReturnType<typeof fakeApprovals>;
+      cwd?: string;
+      provider?: string;
+    } = {}
+  ) =>
+    new HerdrAgentPaneRuntimeBridge({
+      exec: exec as never,
+      promptPolicy: {
+        version: '1.0.0',
+        escalation_wait_ms: 0,
+        relay_keys: { default: { approve: ['enter'], reject: ['esc'] } },
+        ...(options.policy ?? {}),
+      } as never,
+      promptApprovals: (options.approvals ?? fakeApprovals('pending')).port as never,
+      promptAudit: () => undefined,
+      settleDelayMs: 0,
+    }).createAdapter({
       agentId: 'worker',
-      provider: 'claude',
-      cwd: '/tmp/repo',
+      provider: options.provider ?? 'claude',
+      cwd: options.cwd ?? '/tmp/repo',
     });
 
-  it('refuses when herdr itself reports the agent blocked', async () => {
-    const exec = fakeHerdr({
-      status: 'blocked',
-      screen: '● Edit(src/app.ts)\n  Do you want to make this edit?\n  ❯ 1. Yes\n    2. No',
+  it('escalates when herdr itself reports the agent blocked', async () => {
+    const { exec, sent } = fakeHerdr({ status: 'blocked', screens: ['❯ \n', EDIT_ASK] });
+    // Boot sees an idle input; the turn stops on the edit question.
+    let reads = 0;
+    const execWithTurn = vi.fn((command: string, args: string[] = []) => {
+      if (args[0] === 'agent' && args[1] === 'read') {
+        reads += 1;
+        return { status: 0, stdout: reads === 1 ? '❯ \n' : EDIT_ASK, stderr: '' };
+      }
+      return exec(command, args);
     });
-    await expect(adapterFor(exec).ask('update the header')).rejects.toThrow(
-      /AGENT_RUNTIME_AWAITING_HUMAN/
+    const approvals = fakeApprovals('pending');
+    await expect(adapterFor(execWithTurn, { approvals }).ask('update the header')).rejects.toThrow(
+      /AGENT_RUNTIME_AWAITING_HUMAN[\s\S]*pnpm kyberion approve req-1/
     );
+    expect(approvals.opened).toHaveLength(1);
+    expect(sent).toEqual([]);
   });
 
-  it('refuses when the screen shows a prompt herdr reported as idle', async () => {
-    // What an agent on a first-run trust prompt looked like from outside.
-    const exec = fakeHerdr({
-      status: 'idle',
-      screen: 'Do you trust the contents of this project?\n> Yes, I trust this folder\n  No, exit',
-    });
-    await expect(adapterFor(exec).ask('update the header')).rejects.toThrow(/trust the contents/i);
+  it('escalates a trust prompt herdr reported as idle, before the first turn', async () => {
+    const { exec, sent } = fakeHerdr({ status: 'idle', screens: [TRUST] });
+    const approvals = fakeApprovals('pending');
+    await expect(adapterFor(exec, { approvals }).ask('update the header')).rejects.toThrow(
+      /trust the contents/i
+    );
+    expect(approvals.opened).toEqual(['workspace_trust']);
+    expect(sent).toEqual([]);
   });
 
   it('still returns a genuine answer', async () => {
-    const exec = fakeHerdr({
-      status: 'done',
-      screen: '> update the header\n\n● Updated the header in src/app.ts.\n\n❯ \n',
-    });
+    const { exec } = fakeHerdr({ status: 'done', screens: [ANSWER] });
     const response = await adapterFor(exec).ask('update the header');
     expect(response.text).toMatch(/Updated the header/);
+  });
+
+  it('answers a trust prompt an allowlist rule covers, and carries on', async () => {
+    const { exec, sent } = fakeHerdr({ status: 'idle', screens: [TRUST, ANSWER] });
+    const approvals = fakeApprovals('pending');
+    const response = await adapterFor(exec, {
+      approvals,
+      cwd: '/work/checkouts/repo-a',
+      policy: {
+        auto_answer: [
+          {
+            id: 'trust-checkouts',
+            signature: 'workspace_trust',
+            cwd_prefixes: ['/work/checkouts'],
+            keys: ['enter'],
+          },
+        ],
+      },
+    }).ask('update the header');
+    expect(sent).toEqual([['enter']]);
+    expect(approvals.opened).toEqual([]);
+    expect(response.text).toMatch(/Updated the header/);
+  });
+
+  it('does not stretch a trust rule to a path it does not name', async () => {
+    const { exec, sent } = fakeHerdr({ status: 'idle', screens: [TRUST, ANSWER] });
+    const approvals = fakeApprovals('pending');
+    await expect(
+      adapterFor(exec, {
+        approvals,
+        cwd: '/elsewhere/repo',
+        policy: {
+          auto_answer: [
+            {
+              id: 'trust-checkouts',
+              signature: 'workspace_trust',
+              cwd_prefixes: ['/work/checkouts'],
+              keys: ['enter'],
+            },
+          ],
+        },
+      }).ask('update the header')
+    ).rejects.toThrow(/AGENT_RUNTIME_AWAITING_HUMAN/);
+    expect(sent).toEqual([]);
+  });
+
+  it("relays a person's approval as keys, once", async () => {
+    const { exec, sent } = fakeHerdr({ status: 'idle', screens: [TRUST, ANSWER] });
+    const approvals = fakeApprovals('approved');
+    const response = await adapterFor(exec, { approvals }).ask('update the header');
+    expect(sent).toEqual([['enter']]);
+    expect(approvals.consumed).toEqual(['req-1']);
+    expect(response.text).toMatch(/Updated the header/);
+  });
+
+  it("relays a person's rejection and stops", async () => {
+    const { exec, sent } = fakeHerdr({ status: 'idle', screens: [TRUST, '-zsh %'] });
+    const approvals = fakeApprovals('rejected');
+    await expect(adapterFor(exec, { approvals }).ask('update the header')).rejects.toThrow(
+      /AGENT_RUNTIME_PROMPT_DECLINED/
+    );
+    expect(sent).toEqual([['esc']]);
+    expect(approvals.consumed).toEqual(['req-1']);
+  });
+
+  it('never answers a sign-in prompt, even with a rule and an approval', async () => {
+    const { exec, sent } = fakeHerdr({ status: 'idle', screens: ['Please sign in to continue'] });
+    const approvals = fakeApprovals('approved');
+    await expect(
+      adapterFor(exec, {
+        approvals,
+        policy: {
+          auto_answer: [{ id: 'bad', signature: 'sign_in', keys: ['enter'] }],
+        },
+      }).ask('update the header')
+    ).rejects.toThrow(/AGENT_RUNTIME_AWAITING_HUMAN/);
+    expect(sent).toEqual([]);
+    expect(approvals.opened).toEqual([]);
+  });
+
+  it('stops rather than answering twice when an answer does not take', async () => {
+    const { exec, sent } = fakeHerdr({ status: 'idle', screens: [TRUST, TRUST] });
+    await expect(
+      adapterFor(exec, { approvals: fakeApprovals('approved') }).ask('update the header')
+    ).rejects.toThrow(/did not take effect/);
+    expect(sent).toEqual([['enter']]);
+  });
+
+  it('starts the agent with the launch args the policy names', async () => {
+    const { exec } = fakeHerdr({ status: 'done', screens: [ANSWER] });
+    await adapterFor(exec, {
+      policy: { launch_args: { claude: ['--permission-mode', 'acceptEdits'] } },
+    }).ask('update the header');
+    const start = exec.mock.calls.find(([, args]) => (args as string[])[1] === 'start');
+    expect(start?.[1]).toEqual(expect.arrayContaining(['--', '--permission-mode', 'acceptEdits']));
   });
 });

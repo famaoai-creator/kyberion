@@ -172,6 +172,9 @@ const NOT_ATTEMPTED_CODES = [
   'PROVIDER_EGRESS_DENIED',
   'EXECUTION_SURFACE_UNAVAILABLE',
   'AGENT_RUNTIME_AWAITING_HUMAN',
+  // A person declined a prompt the agent stopped on. Mid-turn the model has
+  // run, but what ended the turn was a person's decision, not its capability.
+  'AGENT_RUNTIME_PROMPT_DECLINED',
   'MISSION_WORKITEM_SCOPE_REQUIRED',
   'SCOPE_CONTEXT_INVALID',
 ];
