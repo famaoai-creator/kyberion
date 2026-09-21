@@ -1,4 +1,4 @@
 {
   "version": "1.0.0",
-  "order": ["browser-automation-runtime", "image-generation-provider"]
+  "order": ["browser-automation-runtime", "image-generation-provider", "ocr-provider"]
 }
