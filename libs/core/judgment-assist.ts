@@ -117,14 +117,20 @@ export async function assistWithJudgment<T>(
   } catch (error: any) {
     // Includes "no provider registered": not having a model is the normal
     // state of this repo, not an incident.
-    const reason = `${label}: judgment unavailable (${error?.message || error})`;
+    const message = String(error?.message || error);
+    const reason = message.includes('[JUDGMENT_BACKEND] provider returned')
+      ? `${label}: declined malformed provider answer (${message})`
+      : `${label}: judgment unavailable (${message})`;
     logger.debug(`[judgment-assist] ${reason}`);
     return baselineResult(input.baseline, reason);
   }
 
   const answers = result.answers || [];
   if (answers.length === 0) {
-    return { ...baselineResult(input.baseline, `${label}: no answers`), provider_id: result.provider_id };
+    return {
+      ...baselineResult(input.baseline, `${label}: no answers`),
+      provider_id: result.provider_id,
+    };
   }
 
   if (input.requireCalibrated) {

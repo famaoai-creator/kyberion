@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  applyCalibrationTemperature,
   BUILTIN_JUDGMENT_PROVIDER,
   judge,
   listJudgmentBackends,
   registerJudgmentBackend,
+  resolveCalibrationTemperature,
   resetJudgmentBackends,
   selectJudgmentBackend,
   type JudgmentBackend,
@@ -45,6 +47,25 @@ afterEach(() => {
 });
 
 describe('judgment-backend seam', () => {
+  it('prefers question-specific calibration temperatures over the legacy default', () => {
+    const entry = {
+      questions: ['error.category', 'task.model_tier'],
+      fitted_from: 'test',
+      fitted_at: '2026-09-21T00:00:00.000Z',
+      temperature: 1.5,
+      temperatures: { 'error.category': 2.25 },
+    };
+    expect(resolveCalibrationTemperature(entry, 'error.category')).toBe(2.25);
+    expect(resolveCalibrationTemperature(entry, 'task.model_tier')).toBe(1.5);
+    expect(resolveCalibrationTemperature(entry, 'unknown')).toBeUndefined();
+  });
+
+  it('applies fitted temperature scaling to confidence values', () => {
+    expect(applyCalibrationTemperature(0.9, 2)).toBeLessThan(0.9);
+    expect(applyCalibrationTemperature(0.9, 2)).toBeGreaterThan(0.5);
+    expect(applyCalibrationTemperature(0.9, 0)).toBe(0.9);
+  });
+
   it('registers the built-in rule provider and answers through it', async () => {
     registerOrganizationWorkJudgment();
     expect(listJudgmentBackends().map((b) => b.judgment_id)).toContain(BUILTIN_JUDGMENT_PROVIDER);
@@ -137,6 +158,29 @@ describe('judgment-backend seam', () => {
     expect(result.provider_id).toBe(BUILTIN_JUDGMENT_PROVIDER);
     expect(result.reason).toMatch(/provider exploded/);
     expect(result.answers[0].value).toBe('incident_response');
+  });
+
+  it('degrades when a provider returns a value outside the question contract', async () => {
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend(
+      stubBackend({
+        async judge(request) {
+          return request.questions.map((question) => ({
+            id: question.id,
+            value: 'not-an-option',
+            confidence: 0.99,
+            calibrated: false,
+          }));
+        },
+      })
+    );
+    const result = await judge({
+      state: 'なんでもいい',
+      questions: [QUESTION],
+      tier: 'public',
+    });
+    expect(result.provider_id).toBe(BUILTIN_JUDGMENT_PROVIDER);
+    expect(result.answers[0].value).toBe('routine_operation');
   });
 
   it('clamps a provider confidence into 0..1', async () => {
