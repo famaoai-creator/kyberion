@@ -16,7 +16,7 @@ import {
 import { resolveSecretIdentity } from '@agent/core/secret-identity';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeReadFile } from '@agent/core/secure-io';
-import { defineScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
 
@@ -268,11 +268,28 @@ export async function main(argv: string[]): Promise<void> {
   await runSecretCli(argv);
 }
 
-defineScript(import.meta.url, async (args) => {
-  try {
-    await main(args);
-  } catch (error) {
-    if (error instanceof ScriptExitError) throw error;
-    throw new ScriptExitError(1, error instanceof Error ? error.message : String(error));
-  }
+export const runSecretIntroduce = defineScript({
+  name: 'secret',
+  flags: ['json', 'quiet'],
+  run: async ({ argv, print, json }) => {
+    try {
+      const result = await runSecretCli(argv, {
+        print: (value) => {
+          if (json && typeof value === 'string') print(value);
+          else print(value);
+        },
+      });
+      return result;
+    } catch (error) {
+      if (error instanceof ScriptExitError) throw error;
+      throw new ScriptExitError(1, error instanceof Error ? error.message : String(error));
+    }
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'secret_introduce.ts') ||
+  isDirectScript(import.meta.url, 'secret_introduce.js')
+) {
+  void runSecretIntroduce();
+}
