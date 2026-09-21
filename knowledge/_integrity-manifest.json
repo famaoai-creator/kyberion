@@ -163,6 +163,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/agent-prompt-handling.md",
+      "tier": "public",
+      "size": 3800,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/agent-runtime-dispatch-observability-findings.md",
       "tier": "public",
       "size": 4881,
@@ -465,7 +471,7 @@
     {
       "path": "product/architecture/judgment-backend-seam.md",
       "tier": "public",
-      "size": 8912,
+      "size": 17568,
       "type": "md"
     },
     {
@@ -1153,6 +1159,12 @@
       "type": "yaml"
     },
     {
+      "path": "product/governance/agent-prompt-response-policy.json",
+      "tier": "public",
+      "size": 774,
+      "type": "json"
+    },
+    {
       "path": "product/governance/analysis-config.json",
       "tier": "public",
       "size": 900,
@@ -1515,7 +1527,7 @@
     {
       "path": "product/governance/egress-policy.json",
       "tier": "public",
-      "size": 775,
+      "size": 1265,
       "type": "json"
     },
     {
@@ -1527,7 +1539,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 138726,
+      "size": 140304,
       "type": "json"
     },
     {
@@ -2169,7 +2181,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 7548,
+      "size": 7601,
       "type": "json"
     },
     {
@@ -2319,7 +2331,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 17482,
+      "size": 18685,
       "type": "md"
     },
     {
@@ -3165,7 +3177,7 @@
     {
       "path": "product/governance/provider-egress-policy.json",
       "tier": "public",
-      "size": 1135,
+      "size": 1691,
       "type": "json"
     },
     {
@@ -3819,13 +3831,19 @@
     {
       "path": "product/governance/tool-runtimes/index.json",
       "tier": "public",
-      "size": 503,
+      "size": 519,
       "type": "json"
     },
     {
       "path": "product/governance/tool-runtimes/kokoro_tts.json",
       "tier": "public",
       "size": 1188,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/laya_mlx.json",
+      "tier": "public",
+      "size": 1432,
       "type": "json"
     },
     {
@@ -7501,6 +7519,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/agent-prompt-response-policy.schema.json",
+      "tier": "public",
+      "size": 3669,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/agent-role-outcome.schema.json",
       "tier": "public",
       "size": 640,
@@ -8307,7 +8331,7 @@
     {
       "path": "product/schemas/egress-policy.schema.json",
       "tier": "public",
-      "size": 814,
+      "size": 1294,
       "type": "json"
     },
     {
@@ -10449,7 +10473,7 @@
     {
       "path": "product/schemas/provider-egress-policy.schema.json",
       "tier": "public",
-      "size": 5459,
+      "size": 5937,
       "type": "json"
     },
     {
@@ -11403,7 +11427,7 @@
     {
       "path": "product/schemas/unclassified-error-registry.schema.json",
       "tier": "public",
-      "size": 1130,
+      "size": 1201,
       "type": "json"
     },
     {

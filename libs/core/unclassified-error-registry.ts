@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
+import { isVitestProcess } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import * as nodePath from 'node:path';
@@ -14,6 +15,14 @@ export interface UnclassifiedErrorEntry {
   occurrence_count: number;
   reconciled: boolean;
   reconciled_at?: string;
+  /**
+   * The category this entry was resolved to. Without it the registry records
+   * *that* something was reconciled but not *to what*, which leaves it a
+   * queue of inputs rather than a labelled corpus — and a labelled corpus
+   * from real traffic is the one thing calibration needs and synthetic
+   * benches cannot supply.
+   */
+  reconciled_category?: string;
 }
 
 interface UnclassifiedErrorRegistry {
@@ -86,6 +95,14 @@ export function writeUnclassifiedErrorRegistryAtPath(
  */
 export function recordUnclassifiedError(message: string, code?: string | number): void {
   try {
+    // The registry is the only record of what real traffic fails to classify,
+    // and it is the corpus a calibration fit would be built on. A test suite
+    // deliberately throws unclassifiable things — 'boom', 'null', '42',
+    // 'database exploded: secret=abc123' — and every one of those was sitting
+    // in the registry alongside genuine errors, each with an occurrence count
+    // from however many times the suite had run. Fixtures must not become
+    // evidence.
+    if (isVitestProcess()) return;
     const excerpt = message.slice(0, EXCERPT_LEN);
     const codeStr = code !== undefined ? String(code) : undefined;
     const dedupeKey = `${excerpt}|${codeStr ?? ''}`;
@@ -126,7 +143,7 @@ export function listUnclassifiedErrors(): UnclassifiedErrorEntry[] {
   return readRegistry().entries;
 }
 
-export function markReconciled(excerpts: string[]): void {
+export function markReconciled(excerpts: string[], category?: string): void {
   try {
     const set = new Set(excerpts);
     const registry = readRegistry();
@@ -135,6 +152,7 @@ export function markReconciled(excerpts: string[]): void {
       if (set.has(entry.message_excerpt)) {
         entry.reconciled = true;
         entry.reconciled_at = now;
+        if (category?.trim()) entry.reconciled_category = category.trim();
       }
     }
     writeRegistry(registry);
