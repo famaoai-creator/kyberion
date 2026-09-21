@@ -2931,6 +2931,10 @@
       "types": "./dist/judgment-callsite-eval.d.ts",
       "default": "./dist/judgment-callsite-eval.js"
     },
+    "./task-routing-judgment": {
+      "types": "./dist/task-routing-judgment.d.ts",
+      "default": "./dist/task-routing-judgment.js"
+    },
     "./tool-call-scheduler": {
       "types": "./dist/tool-call-scheduler.d.ts",
       "default": "./dist/tool-call-scheduler.js"
