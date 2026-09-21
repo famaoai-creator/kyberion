@@ -465,7 +465,7 @@
     {
       "path": "product/architecture/judgment-backend-seam.md",
       "tier": "public",
-      "size": 8912,
+      "size": 16127,
       "type": "md"
     },
     {
@@ -1515,7 +1515,7 @@
     {
       "path": "product/governance/egress-policy.json",
       "tier": "public",
-      "size": 775,
+      "size": 1265,
       "type": "json"
     },
     {
@@ -1527,7 +1527,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 138726,
+      "size": 139215,
       "type": "json"
     },
     {
@@ -3165,7 +3165,7 @@
     {
       "path": "product/governance/provider-egress-policy.json",
       "tier": "public",
-      "size": 1135,
+      "size": 1691,
       "type": "json"
     },
     {
@@ -3819,13 +3819,19 @@
     {
       "path": "product/governance/tool-runtimes/index.json",
       "tier": "public",
-      "size": 503,
+      "size": 519,
       "type": "json"
     },
     {
       "path": "product/governance/tool-runtimes/kokoro_tts.json",
       "tier": "public",
       "size": 1188,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/laya_mlx.json",
+      "tier": "public",
+      "size": 1432,
       "type": "json"
     },
     {
@@ -8307,7 +8313,7 @@
     {
       "path": "product/schemas/egress-policy.schema.json",
       "tier": "public",
-      "size": 814,
+      "size": 1294,
       "type": "json"
     },
     {
@@ -10449,7 +10455,7 @@
     {
       "path": "product/schemas/provider-egress-policy.schema.json",
       "tier": "public",
-      "size": 5459,
+      "size": 5937,
       "type": "json"
     },
     {
@@ -11403,7 +11409,7 @@
     {
       "path": "product/schemas/unclassified-error-registry.schema.json",
       "tier": "public",
-      "size": 1130,
+      "size": 1201,
       "type": "json"
     },
     {

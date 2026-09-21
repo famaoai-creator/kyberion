@@ -18,5 +18,9 @@
   "tenant_allowed_domains": {
     "kyberion-service-studio": ["api.anthropic.com"]
   },
-  "_meta_tenant": "SA-04 Task 2: destinations approved for confidential/personal material, keyed by tenant slug ('*' applies to all). The Kyberion Service verification tenant explicitly approves Anthropic for the model-backed runtime probe; the general allowlist does NOT grant tenant data egress."
+  "tenant_allowed_providers": {
+    "default": ["agy", "claude", "codex", "cursor"]
+  },
+  "_meta_tenant": "SA-04 Task 2: destinations approved for confidential/personal material, keyed by tenant slug ('*' applies to all). The Kyberion Service verification tenant explicitly approves Anthropic for the model-backed runtime probe; the general allowlist does NOT grant tenant data egress.",
+  "_meta_tenant_providers": "Providers approved for a tenant's confidential/personal material, keyed by tenant slug ('*' applies to all). Each provider's hosts come from its endpoint_domains in provider-egress-policy.json. Kept separate from tenant_allowed_domains, which also serves as the customer-message link floor. This is the network face only; the provider gate (training use) still applies."
 }

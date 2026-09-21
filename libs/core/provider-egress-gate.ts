@@ -74,6 +74,8 @@ export interface ProviderEgressPolicyFile {
       training_use?: ProviderTrainingUse;
       plan?: string;
       basis?: string;
+      /** Hosts this provider sends payloads to; empty for local-only. */
+      endpoint_domains?: string[];
     }
   >;
   tier_policy: {
@@ -150,6 +152,22 @@ export function loadProviderEgressPolicy(): PolicyLoadResult {
     };
     return cachedResult;
   }
+}
+
+/**
+ * Hosts a provider sends payloads to, as declared next to the provider.
+ *
+ * The network gate (egress-policy.ts) approves tenants by provider id and
+ * resolves the hosts here, so a provider's domains are written once, with
+ * the provider, rather than copied into every tenant's allowlist. An unknown
+ * provider or an unreadable policy resolves to no hosts — which the network
+ * gate treats as nothing approved.
+ */
+export function providerEndpointDomains(provider: string): string[] {
+  const loaded = loadProviderEgressPolicy();
+  if (loaded.status !== 'ok') return [];
+  const declaration = loaded.policy.providers[String(provider || '').trim()];
+  return Array.isArray(declaration?.endpoint_domains) ? [...declaration.endpoint_domains] : [];
 }
 
 export interface ProviderEgressCheckInput {
