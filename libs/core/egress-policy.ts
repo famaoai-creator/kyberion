@@ -7,6 +7,10 @@ import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { getActiveSandboxPolicy } from './sandbox-policy.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
+import {
+  _resetProviderEndpointDomainsForTests,
+  providerEndpointDomains,
+} from './provider-endpoint-domains.js';
 
 export type EgressPolicyMode = 'warn' | 'enforce';
 
@@ -21,6 +25,16 @@ export interface EgressPolicyFile {
    * default — tenant data has nowhere approved to go until someone says so.
    */
   tenant_allowed_domains?: Record<string, string[]>;
+  /**
+   * Providers approved for a tenant's confidential/personal material, keyed
+   * like `tenant_allowed_domains`. The hosts come from each provider's
+   * `endpoint_domains` in provider-egress-policy.json, so approving "agy"
+   * does not mean knowing that agy talks to generativelanguage.googleapis.com.
+   * Separate from `tenant_allowed_domains` because that table is also the
+   * customer-message link floor, and approving a model API for egress must
+   * not restrict which links a customer can be sent.
+   */
+  tenant_allowed_providers?: Record<string, string[]>;
   /**
    * QM-11: operator policy for LINKS SHARED IN MESSAGES — deliberately
    * separate from the network-egress allowlist above (mentioning a URL to a
@@ -51,6 +65,12 @@ let cachedPolicy: EgressPolicyFile | null = null;
 let cachedAllowedDomains: string[] | null = null;
 const egressContextStorage = new AsyncLocalStorage<EgressPayloadContext>();
 
+const EGRESS_TIER_ORDER: Record<'public' | 'confidential' | 'personal', number> = {
+  public: 0,
+  confidential: 1,
+  personal: 2,
+};
+
 const policyCatalog = defineCatalog<EgressPolicyFile>({
   id: 'egress-policy',
   path: () => getEgressPolicyPath(),
@@ -77,6 +97,7 @@ export function _resetEgressPolicyCacheForTests(): void {
   cachedAllowedDomains = null;
   policyCatalog.reset();
   securityPolicyCatalog.reset();
+  _resetProviderEndpointDomainsForTests();
 }
 
 /**
@@ -222,6 +243,10 @@ export function loadEgressPolicy(): EgressPolicyFile {
       parsed.tenant_allowed_domains && typeof parsed.tenant_allowed_domains === 'object'
         ? parsed.tenant_allowed_domains
         : {},
+    tenant_allowed_providers:
+      parsed.tenant_allowed_providers && typeof parsed.tenant_allowed_providers === 'object'
+        ? parsed.tenant_allowed_providers
+        : {},
     ...(Array.isArray(parsed.link_allowed_domains)
       ? { link_allowed_domains: parsed.link_allowed_domains }
       : {}),
@@ -303,13 +328,50 @@ export function resolveEgressPayloadContext(
   const ambient = getEgressPayloadContext();
   if (!ambient) return explicit;
   if (!explicit) return ambient;
+  if (ambient.tenant_slug && explicit.tenant_slug && ambient.tenant_slug !== explicit.tenant_slug) {
+    throw new Error(
+      `[TENANT_SCOPE_CONFLICT] ambient tenant '${ambient.tenant_slug}' conflicts with explicit tenant '${explicit.tenant_slug}'`
+    );
+  }
+  const ambientTier = ambient.tier;
+  const explicitTier = explicit.tier;
+  const tier =
+    ambientTier && explicitTier
+      ? EGRESS_TIER_ORDER[ambientTier] >= EGRESS_TIER_ORDER[explicitTier]
+        ? ambientTier
+        : explicitTier
+      : ambientTier || explicitTier;
   return {
     ...ambient,
     ...explicit,
-    ...(explicit.tier === undefined ? { tier: ambient.tier } : {}),
+    ...(tier ? { tier } : {}),
     ...(explicit.tenant_slug === undefined ? { tenant_slug: ambient.tenant_slug } : {}),
     ...(explicit.purpose === undefined ? { purpose: ambient.purpose } : {}),
-    ...(explicit.provenance === undefined ? { provenance: ambient.provenance } : {}),
+    provenance: mergeEgressProvenance(ambient.provenance, explicit.provenance),
+  };
+}
+
+function mergeEgressProvenance(
+  ambient: ProvenanceTaint | undefined,
+  explicit: ProvenanceTaint | undefined
+): ProvenanceTaint | undefined {
+  if (!ambient) return explicit;
+  if (!explicit) return ambient;
+  const tenants =
+    ambient.tenants.length > 0 && explicit.tenants.length > 0
+      ? ambient.tenants.filter((tenant) => explicit.tenants.includes(tenant))
+      : ambient.tenants.length > 0
+        ? ambient.tenants
+        : explicit.tenants;
+  return {
+    missionId: ambient.missionId,
+    highestTier:
+      EGRESS_TIER_ORDER[ambient.highestTier] >= EGRESS_TIER_ORDER[explicit.highestTier]
+        ? ambient.highestTier
+        : explicit.highestTier,
+    tenants: tenants.length > 0 ? tenants : ['__provenance_scope_conflict__'],
+    prohibitExternal: ambient.prohibitExternal || explicit.prohibitExternal,
+    observationIds: Array.from(new Set([...ambient.observationIds, ...explicit.observationIds])),
   };
 }
 
@@ -449,20 +511,23 @@ export function evaluateEgressPolicy(
  * may be sent there.
  */
 function loadTenantEgressDomains(policy: EgressPolicyFile, tenantSlug?: string): string[] {
-  const table = policy.tenant_allowed_domains ?? {};
   const domains = new Set<string>();
-  for (const domain of table['*'] ?? []) {
+  const add = (domain: string | undefined | null) => {
     const normalized = normalizeDomain(domain);
     if (normalized) domains.add(normalized);
-  }
-  if (tenantSlug && isValidTenantSlug(tenantSlug)) {
-    const tenantDomains = Object.prototype.hasOwnProperty.call(table, tenantSlug)
-      ? table[tenantSlug]
-      : [];
-    for (const domain of tenantDomains ?? []) {
-      const normalized = normalizeDomain(domain);
-      if (normalized) domains.add(normalized);
+  };
+  const entriesFor = (table: Record<string, string[]> | undefined): string[] => {
+    const rows = [...(table?.['*'] ?? [])];
+    if (tenantSlug && isValidTenantSlug(tenantSlug) && table) {
+      if (Object.prototype.hasOwnProperty.call(table, tenantSlug)) {
+        rows.push(...(table[tenantSlug] ?? []));
+      }
     }
+    return rows;
+  };
+  for (const domain of entriesFor(policy.tenant_allowed_domains)) add(domain);
+  for (const provider of entriesFor(policy.tenant_allowed_providers)) {
+    for (const domain of providerEndpointDomains(provider)) add(domain);
   }
   return Array.from(domains);
 }

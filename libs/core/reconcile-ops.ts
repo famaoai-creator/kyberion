@@ -228,7 +228,7 @@ function writeErrorProposal(
         'patterns: array of regex strings (case-insensitive) that match this error message.',
         'Once accepted, append suggested_rule to:',
         '  knowledge/product/governance/error-classifier-rules.json  (under "rules" array)',
-        'Then call markReconciled([message_excerpt]) to clear this entry from the registry.',
+        'Then call markReconciled([message_excerpt], category) to clear this entry and record the label it was resolved to.',
       ],
     };
 

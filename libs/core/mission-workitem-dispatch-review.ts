@@ -39,7 +39,12 @@ import {
   resolveMissionContextPack,
   saveMissionContextPack,
 } from './mission-context-pack.js';
-import { resolveTaskModelHint, type TaskModelHint } from './reasoning-model-routing.js';
+import {
+  raiseTaskModelHintToTier,
+  resolveTaskModelHint,
+  type TaskModelHint,
+} from './reasoning-model-routing.js';
+import { routeTaskWithJudgment } from './task-routing-judgment.js';
 import { type TaskResultBlock } from './channel-surface-types.js';
 import { type OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { HarnessSubagentDispatcher } from './agent-dispatch.js';
@@ -657,19 +662,63 @@ export function getTaskDescription(item: WorkItem): string {
 
 export function getTaskModelHint(
   item: WorkItem,
-  phaseKind: 'implement' | 'review' = 'implement'
+  phaseKind: 'implement' | 'review' = 'implement',
+  options: { minimumTier?: import('./reasoning-level-policy.js').TaskModelTier } = {}
 ): TaskModelHint {
   const metadata = (item.metadata || {}) as Record<string, unknown>;
   const risk = typeof metadata.risk === 'string' ? metadata.risk : undefined;
   const estimatedScope =
     typeof metadata.estimated_scope === 'string' ? metadata.estimated_scope : undefined;
   const modelId = typeof metadata.model_id === 'string' ? metadata.model_id : undefined;
-  return resolveTaskModelHint({
+  const hint = resolveTaskModelHint({
     phase_kind: phaseKind,
     ...(risk ? { risk } : {}),
     ...(estimatedScope ? { estimated_scope: estimatedScope } : {}),
     ...(modelId ? { model_id: modelId } : {}),
   });
+  return options.minimumTier ? raiseTaskModelHintToTier(hint, options.minimumTier) : hint;
+}
+
+/**
+ * `getTaskModelHint()` plus a judgment that may narrow the tier.
+ *
+ * The deterministic hint is the baseline and is never exceeded. A judgment
+ * can only move it down, and dispatch's own escalation covers the case where
+ * that was wrong — which is why this is the one judgment call site allowed to
+ * act without a calibration fit. See `task-routing-judgment.ts`.
+ *
+ * Inert until a judgment provider is registered, which nothing does by
+ * default; `KYBERION_TASK_ROUTING_JUDGMENT=off` turns it off even then.
+ */
+export async function getTaskModelHintAssisted(
+  item: WorkItem,
+  phaseKind: 'implement' | 'review' = 'implement',
+  scope: { tier?: import('./types.js').TierLevel; tenantSlug?: string } = {}
+): Promise<{ hint: TaskModelHint; baseline: TaskModelHint; downgraded: boolean }> {
+  const metadata = (item.metadata || {}) as Record<string, unknown>;
+  const minimumTier =
+    metadata.routing_minimum_tier === 'small' ||
+    metadata.routing_minimum_tier === 'standard' ||
+    metadata.routing_minimum_tier === 'large'
+      ? (metadata.routing_minimum_tier as import('./reasoning-level-policy.js').TaskModelTier)
+      : undefined;
+  const baseline = getTaskModelHint(item, phaseKind, { minimumTier });
+  if (getRegisteredEnvText('KYBERION_TASK_ROUTING_JUDGMENT') === 'off') {
+    return { hint: baseline, baseline, downgraded: false };
+  }
+  const result = await routeTaskWithJudgment({
+    task: [item.title, item.description].filter(Boolean).join('\n'),
+    baseline,
+    phaseKind,
+    ...(scope.tier ? { tier: scope.tier } : {}),
+    ...(scope.tenantSlug ? { tenantSlug: scope.tenantSlug } : {}),
+    ...(minimumTier ? { floorTier: minimumTier, requireCalibrated: true } : {}),
+  });
+  return {
+    hint: result.hint,
+    baseline,
+    downgraded: result.source === 'judgment',
+  };
 }
 
 export function isFastTierTaskModelHint(taskModelHint?: TaskModelHint): boolean {
