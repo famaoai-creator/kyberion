@@ -2899,6 +2899,10 @@
       "types": "./dist/judgment-backend.d.ts",
       "default": "./dist/judgment-backend.js"
     },
+    "./provider-pins-store": {
+      "types": "./dist/provider-pins-store.d.ts",
+      "default": "./dist/provider-pins-store.js"
+    },
     "./seam-provider-selection": {
       "types": "./dist/seam-provider-selection.d.ts",
       "default": "./dist/seam-provider-selection.js"

@@ -22,7 +22,7 @@ import {
   loadSeamProviderPin,
   pinSeamProviderDecision,
   type SeamPinnedEntry,
-} from './capability-broker.js';
+} from './provider-pins-store.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { loadRegistryDirectory, type RegistryDirectoryOptions } from './registry-directory.js';
