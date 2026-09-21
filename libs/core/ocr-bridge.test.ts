@@ -12,6 +12,7 @@ import {
   parseGeminiOcrResponse,
   parseLocalVlmOcrResponse,
   parseOpenAiOcrResponse,
+  toTesseractLanguage,
 } from './ocr-bridge.js';
 import { OcrProvider } from './ocr-types.js';
 
@@ -247,7 +248,11 @@ describe('TesseractOcrProvider', () => {
     expect(result.status).toBe('failed');
     expect(worker.recognize).toHaveBeenCalledOnce();
     expect(worker.terminate).toHaveBeenCalledOnce();
-    expect(tesseractMocks.createWorker).toHaveBeenCalledWith('eng');
+    expect(tesseractMocks.createWorker).toHaveBeenCalledWith(
+      'eng',
+      undefined,
+      expect.objectContaining({ errorHandler: expect.any(Function) })
+    );
   });
 });
 
@@ -542,5 +547,14 @@ describe('OCR input path boundary', () => {
     } finally {
       mocks.safeLstat.mockReturnValue({ isFile: () => true });
     }
+  });
+
+  it('maps BCP-47 languages to tesseract traineddata codes', () => {
+    expect(toTesseractLanguage(undefined)).toBe('eng');
+    expect(toTesseractLanguage('ja')).toBe('jpn');
+    expect(toTesseractLanguage('ja-JP')).toBe('jpn');
+    expect(toTesseractLanguage('ja+en')).toBe('jpn+eng');
+    expect(toTesseractLanguage('jpn')).toBe('jpn');
+    expect(toTesseractLanguage('zh')).toBe('chi_sim');
   });
 });

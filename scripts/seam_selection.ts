@@ -11,8 +11,8 @@
  *   pnpm kyberion seam select apply-measurements --report <report.json> [--traits t1,t2] [--providers a,b]
  *
  * Rules and measured traits are written to the operator overlay
- * (<profile>/onboarding/seam-selection-rules.json) under the
- * sovereign_concierge identity, like other operator onboarding choices.
+ * (active/shared/runtime/seam-selection/rules.json) under the
+ * sovereign_concierge identity; every change is audited.
  */
 
 import { createStandardYargs } from '@agent/core/cli-utils';
