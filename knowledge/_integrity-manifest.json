@@ -163,6 +163,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/agent-prompt-handling.md",
+      "tier": "public",
+      "size": 3076,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/agent-runtime-dispatch-observability-findings.md",
       "tier": "public",
       "size": 4881,
@@ -1153,6 +1159,12 @@
       "type": "yaml"
     },
     {
+      "path": "product/governance/agent-prompt-response-policy.json",
+      "tier": "public",
+      "size": 774,
+      "type": "json"
+    },
+    {
       "path": "product/governance/analysis-config.json",
       "tier": "public",
       "size": 900,
@@ -1527,7 +1539,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 139215,
+      "size": 140304,
       "type": "json"
     },
     {
@@ -7504,6 +7516,12 @@
       "path": "product/schemas/agent-profile-index.schema.json",
       "tier": "public",
       "size": 1039,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/agent-prompt-response-policy.schema.json",
+      "tier": "public",
+      "size": 3669,
       "type": "json"
     },
     {
