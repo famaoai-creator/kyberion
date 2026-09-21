@@ -117,6 +117,7 @@
 - [Operator Surface Strategy (CLI + Read-only Web)](./product/architecture/operator-surface-strategy.md) (public | Unknown)
 - [Organization Profile Model](./product/architecture/organization-profile-model.md) (public | Ecosystem Architect)
 - [Organization Work Loop](./product/architecture/organization-work-loop.md) (public | Ecosystem Architect)
+- [Pane Agent Prompt Handling](./product/architecture/agent-prompt-handling.md) (public | Unknown)
 - [Personal Voice Narrated Video Delivery Plan](./product/architecture/personal-voice-narrated-video-delivery-plan.md) (public | Ecosystem Architect)
 - [Presence Layer: Sensors, Displays, and Intervention](./product/architecture/presence-layer.md) (public | Ecosystem Architect)
 - [Project Mission Artifact Service Model](./product/architecture/project-mission-artifact-service-model.md) (public | Ecosystem Architect)
