@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "lightpanda",
+      "display_name": "Lightpanda Headless Browser",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["darwin", "linux"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "lightpanda",
+        "args": ["version"],
+        "description": "Probe Lightpanda availability without starting a CDP server."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "lightpanda-io/browser/lightpanda"],
+        "description": "Fallback when no managed_binary artifact matches the host: install the Lightpanda nightly through its Homebrew tap."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "lightpanda",
+        "args": ["version"],
+        "description": "Re-check the installed Lightpanda binary."
+      },
+      "managed_env_subpath": "tool-runtimes/lightpanda",
+      "managed_binary": {
+        "version": "0.4.1",
+        "relative_path": "bin/lightpanda",
+        "artifacts": {
+          "darwin-arm64": {
+            "url": "https://github.com/lightpanda-io/browser/releases/download/0.4.1/lightpanda-aarch64-macos",
+            "sha256": "99e67739ed8cf5b985af7cbfa7c76b2bab257b171b2dad21109bd74b4f3bb510"
+          },
+          "darwin-x64": {
+            "url": "https://github.com/lightpanda-io/browser/releases/download/0.4.1/lightpanda-x86_64-macos",
+            "sha256": "9f8ed2787476e39e9c8ba4890a4971391fb7098bbe6384350b21a3649b485eec"
+          },
+          "linux-arm64": {
+            "url": "https://github.com/lightpanda-io/browser/releases/download/0.4.1/lightpanda-aarch64-linux",
+            "sha256": "664775c7f5ab69cc3189954c7f9345e25c167cb4dace016173e629f9a5e82c42"
+          },
+          "linux-x64": {
+            "url": "https://github.com/lightpanda-io/browser/releases/download/0.4.1/lightpanda-x86_64-linux",
+            "sha256": "1d40801e72c0bc61b2cbd3f3562bcfc46de7b79e0568f33f686b64f2e587610a"
+          }
+        }
+      },
+      "notes": "Lightweight CDP browser (Zig + V8, no rendering engine) evaluated as a browser-automation-runtime provider. AGPL-3.0: invoked as an external binary, never vendored. Telemetry is on by default upstream — always launch with LIGHTPANDA_DISABLE_TELEMETRY=true. One CDP connection = one context + one page; no pixel screenshots. Preferred install: `pnpm tool:setup -- --tool lightpanda --apply` downloads the checksum-pinned release into the managed env (bin/lightpanda). Override the binary with KYBERION_LIGHTPANDA_BIN."
+    }
+  ]
+}
