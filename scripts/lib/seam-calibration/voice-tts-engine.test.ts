@@ -115,7 +115,7 @@ describe('voice-tts-engine calibration adapter', () => {
       });
       const kokoro = report.providers.find((p) => p.provider_id === 'kokoro')!;
       expect(kokoro.success_rate).toBe(0);
-      expect(kokoro.runs[0]!.error).toMatch(/kokoro unavailable/);
+      expect(kokoro.runs[0]!.error).toBe('provider trial failed');
       const local = report.providers.find((p) => p.provider_id === 'local_say')!;
       expect(local.metrics_mean).toEqual({ audio_bytes: 2048 });
     } finally {

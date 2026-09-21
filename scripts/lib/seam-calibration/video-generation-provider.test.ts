@@ -67,12 +67,14 @@ describe('video-generation-provider calibration adapter', () => {
       expect.objectContaining({
         ok: true,
         output: {
-          artifact_path: path.join(
-            outRoot,
-            'video-generation-provider',
-            'video-opt-in',
-            'media-generation.openai.sora-2',
-            'trial-1.mp4'
+          artifact_path: pathResolver.toRepoRelative(
+            path.join(
+              outRoot,
+              'video-generation-provider',
+              'video-opt-in',
+              'media-generation.openai.sora-2',
+              'trial-1.mp4'
+            )
           ),
         },
       })

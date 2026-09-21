@@ -273,7 +273,11 @@ function decide(
     ...byPreference.filter((id) => !first.includes(id)),
   ];
 
-  if (pin && eligible.includes(pin.provider_id)) {
+  const pinMatchesPurpose =
+    pin &&
+    (pin.purpose ?? undefined) === (purpose ?? undefined) &&
+    eligible.includes(pin.provider_id);
+  if (pinMatchesPurpose) {
     return {
       ...withScores,
       provider_id: pin.provider_id,
@@ -284,7 +288,13 @@ function decide(
     };
   }
   const notes: string[] = [];
-  if (pin) notes.push(`mission pin '${pin.provider_id}' cannot run this task`);
+  if (pin && !pinMatchesPurpose) {
+    notes.push(
+      pin.purpose !== undefined && pin.purpose !== purpose
+        ? `mission pin '${pin.provider_id}' belongs to purpose '${pin.purpose}', not '${purpose ?? 'default'}'`
+        : `mission pin '${pin.provider_id}' cannot run this task`
+    );
+  }
 
   const rule: SeamSelectionRule | null = withOverlay
     ? matchSeamSelectionRule(seam, { purpose, context })

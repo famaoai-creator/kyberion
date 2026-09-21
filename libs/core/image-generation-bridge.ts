@@ -973,7 +973,7 @@ export class AdaptivePolicyRouter {
     if (!matchSeamSelectionRule(IMAGE_GENERATION_PROVIDER_SEAM, { context })) return [];
     const options: ResolveSeamProviderOptions = {
       seam: IMAGE_GENERATION_PROVIDER_SEAM,
-      candidates: await this.selectionCandidates(request, true),
+      candidates: await this.selectionCandidates(request, request.allowHostHandoff === true),
       context,
       decisionKey: 'default',
     };

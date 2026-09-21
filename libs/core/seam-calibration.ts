@@ -20,7 +20,7 @@ import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type { SeamProviderCandidate } from './seam-provider-selection.js';
 
 export interface SeamCalibrationTrialOutput {
-  /** Text output (transcript, OCR text, ...) shown in the report. */
+  /** Text output (transcript, OCR text, ...) before report redaction. */
   text?: string;
   /** Artifact written by the trial (audio, image, video, ...). */
   artifact_path?: string;
@@ -86,6 +86,7 @@ export interface SeamCalibrationReport {
   seam: string;
   run_id: string;
   created_at: string;
+  /** Report-safe input metadata; content-bearing values are redacted. */
   input: unknown;
   repeats: number;
   providers: SeamCalibrationProviderSummary[];
@@ -208,9 +209,14 @@ function renderMarkdown(report: Omit<SeamCalibrationReport, 'report_markdown'>):
 
 export function defaultCalibrationRoot(): string {
   const missionId = getMissionIdSafe();
-  return missionId
-    ? pathResolver.rootResolve(path.join('active/shared/runtime/seam-calibration', missionId))
-    : pathResolver.rootResolve('active/shared/runtime/seam-calibration');
+  if (!missionId) return pathResolver.sharedTmp('seam-calibration');
+  const missionEvidence = pathResolver.missionEvidenceDir(missionId);
+  if (!missionEvidence) {
+    throw new Error(
+      `[SEAM_CALIBRATION] mission '${missionId}' is not materialized; calibration artifacts require mission-scoped evidence`
+    );
+  }
+  return path.join(missionEvidence, 'seam-calibration');
 }
 
 function getMissionIdSafe(): string | undefined {
@@ -227,6 +233,82 @@ export interface RunSeamCalibrationOptions {
   outRoot?: string;
   runId?: string;
   now?: () => number;
+}
+
+const SAFE_REPORT_STRING_KEYS = new Set([
+  'aspect_ratio',
+  'backend_id',
+  'format',
+  'language',
+  'mode',
+  'provider',
+  'provider_id',
+  'quality',
+  'style',
+  'voice',
+]);
+
+function sanitizeReportValue(value: unknown, key = ''): unknown {
+  if (value === null || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (typeof value === 'string') return SAFE_REPORT_STRING_KEYS.has(key) ? value : '[redacted]';
+  if (Array.isArray(value)) return value.map((item) => sanitizeReportValue(item, key));
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([childKey, childValue]) => [
+        childKey,
+        sanitizeReportValue(childValue, childKey),
+      ])
+    );
+  }
+  return '[redacted]';
+}
+
+function safeArtifactReference(artifactPath: string, runDir: string): string {
+  const resolved = path.isAbsolute(artifactPath)
+    ? path.resolve(artifactPath)
+    : pathResolver.rootResolve(artifactPath);
+  const relativeToRun = path.relative(path.resolve(runDir), resolved);
+  if (
+    !relativeToRun ||
+    relativeToRun === '..' ||
+    relativeToRun.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativeToRun)
+  ) {
+    return '[redacted artifact]';
+  }
+  return pathResolver.toRepoRelative(resolved);
+}
+
+function sanitizeTrialForReport(
+  trial: SeamCalibrationTrialResult & { latency_ms: number },
+  runDir: string
+): SeamCalibrationTrialResult & { latency_ms: number } {
+  return {
+    ok: trial.ok,
+    latency_ms: trial.latency_ms,
+    ...(trial.output
+      ? {
+          output: {
+            ...(trial.output.text !== undefined ? { text: '[redacted]' } : {}),
+            ...(trial.output.artifact_path
+              ? { artifact_path: safeArtifactReference(trial.output.artifact_path, runDir) }
+              : {}),
+          },
+        }
+      : {}),
+    ...(trial.metrics ? { metrics: trial.metrics } : {}),
+    ...(trial.error ? { error: 'provider trial failed' } : {}),
+  };
+}
+
+function sanitizeProviderSummary(
+  summary: SeamCalibrationProviderSummary,
+  runDir: string
+): SeamCalibrationProviderSummary {
+  return {
+    ...summary,
+    runs: summary.runs.map((trial) => sanitizeTrialForReport(trial, runDir)),
+  };
 }
 
 export async function runSeamCalibration(
@@ -305,9 +387,9 @@ export async function runSeamCalibration(
     seam: options.seam,
     run_id: runId,
     created_at: nowIso(),
-    input: options.input,
+    input: sanitizeReportValue(options.input),
     repeats,
-    providers: summaries,
+    providers: summaries.map((summary) => sanitizeProviderSummary(summary, runDir)),
     suggested_traits: suggestTraitValues(summaries, mappings),
     report_json: pathResolver.toRepoRelative(reportJson),
   };

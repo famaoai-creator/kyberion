@@ -66,6 +66,8 @@ describe('seam calibration', () => {
     expect(byId.broken!.eligible).toBe(false);
     expect(byId.fast!.success_rate).toBe(1);
     expect(report.suggested_traits.accuracy).toEqual({ fast: 0, slow: 1 });
+    expect(report.input).toEqual({ text: '[redacted]' });
+    expect(byId.fast!.runs[0]!.output).toEqual({ text: '[redacted]' });
     const json = path.join(pathResolver.rootDir(), report.report_json);
     const md = path.join(pathResolver.rootDir(), report.report_markdown);
     expect(safeExistsSync(json)).toBe(true);
