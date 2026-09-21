@@ -13,6 +13,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExecResult } from './secure-io.js';
 import { resolveHerdrBin } from './tool-binary-resolvers.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
+import { classifyAgentReadiness, describeAgentReadiness } from './agent-runtime-readiness.js';
 import {
   registerAgentPaneRuntimeBridge,
   type AgentPaneRuntimeBridge,
@@ -592,6 +593,30 @@ class HerdrPaneAgentAdapter implements AgentAdapter {
         }`
       );
       screen = before;
+    }
+
+    // An agent that stops mid-turn to ask something — "allow this tool?",
+    // a clarifying question, a trust prompt — is not finished. `prompt --wait`
+    // returns as soon as herdr sees it `blocked`, and this used to read the
+    // screen and hand the question back as the agent's answer: dispatch then
+    // treated "Allow edits to this file? (y/n)" as completed work.
+    //
+    // Two checks, because neither is enough alone. herdr's own `blocked`
+    // status is authoritative for the prompts it understands; for the ones it
+    // does not, the pane reads `idle` — an agent sitting on a trust prompt was
+    // reported exactly that way — so the screen is classified as well.
+    const nativeBlocked = String(promptResult.agent_status || '').toLowerCase() === 'blocked';
+    const onScreen = classifyAgentReadiness(screen);
+    if (nativeBlocked || onScreen.state === 'awaiting_human') {
+      const readiness =
+        onScreen.state === 'awaiting_human'
+          ? onScreen
+          : {
+              state: 'awaiting_human' as const,
+              reason: `agent is waiting for a person: herdr reports '${this.paneAgentName}' as blocked`,
+              promptExcerpt: screen.split('\n').slice(-12).join('\n').trim(),
+            };
+      throw new Error(`[AGENT_RUNTIME_AWAITING_HUMAN] ${describeAgentReadiness(readiness)}`);
     }
 
     const text = extractPaneAssistantText(screen, prompt) || screen.trim();
