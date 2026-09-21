@@ -108,6 +108,8 @@ describe('voice-actuator purpose-driven STT selection', () => {
       prefer: ['mlx_whisper'],
       set_by: 'user:test',
     });
+    // Rule changes are audited too; assertions below are about selection.
+    mocks.record.mockClear();
     const result = await transcribe({ language: 'ja' });
     expect(result.backend).toBe('mlx_whisper');
     expect(calls).toEqual(['mlx_whisper']);

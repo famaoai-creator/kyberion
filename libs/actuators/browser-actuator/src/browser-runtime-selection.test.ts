@@ -88,6 +88,8 @@ describe('purpose-driven browser runtime selection', () => {
       prefer: ['lightpanda'],
       set_by: 'user:owner',
     });
+    // Rule changes are audited too; assertions below are about selection.
+    record.mockClear();
 
     expect(selectBrowserAutomationRuntime(READ_ONLY, {})).toBe('lightpanda');
     expect(record).toHaveBeenCalledWith(
@@ -109,6 +111,8 @@ describe('purpose-driven browser runtime selection', () => {
       prefer: ['lightpanda'],
       set_by: 'user:owner',
     });
+    // Rule changes are audited too; assertions below are about selection.
+    record.mockClear();
 
     expect(
       selectBrowserAutomationRuntime(READ_ONLY, { browser_runtime: 'playwright-chromium' })

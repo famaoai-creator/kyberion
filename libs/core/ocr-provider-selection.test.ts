@@ -161,6 +161,8 @@ describe('purpose-driven OCR provider selection', () => {
       prefer: ['llm_api'],
       set_by: 'user:owner',
     });
+    // Rule changes are audited too; assertions below are about selection.
+    record.mockClear();
 
     const after = await router.resolveCandidates({ path: 'test.png' });
     expect(after[0]!.id).toBe('llm_api');
@@ -185,6 +187,8 @@ describe('purpose-driven OCR provider selection', () => {
       prefer: ['llm_api'],
       set_by: 'user:owner',
     });
+    // Rule changes are audited too; assertions below are about selection.
+    record.mockClear();
 
     const candidates = await router.resolveCandidates({
       path: 'test.png',
@@ -207,6 +211,8 @@ describe('purpose-driven OCR provider selection', () => {
       prefer: ['llm_api'],
       set_by: 'user:owner',
     });
+    // Rule changes are audited too; assertions below are about selection.
+    record.mockClear();
 
     const jaCandidates = await router.resolveCandidates({
       path: 'test.png',
@@ -246,6 +252,8 @@ describe('purpose-driven OCR provider selection', () => {
       prefer: ['llm_api'],
       set_by: 'user:owner',
     });
+    // Rule changes are audited too; assertions below are about selection.
+    record.mockClear();
 
     const en = await router.resolveCandidates({ path: 'test.png', language: 'en' });
     expect(en.map((p) => p.id)).toEqual(['apple_vision', 'llm_api']);
