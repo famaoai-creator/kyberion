@@ -192,7 +192,19 @@ export async function judgePageReadiness(
   pageText: string,
   gatePassed: boolean,
   expectation: string,
-  options: BrowserJudgmentOptions = {}
+  options: BrowserJudgmentOptions & {
+    /**
+     * A screenshot, base64, no `data:` prefix.
+     *
+     * The text of a page cannot show a spinner, a half-painted layout, or a
+     * modal sitting over the content — the cases where "is it ready" is
+     * actually in doubt. Supplying one restricts the call to providers that
+     * declare `acceptsImages`; if none is registered the seam refuses and
+     * the caller's gate stands, which is the same outcome as not asking.
+     */
+    screenshotBase64?: string;
+    screenshotMediaType?: string;
+  } = {}
 ): Promise<PageReadinessVerdict> {
   if (!gatePassed) {
     // Nothing to add: the deterministic gate has not passed, so the answer
@@ -214,9 +226,18 @@ export async function judgePageReadiness(
       '同意バナーなどで内容が出ていない場合は false。',
   };
 
+  const text = String(pageText || '').slice(0, 4_000);
   const result = await assistWithJudgment<{ ready: boolean }>({
     baseline: { ready: true },
-    state: String(pageText || '').slice(0, 4_000),
+    state: options.screenshotBase64
+      ? {
+          text,
+          imageBase64: options.screenshotBase64,
+          ...(options.screenshotMediaType
+            ? { imageMediaType: options.screenshotMediaType }
+            : {}),
+        }
+      : text,
     questions: [question],
     tier: options.tier ?? 'personal',
     ...(options.tenantSlug ? { tenantSlug: options.tenantSlug } : {}),

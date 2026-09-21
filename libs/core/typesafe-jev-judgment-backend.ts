@@ -28,6 +28,7 @@
 import {
   describeChoiceOptions,
   registerJudgmentBackend,
+  stateText,
   type JudgmentAnswer,
   type JudgmentBackend,
   type JudgmentQuestion,
@@ -158,7 +159,7 @@ export function createTypeSafeJevBackend(options: TypeSafeJevOptions = {}): Judg
             'content-type': 'application/json',
           },
           body: JSON.stringify({
-            state: request.state,
+            state: stateText(request.state),
             model,
             // Independent questions over the same state go in one call; that
             // is the shape Jev is built for and it costs one round trip.

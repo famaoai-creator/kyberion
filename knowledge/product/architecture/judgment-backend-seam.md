@@ -160,15 +160,31 @@ needs its options described — asked without them it called
 '月次レポートを作って' not a work request at 0.002, and asked with them it
 is right on seven of eight.
 
-## State is text only
+## A state may carry an image, and `acceptsImages` decides who sees it
 
-`JudgmentRequest.state` is a string, so nothing here can judge an image or
-audio. That is a real limitation rather than an omission waiting to be
-tidied: `judgePageReadiness` can read a page's text but cannot see a
-spinner or a broken layout, which is exactly the case a screenshot would
-settle. Implementations that take images and audio exist (openvons,
-PlayJev); widening the type is small and additive and should follow a
-provider that can use it, not precede one.
+`JudgmentState` is a string, or text plus a base64 image. The text-only
+version was a real limit rather than an omission: `judgePageReadiness` can
+read a page's words but not see a spinner, a half-painted layout, or a modal
+over the content — the cases where "is it ready" is genuinely in doubt.
+`judgePageReadiness` takes a `screenshotBase64` for that.
+
+Seeing pixels is a property of the provider, not of the question, so it is a
+capability flag rather than something `supports()` could express. **Absent
+means no**, and `selectJudgmentBackend` filters on it at all three paths
+that can reach a provider — selection, the built-in floor, and the
+failure-degradation path. A text-only provider handed an image would answer
+from the caption and look like it had looked at the picture; instead the
+caller gets its baseline and a reason saying nothing can see images.
+
+Providers that take pixels exist. PlayJev-0.8B reads one 448px frame and
+returns a distribution over the listed options in a single forward pass with
+nothing generated, which is exactly this seam's shape; openvons covers text,
+images and Japanese voice, and answers the escape-option problem a third way
+— it scores a *free hypothesis* alongside the candidates rather than adding
+"none of these" as an option that competes for the same probability mass.
+Neither has been measured against a call site here, so neither is
+registered: per the evaluation rule above, an unmeasured provider is treated
+exactly like a bad one.
 
 ## Adding a provider
 

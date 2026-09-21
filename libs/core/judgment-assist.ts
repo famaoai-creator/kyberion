@@ -29,7 +29,14 @@
  * reason it chose it; routing stays in `judge-route.ts`.
  */
 
-import { judge, type JudgmentAnswer, type JudgmentQuestion } from './judgment-backend.js';
+import {
+  judge,
+  stateHasImage,
+  stateText,
+  type JudgmentAnswer,
+  type JudgmentQuestion,
+  type JudgmentState,
+} from './judgment-backend.js';
 import { createLogger } from './logger.js';
 import type { TierLevel } from './types.js';
 
@@ -41,8 +48,8 @@ const DEFAULT_MIN_CONFIDENCE = 0.7;
 export interface JudgmentAssistInput<T> {
   /** What the deterministic path already decided. Returned unless refined. */
   baseline: T;
-  /** The material to judge. */
-  state: string;
+  /** The material to judge; a string, or text and an image. */
+  state: JudgmentState;
   /** Asked together in one call when a provider supports it. */
   questions: readonly JudgmentQuestion[];
   /** Highest data tier in `state`; decides which providers may see it. */
@@ -88,7 +95,11 @@ export async function assistWithJudgment<T>(
   const minConfidence = input.minConfidence ?? DEFAULT_MIN_CONFIDENCE;
   const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-  if (!input.state?.trim()) return baselineResult(input.baseline, `${label}: empty state`);
+  // A state is now text, or text plus an image, or an image alone — so
+  // "empty" means neither.
+  if (!stateText(input.state).trim() && !stateHasImage(input.state)) {
+    return baselineResult(input.baseline, `${label}: empty state`);
+  }
   if (!input.questions?.length) return baselineResult(input.baseline, `${label}: no questions`);
 
   let result: Awaited<ReturnType<typeof judge>>;
