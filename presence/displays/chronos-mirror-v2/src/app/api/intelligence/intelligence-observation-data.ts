@@ -205,6 +205,9 @@ export interface SecretApprovalSummary {
   requiresStrongAuth: boolean;
   pendingRoles: string[];
   kind?: 'secret_mutation' | 'computer_action';
+  /** pending = needs decide; apply_pending = approved, value not yet collected */
+  phase?: 'pending' | 'apply_pending';
+  status?: string;
 }
 
 export interface PendingApprovalSummary {
