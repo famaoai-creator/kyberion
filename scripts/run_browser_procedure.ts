@@ -41,6 +41,10 @@ const USAGE = [
   '  pnpm kyberion browser run --recording <allowlisted-recording.json> [--headed]',
   '  pnpm kyberion browser run --adf <browser-actuator-example.json> [--headed]',
   '',
+  '--browser-runtime lightpanda runs on the lightweight Lightpanda engine',
+  '(read-mostly flows; no tabs, screenshots or passkeys). Install it with',
+  '`pnpm tool:setup -- --tool lightpanda --apply`.',
+  '',
   'Governed recording/procedure runs use the same approval gate and origin',
   'allowlist as the Chrome extension path.',
   'Hand-authored --adf examples call browser-actuator directly (not the',
@@ -96,6 +100,7 @@ async function bindExecutor(
     connectOverCdp: boolean;
     cdpUrl?: string;
     cdpPort?: number;
+    browserRuntime?: string;
     context: Record<string, unknown>;
   }
 ): Promise<ExecuteBrowserPipeline> {
@@ -141,6 +146,11 @@ export async function main(
       type: 'string',
       description: 'Optional session/tab id when attaching with --cdp-url/--cdp-port',
     })
+    .option('browser-runtime', {
+      type: 'string',
+      description:
+        'Browser runtime provider (default Chromium; `lightpanda` for read-mostly flows)',
+    })
     .option('mission-id', { type: 'string', description: 'Mission id for the dispatch' })
     .option('json', { type: 'boolean', default: false })
     .parse();
@@ -176,6 +186,7 @@ export async function main(
   const cdpPort = typeof argv['cdp-port'] === 'number' ? Number(argv['cdp-port']) : undefined;
   const tabId = argv['tab-id'] ? String(argv['tab-id']) : undefined;
   const connectOverCdp = Boolean(cdpUrl || cdpPort);
+  const browserRuntime = argv['browser-runtime'] ? String(argv['browser-runtime']) : undefined;
   const missionId =
     (argv['mission-id'] ? String(argv['mission-id']) : '') ||
     deps.missionId ||
@@ -209,6 +220,7 @@ export async function main(
         connect_over_cdp: connectOverCdp,
         ...(cdpUrl ? { cdp_url: cdpUrl } : {}),
         ...(cdpPort ? { cdp_port: cdpPort } : {}),
+        ...(browserRuntime ? { browser_runtime: browserRuntime } : {}),
       },
       context: {
         ...((adf.context as Record<string, unknown> | undefined) || {}),
@@ -284,6 +296,7 @@ export async function main(
     connectOverCdp,
     cdpUrl,
     cdpPort,
+    browserRuntime,
     context: {
       procedure_id: entry.procedure_id,
       mission_id: missionId,
