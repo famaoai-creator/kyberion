@@ -226,6 +226,8 @@ export class ClaudeCliSessionAdapter {
 
   private child?: ChildProcessWithoutNullStreams;
   private bootPromise?: Promise<void>;
+  /** A timed-out child is drained before a new session may consume stdout. */
+  private recoveryPromise?: Promise<void>;
   private stdoutBuffer = '';
   private stderrTail = '';
   private turn?: TurnState;
@@ -398,6 +400,7 @@ export class ClaudeCliSessionAdapter {
     options: AgentAskOptions,
     requireNative: boolean
   ): Promise<AgentResponse> {
+    if (this.recoveryPromise) await this.recoveryPromise;
     await this.boot();
     const child = this.child;
     if (!child) throw this.unavailable('claude CLI session is not running.');
@@ -406,7 +409,22 @@ export class ClaudeCliSessionAdapter {
 
     return new Promise<AgentResponse>((resolve, reject) => {
       const timer = setTimeout(() => {
+        // A timeout cannot leave the old stream alive: without a per-turn
+        // protocol id, a late result would otherwise be consumed by the next
+        // turn. Reject first so shutdown cannot replace the useful error, then
+        // interrupt and drain the child before allowing another turn.
         this.settleTurn(this.unavailable(`claude CLI turn timed out after ${this.timeoutMs}ms.`));
+        this.interrupt();
+        const recovery = this.shutdown();
+        this.recoveryPromise = recovery;
+        void recovery.then(
+          () => {
+            if (this.recoveryPromise === recovery) this.recoveryPromise = undefined;
+          },
+          () => {
+            if (this.recoveryPromise === recovery) this.recoveryPromise = undefined;
+          }
+        );
       }, this.timeoutMs);
       const state: TurnState = {
         resolve,
@@ -680,6 +698,10 @@ export class ClaudeCliSessionAdapter {
     this.child = undefined;
     this.bootPromise = undefined;
     this.stdoutBuffer = '';
+    this.stderrTail = '';
+    this.sessionId = undefined;
+    this.registeredAgents = [];
+    this.lastNativeSubagent = null;
   }
 
   private unavailable(message: string): Error {

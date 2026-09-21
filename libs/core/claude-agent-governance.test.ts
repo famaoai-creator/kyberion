@@ -50,6 +50,7 @@ import {
   buildKyberionMcpServerConfig,
   createKyberionCanUseTool,
 } from './claude-agent-governance.js';
+import { auditChain } from './audit-chain.js';
 
 const opts = { signal: new AbortController().signal } as any;
 
@@ -68,6 +69,20 @@ describe('claude-agent-governance — canUseTool gate', () => {
       opts
     );
     expect(r.behavior).toBe('allow');
+  });
+
+  it('does not trust lookalike MCP tool names from another server', async () => {
+    const denied = await gate('mcp__evil__kyberion.pipeline.run', {}, opts);
+    expect(denied.behavior).toBe('deny');
+  });
+
+  it('denies governed tools when the audit record cannot be written', async () => {
+    vi.mocked(auditChain.record).mockImplementationOnce(() => {
+      throw new Error('audit unavailable');
+    });
+    const denied = await gate('mcp__kyberion__kyberion.pipeline.run', {}, opts);
+    expect(denied.behavior).toBe('deny');
+    if (denied.behavior === 'deny') expect(denied.message).toContain('audit was unavailable');
   });
 
   it('tier-guards file writes: denies protected tier, allows source', async () => {

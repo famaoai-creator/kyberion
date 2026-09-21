@@ -857,6 +857,8 @@ function nativeHarnessEventFields(
     info.effort === 'ultra'
       ? { effort: info.effort }
       : {}),
+    ...(typeof info.totalCostUsd === 'number' ? { total_cost_usd: info.totalCostUsd } : {}),
+    ...(typeof info.numTurns === 'number' ? { num_turns: info.numTurns } : {}),
   };
 }
 

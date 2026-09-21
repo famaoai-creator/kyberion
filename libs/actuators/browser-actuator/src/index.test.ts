@@ -1669,4 +1669,17 @@ describe('browser-actuator v3 contract', () => {
     expect(result.context.browser_extension_pipeline_candidate.recording_id).toBe('REC-1');
     expect(mocks.context.newPage).not.toHaveBeenCalled();
   });
+
+  it('rejects extension sessions when an explicitly restricted runtime cannot attach', async () => {
+    const { handleAction } = await import('./index');
+
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'extension_session', params: {} }],
+        options: { browser_runtime: 'lightpanda' },
+      })
+    ).rejects.toThrow(/BROWSER_RUNTIME_UNSUPPORTED.*lightpanda.*extension_session/);
+    expect(mocks.context.newPage).not.toHaveBeenCalled();
+  });
 });

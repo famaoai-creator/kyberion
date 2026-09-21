@@ -31,6 +31,7 @@ const READ_ONLY_TOOLS = new Set(['Read', 'Grep', 'Glob', 'NotebookRead']);
 const FILE_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 /** Tools that start a provider-native sub-agent (CN-05). */
 const NATIVE_SUBAGENT_TOOLS = new Set(CLAUDE_NATIVE_SUBAGENT_TOOL_NAMES);
+const GOVERNED_MCP_TOOL_PREFIX = 'mcp__kyberion__';
 
 export interface KyberionCanUseToolOptions {
   /**
@@ -62,7 +63,7 @@ function deny(message: string): PermissionResult {
   return { behavior: 'deny', message, interrupt: false };
 }
 
-function auditAgentTool(toolName: string, input: Record<string, unknown>): void {
+function auditAgentTool(toolName: string, input: Record<string, unknown>): boolean {
   try {
     auditChain.record({
       agentId: 'claude-agent-subagent',
@@ -71,8 +72,11 @@ function auditAgentTool(toolName: string, input: Record<string, unknown>): void 
       result: 'allowed',
       metadata: { tool: toolName, input: summarizeInput(input) },
     });
+    return true;
   } catch {
-    // audit is best-effort; never block the sub-agent on a logging failure
+    // Audit failure must deny the tool call. Allowing a governed write or MCP
+    // operation when its audit record could not be persisted is fail-open.
+    return false;
   }
 }
 
@@ -112,13 +116,17 @@ export function createKyberionCanUseTool(options: KyberionCanUseToolOptions = {}
           `Only governed ${CLAUDE_NATIVE_AGENT_PREFIX}* sub-agents may be started (requested "${subagentType || 'none'}").`
         );
       }
-      auditAgentTool(toolName, input);
+      if (!auditAgentTool(toolName, input)) {
+        return deny('Kyberion governance audit was unavailable; tool call denied.');
+      }
       return allow(input);
     }
 
     // Governed Kyberion MCP tools (already allowlisted / tier-isolated / audited server-side).
-    if (toolName.includes('kyberion')) {
-      auditAgentTool(toolName, input);
+    if (toolName.startsWith(GOVERNED_MCP_TOOL_PREFIX)) {
+      if (!auditAgentTool(toolName, input)) {
+        return deny('Kyberion governance audit was unavailable; tool call denied.');
+      }
       return allow(input);
     }
 
@@ -128,7 +136,9 @@ export function createKyberionCanUseTool(options: KyberionCanUseToolOptions = {}
         tool_input: input,
       }).hookSpecificOutput;
       if (decision.permissionDecision === 'deny') return deny(decision.permissionDecisionReason);
-      auditAgentTool(toolName, input);
+      if (!auditAgentTool(toolName, input)) {
+        return deny('Kyberion governance audit was unavailable; tool call denied.');
+      }
       return allow(input);
     }
 
@@ -162,7 +172,9 @@ export function createKyberionCanUseTool(options: KyberionCanUseToolOptions = {}
           );
         }
       }
-      auditAgentTool(toolName, input);
+      if (!auditAgentTool(toolName, input)) {
+        return deny('Kyberion governance audit was unavailable; tool call denied.');
+      }
       return allow(input);
     }
 

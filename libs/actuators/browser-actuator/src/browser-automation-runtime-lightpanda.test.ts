@@ -5,7 +5,11 @@ import {
   resolveBrowserAutomationRuntime,
 } from '@agent/core/browser-automation-runtime-bridge';
 import './browser-automation-runtime-playwright.js';
-import { LIGHTPANDA_BRIDGE_ID } from './browser-automation-runtime-lightpanda.js';
+import {
+  extractLightpandaListeningPort,
+  isLightpandaCdpVersion,
+  LIGHTPANDA_BRIDGE_ID,
+} from './browser-automation-runtime-lightpanda.js';
 
 describe('lightpanda browser-automation-runtime provider', () => {
   it('registers as an opt-in provider next to playwright-chromium', () => {
@@ -25,5 +29,13 @@ describe('lightpanda browser-automation-runtime provider', () => {
     await expect(
       resolveBrowserAutomationRuntime(LIGHTPANDA_BRIDGE_ID).connectOverCDP('http://127.0.0.1:9222')
     ).rejects.toThrow(/not supported/);
+  });
+
+  it('accepts only Lightpanda-owned CDP version payloads', () => {
+    expect(extractLightpandaListeningPort('$msg="server running" address=127.0.0.1:61490')).toBe(
+      61490
+    );
+    expect(isLightpandaCdpVersion({ Browser: 'Lightpanda/0.4.1' })).toBe(true);
+    expect(isLightpandaCdpVersion({ Browser: 'Chrome/140.0' })).toBe(false);
   });
 });
