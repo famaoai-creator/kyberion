@@ -1,0 +1,144 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "image-generation-provider",
+      "default_provider": "local_flux",
+      "traits": {
+        "quality": "Artistic fidelity and prompt adherence of the generated image.",
+        "speed": "Wall-clock from request to a saved image, including any hand-off before the image exists.",
+        "privacy": "How far the prompt travels: local_only (stays on the machine) > zero_retention (remote, not retained) > training_eligible (remote, may be used for training). Derived from the provider's declared dataPolicy/executionLocality.",
+        "cost": "Marginal money cost per image: free or self-hosted is cheap, host environment is covered by an existing subscription, paid APIs are billed. Derived from the provider's declared costTier."
+      },
+      "providers": {
+        "comfyui": {
+          "traits": { "quality": 0.8, "speed": 0.4, "privacy": 1, "cost": 0.9 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "gemini_fast": {
+          "traits": { "quality": 0.7, "speed": 0.9, "privacy": 0, "cost": 1 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "gemini_service": {
+          "traits": { "quality": 0.9, "speed": 0.7, "privacy": 0.6, "cost": 0.2 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "llm_api": {
+          "traits": { "quality": 0.8, "speed": 0.6, "privacy": 0.6, "cost": 0.2 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "local_flux": {
+          "traits": { "quality": 0.7, "speed": 0.3, "privacy": 1, "cost": 0.9 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "local_diffusion": {
+          "traits": { "quality": 0.7, "speed": 0.3, "privacy": 1, "cost": 0.9 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "windows_native": {
+          "traits": { "quality": 0.4, "speed": 0.6, "privacy": 1, "cost": 0.9 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "apple_playground": {
+          "traits": { "quality": 0.4, "speed": 0.8, "privacy": 1, "cost": 0.9 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "host_agent": {
+          "traits": { "quality": 0.9, "speed": 0.1, "privacy": 0.5, "cost": 0.7 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "codex_host_bridge": {
+          "traits": { "quality": 0.9, "speed": 0.1, "privacy": 0.5, "cost": 0.7 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "agy_host_bridge": {
+          "traits": { "quality": 0.9, "speed": 0.1, "privacy": 0.5, "cost": 0.7 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        },
+        "cursor_host_bridge": {
+          "traits": { "quality": 0.9, "speed": 0.1, "privacy": 0.5, "cost": 0.7 },
+          "trait_basis": {
+            "quality": "declared",
+            "speed": "declared",
+            "privacy": "declared",
+            "cost": "declared"
+          }
+        }
+      },
+      "purposes": {
+        "quality": {
+          "description": "Artistic fidelity matters most (hero images, deliverables); slower or billed providers are acceptable.",
+          "weights": { "quality": 1 }
+        },
+        "speed": {
+          "description": "Drafts, previews and bulk runs where time to a saved image matters most.",
+          "weights": { "speed": 0.8, "quality": 0.2 }
+        },
+        "privacy": {
+          "description": "Prefer keeping the prompt on the machine (local_only), then zero-retention providers. A soft preference; use mode local_only / privacy_first for a hard constraint.",
+          "weights": { "privacy": 0.8, "quality": 0.2 }
+        },
+        "cost": {
+          "description": "Keep marginal spend low: free, self-hosted and subscription-covered providers first.",
+          "weights": { "cost": 0.8, "quality": 0.2 }
+        }
+      }
+    }
+  ]
+}
