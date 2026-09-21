@@ -17,8 +17,39 @@ export interface BrowserAutomationLaunchPersistentContextOptions {
   [key: string]: unknown;
 }
 
+/**
+ * What a provider can do beyond basic single-page automation (navigate,
+ * locate, fill, click, evaluate, cookies, routing). Callers preflight
+ * pipelines against these flags so unsupported ops fail before launch.
+ */
+export interface BrowserAutomationRuntimeCapabilities {
+  /** More than one page per session: open_tab / select_tab / popups. */
+  multi_tab: boolean;
+  /** Screenshots rendered with real layout (usable as visual evidence). */
+  pixel_screenshots: boolean;
+  video_recording: boolean;
+  /** CDP WebAuthn domain (virtual authenticators / passkeys). */
+  webauthn: boolean;
+  /** Chrome user-data-dir profiles (channel, profile_directory, DevToolsActivePort). */
+  persistent_profile: boolean;
+  /** Attach to an already running browser over CDP. */
+  attach_existing_browser: boolean;
+}
+
+export const FULL_BROWSER_AUTOMATION_RUNTIME_CAPABILITIES: Readonly<BrowserAutomationRuntimeCapabilities> =
+  Object.freeze({
+    multi_tab: true,
+    pixel_screenshots: true,
+    video_recording: true,
+    webauthn: true,
+    persistent_profile: true,
+    attach_existing_browser: true,
+  });
+
 export interface BrowserAutomationRuntimeBridge {
   readonly bridge_id: string;
+  /** Omitted = full Chromium-equivalent capabilities. */
+  readonly capabilities?: Readonly<BrowserAutomationRuntimeCapabilities>;
   connectOverCDP(endpoint: string): Promise<unknown>;
   launchPersistentContext(
     userDataDir: string,
@@ -87,5 +118,13 @@ export function resolveBrowserAutomationRuntime(
       '[browser-automation-runtime] no browser automation runtime providers registered'
     );
   }
-  return bridges[0]!;
+  // Capability-restricted providers (e.g. lightpanda) are opt-in only: 'auto'
+  // never silently downgrades a session, whatever the registration order.
+  return bridges.find((bridge) => !bridge.capabilities) ?? bridges[0]!;
+}
+
+export function getBrowserAutomationRuntimeCapabilities(
+  bridge: BrowserAutomationRuntimeBridge
+): Readonly<BrowserAutomationRuntimeCapabilities> {
+  return bridge.capabilities ?? FULL_BROWSER_AUTOMATION_RUNTIME_CAPABILITIES;
 }

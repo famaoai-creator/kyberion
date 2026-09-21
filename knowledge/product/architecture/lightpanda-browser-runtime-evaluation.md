@@ -62,14 +62,32 @@ external binary, never vendor or link it.
   (screenshots, video recording, visual review), passkeys, persistent Chrome
   profiles (`user_data_dir`), coordinate-based interaction.
 
-## Required seam work before registering a `lightpanda` provider
+## Provider (`browser_runtime: lightpanda`)
 
-1. Let callers choose a provider: `resolveBrowserAutomationRuntime()` is called
-   without a preference in `browser-runtime-helpers.ts`, so the first
-   registered bridge (Playwright Chromium) always wins.
-2. `launchPersistentContext` for Lightpanda = spawn `lightpanda serve` on a free
-   port and connect over CDP; the Chrome-only `waitForCdpEndpoint(userDataDir)`
-   (`DevToolsActivePort`) must not be used.
-3. Never reuse the default context's pre-existing page; open a fresh page.
-4. Declare provider capabilities (screenshot / multi_tab / webauthn = false) so
-   pipeline preflight rejects unsupported ops instead of failing mid-run.
+The browser-actuator registers `lightpanda` on the `browser-automation-runtime`
+seam next to `playwright-chromium`
+(`libs/actuators/browser-actuator/src/browser-automation-runtime-lightpanda.ts`).
+
+- **Opt-in only.** Pipelines select it with `options.browser_runtime:
+"lightpanda"`; hosts with `pnpm kyberion browser run --browser-runtime
+lightpanda` (also `pnpm kyberion procedure run`). `auto` resolution never
+  picks a provider that declares `capabilities`, so the Chromium default is
+  unaffected. `browser_runtime` is host-owned: dispatcher/recording options
+  cannot switch it.
+- **Process model.** Each session spawns its own `lightpanda serve` on a free
+  loopback port (via `safeSpawn`, telemetry disabled) and works in a fresh
+  `browser.newContext()` — never the default context's phantom page. Closing
+  the context (`keep_alive: false`, `close_session`, lease expiry) closes the
+  browser and kills the process; the process is also killed on Node exit, so
+  sessions are not reattached across processes.
+- **Fail fast.** `preflightBrowserRuntimePipeline`
+  (`browser-runtime-capabilities.ts`) scans every step, including nested
+  control flow, before launch: tab ops, `screenshot`, passkey ops,
+  `list_profiles`, `extension_session`, CDP attach options and Chrome profile
+  options raise `[BROWSER_RUNTIME_UNSUPPORTED]`. Host-default `record_video`
+  is dropped with a warning; `record_trace` still works (degraded DOM
+  snapshots).
+- Verified end to end (2026-09-21): goto / fill / click / evaluate / title /
+  `distill_dom` on a local page and example.com, keep_alive reuse across two
+  pipeline calls, `close_session` stops the process, the CLI `--adf` path, and
+  unchanged Chromium default runs.
