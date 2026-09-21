@@ -31,8 +31,10 @@ import type { AudioChunk } from '@agent/core/meeting-session-types';
 import {
   getSpeechToTextBridge,
   installAvailableSpeechToTextBridges,
+  resolveSpeechToTextBridge,
+  type SpeechToTextBridge,
 } from '@agent/core/speech-to-text-bridge';
-import { getStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
+import { selectStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
 import { getStreamingTtsBridge } from '@agent/core/streaming-tts-bridge';
 import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
 import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
@@ -106,6 +108,10 @@ export interface RealtimeVoiceConversationCliOptions {
   bargeIn: boolean;
   /** VAD backend id ('energy' | 'silero' | registered custom). */
   vadBackend?: string;
+  /** VAD selection purpose (voice.vad-backend policy) when no backend is named. */
+  vadPurpose?: string;
+  /** STT selection purpose for the batch and streaming STT seams (accuracy, latency, privacy). */
+  sttPurpose?: string;
   /** Use streaming STT (KYBERION_STT_COMMAND) during the utterance when available. */
   streamingStt: boolean;
   /** Keep one warm voice-actuator process instead of spawning per segment. */
@@ -427,7 +433,7 @@ export async function runRealtimeVoiceConversationInteractive(
       }
     });
 
-  const sttBridge = getSpeechToTextBridge();
+  const sttBridge = resolveRealtimeSttBridge(options);
   if (sttBridge.name === 'stub') {
     throw new Error(
       'Realtime interactive voice requires a real STT backend. Set KYBERION_STT_COMMAND or register a SpeechToTextBridge before using --interactive.'
@@ -494,6 +500,21 @@ function describeLoopEvent(event: RealtimeVoiceLoopEvent): string | null {
   }
 }
 
+/**
+ * Batch STT bridge for the turn loop: the priority default, or the seam's
+ * choice when --stt-purpose is given, an operator rule matches the language,
+ * or the default cannot transcribe the session language.
+ */
+function resolveRealtimeSttBridge(
+  options: Pick<RealtimeVoiceConversationCliOptions, 'language' | 'sttPurpose'>
+): SpeechToTextBridge {
+  return resolveSpeechToTextBridge({
+    ...(options.sttPurpose ? { purpose: options.sttPurpose } : {}),
+    // The stub stays eligible so the caller's "requires a real STT backend" check reports it.
+    requires: { allowSynthetic: true, ...(options.language ? { language: options.language } : {}) },
+  });
+}
+
 const IMMEDIATE_PLAYBACK: PlaybackHandle = {
   done: Promise.resolve({ ok: true, interrupted: false }),
   stop: async () => ({ ok: true, interrupted: false }),
@@ -503,7 +524,7 @@ export async function runRealtimeVoiceConversationLoop(
   options: RealtimeVoiceConversationCliOptions,
   print: (value: unknown) => void = () => undefined
 ): Promise<void> {
-  const sttBridge = getSpeechToTextBridge();
+  const sttBridge = resolveRealtimeSttBridge(options);
   if (sttBridge.name === 'stub') {
     throw new Error(
       'Realtime interactive voice requires a real STT backend. Set KYBERION_STT_COMMAND or register a SpeechToTextBridge before using --interactive.'
@@ -562,27 +583,44 @@ export async function runRealtimeVoiceConversationLoop(
   // VAD backend (Phase 3): silero when configured, energy otherwise.
   installSileroVadBackend();
   installTenVadBackend();
-  const resolvedVad = resolveVadBackend(options.vadBackend);
+  const resolvedVad = resolveVadBackend(options.vadBackend, {
+    ...(options.vadPurpose ? { purpose: options.vadPurpose } : {}),
+  });
   if (resolvedVad.degradedFrom) {
     print(
       `⚠️  VAD backend '${resolvedVad.degradedFrom}' unavailable (${resolvedVad.degradedReason}); using 'energy'.`
     );
   }
   const vadBackend = resolvedVad.backend;
+  if (resolvedVad.decision) {
+    print(`🎚️  VAD backend: ${vadBackend.backend_id} (${resolvedVad.decision.rationale})`);
+  }
 
   // Streaming STT (Phase 1): transcription overlaps the utterance when configured.
   let streamingStt: StreamingSpeechToTextBridge | undefined;
   if (options.streamingStt) {
     const installed = installShellStreamingSttBridgeFromEnv();
-    if (installed.installed) {
-      streamingStt = getStreamingSttBridge('shell');
-      print('🔁 streaming STT: KYBERION_STT_COMMAND (partials during speech)');
-    } else {
-      const managed = installManagedMlxWhisperStreamingSttBridgeIfAvailable();
-      if (managed.installed && managed.bridge_id) {
-        streamingStt = getStreamingSttBridge(managed.bridge_id);
-        print('🔁 streaming STT: managed mlx_whisper (resident per utterance)');
+    if (!installed.installed) installManagedMlxWhisperStreamingSttBridgeIfAvailable();
+    // Real transcription only: the stub is never streamed into the loop.
+    try {
+      const selection = selectStreamingSttBridge({
+        ...(options.sttPurpose ? { purpose: options.sttPurpose } : {}),
+        requires: { allowSynthetic: false, ...(language ? { language } : {}) },
+      });
+      if (selection.bridge_id !== 'stub') {
+        streamingStt = selection.bridge;
+        print(
+          selection.bridge_id === 'shell'
+            ? '🔁 streaming STT: KYBERION_STT_COMMAND (partials during speech)'
+            : selection.bridge_id === 'managed_mlx_whisper'
+              ? '🔁 streaming STT: managed mlx_whisper (resident per utterance)'
+              : `🔁 streaming STT: ${selection.bridge_id} (${selection.source})`
+        );
       }
+    } catch (error: unknown) {
+      print(
+        `⚠️  streaming STT unavailable (${error instanceof Error ? error.message : String(error)}); using batch STT.`
+      );
     }
   }
 
@@ -867,6 +905,8 @@ export function parseRealtimeVoiceConversationCli(
     ...(argv['mic-device'] ? { micDevice: String(argv['mic-device']) } : {}),
     bargeIn: Boolean(argv['barge-in']),
     ...(argv['vad-backend'] ? { vadBackend: String(argv['vad-backend']) } : {}),
+    ...(argv['vad-purpose'] ? { vadPurpose: String(argv['vad-purpose']) } : {}),
+    ...(argv['stt-purpose'] ? { sttPurpose: String(argv['stt-purpose']) } : {}),
     streamingStt: argv['streaming-stt'] === undefined ? true : Boolean(argv['streaming-stt']),
     warmActuator: argv['warm-actuator'] === undefined ? true : Boolean(argv['warm-actuator']),
     ...(argv.mission ? { mission: String(argv.mission) } : {}),
@@ -989,6 +1029,16 @@ export async function main(
       type: 'string',
       describe:
         "VAD backend id ('energy' default, 'silero' when KYBERION_SILERO_VAD_MODEL is set; falls back to KYBERION_VAD)",
+    })
+    .option('vad-purpose', {
+      type: 'string',
+      describe:
+        'VAD selection purpose when no backend is named (voice.vad-backend policy: accuracy, light)',
+    })
+    .option('stt-purpose', {
+      type: 'string',
+      describe:
+        'STT selection purpose for batch and streaming STT (accuracy, latency, privacy); unset keeps the default bridge',
     })
     .option('streaming-stt', {
       type: 'boolean',
