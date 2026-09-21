@@ -38,6 +38,14 @@
           "basis": {
             "type": "string",
             "description": "Where the training_use claim was verified -- a terms URL, contract reference or ticket. A 'none' claim with no basis is an assertion, not a fact."
+          },
+          "endpoint_domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Hosts this provider sends payloads to. Owned here, next to the provider, so an approval can name the provider (egress-policy.json tenant_allowed_providers) and the hosts follow the product rather than being copied into every tenant entry. A local-only provider declares none."
           }
         },
         "required": ["egress"]

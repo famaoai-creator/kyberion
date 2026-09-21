@@ -2903,6 +2903,42 @@
       "types": "./dist/typesafe-jev-judgment-backend.d.ts",
       "default": "./dist/typesafe-jev-judgment-backend.js"
     },
+    "./laya-mlx-judgment-backend": {
+      "types": "./dist/laya-mlx-judgment-backend.d.ts",
+      "default": "./dist/laya-mlx-judgment-backend.js"
+    },
+    "./judgment-assist": {
+      "types": "./dist/judgment-assist.d.ts",
+      "default": "./dist/judgment-assist.js"
+    },
+    "./error-classifier-judgment": {
+      "types": "./dist/error-classifier-judgment.d.ts",
+      "default": "./dist/error-classifier-judgment.js"
+    },
+    "./knowledge-relevance-judgment": {
+      "types": "./dist/knowledge-relevance-judgment.d.ts",
+      "default": "./dist/knowledge-relevance-judgment.js"
+    },
+    "./browser-judgment": {
+      "types": "./dist/browser-judgment.d.ts",
+      "default": "./dist/browser-judgment.js"
+    },
+    "./judgment-calibration-fit": {
+      "types": "./dist/judgment-calibration-fit.d.ts",
+      "default": "./dist/judgment-calibration-fit.js"
+    },
+    "./judgment-callsite-eval": {
+      "types": "./dist/judgment-callsite-eval.d.ts",
+      "default": "./dist/judgment-callsite-eval.js"
+    },
+    "./task-routing-judgment": {
+      "types": "./dist/task-routing-judgment.d.ts",
+      "default": "./dist/task-routing-judgment.js"
+    },
+    "./agent-runtime-readiness": {
+      "types": "./dist/agent-runtime-readiness.d.ts",
+      "default": "./dist/agent-runtime-readiness.js"
+    },
     "./tool-call-scheduler": {
       "types": "./dist/tool-call-scheduler.d.ts",
       "default": "./dist/tool-call-scheduler.js"
@@ -3074,6 +3110,22 @@
     "./training-catalog": {
       "types": "./dist/training-catalog.d.ts",
       "default": "./dist/training-catalog.js"
+    },
+    "./agent-prompt-approval": {
+      "types": "./dist/agent-prompt-approval.d.ts",
+      "default": "./dist/agent-prompt-approval.js"
+    },
+    "./agent-prompt-approval-port": {
+      "types": "./dist/agent-prompt-approval-port.d.ts",
+      "default": "./dist/agent-prompt-approval-port.js"
+    },
+    "./agent-prompt-response": {
+      "types": "./dist/agent-prompt-response.d.ts",
+      "default": "./dist/agent-prompt-response.js"
+    },
+    "./provider-endpoint-domains": {
+      "types": "./dist/provider-endpoint-domains.d.ts",
+      "default": "./dist/provider-endpoint-domains.js"
     }
   },
   "dependencies": {

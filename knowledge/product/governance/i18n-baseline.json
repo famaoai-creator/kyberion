@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-09-14T22:47:47.333Z",
+  "generated_at": "2026-09-21T13:42:46.382Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -44,7 +44,6 @@
     "satellites/slack-bridge",
     "satellites/telegram-bridge",
     "satellites/voice-hub",
-    "presence/displays/avatar-studio",
     "presence/displays/chronos-mirror-v2",
     "presence/displays/computer-surface",
     "presence/displays/concierge",
@@ -66,6 +65,7 @@
     "libs/core/background-review-runner.ts": 3,
     "libs/core/browser-conversation-session.ts": 14,
     "libs/core/browser-extension-bridge.ts": 1,
+    "libs/core/browser-judgment.ts": 3,
     "libs/core/capability-bundle-registry.ts": 2,
     "libs/core/capture-photo-task-session-executor.ts": 2,
     "libs/core/ceo-surface-summary.ts": 4,
@@ -76,6 +76,7 @@
     "libs/core/in-room-minutes-recorder.ts": 1,
     "libs/core/intent-clarification-format.ts": 5,
     "libs/core/intent-resolution.ts": 6,
+    "libs/core/knowledge-relevance-judgment.ts": 3,
     "libs/core/lead-score.ts": 11,
     "libs/core/mission-gate-engine.ts": 3,
     "libs/core/mission-hygiene.ts": 13,
