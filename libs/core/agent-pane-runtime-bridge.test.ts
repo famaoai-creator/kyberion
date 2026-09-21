@@ -275,7 +275,7 @@ describe('pane adapter: an agent that stops to ask is not finished', () => {
     exec: unknown,
     options: {
       policy?: Record<string, unknown>;
-      approvals?: ReturnType<typeof fakeApprovals>;
+      approvals?: ReturnType<typeof fakeApprovals> | null;
       cwd?: string;
       provider?: string;
     } = {}
@@ -288,7 +288,9 @@ describe('pane adapter: an agent that stops to ask is not finished', () => {
         relay_keys: { default: { approve: ['enter'], reject: ['esc'] } },
         ...(options.policy ?? {}),
       } as never,
-      promptApprovals: (options.approvals ?? fakeApprovals('pending')).port as never,
+      promptApprovals: (options.approvals === null
+        ? undefined
+        : (options.approvals ?? fakeApprovals('pending')).port) as never,
       promptAudit: () => undefined,
       settleDelayMs: 0,
     }).createAdapter({
@@ -416,6 +418,14 @@ describe('pane adapter: an agent that stops to ask is not finished', () => {
       adapterFor(exec, { approvals: fakeApprovals('approved') }).ask('update the header')
     ).rejects.toThrow(/did not take effect/);
     expect(sent).toEqual([['enter']]);
+  });
+
+  it('fails as awaiting_human, sending nothing, when no approval channel is registered', async () => {
+    const { exec, sent } = fakeHerdr({ status: 'idle', screens: [TRUST] });
+    await expect(adapterFor(exec, { approvals: null }).ask('update the header')).rejects.toThrow(
+      /AGENT_RUNTIME_AWAITING_HUMAN[\s\S]*No approval channel is registered/
+    );
+    expect(sent).toEqual([]);
   });
 
   it('starts the agent with the launch args the policy names', async () => {

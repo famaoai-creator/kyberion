@@ -18,31 +18,19 @@ import {
 } from './approval-store.js';
 import { nowIso } from './foundation/time.js';
 import { notifyOperator } from './operator-notifications.js';
+import {
+  registerAgentPromptApprovalPort,
+  type AgentPromptApprovalPort,
+  type AgentPromptApprovalRequest,
+} from './agent-prompt-approval-port.js';
+
+export type {
+  AgentPromptApprovalPort,
+  AgentPromptApprovalRequest,
+  AgentPromptApprovalStatus,
+} from './agent-prompt-approval-port.js';
 
 export const AGENT_PROMPT_APPROVAL_CHANNEL = 'agent-runtime';
-
-export type AgentPromptApprovalStatus = 'pending' | 'approved' | 'rejected' | 'closed';
-
-export interface AgentPromptApprovalRequest {
-  agentName: string;
-  provider: string;
-  signatureId: string;
-  cwd: string;
-  excerpt: string;
-  missionId?: string;
-}
-
-export interface AgentPromptApprovalPort {
-  /** The open request for this prompt, creating one if there is none. */
-  open(request: AgentPromptApprovalRequest): { id: string; created: boolean };
-  status(id: string): AgentPromptApprovalStatus;
-  /**
-   * Mark a decision as relayed. One decision answers one prompt: without
-   * this, the next identical prompt would find the old "yes" and be answered
-   * by it, turning a single approval into a standing grant.
-   */
-  consume(id: string, relayed: boolean): void;
-}
 
 /**
  * The same prompt on the same agent is one request, however many turns hit
@@ -123,3 +111,6 @@ export function createApprovalStorePromptPort(): AgentPromptApprovalPort {
     },
   };
 }
+
+// Importing this module is how an entry point turns escalation on.
+registerAgentPromptApprovalPort(createApprovalStorePromptPort);
