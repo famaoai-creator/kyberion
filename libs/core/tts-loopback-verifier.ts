@@ -18,7 +18,7 @@ export interface TtsLoopbackVerificationRequest {
   language?: string;
   voice_profile_id?: string;
   audio_route: {
-    bus: 'blackhole' | 'stub';
+    bus: 'blackhole' | 'pulseaudio' | 'stub';
     input_device_uid?: string;
     output_device_uid?: string;
     expected_device_label?: string;

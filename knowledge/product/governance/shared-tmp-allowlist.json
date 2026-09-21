@@ -486,6 +486,12 @@
       "note": "default PNG+handoff export path for localhost sketch board; operator-consumed intermediate"
     },
     {
+      "file": "scripts/smoke_capability_seams_live.ts",
+      "count": 2,
+      "classification": "legit-tmp",
+      "note": "disposable camera capture and JSON report produced by the live capability-seam smoke"
+    },
+    {
       "file": "scripts/soak_endurance.ts",
       "count": 3,
       "classification": "legit-tmp",

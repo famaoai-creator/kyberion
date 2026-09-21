@@ -27,6 +27,10 @@
       "egress": "external-api",
       "training_use": "unknown"
     },
+    "typesafe-jev": {
+      "egress": "external-api",
+      "training_use": "unknown"
+    },
     "cursor": {
       "egress": "external-api",
       "training_use": "unknown"

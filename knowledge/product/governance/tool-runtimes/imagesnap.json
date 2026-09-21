@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "imagesnap",
+      "display_name": "ImageSnap Camera Capture",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "imagesnap",
+        "args": ["-h"],
+        "description": "Probe ImageSnap availability without capturing a frame."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "imagesnap"],
+        "description": "Install ImageSnap through Homebrew on macOS."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "imagesnap",
+        "args": ["-h"],
+        "description": "Re-check the installed ImageSnap binary."
+      },
+      "managed_env_subpath": "tool-runtimes/imagesnap",
+      "notes": "macOS still-capture backend for the virtual-camera-capture seam (preferred_backend imagesnap)."
+    }
+  ]
+}

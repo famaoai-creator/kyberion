@@ -3,7 +3,7 @@ title: Tool Runtime Abstraction
 category: Architecture
 tags: [runtime, package-manager, uvx, npx, venv, install, policy]
 importance: 7
-last_updated: 2026-09-16
+last_updated: 2026-09-21
 ---
 
 # Tool Runtime Abstraction
@@ -78,6 +78,18 @@ The registry is intentionally not limited to Python tools:
   - OCR toolkit example
   - Trial probe through `tesseract --version`
   - Install through `brew install tesseract`
+- `herdr`
+  - Terminal multiplexer for the agent-pane-runtime seam (`pane` launch mode)
+  - Trial probe through `herdr --version`
+  - Install through `brew install herdr` (or `pnpm tool:setup -- --tool herdr --apply`)
+- `imagesnap`
+  - macOS still-capture backend for virtual-camera-capture
+  - Trial probe through `imagesnap -h`
+  - Install through `brew install imagesnap`
+- `blackhole-2ch`
+  - macOS virtual audio driver for the audio-bus-bridge `blackhole` provider
+  - Trial probe through `brew list --cask blackhole-2ch`
+  - Install through `brew install --cask blackhole-2ch` (reboot may be required)
 - `mlx_audio`
   - Apple Silicon TTS engine dependency example
   - Trial probe through `python3 -c "import mlx_audio"`

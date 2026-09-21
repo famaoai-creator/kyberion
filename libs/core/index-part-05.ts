@@ -4,6 +4,10 @@ export * from './approval-store.js';
 
 export * from './judge-route.js';
 
+export * from './judgment-backend.js';
+
+export * from './typesafe-jev-judgment-backend.js';
+
 export * from './plugin-source-trust.js';
 
 export * from './plugin-managed-install.js';
