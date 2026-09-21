@@ -37,43 +37,12 @@ export interface SpeechToTextCalibrationInput {
   language?: string;
 }
 
-/**
- * Transcript comparison form: NFKC, lower case, without whitespace and
- * punctuation, as code points. STT backends differ in spacing (Japanese has
- * none), punctuation and full/half-width forms; none of that is a
- * recognition error.
- */
-export function normalizeTranscriptForCer(text: string): string[] {
-  return Array.from(
-    String(text ?? '')
-      .normalize('NFKC')
-      .toLowerCase()
-      .replace(/[\s\p{P}]/gu, '')
-  );
-}
-
-/**
- * Character Error Rate over normalised transcripts: Levenshtein distance
- * (insertions, deletions, substitutions) divided by the reference length,
- * capped at 1. 0 = identical, 1 = no better than an empty transcript.
- */
-export function transcriptCharErrorRate(hypothesis: string, reference: string): number {
-  const hyp = normalizeTranscriptForCer(hypothesis);
-  const ref = normalizeTranscriptForCer(reference);
-  if (ref.length === 0) return hyp.length === 0 ? 0 : 1;
-  if (hyp.length === 0) return 1;
-  let previous = Array.from({ length: ref.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= hyp.length; i += 1) {
-    const current = new Array<number>(ref.length + 1);
-    current[0] = i;
-    for (let j = 1; j <= ref.length; j += 1) {
-      const cost = hyp[i - 1] === ref[j - 1] ? 0 : 1;
-      current[j] = Math.min(previous[j]! + 1, current[j - 1]! + 1, previous[j - 1]! + cost);
-    }
-    previous = current;
-  }
-  return Math.min(1, previous[ref.length]! / ref.length);
-}
+/** Transcript comparison (shared with the OCR adapter; see text-metrics.ts). */
+export {
+  normalizeTextForCer as normalizeTranscriptForCer,
+  characterErrorRate as transcriptCharErrorRate,
+} from './text-metrics.js';
+import { characterErrorRate } from './text-metrics.js';
 
 /** Install every file-STT bridge available on this machine (each helper is idempotent). */
 export async function installSpeechToTextBridgesForCalibration(): Promise<void> {
@@ -118,7 +87,7 @@ export const speechToTextBridgeCalibrationAdapter: SeamCalibrationAdapter<Speech
       if (result.synthetic) return { ok: false, error: 'synthetic transcript (sidecar), not STT' };
       const metrics: Record<string, number> = {};
       if (input.reference_text) {
-        metrics.char_error_rate = transcriptCharErrorRate(result.text, input.reference_text);
+        metrics.char_error_rate = characterErrorRate(result.text, input.reference_text);
       }
       return {
         ok: true,

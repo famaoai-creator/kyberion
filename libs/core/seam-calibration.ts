@@ -146,8 +146,10 @@ export function suggestTraitValues(
     const max = Math.max(...values.map((v) => v.value));
     suggested[trait] = {};
     for (const { id, value } of values) {
+      // All providers equal on this metric: all are best, not all worst.
       const normalised = max === min ? 1 : (value - min) / (max - min);
-      suggested[trait]![id] = round(mapping.higher_is_better ? normalised : 1 - normalised, 2);
+      const oriented = max === min ? 1 : mapping.higher_is_better ? normalised : 1 - normalised;
+      suggested[trait]![id] = round(oriented, 2);
     }
   }
   return suggested;

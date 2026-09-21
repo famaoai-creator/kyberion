@@ -1,5 +1,8 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const record = vi.hoisted(() => vi.fn());
+vi.mock('./audit-chain.js', () => ({ auditChain: { record } }));
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
 import {
@@ -17,6 +20,7 @@ const file = path.join(dir, 'rules.json');
 
 describe('operator seam selection rules', () => {
   beforeEach(() => {
+    record.mockClear();
     safeRmSync(dir, { recursive: true, force: true });
     vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', file);
   });
@@ -51,6 +55,11 @@ describe('operator seam selection rules', () => {
     expect(rules[0]!.prefer).toEqual(['local_say', 'kokoro']);
     expect(removeSeamSelectionRule('ja-tts')).toBe(true);
     expect(removeSeamSelectionRule('ja-tts')).toBe(false);
+    expect(record.mock.calls.map(([entry]) => entry.operation)).toEqual([
+      'set:voice-tts-engine/ja-tts',
+      'set:voice-tts-engine/ja-tts',
+      'remove:ja-tts',
+    ]);
   });
 
   it('picks the most specific matching rule', () => {
@@ -97,5 +106,13 @@ describe('operator seam selection rules', () => {
     expect(() =>
       setSeamSelectionRule({ rule_id: 'Bad Id', seam: 'x', when: {}, prefer: ['a'] })
     ).toThrow();
+  });
+
+  it('defaults to shared runtime storage that runtime roles can read', async () => {
+    vi.stubEnv('KYBERION_SEAM_SELECTION_RULES_PATH', '');
+    const { seamSelectionRulesPath } = await import('./seam-selection-rules.js');
+    expect(seamSelectionRulesPath()).toBe(
+      pathResolver.rootResolve('active/shared/runtime/seam-selection/rules.json')
+    );
   });
 });

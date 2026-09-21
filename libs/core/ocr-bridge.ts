@@ -177,6 +177,31 @@ export function parseLocalVlmOcrResponse(value: unknown): string | undefined {
   return isRecord(value) ? nonEmptyString(value.response) : undefined;
 }
 
+/** BCP-47 primary subtags → tesseract traineddata codes (3-letter codes pass through). */
+const TESSERACT_LANGUAGE_CODES: Record<string, string> = {
+  en: 'eng',
+  ja: 'jpn',
+  zh: 'chi_sim',
+  ko: 'kor',
+  de: 'deu',
+  fr: 'fra',
+  es: 'spa',
+  it: 'ita',
+  pt: 'por',
+};
+
+export function toTesseractLanguage(language?: string): string {
+  const raw = String(language || '').trim();
+  if (!raw) return 'eng';
+  return raw
+    .split('+')
+    .map((part) => {
+      const primary = part.trim().toLowerCase().split(/[-_]/u)[0] ?? '';
+      return TESSERACT_LANGUAGE_CODES[primary] ?? part.trim();
+    })
+    .join('+');
+}
+
 export class TesseractOcrProvider implements OcrProvider {
   readonly id = 'tesseract';
   readonly dataEgress = 'none' as const; // tesseract.js, in-process
@@ -193,12 +218,18 @@ export class TesseractOcrProvider implements OcrProvider {
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
     const resolvedPath = resolveOcrImagePath(request.path);
-    const lang = request.language || 'eng';
+    const lang = toTesseractLanguage(request.language);
     let worker: any = null;
 
     try {
       const { createWorker } = await import('tesseract.js');
-      worker = await createWorker(lang);
+      // Without an errorHandler tesseract.js rethrows worker failures (e.g. a
+      // missing traineddata download) as an uncaught exception that kills the
+      // process; with it they reject createWorker/recognize and land below.
+      worker = await createWorker(lang, undefined, {
+        errorHandler: (error: unknown) =>
+          logger.warn(`[ocr_bridge] Tesseract worker error: ${String(error)}`),
+      });
       const result = await worker.recognize(resolvedPath);
 
       return {
@@ -766,7 +797,8 @@ export class AdaptivePolicyRouter {
   }
 }
 
-function ensureBuiltinOcrProviders(): void {
+/** Register the built-in OCR providers (idempotent); callers listing providers need this first. */
+export function ensureBuiltinOcrProviders(): void {
   if (ocrBuiltinsRegistered && listOcrProviders().length > 0) return;
   registerOcrProvider(new WindowsNativeOcrProvider());
   registerOcrProvider(new AppleVisionOcrProvider());

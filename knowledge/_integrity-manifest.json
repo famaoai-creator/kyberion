@@ -777,7 +777,7 @@
     {
       "path": "product/architecture/seam-provider-selection.md",
       "tier": "public",
-      "size": 6602,
+      "size": 10444,
       "type": "md"
     },
     {
@@ -1551,7 +1551,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 141062,
+      "size": 141157,
       "type": "json"
     },
     {

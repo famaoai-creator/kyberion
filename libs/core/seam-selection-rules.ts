@@ -2,22 +2,31 @@
  * Operator seam selection rules — what a human decided after seeing the
  * providers side by side (see seam-calibration.ts).
  *
- * Two kinds of override live in `<profile>/onboarding/seam-selection-rules.json`
- * (personal tier, like voice-selection.json):
+ * Two kinds of override live in `active/shared/runtime/seam-selection/rules.json`
+ * (KYBERION_SEAM_SELECTION_RULES_PATH overrides it for direct / test use):
  *   - rules: "for this seam, when <purpose / context>, prefer these providers";
  *   - trait_overrides: measured trait values replacing the product policy's
  *     declared ones for a provider (basis `measured`, with evidence).
  *
  * The product policy (knowledge/product/governance/seam-provider-selection/)
- * stays the shared baseline; this file is one operator's judgment on top.
+ * stays the shared baseline; this file is the operator's judgment on top.
+ *
+ * Why shared runtime storage and not the personal profile: every runtime role
+ * that selects a provider (worker, surface_runtime, …) must be able to read
+ * the rules, and the personal tier is not readable by them — rules there were
+ * silently ignored at run time. Rules hold provider preferences and measured
+ * numbers, not personal data. They can only reorder providers that already
+ * passed each seam's hard filter (egress, identity, capabilities), and every
+ * change is written to the audit chain.
  */
 
 import * as path from 'node:path';
+import { auditChain } from './audit-chain.js';
+import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
-import { resolveActiveProfileRoot } from './profile-root.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -65,7 +74,7 @@ const RULES_SCHEMA_PATH = pathResolver.knowledge(
 export function seamSelectionRulesPath(): string {
   const explicit = getRegisteredEnvText('KYBERION_SEAM_SELECTION_RULES_PATH')?.trim();
   return assertSafeRepositoryPath(
-    explicit || path.join(resolveActiveProfileRoot(), 'onboarding', 'seam-selection-rules.json'),
+    explicit || pathResolver.rootResolve('active/shared/runtime/seam-selection/rules.json'),
     { allowMissingLeaf: true }
   );
 }
@@ -80,15 +89,40 @@ function catalogAt(filePath: string) {
 
 const EMPTY: SeamSelectionRulesFile = { version: '1.0.0', rules: [] };
 
-/** Load the operator overlay; missing or invalid files read as "no rules". */
+let warnedLoadFailure = false;
+
+/**
+ * Load the operator overlay. A missing file means "no rules"; an unreadable or
+ * invalid one also yields no rules (selection must not break) but is warned
+ * about once per process so it is never silently ignored.
+ */
 export function loadSeamSelectionRules(): SeamSelectionRulesFile {
+  let filePath = '';
   try {
-    const filePath = seamSelectionRulesPath();
+    filePath = seamSelectionRulesPath();
     if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return { ...EMPTY, rules: [] };
     return catalogAt(filePath).load();
-  } catch {
+  } catch (error: unknown) {
+    if (!warnedLoadFailure) {
+      warnedLoadFailure = true;
+      logger.warn(
+        `[seam-selection-rules] ignoring operator rules at ${filePath || 'unknown path'}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
     return { ...EMPTY, rules: [] };
   }
+}
+
+function recordRuleChange(operation: string, detail: Record<string, unknown>): void {
+  auditChain.record({
+    agentId: actor(),
+    action: 'seam_selection_rule_change',
+    operation,
+    result: 'completed',
+    metadata: detail,
+  });
 }
 
 function saveSeamSelectionRules(file: SeamSelectionRulesFile): string {
@@ -166,7 +200,9 @@ export function setSeamSelectionRule(input: {
   };
   const rules = file.rules.filter((existing) => existing.rule_id !== rule.rule_id);
   rules.push(rule);
-  return { rule, path: saveSeamSelectionRules({ ...file, rules }) };
+  const saved = saveSeamSelectionRules({ ...file, rules });
+  recordRuleChange(`set:${rule.seam}/${rule.rule_id}`, { rule });
+  return { rule, path: saved };
 }
 
 export function removeSeamSelectionRule(ruleId: string): boolean {
@@ -174,6 +210,7 @@ export function removeSeamSelectionRule(ruleId: string): boolean {
   const rules = file.rules.filter((rule) => rule.rule_id !== ruleId);
   if (rules.length === file.rules.length) return false;
   saveSeamSelectionRules({ ...file, rules });
+  recordRuleChange(`remove:${ruleId}`, { rule_id: ruleId });
   return true;
 }
 
@@ -201,5 +238,11 @@ export function setSeamTraitOverrides(input: {
     };
   }
   overrides[input.seam] = seamOverrides;
-  return saveSeamSelectionRules({ ...file, trait_overrides: overrides });
+  const saved = saveSeamSelectionRules({ ...file, trait_overrides: overrides });
+  recordRuleChange(`measured-traits:${input.seam}`, {
+    seam: input.seam,
+    values: input.values,
+    evidence: input.evidence,
+  });
+  return saved;
 }
