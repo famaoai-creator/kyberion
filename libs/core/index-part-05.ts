@@ -22,6 +22,8 @@ export * from './judgment-calibration-fit.js';
 
 export * from './judgment-callsite-eval.js';
 
+export * from './task-routing-judgment.js';
+
 export * from './plugin-source-trust.js';
 
 export * from './plugin-managed-install.js';
