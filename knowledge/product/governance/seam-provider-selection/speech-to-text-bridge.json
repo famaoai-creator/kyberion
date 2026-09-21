@@ -5,6 +5,7 @@
     {
       "seam_id": "speech-to-text-bridge",
       "default_provider": "whisperkit-cli",
+      "fallback_purpose": "accuracy",
       "traits": {
         "accuracy": "Transcript quality on multilingual (incl. Japanese) meeting and requirements audio.",
         "latency": "Wall-clock from audio file to transcript (model warm-up included).",

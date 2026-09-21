@@ -1,0 +1,80 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "voice.vad-backend",
+      "default_provider": "energy",
+      "traits": {
+        "accuracy": "Speech / non-speech discrimination under background noise (fewer false endpoints and false barge-ins).",
+        "latency": "Delay between audio arriving and the speech decision (subprocess bridges decide one chunk late by design).",
+        "footprint": "CPU, memory and setup cost: no subprocess, no model file, no extra Python package."
+      },
+      "providers": {
+        "energy": {
+          "traits": {
+            "accuracy": 0.4,
+            "latency": 1,
+            "footprint": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "footprint": "declared"
+          },
+          "evidence": [
+            "libs/core/voice-activity-detector.ts (EnergyVad: RMS threshold per 16-bit PCM frame, 'replace before high-noise environments')",
+            "libs/core/vad-registry.ts (built in, always available)"
+          ]
+        },
+        "silero": {
+          "traits": {
+            "accuracy": 0.85,
+            "latency": 0.7,
+            "footprint": 0.4
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "footprint": "declared"
+          },
+          "evidence": [
+            "libs/core/silero-vad-bridge.ts (neural VAD over an onnxruntime Python subprocess; one chunk late; needs KYBERION_SILERO_VAD_MODEL)"
+          ]
+        },
+        "ten_vad": {
+          "traits": {
+            "accuracy": 0.85,
+            "latency": 0.75,
+            "footprint": 0.45
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "footprint": "declared"
+          },
+          "evidence": [
+            "libs/core/ten-vad-bridge.ts (upstream TEN VAD Python binding over NDJSON; one chunk late; needs the ten_vad package)",
+            "Upstream TEN VAD README claims lower latency than Silero at comparable precision (not measured locally)"
+          ]
+        }
+      },
+      "purposes": {
+        "accuracy": {
+          "description": "Noisy rooms, meetings and barge-in, where false endpoints or false interruptions cost more than a little latency.",
+          "weights": {
+            "accuracy": 0.8,
+            "latency": 0.2
+          }
+        },
+        "light": {
+          "description": "Quiet single-speaker use or constrained machines: the cheapest detector that responds immediately.",
+          "weights": {
+            "footprint": 0.6,
+            "latency": 0.4
+          }
+        }
+      }
+    }
+  ]
+}

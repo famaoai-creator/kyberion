@@ -249,10 +249,12 @@ function sttCandidates(availability: VoiceSttAvailability): VoiceSttSelectionCan
 export function getVoiceSelectionSnapshot(): VoiceSelectionSnapshot {
   const preferences = getPreferences();
   const availability = resolveSttAvailability();
+  // Display only: the voice-hub listen path records the decision it acts on.
   const selectedOrder = resolveVoiceSttBackendOrder(
     preferences.stt_backend,
     availability,
-    process.env
+    process.env,
+    { record: false }
   );
   const engines = listVoiceEngines('active')
     .filter((engine) => {
