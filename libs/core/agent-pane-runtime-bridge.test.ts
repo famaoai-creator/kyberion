@@ -6,6 +6,7 @@ import {
 } from './agent-pane-runtime-bridge.js';
 import {
   extractPaneAssistantText,
+  HerdrAgentPaneRuntimeBridge,
   HerdrRuntimeClient,
   mapProviderToHerdrKind,
   registerHerdrAgentPaneRuntimeBridge,
@@ -188,5 +189,94 @@ describe('agent-pane-runtime herdr provider', () => {
     const ensured = client.ensureWorkspace({ cwd: '/tmp/repo', label: 'kyberion' });
     expect(ensured.created).toBe(true);
     expect(ensured.root_pane.pane_id).toBe('w9:p1');
+  });
+});
+
+/**
+ * A mid-turn user-ask must never come back as the agent's answer.
+ *
+ * `herdr agent prompt --wait` returns as soon as an agent is `blocked`, and
+ * the adapter used to read the screen at that point and return whatever was
+ * on it — so "Allow edits to this file? (y/n)" was handed to dispatch as
+ * completed work.
+ */
+describe('pane adapter: an agent that stops to ask is not finished', () => {
+  function fakeHerdr(opts: { status: string; screen: string }) {
+    const exec = vi.fn((_command: string, args: string[] = []) => {
+      const joined = args.join(' ');
+      const ok = (result: unknown) => ({
+        status: 0,
+        stdout: JSON.stringify({ result }),
+        stderr: '',
+      });
+      if (joined.startsWith('workspace list')) {
+        return ok({ workspaces: [{ workspace_id: 'w9', label: 'kyberion', pane_count: 1 }] });
+      }
+      if (joined.startsWith('workspace create') || joined.startsWith('workspace ensure')) {
+        return ok({
+          workspace: { workspace_id: 'w9', label: 'kyberion' },
+          root_pane: { pane_id: 'w9:p1', workspace_id: 'w9' },
+        });
+      }
+      if (joined.startsWith('pane list')) {
+        return ok({ panes: [{ pane_id: 'w9:p1', workspace_id: 'w9' }] });
+      }
+      if (joined.startsWith('agent list')) return ok({ agents: [] });
+      if (joined.startsWith('agent start')) {
+        return ok({
+          agent: { name: 'worker', agent_status: 'idle', pane_id: 'w9:p1', workspace_id: 'w9' },
+        });
+      }
+      if (joined.startsWith('agent read')) {
+        return { status: 0, stdout: opts.screen, stderr: '' };
+      }
+      if (joined.startsWith('agent prompt')) {
+        return ok({
+          agent: {
+            name: 'worker',
+            agent_status: opts.status,
+            pane_id: 'w9:p1',
+            workspace_id: 'w9',
+          },
+        });
+      }
+      return ok({});
+    });
+    return exec;
+  }
+
+  const adapterFor = (exec: ReturnType<typeof fakeHerdr>) =>
+    new HerdrAgentPaneRuntimeBridge({ exec: exec as never }).createAdapter({
+      agentId: 'worker',
+      provider: 'claude',
+      cwd: '/tmp/repo',
+    });
+
+  it('refuses when herdr itself reports the agent blocked', async () => {
+    const exec = fakeHerdr({
+      status: 'blocked',
+      screen: '● Edit(src/app.ts)\n  Do you want to make this edit?\n  ❯ 1. Yes\n    2. No',
+    });
+    await expect(adapterFor(exec).ask('update the header')).rejects.toThrow(
+      /AGENT_RUNTIME_AWAITING_HUMAN/
+    );
+  });
+
+  it('refuses when the screen shows a prompt herdr reported as idle', async () => {
+    // What an agent on a first-run trust prompt looked like from outside.
+    const exec = fakeHerdr({
+      status: 'idle',
+      screen: 'Do you trust the contents of this project?\n> Yes, I trust this folder\n  No, exit',
+    });
+    await expect(adapterFor(exec).ask('update the header')).rejects.toThrow(/trust the contents/i);
+  });
+
+  it('still returns a genuine answer', async () => {
+    const exec = fakeHerdr({
+      status: 'done',
+      screen: '> update the header\n\n● Updated the header in src/app.ts.\n\n❯ \n',
+    });
+    const response = await adapterFor(exec).ask('update the header');
+    expect(response.text).toMatch(/Updated the header/);
   });
 });
