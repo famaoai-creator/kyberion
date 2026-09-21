@@ -1,0 +1,86 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "streaming-tts-bridge",
+      "default_provider": "stub",
+      "fallback_purpose": "privacy",
+      "traits": {
+        "naturalness": "How human the streamed speech sounds for the languages the bridge declares.",
+        "latency": "Time from the first text segment to the first audio chunk.",
+        "privacy": "Confidence that the text never leaves the machine."
+      },
+      "providers": {
+        "stub": {
+          "traits": {
+            "naturalness": 0,
+            "latency": 1,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/streaming-tts-bridge.ts (StubStreamingTextToSpeechBridge: synthetic bytes, no real speech; eligible only when synthetic output is allowed)"
+          ]
+        },
+        "gemini": {
+          "traits": {
+            "naturalness": 0.9,
+            "latency": 0.3,
+            "privacy": 0
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/streaming-tts-bridge.ts (GeminiStreamingTextToSpeechBridge: buffers the whole prompt, cloud Gemini generate_tts)"
+          ]
+        },
+        "shell": {
+          "traits": {
+            "naturalness": 0.5,
+            "latency": 0.7,
+            "privacy": 0.3
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/shell-streaming-tts-bridge.ts (operator command from KYBERION_TTS_COMMAND, e.g. piper; may be a cloud CLI, so privacy is kept low unless declared local)"
+          ]
+        }
+      },
+      "purposes": {
+        "naturalness": {
+          "description": "Meetings and conversations where the voice quality matters most.",
+          "weights": {
+            "naturalness": 1
+          }
+        },
+        "latency": {
+          "description": "Turn-taking where the first audio chunk must arrive quickly.",
+          "weights": {
+            "latency": 0.8,
+            "naturalness": 0.2
+          }
+        },
+        "privacy": {
+          "description": "Sensitive conversations: prefer bridges that keep text on the machine. Also the fallback when the default bridge cannot run the task.",
+          "weights": {
+            "privacy": 0.6,
+            "naturalness": 0.3,
+            "latency": 0.1
+          }
+        }
+      }
+    }
+  ]
+}

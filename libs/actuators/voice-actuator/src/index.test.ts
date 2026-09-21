@@ -391,10 +391,23 @@ vi.mock('@agent/core/virtual-device-inventory-bridge', () => ({
 vi.mock('@agent/core/voice-path-policy', () => ({
   resolveVoicePath: vi.fn((value: string) => value),
 }));
-vi.mock('@agent/core/voice-engine-registry', () => ({
-  getVoiceEngineRecord: mocks.getVoiceEngineRecord,
-  getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
-  resolveVoiceEngineForPlatform: mocks.resolveVoiceEngineForPlatform,
+vi.mock('@agent/core/voice-engine-registry', async () => {
+  // Pure selection helpers stay real; registry reads stay doubled.
+  const actual = await vi.importActual<typeof import('@agent/core/voice-engine-registry')>(
+    '@agent/core/voice-engine-registry'
+  );
+  return {
+    ...actual,
+    getVoiceEngineRecord: mocks.getVoiceEngineRecord,
+    getVoiceEngineRegistry: mocks.getVoiceEngineRegistry,
+    resolveVoiceEngineForPlatform: mocks.resolveVoiceEngineForPlatform,
+  };
+});
+// No operator seam-selection rules in unit tests (hermetic).
+vi.mock('@agent/core/seam-selection-rules', () => ({
+  hasSeamSelectionRules: vi.fn(() => false),
+  matchSeamSelectionRule: vi.fn(() => null),
+  getSeamTraitOverrides: vi.fn(() => ({})),
 }));
 vi.mock('@agent/core/media-backend-registry', () => ({
   resolveVoiceBackend: vi.fn(() => ({
