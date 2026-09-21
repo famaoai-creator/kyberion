@@ -118,6 +118,13 @@ pnpm kyberion setup report --persona first-time-user
   `.env.local` の `KYBERION_REASONING_BACKEND` に保存される。
 - **外部サービス**: `pnpm services:setup` で必要な secret と接続の置き場を確認する。実行直前の
   可否は `pnpm service:preflight -- --service <service-id>` で確かめる。
+- **secret の登録**: API key などの値は `pnpm kyberion secret introduce <service-id> <secret-key>` で
+  入れる。値は argv では受け付けず、TTY の非表示プロンプトか `active/shared/tmp/` 配下の
+  `--from-file` から読む。ローカルで自動承認されない場合は、表示された
+  `pnpm kyberion approve <approval-id>` の後に `pnpm kyberion secret apply <approval-id> --from-file <path>`
+  で適用する。登録状況は `pnpm kyberion secret status <service-id>` で確認する。GUI では
+  concierge の `/settings` →「サービス連携」から同じ二段階の流れで登録できる。接続 JSON や
+  `.env` に値を直接書かない。
 - **機能ごとの依存**: `pnpm deps:check --actuator <browser|voice|media-generation>`。
   lightpanda などの system tool は `pnpm tool:setup -- --list` で確認し、`--apply` で導入する。
 
@@ -155,7 +162,7 @@ GUI では concierge の `/settings` を開く（旧 `/setup` と `/onboarding` 
 | -------------- | --------------------------------------------------- |
 | あなたのこと   | 名前、言語、対話スタイル、vision（identity の保存） |
 | 組織とメンバー | メンバーと承認者、責任を持つ agent                  |
-| サービス連携   | 外部サービスの接続                                  |
+| サービス連携   | 外部サービスの接続と secret の登録                  |
 | 声と話し方     | 音声と話し方                                        |
 | 通知           | 通知の受け取り方                                    |
 | 拡張機能       | プラグインの承認                                    |
