@@ -94,6 +94,7 @@
 - [Kyberion Surface UX Architecture](./product/architecture/kyberion-surface-ux-architecture.md) (public | Ecosystem Architect)
 - [Kyberion コンセプト評価と実装改善計画](./product/architecture/kyberion-concept-evaluation-2026-04-26.md) (public | Codex)
 - [LLM Execution Boundary](./product/architecture/llm-execution-boundary.md) (public | Unknown)
+- [Lightpanda as a Browser Automation Runtime Provider — Evaluation](./product/architecture/lightpanda-browser-runtime-evaluation.md) (public | ecosystem_architect)
 - [Loop Closure Machinery — 4つの自己改善ループの実装地図](./product/architecture/loop-closure-machinery.md) (public | Unknown)
 - [MCP Facade Model (Inbound Tools, Skills, Actuators)](./product/architecture/mcp-facade-model.md) (public | Ecosystem Architect)
 - [Management Control Plane](./product/architecture/management-control-plane.md) (public | Ecosystem Architect)

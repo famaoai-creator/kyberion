@@ -529,6 +529,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/lightpanda-browser-runtime-evaluation.md",
+      "tier": "public",
+      "size": 4982,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/llm-execution-boundary.md",
       "tier": "public",
       "size": 4835,
@@ -873,7 +879,7 @@
     {
       "path": "product/architecture/tool-runtime-abstraction.md",
       "tier": "public",
-      "size": 4634,
+      "size": 5871,
       "type": "md"
     },
     {
@@ -1527,7 +1533,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 138726,
+      "size": 139082,
       "type": "json"
     },
     {
@@ -3819,13 +3825,19 @@
     {
       "path": "product/governance/tool-runtimes/index.json",
       "tier": "public",
-      "size": 503,
+      "size": 521,
       "type": "json"
     },
     {
       "path": "product/governance/tool-runtimes/kokoro_tts.json",
       "tier": "public",
       "size": 1188,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/tool-runtimes/lightpanda.json",
+      "tier": "public",
+      "size": 2728,
       "type": "json"
     },
     {
@@ -11337,7 +11349,7 @@
     {
       "path": "product/schemas/tool-runtime-registry.schema.json",
       "tier": "public",
-      "size": 4406,
+      "size": 5365,
       "type": "json"
     },
     {

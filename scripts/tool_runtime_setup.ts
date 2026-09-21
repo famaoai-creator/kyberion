@@ -7,16 +7,27 @@
  *   pnpm tool:setup -- --tool herdr --apply
  *   pnpm tool:setup -- --tools herdr,imagesnap,blackhole-2ch --apply
  *   pnpm tool:setup -- --list
+ *
+ * Tools that declare a `managed_binary` (e.g. lightpanda) install the
+ * checksum-pinned upstream release into their managed env first; the
+ * package-manager `install_backend` is only the fallback for hosts without a
+ * matching artifact.
  */
 
+import { createHash } from 'node:crypto';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { secureFetch } from '@agent/core/network';
 import {
+  findInstalledManagedBinary,
+  getToolRuntimeRecord,
   listToolRuntimes,
   markToolRuntimeInstalled,
   probeToolRuntime,
+  resolveManagedBinaryArtifact,
+  resolveManagedBinaryPath,
 } from '@agent/core/tool-runtime-registry';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExecResult } from '@agent/core/secure-io';
+import { safeChmodSync, safeExecResult, safeMoveSync, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DEFAULT_TOOLS = ['herdr', 'imagesnap', 'blackhole-2ch'] as const;
@@ -49,7 +60,8 @@ function isBinaryHealthy(toolId: string): boolean {
   const trial = probeToolRuntime(toolId, 'trial');
   const backend = trial.trial_backend;
   if (!backend) return false;
-  const result = safeExecResult(backend.command, backend.args || [], {
+  const command = findInstalledManagedBinary(toolId) ?? backend.command;
+  const result = safeExecResult(command, backend.args || [], {
     cwd: pathResolver.rootDir(),
     timeoutMs: 15_000,
     maxOutputMB: 2,
@@ -79,7 +91,7 @@ function inspectTool(toolId: string): SetupRow {
       selected_action: resolution.selected_action,
       installed: true,
       requires_install: false,
-      command: resolution.trial_backend.command,
+      command: findInstalledManagedBinary(toolId) ?? resolution.trial_backend.command,
       detail: `${resolution.tool.display_name} is available (${resolution.reason}).`,
     };
   }
@@ -106,6 +118,64 @@ function inspectTool(toolId: string): SetupRow {
     command:
       `${resolution.install_backend.command} ${(resolution.install_backend.args || []).join(' ')}`.trim(),
     detail: resolution.install_backend.description || resolution.reason,
+  };
+}
+
+async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
+  const artifact = resolveManagedBinaryArtifact(toolId);
+  const target = resolveManagedBinaryPath(toolId);
+  if (!artifact || !target) return null;
+  const record = getToolRuntimeRecord(toolId);
+  const version = record.managed_binary?.version ?? 'unknown';
+  if (isBinaryHealthy(toolId) && findInstalledManagedBinary(toolId)) {
+    return {
+      tool_id: toolId,
+      display_name: record.display_name,
+      status: 'ready',
+      selected_action: 'run_installed',
+      installed: true,
+      requires_install: false,
+      command: target,
+      detail: `${record.display_name} ${version} is already in the managed env.`,
+    };
+  }
+
+  const payload = await secureFetch<ArrayBuffer>({
+    url: artifact.url,
+    method: 'GET',
+    responseType: 'arraybuffer',
+    timeout: 600_000,
+  });
+  const data = Buffer.from(payload);
+  const digest = createHash('sha256').update(data).digest('hex');
+  if (digest !== artifact.sha256) {
+    throw new Error(
+      `managed_binary checksum mismatch for ${toolId} ${version}: expected ${artifact.sha256}, got ${digest}`
+    );
+  }
+  const staging = `${target}.download`;
+  safeWriteFile(staging, data);
+  safeChmodSync(staging, 0o755);
+  safeMoveSync(staging, target);
+
+  markToolRuntimeInstalled(toolId, {
+    action: 'tool_runtime_setup',
+    command: target,
+    args: [],
+    notes: `managed_binary ${version} sha256:${digest} from ${artifact.url}`,
+  });
+  const healthy = isBinaryHealthy(toolId);
+  return {
+    tool_id: toolId,
+    display_name: record.display_name,
+    status: healthy ? 'ready' : 'needs_install',
+    selected_action: 'run_installed',
+    installed: healthy,
+    requires_install: !healthy,
+    command: target,
+    detail: healthy
+      ? `Installed ${record.display_name} ${version} into the managed env (sha256 verified).`
+      : `Downloaded ${record.display_name} ${version} but the trial probe fails for ${target}.`,
   };
 }
 
@@ -202,7 +272,7 @@ function scriptUserArgs(argv: readonly string[]): string[] {
 export const runToolRuntimeSetup = defineScript({
   name: 'tool-runtime-setup',
   flags: [],
-  run(context) {
+  async run(context) {
     const argv = createStandardYargs([
       'node',
       'tool_runtime_setup',
@@ -253,7 +323,11 @@ export const runToolRuntimeSetup = defineScript({
 
     const rows: SetupRow[] = [];
     for (const toolId of toolIds) {
-      rows.push(argv.apply ? installTool(toolId) : inspectTool(toolId));
+      if (!argv.apply) {
+        rows.push(inspectTool(toolId));
+        continue;
+      }
+      rows.push((await installManagedBinary(toolId)) ?? installTool(toolId));
     }
 
     const report = {
