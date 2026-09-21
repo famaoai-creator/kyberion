@@ -4,7 +4,12 @@
  * before a browser is launched instead of mid-run.
  */
 
-import type { BrowserAutomationRuntimeCapabilities } from '@agent/core/browser-automation-runtime-bridge';
+import {
+  getBrowserAutomationRuntimeCapabilities,
+  resolveBrowserAutomationRuntime,
+  type BrowserAutomationRuntimeCapabilities,
+} from '@agent/core/browser-automation-runtime-bridge';
+import { logger } from '@agent/core/core';
 import { isRecord } from '@agent/core/foundation';
 
 type Capability = keyof BrowserAutomationRuntimeCapabilities;
@@ -101,4 +106,59 @@ export function formatBrowserRuntimePreflightError(
     `[BROWSER_RUNTIME_UNSUPPORTED] browser_runtime '${runtimeId}' cannot run this pipeline: ` +
     `${parts.join(', ')}. Use the default Chromium runtime for these steps.`
   );
+}
+
+/**
+ * Namespace a session id for a non-default runtime: `lightpanda--checkout`.
+ * The default runtime keeps bare ids (existing sessions stay addressable) and
+ * an already-scoped id is returned unchanged, so callers may echo back the
+ * `session_id` a previous run reported.
+ */
+export function scopeBrowserSessionId(
+  sessionId: string,
+  runtimeId: string,
+  defaultRuntimeId: string
+): string {
+  const base = String(sessionId || 'default');
+  if (runtimeId === defaultRuntimeId) return base;
+  const prefix = `${runtimeId}--`;
+  return base.startsWith(prefix) ? base : `${prefix}${base}`;
+}
+
+/**
+ * Reject pipelines the selected browser runtime cannot run before anything is
+ * launched; host-default extras it cannot provide (video) are dropped.
+ * Non-default runtimes get their own session namespace
+ * (`<runtime>--<session_id>`) so leases, profiles, metadata and evidence never
+ * collide with a Chromium session of the same name.
+ */
+export function preflightAutomationRuntime(
+  steps: unknown,
+  sessionId: string,
+  options: Record<string, any>
+): { sessionId: string; options: Record<string, any> } {
+  const runtime = resolveBrowserAutomationRuntime(options.browser_runtime);
+  const scopedSessionId = scopeBrowserSessionId(
+    sessionId,
+    runtime.bridge_id,
+    resolveBrowserAutomationRuntime().bridge_id
+  );
+  const { blocking, degraded } = preflightBrowserRuntimePipeline(
+    steps,
+    options,
+    getBrowserAutomationRuntimeCapabilities(runtime)
+  );
+  if (blocking.length > 0) {
+    throw new Error(formatBrowserRuntimePreflightError(runtime.bridge_id, blocking));
+  }
+  if (degraded.length === 0) return { sessionId: scopedSessionId, options };
+  const adjusted = { ...options };
+  for (const issue of degraded) {
+    if (!issue.option) continue;
+    logger.warn(
+      `[BROWSER] browser_runtime '${runtime.bridge_id}' lacks ${issue.capability}; ignoring option '${issue.option}'.`
+    );
+    adjusted[issue.option] = false;
+  }
+  return { sessionId: scopedSessionId, options: adjusted };
 }

@@ -509,7 +509,7 @@ export function createBrowserInteractionHelpers(deps: {
     );
     const ctx = (result as any).context || {};
     deps.emitComputerSurfacePatch({
-      sessionId: browserAction.session_id || 'default',
+      sessionId: ctx.session_id || browserAction.session_id || 'default',
       executor: 'browser',
       status: String((result as any).status || 'unknown'),
       latestAction: input.action.type,

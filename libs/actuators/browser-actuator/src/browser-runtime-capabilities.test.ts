@@ -3,6 +3,7 @@ import { FULL_BROWSER_AUTOMATION_RUNTIME_CAPABILITIES } from '@agent/core/browse
 import {
   formatBrowserRuntimePreflightError,
   preflightBrowserRuntimePipeline,
+  scopeBrowserSessionId,
 } from './browser-runtime-capabilities.js';
 import { LIGHTPANDA_CAPABILITIES } from './browser-automation-runtime-lightpanda.js';
 
@@ -72,5 +73,15 @@ describe('browser runtime capability preflight', () => {
       'profile_directory',
     ]);
     expect(degraded).toEqual([{ option: 'record_video', capability: 'video_recording' }]);
+  });
+
+  it('namespaces session ids for non-default runtimes only, idempotently', () => {
+    const DEFAULT = 'playwright-chromium';
+    expect(scopeBrowserSessionId('checkout', DEFAULT, DEFAULT)).toBe('checkout');
+    expect(scopeBrowserSessionId('checkout', 'lightpanda', DEFAULT)).toBe('lightpanda--checkout');
+    expect(scopeBrowserSessionId('lightpanda--checkout', 'lightpanda', DEFAULT)).toBe(
+      'lightpanda--checkout'
+    );
+    expect(scopeBrowserSessionId('', 'lightpanda', DEFAULT)).toBe('lightpanda--default');
   });
 });

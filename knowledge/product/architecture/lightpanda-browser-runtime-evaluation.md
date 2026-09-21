@@ -80,6 +80,12 @@ lightpanda` (also `pnpm kyberion procedure run`). `auto` resolution never
   the context (`keep_alive: false`, `close_session`, lease expiry) closes the
   browser and kills the process; the process is also killed on Node exit, so
   sessions are not reattached across processes.
+- **Session namespace.** Non-default runtimes scope the session id as
+  `<runtime>--<session_id>` (e.g. `lightpanda--checkout`), so leases, the
+  per-session runtime dir, session metadata, action trails and evidence file
+  names never collide with a Chromium session of the same name. The default
+  runtime keeps bare ids, and an already-scoped id is used as-is, so callers
+  can pass back the `session_id` a run reported.
 - **Fail fast.** `preflightBrowserRuntimePipeline`
   (`browser-runtime-capabilities.ts`) scans every step, including nested
   control flow, before launch: tab ops, `screenshot`, passkey ops,
