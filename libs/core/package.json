@@ -1375,6 +1375,14 @@
       "types": "./dist/secret-bridge.d.ts",
       "default": "./dist/secret-bridge.js"
     },
+    "./secret-identity": {
+      "types": "./dist/secret-identity.d.ts",
+      "default": "./dist/secret-identity.js"
+    },
+    "./secret-introduction": {
+      "types": "./dist/secret-introduction.d.ts",
+      "default": "./dist/secret-introduction.js"
+    },
     "./service-binding-registry": {
       "types": "./dist/service-binding-registry.d.ts",
       "default": "./dist/service-binding-registry.js"

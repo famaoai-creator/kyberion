@@ -234,11 +234,13 @@ See [CAPABILITIES_GUIDE.md](../../../../CAPABILITIES_GUIDE.md) for the full actu
 
 ## Setup
 
-Register any required secrets via \`secret:set\` before running:
+Register any required secrets via \`pnpm kyberion secret introduce\` (never paste values into ADF):
 
-\`\`\`json
-{ "op": "secret:set", "params": { "key": "${envName}_API_KEY", "value": "your-key-here" } }
 \`\`\`
+pnpm kyberion secret introduce <serviceId> API_KEY --reason "Enable ${envName}"
+\`\`\`
+
+Keychain identity: service=\`<serviceId>\`, account=\`api_key\` (see secret-introduction-model).
 `;
 }
 
