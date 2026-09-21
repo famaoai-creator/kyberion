@@ -436,7 +436,7 @@ export function hasBoundApproval(step: PipelineAdfStep, ctx: Record<string, unkn
   try {
     const request = loadApprovalRequest(decision.storage_channel, decision.approval_request_id);
     return (
-      request?.status === 'approved' &&
+      (request?.status === 'approved' || request?.status === 'applied') &&
       request.requestedByContext?.stepId === decision.step_id &&
       request.requestedByContext?.targetStepId === step.id
     );
