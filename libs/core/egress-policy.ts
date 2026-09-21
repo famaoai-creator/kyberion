@@ -7,7 +7,10 @@ import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { getActiveSandboxPolicy } from './sandbox-policy.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
-import { providerEndpointDomains } from './provider-egress-gate.js';
+import {
+  _resetProviderEndpointDomainsForTests,
+  providerEndpointDomains,
+} from './provider-endpoint-domains.js';
 
 export type EgressPolicyMode = 'warn' | 'enforce';
 
@@ -88,6 +91,7 @@ export function _resetEgressPolicyCacheForTests(): void {
   cachedAllowedDomains = null;
   policyCatalog.reset();
   securityPolicyCatalog.reset();
+  _resetProviderEndpointDomainsForTests();
 }
 
 /**

@@ -4,7 +4,7 @@
  * provider for a tenant silently stops covering the host it really calls.
  */
 import { describe, expect, it } from 'vitest';
-import { providerEndpointDomains } from './provider-egress-gate.js';
+import { providerEndpointDomains } from './provider-endpoint-domains.js';
 import { reasoningBackendEndpoint } from './reasoning-egress-scope.js';
 
 const BACKEND_PROVIDER: Record<string, string> = {

@@ -3110,6 +3110,22 @@
     "./training-catalog": {
       "types": "./dist/training-catalog.d.ts",
       "default": "./dist/training-catalog.js"
+    },
+    "./agent-prompt-approval": {
+      "types": "./dist/agent-prompt-approval.d.ts",
+      "default": "./dist/agent-prompt-approval.js"
+    },
+    "./agent-prompt-approval-port": {
+      "types": "./dist/agent-prompt-approval-port.d.ts",
+      "default": "./dist/agent-prompt-approval-port.js"
+    },
+    "./agent-prompt-response": {
+      "types": "./dist/agent-prompt-response.d.ts",
+      "default": "./dist/agent-prompt-response.js"
+    },
+    "./provider-endpoint-domains": {
+      "types": "./dist/provider-endpoint-domains.d.ts",
+      "default": "./dist/provider-endpoint-domains.js"
     }
   },
   "dependencies": {

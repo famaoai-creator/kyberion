@@ -14,6 +14,12 @@ import {
 } from './laya-mlx-judgment-backend.js';
 import { registerOrganizationWorkJudgment } from './organization-operating-model-persistence.js';
 
+/** What the backend writes to the worker, as far as these tests read it. */
+type SentJudgment = {
+  state: string;
+  questions: Record<string, { type: string; criteria: Record<string, string> }>;
+};
+
 const QUESTION: JudgmentQuestion = {
   kind: 'choice',
   id: 'organization.work_shape',
@@ -66,7 +72,7 @@ describe('laya-mlx judgment provider', () => {
       tier: 'personal',
     });
 
-    const payload = sent[0] as any;
+    const payload = sent[0] as SentJudgment;
     expect(payload.state).toBe('APIが落ちてます緊急で見てほしい');
     expect(payload.questions['organization.work_shape'].type).toBe('choice');
     // The measured difference between 1/6 and 6/6 on this model.
@@ -91,7 +97,7 @@ describe('laya-mlx judgment provider', () => {
       questions: [{ kind: 'choice', id: 'organization.work_shape', options: ['a', 'b'] }],
       tier: 'personal',
     });
-    expect((sent[0] as any).questions['organization.work_shape'].criteria).toEqual({
+    expect((sent[0] as SentJudgment).questions['organization.work_shape'].criteria).toEqual({
       a: 'a',
       b: 'b',
     });

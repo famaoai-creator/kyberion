@@ -22,6 +22,8 @@ import { discoverProviders } from '@agent/core/provider-discovery';
 // `getA2ARoute()` is undefined and every agent_runtime dispatch fails with
 // "has no A2A/runtime route" — the surface is selectable but unreachable.
 import '@agent/core/a2a-bridge';
+// Lets pane agents escalate prompts they stop on as approval requests.
+import '@agent/core/agent-prompt-approval';
 import { discoverReasoningEndpoints } from '@agent/core/reasoning-endpoint-discovery';
 import {
   getInstalledReasoningMode,
