@@ -80,7 +80,23 @@ export interface ClassifyErrorAssistedOptions {
   tenantSlug?: string;
   minConfidence?: number;
   timeoutMs?: number;
-  /** Refuse any provider without a fit. Off by default; nothing is fitted yet. */
+  /**
+   * Whether to require a fitted provider. **Defaults to true here**, unlike
+   * the other call sites, and the reason is measured.
+   *
+   * Laya scores 6/6 classifying Japanese work requests and 1/5 on this
+   * repository's error taxonomy — a 322M multilingual encoder has not seen
+   * infrastructure vocabulary. Worse, it called
+   * `[RESOURCE_PATH_SCOPE] resource path is outside the repository root`
+   * a `resource_unavailable` **at 0.998** when it is a `permission_denied`.
+   *
+   * A confidence floor cannot catch that. `assistWithJudgment` protects
+   * against a judgment that is absent, weak, slow or broken; it does not
+   * protect against one that is confidently wrong. The only guard that does
+   * is requiring a fit, because a fit is evidence the provider's confidence
+   * tracks its correctness *on this question*. Until one exists this path is
+   * inert, which is the correct state and not a limitation to route around.
+   */
   requireCalibrated?: boolean;
 }
 
@@ -109,7 +125,8 @@ export async function classifyErrorAssisted(
     ...(options.tenantSlug ? { tenantSlug: options.tenantSlug } : {}),
     ...(options.minConfidence !== undefined ? { minConfidence: options.minConfidence } : {}),
     ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
-    ...(options.requireCalibrated ? { requireCalibrated: true } : {}),
+    // Opt-out rather than opt-in; see the option's documentation.
+    requireCalibrated: options.requireCalibrated !== false,
     label: ERROR_CATEGORY_QUESTION,
     accept(answers, current) {
       const answer = choiceAnswer(answers, ERROR_CATEGORY_QUESTION);
