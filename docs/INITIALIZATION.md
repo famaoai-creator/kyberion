@@ -144,6 +144,12 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
   - `voice` / `meeting` のように bridge health を持つもの
   - `google-workspace` のように auth と CLI health を合わせて見たいもの
   - `media-generation` のようにローカル runtime に依存するもの。ComfyUI などの runtime に到達できるかを確かめる入口です。失敗した場合は ComfyUI の起動、プロビジョニング、接続先を確認してください。
+- **secret の登録**: `services:setup` で不足と出た secret は、`pnpm kyberion secret introduce <service-id> <secret-key>` で登録します。
+  - 値は argv では受け付けません。TTY の非表示プロンプトで入力するか、`active/shared/tmp/` 配下のファイルを `--from-file <path>` で渡します。
+  - 提案（propose）と適用（apply）の二段階です。ローカルで自動承認された場合はそのまま適用されます。承認待ちになった場合は、表示に従って `pnpm kyberion approve <approval-id>` の後に `pnpm kyberion secret apply <approval-id> --from-file <path>` を実行します。自動承認を使わない場合は `--no-auto-approve` を付けます。
+  - 登録状況は `pnpm kyberion secret status <service-id>` で確認します。値は表示されません。
+  - GUI では concierge の `/settings` →「サービス連携」から同じ流れで登録できます。
+  - 接続 JSON や `.env` に値を直接書かないでください。
 
 #### 4c. Reasoning Backend Setup
 
