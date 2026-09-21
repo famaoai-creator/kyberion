@@ -31,6 +31,10 @@
       "egress": "external-api",
       "training_use": "unknown"
     },
+    "laya-mlx": {
+      "egress": "local-only",
+      "training_use": "none"
+    },
     "cursor": {
       "egress": "external-api",
       "training_use": "unknown"

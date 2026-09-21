@@ -24,6 +24,7 @@
     "vllm",
     "llamacpp",
     "mlx_lm",
+    "laya_mlx",
     "localai",
     "ffprobe",
     "adb",

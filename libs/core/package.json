@@ -2903,6 +2903,10 @@
       "types": "./dist/typesafe-jev-judgment-backend.d.ts",
       "default": "./dist/typesafe-jev-judgment-backend.js"
     },
+    "./laya-mlx-judgment-backend": {
+      "types": "./dist/laya-mlx-judgment-backend.d.ts",
+      "default": "./dist/laya-mlx-judgment-backend.js"
+    },
     "./tool-call-scheduler": {
       "types": "./dist/tool-call-scheduler.d.ts",
       "default": "./dist/tool-call-scheduler.js"

@@ -143,15 +143,55 @@ better one, and the raw count inverts the ranking.
    `judgment-calibration.json`. Until then it reports `calibrated: false`,
    which is correct and does not stop it being used.
 
+## Criteria text is not optional in practice
+
+`JudgmentQuestion.optionDescriptions` is typed optional and behaves like it is
+required. Asked with bare identifiers (`incident_response`,
+`routine_operation`, …), the Laya-MLX provider got **1 of 6** unambiguous
+Japanese requests right. The same six utterances, same model, same threshold,
+with one sentence of description per option: **6 of 6** — better than the
+rules (5/6) and better than Jev (4/6).
+
+An identifier is legible to whoever named it and to nobody else. Write the
+descriptions.
+
+The earlier Jev measurements in this document were taken *before* this was
+understood, with option names passed as their own descriptions, so they
+understate it. Both providers now go through `describeChoiceOptions()`.
+
+## Providers measured so far
+
+| | decisions | silent errors | shape on clear input | determinism | latency | tiers reachable |
+| --- | --- | --- | --- | --- | --- | --- |
+| built-in rules | 11/12 | 1 | 5/6 | total | ~0ms | all |
+| local 4B (generative) | — | — | 3/6 | not measured | 294ms | all |
+| TypeSafe Jev | 10/12 | 0 | 4/6 | **varies between runs** | 235-278ms | public only |
+| Laya-MLX | 9/12 | 1 | **6/6** | **total** | 24ms | **all** |
+
+Read the columns, not the totals. Laya's decision score is the lowest of the
+three model providers while its *classification* is the best: two correct
+answers land at 0.63 and 0.67 and are refused by the 0.7 threshold. That is a
+calibration problem, not a comprehension one — and it is the first such
+problem here worth fixing, because Laya is the first provider whose answers
+do not move between runs.
+
+The rules still win overall and remain the built-in provider. Their single
+miss is the expensive kind: a wrong shape at 0.80, which nobody is asked
+about.
+
 ## Nothing is calibrated yet, deliberately
 
 `judgment-calibration.json` does not exist, so every provider reports
 `calibrated: false`. That is the accurate state, not an oversight.
 
-TypeSafe Jev is the strongest candidate measured so far and is still not
-eligible: its answers move between identical runs, twelve synthetic cases
-over three runs cannot estimate calibration error, and those cases were
-written for the bench rather than drawn from real traffic. A fit needs a
+Laya-MLX is the first eligible candidate and is still not calibrated: twelve
+synthetic cases cannot estimate calibration error, and those cases were
+written for the bench rather than drawn from real traffic. What it does have
+is the precondition — twelve utterances judged five times each returned
+byte-identical choices, confidences and noul values, so a fit would describe
+something stable. TypeSafe Jev does not clear that bar: asked the same
+utterance three times it returned three answers, two of them different
+shapes. A fit needs a
 labelled corpus of real utterances, repeated runs to measure variance, and a
 demonstrated improvement in calibration error.
 
