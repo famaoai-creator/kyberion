@@ -8,6 +8,7 @@
  * an import cycle through the providers it discovers).
  */
 
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
@@ -20,6 +21,7 @@ import {
 } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
+import { withLockSync } from './src/lock-utils.js';
 import type { HealthAwareResolution } from './provider-health-registry.js';
 
 export interface PinnedEntry {
@@ -109,11 +111,32 @@ export function readPinFile(): PinFile {
   return { version: PIN_FILE_VERSION, pins: {} };
 }
 
-export function writePinFile(file: PinFile): void {
+function pinFileLockId(filePath: string): string {
+  return `provider-pins-${createHash('sha256').update(filePath, 'utf8').digest('hex')}`;
+}
+
+function writePinFileUnlocked(file: PinFile): void {
   const filePath = pinFilePath();
+  const validated = providerPinsCatalog.validate(file, filePath);
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(file, null, 2), { encoding: 'utf8' });
+  safeWriteFile(filePath, `${JSON.stringify(validated, null, 2)}\n`, { encoding: 'utf8' });
+  providerPinsCatalog.reset();
+}
+
+export function writePinFile(file: PinFile): void {
+  const filePath = pinFilePath();
+  withLockSync(pinFileLockId(filePath), () => writePinFileUnlocked(file));
+}
+
+/** Atomically read, update and validate the complete pin file. */
+export function updatePinFile(mutator: (file: PinFile) => PinFile): PinFile {
+  const filePath = pinFilePath();
+  return withLockSync(pinFileLockId(filePath), () => {
+    const next = mutator(readPinFile());
+    writePinFileUnlocked(next);
+    return next;
+  });
 }
 
 function seamPinKey(seam: string, decisionKey: string): string {
@@ -130,7 +153,6 @@ export function pinSeamProviderDecision(
   providerId: string,
   purpose?: string
 ): SeamPinnedEntry {
-  const file = readPinFile();
   const entry: SeamPinnedEntry = {
     seam,
     provider_id: providerId,
@@ -138,18 +160,19 @@ export function pinSeamProviderDecision(
     pinnedAt: nowIso(),
     by: pinActorId(),
   };
-  file.version = PIN_FILE_VERSION;
-  file.missionId = getRegisteredEnvText('MISSION_ID');
-  file.seam_pins = { ...(file.seam_pins ?? {}), [seamPinKey(seam, decisionKey)]: entry };
-  writePinFile(file);
+  updatePinFile((file) => {
+    file.version = PIN_FILE_VERSION;
+    file.missionId = getRegisteredEnvText('MISSION_ID');
+    file.seam_pins = { ...(file.seam_pins ?? {}), [seamPinKey(seam, decisionKey)]: entry };
+    return file;
+  });
   return entry;
 }
 
 export function unpinSeamProviderDecision(seam: string, decisionKey: string): void {
-  const file = readPinFile();
   const key = seamPinKey(seam, decisionKey);
-  if (file.seam_pins?.[key]) {
-    delete file.seam_pins[key];
-    writePinFile(file);
-  }
+  updatePinFile((file) => {
+    if (file.seam_pins?.[key]) delete file.seam_pins[key];
+    return file;
+  });
 }

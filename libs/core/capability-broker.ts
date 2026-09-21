@@ -3,7 +3,7 @@ import {
   PIN_FILE_VERSION,
   pinActorId as actorId,
   readPinFile,
-  writePinFile,
+  updatePinFile,
   type PinnedEntry,
 } from './provider-pins-store.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
@@ -57,7 +57,6 @@ export function loadPinnedDecision(decisionKey: string): PinnedEntry | null {
 }
 
 export function pinProviderDecision(decisionKey: string, decision: ProviderDecision): PinnedEntry {
-  const file = readPinFile();
   const entry: PinnedEntry = {
     provider: decision.provider,
     modelId: decision.modelId,
@@ -66,19 +65,20 @@ export function pinProviderDecision(decisionKey: string, decision: ProviderDecis
     pinnedAt: nowIso(),
     by: actorId(),
   };
-  file.version = PIN_FILE_VERSION;
-  file.missionId = getRegisteredEnvText('MISSION_ID');
-  file.pins[decisionKey] = entry;
-  writePinFile(file);
+  updatePinFile((file) => {
+    file.version = PIN_FILE_VERSION;
+    file.missionId = getRegisteredEnvText('MISSION_ID');
+    file.pins[decisionKey] = entry;
+    return file;
+  });
   return entry;
 }
 
 export function unpinProviderDecision(decisionKey: string): void {
-  const file = readPinFile();
-  if (file.pins[decisionKey]) {
-    delete file.pins[decisionKey];
-    writePinFile(file);
-  }
+  updatePinFile((file) => {
+    if (file.pins[decisionKey]) delete file.pins[decisionKey];
+    return file;
+  });
 }
 
 function recordDecision(decision: ProviderDecision): void {

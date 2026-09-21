@@ -20,6 +20,7 @@
  * change is written to the audit chain.
  */
 
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
@@ -27,6 +28,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
+import { withLockSync } from './src/lock-utils.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -135,6 +137,22 @@ function saveSeamSelectionRules(file: SeamSelectionRulesFile): string {
   return filePath;
 }
 
+function updateSeamSelectionRules(
+  mutator: (file: SeamSelectionRulesFile) => SeamSelectionRulesFile | null
+): { filePath: string; file: SeamSelectionRulesFile; changed: boolean } {
+  const filePath = seamSelectionRulesPath();
+  const lockId = `seam-selection-rules-${createHash('sha256')
+    .update(filePath, 'utf8')
+    .digest('hex')}`;
+  return withLockSync(lockId, () => {
+    const file = loadSeamSelectionRules();
+    const next = mutator(file);
+    if (!next) return { filePath, file, changed: false };
+    saveSeamSelectionRules(next);
+    return { filePath, file: next, changed: true };
+  });
+}
+
 export function listSeamSelectionRules(seam?: string): SeamSelectionRule[] {
   const rules = loadSeamSelectionRules().rules;
   return seam ? rules.filter((rule) => rule.seam === seam) : rules;
@@ -182,7 +200,6 @@ export function setSeamSelectionRule(input: {
   evidence?: string[];
   set_by?: string;
 }): { rule: SeamSelectionRule; path: string } {
-  const file = loadSeamSelectionRules();
   const rule: SeamSelectionRule = {
     rule_id: input.rule_id,
     seam: input.seam,
@@ -198,18 +215,20 @@ export function setSeamSelectionRule(input: {
     set_by: input.set_by || actor(),
     set_at: nowIso(),
   };
-  const rules = file.rules.filter((existing) => existing.rule_id !== rule.rule_id);
-  rules.push(rule);
-  const saved = saveSeamSelectionRules({ ...file, rules });
+  const { filePath } = updateSeamSelectionRules((file) => ({
+    ...file,
+    rules: [...file.rules.filter((existing) => existing.rule_id !== rule.rule_id), rule],
+  }));
   recordRuleChange(`set:${rule.seam}/${rule.rule_id}`, { rule });
-  return { rule, path: saved };
+  return { rule, path: filePath };
 }
 
 export function removeSeamSelectionRule(ruleId: string): boolean {
-  const file = loadSeamSelectionRules();
-  const rules = file.rules.filter((rule) => rule.rule_id !== ruleId);
-  if (rules.length === file.rules.length) return false;
-  saveSeamSelectionRules({ ...file, rules });
+  const { changed } = updateSeamSelectionRules((file) => {
+    const rules = file.rules.filter((rule) => rule.rule_id !== ruleId);
+    return rules.length === file.rules.length ? null : { ...file, rules };
+  });
+  if (!changed) return false;
   recordRuleChange(`remove:${ruleId}`, { rule_id: ruleId });
   return true;
 }
@@ -225,24 +244,25 @@ export function setSeamTraitOverrides(input: {
   evidence?: string[];
   set_by?: string;
 }): string {
-  const file = loadSeamSelectionRules();
-  const overrides = { ...(file.trait_overrides ?? {}) };
-  const seamOverrides = { ...(overrides[input.seam] ?? {}) };
-  for (const [providerId, traits] of Object.entries(input.values)) {
-    const previous = seamOverrides[providerId];
-    seamOverrides[providerId] = {
-      traits: { ...(previous?.traits ?? {}), ...traits },
-      ...(input.evidence?.length ? { evidence: input.evidence } : {}),
-      set_by: input.set_by || actor(),
-      set_at: nowIso(),
-    };
-  }
-  overrides[input.seam] = seamOverrides;
-  const saved = saveSeamSelectionRules({ ...file, trait_overrides: overrides });
+  const { filePath } = updateSeamSelectionRules((file) => {
+    const overrides = { ...(file.trait_overrides ?? {}) };
+    const seamOverrides = { ...(overrides[input.seam] ?? {}) };
+    for (const [providerId, traits] of Object.entries(input.values)) {
+      const previous = seamOverrides[providerId];
+      seamOverrides[providerId] = {
+        traits: { ...(previous?.traits ?? {}), ...traits },
+        ...(input.evidence?.length ? { evidence: input.evidence } : {}),
+        set_by: input.set_by || actor(),
+        set_at: nowIso(),
+      };
+    }
+    overrides[input.seam] = seamOverrides;
+    return { ...file, trait_overrides: overrides };
+  });
   recordRuleChange(`measured-traits:${input.seam}`, {
     seam: input.seam,
     values: input.values,
     evidence: input.evidence,
   });
-  return saved;
+  return filePath;
 }

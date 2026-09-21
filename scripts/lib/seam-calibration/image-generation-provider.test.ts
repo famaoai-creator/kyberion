@@ -68,10 +68,14 @@ describe('image-generation-provider calibration adapter', () => {
     expect(byId.local_flux?.success_rate).toBe(1);
     const artifact = byId.local_flux?.runs[0]?.output?.artifact_path;
     expect(artifact).toBe(
-      path.join(outRoot, 'image-generation-provider', 'image-test', 'local_flux', 'trial-1.png')
+      pathResolver.toRepoRelative(
+        path.join(outRoot, 'image-generation-provider', 'image-test', 'local_flux', 'trial-1.png')
+      )
     );
     expect(byId.local_flux?.runs[0]?.metrics).toEqual({ bytes: 9 });
-    expect(byId.comfyui?.runs[0]).toEqual(expect.objectContaining({ ok: false, error: 'boom' }));
+    expect(byId.comfyui?.runs[0]).toEqual(
+      expect.objectContaining({ ok: false, error: 'provider trial failed' })
+    );
     expect(byId.gemini_service?.skipped_reason).toMatch(/--providers/);
     expect(cloud.generate).not.toHaveBeenCalled();
     expect(byId.cursor_host_bridge?.eligible).toBe(false);

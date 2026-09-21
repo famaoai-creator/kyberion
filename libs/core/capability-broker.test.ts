@@ -14,6 +14,9 @@ const nonRegularPaths = new Set<string>();
 const fileVersions = new Map<string, number>();
 
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: recordMock } }));
+vi.mock('./src/lock-utils.js', () => ({
+  withLockSync: <T>(_resourceId: string, fn: () => T): T => fn(),
+}));
 
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {

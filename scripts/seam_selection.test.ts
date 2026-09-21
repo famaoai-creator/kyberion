@@ -289,8 +289,8 @@ describe('seam_selection CLI', () => {
       expect(report.suggested_traits.accuracy).toBeDefined();
       expect(process.exitCode ?? 0).toBe(0);
 
-      // Clean up the run directory the calibration module wrote outside
-      // active/shared/tmp/ (its own governed location), not just our input file.
+      // Clean up the run directory the calibration module wrote under its
+      // governed temporary location, not just our input file.
       const reportJsonAbs = pathResolver.rootResolve(report.report_json);
       calibrationRunDirs.push(path.dirname(reportJsonAbs));
     } finally {
