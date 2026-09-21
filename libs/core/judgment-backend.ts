@@ -223,6 +223,10 @@ export interface JudgmentCalibrationEntry {
   /** Bench the fit was produced from; recorded for audit, not read back. */
   fitted_from: string;
   fitted_at: string;
+  /** Legacy provider-wide temperature, used when no question-specific value exists. */
+  temperature?: number;
+  /** Question-specific temperatures; these take precedence over `temperature`. */
+  temperatures?: Readonly<Record<string, number>>;
 }
 
 interface JudgmentCalibrationFile {
@@ -257,10 +261,37 @@ function loadCalibrationFile(): JudgmentCalibrationFile {
  * was built to stop.
  */
 export function resolveCalibration(providerId: string, questionId: string): boolean {
-  if (providerId === BUILTIN_JUDGMENT_PROVIDER) return false;
+  return Boolean(resolveCalibrationEntry(providerId, questionId));
+}
+
+/** Resolve a question-specific fit, with support for the legacy default. */
+export function resolveCalibrationTemperature(
+  entry: JudgmentCalibrationEntry,
+  questionId: string
+): number | undefined {
+  if (!Array.isArray(entry.questions)) return undefined;
+  const covered = entry.questions.includes('*') || entry.questions.includes(questionId);
+  if (!covered) return undefined;
+
+  const temperatures =
+    entry.temperatures &&
+    typeof entry.temperatures === 'object' &&
+    !Array.isArray(entry.temperatures)
+      ? entry.temperatures
+      : undefined;
+  const candidate = temperatures?.[questionId] ?? temperatures?.['*'] ?? entry.temperature;
+  return Number.isFinite(candidate) && candidate > 0 ? candidate : undefined;
+}
+
+function resolveCalibrationEntry(
+  providerId: string,
+  questionId: string
+): (JudgmentCalibrationEntry & { temperature: number }) | undefined {
+  if (providerId === BUILTIN_JUDGMENT_PROVIDER) return undefined;
   const entry = loadCalibrationFile().providers?.[providerId];
-  if (!entry || !Array.isArray(entry.questions)) return false;
-  return entry.questions.includes('*') || entry.questions.includes(questionId);
+  if (!entry) return undefined;
+  const temperature = resolveCalibrationTemperature(entry, questionId);
+  return temperature === undefined ? undefined : { ...entry, temperature };
 }
 
 // --- selection --------------------------------------------------------------
@@ -329,9 +360,7 @@ export function selectJudgmentBackend(request: JudgmentRequest): JudgmentSelecti
   // that callers keep their deterministic result when judgment is not
   // available, and a confident-looking wrong answer denies them that.
   if (needsImage && !builtin.acceptsImages) {
-    throw new Error(
-      `[JUDGMENT_BACKEND] no provider can see images at tier=${request.tier}${why}`
-    );
+    throw new Error(`[JUDGMENT_BACKEND] no provider can see images at tier=${request.tier}${why}`);
   }
 
   const unsupported = request.questions.filter((question) => !builtin.supports(question));
@@ -370,7 +399,7 @@ export async function judge(request: JudgmentRequest): Promise<JudgmentResult> {
   let answers: readonly JudgmentAnswer[];
 
   try {
-    answers = await backend.judge(request);
+    answers = validateJudgmentAnswers(await backend.judge(request), request.questions);
   } catch (error: unknown) {
     const builtin = judgmentSeam.getOptional(BUILTIN_JUDGMENT_PROVIDER);
     if (!builtin || backend.judgment_id === BUILTIN_JUDGMENT_PROVIDER) throw error;
@@ -387,19 +416,76 @@ export async function judge(request: JudgmentRequest): Promise<JudgmentResult> {
     );
     reason = `${reason}; then '${backend.judgment_id}' failed (${message}) and degraded to '${BUILTIN_JUDGMENT_PROVIDER}'`;
     backend = builtin;
-    answers = await builtin.judge(request);
+    answers = validateJudgmentAnswers(await builtin.judge(request), request.questions);
   }
 
   const providerId = backend.judgment_id;
   return {
     provider_id: providerId,
     reason,
-    answers: answers.map((answer) => ({
-      ...answer,
-      confidence: clampConfidence(answer.confidence),
-      calibrated: resolveCalibration(providerId, answer.id),
-    })),
+    answers: answers.map((answer) => {
+      const rawConfidence = clampConfidence(answer.confidence);
+      const calibration = resolveCalibrationEntry(providerId, answer.id);
+      return {
+        ...answer,
+        confidence: calibration
+          ? applyCalibrationTemperature(rawConfidence, calibration.temperature)
+          : rawConfidence,
+        calibrated: Boolean(calibration),
+      };
+    }),
   };
+}
+
+/** Apply the same logit temperature scaling used by the calibration fitter. */
+export function applyCalibrationTemperature(confidence: number, temperature: number): number {
+  if (!Number.isFinite(temperature) || temperature <= 0) return clampConfidence(confidence);
+  const bounded = Math.min(0.999999, Math.max(0.000001, clampConfidence(confidence)));
+  const logit = Math.log(bounded / (1 - bounded));
+  return clampConfidence(1 / (1 + Math.exp(-logit / temperature)));
+}
+
+function validateJudgmentAnswers(
+  answers: readonly JudgmentAnswer[],
+  questions: readonly JudgmentQuestion[]
+): readonly JudgmentAnswer[] {
+  if (!Array.isArray(answers) || answers.length !== questions.length) {
+    throw new Error(
+      `[JUDGMENT_BACKEND] provider returned ${Array.isArray(answers) ? answers.length : 'non-array'} answers for ${questions.length} questions`
+    );
+  }
+  const expected = new Map(questions.map((question) => [question.id, question]));
+  const seen = new Set<string>();
+  for (const answer of answers) {
+    if (!answer || typeof answer.id !== 'string' || !expected.has(answer.id)) {
+      throw new Error(`[JUDGMENT_BACKEND] provider returned an answer for an unknown question`);
+    }
+    if (seen.has(answer.id)) {
+      throw new Error(`[JUDGMENT_BACKEND] provider returned duplicate answer '${answer.id}'`);
+    }
+    seen.add(answer.id);
+    if (typeof answer.confidence !== 'number' || !Number.isFinite(answer.confidence)) {
+      throw new Error(`[JUDGMENT_BACKEND] provider returned invalid confidence for '${answer.id}'`);
+    }
+    const question = expected.get(answer.id)!;
+    if (question.kind === 'choice') {
+      if (typeof answer.value !== 'string' || !question.options.includes(answer.value)) {
+        throw new Error(`[JUDGMENT_BACKEND] provider returned invalid choice for '${answer.id}'`);
+      }
+    } else if (question.kind === 'bool') {
+      if (typeof answer.value !== 'boolean') {
+        throw new Error(`[JUDGMENT_BACKEND] provider returned invalid boolean for '${answer.id}'`);
+      }
+    } else if (
+      typeof answer.value !== 'number' ||
+      !Number.isFinite(answer.value) ||
+      answer.value < question.range[0] ||
+      answer.value > question.range[1]
+    ) {
+      throw new Error(`[JUDGMENT_BACKEND] provider returned invalid score for '${answer.id}'`);
+    }
+  }
+  return answers;
 }
 
 function clampConfidence(value: unknown): number {

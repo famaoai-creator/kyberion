@@ -79,6 +79,20 @@ describe('assistWithJudgment fallback contract', () => {
     expect(result.value).toBe('unknown');
   });
 
+  it('uses the same declined wording for malformed answer counts', async () => {
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend(
+      provider({
+        async judge() {
+          return [];
+        },
+      })
+    );
+    const result = await assistWithJudgment(base);
+    expect(result.source).toBe('baseline');
+    expect(result.reason).toMatch(/declined malformed provider answer/);
+  });
+
   it('keeps the baseline when the provider hangs, and does not hang with it', async () => {
     registerOrganizationWorkJudgment();
     registerJudgmentBackend(

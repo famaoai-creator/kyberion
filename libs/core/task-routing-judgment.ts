@@ -40,9 +40,9 @@
 
 import { assistWithJudgment, choiceAnswer } from './judgment-assist.js';
 import type { JudgmentQuestion } from './judgment-backend.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
-import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeMkdir } from './secure-io.js';
 import { isVitestProcess } from './foundation/env.js';
 import { createLogger } from './logger.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
@@ -104,6 +104,14 @@ export interface RouteTaskResult {
   reason: string;
   /** Set when a judgment moved the tier down; dispatch must be able to retry. */
   downgradedFrom?: TaskModelTier;
+}
+
+const TASK_MODEL_TIER_ORDER: TaskModelTier[] = ['small', 'standard', 'large'];
+
+/** The next larger tier to try after a model attempt did not complete. */
+export function nextTaskModelTier(tier: TaskModelTier): TaskModelTier | undefined {
+  const index = TASK_MODEL_TIER_ORDER.indexOf(tier);
+  return index >= 0 ? TASK_MODEL_TIER_ORDER[index + 1] : undefined;
 }
 
 /**
@@ -223,11 +231,11 @@ export interface RoutingOutcome {
   recorded_at: string;
 }
 
-const LEDGER_RELATIVE = nodePath.join('active', 'shared', 'runtime', 'routing-outcomes.jsonl');
 const EXCERPT_LEN = 300;
 
-function ledgerPath(): string {
-  return nodePath.join(pathResolver.rootDir(), LEDGER_RELATIVE);
+/** Keep routing evidence inside the mission that supplied the task text. */
+export function routingOutcomeLedgerPath(missionPath: string): string {
+  return nodePath.join(missionPath, 'evidence', 'routing-outcomes.jsonl');
 }
 
 /**
@@ -243,7 +251,8 @@ function ledgerPath(): string {
  * corpus with fixtures, and fixtures must not become evidence.
  */
 export function recordRoutingOutcome(
-  outcome: Omit<RoutingOutcome, 'recorded_at' | 'task_excerpt'> & { task: string }
+  outcome: Omit<RoutingOutcome, 'recorded_at' | 'task_excerpt'> & { task: string },
+  options: { ledgerPath: string }
 ): void {
   if (isVitestProcess()) return;
   try {
@@ -261,10 +270,9 @@ export function recordRoutingOutcome(
       ...(outcome.escalated_to ? { escalated_to: outcome.escalated_to } : {}),
       recorded_at: nowIso(),
     };
-    const file = ledgerPath();
+    const file = options.ledgerPath;
     safeMkdir(nodePath.dirname(file), { recursive: true });
-    const existing = safeExistsSync(file) ? String(safeReadFile(file, { encoding: 'utf8' })) : '';
-    safeWriteFile(file, `${existing}${JSON.stringify(record)}\n`, { encoding: 'utf8' });
+    appendJsonLine(file, record);
   } catch (error: unknown) {
     // Losing a label must never fail the work that produced it.
     logger.warn(
@@ -281,14 +289,11 @@ export function recordRoutingOutcome(
  * `expected_tier` is the smallest tier observed to succeed for that task —
  * which is what a correct router would have chosen.
  */
-export function loadRoutingOutcomes(): RoutingOutcome[] {
+export function loadRoutingOutcomes(ledgerPath?: string): RoutingOutcome[] {
+  if (!ledgerPath) return [];
   try {
-    const file = ledgerPath();
-    if (!safeExistsSync(file)) return [];
-    return String(safeReadFile(file, { encoding: 'utf8' }))
-      .split('\n')
-      .filter((line) => line.trim())
-      .map((line) => JSON.parse(line) as RoutingOutcome);
+    const file = ledgerPath;
+    return readJsonLines<RoutingOutcome>(file, { onMalformed: 'skip' });
   } catch (error: unknown) {
     logger.warn(
       `[task-routing-judgment] routing outcome ledger unreadable: ${
@@ -307,10 +312,9 @@ export interface RoutingCorpusItem {
   observations: number;
 }
 
-/** Collapse the ledger into one labelled item per task. */
-export function exportRoutingCorpus(): RoutingCorpusItem[] {
+function collapseRoutingCorpus(outcomes: readonly RoutingOutcome[]): RoutingCorpusItem[] {
   const byTask = new Map<string, RoutingOutcome[]>();
-  for (const outcome of loadRoutingOutcomes()) {
+  for (const outcome of outcomes) {
     // A policy refusal or a missing route is not evidence about any tier.
     if (outcome.outcome === 'not_attempted') continue;
     const list = byTask.get(outcome.task_excerpt) || [];
@@ -338,4 +342,26 @@ export function exportRoutingCorpus(): RoutingCorpusItem[] {
     });
   }
   return items;
+}
+
+/** Collapse one mission-local ledger into one labelled item per task. */
+export function exportRoutingCorpus(ledgerPath?: string): RoutingCorpusItem[] {
+  return collapseRoutingCorpus(loadRoutingOutcomes(ledgerPath));
+}
+
+/**
+ * Build a corpus from explicitly authorized mission paths.
+ *
+ * A no-argument global scan would make confidential task excerpts discoverable
+ * across tenants. Callers must first resolve and authorize the mission set,
+ * then pass only those paths here; the function reads each mission's evidence
+ * ledger and never falls back to the retired shared runtime ledger.
+ */
+export function exportRoutingCorpusAcrossMissions(
+  missionPaths: readonly string[]
+): RoutingCorpusItem[] {
+  const outcomes = missionPaths.flatMap((missionPath) =>
+    loadRoutingOutcomes(routingOutcomeLedgerPath(missionPath))
+  );
+  return collapseRoutingCorpus(outcomes);
 }

@@ -1244,6 +1244,9 @@ describe('mission work item dispatch', () => {
     });
     expect(manifest.records[0].clarification_packet_path).toBeDefined();
     expect(manifest.records[0].notes).toContain('needs_input');
+    expect(
+      getWorkItem(manifest.records[0].item_id)?.metadata?.routing_minimum_tier
+    ).toBeUndefined();
 
     const clarificationPath = String(
       manifest.records[0].clarification_packet_path ||

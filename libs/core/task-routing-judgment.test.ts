@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import * as pathResolver from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   registerJudgmentBackend,
   resetJudgmentBackends,
@@ -7,6 +9,8 @@ import {
 import { registerOrganizationWorkJudgment } from './organization-operating-model-persistence.js';
 import {
   exportRoutingCorpus,
+  exportRoutingCorpusAcrossMissions,
+  nextTaskModelTier,
   routeTaskWithJudgment,
   TASK_TIER_DESCRIPTIONS,
   TASK_TIER_QUESTION,
@@ -143,6 +147,18 @@ describe('routeTaskWithJudgment', () => {
     expect((await routeTaskWithJudgment(base)).hint.tier).toBe('large');
   });
 
+  it('uses the caller tier when deciding whether an external provider may judge', async () => {
+    registerOrganizationWorkJudgment();
+    registerJudgmentBackend({
+      ...provider('small'),
+      judgment_id: 'typesafe-jev',
+      egress: 'external-api',
+    });
+    const result = await routeTaskWithJudgment({ ...base, tier: 'public' });
+    expect(result.source).toBe('judgment');
+    expect(result.hint.tier).toBe('small');
+  });
+
   it('describes every tier it offers', () => {
     const question = taskTierQuestion();
     if (question.kind !== 'choice') throw new Error('expected a choice');
@@ -152,6 +168,14 @@ describe('routeTaskWithJudgment', () => {
         TASK_TIER_DESCRIPTIONS[option as keyof typeof TASK_TIER_DESCRIPTIONS]
       );
     }
+  });
+});
+
+describe('retry escalation', () => {
+  it('moves one tier at a time and stops at large', () => {
+    expect(nextTaskModelTier('small')).toBe('standard');
+    expect(nextTaskModelTier('standard')).toBe('large');
+    expect(nextTaskModelTier('large')).toBeUndefined();
   });
 });
 
@@ -204,5 +228,66 @@ describe('exportRoutingCorpus', () => {
 
   it('returns an empty corpus rather than throwing when nothing has been recorded', () => {
     expect(Array.isArray(exportRoutingCorpus())).toBe(true);
+  });
+
+  it('aggregates only the explicitly supplied mission-local ledgers', () => {
+    const missionA = pathResolver.sharedTmp(`routing-corpus-a-${process.pid}`);
+    const missionB = pathResolver.sharedTmp(`routing-corpus-b-${process.pid}`);
+    try {
+      safeMkdir(`${missionA}/evidence`, { recursive: true });
+      safeMkdir(`${missionB}/evidence`, { recursive: true });
+      safeWriteFile(
+        `${missionA}/evidence/routing-outcomes.jsonl`,
+        `${JSON.stringify(ledger[0])}\n`
+      );
+      safeWriteFile(
+        `${missionB}/evidence/routing-outcomes.jsonl`,
+        `${JSON.stringify(ledger[1])}\n`
+      );
+
+      expect(exportRoutingCorpusAcrossMissions([missionA, missionB])).toEqual([
+        {
+          task_excerpt: 'rename a variable',
+          expected_tier: 'small',
+          observations: 1,
+        },
+        {
+          task_excerpt: 'design the caching layer',
+          expected_tier: 'large',
+          observations: 1,
+        },
+      ]);
+    } finally {
+      safeRmSync(missionA, { recursive: true, force: true });
+      safeRmSync(missionB, { recursive: true, force: true });
+    }
+  });
+
+  it('does not label a task when repeated attempts all fail', () => {
+    const mission = pathResolver.sharedTmp(`routing-corpus-failures-${process.pid}`);
+    const failedSmall: RoutingOutcome = {
+      task_excerpt: 'task with repeated failures',
+      baseline_tier: 'large',
+      chosen_tier: 'small',
+      chosen_by: 'judgment',
+      succeeded: false,
+      recorded_at: '2026-09-21T00:02:00.000Z',
+    };
+    const failedStandard: RoutingOutcome = {
+      ...failedSmall,
+      chosen_tier: 'standard',
+      recorded_at: '2026-09-21T00:03:00.000Z',
+    };
+    try {
+      safeMkdir(`${mission}/evidence`, { recursive: true });
+      safeWriteFile(
+        `${mission}/evidence/routing-outcomes.jsonl`,
+        `${JSON.stringify(failedSmall)}\n${JSON.stringify(failedStandard)}\n`
+      );
+
+      expect(exportRoutingCorpusAcrossMissions([mission])).toEqual([]);
+    } finally {
+      safeRmSync(mission, { recursive: true, force: true });
+    }
   });
 });
