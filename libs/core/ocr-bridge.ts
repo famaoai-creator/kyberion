@@ -19,6 +19,7 @@ import {
   resolveSeamProviderDecision,
   type SeamProviderCandidate,
 } from './seam-provider-selection.js';
+import { matchSeamSelectionRule } from './seam-selection-rules.js';
 
 const ocrProviderSeam = createSeam<OcrProvider>({
   key: 'ocr-provider',
@@ -665,9 +666,11 @@ export class AdaptivePolicyRouter {
    * Hard-eligible providers for `request.mode`: allowed by the egress filter
    * and available right now. This is the same eligibility test resolveCandidates
    * uses by default; purpose-driven selection reuses it instead of a second
-   * notion of "can run this task".
+   * notion of "can run this task". Public so the 'ocr-provider' seam
+   * calibration adapter (scripts/lib/seam-calibration/ocr-provider.ts) can
+   * reuse it instead of re-deriving eligibility.
    */
-  private async eligibleCandidates(request: OcrRequest): Promise<SeamProviderCandidate[]> {
+  async eligibleCandidates(request: OcrRequest): Promise<SeamProviderCandidate[]> {
     const mode = request.mode || 'balanced';
     const allowed = this.allowedEgress(mode);
     const candidates: SeamProviderCandidate[] = [];
@@ -692,23 +695,28 @@ export class AdaptivePolicyRouter {
 
   /**
    * Purpose-driven order: hard mode/availability eligibility (above) filters,
-   * then the governed ocr-provider selection policy ranks who runs the task
-   * first. Only used when the caller asked for a purpose and did not already
-   * pin an explicit providerPreference — an explicit choice always wins.
+   * then the governed ocr-provider selection policy ranks who runs the task.
+   * Used when the caller asked for a purpose, or (with no purpose) when an
+   * operator rule matches this request (decisionKey 'default'). Request language,
+   * when set, is passed as selection context so a rule can match on it.
+   * Only used when the caller did not already pin an explicit
+   * providerPreference — an explicit choice always wins.
    */
-  private async resolvePurposeChain(request: OcrRequest, purpose: string): Promise<OcrProvider[]> {
+  private async resolvePurposeChain(request: OcrRequest, purpose?: string): Promise<OcrProvider[]> {
     const candidates = await this.eligibleCandidates(request);
+    const context = request.language ? { language: request.language } : undefined;
     const decision = resolveSeamProviderDecision({
       seam: ocrProviderSeam.key,
       candidates,
-      purpose,
-      decisionKey: purpose,
+      ...(purpose ? { purpose } : {}),
+      ...(context ? { context } : {}),
+      decisionKey: purpose || 'default',
     });
     if (decision.strategy === 'unresolved') {
       throw new Error(`[OCR_PROVIDER_SELECTION] ${decision.rationale}`);
     }
     logger.info(
-      `[ocr_bridge] purpose '${purpose}' provider chain (${decision.strategy}): ${decision.ranked.join(' > ')} — ${decision.rationale}`
+      `[ocr_bridge] ${purpose ? `purpose '${purpose}'` : 'rule-driven'} provider chain (${decision.strategy}): ${decision.ranked.join(' > ')} — ${decision.rationale}`
     );
     return decision.ranked
       .map((id) => this.providers.get(id))
@@ -719,7 +727,16 @@ export class AdaptivePolicyRouter {
     const hasProviderPreference = Boolean(
       request.providerPreference && request.providerPreference.length > 0
     );
-    if (request.purpose && !hasProviderPreference) {
+    // Without a purpose, only an operator rule that matches this request
+    // takes the selection path; otherwise the per-mode chain stays as is.
+    const ruleApplies =
+      !request.purpose &&
+      Boolean(
+        matchSeamSelectionRule(ocrProviderSeam.key, {
+          ...(request.language ? { context: { language: request.language } } : {}),
+        })
+      );
+    if (!hasProviderPreference && (request.purpose || ruleApplies)) {
       return this.resolvePurposeChain(request, request.purpose);
     }
 
