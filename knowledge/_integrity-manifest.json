@@ -2349,7 +2349,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 18685,
+      "size": 18730,
       "type": "md"
     },
     {
@@ -3135,7 +3135,7 @@
     {
       "path": "product/governance/pre-pr-ci-readiness-checklist.ja.md",
       "tier": "public",
-      "size": 10032,
+      "size": 13390,
       "type": "md"
     },
     {
@@ -4881,7 +4881,7 @@
     {
       "path": "product/orchestration/git-flow-standards.md",
       "tier": "public",
-      "size": 3139,
+      "size": 3002,
       "type": "md"
     },
     {
