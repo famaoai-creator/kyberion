@@ -155,6 +155,9 @@ describe('devin-cli-reasoning-backend', () => {
     );
     expect(() => new DevinCliReasoningBackend({ extraArgs: ['-p'] })).toThrow(/governed flag: -p/);
     expect(() => new DevinCliReasoningBackend({ extraArgs: ['-c'] })).toThrow(/governed flag: -c/);
+    expect(() => new DevinCliReasoningBackend({ extraArgs: ['--'] })).toThrow(
+      /restructure option parsing/
+    );
   });
 
   it('preserves non-governed extra args', async () => {
