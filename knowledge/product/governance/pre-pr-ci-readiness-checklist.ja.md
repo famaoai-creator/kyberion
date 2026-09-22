@@ -33,7 +33,7 @@ PR を開く前の必須 runbook。人間・エージェント共通。PR 作成
 ## PR 作成手順（この順で実行する）
 
 ```bash
-# 0. 専用 worktree で作業する（main checkout や他 agent の worktree では作らない）
+# 0. 専用 worktree で作業する（main checkout や他 agent の worktree では作らない。`.git` を触るのは mission owner）
 git fetch origin
 git worktree add -b <prefix>/<topic>-<yyyymmdd> ../kyberion-<topic> origin/main
 #    worktree ごとにゼロから用意する（main checkout の node_modules を symlink しない）
