@@ -284,6 +284,7 @@ function modelFromRuntimeEnv(mode: string, env: NodeJS.ProcessEnv): string | und
     'grok-cli': ['KYBERION_GROK_CLI_MODEL'],
     'cursor-cli': ['KYBERION_CURSOR_CLI_MODEL'],
     'opencode-cli': ['KYBERION_OPENCODE_CLI_MODEL'],
+    'devin-cli': ['KYBERION_DEVIN_CLI_MODEL'],
     openrouter: ['KYBERION_OPENROUTER_MODEL'],
     'nemotron-api': ['KYBERION_NEMOTRON_MODEL'],
     ollama: ['KYBERION_OLLAMA_MODEL', 'OLLAMA_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],

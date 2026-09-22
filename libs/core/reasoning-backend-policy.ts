@@ -16,6 +16,7 @@ export type ReasoningBackendMode =
   | 'copilot'
   | 'cursor-cli'
   | 'opencode-cli'
+  | 'devin-cli'
   | 'local'
   | 'ollama'
   | 'vllm'

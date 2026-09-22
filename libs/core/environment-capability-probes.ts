@@ -172,6 +172,13 @@ export async function probeExplicitReasoningBackend(
       )
         ? { available: true }
         : unavailable('`opencode --version` failed');
+    case 'devin-cli':
+      return binaryProbe(
+        getRegisteredEnvText('KYBERION_DEVIN_CLI_BIN', { env })?.trim() || 'devin',
+        ['--version']
+      )
+        ? { available: true }
+        : unavailable('`devin --version` failed');
     case 'anthropic': {
       const probe = await anthropicProbe(env);
       return probe.available
@@ -264,6 +271,9 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   if (binaryAvailable('grok', ['--version'])) {
     return { available: true };
   }
+  if (binaryAvailable('devin', ['--version'])) {
+    return { available: true };
+  }
   if (kyberionEnv('CLAUDE_API_KEY') || probeShellClaudeCliAvailability().available) {
     return { available: true };
   }
@@ -324,7 +334,7 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   return {
     available: false,
     reason:
-      'no real reasoning backend reachable. Authenticate one of: claude CLI, codex CLI, gemini CLI, agy CLI, grok CLI (Grok Build), xAI Grok API key (XAI_API_KEY or KYBERION_GROK_API_KEY), Google AI Studio API key (GEMINI_API_KEY or GOOGLE_API_KEY), Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Ollama URL (KYBERION_OLLAMA_URL), vLLM URL (KYBERION_VLLM_URL), LM Studio URL (KYBERION_LMSTUDIO_URL), llama.cpp URL (KYBERION_LLAMACPP_URL), MLX URL (KYBERION_MLX_URL), LocalAI URL (KYBERION_LOCALAI_URL), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
+      'no real reasoning backend reachable. Authenticate one of: claude CLI, codex CLI, gemini CLI, agy CLI, grok CLI (Grok Build), devin CLI (`devin auth login`), xAI Grok API key (XAI_API_KEY or KYBERION_GROK_API_KEY), Google AI Studio API key (GEMINI_API_KEY or GOOGLE_API_KEY), Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Ollama URL (KYBERION_OLLAMA_URL), vLLM URL (KYBERION_VLLM_URL), LM Studio URL (KYBERION_LMSTUDIO_URL), llama.cpp URL (KYBERION_LLAMACPP_URL), MLX URL (KYBERION_MLX_URL), LocalAI URL (KYBERION_LOCALAI_URL), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
   };
 }
 

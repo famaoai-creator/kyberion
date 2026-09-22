@@ -51,6 +51,18 @@
       "egress": "external-api",
       "training_use": "unknown",
       "endpoint_domains": ["opencode.ai"]
+    },
+    "devin": {
+      "egress": "external-api",
+      "training_use": "unknown",
+      "endpoint_domains": [
+        "api.devin.ai",
+        "app.devin.ai",
+        "cli.devin.ai",
+        "static.devin.ai",
+        "windsurf.ai",
+        "static.windsurf.com"
+      ]
     }
   },
   "tier_policy": {

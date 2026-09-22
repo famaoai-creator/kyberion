@@ -73,6 +73,7 @@ export function reasoningBackendEndpoint(backendName: string): string {
     'grok-api': 'https://api.x.ai',
     'cursor-cli': 'https://api2.cursor.sh',
     'opencode-cli': 'https://opencode.ai',
+    'devin-cli': 'https://api.devin.ai',
     'agy-cli': 'https://generativelanguage.googleapis.com',
   };
   return endpoints[backendName] ?? `https://${backendName}.unknown-provider.invalid`;
