@@ -62,7 +62,9 @@ export function requireWorkInventoryMember(
  * Applies the same CSRF/rate-limit posture as `requireConciergeMutationAccess`
  * (`guardConciergeRequest` + `authorizeSurfaceMutation`), but skips its
  * "bearer token must resolve to a localadmin viewer" check — any resolvable
- * viewer, including a `readonly`-role token viewer, passes here. The actual
+ * viewer, including a `readonly`-role token viewer, passes here as long as the
+ * request is same-origin (a client without an Origin header still gets the
+ * CSRF 403 from `authorizeSurfaceMutation`). The actual
  * authorization is the member-resolution gate every caller already runs
  * right after (`requireWorkInventoryMember`, backed by
  * `resolveMemberByPrincipal`'s `status === 'active'` filter): an anonymous
