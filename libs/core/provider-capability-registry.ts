@@ -184,6 +184,19 @@ export const PROVIDER_PROBE_TABLE: Readonly<Record<string, ProviderProbeSpec>> =
       expectedFlags: ['--agent', '--format'],
     },
   },
+  devin: {
+    binaryCommand: 'devin',
+    binaryArgs: ['--version'],
+    authCommand: 'devin',
+    authArgs: ['auth', 'status'],
+    headless: true,
+    structuredOutput: true,
+    sandboxProbe: {
+      command: 'devin',
+      args: ['--help'],
+      expectedFlags: ['--permission-mode', '--sandbox'],
+    },
+  },
   gemini: {
     binaryCommand: 'gemini',
     binaryArgs: ['--version'],
@@ -219,6 +232,7 @@ const PROVIDER_BINARY_ENV_KEYS: Readonly<Record<string, string>> = {
   grok: 'KYBERION_GROK_CLI_BIN',
   cursor: 'KYBERION_CURSOR_CLI_BIN',
   opencode: 'KYBERION_OPENCODE_CLI_BIN',
+  devin: 'KYBERION_DEVIN_CLI_BIN',
   gemini: 'KYBERION_GEMINI_CLI_BIN',
   copilot: 'KYBERION_COPILOT_CLI_BIN',
 };
