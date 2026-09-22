@@ -3,9 +3,12 @@
 .env.local
 
 # Provider state directories (XP-04 multi-provider-coexecution-contract):
-# gitignored, reproduced via generation ceremonies. Exception: .claude/agents/
-# is generated-and-tracked under CT-01's drift check.
-.codex/
+# gitignored, reproduced via generation ceremonies. Project-scoped Codex
+# custom-agent TOML is the generated-and-tracked exception alongside the
+# provider subagent definitions below.
+.codex/*
+!/.codex/agents/
+!/.codex/agents/*.toml
 .agy/
 /.claude/*
 !/.claude/agents/
