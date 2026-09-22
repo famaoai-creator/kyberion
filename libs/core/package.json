@@ -3151,6 +3151,10 @@
       "types": "./dist/work-inventory-observation.d.ts",
       "default": "./dist/work-inventory-observation.js"
     },
+    "./work-inventory-decompose": {
+      "types": "./dist/work-inventory-decompose.d.ts",
+      "default": "./dist/work-inventory-decompose.js"
+    },
     "./agent-prompt-approval": {
       "types": "./dist/agent-prompt-approval.d.ts",
       "default": "./dist/agent-prompt-approval.js"

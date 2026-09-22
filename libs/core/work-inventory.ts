@@ -177,6 +177,8 @@ export interface WorkInventoryVerbDef {
   description: string;
   default_stage: WorkStage;
   candidate_bindings: WorkInventoryCandidateBinding[];
+  /** WI-04: free-text keyword lists the heuristic decomposer matches against a fragment. */
+  keywords?: { ja?: string[]; en?: string[] };
 }
 
 export interface WorkInventoryMethodDef {
@@ -187,6 +189,10 @@ export interface WorkInventoryMethodDef {
 export interface WorkInventoryEffectDef {
   id: WorkEffect;
   description: string;
+  /** Free-text keywords the heuristic decomposer (WI-04) uses to detect this effect. */
+  keywords?: { ja?: string[]; en?: string[] };
+  /** Detect the effect only on steps with one of these verbs. */
+  only_with_verbs?: WorkVerb[];
 }
 
 export interface WorkInventoryRuleWhen {

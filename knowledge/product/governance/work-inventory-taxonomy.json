@@ -45,7 +45,11 @@
           "actuator": "ingest-actuator",
           "op": "sync_source"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["受信", "届く", "メールを開く", "メールを確認", "メール確認", "届いた"],
+        "en": ["receive", "incoming", "open the email", "check the inbox", "check email"]
+      }
     },
     {
       "id": "search",
@@ -60,7 +64,11 @@
           "actuator": "browser-actuator",
           "op": "pipeline"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["検索", "探す"],
+        "en": ["search", "look for", "find"]
+      }
     },
     {
       "id": "read",
@@ -79,7 +87,11 @@
           "actuator": "ingest-actuator",
           "op": "parse_document"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["読む", "確認", "見る"],
+        "en": ["read", "review", "check", "look at"]
+      }
     },
     {
       "id": "input",
@@ -94,7 +106,11 @@
           "actuator": "service-actuator",
           "op": "api"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["入力", "転記", "登録", "反映"],
+        "en": ["input", "enter", "register", "reflect"]
+      }
     },
     {
       "id": "transform",
@@ -109,7 +125,11 @@
           "actuator": "ingest-actuator",
           "op": "normalize_card"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["集計", "加工", "変換", "結合"],
+        "en": ["aggregate", "transform", "convert", "merge", "combine"]
+      }
     },
     {
       "id": "judge",
@@ -124,7 +144,11 @@
           "actuator": "approval-actuator",
           "op": "evaluate_decision_rights"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["判断", "判定", "承認可否", "異常値"],
+        "en": ["judge", "decide", "determine", "anomaly"]
+      }
     },
     {
       "id": "create",
@@ -143,7 +167,11 @@
           "actuator": "email-actuator",
           "op": "create_draft"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["作成", "作る", "更新"],
+        "en": ["create", "make", "update", "draft"]
+      }
     },
     {
       "id": "operate",
@@ -158,7 +186,11 @@
           "actuator": "service-actuator",
           "op": "cli"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["ログイン", "ダウンロード", "クリック", "開く"],
+        "en": ["login", "log in", "download", "click", "open"]
+      }
     },
     {
       "id": "communicate",
@@ -173,7 +205,11 @@
           "actuator": "meeting-actuator",
           "op": "speak"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["送る", "送信", "メールする", "聞く", "共有", "投稿"],
+        "en": ["send", "email", "ask", "share", "post"]
+      }
     },
     {
       "id": "manage",
@@ -188,7 +224,11 @@
           "actuator": "approval-actuator",
           "op": "create"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["管理", "追う", "リマインド"],
+        "en": ["manage", "track", "remind"]
+      }
     },
     {
       "id": "record",
@@ -203,7 +243,11 @@
           "actuator": "working-memory-actuator",
           "op": "note"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["記録", "保存", "ログ"],
+        "en": ["record", "save", "log"]
+      }
     },
     {
       "id": "coordinate",
@@ -218,7 +262,11 @@
           "actuator": "presence-actuator",
           "op": "dispatch"
         }
-      ]
+      ],
+      "keywords": {
+        "ja": ["調整", "日程", "アサイン"],
+        "en": ["coordinate", "schedule", "assign"]
+      }
     }
   ],
   "methods": [
@@ -246,23 +294,44 @@
   "effects": [
     {
       "id": "external_send",
-      "description": "The step sends information outside the originating system or organization."
+      "description": "The step sends information outside the originating system or organization.",
+      "keywords": {
+        "ja": ["送信", "送る", "メールする"],
+        "en": ["send", "email"]
+      },
+      "only_with_verbs": ["communicate"]
     },
     {
       "id": "money",
-      "description": "The step moves, commits, or changes money."
+      "description": "The step moves, commits, or changes money.",
+      "keywords": {
+        "ja": ["支払", "振込", "請求", "発注"],
+        "en": ["payment", "pay", "invoice", "purchase order"]
+      }
     },
     {
       "id": "personal_data",
-      "description": "The step touches personally identifiable information."
+      "description": "The step touches personally identifiable information.",
+      "keywords": {
+        "ja": ["個人情報", "氏名", "住所"],
+        "en": ["personal data", "personal information"]
+      }
     },
     {
       "id": "irreversible",
-      "description": "The step cannot be easily undone once taken."
+      "description": "The step cannot be easily undone once taken.",
+      "keywords": {
+        "ja": ["削除"],
+        "en": ["delete"]
+      }
     },
     {
       "id": "approval",
-      "description": "The step requires an authorization decision."
+      "description": "The step requires an authorization decision.",
+      "keywords": {
+        "ja": ["承認", "決裁"],
+        "en": ["approve", "approval"]
+      }
     }
   ],
   "rules": [
