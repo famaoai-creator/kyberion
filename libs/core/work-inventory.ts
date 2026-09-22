@@ -27,6 +27,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { resolveKnowledgeScopeSet } from './knowledge-scope.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -473,7 +474,13 @@ export function workInventoryRoot(
     if (!isValidTenantSlug(scope.tenant_slug)) {
       throw new Error(`invalid tenant slug: ${scope.tenant_slug}`);
     }
-    return path.join(rootDir, 'knowledge/confidential', scope.tenant_slug, 'work-inventory');
+    // The tenant root comes from the governed scope chain, not a hand-built path.
+    const tenantRoot = resolveKnowledgeScopeSet(
+      { tier: 'confidential', tenant_slug: scope.tenant_slug },
+      { includeCommon: false }
+    ).roots.find((root) => root.startsWith('confidential/'));
+    if (!tenantRoot) throw new Error(`no confidential root for tenant: ${scope.tenant_slug}`);
+    return path.join(rootDir, 'knowledge', tenantRoot, 'work-inventory');
   }
   return path.join(rootDir, 'knowledge/personal/work-inventory');
 }

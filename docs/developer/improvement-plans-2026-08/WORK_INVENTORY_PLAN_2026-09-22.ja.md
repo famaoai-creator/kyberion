@@ -164,6 +164,32 @@ WorkInventoryEntry(業務 1 件)
 
 ## 8. 実装状況
 
-| ID        | 状態 | 備考            |
-| --------- | ---- | --------------- |
-| WI-01〜12 | 計画 | 2026-09-22 着手 |
+ブランチ `agent/work-inventory-20260922`(worktree `kyberion-work-inventory`)。
+
+| ID    | 状態   | 備考                                                                                                                                                                                                                                                                                 |
+| ----- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| WI-01 | DONE   | `work-inventory-taxonomy.json`(7 段・12 行為・5 手段・規則 7 本・行為/効果のキーワード・順位の既定値)と entry / taxonomy スキーマ。カタログ整合性チェックに登録                                                                                                                      |
+| WI-02 | DONE   | `libs/core/work-inventory.ts`。規則は先勝ち、`money` / `irreversible` / `approval` は常に人間。`human_override` は保持、提案との食い違いは理由に両方残す                                                                                                                             |
+| WI-03 | DONE   | `work-inventory-harvest.ts`。スパン名・時刻・状態・所要時間だけを読む。テナント間・個人スコープへの混入なし。`schedule` 宣言のあるパイプラインは `origin: scheduled` として候補提案から除外                                                                                          |
+| WI-04 | DONE   | `work-inventory-decompose.ts`。モデル提案 → 規則で再判定。モデル不在・不正応答・時間切れは決定的なキーワード分解に落ちる                                                                                                                                                             |
+| WI-05 | DONE   | `work-inventory-consent.ts` / `work-inventory-observation.ts`。同意は本人のみ・90 日以内・クリップボードと画面フレームは不可。要約は許可リスト方式(アプリ名・ホスト名・操作種別・回数)で本人の personal 層に保存し、本人確認後にだけテナントの業務へ。付与・撤回・取り込みは監査ログ |
+| WI-06 | DONE   | `work-inventory-scoring.ts`。実測(利用ログ・記録)を自己申告より優先。校正は手段ごとの自動化可能割合を実績に寄せる(人間は固定 0)                                                                                                                                                      |
+| WI-07 | DONE   | `pnpm inventory`(add / list / show / classify / override / status / harvest / consent / observe / candidates / promote / learn)。階層ガードのある読み書きは `pnpm tenant` と同じく `sovereign_concierge` の実行コンテキストで行う                                                    |
+| WI-08 | DONE   | ヒアリングのシナリオをカタログ化(`hearing-scenarios.json`)。`/ask?mode=hearing&scenario=work_inventory` で棚卸しの 8 項目を聞き、確定で業務記録を保存                                                                                                                                |
+| WI-09 | DONE   | `work-inventory-promotion.ts`。mission への昇格はヒアリングと同じ統治された hand-off(人間の `decided_by`、alignment gate)。実績計測 → 校正 → 組織の学習候補キュー                                                                                                                    |
+| WI-10 | 進行中 | 標準意図・保持期間・knowledge 文書                                                                                                                                                                                                                                                   |
+| WI-11 | 進行中 | 「進み具合」の候補パネル                                                                                                                                                                                                                                                             |
+| WI-12 | 進行中 | 波ごとの tsc / テストは実施済み。PR 前の `pnpm check -- --scope pr` は最後に実施                                                                                                                                                                                                     |
+
+### 発見・修正した欠陥
+
+- 規則の穴: API のある業務システムへの画面操作、API のないシステムでの受信・連絡が「人間」に落ちていた → 規則を広げた(Wave 1 レビュー)。
+- 観測要約の ID に「要約した日」が入り、翌日に同じ記録を要約し直すと重複して回数が二重計上される → 記録日に変更(Wave 2 レビュー)。
+- 定期実行の判定をダイジェスト文字列の中身で行っていた → 観測記録に `origin` 欄を追加(Wave 3 レビュー)。
+- CLI が実行コンテキストなしで階層ガード付きの領域を読み書きして拒否されていた → `pnpm tenant` と同じ統治された実行コンテキストで包んだ(Wave 3 レビュー)。
+
+### 既知の残件
+
+- **トレースの衛生**: 2026-08-25〜28 に空の `code-actuator:pipeline` などが 1 日 2〜3 千件記録されている。テスト実行が本番のトレースに書き込んだとみられ、需要推定を歪める。トレースの出所の区別(テスト / 定期 / 人)は別件で対応する。
+- デスクトップ記録にはステップごとの時刻がないため、デスクトップ由来の所要時間は取れない(ブラウザ記録のみ)。
+- ヒアリング画面の見出しは両シナリオ共通のまま(シナリオ別の見出し・説明の表示は後続)。

@@ -473,11 +473,10 @@ describe('calibration: storage (hermetic)', () => {
       taxonomy,
       new Date('2026-09-22T00:00:00.000Z')
     );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const invalid = {
       ...calibration,
       method_automatable: { ...calibration.method_automatable, api: 'nope' },
-    } as any;
+    } as unknown as WorkInventoryCalibration;
     expect(() => saveWorkInventoryCalibration(invalid, { rootDir: fixtureRoot })).toThrow(
       /Invalid work inventory calibration/
     );

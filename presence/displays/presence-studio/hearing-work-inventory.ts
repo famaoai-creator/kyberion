@@ -42,7 +42,7 @@ export function workInventoryRequirementAnswer(
 // ---------------------------------------------------------------------------
 
 const SCHEDULE_KEYWORDS = ['毎日', '毎週', '毎月', 'daily', 'weekly', 'monthly'];
-const EVENT_KEYWORDS = ['メール', '受信', '届いたら', 'email', 'received'];
+const EVENT_KEYWORDS = ['メール', '受信', '届いたら', 'email', 'received']; // i18n-exempt: input-parsing keywords matched against hearing answers, never shown
 
 /** Combines the `trigger` and `frequency` answers per WI-08 §4: "schedule if
  * frequency/trigger mention 毎日/毎週/毎月/daily/weekly/monthly, event if
