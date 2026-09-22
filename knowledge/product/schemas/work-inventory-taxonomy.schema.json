@@ -278,6 +278,15 @@
         "enum": ["external_send", "money", "personal_data", "irreversible", "approval"]
       }
     },
+    "forced_human_effects": {
+      "type": "array",
+      "description": "Effects whose steps always stay human; a human_override may never downgrade them.",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["external_send", "money", "personal_data", "irreversible", "approval"]
+      }
+    },
     "scoring_defaults": {
       "type": "object",
       "additionalProperties": false,

@@ -24,7 +24,11 @@ import {
   type HearingScenarioCatalogEntry,
 } from '@agent/core/hearing-scenario-catalog';
 import { proposeWorkDecomposition } from '@agent/core/work-inventory-decompose';
-import { saveWorkInventoryEntry, type WorkInventoryScope } from '@agent/core/work-inventory';
+import {
+  saveWorkInventoryEntry,
+  WorkInventoryStoreError,
+  type WorkInventoryScope,
+} from '@agent/core/work-inventory';
 import { resolveWorkInventoryScopeForViewer } from './work-inventory-routes.js';
 import {
   PresenceStudioViewerError,
@@ -191,7 +195,9 @@ function hearingResponseError(req: Request, res: Response, error: unknown): void
       ? error.status
       : error instanceof PresenceStudioViewerError
         ? error.status
-        : 500;
+        : error instanceof WorkInventoryStoreError
+          ? 409
+          : 500;
   logger.warn(
     presenceStudioData.presenceStudioAuditLine(req, 'hearing.reject', {
       status,
@@ -579,19 +585,23 @@ export function registerHearingRoutes(app: express.Express): void {
       // — elevate only for this write, the same pattern `training-routes.ts`
       // uses for its own confidential-tier assignment writes and
       // `hearing-mission-routes.ts` uses for its mission-evidence write.
+      // `mode: 'create'`: a new entry never overwrites an existing one.
       const entry = withExecutionContext('ecosystem_architect', () =>
-        saveWorkInventoryEntry({
-          ...result.entry,
-          status: 'confirmed',
-          observations: [
-            ...(result.entry.observations ?? []),
-            {
-              source: 'self_report' as const,
-              ref: `hearing:${record.session_id}`,
-              observed_at: nowIso(),
-            },
-          ],
-        })
+        saveWorkInventoryEntry(
+          {
+            ...result.entry,
+            status: 'confirmed',
+            observations: [
+              ...(result.entry.observations ?? []),
+              {
+                source: 'self_report' as const,
+                ref: `hearing:${record.session_id}`,
+                observed_at: nowIso(),
+              },
+            ],
+          },
+          { mode: 'create' }
+        )
       );
 
       const updated: HearingRecordWithInventoryFields = {

@@ -112,7 +112,7 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
 
   switch (command) {
     case 'add': {
-      const result = await runAdd(argv, coreOptions);
+      const result = await runAdd(argv, { ...coreOptions, now });
       emit(
         result,
         [

@@ -1,7 +1,8 @@
-import * as fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
 import {
   loadWorkInventoryTaxonomy,
   type WorkInventoryEntry,
@@ -152,6 +153,40 @@ describe('scoreWorkInventoryEntry: effort_minutes basis', () => {
     );
     expect(result.basis.effort).toBe('observed');
     expect(result.components.effort_minutes).toBe(3);
+  });
+
+  it('never takes effort from a kyberion_trace duration (machine time, not human time)', () => {
+    const result = scoreWorkInventoryEntry(
+      entry({
+        observations: [
+          {
+            source: 'kyberion_trace',
+            ref: 'pipeline:weekly',
+            observed_at: '2026-09-01T00:00:00.000Z',
+            metrics: { median_duration_ms: 600000 },
+          },
+        ],
+      }),
+      { taxonomy }
+    );
+    expect(result.basis.effort).toBe('none');
+    expect(result.components.effort_minutes).toBe(0);
+
+    const browser = scoreWorkInventoryEntry(
+      entry({
+        observations: [
+          {
+            source: 'browser_recording',
+            ref: 'rec-1',
+            observed_at: '2026-09-01T00:00:00.000Z',
+            metrics: { median_duration_ms: 120000 },
+          },
+        ],
+      }),
+      { taxonomy }
+    );
+    expect(browser.basis.effort).toBe('observed');
+    expect(browser.components.effort_minutes).toBe(2);
   });
 
   it('is 0 with basis none when neither self-report nor observed duration is present', () => {
@@ -419,12 +454,14 @@ describe('calibration: storage (hermetic)', () => {
   let fixtureRoot = '';
 
   beforeEach(() => {
-    fs.mkdirSync(FIXTURE_PARENT, { recursive: true });
-    fixtureRoot = fs.mkdtempSync(path.join(FIXTURE_PARENT, 'work-inventory-calibration-test-'));
+    fixtureRoot = path.join(FIXTURE_PARENT, `work-inventory-calibration-test-${randomUUID()}`);
+    safeMkdir(fixtureRoot, { recursive: true });
   });
 
   afterEach(() => {
-    if (fixtureRoot) fs.rmSync(fixtureRoot, { recursive: true, force: true });
+    if (fixtureRoot && safeExistsSync(fixtureRoot)) {
+      safeRmSync(fixtureRoot, { recursive: true, force: true });
+    }
     fixtureRoot = '';
   });
 

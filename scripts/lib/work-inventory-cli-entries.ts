@@ -10,6 +10,7 @@ import {
   listWorkInventoryEntries,
   loadWorkInventoryEntry,
   saveWorkInventoryEntry,
+  stepForcedHumanEffects,
   type WorkEntryStatus,
   type WorkInventoryEntry,
   type WorkInventoryStep,
@@ -76,7 +77,11 @@ export interface AddResult {
   source: 'model' | 'heuristic' | 'empty';
 }
 
-export async function runAdd(argv: string[], options: WorkInventoryCliOptions): Promise<AddResult> {
+/** Always writes a *new* entry (`mode: 'create'`): an id collision fails, never overwrites. */
+export async function runAdd(
+  argv: string[],
+  options: WorkInventoryCliOptions & { now?: Date }
+): Promise<AddResult> {
   const title = requireFlag(argv, '--title', 'add');
   const stepsText = getFlag(argv, '--steps');
   const systems = csv(argv, '--systems');
@@ -102,22 +107,25 @@ export async function runAdd(argv: string[], options: WorkInventoryCliOptions): 
           ? { effort_minutes_per_run: effortMinutesPerRun }
           : {}),
       },
-      { useModel }
+      { useModel, ...(options.now ? { now: options.now } : {}) }
     );
-    const saved = governed(() => saveWorkInventoryEntry(result.entry, { rootDir }));
+    const saved = governed(() => saveWorkInventoryEntry(result.entry, { rootDir, mode: 'create' }));
     return { entry: saved, warnings: result.warnings, source: result.source };
   }
 
-  const draft = createWorkInventoryEntry({
-    title,
-    scope,
-    trigger: { kind: triggerKind ?? 'ad_hoc', description: title },
-    ...(frequency ? { frequency } : {}),
-    ...(effortMinutesPerRun !== undefined ? { effort_minutes_per_run: effortMinutesPerRun } : {}),
-    ...(systems.length > 0 ? { systems } : {}),
-  });
+  const draft = createWorkInventoryEntry(
+    {
+      title,
+      scope,
+      trigger: { kind: triggerKind ?? 'ad_hoc', description: title },
+      ...(frequency ? { frequency } : {}),
+      ...(effortMinutesPerRun !== undefined ? { effort_minutes_per_run: effortMinutesPerRun } : {}),
+      ...(systems.length > 0 ? { systems } : {}),
+    },
+    options.now
+  );
   const classified = applyClassification(draft, { apiSystems });
-  const saved = governed(() => saveWorkInventoryEntry(classified, { rootDir }));
+  const saved = governed(() => saveWorkInventoryEntry(classified, { rootDir, mode: 'create' }));
   return { entry: saved, warnings: [], source: 'empty' };
 }
 
@@ -176,8 +184,15 @@ export function runOverride(
   const decidedBy = requireDecidedBy(argv);
   const entry = loadWorkInventoryEntry(scope, entryId, { rootDir: options.rootDir });
   if (!entry) notFound(entryId);
-  if (!entry.steps.some((step) => step.step_id === stepId)) {
+  const target = entry.steps.find((step) => step.step_id === stepId);
+  if (!target) {
     throw new WorkInventoryCliUsageError(`entry ${entryId} has no step ${stepId}`);
+  }
+  const forced = stepForcedHumanEffects(target);
+  if (method !== 'human' && forced.length > 0) {
+    throw new WorkInventoryCliUsageError(
+      `step ${stepId} has effect ${forced.join(', ')}, which always stays human; it cannot be overridden to ${method}`
+    );
   }
   const steps: WorkInventoryStep[] = entry.steps.map((step) =>
     step.step_id === stepId
