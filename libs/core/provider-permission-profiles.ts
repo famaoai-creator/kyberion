@@ -37,7 +37,8 @@ import {
  * given — see each backend's `resolvePermissionArgs` helper).
  */
 
-export type ProviderId = 'claude' | 'codex' | 'agy' | 'grok' | 'gemini' | 'cursor' | 'opencode';
+export type ProviderId =
+  'claude' | 'codex' | 'agy' | 'grok' | 'gemini' | 'cursor' | 'opencode' | 'devin';
 
 export const PROVIDER_IDS: readonly ProviderId[] = [
   'claude',
@@ -47,6 +48,7 @@ export const PROVIDER_IDS: readonly ProviderId[] = [
   'gemini',
   'cursor',
   'opencode',
+  'devin',
 ] as const;
 
 /**
@@ -175,6 +177,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
       ['--agent', 'build'],
       'OpenCode CLI implementer tier runs on the build agent with the full tool set.'
     ),
+    devin: ok(
+      ['--permission-mode', 'bypass'],
+      'Devin CLI bypass mode auto-approves every tool call for implementer-tier write/exec work.'
+    ),
   },
   explorer: {
     claude: ok(
@@ -214,6 +220,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
       ['--agent', 'plan'],
       'OpenCode CLI explorer tier runs on the read-only-leaning plan agent.'
     ),
+    devin: ok(
+      ['--permission-mode', 'normal'],
+      'Devin CLI normal mode auto-approves read-only tools; write/exec approval prompts have no one to answer under `-p` and fail closed.'
+    ),
   },
   planner: {
     claude: ok(
@@ -244,6 +254,11 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
     opencode: ok(
       ['--agent', 'plan'],
       'OpenCode CLI planner tier runs on the plan agent without --auto approval.'
+    ),
+    devin: refused(
+      'Devin CLI has no headless no-tools mode: the Plan/Ask agent modes are interactive-only ' +
+        "(`/plan`, `/ask`), so a `-p` invocation cannot enforce the planner tier's no-execution " +
+        'invariant. Refusing delegation rather than granting an under-restricted approximation.'
     ),
   },
 } as const;
@@ -349,6 +364,9 @@ const PROVIDER_REQUIRED_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>
   // OpenCode authenticates via its own login session (opencode auth login);
   // no extra config home override is required for headless run invocations.
   opencode: [],
+  // Devin CLI reads its login session from ~/.local/share/devin (HOME passes
+  // through); model/permission selection is always passed as explicit argv.
+  devin: [],
 };
 
 /**
@@ -366,6 +384,9 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
   cursor: ['CURSOR_API_KEY'],
   // OpenCode primarily uses its login session; no provider API key passes through.
   opencode: [],
+  // Devin CLI primarily uses its `devin auth login` session; WINDSURF_API_KEY
+  // is the documented credential override (shared Cognition/Windsurf auth).
+  devin: ['WINDSURF_API_KEY', 'DEVIN_API_KEY'],
 };
 
 /**

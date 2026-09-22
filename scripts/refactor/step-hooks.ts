@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { safeExecResult } from '@agent/core/secure-io';
+import { safeExecShellScriptResult } from '@agent/core/secure-io';
 import { secureFetch } from '@agent/core/network';
 import type { StepHook } from '@agent/core/pipeline-contract';
 import { isRecord } from '@agent/core/foundation';
@@ -109,7 +109,7 @@ async function runHttpHook(hook: StepHook, ctx: Record<string, unknown>): Promis
 function runCommandHook(hook: StepHook, ctx: Record<string, unknown>): boolean {
   if (!hook.cmd) throw new Error('command hook requires cmd');
   const cmd = String(resolveVars(hook.cmd, ctx));
-  const result = safeExecResult('bash', ['-lc', cmd]);
+  const result = safeExecShellScriptResult('bash', cmd, { login: true });
   if (result.status === 0) return false;
   if (result.status === 2) return true;
   throw new Error(result.stderr || result.error?.message || `command exited with ${result.status}`);

@@ -1,7 +1,7 @@
 import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { classifyError } from '@agent/core/error-classifier';
 import { logger } from '@agent/core/core';
-import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, type SafeShell } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { resolveVars, evaluateCondition } from '@agent/core/logic-utils';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -186,7 +186,7 @@ export async function runSteps(
   context: Record<string, unknown>;
 }> {
   const rootDir = pathResolver.rootDir();
-  const shellBin = 'bash';
+  const shellBin: SafeShell = 'bash';
   const forwardingPort: ActuatorForwardingPort = {
     forward: async (request: ActuatorForwardRequest) => {
       const targetOp = `${request.target_actuator}:${request.target_op}`;
@@ -220,7 +220,7 @@ export async function runStepsInternal(
   initialCtx: Record<string, unknown>,
   opts: RunStepsOptions,
   rootDir: string,
-  shellBin: string
+  shellBin: SafeShell
 ): Promise<{
   status: 'succeeded' | 'failed';
   results: RunStepResult[];
