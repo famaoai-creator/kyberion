@@ -90,12 +90,12 @@ leftovers. A test may not depend on:
   under vitest (`KYBERION_ALLOW_TEST_NOTIFICATIONS=1` opts a delivery
   suite back in); 82 phantom inbox entries from un-mocked finishMission
   flows taught us this;
-- **production shared stores** — any writer to a repo-wide store
-  (`active/shared/logs/traces`, the inbox, audit) skips the write under
-  vitest unless the caller passes an explicit target or an opt-in env is
-  set (`KYBERION_TRACE_TEST_PERSIST=1` for traces). `vi.mock` of secure-io
-  does not intercept foundation JSON IO, so unguarded writers leaked test
-  traces into production and skewed work-inventory demand signals;
+- **production shared stores** — a writer to a repo-wide store must not
+  reach the real store under vitest: traces skip the shared log unless the
+  caller passes a `dir` or sets `KYBERION_TRACE_TEST_PERSIST=1`, and the
+  audit chain redirects to the injected test IO. `vi.mock` of secure-io does
+  not intercept foundation JSON IO, so an unguarded writer leaked test traces
+  into production and skewed work-inventory demand signals;
 - **the calendar** — absolute dates in fixtures rot; freeze
   `vi.useFakeTimers({ now, toFake: ['Date'] })` for the WHOLE flow, not
   just the assertion phase.
@@ -112,7 +112,9 @@ see). Before calling such code done, run it once through its real entry
 point (CLI, janitor, worker, surface) against the real root. Wrap each
 synchronous disk call in `withExecutionContext(role, fn)` — it restores the
 context as soon as `fn` returns, so never wrap an `await`; use
-`withExecutionContextAsync` across awaits. Data a runtime role must read
+`withExecutionContextAsync` across awaits — it swaps the process-global
+`MISSION_ROLE` for the whole await, so concurrent async flows in one process
+see each other's role. Data a runtime role must read
 must live where that role can read it, and an unreadable overlay must warn,
 not drop silently.
 
@@ -181,10 +183,15 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
 - One logical change per commit; lint-staged regenerates the knowledge
   index and runs eslint/prettier — expect it to amend what you staged.
   lint-staged stashes unstaged changes, so while other agents edit the
-  same worktree, stage explicit paths and commit with hooks disabled
-  (`git -c core.hooksPath=/dev/null commit ...`), then run the hook's steps
-  yourself: eslint --fix, prettier, and `pnpm generate:knowledge-index` for
-  any `knowledge/` edit (a missed index turns CI `catalogs` red).
+  same worktree, do the hook's work yourself **before** committing:
+  1. run `eslint --fix --max-warnings 0` and `prettier --write` on the paths
+     you will stage;
+  2. for any `knowledge/` edit, run `pnpm generate:knowledge-index` (it also
+     picks up other agents' uncommitted knowledge edits — check the diff);
+  3. stage explicit paths plus `knowledge/_index.md` and
+     `knowledge/_integrity-manifest.json`, and confirm no newly added
+     `.js`/`.d.ts` shadows a `.ts` source (the `.husky/pre-commit` check);
+  4. only then `git -c core.hooksPath=/dev/null commit`.
 - Set up every new worktree from scratch (install with
   `CI=true pnpm install --frozen-lockfile`, then `pnpm build`). Never
   symlink the main checkout's `node_modules`; if `pnpm exec` misbehaves in
@@ -239,11 +246,12 @@ Patterns proven in yc-software/qm and adopted as repo-wide discipline
 - **Asymmetric trust for de-obfuscation.** Seeing through quotes, wrappers
   and encodings is correct when looking for something to BLOCK, and wrong
   when looking for a reason to PERMIT (`shell-command-normalize.ts`).
-- **Ties deny, and identity is never ambient.** Equal-priority allow/deny
-  rules resolve to deny. Agent or human identity comes from an authenticated
-  context, never from ambient env such as `MISSION_ROLE` or
-  `KYBERION_AGENT_ID` — `pnpm pipeline` and `withExecutionContext` set
-  `MISSION_ROLE` for ordinary human runs.
+- **`MISSION_ROLE` is an authority role, not an identity.** It authorizes
+  file access (`resolveRole()`), but `pnpm pipeline` and every
+  `withExecutionContext` set it for ordinary human runs, so never infer who
+  started a run from it — trace origin marks a run `agent` only when
+  `KYBERION_NHI_ID` / `KYBERION_AGENT_ID` is set (`deriveTraceOrigin` in
+  `libs/core/src/trace.ts`).
 - **Tighten monotonically, never replace.** A security floor (posture,
   approval requirements) is applied as a union on top of the base
   resolution — an early-return floor that REPLACES stronger requirements
