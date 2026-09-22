@@ -25,6 +25,7 @@ import {
 } from '@agent/core/hearing-scenario-catalog';
 import { proposeWorkDecomposition } from '@agent/core/work-inventory-decompose';
 import { saveWorkInventoryEntry, type WorkInventoryScope } from '@agent/core/work-inventory';
+import { resolveWorkInventoryScopeForViewer } from './work-inventory-routes.js';
 import {
   PresenceStudioViewerError,
   resolvePresenceStudioViewerContext,
@@ -137,14 +138,14 @@ async function renderCurrentHearingCanvas(
  * tenant. Mirrors `hearing-runtime.ts`'s `hearingNamespace` resolution:
  * first tenant slug -> tenant scope; `'unscoped'` (no tenant) -> personal
  * scope. */
-function workInventoryScopeForNamespace(namespace: string): WorkInventoryScope {
-  if (namespace === 'all') {
+function workInventoryScopeForHandoff(viewer: PresenceStudioViewerContext): WorkInventoryScope {
+  const scope = resolveWorkInventoryScopeForViewer(viewer);
+  if (!scope) {
     throw new HearingRequestError(
-      'Work inventory hand-off requires a concrete tenant or personal scope.'
+      'Work inventory hand-off requires a concrete tenant or a local owner session.'
     );
   }
-  if (namespace === 'unscoped') return {};
-  return { tenant_slug: namespace };
+  return scope;
 }
 
 /** WI-08: `?scenario_id=` on the canvas URL itself (not just the record
@@ -570,7 +571,7 @@ export function registerHearingRoutes(app: express.Express): void {
         );
       }
 
-      const scope = workInventoryScopeForNamespace(namespace);
+      const scope = workInventoryScopeForHandoff(viewer);
       const input = buildWorkInventoryDecompositionInput(record, { scope });
       const result = await proposeWorkDecomposition(input, { useModel: true });
       // Writing a `knowledge/confidential/<tenant>/work-inventory/` entry is

@@ -10981,6 +10981,81 @@
         "ja": "項目を選ぶと詳細が見られます。",
         "qps-ploc": "⟦Ƈħőőşė ȧñ ïŧėɱ ŧő şėė ïŧş ḓėŧȧïŀş. ŀőřėɱ ïṗşůɱ⟧"
       },
+      "progress_work_inventory_title": {
+        "en": "Automation candidates",
+        "ja": "業務の自動化候補",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧïőñ ƈȧñḓïḓȧŧėş ŀőřėɱ ⟧"
+      },
+      "progress_work_inventory_score_label": {
+        "en": "Score",
+        "ja": "スコア",
+        "qps-ploc": "⟦Şƈőřė ŀőř⟧"
+      },
+      "progress_work_inventory_hours_label": {
+        "en": "{hours} hrs/month",
+        "ja": "{hours} 時間/月",
+        "qps-ploc": "⟦{hours} ħřş/ɱőñŧħ ŀőřėɱ⟧"
+      },
+      "progress_work_inventory_automatable_label": {
+        "en": "Automatable share",
+        "ja": "自動化率",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧȧƀŀė şħȧřė ŀőřėɱ⟧"
+      },
+      "progress_work_inventory_status_draft": {
+        "en": "Draft",
+        "ja": "下書き",
+        "qps-ploc": "⟦Ḓřȧƒŧ ŀőř⟧"
+      },
+      "progress_work_inventory_status_confirmed": {
+        "en": "Confirmed",
+        "ja": "確認済み",
+        "qps-ploc": "⟦Ƈőñƒïřɱėḓ ŀőř⟧"
+      },
+      "progress_work_inventory_status_candidate": {
+        "en": "Candidate",
+        "ja": "候補",
+        "qps-ploc": "⟦Ƈȧñḓïḓȧŧė ŀőř⟧"
+      },
+      "progress_work_inventory_status_promoted": {
+        "en": "Automated",
+        "ja": "自動化済み",
+        "qps-ploc": "⟦Ȧůŧőɱȧŧėḓ ŀőř⟧"
+      },
+      "progress_work_inventory_status_retired": {
+        "en": "Retired",
+        "ja": "終了",
+        "qps-ploc": "⟦Řėŧïřėḓ ŀőř⟧"
+      },
+      "progress_work_inventory_consent_line": {
+        "en": "Recording consent: {active} active (until {expires})・{pending} summaries waiting for review",
+        "ja": "PC 操作の記録: 同意 {active} 件（{expires} まで）・確認待ちの要約 {pending} 件",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ ƈőñşėñŧ: {active} ȧƈŧïṽė (ůñŧïŀ {expires})・{pending} şůɱɱȧřïėş ẇȧïŧïñɠ ƒőř řėṽïėẇ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "progress_work_inventory_consent_line_no_expiry": {
+        "en": "Recording consent: {active} active・{pending} summaries waiting for review",
+        "ja": "PC 操作の記録: 同意 {active} 件・確認待ちの要約 {pending} 件",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ ƈőñşėñŧ: {active} ȧƈŧïṽė・{pending} şůɱɱȧřïėş ẇȧïŧïñɠ ƒőř řėṽïėẇ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "progress_work_inventory_consent_none": {
+        "en": "No consent to record your screen yet.",
+        "ja": "PC 操作の記録への同意はまだありません。",
+        "qps-ploc": "⟦Ñő ƈőñşėñŧ ŧő řėƈőřḓ ẏőůř şƈřėėñ ẏėŧ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "progress_work_inventory_start": {
+        "en": "Start the inventory",
+        "ja": "棚卸しを始める",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħė ïñṽėñŧőřẏ ŀőřėɱ ⟧"
+      },
+      "progress_work_inventory_operator_hint": {
+        "en": "Detailed setup runs through pnpm inventory.",
+        "ja": "詳しい操作は pnpm inventory で行えます。",
+        "qps-ploc": "⟦Ḓėŧȧïŀėḓ şėŧůṗ řůñş ŧħřőůɠħ ṗñṗɱ ïñṽėñŧőřẏ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "progress_work_inventory_empty": {
+        "en": "Once you inventory your regular work, automation candidates worth handing off will show up here.",
+        "ja": "よく行う作業を棚卸しすると、自動化できそうな候補がここに表示されます。",
+        "qps-ploc": "⟦Őñƈė ẏőů ïñṽėñŧőřẏ ẏőůř řėɠůŀȧř ẇőřķ, ȧůŧőɱȧŧïőñ ƈȧñḓïḓȧŧėş ẇőřŧħ ħȧñḓïñɠ őƒƒ ẇïŀŀ şħőẇ ůṗ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
       "settings_nav_profile": {
         "en": "About you",
         "ja": "あなたのこと",

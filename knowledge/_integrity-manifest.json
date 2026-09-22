@@ -913,6 +913,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/work-inventory-discovery-stage.md",
+      "tier": "public",
+      "size": 11310,
+      "type": "md"
+    },
+    {
       "path": "product/capability-assets/README.md",
       "tier": "public",
       "size": 981,
@@ -2247,13 +2253,13 @@
     {
       "path": "product/governance/intent-coverage-matrix.json",
       "tier": "public",
-      "size": 31855,
+      "size": 32738,
       "type": "json"
     },
     {
       "path": "product/governance/intent-domain-ontology.json",
       "tier": "public",
-      "size": 111032,
+      "size": 112057,
       "type": "json"
     },
     {
@@ -2265,7 +2271,7 @@
     {
       "path": "product/governance/intent-outcome-patterns.json",
       "tier": "public",
-      "size": 27496,
+      "size": 28830,
       "type": "json"
     },
     {
@@ -2979,7 +2985,7 @@
     {
       "path": "product/governance/outcome-catalog.json",
       "tier": "public",
-      "size": 32388,
+      "size": 33167,
       "type": "json"
     },
     {
@@ -3615,7 +3621,7 @@
     {
       "path": "product/governance/standard-intents.json",
       "tier": "public",
-      "size": 188284,
+      "size": 189913,
       "type": "json"
     },
     {
@@ -3627,7 +3633,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 22600,
+      "size": 25329,
       "type": "json"
     },
     {
@@ -3801,7 +3807,7 @@
     {
       "path": "product/governance/task-session-policy.json",
       "tier": "public",
-      "size": 51823,
+      "size": 53380,
       "type": "json"
     },
     {
@@ -6189,7 +6195,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 577438,
+      "size": 581427,
       "type": "json"
     },
     {
