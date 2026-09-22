@@ -18,7 +18,9 @@ At every step it makes the request, plan, result, and next action visible.
 
 ## 1. Setup
 
-> This document is the canonical first-win source. Day-2 tenant / organization / activation work is in [INITIALIZATION.md](./INITIALIZATION.md), and the operational lifecycle is in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md).
+> This document is the canonical first-win source. The full onboarding order after first-win — readiness, identity, getting the baseline to `all_clear`, and the optional tenant / organization / activation steps — is in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md). Command-by-command detail is in [INITIALIZATION.md](./INITIALIZATION.md).
+>
+> Pick a route first: **personal only** (no tenant; stop after the baseline is `all_clear`), **AI company** (`pnpm onboard company`, below), or **add an existing tenant** (standard flow Steps 5–8).
 
 Prerequisites:
 
@@ -73,7 +75,7 @@ Before starting the first work, activate the tenant after the readiness probes, 
 ```bash
 pnpm tenant:activation activate \
   --customer-slug acme-ai --tenant-slug <tenant> --organization-id acme-ai \
-  --nhi-id <nhi-id> \
+  --owner-id human:founder --nhi-id <nhi-id> \
   --check-viewer-scope --check-nhi --check-services --check-isolation \
   --probe-ref viewer_scope=<audit-ref> \
   --probe-ref nhi_provisioned=<audit-ref> \

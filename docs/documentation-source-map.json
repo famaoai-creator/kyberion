@@ -34,18 +34,18 @@
     {
       "id": "onboarding",
       "canonical": "docs/QUICKSTART.md",
-      "canonical_scope": "First-win entry point. Later onboarding stages are canonical only within the explicit scopes below.",
+      "canonical_scope": "First-win entry point. The end-to-end onboarding order (routes, identity, baseline all_clear, tenant activation, first work) is canonical in the onboarding standard flow; INITIALIZATION.md is the day-2 command reference.",
       "scoped_sources": [
         {
           "scope": "first_win",
           "path": "docs/QUICKSTART.md"
         },
         {
-          "scope": "day_2_initialization",
+          "scope": "day_2_command_reference",
           "path": "docs/INITIALIZATION.md"
         },
         {
-          "scope": "tenant_organization_activation_and_first_work",
+          "scope": "end_to_end_order_and_tenant_activation",
           "path": "knowledge/product/governance/onboarding-flow.md"
         }
       ],

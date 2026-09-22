@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Onboarding'
 tags: [governance, lifecycle, onboarding]
-last_updated: 2026-08-15
+last_updated: 2026-09-22
 runtime_stages: [intake, classification]
 ---
 
@@ -9,114 +9,89 @@ runtime_stages: [intake, classification]
 
 ## 目的
 
-環境、identity、tenant、organization、実行権限を順に準備し、最初の仕事を安全に開始できる
-状態へ進める。identity の保存だけではオンボーディング完了とはみなさない。
+環境、identity、（必要なら）tenant と organization、実行権限を順に準備し、最初の仕事を安全に
+開始できる状態へ進める。
 
-エンドツーエンドの正本は [オンボーディング標準フロー](../onboarding-flow.md) である。
-この文書は lifecycle phase から参照する短い runbook とする。
+手順の順序の正本は [オンボーディング標準フロー](../onboarding-flow.md) である。この文書は
+lifecycle phase から参照する短い runbook で、各項目の番号は標準フローの Step に対応する。
+
+## ルートを決める
+
+| ルート              | 通る Step                                               |
+| ------------------- | ------------------------------------------------------- |
+| 1. 個人のみ         | 0 → 1 → 2 → 3 → 4 → 9                                   |
+| 2. AI 会社          | 0〜4 → 5〜8（`onboard company` で 5・6 をまとめる） → 9 |
+| 3. 既存テナント追加 | 0〜9 すべて                                             |
 
 ## 実行順
 
-### 1. Baseline と環境
+### Step 0〜2: baseline・導入・readiness
 
 ```bash
 pnpm pipeline --input pipelines/baseline-check.json
 pnpm install
-pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm build
+pnpm env:bootstrap --manifest kyberion-toolchain   # dist/ を使うので build の後
+pnpm doctor
 pnpm kyberion setup report --persona first-time-user
+pnpm kyberion secret introduce <service-id> <secret-key>   # 必要な secret だけ。値は argv に載せない
 pnpm surfaces reconcile
 ```
 
-baseline が `needs_recovery` または `fatal_error` の場合は、通常の onboarding を開始せず、
+baseline が `needs_recovery` または `fatal_error` の場合は、通常の onboarding を始めず、
 それぞれ recovery または障害修復へ分岐する。
 
-### 2. Identity と個人 onboarding
+### Step 3: stance を決めてから identity を保存する
 
-対話環境では `pnpm onboard`、非対話環境では reviewed JSON を使う。
+顧客・会社として使う場合は、先に `pnpm customer:switch <customer-slug>` を実行する。
+baseline の L3 はアクティブな profile の identity を見るため、順序を逆にしない。
 
 ```bash
 pnpm onboard
-# または
+# または（非対話）
 pnpm onboard apply --identity <reviewed-identity-json> --dry-run
 pnpm onboard apply --identity <reviewed-identity-json>
 ```
 
-成果物は identity、vision、agent identity、onboarding state / summary、connection 候補、
-tenant 候補、tutorial plan である。ここでは外部効果や mission を開始しない。
+GUI では concierge（`http://127.0.0.1:3050`）の `/settings` から保存できる。メンバーと承認者も
+ここで登録する。この段階では外部効果や mission を開始しない。
 
-### 3. Tenant registry
+### Step 4: baseline を all_clear にする
 
-tenant は `pnpm tenant create ... --apply` で登録する。正本は
-`knowledge/personal/tenants/{tenant-slug}.json` であり、`customer/{slug}` の tenant facet や
-`KYBERION_CUSTOMER` の切替に依存しない。登録後は次を実行する。
+baseline を再実行し、`needs_attention` が残れば失敗層を確認する。初回は L8（storage janitor）、
+L10（chronos scheduler）、L11（監査台帳）が落ちやすい。対処は標準フロー Step 4 を参照する。
+
+ルート 1 はここで Step 9 へ進む。
+
+### Step 5〜8: tenant・binding・activation・first-work
 
 ```bash
-pnpm tenant show <tenant-slug> --json
+pnpm tenant create <tenant-slug> --display-name "<Tenant name>" --assigned-role owner --apply
 pnpm check -- --only tenant-registry
-```
-
-未登録、`suspended`、`archived`、または reserved scope 名の tenant は次へ進めない。
-
-### 4. Operating context binding
-
-`customer_slug`（stance）と `tenant_slug → organization_id`（containment）を dry-run で
-確認してから binding を適用する。
-
-```bash
-pnpm onboarding:context bind \
-  --customer-slug <customer-slug> \
-  --tenant-slug <tenant-slug> \
-  --organization-id <organization-id> \
-  --dry-run --json
-pnpm onboarding:context bind \
-  --customer-slug <customer-slug> \
-  --tenant-slug <tenant-slug> \
-  --organization-id <organization-id> \
-  --apply --json
-```
-
-binding は organization state を作成または再利用するが、tenant activation そのものではない。
-
-### 5. Tenant activation
-
-activation plan で blockers を確認し、viewer scope、NHI、service readiness、isolation の
-成功 probe と、それぞれに対応する監査証跡 ref を揃えてから、人間の `--accept` 付き apply を行う。
-
-```bash
-pnpm tenant:activation plan \
-  --customer-slug <customer-slug> \
-  --tenant-slug <tenant-slug> \
+pnpm onboarding:context bind --customer-slug <customer-slug> --tenant-slug <tenant-slug> \
+  --organization-id <organization-id> --dry-run --json
+pnpm onboarding:context bind ... --apply --json
+pnpm tenant:activation plan --customer-slug <customer-slug> --tenant-slug <tenant-slug> \
   --organization-id <organization-id>
-pnpm tenant:activation activate \
-  --customer-slug <customer-slug> \
-  --tenant-slug <tenant-slug> \
-  --organization-id <organization-id> \
-  --nhi-id <nhi-id> \
+pnpm tenant:activation activate ... --owner-id human:<owner> --nhi-id <nhi-id> \
   --check-viewer-scope --check-nhi --check-services --check-isolation \
-  --probe-ref viewer_scope=<audit-ref> \
-  --probe-ref nhi_provisioned=<audit-ref> \
-  --probe-ref service_readiness=<audit-ref> \
-  --probe-ref isolation_probe=<audit-ref> \
+  --probe-ref viewer_scope=<audit-ref> --probe-ref nhi_provisioned=<audit-ref> \
+  --probe-ref service_readiness=<audit-ref> --probe-ref isolation_probe=<audit-ref> \
   --apply --accept
+pnpm onboarding:context first-work --customer-slug <customer-slug> \
+  --intent "<最初の依頼>" --dry-run --json
 ```
 
-`customer/<customer-slug>/onboarding/tenant-activation/<tenant>/<organization>/<tier>/activation.json`
-が `active` になるまで、first-work の apply と tenant-bound mission は fail-closed で停止する。
+未登録、`suspended`、`archived`、または reserved scope 名の tenant は先へ進めない。
+activation receipt が `active` になるまで、first-work の apply と tenant に紐づく mission は
+fail-closed で停止する。オプションの詳細は標準フロー Step 5〜8 を参照する。
 
-### 6. First work と review
+### Step 9: 完了確認
 
 ```bash
-pnpm onboarding:context first-work \
-  --customer-slug <customer-slug> \
-  --intent "<最初の依頼>" \
-  --dry-run --json
+pnpm pipeline vital-check
+pnpm pipeline --input pipelines/baseline-check.json
 ```
-
-結果の work shape、管理単位、scope、budget、success condition、approval boundary を
-人間が確認する。`solution_project` だけが Project bootstrap 候補になり、
-`service_operation` / `routine_operation` / `incident_response` /
-`governance_cadence` / `improvement_experiment` は organization operating model の管理単位へ接続する。
 
 ## 再開と失敗時の扱い
 
@@ -124,29 +99,21 @@ pnpm onboarding:context first-work \
 pnpm onboarding:context show --customer-slug <customer-slug> --json
 pnpm tenant:activation reconcile --customer-slug <customer-slug> \
   --tenant-slug <tenant-slug> --organization-id <organization-id>
-pnpm tenant:activation resume \
-  --customer-slug <customer-slug> \
-  --tenant-slug <tenant-slug> \
-  --organization-id <organization-id> \
-  --nhi-id <nhi-id> \
-  --check-viewer-scope --check-nhi --check-services --check-isolation \
-  --probe-ref viewer_scope=<new-audit-ref> \
-  --probe-ref nhi_provisioned=<new-audit-ref> \
-  --probe-ref service_readiness=<new-audit-ref> \
-  --probe-ref isolation_probe=<new-audit-ref> \
-  --apply --accept
+pnpm tenant:activation resume ... --apply --accept
 ```
 
-probe の再実行なしに activation を再開しない。停止・ロールバック・offboarding は
-`tenant:activation suspend|rollback` の governed command を使い、直接 state を編集しない。
+probe をやり直さずに activation を再開しない。停止・ロールバック・offboarding は
+`tenant:activation suspend|rollback` の governed command を使い、state を直接編集しない。
+identity のやり直しは `pnpm onboard reset` を使う。
 
 ## 成功条件
 
-1. identity / onboarding summary が保存されている。
-2. tenant registry と consistency check が成功している。
-3. customer、tenant、organization の binding が一致している。
-4. activation receipt が `active` で、必須 probe と accountable human が記録されている。
-5. first-work がレビュー済みで、typed context と approval boundary が定まっている。
+1. identity と onboarding summary がアクティブな profile に保存されている。
+2. `pnpm pipeline vital-check` が成功し、baseline-check が `all_clear` である。
+3. （ルート 2・3）tenant registry と consistency check が成功している。
+4. （ルート 2・3）customer、tenant、organization の binding が一致している。
+5. （ルート 2・3）activation receipt が `active` で、必須 probe と責任を持つ人間が記録されている。
+6. （ルート 2・3）first-work がレビュー済みで、typed context と approval boundary が定まっている。
 
 ## 関連文書
 
