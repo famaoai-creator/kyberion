@@ -13,6 +13,7 @@ import {
 import {
   attachDemandSignals,
   collectKyberionDemandSignals,
+  collectKyberionDemandSignalsWithStats,
   matchSignalsToEntries,
   suggestEntriesFromSignals,
   type DemandSignal,
@@ -30,6 +31,8 @@ interface TraceLineInput {
   completedAt?: string;
   status?: 'ok' | 'error' | 'in_progress';
   tenantSlug?: string;
+  /** WI-13: `Trace['metadata']['origin']`; absent -> legacy untagged trace. */
+  origin?: 'test' | 'ci' | 'scheduled' | 'agent' | 'interactive';
 }
 
 function traceLine(input: TraceLineInput): string {
@@ -53,6 +56,7 @@ function traceLine(input: TraceLineInput): string {
       startedAt: input.startedAt,
       completedAt: input.completedAt,
       ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
+      ...(input.origin ? { origin: input.origin } : {}),
     },
   });
 }
@@ -857,5 +861,141 @@ describe('work inventory harvest (hermetic)', () => {
       });
       expect(drafts.every((d) => d.scope.tenant_slug === 'acme-corp')).toBe(true);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-13: trace-origin hygiene (test/ci exclusion, scheduled override, stats)
+// ---------------------------------------------------------------------------
+// A dedicated, minimal fixture — kept separate from the large shared fixture
+// above so origin-related counts stay simple and self-evident rather than
+// riding on unrelated bookkeeping/tenant/window fixture data.
+describe('WI-13: trace origin hygiene', () => {
+  let fixtureRoot = '';
+  let tracesDir = '';
+
+  beforeEach(() => {
+    fixtureRoot = path.join(
+      pathResolver.rootDir(),
+      'active',
+      'shared',
+      'tmp',
+      `work-inventory-harvest-origin-test-${randomUUID()}`
+    );
+    tracesDir = path.join(fixtureRoot, 'active', 'shared', 'logs', 'traces');
+    safeMkdir(tracesDir, { recursive: true });
+
+    const lines: string[] = [
+      // pipeline:demo — 2 untagged (legacy) + 2 test + 1 ci. Only the 2
+      // untagged traces ever reach the signal; the 3 test/ci traces are
+      // excluded entirely (never touch any accumulator).
+      traceLine({
+        traceId: 'origin-demo-untagged-1',
+        name: 'pipeline:demo',
+        startedAt: '2026-09-19T01:00:00.000Z',
+      }),
+      traceLine({
+        traceId: 'origin-demo-untagged-2',
+        name: 'pipeline:demo',
+        startedAt: '2026-09-19T02:00:00.000Z',
+      }),
+      traceLine({
+        traceId: 'origin-demo-test-1',
+        name: 'pipeline:demo',
+        startedAt: '2026-09-19T03:00:00.000Z',
+        origin: 'test',
+      }),
+      traceLine({
+        traceId: 'origin-demo-test-2',
+        name: 'pipeline:demo',
+        startedAt: '2026-09-19T04:00:00.000Z',
+        origin: 'test',
+      }),
+      traceLine({
+        traceId: 'origin-demo-ci-1',
+        name: 'pipeline:demo',
+        startedAt: '2026-09-19T05:00:00.000Z',
+        origin: 'ci',
+      }),
+      // voice-actuator:speak_local (actuator_op, no pipelines/<id>.json —
+      // never resolves to 'scheduled' via the per-kind lookup) — 3 traces
+      // tagged scheduled + 1 untagged. The signal still ends up 'scheduled'.
+      traceLine({
+        traceId: 'origin-voice-scheduled-1',
+        name: 'voice-actuator:speak_local',
+        startedAt: '2026-09-19T06:00:00.000Z',
+        origin: 'scheduled',
+      }),
+      traceLine({
+        traceId: 'origin-voice-scheduled-2',
+        name: 'voice-actuator:speak_local',
+        startedAt: '2026-09-19T07:00:00.000Z',
+        origin: 'scheduled',
+      }),
+      traceLine({
+        traceId: 'origin-voice-scheduled-3',
+        name: 'voice-actuator:speak_local',
+        startedAt: '2026-09-19T08:00:00.000Z',
+        origin: 'scheduled',
+      }),
+      traceLine({
+        traceId: 'origin-voice-untagged',
+        name: 'voice-actuator:speak_local',
+        startedAt: '2026-09-19T09:00:00.000Z',
+      }),
+      // agent/interactive traces count normally and are neither excluded
+      // nor tallied as untagged.
+      traceLine({
+        traceId: 'origin-agent-1',
+        name: 'mission_run',
+        startedAt: '2026-09-19T10:00:00.000Z',
+        origin: 'agent',
+      }),
+      traceLine({
+        traceId: 'origin-interactive-1',
+        name: 'mission_run',
+        startedAt: '2026-09-19T11:00:00.000Z',
+        origin: 'interactive',
+      }),
+    ];
+    safeWriteFile(path.join(tracesDir, 'traces-2026-09-19.jsonl'), lines.join('\n'));
+  });
+
+  afterEach(() => {
+    if (fixtureRoot && safeExistsSync(fixtureRoot)) {
+      safeRmSync(fixtureRoot, { recursive: true, force: true });
+    }
+    fixtureRoot = '';
+  });
+
+  it('drops test/ci traces entirely — they never become or grow a signal', () => {
+    const signals = collectKyberionDemandSignals({ rootDir: fixtureRoot, now: NOW });
+    const demo = signals.find((s) => s.signature === 'pipeline:demo');
+    expect(demo?.count).toBe(2);
+    expect(demo?.sample_refs.sort()).toEqual(['origin-demo-untagged-1', 'origin-demo-untagged-2']);
+  });
+
+  it('marks a signal scheduled from trace-level metadata even for a non-pipeline (actuator_op) signature', () => {
+    const signals = collectKyberionDemandSignals({ rootDir: fixtureRoot, now: NOW });
+    const voice = signals.find((s) => s.signature === 'voice-actuator:speak_local');
+    expect(voice?.count).toBe(4); // 3 scheduled + 1 untagged, all counted
+    expect(voice?.origin).toBe('scheduled');
+  });
+
+  it('counts agent/interactive traces normally, neither excluded nor untagged', () => {
+    const { signals, stats } = collectKyberionDemandSignalsWithStats({
+      rootDir: fixtureRoot,
+      now: NOW,
+    });
+    const missionRun = signals.find((s) => s.signature === 'mission_run');
+    expect(missionRun?.count).toBe(2);
+    expect(stats.excluded_test_or_ci).toBe(3);
+    expect(stats.untagged).toBe(3); // 2 pipeline:demo + 1 voice-actuator, untagged
+  });
+
+  it('collectKyberionDemandSignals (the plain wrapper) returns the same signals as the stats variant', () => {
+    const plain = collectKyberionDemandSignals({ rootDir: fixtureRoot, now: NOW });
+    const { signals } = collectKyberionDemandSignalsWithStats({ rootDir: fixtureRoot, now: NOW });
+    expect(plain).toEqual(signals);
   });
 });

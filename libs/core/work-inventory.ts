@@ -437,6 +437,50 @@ export function applyClassification(
 }
 
 // ---------------------------------------------------------------------------
+// WI-17: backfill `inferred` on legacy default-candidate bindings
+// ---------------------------------------------------------------------------
+
+export interface MigrateInferredBindingsResult {
+  entry: WorkInventoryEntry;
+  /** Number of steps whose `binding.inferred` was set `true` by this call. */
+  changed: number;
+}
+
+/**
+ * `fillBinding` (used by `applyClassification`) has tagged
+ * candidate-default bindings `inferred: true` since it was introduced, but
+ * entries created before that never got the flag even though their binding
+ * is exactly the verb's first taxonomy candidate. `matchSignalsToEntries`
+ * treats an untagged binding as a real, declared one (never `inferred`),
+ * so an untagged legacy default binding wrongly counts as demand-signal
+ * evidence. This backfills the flag — and nothing else: a step is only
+ * touched when its `binding` has no `pipeline_id`/`intent_id`, has no
+ * `inferred` key at all (an explicit `inferred: false` is left alone — a
+ * person confirmed it deliberately), and its `actuator`/`op` are exactly the
+ * verb's first candidate binding. Idempotent: a second run changes nothing.
+ */
+export function migrateInferredBindings(
+  entry: WorkInventoryEntry,
+  taxonomy: WorkInventoryTaxonomy = loadWorkInventoryTaxonomy()
+): MigrateInferredBindingsResult {
+  let changed = 0;
+  const steps = entry.steps.map((step) => {
+    const binding = step.binding;
+    if (!binding) return step;
+    if (binding.inferred !== undefined) return step;
+    if (binding.pipeline_id || binding.intent_id) return step;
+    const candidate = firstCandidateBinding(step.verb, taxonomy);
+    if (!candidate) return step;
+    const opMatches = (candidate.op ?? undefined) === (binding.op ?? undefined);
+    if (binding.actuator !== candidate.actuator || !opMatches) return step;
+    changed += 1;
+    return { ...step, binding: { ...binding, inferred: true } };
+  });
+  if (changed === 0) return { entry, changed: 0 };
+  return { entry: { ...entry, steps }, changed };
+}
+
+// ---------------------------------------------------------------------------
 // Schema validation
 // ---------------------------------------------------------------------------
 

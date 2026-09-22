@@ -19,12 +19,14 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 import {
   formatCandidates,
   formatEntryList,
+  formatMigrate,
   formatShow,
   formatStepsTable,
   runAdd,
   runCandidates,
   runClassify,
   runList,
+  runMigrate,
   runOverride,
   runShow,
   runStatus,
@@ -258,9 +260,14 @@ export async function run(argv: string[], options: WorkInventoryRunOptions = {})
       );
       return;
     }
+    case 'migrate': {
+      const result = governed(() => runMigrate(argv, { ...coreOptions, dryRun }));
+      emit(result, formatMigrate(result));
+      return;
+    }
     default:
       throw new WorkInventoryCliUsageError(
-        'Usage: inventory <add|list|show|classify|override|status|harvest|consent|observe|candidates|promote|learn> ...'
+        'Usage: inventory <add|list|show|classify|override|status|harvest|consent|observe|candidates|promote|learn|migrate> ...'
       );
   }
 }

@@ -11,6 +11,7 @@ import {
   listWorkInventoryEntries,
   loadWorkInventoryEntry,
   loadWorkInventoryTaxonomy,
+  migrateInferredBindings,
   saveWorkInventoryEntry,
   validateWorkInventoryEntry,
   workInventoryRoot,
@@ -303,6 +304,128 @@ describe('applyClassification', () => {
     ]);
     const { forced_human_effects: _omitted, ...withoutField } = taxonomy;
     expect(forcedHumanEffects(withoutField)).toEqual(['money', 'irreversible', 'approval']);
+  });
+});
+
+// WI-17: verb 'read''s first taxonomy candidate is {actuator: 'vision-actuator',
+// op: 'ocr_image'} (see the applyClassification suite above).
+describe('migrateInferredBindings', () => {
+  function entryWithBinding(
+    binding: WorkInventoryStep['binding'],
+    extraSteps: WorkInventoryStep[] = []
+  ): WorkInventoryEntry {
+    return {
+      schema_version: 'work-inventory.v1',
+      entry_id: 'WI-20260922-migrate-test',
+      title: 'migrate test',
+      scope: {},
+      trigger: { kind: 'ad_hoc', description: 'test' },
+      steps: [step({ verb: 'read', binding }), ...extraSteps],
+      status: 'draft',
+      created_at: '2026-09-22T00:00:00.000Z',
+      updated_at: '2026-09-22T00:00:00.000Z',
+    };
+  }
+
+  it('marks inferred: true on a legacy binding matching the default candidate and lacking inferred', () => {
+    const entry = entryWithBinding({ actuator: 'vision-actuator', op: 'ocr_image' });
+    const { entry: migrated, changed } = migrateInferredBindings(entry);
+    expect(changed).toBe(1);
+    expect(migrated.steps[0].binding).toEqual({
+      actuator: 'vision-actuator',
+      op: 'ocr_image',
+      inferred: true,
+    });
+  });
+
+  it('leaves an explicit binding that differs from the default candidate untouched', () => {
+    const entry = entryWithBinding({ actuator: 'wisdom-actuator', op: 'knowledge_read' });
+    const { entry: migrated, changed } = migrateInferredBindings(entry);
+    expect(changed).toBe(0);
+    expect(migrated).toBe(entry); // untouched: same reference, not a rebuilt copy
+    expect(migrated.steps[0].binding).toEqual({
+      actuator: 'wisdom-actuator',
+      op: 'knowledge_read',
+    });
+  });
+
+  it('leaves a default-matching binding untouched when it carries a pipeline_id or intent_id', () => {
+    const withPipeline = entryWithBinding({
+      actuator: 'vision-actuator',
+      op: 'ocr_image',
+      pipeline_id: 'some-pipeline',
+    });
+    expect(migrateInferredBindings(withPipeline).changed).toBe(0);
+
+    const withIntent = entryWithBinding({
+      actuator: 'vision-actuator',
+      op: 'ocr_image',
+      intent_id: 'some-intent',
+    });
+    expect(migrateInferredBindings(withIntent).changed).toBe(0);
+  });
+
+  it('leaves a binding that already carries an inferred key untouched (true or explicit false)', () => {
+    const alreadyTrue = entryWithBinding({
+      actuator: 'vision-actuator',
+      op: 'ocr_image',
+      inferred: true,
+    });
+    expect(migrateInferredBindings(alreadyTrue).changed).toBe(0);
+
+    // An explicit `inferred: false` means a person confirmed this binding
+    // deliberately even though it happens to match the default — migration
+    // must never flip that back to true.
+    const explicitFalse = entryWithBinding({
+      actuator: 'vision-actuator',
+      op: 'ocr_image',
+      inferred: false,
+    });
+    const { entry: migrated, changed } = migrateInferredBindings(explicitFalse);
+    expect(changed).toBe(0);
+    expect(migrated.steps[0].binding?.inferred).toBe(false);
+  });
+
+  it('leaves a step with no binding at all untouched', () => {
+    const entry = entryWithBinding(undefined);
+    const { entry: migrated, changed } = migrateInferredBindings(entry);
+    expect(changed).toBe(0);
+    expect(migrated).toBe(entry);
+  });
+
+  it('touches only the matching steps and sums changed across the entry', () => {
+    const entry = entryWithBinding(
+      { actuator: 'vision-actuator', op: 'ocr_image' }, // S1: matches -> migrated
+      [
+        step({
+          step_id: 'S2',
+          verb: 'read',
+          binding: { actuator: 'wisdom-actuator', op: 'knowledge_read' }, // explicit -> untouched
+        }),
+        step({
+          step_id: 'S3',
+          verb: 'read',
+          binding: { actuator: 'vision-actuator', op: 'ocr_image' }, // matches -> migrated
+        }),
+      ]
+    );
+    const { entry: migrated, changed } = migrateInferredBindings(entry);
+    expect(changed).toBe(2);
+    expect(migrated.steps[0].binding?.inferred).toBe(true);
+    expect(migrated.steps[1].binding).toEqual({
+      actuator: 'wisdom-actuator',
+      op: 'knowledge_read',
+    });
+    expect(migrated.steps[2].binding?.inferred).toBe(true);
+  });
+
+  it('is idempotent: a second run over the migrated entry changes nothing', () => {
+    const entry = entryWithBinding({ actuator: 'vision-actuator', op: 'ocr_image' });
+    const first = migrateInferredBindings(entry);
+    expect(first.changed).toBe(1);
+    const second = migrateInferredBindings(first.entry);
+    expect(second.changed).toBe(0);
+    expect(second.entry).toBe(first.entry);
   });
 });
 

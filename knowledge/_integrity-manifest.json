@@ -915,7 +915,7 @@
     {
       "path": "product/architecture/work-inventory-discovery-stage.md",
       "tier": "public",
-      "size": 11882,
+      "size": 13799,
       "type": "md"
     },
     {
@@ -1563,7 +1563,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 141157,
+      "size": 141554,
       "type": "json"
     },
     {

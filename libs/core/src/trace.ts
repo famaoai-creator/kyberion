@@ -7,7 +7,7 @@ import { nowIso } from '../foundation/time.js';
 
 import { createHash, randomUUID } from 'crypto';
 import * as path from 'node:path';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { getRegisteredEnvText, isCiProcess, isVitestProcess } from '../foundation/env.js';
 import * as pathResolver from '../path-resolver.js';
 import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
@@ -30,6 +30,41 @@ export interface TraceArtifact {
   path: string;
   description?: string;
   timestamp: string;
+}
+
+/**
+ * WI-13: who/what started the run this trace belongs to, derived
+ * deterministically at `TraceContext` construction time (never self-reported
+ * later) so downstream consumers — work-inventory harvest chief among them —
+ * can tell real usage apart from test/CI noise without inspecting free text.
+ * Priority: `VITEST` -> test; `CI` -> ci; a `cron:`-prefixed correlationId
+ * (Chronos firings, `cron:<schedule_id>:<minute>`) -> scheduled; an agent
+ * identity env (`KYBERION_NHI_ID` / `KYBERION_AGENT_ID` / `MISSION_ROLE`) set
+ * -> agent; otherwise interactive.
+ */
+export type TraceOrigin = 'test' | 'ci' | 'scheduled' | 'agent' | 'interactive';
+
+/**
+ * Exported (rather than a private constructor helper) so the priority table
+ * is directly unit-testable against an injected `env` map, without mutating
+ * `process.env.VITEST` mid-test-run. `env` defaults to `process.env`, the
+ * same convention `isVitestProcess`/`isCiProcess` use.
+ */
+export function deriveTraceOrigin(
+  correlationId: string | undefined,
+  env: Record<string, string | undefined> = process.env
+): TraceOrigin {
+  if (isVitestProcess(env)) return 'test';
+  if (isCiProcess(env)) return 'ci';
+  if (correlationId?.startsWith('cron:')) return 'scheduled';
+  if (
+    getRegisteredEnvText('KYBERION_NHI_ID', { env })?.trim() ||
+    getRegisteredEnvText('KYBERION_AGENT_ID', { env })?.trim() ||
+    getRegisteredEnvText('MISSION_ROLE', { env })?.trim()
+  ) {
+    return 'agent';
+  }
+  return 'interactive';
 }
 
 export interface TraceSpan {
@@ -70,6 +105,12 @@ export interface Trace {
      * NI-03's scope).
      */
     onBehalfOf?: string;
+    /**
+     * WI-13: deterministic run-origin classification (see `TraceOrigin`).
+     * Set once at `TraceContext` construction; a caller-supplied value in the
+     * constructor's `metadata` always wins over the derived default.
+     */
+    origin?: TraceOrigin;
   };
 }
 
@@ -102,6 +143,7 @@ export class TraceContext {
       rootSpan,
       metadata: {
         startedAt: rootSpan.startTime,
+        origin: deriveTraceOrigin(correlationId),
         ...(customer ? { customerId: customer } : {}),
         ...(tenant ? { tenantSlug: tenant } : {}),
         ...metadata,
@@ -232,6 +274,20 @@ export class TraceContext {
 }
 
 /**
+ * Pure (no filesystem mutation) resolution of the directory traces persist
+ * to: `customer/{slug}/logs/traces/` when KYBERION_CUSTOMER is active, else
+ * `active/shared/logs/traces/`. Shared by `traceLogDir()` (which additionally
+ * creates the directory) and `persistTrace`'s vitest skip-write path (which
+ * must compute the same path without touching disk).
+ */
+function resolveTraceLogDirPath(): string {
+  const baseDir = customerIsConfigured()
+    ? path.join(customerRoot('logs/traces')!)
+    : path.join(pathResolver.shared('logs/traces'));
+  return assertSafeRepositoryPath(baseDir, { allowMissingLeaf: true });
+}
+
+/**
  * Resolve the directory where traces should be persisted as JSONL.
  * - When KYBERION_CUSTOMER is active: customer/{slug}/logs/traces/
  * - Otherwise: active/shared/logs/traces/
@@ -239,18 +295,26 @@ export class TraceContext {
  * Creates the directory if it does not exist.
  */
 export function traceLogDir(): string {
-  let baseDir: string;
-  if (customerIsConfigured()) {
-    baseDir = path.join(customerRoot('logs/traces')!);
-  } else {
-    baseDir = path.join(pathResolver.shared('logs/traces'));
-  }
-  const safeDir = assertSafeRepositoryPath(baseDir, { allowMissingLeaf: true });
+  const safeDir = resolveTraceLogDirPath();
   if (safeExistsSync(safeDir) && !safeLstat(safeDir).isDirectory()) {
     throw new Error(`[TRACE_PATH] trace log root must be a directory: ${safeDir}`);
   }
   if (!safeExistsSync(safeDir)) safeMkdir(safeDir, { recursive: true });
   return safeDir;
+}
+
+/**
+ * WI-13: `persistTrace` writes into the shared, repo-wide traces store by
+ * default (`traceLogDir()`), so every vitest run that exercises tracing
+ * without an explicit `opts.dir` was leaking JSONL lines into the real
+ * checkout. Under vitest with no explicit `dir`, persistence is skipped
+ * unless a test deliberately opts in via `KYBERION_TRACE_TEST_PERSIST=1`
+ * (same pattern as `KYBERION_SPEND_GUARD_TEST` / `KYBERION_ALLOW_TEST_NOTIFICATIONS`).
+ */
+function shouldSkipPersistUnderTest(explicitDir: string | undefined): boolean {
+  if (explicitDir) return false;
+  if (!isVitestProcess()) return false;
+  return getRegisteredEnvText('KYBERION_TRACE_TEST_PERSIST') !== '1';
 }
 
 /**
@@ -269,6 +333,13 @@ export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
         .map((issue) => `${issue.path}: ${issue.message}`)
         .join('; ')}`
     );
+  }
+  if (shouldSkipPersistUnderTest(opts?.dir)) {
+    // Same value shape as a real write (a day-rotated JSONL path under the
+    // resolved trace log dir) — callers keep working unmodified — but no
+    // directory or file is created: the write is skipped entirely.
+    const day = nowIso().slice(0, 10);
+    return path.join(resolveTraceLogDirPath(), `traces-${day}.jsonl`);
   }
   const dir = assertSafeRepositoryPath(opts?.dir ?? traceLogDir(), { allowMissingLeaf: true });
   if (safeExistsSync(dir) && !safeLstat(dir).isDirectory()) {
