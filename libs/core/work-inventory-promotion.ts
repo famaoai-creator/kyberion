@@ -34,8 +34,10 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
+  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   enqueueOperationalLearningSignal,
   type OperationalLearningSignal,
@@ -46,6 +48,7 @@ import {
   loadWorkInventoryTaxonomy,
   saveWorkInventoryEntry,
   validateWorkInventoryEntry,
+  workInventoryScopeKey,
   type WorkInventoryEntry,
   type WorkInventoryOutcome,
   type WorkInventoryPromotion,
@@ -79,6 +82,7 @@ export type WorkInventoryPromotionErrorCode =
   | 'INVALID_ENTRY'
   | 'INVALID_MISSION_ID'
   | 'MISSION_NOT_CREATED'
+  | 'MISSION_ID_CONFLICT'
   | 'SCRIPT_NOT_BUILT';
 
 export class WorkInventoryPromotionError extends Error {
@@ -121,12 +125,20 @@ function round4(value: number): number {
 
 export type WorkInventoryDecidedBy = WorkInventoryPromotion['decided_by'];
 
+/** Where a brief came from; lets an idempotent re-run prove the mission is this entry's. */
+export interface WorkInventoryMissionBriefSource {
+  kind: 'work_inventory';
+  ref: string;
+  tenantSlug?: string;
+}
+
 /** The subset of `mission-brief.schema.json` this module authors. */
 export interface WorkInventoryMissionBrief {
   missionId: string;
   title: string;
   intent: string;
   tier: 'personal' | 'confidential';
+  source: WorkInventoryMissionBriefSource;
   victoryConditions: string[];
   scope: { in: string[]; out?: string[] };
   flow: Array<{ step: string; title: string; detail: string; pipeline?: string }>;
@@ -208,34 +220,37 @@ function assertPromotable(entry: WorkInventoryEntry, decidedBy: WorkInventoryDec
 }
 
 /**
- * Deterministic mission id: `<prefix>-<entry id without "WI-", upper-cased>`,
- * constrained to the mission id grammar. When the id would exceed 64
- * characters the suffix is truncated and a short hash of the entry id keeps
- * it unique.
+ * Deterministic mission id:
+ * `<prefix>-<8 hex of sha256(scope key \n entry id)>-<entry id suffix>`,
+ * upper-cased and constrained to the mission id grammar (the suffix — the
+ * entry id without "WI-" — is truncated to fit 64 characters). The scope is
+ * part of the hash, so the same entry id in two tenants (or a tenant and the
+ * personal scope) never maps to the same mission.
  */
-export function workInventoryMissionId(entryId: string, prefix = 'MSN-WI'): string {
+export function workInventoryMissionId(
+  entryId: string,
+  scope: WorkInventoryScope,
+  prefix = 'MSN-WI'
+): string {
   if (!MISSION_ID_PREFIX_PATTERN.test(prefix)) {
     throw new WorkInventoryPromotionError(
       'INVALID_MISSION_ID',
       `missionIdPrefix '${prefix}' must match ${MISSION_ID_PREFIX_PATTERN.source}`
     );
   }
-  const rawSuffix = entryId.replace(/^WI-/, '');
-  const suffix = rawSuffix
+  const digest = createHash('sha256')
+    .update(`${workInventoryScopeKey(scope)}\n${entryId}`, 'utf8')
+    .digest('hex')
+    .slice(0, 8)
+    .toUpperCase();
+  const room = MISSION_ID_MAX_LENGTH - prefix.length - digest.length - 2;
+  const suffix = entryId
+    .replace(/^WI-/, '')
     .toUpperCase()
     .replace(/[^A-Z0-9_-]+/g, '-')
+    .slice(0, room)
     .replace(/^-+|-+$/g, '');
-  const room = MISSION_ID_MAX_LENGTH - prefix.length - 1;
-  let body = suffix || createHash('sha256').update(entryId, 'utf8').digest('hex').slice(0, 8);
-  if (body.length > room) {
-    const digest = createHash('sha256')
-      .update(entryId, 'utf8')
-      .digest('hex')
-      .slice(0, 8)
-      .toUpperCase();
-    body = `${body.slice(0, room - 9).replace(/-+$/, '')}-${digest}`;
-  }
-  const missionId = `${prefix}-${body}`;
+  const missionId = suffix ? `${prefix}-${digest}-${suffix}` : `${prefix}-${digest}`;
   if (!MISSION_ID_PATTERN.test(missionId)) {
     throw new WorkInventoryPromotionError(
       'INVALID_MISSION_ID',
@@ -306,6 +321,11 @@ function buildMissionBrief(
     title,
     intent,
     tier,
+    source: {
+      kind: 'work_inventory',
+      ref: entry.entry_id,
+      ...(entry.scope.tenant_slug ? { tenantSlug: entry.scope.tenant_slug } : {}),
+    },
     victoryConditions: [MISSION_SUCCESS_CRITERION],
     scope: {
       in: automated.length > 0 ? automated.map(describeStep) : [`Automate: ${entry.title}`],
@@ -429,7 +449,7 @@ export function planWorkInventoryPromotion(
   const plannedAt = nowIso(options.now ?? new Date());
 
   if (options.kind === 'mission') {
-    const missionId = workInventoryMissionId(entry.entry_id, options.missionIdPrefix);
+    const missionId = workInventoryMissionId(entry.entry_id, entry.scope, options.missionIdPrefix);
     const tenantSlug = entry.scope.tenant_slug;
     const tier: 'personal' | 'confidential' = tenantSlug ? 'confidential' : 'personal';
     const brief = buildMissionBrief(entry, missionId, tier, decidedBy);
@@ -572,6 +592,47 @@ function resolveAlignmentRequestId(
   )?.id;
 }
 
+function readStoredBrief(briefPath: string): unknown {
+  try {
+    return parseSafeJsonInput(
+      String(safeReadFile(briefPath, { encoding: 'utf8' })),
+      'existing mission brief'
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * An existing mission is this plan's only when its stored brief names the
+ * same work inventory entry, tier, and tenant. Anything else (another
+ * entry, another scope, a hand-written brief) is a `MISSION_ID_CONFLICT`.
+ */
+function assertExistingMissionBelongsToPlan(
+  plan: WorkInventoryMissionPromotionPlan,
+  stored: unknown
+): void {
+  const record =
+    typeof stored === 'object' && stored !== null && !Array.isArray(stored)
+      ? (stored as Record<string, unknown>)
+      : undefined;
+  const source =
+    record && typeof record.source === 'object' && record.source !== null
+      ? (record.source as Record<string, unknown>)
+      : undefined;
+  const matches =
+    source?.kind === 'work_inventory' &&
+    source.ref === plan.entry_id &&
+    record?.tier === plan.tier &&
+    (source.tenantSlug ?? undefined) === plan.tenant_slug;
+  if (!matches) {
+    throw new WorkInventoryPromotionError(
+      'MISSION_ID_CONFLICT',
+      `mission ${plan.mission_id} already exists but its brief is not for work inventory entry ${plan.entry_id} (${plan.tier}${plan.tenant_slug ? `, tenant ${plan.tenant_slug}` : ''})`
+    );
+  }
+}
+
 /**
  * Runs the governed mission hand-off for a mission plan, mirroring
  * `hearing-mission-routes.ts`: `mission_controller.js create` (subprocess,
@@ -582,7 +643,9 @@ function resolveAlignmentRequestId(
  *
  * Idempotent: an existing mission skips `create` and keeps an existing brief
  * (rewriting it would invalidate an alignment approval bound to its hash);
- * the alignment CLI reuses a pending request for the same brief.
+ * the alignment CLI reuses a pending request for the same brief. An existing
+ * mission must carry a brief whose `source` is this entry in this tier/tenant —
+ * otherwise `MISSION_ID_CONFLICT` (never adopt another scope's mission).
  */
 export function executeMissionPromotion(
   plan: WorkInventoryPromotionPlan,
@@ -624,6 +687,16 @@ export function executeMissionPromotion(
   }
 
   const dir = missionDir;
+  if (!created) {
+    const briefPath = assertSafeRepositoryPath(path.join(dir, 'evidence', 'mission-brief.json'), {
+      allowMissingLeaf: true,
+      rootDir,
+    });
+    const stored = withExecutionContext('mission_controller', () =>
+      safeExistsSync(briefPath) ? readStoredBrief(briefPath) : undefined
+    );
+    assertExistingMissionBelongsToPlan(plan, stored);
+  }
   withExecutionContext('mission_controller', () => {
     const evidenceDir = assertSafeRepositoryPath(path.join(dir, 'evidence'), {
       allowMissingLeaf: true,
@@ -676,11 +749,47 @@ function promotionSignatures(promotion: WorkInventoryPromotion): string[] {
   if (promotion.kind !== 'pipeline') return [];
   const ref = promotion.ref.trim();
   const base = ref.includes('/') ? ref.slice(ref.lastIndexOf('/') + 1) : ref;
-  const id = base.replace(/\.json$/i, '');
-  return [`pipeline:${id}`, `adhoc_pipeline:${ref}`, `adhoc_pipeline:pipelines/${id}.json`];
+  return [`pipeline:${base.replace(/\.json$/i, '')}`];
 }
 
-/** Demand signals attributable to a promoted entry (promotion ref + bindings + trace observations). */
+/**
+ * Signal kinds that are lifetime tallies rather than windowed runs (the
+ * ad-hoc ledger count, the unhandled-intent occurrence count). They cannot be
+ * split at `promoted_at`, so they never count toward an outcome.
+ */
+const LIFETIME_SIGNAL_KINDS: ReadonlySet<DemandSignal['kind']> = new Set([
+  'adhoc_pipeline',
+  'unhandled_intent',
+]);
+
+/** Default look-back for outcome measurement (days). */
+export const DEFAULT_OUTCOME_WINDOW_DAYS = 28;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Collects demand signals over `[since, now)`. Injected so outcomes are always
+ * measured over a per-entry window that starts at the promotion.
+ */
+export type WorkInventoryCollectSignals = (since: Date) => DemandSignal[];
+
+/** `max(promoted_at, now − windowDays)`: outcomes only ever count post-promotion runs. */
+export function outcomeWindowSince(
+  entry: WorkInventoryEntry,
+  now: Date,
+  windowDays: number = DEFAULT_OUTCOME_WINDOW_DAYS
+): Date {
+  assertPromoted(entry);
+  const windowStart = now.getTime() - windowDays * MS_PER_DAY;
+  const promotedAt = Date.parse(entry.promotion.promoted_at);
+  return new Date(Number.isFinite(promotedAt) ? Math.max(promotedAt, windowStart) : windowStart);
+}
+
+/**
+ * Demand signals attributable to a promoted entry (promotion ref + explicit
+ * bindings + trace observations), limited to windowed kinds whose first run
+ * is at/after `promoted_at` — a signal that starts before the promotion mixes
+ * pre-promotion runs in and is dropped; collect it with `outcomeWindowSince`.
+ */
 export function signalsForPromotedEntry(
   entry: WorkInventoryEntry,
   signals: DemandSignal[]
@@ -691,17 +800,27 @@ export function signalsForPromotedEntry(
     wanted.add(signal.signature);
   }
   const promotedAt = Date.parse(entry.promotion.promoted_at);
-  return signals.filter(
-    (signal) =>
-      wanted.has(signal.signature) &&
-      // Signals are window aggregates; one whose latest run predates the
-      // promotion holds no post-promotion runs at all.
-      !(Number.isFinite(promotedAt) && Date.parse(signal.last_at) < promotedAt)
+  return signals.filter((signal) => {
+    if (!wanted.has(signal.signature) || LIFETIME_SIGNAL_KINDS.has(signal.kind)) return false;
+    const firstAt = Date.parse(signal.first_at);
+    return Number.isFinite(promotedAt) && Number.isFinite(firstAt) && firstAt >= promotedAt;
+  });
+}
+
+/** Signals for one promoted entry, collected over `outcomeWindowSince`. */
+export function collectSignalsForPromotedEntry(
+  entry: WorkInventoryEntry,
+  collectSignals: WorkInventoryCollectSignals,
+  options: { now: Date; windowDays?: number }
+): DemandSignal[] {
+  return signalsForPromotedEntry(
+    entry,
+    collectSignals(outcomeWindowSince(entry, options.now, options.windowDays))
   );
 }
 
 /** 0..1 share of runs that completed without failure; 0 when nothing ran. */
-export function outcomeRealizedRatio(
+export function outcomeSuccessRate(
   outcome: Pick<WorkInventoryOutcome, 'runs' | 'failures'>
 ): number {
   if (outcome.runs <= 0) return 0;
@@ -709,7 +828,9 @@ export function outcomeRealizedRatio(
 }
 
 /**
- * Pure: an `outcomes[]` item for a promoted entry.
+ * Pure: an `outcomes[]` item for a promoted entry, from `signals` collected
+ * with `since = outcomeWindowSince(entry, now)` (see `signalsForPromotedEntry`
+ * for which signals count).
  * `minutes_saved_estimate = runs × effort_minutes_per_run × (runs>0 ? 1 − failures/runs : 0)`,
  * where effort is the self-reported value, else the observed median (same
  * resolution as scoring).
@@ -729,7 +850,7 @@ export function measureWorkInventoryOutcome(
     typeof entry.effort_minutes_per_run === 'number'
       ? entry.effort_minutes_per_run
       : scoreWorkInventoryEntry(entry, { taxonomy: options.taxonomy }).components.effort_minutes;
-  const realized = outcomeRealizedRatio({ runs, failures });
+  const realized = outcomeSuccessRate({ runs, failures });
   return {
     measured_at: nowIso(options.now ?? new Date()),
     runs,
@@ -772,6 +893,11 @@ export interface BuildCalibrationSamplesOptions {
  * Pure: calibration samples from promoted entries with ≥1 outcome. Skips
  * human-only entries (nothing to calibrate) and entries whose latest outcome
  * has zero runs (no evidence is not the same as a failure).
+ *
+ * `realized_automatable_ratio = predicted × success_rate`: both sides measure
+ * the same quantity (the automatable share of the work), so realized /
+ * predicted is the success rate and a mixed human/automated entry whose runs
+ * never fail realizes exactly what was predicted.
  */
 export function buildCalibrationSamples(
   entries: WorkInventoryEntry[],
@@ -793,14 +919,15 @@ export function buildCalibrationSamples(
     for (const [method, count] of [...counts].sort((a, b) => a[0].localeCompare(b[0]))) {
       methodMix[method] = round4(count / entry.steps.length);
     }
+    const predicted = scoreWorkInventoryEntry(entry, {
+      taxonomy,
+      calibration: options.calibration,
+    }).components.automatable_ratio;
     samples.push({
       entry_id: entry.entry_id,
       method_mix: methodMix,
-      predicted_automatable_ratio: scoreWorkInventoryEntry(entry, {
-        taxonomy,
-        calibration: options.calibration,
-      }).components.automatable_ratio,
-      realized_automatable_ratio: round4(outcomeRealizedRatio(outcome)),
+      predicted_automatable_ratio: predicted,
+      realized_automatable_ratio: round4(predicted * outcomeSuccessRate(outcome)),
     });
   }
   return samples.sort((a, b) => a.entry_id.localeCompare(b.entry_id));
@@ -841,7 +968,8 @@ function tierFields(
 
 /**
  * Pure: learning signals for (a) promoted entries whose realized ratio
- * diverges from the predicted automatable ratio by more than `gapThreshold`,
+ * (`predicted × success_rate`, see `buildCalibrationSamples`) falls short of
+ * the predicted automatable ratio by more than `gapThreshold`,
  * and (b) taxonomy rules that humans overrode at least `overrideThreshold`
  * times. The overridden rule is re-derived with `classifyWorkStep` (a
  * `human_override` step no longer records it). Overrides are counted per
@@ -977,7 +1105,10 @@ export function emitWorkInventoryLearningSignals(
 
 export interface RunWorkInventoryLearningCycleOptions {
   scope: WorkInventoryScope;
-  signals: DemandSignal[];
+  /** Called once per promoted entry with `since = outcomeWindowSince(entry, now, windowDays)`. */
+  collectSignals: WorkInventoryCollectSignals;
+  /** Outcome look-back in days (capped below by each entry's `promoted_at`). Default 28. */
+  windowDays?: number;
   rootDir?: string;
   now?: Date;
   taxonomy?: WorkInventoryTaxonomy;
@@ -1012,7 +1143,11 @@ export function runWorkInventoryLearningCycle(
   let measured = 0;
   const entries = listWorkInventoryEntries(options.scope, { rootDir }).map((entry) => {
     if (entry.status !== 'promoted' || !entry.promotion) return entry;
-    const outcome = measureWorkInventoryOutcome(entry, options.signals, { now, taxonomy });
+    const signals = collectSignalsForPromotedEntry(entry, options.collectSignals, {
+      now,
+      windowDays: options.windowDays,
+    });
+    const outcome = measureWorkInventoryOutcome(entry, signals, { now, taxonomy });
     measured += 1;
     return saveWorkInventoryEntry(recordWorkInventoryOutcome(entry, outcome), { rootDir });
   });

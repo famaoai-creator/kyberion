@@ -30,7 +30,11 @@ import {
   type WorkInventoryStep,
 } from './work-inventory.js';
 import type { DemandSignal } from './work-inventory-harvest.js';
-import { loadWorkInventoryCalibration } from './work-inventory-scoring.js';
+import {
+  calibrateFromOutcomes,
+  defaultWorkInventoryCalibration,
+  loadWorkInventoryCalibration,
+} from './work-inventory-scoring.js';
 import {
   applyWorkInventoryPromotion,
   buildCalibrationSamples,
@@ -38,6 +42,7 @@ import {
   emitWorkInventoryLearningSignals,
   executeMissionPromotion,
   measureWorkInventoryOutcome,
+  outcomeWindowSince,
   planWorkInventoryPromotion,
   recordWorkInventoryOutcome,
   runWorkInventoryLearningCycle,
@@ -236,14 +241,35 @@ describe('planWorkInventoryPromotion', () => {
     expect(a.kind === 'mission' && b.kind === 'mission' && a.mission_id === b.mission_id).toBe(
       true
     );
-    expect(workInventoryMissionId('WI-20260922-weekly-sales-report')).toBe(
-      'MSN-WI-20260922-WEEKLY-SALES-REPORT'
+    expect(workInventoryMissionId('WI-20260922-weekly-sales-report', {})).toMatch(
+      /^MSN-WI-[0-9A-F]{8}-20260922-WEEKLY-SALES-REPORT$/
     );
-    const long = workInventoryMissionId(`WI-${'x'.repeat(80)}`);
+    const long = workInventoryMissionId(`WI-${'x'.repeat(80)}`, {});
     expect(long).toMatch(/^[A-Z0-9][A-Z0-9_-]{2,63}$/);
-    expect(long).toBe(workInventoryMissionId(`WI-${'x'.repeat(80)}`));
-    expect(long).not.toBe(workInventoryMissionId(`WI-${'x'.repeat(79)}y`));
-    expect(workInventoryMissionId('WI-abc', 'MSN-OPS')).toBe('MSN-OPS-ABC');
+    expect(long).toBe(workInventoryMissionId(`WI-${'x'.repeat(80)}`, {}));
+    expect(long).not.toBe(workInventoryMissionId(`WI-${'x'.repeat(79)}y`, {}));
+    expect(workInventoryMissionId('WI-abc', {}, 'MSN-OPS')).toMatch(/^MSN-OPS-[0-9A-F]{8}-ABC$/);
+  });
+
+  it('never gives the same entry id in two scopes the same mission id', () => {
+    const id = 'WI-20260922-weekly-sales-report';
+    const personal = workInventoryMissionId(id, {});
+    const acme = workInventoryMissionId(id, { tenant_slug: 'acme-corp' });
+    const other = workInventoryMissionId(id, { tenant_slug: 'other-co' });
+    expect(new Set([personal, acme, other]).size).toBe(3);
+    const plan = planWorkInventoryPromotion(baseEntry({ scope: { tenant_slug: 'acme-corp' } }), {
+      kind: 'mission',
+      decided_by: HUMAN,
+      now: NOW,
+    }) as WorkInventoryMissionPromotionPlan;
+    expect(plan.mission_id).toBe(
+      workInventoryMissionId(plan.entry_id, { tenant_slug: 'acme-corp' })
+    );
+    expect(plan.brief.source).toEqual({
+      kind: 'work_inventory',
+      ref: plan.entry_id,
+      tenantSlug: 'acme-corp',
+    });
   });
 
   it('requires a pipeline binding or an on-demand trace observation for pipeline plans', () => {
@@ -396,7 +422,8 @@ describe('executeMissionPromotion (fake exec)', () => {
     mocks.findMissionPath.mockReturnValue(missionDir);
     safeMkdir(path.join(missionDir, 'evidence'), { recursive: true });
     const briefPath = path.join(missionDir, 'evidence', 'mission-brief.json');
-    safeWriteFile(briefPath, '{"title":"approved brief"}\n', { encoding: 'utf8' });
+    const approved = `${JSON.stringify({ ...plan.brief, title: 'approved brief' })}\n`;
+    safeWriteFile(briefPath, approved, { encoding: 'utf8' });
     mocks.listApprovalRequests.mockReturnValue([
       { id: 'REQ-EXISTING', correlationId: `mission-alignment-${plan.mission_id}` },
     ]);
@@ -414,9 +441,30 @@ describe('executeMissionPromotion (fake exec)', () => {
     });
     expect(exec).toHaveBeenCalledTimes(1);
     expect(exec.mock.calls[0][1][0]).toBe('dist/scripts/mission_alignment_request.js');
-    expect(String(safeReadFile(briefPath, { encoding: 'utf8' }))).toBe(
-      '{"title":"approved brief"}\n'
-    );
+    expect(String(safeReadFile(briefPath, { encoding: 'utf8' }))).toBe(approved);
+  });
+
+  it('refuses to adopt an existing mission whose brief is for another entry or scope', () => {
+    mocks.findMissionPath.mockReturnValue(missionDir);
+    safeMkdir(path.join(missionDir, 'evidence'), { recursive: true });
+    const briefPath = path.join(missionDir, 'evidence', 'mission-brief.json');
+    const exec = vi.fn<WorkInventoryPromotionExec>();
+    const foreignBriefs = [
+      { title: 'hand-written brief' },
+      { ...plan.brief, source: { kind: 'work_inventory', ref: 'WI-20260922-other' } },
+      {
+        ...plan.brief,
+        tier: 'confidential',
+        source: { kind: 'work_inventory', ref: plan.entry_id, tenantSlug: 'acme-corp' },
+      },
+    ];
+    for (const brief of foreignBriefs) {
+      safeWriteFile(briefPath, JSON.stringify(brief), { encoding: 'utf8' });
+      expect(() => executeMissionPromotion(plan, { exec })).toThrow(/MISSION_ID_CONFLICT/);
+    }
+    safeRmSync(briefPath, { force: true });
+    expect(() => executeMissionPromotion(plan, { exec })).toThrow(/MISSION_ID_CONFLICT/);
+    expect(exec).not.toHaveBeenCalled();
   });
 
   it('fails when create exits 0 but the mission is not planned', () => {
@@ -461,6 +509,31 @@ describe('outcomes', () => {
       failures: 1,
       source: 'kyberion_trace',
     });
+  });
+
+  it('counts only runs at/after promoted_at and never lifetime tallies', () => {
+    const entry = promotedPipelineEntry(); // promoted_at = NOW
+    const outcome = measureWorkInventoryOutcome(
+      entry,
+      [
+        // Window started before the promotion: mixes pre-promotion runs in.
+        signal({ first_at: '2026-09-01T00:00:00.000Z', count: 50, failure_count: 0 }),
+        // Lifetime ledger count for the promoted pipeline.
+        signal({
+          signature: 'adhoc_pipeline:pipelines/weekly-sales-report.json',
+          kind: 'adhoc_pipeline',
+          count: 40,
+        }),
+      ],
+      { now: LATER }
+    );
+    expect(outcome).toMatchObject({ runs: 0, failures: 0, minutes_saved_estimate: 0 });
+  });
+
+  it('starts the outcome window at max(promoted_at, now - window)', () => {
+    const entry = promotedPipelineEntry(); // promoted_at = NOW
+    expect(outcomeWindowSince(entry, LATER, 60).toISOString()).toBe(NOW.toISOString());
+    expect(outcomeWindowSince(entry, LATER, 7).toISOString()).toBe('2026-10-13T12:00:00.000Z');
   });
 
   it('reports zero savings when nothing ran', () => {
@@ -514,18 +587,46 @@ describe('learning', () => {
         entry_id: measured.entry_id,
         method_mix: { ai_reasoning: 0.3333, human: 0.3333, program: 0.3333 },
         predicted_automatable_ratio: 0.5667,
-        realized_automatable_ratio: 0.75,
+        // predicted × success rate (1 − 1/4): the same quantity as the prediction.
+        realized_automatable_ratio: 0.425,
       },
     ]);
   });
 
+  it('leaves api unchanged for a half-api/half-human entry whose runs never fail', () => {
+    const mixed = withOutcome(
+      promotedPipelineEntry({
+        steps: [
+          step({
+            step_id: 'S1',
+            verb: 'input',
+            method: { assigned: 'api', source: 'rule', rule_id: 'x', rationale: 'r' },
+          }),
+          baseEntry().steps[2], // human (approval)
+        ],
+      }),
+      10,
+      0
+    );
+    const samples = buildCalibrationSamples([mixed]);
+    expect(samples[0]).toMatchObject({
+      predicted_automatable_ratio: 0.5,
+      realized_automatable_ratio: 0.5,
+    });
+    const calibration = defaultWorkInventoryCalibration({});
+    const next = calibrateFromOutcomes(calibration, samples, { reason: 'test', now: LATER });
+    expect(next.method_automatable.api).toBe(calibration.method_automatable.api);
+    expect(next.history.at(-1)?.changes).toEqual({});
+    expect(detectWorkInventoryLearningSignals([mixed])).toEqual([]);
+  });
+
   it('flags prediction gaps above the threshold only', () => {
-    const small = withOutcome(promotedPipelineEntry(), 4, 1); // realized 0.75 vs 0.5667
+    const small = withOutcome(promotedPipelineEntry(), 4, 1); // realized 0.425 vs 0.5667
     const large = withOutcome(
       promotedPipelineEntry({ entry_id: 'WI-20260922-large', scope: { tenant_slug: 'acme-corp' } }),
       4,
-      0
-    ); // realized 1 vs 0.5667
+      3
+    ); // realized 0.1417 vs 0.5667
     const signals = detectWorkInventoryLearningSignals([small, large]);
     expect(signals).toHaveLength(1);
     expect(signals[0]).toMatchObject({
@@ -534,7 +635,7 @@ describe('learning', () => {
       targetKind: 'knowledge_hint',
       tier: 'confidential',
       tenantSlug: 'acme-corp',
-      metadata: { predicted: 0.5667, realized: 1, gap: 0.4333 },
+      metadata: { predicted: 0.5667, realized: 0.1417, gap: -0.425 },
     });
     expect(detectWorkInventoryLearningSignals([small, large], { gapThreshold: 0.1 })).toHaveLength(
       2
@@ -635,15 +736,22 @@ describe('runWorkInventoryLearningCycle (hermetic)', () => {
     saveWorkInventoryEntry(promoted, { rootDir: fixtureRoot });
     saveWorkInventoryEntry(untouched, { rootDir: fixtureRoot });
 
+    const sinces: string[] = [];
     const summary = runWorkInventoryLearningCycle({
       scope,
       rootDir: fixtureRoot,
       now: LATER,
-      signals: [signal({ failure_count: 0 })],
+      windowDays: 60,
+      collectSignals: (since) => {
+        sinces.push(since.toISOString());
+        return [signal({ failure_count: 3 })];
+      },
     });
 
+    // One collection per promoted entry, starting at its promotion.
+    expect(sinces).toEqual([NOW.toISOString()]);
     expect(summary.measured).toBe(1);
-    expect(summary.calibrated_methods).toEqual(['ai_reasoning']); // program is already at 1
+    expect(summary.calibrated_methods).toEqual(['ai_reasoning', 'program']);
     expect(summary.learning_signals.map((s) => s.signalId)).toEqual([
       `work-inventory-gap-${promoted.entry_id}`,
     ]);
@@ -660,8 +768,8 @@ describe('runWorkInventoryLearningCycle (hermetic)', () => {
       {
         measured_at: LATER.toISOString(),
         runs: 4,
-        failures: 0,
-        minutes_saved_estimate: 120,
+        failures: 3,
+        minutes_saved_estimate: 30,
         source: 'kyberion_trace',
       },
     ]);
@@ -674,6 +782,8 @@ describe('runWorkInventoryLearningCycle (hermetic)', () => {
     expect(safeExistsSync(calibrationPath)).toBe(true);
     const calibration = loadWorkInventoryCalibration(scope, { rootDir: fixtureRoot });
     expect(calibration.history.at(-1)?.reason).toBe('learning-cycle 2026-10-20');
-    expect(calibration.method_automatable.ai_reasoning).toBeGreaterThan(0.7);
+    // Failed automated runs lower the methods they used.
+    expect(calibration.method_automatable.ai_reasoning).toBeLessThan(0.7);
+    expect(calibration.method_automatable.program).toBeLessThan(1);
   });
 });

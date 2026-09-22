@@ -197,6 +197,10 @@
               "intent_id": {
                 "type": "string",
                 "minLength": 1
+              },
+              "inferred": {
+                "type": "boolean",
+                "description": "True when actuator/op were filled from the verb's first taxonomy candidate. Display/promotion hint only; never used to match demand signals."
               }
             }
           },

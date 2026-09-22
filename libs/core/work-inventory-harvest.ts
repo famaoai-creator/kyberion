@@ -454,9 +454,11 @@ function assignOrigins(signals: DemandSignal[], rootDir: string): DemandSignal[]
 
 /**
  * Scans Kyberion's own usage logs (traces, ad-hoc pipeline ledger, unhandled
- * intent registry) and returns aggregate demand signals — never trace
- * attribute/event text, pipeline payloads, or intent utterance text — sorted
- * by `count` descending, then `signature` ascending. Every signal carries an
+ * intent registry) and returns aggregate demand signals. The ledger and the
+ * registry carry no tenant, so — like untagged traces — they are included only
+ * for the personal scope (no `tenantSlug`) or with `includeUnscoped`. Never
+ * trace attribute/event text, pipeline payloads, or intent utterance text;
+ * sorted by `count` descending, then `signature` ascending. Every signal carries an
  * `origin` (`pipeline:<id>` / `browser-pipeline:<id>` → looked up in
  * `pipelines/<id>.json`; ad-hoc ledger and unhandled intents → `on_demand`;
  * everything else → `unknown`).
@@ -470,8 +472,14 @@ export function collectKyberionDemandSignals(
   const signals: DemandSignal[] = assignOrigins(
     [
       ...collectTraceSignals(rootDir, since, until, windowDays, options),
-      ...collectAdhocLedgerSignals(rootDir, since, until, windowDays),
-      ...collectUnhandledIntentSignals(rootDir, since, until, windowDays),
+      // The ad-hoc ledger and unhandled-intent registry carry no tenant, so
+      // they are unscoped sources: same rule as an untagged trace.
+      ...(tenantMatches(undefined, options)
+        ? [
+            ...collectAdhocLedgerSignals(rootDir, since, until, windowDays),
+            ...collectUnhandledIntentSignals(rootDir, since, until, windowDays),
+          ]
+        : []),
     ],
     rootDir
   );
@@ -493,8 +501,10 @@ function normalizePipelineId(pipelineId: string): string {
 /**
  * Maps each entry (by `entry_id`) to the demand signals it already matches:
  * a step binding's `pipeline_id` (accepting a bare id or a `pipelines/<id>.json`
- * path), a step binding's `actuator`+`op`, a step binding's `intent_id`, or an
- * existing `kyberion_trace` observation whose `ref` equals the signature.
+ * path), a step binding's explicit `actuator`+`op`, a step binding's
+ * `intent_id`, or an existing `kyberion_trace` observation whose `ref` equals
+ * the signature. `inferred` bindings (filled from the verb's first taxonomy
+ * candidate) never match: generic actuator traffic is not evidence of an entry.
  */
 export function matchSignalsToEntries(
   entries: WorkInventoryEntry[],
@@ -513,7 +523,7 @@ export function matchSignalsToEntries(
         const signature = `pipeline:${normalizePipelineId(binding.pipeline_id)}`;
         if (bySignature.has(signature)) matched.add(signature);
       }
-      if (binding.actuator && binding.op) {
+      if (binding.actuator && binding.op && binding.inferred !== true) {
         const signature = `${binding.actuator}:${binding.op}`;
         if (bySignature.has(signature)) matched.add(signature);
       }

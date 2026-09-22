@@ -1,17 +1,20 @@
-import * as fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeMkdir, safeRmSync } from './secure-io.js';
 import {
   applyClassification,
   classifyWorkStep,
   createWorkInventoryEntry,
+  forcedHumanEffects,
   listWorkInventoryEntries,
   loadWorkInventoryEntry,
   loadWorkInventoryTaxonomy,
   saveWorkInventoryEntry,
   validateWorkInventoryEntry,
   workInventoryRoot,
+  WorkInventoryStoreError,
   type WorkInventoryEntry,
   type WorkInventoryStep,
 } from './work-inventory.js';
@@ -228,6 +231,78 @@ describe('applyClassification', () => {
     const result = applyClassification(entry);
     expect(result.steps[0].binding?.actuator).toBe('vision-actuator');
     expect(result.steps[0].binding?.op).toBe('ocr_image');
+    // A filled default is a hint, never a declared binding.
+    expect(result.steps[0].binding?.inferred).toBe(true);
+    expect(validateWorkInventoryEntry(result).valid).toBe(true);
+  });
+
+  it('keeps an explicit binding un-inferred', () => {
+    const entry: WorkInventoryEntry = {
+      schema_version: 'work-inventory.v1',
+      entry_id: 'WI-20260922-test4',
+      title: 'test4',
+      scope: {},
+      trigger: { kind: 'ad_hoc', description: 'test' },
+      steps: [
+        step({ verb: 'read', binding: { actuator: 'wisdom-actuator', op: 'knowledge_read' } }),
+      ],
+      status: 'draft',
+      created_at: '2026-09-22T00:00:00.000Z',
+      updated_at: '2026-09-22T00:00:00.000Z',
+    };
+    expect(applyClassification(entry).steps[0].binding).toEqual({
+      actuator: 'wisdom-actuator',
+      op: 'knowledge_read',
+    });
+  });
+
+  it('rejects a non-human override on a money/irreversible/approval step; the rule wins', () => {
+    const taxonomy = loadWorkInventoryTaxonomy();
+    expect(forcedHumanEffects(taxonomy)).toEqual(['money', 'irreversible', 'approval']);
+    const entry: WorkInventoryEntry = {
+      schema_version: 'work-inventory.v1',
+      entry_id: 'WI-20260922-test5',
+      title: 'test5',
+      scope: {},
+      trigger: { kind: 'ad_hoc', description: 'test' },
+      steps: [
+        step({
+          verb: 'operate',
+          effects: ['money'],
+          method: { assigned: 'api', source: 'human_override', rationale: 'just pay it' },
+        }),
+        step({
+          step_id: 'S2',
+          verb: 'judge',
+          effects: ['approval'],
+          method: { assigned: 'human', source: 'human_override', rationale: 'I sign off' },
+        }),
+      ],
+      status: 'draft',
+      created_at: '2026-09-22T00:00:00.000Z',
+      updated_at: '2026-09-22T00:00:00.000Z',
+    };
+    const [paid, approved] = applyClassification(entry, {}, taxonomy).steps;
+    expect(paid.method.assigned).toBe('human');
+    expect(paid.method.source).toBe('rule');
+    expect(paid.method.rule_id).toBe('effects-force-human');
+    expect(paid.method.rationale).toContain('rejected human_override to api');
+    expect(paid.method.rationale).toContain('just pay it');
+    // A human override on the same kind of step stands.
+    expect(approved.method).toEqual({
+      assigned: 'human',
+      source: 'human_override',
+      rationale: 'I sign off',
+    });
+  });
+
+  it('reads the forced-human effects from the taxonomy, not a hardcoded list', () => {
+    const taxonomy = loadWorkInventoryTaxonomy();
+    expect(forcedHumanEffects({ ...taxonomy, forced_human_effects: ['personal_data'] })).toEqual([
+      'personal_data',
+    ]);
+    const { forced_human_effects: _omitted, ...withoutField } = taxonomy;
+    expect(forcedHumanEffects(withoutField)).toEqual(['money', 'irreversible', 'approval']);
   });
 });
 
@@ -311,18 +386,75 @@ describe('createWorkInventoryEntry', () => {
   });
 });
 
+describe('createWorkInventoryEntry ids', () => {
+  const now = new Date('2026-09-22T12:00:00.000Z');
+  const make = (title: string, scope: WorkInventoryEntry['scope'] = {}, at = now) =>
+    createWorkInventoryEntry({ title, scope, trigger: { kind: 'ad_hoc', description: 't' } }, at);
+
+  it('never collides for two titles whose ASCII slug is the same', () => {
+    const expense = make('経費精算 Excel');
+    const sales = make('売上集計 Excel');
+    expect(expense.entry_id).not.toBe(sales.entry_id);
+    expect(expense.entry_id).toMatch(/^WI-20260922-excel-[0-9a-f]{8}$/);
+    expect(sales.entry_id).toMatch(/^WI-20260922-excel-[0-9a-f]{8}$/);
+  });
+
+  it('separates scopes and creation times, and omits an empty slug', () => {
+    expect(make('Excel').entry_id).not.toBe(make('Excel', { tenant_slug: 'acme-corp' }).entry_id);
+    expect(make('Excel').entry_id).not.toBe(
+      make('Excel', {}, new Date('2026-09-22T12:00:01.000Z')).entry_id
+    );
+    expect(make('経費精算').entry_id).toMatch(/^WI-20260922-[0-9a-f]{8}$/);
+    const long = make('x'.repeat(200)).entry_id;
+    expect(long).toMatch(/^WI-[A-Za-z0-9_-]{3,80}$/);
+    expect(long).toBe(`WI-20260922-${'x'.repeat(40)}-${long.slice(-8)}`);
+  });
+});
+
 describe('work inventory storage (hermetic)', () => {
   const FIXTURE_PARENT = path.join(pathResolver.rootDir(), 'active', 'shared', 'tmp');
   let fixtureRoot = '';
 
   beforeEach(() => {
-    fs.mkdirSync(FIXTURE_PARENT, { recursive: true });
-    fixtureRoot = fs.mkdtempSync(path.join(FIXTURE_PARENT, 'work-inventory-test-'));
+    fixtureRoot = path.join(FIXTURE_PARENT, `work-inventory-test-${randomUUID()}`);
+    safeMkdir(fixtureRoot, { recursive: true });
   });
 
   afterEach(() => {
-    if (fixtureRoot) fs.rmSync(fixtureRoot, { recursive: true, force: true });
+    if (fixtureRoot && safeExistsSync(fixtureRoot)) {
+      safeRmSync(fixtureRoot, { recursive: true, force: true });
+    }
     fixtureRoot = '';
+  });
+
+  it('create mode refuses to overwrite an existing entry; upsert still updates', () => {
+    const now = new Date('2026-09-22T12:00:00.000Z');
+    const entry = createWorkInventoryEntry(
+      { title: 'Monthly close', scope: {}, trigger: { kind: 'schedule', description: 'monthly' } },
+      now
+    );
+    saveWorkInventoryEntry(entry, { rootDir: fixtureRoot, mode: 'create' });
+    let caught: unknown;
+    try {
+      saveWorkInventoryEntry(
+        { ...entry, title: 'Other work' },
+        {
+          rootDir: fixtureRoot,
+          mode: 'create',
+        }
+      );
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(WorkInventoryStoreError);
+    expect((caught as WorkInventoryStoreError).code).toBe('WORK_INVENTORY_ENTRY_EXISTS');
+    expect(loadWorkInventoryEntry({}, entry.entry_id, { rootDir: fixtureRoot })?.title).toBe(
+      'Monthly close'
+    );
+    saveWorkInventoryEntry({ ...entry, status: 'confirmed' }, { rootDir: fixtureRoot });
+    expect(loadWorkInventoryEntry({}, entry.entry_id, { rootDir: fixtureRoot })?.status).toBe(
+      'confirmed'
+    );
   });
 
   it('rejects a reserved scope name as a tenant slug', () => {

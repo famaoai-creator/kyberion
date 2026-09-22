@@ -75,6 +75,13 @@ const OBSERVED_RUNS_SOURCES: WorkObservationSource[] = [
   'browser_recording',
 ];
 
+/**
+ * Only recordings of a person operating the machine measure *human* effort.
+ * A `kyberion_trace` duration is machine time (how long an automated run
+ * took) and never stands in for the minutes a person spends on the work.
+ */
+const OBSERVED_EFFORT_SOURCES: WorkObservationSource[] = ['desktop_recording', 'browser_recording'];
+
 /** self-report frequency → runs per month, per plan §6 (WI-06 acceptance). */
 const FREQUENCY_PER_MONTH_MULTIPLIER: Record<WorkFrequencyPer, number> = {
   day: 21.7,
@@ -131,7 +138,9 @@ function resolveEffortMinutes(entry: WorkInventoryEntry): {
         observation
       ): observation is WorkInventoryObservation & {
         metrics: { median_duration_ms: number };
-      } => typeof observation.metrics?.median_duration_ms === 'number'
+      } =>
+        OBSERVED_EFFORT_SOURCES.includes(observation.source) &&
+        typeof observation.metrics?.median_duration_ms === 'number'
     )
     .map((observation) => observation.metrics.median_duration_ms);
   if (observedDurations.length > 0) {
@@ -383,8 +392,14 @@ export interface WorkInventoryCalibrationSample {
   entry_id: string;
   /** Share of steps assigned to each method; shares for one sample sum to 1. */
   method_mix: Partial<Record<WorkMethod, number>>;
+  /** Mean automatable share of the steps (same quantity scoring ranks on). */
   predicted_automatable_ratio: number;
-  /** 0..1: share of runs completed without a human fallback. */
+  /**
+   * Same quantity, realized: `predicted_automatable_ratio × success_rate`
+   * where `success_rate = 1 − failures/runs`. So `realized / predicted` is the
+   * success rate (≤ 1) — a half-api/half-human entry whose automated runs
+   * never fail realizes exactly its prediction.
+   */
   realized_automatable_ratio: number;
 }
 
@@ -395,10 +410,12 @@ export interface CalibrateFromOutcomesOptions {
 }
 
 /**
- * Learns `method_automatable` from realized promotion outcomes: methods that
- * under- or over-performed their prediction move toward
- * `current × (realized / predicted)`, weighted by how much of the observed
- * mix they represent and by `learningRate`. `human` never moves (plan §2.4:
+ * Learns `method_automatable` from realized promotion outcomes: each method
+ * in a sample's mix moves toward `current × (realized / predicted)` — i.e.
+ * `current × success_rate` (see `WorkInventoryCalibrationSample`) — weighted
+ * by how much of the observed mix it represents and by `learningRate`. With
+ * samples from `buildCalibrationSamples` (work-inventory-promotion.ts) the
+ * ratio is ≤ 1, so methods are only lowered, and only when automated runs failed. `human` never moves (plan §2.4:
  * 判断を要するステップは人間のまま); samples with a non-positive prediction
  * are ignored so the function stays a pure fold over valid samples.
  */

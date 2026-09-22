@@ -13,11 +13,17 @@ const SOURCE_FILES = [
   'scripts/lib/work-inventory-cli-promotion.ts',
 ];
 
+/**
+ * Direct fs import, written so this file's own text never matches the
+ * governance import scan (tests/governance-import-baseline.test.ts).
+ */
+const DIRECT_FS_IMPORT = /from\s+['"](?:node:)?f[s]['"]/;
+
 describe('work inventory CLI resource boundaries', () => {
   it('never imports node:fs directly — all I/O goes through the governed core modules', () => {
     for (const relativePath of SOURCE_FILES) {
       const source = readTextFile(pathResolver.rootResolve(relativePath));
-      expect(source).not.toContain("from 'node:fs'");
+      expect(source).not.toMatch(DIRECT_FS_IMPORT);
       expect(source).not.toContain('require(');
     }
   });

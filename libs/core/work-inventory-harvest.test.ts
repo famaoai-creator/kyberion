@@ -1,7 +1,8 @@
-import * as fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   applyClassification,
   createWorkInventoryEntry,
@@ -75,14 +76,14 @@ describe('work inventory harvest (hermetic)', () => {
   let tracesDir = '';
 
   beforeEach(() => {
-    fs.mkdirSync(FIXTURE_PARENT, { recursive: true });
-    fixtureRoot = fs.mkdtempSync(path.join(FIXTURE_PARENT, 'work-inventory-harvest-test-'));
+    fixtureRoot = path.join(FIXTURE_PARENT, `work-inventory-harvest-test-${randomUUID()}`);
+    safeMkdir(fixtureRoot, { recursive: true });
     tracesDir = path.join(fixtureRoot, 'active', 'shared', 'logs', 'traces');
-    fs.mkdirSync(tracesDir, { recursive: true });
-    fs.mkdirSync(path.join(fixtureRoot, 'active', 'shared', 'runtime', 'feedback-loop'), {
+    safeMkdir(tracesDir, { recursive: true });
+    safeMkdir(path.join(fixtureRoot, 'active', 'shared', 'runtime', 'feedback-loop'), {
       recursive: true,
     });
-    fs.mkdirSync(path.join(fixtureRoot, 'active', 'shared', 'tmp'), { recursive: true });
+    safeMkdir(path.join(fixtureRoot, 'active', 'shared', 'tmp'), { recursive: true });
 
     const lines: string[] = [
       // Signature A: pipeline:demo-pipeline — 3 ok runs, durations 1000/2000/3000ms.
@@ -205,18 +206,18 @@ describe('work inventory harvest (hermetic)', () => {
       '{not valid json',
       '', // blank line — also skipped
     ];
-    fs.writeFileSync(path.join(tracesDir, 'traces-2026-09-20.jsonl'), lines.join('\n'));
+    safeWriteFile(path.join(tracesDir, 'traces-2026-09-20.jsonl'), lines.join('\n'));
 
     // Pipeline definitions for origin resolution: demo-pipeline has no
     // schedule (on demand), tenant-scope-test has an enabled schedule,
     // window-excluded-test has a disabled schedule; browser-test has no file.
     const pipelinesDir = path.join(fixtureRoot, 'pipelines');
-    fs.mkdirSync(pipelinesDir, { recursive: true });
-    fs.writeFileSync(
+    safeMkdir(pipelinesDir, { recursive: true });
+    safeWriteFile(
       path.join(pipelinesDir, 'demo-pipeline.json'),
       JSON.stringify({ pipeline_id: 'demo-pipeline', steps: [] })
     );
-    fs.writeFileSync(
+    safeWriteFile(
       path.join(pipelinesDir, 'tenant-scope-test.json'),
       JSON.stringify({
         pipeline_id: 'tenant-scope-test',
@@ -224,7 +225,7 @@ describe('work inventory harvest (hermetic)', () => {
         steps: [],
       })
     );
-    fs.writeFileSync(
+    safeWriteFile(
       path.join(pipelinesDir, 'window-excluded-test.json'),
       JSON.stringify({
         pipeline_id: 'window-excluded-test',
@@ -233,7 +234,7 @@ describe('work inventory harvest (hermetic)', () => {
       })
     );
 
-    fs.writeFileSync(
+    safeWriteFile(
       path.join(fixtureRoot, 'active/shared/runtime/feedback-loop/adhoc-pipeline-runs.json'),
       JSON.stringify(
         [
@@ -245,7 +246,7 @@ describe('work inventory harvest (hermetic)', () => {
       )
     );
 
-    fs.writeFileSync(
+    safeWriteFile(
       path.join(fixtureRoot, 'active/shared/tmp/unhandled-intent-registry.json'),
       JSON.stringify(
         {
@@ -277,7 +278,9 @@ describe('work inventory harvest (hermetic)', () => {
   });
 
   afterEach(() => {
-    if (fixtureRoot) fs.rmSync(fixtureRoot, { recursive: true, force: true });
+    if (fixtureRoot && safeExistsSync(fixtureRoot)) {
+      safeRmSync(fixtureRoot, { recursive: true, force: true });
+    }
     fixtureRoot = '';
   });
 
@@ -389,6 +392,36 @@ describe('work inventory harvest (hermetic)', () => {
         const signal = signals.find((s) => s.signature === 'pipeline:tenant-scope-test');
         expect(signal?.count).toBe(1);
         expect(signal?.sample_refs).toEqual(['t-tenant-unscoped']);
+      });
+
+      it('keeps the tenant-less ad-hoc ledger and unhandled-intent sources out of a tenant harvest', () => {
+        const unscopedKinds = (signals: DemandSignal[]) =>
+          signals.filter((s) => s.kind === 'adhoc_pipeline' || s.kind === 'unhandled_intent');
+        const tenant = collectKyberionDemandSignals({
+          rootDir: fixtureRoot,
+          now: NOW,
+          tenantSlug: 'tenant-a',
+        });
+        expect(unscopedKinds(tenant)).toEqual([]);
+
+        const personal = collectKyberionDemandSignals({ rootDir: fixtureRoot, now: NOW });
+        expect(
+          unscopedKinds(personal)
+            .map((s) => s.signature)
+            .sort()
+        ).toEqual([
+          'adhoc_pipeline:pipelines/bar-adhoc.json',
+          'adhoc_pipeline:pipelines/foo-adhoc.json',
+          'intent:rotate-secret',
+        ]);
+
+        const optedIn = collectKyberionDemandSignals({
+          rootDir: fixtureRoot,
+          now: NOW,
+          tenantSlug: 'tenant-a',
+          includeUnscoped: true,
+        });
+        expect(unscopedKinds(optedIn)).toHaveLength(3);
       });
 
       it('never mixes tenant-b traces into a tenant-a request', () => {
@@ -513,6 +546,50 @@ describe('work inventory harvest (hermetic)', () => {
       expect(matches.get(entry.entry_id)?.map((s) => s.signature)).toEqual([
         'voice-actuator:speak_local',
       ]);
+    });
+
+    it('never matches an inferred (taxonomy-default) actuator binding', () => {
+      const generic: DemandSignal = {
+        ...signals[1],
+        signature: 'browser-actuator:computer_interaction',
+      };
+      // applyClassification fills operate -> browser-actuator:computer_interaction as a hint.
+      const classified = applyClassification(
+        createWorkInventoryEntry(
+          {
+            title: 'entry inferred',
+            scope: {},
+            trigger: { kind: 'ad_hoc', description: 'test' },
+            steps: [step({ verb: 'operate' })],
+          },
+          NOW
+        )
+      );
+      expect(classified.steps[0].binding).toMatchObject({
+        actuator: 'browser-actuator',
+        op: 'computer_interaction',
+        inferred: true,
+      });
+      expect(matchSignalsToEntries([classified], [generic]).has(classified.entry_id)).toBe(false);
+
+      // An inferred actuator next to an explicit pipeline_id still matches on the pipeline.
+      const withPipeline = applyClassification(
+        createWorkInventoryEntry(
+          {
+            title: 'entry inferred with pipeline',
+            scope: {},
+            trigger: { kind: 'ad_hoc', description: 'test' },
+            steps: [step({ verb: 'operate', binding: { pipeline_id: 'demo-pipeline' } })],
+          },
+          NOW
+        )
+      );
+      expect(withPipeline.steps[0].binding?.inferred).toBe(true);
+      expect(
+        matchSignalsToEntries([withPipeline], [...signals, generic])
+          .get(withPipeline.entry_id)
+          ?.map((s) => s.signature)
+      ).toEqual(['pipeline:demo-pipeline']);
     });
 
     it('matches via an existing kyberion_trace observation ref', () => {

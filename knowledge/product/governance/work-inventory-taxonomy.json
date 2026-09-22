@@ -393,6 +393,7 @@
     }
   ],
   "review_effects": ["external_send", "personal_data"],
+  "forced_human_effects": ["money", "irreversible", "approval"],
   "scoring_defaults": {
     "weights": {
       "frequency": 1,

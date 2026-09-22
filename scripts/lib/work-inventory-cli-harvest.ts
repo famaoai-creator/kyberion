@@ -5,7 +5,9 @@
  */
 import {
   listWorkInventoryEntries,
+  loadWorkInventoryEntry,
   saveWorkInventoryEntry,
+  WorkInventoryStoreError,
   type WorkInventoryEntry,
 } from '@agent/core/work-inventory';
 import {
@@ -65,13 +67,28 @@ export function runHarvest(
 
   let suggested: WorkInventoryEntry[] = [];
   if (suggest) {
-    suggested = suggestEntriesFromSignals(signals, entries, { scope, now });
-    if (!options.dryRun) {
-      suggested = suggested.map((entry) => saveWorkInventoryEntry(entry, { rootDir }));
-    }
+    // A suggestion whose id already exists (e.g. a re-run at the same `now`)
+    // is skipped — never overwritten and never a failure.
+    const fresh = suggestEntriesFromSignals(signals, entries, { scope, now }).filter(
+      (entry) => !loadWorkInventoryEntry(entry.scope, entry.entry_id, { rootDir })
+    );
+    suggested = options.dryRun
+      ? fresh
+      : fresh.flatMap((entry) => saveNewSuggestion(entry, rootDir));
   }
 
   return { signals, entries_updated: entriesUpdated, suggested, dry_run: options.dryRun };
+}
+
+function saveNewSuggestion(entry: WorkInventoryEntry, rootDir?: string): WorkInventoryEntry[] {
+  try {
+    return [saveWorkInventoryEntry(entry, { rootDir, mode: 'create' })];
+  } catch (error) {
+    if (error instanceof WorkInventoryStoreError && error.code === 'WORK_INVENTORY_ENTRY_EXISTS') {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export function formatHarvest(result: HarvestResult): string {

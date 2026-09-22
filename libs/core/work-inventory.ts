@@ -81,6 +81,14 @@ export interface WorkInventoryStepBinding {
   op?: string;
   pipeline_id?: string;
   intent_id?: string;
+  /**
+   * `true` when `actuator`/`op` were filled from the verb's first taxonomy
+   * candidate rather than declared by a person or a demand signal. Inferred
+   * bindings are display / promotion hints only — demand-signal matching
+   * never uses them (a generic `browser-actuator:computer_interaction` run is
+   * not evidence of any particular entry).
+   */
+  inferred?: boolean;
 }
 
 export interface WorkInventoryStep {
@@ -241,6 +249,12 @@ export interface WorkInventoryTaxonomy {
   effects: WorkInventoryEffectDef[];
   rules: WorkInventoryRule[];
   review_effects: WorkEffect[];
+  /**
+   * Effects whose steps are always `human` — a `human_override` may never
+   * downgrade them. Absent: derived from the first rule that assigns `human`
+   * on `effects_any` (see `forcedHumanEffects`).
+   */
+  forced_human_effects?: WorkEffect[];
   scoring_defaults: WorkInventoryScoringDefaults;
 }
 
@@ -327,6 +341,30 @@ export function classifyWorkStep(
   };
 }
 
+/**
+ * Effects that force a step to `human` regardless of any override: the
+ * taxonomy's `forced_human_effects`, else the `effects_any` of the first rule
+ * that assigns `human` on effects alone (the `effects-force-human` rule).
+ */
+export function forcedHumanEffects(
+  taxonomy: WorkInventoryTaxonomy = loadWorkInventoryTaxonomy()
+): WorkEffect[] {
+  if (taxonomy.forced_human_effects) return [...taxonomy.forced_human_effects];
+  const rule = taxonomy.rules.find(
+    (candidate) => candidate.assign === 'human' && (candidate.when.effects_any?.length ?? 0) > 0
+  );
+  return [...(rule?.when.effects_any ?? [])];
+}
+
+/** The forced-human effects a step carries (empty when an override may stand). */
+export function stepForcedHumanEffects(
+  step: Pick<WorkInventoryStep, 'effects'>,
+  taxonomy: WorkInventoryTaxonomy = loadWorkInventoryTaxonomy()
+): WorkEffect[] {
+  const forced = new Set(forcedHumanEffects(taxonomy));
+  return (step.effects ?? []).filter((effect) => forced.has(effect));
+}
+
 function firstCandidateBinding(
   verb: WorkVerb,
   taxonomy: WorkInventoryTaxonomy
@@ -345,6 +383,7 @@ function fillBinding(
     ...step.binding,
     actuator: candidate.actuator,
     ...(candidate.op ? { op: candidate.op } : {}),
+    inferred: true,
   };
 }
 
@@ -353,6 +392,9 @@ function fillBinding(
  * `human_override` decisions. When a step carried a `proposal` method that
  * disagrees with the rule's verdict, the rule wins and the rationale records
  * both, per plan §2.2 ("規則と提案が食い違ったら rationale に両方を残す").
+ * An override that is not `human` on a step with a forced-human effect
+ * (money / irreversible / approval — `forcedHumanEffects`) is rejected: the
+ * rule wins and the rationale records the rejected override.
  */
 export function applyClassification(
   entry: WorkInventoryEntry,
@@ -365,15 +407,19 @@ export function applyClassification(
     const classification = classifyWorkStep(step, { system_has_api: systemHasApi }, taxonomy);
     const binding = fillBinding(step, taxonomy);
 
-    if (step.method?.source === 'human_override') {
+    const override = step.method?.source === 'human_override' ? step.method : undefined;
+    const forced = override ? stepForcedHumanEffects(step, taxonomy) : [];
+    if (override && (override.assigned === 'human' || forced.length === 0)) {
       return { ...step, binding, requires_review: classification.requires_review };
     }
 
     const proposal = step.method?.source === 'proposal' ? step.method : undefined;
-    const rationale =
-      proposal && proposal.assigned !== classification.method
-        ? `rule ${classification.rule_id}: ${classification.rationale}; proposal was ${proposal.assigned}: ${proposal.rationale}`
-        : `rule ${classification.rule_id}: ${classification.rationale}`;
+    let rationale = `rule ${classification.rule_id}: ${classification.rationale}`;
+    if (override) {
+      rationale = `${rationale}; rejected human_override to ${override.assigned} (effects ${forced.join(', ')} always stay human): ${override.rationale}`;
+    } else if (proposal && proposal.assigned !== classification.method) {
+      rationale = `${rationale}; proposal was ${proposal.assigned}: ${proposal.rationale}`;
+    }
 
     return {
       ...step,
@@ -419,11 +465,33 @@ export function validateWorkInventoryEntry(input: unknown): { valid: boolean; er
 
 const ENTRY_ID_PATTERN = /^WI-[A-Za-z0-9_-]{3,80}$/;
 
-function generateWorkInventoryEntryId(title: string, now: Date): string {
-  const datePart = now.toISOString().slice(0, 10).replaceAll('-', '');
-  const slug = slugify(title, { maxLength: 32 });
-  const suffix = slug || createHash('sha256').update(title, 'utf8').digest('hex').slice(0, 10);
-  return `WI-${datePart}-${suffix}`;
+/**
+ * The storage partition an entry lives in: `tenant:<slug>` or `personal`
+ * (the same split `workInventoryRoot` uses). Part of the entry id hash and of
+ * the promoted mission id so two scopes never share either.
+ */
+export function workInventoryScopeKey(scope: WorkInventoryScope): string {
+  return scope.tenant_slug ? `tenant:${scope.tenant_slug}` : 'personal';
+}
+
+/**
+ * `WI-<yyyymmdd>-<ascii slug, ≤40, omitted when empty>-<8 hex>` where the hex
+ * is `sha256(title \n scope key \n created_at)`. The slug drops non-ASCII,
+ * so the hash — not the slug — is what keeps two titles ("経費精算 Excel" /
+ * "売上集計 Excel") apart. Deterministic for fixed inputs and `now`.
+ */
+function generateWorkInventoryEntryId(
+  title: string,
+  scope: WorkInventoryScope,
+  createdAt: string
+): string {
+  const datePart = createdAt.slice(0, 10).replaceAll('-', '');
+  const slug = slugify(title, { maxLength: 40 }).replace(/^-+|-+$/g, '');
+  const digest = createHash('sha256')
+    .update(`${title}\n${workInventoryScopeKey(scope)}\n${createdAt}`, 'utf8')
+    .digest('hex')
+    .slice(0, 8);
+  return slug ? `WI-${datePart}-${slug}-${digest}` : `WI-${datePart}-${digest}`;
 }
 
 export interface CreateWorkInventoryEntryInput {
@@ -445,7 +513,7 @@ export function createWorkInventoryEntry(
   const createdAt = nowIso(now);
   return {
     schema_version: 'work-inventory.v1',
-    entry_id: generateWorkInventoryEntryId(input.title, now),
+    entry_id: generateWorkInventoryEntryId(input.title, input.scope, createdAt),
     title: input.title,
     scope: input.scope,
     trigger: input.trigger,
@@ -501,9 +569,30 @@ function workInventoryEntryPath(
   return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true, rootDir });
 }
 
+export type WorkInventoryStoreErrorCode = 'WORK_INVENTORY_ENTRY_EXISTS';
+
+export class WorkInventoryStoreError extends Error {
+  readonly code: WorkInventoryStoreErrorCode;
+
+  constructor(code: WorkInventoryStoreErrorCode, message: string) {
+    super(`[${code}] ${message}`);
+    this.name = 'WorkInventoryStoreError';
+    this.code = code;
+  }
+}
+
+export interface SaveWorkInventoryEntryOptions {
+  rootDir?: string;
+  /**
+   * `create` refuses to replace an existing file (`WORK_INVENTORY_ENTRY_EXISTS`)
+   * — use it wherever a *new* entry is written. `upsert` (default) updates.
+   */
+  mode?: 'create' | 'upsert';
+}
+
 export function saveWorkInventoryEntry(
   entry: WorkInventoryEntry,
-  options: { rootDir?: string } = {}
+  options: SaveWorkInventoryEntryOptions = {}
 ): WorkInventoryEntry {
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   const updated: WorkInventoryEntry = { ...entry, updated_at: nowIso() };
@@ -512,6 +601,12 @@ export function saveWorkInventoryEntry(
     throw new Error(`Invalid work inventory entry ${updated.entry_id}: ${check.errors.join('; ')}`);
   }
   const filePath = workInventoryEntryPath(updated.scope, updated.entry_id, rootDir);
+  if (options.mode === 'create' && safeExistsSync(filePath)) {
+    throw new WorkInventoryStoreError(
+      'WORK_INVENTORY_ENTRY_EXISTS',
+      `work inventory entry ${updated.entry_id} already exists; refusing to overwrite it`
+    );
+  }
   safeMkdir(path.dirname(filePath), { recursive: true });
   safeWriteFile(filePath, `${JSON.stringify(updated, null, 2)}\n`, { encoding: 'utf8' });
   return updated;

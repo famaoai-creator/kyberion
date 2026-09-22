@@ -38,7 +38,11 @@ vi.mock('./hearing-canvas.js', async () => {
 });
 
 import { resolveMemberByPrincipal } from '@agent/core/member-registry';
-import { loadWorkInventoryEntry } from '@agent/core/work-inventory';
+import {
+  createWorkInventoryEntry,
+  loadWorkInventoryEntry,
+  saveWorkInventoryEntry,
+} from '@agent/core/work-inventory';
 import { applyHearingTurn, createHearingRecord, type HearingRecord } from './hearing.js';
 import { hearingNamespace, loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
 import { generateHearingCanvas } from './hearing-canvas.js';
@@ -674,5 +678,41 @@ describe('POST /api/hearing/:session/inventory (WI-08)', () => {
     const res2 = fakeResponse();
     await inventory(fakeRequest({ params: { session: sessionId } }), res2);
     expect((res2.body as { entry_id: string }).entry_id).toBe(body.entry_id);
+  });
+
+  it('refuses with 409 instead of overwriting an existing entry with the same id', async () => {
+    const sessionId = `sess-${randomUUID()}`;
+    await answerAllWorkInventoryRequirements(sessionId);
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember('approver'));
+    const decideRes = fakeResponse();
+    decide(fakeRequest({ params: { session: sessionId } }), decideRes);
+    expect(decideRes.statusCode).toBe(200);
+
+    const fixedNow = new Date('2026-09-22T09:00:00.000Z');
+    const scope = { tenant_slug: INVENTORY_TEST_TENANT };
+    const occupant = {
+      ...createWorkInventoryEntry(
+        { title: ANSWERS.task_name, scope, trigger: { kind: 'ad_hoc', description: 'other' } },
+        fixedNow
+      ),
+      title: 'Occupant',
+    };
+    withExecutionContext('ecosystem_architect', () => saveWorkInventoryEntry(occupant));
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(fixedNow);
+    const res = fakeResponse();
+    try {
+      await inventory(fakeRequest({ params: { session: sessionId } }), res);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(res.statusCode).toBe(409);
+    const stored = withExecutionContext('ecosystem_architect', () =>
+      loadWorkInventoryEntry(scope, occupant.entry_id)
+    );
+    expect(stored?.title).toBe('Occupant');
+    const persisted = loadHearingRecord(namespace, sessionId) as HearingRecordWithInventoryFields;
+    expect(persisted.work_inventory_entry_id).toBeUndefined();
   });
 });

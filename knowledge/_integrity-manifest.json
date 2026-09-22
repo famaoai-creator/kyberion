@@ -4233,7 +4233,7 @@
     {
       "path": "product/governance/work-inventory-taxonomy.json",
       "tier": "public",
-      "size": 12199,
+      "size": 12264,
       "type": "json"
     },
     {
@@ -9447,7 +9447,7 @@
     {
       "path": "product/schemas/mission-brief.schema.json",
       "tier": "public",
-      "size": 2661,
+      "size": 3076,
       "type": "json"
     },
     {
@@ -11889,7 +11889,7 @@
     {
       "path": "product/schemas/work-inventory-entry.schema.json",
       "tier": "public",
-      "size": 8644,
+      "size": 8898,
       "type": "json"
     },
     {
@@ -11901,7 +11901,7 @@
     {
       "path": "product/schemas/work-inventory-taxonomy.schema.json",
       "tier": "public",
-      "size": 10946,
+      "size": 11278,
       "type": "json"
     },
     {

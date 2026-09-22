@@ -1,9 +1,18 @@
 /**
  * WI-07: `pnpm inventory consent ...` and `pnpm inventory observe ...`
  * command handlers.
+ *
+ * Who acts: the terminal CLI runs on this machine as its local owner — the
+ * same trust a presence-studio loopback viewer gets
+ * (`resolveMemberByPrincipal({ source: 'loopback' })`). Consent and
+ * observation records therefore always belong to the owner member: `--member`
+ * and `--decided-by`, when given, must name the owner, so nobody can act as
+ * another member by passing two matching flags. Other members consent through
+ * their own authenticated surface (not this CLI).
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolveMemberByPrincipal } from '@agent/core/member-registry';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { loadDesktopRecordingAtPath } from '@agent/core/desktop-recording';
 import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
@@ -32,15 +41,66 @@ import {
   type WorkInventoryObservationSummary,
 } from '@agent/core/work-inventory-observation';
 import { readSafeJsonValueFile } from './json-input.js';
+import { resolveDecidedByFromArgv } from './decided-by-args.js';
 import {
-  bareMemberId,
   csv,
   formatTable,
-  requireDecidedBy,
+  getFlag,
   requireFlag,
   resolveScope,
+  WorkInventoryCliUsageError,
 } from './work-inventory-cli-shared.js';
 import type { WorkInventoryCliOptions } from './work-inventory-cli-entries.js';
+
+// ---------------------------------------------------------------------------
+// Local owner (the only member this terminal CLI may act as)
+// ---------------------------------------------------------------------------
+
+export interface LocalOwnerActor {
+  /** Bare member id consent/observation records are keyed by. */
+  member_id: string;
+  by: { kind: 'human'; id: string };
+}
+
+/**
+ * Resolves the member this CLI acts as: the local owner. `--member`, if
+ * given, must equal the owner id and `--decided-by`, if given, must be
+ * `user:<owner>`. Fails when no owner member is provisioned yet.
+ */
+export function resolveLocalOwnerActor(
+  argv: string[],
+  subcommand: string,
+  options: WorkInventoryCliOptions = {}
+): LocalOwnerActor {
+  const owner = resolveMemberByPrincipal(
+    { source: 'loopback' },
+    options.rootDir ? { rootDir: options.rootDir } : {}
+  );
+  if (!owner) {
+    throw new WorkInventoryCliUsageError(
+      `${subcommand}: no active owner member is provisioned on this machine — complete onboarding (pnpm onboard, which provisions it via ensureOwnerMember) first`
+    );
+  }
+  const ownerId = owner.member_id;
+  const member = getFlag(argv, '--member');
+  if (member !== undefined && member !== ownerId) {
+    throw new WorkInventoryCliUsageError(
+      `${subcommand}: this CLI acts as the local owner (${ownerId}); --member ${member} is not allowed — other members consent through their own authenticated surface`
+    );
+  }
+  let decidedBy: ReturnType<typeof resolveDecidedByFromArgv>;
+  try {
+    decidedBy = resolveDecidedByFromArgv(argv);
+  } catch (error) {
+    throw new WorkInventoryCliUsageError(error instanceof Error ? error.message : String(error));
+  }
+  if (decidedBy && decidedBy.id !== `user:${ownerId}`) {
+    throw new WorkInventoryCliUsageError(
+      `${subcommand}: this CLI acts as the local owner; --decided-by must be user:${ownerId}, got ${decidedBy.id}`
+    );
+  }
+  return { member_id: ownerId, by: { kind: 'human', id: ownerId } };
+}
 
 // ---------------------------------------------------------------------------
 // consent
@@ -50,7 +110,7 @@ export function runConsentGrant(
   argv: string[],
   options: WorkInventoryCliOptions & { now?: Date }
 ): WorkInventoryConsent {
-  const memberId = requireFlag(argv, '--member', 'consent grant');
+  const actor = resolveLocalOwnerActor(argv, 'consent grant', options);
   const sources = csv(argv, '--sources') as WorkInventoryConsentSource[];
   const kinds = csv(argv, '--kinds') as WorkInventoryObservationKind[];
   const purpose = requireFlag(argv, '--purpose', 'consent grant');
@@ -59,20 +119,19 @@ export function runConsentGrant(
   if (!Number.isFinite(days) || days <= 0) {
     throw new Error(`--days must be a positive number, got "${daysRaw}"`);
   }
-  const decidedBy = requireDecidedBy(argv);
   const scope = resolveScope(argv);
   const now = options.now ?? new Date();
   const expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
 
   return grantWorkInventoryConsent(
     {
-      member_id: memberId,
+      member_id: actor.member_id,
       ...(scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {}),
       sources,
       observation_kinds: kinds,
       purpose,
       expires_at: expiresAt,
-      granted_by: { kind: 'human', id: bareMemberId(decidedBy) },
+      granted_by: actor.by,
     },
     { rootDir: options.rootDir, now }
   );
@@ -82,13 +141,12 @@ export function runConsentRevoke(
   argv: string[],
   options: WorkInventoryCliOptions & { now?: Date }
 ): WorkInventoryConsent {
-  const memberId = requireFlag(argv, '--member', 'consent revoke');
+  const actor = resolveLocalOwnerActor(argv, 'consent revoke', options);
   const consentId = requireFlag(argv, '--consent', 'consent revoke');
-  const decidedBy = requireDecidedBy(argv);
-  return revokeWorkInventoryConsent(memberId, consentId, {
+  return revokeWorkInventoryConsent(actor.member_id, consentId, {
     rootDir: options.rootDir,
     now: options.now,
-    by: { kind: 'human', id: bareMemberId(decidedBy) },
+    by: actor.by,
   });
 }
 
@@ -96,8 +154,8 @@ export function runConsentList(
   argv: string[],
   options: WorkInventoryCliOptions
 ): WorkInventoryConsent[] {
-  const memberId = requireFlag(argv, '--member', 'consent list');
-  return listWorkInventoryConsents(memberId, { rootDir: options.rootDir });
+  const actor = resolveLocalOwnerActor(argv, 'consent list', options);
+  return listWorkInventoryConsents(actor.member_id, { rootDir: options.rootDir });
 }
 
 export function formatConsent(consent: WorkInventoryConsent): string {
@@ -130,6 +188,11 @@ export function formatConsentList(consents: readonly WorkInventoryConsent[]): st
 // observe
 // ---------------------------------------------------------------------------
 
+/**
+ * Recordings under `active/shared/runtime/recordings/` are captured on this
+ * machine by its owner (`pnpm kyberion record` / the browser extension bridge),
+ * which is why summarizing them is attributed to the local owner member.
+ */
 const RECORDINGS_ROOT_SEGMENTS = ['active', 'shared', 'runtime', 'recordings'];
 
 /** Resolves and bounds a recording path to `active/shared/runtime/recordings/` under the repo. */
@@ -165,14 +228,14 @@ export function runObserveSummarize(
   argv: string[],
   options: WorkInventoryCliOptions & { now?: Date }
 ): WorkInventoryObservationSummary {
-  const memberId = requireFlag(argv, '--member', 'observe summarize');
+  const actor = resolveLocalOwnerActor(argv, 'observe summarize', options);
   const recordingArg = requireFlag(argv, '--recording', 'observe summarize');
   const scope = resolveScope(argv);
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   const safePath = resolveRecordingPath(recordingArg, rootDir);
   const recording = loadInventoryRecording(safePath);
   return summarizeRecordingForInventory(recording, {
-    member_id: memberId,
+    member_id: actor.member_id,
     ...(scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {}),
     now: options.now,
     rootDir,
@@ -183,13 +246,12 @@ export function runObserveConfirm(
   argv: string[],
   options: WorkInventoryCliOptions & { now?: Date }
 ): WorkInventoryObservationSummary {
-  const memberId = requireFlag(argv, '--member', 'observe confirm');
+  const actor = resolveLocalOwnerActor(argv, 'observe confirm', options);
   const summaryId = requireFlag(argv, '--summary', 'observe confirm');
-  const decidedBy = requireDecidedBy(argv);
-  return confirmObservationSummary(memberId, summaryId, {
+  return confirmObservationSummary(actor.member_id, summaryId, {
     rootDir: options.rootDir,
     now: options.now,
-    by: { kind: 'human', id: bareMemberId(decidedBy) },
+    by: actor.by,
   });
 }
 
@@ -197,13 +259,12 @@ export function runObserveDiscard(
   argv: string[],
   options: WorkInventoryCliOptions & { now?: Date }
 ): WorkInventoryObservationSummary {
-  const memberId = requireFlag(argv, '--member', 'observe discard');
+  const actor = resolveLocalOwnerActor(argv, 'observe discard', options);
   const summaryId = requireFlag(argv, '--summary', 'observe discard');
-  const decidedBy = requireDecidedBy(argv);
-  return discardObservationSummary(memberId, summaryId, {
+  return discardObservationSummary(actor.member_id, summaryId, {
     rootDir: options.rootDir,
     now: options.now,
-    by: { kind: 'human', id: bareMemberId(decidedBy) },
+    by: actor.by,
   });
 }
 
@@ -211,29 +272,28 @@ export function runObserveList(
   argv: string[],
   options: WorkInventoryCliOptions
 ): WorkInventoryObservationSummary[] {
-  const memberId = requireFlag(argv, '--member', 'observe list');
-  return listObservationSummaries(memberId, { rootDir: options.rootDir });
+  const actor = resolveLocalOwnerActor(argv, 'observe list', options);
+  return listObservationSummaries(actor.member_id, { rootDir: options.rootDir });
 }
 
 export function runObserveAttach(
   argv: string[],
   options: WorkInventoryCliOptions & { now?: Date }
 ): WorkInventoryEntry {
-  const memberId = requireFlag(argv, '--member', 'observe attach');
+  const actor = resolveLocalOwnerActor(argv, 'observe attach', options);
   const summaryId = requireFlag(argv, '--summary', 'observe attach');
   const entryId = requireFlag(argv, '--entry', 'observe attach');
   const apiSystems = csv(argv, '--api-systems');
-  const decidedBy = requireDecidedBy(argv);
   const scope = resolveScope(argv);
   const rootDir = options.rootDir;
 
-  const summary = loadObservationSummary(memberId, summaryId, { rootDir });
+  const summary = loadObservationSummary(actor.member_id, summaryId, { rootDir });
   if (!summary) throw new Error(`observation summary not found: ${summaryId}`);
   const entry = loadWorkInventoryEntry(scope, entryId, { rootDir });
   if (!entry) throw new Error(`work inventory entry not found: ${entryId}`);
 
   const attached = attachObservationToEntry(entry, summary, {
-    by: { kind: 'human', id: bareMemberId(decidedBy) },
+    by: actor.by,
     now: options.now,
     rootDir,
     ...(apiSystems.length > 0 ? { apiSystems } : {}),
