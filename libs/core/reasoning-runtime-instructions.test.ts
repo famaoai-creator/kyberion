@@ -26,6 +26,12 @@ describe('reasoning runtime instructions', () => {
     expect(section).toContain('structured and bounded');
   });
 
+  it('selects cursor-specific notes for Cursor subagent projections', () => {
+    const section = renderRuntimeInstructions(runtimeInstructionsForProvider('cursor'));
+    expect(section).toContain('no per-tool allowlist');
+    expect(section).toContain('honor readonly');
+  });
+
   it('includes only activated plugin prompt sections in runtime instructions', async () => {
     const activation = await activatePluginContributions(
       { prompt_sections: ['runtime-note'] },
