@@ -24,6 +24,7 @@
 import * as path from 'node:path';
 import { nowIso } from './foundation/time.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { readJsonLines } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
 import { loadAdhocRunLedgerAtPath, type AdhocRunTally } from './promotion-candidates.js';
@@ -204,22 +205,13 @@ function collectTraceSignals(
   const accumulators = new Map<string, SignalAccumulator>();
 
   for (const file of files) {
-    let raw: string;
+    let records: unknown[];
     try {
-      raw = String(safeReadFile(file, { encoding: 'utf8' }));
+      records = readJsonLines<unknown>(file, { onMalformed: 'skip' });
     } catch {
       continue; // unreadable file: skip, never abort the whole scan
     }
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      let record: unknown;
-      try {
-        record = parseSafeJsonInput(trimmed, 'trace line');
-      } catch {
-        continue; // malformed line: skip
-      }
+    for (const record of records) {
       if (!isRecord(record)) continue;
 
       const rootSpan = record.rootSpan;
