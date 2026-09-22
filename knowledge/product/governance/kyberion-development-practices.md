@@ -90,12 +90,31 @@ leftovers. A test may not depend on:
   under vitest (`KYBERION_ALLOW_TEST_NOTIFICATIONS=1` opts a delivery
   suite back in); 82 phantom inbox entries from un-mocked finishMission
   flows taught us this;
+- **production shared stores** — any writer to a repo-wide store
+  (`active/shared/logs/traces`, the inbox, audit) skips the write under
+  vitest unless the caller passes an explicit target or an opt-in env is
+  set (`KYBERION_TRACE_TEST_PERSIST=1` for traces). `vi.mock` of secure-io
+  does not intercept foundation JSON IO, so unguarded writers leaked test
+  traces into production and skewed work-inventory demand signals;
 - **the calendar** — absolute dates in fixtures rot; freeze
   `vi.useFakeTimers({ now, toFake: ['Date'] })` for the WHOLE flow, not
   just the assertion phase.
 
 Smell test: _would this pass in a fresh clone on a different OS on the
 first run?_
+
+**The tier guard is not a fixture either.** Tests that point `rootDir`
+under `active/shared/tmp/` are default-allowed, so code that reads or writes
+`knowledge/personal/**` or `knowledge/confidential/**` passes there and is
+denied on a real root (this broke a CLI, a janitor sweep that silently
+expired nothing, and rules silently ignored from a tier the reader could not
+see). Before calling such code done, run it once through its real entry
+point (CLI, janitor, worker, surface) against the real root. Wrap each
+synchronous disk call in `withExecutionContext(role, fn)` — it restores the
+context as soon as `fn` returns, so never wrap an `await`; use
+`withExecutionContextAsync` across awaits. Data a runtime role must read
+must live where that role can read it, and an unreadable overlay must warn,
+not drop silently.
 
 ## 4. Build & verification order — run the check CI runs
 
@@ -116,6 +135,15 @@ build:actuators`.
 - Full local battery: `pnpm vitest run libs/core/ scripts/ tests/
 libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   pipelines or goldens, `pnpm check -- --scope pr --only golden`.
+- **One heavy run per worktree at a time.** Never run the `golden` /
+  vital-check gate while vitest runs in the same worktree — the suite
+  deletes fixtures the golden reads. Rerun any full-suite timeout or flake
+  in isolation and report both results; name pre-existing failures as
+  pre-existing (with test names) instead of counting them as passes.
+- **Verify static-analysis fixes locally.** PR code scanning reports only
+  alerts on changed lines, and moving a sink makes pre-existing alerts show
+  as new. Confirm a CodeQL fix with the local CodeQL CLI over the same scope
+  GitHub scans (test files included) before pushing.
 
 ## 5. Governance & policy mechanics
 
@@ -124,6 +152,12 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
   filename, `MISSION_ROLE=mission_controller` covers mission-lifecycle
   paths. When a legitimate tool needs a new write path, grant the
   narrowest possible role permission rather than widening an existing one.
+- **Shell scripts go through `safeExecShellScript*` only.** Never pass a
+  literal `sh` / `bash` / `cmd` with `-c` / `/c` to the generic
+  `safeExec*` / `safeSpawn` helpers — not even in a test that proves the call
+  is rejected. CodeQL's context-insensitive `IndirectCommandArgument` model
+  then treats every argument of those helpers as shell-interpreted and flags
+  every caller (698 false alerts before the split).
 - Actuator CLIs exit 0 with `status:"failed"` in stdout — callers parse
   the payload and verify artifacts; exit codes prove nothing.
 - Optional platform capabilities (Apple Intelligence, BlackHole, mlx)
@@ -146,6 +180,15 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
 
 - One logical change per commit; lint-staged regenerates the knowledge
   index and runs eslint/prettier — expect it to amend what you staged.
+  lint-staged stashes unstaged changes, so while other agents edit the
+  same worktree, stage explicit paths and commit with hooks disabled
+  (`git -c core.hooksPath=/dev/null commit ...`), then run the hook's steps
+  yourself: eslint --fix, prettier, and `pnpm generate:knowledge-index` for
+  any `knowledge/` edit (a missed index turns CI `catalogs` red).
+- Set up every new worktree from scratch (install with
+  `CI=true pnpm install --frozen-lockfile`, then `pnpm build`). Never
+  symlink the main checkout's `node_modules`; if `pnpm exec` misbehaves in
+  a worktree, call `./node_modules/.bin/*` directly.
 - prettier mangles `{{VAR}}` placeholders in scaffolds — scaffold
   directories belong in `.prettierignore`.
 - When CI fails: fix the ROOT class, then sweep the repo for siblings of
@@ -196,6 +239,11 @@ Patterns proven in yc-software/qm and adopted as repo-wide discipline
 - **Asymmetric trust for de-obfuscation.** Seeing through quotes, wrappers
   and encodings is correct when looking for something to BLOCK, and wrong
   when looking for a reason to PERMIT (`shell-command-normalize.ts`).
+- **Ties deny, and identity is never ambient.** Equal-priority allow/deny
+  rules resolve to deny. Agent or human identity comes from an authenticated
+  context, never from ambient env such as `MISSION_ROLE` or
+  `KYBERION_AGENT_ID` — `pnpm pipeline` and `withExecutionContext` set
+  `MISSION_ROLE` for ordinary human runs.
 - **Tighten monotonically, never replace.** A security floor (posture,
   approval requirements) is applied as a union on top of the base
   resolution — an early-return floor that REPLACES stronger requirements

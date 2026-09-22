@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-09-22
+last_updated: 2026-09-23
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -36,6 +36,8 @@ PR を開く前の必須 runbook。人間・エージェント共通。PR 作成
 # 0. 専用 worktree で作業する（main checkout や他 agent の worktree では作らない）
 git fetch origin
 git worktree add -b <prefix>/<topic>-<yyyymmdd> ../kyberion-<topic> origin/main
+#    worktree ごとにゼロから用意する（main checkout の node_modules を symlink しない）
+(cd ../kyberion-<topic> && CI=true pnpm install --frozen-lockfile && pnpm build)
 
 # 1〜4. 実装・commit のあと、PR 前確認（下の「エージェント必須手順」）
 git diff --name-only origin/main...HEAD
@@ -130,13 +132,14 @@ pnpm check -- --scope pr
 
 ## よく落ちる gate（実測パターン）
 
-| Gate / 症状                | 典型原因                                                   | 直し方                                                                                                              |
-| -------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `type-ratchet`             | テストや実装に `as any` / `AnyKeyword` を増やした          | `vi.mocked()`・generics・narrowing に置換。baseline を安易に上げない                                                |
-| `contract-semver`          | actuator version / schema / ops を変えたが baseline 未更新 | intentional bump なら rebaseline して `scripts/contract-baseline.json` を commit。ついでに component-inventory sync |
-| `env-registry`             | コードに新しい `KYBERION_*` を追加したが registry 未更新   | `pnpm generate:env-registry` → curated 説明を埋める → `--check`                                                     |
-| `build:actuators` / TS2345 | source path typecheck は通るが dist export 経由で型不一致  | core build 後に `build:actuators`。呼び出し側の型を `GenerationBackend` など実際の公開型に合わせる                  |
-| component-inventory drift  | CAPABILITIES / global index が manifest と不一致           | `pnpm kyberion sync component-inventory`                                                                            |
+| Gate / 症状                   | 典型原因                                                                                                                                             | 直し方                                                                                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type-ratchet`                | テストや実装に `as any` / `AnyKeyword` を増やした                                                                                                    | `vi.mocked()`・generics・narrowing に置換。baseline を安易に上げない                                                                                 |
+| `contract-semver`             | actuator version / schema / ops を変えたが baseline 未更新                                                                                           | intentional bump なら rebaseline して `scripts/contract-baseline.json` を commit。ついでに component-inventory sync                                  |
+| `env-registry`                | コードに新しい `KYBERION_*` を追加したが registry 未更新                                                                                             | `pnpm generate:env-registry` → curated 説明を埋める → `--check`                                                                                      |
+| `build:actuators` / TS2345    | source path typecheck は通るが dist export 経由で型不一致                                                                                            | core build 後に `build:actuators`。呼び出し側の型を `GenerationBackend` など実際の公開型に合わせる                                                   |
+| component-inventory drift     | CAPABILITIES / global index が manifest と不一致                                                                                                     | `pnpm kyberion sync component-inventory`                                                                                                             |
+| CodeQL（PR の code scanning） | 変更行のアラートだけが出る。sink を移すと既存アラートが「新規」になる。汎用 `safeExec*` に `sh`/`bash`/`cmd` + `-c` を渡すと全呼び出し元が指摘される | 手元の CodeQL CLI でテストを含めて解析して確かめる。シェル実行は `safeExecShellScript*` を使う。移動しただけの既存アラートは根拠を書いて扱いを決める |
 
 ## 失敗時の原則
 
