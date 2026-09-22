@@ -50,6 +50,7 @@
 - [Architecture: Fidelity Refactoring Protocol](./product/architecture/fidelity-refactoring-protocol.md) (public | Unknown)
 - [Architecture: Intent Classifier Routing](./product/architecture/intent-classifier-routing.md) (public | Unknown)
 - [Architecture: The 5-Layer Backbone of Kyberion](./product/architecture/backbone-sovereignty.md) (public | Unknown)
+- [AuthN/AuthZ Seams — Principal Resolution and Policy Evaluation](./product/architecture/authn-authz-seams.md) (public | ecosystem_architect)
 - [Benchmark-Driven Harness Evolution](./product/architecture/benchmark-driven-harness-evolution.md) (public | Ecosystem Architect)
 - [Browser Actuator v3](./product/architecture/browser-actuator-v3.md) (public | ecosystem_architect)
 - [Browser Execution Substrate — How To](./product/architecture/browser-execution-substrate-howto.md) (public | ecosystem_architect)

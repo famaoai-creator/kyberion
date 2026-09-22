@@ -1,0 +1,202 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "authn-principal-resolver",
+      "default_provider": "registry-token",
+      "fallback_purpose": "local_dev",
+      "traits": {
+        "assurance": "Credential verification strength: how strongly the resolved principal is bound to a checked credential or trust boundary.",
+        "offline": "Resolves without any network round-trip (no remote JWKS, no introspection).",
+        "zero_config": "Works with no operator-side setup beyond the defaults.",
+        "agent_workload": "Can resolve non-human (agent/NHI) principals.",
+        "human_workload": "Can resolve human member principals.",
+        "external_idp": "Federates to an external identity provider (OIDC-class).",
+        "synthetic": "Returns a synthetic/unverified principal — test isolation, never a real identity."
+      },
+      "providers": {
+        "stub": {
+          "traits": {
+            "assurance": 0,
+            "offline": 1,
+            "zero_config": 1,
+            "agent_workload": 0.5,
+            "human_workload": 0.5,
+            "external_idp": 0,
+            "synthetic": 1
+          },
+          "trait_basis": {
+            "assurance": "declared",
+            "offline": "declared",
+            "zero_config": "declared",
+            "agent_workload": "declared",
+            "human_workload": "declared",
+            "external_idp": "declared",
+            "synthetic": "declared"
+          }
+        },
+        "loopback-local": {
+          "traits": {
+            "assurance": 0.4,
+            "offline": 1,
+            "zero_config": 1,
+            "agent_workload": 0,
+            "human_workload": 1,
+            "external_idp": 0,
+            "synthetic": 0
+          },
+          "trait_basis": {
+            "assurance": "declared",
+            "offline": "declared",
+            "zero_config": "declared",
+            "agent_workload": "declared",
+            "human_workload": "declared",
+            "external_idp": "declared",
+            "synthetic": "declared"
+          }
+        },
+        "env-token": {
+          "traits": {
+            "assurance": 0.3,
+            "offline": 1,
+            "zero_config": 0.7,
+            "agent_workload": 0,
+            "human_workload": 1,
+            "external_idp": 0,
+            "synthetic": 0
+          },
+          "trait_basis": {
+            "assurance": "declared",
+            "offline": "declared",
+            "zero_config": "declared",
+            "agent_workload": "declared",
+            "human_workload": "declared",
+            "external_idp": "declared",
+            "synthetic": "declared"
+          }
+        },
+        "registry-token": {
+          "traits": {
+            "assurance": 0.8,
+            "offline": 1,
+            "zero_config": 0.4,
+            "agent_workload": 0,
+            "human_workload": 1,
+            "external_idp": 0,
+            "synthetic": 0
+          },
+          "trait_basis": {
+            "assurance": "declared",
+            "offline": "declared",
+            "zero_config": "declared",
+            "agent_workload": "declared",
+            "human_workload": "declared",
+            "external_idp": "declared",
+            "synthetic": "declared"
+          },
+          "evidence": ["libs/core/chronos-access-registry.ts"]
+        },
+        "agent-context": {
+          "traits": {
+            "assurance": 0.4,
+            "offline": 1,
+            "zero_config": 0.8,
+            "agent_workload": 0.8,
+            "human_workload": 0,
+            "external_idp": 0,
+            "synthetic": 0
+          },
+          "trait_basis": {
+            "assurance": "declared",
+            "offline": "declared",
+            "zero_config": "declared",
+            "agent_workload": "declared",
+            "human_workload": "declared",
+            "external_idp": "declared",
+            "synthetic": "declared"
+          },
+          "evidence": ["libs/core/nhi-actor-verification.ts"]
+        },
+        "agent-token": {
+          "traits": {
+            "assurance": 0.9,
+            "offline": 1,
+            "zero_config": 0.3,
+            "agent_workload": 1,
+            "human_workload": 0,
+            "external_idp": 0,
+            "synthetic": 0
+          },
+          "trait_basis": {
+            "assurance": "declared",
+            "offline": "declared",
+            "zero_config": "declared",
+            "agent_workload": "declared",
+            "human_workload": "declared",
+            "external_idp": "declared",
+            "synthetic": "declared"
+          },
+          "evidence": ["libs/core/agent-identity.ts"]
+        },
+        "oidc-jwt": {
+          "traits": {
+            "assurance": 0.9,
+            "offline": 0.6,
+            "zero_config": 0.1,
+            "agent_workload": 0.3,
+            "human_workload": 1,
+            "external_idp": 1,
+            "synthetic": 0
+          },
+          "trait_basis": {
+            "assurance": "declared",
+            "offline": "declared",
+            "zero_config": "declared",
+            "agent_workload": "declared",
+            "human_workload": "declared",
+            "external_idp": "declared",
+            "synthetic": "declared"
+          }
+        }
+      },
+      "purposes": {
+        "local_dev": {
+          "description": "Local operator/dev loop: zero-config, offline, still a real trust boundary.",
+          "weights": {
+            "zero_config": 0.4,
+            "offline": 0.3,
+            "assurance": 0.3
+          }
+        },
+        "remote_human": {
+          "description": "A human reaching a surface remotely: credential strength and member binding matter.",
+          "weights": {
+            "assurance": 0.5,
+            "human_workload": 0.5
+          }
+        },
+        "agent": {
+          "description": "A non-human workload (subagent, actuator, service) asserting an identity.",
+          "weights": {
+            "agent_workload": 0.6,
+            "assurance": 0.4
+          }
+        },
+        "federated": {
+          "description": "External IdP-issued identity (OIDC JWT / future SaaS integration).",
+          "weights": {
+            "external_idp": 0.8,
+            "assurance": 0.2
+          }
+        },
+        "test": {
+          "description": "Hermetic tests and offline probes: a synthetic principal is acceptable.",
+          "weights": {
+            "synthetic": 1
+          }
+        }
+      }
+    }
+  ]
+}
