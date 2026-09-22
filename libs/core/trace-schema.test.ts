@@ -137,6 +137,46 @@ describe('PI-06 trace schema', () => {
     });
   });
 
+  it('WI-13: accepts every governed metadata.origin value and rejects anything else', () => {
+    const rootSpan = {
+      spanId: 'root-span',
+      name: 'workflow.custom',
+      status: 'ok' as const,
+      startTime: '2026-01-01T00:00:00.000Z',
+      events: [],
+      artifacts: [],
+      knowledgeRefs: [],
+      children: [],
+    };
+    for (const origin of ['test', 'ci', 'scheduled', 'agent', 'interactive']) {
+      expect(
+        validateTraceReplay({
+          traceId: 'trace-origin',
+          rootSpan,
+          metadata: { startedAt: '2026-01-01T00:00:00.000Z', origin },
+        })
+      ).toEqual([]);
+    }
+
+    expect(
+      validateTraceReplay({
+        traceId: 'trace-origin-invalid',
+        rootSpan,
+        metadata: { startedAt: '2026-01-01T00:00:00.000Z', origin: 'attacker' },
+      })
+    ).toContainEqual({
+      path: 'trace.metadata.origin',
+      message: 'origin must be one of test, ci, scheduled, agent, interactive',
+    });
+
+    expect(
+      validateTraceReplay({
+        traceId: 'trace-origin-absent',
+        rootSpan,
+      })
+    ).toEqual([]); // absent metadata.origin (legacy, pre-WI-13 traces) stays valid
+  });
+
   it('provides a closed replay vocabulary for known extensions', () => {
     expect(isGovernedTraceSpanName('pipeline:baseline-check')).toBe(true);
     expect(isGovernedTraceSpanName('action.completed')).toBe(true);

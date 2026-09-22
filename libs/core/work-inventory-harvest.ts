@@ -92,6 +92,20 @@ export interface CollectKyberionDemandSignalsOptions {
   now?: Date;
 }
 
+/**
+ * WI-13: trace-scan bookkeeping surfaced alongside `DemandSignal[]` so
+ * `pnpm inventory harvest` can report hygiene, not just counts. Both figures
+ * are about individual *traces* scanned, not signals: `excluded_test_or_ci`
+ * traces never touch any signal at all (see `collectTraceSignals`);
+ * `untagged` traces (no `metadata.origin` — pre-WI-13) still count normally,
+ * same as before, but are called out so operators can see the legacy-trace
+ * fraction shrink as the 28-day window ages past the fix.
+ */
+export interface DemandSignalHarvestStats {
+  excluded_test_or_ci: number;
+  untagged: number;
+}
+
 const DEFAULT_WINDOW_DAYS = 28;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const MAX_SAMPLE_REFS = 5;
@@ -175,6 +189,22 @@ interface SignalAccumulator {
   durations: number[];
   failure_count: number;
   sample_refs: string[];
+  /** Counted traces tagged `metadata.origin: 'scheduled'`. */
+  scheduled_count: number;
+}
+
+/** WI-13: the closed `Trace['metadata']['origin']` vocabulary (`TraceOrigin` in `src/trace.ts`). */
+const TEST_OR_CI_TRACE_ORIGINS = new Set(['test', 'ci']);
+
+interface TraceSignalScanResult {
+  signals: DemandSignal[];
+  /**
+   * Signatures whose counted traces are at least half `metadata.origin:
+   * 'scheduled'` — one chronos run among many interactive ones does not turn
+   * a person's work into system cadence.
+   */
+  scheduledSignatures: Set<string>;
+  stats: DemandSignalHarvestStats;
 }
 
 function traceFilesInWindow(rootDir: string, since: Date, until: Date): string[] {
@@ -198,11 +228,14 @@ function collectTraceSignals(
   until: Date,
   windowDays: number,
   options: CollectKyberionDemandSignalsOptions
-): DemandSignal[] {
+): TraceSignalScanResult {
   const files = traceFilesInWindow(rootDir, since, until);
   const sinceMs = since.getTime();
   const untilMs = until.getTime();
   const accumulators = new Map<string, SignalAccumulator>();
+  const scheduledSignatures = new Set<string>();
+  let excludedTestOrCi = 0;
+  let untagged = 0;
 
   for (const file of files) {
     let records: unknown[];
@@ -230,6 +263,15 @@ function collectTraceSignals(
       const startMs = Date.parse(startIso);
       if (!Number.isFinite(startMs) || startMs < sinceMs || startMs >= untilMs) continue;
 
+      // WI-13: never let vitest/CI noise become a demand signal; legacy
+      // (untagged) traces still count exactly as before, just tallied.
+      const traceOrigin = asString(metadata.origin);
+      if (traceOrigin && TEST_OR_CI_TRACE_ORIGINS.has(traceOrigin)) {
+        excludedTestOrCi += 1;
+        continue;
+      }
+      if (!traceOrigin) untagged += 1;
+
       const endIso = asString(metadata.completedAt) ?? asString(rootSpan.endTime);
       let durationMs: number | undefined;
       if (endIso) {
@@ -250,6 +292,7 @@ function collectTraceSignals(
           durations: [],
           failure_count: 0,
           sample_refs: [],
+          scheduled_count: 0,
         };
         accumulators.set(classification.signature, acc);
       }
@@ -265,11 +308,15 @@ function collectTraceSignals(
       ) {
         acc.sample_refs.push(traceId);
       }
+      if (traceOrigin === 'scheduled') acc.scheduled_count += 1;
     }
   }
 
   const results: DemandSignal[] = [];
   for (const [signature, acc] of accumulators) {
+    if (acc.scheduled_count > 0 && acc.scheduled_count * 2 >= acc.count) {
+      scheduledSignatures.add(signature);
+    }
     results.push({
       signature,
       kind: acc.kind,
@@ -283,7 +330,11 @@ function collectTraceSignals(
       sample_refs: acc.sample_refs,
     });
   }
-  return results;
+  return {
+    signals: results,
+    scheduledSignatures,
+    stats: { excluded_test_or_ci: excludedTestOrCi, untagged },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -427,7 +478,17 @@ function resolvePipelineOrigin(rootDir: string, pipelineId: string): DemandSigna
   }
 }
 
-function assignOrigins(signals: DemandSignal[], rootDir: string): DemandSignal[] {
+/**
+ * `scheduledSignatures` are signatures whose counted traces are at least half
+ * tagged `metadata.origin: 'scheduled'` (WI-13, chronos-fired work): they always
+ * resolve to `scheduled`, even for `actuator_op`/`mission` kinds that the
+ * per-kind lookup below never derives a non-`unknown` origin for.
+ */
+function assignOrigins(
+  signals: DemandSignal[],
+  rootDir: string,
+  scheduledSignatures: Set<string>
+): DemandSignal[] {
   const pipelineOrigins = new Map<string, DemandSignalOrigin>(); // per-call lookup cache
   return signals.map((signal) => {
     let origin: DemandSignalOrigin = 'unknown';
@@ -444,6 +505,7 @@ function assignOrigins(signals: DemandSignal[], rootDir: string): DemandSignal[]
         origin = cached;
       }
     }
+    if (scheduledSignatures.has(signal.signature)) origin = 'scheduled';
     return { ...signal, origin };
   });
 }
@@ -452,26 +514,35 @@ function assignOrigins(signals: DemandSignal[], rootDir: string): DemandSignal[]
 // Public: collect
 // ---------------------------------------------------------------------------
 
+export interface CollectKyberionDemandSignalsResult {
+  signals: DemandSignal[];
+  /** WI-13: trace-hygiene bookkeeping from the trace source only (see `DemandSignalHarvestStats`). */
+  stats: DemandSignalHarvestStats;
+}
+
 /**
  * Scans Kyberion's own usage logs (traces, ad-hoc pipeline ledger, unhandled
- * intent registry) and returns aggregate demand signals. The ledger and the
- * registry carry no tenant, so — like untagged traces — they are included only
- * for the personal scope (no `tenantSlug`) or with `includeUnscoped`. Never
- * trace attribute/event text, pipeline payloads, or intent utterance text;
- * sorted by `count` descending, then `signature` ascending. Every signal carries an
- * `origin` (`pipeline:<id>` / `browser-pipeline:<id>` → looked up in
- * `pipelines/<id>.json`; ad-hoc ledger and unhandled intents → `on_demand`;
- * everything else → `unknown`).
+ * intent registry) and returns aggregate demand signals plus trace-hygiene
+ * stats. The ledger and the registry carry no tenant, so — like untagged
+ * traces — they are included only for the personal scope (no `tenantSlug`) or
+ * with `includeUnscoped`. Never trace attribute/event text, pipeline
+ * payloads, or intent utterance text; sorted by `count` descending, then
+ * `signature` ascending. Every signal carries an `origin` (`pipeline:<id>` /
+ * `browser-pipeline:<id>` → looked up in `pipelines/<id>.json`; any signature
+ * whose traces are at least half `metadata.origin: 'scheduled'` → `scheduled`; ad-hoc ledger and
+ * unhandled intents → `on_demand`; everything else → `unknown`).
  */
-export function collectKyberionDemandSignals(
+export function collectKyberionDemandSignalsWithStats(
   options: CollectKyberionDemandSignalsOptions = {}
-): DemandSignal[] {
+): CollectKyberionDemandSignalsResult {
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   const { since, until, windowDays } = resolveWindow(options);
 
+  const traceResult = collectTraceSignals(rootDir, since, until, windowDays, options);
+
   const signals: DemandSignal[] = assignOrigins(
     [
-      ...collectTraceSignals(rootDir, since, until, windowDays, options),
+      ...traceResult.signals,
       // The ad-hoc ledger and unhandled-intent registry carry no tenant, so
       // they are unscoped sources: same rule as an untagged trace.
       ...(tenantMatches(undefined, options)
@@ -481,11 +552,23 @@ export function collectKyberionDemandSignals(
           ]
         : []),
     ],
-    rootDir
+    rootDir,
+    traceResult.scheduledSignatures
   );
 
   signals.sort((a, b) => b.count - a.count || a.signature.localeCompare(b.signature));
-  return signals;
+  return { signals, stats: traceResult.stats };
+}
+
+/**
+ * Convenience wrapper over `collectKyberionDemandSignalsWithStats` for
+ * callers that only need the signals (e.g. `matchSignalsToEntries`,
+ * `suggestEntriesFromSignals`, and every caller predating WI-13's stats).
+ */
+export function collectKyberionDemandSignals(
+  options: CollectKyberionDemandSignalsOptions = {}
+): DemandSignal[] {
+  return collectKyberionDemandSignalsWithStats(options).signals;
 }
 
 // ---------------------------------------------------------------------------
@@ -645,17 +728,22 @@ function verbForSignal(signal: DemandSignal, taxonomy: WorkInventoryTaxonomy): W
   return 'operate'; // mission
 }
 
+/**
+ * A binding derived from a demand signal names the exact thing that ran, so it
+ * is explicit evidence: stamped `inferred: false` (WI-17 review) so the
+ * inferred-binding migration can never relabel it as a taxonomy default.
+ */
 function bindingForSignal(signal: DemandSignal): WorkInventoryStepBinding | undefined {
   switch (signal.kind) {
     case 'pipeline': {
       const id = signal.signature.startsWith('browser-pipeline:')
         ? signal.signature.slice('browser-pipeline:'.length)
         : signal.signature.slice('pipeline:'.length);
-      return id ? { pipeline_id: id } : undefined;
+      return id ? { pipeline_id: id, inferred: false } : undefined;
     }
     case 'adhoc_pipeline': {
       const id = signal.signature.slice('adhoc_pipeline:'.length);
-      return id ? { pipeline_id: id } : undefined;
+      return id ? { pipeline_id: id, inferred: false } : undefined;
     }
     case 'actuator_op': {
       const separator = signal.signature.indexOf(':');
@@ -663,11 +751,12 @@ function bindingForSignal(signal: DemandSignal): WorkInventoryStepBinding | unde
       return {
         actuator: signal.signature.slice(0, separator),
         op: signal.signature.slice(separator + 1),
+        inferred: false,
       };
     }
     case 'unhandled_intent': {
       const id = signal.signature.slice('intent:'.length);
-      return id ? { intent_id: id } : undefined;
+      return id ? { intent_id: id, inferred: false } : undefined;
     }
     case 'mission':
     default:

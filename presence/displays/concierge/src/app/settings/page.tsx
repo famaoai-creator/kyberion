@@ -32,11 +32,13 @@ import {
 } from '../../lib/settings-types';
 import { useVoiceSelection } from '../../lib/use-voice-selection';
 import { useTrainingAssignments } from '../../lib/use-training-assignments';
+import { useRecordingConsent } from '../../lib/use-recording-consent';
 import { ProfileSection } from './sections/ProfileSection';
 import { MembersSection, type MemberFormState } from './sections/MembersSection';
 import { ServicesSection } from './sections/ServicesSection';
 import { VoiceSection } from './sections/VoiceSection';
 import { NotificationsSection } from './sections/NotificationsSection';
+import { RecordingConsentSection } from './sections/RecordingConsentSection';
 import { PluginsSection, type PluginConfirmState } from './sections/PluginsSection';
 import { AdvancedSection, type ManagementState } from './sections/AdvancedSection';
 
@@ -80,6 +82,7 @@ const SETTINGS_NAV_LABEL_KEYS: Record<SettingsSectionId, FrontDeskMessageKey> = 
   services: 'settings_nav_services',
   voice: 'settings_nav_voice',
   notifications: 'settings_nav_notifications',
+  recording: 'settings_nav_recording',
   plugins: 'settings_nav_plugins',
   advanced: 'settings_nav_advanced',
 };
@@ -93,6 +96,7 @@ const SETTINGS_SECTION_ELEMENT_ID: Record<SettingsSectionId, string> = {
   services: 'setup-services',
   voice: 'setup-media',
   notifications: 'setup-notifications',
+  recording: 'settings-recording',
   plugins: 'setup-plugins',
   advanced: 'settings-advanced',
 };
@@ -168,6 +172,8 @@ export default function SettingsPage() {
     refreshTrainingProgress,
     assignTraining,
   } = useTrainingAssignments(locale, setNotice);
+  const recordingConsent = useRecordingConsent(locale, setNotice);
+  const { refreshRecordingConsent, refreshRecordingObservations } = recordingConsent;
   const [activeSection, setActiveSection] = React.useState<SettingsSectionId>('profile');
   const cameraStreamRef = React.useRef<MediaStream | null>(null);
   const cameraVideoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -440,6 +446,8 @@ export default function SettingsPage() {
     void refreshTrainingCatalog();
     void refreshTrainingAssignments();
     void refreshTrainingProgress();
+    void refreshRecordingConsent();
+    void refreshRecordingObservations();
     return () => {
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -456,6 +464,8 @@ export default function SettingsPage() {
     refreshTrainingCatalog,
     refreshTrainingAssignments,
     refreshTrainingProgress,
+    refreshRecordingConsent,
+    refreshRecordingObservations,
   ]);
 
   React.useEffect(() => {
@@ -944,6 +954,16 @@ export default function SettingsPage() {
             busy={busy}
             onSaveNotification={() => void saveNotification()}
             sectionRef={setSectionRef('notifications')}
+          />
+        );
+
+      case 'recording':
+        return (
+          <RecordingConsentSection
+            key="recording"
+            locale={locale}
+            sectionRef={setSectionRef('recording')}
+            {...recordingConsent}
           />
         );
 

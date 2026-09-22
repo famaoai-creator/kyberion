@@ -11461,6 +11461,196 @@
         "ja": "そのメンバーは見つかりませんでした。",
         "qps-ploc": "⟦Ŧħȧŧ ɱėɱƀėř ẇȧş ñőŧ ƒőůñḓ. ŀőřėɱ ïṗ⟧"
       },
+      "settings_nav_recording": {
+        "en": "PC recording",
+        "ja": "PC 操作の記録",
+        "qps-ploc": "⟦ṖƇ řėƈőřḓïñɠ ŀőř⟧"
+      },
+      "settings_recording_lead": {
+        "en": "Kyberion can record the app names you use, the website hostnames you visit, and the kinds and counts of operations you do — never what you type, your clipboard, or a screen image.",
+        "ja": "記録されるのは、使ったアプリ名・訪れたサイトのホスト名・操作の種類と回数だけです。入力した文字やクリップボード、画面の画像は記録されません。",
+        "qps-ploc": "⟦Ķẏƀėřïőñ ƈȧñ řėƈőřḓ ŧħė ȧṗṗ ñȧɱėş ẏőů ůşė, ŧħė ẇėƀşïŧė ħőşŧñȧɱėş ẏőů ṽïşïŧ, ȧñḓ ŧħė ķïñḓş ȧñḓ ƈőůñŧş őƒ őṗėřȧŧïőñş ẏőů ḓő — ñėṽėř ẇħȧŧ ẏőů ŧẏṗė, ẏőůř ƈŀïṗƀőȧřḓ, őř ȧ şƈřėėñ ïɱȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "settings_recording_grant_title": {
+        "en": "Consent to recording",
+        "ja": "記録への同意",
+        "qps-ploc": "⟦Ƈőñşėñŧ ŧő řėƈőřḓïñɠ ŀőřėɱ ⟧"
+      },
+      "settings_recording_sources_label": {
+        "en": "Where to record",
+        "ja": "記録する場所",
+        "qps-ploc": "⟦Ẇħėřė ŧő řėƈőřḓ ŀőřė⟧"
+      },
+      "settings_recording_source_desktop_recording": {
+        "en": "Desktop apps",
+        "ja": "デスクトップアプリ",
+        "qps-ploc": "⟦Ḓėşķŧőṗ ȧṗṗş ŀőř⟧"
+      },
+      "settings_recording_source_browser_recording": {
+        "en": "Browser",
+        "ja": "ブラウザ",
+        "qps-ploc": "⟦Ƀřőẇşėř ŀőř⟧"
+      },
+      "settings_recording_kinds_label": {
+        "en": "What to record",
+        "ja": "記録する内容",
+        "qps-ploc": "⟦Ẇħȧŧ ŧő řėƈőřḓ ŀőřė⟧"
+      },
+      "settings_recording_kind_active_window": {
+        "en": "App names",
+        "ja": "アプリ名",
+        "qps-ploc": "⟦Ȧṗṗ ñȧɱėş ŀőř⟧"
+      },
+      "settings_recording_kind_browser_tabs": {
+        "en": "Website hostnames",
+        "ja": "サイトのホスト名",
+        "qps-ploc": "⟦Ẇėƀşïŧė ħőşŧñȧɱėş ŀőřėɱ⟧"
+      },
+      "settings_recording_kind_focused_input": {
+        "en": "Which field you're using",
+        "ja": "使っている入力欄",
+        "qps-ploc": "⟦Ẇħïƈħ ƒïėŀḓ ẏőů'řė ůşïñɠ ŀőřėɱ ï⟧"
+      },
+      "settings_recording_purpose_label": {
+        "en": "What it's for",
+        "ja": "何のために使うか",
+        "qps-ploc": "⟦Ẇħȧŧ ïŧ'ş ƒőř ŀőřė⟧"
+      },
+      "settings_recording_purpose_placeholder": {
+        "en": "e.g. finding automation candidates",
+        "ja": "例: 自動化できる作業を見つけるため",
+        "qps-ploc": "⟦ė.ɠ. ƒïñḓïñɠ ȧůŧőɱȧŧïőñ ƈȧñḓïḓȧŧėş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "settings_recording_days_label": {
+        "en": "For how many days",
+        "ja": "何日間",
+        "qps-ploc": "⟦Ƒőř ħőẇ ɱȧñẏ ḓȧẏş ŀőřėɱ⟧"
+      },
+      "settings_recording_days_hint": {
+        "en": "Up to {max} days.",
+        "ja": "最大 {max} 日まで。",
+        "qps-ploc": "⟦Ůṗ ŧő {max} ḓȧẏş. ŀőřėɱ⟧"
+      },
+      "settings_recording_grant_submit": {
+        "en": "Agree and start",
+        "ja": "同意して始める",
+        "qps-ploc": "⟦Ȧɠřėė ȧñḓ şŧȧřŧ ŀőřė⟧"
+      },
+      "settings_recording_consents_title": {
+        "en": "Your consents",
+        "ja": "あなたの同意",
+        "qps-ploc": "⟦Ẏőůř ƈőñşėñŧş ŀőřė⟧"
+      },
+      "settings_recording_consents_empty": {
+        "en": "You haven't consented to any recording yet.",
+        "ja": "まだ記録への同意はありません。",
+        "qps-ploc": "⟦Ẏőů ħȧṽėñ'ŧ ƈőñşėñŧėḓ ŧő ȧñẏ řėƈőřḓïñɠ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "settings_recording_consent_status_active": {
+        "en": "Active",
+        "ja": "有効",
+        "qps-ploc": "⟦Ȧƈŧïṽė ŀőř⟧"
+      },
+      "settings_recording_consent_status_expired": {
+        "en": "Expired",
+        "ja": "期限切れ",
+        "qps-ploc": "⟦Ėẋṗïřėḓ ŀőř⟧"
+      },
+      "settings_recording_consent_status_revoked": {
+        "en": "Revoked",
+        "ja": "撤回済み",
+        "qps-ploc": "⟦Řėṽőķėḓ ŀőř⟧"
+      },
+      "settings_recording_consent_expires": {
+        "en": "Until {date}",
+        "ja": "{date} まで",
+        "qps-ploc": "⟦Ůñŧïŀ {date} ŀőř⟧"
+      },
+      "settings_recording_consent_revoke": {
+        "en": "Revoke",
+        "ja": "撤回する",
+        "qps-ploc": "⟦Řėṽőķė ŀőř⟧"
+      },
+      "settings_recording_pending_title": {
+        "en": "Summaries to review",
+        "ja": "確認待ちの要約",
+        "qps-ploc": "⟦Şůɱɱȧřïėş ŧő řėṽïėẇ ŀőřėɱ ⟧"
+      },
+      "settings_recording_pending_empty": {
+        "en": "No summaries are waiting for your review.",
+        "ja": "確認待ちの要約はありません。",
+        "qps-ploc": "⟦Ñő şůɱɱȧřïėş ȧřė ẇȧïŧïñɠ ƒőř ẏőůř řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "settings_recording_pending_confirm": {
+        "en": "Confirm",
+        "ja": "確認する",
+        "qps-ploc": "⟦Ƈőñƒïřɱ ŀőř⟧"
+      },
+      "settings_recording_pending_discard": {
+        "en": "Discard",
+        "ja": "破棄する",
+        "qps-ploc": "⟦Ḓïşƈȧřḓ ŀőř⟧"
+      },
+      "settings_recording_pending_attach_label": {
+        "en": "Add to a work item",
+        "ja": "業務に取り込む",
+        "qps-ploc": "⟦Ȧḓḓ ŧő ȧ ẇőřķ ïŧėɱ ŀőřėɱ⟧"
+      },
+      "settings_recording_pending_attach_placeholder": {
+        "en": "Choose a work item",
+        "ja": "業務を選ぶ",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ẇőřķ ïŧėɱ ŀőřėɱ⟧"
+      },
+      "settings_recording_pending_attach_submit": {
+        "en": "Attach",
+        "ja": "取り込む",
+        "qps-ploc": "⟦Ȧŧŧȧƈħ ŀőř⟧"
+      },
+      "settings_recording_pending_attach_none": {
+        "en": "No work items are available to attach to yet.",
+        "ja": "取り込める業務がまだありません。",
+        "qps-ploc": "⟦Ñő ẇőřķ ïŧėɱş ȧřė ȧṽȧïŀȧƀŀė ŧő ȧŧŧȧƈħ ŧő ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "settings_recording_consent_granted": {
+        "en": "Consent saved.",
+        "ja": "同意を保存しました。",
+        "qps-ploc": "⟦Ƈőñşėñŧ şȧṽėḓ. ŀőřė⟧"
+      },
+      "settings_recording_consent_revoked_notice": {
+        "en": "Consent revoked.",
+        "ja": "同意を撤回しました。",
+        "qps-ploc": "⟦Ƈőñşėñŧ řėṽőķėḓ. ŀőřėɱ⟧"
+      },
+      "settings_recording_summary_confirmed": {
+        "en": "Summary confirmed.",
+        "ja": "要約を確認しました。",
+        "qps-ploc": "⟦Şůɱɱȧřẏ ƈőñƒïřɱėḓ. ŀőřėɱ⟧"
+      },
+      "settings_recording_summary_discarded": {
+        "en": "Summary discarded.",
+        "ja": "要約を破棄しました。",
+        "qps-ploc": "⟦Şůɱɱȧřẏ ḓïşƈȧřḓėḓ. ŀőřėɱ⟧"
+      },
+      "settings_recording_summary_attached": {
+        "en": "Attached to the work item.",
+        "ja": "業務に取り込みました。",
+        "qps-ploc": "⟦Ȧŧŧȧƈħėḓ ŧő ŧħė ẇőřķ ïŧėɱ. ŀőřėɱ ïṗ⟧"
+      },
+      "settings_recording_member_not_found": {
+        "en": "We could not verify your member account. Complete onboarding first.",
+        "ja": "会員情報を確認できませんでした。先にオンボーディングを完了してください。",
+        "qps-ploc": "⟦Ẇė ƈőůŀḓ ñőŧ ṽėřïƒẏ ẏőůř ɱėɱƀėř ȧƈƈőůñŧ. Ƈőɱṗŀėŧė őñƀőȧřḓïñɠ ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "settings_recording_entry_not_found": {
+        "en": "That work item was not found.",
+        "ja": "その業務は見つかりませんでした。",
+        "qps-ploc": "⟦Ŧħȧŧ ẇőřķ ïŧėɱ ẇȧş ñőŧ ƒőůñḓ. ŀőřėɱ ïṗş⟧"
+      },
+      "settings_recording_grant_invalid": {
+        "en": "Check the recording consent form and try again.",
+        "ja": "入力内容を確認してもう一度お試しください。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė řėƈőřḓïñɠ ƈőñşėñŧ ƒőřɱ ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
       "hearing_req_audience": {
         "en": "Who it's for",
         "ja": "対象となる人",

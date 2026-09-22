@@ -915,7 +915,7 @@
     {
       "path": "product/architecture/work-inventory-discovery-stage.md",
       "tier": "public",
-      "size": 11882,
+      "size": 14322,
       "type": "md"
     },
     {
@@ -1563,7 +1563,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 141157,
+      "size": 142035,
       "type": "json"
     },
     {
@@ -3633,7 +3633,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 25329,
+      "size": 26225,
       "type": "json"
     },
     {
@@ -6195,7 +6195,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 581427,
+      "size": 590448,
       "type": "json"
     },
     {
@@ -11163,7 +11163,7 @@
     {
       "path": "product/schemas/storage-retention-catalog.schema.json",
       "tier": "public",
-      "size": 3950,
+      "size": 6418,
       "type": "json"
     },
     {

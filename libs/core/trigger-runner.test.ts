@@ -17,6 +17,7 @@ import {
   runWakeTrigger,
 } from './trigger-runner.js';
 import { auditChain } from './audit-chain.js';
+import { deriveTraceOrigin } from './src/trace.js';
 
 describe('QM-02 trigger runner', () => {
   const stores: string[] = [];
@@ -61,6 +62,35 @@ describe('QM-02 trigger runner', () => {
 
     expect(delivered).toHaveBeenCalledTimes(3);
     expect(triggerRunner.records()).toHaveLength(6);
+  });
+
+  it('WI-13 review: a trace built inside a cron delivery derives scheduled, even while deliveries overlap', async () => {
+    const triggerRunner = runner();
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const origins: Record<string, string> = {};
+    // Clean env (no VITEST/CI) so only the ambient trigger scope decides.
+    const cronRun = triggerRunner.run(
+      { idempotencyKey: 'wi13:cron:1', source: 'cron', createdBy: authority },
+      async () => {
+        await gate; // stay open while the watch delivery runs
+        origins.cron = deriveTraceOrigin(undefined, {});
+        return 'cron-delivery';
+      }
+    );
+    const watchRun = triggerRunner.run(
+      { idempotencyKey: 'wi13:watch:1', source: 'watch', createdBy: authority },
+      async () => {
+        origins.watch = deriveTraceOrigin(undefined, {});
+        release();
+        return 'watch-delivery';
+      }
+    );
+    await Promise.all([cronRun, watchRun]);
+    expect(origins).toEqual({ cron: 'scheduled', watch: 'interactive' });
+    expect(deriveTraceOrigin(undefined, {})).toBe('interactive');
   });
 
   it('rejects authority and tenant escalation before delivery', async () => {
