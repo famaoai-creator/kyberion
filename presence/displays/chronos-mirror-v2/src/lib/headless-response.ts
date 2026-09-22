@@ -18,7 +18,11 @@ export function headlessManifest(): HeadlessApiManifest {
 }
 
 export function headlessManifestForViewer(viewer: ViewerContext): HeadlessApiManifest {
-  return filterHeadlessManifestForViewer(toSurfaceAuthorizationContext(viewer), headlessManifest());
+  return filterHeadlessManifestForViewer(
+    toSurfaceAuthorizationContext(viewer),
+    headlessManifest(),
+    authorizeSurfaceContextOperation
+  );
 }
 
 export function authorizeHeadlessOperation(
@@ -56,6 +60,7 @@ export function headlessEnvelope<T>(
     scope: headlessViewerScope(viewer),
     manifest,
     authorizationContext: toSurfaceAuthorizationContext(viewer),
+    authorize: authorizeSurfaceContextOperation,
   });
 }
 

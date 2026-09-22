@@ -226,7 +226,13 @@ app.get('/favicon.ico', (_req, res) => {
 app.get('/api/headless/manifest', (req, res) => {
   const context = authorizeSurface(req, res, 'computer_surface.manifest.read');
   if (!context) return;
-  res.json(filterHeadlessManifestForViewer(context, computerSurfaceManifest));
+  res.json(
+    filterHeadlessManifestForViewer(
+      context,
+      computerSurfaceManifest,
+      authorizeSurfaceContextOperation
+    )
+  );
 });
 
 app.get('/api/identity', (req, res) => {

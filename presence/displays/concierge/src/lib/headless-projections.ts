@@ -91,7 +91,8 @@ export function buildConciergeHeadlessManifest(): HeadlessApiManifest {
 export function conciergeManifestForViewer(viewer: ConciergeViewerContext): HeadlessApiManifest {
   return filterHeadlessManifestForViewer(
     toSurfaceAuthorizationContext(viewer),
-    buildConciergeHeadlessManifest()
+    buildConciergeHeadlessManifest(),
+    authorizeSurfaceContextOperation
   );
 }
 
@@ -148,13 +149,15 @@ export function conciergeEnvelope<T>(resource: string, data: T, viewer: Concierg
     scope: conciergeHeadlessScope(viewer),
     manifest,
     authorizationContext: toSurfaceAuthorizationContext(viewer),
+    authorize: authorizeSurfaceContextOperation,
   });
 }
 
 export function conciergeAvailableOperations(viewer: ConciergeViewerContext): string[] {
   return availableHeadlessOperationIds(
     toSurfaceAuthorizationContext(viewer),
-    buildConciergeHeadlessManifest()
+    buildConciergeHeadlessManifest(),
+    authorizeSurfaceContextOperation
   );
 }
 
