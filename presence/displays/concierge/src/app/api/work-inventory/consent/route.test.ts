@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-const guard = vi.hoisted(() => vi.fn(() => null));
+type GuardResponse = { status: number };
+const selfServiceGuard = vi.hoisted(() => vi.fn<() => GuardResponse | null>(() => null));
 const defaultViewer = () => ({
   context: {
     role: 'localadmin' as const,
@@ -20,7 +21,15 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
 }));
 
-vi.mock('../../../../lib/api-guard', () => ({ requireConciergeMutationAccess: guard }));
+vi.mock('../../../../lib/work-inventory-member', async () => {
+  const actual = await vi.importActual<typeof import('../../../../lib/work-inventory-member')>(
+    '../../../../lib/work-inventory-member'
+  );
+  return {
+    ...actual,
+    requireConciergeSelfServiceAccess: selfServiceGuard,
+  };
+});
 vi.mock('../../../../lib/viewer-context', async () => {
   const actual = await vi.importActual<typeof import('../../../../lib/viewer-context')>(
     '../../../../lib/viewer-context'
@@ -65,7 +74,7 @@ function request(body?: unknown): NextRequest {
 describe('concierge work-inventory consent route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    guard.mockReturnValue(null);
+    selfServiceGuard.mockReturnValue(null);
     viewerResolution.value = defaultViewer();
   });
 
@@ -211,5 +220,75 @@ describe('concierge work-inventory consent route', () => {
     });
     const response = await POST(request({ action: 'revoke', consent_id: 'WIC-x' }));
     expect(response.status).toBe(404);
+  });
+
+  // WI-18 (user decision 2026-09-22): a readonly-role token member may
+  // grant/revoke their own consent — this route only calls
+  // `requireConciergeSelfServiceAccess`, never `requireConciergeMutationAccess`.
+  it('POST grant succeeds for a readonly-role token viewer resolved to an active member', async () => {
+    viewerResolution.value = {
+      context: {
+        role: 'readonly' as const,
+        tenantSlugs: ['acme'] as string[],
+        organizationIds: 'all' as const,
+        projectIds: 'all' as const,
+        tierAccess: ['confidential', 'public'] as Array<'confidential' | 'public'>,
+        source: 'token' as const,
+        principalId: 'reader-token',
+        registrationLabel: 'reader-token',
+      },
+    };
+    mocks.resolveMember.mockReturnValue({ member_id: 'member-a' });
+    mocks.grant.mockReturnValue({ consent_id: 'WIC-20260101-abc123456789' });
+    const response = await POST(
+      request({
+        action: 'grant',
+        sources: ['desktop_recording'],
+        observation_kinds: ['active_window'],
+        purpose: 'find automation candidates',
+        days: 7,
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.grant).toHaveBeenCalledWith(
+      expect.objectContaining({ member_id: 'member-a' }),
+      expect.anything()
+    );
+  });
+
+  it('POST revoke succeeds for a readonly-role token viewer resolved to an active member', async () => {
+    viewerResolution.value = {
+      context: {
+        role: 'readonly' as const,
+        tenantSlugs: ['acme'] as string[],
+        organizationIds: 'all' as const,
+        projectIds: 'all' as const,
+        tierAccess: ['confidential', 'public'] as Array<'confidential' | 'public'>,
+        source: 'token' as const,
+        principalId: 'reader-token',
+        registrationLabel: 'reader-token',
+      },
+    };
+    mocks.resolveMember.mockReturnValue({ member_id: 'member-a' });
+    mocks.revoke.mockReturnValue({ consent_id: 'WIC-20260101-abc123456789' });
+    const response = await POST(
+      request({ action: 'revoke', consent_id: 'WIC-20260101-abc123456789' })
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.revoke).toHaveBeenCalledWith(
+      'member-a',
+      'WIC-20260101-abc123456789',
+      expect.anything()
+    );
+  });
+
+  it('honors a self-service guard denial (e.g. CSRF/rate-limit) before touching the domain layer', async () => {
+    selfServiceGuard.mockReturnValue(
+      new Response(JSON.stringify({ ok: false, error: 'Forbidden.' }), { status: 403 })
+    );
+    const response = await POST(request({ action: 'grant' }));
+    expect((response as Response).status).toBe(403);
+    expect(mocks.resolveMember).not.toHaveBeenCalled();
+    expect(mocks.grant).not.toHaveBeenCalled();
   });
 });

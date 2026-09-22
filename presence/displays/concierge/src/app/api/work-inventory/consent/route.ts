@@ -10,10 +10,10 @@ import {
   type WorkInventoryConsentSource,
   type WorkInventoryObservationKind,
 } from '@agent/core/work-inventory-consent';
-import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 import {
+  requireConciergeSelfServiceAccess,
   requireWorkInventoryMember,
   resolveWorkInventoryScopeForViewer,
   workInventoryErrorResponse,
@@ -26,6 +26,9 @@ export const dynamic = 'force-dynamic';
  * WI-15: member-facing "PC 操作の記録" consent. Every read and write below
  * acts only on the viewer's own member record (`requireWorkInventoryMember`)
  * — a client-supplied member id is never accepted anywhere on this route.
+ *
+ * WI-18: grant/revoke are self-service — a `readonly`-role member may write
+ * their own consent (`requireConciergeSelfServiceAccess`); GET is unchanged.
  */
 export function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
@@ -56,7 +59,7 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 export async function POST(req: NextRequest) {
-  const denied = requireConciergeMutationAccess(req);
+  const denied = requireConciergeSelfServiceAccess(req);
   if (denied) return denied;
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
