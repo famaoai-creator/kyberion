@@ -30,17 +30,20 @@ describe('Core runtime import contract', () => {
     // each child imports a whole chunk sequentially (every import isolated
     // by its own try/catch) and reports failures as JSON. Chunks run in
     // parallel; results are sorted so the failure list stays deterministic.
+    // Trade-off: modules in one chunk share a process, so a subpath that only
+    // loads after a sibling has been imported (circular-import TDZ, missing
+    // global setup) can be masked; before, every subpath loaded in isolation.
     const CHUNKS = 8;
     const chunkSize = Math.ceil(exportKeys.length / CHUNKS);
     const script = [
       'const specs = JSON.parse(process.argv[1]);',
       'const failed = [];',
       'for (const spec of specs) {',
+      "  process.stderr.write('__AT__' + spec + '\\n');",
       '  try { await import(spec); }',
       '  catch (error) { failed.push({ specifier: spec, error: String(error?.stack ?? error).slice(0, 300) }); }',
       '}',
-      "process.stdout.write('\\n__RESULT__' + JSON.stringify(failed));",
-      'process.exit(0);',
+      "process.stdout.write('\\n__RESULT__' + JSON.stringify(failed), () => process.exit(0));",
     ].join('\n');
     const chunks = Array.from({ length: CHUNKS }, (_, i) =>
       exportKeys.slice(i * chunkSize, (i + 1) * chunkSize).map(exportKeyToSpecifier)
@@ -51,15 +54,18 @@ describe('Core runtime import contract', () => {
         const result = await safeExecResultAsync(
           'node',
           ['--input-type=module', '-e', script, JSON.stringify(specs)],
-          { cwd: process.cwd() }
+          // One timeout per chunk (~100 sequential imports), kept under the test timeout.
+          { cwd: process.cwd(), timeoutMs: 150_000 }
         );
         const marker = result.stdout.lastIndexOf('__RESULT__');
         if (result.status !== 0 || result.error || marker < 0) {
+          // Blame the subpath that was importing when the child died.
+          const lastAt = result.stderr.lastIndexOf('__AT__');
+          const culprit = lastAt >= 0 ? result.stderr.slice(lastAt + 6).split('\n')[0] : specs[0];
           return [
             {
-              specifier: `${specs[0]} .. ${specs[specs.length - 1]}`,
-              error:
-                result.error?.message || result.stderr.slice(0, 300) || `exit ${result.status}`,
+              specifier: culprit,
+              error: result.error?.message || result.stderr.slice(-300) || `exit ${result.status}`,
             },
           ];
         }
