@@ -4,7 +4,7 @@ category: Orchestration
 tags: [orchestration, git, flow, standards]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-07-07
+last_updated: 2026-09-22
 ---
 
 # 自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)
@@ -31,11 +31,9 @@ Kyberion の改善タスクは、原則として以下の順で進める。
 1. **origin/main を最新化**: `git fetch origin` してから、`git switch main && git pull --ff-only origin main` で基点を揃える。
 2. **worktree を作成**: `git worktree add -b <prefix>/<feature-name> <worktree-path> origin/main` か、最新の `main` を起点に同等の手順を取る。
 3. **実装・テスト**: ハイブリッドTDDフローに従い、依存する変更は同じ worktree にまとめて実装とカバレッジを確保する。
-4. **CI 事前チェック**: PR を出す前に、少なくとも `pnpm validate` を実行する。重い場合でも、変更に直結するチェック群は必ず走らせる。
-5. **PR タイトル検査**: `pnpm check:pr-title -- --title "<proposed title>"` を実行し、PR タイトルが Conventional Commits に沿っているか確認する。`pnpm kyberion pr create` を使う場合も同じ制約に従う。
-6. **セルフレビュー**: `local-reviewer` を実行し、差分の整合性を確認。
-7. **PR 作成**: `gh pr create` (GitHub CLI) または Web UI を使用。レビューコメントが付いたら、同じ branch / worktree で修正する。
-   - **本文必須項目**: 概要、変更点、**ローカルでの実行エビデンス（テストパスのログ等）**。
+4. **セルフレビュー**: `local-reviewer` を実行し、差分の整合性を確認。
+5. **PR 前確認と PR 作成**: [PR前CI準備チェックリスト](../governance/pre-pr-ci-readiness-checklist.ja.md)の「PR 作成手順」に従う。`pnpm check -- --scope pr` → タイトル検査 → テンプレートから本文作成 → push → `pnpm kyberion pr create --title ... --body-file ...` → `gh pr checks --watch` の順で、base は `main` にする。大規模変更や release のときは追加で `pnpm validate` を実行する。
+6. **レビュー対応**: レビューコメントが付いたら、同じ branch / worktree で修正する。
 
 ## 3. マージとクリーンアップ
 

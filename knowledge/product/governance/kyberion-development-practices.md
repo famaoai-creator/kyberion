@@ -157,8 +157,9 @@ libs/actuators/` — plus `pnpm check -- --only catalogs` and, if you touched
 - **Before opening a PR**, follow
   [pre-pr-ci-readiness-checklist.ja.md](./pre-pr-ci-readiness-checklist.ja.md):
   `pnpm check -- --scope pr` plus the exception-table rows for your
-  changed paths. Prefer `pnpm kyberion pr create` (runs the readiness
-  gate). Do not treat pending CI as green.
+  changed paths, then its PR creation steps (push, base `main`,
+  `pnpm kyberion pr create --title ... --body-file ...`). Do not treat
+  pending CI as green.
 
 The CI boundary checks are deliberately layered. A new runtime module can
 need both a source-level allowlist and a JSON baseline even when the code

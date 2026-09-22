@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-09-17
+last_updated: 2026-09-22
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -27,7 +27,54 @@ status: active
 
 # PR前CI準備チェックリスト
 
-PR を開く前の必須 runbook。人間・エージェント共通。`gh pr create` でも `pnpm kyberion pr create` でも、ここに書かれた確認を省略しない。
+PR を開く前の必須 runbook。人間・エージェント共通。PR 作成の手順（コマンドの順序）の正本もこの文書である。
+`AGENTS.md`、`CONTRIBUTING.md`、`git-flow-standards.md`、`kyberion-development-practices.md` はここを参照する。
+
+## PR 作成手順（この順で実行する）
+
+```bash
+# 0. 専用 worktree で作業する（main checkout や他 agent の worktree では作らない）
+git fetch origin
+git worktree add -b <prefix>/<topic>-<yyyymmdd> ../kyberion-<topic> origin/main
+
+# 1〜4. 実装・commit のあと、PR 前確認（下の「エージェント必須手順」）
+git diff --name-only origin/main...HEAD
+pnpm check -- --scope pr
+
+# 5. PR 全体を表すタイトルを決めて検査する
+pnpm check:pr-title -- --title "<type>(<scope>): <summary>"
+
+# 6. 本文をテンプレートから作る（一時ファイルは active/shared/tmp/ に置く）
+cp .github/PULL_REQUEST_TEMPLATE.md active/shared/tmp/pr-body-<topic>.md
+#    → Summary / Type / Area / Test plan（実行したコマンドと結果）/ 該当チェック欄を埋める
+
+# 7. push してから作成する
+git push -u origin <branch>
+pnpm kyberion pr create \
+  --title "<type>(<scope>): <summary>" \
+  --body-file active/shared/tmp/pr-body-<topic>.md \
+  --no-draft            # レビュー可能な場合。作業途中なら付けずに draft のまま
+
+# 8. CI を最後まで見る
+gh pr checks <number> --watch
+```
+
+守ること:
+
+- **base は `main`**。PR Validation は base が `main` / `develop` の PR でしか起動しない。別 PR の上に積む
+  （stacked）と CI が走らないので、依存先がマージされるのを待って rebase するか、base を `main` にする。
+- **`--title` を必ず渡す**。省略すると HEAD commit の件名がタイトルになり、最後の小さな修正 commit が
+  PR 名になる。
+- **`--body-file` を必ず渡す**。省略すると `gh --fill` で commit 一覧が本文になり、テンプレートの
+  Test plan やチェック欄が抜ける。
+- **`pnpm kyberion pr create --help` を実行しない**。ヘルプは表示されず、そのまま readiness gate と
+  PR 作成が走る。オプションはこの文書で確認する。
+- **push を先に行う**。`pr create` は push しない。未 push だと `No commits between main and <branch>` で失敗する。
+- **draft がデフォルト**。レビューに出すときは `--no-draft` を付けるか、作成後に `gh pr ready <number>` を実行する。
+- **`gh pr create` を直接使うのは例外**。使う場合も手順 1〜6 と 8 は省略せず、`--title` と `--body-file` を渡す。
+- **CI の pending を成功と数えない**。macOS smoke などが concurrency で cancel された場合は
+  `gh run rerun <run-id> --failed` で再実行し、結果を待つ。
+- **レビュー修正は同じ worktree・同じ branch で行う**。マージ後は `git worktree remove` で片付ける。
 
 ## エージェント必須手順
 
@@ -47,6 +94,9 @@ pnpm check -- --scope pr
 
 `pnpm kyberion pr create`（`scripts/publish_pull_request.ts`）はデフォルトで手順 3 を実行する。緊急回避のみ `--skip-readiness`。エージェントは通常パスで skip しない。
 
+`knowledge/` 配下を 1 ファイルでも変更したら、commit 前に `pnpm generate:knowledge-index` を実行して
+`knowledge/_index.md` と `knowledge/_integrity-manifest.json` を同じ commit に含める。忘れると CI の `catalogs` gate が落ちる。
+
 完了条件:
 
 - [ ] `git status --short --branch` と差分一覧で、別作業・秘密情報・生成済み `dist/`・不要な runtime state が混ざっていない。
@@ -54,6 +104,8 @@ pnpm check -- --scope pr
 - [ ] `pnpm check -- --scope pr` が緑。
 - [ ] 例外表の該当行が緑（または N/A）。
 - [ ] 実装と生成物の変更が同じ commit に含まれている。
+- [ ] PR の base が `main`（または `develop`）で、タイトルが PR 全体を表す Conventional Commit になっている。
+- [ ] PR 本文がテンプレートに沿い、Test plan に実行したコマンドと結果が書かれている。
 - [ ] push 後の `gh pr checks` がすべて pass（pending 待ちは未完了）。
 
 `pnpm check -- --scope pr` は build / typecheck / lint / test matrix の代替ではない。これらは PR workflow が実行するため、ローカルで追加実行した場合だけ実測済みとして記録する。CI failure は job 名・run ID・失敗 step・ログを先に記録し、原因仮説を更新してから修正する。
