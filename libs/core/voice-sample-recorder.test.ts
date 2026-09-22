@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 
 const mocks = vi.hoisted(() => ({
-  safeExec: vi.fn(() => ''),
+  safeExecShellScript: vi.fn(() => ''),
   safeMkdir: vi.fn(),
   safeWriteFile: vi.fn(),
   sharedTmp: vi.fn((value: string) => `/tmp/${value}`),
@@ -17,7 +17,7 @@ vi.mock('./secure-io.js', async () => {
     // The recorder suite uses /tmp as an isolated output seam; production
     // path confinement is covered by the real secure-io implementation.
     assertSafeRepositoryPath: (filePath: string) => filePath,
-    safeExec: mocks.safeExec,
+    safeExecShellScript: mocks.safeExecShellScript,
     safeMkdir: mocks.safeMkdir,
     safeWriteFile: mocks.safeWriteFile,
   };
@@ -137,7 +137,7 @@ describe('voice-sample-recorder', () => {
     expect(result.selected_input_device).toBe('Built-in Microphone');
     expect(result.backend).toBe('ffmpeg-avfoundation-stream');
     expect(mocks.createVirtualAudioInputRecordingBridge).toHaveBeenCalled();
-    expect(mocks.safeExec).not.toHaveBeenCalled();
+    expect(mocks.safeExecShellScript).not.toHaveBeenCalled();
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       '/tmp/voice-sample-recording/rec-1/s1.wav',
       expect.any(Buffer)
@@ -203,10 +203,10 @@ describe('voice-sample-recorder', () => {
       '/tmp/voice-sample-recording/rec-2/s2.prompt.txt',
       'Please read this line.\n'
     );
-    expect(mocks.safeExec).toHaveBeenCalledWith(
+    expect(mocks.safeExecShellScript).toHaveBeenCalledWith(
       expect.any(String),
-      ['-lc', 'record-tool --out "/tmp/voice-sample-recording/rec-2/s2.wav" --sec 12'],
-      expect.objectContaining({ timeoutMs: 30000 })
+      'record-tool --out "/tmp/voice-sample-recording/rec-2/s2.wav" --sec 12',
+      expect.objectContaining({ login: true, timeoutMs: 30000 })
     );
   });
 });

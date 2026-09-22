@@ -1,5 +1,5 @@
 import * as os from 'node:os';
-import { safeExec } from './secure-io.js';
+import { safeExec, safeExecShellScript } from './secure-io.js';
 import { resolveFfmpegBin, resolveFfprobeBin } from './tool-binary-resolvers.js';
 import { createLogger } from './logger.js';
 
@@ -321,10 +321,10 @@ class LinuxDriver implements OSDriver {
   async captureFocusedWindow(outputPath: string): Promise<void> {
     if ((await commandExists('import')) && (await commandExists('xprop'))) {
       try {
-        const activeWindowId = safeExec('sh', [
-          '-c',
-          "xprop -root _NET_ACTIVE_WINDOW | awk '{print $5}'",
-        ]).trim();
+        const activeWindowId = safeExecShellScript(
+          'sh',
+          "xprop -root _NET_ACTIVE_WINDOW | awk '{print $5}'"
+        ).trim();
         if (activeWindowId && activeWindowId !== '0x0') {
           await safeExec('import', ['-window', activeWindowId, outputPath]);
           return;
@@ -424,4 +424,4 @@ export function getPlatformDriver(): OSDriver {
 
 export const platform = getPlatformDriver();
 export const currentPlatform: Platform = os.platform() as Platform;
-export const __test__ = { buildMacSpeakArgs };
+export const __test__ = { buildMacSpeakArgs, LinuxDriver };

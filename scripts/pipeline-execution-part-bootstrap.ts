@@ -2,11 +2,12 @@ import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
 import { TraceContext, finalizeAndPersist, persistTrace } from '@agent/core/trace';
 import { logger } from '@agent/core/core';
 import {
-  safeExec,
   safeExecResult,
+  safeExecShellScript,
   safeExistsSync,
   safeMkdir,
   safeWriteFile,
+  type SafeShell,
 } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
 import { resolveVars } from '@agent/core/logic-utils';
@@ -1031,7 +1032,7 @@ export async function runInlineSystemShell(
   params: Record<string, unknown>,
   ctx: Record<string, unknown>,
   rootDir: string,
-  shellBin: string
+  shellBin: SafeShell
 ): Promise<Record<string, unknown>> {
   // Accept "command" as well as "cmd" (system:exec already does this) — 3
   // pipelines authored with "command" silently ran an empty shell command
@@ -1048,7 +1049,7 @@ export async function runInlineSystemShell(
   // As in runInlineSystemExec: a falsy `timeout_ms` is not forwarded, because
   // secure-io treats 0 as an immediate-kill deadline rather than "unlimited".
   const timeoutMs = typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined;
-  const output = safeExec(shellBin, ['-c', cmd], {
+  const output = safeExecShellScript(shellBin, cmd, {
     cwd: rootDir,
     env,
     ...(timeoutMs ? { timeoutMs } : {}),

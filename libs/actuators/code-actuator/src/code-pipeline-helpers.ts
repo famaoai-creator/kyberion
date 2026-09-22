@@ -30,7 +30,7 @@ import {
 } from '@agent/core/provider-capability-scanner';
 import { retry } from '@agent/core/async-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
-import { runGovernedCommand } from '@agent/core/command-runner';
+import { runGovernedCommand, runGovernedShellScript } from '@agent/core/command-runner';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
@@ -344,7 +344,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return {
         ...ctx,
         [params.export_as || 'last_capture']: await retry(async () => {
-          const result = runGovernedCommand('/bin/sh', ['-c', resolve(params.cmd)], {
+          const result = runGovernedShellScript('/bin/sh', resolve(params.cmd), {
             maxOutputMB: 10,
           });
           if (result.error) throw result.error;
