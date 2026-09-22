@@ -395,8 +395,7 @@ describe('work inventory storage (hermetic)', () => {
       status: 'not-a-status',
       created_at: '2026-09-22T00:00:00.000Z',
       updated_at: '2026-09-22T00:00:00.000Z',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any;
+    } as unknown as WorkInventoryEntry;
     expect(() => saveWorkInventoryEntry(invalid, { rootDir: fixtureRoot })).toThrow(
       /Invalid work inventory entry/
     );
