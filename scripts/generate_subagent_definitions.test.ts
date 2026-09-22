@@ -15,11 +15,26 @@ import {
   extractAgentDefinitionBody,
 } from './agy-agent-definition-adapter.js';
 import {
+  CURSOR_PROFILE_READONLY,
+  buildCursorAgentDefinitionSource,
+} from './cursor-agent-definition-adapter.js';
+import {
+  DEVIN_PROFILE_TOOLS,
+  buildDevinAgentDefinitionSource,
+} from './devin-agent-definition-adapter.js';
+import {
+  buildCodexAgentDefinitionSource,
+  resolveCodexSandboxMode,
+} from './codex-agent-definition-adapter.js';
+import {
   GENERATED_ROLES,
   PROFILE_SPECS,
   SHARED_DIRECTORY_RULES_LINES,
   buildAgentDefinitionSource,
   buildGeneratedAgyFiles,
+  buildGeneratedCursorFiles,
+  buildGeneratedCodexFiles,
+  buildGeneratedDevinFiles,
   buildGeneratedFiles,
   condenseProcedure,
   main,
@@ -33,6 +48,18 @@ function agentPath(role: string): string {
 
 function agyAgentPath(role: string): string {
   return path.join(pathResolver.rootResolve('.agents/agents'), agyAgentName(role), 'agent.md');
+}
+
+function devinAgentPath(role: string): string {
+  return path.join(pathResolver.rootResolve('.devin/agents'), `${role}.md`);
+}
+
+function cursorAgentPath(role: string): string {
+  return path.join(pathResolver.rootResolve('.cursor/agents'), `${role}.md`);
+}
+
+function codexAgentPath(role: string): string {
+  return path.join(pathResolver.rootResolve('.codex/agents'), `${role}.toml`);
 }
 
 describe('generate_subagent_definitions', () => {
@@ -139,6 +166,109 @@ describe('generate_subagent_definitions', () => {
     expect(agyAgentName('devils_advocate')).toBe('kyberion-devils-advocate');
   });
 
+  it('projects the same governed body into Devin custom-subagent frontmatter', () => {
+    const source = buildAgentDefinitionSource('implementer', 'devin');
+    const devin = buildDevinAgentDefinitionSource({
+      role: 'implementer',
+      description: 'Produces the main code and configuration changes.',
+      profile: 'implementer',
+      body: extractAgentDefinitionBody(source),
+    });
+
+    expect(devin).toContain('name: implementer');
+    expect(devin).toContain('allowed-tools:');
+    expect(devin).toContain('  - edit');
+    expect(devin).toContain('  - exec');
+    expect(devin).toContain('You are a delegated implementer sub-agent.');
+    // Devin's allowlist is strict — AGY or Claude tool names must never leak
+    // into it, or the subagent ends up with an effectively empty tool set.
+    expect(devin).not.toContain('view_file');
+    expect(devin).not.toContain('grep_search');
+    expect(devin).not.toContain('replace_file_content');
+    expect(devin).not.toContain('tools: Read, Grep, Glob');
+  });
+
+  it('keeps Devin tool vocabulary provider-specific and least-privileged', () => {
+    expect(DEVIN_PROFILE_TOOLS.implementer).toEqual([
+      'read',
+      'edit',
+      'write',
+      'grep',
+      'glob',
+      'find_file_by_name',
+      'exec',
+      'get_output',
+      'kill_shell',
+      'write_to_process',
+      'notebook_read',
+      'notebook_edit',
+    ]);
+    for (const tool of DEVIN_PROFILE_TOOLS.explorer) {
+      expect(['edit', 'write', 'exec', 'notebook_edit']).not.toContain(tool);
+    }
+    expect(DEVIN_PROFILE_TOOLS.explorer).toContain('read');
+    expect(DEVIN_PROFILE_TOOLS.planner).toEqual([]);
+  });
+
+  it('projects the same governed body into Cursor custom-subagent frontmatter', () => {
+    const source = buildAgentDefinitionSource('implementer', 'cursor');
+    const cursor = buildCursorAgentDefinitionSource({
+      role: 'implementer',
+      description: 'Produces the main code and configuration changes.',
+      profile: 'implementer',
+      body: extractAgentDefinitionBody(source),
+    });
+
+    expect(cursor).toContain('name: implementer');
+    expect(cursor).toContain('model: inherit');
+    expect(cursor).toContain('readonly: false');
+    expect(cursor).toContain('You are a delegated implementer sub-agent.');
+    // Cursor has no tools allowlist — Claude/AGY/Devin vocab must not leak in.
+    expect(cursor).not.toContain('tools:');
+    expect(cursor).not.toContain('allowed-tools:');
+    expect(cursor).not.toContain('view_file');
+    expect(cursor).not.toContain('Read, Grep');
+  });
+
+  it('maps KD-05 tiers to Cursor readonly instead of a tool allowlist', () => {
+    expect(CURSOR_PROFILE_READONLY.implementer).toBe(false);
+    expect(CURSOR_PROFILE_READONLY.explorer).toBe(true);
+    expect(CURSOR_PROFILE_READONLY.planner).toBe(true);
+
+    const reviewer = buildCursorAgentDefinitionSource({
+      role: 'reviewer',
+      description: 'Reviews risk, regression potential, and boundary compliance.',
+      profile: 'explorer',
+      body: 'body',
+    });
+    expect(reviewer).toContain('readonly: true');
+  });
+
+  it('projects the same governed body into Codex custom-agent TOML', () => {
+    const source = buildAgentDefinitionSource('implementer', 'codex');
+    const codex = buildCodexAgentDefinitionSource({
+      role: 'implementer',
+      description: 'Produces the main code and configuration changes.',
+      profile: 'implementer',
+      body: extractAgentDefinitionBody(source),
+    });
+
+    expect(codex).toContain('name = "implementer"');
+    expect(codex).toContain('description = "Produces the main code and configuration changes."');
+    expect(codex).toContain('sandbox_mode = "workspace-write"');
+    expect(codex).toContain('developer_instructions = """');
+    expect(codex).toContain('You are a delegated implementer sub-agent.');
+    expect(codex).not.toContain('---\n');
+    expect(codex).not.toContain('tools:');
+    expect(codex).not.toContain('allowed-tools:');
+  });
+
+  it('maps Codex sandbox modes from KD-05 profiles', () => {
+    expect(resolveCodexSandboxMode('implementer')).toBe('workspace-write');
+    expect(resolveCodexSandboxMode('explorer')).toBe('read-only');
+    expect(() => resolveCodexSandboxMode('planner')).toThrow('[CODEX_AGENT_PROFILE_REFUSED]');
+  });
+
   it('generated definitions carry the XP-04 shared-directory rules matrix and canonical link', () => {
     for (const role of GENERATED_ROLES) {
       const source = buildAgentDefinitionSource(role);
@@ -210,11 +340,22 @@ describe('generate_subagent_definitions', () => {
     it('passes when the committed files match the generator output', async () => {
       const built = await buildGeneratedFiles();
       const agyBuilt = await buildGeneratedAgyFiles();
+      const devinBuilt = await buildGeneratedDevinFiles();
+      const cursorBuilt = await buildGeneratedCursorFiles();
+      const codexBuilt = await buildGeneratedCodexFiles();
       for (const role of GENERATED_ROLES) {
         const onDisk = String(safeReadFile(agentPath(role), { encoding: 'utf8' }) || '');
         expect(onDisk).toBe(built.get(role));
         const agyOnDisk = String(safeReadFile(agyAgentPath(role), { encoding: 'utf8' }) || '');
         expect(agyOnDisk).toBe(agyBuilt.get(role));
+        const devinOnDisk = String(safeReadFile(devinAgentPath(role), { encoding: 'utf8' }) || '');
+        expect(devinOnDisk).toBe(devinBuilt.get(role));
+        const cursorOnDisk = String(
+          safeReadFile(cursorAgentPath(role), { encoding: 'utf8' }) || ''
+        );
+        expect(cursorOnDisk).toBe(cursorBuilt.get(role));
+        const codexOnDisk = String(safeReadFile(codexAgentPath(role), { encoding: 'utf8' }) || '');
+        expect(codexOnDisk).toBe(codexBuilt.get(role));
       }
 
       process.exitCode = undefined;
@@ -285,6 +426,74 @@ describe('generate_subagent_definitions', () => {
 
       withExecutionContext('generate_subagent_definitions', () => {
         safeWriteFile(filePath, `${original}\n<!-- tampered -->\n`);
+      });
+
+      process.exitCode = undefined;
+      await main(['--check']);
+      expect(process.exitCode).toBe(1);
+
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeWriteFile(filePath, original);
+      });
+      process.exitCode = undefined;
+      await main(['--check']);
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it('fails --check when a Devin definition is tampered with, and recovers after restore', async () => {
+      const role = 'implementer';
+      const filePath = devinAgentPath(role);
+      const original = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+      expect(original).toContain('name: implementer');
+
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeWriteFile(filePath, `${original}\n<!-- tampered -->\n`);
+      });
+
+      process.exitCode = undefined;
+      await main(['--check']);
+      expect(process.exitCode).toBe(1);
+
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeWriteFile(filePath, original);
+      });
+      process.exitCode = undefined;
+      await main(['--check']);
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it('fails --check when a Cursor definition is tampered with, and recovers after restore', async () => {
+      const role = 'implementer';
+      const filePath = cursorAgentPath(role);
+      const original = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+      expect(original).toContain('name: implementer');
+      expect(original).toContain('readonly: false');
+
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeWriteFile(filePath, `${original}\n<!-- tampered -->\n`);
+      });
+
+      process.exitCode = undefined;
+      await main(['--check']);
+      expect(process.exitCode).toBe(1);
+
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeWriteFile(filePath, original);
+      });
+      process.exitCode = undefined;
+      await main(['--check']);
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it('fails --check when a Codex definition is tampered with, and recovers after restore', async () => {
+      const role = 'implementer';
+      const filePath = codexAgentPath(role);
+      const original = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+      expect(original).toContain('name = "implementer"');
+      expect(original).toContain('sandbox_mode = "workspace-write"');
+
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeWriteFile(filePath, `${original}\n# tampered\n`);
       });
 
       process.exitCode = undefined;

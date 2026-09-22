@@ -18,5 +18,5 @@
   "multilingual_confidence": "high",
   "reasoning_confidence": "high",
   "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "deep_reasoning"],
-  "notes": "Current Claude Opus for complex agentic coding and enterprise work; drop-in successor to claude-opus-4-8 at the same price band. Adaptive thinking is on by default (disabling it is rejected above effort=high)."
+  "notes": "Previous-generation Opus, still served; superseded by claude-opus-5-5. Successor to claude-opus-4-8 at the same price band. Adaptive thinking is on by default (disabling it is rejected above effort=high)."
 }
