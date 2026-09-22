@@ -143,6 +143,22 @@
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
     },
+    "./authn-principal-resolver": {
+      "types": "./dist/authn-principal-resolver.d.ts",
+      "default": "./dist/authn-principal-resolver.js"
+    },
+    "./authn-providers": {
+      "types": "./dist/authn-providers.d.ts",
+      "default": "./dist/authn-providers.js"
+    },
+    "./authz-policy-engine": {
+      "types": "./dist/authz-policy-engine.d.ts",
+      "default": "./dist/authz-policy-engine.js"
+    },
+    "./authz-providers": {
+      "types": "./dist/authz-providers.d.ts",
+      "default": "./dist/authz-providers.js"
+    },
     "./actor": {
       "types": "./dist/actor.d.ts",
       "default": "./dist/actor.js"
