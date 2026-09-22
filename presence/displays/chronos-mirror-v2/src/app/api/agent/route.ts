@@ -32,6 +32,7 @@ import {
   type ChronosMissionProposalState,
   type MissionProposal,
 } from './chronos-persisted-parsers';
+import type { AgentRoutingDecision } from '@agent/core/intent-contract';
 
 async function loadChronosCore() {
   const [
@@ -47,6 +48,7 @@ async function loadChronosCore() {
     toolRuntimeRegistry,
     coreLogger,
     missionState,
+    missionNextTaskReader,
     foundation,
   ] = await Promise.all([
     import('@agent/core/presence-bridge'),
@@ -61,6 +63,7 @@ async function loadChronosCore() {
     import('@agent/core/tool-runtime-registry'),
     import('@agent/core/core'),
     import('@agent/core/mission-state'),
+    import('@agent/core/mission-next-task-reader'),
     import('@agent/core/foundation'),
   ]);
 
@@ -69,7 +72,7 @@ async function loadChronosCore() {
     pathResolver: pathResolverModule.pathResolver,
     assertSafeRepositoryPath: secureIo.assertSafeRepositoryPath,
     loadStateAtPath: missionState.loadStateAtPath,
-    loadMissionNextTaskRecordsAtPath: missionState.loadMissionNextTaskRecordsAtPath,
+    loadMissionNextTaskRecordsAtPath: missionNextTaskReader.loadMissionNextTaskRecordsAtPath,
     safeExistsSync: secureIo.safeExistsSync,
     safeMkdir: secureIo.safeMkdir,
     safeLstat: secureIo.safeLstat,
@@ -104,6 +107,7 @@ async function loadChronosCore() {
     enqueueMissionOrchestrationEvent: orchestrationEvents.enqueueMissionOrchestrationEvent,
     startMissionOrchestrationWorker: orchestrationEvents.startMissionOrchestrationWorker,
     readJsonLines: foundation.readJsonLines,
+    readJson: foundation.readJson,
   };
 }
 
@@ -874,7 +878,9 @@ async function tryHandleChronosQuickAction(
       if (!core.safeLstat(securityPolicyPath).isFile()) {
         throw new Error('Chronos security policy must be a regular file');
       }
-      const securityPolicy = readJson(securityPolicyPath);
+      const securityPolicy = readJson<{
+        authority_role_permissions?: { chronos_operator?: { allow_read?: string[] } };
+      }>(securityPolicyPath);
       const chronosPolicy = securityPolicy.authority_role_permissions?.chronos_operator || {};
       return {
         status: 'ok',
@@ -991,7 +997,8 @@ export async function POST(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
   try {
     const parsedBody = await readChronosAgentBody(req);
-    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    if (parsedBody.ok !== true)
+      return NextResponse.json({ error: parsedBody.error }, { status: 400 });
     const { body, query: rawQuery, requesterId } = parsedBody;
     const core = await loadChronosCore();
     const {
@@ -1110,15 +1117,12 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
       }
-      const issued = await core.issueChronosMissionFromProposal(
-        {
-          sessionId,
-          proposal: pendingMissionProposal.proposal,
-          sourceText: pendingMissionProposal.sourceText,
-          routingDecision: pendingMissionProposal.routingDecision,
-        },
-        core
-      );
+      const issued = await core.issueChronosMissionFromProposal({
+        sessionId,
+        proposal: pendingMissionProposal.proposal,
+        sourceText: pendingMissionProposal.sourceText,
+        routingDecision: pendingMissionProposal.routingDecision,
+      });
       clearChronosMissionProposalState(sessionId, core);
       return NextResponse.json({
         status: 'ok',
@@ -1190,7 +1194,7 @@ export async function POST(req: NextRequest) {
       throw new Error('Chronos surface request artifact must be a regular file');
     }
     const requestArtifact = parseChronosSurfaceRequestArtifact(
-      readJson<unknown>(requestArtifactPath)
+      core.readJson<unknown>(core.assertSafeRepositoryPath(requestArtifactPath))
     );
     if (!requestArtifact) {
       throw new Error('Chronos surface request artifact is invalid');

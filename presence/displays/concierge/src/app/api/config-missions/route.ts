@@ -144,7 +144,14 @@ export function GET(req: NextRequest) {
   try {
     const payload = withExecutionContext('sovereign_concierge', () => {
       const presets = readPresets();
-      const tenants = listTenantProfileSlugs();
+      // Tenants and their briefs are limited to the resolved viewer's own
+      // scope — a client-supplied tenant may narrow, never widen (N3).
+      const tenants =
+        resolved.context.tenantSlugs === 'all'
+          ? listTenantProfileSlugs()
+          : listTenantProfileSlugs().filter((tenant) =>
+              resolved.context.tenantSlugs.includes(tenant)
+            );
       const recent = secureIo.withSensitivePathMediation(() => readRecentMissions(tenants));
       return { presets, tenants, recent };
     });
@@ -157,6 +164,8 @@ export function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
 
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
   const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
@@ -197,6 +206,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { ok: false, error: t('api.config.tenant_invalid') },
         { status: 400 }
+      );
+    }
+    // A registered tenant is only usable when it lies inside the resolved
+    // viewer's own scope — the client parameter may narrow, never widen (N3).
+    if (resolved.context.tenantSlugs !== 'all' && !resolved.context.tenantSlugs.includes(tenant)) {
+      return NextResponse.json(
+        { ok: false, error: t('api.config.tenant_invalid') },
+        { status: 403 }
       );
     }
 

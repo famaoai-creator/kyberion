@@ -17,7 +17,7 @@ import {
   type ConciergeViewerContext,
 } from './viewer-context';
 import { ConciergeViewerError } from './viewer-context';
-import { authorizeSurfaceOperation } from '@agent/core/surface-authorization';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface-authn';
 
 const CONCIERGE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
   {
@@ -91,7 +91,8 @@ export function buildConciergeHeadlessManifest(): HeadlessApiManifest {
 export function conciergeManifestForViewer(viewer: ConciergeViewerContext): HeadlessApiManifest {
   return filterHeadlessManifestForViewer(
     toSurfaceAuthorizationContext(viewer),
-    buildConciergeHeadlessManifest()
+    buildConciergeHeadlessManifest(),
+    authorizeSurfaceContextOperation
   );
 }
 
@@ -104,7 +105,7 @@ export function authorizeConciergeOperation(
     (candidate) => candidate.operation_id === operationId
   );
   if (!operation) throw new ConciergeViewerError(403, `unknown headless operation: ${operationId}`);
-  const decision = authorizeSurfaceOperation({
+  const decision = authorizeSurfaceContextOperation({
     context: toSurfaceAuthorizationContext(viewer),
     operation: {
       operationId: operation.operation_id,
@@ -113,6 +114,7 @@ export function authorizeConciergeOperation(
       requiredPermissions: operation.required_permissions,
     },
     resource,
+    surface: 'concierge',
   });
   if (!decision.allowed) throw new ConciergeViewerError(403, decision.reason);
 }
@@ -147,13 +149,15 @@ export function conciergeEnvelope<T>(resource: string, data: T, viewer: Concierg
     scope: conciergeHeadlessScope(viewer),
     manifest,
     authorizationContext: toSurfaceAuthorizationContext(viewer),
+    authorize: authorizeSurfaceContextOperation,
   });
 }
 
 export function conciergeAvailableOperations(viewer: ConciergeViewerContext): string[] {
   return availableHeadlessOperationIds(
     toSurfaceAuthorizationContext(viewer),
-    buildConciergeHeadlessManifest()
+    buildConciergeHeadlessManifest(),
+    authorizeSurfaceContextOperation
   );
 }
 

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Activity } from 'lucide-react';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 import {
@@ -5,9 +6,12 @@ import {
   ActionGuidance,
   ActionStatusBadge,
   actionButtonClass,
+  buildDangerousActionPrompt,
   getActionDefinition,
   getGlobalSurfaceControlAction,
   getLatestSurfaceControlAction,
+  surfaceSummaryBadgeClass,
+  toDomId,
 } from './MissionIntelligenceViewHelpers';
 import { Panel, RuntimeCell } from './MissionIntelligencePrimitives';
 import { chronosSpeechLocale } from '../lib/ux-vocabulary';
@@ -24,7 +28,18 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
     runSurfaceControl,
     setExpandedSurfaceCardActionId,
     requestDangerousAction,
+    hideSurfaceControl = false,
   } = context;
+
+  const [expandedGlobalSurfaceActionId, setExpandedGlobalSurfaceActionId] = useState<string | null>(
+    null
+  );
+  const getActionsByRisk = (actions: any[], risk: 'safe' | 'risky') =>
+    actions.filter((action) => action.risk === risk);
+  const getSharedDisabledReason = (actions: any[]) =>
+    actions.map((action) => action.disabledReason).find((reason) => Boolean(reason)) || null;
+  const getAvailableSurfaceActions = (payload: any, surfaceId: string) =>
+    payload.controlActionAvailability.surface[surfaceId] || payload.controlActionCatalog.surface;
 
   return (
     <>

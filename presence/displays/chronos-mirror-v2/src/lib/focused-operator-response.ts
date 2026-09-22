@@ -159,9 +159,11 @@ function parseSecretApproval(value: unknown): Payload['secretApprovals'][number]
     riskLevel: value.riskLevel as Payload['secretApprovals'][number]['riskLevel'],
     requiresStrongAuth: value.requiresStrongAuth,
     pendingRoles: value.pendingRoles,
-    ...(value.kind !== undefined ? { kind: value.kind } : {}),
-    ...(value.phase !== undefined ? { phase: value.phase } : {}),
-    ...(value.status !== undefined ? { status: value.status } : {}),
+    ...(value.kind !== undefined
+      ? { kind: value.kind as 'secret_mutation' | 'computer_action' }
+      : {}),
+    ...(value.phase !== undefined ? { phase: value.phase as 'pending' | 'apply_pending' } : {}),
+    ...(value.status !== undefined ? { status: value.status as string } : {}),
   };
 }
 
@@ -481,6 +483,8 @@ export function parseFocusedOperatorResponse(value: unknown): Payload | undefine
       !nonNegativeInteger(runtime.error))
   )
     return undefined;
+  const runtimeTotals = runtime as
+    { total: number; ready: number; busy: number; error: number } | undefined;
   return {
     revision: value.revision,
     activeMissions,
@@ -492,8 +496,13 @@ export function parseFocusedOperatorResponse(value: unknown): Payload | undefine
     recentSurfaceOutbox,
     computerSessions,
     runtimeTopology,
-    runtime: runtime
-      ? { total: runtime.total, ready: runtime.ready, busy: runtime.busy, error: runtime.error }
+    runtime: runtimeTotals
+      ? {
+          total: runtimeTotals.total,
+          ready: runtimeTotals.ready,
+          busy: runtimeTotals.busy,
+          error: runtimeTotals.error,
+        }
       : undefined,
     ownerSummaries,
     recentEvents,

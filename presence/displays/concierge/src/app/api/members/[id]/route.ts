@@ -15,46 +15,39 @@ import {
   resolveConciergeViewer,
   type ConciergeViewerContext,
 } from '../../../../lib/viewer-context';
-import { resolveConciergeFrontDeskRole } from '../../../../lib/front-desk-member';
+import {
+  conciergeFrontDeskRoleForTenant,
+  resolveConciergeFrontDeskRole,
+} from '../../../../lib/front-desk-member';
 import { frontDeskText, resolveConciergeLocale } from '../../../../lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-const HUMAN_ROLES = ['owner', 'approver', 'viewer'] as const;
+const HUMAN_ROLES = ['owner', 'approver', 'operator', 'viewer'] as const;
 type HumanRole = (typeof HUMAN_ROLES)[number];
 
 function isHumanRole(value: unknown): value is HumanRole {
   return typeof value === 'string' && (HUMAN_ROLES as readonly string[]).includes(value);
 }
 
-function requireOwnerViewer(
+function requireViewer(
   req: NextRequest
 ):
   | { context: ConciergeViewerContext; response?: never }
   | { context?: never; response: NextResponse } {
-  const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
-  const resolved = resolveConciergeViewer(req);
-  if (resolved.response) return resolved;
-  if (resolveConciergeFrontDeskRole(resolved.context) !== 'owner') {
-    return {
-      response: NextResponse.json(
-        { ok: false, error: frontDeskText('settings_member_owner_only', locale) },
-        { status: 403 }
-      ),
-    };
-  }
-  return resolved;
+  return resolveConciergeViewer(req);
 }
 
 /**
- * FD-07 「役割変更」「停止」: owner-only. No delete — `status` only ever
- * moves between `active` and `suspended` (plan §2.3: "削除なし（停止のみ）").
+ * FD-07 「役割変更」「停止」: owner-only on the tenant the write lands on.
+ * No delete — `status` only ever moves between `active` and `suspended`
+ * (plan §2.3: "削除なし（停止のみ）").
  */
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
-  const owner = requireOwnerViewer(req);
-  if (owner.response) return owner.response;
+  const viewer = requireViewer(req);
+  if (viewer.response) return viewer.response;
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
 
   try {
@@ -93,10 +86,40 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       );
     }
 
-    const updated = withExecutionContext('sovereign_concierge', () => {
-      const existing = readMemberProfile(id);
-      if (!existing) return null;
+    const existing = withExecutionContext('sovereign_concierge', () => readMemberProfile(id));
+    if (!existing) {
+      return NextResponse.json(
+        { ok: false, error: frontDeskText('settings_member_not_found', locale) },
+        { status: 404 }
+      );
+    }
 
+    // Owner authority is required on the tenant(s) the write lands on —
+    // not merely the first tenant in the viewer's scope (F2: a
+    // multi-tenant scope must not launder owner@A into writes on B).
+    // A role write lands on `tenantSlug`; a status change affects every
+    // tenant the member belongs to, so it needs owner on each of them —
+    // including when a role write rides along in the same request (a
+    // per-tenant role grant must not smuggle a global suspension).
+    const statusOwnerCheckFailed =
+      status !== undefined &&
+      (existing.memberships.length > 0
+        ? existing.memberships.some(
+            (m) => conciergeFrontDeskRoleForTenant(viewer.context, m.tenant_slug) !== 'owner'
+          )
+        : resolveConciergeFrontDeskRole(viewer.context) !== 'owner');
+    const roleOwnerCheckFailed =
+      tenantSlug !== undefined &&
+      conciergeFrontDeskRoleForTenant(viewer.context, tenantSlug) !== 'owner';
+    const ownerCheckFailed = statusOwnerCheckFailed || roleOwnerCheckFailed;
+    if (ownerCheckFailed) {
+      return NextResponse.json(
+        { ok: false, error: frontDeskText('settings_member_owner_only', locale) },
+        { status: 403 }
+      );
+    }
+
+    const updated = withExecutionContext('sovereign_concierge', () => {
       let memberships = existing.memberships;
       if (tenantSlug !== undefined && role !== undefined) {
         const index = memberships.findIndex((m) => m.tenant_slug === tenantSlug);

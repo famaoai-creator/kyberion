@@ -67,6 +67,14 @@ export interface AuthzQuery {
   principal: ResolvedPrincipal;
   operation: AuthzOperation;
   resource?: AuthzResource;
+  /**
+   * FD-07 permission replacement set: when present it REPLACES (never unions
+   * with) the role-derived permission set — e.g. an approver sharing role
+   * 'localadmin' while carrying only ['surface.decision.write']. Providers
+   * that evaluate the surface model must honor it exactly like a legacy
+   * `SurfaceAuthorizationContext.permissions`.
+   */
+  permissions?: readonly SurfacePermission[];
 }
 
 export type AuthzReasonCode =

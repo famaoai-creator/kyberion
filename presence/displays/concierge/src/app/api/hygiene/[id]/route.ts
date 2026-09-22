@@ -15,7 +15,10 @@ import {
 } from '../../../../lib/i18n';
 import { findHygieneInquiry, readMissionStatus } from '../../../../lib/hygiene-server';
 import { resolveConciergeViewer } from '../../../../lib/viewer-context';
-import { resolveConciergeDecidedBy } from '../../../../lib/front-desk-member';
+import {
+  conciergeDecisionDenied,
+  resolveConciergeDecidedBy,
+} from '../../../../lib/front-desk-member';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,6 +76,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       return NextResponse.json({ ok: false, error: t('api.hygiene.not_found') }, { status: 404 });
     }
 
+    // The decision lands on the mission's tenant — the member gate checks
+    // the membership for THAT tenant, not the first scope entry (B4/F2).
+    const decisionDenied = conciergeDecisionDenied(resolved.context, inquiry.tenant_slug);
+    if (decisionDenied) return decisionDenied;
+
     const rootDir = pathResolver.rootDir();
     const controllerPath = pathResolver.rootResolve(CONTROLLER_RELATIVE);
     let controllerReady = false;
@@ -94,7 +102,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     // best-effort fallback as FD-07's decidedBy seam — an unresolved
     // principal (legacy synthetic identity) simply omits the flags, and the
     // CLI keeps working without them.
-    const decidedBy = resolveConciergeDecidedBy(resolved.context);
+    const decidedBy = resolveConciergeDecidedBy(resolved.context, inquiry.tenant_slug);
     const decidedByArgs = decidedBy
       ? [
           '--decided-by',

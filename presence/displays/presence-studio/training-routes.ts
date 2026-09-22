@@ -58,10 +58,11 @@ function resolveTrainingViewerRole(
   viewer: PresenceStudioViewerContext
 ): FrontDeskRole {
   const tenant = viewer.tenantSlugs !== 'all' ? viewer.tenantSlugs[0] : undefined;
-  const membership = tenant
-    ? member.memberships.find((item) => item.tenant_slug === tenant)
-    : undefined;
-  if (membership) return membership.role;
+  if (tenant) {
+    // A resolved member with no membership on the viewed tenant is a viewer
+    // — never the flat owner/localadmin fallback.
+    return member.memberships.find((item) => item.tenant_slug === tenant)?.role ?? 'viewer';
+  }
   return frontDeskRoleFromViewerScope(toFrontDeskViewerScope(viewer));
 }
 
@@ -81,7 +82,12 @@ export function registerTrainingRoutes(app: express.Express): void {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       const member = withExecutionContext('ecosystem_architect', () =>
-        resolveMemberByPrincipal({ principalId: viewer.principalId, source: viewer.source })
+        resolveMemberByPrincipal({
+          principalId: viewer.principalId,
+          source: viewer.source,
+          registrationLabel: viewer.principal?.registrationLabel,
+          memberId: viewer.principal?.memberId,
+        })
       );
       if (!member) return res.status(404).json({ ok: false, error: 'Training member not found.' });
       const progress = withExecutionContext('ecosystem_architect', () =>
@@ -100,7 +106,12 @@ export function registerTrainingRoutes(app: express.Express): void {
       const viewer = resolvePresenceStudioViewerContext(req);
       requirePresenceStudioLocalAdmin(viewer);
       const member = withExecutionContext('ecosystem_architect', () =>
-        resolveMemberByPrincipal({ principalId: viewer.principalId, source: viewer.source })
+        resolveMemberByPrincipal({
+          principalId: viewer.principalId,
+          source: viewer.source,
+          registrationLabel: viewer.principal?.registrationLabel,
+          memberId: viewer.principal?.memberId,
+        })
       );
       if (!member) return res.status(404).json({ ok: false, error: 'Training member not found.' });
       const lessonId = typeof req.body?.lesson_id === 'string' ? req.body.lesson_id.trim() : '';
@@ -172,7 +183,12 @@ export function registerTrainingRoutes(app: express.Express): void {
       const viewer = resolvePresenceStudioViewerContext(req);
       requirePresenceStudioLocalAdmin(viewer);
       const member = withExecutionContext('ecosystem_architect', () =>
-        resolveMemberByPrincipal({ principalId: viewer.principalId, source: viewer.source })
+        resolveMemberByPrincipal({
+          principalId: viewer.principalId,
+          source: viewer.source,
+          registrationLabel: viewer.principal?.registrationLabel,
+          memberId: viewer.principal?.memberId,
+        })
       );
       if (!member) return res.status(404).json({ ok: false, error: 'Training member not found.' });
       if (resolveTrainingViewerRole(member, viewer) !== 'owner') {

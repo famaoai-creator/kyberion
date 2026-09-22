@@ -5,6 +5,7 @@ import {
   buildChronosHeadlessManifest,
   createHeadlessEnvelope,
 } from './headless-surface-contract.js';
+import { authorizeSurfaceContextOperation } from './surface-authn.js';
 
 describe('headless surface contract', () => {
   it('publishes discoverable read resources and an explicit localadmin write operation', () => {
@@ -34,14 +35,16 @@ describe('headless surface contract', () => {
   it('does not advertise write operations to readonly viewers', () => {
     const manifest = buildChronosHeadlessManifest();
 
-    expect(availableHeadlessOperationIds('readonly', manifest)).toEqual([
+    expect(
+      availableHeadlessOperationIds('readonly', manifest, authorizeSurfaceContextOperation)
+    ).toEqual([
       'chronos.operator_home.read',
       'chronos.work_items.read',
       'chronos.collaboration.read',
     ]);
-    expect(availableHeadlessOperationIds('localadmin', manifest)).toContain(
-      'chronos.work_items.update_status'
-    );
+    expect(
+      availableHeadlessOperationIds('localadmin', manifest, authorizeSurfaceContextOperation)
+    ).toContain('chronos.work_items.update_status');
   });
 
   it('keeps server-resolved scope and available operations in every envelope', () => {
@@ -56,6 +59,7 @@ describe('headless surface contract', () => {
         project_ids: [],
         tier_access: ['public'],
       },
+      authorize: authorizeSurfaceContextOperation,
     });
 
     expect(envelope).toMatchObject({
@@ -76,15 +80,17 @@ describe('headless surface contract', () => {
     const manifest = buildComputerSurfaceManifest();
     expect(manifest.surface).toBe('computer-surface');
 
-    expect(availableHeadlessOperationIds('readonly', manifest)).toEqual([
+    expect(
+      availableHeadlessOperationIds('readonly', manifest, authorizeSurfaceContextOperation)
+    ).toEqual([
       'computer_surface.manifest.read',
       'computer_surface.state.read',
       'computer_surface.stream.read',
       'computer_surface.os_control_plane.read',
     ]);
-    expect(availableHeadlessOperationIds('localadmin', manifest)).toContain(
-      'computer_surface.a2ui.dispatch'
-    );
+    expect(
+      availableHeadlessOperationIds('localadmin', manifest, authorizeSurfaceContextOperation)
+    ).toContain('computer_surface.a2ui.dispatch');
 
     const dispatch = manifest.operations.find(
       (operation) => operation.operation_id === 'computer_surface.a2ui.dispatch'

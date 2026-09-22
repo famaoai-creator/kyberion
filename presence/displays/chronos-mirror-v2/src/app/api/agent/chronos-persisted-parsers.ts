@@ -99,7 +99,7 @@ function parseMissionProposal(value: unknown): MissionProposal | null {
   ) {
     return null;
   }
-  if (value.tier) proposal.tier = value.tier;
+  if (value.tier) proposal.tier = value.tier as MissionProposal['tier'];
   return proposal;
 }
 
@@ -141,13 +141,13 @@ function parseChronosRoutingDecision(value: unknown): AgentRoutingDecision | nul
     kind: 'agent-routing-decision',
     source_text: value.source_text,
     intent_id: value.intent_id,
-    mode,
-    scope,
-    autonomy,
-    boundary_crossing: value.boundary_crossing,
-    fanout,
+    mode: mode as AgentRoutingDecision['mode'],
+    scope: scope as AgentRoutingDecision['scope'],
+    autonomy: autonomy as AgentRoutingDecision['autonomy'],
+    boundary_crossing: value.boundary_crossing as boolean,
+    fanout: fanout as AgentRoutingDecision['fanout'],
     owner: value.owner,
-    ...(delegates ? { delegates } : {}),
+    ...(delegates ? { delegates: delegates as string[] } : {}),
     artifact_count: artifactCount,
     stop_condition: value.stop_condition,
     rationale: value.rationale,
