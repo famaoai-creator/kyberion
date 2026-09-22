@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "authz-policy.schema.json",
+  "title": "Authz Policy File",
+  "description": "Declarative authorization rules consumed by the authz-policy-engine seam's policy-file provider. Deny rules win over allow rules; no match denies (fail closed).",
+  "type": "object",
+  "required": ["version", "rules"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "default_decision": { "const": "deny" },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "decision"],
+        "additionalProperties": false,
+        "properties": {
+          "rule_id": { "type": "string", "minLength": 1 },
+          "decision": { "enum": ["allow", "deny"] },
+          "principals": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Actor id / principal id patterns; '*' matches all, trailing '*' is a prefix match."
+          },
+          "principal_kinds": {
+            "type": "array",
+            "items": { "enum": ["human", "agent", "service"] }
+          },
+          "operations": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Operation id patterns; same glob rules as principals."
+          },
+          "effects": {
+            "type": "array",
+            "items": { "enum": ["read", "write", "decide"] }
+          },
+          "resources": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "tenant": { "type": "string" },
+              "organization": { "type": "string" },
+              "project": { "type": "string" },
+              "tier": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
