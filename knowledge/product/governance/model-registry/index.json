@@ -23,6 +23,7 @@
     "xai:grok-4.6",
     "xai:grok-4.5",
     "xai:grok-4.5-build",
-    "opencode:muse-spark-1.3-contributor-free"
+    "opencode:muse-spark-1.3-contributor-free",
+    "devin:swe"
   ]
 }
