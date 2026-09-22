@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "work-inventory-observation-summary.schema.json",
+  "title": "Work Inventory Observation Summary (work-inventory-observation-summary.v1)",
+  "description": "Content-free summary of one consented, reviewed desktop/browser recording (WI-05). Carries app names, hostnames, coarse op kinds, counts and durations only — never typed text, variable values, params, clipboard, window titles, URL paths, selector descriptions, frame refs or file paths. Stored in the member's personal tier; only a member-confirmed summary may be attached to an inventory entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "summary_id",
+    "member_id",
+    "consent_id",
+    "source",
+    "recording_hash",
+    "window",
+    "apps",
+    "hosts",
+    "op_counts",
+    "step_count",
+    "proposed_steps",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "work-inventory-observation-summary.v1" },
+    "summary_id": { "type": "string", "pattern": "^WIO-[0-9]{8}-[a-f0-9]{12}$" },
+    "member_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_slug": { "type": "string", "minLength": 1 },
+    "consent_id": { "type": "string", "pattern": "^WIC-[0-9]{8}-[a-f0-9]{12}$" },
+    "source": { "type": "string", "enum": ["desktop_recording", "browser_recording"] },
+    "recording_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "string", "format": "date-time" },
+        "end": { "type": "string", "format": "date-time" }
+      }
+    },
+    "apps": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/app_name" }
+    },
+    "hosts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/hostname" }
+    },
+    "op_counts": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/definitions/op_kind" },
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "step_count": { "type": "integer", "minimum": 0 },
+    "duration_ms": { "type": "number", "minimum": 0 },
+    "proposed_steps": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "verb", "description", "effects", "requires_attention"],
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": ["trigger", "gather", "understand", "decide", "act", "verify", "record"]
+          },
+          "verb": {
+            "type": "string",
+            "enum": ["read", "input", "transform", "operate", "communicate", "record"]
+          },
+          "description": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "system": {
+            "anyOf": [{ "$ref": "#/definitions/app_name" }, { "$ref": "#/definitions/hostname" }]
+          },
+          "effects": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": ["external_send", "money", "personal_data", "irreversible", "approval"]
+            }
+          },
+          "requires_attention": { "type": "boolean" }
+        }
+      }
+    },
+    "status": { "type": "string", "enum": ["pending_review", "confirmed", "discarded"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "confirmed_at": { "type": "string", "format": "date-time" },
+    "confirmed_by": { "$ref": "#/definitions/human_actor" },
+    "discarded_at": { "type": "string", "format": "date-time" },
+    "discarded_by": { "$ref": "#/definitions/human_actor" }
+  },
+  "definitions": {
+    "app_name": { "type": "string", "pattern": "^[\\p{L}\\p{N} ._()&+-]{1,80}$" },
+    "hostname": { "type": "string", "pattern": "^[a-z0-9.-]{1,253}$" },
+    "op_kind": {
+      "type": "string",
+      "enum": [
+        "click",
+        "select",
+        "drag",
+        "input",
+        "navigate",
+        "open",
+        "close",
+        "copy",
+        "paste",
+        "download",
+        "save",
+        "upload",
+        "send",
+        "submit",
+        "delete",
+        "purchase",
+        "credential",
+        "settings",
+        "observe",
+        "other"
+      ]
+    },
+    "human_actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "human" },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
