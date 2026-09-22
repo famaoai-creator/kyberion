@@ -12,10 +12,11 @@ import {
 } from '@agent/core/work-inventory';
 import {
   attachDemandSignals,
-  collectKyberionDemandSignals,
+  collectKyberionDemandSignalsWithStats,
   matchSignalsToEntries,
   suggestEntriesFromSignals,
   type DemandSignal,
+  type DemandSignalHarvestStats,
 } from '@agent/core/work-inventory-harvest';
 import {
   formatTable,
@@ -33,6 +34,8 @@ export interface HarvestResult {
   entries_updated: WorkInventoryEntry[];
   suggested: WorkInventoryEntry[];
   dry_run: boolean;
+  /** WI-13: trace-hygiene stats from the scan (excluded test/ci traces, untagged legacy traces). */
+  stats: DemandSignalHarvestStats;
 }
 
 export function runHarvest(
@@ -46,7 +49,7 @@ export function runHarvest(
   const includeUnscoped = hasFlag(argv, '--include-unscoped');
   const suggest = hasFlag(argv, '--suggest');
 
-  const signals = collectKyberionDemandSignals({
+  const { signals, stats } = collectKyberionDemandSignalsWithStats({
     rootDir,
     now,
     since: new Date(now.getTime() - days * MS_PER_DAY),
@@ -77,7 +80,7 @@ export function runHarvest(
       : fresh.flatMap((entry) => saveNewSuggestion(entry, rootDir));
   }
 
-  return { signals, entries_updated: entriesUpdated, suggested, dry_run: options.dryRun };
+  return { signals, entries_updated: entriesUpdated, suggested, dry_run: options.dryRun, stats };
 }
 
 function saveNewSuggestion(entry: WorkInventoryEntry, rootDir?: string): WorkInventoryEntry[] {
@@ -96,6 +99,8 @@ export function formatHarvest(result: HarvestResult): string {
     `${result.dry_run ? '(dry-run) ' : ''}signals: ${result.signals.length}`,
     `entries updated: ${result.entries_updated.length}`,
     `suggested drafts: ${result.suggested.length}`,
+    `traces excluded (test/ci): ${result.stats.excluded_test_or_ci}`,
+    `traces untagged (legacy, still counted): ${result.stats.untagged}`,
   ];
   if (result.signals.length > 0) {
     lines.push(

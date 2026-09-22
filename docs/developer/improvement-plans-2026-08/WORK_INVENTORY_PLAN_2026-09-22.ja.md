@@ -205,3 +205,41 @@ WorkInventoryEntry(業務 1 件)
 - ヒアリング画面の見出しは両シナリオ共通のまま(シナリオ別の見出し・説明の表示は後続)。
 - 持ち主以外のメンバーの同意・観測は、そのメンバー自身が認証された画面(トークン経由の surface)で行う必要がある。端末 CLI は持ち主専用で、他メンバー向けの同意導線は未実装。
 - この修正より前に保存した業務の結び付けには `inferred` 印がないため、既定候補で埋めた結び付けがまだ照合に使われる(既存記録の移行は未対応)。
+
+## 9. 続き(WI-13〜17、ミッション `MSN-WORK-INVENTORY-FOLLOWUPS-20260922`)
+
+PR #761 のマージ後、§8 の既知の残件を片付ける。調査で分かった原因:
+
+- **トレースの混入**: vitest を本番チェックアウトで実行すると、アクチュエータのトレース(`code-actuator:pipeline`、`media-actuator:pipeline`、`browser-pipeline:*`、`meeting-actuator:speak`)が `active/shared/logs/traces/` に書かれる。2026-08-25 の `110d028d4`(トレース追記を foundation の `appendJsonLine` に移行)以降、テストの secure-io モックが効かなくなった。media / speak / browser は 2026-09-21 時点でも混入が続いている。
+- **CodeQL `js/shell-command-constructed-from-input`**(リポジトリ全体で未解決 686 件): シンクは `secure-io.ts` の `safeExecResult`(`spawnSync`)と `safeExec`(`execFileSync`)の 2 箇所だけ。どちらも `shell: false` を明示しておらず、オプションが `any` 型。
+
+| ID    | 区分 | 内容                                                                                                                                                                                                                     | 優先度 |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| WI-13 | 衛生 | テストプロセスからは本番トレースに書かない(明示の出力先指定か専用の環境変数があるときだけ書く)。トレースに `metadata.origin`(test / ci / scheduled / agent / interactive)を付け、業務棚卸しの収集は test / ci を除外する | P1     |
+| WI-14 | 安全 | `safeExec` / `safeExecResult` に `shell: false` を明示し、オプションを型付きにして `shell` キーを拒否する                                                                                                                | P1     |
+| WI-15 | 同意 | 秘書室の「設定」に「PC 操作の記録」を追加。ログイン中のメンバー本人が、自分の同意の付与・撤回と、確認待ち要約の確認・破棄・業務への取り込みを行う(本人は必ずサーバー側で解決)                                            | P1     |
+| WI-16 | 保持 | 保持期間カタログに状態つき規則を追加し、janitor が「確認されないまま 30 日を過ぎた要約」と「破棄後 30 日を過ぎた要約」を監査つきで削除する                                                                               | P2     |
+| WI-17 | 移行 | 既存の業務記録で、行為の既定候補と一致する結び付けに `inferred` 印を付ける移行(`pnpm inventory migrate`、空実行つき)                                                                                                     | P2     |
+
+| Wave | 項目          | 担当モデル | ファイル所有権                                                                                |
+| ---- | ------------- | ---------- | --------------------------------------------------------------------------------------------- |
+| 1    | WI-13 + WI-17 | sonnet     | `libs/core/src/trace.ts`・env registry・`work-inventory-harvest.ts`・`work-inventory.ts`・CLI |
+| 1    | WI-14         | sonnet     | `libs/core/secure-io.ts` と呼び出し側の型                                                     |
+| 1    | WI-15         | sonnet     | `presence/displays/concierge/**`・語彙                                                        |
+| 1    | WI-16         | sonnet     | `storage-janitor.ts`・保持期間カタログとスキーマ                                              |
+
+受入条件:
+
+- WI-13: vitest 実行中の `persistTrace` は既定で本番ディレクトリに書かない。`origin` は環境から決定的に付く。test / ci 由来の信号は収集されない。
+- WI-14: 既存の呼び出しがすべて通り、`shell` を渡すと例外になる。PR の CodeQL で該当ルールの新規アラートが出ない。
+- WI-15: 他人の同意・要約は見えず操作できない(本人は常にサーバー側で解決)。匿名の閲覧者には出さない。
+- WI-16: 確認済みの要約と有効な同意は消えない。削除は監査に残る。
+- WI-17: 空実行で対象件数を表示し、実行後に既定候補の結び付けが照合に使われない。
+
+レビューで修正した点:
+
+- WI-17: 移行が、人が意図して既定候補と同じ結び付けを設定した業務まで `inferred` にしていた。`INFERRED_BINDING_TAGGING_SINCE`(PR #761 のマージ時刻 `2026-09-22T10:18:05Z`)より前に作られた業務だけを移行の対象にし、それ以降の業務では明示の結び付けに `inferred: false` を付ける(`applyClassification` と、使用信号から作る下書き)。
+- WI-13(origin): `MISSION_ROLE` は `pnpm pipeline` や `withExecutionContext` でも付くため、人が始めた実行が `agent` になっていた。`agent` は `KYBERION_NHI_ID` / `KYBERION_AGENT_ID` があるときだけにした。
+- WI-13(scheduled): Chronos の実行が `scheduled` にならなかった。トリガー実行器が cron 配信ごとに張る非同期スコープ(`withTriggerCorrelation`)を `deriveTraceOrigin` が読むようにした(実行が重なっても混ざらない)。環境変数 `KYBERION_RUN_ORIGIN` を登録し、baseline-check が起動する janitor に `scheduled` を渡す。収集では、数えたトレースの半分以上が `scheduled` のときだけ信号を `scheduled` にする。
+- WI-16: `review_required` の下で状態つき規則が削除することを、唯一の明示的な例外としてコードとカタログの注記に書いた。削除の直前にファイルを読み直し、状態と経過日数がまだ条件に合うときだけ消す。
+- WI-15: ループバックの閲覧者に本人の個人の業務一覧を出すのは意図した判断(所有者本人、presence-studio と同じ規則)だとコメントに残した。同意の日数は 1 以上・上限以下の整数だけを受け付け、大きすぎる値は 500 ではなく 400 を返す。

@@ -34,6 +34,7 @@ const {
   SCHEDULES_FIRING_WINDOW_MS,
   readAuditLedgerFreshness,
   AUDIT_LEDGER_FRESHNESS_MAX_AGE_MS,
+  janitorSpawnEnv,
 } = await import(new URL('./run_baseline_check.js', import.meta.url).href);
 
 function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCapability {
@@ -502,5 +503,15 @@ describe('run_baseline_check', () => {
         shouldEmitDailyOpsAlert({ failed_schedules: '2026-08-08' }, 'scheduler_alive', NOW)
       ).toBe(true);
     });
+  });
+});
+
+describe('WI-13 review: baseline-check janitor spawn env', () => {
+  it('tags the spawned janitor run origin scheduled without mutating the parent env', () => {
+    const parent = { PATH: '/usr/bin', MISSION_ROLE: 'baseline_check' };
+    const env = janitorSpawnEnv(parent);
+    expect(env.KYBERION_RUN_ORIGIN).toBe('scheduled');
+    expect(env.PATH).toBe('/usr/bin');
+    expect(parent).not.toHaveProperty('KYBERION_RUN_ORIGIN');
   });
 });

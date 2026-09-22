@@ -55,7 +55,9 @@ export const RETENTION_ACTIONS = [
   /**
    * AL-04: no automatic deletion — the directory is declared (so it never
    * shows up as uncovered) and surfaced in the janitor report for a human
-   * retention decision. The janitor MUST NOT delete anything under it.
+   * retention decision. The janitor MUST NOT delete anything under it —
+   * except through a nested `status_rules` entry, the one explicit, opt-in
+   * exception (see `RetentionStatusRule`).
    */
   'review_required',
 ] as const;
@@ -68,6 +70,56 @@ export type RetentionAction = (typeof RETENTION_ACTIONS)[number];
  * `mission-closure.jsonl` / `mission-purge.jsonl`.
  */
 export const STORAGE_RETENTION_AUDIT_FILENAME = 'storage-retention.jsonl';
+
+/**
+ * Actions a per-file status rule may declare. Only `delete` is implemented —
+ * a status-based rule expresses "this specific file, by its own JSON status
+ * field, is past its own TTL", which the janitor sweep resolves through the
+ * same audited `expireFilePerPolicy` path as a directory-level `delete`
+ * entry (soft-delete when the owning directory entry declares
+ * `soft_delete_days`).
+ */
+export const STATUS_RULE_ACTIONS = ['delete'] as const;
+export type StatusRuleAction = (typeof STATUS_RULE_ACTIONS)[number];
+
+/**
+ * WI-16: a declarative, per-file status-aware expiry rule nested under a
+ * directory-level catalog entry. Directory-level `ttl_days`/mtime cannot
+ * express "this file's own `pending_review` status is 30 days stale" without
+ * also catching `confirmed` records in the same sweep — a `status_rules`
+ * entry closes that gap by reading one JSON field (`status_field`) and one
+ * JSON date field (`age_field`) out of each file the pattern matches, instead
+ * of trusting directory mtime.
+ *
+ * Status rules are the one explicit, opt-in exception to "review_required
+ * never becomes a deletion rule" (AL-04): a rule nested under a
+ * `review_required` entry deletes inside it, but only by the rule's own
+ * `action: 'delete'`, scoped to files matching its `path_pattern` whose
+ * `status_field` is one of its `statuses` and past its `ttl_days`. Nothing
+ * else under the entry is ever deleted.
+ */
+export interface RetentionStatusRule {
+  /** Stable identifier, named in the janitor's deletion audit record. */
+  id: string;
+  /**
+   * Glob-like path, relative to the owning entry's `path`, matched against
+   * every file under that directory. A `*` matches within one path segment
+   * only (it never spans a path separator); segments are otherwise literal
+   * repo-relative-safe path pieces (no `..`, no leading/trailing slash, no
+   * absolute path). Example (see the `knowledge/personal/members` entry in
+   * the governance catalog): a wildcard member-id segment, then the literal
+   * `work-inventory`, `observations`, then a wildcard `.json` filename.
+   */
+  path_pattern: string;
+  /** JSON field (top-level) read from each matched file to test `statuses`. */
+  status_field: string;
+  /** The file is a candidate only when `status_field`'s value is one of these. */
+  statuses: string[];
+  /** JSON field (top-level, ISO date string) the TTL is measured from. */
+  age_field: string;
+  ttl_days: number;
+  action: StatusRuleAction;
+}
 
 export interface RetentionCatalogEntry {
   /** Repo-relative directory (POSIX separators, no leading/trailing slash). */
@@ -88,6 +140,8 @@ export interface RetentionCatalogEntry {
    */
   soft_delete_days?: number;
   note?: string;
+  /** WI-16: per-file status-aware expiry rules nested under this directory. */
+  status_rules?: RetentionStatusRule[];
 }
 
 export interface LoadedRetentionCatalog {
@@ -169,6 +223,65 @@ function isRepoRelativeDirPath(value: unknown): value is string {
   );
 }
 
+/**
+ * WI-16: relative glob-like path segment check for `status_rules[].path_pattern`
+ * — same safety bar as {@link isRepoRelativeDirPath} (no leading/trailing
+ * slash, no backslash, no `.`/`..` segment, no absolute path) plus `*`
+ * allowed as a within-segment wildcard character.
+ */
+function isSafeStatusRulePattern(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    !value.startsWith('/') &&
+    !value.endsWith('/') &&
+    !value.includes('\\') &&
+    value
+      .split('/')
+      .every(
+        (seg) => seg.length > 0 && seg !== '.' && seg !== '..' && /^[A-Za-z0-9_.*-]+$/.test(seg)
+      )
+  );
+}
+
+function validateStatusRule(raw: unknown, entryIndex: number, ruleIndex: number): string | null {
+  const where = `entries[${entryIndex}].status_rules[${ruleIndex}]`;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return `${where}: not an object`;
+  }
+  const rule = raw as Record<string, unknown>;
+  if (typeof rule.id !== 'string' || rule.id.length === 0) {
+    return `${where}: "id" must be a non-empty string`;
+  }
+  if (!isSafeStatusRulePattern(rule.path_pattern)) {
+    return `${where} (${rule.id}): "path_pattern" must be a safe relative glob path`;
+  }
+  if (typeof rule.status_field !== 'string' || rule.status_field.length === 0) {
+    return `${where} (${rule.id}): "status_field" must be a non-empty string`;
+  }
+  if (
+    !Array.isArray(rule.statuses) ||
+    rule.statuses.length === 0 ||
+    !rule.statuses.every((s) => typeof s === 'string' && s.length > 0)
+  ) {
+    return `${where} (${rule.id}): "statuses" must be a non-empty array of non-empty strings`;
+  }
+  if (typeof rule.age_field !== 'string' || rule.age_field.length === 0) {
+    return `${where} (${rule.id}): "age_field" must be a non-empty string`;
+  }
+  if (
+    typeof rule.ttl_days !== 'number' ||
+    !Number.isFinite(rule.ttl_days) ||
+    (rule.ttl_days as number) <= 0
+  ) {
+    return `${where} (${rule.id}): "ttl_days" must be a positive number`;
+  }
+  if (!STATUS_RULE_ACTIONS.includes(rule.action as StatusRuleAction)) {
+    return `${where} (${rule.id}): invalid "action" ${JSON.stringify(rule.action)}`;
+  }
+  return null;
+}
+
 function validateEntry(raw: unknown, index: number): string | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     return `entries[${index}]: not an object`;
@@ -206,6 +319,15 @@ function validateEntry(raw: unknown, index: number): string | null {
   }
   if (entry.note !== undefined && typeof entry.note !== 'string') {
     return `entries[${index}] (${String(entry.path)}): "note" must be a string`;
+  }
+  if (entry.status_rules !== undefined) {
+    if (!Array.isArray(entry.status_rules)) {
+      return `entries[${index}] (${String(entry.path)}): "status_rules" must be an array`;
+    }
+    for (let j = 0; j < entry.status_rules.length; j++) {
+      const error = validateStatusRule(entry.status_rules[j], index, j);
+      if (error) return error;
+    }
   }
   return null;
 }
@@ -304,6 +426,8 @@ const RUNTIME_PREFIX = 'active/shared/runtime/';
  * the catalog-driven successor of the janitor's former `RUNTIME_RETENTION`
  * constant. Only entries with a `ttl_days` participate; `review_required`
  * entries NEVER become scan rules (AL-04), even if a ttl_days slipped in.
+ * (Status rules are the one explicit, opt-in exception — a rule's own
+ * `action: 'delete'` scoped to its pattern/statuses; see `RetentionStatusRule`.)
  */
 export function runtimeRetentionRules(
   catalog: LoadedRetentionCatalog
@@ -346,7 +470,8 @@ function isEventStorePath(repoRelativePath: string): boolean {
 /**
  * TTL rules for declared event-store directories. Same contract as
  * {@link runtimeRetentionRules}: only entries carrying a `ttl_days`
- * participate, and `review_required` never becomes a deletion rule.
+ * participate, and `review_required` never becomes a deletion rule (status
+ * rules are the one explicit, opt-in exception; see `RetentionStatusRule`).
  */
 export function eventStoreRetentionRules(
   catalog: LoadedRetentionCatalog
@@ -406,12 +531,53 @@ export function retentionEntryForPath(
 /**
  * Repo-relative paths declared `review_required` (AL-04): covered for
  * reporting purposes, never deleted, surfaced for a human retention decision.
+ * The one explicit, opt-in exception is a nested status rule (its own
+ * `action: 'delete'` scoped to its pattern/statuses; see `RetentionStatusRule`).
  */
 export function reviewRequiredCatalogPaths(catalog: LoadedRetentionCatalog): string[] {
   return catalog.entries
     .filter((e) => e.action === 'review_required')
     .map((e) => e.path)
     .sort();
+}
+
+/**
+ * WI-16: every declared `status_rules` entry, flattened with the directory
+ * entry that owns it (the janitor needs the owning entry to resolve
+ * `soft_delete_days` / `audit` for the same audited expiry path directory-level
+ * TTL rules use).
+ */
+export function catalogStatusRules(
+  catalog: LoadedRetentionCatalog
+): Array<{ entry: RetentionCatalogEntry; rule: RetentionStatusRule }> {
+  const flattened: Array<{ entry: RetentionCatalogEntry; rule: RetentionStatusRule }> = [];
+  for (const entry of catalog.entries) {
+    for (const rule of entry.status_rules ?? []) {
+      flattened.push({ entry, rule });
+    }
+  }
+  return flattened;
+}
+
+/**
+ * WI-16: compile a `status_rules[].path_pattern` (relative to its owning
+ * entry's directory) into a `RegExp` matched against a POSIX relative path.
+ * `*` matches any run of characters within one path segment; it never spans
+ * `/`. Callers only ever pass patterns that already passed
+ * {@link isSafeStatusRulePattern}, so no path-traversal character reaches
+ * here.
+ */
+export function statusRulePatternToRegex(pattern: string): RegExp {
+  const source = pattern
+    .split('/')
+    .map((segment) =>
+      segment
+        .split('*')
+        .map((literal) => literal.replace(/[.+^${}()|[\]\\]/g, '\\$&'))
+        .join('[^/]*')
+    )
+    .join('/');
+  return new RegExp(`^${source}$`);
 }
 
 /**

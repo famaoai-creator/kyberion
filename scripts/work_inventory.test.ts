@@ -26,6 +26,7 @@ import {
   runCandidates,
   runClassify,
   runList,
+  runMigrate,
   runOverride,
   runShow,
   runStatus,
@@ -423,6 +424,33 @@ describe('inventory harvest (hermetic)', () => {
     expect(result.entries_updated).toEqual([]);
     expect(result.suggested).toEqual([]);
     expect(result.dry_run).toBe(false);
+    expect(result.stats).toEqual({ excluded_test_or_ci: 0, untagged: 0 });
+  });
+
+  it('WI-13: excludes test/ci traces, keeps untagged legacy traces counted, and reports both stats', () => {
+    const tracesDir = path.join(tmpRoot, 'active/shared/logs/traces');
+    safeMkdir(tracesDir, { recursive: true });
+    const trace = (id: string, hour: number, origin?: string) =>
+      JSON.stringify({
+        traceId: id,
+        rootSpan: { name: 'pipeline:cli-origin-test', status: 'ok' },
+        metadata: {
+          startedAt: `2026-09-20T${String(hour).padStart(2, '0')}:00:00.000Z`,
+          ...(origin ? { origin } : {}),
+        },
+      });
+    const lines = [
+      trace('untagged-1', 1),
+      trace('untagged-2', 2),
+      trace('test-1', 3, 'test'),
+      trace('ci-1', 4, 'ci'),
+    ];
+    safeWriteFile(path.join(tracesDir, 'traces-2026-09-20.jsonl'), lines.join('\n'));
+
+    const result = runHarvest(['harvest', '--days', '7'], { ...opts, dryRun: false });
+    const signal = result.signals.find((s) => s.signature === 'pipeline:cli-origin-test');
+    expect(signal?.count).toBe(2); // only the 2 untagged traces
+    expect(result.stats).toEqual({ excluded_test_or_ci: 2, untagged: 2 });
   });
 
   it('--suggest skips a suggestion whose id already exists instead of overwriting it', () => {
@@ -458,6 +486,109 @@ describe('inventory harvest (hermetic)', () => {
     const result = runHarvest(['harvest', '--dry-run', '--suggest'], { ...opts, dryRun: true });
     expect(result.dry_run).toBe(true);
     expect(result.suggested).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// migrate (WI-17)
+// ---------------------------------------------------------------------------
+
+function legacyOcrBindingEntry(title: string): WorkInventoryEntry {
+  return createWorkInventoryEntry(
+    {
+      title,
+      scope: {},
+      trigger: { kind: 'ad_hoc', description: 'test' },
+      steps: [
+        {
+          step_id: 'S1',
+          stage: 'understand',
+          verb: 'read',
+          description: 'ocr a screenshot',
+          data_sensitivity: 'internal',
+          effects: [],
+          method: {
+            assigned: 'ai_reasoning',
+            source: 'rule',
+            rule_id: 'reasoning-verbs',
+            rationale: 'x',
+          },
+          // verb 'read''s first taxonomy candidate binding (vision-actuator /
+          // ocr_image), declared here the way a pre-WI-17 entry would have
+          // it — matching the default but with no `inferred` key at all.
+          binding: { actuator: 'vision-actuator', op: 'ocr_image' },
+        },
+      ],
+    },
+    NOW
+  );
+}
+
+describe('inventory migrate (hermetic)', () => {
+  it('backfills inferred: true on a legacy default-candidate binding, saves it, and is idempotent', () => {
+    const entry = legacyOcrBindingEntry('legacy binding entry');
+    saveWorkInventoryEntry(entry, { rootDir: tmpRoot });
+
+    const first = runMigrate(['migrate'], { ...opts, dryRun: false });
+    expect(first.total_changed).toBe(1);
+    expect(first.results).toEqual([{ entry_id: entry.entry_id, changed: 1 }]);
+    expect(first.dry_run).toBe(false);
+
+    const reloaded = loadWorkInventoryEntry({}, entry.entry_id, { rootDir: tmpRoot });
+    expect(reloaded?.steps[0].binding).toEqual({
+      actuator: 'vision-actuator',
+      op: 'ocr_image',
+      inferred: true,
+    });
+
+    const second = runMigrate(['migrate'], { ...opts, dryRun: false });
+    expect(second.total_changed).toBe(0);
+    expect(second.results).toEqual([]);
+  });
+
+  it('--dry-run reports the pending change but writes nothing', () => {
+    const entry = legacyOcrBindingEntry('legacy binding entry (dry-run)');
+    saveWorkInventoryEntry(entry, { rootDir: tmpRoot });
+
+    const result = runMigrate(['migrate', '--dry-run'], { ...opts, dryRun: true });
+    expect(result.total_changed).toBe(1);
+    expect(result.dry_run).toBe(true);
+
+    const reloaded = loadWorkInventoryEntry({}, entry.entry_id, { rootDir: tmpRoot });
+    expect(reloaded?.steps[0].binding?.inferred).toBeUndefined();
+  });
+
+  it('leaves an entry with an explicit (non-default) binding out of the results entirely', () => {
+    const entry = createWorkInventoryEntry(
+      {
+        title: 'explicit binding entry',
+        scope: {},
+        trigger: { kind: 'ad_hoc', description: 'test' },
+        steps: [
+          {
+            step_id: 'S1',
+            stage: 'understand',
+            verb: 'read',
+            description: 'read via a declared knowledge api',
+            data_sensitivity: 'internal',
+            effects: [],
+            method: {
+              assigned: 'ai_reasoning',
+              source: 'rule',
+              rule_id: 'reasoning-verbs',
+              rationale: 'x',
+            },
+            binding: { actuator: 'wisdom-actuator', op: 'knowledge_read' },
+          },
+        ],
+      },
+      NOW
+    );
+    saveWorkInventoryEntry(entry, { rootDir: tmpRoot });
+
+    const result = runMigrate(['migrate'], { ...opts, dryRun: false });
+    expect(result.total_changed).toBe(0);
+    expect(result.results).toEqual([]);
   });
 });
 
@@ -735,5 +866,23 @@ describe('inventory dispatcher end-to-end (hermetic)', () => {
     await run(['add', '--title', 'Human readable'], { rootDir: tmpRoot, now: NOW, print });
     expect(typeof printed.at(-1)).toBe('string');
     expect(String(printed.at(-1))).toContain('Steps:');
+  });
+
+  it('runs migrate through argv and reports the entries it changed', async () => {
+    const entry = legacyOcrBindingEntry('E2E migrate entry');
+    saveWorkInventoryEntry(entry, { rootDir: tmpRoot });
+
+    const printed: unknown[] = [];
+    const print = (value: unknown) => printed.push(value);
+    await run(['migrate', '--json'], { rootDir: tmpRoot, print });
+    const result = printed.at(-1) as {
+      results: Array<{ entry_id: string }>;
+      total_changed: number;
+    };
+    expect(result.total_changed).toBe(1);
+    expect(result.results.map((r) => r.entry_id)).toEqual([entry.entry_id]);
+
+    await run(['migrate'], { rootDir: tmpRoot, print });
+    expect(String(printed.at(-1))).toContain('bindings marked inferred: 0');
   });
 });

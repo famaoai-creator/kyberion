@@ -95,6 +95,16 @@ export function isVitestProcess(env: Record<string, string | undefined> = proces
   return Boolean(env.VITEST);
 }
 
+/**
+ * Detect a CI runner, mirroring `isVitestProcess`'s raw-env contract: `CI` is
+ * the conventional marker every major CI provider sets (GitHub Actions,
+ * GitLab, CircleCI, …) and is not a `KYBERION_*` registry entry, so it is
+ * read the same side-effect-free way rather than through the registry.
+ */
+export function isCiProcess(env: Record<string, string | undefined> = process.env): boolean {
+  return Boolean(env.CI);
+}
+
 /** Read a registered boolean without converting it to the legacy text form. */
 export function getRegisteredEnvBool(
   name: string,

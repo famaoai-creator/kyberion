@@ -9,6 +9,7 @@ import {
   createWorkInventoryEntry,
   listWorkInventoryEntries,
   loadWorkInventoryEntry,
+  migrateInferredBindings,
   saveWorkInventoryEntry,
   stepForcedHumanEffects,
   type WorkEntryStatus,
@@ -244,6 +245,47 @@ export function runCandidates(
 }
 
 // ---------------------------------------------------------------------------
+// migrate (WI-17)
+// ---------------------------------------------------------------------------
+
+export interface MigrateEntryResult {
+  entry_id: string;
+  /** Steps whose `binding.inferred` was backfilled to `true`. */
+  changed: number;
+}
+
+export interface MigrateResult {
+  results: MigrateEntryResult[];
+  /** Sum of `changed` across every touched entry. */
+  total_changed: number;
+  dry_run: boolean;
+}
+
+/**
+ * WI-17: backfills `binding.inferred` on legacy entries whose binding
+ * already matches the verb's first taxonomy candidate (see
+ * `migrateInferredBindings`). Scans every entry in scope; only entries with
+ * at least one changed step are saved (`--dry-run` saves nothing).
+ */
+export function runMigrate(
+  argv: string[],
+  options: WorkInventoryCliOptions & { dryRun: boolean }
+): MigrateResult {
+  const scope = resolveScope(argv);
+  const entries = listWorkInventoryEntries(scope, { rootDir: options.rootDir });
+  const results: MigrateEntryResult[] = [];
+  let totalChanged = 0;
+  for (const entry of entries) {
+    const { entry: migrated, changed } = migrateInferredBindings(entry);
+    if (changed === 0) continue;
+    results.push({ entry_id: entry.entry_id, changed });
+    totalChanged += changed;
+    if (!options.dryRun) saveWorkInventoryEntry(migrated, { rootDir: options.rootDir });
+  }
+  return { results, total_changed: totalChanged, dry_run: options.dryRun };
+}
+
+// ---------------------------------------------------------------------------
 // Human-readable formatting
 // ---------------------------------------------------------------------------
 
@@ -315,4 +357,21 @@ export function formatCandidates(results: readonly WorkInventoryScoreResult[]): 
       `${result.basis.runs}/${result.basis.effort}`,
     ])
   );
+}
+
+export function formatMigrate(result: MigrateResult): string {
+  const lines = [
+    `${result.dry_run ? '(dry-run) ' : ''}entries changed: ${result.results.length}`,
+    `bindings marked inferred: ${result.total_changed}`,
+  ];
+  if (result.results.length > 0) {
+    lines.push(
+      '',
+      formatTable(
+        ['entry_id', 'changed'],
+        result.results.map((r) => [r.entry_id, String(r.changed)])
+      )
+    );
+  }
+  return lines.join('\n');
 }

@@ -191,6 +191,12 @@ async function tickAsLeader(): Promise<void> {
           const adf = readValidatedPipelineAdf(resolvedPipelinePath, {
             trustResolved: true,
           });
+          // WI-13: traces built during this run are tagged origin `scheduled`
+          // through the trigger runner's async-scoped cron correlation
+          // (`withTriggerCorrelation`, read by `deriveTraceOrigin`), not via a
+          // process-env flip: ticks fire from an un-awaited setInterval, so
+          // runs of different schedules can overlap in this process, and
+          // secure-io child processes never inherit non-allowlisted env.
           const result = await runSteps(
             adf.steps,
             {

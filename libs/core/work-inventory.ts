@@ -372,13 +372,35 @@ function firstCandidateBinding(
   return taxonomy.verbs.find((entry) => entry.id === verb)?.candidate_bindings[0];
 }
 
+/**
+ * When `fillBinding` began tagging candidate-default bindings `inferred: true`
+ * (the merge time of PR #761). An entry created at/after this instant had
+ * every default binding tagged at write time, so an untagged binding on it
+ * was set by a person or a demand signal — never a default. Entries created
+ * before it may carry untagged defaults, which is what `migrateInferredBindings`
+ * backfills; it must never touch a newer entry.
+ */
+export const INFERRED_BINDING_TAGGING_SINCE = '2026-09-22T10:18:05.000Z';
+
+function createdAtOrAfterTaggingCutoff(entry: Pick<WorkInventoryEntry, 'created_at'>): boolean {
+  const created = Date.parse(entry.created_at);
+  return Number.isFinite(created) && created >= Date.parse(INFERRED_BINDING_TAGGING_SINCE);
+}
+
 function fillBinding(
   step: WorkInventoryStep,
-  taxonomy: WorkInventoryTaxonomy
+  taxonomy: WorkInventoryTaxonomy,
+  stampExplicit: boolean
 ): WorkInventoryStepBinding | undefined {
-  if (step.binding?.actuator) return step.binding;
+  // An existing binding without the key on a post-cutoff entry is explicit:
+  // stamp `inferred: false` so it can never be mistaken for a legacy default.
+  const explicit =
+    step.binding && stampExplicit && step.binding.inferred === undefined
+      ? { ...step.binding, inferred: false }
+      : step.binding;
+  if (explicit?.actuator) return explicit;
   const candidate = firstCandidateBinding(step.verb, taxonomy);
-  if (!candidate) return step.binding;
+  if (!candidate) return explicit;
   return {
     ...step.binding,
     actuator: candidate.actuator,
@@ -402,10 +424,11 @@ export function applyClassification(
   taxonomy: WorkInventoryTaxonomy = loadWorkInventoryTaxonomy()
 ): WorkInventoryEntry {
   const apiSystems = new Set((options.apiSystems ?? []).map((system) => system.toLowerCase()));
+  const stampExplicit = createdAtOrAfterTaggingCutoff(entry);
   const steps = entry.steps.map((step) => {
     const systemHasApi = Boolean(step.system && apiSystems.has(step.system.toLowerCase()));
     const classification = classifyWorkStep(step, { system_has_api: systemHasApi }, taxonomy);
-    const binding = fillBinding(step, taxonomy);
+    const binding = fillBinding(step, taxonomy, stampExplicit);
 
     const override = step.method?.source === 'human_override' ? step.method : undefined;
     const forced = override ? stepForcedHumanEffects(step, taxonomy) : [];
@@ -434,6 +457,57 @@ export function applyClassification(
     };
   });
   return { ...entry, steps };
+}
+
+// ---------------------------------------------------------------------------
+// WI-17: backfill `inferred` on legacy default-candidate bindings
+// ---------------------------------------------------------------------------
+
+export interface MigrateInferredBindingsResult {
+  entry: WorkInventoryEntry;
+  /** Number of steps whose `binding.inferred` was set `true` by this call. */
+  changed: number;
+}
+
+/**
+ * `fillBinding` (used by `applyClassification`) has tagged
+ * candidate-default bindings `inferred: true` since it was introduced, but
+ * entries created before that never got the flag even though their binding
+ * is exactly the verb's first taxonomy candidate. `matchSignalsToEntries`
+ * treats an untagged binding as a real, declared one (never `inferred`),
+ * so an untagged legacy default binding wrongly counts as demand-signal
+ * evidence. This backfills the flag — and nothing else: a step is only
+ * touched when its `binding` has no `pipeline_id`/`intent_id`, has no
+ * `inferred` key at all (an explicit `inferred: false` is left alone — a
+ * person confirmed it deliberately), and its `actuator`/`op` are exactly the
+ * verb's first candidate binding. Only entries created before
+ * `INFERRED_BINDING_TAGGING_SINCE` are considered: on newer entries every
+ * default was tagged at write time, so an untagged binding there is one a
+ * person set deliberately (even if it equals the default) and must keep
+ * counting as evidence. Idempotent: a second run changes nothing.
+ */
+export function migrateInferredBindings(
+  entry: WorkInventoryEntry,
+  taxonomy: WorkInventoryTaxonomy = loadWorkInventoryTaxonomy()
+): MigrateInferredBindingsResult {
+  if (!Number.isFinite(Date.parse(entry.created_at)) || createdAtOrAfterTaggingCutoff(entry)) {
+    return { entry, changed: 0 };
+  }
+  let changed = 0;
+  const steps = entry.steps.map((step) => {
+    const binding = step.binding;
+    if (!binding) return step;
+    if (binding.inferred !== undefined) return step;
+    if (binding.pipeline_id || binding.intent_id) return step;
+    const candidate = firstCandidateBinding(step.verb, taxonomy);
+    if (!candidate) return step;
+    const opMatches = (candidate.op ?? undefined) === (binding.op ?? undefined);
+    if (binding.actuator !== candidate.actuator || !opMatches) return step;
+    changed += 1;
+    return { ...step, binding: { ...binding, inferred: true } };
+  });
+  if (changed === 0) return { entry, changed: 0 };
+  return { entry: { ...entry, steps }, changed };
 }
 
 // ---------------------------------------------------------------------------

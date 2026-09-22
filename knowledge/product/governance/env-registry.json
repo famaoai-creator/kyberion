@@ -2806,6 +2806,16 @@
       "subsystem": "core"
     },
     {
+      "name": "KYBERION_RUN_ORIGIN",
+      "category": "runtime",
+      "type": "enum",
+      "enum": ["scheduled", "interactive", "agent"],
+      "required": false,
+      "subsystem": "observability",
+      "description": "Explicit run origin stamped on traces (metadata.origin) when set by a launcher, e.g. scheduled for the baseline-check janitor spawn and the Chronos daemon. Consulted right after VITEST/CI; unknown values are ignored.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_RUNTIME_SWEEP_INTERVAL_MS",
       "category": "tuning",
       "type": "number",
@@ -3534,6 +3544,15 @@
       "required": false,
       "description": "Optional path override for tool runtime registry path; keep it inside governed repository or runtime storage.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_TRACE_TEST_PERSIST",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Test-only opt-in: lets vitest exercise real trace persistence to the resolved logs/traces dir (normally skipped under VITEST to stop test traces from leaking into the checkout).",
+      "documented": true,
+      "subsystem": "observability"
     },
     {
       "name": "KYBERION_TRUST_PROXY",
