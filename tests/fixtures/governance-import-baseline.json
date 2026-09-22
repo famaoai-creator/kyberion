@@ -122,6 +122,7 @@
     "plugins/fixtures/skill-plugin-loader-official-fixture.mjs",
     "presence/displays/concierge/test/concierge-contract.test.ts",
     "presence/displays/concierge/test/front-desk-contract.test.ts",
+    "presence/displays/concierge/test/recording-consent-contract.test.ts",
     "scripts/agent_runtime_supervisor_daemon.test.ts",
     "scripts/capability_discovery.test.ts",
     "scripts/capability_discovery_entry.mjs",
