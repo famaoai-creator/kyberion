@@ -5,7 +5,7 @@ import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
-  safeExec,
+  safeExecShellScript,
   safeReaddir,
   safeWriteFile,
   validateUrl,
@@ -421,7 +421,8 @@ export class OpenRouterBackend implements ReasoningBackend {
         case 'list_directory':
           return JSON.stringify(safeReaddir(assertSafeRepositoryPath(String(args.path ?? ''))));
         case 'shell_exec':
-          return safeExec('bash', ['-lc', String(args.command ?? '')], {
+          return safeExecShellScript('bash', String(args.command ?? ''), {
+            login: true,
             cwd: pathResolver.rootDir(),
           });
         default:

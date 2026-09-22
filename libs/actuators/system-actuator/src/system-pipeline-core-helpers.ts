@@ -5,8 +5,9 @@ import {
   assertSafeRepositoryPath,
   safeReadFile,
   safeMkdir,
-  safeExec,
+  resolveUserLoginShell,
   safeExecResult,
+  safeExecShellScript,
   safeExistsSync,
   safeLstat,
   safeStat,
@@ -374,10 +375,15 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
         ...ctx,
         [params.export_as || 'last_capture']: await retry(
           async () =>
-            safeExec(getRegisteredEnvText('SHELL') || '/bin/zsh', ['-lc', resolve(params.cmd)], {
-              cwd: rootDir,
-              env: params.env || {},
-            }).trim(),
+            safeExecShellScript(
+              resolveUserLoginShell(getRegisteredEnvText('SHELL'), '/bin/zsh'),
+              resolve(params.cmd),
+              {
+                login: true,
+                cwd: rootDir,
+                env: params.env || {},
+              }
+            ).trim(),
           buildRetryOptions(params.retry)
         ),
       };

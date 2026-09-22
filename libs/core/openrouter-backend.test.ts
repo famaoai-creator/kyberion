@@ -6,12 +6,14 @@ import {
   buildOpenRouterBackendFromEnv,
   probeOpenRouterBackendAvailability,
 } from './openrouter-backend.js';
+import { safeExecShellScript } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 
 vi.mock('./secure-io.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./secure-io.js')>();
   return {
     ...actual,
-    safeExec: vi.fn(() => 'shell-ok'),
+    safeExecShellScript: vi.fn(() => 'shell-ok'),
     safeReadFile: vi.fn((filePath: string, options?: Parameters<typeof actual.safeReadFile>[1]) => {
       if (filePath.includes('reasoning-backend-policy.json'))
         return actual.safeReadFile(filePath, options);
@@ -148,6 +150,27 @@ describe('openrouter-backend', () => {
     });
 
     await expect(backend.prompt('Say hello')).rejects.toThrow('invalid chat completion response');
+  });
+
+  it('runs shell_exec through the dedicated bash login-shell script helper', async () => {
+    vi.mocked(safeExecShellScript).mockReturnValue('shell-ok');
+    const backend = new OpenRouterBackend({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: 'or-test-key',
+      model: 'openrouter/free',
+      toolsEnabled: true,
+      allowedTools: ['shell_exec'],
+    });
+    const result = await (
+      backend as unknown as {
+        handleToolCall(name: string, args: string): Promise<string>;
+      }
+    ).handleToolCall('shell_exec', JSON.stringify({ command: 'echo hi' }));
+    expect(result).toBe('shell-ok');
+    expect(safeExecShellScript).toHaveBeenCalledWith('bash', 'echo hi', {
+      login: true,
+      cwd: pathResolver.rootDir(),
+    });
   });
 
   it('rejects non-object tool arguments before a tool path is resolved', async () => {

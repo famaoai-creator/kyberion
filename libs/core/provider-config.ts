@@ -10,7 +10,8 @@ export type ProviderConfigRuntimeRole =
   | 'codex-default'
   | 'copilot-default'
   | 'cursor-default'
-  | 'opencode-default';
+  | 'opencode-default'
+  | 'devin-default';
 
 export interface ProviderLifecycleEntry {
   boot_command: string;
@@ -59,6 +60,7 @@ const RUNTIME_ROLE_PROVIDER_FALLBACK: Record<ProviderConfigRuntimeRole, string> 
   'copilot-default': 'copilot',
   'cursor-default': 'cursor',
   'opencode-default': 'opencode',
+  'devin-default': 'devin',
 };
 
 export function resolveRuntimeDefaultModelId(role: ProviderConfigRuntimeRole): string {

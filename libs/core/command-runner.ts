@@ -1,4 +1,4 @@
-import { safeExecResult } from './secure-io.js';
+import { safeExecResult, safeExecShellScriptResult, type SafeShell } from './secure-io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 export interface GovernedCommandOptions {
@@ -22,6 +22,19 @@ export function runGovernedCommand(
   options: GovernedCommandOptions = {}
 ): GovernedCommandResult {
   return safeExecResult(command, args, options);
+}
+
+/**
+ * Run an intentional shell script (`/bin/sh -c <script>`) through the
+ * dedicated secure-io shell-script boundary. runGovernedCommand rejects that
+ * shape; see safeExecShellScript for why the two are kept apart.
+ */
+export function runGovernedShellScript(
+  shell: SafeShell,
+  script: string,
+  options: GovernedCommandOptions = {}
+): GovernedCommandResult {
+  return safeExecShellScriptResult(shell, script, options);
 }
 
 export function runGovernedJsonCommand<T>(

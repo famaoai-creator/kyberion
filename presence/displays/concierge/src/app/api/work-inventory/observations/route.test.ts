@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-const guard = vi.hoisted(() => vi.fn(() => null));
+type GuardResponse = { status: number };
+const mutationGuard = vi.hoisted(() => vi.fn<() => GuardResponse | null>(() => null));
+const selfServiceGuard = vi.hoisted(() => vi.fn<() => GuardResponse | null>(() => null));
 const defaultViewer = () => ({
   context: {
     role: 'localadmin' as const,
@@ -25,7 +27,16 @@ const mocks = vi.hoisted(() => ({
   saveEntry: vi.fn(),
 }));
 
-vi.mock('../../../../lib/api-guard', () => ({ requireConciergeMutationAccess: guard }));
+vi.mock('../../../../lib/api-guard', () => ({ requireConciergeMutationAccess: mutationGuard }));
+vi.mock('../../../../lib/work-inventory-member', async () => {
+  const actual = await vi.importActual<typeof import('../../../../lib/work-inventory-member')>(
+    '../../../../lib/work-inventory-member'
+  );
+  return {
+    ...actual,
+    requireConciergeSelfServiceAccess: selfServiceGuard,
+  };
+});
 vi.mock('../../../../lib/viewer-context', async () => {
   const actual = await vi.importActual<typeof import('../../../../lib/viewer-context')>(
     '../../../../lib/viewer-context'
@@ -83,7 +94,8 @@ const summary = {
 describe('concierge work-inventory observations route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    guard.mockReturnValue(null);
+    mutationGuard.mockReturnValue(null);
+    selfServiceGuard.mockReturnValue(null);
     viewerResolution.value = defaultViewer();
   });
 
@@ -168,5 +180,67 @@ describe('concierge work-inventory observations route', () => {
     });
     const response = await POST(request({ action: 'discard', summary_id: 'WIO-x' }));
     expect(response.status).toBe(404);
+  });
+
+  // WI-18 (user decision 2026-09-22): a readonly-role token member may
+  // confirm/discard their own observation summary via the self-service
+  // guard, but `attach` still requires `requireConciergeMutationAccess`
+  // (localadmin/loopback only) — it mutates a shared work-inventory entry.
+  const readonlyViewer = () => ({
+    context: {
+      role: 'readonly' as const,
+      tenantSlugs: ['acme'] as string[],
+      organizationIds: 'all' as const,
+      projectIds: 'all' as const,
+      tierAccess: ['confidential', 'public'] as Array<'confidential' | 'public'>,
+      source: 'token' as const,
+      principalId: 'reader-token',
+      registrationLabel: 'reader-token',
+    },
+  });
+
+  it('POST confirm succeeds for a readonly-role token viewer resolved to an active member', async () => {
+    viewerResolution.value = readonlyViewer();
+    mocks.resolveMember.mockReturnValue({ member_id: 'member-a' });
+    mocks.confirm.mockReturnValue(summary);
+    const response = await POST(request({ action: 'confirm', summary_id: summary.summary_id }));
+    expect(response.status).toBe(200);
+    expect(mutationGuard).not.toHaveBeenCalled();
+  });
+
+  it('POST discard succeeds for a readonly-role token viewer resolved to an active member', async () => {
+    viewerResolution.value = readonlyViewer();
+    mocks.resolveMember.mockReturnValue({ member_id: 'member-a' });
+    mocks.discard.mockReturnValue(summary);
+    const response = await POST(request({ action: 'discard', summary_id: summary.summary_id }));
+    expect(response.status).toBe(200);
+    expect(mutationGuard).not.toHaveBeenCalled();
+  });
+
+  it('POST attach still requires mutation access — a readonly-role viewer is rejected', async () => {
+    viewerResolution.value = readonlyViewer();
+    mocks.resolveMember.mockReturnValue({ member_id: 'member-a' });
+    mutationGuard.mockReturnValue(
+      new Response(
+        JSON.stringify({ ok: false, error: 'Concierge mutation requires a localadmin viewer.' }),
+        { status: 403 }
+      )
+    );
+    const response = await POST(
+      request({ action: 'attach', summary_id: summary.summary_id, entry_id: 'WI-1' })
+    );
+    expect((response as Response).status).toBe(403);
+    expect(mocks.attach).not.toHaveBeenCalled();
+    expect(mutationGuard).toHaveBeenCalled();
+  });
+
+  it('honors a self-service guard denial (e.g. CSRF/rate-limit) before touching the domain layer', async () => {
+    selfServiceGuard.mockReturnValue(
+      new Response(JSON.stringify({ ok: false, error: 'Forbidden.' }), { status: 403 })
+    );
+    const response = await POST(request({ action: 'confirm', summary_id: summary.summary_id }));
+    expect((response as Response).status).toBe(403);
+    expect(mocks.resolveMember).not.toHaveBeenCalled();
+    expect(mocks.confirm).not.toHaveBeenCalled();
   });
 });

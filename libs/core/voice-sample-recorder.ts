@@ -4,7 +4,13 @@ import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { createVirtualAudioInputRecordingBridge } from './virtual-audio-input-recording-bridge.js';
 import { createVirtualDeviceInventoryBridge } from './virtual-device-inventory-bridge.js';
-import { assertSafeRepositoryPath, safeExec, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  resolveUserLoginShell,
+  safeExecShellScript,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { resolveVoicePath } from './voice-path-policy.js';
 import { clamp } from './foundation/text.js';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -327,7 +333,7 @@ export async function recordVoiceSample(
     };
   }
 
-  const shell = env.SHELL || '/bin/zsh';
+  const shell = resolveUserLoginShell(env.SHELL, '/bin/zsh');
   const command = interpolateCommand(commandTemplate, {
     output: shellQuote(outputPath),
     duration_sec: String(durationSec),
@@ -337,7 +343,8 @@ export async function recordVoiceSample(
     sample_id: shellQuote(sampleId),
     request_id: shellQuote(requestId),
   });
-  safeExec(shell, ['-lc', command], {
+  safeExecShellScript(shell, command, {
+    login: true,
     timeoutMs: Math.max(30_000, durationSec * 1000 + 15_000),
   });
 

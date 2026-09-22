@@ -105,6 +105,7 @@ const KNOWN_MODES = new Set<ReasoningBackendMode>([
   'copilot',
   'cursor-cli',
   'opencode-cli',
+  'devin-cli',
   'local',
   'ollama',
   'vllm',

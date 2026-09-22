@@ -3,7 +3,12 @@ import { withExecutionContext } from '@agent/core/authority';
 import { resolveMemberByPrincipal, type MemberProfile } from '@agent/core/member-registry';
 import type { WorkInventoryScope } from '@agent/core/work-inventory';
 import { WorkInventoryConsentError } from '@agent/core/work-inventory-consent';
-import { conciergeErrorResponse, type ConciergeViewerContext } from './viewer-context';
+import { authorizeSurfaceMutation } from '@agent/core/surface-mutation-guard';
+import {
+  conciergeErrorResponse,
+  guardConciergeRequest,
+  type ConciergeViewerContext,
+} from './viewer-context';
 import { frontDeskText, resolveConciergeLocale } from './i18n';
 
 /**
@@ -40,6 +45,45 @@ export function requireWorkInventoryMember(
       { status: 404 }
     ),
   };
+}
+
+/**
+ * WI-18 (user decision 2026-09-22,
+ * docs/developer/improvement-plans-2026-08/WORK_INVENTORY_PLAN_2026-09-22.ja.md
+ * §10): narrow self-service write gate for exactly two write shapes — a
+ * member's own recording consent (grant/revoke) and confirming/discarding
+ * their own observation summary. Every other Concierge self-service
+ * mutation — including `attach`, which updates a shared tenant/personal
+ * work-inventory entry — still requires `requireConciergeMutationAccess`
+ * (localadmin/loopback only). Do not reach for this function for anything
+ * else; it exists only to widen those two write shapes to read-only
+ * (`viewer` / server role `readonly`) members writing their own data.
+ *
+ * Applies the same CSRF/rate-limit posture as `requireConciergeMutationAccess`
+ * (`guardConciergeRequest` + `authorizeSurfaceMutation`), but skips its
+ * "bearer token must resolve to a localadmin viewer" check — any resolvable
+ * viewer, including a `readonly`-role token viewer, passes here as long as the
+ * request is same-origin (a client without an Origin header still gets the
+ * CSRF 403 from `authorizeSurfaceMutation`). The actual
+ * authorization is the member-resolution gate every caller already runs
+ * right after (`requireWorkInventoryMember`, backed by
+ * `resolveMemberByPrincipal`'s `status === 'active'` filter): an anonymous
+ * viewer still 401s there (via `resolveConciergeViewer`), and an unresolved
+ * or suspended member still 404s there. This function never accepts a
+ * client-supplied member id and has no role check of its own — it must
+ * never be used to widen access on any other route.
+ */
+export function requireConciergeSelfServiceAccess(req: NextRequest): NextResponse | null {
+  const rateLimitResponse = guardConciergeRequest(req);
+  if (rateLimitResponse) return rateLimitResponse;
+  const decision = authorizeSurfaceMutation({
+    url: req.url,
+    getHeader: (name) => req.headers.get(name),
+  });
+  if (!decision.ok) {
+    return NextResponse.json({ ok: false, error: decision.reason }, { status: decision.status });
+  }
+  return null;
 }
 
 /**

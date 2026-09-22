@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  safeExecResult: vi.fn(),
+  safeExecShellScriptResult: vi.fn(),
   secureFetch: vi.fn(),
   warn: vi.fn(),
 }));
@@ -11,7 +11,7 @@ vi.mock('@agent/core/secure-io', async () => {
     await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
   return {
     ...actual,
-    safeExecResult: mocks.safeExecResult,
+    safeExecShellScriptResult: mocks.safeExecShellScriptResult,
   };
 });
 
@@ -59,7 +59,7 @@ describe('step-hooks', () => {
 
   it('honours on_reject=warn for a rejected command hook', async () => {
     const { runStepHooks } = await import('./step-hooks.js');
-    mocks.safeExecResult.mockReturnValue({ status: 2, stdout: '', stderr: 'deny' });
+    mocks.safeExecShellScriptResult.mockReturnValue({ status: 2, stdout: '', stderr: 'deny' });
 
     const decision = await runStepHooks(
       [
@@ -76,6 +76,7 @@ describe('step-hooks', () => {
 
     expect(decision).toBe('continue');
     expect(mocks.warn).toHaveBeenCalled();
+    expect(mocks.safeExecShellScriptResult).toHaveBeenCalledWith('bash', 'exit 2', { login: true });
   });
 
   it('skips an after hook when on_reject=skip', async () => {

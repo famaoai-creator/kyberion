@@ -14,12 +14,14 @@ import {
 } from './openai-compatible-backend.js';
 import { delegateStructured } from './reasoning-backend.js';
 import { z } from 'zod';
+import { safeExecShellScript } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 
 vi.mock('./secure-io.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./secure-io.js')>();
   return {
     ...actual,
-    safeExec: vi.fn(() => 'shell-ok'),
+    safeExecShellScript: vi.fn(() => 'shell-ok'),
     safeReadFile: vi.fn(() => 'file contents'),
     safeReaddir: vi.fn(() => ['a.txt', 'b.txt']),
     safeWriteFile: vi.fn(),
@@ -432,6 +434,27 @@ describe('openai-compatible-backend', () => {
     const deltas: string[] = [];
     for await (const delta of backend.streamPrompt('malformed stream')) deltas.push(delta);
     expect(deltas).toEqual(['ok']);
+  });
+
+  it('runs shell_exec through the dedicated bash login-shell script helper', async () => {
+    vi.mocked(safeExecShellScript).mockReturnValue('shell-ok');
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'qwen2.5',
+      toolsEnabled: true,
+      allowedTools: ['shell_exec'],
+    });
+    const result = await (
+      backend as unknown as {
+        handleToolCall(name: string, args: string): Promise<string>;
+      }
+    ).handleToolCall('shell_exec', JSON.stringify({ command: 'echo hi' }));
+    expect(result).toBe('shell-ok');
+    expect(safeExecShellScript).toHaveBeenCalledWith('bash', 'echo hi', {
+      login: true,
+      cwd: pathResolver.rootDir(),
+    });
   });
 
   it('rejects non-object tool arguments before any tool side effect', async () => {

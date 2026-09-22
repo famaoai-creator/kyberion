@@ -11611,6 +11611,11 @@
         "ja": "取り込める業務がまだありません。",
         "qps-ploc": "⟦Ñő ẇőřķ ïŧėɱş ȧřė ȧṽȧïŀȧƀŀė ŧő ȧŧŧȧƈħ ŧő ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
+      "settings_recording_pending_attach_restricted": {
+        "en": "Attaching to a work item needs an owner or approver — ask one to attach it for you.",
+        "ja": "業務への取り込みはオーナーか承認者のみ行えます。取り込みを依頼してください。",
+        "qps-ploc": "⟦Ȧŧŧȧƈħïñɠ ŧő ȧ ẇőřķ ïŧėɱ ñėėḓş ȧñ őẇñėř őř ȧṗṗřőṽėř — ȧşķ őñė ŧő ȧŧŧȧƈħ ïŧ ƒőř ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
       "settings_recording_consent_granted": {
         "en": "Consent saved.",
         "ja": "同意を保存しました。",
