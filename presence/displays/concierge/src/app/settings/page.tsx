@@ -963,6 +963,9 @@ export default function SettingsPage() {
             key="recording"
             locale={locale}
             sectionRef={setSectionRef('recording')}
+            // WI-18: attach still needs an owner/approver viewer; grant,
+            // revoke, confirm, and discard are self-service for everyone.
+            canAttachToWorkItem={meViewing?.role !== 'viewer'}
             {...recordingConsent}
           />
         );
