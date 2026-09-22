@@ -207,6 +207,32 @@ describe('work inventory harvest (hermetic)', () => {
     ];
     fs.writeFileSync(path.join(tracesDir, 'traces-2026-09-20.jsonl'), lines.join('\n'));
 
+    // Pipeline definitions for origin resolution: demo-pipeline has no
+    // schedule (on demand), tenant-scope-test has an enabled schedule,
+    // window-excluded-test has a disabled schedule; browser-test has no file.
+    const pipelinesDir = path.join(fixtureRoot, 'pipelines');
+    fs.mkdirSync(pipelinesDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pipelinesDir, 'demo-pipeline.json'),
+      JSON.stringify({ pipeline_id: 'demo-pipeline', steps: [] })
+    );
+    fs.writeFileSync(
+      path.join(pipelinesDir, 'tenant-scope-test.json'),
+      JSON.stringify({
+        pipeline_id: 'tenant-scope-test',
+        schedule: { id: 'tenant-scope-hourly', cron: '0 * * * *' },
+        steps: [],
+      })
+    );
+    fs.writeFileSync(
+      path.join(pipelinesDir, 'window-excluded-test.json'),
+      JSON.stringify({
+        pipeline_id: 'window-excluded-test',
+        schedule: { id: 'off', cron: '0 * * * *', enabled: false },
+        steps: [],
+      })
+    );
+
     fs.writeFileSync(
       path.join(fixtureRoot, 'active/shared/runtime/feedback-loop/adhoc-pipeline-runs.json'),
       JSON.stringify(
@@ -377,6 +403,25 @@ describe('work inventory harvest (hermetic)', () => {
       });
     });
 
+    it('marks each signal with its origin from pipelines/<id>.json and the source kind', () => {
+      const signals = collectKyberionDemandSignals({
+        rootDir: fixtureRoot,
+        now: NOW,
+        since: new Date('2026-01-01T00:00:00.000Z'),
+        tenantSlug: 'tenant-a',
+        includeUnscoped: true,
+      });
+      const origin = (signature: string) => signals.find((s) => s.signature === signature)?.origin;
+      expect(origin('pipeline:demo-pipeline')).toBe('on_demand');
+      expect(origin('pipeline:tenant-scope-test')).toBe('scheduled');
+      expect(origin('pipeline:window-excluded-test')).toBe('on_demand'); // schedule disabled
+      expect(origin('browser-pipeline:browser-test')).toBe('unknown'); // no pipeline file
+      expect(origin('voice-actuator:speak_local')).toBe('unknown');
+      expect(origin('mission_run')).toBe('unknown');
+      expect(origin('adhoc_pipeline:pipelines/foo-adhoc.json')).toBe('on_demand');
+      expect(origin('intent:rotate-secret')).toBe('on_demand');
+    });
+
     it('sorts by count descending, then signature ascending', () => {
       const signals = collectKyberionDemandSignals({ rootDir: fixtureRoot, now: NOW });
       for (let i = 1; i < signals.length; i += 1) {
@@ -538,6 +583,7 @@ describe('work inventory harvest (hermetic)', () => {
           window_days: 28,
         },
       });
+      expect(updated.observations?.[0].digest).toContain('origin unknown');
       expect(updated.frequency).toEqual({ per: 'week', count: 9 });
       expect(updated.effort_minutes_per_run).toBe(42);
       expect(validateWorkInventoryEntry(updated).valid).toBe(true);
@@ -696,6 +742,35 @@ describe('work inventory harvest (hermetic)', () => {
     it('respects a custom minCount', () => {
       const drafts = suggestEntriesFromSignals(signals, [], { now: NOW, minCount: 5 });
       expect(drafts.map((d) => d.observations?.[0]?.ref)).toEqual(['intent:rotate-secret']);
+    });
+
+    it('skips scheduled signals by default and drafts them with includeScheduled', () => {
+      const scheduled: DemandSignal = {
+        signature: 'pipeline:baseline-check',
+        kind: 'pipeline',
+        count: 600,
+        first_at: '2026-08-25T00:00:00.000Z',
+        last_at: '2026-09-21T00:00:00.000Z',
+        per_week: 168,
+        failure_count: 0,
+        window_days: 28,
+        sample_refs: [],
+        origin: 'scheduled',
+      };
+      const onDemand: DemandSignal = { ...signals[0], origin: 'on_demand' };
+      const byDefault = suggestEntriesFromSignals([scheduled, onDemand], [], { now: NOW });
+      expect(byDefault.map((d) => d.observations?.[0]?.ref)).toEqual(['pipeline:demo-pipeline']);
+      expect(byDefault[0].observations?.[0].digest).toContain('origin on_demand');
+      expect(byDefault[0].observations?.[0].origin).toBe('on_demand');
+
+      const included = suggestEntriesFromSignals([scheduled, onDemand], [], {
+        now: NOW,
+        includeScheduled: true,
+      });
+      expect(included.map((d) => d.observations?.[0]?.ref).sort()).toEqual([
+        'pipeline:baseline-check',
+        'pipeline:demo-pipeline',
+      ]);
     });
 
     it('applies the given scope to every draft', () => {

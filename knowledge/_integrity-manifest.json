@@ -4909,6 +4909,12 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/hearing-scenarios.json",
+      "tier": "public",
+      "size": 2973,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/hybrid-development-flow.md",
       "tier": "public",
       "size": 1581,
@@ -6183,7 +6189,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 570960,
+      "size": 577438,
       "type": "json"
     },
     {
@@ -8716,6 +8722,12 @@
       "path": "product/schemas/health-thresholds.schema.json",
       "tier": "public",
       "size": 954,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/hearing-scenarios.schema.json",
+      "tier": "public",
+      "size": 2423,
       "type": "json"
     },
     {
@@ -11871,7 +11883,7 @@
     {
       "path": "product/schemas/work-inventory-entry.schema.json",
       "tier": "public",
-      "size": 8397,
+      "size": 8644,
       "type": "json"
     },
     {

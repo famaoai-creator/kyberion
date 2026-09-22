@@ -120,12 +120,16 @@ export interface WorkObservationMetrics {
   window_days?: number;
 }
 
+export type WorkObservationOrigin = 'scheduled' | 'on_demand' | 'unknown';
+
 export interface WorkInventoryObservation {
   source: WorkObservationSource;
   ref: string;
   observed_at: string;
   digest?: string;
   metrics?: WorkObservationMetrics;
+  /** Who started the observed runs (kyberion_trace): a declared schedule, on demand, or unknown. */
+  origin?: WorkObservationOrigin;
 }
 
 export interface WorkInventoryPromotion {

@@ -255,6 +255,11 @@
                 "minimum": 0
               }
             }
+          },
+          "origin": {
+            "type": "string",
+            "enum": ["scheduled", "on_demand", "unknown"],
+            "description": "Who started the observed runs: a declared schedule, a person/request (on demand), or unknown."
           }
         }
       }

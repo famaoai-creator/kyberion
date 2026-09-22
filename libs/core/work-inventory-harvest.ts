@@ -40,6 +40,7 @@ import {
   type WorkInventoryTaxonomy,
   type WorkStage,
   type WorkVerb,
+  type WorkObservationOrigin,
 } from './work-inventory.js';
 
 // ---------------------------------------------------------------------------
@@ -48,6 +49,14 @@ import {
 
 export type DemandSignalKind =
   'pipeline' | 'actuator_op' | 'mission' | 'adhoc_pipeline' | 'unhandled_intent';
+
+/**
+ * Who started the work: a system schedule (`pipelines/<id>.json` carries an
+ * enabled `schedule`), a human/agent on demand, or not determinable. Scheduled
+ * runs are system cadence, not human demand, so suggestions skip them by
+ * default (see `suggestEntriesFromSignals`).
+ */
+export type DemandSignalOrigin = WorkObservationOrigin;
 
 /**
  * A demand signal is an aggregate: how often and how long a piece of work
@@ -66,6 +75,11 @@ export interface DemandSignal {
   window_days: number;
   /** Up to 5 trace ids that contributed to this signal; empty for non-trace sources. */
   sample_refs: string[];
+  /**
+   * Set by `collectKyberionDemandSignals`. Optional so hand-built signals
+   * (tests, older callers) stay valid; absent is treated as `unknown`.
+   */
+  origin?: DemandSignalOrigin;
 }
 
 export interface CollectKyberionDemandSignalsOptions {
@@ -385,6 +399,64 @@ function collectUnhandledIntentSignals(
 }
 
 // ---------------------------------------------------------------------------
+// Origin (scheduled vs on-demand)
+// ---------------------------------------------------------------------------
+
+const PIPELINE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+function pipelineIdFromSignature(signature: string): string | undefined {
+  for (const prefix of ['pipeline:', 'browser-pipeline:']) {
+    if (signature.startsWith(prefix)) return signature.slice(prefix.length);
+  }
+  return undefined;
+}
+
+/**
+ * Reads `pipelines/<id>.json` under `rootDir` and reports `scheduled` when it
+ * declares a `schedule` whose `enabled` is not `false`, `on_demand` when the
+ * file exists without an active schedule, and `unknown` when there is no such
+ * pipeline file (e.g. a `browser-pipeline:<session>` span) or it is unreadable.
+ */
+function resolvePipelineOrigin(rootDir: string, pipelineId: string): DemandSignalOrigin {
+  if (!PIPELINE_ID_PATTERN.test(pipelineId) || pipelineId.includes('..')) return 'unknown';
+  const filePath = path.join(rootDir, 'pipelines', `${pipelineId}.json`);
+  try {
+    if (!safeExistsSync(filePath)) return 'unknown';
+    const parsed = parseSafeJsonInput(
+      String(safeReadFile(filePath, { encoding: 'utf8' })),
+      `pipeline ${pipelineId}`
+    );
+    if (!isRecord(parsed)) return 'unknown';
+    const schedule = parsed.schedule;
+    if (isRecord(schedule) && schedule.enabled !== false) return 'scheduled';
+    return 'on_demand';
+  } catch {
+    return 'unknown';
+  }
+}
+
+function assignOrigins(signals: DemandSignal[], rootDir: string): DemandSignal[] {
+  const pipelineOrigins = new Map<string, DemandSignalOrigin>(); // per-call lookup cache
+  return signals.map((signal) => {
+    let origin: DemandSignalOrigin = 'unknown';
+    if (signal.kind === 'adhoc_pipeline' || signal.kind === 'unhandled_intent') {
+      origin = 'on_demand';
+    } else if (signal.kind === 'pipeline') {
+      const pipelineId = pipelineIdFromSignature(signal.signature);
+      if (pipelineId) {
+        let cached = pipelineOrigins.get(pipelineId);
+        if (!cached) {
+          cached = resolvePipelineOrigin(rootDir, pipelineId);
+          pipelineOrigins.set(pipelineId, cached);
+        }
+        origin = cached;
+      }
+    }
+    return { ...signal, origin };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Public: collect
 // ---------------------------------------------------------------------------
 
@@ -392,7 +464,10 @@ function collectUnhandledIntentSignals(
  * Scans Kyberion's own usage logs (traces, ad-hoc pipeline ledger, unhandled
  * intent registry) and returns aggregate demand signals — never trace
  * attribute/event text, pipeline payloads, or intent utterance text — sorted
- * by `count` descending, then `signature` ascending.
+ * by `count` descending, then `signature` ascending. Every signal carries an
+ * `origin` (`pipeline:<id>` / `browser-pipeline:<id>` → looked up in
+ * `pipelines/<id>.json`; ad-hoc ledger and unhandled intents → `on_demand`;
+ * everything else → `unknown`).
  */
 export function collectKyberionDemandSignals(
   options: CollectKyberionDemandSignalsOptions = {}
@@ -400,11 +475,14 @@ export function collectKyberionDemandSignals(
   const rootDir = options.rootDir ?? pathResolver.rootDir();
   const { since, until, windowDays } = resolveWindow(options);
 
-  const signals: DemandSignal[] = [
-    ...collectTraceSignals(rootDir, since, until, windowDays, options),
-    ...collectAdhocLedgerSignals(rootDir, since, until, windowDays),
-    ...collectUnhandledIntentSignals(rootDir, since, until, windowDays),
-  ];
+  const signals: DemandSignal[] = assignOrigins(
+    [
+      ...collectTraceSignals(rootDir, since, until, windowDays, options),
+      ...collectAdhocLedgerSignals(rootDir, since, until, windowDays),
+      ...collectUnhandledIntentSignals(rootDir, since, until, windowDays),
+    ],
+    rootDir
+  );
 
   signals.sort((a, b) => b.count - a.count || a.signature.localeCompare(b.signature));
   return signals;
@@ -484,6 +562,7 @@ function digestForSignal(signal: DemandSignal): string {
     parts.push(`median ${Math.round(signal.median_duration_ms)}ms`);
   }
   if (signal.failure_count > 0) parts.push(`${signal.failure_count} failures`);
+  parts.push(`origin ${signal.origin ?? 'unknown'}`);
   return parts.join(', ');
 }
 
@@ -513,6 +592,7 @@ export function attachDemandSignals(
       ref: signal.signature,
       observed_at: signal.last_at,
       digest: digestForSignal(signal),
+      origin: signal.origin ?? 'unknown',
       metrics: {
         count: signal.count,
         per_week: signal.per_week,
@@ -538,6 +618,8 @@ export function attachDemandSignals(
 
 export interface SuggestEntriesFromSignalsOptions {
   minCount?: number;
+  /** Also draft entries for `scheduled` (system-cadence) signals. Default false. */
+  includeScheduled?: boolean;
   scope?: WorkInventoryScope;
   now?: Date;
 }
@@ -643,8 +725,9 @@ function buildDraftEntry(
 /**
  * Drafts a `WorkInventoryEntry` (status `draft`) for each signal with
  * `count >= minCount` (default 3) that no existing entry already matches
- * (per `matchSignalsToEntries`). `method` is always re-derived via
- * `applyClassification` — never assigned directly.
+ * (per `matchSignalsToEntries`). `scheduled` signals are system cadence, not
+ * human demand, and are skipped unless `includeScheduled` is set. `method` is
+ * always re-derived via `applyClassification` — never assigned directly.
  */
 export function suggestEntriesFromSignals(
   signals: DemandSignal[],
@@ -663,6 +746,7 @@ export function suggestEntriesFromSignals(
   }
 
   return signals
+    .filter((signal) => options.includeScheduled === true || signal.origin !== 'scheduled')
     .filter((signal) => signal.count >= minCount && !matchedSignatures.has(signal.signature))
     .map((signal) => buildDraftEntry(signal, scope, now, taxonomy));
 }
