@@ -25,6 +25,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import { resolveMemberByPrincipal } from '@agent/core/member-registry';
 import { FRONT_DESK_MENU, readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
+import { findHearingScenario } from '@agent/core/hearing-scenario-catalog';
 import { pathResolver, findMissionPath } from '@agent/core/path-resolver';
 import { loadState } from '@agent/core/mission-state';
 import {
@@ -176,6 +177,21 @@ export function registerHearingMissionRoutes(app: express.Express): void {
       ) as HearingRecordWithMissionHandoff | null;
       if (!record) {
         throw new HearingMissionRequestError(409, 'Hearing record does not exist yet.');
+      }
+
+      // WI-08: a scenario registered with `handoff: 'work_inventory'` in
+      // `hearing-scenarios.json` (e.g. `work_inventory`) never becomes a
+      // mission — it confirms into a work-inventory entry via
+      // `POST /api/hearing/:session/inventory` in `hearing-routes.ts`
+      // instead, which carries the matching refusal for `handoff: 'mission'`
+      // scenarios. An unregistered/legacy scenario id (no catalog entry)
+      // keeps today's behavior and is still handed off as a mission.
+      const scenarioDef = findHearingScenario(record.scenario);
+      if (scenarioDef?.handoff === 'work_inventory') {
+        throw new HearingMissionRequestError(
+          400,
+          'This hearing scenario is not handed off as a mission.'
+        );
       }
 
       const member = withExecutionContext('ecosystem_architect', () =>
