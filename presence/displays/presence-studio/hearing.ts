@@ -1,4 +1,5 @@
 import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract-parser';
+import { findHearingScenario } from '@agent/core/hearing-scenario-catalog';
 
 export interface HearingScenarioRequirement {
   id: string;
@@ -15,30 +16,32 @@ export interface HearingScenario {
   requirements: HearingScenarioRequirement[];
 }
 
-export const WEB_APP_HEARING_SCENARIO: HearingScenario = {
-  id: 'web_app_build',
-  requirements: [
-    {
-      id: 'audience',
-      label_key: 'front_desk:hearing_req_audience',
-      aliases: ['target', 'users', 'user'],
-    },
-    { id: 'problem', label_key: 'front_desk:hearing_req_problem', aliases: ['goal', 'use_case'] },
-    { id: 'core_flow', label_key: 'front_desk:hearing_req_core_flow', aliases: ['flow'] },
-    { id: 'content', label_key: 'front_desk:hearing_req_content' },
-    {
-      id: 'visual_direction',
-      label_key: 'front_desk:hearing_req_visual_direction',
-      aliases: ['visual'],
-    },
-    {
-      id: 'constraints',
-      label_key: 'front_desk:hearing_req_constraints',
-      aliases: ['constraint'],
-    },
-    { id: 'success', label_key: 'front_desk:hearing_req_success', aliases: ['acceptance'] },
-  ],
-};
+/** WI-08: pure `{id, requirements}` shape derived from the
+ * `hearing-scenarios.json` catalog entry (`libs/core/hearing-scenario-catalog.ts`)
+ * — the catalog is the single source of truth for the requirement set,
+ * `createHearingRecord`/`applyHearingTurn` only need this thin projection.
+ * Throws (via `findHearingScenario`/`loadHearingScenarios`'s governed-catalog
+ * validation) if the catalog is missing its `web_app_build` entry, the same
+ * way any other required catalog failing to load would surface. */
+function hearingScenarioFromCatalog(id: string): HearingScenario {
+  const entry = findHearingScenario(id);
+  if (!entry) {
+    throw new Error(
+      `[HEARING_SCENARIO_CATALOG_MISSING] no '${id}' entry in hearing-scenarios.json`
+    );
+  }
+  return {
+    id: entry.id,
+    requirements: entry.requirements.map(({ id: requirementId, label_key, aliases }) => ({
+      id: requirementId,
+      label_key,
+      ...(aliases ? { aliases } : {}),
+    })),
+  };
+}
+
+export const WEB_APP_HEARING_SCENARIO: HearingScenario =
+  hearingScenarioFromCatalog('web_app_build');
 
 export type HearingRequirementId = string;
 

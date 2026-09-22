@@ -865,7 +865,16 @@ describe('HT-06 i18n gate: hearing canvas + training help vocabulary', () => {
     ]) {
       expect(hearingTs).not.toContain(oldLabel);
     }
-    expect(hearingTs).toContain("label_key: 'front_desk:hearing_req_audience'");
+    // WI-08: the `web_app_build` requirement set (ids + `label_key`s) moved
+    // out of this literal source file into the governed
+    // `hearing-scenarios.json` catalog (`libs/core/hearing-scenario-catalog.ts`)
+    // — `WEB_APP_HEARING_SCENARIO` is now a thin constant derived from it, so
+    // the i18n-key assertion moves to the catalog data + the derivation call.
+    expect(hearingTs).toContain("hearingScenarioFromCatalog('web_app_build')");
+    const hearingScenariosJson = readRepoFile(
+      'knowledge/product/orchestration/hearing-scenarios.json'
+    );
+    expect(hearingScenariosJson).toContain('"front_desk:hearing_req_audience"');
     // The canvas's fixed chrome (title, heading, coverage, unanswered
     // fallback) is gone as raw text and resolved through `t()` instead.
     for (const oldText of [

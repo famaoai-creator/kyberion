@@ -3135,6 +3135,10 @@
       "types": "./dist/training-catalog.d.ts",
       "default": "./dist/training-catalog.js"
     },
+    "./hearing-scenario-catalog": {
+      "types": "./dist/hearing-scenario-catalog.d.ts",
+      "default": "./dist/hearing-scenario-catalog.js"
+    },
     "./work-inventory": {
       "types": "./dist/work-inventory.d.ts",
       "default": "./dist/work-inventory.js"

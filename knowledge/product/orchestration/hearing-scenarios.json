@@ -1,0 +1,98 @@
+{
+  "$schema": "../schemas/hearing-scenarios.schema.json",
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "id": "web_app_build",
+      "label_key": "front_desk:hearing_scenario_web_app_build_label",
+      "description_key": "front_desk:hearing_scenario_web_app_build_description",
+      "requirements": [
+        {
+          "id": "audience",
+          "label_key": "front_desk:hearing_req_audience",
+          "aliases": ["target", "users", "user"]
+        },
+        {
+          "id": "problem",
+          "label_key": "front_desk:hearing_req_problem",
+          "aliases": ["goal", "use_case"]
+        },
+        {
+          "id": "core_flow",
+          "label_key": "front_desk:hearing_req_core_flow",
+          "aliases": ["flow"]
+        },
+        {
+          "id": "content",
+          "label_key": "front_desk:hearing_req_content"
+        },
+        {
+          "id": "visual_direction",
+          "label_key": "front_desk:hearing_req_visual_direction",
+          "aliases": ["visual"]
+        },
+        {
+          "id": "constraints",
+          "label_key": "front_desk:hearing_req_constraints",
+          "aliases": ["constraint"]
+        },
+        {
+          "id": "success",
+          "label_key": "front_desk:hearing_req_success",
+          "aliases": ["acceptance"]
+        }
+      ],
+      "canvas": "web_app_preview",
+      "handoff": "mission"
+    },
+    {
+      "id": "work_inventory",
+      "label_key": "front_desk:hearing_scenario_work_inventory_label",
+      "description_key": "front_desk:hearing_scenario_work_inventory_description",
+      "requirements": [
+        {
+          "id": "task_name",
+          "label_key": "front_desk:hearing_req_task_name",
+          "aliases": ["task", "name", "title", "work"]
+        },
+        {
+          "id": "trigger",
+          "label_key": "front_desk:hearing_req_trigger",
+          "aliases": ["when", "kickoff", "trigger_event"]
+        },
+        {
+          "id": "frequency",
+          "label_key": "front_desk:hearing_req_frequency",
+          "aliases": ["cadence", "how_often"]
+        },
+        {
+          "id": "effort",
+          "label_key": "front_desk:hearing_req_effort",
+          "aliases": ["duration", "time_per_run"]
+        },
+        {
+          "id": "steps",
+          "label_key": "front_desk:hearing_req_steps",
+          "aliases": ["procedure", "flow", "steps_detail"]
+        },
+        {
+          "id": "systems",
+          "label_key": "front_desk:hearing_req_systems",
+          "aliases": ["tools", "system", "apps"]
+        },
+        {
+          "id": "decisions",
+          "label_key": "front_desk:hearing_req_decisions",
+          "aliases": ["approvals", "judgment", "decision_points"]
+        },
+        {
+          "id": "output",
+          "label_key": "front_desk:hearing_req_output",
+          "aliases": ["deliverable", "result", "handoff_to"]
+        }
+      ],
+      "canvas": "work_inventory_table",
+      "handoff": "work_inventory"
+    }
+  ]
+}

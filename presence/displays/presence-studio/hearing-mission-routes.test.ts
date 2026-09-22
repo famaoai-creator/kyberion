@@ -54,7 +54,13 @@ import { findMissionPath } from '@agent/core/path-resolver';
 import { loadState } from '@agent/core/mission-state';
 import type { MissionState } from '@agent/core/mission-types';
 import { listApprovalRequests } from '@agent/core/approval-store';
-import { applyHearingTurn, createHearingRecord, type HearingRecord } from './hearing.js';
+import { findHearingScenario } from '@agent/core/hearing-scenario-catalog';
+import {
+  applyHearingTurn,
+  createHearingRecord,
+  type HearingRecord,
+  type HearingScenario,
+} from './hearing.js';
 import { hearingNamespace, loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
 import { hearingMissionId, type MissionBrief } from './hearing-mission.js';
 import {
@@ -162,6 +168,40 @@ function decidedRecord(sessionId: string): HearingRecord {
   };
 }
 
+// WI-08: a `work_inventory`-handoff hearing record, built from the real
+// `hearing-scenarios.json` catalog entry (not mocked) — this scenario must
+// never reach the mission `/handoff` route.
+function workInventoryScenario(): HearingScenario {
+  const entry = findHearingScenario('work_inventory');
+  if (!entry) throw new Error('hearing-scenarios.json is missing its work_inventory entry');
+  return {
+    id: entry.id,
+    requirements: entry.requirements.map(({ id, label_key }) => ({ id, label_key })),
+  };
+}
+
+function decidedWorkInventoryRecord(sessionId: string): HearingRecord {
+  let record = createHearingRecord(sessionId, '2026-09-14T00:00:00.000Z', workInventoryScenario());
+  for (const item of record.requirements) {
+    record = applyHearingTurn(
+      record,
+      { text: `answer ${item.id}`, request_id: `turn-${item.id}` },
+      '2026-09-14T00:01:00.000Z',
+      workInventoryScenario()
+    );
+  }
+  return {
+    ...record,
+    decided_by: {
+      kind: 'human',
+      id: `user:${TEST_MEMBER_ID}`,
+      display_name: 'ZZ Mission Tester',
+      role: 'approver',
+    },
+    decided_at: '2026-09-14T00:02:00.000Z',
+  };
+}
+
 describe('hearing-mission-routes.ts route wiring', () => {
   it('registers POST /api/hearing/:session/handoff', () => {
     const { app, handlers } = createFakeApp();
@@ -228,6 +268,18 @@ describe('POST /api/hearing/:session/handoff', () => {
     const res = fakeResponse();
     handoff(fakeRequest({ params: { session: sessionId } }), res);
     expect(res.statusCode).toBe(403);
+    expect(safeExecResult).not.toHaveBeenCalled();
+  });
+
+  it('refuses with 400 a hearing scenario registered with handoff: work_inventory, before ever resolving a member', () => {
+    const sessionId = `sess-${randomUUID()}`;
+    saveHearingRecord(namespace, decidedWorkInventoryRecord(sessionId));
+
+    const res = fakeResponse();
+    handoff(fakeRequest({ params: { session: sessionId } }), res);
+    expect(res.statusCode).toBe(400);
+    expect((res.body as { ok: boolean }).ok).toBe(false);
+    expect(resolveMemberByPrincipal).not.toHaveBeenCalled();
     expect(safeExecResult).not.toHaveBeenCalled();
   });
 
