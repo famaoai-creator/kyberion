@@ -11,7 +11,14 @@
  */
 
 export type SettingsSectionId =
-  'profile' | 'members' | 'services' | 'voice' | 'notifications' | 'plugins' | 'advanced';
+  | 'profile'
+  | 'members'
+  | 'services'
+  | 'voice'
+  | 'notifications'
+  | 'recording'
+  | 'plugins'
+  | 'advanced';
 
 export interface SettingsReadinessItem {
   id: string;
@@ -25,6 +32,7 @@ export const SETTINGS_SECTION_ORDER: readonly SettingsSectionId[] = [
   'services',
   'voice',
   'notifications',
+  'recording',
   'plugins',
   'advanced',
 ];

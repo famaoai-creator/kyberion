@@ -42,6 +42,7 @@ describe('orderSectionsForFirstRun', () => {
       'profile',
       'members',
       'services',
+      'recording',
       'plugins',
     ]);
   });
@@ -63,5 +64,12 @@ describe('orderSectionsForFirstRun', () => {
     const order = orderSectionsForFirstRun(readiness);
     expect(order[0]).toBe('profile');
     expect(order.indexOf('members')).toBeGreaterThan(order.indexOf('profile'));
+  });
+
+  it('never surfaces "recording" ahead of others on its own — it has no diagnostic yet', () => {
+    const readiness = [incomplete('profile')];
+    const order = orderSectionsForFirstRun(readiness);
+    expect(order[0]).toBe('profile');
+    expect(order.indexOf('recording')).toBeGreaterThan(order.indexOf('profile'));
   });
 });
