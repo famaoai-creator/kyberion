@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "devin-cli",
+      "provider": "devin",
+      "module": "./reasoning-cli-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "input_modalities": ["text"]
+      },
+      "env_keys": [
+        "DEVIN_MODEL",
+        "DEVIN_PERMISSION_MODE",
+        "DEVIN_SANDBOX",
+        "KYBERION_DEVIN_CLI_BIN"
+      ]
+    }
+  ]
+}

@@ -167,6 +167,9 @@ export const BACKEND_CAPABILITY_PROFILES: Record<ReasoningBackendMode, BackendCa
   'grok-cli': cli('grok-cli', { native_subagent: true }),
   'cursor-cli': cli('cursor-cli', { session_continuity: false }),
   'opencode-cli': cli('opencode-cli', { session_continuity: false }),
+  // DevinCliReasoningBackend spawns a fresh `devin -p` per call — the CLI's
+  // `-c`/`--resume` session continuity is not used by the adapter.
+  'devin-cli': cli('devin-cli', { session_continuity: false }),
   'grok-api': api('grok-api', {
     input_modalities: ['text', 'image'],
     streaming: true,

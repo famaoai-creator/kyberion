@@ -9,7 +9,8 @@
     "xai": "grok-api",
     "cursor": "cursor-cli",
     "cursor-agent": "cursor-cli",
-    "opencode": "opencode-cli"
+    "opencode": "opencode-cli",
+    "devin": "devin-cli"
   },
   "allowed_modes": [
     "claude-cli",
@@ -24,6 +25,7 @@
     "copilot",
     "cursor-cli",
     "opencode-cli",
+    "devin-cli",
     "local",
     "ollama",
     "vllm",
@@ -141,6 +143,16 @@
       "env_any": ["OPENCODE_CLI", "OPENCODE_VERSION"],
       "provider": "opencode",
       "mode": "opencode-cli"
+    },
+    {
+      "env_any": [
+        "DEVIN_MODEL",
+        "DEVIN_PERMISSION_MODE",
+        "KYBERION_DEVIN_CLI_BIN",
+        "KYBERION_DEVIN_CLI_MODEL"
+      ],
+      "provider": "devin",
+      "mode": "devin-cli"
     }
   ],
   "provider_fallback_order": [
@@ -171,6 +183,10 @@
     {
       "provider": "opencode",
       "mode": "opencode-cli"
+    },
+    {
+      "provider": "devin",
+      "mode": "devin-cli"
     }
   ],
   "default_mode": "claude-cli",

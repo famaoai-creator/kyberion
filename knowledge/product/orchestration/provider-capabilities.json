@@ -482,6 +482,19 @@
         ]
       }
     },
+    "devin": {
+      "models": ["swe", "opus", "sonnet", "gpt", "codex", "gemini", "fusion"],
+      "capabilities": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
+      "modelCapabilities": {
+        "swe": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
+        "opus": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
+        "sonnet": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
+        "gpt": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
+        "codex": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
+        "gemini": ["reasoning", "planning", "analysis", "review", "code", "structured_json"],
+        "fusion": ["reasoning", "planning", "analysis", "review", "code", "structured_json"]
+      }
+    },
     "agy": {
       "models": [
         "Gemini 3.8 Flash (Medium)",
