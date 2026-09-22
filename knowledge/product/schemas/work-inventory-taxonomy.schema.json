@@ -15,8 +15,13 @@
     "scoring_defaults"
   ],
   "properties": {
-    "$schema": { "type": "string" },
-    "version": { "type": "string", "minLength": 1 },
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
     "stages": {
       "type": "array",
       "minItems": 7,
@@ -30,7 +35,10 @@
             "type": "string",
             "enum": ["trigger", "gather", "understand", "decide", "act", "verify", "record"]
           },
-          "description": { "type": "string", "minLength": 1 }
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -60,7 +68,10 @@
               "coordinate"
             ]
           },
-          "description": { "type": "string", "minLength": 1 },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
           "default_stage": {
             "type": "string",
             "enum": ["trigger", "gather", "understand", "decide", "act", "verify", "record"]
@@ -73,8 +84,37 @@
               "additionalProperties": false,
               "required": ["actuator"],
               "properties": {
-                "actuator": { "type": "string", "pattern": "^[a-z][a-z0-9-]*-actuator$" },
-                "op": { "type": "string", "minLength": 1 }
+                "actuator": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*-actuator$"
+                },
+                "op": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "keywords": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Free-text keyword lists (WI-04) used by the heuristic free-text decomposer to map a description fragment to this verb.",
+            "properties": {
+              "ja": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "en": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
               }
             }
           }
@@ -94,7 +134,10 @@
             "type": "string",
             "enum": ["api", "computer_operation", "ai_reasoning", "program", "human"]
           },
-          "description": { "type": "string", "minLength": 1 }
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -111,7 +154,41 @@
             "type": "string",
             "enum": ["external_send", "money", "personal_data", "irreversible", "approval"]
           },
-          "description": { "type": "string", "minLength": 1 }
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "keywords": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Free-text keyword lists used by the heuristic decomposer to detect this effect in a description fragment.",
+            "properties": {
+              "ja": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "en": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "only_with_verbs": {
+            "type": "array",
+            "description": "When set, the effect is detected only on steps whose verb is listed.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
         }
       }
     },
@@ -123,7 +200,10 @@
         "additionalProperties": false,
         "required": ["rule_id", "when", "assign", "rationale"],
         "properties": {
-          "rule_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "rule_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
           "when": {
             "type": "object",
             "additionalProperties": false,
@@ -165,7 +245,9 @@
                   "enum": ["trigger", "gather", "understand", "decide", "act", "verify", "record"]
                 }
               },
-              "system_has_api": { "type": "boolean" },
+              "system_has_api": {
+                "type": "boolean"
+              },
               "data_sensitivity_any": {
                 "type": "array",
                 "minItems": 1,
@@ -180,7 +262,10 @@
             "type": "string",
             "enum": ["api", "computer_operation", "ai_reasoning", "program", "human"]
           },
-          "rationale": { "type": "string", "minLength": 1 }
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -208,11 +293,21 @@
           "additionalProperties": false,
           "required": ["frequency", "effort", "automatable_ratio", "confidence", "risk_penalty"],
           "properties": {
-            "frequency": { "type": "number" },
-            "effort": { "type": "number" },
-            "automatable_ratio": { "type": "number" },
-            "confidence": { "type": "number" },
-            "risk_penalty": { "type": "number" }
+            "frequency": {
+              "type": "number"
+            },
+            "effort": {
+              "type": "number"
+            },
+            "automatable_ratio": {
+              "type": "number"
+            },
+            "confidence": {
+              "type": "number"
+            },
+            "risk_penalty": {
+              "type": "number"
+            }
           }
         },
         "risk_effect_penalty": {
@@ -220,11 +315,21 @@
           "additionalProperties": false,
           "required": ["money", "irreversible", "approval", "external_send", "personal_data"],
           "properties": {
-            "money": { "type": "number" },
-            "irreversible": { "type": "number" },
-            "approval": { "type": "number" },
-            "external_send": { "type": "number" },
-            "personal_data": { "type": "number" }
+            "money": {
+              "type": "number"
+            },
+            "irreversible": {
+              "type": "number"
+            },
+            "approval": {
+              "type": "number"
+            },
+            "external_send": {
+              "type": "number"
+            },
+            "personal_data": {
+              "type": "number"
+            }
           }
         },
         "method_automatable": {
@@ -232,11 +337,31 @@
           "additionalProperties": false,
           "required": ["api", "program", "ai_reasoning", "computer_operation", "human"],
           "properties": {
-            "api": { "type": "number", "minimum": 0, "maximum": 1 },
-            "program": { "type": "number", "minimum": 0, "maximum": 1 },
-            "ai_reasoning": { "type": "number", "minimum": 0, "maximum": 1 },
-            "computer_operation": { "type": "number", "minimum": 0, "maximum": 1 },
-            "human": { "type": "number", "minimum": 0, "maximum": 1 }
+            "api": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "program": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ai_reasoning": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "computer_operation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "human": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
           }
         },
         "observation_source_confidence": {
@@ -244,10 +369,26 @@
           "additionalProperties": false,
           "required": ["self_report", "kyberion_trace", "desktop_recording", "browser_recording"],
           "properties": {
-            "self_report": { "type": "number", "minimum": 0, "maximum": 1 },
-            "kyberion_trace": { "type": "number", "minimum": 0, "maximum": 1 },
-            "desktop_recording": { "type": "number", "minimum": 0, "maximum": 1 },
-            "browser_recording": { "type": "number", "minimum": 0, "maximum": 1 }
+            "self_report": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "kyberion_trace": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "desktop_recording": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "browser_recording": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
           }
         }
       }

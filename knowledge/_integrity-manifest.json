@@ -4227,7 +4227,7 @@
     {
       "path": "product/governance/work-inventory-taxonomy.json",
       "tier": "public",
-      "size": 11574,
+      "size": 12199,
       "type": "json"
     },
     {
@@ -11883,7 +11883,7 @@
     {
       "path": "product/schemas/work-inventory-taxonomy.schema.json",
       "tier": "public",
-      "size": 8744,
+      "size": 10946,
       "type": "json"
     },
     {
