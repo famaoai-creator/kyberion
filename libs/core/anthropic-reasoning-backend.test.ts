@@ -25,7 +25,7 @@ describe('AnthropicReasoningBackend', () => {
     expect(source).toContain("getRegisteredEnvText('MISSION_ID')");
   });
 
-  it('maps effort hints to extended-thinking budgets', async () => {
+  it('maps effort hints to output_config.effort with adaptive thinking (no budget_tokens)', async () => {
     const create = vi.fn().mockResolvedValue({
       content: [{ type: 'text', text: 'done' }],
     });
@@ -39,13 +39,50 @@ describe('AnthropicReasoningBackend', () => {
       } as any,
     });
 
-    const out = await backend.delegateTask('do it', 'ctx', { effort: 'high' });
+    const out = await backend.delegateTask('do it', 'ctx', { effort: 'low' });
     expect(out).toBe('done');
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        thinking: { type: 'enabled', budget_tokens: 4096 },
-      })
+    const params = create.mock.calls[0][0];
+    expect(params.thinking).toEqual({ type: 'adaptive' });
+    expect(params.output_config).toEqual({ effort: 'low' });
+  });
+
+  it('pins effort to high when unset, since Opus 5.5 defaults to medium', async () => {
+    const create = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+    const backend = new AnthropicReasoningBackend({
+      model: 'claude-opus-5-5',
+      client: { messages: { create, parse: vi.fn() } } as unknown as Anthropic,
+    });
+
+    await backend.delegateTask('do it');
+    expect(create.mock.calls[0][0].output_config).toEqual({ effort: 'high' });
+  });
+
+  it('keeps output_config.format when merging effort into structured calls', async () => {
+    const parse = vi.fn().mockResolvedValue({ parsed_output: { tasks: [] } });
+    const backend = new AnthropicReasoningBackend({
+      client: { messages: { create: vi.fn(), parse } } as unknown as Anthropic,
+    });
+
+    await backend.decomposeIntoTasks(
+      { requirementsDraft: {} } as unknown as Parameters<
+        AnthropicReasoningBackend['decomposeIntoTasks']
+      >[0],
+      { effort: 'medium' }
     );
+    const params = parse.mock.calls[0][0];
+    expect(params.output_config.effort).toBe('medium');
+    expect(params.output_config.format).toBeDefined();
+  });
+
+  it('omits effort for Haiku, which rejects it', async () => {
+    const create = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+    const backend = new AnthropicReasoningBackend({
+      model: 'claude-haiku-4-5-20251001',
+      client: { messages: { create, parse: vi.fn() } } as unknown as Anthropic,
+    });
+
+    await backend.delegateTask('do it', undefined, { effort: 'low' });
+    expect(create.mock.calls[0][0].output_config).toBeUndefined();
   });
 
   it('forwards delegation cancellation to the Anthropic SDK request options', async () => {

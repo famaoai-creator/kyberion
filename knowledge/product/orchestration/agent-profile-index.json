@@ -104,7 +104,7 @@
       ],
       "selection_hints": {
         "preferred_provider": "claude",
-        "preferred_modelId": "claude-opus-5"
+        "preferred_modelId": "claude-opus-5-5"
       },
       "provider_strategy": "preferred",
       "fallback_providers": ["codex", "gemini"]

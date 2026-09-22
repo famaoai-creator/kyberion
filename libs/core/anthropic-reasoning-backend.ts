@@ -365,19 +365,21 @@ const SimulationResultSchema = z.object({
   ),
 });
 
-function buildThinkingConfig(
-  effort?: AnthropicReasoningBackendOptions['effort']
-): { type: 'adaptive' } | { type: 'enabled'; budget_tokens: number } {
-  switch (effort) {
-    case 'low':
-      return { type: 'enabled', budget_tokens: 1024 };
-    case 'medium':
-      return { type: 'enabled', budget_tokens: 2048 };
-    case 'high':
-      return { type: 'enabled', budget_tokens: 4096 };
-    default:
-      return { type: 'adaptive' };
-  }
+/**
+ * Claude Opus 5.x / Fable 5.x accept only adaptive thinking — `budget_tokens`
+ * is rejected with a 400 — so depth is steered through `output_config.effort`.
+ */
+const ADAPTIVE_THINKING = { type: 'adaptive' } as const;
+
+/**
+ * Pinned rather than omitted: an omitted effort means `high` on Opus 5 but
+ * `medium` on Opus 5.5, so a default-model bump would silently lower depth.
+ */
+const DEFAULT_EFFORT: NonNullable<AnthropicReasoningBackendOptions['effort']> = 'high';
+
+/** Haiku 4.5 rejects `output_config.effort`; every other routed Claude model accepts it. */
+function modelSupportsEffort(model: string): boolean {
+  return !/haiku/i.test(model);
 }
 
 export class AnthropicReasoningBackend implements ReasoningBackend {
@@ -476,7 +478,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
   /** Semaphore-guarded wrapper around messages.parse — prevents concurrent 429s. */
   private async callParse(
     params: Parameters<typeof this.client.messages.parse>[0],
-    options?: Pick<ReasoningCallOptions, 'signal'>
+    options?: Pick<ReasoningCallOptions, 'signal' | 'effort'>
   ): Promise<Awaited<ReturnType<typeof this.client.messages.parse>>> {
     if (options?.signal?.aborted) {
       throw options.signal.reason instanceof Error
@@ -484,7 +486,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
         : new Error('[DELEGATION_CANCELLED] anthropic reasoning operation aborted');
     }
     assertReasoningEgressAllowed(this.name);
-    const budgeted = this.applyCompletionBudget(params);
+    const budgeted = this.applyCompletionBudget(this.applyEffort(params, options?.effort));
     const started = Date.now();
     try {
       const result = await llmSemaphore.run(() =>
@@ -503,13 +505,13 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
   /** Semaphore-guarded wrapper around messages.create (non-streaming). */
   private async callCreate(
     params: Parameters<typeof this.client.messages.create>[0] & { stream?: false },
-    options?: Pick<ReasoningCallOptions, 'signal'>
+    options?: Pick<ReasoningCallOptions, 'signal' | 'effort'>
   ): Promise<Anthropic.Message> {
     // The single outbound choke point for this backend. The SDK issues its own
     // HTTP, so `secureFetch`'s tier gate never sees these sends; checking here
     // is what keeps tenant material from reaching an unapproved provider.
     assertReasoningEgressAllowed(this.name);
-    const budgeted = this.applyCompletionBudget(params);
+    const budgeted = this.applyCompletionBudget(this.applyEffort(params, options?.effort));
     if (options?.signal?.aborted) {
       throw options.signal.reason instanceof Error
         ? options.signal.reason
@@ -531,8 +533,23 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     }
   }
 
-  private thinkingConfig(effort?: AnthropicReasoningBackendOptions['effort']) {
-    return buildThinkingConfig(effort ?? this.effort);
+  private thinkingConfig() {
+    return ADAPTIVE_THINKING;
+  }
+
+  /** Merge the resolved effort into `output_config`, keeping any `format` the call site set. */
+  private applyEffort<T extends { model: string; output_config?: object | null }>(
+    params: T,
+    effort?: AnthropicReasoningBackendOptions['effort']
+  ): T {
+    if (!modelSupportsEffort(params.model)) return params;
+    return {
+      ...params,
+      output_config: {
+        ...(params.output_config ?? {}),
+        effort: effort ?? this.effort ?? DEFAULT_EFFORT,
+      },
+    };
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -843,14 +860,17 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       .filter(Boolean)
       .join('\n');
 
-    const result = await this.callParse({
-      model: this.model,
-      max_tokens: this.maxTokens,
-      system: CACHED_SYSTEM_PROMPT_BLOCKS,
-      thinking: this.thinkingConfig(options?.effort),
-      messages: [{ role: 'user', content: userPrompt }],
-      output_config: { format: zodOutputFormat(DecomposedTaskPlanSchema) },
-    });
+    const result = await this.callParse(
+      {
+        model: this.model,
+        max_tokens: this.maxTokens,
+        system: CACHED_SYSTEM_PROMPT_BLOCKS,
+        thinking: this.thinkingConfig(),
+        messages: [{ role: 'user', content: userPrompt }],
+        output_config: { format: zodOutputFormat(DecomposedTaskPlanSchema) },
+      },
+      { effort: options?.effort }
+    );
 
     return result.parsed_output!;
   }
@@ -864,7 +884,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       {
         model: this.model,
         max_tokens: this.maxTokens,
-        thinking: this.thinkingConfig(options?.effort),
+        thinking: this.thinkingConfig(),
         messages: [
           {
             role: 'user',
@@ -947,17 +967,20 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       };
     });
 
-    const response = await this.callCreate({
-      model: this.model,
-      max_tokens: this.maxTokens,
-      // KD-08: same fixed system-prompt breakpoint as every other call site —
-      // see CACHED_SYSTEM_PROMPT_BLOCKS.
-      system: CACHED_SYSTEM_PROMPT_BLOCKS,
-      messages: applyCacheBreakpointToLastMessage([
-        { role: 'user' as const, content: [...blocks, { type: 'text' as const, text: prompt }] },
-      ]),
-      ...this.thinkingConfig(options?.effort),
-    });
+    const response = await this.callCreate(
+      {
+        model: this.model,
+        max_tokens: this.maxTokens,
+        // KD-08: same fixed system-prompt breakpoint as every other call site —
+        // see CACHED_SYSTEM_PROMPT_BLOCKS.
+        system: CACHED_SYSTEM_PROMPT_BLOCKS,
+        messages: applyCacheBreakpointToLastMessage([
+          { role: 'user' as const, content: [...blocks, { type: 'text' as const, text: prompt }] },
+        ]),
+        thinking: this.thinkingConfig(),
+      },
+      { effort: options?.effort }
+    );
 
     return response.content
       .filter((block): block is Anthropic.TextBlock => block.type === 'text')

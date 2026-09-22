@@ -1,5 +1,5 @@
 {
-  "model_id": "anthropic:claude-opus-5",
+  "model_id": "anthropic:claude-opus-5-5",
   "provider": "anthropic",
   "family": "claude-opus",
   "status": "approved",
@@ -18,5 +18,5 @@
   "multilingual_confidence": "high",
   "reasoning_confidence": "high",
   "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "deep_reasoning"],
-  "notes": "Previous-generation Opus, still served; superseded by claude-opus-5-5. Successor to claude-opus-4-8 at the same price band. Adaptive thinking is on by default (disabling it is rejected above effort=high)."
+  "notes": "Current Claude Opus (default for the claude provider). Successor to claude-opus-5 at a lower price ($4/$20 per MTok; 1M context, 128K output). Thinking cannot be disabled (effort is the only control; default effort is medium, not high), forced tool_choice any/tool returns 400, and computer use requires computer_toolset_20260801."
 }
