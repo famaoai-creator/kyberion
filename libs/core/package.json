@@ -3135,6 +3135,10 @@
       "types": "./dist/training-catalog.d.ts",
       "default": "./dist/training-catalog.js"
     },
+    "./work-inventory": {
+      "types": "./dist/work-inventory.d.ts",
+      "default": "./dist/work-inventory.js"
+    },
     "./agent-prompt-approval": {
       "types": "./dist/agent-prompt-approval.d.ts",
       "default": "./dist/agent-prompt-approval.js"

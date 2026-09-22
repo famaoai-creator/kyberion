@@ -1,0 +1,195 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "work-inventory-entry.schema.json",
+  "title": "Work Inventory Entry (work-inventory.v1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "entry_id",
+    "title",
+    "scope",
+    "trigger",
+    "steps",
+    "status",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": "work-inventory.v1" },
+    "entry_id": { "type": "string", "pattern": "^WI-[A-Za-z0-9_-]{3,80}$" },
+    "title": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_slug": { "type": "string", "minLength": 1 },
+        "organization_id": { "type": "string", "minLength": 1 },
+        "owner_member_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "description"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["schedule", "event", "request", "ad_hoc"] },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "frequency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["per", "count"],
+      "properties": {
+        "per": { "type": "string", "enum": ["day", "week", "month", "quarter", "year"] },
+        "count": { "type": "number", "minimum": 0 }
+      }
+    },
+    "effort_minutes_per_run": { "type": "number", "minimum": 0 },
+    "actors": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "systems": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step_id",
+          "stage",
+          "verb",
+          "description",
+          "data_sensitivity",
+          "effects",
+          "method"
+        ],
+        "properties": {
+          "step_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,40}$" },
+          "stage": {
+            "type": "string",
+            "enum": ["trigger", "gather", "understand", "decide", "act", "verify", "record"]
+          },
+          "verb": {
+            "type": "string",
+            "enum": [
+              "receive",
+              "search",
+              "read",
+              "input",
+              "transform",
+              "judge",
+              "create",
+              "operate",
+              "communicate",
+              "manage",
+              "record",
+              "coordinate"
+            ]
+          },
+          "description": { "type": "string", "minLength": 1 },
+          "system": { "type": "string", "minLength": 1 },
+          "data_sensitivity": {
+            "type": "string",
+            "enum": ["public", "internal", "confidential", "personal"]
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["external_send", "money", "personal_data", "irreversible", "approval"]
+            }
+          },
+          "method": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["assigned", "source", "rationale"],
+            "properties": {
+              "assigned": {
+                "type": "string",
+                "enum": ["api", "computer_operation", "ai_reasoning", "program", "human"]
+              },
+              "source": { "type": "string", "enum": ["rule", "proposal", "human_override"] },
+              "rule_id": { "type": "string", "minLength": 1 },
+              "rationale": { "type": "string", "minLength": 1 }
+            }
+          },
+          "binding": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actuator": { "type": "string", "minLength": 1 },
+              "op": { "type": "string", "minLength": 1 },
+              "pipeline_id": { "type": "string", "minLength": 1 },
+              "intent_id": { "type": "string", "minLength": 1 }
+            }
+          },
+          "requires_review": { "type": "boolean" }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "ref", "observed_at"],
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": ["self_report", "kyberion_trace", "desktop_recording", "browser_recording"]
+          },
+          "ref": { "type": "string", "minLength": 1 },
+          "observed_at": { "type": "string", "format": "date-time" },
+          "digest": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "confirmed", "candidate", "promoted", "retired"]
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "promoted_at", "decided_by"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["mission", "pipeline"] },
+        "ref": { "type": "string", "minLength": 1 },
+        "promoted_at": { "type": "string", "format": "date-time" },
+        "decided_by": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "const": "human" },
+            "id": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["measured_at", "runs", "minutes_saved_estimate", "failures", "source"],
+        "properties": {
+          "measured_at": { "type": "string", "format": "date-time" },
+          "runs": { "type": "number", "minimum": 0 },
+          "minutes_saved_estimate": { "type": "number", "minimum": 0 },
+          "failures": { "type": "number", "minimum": 0 },
+          "source": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

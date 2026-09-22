@@ -1,0 +1,356 @@
+{
+  "$schema": "../schemas/work-inventory-taxonomy.schema.json",
+  "version": "1.0.0",
+  "stages": [
+    {
+      "id": "trigger",
+      "description": "What starts the work: a schedule, event, or incoming request."
+    },
+    {
+      "id": "gather",
+      "description": "Collecting the inputs, documents, or data needed before acting."
+    },
+    {
+      "id": "understand",
+      "description": "Reading and interpreting the gathered information."
+    },
+    {
+      "id": "decide",
+      "description": "Judging what to do based on the understood information."
+    },
+    {
+      "id": "act",
+      "description": "Carrying out the decided action in a system or on data."
+    },
+    {
+      "id": "verify",
+      "description": "Checking the result of the action for correctness or completeness."
+    },
+    {
+      "id": "record",
+      "description": "Logging the outcome, decision, or evidence for later reference."
+    }
+  ],
+  "verbs": [
+    {
+      "id": "receive",
+      "description": "Accepting an inbound item (message, document, event) that starts or feeds the work.",
+      "default_stage": "trigger",
+      "candidate_bindings": [
+        {
+          "actuator": "presence-actuator",
+          "op": "receive_event"
+        },
+        {
+          "actuator": "ingest-actuator",
+          "op": "sync_source"
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "description": "Looking for information or items across a system, source, or knowledge base.",
+      "default_stage": "gather",
+      "candidate_bindings": [
+        {
+          "actuator": "wisdom-actuator",
+          "op": "knowledge_search"
+        },
+        {
+          "actuator": "browser-actuator",
+          "op": "pipeline"
+        }
+      ]
+    },
+    {
+      "id": "read",
+      "description": "Extracting the content or meaning of a specific document, image, or record.",
+      "default_stage": "understand",
+      "candidate_bindings": [
+        {
+          "actuator": "vision-actuator",
+          "op": "ocr_image"
+        },
+        {
+          "actuator": "wisdom-actuator",
+          "op": "knowledge_read"
+        },
+        {
+          "actuator": "ingest-actuator",
+          "op": "parse_document"
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "description": "Entering or submitting data into a system, form, or field.",
+      "default_stage": "act",
+      "candidate_bindings": [
+        {
+          "actuator": "browser-actuator",
+          "op": "computer_interaction"
+        },
+        {
+          "actuator": "service-actuator",
+          "op": "api"
+        }
+      ]
+    },
+    {
+      "id": "transform",
+      "description": "Converting, normalizing, or reshaping data from one form to another.",
+      "default_stage": "act",
+      "candidate_bindings": [
+        {
+          "actuator": "artifact-actuator",
+          "op": "write_json"
+        },
+        {
+          "actuator": "ingest-actuator",
+          "op": "normalize_card"
+        }
+      ]
+    },
+    {
+      "id": "judge",
+      "description": "Weighing information against criteria to reach a determination.",
+      "default_stage": "decide",
+      "candidate_bindings": [
+        {
+          "actuator": "wisdom-actuator",
+          "op": "reasoning"
+        },
+        {
+          "actuator": "approval-actuator",
+          "op": "evaluate_decision_rights"
+        }
+      ]
+    },
+    {
+      "id": "create",
+      "description": "Producing a new artifact, record, or item.",
+      "default_stage": "act",
+      "candidate_bindings": [
+        {
+          "actuator": "artifact-actuator",
+          "op": "write_json"
+        },
+        {
+          "actuator": "calendar-actuator",
+          "op": "create_event"
+        },
+        {
+          "actuator": "email-actuator",
+          "op": "create_draft"
+        }
+      ]
+    },
+    {
+      "id": "operate",
+      "description": "Manipulating a system's UI or controls to make it perform an action.",
+      "default_stage": "act",
+      "candidate_bindings": [
+        {
+          "actuator": "browser-actuator",
+          "op": "computer_interaction"
+        },
+        {
+          "actuator": "service-actuator",
+          "op": "cli"
+        }
+      ]
+    },
+    {
+      "id": "communicate",
+      "description": "Sending a message or notification to another person or system.",
+      "default_stage": "act",
+      "candidate_bindings": [
+        {
+          "actuator": "email-actuator",
+          "op": "send"
+        },
+        {
+          "actuator": "meeting-actuator",
+          "op": "speak"
+        }
+      ]
+    },
+    {
+      "id": "manage",
+      "description": "Keeping a system, list, or process up to date and in order.",
+      "default_stage": "verify",
+      "candidate_bindings": [
+        {
+          "actuator": "working-memory-actuator",
+          "op": "todo-add"
+        },
+        {
+          "actuator": "approval-actuator",
+          "op": "create"
+        }
+      ]
+    },
+    {
+      "id": "record",
+      "description": "Writing down the outcome, decision, or evidence of the work.",
+      "default_stage": "record",
+      "candidate_bindings": [
+        {
+          "actuator": "artifact-actuator",
+          "op": "append_event"
+        },
+        {
+          "actuator": "working-memory-actuator",
+          "op": "note"
+        }
+      ]
+    },
+    {
+      "id": "coordinate",
+      "description": "Aligning multiple people or systems around a shared action.",
+      "default_stage": "act",
+      "candidate_bindings": [
+        {
+          "actuator": "meeting-actuator",
+          "op": "join"
+        },
+        {
+          "actuator": "presence-actuator",
+          "op": "dispatch"
+        }
+      ]
+    }
+  ],
+  "methods": [
+    {
+      "id": "api",
+      "description": "A direct programmatic call to a connected system's API."
+    },
+    {
+      "id": "computer_operation",
+      "description": "A manual or automated interaction with a system's screen or UI because no API is available."
+    },
+    {
+      "id": "ai_reasoning",
+      "description": "An LLM interprets, judges, or drafts based on context."
+    },
+    {
+      "id": "program",
+      "description": "A deterministic script or pipeline step performs the transformation."
+    },
+    {
+      "id": "human",
+      "description": "A person performs or approves the step directly."
+    }
+  ],
+  "effects": [
+    {
+      "id": "external_send",
+      "description": "The step sends information outside the originating system or organization."
+    },
+    {
+      "id": "money",
+      "description": "The step moves, commits, or changes money."
+    },
+    {
+      "id": "personal_data",
+      "description": "The step touches personally identifiable information."
+    },
+    {
+      "id": "irreversible",
+      "description": "The step cannot be easily undone once taken."
+    },
+    {
+      "id": "approval",
+      "description": "The step requires an authorization decision."
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "effects-force-human",
+      "when": {
+        "effects_any": ["money", "irreversible", "approval"]
+      },
+      "assign": "human",
+      "rationale": "Steps with a money, irreversible, or approval effect always require direct human judgment or authorization, regardless of verb."
+    },
+    {
+      "rule_id": "api-verbs-with-system-api",
+      "when": {
+        "verbs": ["input", "operate", "communicate", "receive", "record", "coordinate", "search"],
+        "system_has_api": true
+      },
+      "assign": "api",
+      "rationale": "The target system already exposes an API, so a direct programmatic call is more reliable than screen interaction for this verb."
+    },
+    {
+      "rule_id": "no-api-ui-operation",
+      "when": {
+        "verbs": ["input", "operate", "communicate", "receive", "record", "coordinate", "search"],
+        "system_has_api": false
+      },
+      "assign": "computer_operation",
+      "rationale": "The system has no API integration, so input, operation, messaging, intake, record keeping, scheduling and search go through its UI (computer use)."
+    },
+    {
+      "rule_id": "reasoning-verbs",
+      "when": {
+        "verbs": ["read", "judge", "create"]
+      },
+      "assign": "ai_reasoning",
+      "rationale": "Reading, judging, or drafting content without a risk effect is well suited to LLM reasoning, subject to rule re-evaluation."
+    },
+    {
+      "rule_id": "transform-to-program",
+      "when": {
+        "verbs": ["transform"]
+      },
+      "assign": "program",
+      "rationale": "Deterministic data reshaping belongs in a typed program step rather than free-form reasoning or screen interaction."
+    },
+    {
+      "rule_id": "manage-to-program",
+      "when": {
+        "verbs": ["manage"]
+      },
+      "assign": "program",
+      "rationale": "Keeping a system or list up to date is a deterministic bookkeeping operation suited to a program step."
+    },
+    {
+      "rule_id": "fallback-to-human",
+      "when": {},
+      "assign": "human",
+      "rationale": "No declarative rule matched this step, so it defaults to human judgment until a rule is added to cover it."
+    }
+  ],
+  "review_effects": ["external_send", "personal_data"],
+  "scoring_defaults": {
+    "weights": {
+      "frequency": 1,
+      "effort": 1,
+      "automatable_ratio": 1,
+      "confidence": 1,
+      "risk_penalty": 1
+    },
+    "risk_effect_penalty": {
+      "money": 0.3,
+      "irreversible": 0.3,
+      "approval": 0.1,
+      "external_send": 0.1,
+      "personal_data": 0.2
+    },
+    "method_automatable": {
+      "api": 1,
+      "program": 1,
+      "ai_reasoning": 0.7,
+      "computer_operation": 0.6,
+      "human": 0
+    },
+    "observation_source_confidence": {
+      "self_report": 0.5,
+      "kyberion_trace": 0.9,
+      "desktop_recording": 0.8,
+      "browser_recording": 0.8
+    }
+  }
+}
