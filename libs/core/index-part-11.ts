@@ -139,3 +139,5 @@ export type {
 // storage for the business-inventory discovery stage (work-inventory.v1).
 export * from './work-inventory.js';
 export * from './work-inventory-scoring.js';
+export * from './work-inventory-consent.js';
+export * from './work-inventory-observation.js';

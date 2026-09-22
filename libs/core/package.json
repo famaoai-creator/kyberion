@@ -3143,6 +3143,14 @@
       "types": "./dist/work-inventory-scoring.d.ts",
       "default": "./dist/work-inventory-scoring.js"
     },
+    "./work-inventory-consent": {
+      "types": "./dist/work-inventory-consent.d.ts",
+      "default": "./dist/work-inventory-consent.js"
+    },
+    "./work-inventory-observation": {
+      "types": "./dist/work-inventory-observation.d.ts",
+      "default": "./dist/work-inventory-observation.js"
+    },
     "./agent-prompt-approval": {
       "types": "./dist/agent-prompt-approval.d.ts",
       "default": "./dist/agent-prompt-approval.js"
