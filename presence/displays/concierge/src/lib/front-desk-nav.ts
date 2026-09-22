@@ -40,7 +40,7 @@ export interface FrontDeskNavPayload {
   brand_tagline: string;
   aria_label: string;
   tenant_switch_aria: string;
-  role_labels: { owner: string; approver: string; viewer: string };
+  role_labels: { owner: string; approver: string; operator: string; viewer: string };
   tenant_viewing_summary: string;
   tenant_viewing_single: string;
 }
@@ -98,6 +98,7 @@ export function buildFrontDeskNavPayload(
     role_labels: {
       owner: tr('front_desk:role_owner'),
       approver: tr('front_desk:role_approver'),
+      operator: tr('front_desk:role_operator'),
       viewer: tr('front_desk:role_viewer'),
     },
     // Kept as un-interpolated templates (`{role}` / `{count}`) — the rail

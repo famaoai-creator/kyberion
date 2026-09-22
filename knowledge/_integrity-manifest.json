@@ -397,6 +397,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/external-identity-member-mapping.md",
+      "tier": "public",
+      "size": 9522,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/fidelity-refactoring-protocol.md",
       "tier": "public",
       "size": 1567,
@@ -6225,7 +6231,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 590987,
+      "size": 591136,
       "type": "json"
     },
     {
@@ -9417,7 +9423,7 @@
     {
       "path": "product/schemas/member-profile.schema.json",
       "tier": "public",
-      "size": 1757,
+      "size": 2472,
       "type": "json"
     },
     {

@@ -17,7 +17,7 @@ import {
   type ConciergeViewerContext,
 } from './viewer-context';
 import { ConciergeViewerError } from './viewer-context';
-import { authorizeSurfaceOperation } from '@agent/core/surface-authorization';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface-authn';
 
 const CONCIERGE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
   {
@@ -104,7 +104,7 @@ export function authorizeConciergeOperation(
     (candidate) => candidate.operation_id === operationId
   );
   if (!operation) throw new ConciergeViewerError(403, `unknown headless operation: ${operationId}`);
-  const decision = authorizeSurfaceOperation({
+  const decision = authorizeSurfaceContextOperation({
     context: toSurfaceAuthorizationContext(viewer),
     operation: {
       operationId: operation.operation_id,
@@ -113,6 +113,7 @@ export function authorizeConciergeOperation(
       requiredPermissions: operation.required_permissions,
     },
     resource,
+    surface: 'concierge',
   });
   if (!decision.allowed) throw new ConciergeViewerError(403, decision.reason);
 }

@@ -13,7 +13,7 @@
  */
 import { loadSurfaceManifest } from './surface-runtime.js';
 
-export type FrontDeskRole = 'owner' | 'approver' | 'viewer';
+export type FrontDeskRole = 'owner' | 'approver' | 'operator' | 'viewer';
 
 export type FrontDeskSurfaceId = 'presence-studio' | 'concierge';
 
@@ -88,11 +88,12 @@ export const DEFAULT_FRONT_DESK_PORTS: FrontDeskSurfacePorts = {
 
 const FRONT_DESK_ROLE_RANK: Record<FrontDeskRole, number> = {
   viewer: 0,
-  approver: 1,
-  owner: 2,
+  operator: 1,
+  approver: 2,
+  owner: 3,
 };
 
-/** Role ordering helper: owner >= approver >= viewer. */
+/** Role ordering helper: owner >= approver >= operator >= viewer. */
 export function frontDeskRoleAllows(role: FrontDeskRole, min: FrontDeskRole): boolean {
   return FRONT_DESK_ROLE_RANK[role] >= FRONT_DESK_ROLE_RANK[min];
 }

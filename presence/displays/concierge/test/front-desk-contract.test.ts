@@ -309,11 +309,12 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     const membersSection = read('src/app/settings/sections/MembersSection.tsx');
     const settingsPage = read('src/app/settings/page.tsx');
 
-    // In-process (no fetch to another surface), owner-gated the same way
-    // the assignment POST route is, reusing the pure catalog helper.
+    // In-process (no fetch to another surface), owner-gated per tenant the
+    // overview actually covers — a resolved member sees progress only for
+    // tenants where their membership is `owner` (F2).
     expect(progressRoute).toContain('resolveConciergeViewer');
-    expect(progressRoute).toContain('resolveConciergeFrontDeskRole');
-    expect(progressRoute).toContain("!== 'owner'");
+    expect(progressRoute).toContain('conciergeFrontDeskRoleForTenant');
+    expect(progressRoute).toContain("=== 'owner'");
     expect(progressRoute).toContain('summarizeTrainingProgress');
     expect(progressRoute).not.toContain('presenceStudioUrl');
 

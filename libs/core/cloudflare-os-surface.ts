@@ -194,7 +194,10 @@ function redactSurfaceObservationField(value: string, maxLength = 240): string {
 
 function requireHumanSurfaceActor(value: string): string {
   const normalized = String(value || '').trim();
-  if (!normalized.startsWith('human:')) {
+  // `user:<member_id>` is the canonical human actor id (actor.ts
+  // `humanActor`); `human:*` covers legacy synthetic labels already in
+  // recorded decisions.
+  if (!normalized.startsWith('user:') && !normalized.startsWith('human:')) {
     throw new Error('[POLICY_VIOLATION] Surface decisions require a human actor');
   }
   return normalized;

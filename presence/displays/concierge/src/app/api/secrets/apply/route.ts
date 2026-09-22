@@ -3,7 +3,10 @@ import { applySecretIntroduction } from '@agent/core/secret-introduction';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
-import { resolveConciergeDecidedBy } from '../../../../lib/front-desk-member';
+import {
+  conciergeDecisionDenied,
+  resolveConciergeDecidedBy,
+} from '../../../../lib/front-desk-member';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +14,10 @@ export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
   const resolved = resolveConciergeViewer(req);
-  const decidedBy = resolved.context ? resolveConciergeDecidedBy(resolved.context) : null;
+  if (resolved.response) return resolved.response;
+  const decisionDenied = conciergeDecisionDenied(resolved.context);
+  if (decisionDenied) return decisionDenied;
+  const decidedBy = resolveConciergeDecidedBy(resolved.context);
 
   try {
     const parsedBody = await readRequestObject(req, 'request body', [

@@ -5,11 +5,12 @@ import { logger } from '@agent/core/core';
 import {
   extractSurfaceBearerToken,
   narrowSurfaceViewerTenant,
-  resolveSurfaceViewerScope,
   SurfaceViewerScopeError,
   resolveSurfaceViewerToken,
   type SurfaceViewerScope,
 } from '@agent/core/surface-mutation-guard';
+import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface-authn';
+import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
 import type { EventScopeInput } from '@agent/core/event-scope';
@@ -200,6 +201,8 @@ export interface PresenceStudioViewerContext {
   principalId: string;
   tenantSlugs: string[] | 'all';
   source: 'loopback' | 'token';
+  /** The seam-resolved principal, when authn produced one (authz seam input). */
+  principal?: ResolvedPrincipal;
 }
 
 /** Held-action mutations are human operator actions, never readonly token actions. */
@@ -240,6 +243,8 @@ export function toSurfaceAuthorizationContext(
         : ['confidential', 'public'],
     principalId: viewer.principalId,
     source: viewer.source,
+    ...(viewer.principal ? { principal: viewer.principal } : {}),
+    ...(viewer.principal?.memberId ? { memberId: viewer.principal.memberId } : {}),
   };
 }
 
@@ -262,6 +267,7 @@ export function toFrontDeskViewerScope(viewer: PresenceStudioViewerContext): Sur
         : ['confidential', 'public'],
     source: viewer.source,
     principalId: viewer.principalId,
+    ...(viewer.principal?.memberId ? { memberId: viewer.principal.memberId } : {}),
   };
 }
 
@@ -352,13 +358,16 @@ export function resolvePresenceStudioViewerContext(
   const tenant = String(getRegisteredEnvText('KYBERION_TENANT') || '').trim();
   const local = isLoopbackAddress(getPresenceStudioClientAddress(req));
   try {
-    const scope = resolveSurfaceViewerScope({
+    const { scope, principal } = resolveAuthnSurfaceViewerScope({
       // A local request is the server-derived localadmin boundary even when a
       // stale or unrelated bearer header is present.
       token: local ? undefined : extractPresenceStudioToken(req),
       local,
       serverTenant: tenant,
       configuredCredentials: [{ token: getPresenceStudioAuthToken(), role: 'readonly' as const }],
+      // Legacy never consulted the chronos-access registry on this surface —
+      // null stops the registry-token provider from self-loading it.
+      registrations: null,
       allowLoopback: true,
       loopbackRole: 'localadmin',
       loopbackUsesServerTenant: true,
@@ -366,11 +375,13 @@ export function resolvePresenceStudioViewerContext(
         localadmin: 'human:presence-studio-localadmin',
         readonly: 'human:presence-studio-token',
       },
+      surface: 'presence-studio',
     });
     return {
       principalId: scope.principalId || 'human:presence-studio-token',
       tenantSlugs: scope.tenantSlugs,
       source: scope.source === 'loopback' ? 'loopback' : 'token',
+      principal,
     };
   } catch (error) {
     if (!(error instanceof SurfaceViewerScopeError)) throw error;

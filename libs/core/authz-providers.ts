@@ -138,7 +138,10 @@ const roleScopeProvider: AuthzProvider = {
       ...(query.operation.requiredRole ? { requiredRole: query.operation.requiredRole } : {}),
     };
     const result = authorizeSurfaceOperation({
-      context: principalToSurfaceContext(query.principal),
+      context: principalToSurfaceContext(
+        query.principal,
+        query.permissions ? { permissions: query.permissions } : undefined
+      ),
       operation,
       resource: query.resource,
     });
@@ -164,7 +167,8 @@ function resolveMember(
   const options = deps?.memberRegistry ?? {};
   try {
     if (principal.memberId) return readMemberProfile(principal.memberId, options);
-    if (principal.actor.kind === 'human') return resolveAccountableHuman(principal.actor.id, options);
+    if (principal.actor.kind === 'human')
+      return resolveAccountableHuman(principal.actor.id, options);
   } catch {
     return null;
   }
@@ -280,7 +284,9 @@ const memberMembershipProvider: AuthzProvider = {
     // on the principal's authenticated claims.
     const principalTenants = query.principal.tenantSlugs;
     const allowedTenants =
-      principalTenants === 'all' ? memberTenants : memberTenants.filter((slug) => principalTenants.includes(slug));
+      principalTenants === 'all'
+        ? memberTenants
+        : memberTenants.filter((slug) => principalTenants.includes(slug));
     const resource = query.resource ?? {};
     if (!scopeAllows(allowedTenants, resource.tenantSlug)) {
       return decision(
@@ -292,13 +298,31 @@ const memberMembershipProvider: AuthzProvider = {
       );
     }
     if (!scopeAllows(query.principal.organizationIds, resource.organizationId)) {
-      return decision(query, 'member-membership', false, 'organization_scope_denied', `organization scope denied for ${query.operation.operationId}`);
+      return decision(
+        query,
+        'member-membership',
+        false,
+        'organization_scope_denied',
+        `organization scope denied for ${query.operation.operationId}`
+      );
     }
     if (!scopeAllows(query.principal.projectIds, resource.projectId)) {
-      return decision(query, 'member-membership', false, 'project_scope_denied', `project scope denied for ${query.operation.operationId}`);
+      return decision(
+        query,
+        'member-membership',
+        false,
+        'project_scope_denied',
+        `project scope denied for ${query.operation.operationId}`
+      );
     }
     if (resource.tier && !query.principal.tierAccess.includes(resource.tier as OsKnowledgeTier)) {
-      return decision(query, 'member-membership', false, 'tier_scope_denied', `tier scope denied for ${query.operation.operationId}`);
+      return decision(
+        query,
+        'member-membership',
+        false,
+        'tier_scope_denied',
+        `tier scope denied for ${query.operation.operationId}`
+      );
     }
     return decision(query, 'member-membership', true, 'allowed', 'authorized');
   },
@@ -336,8 +360,7 @@ const AUTHZ_POLICY_SCHEMA_PATH = pathResolver.rootResolve(
 );
 
 export function authzPolicyPath(deps?: AuthzResolveDeps): string {
-  const explicit =
-    deps?.policyPath?.trim() || envText(deps, 'KYBERION_AUTHZ_POLICY_PATH')?.trim();
+  const explicit = deps?.policyPath?.trim() || envText(deps, 'KYBERION_AUTHZ_POLICY_PATH')?.trim();
   return assertSafeRepositoryPath(
     explicit || pathResolver.knowledge('product/governance/authz-policy.json'),
     { allowMissingLeaf: true }
@@ -383,7 +406,8 @@ function ruleMatches(rule: AuthzPolicyRule, query: AuthzQuery): boolean {
   if (
     rule.principals?.length &&
     !rule.principals.some(
-      (pattern) => matchPattern(pattern, principal.actor.id) || matchPattern(pattern, principal.principalId)
+      (pattern) =>
+        matchPattern(pattern, principal.actor.id) || matchPattern(pattern, principal.principalId)
     )
   ) {
     return false;

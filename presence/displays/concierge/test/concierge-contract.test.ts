@@ -36,6 +36,109 @@ describe('concierge surface contract', () => {
     }
   });
 
+  it('gates every decide-effect route on owner/approver membership role', () => {
+    // FD-10 wave 2 / review B4: once a member is resolved, decision effects
+    // must be positively allowed by that member's role for the viewed tenant
+    // — never by the flat viewer role alone.
+    const decideRoutes = [
+      'src/app/api/approvals/[id]/route.ts',
+      'src/app/api/outcomes/[id]/route.ts',
+      'src/app/api/memory-queue/[id]/route.ts',
+      'src/app/api/hygiene/[id]/route.ts',
+      'src/app/api/secrets/introduce/route.ts',
+      'src/app/api/secrets/apply/route.ts',
+      'src/app/api/plugins/[id]/route.ts',
+    ];
+    for (const route of decideRoutes) {
+      const source = fs.readFileSync(path.join(appDir, route), 'utf8');
+      expect(source, route).toContain('conciergeDecisionDenied');
+    }
+  });
+
+  it('resolves member roles only from the viewed tenant membership', () => {
+    // B1/B3 regression: member resolution consumes the authn-verified
+    // memberId, and a resolved member without a membership on the viewed
+    // tenant never inherits the localadmin -> owner fallback.
+    const memberLib = fs.readFileSync(path.join(appDir, 'src/lib/front-desk-member.ts'), 'utf8');
+    expect(memberLib).toContain('memberId: viewer.memberId');
+    expect(memberLib).toContain("resolved.membership?.role ?? 'viewer'");
+    // Decision roles recorded are restricted to owner/approver.
+    expect(memberLib).toContain("membership?.role === 'owner' || membership?.role === 'approver'");
+    // F1: an asserted member binding that fails to resolve (suspended or
+    // removed) is a hard deny — it never degrades into the unregistered
+    // legacy fallback that would *upgrade* a suspended localadmin-class
+    // credential to owner.
+    expect(memberLib).toContain("'member_denied'");
+    expect(memberLib).toContain('member binding could not be verified');
+  });
+
+  it('fails closed on viewer resolution and binds decisions to the resource tenant', () => {
+    // F3: a failed viewer resolution is a hard stop on every decide-effect
+    // route — no route may continue on the legacy concierge/sovereign
+    // identity once `resolveConciergeViewer` produced an error response.
+    const decideRoutes = [
+      'src/app/api/approvals/[id]/route.ts',
+      'src/app/api/outcomes/[id]/route.ts',
+      'src/app/api/memory-queue/[id]/route.ts',
+      'src/app/api/hygiene/[id]/route.ts',
+      'src/app/api/secrets/introduce/route.ts',
+      'src/app/api/secrets/apply/route.ts',
+      'src/app/api/plugins/[id]/route.ts',
+    ];
+    for (const route of decideRoutes) {
+      const source = fs.readFileSync(path.join(appDir, route), 'utf8');
+      expect(source, route).toContain('if (resolved.response) return resolved.response;');
+    }
+
+    // F2: tenant-bound decisions check the membership for the tenant the
+    // decision actually lands on — `tenantSlugs[0]` is never the authority.
+    const approvals = fs.readFileSync(
+      path.join(appDir, 'src/app/api/approvals/[id]/route.ts'),
+      'utf8'
+    );
+    expect(approvals).toContain('resourceTenant');
+    expect(approvals).toContain('conciergeDecisionDenied(resolved.context, resourceTenant)');
+    const outcomes = fs.readFileSync(
+      path.join(appDir, 'src/app/api/outcomes/[id]/route.ts'),
+      'utf8'
+    );
+    expect(outcomes).toContain('conciergeDecisionDenied(resolved.context, entry.tenant_slug)');
+    const memoryQueue = fs.readFileSync(
+      path.join(appDir, 'src/app/api/memory-queue/[id]/route.ts'),
+      'utf8'
+    );
+    expect(memoryQueue).toContain('candidate.scope?.tenant_slug');
+    const hygiene = fs.readFileSync(path.join(appDir, 'src/app/api/hygiene/[id]/route.ts'), 'utf8');
+    expect(hygiene).toContain('conciergeDecisionDenied(resolved.context, inquiry.tenant_slug)');
+
+    // F2: tenant-bound member writes (member create/role, training assign)
+    // gate on the tenant the write lands on, not the first scope tenant.
+    const memberLib = fs.readFileSync(path.join(appDir, 'src/lib/front-desk-member.ts'), 'utf8');
+    expect(memberLib).toContain('conciergeFrontDeskRoleForTenant');
+    const membersPost = fs.readFileSync(path.join(appDir, 'src/app/api/members/route.ts'), 'utf8');
+    expect(membersPost).toContain('conciergeFrontDeskRoleForTenant(viewer.context, tenantSlug)');
+    const membersPatch = fs.readFileSync(
+      path.join(appDir, 'src/app/api/members/[id]/route.ts'),
+      'utf8'
+    );
+    expect(membersPatch).toContain('conciergeFrontDeskRoleForTenant(viewer.context, tenantSlug)');
+    const trainingAssign = fs.readFileSync(
+      path.join(appDir, 'src/app/api/training/assignments/route.ts'),
+      'utf8'
+    );
+    expect(trainingAssign).toContain('conciergeFrontDeskRoleForTenant(resolved.context, tenant)');
+
+    // N3: client-supplied tenant parameters are intersected with the
+    // resolved viewer's own scope — never widened by the tenant registry.
+    const ingest = fs.readFileSync(path.join(appDir, 'src/app/api/ingest/route.ts'), 'utf8');
+    expect(ingest).toContain('resolved.context.tenantSlugs.includes(tenant)');
+    const configMissions = fs.readFileSync(
+      path.join(appDir, 'src/app/api/config-missions/route.ts'),
+      'utf8'
+    );
+    expect(configMissions).toContain('resolved.context.tenantSlugs.includes(tenant)');
+  });
+
   it('exposes the personal-secretary onboarding controls', () => {
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
     // FD-06 file split (KP gate: max-file-lines): each card's JSX now lives
@@ -534,7 +637,10 @@ describe('concierge surface contract', () => {
     expect(decisionRoute).toContain('loadApprovalRequest');
     expect(decisionRoute).toContain('decideApprovalRequest');
     expect(decisionRoute).toContain('refreshManagedPluginActivation');
-    expect(decisionRoute).toContain("decidedByRole: 'sovereign'");
+    // FD-10: the deciding member's real membership role is recorded; the
+    // 'sovereign' literal survives only as the unresolved-viewer fallback.
+    expect(decisionRoute).toContain('conciergeDecisionDenied');
+    expect(decisionRoute).toContain("decidedByRole: decidedBy?.role ?? 'sovereign'");
     expect(decisionRoute).toContain("decidedByType: 'human'");
     // Broken manifests stay permanently blocked — approving one is refused.
     expect(decisionRoute).toContain('blocked_broken_manifest');

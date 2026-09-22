@@ -21,12 +21,12 @@ import {
   resolveConciergeViewer,
   type ConciergeViewerContext,
 } from '../../../lib/viewer-context';
-import { resolveConciergeFrontDeskRole } from '../../../lib/front-desk-member';
+import { conciergeFrontDeskRoleForTenant } from '../../../lib/front-desk-member';
 import { frontDeskText, resolveConciergeLocale } from '../../../lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-const HUMAN_ROLES: readonly FrontDeskHumanRole[] = ['owner', 'approver', 'viewer'];
+const HUMAN_ROLES: readonly FrontDeskHumanRole[] = ['owner', 'approver', 'operator', 'viewer'];
 
 function isHumanRole(value: unknown): value is FrontDeskHumanRole {
   return typeof value === 'string' && (HUMAN_ROLES as readonly string[]).includes(value);
@@ -51,23 +51,12 @@ function toListItem(profile: MemberProfile): MemberListItem {
   };
 }
 
-function requireOwnerViewer(
+function requireViewer(
   req: NextRequest
 ):
   | { context: ConciergeViewerContext; response?: never }
   | { context?: never; response: NextResponse } {
-  const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
-  const resolved = resolveConciergeViewer(req);
-  if (resolved.response) return resolved;
-  if (resolveConciergeFrontDeskRole(resolved.context) !== 'owner') {
-    return {
-      response: NextResponse.json(
-        { ok: false, error: frontDeskText('settings_member_owner_only', locale) },
-        { status: 403 }
-      ),
-    };
-  }
-  return resolved;
+  return resolveConciergeViewer(req);
 }
 
 /** FD-07 「設定 › 組織とメンバー」member list. Any authenticated viewer may read it — the settings nav item itself already gates to owner. */
@@ -96,8 +85,8 @@ export function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
-  const owner = requireOwnerViewer(req);
-  if (owner.response) return owner.response;
+  const viewer = requireViewer(req);
+  if (viewer.response) return viewer.response;
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
 
   try {
@@ -126,6 +115,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { ok: false, error: frontDeskText('settings_member_invalid_input', locale) },
         { status: 400 }
+      );
+    }
+
+    // Owner authority is required on the tenant the member is being
+    // created for — not merely the first tenant in the viewer's scope
+    // (F2: a multi-tenant scope must not launder owner@A into writes on B).
+    if (conciergeFrontDeskRoleForTenant(viewer.context, tenantSlug) !== 'owner') {
+      return NextResponse.json(
+        { ok: false, error: frontDeskText('settings_member_owner_only', locale) },
+        { status: 403 }
       );
     }
 

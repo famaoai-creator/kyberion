@@ -12,11 +12,13 @@ import { parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import { readFrontDeskMe } from '@agent/core/front-desk-identity';
+import { memberBindingDenied, resolveMemberByPrincipal } from '@agent/core/member-registry';
 import {
   FRONT_DESK_HELP_LINK,
   frontDeskRoleFromViewer,
   readFrontDeskSurfacePorts,
   resolveFrontDeskMenu,
+  type FrontDeskRole,
 } from '@agent/core/front-desk-nav';
 import {
   loadPersonalAgentIdentityAtPath,
@@ -59,6 +61,7 @@ import {
   readPresenceStudioStringParam,
   summarizePresenceStudioIdentity,
   toFrontDeskViewerScope,
+  type PresenceStudioViewerContext,
 } from './security.js';
 import { presenceAvailableOperations } from './headless.js';
 import {
@@ -160,6 +163,100 @@ function findMatchingInboxEntry(
 // (`/api/conversation` is not in `security.ts`'s remote-safe allowlist).
 const ASK_CONVERSATION_VOICE_HUB_TIMEOUT_MS = 3000;
 
+/** Membership-aware rail role (B1): a resolved member's viewed-tenant
+ * membership role gates nav items; a member with no membership on that
+ * tenant is a viewer, and an unresolved principal keeps the flat
+ * viewer-scope mapping. */
+function resolvePresenceStudioNavRole(viewer: PresenceStudioViewerContext): FrontDeskRole {
+  const input = {
+    principalId: viewer.principalId,
+    source: viewer.source,
+    registrationLabel: viewer.principal?.registrationLabel,
+    memberId: viewer.principal?.memberId,
+  };
+  let member = null;
+  let bindingDenied = false;
+  try {
+    member = withExecutionContext('ecosystem_architect', () => resolveMemberByPrincipal(input));
+    bindingDenied =
+      !member && withExecutionContext('ecosystem_architect', () => memberBindingDenied(input));
+  } catch {
+    member = null;
+    // Unreadable registry: an asserted binding (memberId or label) cannot
+    // be disproven — fail closed.
+    bindingDenied = Boolean(viewer.principal?.memberId || viewer.principal?.registrationLabel);
+  }
+  if (bindingDenied) return 'viewer';
+  if (member) {
+    const tenant = viewer.tenantSlugs !== 'all' ? viewer.tenantSlugs[0] : undefined;
+    if (tenant) {
+      return member.memberships.find((item) => item.tenant_slug === tenant)?.role ?? 'viewer';
+    }
+  }
+  return frontDeskRoleFromViewer({ role: toFrontDeskViewerScope(viewer).role });
+}
+
+/** FD-10/F4: the member actor behind a recorded decision on this surface.
+ * Loopback resolves to the provisioned owner member, a member-bound token
+ * to its own member — attribution is always `user:<member_id>` once a
+ * member resolves. An asserted member binding that fails to resolve is a
+ * hard 403 (never the synthetic principal id), and the membership on the
+ * tenant the decision lands on must be owner/approver. Only a genuinely
+ * unregistered principal keeps the legacy `principalId` attribution. */
+function resolvePresenceStudioDecisionActor(
+  viewer: PresenceStudioViewerContext,
+  resourceTenant?: string
+): { actorId: string; role?: 'owner' | 'approver' } {
+  const input = {
+    principalId: viewer.principalId,
+    source: viewer.source,
+    registrationLabel: viewer.principal?.registrationLabel,
+    memberId: viewer.principal?.memberId,
+  };
+  let member = null;
+  let bindingDenied = Boolean(viewer.principal?.memberId);
+  try {
+    member = withExecutionContext('ecosystem_architect', () => resolveMemberByPrincipal(input));
+    if (!member) {
+      // A label-bound token matching a suspended member's
+      // access_registrations is denied too — "unregistered" would be an
+      // upgrade for a localadmin-class credential.
+      bindingDenied =
+        bindingDenied ||
+        withExecutionContext('ecosystem_architect', () => memberBindingDenied(input));
+    }
+  } catch {
+    member = null;
+    // Unreadable registry: an asserted binding cannot be disproven.
+    bindingDenied = bindingDenied || Boolean(viewer.principal?.registrationLabel);
+  }
+  if (!member) {
+    if (bindingDenied) {
+      throw new PresenceStudioViewerError(403, 'member binding could not be verified');
+    }
+    return { actorId: viewer.principalId };
+  }
+  const isDecisionCapable = (role?: string) => role === 'owner' || role === 'approver';
+  if (resourceTenant) {
+    const role = member.memberships.find((item) => item.tenant_slug === resourceTenant)?.role;
+    if (!isDecisionCapable(role)) {
+      throw new PresenceStudioViewerError(403, 'this member role cannot record decisions');
+    }
+    return { actorId: `user:${member.member_id}`, role: role as 'owner' | 'approver' };
+  }
+  if (
+    member.memberships.length === 0 ||
+    member.memberships.some((item) => !isDecisionCapable(item.role))
+  ) {
+    throw new PresenceStudioViewerError(403, 'this member role cannot record decisions');
+  }
+  const roles = new Set(member.memberships.map((item) => item.role));
+  return {
+    actorId: `user:${member.member_id}`,
+    role: roles.size === 1 ? (member.memberships[0].role as 'owner' | 'approver') : 'approver',
+  };
+}
+
 export function registerFrontDeskRoutes(app: express.Express): void {
   // FD-01: unified `GET /api/me` — see FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md
   // §2.4. Tenant profiles live under the personal tier, so the read runs
@@ -193,7 +290,7 @@ export function registerFrontDeskRoutes(app: express.Express): void {
     try {
       const viewer = resolvePresenceStudioViewerContext(req);
       const locale = normalizeLocale(readSurfaceStringParam(req.query.locale)) ?? 'en';
-      const role = frontDeskRoleFromViewer({ role: toFrontDeskViewerScope(viewer).role });
+      const role = resolvePresenceStudioNavRole(viewer);
       const items = resolveFrontDeskMenu({
         currentSurface: 'presence-studio',
         ports: readFrontDeskSurfacePorts(),
@@ -223,6 +320,7 @@ export function registerFrontDeskRoutes(app: express.Express): void {
         role_labels: {
           owner: catalogT('front_desk:role_owner', undefined, locale),
           approver: catalogT('front_desk:role_approver', undefined, locale),
+          operator: catalogT('front_desk:role_operator', undefined, locale),
           viewer: catalogT('front_desk:role_viewer', undefined, locale),
         },
         tenant_viewing_summary: catalogT('front_desk:tenant_viewing_summary', undefined, locale),
@@ -477,18 +575,27 @@ export function registerFrontDeskRoutes(app: express.Express): void {
       const viewer = resolvePresenceStudioViewerContext(req);
       requirePresenceStudioLocalAdmin(viewer);
       const { status, note } = parsed.data;
+      // The verdict lands on the entry's tenant — the member's role is
+      // checked against THAT tenant, never the first scope entry (F2/F4).
+      const entry = withExecutionContext('ecosystem_architect', () =>
+        listInboxEntries({}).find((item) => item.entry_id === entryId)
+      );
+      if (!entry) {
+        return res.status(404).json({ ok: false, error: `deliverable not found: ${entryId}` });
+      }
+      const actor = resolvePresenceStudioDecisionActor(viewer, entry.tenant_slug);
       const updated =
         status === 'accepted'
           ? acceptInboxEntryWithHumanReceipt({
               entryId,
-              actorId: viewer.principalId,
+              actorId: actor.actorId,
               authenticated: true,
               authMethod: 'surface_session',
               responsibilityStatement: 'I accept this deliverable on behalf of the operator.',
             })
           : markInboxEntry(entryId, 'rejected', {
               verdictNote: note,
-              reviewedBy: viewer.principalId,
+              reviewedBy: actor.actorId,
             });
       if (!updated) {
         logger.warn(

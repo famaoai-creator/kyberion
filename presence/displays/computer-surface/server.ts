@@ -1,10 +1,8 @@
 import express from 'express';
 import { createServer } from 'node:http';
 import * as path from 'node:path';
-import {
-  assertSurfaceOperation,
-  type SurfaceAuthorizationContext,
-} from '@agent/core/surface-authorization';
+import { type SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface-authn';
 import {
   buildComputerSurfaceManifest,
   filterHeadlessManifestForViewer,
@@ -122,22 +120,22 @@ function authorizeSurface(
     return null;
   }
 
-  try {
-    assertSurfaceOperation({
-      context,
-      operation: {
-        operationId: operation.operation_id,
-        effect: operation.effect,
-        requiredRole: operation.required_role,
-        requiredPermissions: operation.required_permissions,
-      },
-      resource: { ...computerSurfaceServerTenantResource(context), ...resource },
-    });
-    return context;
-  } catch (error) {
-    res.status(403).json(computerSurfaceWireError(error, 403));
+  const authorization = authorizeSurfaceContextOperation({
+    context,
+    operation: {
+      operationId: operation.operation_id,
+      effect: operation.effect,
+      requiredRole: operation.required_role,
+      requiredPermissions: operation.required_permissions,
+    },
+    resource: { ...computerSurfaceServerTenantResource(context), ...resource },
+    surface: 'computer-surface',
+  });
+  if (!authorization.allowed) {
+    res.status(403).json(computerSurfaceWireError(authorization.reason, 403));
     return null;
   }
+  return context;
 }
 
 const state: {
