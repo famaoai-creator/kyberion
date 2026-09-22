@@ -458,6 +458,35 @@
       ]
     },
     {
+      "intent_id": "inventory-work",
+      "canonical_flow": [
+        "intent normalization",
+        "work description capture (hearing scenario=work_inventory or pnpm inventory add)",
+        "step decomposition and rule-based execution-method classification",
+        "demand harvest from trace/repeat-run/unhandled-intent signals",
+        "candidate ranking and calibration",
+        "human promotion decision"
+      ],
+      "contract_layers": [
+        "task_session",
+        "work_inventory_entry",
+        "work_inventory_taxonomy",
+        "work_inventory_calibration"
+      ],
+      "primary_outcome_ids": ["work_inventory_entry", "work_inventory_candidate_ranking"],
+      "evidence": ["work inventory entry", "candidate ranking"],
+      "completion_criteria": [
+        "work title and trigger resolve",
+        "work inventory entry is stored under the member's or tenant's governed work-inventory path",
+        "steps carry a rule-classified execution method with rationale",
+        "candidate ranking is returned when harvested or self-reported observations exist"
+      ],
+      "follow_up": [
+        "confirmed entry can be promoted via the alignment gate into a mission or pipeline:promote",
+        "promoted entry outcomes feed back into calibration and the organization learning queue"
+      ]
+    },
+    {
       "intent_id": "evolve-agent-harness",
       "canonical_flow": [
         "intent normalization",

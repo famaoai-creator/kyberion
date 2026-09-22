@@ -525,6 +525,33 @@
       }
     },
     {
+      "intent_id": "inventory-work",
+      "category": "knowledge_lifecycle",
+      "legacy_category": "surface",
+      "target": "knowledge",
+      "action": "review",
+      "object": "work_inventory",
+      "exposed_to_surface": true,
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "workflow_template": "coordinated-multi-track",
+      "team_template": "development",
+      "risk_profile": "review_required",
+      "outcome_ids": ["work_inventory_entry", "work_inventory_candidate_ranking"],
+      "actuator_requirements": ["wisdom-actuator", "modeling-actuator"],
+      "readiness_required": [
+        "knowledge-tier-hygiene",
+        "reasoning-backend",
+        "kyberion-runtime-baseline"
+      ],
+      "evidence_required": ["execution-receipt", "delivery-pack"],
+      "reasoning_requirements": {
+        "mode": "multi_step_reasoning",
+        "capability_tags": ["multi_step_reasoning", "structured_output"],
+        "fallback_allowed": false
+      }
+    },
+    {
       "intent_id": "contract-review",
       "category": "knowledge_lifecycle",
       "legacy_category": "surface",

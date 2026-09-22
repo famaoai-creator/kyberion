@@ -223,6 +223,22 @@
       "gaps": []
     },
     {
+      "intent_id": "inventory-work",
+      "status": "implemented",
+      "entry_path": "task-session classifier / hearing (mode=hearing&scenario=work_inventory) / pnpm inventory",
+      "execution_shape": "task_session",
+      "outcome_ids": ["work_inventory_entry", "work_inventory_candidate_ranking"],
+      "execution_path": [
+        "task-session classifier",
+        "work-inventory decompose (rule-classified steps)",
+        "work-inventory harvest (trace/repeat-run/unhandled-intent demand signals)",
+        "work-inventory scoring and calibration"
+      ],
+      "gaps": [
+        "storage-retention-catalog.json cannot express per-file status (pending_review vs confirmed) for knowledge/personal/members/<id>/work-inventory/observations, so unconfirmed observation summaries do not auto-expire at ~30d; only human review_required is enforced today"
+      ]
+    },
+    {
       "intent_id": "evolve-agent-harness",
       "status": "implemented",
       "entry_path": "task-session classifier",
