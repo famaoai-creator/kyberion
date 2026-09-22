@@ -56,6 +56,8 @@ import {
   reviewRequiredCatalogPaths,
   runtimeRetentionRules,
   coveredRuntimeSubdirs,
+  catalogStatusRules,
+  statusRulePatternToRegex,
   BUILTIN_RETENTION_DEFAULTS,
   RETENTION_DAY_MS,
 } from './storage-retention-catalog.js';
@@ -169,6 +171,177 @@ describe('storage-retention-catalog', () => {
       const ajv = new Ajv({ allErrors: true });
       const validate = ajv.compile(schema);
       expect(validate({ version: '1.0.0', entries: [...BUILTIN_RETENTION_DEFAULTS] })).toBe(true);
+    });
+  });
+
+  describe('WI-16: status_rules vocabulary', () => {
+    it('the seeded catalog declares the two work-inventory-observation status rules on knowledge/personal/members', () => {
+      const loaded = loadRetentionCatalog({ catalogPath: SEEDED_CATALOG });
+      const rules = catalogStatusRules(loaded).filter(
+        ({ entry }) => entry.path === 'knowledge/personal/members'
+      );
+      expect(rules.map(({ rule }) => rule.id).sort()).toEqual([
+        'wi-observation-discarded-expiry',
+        'wi-observation-pending-review-expiry',
+      ]);
+      const pending = rules.find(
+        ({ rule }) => rule.id === 'wi-observation-pending-review-expiry'
+      )!.rule;
+      expect(pending).toMatchObject({
+        path_pattern: '*/work-inventory/observations/*.json',
+        status_field: 'status',
+        statuses: ['pending_review'],
+        age_field: 'created_at',
+        ttl_days: 30,
+        action: 'delete',
+      });
+      const discarded = rules.find(
+        ({ rule }) => rule.id === 'wi-observation-discarded-expiry'
+      )!.rule;
+      expect(discarded).toMatchObject({
+        age_field: 'discarded_at',
+        statuses: ['discarded'],
+        ttl_days: 30,
+      });
+    });
+
+    it('statusRulePatternToRegex matches only the declared shape, one segment per wildcard', () => {
+      const regex = statusRulePatternToRegex('*/work-inventory/observations/*.json');
+      expect(regex.test('member-1/work-inventory/observations/WIO-x.json')).toBe(true);
+      // Wildcard never spans '/': a deeper nested path does not match.
+      expect(regex.test('member-1/nested/work-inventory/observations/WIO-x.json')).toBe(false);
+      // Wrong tail / missing member segment.
+      expect(regex.test('work-inventory/observations/WIO-x.json')).toBe(false);
+      expect(regex.test('member-1/work-inventory/observations/WIO-x.json.bak')).toBe(false);
+    });
+
+    it('valid custom status_rules load as-is', () => {
+      const p = writeCatalog({
+        version: '1.0.0',
+        entries: [
+          {
+            path: 'knowledge/personal/members',
+            artifact_class: 'evidence',
+            action: 'review_required',
+            audit: true,
+            status_rules: [
+              {
+                id: 'custom-rule',
+                path_pattern: '*/inbox/*.json',
+                status_field: 'status',
+                statuses: ['pending', 'stale'],
+                age_field: 'updated_at',
+                ttl_days: 7,
+                action: 'delete',
+              },
+            ],
+          },
+        ],
+      });
+      const loaded = loadRetentionCatalog({ catalogPath: p });
+      expect(loaded.source).toBe('catalog');
+      expect(loaded.warnings).toEqual([]);
+      expect(catalogStatusRules(loaded)).toEqual([
+        {
+          entry: loaded.entries[0],
+          rule: {
+            id: 'custom-rule',
+            path_pattern: '*/inbox/*.json',
+            status_field: 'status',
+            statuses: ['pending', 'stale'],
+            age_field: 'updated_at',
+            ttl_days: 7,
+            action: 'delete',
+          },
+        },
+      ]);
+    });
+
+    it.each([
+      [
+        'missing id',
+        {
+          path_pattern: '*/a/*.json',
+          status_field: 's',
+          statuses: ['x'],
+          age_field: 'a',
+          ttl_days: 1,
+          action: 'delete',
+        },
+      ],
+      [
+        'path traversal in path_pattern',
+        {
+          id: 'r',
+          path_pattern: '../escape/*.json',
+          status_field: 's',
+          statuses: ['x'],
+          age_field: 'a',
+          ttl_days: 1,
+          action: 'delete',
+        },
+      ],
+      [
+        'absolute path_pattern',
+        {
+          id: 'r',
+          path_pattern: '/etc/*.json',
+          status_field: 's',
+          statuses: ['x'],
+          age_field: 'a',
+          ttl_days: 1,
+          action: 'delete',
+        },
+      ],
+      [
+        'empty statuses',
+        {
+          id: 'r',
+          path_pattern: '*/a/*.json',
+          status_field: 's',
+          statuses: [],
+          age_field: 'a',
+          ttl_days: 1,
+          action: 'delete',
+        },
+      ],
+      [
+        'non-positive ttl_days',
+        {
+          id: 'r',
+          path_pattern: '*/a/*.json',
+          status_field: 's',
+          statuses: ['x'],
+          age_field: 'a',
+          ttl_days: 0,
+          action: 'delete',
+        },
+      ],
+      [
+        'invalid action',
+        {
+          id: 'r',
+          path_pattern: '*/a/*.json',
+          status_field: 's',
+          statuses: ['x'],
+          age_field: 'a',
+          ttl_days: 1,
+          action: 'archive',
+        },
+      ],
+    ])('falls back to builtin defaults on an invalid status rule: %s', (_label, badRule) => {
+      const p = writeCatalog({
+        version: '1.0.0',
+        entries: [
+          {
+            path: 'knowledge/personal/members',
+            artifact_class: 'evidence',
+            action: 'review_required',
+            status_rules: [badRule],
+          },
+        ],
+      });
+      expect(loadRetentionCatalog({ catalogPath: p }).source).toBe('builtin-defaults');
     });
   });
 

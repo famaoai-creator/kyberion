@@ -173,11 +173,38 @@ tenant/personal scope.
 
 ## 8. Known limitations
 
-- **Trace hygiene.** `pnpm inventory harvest` reads `active/shared/logs/traces/*.jsonl` root spans
-  matching `<actuator>:<op>` (e.g. `code-actuator:pipeline`-shaped names). Test or CI runs that emit
-  spans into the same trace store as production traffic inflate repeat-run counts and can surface a
-  spurious automation candidate; harvest has no way to distinguish a test invocation from a real one
-  from the span alone.
+- **Trace hygiene (fixed going forward, WI-13).** Every `Trace` now carries a deterministic
+  `metadata.origin` (`test` / `ci` / `scheduled` / `agent` / `interactive`), derived once at
+  `TraceContext` construction (`VITEST` -> test; `CI` -> ci; a valid `KYBERION_RUN_ORIGIN` ->
+  that value; a `cron:`-prefixed correlationId or an ambient cron trigger delivery scope (Chronos)
+  -> scheduled; `KYBERION_NHI_ID` / `KYBERION_AGENT_ID` set -> agent (`MISSION_ROLE` alone is not
+  an agent signal); else interactive — see `deriveTraceOrigin` in
+  `libs/core/src/trace.ts`). `pnpm inventory harvest` now drops `test`/`ci`-tagged traces entirely
+  before they ever become or inflate a signal, and when at least half of a signature's counted
+  traces are `scheduled`-tagged its signal's
+  `origin` is `scheduled` even for a non-pipeline (`actuator_op`) signature that the
+  `pipelines/<id>.json` lookup alone could never resolve. `persistTrace` also stops writing to the
+  shared `active/shared/logs/traces/` store under vitest by default (opt back in per-test with
+  `KYBERION_TRACE_TEST_PERSIST=1`), so the trace store a running instance harvests from no longer
+  accumulates test noise at the source either.
+  **Residual gap:** traces persisted before this fix (and any trace a caller writes with no
+  `metadata.origin` at all) have no origin tag. Harvest still counts these — same as before, so no
+  demand signal silently drops — but the CLI's `harvest` output now reports how many scanned traces
+  were `excluded (test/ci)` versus `untagged (legacy, still counted)`, so the untagged fraction is
+  visible and shrinks on its own as the default 28-day harvest window ages past the fix date.
+- **Legacy default bindings weren't tagged `inferred` (fixed on demand, WI-17).** `fillBinding`
+  (used by `applyClassification`) has tagged a candidate-default `actuator`/`op` binding
+  `inferred: true` since it was introduced, but entries created earlier never got the flag even
+  though their binding is exactly the verb's first taxonomy candidate — so `matchSignalsToEntries`
+  could treat generic actuator traffic as if it were real evidence for that entry. Run
+  `pnpm inventory migrate [--dry-run]` to backfill `inferred: true` on every entry in scope whose
+  binding matches the default candidate and carries no `pipeline_id`/`intent_id`/`inferred` key
+  already; explicit bindings (including an explicit `inferred: false`) are left untouched, and a
+  second run is always a no-op (see `migrateInferredBindings` in `libs/core/work-inventory.ts`).
+  Only entries created before `INFERRED_BINDING_TAGGING_SINCE` (2026-09-22T10:18:05Z, when
+  `fillBinding` began tagging defaults) are migrated; on newer entries `applyClassification`
+  stamps every explicit binding `inferred: false`, so a person's deliberate default-equal binding
+  keeps counting as evidence.
 - **Scheduled runs are excluded by default.** `resolvePipelineOrigin` marks a signal `scheduled` when
   its `pipelines/<id>.json` declares an enabled `schedule`; `matchSignalsToEntries` skips `scheduled`
   signals unless the caller explicitly opts in with `includeScheduled: true`, because a cron-driven

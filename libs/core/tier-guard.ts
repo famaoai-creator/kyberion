@@ -47,11 +47,19 @@ function projectRoot(): string {
   }
 }
 
+function trimTrailingSlashes(value: string): string {
+  // A linear scan instead of `/\/+$/`, which backtracks quadratically on long
+  // runs of '/' (CodeQL js/polynomial-redos).
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+  return value.slice(0, end);
+}
+
 function normalizePath(p: string): string {
   // Policy paths use POSIX separators even when Kyberion runs on Windows.
   // `path.relative()` returns `\\` on Windows, so normalize both forms before
   // matching policy prefixes.
-  return p.replace(/\\/g, '/').replace(/\/+$/, '');
+  return trimTrailingSlashes(p.replace(/\\/g, '/'));
 }
 
 function pathStartsWith(targetPath: string, patternPath: string): boolean {

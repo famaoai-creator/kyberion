@@ -133,6 +133,37 @@ export interface SafeWriteOptions {
 }
 
 /**
+ * Options accepted by `safeExecResult` and `safeExec`. Both functions run
+ * `spawnSync`/`execFileSync` with `shell: false` — callers cannot request a
+ * shell through this surface (a caller that needs one passes the shell
+ * itself as `command`, e.g. `sh -c` or `powershell`, which stays valid).
+ * `shell` is intentionally not a key of this type; a caller that passes one
+ * anyway gets a clear runtime error rather than a silently ignored option.
+ */
+export interface SafeExecOptions {
+  timeoutMs?: number;
+  cwd?: string;
+  encoding?: BufferEncoding | null;
+  maxOutputMB?: number;
+  env?: Record<string, string | undefined>;
+  input?: string | Buffer;
+}
+
+/**
+ * Reject a caller-supplied `shell` option before it can reach
+ * `spawnSync`/`execFileSync`. `safeExecResult`/`safeExec` always run with
+ * `shell: false`; accepting-and-ignoring a `shell` key would let a caller
+ * believe it had effect when it never does, so this fails loudly instead.
+ */
+function assertNoShellOption(options: object): void {
+  if (Object.hasOwn(options, 'shell')) {
+    throw new Error(
+      '[SECURITY] safeExec/safeExecResult do not accept a "shell" option — commands always run with shell: false. Pass the shell itself as `command` (e.g. "sh", "-c", ...) if you need shell semantics.'
+    );
+  }
+}
+
+/**
  * Validate a repository-relative resource path without allowing an existing
  * path component to be a symbolic link. This is intentionally separate from
  * the lexical permission checks in safeReadFile/safeWriteFile: model-facing
@@ -726,13 +757,14 @@ function assertExecPolicy(command: string): void {
 export function safeExecResult(
   command: string,
   args: string[] = [],
-  options: any = {}
+  options: SafeExecOptions = {}
 ): {
   stdout: string;
   stderr: string;
   status: number | null;
   error?: Error;
 } {
+  assertNoShellOption(options);
   const {
     timeoutMs = DEFAULT_TIMEOUT_MS,
     cwd = process.cwd(),
@@ -753,6 +785,7 @@ export function safeExecResult(
       maxBuffer: maxOutputMB * 1024 * 1024,
       input,
       stdio: ['pipe', 'pipe', 'pipe'],
+      shell: false,
     });
 
     return {
@@ -861,7 +894,12 @@ export function safeExecResultAsync(
 /**
  * Execute a command safely.
  */
-export function safeExec(command: string, args: string[] = [], options: any = {}): string {
+export function safeExec(
+  command: string,
+  args: string[] = [],
+  options: SafeExecOptions = {}
+): string {
+  assertNoShellOption(options);
   const {
     timeoutMs = DEFAULT_TIMEOUT_MS,
     cwd = process.cwd(),
@@ -881,6 +919,7 @@ export function safeExec(command: string, args: string[] = [], options: any = {}
     maxBuffer: maxOutputMB * 1024 * 1024,
     input,
     stdio: ['pipe', 'pipe', 'pipe'],
+    shell: false,
   }) as string;
 }
 

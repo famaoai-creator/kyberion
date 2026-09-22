@@ -1,5 +1,5 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { appendJsonLine, loadJsonIfPresent, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import * as nodePath from 'node:path';
 import { knowledge, sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
@@ -16,6 +16,7 @@ import {
   safeRmSync,
 } from './secure-io.js';
 import { logger } from './core.js';
+import { withExecutionContext } from './authority.js';
 import { loadVaultEntryAtPath } from './data-vault.js';
 import {
   DELEGATION_CHILDREN_REGISTRY_SUBPATH,
@@ -34,6 +35,8 @@ import {
   eventStoreRetentionRules,
   coveredEventStoreDirs,
   coveredRuntimeSubdirs,
+  catalogStatusRules,
+  statusRulePatternToRegex,
   EVENT_STORE_PREFIXES,
   BUILTIN_RETENTION_DEFAULTS,
   RETENTION_CATALOG_REPO_PATH,
@@ -41,6 +44,7 @@ import {
   STORAGE_RETENTION_AUDIT_FILENAME,
   type LoadedRetentionCatalog,
   type RetentionCatalogEntry,
+  type RetentionStatusRule,
 } from './storage-retention-catalog.js';
 import {
   listSupervisorEventFiles,
@@ -172,6 +176,9 @@ export interface JanitorReport {
   /** AC-10: dated supervisor-event files expired / deleted this run (legacy file never included). */
   expiredSupervisorEvents: number;
   deletedSupervisorEvents: number;
+  /** WI-16: files expired / deleted this run by a catalog `status_rules` entry. */
+  expiredStatusRules: number;
+  deletedStatusRules: number;
   staleDelegationChildren: number;
   killedDelegationChildren: number;
   /**
@@ -415,7 +422,9 @@ export function restoreFromTrash(originalRepoRelativePath: string): {
 function expireFilePerPolicy(
   filePath: string,
   entry: RetentionCatalogEntry | null,
-  outcome: { deleted: string[]; softDeleted: string[] }
+  outcome: { deleted: string[]; softDeleted: string[] },
+  /** WI-16: extra audit fields (e.g. status-rule id/status) merged into the audit record when written. */
+  auditExtra?: Record<string, unknown>
 ): void {
   const repoRel = repoRelativePosix(filePath);
   const softDelete = entry?.soft_delete_days !== undefined;
@@ -428,7 +437,7 @@ function expireFilePerPolicy(
     outcome.deleted.push(filePath);
     logger.info(`[JANITOR] deleted: ${filePath}`);
   }
-  if (entry?.audit || softDelete) {
+  if (entry?.audit || softDelete || auditExtra) {
     appendRetentionAudit({
       event: softDelete ? 'RETENTION_SOFT_DELETE' : 'RETENTION_DELETE',
       path: repoRel,
@@ -443,6 +452,7 @@ function expireFilePerPolicy(
       ttl_days: entry?.ttl_days,
       policy_ref: RETENTION_CATALOG_REPO_PATH,
       reason: 'retention TTL elapsed (storage janitor)',
+      ...auditExtra,
     });
   }
 }
@@ -615,6 +625,115 @@ export function scanEventStores(opts: {
         }
       } catch {
         // skip
+      }
+    }
+  }
+
+  return { expired, deleted: outcome.deleted, softDeleted: outcome.softDeleted };
+}
+
+/**
+ * WI-16: expire individual files by their OWN JSON status + age field,
+ * declared per-directory-entry via the catalog's `status_rules` vocabulary
+ * (see `storage-retention-catalog.ts`'s `RetentionStatusRule`).
+ *
+ * This closes the gap directory-level `ttl_days`/mtime cannot express: a
+ * directory that legitimately holds a mix of statuses (e.g.
+ * `knowledge/personal/members/<id>/work-inventory/observations/*.json`,
+ * `pending_review | confirmed | discarded`) where only some statuses should
+ * ever expire, and only counting from a per-file date field, not mtime.
+ *
+ * Fail-safe per file: malformed JSON, a non-object body, a missing/wrong-type
+ * `status_field` or `age_field`, or an unparseable `age_field` date all skip
+ * the file — it is never deleted on doubt. A file whose status is not one of
+ * the rule's `statuses` simply isn't a candidate (not an error).
+ */
+/**
+ * Reads `filePath` and returns its status when it is a candidate of `rule`
+ * that is past the rule's ttl at `now`; `null` otherwise (including every
+ * fail-safe skip: malformed JSON, non-object body, missing/wrong-type status or
+ * age field, unparseable date, status outside `rule.statuses`, still in ttl).
+ */
+function expiredStatusRuleMatch(
+  filePath: string,
+  rule: RetentionStatusRule,
+  now: number
+): string | null {
+  let parsed: unknown;
+  try {
+    parsed = loadJsonIfPresent<Record<string, unknown>>(filePath);
+  } catch {
+    parsed = null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null; // malformed → skip
+
+  const record = parsed as Record<string, unknown>;
+  const status = record[rule.status_field];
+  if (typeof status !== 'string' || !rule.statuses.includes(status)) return null; // not a candidate
+
+  const ageRaw = record[rule.age_field];
+  if (typeof ageRaw !== 'string') return null; // missing/wrong-type age field → skip
+  const ageMs = Date.parse(ageRaw);
+  if (!Number.isFinite(ageMs)) return null; // unparseable date → skip
+
+  return now - ageMs > rule.ttl_days * RETENTION_DAY_MS ? status : null;
+}
+
+export function sweepStatusRules(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): ScanRuntimeResult {
+  // Status-rule areas live under tier-guarded knowledge (e.g.
+  // knowledge/personal/members/**): without a system context every read is
+  // denied and the fail-safe skip would silently expire nothing. The sweep is
+  // synchronous, so one context covers every read and delete it makes.
+  return withExecutionContext('ecosystem_architect', () => sweepStatusRulesInContext(opts));
+}
+
+function sweepStatusRulesInContext(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): ScanRuntimeResult {
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  const now = Date.now();
+  const expired: string[] = [];
+  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
+
+  for (const { entry, rule } of catalogStatusRules(catalog)) {
+    const entryDir = nodePath.join(rootDir(), ...entry.path.split('/'));
+    const matcher = statusRulePatternToRegex(rule.path_pattern);
+    for (const filePath of collectFiles(entryDir)) {
+      try {
+        const relativeToEntry = nodePath.relative(entryDir, filePath).split(nodePath.sep).join('/');
+        // collectFiles never walks outside entryDir (symlinks are skipped),
+        // so relativeToEntry can never carry a leading '..' — the pattern
+        // itself is also validated at load time to reject '..' segments.
+        if (!matcher.test(relativeToEntry)) continue;
+
+        const status = expiredStatusRuleMatch(filePath, rule, now);
+        if (status === null) continue;
+
+        if (opts.dryRun) {
+          expired.push(filePath);
+          continue;
+        }
+        // Narrow the scan-vs-confirm race: a member may confirm (or restore)
+        // the file between the scan read above and the delete. Re-read right
+        // before deleting and skip unless the status and age still match.
+        if (expiredStatusRuleMatch(filePath, rule, Date.now()) !== status) {
+          logger.info(`[JANITOR] status changed before delete, kept: ${filePath}`);
+          continue;
+        }
+        expired.push(filePath);
+        expireFilePerPolicy(filePath, entry, outcome, {
+          status_rule_id: rule.id,
+          status,
+          status_field: rule.status_field,
+          age_field: rule.age_field,
+          status_rule_ttl_days: rule.ttl_days,
+        });
+      } catch {
+        // skip — never delete on doubt
       }
     }
   }
@@ -984,6 +1103,13 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`supervisor-events: ${err?.message ?? String(err)}`);
   }
 
+  let statusRulesResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
+  try {
+    statusRulesResult = sweepStatusRules({ dryRun: opts.dryRun, catalog });
+  } catch (err: any) {
+    errors.push(`status-rules: ${err?.message ?? String(err)}`);
+  }
+
   let trashResult: SweepTrashResult = { expired: [], purged: [] };
   try {
     trashResult = sweepTrash({ dryRun: opts.dryRun, catalog });
@@ -1037,6 +1163,8 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     deletedEventStores: eventStoreResult.deleted.length,
     expiredSupervisorEvents: supervisorEventsResult.expired.length,
     deletedSupervisorEvents: supervisorEventsResult.deleted.length,
+    expiredStatusRules: statusRulesResult.expired.length,
+    deletedStatusRules: statusRulesResult.deleted.length,
     staleDelegationChildren: delegationChildrenResult.stale.length,
     killedDelegationChildren: delegationChildrenResult.killed.length,
     uncoveredRuntimeDirs,
@@ -1047,7 +1175,8 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
       logResult.softDeleted.length +
       runtimeResult.softDeleted.length +
       eventStoreResult.softDeleted.length +
-      supervisorEventsResult.softDeleted.length,
+      supervisorEventsResult.softDeleted.length +
+      statusRulesResult.softDeleted.length,
     expiredTrash: trashResult.expired.length,
     purgedTrash: trashResult.purged.length,
     retentionCatalogSource: catalog.source,
