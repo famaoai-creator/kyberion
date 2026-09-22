@@ -3,8 +3,10 @@
  * generation ceremony (CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md §3 CT-01).
  *
  * Projects Kyberion's runtime-independent team contracts onto provider
- * subagent mechanisms: `.claude/agents/<role>.md` and AGY's
- * `.agents/agents/<name>/agent.md` files generated from
+ * subagent mechanisms: `.claude/agents/<role>.md`, AGY's
+ * `.agents/agents/<name>/agent.md`, Devin CLI's `.devin/agents/<role>.md`,
+ * Cursor's `.cursor/agents/<role>.md`, and Codex CLI's
+ * `.codex/agents/<role>.toml` files generated from
  *   - knowledge/product/orchestration/team-roles/<role>.json (team-role SSoT:
  *     description, compatible_authority_roles)
  *   - knowledge/product/roles/<authority-role>/PROCEDURE.md (condensed into
@@ -17,13 +19,13 @@
  *     script-local framing lookup keyed by the same profile names.)
  *   - libs/core/working-principles.ts (buildWorkingPrinciplesLines)
  *
- * Generated files are committed artifacts, never hand-edited (each file
+ * Generated files are ceremony-owned artifacts, never hand-edited (each file
  * carries its own "DO NOT EDIT BY HAND" header). `--check` regenerates
  * in-memory and diffs against the files on disk — same shape as
  * `generate_op_registry.ts --check` / `generate:op-registry -- --check`.
  *
  * Usage:
- *   pnpm agents:generate                 — write Claude and AGY definitions
+ *   pnpm agents:generate                 — write Claude / AGY / Devin / Cursor / Codex definitions
  *   pnpm agents:generate -- --check      — fail if any definition drifted
  */
 
@@ -55,6 +57,18 @@ import {
   agyAgentName,
   type AgyAgentProfile,
 } from './agy-agent-definition-adapter.js';
+import {
+  buildCursorAgentDefinitionSource,
+  type CursorAgentProfile,
+} from './cursor-agent-definition-adapter.js';
+import {
+  buildDevinAgentDefinitionSource,
+  type DevinAgentProfile,
+} from './devin-agent-definition-adapter.js';
+import {
+  buildCodexAgentDefinitionSource,
+  type CodexAgentProfile,
+} from './codex-agent-definition-adapter.js';
 
 export type SubagentProfileName = 'implementer' | 'explorer' | 'planner';
 
@@ -218,6 +232,9 @@ export function buildAgentDefinitionSource(role: string, provider = 'claude'): s
 
 const AGENTS_DIR = pathResolver.rootResolve('.claude/agents');
 const AGY_AGENTS_DIR = pathResolver.rootResolve('.agents/agents');
+const DEVIN_AGENTS_DIR = pathResolver.rootResolve('.devin/agents');
+const CURSOR_AGENTS_DIR = pathResolver.rootResolve('.cursor/agents');
+const CODEX_AGENTS_DIR = pathResolver.rootResolve('.codex/agents');
 
 function targetPath(role: string): string {
   return path.join(AGENTS_DIR, `${role}.md`);
@@ -225,6 +242,18 @@ function targetPath(role: string): string {
 
 function agyTargetPath(role: string): string {
   return path.join(AGY_AGENTS_DIR, agyAgentName(role), 'agent.md');
+}
+
+function devinTargetPath(role: string): string {
+  return path.join(DEVIN_AGENTS_DIR, `${role}.md`);
+}
+
+function cursorTargetPath(role: string): string {
+  return path.join(CURSOR_AGENTS_DIR, `${role}.md`);
+}
+
+function codexTargetPath(role: string): string {
+  return path.join(CODEX_AGENTS_DIR, `${role}.toml`);
 }
 
 async function formatMarkdown(content: string, filePath: string): Promise<string> {
@@ -261,16 +290,79 @@ export async function buildGeneratedAgyFiles(): Promise<Map<string, string>> {
   return built;
 }
 
+/** Build the Devin CLI projection from the same canonical role output. */
+export async function buildGeneratedDevinFiles(): Promise<Map<string, string>> {
+  const built = new Map<string, string>();
+  for (const role of GENERATED_ROLES) {
+    const source = buildAgentDefinitionSource(role, 'devin');
+    const description = source.match(/^description:\s*(.*)$/m)?.[1]?.trim() || role;
+    const raw = buildDevinAgentDefinitionSource({
+      role,
+      description: description.replace(/^['"]|['"]$/g, ''),
+      profile: resolveProfile(role) as DevinAgentProfile,
+      body: extractAgentDefinitionBody(source),
+    });
+    built.set(role, await formatMarkdown(raw, devinTargetPath(role)));
+  }
+  return built;
+}
+
+/** Build the Cursor projection from the same canonical role output. */
+export async function buildGeneratedCursorFiles(): Promise<Map<string, string>> {
+  const built = new Map<string, string>();
+  for (const role of GENERATED_ROLES) {
+    const source = buildAgentDefinitionSource(role, 'cursor');
+    const description = source.match(/^description:\s*(.*)$/m)?.[1]?.trim() || role;
+    const raw = buildCursorAgentDefinitionSource({
+      role,
+      description: description.replace(/^['"]|['"]$/g, ''),
+      profile: resolveProfile(role) as CursorAgentProfile,
+      body: extractAgentDefinitionBody(source),
+    });
+    built.set(role, await formatMarkdown(raw, cursorTargetPath(role)));
+  }
+  return built;
+}
+
+/** Build the Codex CLI projection from the same canonical role output. */
+export async function buildGeneratedCodexFiles(): Promise<Map<string, string>> {
+  const built = new Map<string, string>();
+  for (const role of GENERATED_ROLES) {
+    const source = buildAgentDefinitionSource(role, 'codex');
+    const description = source.match(/^description:\s*(.*)$/m)?.[1]?.trim() || role;
+    const raw = buildCodexAgentDefinitionSource({
+      role,
+      description: description.replace(/^['"]|['"]$/g, ''),
+      profile: resolveProfile(role) as CodexAgentProfile,
+      body: extractAgentDefinitionBody(source),
+    });
+    built.set(role, raw);
+  }
+  return built;
+}
+
 export const main = defineGenerator({
   id: 'subagent-definitions',
-  outputs: GENERATED_ROLES.flatMap((role) => [targetPath(role), agyTargetPath(role)]),
+  outputs: GENERATED_ROLES.flatMap((role) => [
+    targetPath(role),
+    agyTargetPath(role),
+    devinTargetPath(role),
+    cursorTargetPath(role),
+    codexTargetPath(role),
+  ]),
   executionContext: 'generate_subagent_definitions',
   async render() {
     const built = await buildGeneratedFiles();
     const agyBuilt = await buildGeneratedAgyFiles();
+    const devinBuilt = await buildGeneratedDevinFiles();
+    const cursorBuilt = await buildGeneratedCursorFiles();
+    const codexBuilt = await buildGeneratedCodexFiles();
     return [
       ...Array.from(built, ([role, content]) => ({ path: targetPath(role), content })),
       ...Array.from(agyBuilt, ([role, content]) => ({ path: agyTargetPath(role), content })),
+      ...Array.from(devinBuilt, ([role, content]) => ({ path: devinTargetPath(role), content })),
+      ...Array.from(cursorBuilt, ([role, content]) => ({ path: cursorTargetPath(role), content })),
+      ...Array.from(codexBuilt, ([role, content]) => ({ path: codexTargetPath(role), content })),
     ];
   },
 });
