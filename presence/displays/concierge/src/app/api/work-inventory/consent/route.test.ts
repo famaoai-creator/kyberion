@@ -131,6 +131,23 @@ describe('concierge work-inventory consent route', () => {
     expect(mocks.grant).not.toHaveBeenCalled();
   });
 
+  it('POST grant rejects days outside integer 1..max as 400 before calling the domain layer', async () => {
+    mocks.resolveMember.mockReturnValue({ member_id: 'member-a' });
+    for (const days of [1e308, 91, 0, -1, 1.5, '7', null]) {
+      const response = await POST(
+        request({
+          action: 'grant',
+          sources: ['desktop_recording'],
+          observation_kinds: ['active_window'],
+          purpose: 'find automation candidates',
+          days,
+        })
+      );
+      expect(response.status).toBe(400);
+    }
+    expect(mocks.grant).not.toHaveBeenCalled();
+  });
+
   it('POST grant maps a domain validation error to 400 without leaking internals', async () => {
     mocks.resolveMember.mockReturnValue({ member_id: 'member-a' });
     mocks.grant.mockImplementation(() => {

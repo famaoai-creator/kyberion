@@ -235,3 +235,11 @@ PR #761 のマージ後、§8 の既知の残件を片付ける。調査で分�
 - WI-15: 他人の同意・要約は見えず操作できない(本人は常にサーバー側で解決)。匿名の閲覧者には出さない。
 - WI-16: 確認済みの要約と有効な同意は消えない。削除は監査に残る。
 - WI-17: 空実行で対象件数を表示し、実行後に既定候補の結び付けが照合に使われない。
+
+レビューで修正した点:
+
+- WI-17: 移行が、人が意図して既定候補と同じ結び付けを設定した業務まで `inferred` にしていた。`INFERRED_BINDING_TAGGING_SINCE`(PR #761 のマージ時刻 `2026-09-22T10:18:05Z`)より前に作られた業務だけを移行の対象にし、それ以降の業務では明示の結び付けに `inferred: false` を付ける(`applyClassification` と、使用信号から作る下書き)。
+- WI-13(origin): `MISSION_ROLE` は `pnpm pipeline` や `withExecutionContext` でも付くため、人が始めた実行が `agent` になっていた。`agent` は `KYBERION_NHI_ID` / `KYBERION_AGENT_ID` があるときだけにした。
+- WI-13(scheduled): Chronos の実行が `scheduled` にならなかった。トリガー実行器が cron 配信ごとに張る非同期スコープ(`withTriggerCorrelation`)を `deriveTraceOrigin` が読むようにした(実行が重なっても混ざらない)。環境変数 `KYBERION_RUN_ORIGIN` を登録し、baseline-check が起動する janitor に `scheduled` を渡す。収集では、数えたトレースの半分以上が `scheduled` のときだけ信号を `scheduled` にする。
+- WI-16: `review_required` の下で状態つき規則が削除することを、唯一の明示的な例外としてコードとカタログの注記に書いた。削除の直前にファイルを読み直し、状態と経過日数がまだ条件に合うときだけ消す。
+- WI-15: ループバックの閲覧者に本人の個人の業務一覧を出すのは意図した判断(所有者本人、presence-studio と同じ規則)だとコメントに残した。同意の日数は 1 以上・上限以下の整数だけを受け付け、大きすぎる値は 500 ではなく 400 を返す。

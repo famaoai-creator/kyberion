@@ -6,6 +6,7 @@ import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-i
 import {
   applyClassification,
   createWorkInventoryEntry,
+  migrateInferredBindings,
   validateWorkInventoryEntry,
   type WorkInventoryEntry,
   type WorkInventoryStep,
@@ -806,6 +807,27 @@ describe('work inventory harvest (hermetic)', () => {
       expect(draft.steps[0].verb).toBe('communicate');
     });
 
+    it('stamps a signal-derived binding inferred: false even when it equals the verb default', () => {
+      const meetingSignal: DemandSignal = {
+        signature: 'meeting-actuator:speak',
+        kind: 'actuator_op',
+        count: 6,
+        first_at: '2026-09-01T00:00:00.000Z',
+        last_at: '2026-09-21T00:00:00.000Z',
+        per_week: 1.5,
+        failure_count: 0,
+        window_days: 28,
+        sample_refs: [],
+      };
+      const [draft] = suggestEntriesFromSignals([meetingSignal], [], { now: NOW });
+      expect(draft.steps[0].binding?.inferred).toBe(false);
+      // Even with a pre-cutoff created_at, migration must leave it alone.
+      const legacy = { ...draft, created_at: '2026-09-01T00:00:00.000Z' };
+      expect(migrateInferredBindings(legacy).changed).toBe(0);
+      // And it still counts as demand-signal evidence.
+      expect(matchSignalsToEntries([draft], [meetingSignal]).get(draft.entry_id)).toHaveLength(1);
+    });
+
     it('skips a signal already matched to an existing entry', () => {
       const existing = createWorkInventoryEntry(
         {
@@ -943,6 +965,26 @@ describe('WI-13: trace origin hygiene', () => {
         name: 'voice-actuator:speak_local',
         startedAt: '2026-09-19T09:00:00.000Z',
       }),
+      // voice-actuator:transcribe — 1 scheduled among 3 counted traces: a
+      // minority, so the signal must NOT become 'scheduled'.
+      traceLine({
+        traceId: 'origin-transcribe-scheduled',
+        name: 'voice-actuator:transcribe',
+        startedAt: '2026-09-19T06:30:00.000Z',
+        origin: 'scheduled',
+      }),
+      traceLine({
+        traceId: 'origin-transcribe-interactive-1',
+        name: 'voice-actuator:transcribe',
+        startedAt: '2026-09-19T07:30:00.000Z',
+        origin: 'interactive',
+      }),
+      traceLine({
+        traceId: 'origin-transcribe-interactive-2',
+        name: 'voice-actuator:transcribe',
+        startedAt: '2026-09-19T08:30:00.000Z',
+        origin: 'interactive',
+      }),
       // agent/interactive traces count normally and are neither excluded
       // nor tallied as untagged.
       traceLine({
@@ -980,6 +1022,13 @@ describe('WI-13: trace origin hygiene', () => {
     const voice = signals.find((s) => s.signature === 'voice-actuator:speak_local');
     expect(voice?.count).toBe(4); // 3 scheduled + 1 untagged, all counted
     expect(voice?.origin).toBe('scheduled');
+  });
+
+  it('does not mark a signal scheduled when scheduled traces are a minority of its counted traces', () => {
+    const signals = collectKyberionDemandSignals({ rootDir: fixtureRoot, now: NOW });
+    const transcribe = signals.find((s) => s.signature === 'voice-actuator:transcribe');
+    expect(transcribe?.count).toBe(3);
+    expect(transcribe?.origin).not.toBe('scheduled');
   });
 
   it('counts agent/interactive traces normally, neither excluded nor untagged', () => {

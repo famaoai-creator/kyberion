@@ -175,11 +175,14 @@ tenant/personal scope.
 
 - **Trace hygiene (fixed going forward, WI-13).** Every `Trace` now carries a deterministic
   `metadata.origin` (`test` / `ci` / `scheduled` / `agent` / `interactive`), derived once at
-  `TraceContext` construction (`VITEST` -> test; `CI` -> ci; a `cron:`-prefixed correlationId ->
-  scheduled; an agent identity env set -> agent; else interactive — see `deriveTraceOrigin` in
+  `TraceContext` construction (`VITEST` -> test; `CI` -> ci; a valid `KYBERION_RUN_ORIGIN` ->
+  that value; a `cron:`-prefixed correlationId or an ambient cron trigger delivery scope (Chronos)
+  -> scheduled; `KYBERION_NHI_ID` / `KYBERION_AGENT_ID` set -> agent (`MISSION_ROLE` alone is not
+  an agent signal); else interactive — see `deriveTraceOrigin` in
   `libs/core/src/trace.ts`). `pnpm inventory harvest` now drops `test`/`ci`-tagged traces entirely
-  before they ever become or inflate a signal, and a `scheduled`-tagged trace marks its signal's
-  `origin` `scheduled` even for a non-pipeline (`actuator_op`) signature that the
+  before they ever become or inflate a signal, and when at least half of a signature's counted
+  traces are `scheduled`-tagged its signal's
+  `origin` is `scheduled` even for a non-pipeline (`actuator_op`) signature that the
   `pipelines/<id>.json` lookup alone could never resolve. `persistTrace` also stops writing to the
   shared `active/shared/logs/traces/` store under vitest by default (opt back in per-test with
   `KYBERION_TRACE_TEST_PERSIST=1`), so the trace store a running instance harvests from no longer
@@ -198,6 +201,10 @@ tenant/personal scope.
   binding matches the default candidate and carries no `pipeline_id`/`intent_id`/`inferred` key
   already; explicit bindings (including an explicit `inferred: false`) are left untouched, and a
   second run is always a no-op (see `migrateInferredBindings` in `libs/core/work-inventory.ts`).
+  Only entries created before `INFERRED_BINDING_TAGGING_SINCE` (2026-09-22T10:18:05Z, when
+  `fillBinding` began tagging defaults) are migrated; on newer entries `applyClassification`
+  stamps every explicit binding `inferred: false`, so a person's deliberate default-equal binding
+  keeps counting as evidence.
 - **Scheduled runs are excluded by default.** `resolvePipelineOrigin` marks a signal `scheduled` when
   its `pipelines/<id>.json` declares an enabled `schedule`; `matchSignalsToEntries` skips `scheduled`
   signals unless the caller explicitly opts in with `includeScheduled: true`, because a cron-driven

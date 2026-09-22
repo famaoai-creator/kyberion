@@ -8,6 +8,7 @@ import {
   isVitestProcess,
   parseSafeJsonInput,
   readJsonLines,
+  setRegisteredEnv,
 } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
@@ -496,6 +497,17 @@ function markJanitorSubmission(): void {
   writeJanitorSubmissionMarker();
 }
 
+/**
+ * Environment for the baseline-check-spawned storage janitor. The janitor is
+ * system-cadence maintenance, not a person's work, so its traces are tagged
+ * origin `scheduled` (WI-13) and never become work-inventory demand.
+ */
+export function janitorSpawnEnv(baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...baseEnv };
+  setRegisteredEnv('KYBERION_RUN_ORIGIN', 'scheduled', env);
+  return env;
+}
+
 function maybeSubmitJanitorMaintenanceJob(): {
   submitted: boolean;
   pending: boolean;
@@ -533,7 +545,7 @@ function maybeSubmitJanitorMaintenanceJob(): {
     ],
     spawnOptions: {
       cwd: pathResolver.rootDir(),
-      env: process.env,
+      env: janitorSpawnEnv(),
       detached: true,
       stdio: 'ignore',
     },
