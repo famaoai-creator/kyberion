@@ -161,7 +161,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
             ? {
                 model: resolveCodexModelForTier(
                   options.model_tier,
-                  this.options.model ?? 'gpt-5.6-sol'
+                  this.options.model ?? 'gpt-6-sol'
                 ),
               }
             : {}),
