@@ -1,8 +1,80 @@
 {
   "$schema": "../schemas/model-registry.schema.json",
   "version": "1.0.0",
-  "default_model_id": "openai:gpt-5.6-sol",
+  "default_model_id": "openai:gpt-6-astra",
   "models": [
+    {
+      "model_id": "openai:gpt-6-astra",
+      "provider": "openai",
+      "family": "gpt-6",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "primary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "very_high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "agentic_coding",
+        "tool_use",
+        "multi_step_reasoning",
+        "computer_use",
+        "ultra_reasoning"
+      ],
+      "notes": "GPT-6 Astra is available in Codex for complex end-to-end work; flagship model for highest-complexity reasoning and coding."
+    },
+    {
+      "model_id": "openai:gpt-6-sol",
+      "provider": "openai",
+      "family": "gpt-6",
+      "status": "approved",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "primary",
+        "surface_agent": "primary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": ["agentic_coding", "tool_use", "multi_step_reasoning", "ultra_reasoning"],
+      "notes": "GPT-6 Sol Codex model; current frontier agentic coding workhorse."
+    },
+    {
+      "model_id": "openai:gpt-6-luna",
+      "provider": "openai",
+      "family": "gpt-6",
+      "status": "approved",
+      "tier": "small",
+      "execution_tier": "fast",
+      "role_fit": {
+        "intent_compiler": "secondary",
+        "surface_agent": "primary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["agentic_coding", "fast_iteration", "tool_first_execution"],
+      "notes": "GPT-6 Luna Codex model optimized for fast and affordable agentic coding work."
+    },
     {
       "model_id": "openai:gpt-5.6-sol",
       "provider": "openai",

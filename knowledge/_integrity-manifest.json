@@ -2703,13 +2703,13 @@
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 2316,
+      "size": 3421,
       "type": "json"
     },
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 19371,
+      "size": 21766,
       "type": "json"
     },
     {
@@ -2721,7 +2721,7 @@
     {
       "path": "product/governance/model-registry/index.json",
       "tier": "public",
-      "size": 808,
+      "size": 883,
       "type": "json"
     },
     {
@@ -2842,6 +2842,24 @@
       "path": "product/governance/model-registry/model-6f70656e61693a6770742d352e362d7465727261.json",
       "tier": "public",
       "size": 673,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-6f70656e61693a6770742d362d6173747261.json",
+      "tier": "public",
+      "size": 768,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-6f70656e61693a6770742d362d6c756e61.json",
+      "tier": "public",
+      "size": 672,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-6f70656e61693a6770742d362d736f6c.json",
+      "tier": "public",
+      "size": 664,
       "type": "json"
     },
     {
@@ -3213,7 +3231,7 @@
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1598,
+      "size": 1594,
       "type": "json"
     },
     {
@@ -3399,7 +3417,7 @@
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 15144,
+      "size": 15142,
       "type": "json"
     },
     {
