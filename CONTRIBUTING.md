@@ -30,7 +30,7 @@ Minimum bar:
 
 - [ ] `pnpm check -- --scope pr` is green locally (same gate set as PR Validation; includes `type-ratchet`, `contract-semver`, and `env-registry`).
 - [ ] Exception-table rows for your changed paths are green (actuator rebaseline + component-inventory, `build:actuators` for core/actuator type boundaries, etc.).
-- [ ] Prefer `pnpm kyberion pr create` — it runs the readiness gate unless `--skip-readiness` is passed.
+- [ ] Push first, then open the PR against `main` with `pnpm kyberion pr create --title "<conventional title>" --body-file <filled PR template>` — it runs the readiness gate unless `--skip-readiness` is passed. The exact order is in the checklist's PR creation steps.
 - [ ] New code has at least one test (unit, integration, or contract — whatever fits).
 - [ ] You've read [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) — your change does not silently modify a Stable surface without a semver bump.
 - [ ] If you touched an actuator manifest or schema, you ran `pnpm check:contract-semver -- --rebaseline` and committed the updated baseline.
