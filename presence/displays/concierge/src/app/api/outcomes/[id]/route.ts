@@ -27,6 +27,8 @@ function isAllowedStatus(value: unknown): value is DeliverableInboxStatus {
   return typeof value === 'string' && ALLOWED_STATUSES.includes(value as DeliverableInboxStatus);
 }
 
+const ENTRY_NOT_FOUND = '該当する成果物が見つかりません';
+
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
@@ -54,10 +56,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       listInboxEntries({}).find((item) => item.entry_id === id)
     );
     if (!entry) {
-      return NextResponse.json(
-        { ok: false, error: '該当する成果物が見つかりません' },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: ENTRY_NOT_FOUND }, { status: 404 });
     }
     const decisionDenied = conciergeDecisionDenied(resolved.context, entry.tenant_slug);
     if (decisionDenied) return decisionDenied;
@@ -76,10 +75,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
             reviewedBy: decidedBy?.id ?? 'concierge',
           });
     if (!updated) {
-      return NextResponse.json(
-        { ok: false, error: '該当する成果物が見つかりません' },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: ENTRY_NOT_FOUND }, { status: 404 });
     }
     return NextResponse.json({ ok: true, entry: updated });
   } catch (error) {
