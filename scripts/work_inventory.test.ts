@@ -1,10 +1,14 @@
+import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeRmSync } from '@agent/core';
+import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { writeMemberProfile } from '@agent/core/member-registry';
 import {
   applyClassification,
   createWorkInventoryEntry,
+  listWorkInventoryEntries,
   loadWorkInventoryEntry,
   saveWorkInventoryEntry,
+  WorkInventoryStoreError,
   type WorkInventoryEntry,
   type WorkInventoryStep,
 } from '@agent/core/work-inventory';
@@ -31,6 +35,9 @@ import {
   runConsentGrant,
   runConsentList,
   runConsentRevoke,
+  runObserveConfirm,
+  runObserveList,
+  runObserveSummarize,
   resolveRecordingPath,
 } from './lib/work-inventory-cli-consent.js';
 import { runLearn, runPromote, type PromoteResult } from './lib/work-inventory-cli-promotion.js';
@@ -52,6 +59,22 @@ const opts: WorkInventoryCliOptions & { now: Date } = { rootDir: tmpRoot, now: N
 afterEach(() => {
   safeRmSync(tmpRoot, { recursive: true, force: true });
 });
+
+/** Provisions the local owner member inside the isolated root (what onboarding does for real). */
+function provisionOwner(): void {
+  writeMemberProfile(
+    {
+      member_id: 'owner',
+      display_name: 'Owner',
+      status: 'active',
+      memberships: [],
+      access_registrations: [],
+      created_at: NOW.toISOString(),
+      updated_at: NOW.toISOString(),
+    },
+    { rootDir: tmpRoot }
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Shared argv helpers
@@ -206,6 +229,62 @@ describe('inventory entry lifecycle (hermetic)', () => {
     expect(step.method.rationale).toContain('user:alice');
   });
 
+  it('add never overwrites an existing entry with the same id', async () => {
+    const first = await runAdd(['add', '--title', '経費精算 Excel'], opts);
+    const second = await runAdd(['add', '--title', '売上集計 Excel'], opts);
+    expect(second.entry.entry_id).not.toBe(first.entry.entry_id);
+
+    // Same title, scope and instant -> same id: refused instead of overwritten.
+    await expect(runAdd(['add', '--title', '経費精算 Excel'], opts)).rejects.toSatisfy(
+      (error: unknown) =>
+        error instanceof WorkInventoryStoreError && error.code === 'WORK_INVENTORY_ENTRY_EXISTS'
+    );
+    expect(
+      runList(['list'], opts)
+        .map((e) => e.title)
+        .sort()
+    ).toEqual(['経費精算 Excel', '売上集計 Excel'].sort());
+  });
+
+  it('override refuses to downgrade a money/irreversible/approval step', () => {
+    const draft = createWorkInventoryEntry(
+      {
+        title: 'Pay invoices',
+        scope: {},
+        trigger: { kind: 'schedule', description: 'monthly' },
+        steps: [
+          {
+            step_id: 'S1',
+            stage: 'act',
+            verb: 'operate',
+            description: 'pay the invoice',
+            data_sensitivity: 'internal',
+            effects: ['money'],
+            method: { assigned: 'human', source: 'proposal', rationale: 'seed' },
+          },
+        ],
+      },
+      NOW
+    );
+    saveWorkInventoryEntry(applyClassification(draft), { rootDir: tmpRoot });
+    const args = (method: string) => [
+      'override',
+      '--step',
+      'S1',
+      '--method',
+      method,
+      '--reason',
+      'the bank has an API',
+      '--decided-by',
+      'user:alice',
+    ];
+    expect(() => runOverride(draft.entry_id, args('api'), opts)).toThrow(
+      /effect money, which always stays human/
+    );
+    const kept = runOverride(draft.entry_id, args('human'), opts);
+    expect(kept.steps[0].method).toMatchObject({ assigned: 'human', source: 'human_override' });
+  });
+
   it('override rejects an unknown step id and an unknown method', async () => {
     const added = await runAdd(
       ['add', '--title', 'Bad override', '--steps', '確認する', '--no-model'],
@@ -346,6 +425,35 @@ describe('inventory harvest (hermetic)', () => {
     expect(result.dry_run).toBe(false);
   });
 
+  it('--suggest skips a suggestion whose id already exists instead of overwriting it', () => {
+    const tracesDir = path.join(tmpRoot, 'active/shared/logs/traces');
+    safeMkdir(tracesDir, { recursive: true });
+    const lines = [1, 2, 3].map((n) =>
+      JSON.stringify({
+        traceId: `t-${n}`,
+        rootSpan: { name: 'pipeline:nightly-export', status: 'ok' },
+        metadata: { startedAt: `2026-09-2${n - 1}T01:00:00.000Z` },
+      })
+    );
+    safeWriteFile(path.join(tracesDir, 'traces-2026-09-20.jsonl'), lines.join('\n'));
+
+    const preview = runHarvest(['harvest', '--suggest'], { ...opts, dryRun: true });
+    expect(preview.suggested).toHaveLength(1);
+    // Something else already holds the suggestion's id (and does not match the signal).
+    const occupant: WorkInventoryEntry = {
+      ...preview.suggested[0],
+      title: 'Occupant',
+      steps: [],
+      observations: [],
+    };
+    saveWorkInventoryEntry(occupant, { rootDir: tmpRoot });
+
+    const result = runHarvest(['harvest', '--suggest'], { ...opts, dryRun: false });
+    expect(result.suggested).toEqual([]);
+    const stored = listWorkInventoryEntries({}, { rootDir: tmpRoot });
+    expect(stored.map((e) => e.title)).toEqual(['Occupant']);
+  });
+
   it('--dry-run never saves suggested drafts', () => {
     const result = runHarvest(['harvest', '--dry-run', '--suggest'], { ...opts, dryRun: true });
     expect(result.dry_run).toBe(true);
@@ -358,91 +466,62 @@ describe('inventory harvest (hermetic)', () => {
 // ---------------------------------------------------------------------------
 
 describe('inventory consent (hermetic)', () => {
-  it('grant requires --decided-by', () => {
-    expect(() =>
-      runConsentGrant(
-        [
-          'consent',
-          'grant',
-          '--member',
-          'alice',
-          '--sources',
-          'desktop_recording',
-          '--kinds',
-          'active_window',
-          '--purpose',
-          'find automatable steps',
-          '--days',
-          '30',
-        ],
-        opts
-      )
-    ).toThrow(WorkInventoryCliUsageError);
+  const GRANT_ARGS = [
+    'consent',
+    'grant',
+    '--sources',
+    'desktop_recording,browser_recording',
+    '--kinds',
+    'active_window,browser_tabs',
+    '--purpose',
+    'find automatable steps',
+    '--days',
+    '30',
+  ];
+
+  it('fails with an onboarding hint when no owner member is provisioned', () => {
+    expect(() => runConsentGrant(GRANT_ARGS, opts)).toThrow(/no active owner member.*onboard/);
+    expect(() => runObserveList(['observe', 'list'], opts)).toThrow(/no active owner member/);
   });
 
-  it('rejects granting consent on behalf of another member', () => {
+  it('acts only as the local owner: another --member or --decided-by is refused', () => {
+    provisionOwner();
     expect(() =>
-      runConsentGrant(
-        [
-          'consent',
-          'grant',
-          '--member',
-          'alice',
-          '--sources',
-          'desktop_recording',
-          '--kinds',
-          'active_window',
-          '--purpose',
-          'find automatable steps',
-          '--days',
-          '30',
-          '--decided-by',
-          'user:bob',
-        ],
+      runConsentGrant([...GRANT_ARGS, '--member', 'alice', '--decided-by', 'user:alice'], opts)
+    ).toThrow(/acts as the local owner \(owner\); --member alice is not allowed/);
+    expect(() => runConsentGrant([...GRANT_ARGS, '--decided-by', 'user:bob'], opts)).toThrow(
+      /--decided-by must be user:owner/
+    );
+    expect(() => runConsentList(['consent', 'list', '--member', 'alice'], opts)).toThrow(
+      WorkInventoryCliUsageError
+    );
+    expect(() =>
+      runObserveConfirm(
+        ['observe', 'confirm', '--member', 'alice', '--summary', 'x', '--decided-by', 'user:alice'],
         opts
       )
-    ).toThrow();
+    ).toThrow(/--member alice is not allowed/);
+    expect(() =>
+      runObserveSummarize(
+        ['observe', 'summarize', '--member', 'alice', '--recording', 'x.json'],
+        opts
+      )
+    ).toThrow(/--member alice is not allowed/);
   });
 
-  it('grant -> list -> revoke round-trips', () => {
+  it('grant -> list -> revoke round-trips as the owner', () => {
+    provisionOwner();
     const granted: WorkInventoryConsent = runConsentGrant(
-      [
-        'consent',
-        'grant',
-        '--member',
-        'alice',
-        '--sources',
-        'desktop_recording,browser_recording',
-        '--kinds',
-        'active_window,browser_tabs',
-        '--purpose',
-        'find automatable steps',
-        '--days',
-        '30',
-        '--decided-by',
-        'user:alice',
-      ],
+      [...GRANT_ARGS, '--member', 'owner', '--decided-by', 'user:owner'],
       opts
     );
-    expect(granted.member_id).toBe('alice');
+    expect(granted.member_id).toBe('owner');
     expect(granted.sources).toEqual(['desktop_recording', 'browser_recording']);
 
-    const listed = runConsentList(['consent', 'list', '--member', 'alice'], opts);
+    const listed = runConsentList(['consent', 'list'], opts);
     expect(listed.map((c) => c.consent_id)).toContain(granted.consent_id);
 
-    const revoked = runConsentRevoke(
-      [
-        'consent',
-        'revoke',
-        '--member',
-        'alice',
-        '--consent',
-        granted.consent_id,
-        '--decided-by',
-        'user:alice',
-      ],
-      opts
-    );
+    const revoked = runConsentRevoke(['consent', 'revoke', '--consent', granted.consent_id], opts);
     expect(revoked.revoked_at).toBeTruthy();
   });
 });
@@ -515,6 +594,70 @@ describe('inventory promote (hermetic)', () => {
 // ---------------------------------------------------------------------------
 
 describe('inventory learn (hermetic)', () => {
+  it('measures only runs after promoted_at (pre-promotion failures never count)', () => {
+    const promotedAt = '2026-09-10T00:00:00.000Z';
+    const draft = createWorkInventoryEntry(
+      {
+        title: 'Monthly report',
+        scope: {},
+        trigger: { kind: 'schedule', description: 'monthly' },
+        effort_minutes_per_run: 30,
+        steps: [
+          {
+            step_id: 'S1',
+            stage: 'act',
+            verb: 'transform',
+            description: 'build the report',
+            data_sensitivity: 'internal',
+            effects: [],
+            method: { assigned: 'program', source: 'rule', rationale: 'seed' },
+            binding: { pipeline_id: 'monthly-report' },
+          },
+        ],
+      },
+      NOW
+    );
+    saveWorkInventoryEntry(
+      {
+        ...draft,
+        status: 'promoted',
+        promotion: {
+          kind: 'pipeline',
+          ref: 'monthly-report',
+          promoted_at: promotedAt,
+          decided_by: { kind: 'human', id: 'user:alice' },
+        },
+      },
+      { rootDir: tmpRoot }
+    );
+    const tracesDir = path.join(tmpRoot, 'active/shared/logs/traces');
+    safeMkdir(tracesDir, { recursive: true });
+    const trace = (id: string, at: string, status: 'ok' | 'error') =>
+      JSON.stringify({
+        traceId: id,
+        rootSpan: { name: 'pipeline:monthly-report', status },
+        metadata: { startedAt: at },
+      });
+    safeWriteFile(
+      path.join(tracesDir, 'traces-2026-09-05.jsonl'),
+      [
+        // Before the promotion: manual runs that failed.
+        trace('pre-1', '2026-09-05T01:00:00.000Z', 'error'),
+        trace('pre-2', '2026-09-05T02:00:00.000Z', 'error'),
+        trace('pre-3', '2026-09-05T03:00:00.000Z', 'error'),
+        // After the promotion: the automation succeeded.
+        trace('post-1', '2026-09-15T01:00:00.000Z', 'ok'),
+        trace('post-2', '2026-09-16T01:00:00.000Z', 'ok'),
+      ].join('\n')
+    );
+
+    const result = runLearn(['learn', '--dry-run', '--days', '28'], { ...opts, dryRun: true });
+    expect(result.measured).toBe(1);
+    // Post-promotion runs never failed: nothing to calibrate, no gap to report.
+    expect(result.calibrated_methods).toEqual([]);
+    expect(result.learning_signals).toEqual([]);
+  });
+
   it('dry-run previews without persisting anything against an empty fixture root', () => {
     const result = runLearn(['learn', '--dry-run', '--days', '7'], { ...opts, dryRun: true });
     expect(result.dry_run).toBe(true);

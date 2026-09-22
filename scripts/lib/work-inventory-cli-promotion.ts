@@ -11,12 +11,14 @@ import {
 import {
   applyWorkInventoryPromotion,
   buildCalibrationSamples,
+  collectSignalsForPromotedEntry,
   detectWorkInventoryLearningSignals,
   executeMissionPromotion,
   measureWorkInventoryOutcome,
   planWorkInventoryPromotion,
   recordWorkInventoryOutcome,
   runWorkInventoryLearningCycle,
+  type WorkInventoryCollectSignals,
   type WorkInventoryPromotionPlan,
 } from '@agent/core/work-inventory-promotion';
 import { collectKyberionDemandSignals } from '@agent/core/work-inventory-harvest';
@@ -36,7 +38,6 @@ import {
 } from './work-inventory-cli-shared.js';
 import type { WorkInventoryCliOptions } from './work-inventory-cli-entries.js';
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const PROMOTION_KINDS = ['mission', 'pipeline'] as const;
 
 export interface PromoteResult {
@@ -138,18 +139,22 @@ export function runLearn(
   const apiSystems = csv(argv, '--api-systems');
   const taxonomy = loadWorkInventoryTaxonomy();
 
-  const signals = collectKyberionDemandSignals({
-    rootDir,
-    now,
-    since: new Date(now.getTime() - days * MS_PER_DAY),
-    until: now,
-    ...(scope.tenant_slug ? { tenantSlug: scope.tenant_slug } : {}),
-  });
+  // Outcomes count only post-promotion runs: each promoted entry is measured
+  // over `since = max(promoted_at, now − days)`, never over a shared window.
+  const collectSignals: WorkInventoryCollectSignals = (since) =>
+    collectKyberionDemandSignals({
+      rootDir,
+      now,
+      since,
+      until: now,
+      ...(scope.tenant_slug ? { tenantSlug: scope.tenant_slug } : {}),
+    });
 
   if (!options.dryRun) {
     const summary = runWorkInventoryLearningCycle({
       scope,
-      signals,
+      collectSignals,
+      windowDays: days,
       rootDir,
       now,
       taxonomy,
@@ -164,6 +169,10 @@ export function runLearn(
   const previewed = entries.map((entry) => {
     if (entry.status !== 'promoted' || !entry.promotion) return entry;
     measured += 1;
+    const signals = collectSignalsForPromotedEntry(entry, collectSignals, {
+      now,
+      windowDays: days,
+    });
     const outcome = measureWorkInventoryOutcome(entry, signals, { now, taxonomy });
     return recordWorkInventoryOutcome(entry, outcome);
   });
