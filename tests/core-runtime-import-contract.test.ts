@@ -25,42 +25,59 @@ describe('Core runtime import contract', () => {
 
     const failures: Array<{ specifier: string; error: string }> = [];
 
-    // ~750 subpaths × one child node each: sequential spawns take ~85s
-    // locally and exceed the timeout on shared CI runners. Overlap bounded
-    // batches through the governed async exec boundary instead; batches stay
-    // sequential so failure order remains deterministic.
-    const CONCURRENCY = 8;
-    for (let index = 0; index < exportKeys.length; index += CONCURRENCY) {
-      const batch = exportKeys.slice(index, index + CONCURRENCY);
-      const settled = await Promise.all(
-        batch.map(async (key) => {
-          const specifier = exportKeyToSpecifier(key);
-          const result = await safeExecResultAsync(
-            'node',
-            [
-              '--input-type=module',
-              '-e',
-              `import(${JSON.stringify(specifier)}).then(() => console.log('ok'))`,
-            ],
+    // ~790 subpaths. One child node per subpath spent most of the time on
+    // process start-up and exceeded the timeout on shared CI runners, so
+    // each child imports a whole chunk sequentially (every import isolated
+    // by its own try/catch) and reports failures as JSON. Chunks run in
+    // parallel; results are sorted so the failure list stays deterministic.
+    // Trade-off: modules in one chunk share a process, so a subpath that only
+    // loads after a sibling has been imported (circular-import TDZ, missing
+    // global setup) can be masked; before, every subpath loaded in isolation.
+    const CHUNKS = 8;
+    const chunkSize = Math.ceil(exportKeys.length / CHUNKS);
+    const script = [
+      'const specs = JSON.parse(process.argv[1]);',
+      'const failed = [];',
+      'for (const spec of specs) {',
+      "  process.stderr.write('__AT__' + spec + '\\n');",
+      '  try { await import(spec); }',
+      '  catch (error) { failed.push({ specifier: spec, error: String(error?.stack ?? error).slice(0, 300) }); }',
+      '}',
+      "process.stdout.write('\\n__RESULT__' + JSON.stringify(failed), () => process.exit(0));",
+    ].join('\n');
+    const chunks = Array.from({ length: CHUNKS }, (_, i) =>
+      exportKeys.slice(i * chunkSize, (i + 1) * chunkSize).map(exportKeyToSpecifier)
+    ).filter((chunk) => chunk.length > 0);
+
+    const settled = await Promise.all(
+      chunks.map(async (specs) => {
+        const result = await safeExecResultAsync(
+          'node',
+          ['--input-type=module', '-e', script, JSON.stringify(specs)],
+          // One timeout per chunk (~100 sequential imports), kept under the test timeout.
+          { cwd: process.cwd(), timeoutMs: 150_000 }
+        );
+        const marker = result.stdout.lastIndexOf('__RESULT__');
+        if (result.status !== 0 || result.error || marker < 0) {
+          // Blame the subpath that was importing when the child died.
+          const lastAt = result.stderr.lastIndexOf('__AT__');
+          const culprit = lastAt >= 0 ? result.stderr.slice(lastAt + 6).split('\n')[0] : specs[0];
+          return [
             {
-              cwd: process.cwd(),
-            }
-          );
-          if (result.status !== 0 || result.error) {
-            return {
-              specifier,
-              error:
-                result.error?.message || result.stderr.slice(0, 300) || `exit ${result.status}`,
-            };
-          }
-          return null;
-        })
-      );
-      for (const failure of settled) {
-        if (failure) failures.push(failure);
-      }
-    }
+              specifier: culprit,
+              error: result.error?.message || result.stderr.slice(-300) || `exit ${result.status}`,
+            },
+          ];
+        }
+        return JSON.parse(result.stdout.slice(marker + '__RESULT__'.length)) as Array<{
+          specifier: string;
+          error: string;
+        }>;
+      })
+    );
+    for (const chunkFailures of settled) failures.push(...chunkFailures);
+    failures.sort((left, right) => left.specifier.localeCompare(right.specifier));
 
     expect(failures).toEqual([]);
-  }, 300000); // loads every subpath in a child process — slow on shared CI runners
+  }, 180000); // loads every subpath in a child process — slow on shared CI runners
 });
