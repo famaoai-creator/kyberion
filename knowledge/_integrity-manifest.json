@@ -11859,7 +11859,7 @@
     {
       "path": "product/schemas/work-inventory-entry.schema.json",
       "tier": "public",
-      "size": 6368,
+      "size": 8397,
       "type": "json"
     },
     {

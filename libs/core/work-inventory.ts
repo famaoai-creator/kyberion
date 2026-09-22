@@ -111,11 +111,21 @@ export interface WorkInventoryFrequency {
   count: number;
 }
 
+/** Aggregate numbers only (never content): how often and how long the observed work ran. */
+export interface WorkObservationMetrics {
+  count?: number;
+  per_week?: number;
+  median_duration_ms?: number;
+  failure_count?: number;
+  window_days?: number;
+}
+
 export interface WorkInventoryObservation {
   source: WorkObservationSource;
   ref: string;
   observed_at: string;
   digest?: string;
+  metrics?: WorkObservationMetrics;
 }
 
 export interface WorkInventoryPromotion {
