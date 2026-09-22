@@ -1096,6 +1096,42 @@
       "documented": true
     },
     {
+      "name": "KYBERION_DEVIN_CLI_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for the Devin CLI binary (`devin`); leave unset to resolve from PATH.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_DEVIN_CLI_EXTRA_ARGS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Optional whitespace-separated extra argv passed to devin headless invocations.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_DEVIN_CLI_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Model id or family alias (swe, opus, gpt, …) for the Devin CLI reasoning backend; defaults to swe.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
+      "name": "KYBERION_DEVIN_CLI_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Optional wall-clock timeout in milliseconds for a single devin reasoning call; leave unset to use the governed default.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
       "name": "KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON",
       "category": "flag",
       "type": "boolean",
