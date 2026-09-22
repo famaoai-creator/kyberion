@@ -1,0 +1,668 @@
+/**
+ * WI-03: turn Kyberion's own usage logs into demand signals and attach them
+ * to work inventory entries (docs/developer/improvement-plans-2026-08/
+ * WORK_INVENTORY_PLAN_2026-09-22.ja.md §2.3 ②).
+ *
+ * Sources are scanned read-only and only aggregate numbers, names, and ids
+ * are ever extracted — never trace attribute/event text, pipeline step
+ * payloads, or unhandled-intent utterance text. See
+ * `WorkObservationMetrics` (work-inventory.ts) for the same "counts only"
+ * contract on the entry side.
+ *
+ * - `collectKyberionDemandSignals` scans:
+ *   - `active/shared/logs/traces/traces-YYYY-MM-DD.jsonl` (root spans only)
+ *   - `active/shared/runtime/feedback-loop/adhoc-pipeline-runs.json` (via
+ *     `loadAdhocRunLedgerAtPath`)
+ *   - `active/shared/tmp/unhandled-intent-registry.json` (ids/counts only)
+ * - `matchSignalsToEntries` / `attachDemandSignals` connect signals to
+ *   existing entries via step bindings or a prior `kyberion_trace`
+ *   observation, without ever touching self-reported fields.
+ * - `suggestEntriesFromSignals` drafts new entries for frequent signals that
+ *   match nothing yet, then re-derives `method` via `applyClassification`
+ *   (never assigns method directly — same invariant as WI-02).
+ */
+import * as path from 'node:path';
+import { nowIso } from './foundation/time.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
+import { loadAdhocRunLedgerAtPath, type AdhocRunTally } from './promotion-candidates.js';
+import {
+  applyClassification,
+  createWorkInventoryEntry,
+  loadWorkInventoryTaxonomy,
+  validateWorkInventoryEntry,
+  type WorkInventoryEntry,
+  type WorkInventoryObservation,
+  type WorkInventoryScope,
+  type WorkInventoryStep,
+  type WorkInventoryStepBinding,
+  type WorkInventoryTaxonomy,
+  type WorkStage,
+  type WorkVerb,
+} from './work-inventory.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type DemandSignalKind =
+  'pipeline' | 'actuator_op' | 'mission' | 'adhoc_pipeline' | 'unhandled_intent';
+
+/**
+ * A demand signal is an aggregate: how often and how long a piece of work
+ * ran, keyed by a stable `signature`. Never carries free text.
+ */
+export interface DemandSignal {
+  signature: string;
+  kind: DemandSignalKind;
+  count: number;
+  first_at: string;
+  last_at: string;
+  per_week: number;
+  median_duration_ms?: number;
+  failure_count: number;
+  /** Window (in days) the count/per_week were computed over. */
+  window_days: number;
+  /** Up to 5 trace ids that contributed to this signal; empty for non-trace sources. */
+  sample_refs: string[];
+}
+
+export interface CollectKyberionDemandSignalsOptions {
+  rootDir?: string;
+  since?: Date;
+  until?: Date;
+  tenantSlug?: string;
+  includeUnscoped?: boolean;
+  now?: Date;
+}
+
+const DEFAULT_WINDOW_DAYS = 28;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MAX_SAMPLE_REFS = 5;
+
+// ---------------------------------------------------------------------------
+// Small shared helpers
+// ---------------------------------------------------------------------------
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function resolveWindow(options: CollectKyberionDemandSignalsOptions): {
+  since: Date;
+  until: Date;
+  windowDays: number;
+} {
+  const until = options.until ?? options.now ?? new Date();
+  const since = options.since ?? new Date(until.getTime() - DEFAULT_WINDOW_DAYS * MS_PER_DAY);
+  const rawDays = (until.getTime() - since.getTime()) / MS_PER_DAY;
+  const windowDays = rawDays > 0 ? rawDays : DEFAULT_WINDOW_DAYS;
+  return { since, until, windowDays };
+}
+
+// ---------------------------------------------------------------------------
+// Trace source (root spans only)
+// ---------------------------------------------------------------------------
+
+interface RootSpanClassification {
+  kind: DemandSignalKind;
+  signature: string;
+}
+
+/**
+ * Classifies a *root* span name into a demand-signal family, or returns
+ * `undefined` to skip it (bookkeeping spans, or an unrecognized family).
+ * Root span name families, per plan §2.3 ②: `pipeline:<id>`,
+ * `browser-pipeline:<id>`, `<actuator>:<op>`, `mission_run`,
+ * `mission_task_dispatch`, `mission:<...>`, `mission_controller:<...>`.
+ */
+function classifyRootSpanName(name: string): RootSpanClassification | undefined {
+  if (name === 'mission_task_dispatch') return undefined;
+  if (name.startsWith('mission:') || name.startsWith('mission_controller:')) return undefined;
+  if (name === 'mission_run') return { kind: 'mission', signature: 'mission_run' };
+  if (name.startsWith('pipeline:') || name.startsWith('browser-pipeline:')) {
+    return { kind: 'pipeline', signature: name };
+  }
+  if (/^[a-z0-9_]+-actuator:.+$/i.test(name)) {
+    return { kind: 'actuator_op', signature: name };
+  }
+  return undefined;
+}
+
+function tenantMatches(
+  tenantSlug: string | undefined,
+  options: CollectKyberionDemandSignalsOptions
+): boolean {
+  if (options.tenantSlug) {
+    if (tenantSlug === options.tenantSlug) return true;
+    return tenantSlug === undefined && options.includeUnscoped === true;
+  }
+  // No tenant requested: personal scope, never mix another tenant's traces in.
+  return tenantSlug === undefined;
+}
+
+interface SignalAccumulator {
+  kind: DemandSignalKind;
+  count: number;
+  first_at: string;
+  last_at: string;
+  durations: number[];
+  failure_count: number;
+  sample_refs: string[];
+}
+
+function traceFilesInWindow(rootDir: string, since: Date, until: Date): string[] {
+  const dir = path.join(rootDir, 'active', 'shared', 'logs', 'traces');
+  if (!safeExistsSync(dir)) return [];
+  const sinceDay = since.toISOString().slice(0, 10);
+  const untilDay = until.toISOString().slice(0, 10);
+  return safeReaddir(dir)
+    .filter((name) => /^traces-\d{4}-\d{2}-\d{2}\.jsonl$/.test(name))
+    .filter((name) => {
+      const day = name.slice('traces-'.length, 'traces-'.length + 10);
+      return day >= sinceDay && day <= untilDay;
+    })
+    .map((name) => path.join(dir, name))
+    .sort();
+}
+
+function collectTraceSignals(
+  rootDir: string,
+  since: Date,
+  until: Date,
+  windowDays: number,
+  options: CollectKyberionDemandSignalsOptions
+): DemandSignal[] {
+  const files = traceFilesInWindow(rootDir, since, until);
+  const sinceMs = since.getTime();
+  const untilMs = until.getTime();
+  const accumulators = new Map<string, SignalAccumulator>();
+
+  for (const file of files) {
+    let raw: string;
+    try {
+      raw = String(safeReadFile(file, { encoding: 'utf8' }));
+    } catch {
+      continue; // unreadable file: skip, never abort the whole scan
+    }
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      let record: unknown;
+      try {
+        record = parseSafeJsonInput(trimmed, 'trace line');
+      } catch {
+        continue; // malformed line: skip
+      }
+      if (!isRecord(record)) continue;
+
+      const rootSpan = record.rootSpan;
+      if (!isRecord(rootSpan)) continue;
+      const name = asString(rootSpan.name);
+      if (!name) continue;
+      const classification = classifyRootSpanName(name);
+      if (!classification) continue;
+
+      const metadata = isRecord(record.metadata) ? record.metadata : {};
+      const tenantSlug = asString(metadata.tenantSlug);
+      if (!tenantMatches(tenantSlug, options)) continue;
+
+      const startIso = asString(metadata.startedAt) ?? asString(rootSpan.startTime);
+      if (!startIso) continue;
+      const startMs = Date.parse(startIso);
+      if (!Number.isFinite(startMs) || startMs < sinceMs || startMs >= untilMs) continue;
+
+      const endIso = asString(metadata.completedAt) ?? asString(rootSpan.endTime);
+      let durationMs: number | undefined;
+      if (endIso) {
+        const endMs = Date.parse(endIso);
+        if (Number.isFinite(endMs) && endMs >= startMs) durationMs = endMs - startMs;
+      }
+
+      const failed = rootSpan.status === 'error';
+      const traceId = asString(record.traceId);
+
+      let acc = accumulators.get(classification.signature);
+      if (!acc) {
+        acc = {
+          kind: classification.kind,
+          count: 0,
+          first_at: startIso,
+          last_at: startIso,
+          durations: [],
+          failure_count: 0,
+          sample_refs: [],
+        };
+        accumulators.set(classification.signature, acc);
+      }
+      acc.count += 1;
+      if (startIso < acc.first_at) acc.first_at = startIso;
+      if (startIso > acc.last_at) acc.last_at = startIso;
+      if (durationMs !== undefined) acc.durations.push(durationMs);
+      if (failed) acc.failure_count += 1;
+      if (
+        traceId &&
+        acc.sample_refs.length < MAX_SAMPLE_REFS &&
+        !acc.sample_refs.includes(traceId)
+      ) {
+        acc.sample_refs.push(traceId);
+      }
+    }
+  }
+
+  const results: DemandSignal[] = [];
+  for (const [signature, acc] of accumulators) {
+    results.push({
+      signature,
+      kind: acc.kind,
+      count: acc.count,
+      first_at: acc.first_at,
+      last_at: acc.last_at,
+      per_week: acc.count / (windowDays / 7),
+      ...(acc.durations.length > 0 ? { median_duration_ms: median(acc.durations) } : {}),
+      failure_count: acc.failure_count,
+      window_days: windowDays,
+      sample_refs: acc.sample_refs,
+    });
+  }
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Ad-hoc pipeline ledger source
+// ---------------------------------------------------------------------------
+
+const ADHOC_LEDGER_RELATIVE_PATH = path.join(
+  'active',
+  'shared',
+  'runtime',
+  'feedback-loop',
+  'adhoc-pipeline-runs.json'
+);
+
+function collectAdhocLedgerSignals(
+  rootDir: string,
+  since: Date,
+  until: Date,
+  windowDays: number
+): DemandSignal[] {
+  const filePath = path.join(rootDir, ADHOC_LEDGER_RELATIVE_PATH);
+  if (!safeExistsSync(filePath)) return [];
+  let tallies: AdhocRunTally[];
+  try {
+    tallies = loadAdhocRunLedgerAtPath(filePath);
+  } catch {
+    return [];
+  }
+  const sinceMs = since.getTime();
+  const untilMs = until.getTime();
+  return tallies.map((tally) => {
+    const lastMs = Date.parse(tally.last_at);
+    const withinWindow = Number.isFinite(lastMs) && lastMs >= sinceMs && lastMs < untilMs;
+    return {
+      signature: `adhoc_pipeline:${tally.path}`,
+      kind: 'adhoc_pipeline',
+      count: tally.count,
+      first_at: tally.last_at,
+      last_at: tally.last_at,
+      per_week: withinWindow ? tally.count / (windowDays / 7) : 0,
+      failure_count: 0,
+      window_days: windowDays,
+      sample_refs: [],
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Unhandled intent registry source (ids/labels + counts only — never text)
+// ---------------------------------------------------------------------------
+
+const UNHANDLED_INTENT_REGISTRY_RELATIVE_PATH = path.join(
+  'active',
+  'shared',
+  'tmp',
+  'unhandled-intent-registry.json'
+);
+
+function collectUnhandledIntentSignals(
+  rootDir: string,
+  since: Date,
+  until: Date,
+  windowDays: number
+): DemandSignal[] {
+  const filePath = path.join(rootDir, UNHANDLED_INTENT_REGISTRY_RELATIVE_PATH);
+  if (!safeExistsSync(filePath)) return [];
+  let parsed: unknown;
+  try {
+    parsed = parseSafeJsonInput(
+      String(safeReadFile(filePath, { encoding: 'utf8' })),
+      'unhandled intent registry'
+    );
+  } catch {
+    return [];
+  }
+  if (!isRecord(parsed) || !Array.isArray(parsed.entries)) return [];
+
+  const sinceMs = since.getTime();
+  const untilMs = until.getTime();
+  const results: DemandSignal[] = [];
+  for (const rawEntry of parsed.entries) {
+    if (!isRecord(rawEntry)) continue;
+    // 'unrecognized' misses may have no scored intent id at all — those carry
+    // no non-text identifier we could safely harvest, so they are skipped.
+    const intentId = asString(rawEntry.intent_id);
+    if (!intentId) continue;
+    const count = typeof rawEntry.occurrence_count === 'number' ? rawEntry.occurrence_count : 0;
+    const firstAt = asString(rawEntry.first_seen) ?? nowIso();
+    const lastAt = asString(rawEntry.last_seen) ?? firstAt;
+    const lastMs = Date.parse(lastAt);
+    const withinWindow = Number.isFinite(lastMs) && lastMs >= sinceMs && lastMs < untilMs;
+    results.push({
+      signature: `intent:${intentId}`,
+      kind: 'unhandled_intent',
+      count,
+      first_at: firstAt,
+      last_at: lastAt,
+      per_week: withinWindow ? count / (windowDays / 7) : 0,
+      failure_count: 0,
+      window_days: windowDays,
+      sample_refs: [],
+    });
+  }
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Public: collect
+// ---------------------------------------------------------------------------
+
+/**
+ * Scans Kyberion's own usage logs (traces, ad-hoc pipeline ledger, unhandled
+ * intent registry) and returns aggregate demand signals — never trace
+ * attribute/event text, pipeline payloads, or intent utterance text — sorted
+ * by `count` descending, then `signature` ascending.
+ */
+export function collectKyberionDemandSignals(
+  options: CollectKyberionDemandSignalsOptions = {}
+): DemandSignal[] {
+  const rootDir = options.rootDir ?? pathResolver.rootDir();
+  const { since, until, windowDays } = resolveWindow(options);
+
+  const signals: DemandSignal[] = [
+    ...collectTraceSignals(rootDir, since, until, windowDays, options),
+    ...collectAdhocLedgerSignals(rootDir, since, until, windowDays),
+    ...collectUnhandledIntentSignals(rootDir, since, until, windowDays),
+  ];
+
+  signals.sort((a, b) => b.count - a.count || a.signature.localeCompare(b.signature));
+  return signals;
+}
+
+// ---------------------------------------------------------------------------
+// Public: match signals to entries
+// ---------------------------------------------------------------------------
+
+function normalizePipelineId(pipelineId: string): string {
+  const trimmed = pipelineId.trim();
+  const base = trimmed.includes('/') ? trimmed.slice(trimmed.lastIndexOf('/') + 1) : trimmed;
+  return base.replace(/\.json$/i, '');
+}
+
+/**
+ * Maps each entry (by `entry_id`) to the demand signals it already matches:
+ * a step binding's `pipeline_id` (accepting a bare id or a `pipelines/<id>.json`
+ * path), a step binding's `actuator`+`op`, a step binding's `intent_id`, or an
+ * existing `kyberion_trace` observation whose `ref` equals the signature.
+ */
+export function matchSignalsToEntries(
+  entries: WorkInventoryEntry[],
+  signals: DemandSignal[]
+): Map<string, DemandSignal[]> {
+  const bySignature = new Map(signals.map((signal) => [signal.signature, signal]));
+  const result = new Map<string, DemandSignal[]>();
+
+  for (const entry of entries) {
+    const matched = new Set<string>();
+
+    for (const step of entry.steps) {
+      const binding = step.binding;
+      if (!binding) continue;
+      if (binding.pipeline_id) {
+        const signature = `pipeline:${normalizePipelineId(binding.pipeline_id)}`;
+        if (bySignature.has(signature)) matched.add(signature);
+      }
+      if (binding.actuator && binding.op) {
+        const signature = `${binding.actuator}:${binding.op}`;
+        if (bySignature.has(signature)) matched.add(signature);
+      }
+      if (binding.intent_id) {
+        const signature = `intent:${binding.intent_id}`;
+        if (bySignature.has(signature)) matched.add(signature);
+      }
+    }
+
+    for (const observation of entry.observations ?? []) {
+      if (observation.source === 'kyberion_trace' && bySignature.has(observation.ref)) {
+        matched.add(observation.ref);
+      }
+    }
+
+    if (matched.size > 0) {
+      result.set(
+        entry.entry_id,
+        [...matched]
+          .map((signature) => bySignature.get(signature))
+          .filter((s): s is DemandSignal => Boolean(s))
+      );
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Public: attach signals to an entry (immutable, idempotent upsert)
+// ---------------------------------------------------------------------------
+
+function digestForSignal(signal: DemandSignal): string {
+  const parts = [
+    `${signal.count} runs over last ${signal.window_days}d (~${signal.per_week.toFixed(1)}/wk)`,
+  ];
+  if (signal.median_duration_ms !== undefined) {
+    parts.push(`median ${Math.round(signal.median_duration_ms)}ms`);
+  }
+  if (signal.failure_count > 0) parts.push(`${signal.failure_count} failures`);
+  return parts.join(', ');
+}
+
+/**
+ * Returns a new entry with each signal upserted as a `kyberion_trace`
+ * observation keyed by `ref` (signature) — calling this again with the same
+ * signature replaces rather than duplicates. Never touches self-reported
+ * `frequency` / `effort_minutes_per_run`, or observations from other sources.
+ */
+export function attachDemandSignals(
+  entry: WorkInventoryEntry,
+  signals: DemandSignal[],
+  now: Date = new Date()
+): WorkInventoryEntry {
+  if (signals.length === 0) return entry;
+
+  const otherObservations = (entry.observations ?? []).filter((o) => o.source !== 'kyberion_trace');
+  const traceObservations = new Map<string, WorkInventoryObservation>(
+    (entry.observations ?? [])
+      .filter((o) => o.source === 'kyberion_trace')
+      .map((o) => [o.ref, o] as const)
+  );
+
+  for (const signal of signals) {
+    traceObservations.set(signal.signature, {
+      source: 'kyberion_trace',
+      ref: signal.signature,
+      observed_at: signal.last_at,
+      digest: digestForSignal(signal),
+      metrics: {
+        count: signal.count,
+        per_week: signal.per_week,
+        ...(signal.median_duration_ms !== undefined
+          ? { median_duration_ms: signal.median_duration_ms }
+          : {}),
+        failure_count: signal.failure_count,
+        window_days: signal.window_days,
+      },
+    });
+  }
+
+  return {
+    ...entry,
+    observations: [...otherObservations, ...traceObservations.values()],
+    updated_at: nowIso(now),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Public: suggest draft entries for frequent, unmatched signals
+// ---------------------------------------------------------------------------
+
+export interface SuggestEntriesFromSignalsOptions {
+  minCount?: number;
+  scope?: WorkInventoryScope;
+  now?: Date;
+}
+
+function titleFromSignature(signature: string): string {
+  const words = signature.split(/[:_-]+/).filter(Boolean);
+  const titled = words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  return titled || signature;
+}
+
+function verbForSignal(signal: DemandSignal, taxonomy: WorkInventoryTaxonomy): WorkVerb {
+  if (signal.kind === 'pipeline' || signal.kind === 'adhoc_pipeline') return 'operate';
+  if (signal.kind === 'unhandled_intent') return 'receive';
+  if (signal.kind === 'actuator_op') {
+    const actuator = signal.signature.split(':')[0];
+    const found = taxonomy.verbs.find((verb) =>
+      verb.candidate_bindings.some((binding) => binding.actuator === actuator)
+    );
+    return found?.id ?? 'operate';
+  }
+  return 'operate'; // mission
+}
+
+function bindingForSignal(signal: DemandSignal): WorkInventoryStepBinding | undefined {
+  switch (signal.kind) {
+    case 'pipeline': {
+      const id = signal.signature.startsWith('browser-pipeline:')
+        ? signal.signature.slice('browser-pipeline:'.length)
+        : signal.signature.slice('pipeline:'.length);
+      return id ? { pipeline_id: id } : undefined;
+    }
+    case 'adhoc_pipeline': {
+      const id = signal.signature.slice('adhoc_pipeline:'.length);
+      return id ? { pipeline_id: id } : undefined;
+    }
+    case 'actuator_op': {
+      const separator = signal.signature.indexOf(':');
+      if (separator <= 0) return undefined;
+      return {
+        actuator: signal.signature.slice(0, separator),
+        op: signal.signature.slice(separator + 1),
+      };
+    }
+    case 'unhandled_intent': {
+      const id = signal.signature.slice('intent:'.length);
+      return id ? { intent_id: id } : undefined;
+    }
+    case 'mission':
+    default:
+      return undefined;
+  }
+}
+
+function buildDraftEntry(
+  signal: DemandSignal,
+  scope: WorkInventoryScope,
+  now: Date,
+  taxonomy: WorkInventoryTaxonomy
+): WorkInventoryEntry {
+  const verb = verbForSignal(signal, taxonomy);
+  const stage: WorkStage = taxonomy.verbs.find((v) => v.id === verb)?.default_stage ?? 'act';
+  const binding = bindingForSignal(signal);
+
+  const step: WorkInventoryStep = {
+    step_id: 'S1',
+    stage,
+    verb,
+    description: `Observed via a Kyberion usage signal for "${signal.signature}".`,
+    data_sensitivity: 'internal',
+    effects: [],
+    method: {
+      assigned: 'human',
+      source: 'proposal',
+      rationale: 'pending automatic classification from a Kyberion demand signal',
+    },
+    ...(binding ? { binding } : {}),
+  };
+
+  const draft = createWorkInventoryEntry(
+    {
+      title: titleFromSignature(signal.signature),
+      scope,
+      trigger: {
+        kind: 'request',
+        description: `Observed ${signal.count} times via Kyberion usage signal "${signal.signature}".`,
+      },
+      steps: [step],
+    },
+    now
+  );
+
+  const classified = applyClassification(draft, {}, taxonomy);
+  const withSignal = attachDemandSignals(classified, [signal], now);
+  const check = validateWorkInventoryEntry(withSignal);
+  if (!check.valid) {
+    throw new Error(
+      `work-inventory-harvest: suggested entry for "${signal.signature}" failed validation: ${check.errors.join('; ')}`
+    );
+  }
+  return withSignal;
+}
+
+/**
+ * Drafts a `WorkInventoryEntry` (status `draft`) for each signal with
+ * `count >= minCount` (default 3) that no existing entry already matches
+ * (per `matchSignalsToEntries`). `method` is always re-derived via
+ * `applyClassification` — never assigned directly.
+ */
+export function suggestEntriesFromSignals(
+  signals: DemandSignal[],
+  entries: WorkInventoryEntry[],
+  options: SuggestEntriesFromSignalsOptions = {}
+): WorkInventoryEntry[] {
+  const minCount = options.minCount ?? 3;
+  const scope = options.scope ?? {};
+  const now = options.now ?? new Date();
+  const taxonomy = loadWorkInventoryTaxonomy();
+
+  const matched = matchSignalsToEntries(entries, signals);
+  const matchedSignatures = new Set<string>();
+  for (const list of matched.values()) {
+    for (const signal of list) matchedSignatures.add(signal.signature);
+  }
+
+  return signals
+    .filter((signal) => signal.count >= minCount && !matchedSignatures.has(signal.signature))
+    .map((signal) => buildDraftEntry(signal, scope, now, taxonomy));
+}

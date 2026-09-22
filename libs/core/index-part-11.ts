@@ -142,3 +142,4 @@ export * from './work-inventory-scoring.js';
 export * from './work-inventory-consent.js';
 export * from './work-inventory-observation.js';
 export * from './work-inventory-decompose.js';
+export * from './work-inventory-harvest.js';

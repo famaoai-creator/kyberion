@@ -118,6 +118,8 @@
     "libs/core/voice-sample-collection.test.ts",
     "libs/core/voice-sample-ingestion-policy.test.ts",
     "libs/core/work-graph-projection.test.ts",
+    "libs/core/work-inventory-harvest.test.ts",
+    "libs/core/work-inventory-scoring.test.ts",
     "libs/core/work-inventory.test.ts",
     "libs/core/worker-event-stream.test.ts",
     "plugins/fixtures/skill-plugin-loader-official-fixture.mjs",
