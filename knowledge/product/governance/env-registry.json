@@ -174,6 +174,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_AGENT_TOKEN_SECRET",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "HMAC signing/verification key for kya1. agent workload tokens (authn-principal-resolver seam, agent-token provider). When unset, the secret-guard 'kyberion-agent-token' connection document is consulted as a fallback.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
       "name": "KYBERION_AGENT_TURN_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
@@ -459,6 +468,24 @@
       "required": false,
       "description": "Optional HTTP destination for forwarding audit events; outbound delivery remains subject to the egress policy and local audit persistence is authoritative.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_AUTHN_STUB_PRINCIPAL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Principal id returned by the stub authn provider (authn-principal-resolver seam). Test/dev only; never a real identity.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_AUTHZ_POLICY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Override path to the declarative authz rules file consumed by the policy-file provider (authz-policy-engine seam).",
+      "documented": true,
+      "subsystem": "identity"
     },
     {
       "name": "KYBERION_AUTO_SEAL",
@@ -2265,6 +2292,60 @@
       "description": "OBS Studio WebSocket server password for the talking-avatar virtual-camera output; must match OBS Settings → General → WebSocket Server → Server Password.",
       "documented": true,
       "subsystem": "voice"
+    },
+    {
+      "name": "KYBERION_OIDC_ALLOW_HS256",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Allow HS256 JWT verification via oct JWKS keys. Intended for hermetic tests; keep disabled in production (prefer RS256/ES256).",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_OIDC_AUDIENCE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Expected aud claim for OIDC JWT principals; enforced when set.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_OIDC_ISSUER",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Expected iss claim for OIDC JWT principals (oidc-jwt provider). Tokens from other issuers are not judged by this provider.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_OIDC_JWKS",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "Inline JWKS JSON used to verify OIDC JWTs (oidc-jwt provider).",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_OIDC_JWKS_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Repository-safe path to a JWKS JSON file used to verify OIDC JWTs.",
+      "documented": true,
+      "subsystem": "identity"
+    },
+    {
+      "name": "KYBERION_OIDC_JWKS_URL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Remote JWKS endpoint for OIDC verification. The synchronous resolve path never fetches it; surfaces that own egress pre-fetch into deps.jwks.",
+      "documented": true,
+      "subsystem": "identity"
     },
     {
       "name": "KYBERION_OLLAMA_KEY",

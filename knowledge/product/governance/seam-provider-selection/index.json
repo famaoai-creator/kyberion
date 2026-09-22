@@ -11,6 +11,8 @@
     "streaming-stt-bridge",
     "voice-hub-stt",
     "music-generation-provider",
-    "video-generation-provider"
+    "video-generation-provider",
+    "authn-principal-resolver",
+    "authz-policy-engine"
   ]
 }
