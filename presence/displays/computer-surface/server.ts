@@ -31,6 +31,7 @@ import {
   assertComputerSurfacePayloadInScope,
   computerSurfaceServerTenantResource,
   ComputerSurfaceViewerError,
+  isComputerSurfaceLoopbackRequest,
   resolveComputerSurfaceViewerContext,
 } from './auth.js';
 import {
@@ -212,12 +213,64 @@ function emitState(): void {
   for (const client of sseClients) client.write(chunk);
 }
 
+const RATE_LIMIT_DEFAULT_WINDOW_MS = 60_000;
+const RATE_LIMIT_DEFAULT_GET = 180;
+const RATE_LIMIT_DEFAULT_MUTATION = 60;
+const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
+
+function checkComputerSurfaceRateLimit(req: express.Request): {
+  ok: boolean;
+  retryAfterSeconds?: number;
+} {
+  if (isComputerSurfaceLoopbackRequest(req)) return { ok: true };
+  const remote = req.socket?.remoteAddress || 'unknown';
+  const windowMs = Number(
+    getRegisteredEnvText('COMPUTER_SURFACE_RATE_LIMIT_WINDOW_MS') || RATE_LIMIT_DEFAULT_WINDOW_MS
+  );
+  const method = String(req.method || 'UNKNOWN').toUpperCase();
+  const limit =
+    method === 'GET' || method === 'HEAD'
+      ? Number(getRegisteredEnvText('COMPUTER_SURFACE_RATE_LIMIT_GET') || RATE_LIMIT_DEFAULT_GET)
+      : Number(
+          getRegisteredEnvText('COMPUTER_SURFACE_RATE_LIMIT_MUTATION') ||
+            RATE_LIMIT_DEFAULT_MUTATION
+        );
+  const key = `${remote}:${method}`;
+  const now = Date.now();
+  const current = rateLimitStore.get(key);
+  const expired = !current || now - current.windowStart > windowMs;
+  const windowStart = expired ? now : current.windowStart;
+  const count = expired ? 1 : current.count + 1;
+  rateLimitStore.set(key, { count, windowStart });
+  if (count <= limit) return { ok: true };
+  return {
+    ok: false,
+    retryAfterSeconds: Math.max(1, Math.ceil((windowMs - (now - windowStart)) / 1000)),
+  };
+}
+
+function requireComputerSurfaceRateLimit(): express.RequestHandler {
+  return (req, res, next) => {
+    const decision = checkComputerSurfaceRateLimit(req);
+    if (!decision.ok) {
+      res.setHeader('Retry-After', String(decision.retryAfterSeconds));
+      res.status(429).json({
+        ok: false,
+        error: `Computer Surface rate limit exceeded. Retry in about ${decision.retryAfterSeconds}s.`,
+      });
+      return;
+    }
+    next();
+  };
+}
+
 if (!safeExistsSync(staticDir)) {
   safeMkdir(staticDir, { recursive: true });
 }
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(staticDir));
+app.use(['/api', '/a2ui'], requireComputerSurfaceRateLimit());
 
 app.get('/favicon.ico', (_req, res) => {
   res.status(204).end();
