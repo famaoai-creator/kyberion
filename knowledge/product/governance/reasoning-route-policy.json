@@ -363,7 +363,7 @@
     },
     "claude-cli-default": {
       "mode": "claude-cli",
-      "model_ref": "anthropic:claude-opus-5",
+      "model_ref": "anthropic:claude-opus-5-5",
       "capabilities": ["text", "structured_output", "tools"]
     },
     "gemini-cli-default": {
@@ -376,7 +376,7 @@
     },
     "anthropic-default": {
       "mode": "anthropic",
-      "model_ref": "anthropic:claude-opus-5",
+      "model_ref": "anthropic:claude-opus-5-5",
       "capabilities": ["text", "structured_output", "tools", "vision"]
     },
     "gemini-api-default": {
