@@ -188,6 +188,7 @@
     "claude-code": "^1.0.0",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "express-rate-limit": "8.2.2",
     "gif-encoder-2": "^1.0.5",
     "googleapis": "^178.1.1",
     "html-to-docx": "^1.8.0",
