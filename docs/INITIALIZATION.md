@@ -119,6 +119,9 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 - `.venv/bin/python3` は legacy compatibility 用の repo-local 実行環境候補であり、新規標準ではありません。
 - AGY native subagent を使う場合は、公式 SDK を managed runtime へ `pnpm agy:sdk:setup --apply`（内部では `uv venv` + `uv pip install`）で導入できます。Python 3.10+ が必要で、任意の Python 実行ファイルは `KYBERION_AGY_SDK_PYTHON` で上書きできます。
 - AGY CLI の Kyberion 用カスタムエージェント定義は `pnpm agents:generate` で `.agents/agents/` に生成されます。手動で一覧を確認する場合は `agy --add-dir "$PWD" agent`、特定の定義を選ぶ場合は `agy --add-dir "$PWD" --agent kyberion-implementer ...` を使います。`AgyCliBackend` はワークスペースを自動的に `--add-dir` へ渡します。
+- Devin CLI 向けのカスタムサブエージェント定義も同じ `pnpm agents:generate` で `.devin/agents/` に生成されます(ロール名そのまま: `implementer` / `reviewer` / `devils_advocate`)。Devin の `allowed-tools` は厳格な許可リストなので、AGY 向け `.agents/agents/` 側の `kyberion-*` 定義は Devin ではツール名が解決できず実質ツール無しになります — Devin 配下では `.devin/agents/` 側の名前を指定してください。
+- Cursor 向けのカスタムサブエージェント定義も同じ `pnpm agents:generate` で `.cursor/agents/` に生成されます(ロール名そのまま)。Cursor は frontmatter に `tools:` 許可リストがなく、親 Agent のツール(MCP 含む)を継承します。読み取り専用ロールは `readonly: true` で書き込みと状態変更シェルを抑止します。呼び出し例: `/implementer` / `/reviewer` / `/devils_advocate`。
+- Codex CLI 向けのカスタムサブエージェント定義も同じ `pnpm agents:generate` で `.codex/agents/` に生成されます(ロール名そのままの TOML: `implementer` / `reviewer` / `devils_advocate`)。`sandbox_mode` は KD-05 の権限ティアから射影され、実装担当は `workspace-write`、調査・レビュー担当は `read-only` になります。
 - 音声サンプルやプロモート後の voice profile データは `active/shared/tmp/` または `active/shared/runtime/voice-profiles/<profile_id>/` に置きます。
 
 ### Stage 4: Readiness の確認
