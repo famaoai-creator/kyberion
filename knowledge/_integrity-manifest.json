@@ -4227,7 +4227,7 @@
     {
       "path": "product/governance/work-inventory-taxonomy.json",
       "tier": "public",
-      "size": 9811,
+      "size": 10421,
       "type": "json"
     },
     {
@@ -11857,15 +11857,33 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/work-inventory-calibration.schema.json",
+      "tier": "public",
+      "size": 2597,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/work-inventory-consent.schema.json",
+      "tier": "public",
+      "size": 2383,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/work-inventory-entry.schema.json",
       "tier": "public",
       "size": 8397,
       "type": "json"
     },
     {
+      "path": "product/schemas/work-inventory-observation-summary.schema.json",
+      "tier": "public",
+      "size": 4674,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/work-inventory-taxonomy.schema.json",
       "tier": "public",
-      "size": 8114,
+      "size": 8744,
       "type": "json"
     },
     {
