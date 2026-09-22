@@ -156,7 +156,7 @@ describe('reasoning-route-resolver', () => {
       requestedProfile: 'anthropic-default',
       env: { ANTHROPIC_API_KEY: 'test-anthropic-key' },
     });
-    expect(route.model).toBe('anthropic:claude-opus-5');
+    expect(route.model).toBe('anthropic:claude-opus-5-5');
 
     const overridden = resolveReasoningRoute({
       role: 'default',
