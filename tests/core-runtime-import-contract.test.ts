@@ -25,41 +25,52 @@ describe('Core runtime import contract', () => {
 
     const failures: Array<{ specifier: string; error: string }> = [];
 
-    // ~740 subpaths × one child node each: sequential spawns take ~85s
-    // locally and exceed the timeout on shared CI runners. Overlap bounded
-    // batches through the governed async exec boundary instead; batches stay
-    // sequential so failure order remains deterministic.
-    const CONCURRENCY = 8;
-    for (let index = 0; index < exportKeys.length; index += CONCURRENCY) {
-      const batch = exportKeys.slice(index, index + CONCURRENCY);
-      const settled = await Promise.all(
-        batch.map(async (key) => {
-          const specifier = exportKeyToSpecifier(key);
-          const result = await safeExecResultAsync(
-            'node',
-            [
-              '--input-type=module',
-              '-e',
-              `import(${JSON.stringify(specifier)}).then(() => console.log('ok'))`,
-            ],
+    // ~790 subpaths. One child node per subpath spent most of the time on
+    // process start-up and exceeded the timeout on shared CI runners, so
+    // each child imports a whole chunk sequentially (every import isolated
+    // by its own try/catch) and reports failures as JSON. Chunks run in
+    // parallel; results are sorted so the failure list stays deterministic.
+    const CHUNKS = 8;
+    const chunkSize = Math.ceil(exportKeys.length / CHUNKS);
+    const script = [
+      'const specs = JSON.parse(process.argv[1]);',
+      'const failed = [];',
+      'for (const spec of specs) {',
+      '  try { await import(spec); }',
+      '  catch (error) { failed.push({ specifier: spec, error: String(error?.stack ?? error).slice(0, 300) }); }',
+      '}',
+      "process.stdout.write('\\n__RESULT__' + JSON.stringify(failed));",
+      'process.exit(0);',
+    ].join('\n');
+    const chunks = Array.from({ length: CHUNKS }, (_, i) =>
+      exportKeys.slice(i * chunkSize, (i + 1) * chunkSize).map(exportKeyToSpecifier)
+    ).filter((chunk) => chunk.length > 0);
+
+    const settled = await Promise.all(
+      chunks.map(async (specs) => {
+        const result = await safeExecResultAsync(
+          'node',
+          ['--input-type=module', '-e', script, JSON.stringify(specs)],
+          { cwd: process.cwd() }
+        );
+        const marker = result.stdout.lastIndexOf('__RESULT__');
+        if (result.status !== 0 || result.error || marker < 0) {
+          return [
             {
-              cwd: process.cwd(),
-            }
-          );
-          if (result.status !== 0 || result.error) {
-            return {
-              specifier,
+              specifier: `${specs[0]} .. ${specs[specs.length - 1]}`,
               error:
                 result.error?.message || result.stderr.slice(0, 300) || `exit ${result.status}`,
-            };
-          }
-          return null;
-        })
-      );
-      for (const failure of settled) {
-        if (failure) failures.push(failure);
-      }
-    }
+            },
+          ];
+        }
+        return JSON.parse(result.stdout.slice(marker + '__RESULT__'.length)) as Array<{
+          specifier: string;
+          error: string;
+        }>;
+      })
+    );
+    for (const chunkFailures of settled) failures.push(...chunkFailures);
+    failures.sort((left, right) => left.specifier.localeCompare(right.specifier));
 
     expect(failures).toEqual([]);
   }, 180000); // loads every subpath in a child process — slow on shared CI runners
