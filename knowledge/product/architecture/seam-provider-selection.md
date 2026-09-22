@@ -117,6 +117,11 @@ pnpm kyberion seam select explain --seam ocr-provider --purpose accuracy --conte
 | `voice.vad-backend`          | `resolveVadBackend(id, { purpose })`; `--vad-purpose`                             | accuracy, light                     | probe                                                                                                 | — (needs labelled speech segments) |
 | `voice-tts-engine`           | `purpose` / `language` (`speak_local`, `generate_voice` with `engine_id: 'auto'`) | naturalness, latency, privacy       | status, platform, format, runtime adapter, text language, local_only, identity class                  | artifact (listen), latency         |
 | `streaming-tts-bridge`       | `selectStreamingTtsBridge`                                                        | per policy                          | languages, local_only, synthetic                                                                      | —                                  |
+| `authn-principal-resolver`   | `resolveAuthnPrincipal(request, { purpose, context })`                            | local_dev, remote_human, …          | credential type, loopback proof, agent/human principals, IdP config, zero-config                     | —                                  |
+| `authz-policy-engine`        | `authorizeWithPolicyEngine(query, { purpose, context })`                          | default_surface, membership, lockdown, test | principal kinds, effects, tenant/member awareness, requiresConfig                            | —                                  |
+
+AuthN/AuthZ usage (requests, providers, env knobs, surface wiring contract):
+[authn-authz-seams](./authn-authz-seams.md).
 
 Explicit choices that always win: `browser_runtime`, `providerPreference` /
 `backend_id`, voice `engine_id` / `backend`, `KYBERION_VAD`,
