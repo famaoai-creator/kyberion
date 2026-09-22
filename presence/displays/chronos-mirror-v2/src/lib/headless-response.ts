@@ -11,7 +11,7 @@ import {
   ViewerContextError,
 } from './viewer-context';
 import { headlessViewerScope, HeadlessQueryError } from './headless-projections';
-import { authorizeSurfaceOperation } from '@agent/core/surface-authorization';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface-authn';
 
 export function headlessManifest(): HeadlessApiManifest {
   return buildChronosHeadlessManifest();
@@ -30,7 +30,7 @@ export function authorizeHeadlessOperation(
     (candidate) => candidate.operation_id === operationId
   );
   if (!operation) throw new ViewerContextError(403, `unknown headless operation: ${operationId}`);
-  const decision = authorizeSurfaceOperation({
+  const decision = authorizeSurfaceContextOperation({
     context: toSurfaceAuthorizationContext(viewer),
     operation: {
       operationId: operation.operation_id,
@@ -39,6 +39,7 @@ export function authorizeHeadlessOperation(
       requiredPermissions: operation.required_permissions,
     },
     resource,
+    surface: 'chronos',
   });
   if (!decision.allowed) throw new ViewerContextError(403, decision.reason);
 }

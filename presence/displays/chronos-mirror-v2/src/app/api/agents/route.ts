@@ -159,9 +159,11 @@ export async function POST(req: NextRequest) {
   try {
     return await withViewerExecutionContextAsync(resolvedViewer.context, async () => {
       const jsonBody = await readChronosJsonObject(req, 'Chronos agents');
-      if (!jsonBody.ok) return NextResponse.json({ error: jsonBody.error }, { status: 400 });
+      if (jsonBody.ok !== true)
+        return NextResponse.json({ error: jsonBody.error }, { status: 400 });
       const parsedBody = parseChronosAgentsBody(jsonBody.body);
-      if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+      if (parsedBody.ok !== true)
+        return NextResponse.json({ error: parsedBody.error }, { status: 400 });
       const { body, action } = parsedBody;
       const [runtimeSupervisor, runtimeSupervisorClient] = await Promise.all([
         import('@agent/core/agent-runtime-supervisor'),
@@ -486,7 +488,9 @@ export async function POST(req: NextRequest) {
           if (!body.envelope?.header)
             return NextResponse.json({ error: 'Invalid A2A envelope' }, { status: 400 });
           const { a2aBridge } = await import('@agent/core/a2a-bridge');
-          const response = await a2aBridge.route(body.envelope);
+          const response = await a2aBridge.route(
+            body.envelope as unknown as import('@agent/core/a2a-bridge').A2AMessage
+          );
           return NextResponse.json({ status: 'ok', response });
         }
         default:
@@ -508,9 +512,11 @@ export async function DELETE(req: NextRequest) {
     if (forbidden) return forbidden;
     return await withViewerExecutionContextAsync(resolvedViewer.context, async () => {
       const jsonBody = await readChronosJsonObject(req, 'Chronos agents');
-      if (!jsonBody.ok) return NextResponse.json({ error: jsonBody.error }, { status: 400 });
+      if (jsonBody.ok !== true)
+        return NextResponse.json({ error: jsonBody.error }, { status: 400 });
       const parsedBody = parseChronosAgentsBody(jsonBody.body, { requireAgentId: true });
-      if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+      if (parsedBody.ok !== true)
+        return NextResponse.json({ error: parsedBody.error }, { status: 400 });
       const { body } = parsedBody;
       const [{ stopAgentRuntime }, runtimeSupervisorClient] = await Promise.all([
         import('@agent/core/agent-runtime-supervisor'),

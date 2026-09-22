@@ -107,7 +107,7 @@ export function resolveChronosLocale(): SupportedLocale {
     if (stored) return stored;
     return normalizeChronosLocale(window.navigator.language);
   }
-  return browserVocabulary.defaultLocale() || 'en';
+  return normalizeChronosLocale(browserVocabulary.defaultLocale());
 }
 
 export function chronosSpeechLocale(locale = resolveChronosLocale()): string {

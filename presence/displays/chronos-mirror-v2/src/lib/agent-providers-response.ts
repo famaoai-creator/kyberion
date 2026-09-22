@@ -46,11 +46,11 @@ function parseProvider(value: unknown): ClientAgentProvider | undefined {
     return undefined;
   }
   return {
-    provider: value.provider,
-    installed: value.installed,
-    version: value.version,
+    provider: value.provider as string,
+    installed: value.installed as boolean,
+    version: value.version as string,
     protocol: value.protocol as ClientAgentProvider['protocol'],
-    models: value.models,
+    models: value.models as ClientAgentProvider['models'],
   };
 }
 

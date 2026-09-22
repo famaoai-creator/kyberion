@@ -89,7 +89,7 @@ function parseAction(value: unknown): ClientSurfaceControlAction | undefined {
   return {
     operation: value.operation,
     label: value.label,
-    risk: value.risk,
+    risk: value.risk as 'safe' | 'risky',
     enabled: value.enabled,
     ...(value.disabledReason !== undefined ? { disabledReason: value.disabledReason } : {}),
   };
@@ -142,10 +142,10 @@ function parseActionSummary(value: unknown): ClientSurfaceControlActionSummary |
   return {
     ...(value.event_id !== undefined ? { event_id: value.event_id } : {}),
     ...(value.ts !== undefined ? { ts: value.ts } : {}),
-    kind: value.kind,
+    kind: value.kind as 'mission' | 'surface',
     target: value.target,
     operation: value.operation,
-    status: value.status,
+    status: value.status as 'completed' | 'queued' | 'failed',
     ...(value.requested_by !== undefined ? { requested_by: value.requested_by } : {}),
     ...(value.error !== undefined ? { error: value.error } : {}),
   };

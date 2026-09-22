@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 
 import { guardRequest } from '../../../lib/api-guard';
-import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
+import { pathResolver } from '@agent/core/path-resolver';
 import { loadArtifactRecord } from '@agent/core/artifact-record';
-import { loadState } from '@agent/core/mission-state';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -21,6 +20,13 @@ import {
 } from '../../../lib/viewer-context';
 import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
 import { readChronosOptionalStringParam, readChronosStringParam } from '../../../lib/request-input';
+import {
+  artifactTenant,
+  resolveMissionAssetTier,
+  resolveMissionAssetTenant,
+  tenantFromPath,
+  type AssetTier,
+} from './helpers';
 
 const ALLOWED_PREFIXES = ['deliverables/', 'artifacts/', 'outputs/', 'evidence/'] as const;
 // Repo-relative mode (no missionId): where governed artifacts actually live.
@@ -71,88 +77,6 @@ function toRepoRelative(rawPath: string): string | null {
 
 function isAllowedRepoAssetPath(relativePath: string): boolean {
   return ALLOWED_REPO_PREFIXES.some((prefix) => relativePath.startsWith(prefix));
-}
-
-type AssetTier = 'personal' | 'confidential' | 'public';
-
-function normalizeAssetPath(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const normalized = value.replace(/\\/g, '/');
-  const root = pathResolver.rootDir().replace(/\\/g, '/').replace(/\/$/, '');
-  return normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : normalized;
-}
-
-function tierFromPath(value: string | undefined): AssetTier | undefined {
-  const normalized = normalizeAssetPath(value);
-  const match = normalized?.match(
-    /(?:^|\/)active\/(?:missions|projects)\/(personal|confidential|public)(?:\/|$)/
-  );
-  return match?.[1] as AssetTier | undefined;
-}
-
-function tenantFromPath(value: string | undefined): string | undefined {
-  const normalized = normalizeAssetPath(value);
-  const match = normalized?.match(
-    /^active\/(?:missions|projects)\/(?:personal|confidential|public)\/([^/]+)\//
-  );
-  return match?.[1] && match[1] !== 'shared' ? match[1] : undefined;
-}
-
-function missionTier(missionId: string): AssetTier | undefined {
-  const missionPath = findMissionPath(missionId);
-  if (!missionPath) return undefined;
-  try {
-    const state = loadState(missionId);
-    if (state?.tier === 'personal' || state?.tier === 'confidential' || state?.tier === 'public') {
-      return state.tier;
-    }
-  } catch {
-    // Fall back to the governed mission directory shape below.
-  }
-  return tierFromPath(missionPath);
-}
-
-function artifactTenant(artifact: {
-  tenant_slug?: string;
-  mission_id?: string;
-}): string | undefined {
-  if (artifact.tenant_slug) return artifact.tenant_slug;
-  if (!artifact.mission_id) return undefined;
-  const missionPath = findMissionPath(artifact.mission_id);
-  if (!missionPath) return undefined;
-  try {
-    const state = loadState(artifact.mission_id);
-    return state?.tenant_slug || state?.tenant_id;
-  } catch {
-    return undefined;
-  }
-}
-
-export function resolveMissionAssetTier(input: {
-  artifact?: Parameters<typeof inferDeliverableTier>[0];
-  assetPath?: string;
-  missionId?: string;
-}): AssetTier | undefined {
-  const resolvedMissionTier = input.missionId ? missionTier(input.missionId) : undefined;
-  const pathTier = tierFromPath(input.assetPath);
-  if (resolvedMissionTier || pathTier) return resolvedMissionTier || pathTier;
-  return inferDeliverableTier(
-    input.artifact || { kind: '', storage_class: 'external_ref', artifact_id: '' },
-    normalizeAssetPath(input.artifact?.path),
-    undefined
-  );
-}
-
-export function resolveMissionAssetTenant(input: {
-  artifact?: Parameters<typeof inferDeliverableTier>[0];
-  assetPath?: string;
-  missionId?: string;
-}): string | undefined {
-  return (
-    tenantFromPath(input.assetPath) ||
-    (input.artifact ? artifactTenant(input.artifact) : undefined) ||
-    (input.missionId ? artifactTenant({ mission_id: input.missionId }) : undefined)
-  );
 }
 
 function contentTypeFor(filePath: string): string {

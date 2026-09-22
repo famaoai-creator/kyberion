@@ -1,4 +1,5 @@
-import { parseEventScopeFromRecord, type OsKnowledgeTier } from '@agent/core/event-scope';
+import { parseEventScopeFromRecord } from '@agent/core/event-scope';
+import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core/ce-adoption';
 import type { WorkerEventEnvelope } from '@agent/core/worker-event-stream';
 

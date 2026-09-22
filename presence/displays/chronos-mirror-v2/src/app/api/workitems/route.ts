@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
   const viewer = resolvedViewer.context;
   try {
     const parsedBody = await readChronosJsonObject(req, 'Chronos work items');
-    if (!parsedBody.ok) {
+    if (parsedBody.ok !== true) {
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
     const { itemId, status } = parseWorkItemStatusInput(parsedBody.body);

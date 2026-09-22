@@ -2,16 +2,18 @@
   "extends": "../../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./",
-    "module": "CommonJS",
+    "rootDir": "../",
+    "module": "NodeNext",
     "target": "ES2022",
-    "moduleResolution": "Node",
+    "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "strict": true
+    "strict": true,
+    "paths": {
+      "@agent/core": ["../../../libs/core/dist/index.d.ts"],
+      "@agent/core/*": ["../../../libs/core/dist/*"]
+    }
   },
-  "include": [
-    "server.ts"
-  ]
+  "include": ["server.ts"]
 }

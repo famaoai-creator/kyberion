@@ -83,7 +83,9 @@ export function parseAgentRefreshResponse(value: unknown): ClientAgentRefreshRes
       status: 'ok',
       agentId: value.agentId,
       mode: value.mode,
-      ...(value.snapshot !== undefined ? { snapshot: value.snapshot } : {}),
+      ...(value.snapshot !== undefined
+        ? { snapshot: value.snapshot as Record<string, unknown> }
+        : {}),
     };
   }
   return undefined;
@@ -103,8 +105,10 @@ export function parseAgentRestartResponse(value: unknown): ClientAgentRestartRes
   return {
     status: 'ok',
     agentId: value.agentId,
-    ...(value.snapshot !== undefined ? { snapshot: value.snapshot } : {}),
-    ...(value.agent !== undefined ? { agent: value.agent } : {}),
+    ...(value.snapshot !== undefined
+      ? { snapshot: value.snapshot as Record<string, unknown> }
+      : {}),
+    ...(value.agent !== undefined ? { agent: value.agent as Record<string, unknown> } : {}),
   };
 }
 

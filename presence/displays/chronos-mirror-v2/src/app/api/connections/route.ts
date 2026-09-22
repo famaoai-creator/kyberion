@@ -49,7 +49,8 @@ export async function POST(req: NextRequest) {
     if (resolvedViewer.response) return resolvedViewer.response;
 
     const parsedBody = await readChronosJsonObject(req, 'Chronos connections');
-    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    if (parsedBody.ok !== true)
+      return NextResponse.json({ error: parsedBody.error }, { status: 400 });
     let input;
     try {
       input = parseConnectionReviewInput(parsedBody.body);

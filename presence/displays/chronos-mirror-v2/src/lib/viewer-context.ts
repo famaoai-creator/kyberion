@@ -10,11 +10,12 @@ import {
   narrowSurfaceViewerTier,
   narrowSurfaceViewerScope,
   narrowSurfaceViewerTenant,
-  resolveSurfaceViewerScope,
   SurfaceViewerScopeError,
   resolveSurfaceViewerTierAccess,
   type SurfaceViewerScope,
 } from '@agent/core/surface-mutation-guard';
+import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface-authn';
+import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import { toWireError } from '@agent/core/wire-error';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { getRegisteredEnvText } from '@agent/core/foundation';
@@ -35,6 +36,8 @@ export interface ViewerContext extends Omit<
   organizationIds?: string[] | 'all';
   projectIds?: string[] | 'all';
   tierAccess?: OsKnowledgeTier[];
+  /** The seam-resolved principal (authz policy-engine input). */
+  principal?: ResolvedPrincipal;
 }
 
 export class ViewerContextError extends Error {
@@ -64,7 +67,7 @@ export function resolveViewerContext(req: NextRequest): ViewerContext {
   const local = isChronosLoopbackRequest(req);
   const loopbackRole = token ? undefined : resolveChronosAccessRole(req) || undefined;
   try {
-    return resolveSurfaceViewerScope({
+    const { scope, principal } = resolveAuthnSurfaceViewerScope({
       token,
       local,
       serverTenant: resolveServerTenant(),
@@ -76,7 +79,9 @@ export function resolveViewerContext(req: NextRequest): ViewerContext {
       // Chronos preserves its existing all-tenant loopback compatibility
       // boundary; remote credentials still require server tenant binding.
       allowPersonalTier: false,
+      surface: 'chronos',
     });
+    return { ...scope, principal };
   } catch (error) {
     if (!(error instanceof SurfaceViewerScopeError)) throw error;
     let message = error.message;
@@ -108,6 +113,8 @@ export function toSurfaceAuthorizationContext(viewer: ViewerContext): SurfaceAut
     tierAccess: viewer.tierAccess ?? defaultTierAccess(viewer.role),
     principalId: viewer.principalId,
     source: viewer.source,
+    ...(viewer.principal ? { principal: viewer.principal } : {}),
+    ...(viewer.memberId ? { memberId: viewer.memberId } : {}),
   };
 }
 

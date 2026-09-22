@@ -66,6 +66,8 @@ export function FocusedOperatorView({
   focusedMissionId,
   onOpenMissionThread,
   tenant,
+  organizationId,
+  projectId,
 }: {
   viewId: FocusedViewId;
   onBack: () => void;

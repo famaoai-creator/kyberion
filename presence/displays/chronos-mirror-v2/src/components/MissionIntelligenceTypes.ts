@@ -552,8 +552,6 @@ interface WorkLoopPreview {
   authority: string;
 }
 export type {
-  MissionSummary,
-  CompanySnapshot,
   OrchestrationEvent,
   RuntimeSummary,
   RuntimeLease,
@@ -707,4 +705,4 @@ export type MissionIntelligenceWorkspace =
   | 'diagnostics'
   | 'surface-control';
 
-export type { IntelligencePayload, SurfaceSummary, ReferenceDetail, MissionIntelligenceWorkspace };
+export type { IntelligencePayload, SurfaceSummary, ReferenceDetail };
