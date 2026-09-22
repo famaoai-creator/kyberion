@@ -2703,25 +2703,25 @@
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 2077,
+      "size": 2316,
       "type": "json"
     },
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 18339,
+      "size": 19371,
       "type": "json"
     },
     {
       "path": "product/governance/model-registry/README.md",
       "tier": "public",
-      "size": 798,
+      "size": 881,
       "type": "md"
     },
     {
       "path": "product/governance/model-registry/index.json",
       "tier": "public",
-      "size": 775,
+      "size": 808,
       "type": "json"
     },
     {
@@ -2745,7 +2745,13 @@
     {
       "path": "product/governance/model-registry/model-616e7468726f7069633a636c617564652d6f7075732d35.json",
       "tier": "public",
-      "size": 825,
+      "size": 820,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/model-registry/model-616e7468726f7069633a636c617564652d6f7075732d352d35.json",
+      "tier": "public",
+      "size": 948,
       "type": "json"
     },
     {
@@ -3207,7 +3213,7 @@
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1594,
+      "size": 1598,
       "type": "json"
     },
     {
@@ -3393,7 +3399,7 @@
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 15140,
+      "size": 15144,
       "type": "json"
     },
     {
@@ -4629,7 +4635,7 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 10617,
+      "size": 10619,
       "type": "json"
     },
     {
@@ -4671,7 +4677,7 @@
     {
       "path": "product/orchestration/agent-profiles/critique-worker.json",
       "tier": "public",
-      "size": 794,
+      "size": 796,
       "type": "json"
     },
     {
@@ -5409,7 +5415,7 @@
     {
       "path": "product/orchestration/provider-capabilities.json",
       "tier": "public",
-      "size": 18316,
+      "size": 18676,
       "type": "json"
     },
     {
