@@ -72,6 +72,10 @@
         "opencode": {
           "type": "string",
           "minLength": 1
+        },
+        "devin": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false
@@ -121,6 +125,10 @@
           "minLength": 1
         },
         "opencode-default": {
+          "type": "string",
+          "minLength": 1
+        },
+        "devin-default": {
           "type": "string",
           "minLength": 1
         }
