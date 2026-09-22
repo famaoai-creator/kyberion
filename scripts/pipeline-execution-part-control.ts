@@ -1,6 +1,6 @@
 import * as nodePath from 'node:path';
 import { logger } from '@agent/core/core';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { safeExistsSync, type SafeShell } from '@agent/core/secure-io';
 import { retry } from '@agent/core/async-utils';
 import { resolveVars } from '@agent/core/logic-utils';
 import { capabilityEntry } from '@agent/core/path-resolver';
@@ -362,7 +362,7 @@ export async function dispatchProgrammaticToolCall(
   params: Record<string, unknown>,
   ctx: Record<string, unknown>,
   rootDir: string,
-  shellBin: string,
+  shellBin: SafeShell,
   opts: RunStepsOptions,
   stepPolicy: ReasoningStepPolicy
 ): Promise<Record<string, unknown>> {
@@ -450,7 +450,7 @@ export async function dispatchLeafOp(
   step: PipelineAdfStep,
   ctx: Record<string, unknown>,
   rootDir: string,
-  shellBin: string,
+  shellBin: SafeShell,
   opts: RunStepsOptions,
   stepPolicy: ReasoningStepPolicy
 ): Promise<Record<string, unknown>> {

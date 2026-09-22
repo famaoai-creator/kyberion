@@ -135,8 +135,9 @@ export interface SafeWriteOptions {
 /**
  * Options accepted by `safeExecResult` and `safeExec`. Both functions run
  * `spawnSync`/`execFileSync` with `shell: false` — callers cannot request a
- * shell through this surface (a caller that needs one passes the shell
- * itself as `command`, e.g. `sh -c` or `powershell`, which stays valid).
+ * shell through this surface. A caller that intentionally runs a shell
+ * script (`sh -c`, `bash -lc`, `cmd /c`) uses `safeExecShellScript` /
+ * `safeExecShellScriptResult` instead; the generic helpers reject that shape.
  * `shell` is intentionally not a key of this type; a caller that passes one
  * anyway gets a clear runtime error rather than a silently ignored option.
  */
@@ -158,7 +159,7 @@ export interface SafeExecOptions {
 function assertNoShellOption(options: object): void {
   if (Object.hasOwn(options, 'shell')) {
     throw new Error(
-      '[SECURITY] safeExec/safeExecResult do not accept a "shell" option — commands always run with shell: false. Pass the shell itself as `command` (e.g. "sh", "-c", ...) if you need shell semantics.'
+      '[SECURITY] safeExec/safeExecResult do not accept a "shell" option — commands always run with shell: false. Use safeExecShellScript/safeExecShellScriptResult if you need shell semantics.'
     );
   }
 }
@@ -750,6 +751,70 @@ function assertExecPolicy(command: string): void {
   }
 }
 
+type GovernedSyncExecOptions = {
+  encoding: BufferEncoding | null;
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  timeout: number;
+  maxBuffer: number;
+  input: string | Buffer | undefined;
+  stdio: ['pipe', 'pipe', 'pipe'];
+};
+
+/**
+ * Shared policy gate for every synchronous governed exec (generic and
+ * shell-script helpers alike): rejects a `shell` option, runs the
+ * sensitive-text and execute_command policy checks, and builds the
+ * allowlisted env / timeout / maxBuffer options. It deliberately does NOT
+ * receive or return the command itself, so the process-spawning call stays
+ * in each public helper (see the CodeQL note on safeExecShellScript).
+ */
+function prepareGovernedSyncExec(
+  command: string,
+  args: readonly string[],
+  options: SafeExecOptions
+): GovernedSyncExecOptions {
+  assertNoShellOption(options);
+  const {
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    cwd = process.cwd(),
+    encoding = 'utf8',
+    maxOutputMB = 10,
+    env = {},
+    input,
+  } = options;
+
+  assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
+  assertExecPolicy(command);
+  return {
+    encoding,
+    cwd,
+    env: buildSafeExecEnv(env),
+    timeout: timeoutMs,
+    maxBuffer: maxOutputMB * 1024 * 1024,
+    input,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  };
+}
+
+const SHELL_SCRIPT_COMMANDS = new Set(['sh', 'bash', 'cmd']);
+const SHELL_SCRIPT_FLAGS = new Set(['-c', '-lc', '/c', '/C']);
+
+/**
+ * The generic exec helpers never run a shell script. `sh -c <script>`,
+ * `bash -lc <script>` and `cmd /c <command>` must go through
+ * safeExecShellScript / safeExecShellScriptResult so the generic helpers
+ * stay free of shell-interpreted argument lists (see the CodeQL note there).
+ */
+function assertNotShellScriptInvocation(command: string, args: readonly string[]): void {
+  const base = (command.split(/[\\/]/).pop() || '').toLowerCase().replace(/\.exe$/, '');
+  if (SHELL_SCRIPT_COMMANDS.has(base) && args.length > 0 && SHELL_SCRIPT_FLAGS.has(args[0])) {
+    throw new Error(
+      `[SECURITY] safeExec/safeExecResult/safeExecResultAsync/safeSpawn do not run shell scripts (${command} ${args[0]} ...). Use safeExecShellScript/safeExecShellScriptResult for intentional shell-script execution.`
+    );
+  }
+}
+
 /**
  * Execute a command safely and return the full result (stdout, stderr, exit code).
  * Unlike safeExec, this does NOT throw on non-zero exit codes.
@@ -764,29 +829,10 @@ export function safeExecResult(
   status: number | null;
   error?: Error;
 } {
-  assertNoShellOption(options);
-  const {
-    timeoutMs = DEFAULT_TIMEOUT_MS,
-    cwd = process.cwd(),
-    encoding = 'utf8',
-    maxOutputMB = 10,
-    env = {},
-    input,
-  } = options;
-
-  assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
-  assertExecPolicy(command);
+  assertNotShellScriptInvocation(command, args);
+  const execOptions = prepareGovernedSyncExec(command, args, options);
   try {
-    const result = spawnSync(command, args, {
-      encoding,
-      cwd,
-      env: buildSafeExecEnv(env),
-      timeout: timeoutMs,
-      maxBuffer: maxOutputMB * 1024 * 1024,
-      input,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: false,
-    });
+    const result = spawnSync(command, args, { ...execOptions, shell: false });
 
     return {
       stdout: (result.stdout as string) || '',
@@ -825,6 +871,7 @@ export function safeExecResultAsync(
     env = {},
     maxOutputMB = 10,
   } = options;
+  assertNotShellScriptInvocation(command, args);
   assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
   assertExecPolicy(command);
   return new Promise((resolve) => {
@@ -899,28 +946,112 @@ export function safeExec(
   args: string[] = [],
   options: SafeExecOptions = {}
 ): string {
-  assertNoShellOption(options);
-  const {
-    timeoutMs = DEFAULT_TIMEOUT_MS,
-    cwd = process.cwd(),
-    encoding = 'utf8',
-    maxOutputMB = 10,
-    env = {},
-    input,
-  } = options;
+  assertNotShellScriptInvocation(command, args);
+  const execOptions = prepareGovernedSyncExec(command, args, options);
+  return execFileSync(command, args, { ...execOptions, shell: false }) as string;
+}
 
-  assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
-  assertExecPolicy(command);
-  return execFileSync(command, args, {
-    encoding,
-    cwd,
-    env: buildSafeExecEnv(env),
-    timeout: timeoutMs,
-    maxBuffer: maxOutputMB * 1024 * 1024,
-    input,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    shell: false,
-  }) as string;
+/**
+ * Shells that may run an intentional script through safeExecShellScript*.
+ * Closed on purpose — add a member only when a caller needs it.
+ */
+export type SafeShell = 'sh' | '/bin/sh' | 'bash' | 'cmd';
+
+declare const userLoginShellBrand: unique symbol;
+/**
+ * The operator's own login shell (from `$SHELL`), which by definition is not
+ * a closed set. Only obtainable through resolveUserLoginShell so that a
+ * non-literal shell stays an explicit, greppable choice at the call site.
+ */
+export type UserLoginShell = string & { readonly [userLoginShellBrand]: true };
+
+/** Resolve `$SHELL`-style input to a UserLoginShell (`value || fallback`). */
+export function resolveUserLoginShell(value: string | undefined, fallback: string): UserLoginShell {
+  return (value || fallback) as UserLoginShell;
+}
+
+export interface SafeShellScriptOptions extends SafeExecOptions {
+  /** POSIX shells only: run as a login shell (`-lc` instead of `-c`). */
+  login?: boolean;
+  /**
+   * Extra argv after the script (POSIX: `$0`, `$1`, …; cmd: appended to the
+   * command line, e.g. `start "" <target>`).
+   */
+  scriptArgs?: readonly string[];
+}
+
+function buildShellScriptArgv(
+  shell: SafeShell | UserLoginShell,
+  script: string,
+  options: SafeShellScriptOptions
+): { argv: string[]; execOptions: SafeExecOptions } {
+  const { login, scriptArgs = [], ...execOptions } = options;
+  if (!shell) throw new Error('[SECURITY] safeExecShellScript requires a shell');
+  const isCmd = shell === 'cmd';
+  if (isCmd && login) {
+    throw new Error('[SECURITY] safeExecShellScript: `login` is not supported for cmd');
+  }
+  const flag = isCmd ? '/c' : login ? '-lc' : '-c';
+  return { argv: [flag, script, ...scriptArgs], execOptions };
+}
+
+/**
+ * Run an intentional shell script (`sh -c`, `bash -lc`, `cmd /c`) and return
+ * stdout; throws on a non-zero exit like safeExec.
+ *
+ * Why separate from safeExec: CodeQL's IndirectCommandArgument
+ * (js/shell-command-constructed-from-input) treats a process call's whole
+ * argument list as shell-interpreted as soon as ANY caller type-flows a
+ * shell literal (sh/bash/cmd) plus a `-c`/`/c` argument into it. That check
+ * is context-insensitive over a helper's parameters, so a single `bash -lc`
+ * caller of safeExec used to taint every path-concatenating safeExec caller
+ * in the repo. Keeping shell scripts on their own execFileSync/spawnSync
+ * call sites confines that analysis to genuine shell-script callers. The
+ * policy gate (sensitive text, execute_command policy, env allowlist,
+ * timeout, maxBuffer) is shared via prepareGovernedSyncExec.
+ */
+export function safeExecShellScript(
+  shell: SafeShell | UserLoginShell,
+  script: string,
+  options: SafeShellScriptOptions = {}
+): string {
+  const { argv, execOptions } = buildShellScriptArgv(shell, script, options);
+  const prepared = prepareGovernedSyncExec(shell, argv, execOptions);
+  return execFileSync(shell, argv, { ...prepared, shell: false }) as string;
+}
+
+/**
+ * safeExecShellScript counterpart of safeExecResult: returns stdout, stderr
+ * and the exit code without throwing on a non-zero exit.
+ */
+export function safeExecShellScriptResult(
+  shell: SafeShell | UserLoginShell,
+  script: string,
+  options: SafeShellScriptOptions = {}
+): {
+  stdout: string;
+  stderr: string;
+  status: number | null;
+  error?: Error;
+} {
+  const { argv, execOptions } = buildShellScriptArgv(shell, script, options);
+  const prepared = prepareGovernedSyncExec(shell, argv, execOptions);
+  try {
+    const result = spawnSync(shell, argv, { ...prepared, shell: false });
+    return {
+      stdout: (result.stdout as string) || '',
+      stderr: (result.stderr as string) || '',
+      status: result.status,
+      error: result.error,
+    };
+  } catch (err: any) {
+    return {
+      stdout: '',
+      stderr: err.message || '',
+      status: err.status || 1,
+      error: err,
+    };
+  }
 }
 
 /**
@@ -935,6 +1066,7 @@ export function safeSpawn(
   args: string[] = [],
   options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}
 ): ChildProcessWithoutNullStreams {
+  assertNotShellScriptInvocation(command, args);
   assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
   assertExecPolicy(command);
   return spawn(command, args, {

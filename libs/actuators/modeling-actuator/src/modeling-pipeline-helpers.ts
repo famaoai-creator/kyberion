@@ -17,7 +17,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { evaluateCondition, getPathValue, resolveWriteArtifactSpec } from '@agent/core/logic-utils';
 import { retry } from '@agent/core/async-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
-import { runGovernedCommand } from '@agent/core/command-runner';
+import { runGovernedShellScript } from '@agent/core/command-runner';
 import {
   analyzeSourceTree,
   compileEngineeringArtifacts,
@@ -281,7 +281,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return {
         ...ctx,
         [params.export_as || 'last_capture']: await retry(async () => {
-          const result = runGovernedCommand('/bin/sh', ['-c', resolve(params.cmd)]);
+          const result = runGovernedShellScript('/bin/sh', resolve(params.cmd));
           if (result.error || result.status !== 0) {
             throw (
               result.error ||

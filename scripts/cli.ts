@@ -6,6 +6,7 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeExec,
+  safeExecShellScript,
   safeWriteFile,
   safeReaddir,
   safeStat,
@@ -540,14 +541,19 @@ function printArtifactInfo(targetPath: string) {
   printText('\nBinary artifact. Review this path with an appropriate local viewer if needed.');
 }
 
-function resolveOpenArtifactCommand(targetPath: string): { command: string; args: string[] } {
+type OpenArtifactCommand =
+  { kind: 'exec'; command: string; args: string[] } | { kind: 'cmd-start'; args: string[] };
+
+function resolveOpenArtifactCommand(targetPath: string): OpenArtifactCommand {
   if (isMacOS()) {
-    return { command: 'open', args: [targetPath] };
+    return { kind: 'exec', command: 'open', args: [targetPath] };
   }
   if (isWindows()) {
-    return { command: 'cmd', args: ['/c', 'start', '', targetPath] };
+    // `cmd /c start "" <path>` is a shell invocation, so it runs through the
+    // dedicated secure-io shell-script helper rather than safeExec.
+    return { kind: 'cmd-start', args: ['', targetPath] };
   }
-  return { command: 'xdg-open', args: [targetPath] };
+  return { kind: 'exec', command: 'xdg-open', args: [targetPath] };
 }
 
 function openArtifact(targetPath: string) {
@@ -559,6 +565,15 @@ function openArtifact(targetPath: string) {
   printHeader();
   printText(chalk.bold(path.basename(resolvedPath)));
   printText(`Opening: ${targetPath}`);
+  if (opener.kind === 'cmd-start') {
+    printText(`Command: ${['cmd', '/c', 'start', ...opener.args].join(' ')}\n`);
+    safeExecShellScript('cmd', 'start', {
+      scriptArgs: opener.args,
+      cwd: rootDir,
+      timeoutMs: 120000,
+    });
+    return;
+  }
   printText(`Command: ${[opener.command, ...opener.args].join(' ')}\n`);
   safeExec(opener.command, opener.args, { cwd: rootDir, timeoutMs: 120000 });
 }
