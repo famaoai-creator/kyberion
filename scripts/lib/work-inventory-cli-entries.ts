@@ -1,0 +1,303 @@
+/**
+ * WI-07: entry lifecycle command handlers for `pnpm inventory` — add / list /
+ * show / classify / override / status / candidates. See
+ * scripts/work_inventory.ts for the dispatcher and
+ * scripts/lib/work-inventory-cli-shared.ts for the shared argv helpers.
+ */
+import {
+  applyClassification,
+  createWorkInventoryEntry,
+  listWorkInventoryEntries,
+  loadWorkInventoryEntry,
+  saveWorkInventoryEntry,
+  type WorkEntryStatus,
+  type WorkInventoryEntry,
+  type WorkInventoryStep,
+  type WorkMethod,
+  type WorkTriggerKind,
+} from '@agent/core/work-inventory';
+import { proposeWorkDecomposition } from '@agent/core/work-inventory-decompose';
+import {
+  loadWorkInventoryCalibration,
+  rankWorkInventoryCandidates,
+  scoreWorkInventoryEntry,
+  type WorkInventoryScoreResult,
+} from '@agent/core/work-inventory-scoring';
+import {
+  csv,
+  formatTable,
+  getFlag,
+  governed,
+  hasFlag,
+  parseEffortMinutesFlag,
+  parseFrequencyFlag,
+  parseLimitFlag,
+  requireDecidedBy,
+  requireFlag,
+  resolveScope,
+  truncate,
+  WorkInventoryCliUsageError,
+} from './work-inventory-cli-shared.js';
+
+export interface WorkInventoryCliOptions {
+  rootDir?: string;
+}
+
+const TRIGGER_KINDS: readonly WorkTriggerKind[] = ['schedule', 'event', 'request', 'ad_hoc'];
+const STATUS_TRANSITIONS: readonly WorkEntryStatus[] = ['confirmed', 'candidate', 'retired'];
+const METHODS: readonly WorkMethod[] = [
+  'api',
+  'computer_operation',
+  'ai_reasoning',
+  'program',
+  'human',
+];
+
+function parseTriggerKind(argv: string[]): WorkTriggerKind | undefined {
+  const raw = getFlag(argv, '--trigger');
+  if (!raw) return undefined;
+  if (!TRIGGER_KINDS.includes(raw as WorkTriggerKind)) {
+    throw new WorkInventoryCliUsageError(`--trigger must be one of: ${TRIGGER_KINDS.join(', ')}`);
+  }
+  return raw as WorkTriggerKind;
+}
+
+function notFound(entryId: string): never {
+  throw new WorkInventoryCliUsageError(`work inventory entry not found: ${entryId}`);
+}
+
+// ---------------------------------------------------------------------------
+// add
+// ---------------------------------------------------------------------------
+
+export interface AddResult {
+  entry: WorkInventoryEntry;
+  warnings: string[];
+  source: 'model' | 'heuristic' | 'empty';
+}
+
+export async function runAdd(argv: string[], options: WorkInventoryCliOptions): Promise<AddResult> {
+  const title = requireFlag(argv, '--title', 'add');
+  const stepsText = getFlag(argv, '--steps');
+  const systems = csv(argv, '--systems');
+  const apiSystems = csv(argv, '--api-systems');
+  const frequency = parseFrequencyFlag(argv);
+  const effortMinutesPerRun = parseEffortMinutesFlag(argv);
+  const triggerKind = parseTriggerKind(argv);
+  const useModel = !hasFlag(argv, '--no-model');
+  const scope = resolveScope(argv);
+  const rootDir = options.rootDir;
+
+  if (stepsText && stepsText.trim()) {
+    const result = await proposeWorkDecomposition(
+      {
+        title,
+        description: stepsText,
+        scope,
+        ...(systems.length > 0 ? { systems } : {}),
+        ...(apiSystems.length > 0 ? { apiSystems } : {}),
+        trigger: { kind: triggerKind ?? 'ad_hoc', description: stepsText.slice(0, 500) },
+        ...(frequency ? { frequency } : {}),
+        ...(effortMinutesPerRun !== undefined
+          ? { effort_minutes_per_run: effortMinutesPerRun }
+          : {}),
+      },
+      { useModel }
+    );
+    const saved = governed(() => saveWorkInventoryEntry(result.entry, { rootDir }));
+    return { entry: saved, warnings: result.warnings, source: result.source };
+  }
+
+  const draft = createWorkInventoryEntry({
+    title,
+    scope,
+    trigger: { kind: triggerKind ?? 'ad_hoc', description: title },
+    ...(frequency ? { frequency } : {}),
+    ...(effortMinutesPerRun !== undefined ? { effort_minutes_per_run: effortMinutesPerRun } : {}),
+    ...(systems.length > 0 ? { systems } : {}),
+  });
+  const classified = applyClassification(draft, { apiSystems });
+  const saved = governed(() => saveWorkInventoryEntry(classified, { rootDir }));
+  return { entry: saved, warnings: [], source: 'empty' };
+}
+
+// ---------------------------------------------------------------------------
+// list / show / classify / override / status
+// ---------------------------------------------------------------------------
+
+export function runList(argv: string[], options: WorkInventoryCliOptions): WorkInventoryEntry[] {
+  const scope = resolveScope(argv);
+  const status = getFlag(argv, '--status');
+  const entries = listWorkInventoryEntries(scope, { rootDir: options.rootDir });
+  return status ? entries.filter((entry) => entry.status === status) : entries;
+}
+
+export interface ShowResult {
+  entry: WorkInventoryEntry;
+  score: WorkInventoryScoreResult;
+}
+
+export function runShow(
+  entryId: string,
+  argv: string[],
+  options: WorkInventoryCliOptions
+): ShowResult {
+  const scope = resolveScope(argv);
+  const entry = loadWorkInventoryEntry(scope, entryId, { rootDir: options.rootDir });
+  if (!entry) notFound(entryId);
+  return { entry, score: scoreWorkInventoryEntry(entry) };
+}
+
+export function runClassify(
+  entryId: string,
+  argv: string[],
+  options: WorkInventoryCliOptions
+): WorkInventoryEntry {
+  const scope = resolveScope(argv);
+  const apiSystems = csv(argv, '--api-systems');
+  const entry = loadWorkInventoryEntry(scope, entryId, { rootDir: options.rootDir });
+  if (!entry) notFound(entryId);
+  const classified = applyClassification(entry, { apiSystems });
+  return saveWorkInventoryEntry(classified, { rootDir: options.rootDir });
+}
+
+export function runOverride(
+  entryId: string,
+  argv: string[],
+  options: WorkInventoryCliOptions
+): WorkInventoryEntry {
+  const scope = resolveScope(argv);
+  const stepId = requireFlag(argv, '--step', 'override');
+  const method = requireFlag(argv, '--method', 'override') as WorkMethod;
+  if (!METHODS.includes(method)) {
+    throw new WorkInventoryCliUsageError(`--method must be one of: ${METHODS.join(', ')}`);
+  }
+  const reason = requireFlag(argv, '--reason', 'override');
+  const decidedBy = requireDecidedBy(argv);
+  const entry = loadWorkInventoryEntry(scope, entryId, { rootDir: options.rootDir });
+  if (!entry) notFound(entryId);
+  if (!entry.steps.some((step) => step.step_id === stepId)) {
+    throw new WorkInventoryCliUsageError(`entry ${entryId} has no step ${stepId}`);
+  }
+  const steps: WorkInventoryStep[] = entry.steps.map((step) =>
+    step.step_id === stepId
+      ? {
+          ...step,
+          method: {
+            assigned: method,
+            source: 'human_override' as const,
+            rationale: `${reason} (decided by ${decidedBy.id})`,
+          },
+        }
+      : step
+  );
+  const reclassified = applyClassification({ ...entry, steps }, {});
+  return saveWorkInventoryEntry(reclassified, { rootDir: options.rootDir });
+}
+
+export function runStatus(
+  entryId: string,
+  argv: string[],
+  options: WorkInventoryCliOptions
+): WorkInventoryEntry {
+  const scope = resolveScope(argv);
+  const to = requireFlag(argv, '--to', 'status') as WorkEntryStatus;
+  if (!STATUS_TRANSITIONS.includes(to)) {
+    throw new WorkInventoryCliUsageError(`--to must be one of: ${STATUS_TRANSITIONS.join(', ')}`);
+  }
+  // Enforced (a human decision, same grammar as promotion) but the entry
+  // schema has no generic per-status decided_by field to persist it into —
+  // only `promotion.decided_by` exists for the promoted transition.
+  requireDecidedBy(argv);
+  const entry = loadWorkInventoryEntry(scope, entryId, { rootDir: options.rootDir });
+  if (!entry) notFound(entryId);
+  return saveWorkInventoryEntry({ ...entry, status: to }, { rootDir: options.rootDir });
+}
+
+export function runCandidates(
+  argv: string[],
+  options: WorkInventoryCliOptions
+): WorkInventoryScoreResult[] {
+  const scope = resolveScope(argv);
+  const limit = parseLimitFlag(argv);
+  const entries = listWorkInventoryEntries(scope, { rootDir: options.rootDir });
+  const calibration = loadWorkInventoryCalibration(
+    scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {},
+    { rootDir: options.rootDir }
+  );
+  return rankWorkInventoryCandidates(entries, { calibration, ...(limit ? { limit } : {}) });
+}
+
+// ---------------------------------------------------------------------------
+// Human-readable formatting
+// ---------------------------------------------------------------------------
+
+export function formatStepsTable(
+  steps: readonly WorkInventoryStep[],
+  withRationale = false
+): string {
+  const headers = withRationale
+    ? ['step', 'stage', 'verb', 'method', 'rationale']
+    : ['step', 'stage', 'verb', 'method'];
+  const rows = steps.map((step) =>
+    withRationale
+      ? [
+          step.step_id,
+          step.stage,
+          step.verb,
+          step.method.assigned,
+          truncate(step.method.rationale, 80),
+        ]
+      : [step.step_id, step.stage, step.verb, step.method.assigned]
+  );
+  return formatTable(headers, rows);
+}
+
+export function formatEntryList(entries: readonly WorkInventoryEntry[]): string {
+  return formatTable(
+    ['entry_id', 'title', 'status'],
+    entries.map((entry) => [entry.entry_id, truncate(entry.title, 48), entry.status])
+  );
+}
+
+export function formatShow(result: ShowResult): string {
+  const { entry, score } = result;
+  const lines = [
+    `${entry.entry_id}  ${entry.title}  [${entry.status}]`,
+    `Trigger: ${entry.trigger.kind} — ${entry.trigger.description}`,
+    '',
+    'Steps:',
+    formatStepsTable(entry.steps, true),
+  ];
+  if (entry.observations && entry.observations.length > 0) {
+    lines.push('', 'Observations:');
+    lines.push(
+      formatTable(
+        ['source', 'ref', 'observed_at', 'digest'],
+        entry.observations.map((observation) => [
+          observation.source,
+          observation.ref,
+          observation.observed_at,
+          truncate(observation.digest ?? '', 60),
+        ])
+      )
+    );
+  }
+  lines.push('', 'Score:', ...score.explanation.map((line) => `  ${line}`));
+  return lines.join('\n');
+}
+
+export function formatCandidates(results: readonly WorkInventoryScoreResult[]): string {
+  return formatTable(
+    ['entry_id', 'score', 'hours/mo', 'automatable', 'confidence', 'risk', 'basis'],
+    results.map((result) => [
+      result.entry_id,
+      String(result.score),
+      String(result.components.hours_per_month),
+      String(result.components.automatable_ratio),
+      String(result.components.confidence),
+      String(result.components.risk),
+      `${result.basis.runs}/${result.basis.effort}`,
+    ])
+  );
+}

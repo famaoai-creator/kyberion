@@ -67,6 +67,7 @@
     "dev:watch": "pnpm vitest watch libs/core/",
     "watch:tenant-drift": "node dist/scripts/watch_tenant_drift.js",
     "pipeline:promote": "node --import ./scripts/ts-loader.mjs scripts/pipeline_promote.ts",
+    "inventory": "node --import ./scripts/ts-loader.mjs scripts/work_inventory.ts",
     "manifests:sign": "node --import ./scripts/ts-loader.mjs scripts/sign_environment_manifests.ts",
     "secrets:encrypt": "node --import ./scripts/ts-loader.mjs scripts/encrypt_connection_documents.ts",
     "cost:report": "node --import ./scripts/ts-loader.mjs scripts/cost_report.ts",
