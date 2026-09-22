@@ -85,7 +85,8 @@ export function presenceManifestForViewer(
 ): HeadlessApiManifest {
   return filterHeadlessManifestForViewer(
     toSurfaceAuthorizationContext(viewer),
-    buildPresenceHeadlessManifest()
+    buildPresenceHeadlessManifest(),
+    authorizeSurfaceContextOperation
   );
 }
 
@@ -146,13 +147,15 @@ export function presenceEnvelope<T>(
     scope: presenceStudioHeadlessScope(viewer),
     manifest,
     authorizationContext: toSurfaceAuthorizationContext(viewer),
+    authorize: authorizeSurfaceContextOperation,
   });
 }
 
 export function presenceAvailableOperations(viewer: PresenceStudioViewerContext): string[] {
   return availableHeadlessOperationIds(
     toSurfaceAuthorizationContext(viewer),
-    buildPresenceHeadlessManifest()
+    buildPresenceHeadlessManifest(),
+    authorizeSurfaceContextOperation
   );
 }
 

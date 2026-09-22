@@ -1,5 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   authorizeSurfaceContextOperation,
   principalFromSurfaceAuthorizationContext,
@@ -9,6 +11,40 @@ import {
 function tokenHash(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
+
+const TMP_DIR = `active/shared/tmp/surface-authn-tests-${process.pid}`;
+let memberFixtureCounter = 0;
+
+function writeMemberFixture(
+  memberId: string,
+  status: 'active' | 'suspended',
+  registrationLabels: string[] = []
+): string {
+  const root = pathResolver.rootResolve(`${TMP_DIR}/members-${++memberFixtureCounter}`);
+  const dir = `${root}/knowledge/personal/members`;
+  safeMkdir(dir, { recursive: true });
+  safeWriteFile(
+    `${dir}/${memberId}.json`,
+    JSON.stringify(
+      {
+        member_id: memberId,
+        display_name: memberId,
+        status,
+        memberships: [{ tenant_slug: 'default', role: 'owner' }],
+        access_registrations: registrationLabels.map((label) => ({ label })),
+        created_at: '2026-09-23T00:00:00.000Z',
+        updated_at: '2026-09-23T00:00:00.000Z',
+      },
+      null,
+      2
+    )
+  );
+  return root;
+}
+
+afterAll(() => {
+  safeRmSync(pathResolver.rootResolve(TMP_DIR), { recursive: true, force: true });
+});
 
 const originalApiToken = process.env.KYBERION_API_TOKEN;
 const originalAdminToken = process.env.KYBERION_LOCALADMIN_TOKEN;
@@ -96,6 +132,7 @@ describe('resolveAuthnSurfaceViewerScope', () => {
   });
 
   it('preserves registration scope, label, and member id', () => {
+    const memberRoot = writeMemberFixture('member-1', 'active');
     const resolution = resolveAuthnSurfaceViewerScope({
       token: 'registered-token',
       registrations: [
@@ -109,6 +146,7 @@ describe('resolveAuthnSurfaceViewerScope', () => {
         },
       ],
       principalIds: { localadmin: 'should-not-apply' },
+      deps: { memberRegistry: { rootDir: memberRoot } },
     });
     expect(resolution.decision.provider_id).toBe('registry-token');
     expect(resolution.scope).toMatchObject({
@@ -118,6 +156,26 @@ describe('resolveAuthnSurfaceViewerScope', () => {
       principalId: 'registered viewer',
       memberId: 'member-1',
     });
+  });
+
+  it('denies a registration bound to an unknown or suspended member', () => {
+    const memberRoot = writeMemberFixture('member-1', 'suspended');
+    for (const memberId of ['member-1', 'member-unknown']) {
+      expect(() =>
+        resolveAuthnSurfaceViewerScope({
+          token: 'registered-token',
+          registrations: [
+            {
+              token_hash: tokenHash('registered-token'),
+              role: 'localadmin',
+              tenant_slugs: ['tenant-a'],
+              member_id: memberId,
+            },
+          ],
+          deps: { memberRegistry: { rootDir: memberRoot } },
+        })
+      ).toThrow('bound to');
+    }
   });
 
   it('rejects an unknown bearer even on a proven loopback request', () => {
