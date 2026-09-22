@@ -6,7 +6,7 @@
   "obsolete_agent_runtime_providers": ["gemini"],
   "default_models": {
     "gemini": "gemini-3.8-flash",
-    "claude": "claude-opus-5",
+    "claude": "claude-opus-5-5",
     "agy": "Gemini 3.8 Flash (Low)",
     "codex": "gpt-5.6-sol",
     "grok": "grok-4.6",
@@ -16,7 +16,7 @@
     "devin": "swe"
   },
   "runtime_defaults": {
-    "anthropic-default": "claude-opus-5",
+    "anthropic-default": "claude-opus-5-5",
     "anthropic-fast": "claude-haiku-4-5-20251001",
     "gemini-default": "gemini-3.8-flash",
     "gemini-fast": "gemini-3.1-flash-lite",
