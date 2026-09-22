@@ -32,6 +32,22 @@ const PROVIDER_INSTRUCTIONS: Record<string, readonly string[]> = {
     'Provider note: inspect before editing, use governed file I/O, and report the exact verification performed.',
     'Provider note: do not broaden the requested scope or publish external changes without an explicit handoff.',
   ],
+  devin: [
+    'Provider note: operate only inside the declared work-item scope; a denied tool call is a governance result, not a retryable error.',
+    'Provider note: prefer governed facades and pipelines over ad-hoc edits, and return artifact paths plus the verifications actually run.',
+  ],
+  'devin-cli': [
+    'Provider note: operate only inside the declared work-item scope; a denied tool call is a governance result, not a retryable error.',
+    'Provider note: prefer governed facades and pipelines over ad-hoc edits, and return artifact paths plus the verifications actually run.',
+  ],
+  cursor: [
+    'Provider note: Cursor subagents inherit parent tools (no per-tool allowlist); honor readonly and the declared work-item scope anyway.',
+    'Provider note: prefer governed facades and pipelines over ad-hoc edits, and return artifact paths plus the verifications actually run.',
+  ],
+  'cursor-cli': [
+    'Provider note: Cursor subagents inherit parent tools (no per-tool allowlist); honor readonly and the declared work-item scope anyway.',
+    'Provider note: prefer governed facades and pipelines over ad-hoc edits, and return artifact paths plus the verifications actually run.',
+  ],
   gemini: [
     'Provider note: this provider is retained only for compatibility; do not assume personal Gemini availability.',
     'Provider note: fail closed when the configured Gemini runtime or credentials are unavailable.',
@@ -50,6 +66,8 @@ function providerKey(name: string): string {
   if (normalized.includes('claude')) return normalized.includes('cli') ? 'claude-cli' : 'claude';
   if (normalized.includes('agy')) return normalized.includes('cli') ? 'agy-cli' : 'agy';
   if (normalized.includes('codex')) return normalized.includes('cli') ? 'codex-cli' : 'codex';
+  if (normalized.includes('devin')) return normalized.includes('cli') ? 'devin-cli' : 'devin';
+  if (normalized.includes('cursor')) return normalized.includes('cli') ? 'cursor-cli' : 'cursor';
   if (normalized.includes('gemini')) return normalized.includes('cli') ? 'gemini-cli' : 'gemini';
   return normalized || 'default';
 }
