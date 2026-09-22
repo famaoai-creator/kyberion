@@ -161,6 +161,7 @@
         "claude-opus-4-6",
         "fable",
         "claude-fable-5",
+        "claude-opus-5-5",
         "claude-opus-5",
         "claude-opus-4-8",
         "claude-sonnet-5",
@@ -223,6 +224,20 @@
           "can_subagent"
         ],
         "claude-fable-5": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "deep_reasoning",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
+        "claude-opus-5-5": [
           "reasoning",
           "planning",
           "coordination",
