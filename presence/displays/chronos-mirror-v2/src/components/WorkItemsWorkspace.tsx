@@ -11,7 +11,7 @@ import {
   GitBranch,
 } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
-import { uxText } from '../lib/ux-vocabulary';
+import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import {
   parseWorkItemMutationResponse,
   parseWorkItemsResponse,
@@ -419,7 +419,7 @@ function WorkItemLineageOverview({
   locale,
 }: {
   lineage: WorkItemLineage;
-  locale: string;
+  locale: SupportedLocale;
 }) {
   return (
     <section className="mt-5 rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
@@ -507,7 +507,7 @@ function WorkItemLineageChain({
   locale,
 }: {
   context: WorkItem['context'];
-  locale: string;
+  locale: SupportedLocale;
 }) {
   if (!context) return null;
   const chain = [
@@ -540,17 +540,17 @@ function WorkItemLineageChain({
   );
 }
 
-function lineageLabel(kind: string, locale: string): string {
+function lineageLabel(kind: string, locale: SupportedLocale): string {
   const normalizedKind = kind.includes(':') ? kind.slice(0, kind.indexOf(':')) : kind;
   return uxText(LINEAGE_LABEL_KEYS[normalizedKind] || 'chronos_lineage_unknown', locale);
 }
 
-function workScopeLabel(scope: string | undefined, locale: string): string {
+function workScopeLabel(scope: string | undefined, locale: SupportedLocale): string {
   return scope === 'work_items'
     ? uxText('chronos_work_scope_items', locale)
     : scope || uxText('chronos_lineage_unknown', locale);
 }
 
-function workViewLabel(view: string | undefined, locale: string): string {
+function workViewLabel(view: string | undefined, locale: SupportedLocale): string {
   return view === 'all' ? uxText('chronos_work_view_all', locale) : view || '-';
 }

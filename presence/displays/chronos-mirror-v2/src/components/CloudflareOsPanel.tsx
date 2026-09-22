@@ -32,8 +32,10 @@ export function CloudflareOsPanel({ missionId }: { missionId?: string | null }) 
         signal: controller.signal,
       });
       const payload = parseCloudflareOsResponse(await response.json().catch(() => null));
-      if (!response.ok || !payload.ok) {
-        throw new Error(!payload.ok ? payload.error : `OS control plane ${response.status}`);
+      if (!response.ok || payload.ok !== true) {
+        throw new Error(
+          payload.ok !== true ? payload.error : `OS control plane ${response.status}`
+        );
       }
       if (controller.signal.aborted || sequence !== requestSequence.current) return;
       setSnapshot({

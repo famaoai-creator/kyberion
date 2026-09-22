@@ -3,12 +3,12 @@
 import * as React from 'react';
 import { AlertTriangle, CheckCircle2, FileCheck2, ShieldAlert, XCircle } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
-import { formatChronosDateTime, uxText } from '../lib/ux-vocabulary';
+import { formatChronosDateTime, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import { parseApprovalsResponse, type ClientApproval } from '../lib/approvals-response';
 
 type Approval = ClientApproval;
 
-function approvalRiskLabel(value: string | undefined, locale: string): string {
+function approvalRiskLabel(value: string | undefined, locale: SupportedLocale): string {
   const labels: Record<string, string> = {
     low: 'chronos_risk_low',
     medium: 'chronos_risk_medium',
@@ -18,7 +18,7 @@ function approvalRiskLabel(value: string | undefined, locale: string): string {
   return uxText(labels[value || ''] || 'chronos_unknown', locale);
 }
 
-function approvalMutationLabel(value: string | undefined, locale: string): string {
+function approvalMutationLabel(value: string | undefined, locale: SupportedLocale): string {
   const labels: Record<string, string> = {
     create: 'chronos_change_create',
     update: 'chronos_change_update',

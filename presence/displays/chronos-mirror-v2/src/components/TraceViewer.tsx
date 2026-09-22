@@ -17,6 +17,7 @@ import {
   parseTraceFeedResponse,
   type TraceDetailRecord,
   type TraceFeedRecord,
+  type TraceFeedResponse,
   type TraceSpanDetail,
 } from '../lib/trace-response';
 

@@ -198,26 +198,30 @@ function parseEvent(value: unknown): ClientCollaborationProjection['events'][num
   return {
     event_id: value.event_id,
     ts: value.ts,
-    ...(value.mission_id !== undefined ? { mission_id: value.mission_id } : {}),
-    ...(value.task_id !== undefined ? { task_id: value.task_id } : {}),
-    ...(value.agent_id !== undefined ? { agent_id: value.agent_id } : {}),
-    ...(value.causation_id !== undefined ? { causation_id: value.causation_id } : {}),
-    ...(value.evidence_refs !== undefined ? { evidence_refs: value.evidence_refs } : {}),
+    ...(value.mission_id !== undefined ? { mission_id: value.mission_id as string } : {}),
+    ...(value.task_id !== undefined ? { task_id: value.task_id as string } : {}),
+    ...(value.agent_id !== undefined ? { agent_id: value.agent_id as string } : {}),
+    ...(value.causation_id !== undefined ? { causation_id: value.causation_id as string } : {}),
+    ...(value.evidence_refs !== undefined
+      ? { evidence_refs: value.evidence_refs as string[] }
+      : {}),
     kind: value.kind,
     summary: value.summary,
     source: value.source,
-    ...(value.provider !== undefined ? { provider: value.provider } : {}),
-    ...(value.thread_id !== undefined ? { thread_id: value.thread_id } : {}),
-    ...(value.parent_thread_id !== undefined ? { parent_thread_id: value.parent_thread_id } : {}),
-    ...(value.turn_id !== undefined ? { turn_id: value.turn_id } : {}),
-    ...(value.native !== undefined ? { native: value.native } : {}),
-    ...(value.native_fork !== undefined ? { native_fork: value.native_fork } : {}),
-    ...(value.native_mode !== undefined ? { native_mode: value.native_mode } : {}),
+    ...(value.provider !== undefined ? { provider: value.provider as string } : {}),
+    ...(value.thread_id !== undefined ? { thread_id: value.thread_id as string } : {}),
+    ...(value.parent_thread_id !== undefined
+      ? { parent_thread_id: value.parent_thread_id as string }
+      : {}),
+    ...(value.turn_id !== undefined ? { turn_id: value.turn_id as string } : {}),
+    ...(value.native !== undefined ? { native: value.native as boolean } : {}),
+    ...(value.native_fork !== undefined ? { native_fork: value.native_fork as boolean } : {}),
+    ...(value.native_mode !== undefined ? { native_mode: value.native_mode as string } : {}),
     ...(value.effort !== undefined
       ? { effort: value.effort as 'low' | 'medium' | 'high' | 'ultra' }
       : {}),
     ...(value.native_unavailable !== undefined
-      ? { native_unavailable: value.native_unavailable }
+      ? { native_unavailable: value.native_unavailable as boolean }
       : {}),
   };
 }
@@ -419,11 +423,23 @@ export function parseCollaborationResponse(
   ) {
     return undefined;
   }
-  const sequenceGaps = value.projection.sequence_gaps.map(parseSequenceGap);
-  const events = value.projection.events.map(parseEvent);
-  const attention = value.projection.attention.map(parseAttention);
-  const tree = parseTree(value.projection.tree);
-  const edges = value.projection.edges.map((entry) => {
+  const projection = value.projection as {
+    revision: number;
+    generated_at: string;
+    partial: boolean;
+    status_flags: unknown[];
+    sequence_gaps: unknown[];
+    overview: Record<string, unknown>;
+    events: unknown[];
+    edges: unknown[];
+    attention: unknown[];
+    tree: unknown;
+  };
+  const sequenceGaps = projection.sequence_gaps.map(parseSequenceGap);
+  const events = projection.events.map(parseEvent);
+  const attention = projection.attention.map(parseAttention);
+  const tree = parseTree(projection.tree);
+  const edges = projection.edges.map((entry) => {
     if (
       !isRecord(entry) ||
       !nonEmptyString(entry.from) ||
@@ -449,7 +465,7 @@ export function parseCollaborationResponse(
     'unavailable_subagents',
   ] as const;
   if (
-    overviewKeys.some((key) => !nonNegativeInteger(value.projection.overview[key])) ||
+    overviewKeys.some((key) => !nonNegativeInteger(projection.overview[key])) ||
     !sequenceGaps.every((entry): entry is NonNullable<typeof entry> => entry !== undefined) ||
     !events.every((entry): entry is NonNullable<typeof entry> => entry !== undefined) ||
     !edges.every((entry): entry is NonNullable<typeof entry> => entry !== undefined) ||
@@ -459,13 +475,13 @@ export function parseCollaborationResponse(
     return undefined;
   }
   return {
-    revision: value.projection.revision,
-    generated_at: value.projection.generated_at,
-    partial: value.projection.partial,
-    status_flags: value.projection.status_flags as ClientCollaborationProjection['status_flags'],
+    revision: projection.revision,
+    generated_at: projection.generated_at,
+    partial: projection.partial,
+    status_flags: projection.status_flags as ClientCollaborationProjection['status_flags'],
     sequence_gaps: sequenceGaps,
     overview: Object.fromEntries(
-      overviewKeys.map((key) => [key, value.projection.overview[key]])
+      overviewKeys.map((key) => [key, projection.overview[key]])
     ) as ClientCollaborationProjection['overview'],
     events,
     edges,

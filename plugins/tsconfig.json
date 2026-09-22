@@ -12,15 +12,10 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@agent/core": ["../libs/core/index.js"],
-      "@agent/core/*": ["../libs/core/*.js"]
+      "@agent/core": ["../libs/core/dist/index.d.ts"],
+      "@agent/core/*": ["../libs/core/dist/*"]
     }
   },
-  "include": [
-    "*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

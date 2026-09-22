@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver, safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core';
-import { eventFiles, readEvents } from './route.js';
+import { eventFiles, readEvents } from './helpers.js';
 
 const fixtureRoot = pathResolver.sharedTmp(`collaboration-stream-boundary-${process.pid}`);
 

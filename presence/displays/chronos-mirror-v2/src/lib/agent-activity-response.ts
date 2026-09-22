@@ -203,7 +203,9 @@ function parseAgent(
     ...(value.title !== undefined ? { title: value.title } : {}),
     ...(value.latest_event !== undefined ? { latest_event: value.latest_event } : {}),
     ...(value.pressure !== undefined
-      ? { pressure: { severity: value.pressure.severity, value: value.pressure.value } }
+      ? {
+          pressure: value.pressure as { severity: string; value: number },
+        }
       : {}),
   };
 }
