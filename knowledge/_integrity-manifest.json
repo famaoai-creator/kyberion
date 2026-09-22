@@ -229,6 +229,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/authn-authz-seams.md",
+      "tier": "public",
+      "size": 8255,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/backbone-sovereignty.md",
       "tier": "public",
       "size": 2606,
@@ -777,7 +783,7 @@
     {
       "path": "product/architecture/seam-provider-selection.md",
       "tier": "public",
-      "size": 10615,
+      "size": 11334,
       "type": "md"
     },
     {
@@ -1563,7 +1569,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 143287,
+      "size": 146223,
       "type": "json"
     },
     {
@@ -3445,6 +3451,18 @@
       "type": "json"
     },
     {
+      "path": "product/governance/seam-provider-selection/authn-principal-resolver.json",
+      "tier": "public",
+      "size": 6487,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/seam-provider-selection/authz-policy-engine.json",
+      "tier": "public",
+      "size": 5324,
+      "type": "json"
+    },
+    {
       "path": "product/governance/seam-provider-selection/browser-automation-runtime.json",
       "tier": "public",
       "size": 2463,
@@ -3459,7 +3477,7 @@
     {
       "path": "product/governance/seam-provider-selection/index.json",
       "tier": "public",
-      "size": 350,
+      "size": 409,
       "type": "json"
     },
     {
@@ -7846,6 +7864,12 @@
       "path": "product/schemas/authority-role.schema.json",
       "tier": "public",
       "size": 622,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/authz-policy.schema.json",
+      "tier": "public",
+      "size": 1879,
       "type": "json"
     },
     {
