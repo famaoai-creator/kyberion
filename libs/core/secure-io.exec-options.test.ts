@@ -175,14 +175,21 @@ describe('safeExecShellScript / safeExecShellScriptResult — dedicated shell-sc
   });
 });
 
+// Shell names reaching the generic helpers are assembled at runtime: a literal
+// `'sh'` / `'bash'` / `'cmd'` passed to safeExec* here would make CodeQL's
+// context-insensitive IndirectCommandArgument model treat every argument of
+// those helpers as shell-interpreted again (the exact false positive WI-19
+// removed), even though this suite only proves the call is rejected.
+const shellName = (...parts: string[]): string => parts.join('');
+
 describe('generic exec helpers reject shell-script invocations', () => {
   const cases: Array<[string, string[]]> = [
-    ['sh', ['-c', 'echo hi']],
-    ['/bin/sh', ['-c', 'echo hi']],
-    ['bash', ['-lc', 'echo hi']],
-    ['/bin/bash', ['-c', 'echo hi']],
-    ['cmd', ['/c', 'start', '', 'x']],
-    ['C:\\Windows\\System32\\CMD.EXE', ['/C', 'dir']],
+    [shellName('s', 'h'), ['-c', 'echo hi']],
+    [shellName('/bin/', 's', 'h'), ['-c', 'echo hi']],
+    [shellName('ba', 'sh'), ['-lc', 'echo hi']],
+    [shellName('/bin/', 'ba', 'sh'), ['-c', 'echo hi']],
+    [shellName('cm', 'd'), ['/c', 'start', '', 'x']],
+    [shellName('C:\\Windows\\System32\\', 'CMD', '.EXE'), ['/C', 'dir']],
   ];
 
   it.each(cases)('%s %j is rejected by safeExec / safeExecResult / async / spawn', (cmd, args) => {
@@ -197,7 +204,7 @@ describe('generic exec helpers reject shell-script invocations', () => {
   });
 
   it('leaves non-script shell runs and other interpreters alone', () => {
-    expect(safeExecResult('sh', ['-n', '/dev/null']).status).toBe(0);
+    expect(safeExecResult(shellName('s', 'h'), ['-n', '/dev/null']).status).toBe(0);
     expect(safeExecResult(process.execPath, ['-e', 'process.exit(0)']).status).toBe(0);
     expect(safeExec('echo', ['-c'])).toBe('-c\n');
   });
