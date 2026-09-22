@@ -137,6 +137,12 @@
     listening: false,
     handsFree: false,
     hearingMode: false,
+    // WI-08: `/ask?mode=hearing&scenario=work_inventory` — defaults to
+    // `web_app_build` (today's only scenario before WI-08). Sent to the
+    // server as `scenario_id` on every hearing request so a fresh (not yet
+    // persisted) session picks the right requirement set and canvas
+    // instead of always defaulting to `web_app_build`.
+    hearingScenarioId: 'web_app_build',
     hearingRecord: null,
     // HT-02: bounded retry while the record's canvas is still `pending`.
     hearingCanvasPollTries: 0,
@@ -145,6 +151,10 @@
     // `{ refId, href }` (server request id + same-tab decide link) or
     // `{ failed: true }`.
     hearingHandoff: null,
+    // WI-08: same shape as `hearingHandoff` above, for the `work_inventory`
+    // scenario's "save to the work inventory" confirm action —
+    // `{ entryId, href }` on success.
+    hearingInventory: null,
   };
 
   var HEARING_CANVAS_POLL_INTERVAL_MS = 3000;
@@ -471,22 +481,71 @@
     statusEl.textContent = record ? vt(state.vocab, hearingCanvasStatusKey(record)) : '';
   }
 
-  // HT-03 (2nd half): the hand-off button + its own local request/result
-  // state, independent from the hearing record itself (the record only
-  // learns the server ids on the next full reload — this keeps the button
-  // responsive without waiting on that round trip).
+  // WI-08: `record.scenario` (once known) is the source of truth; before the
+  // first load/answer there is no record yet, so this falls back to the
+  // `?scenario=` the page was opened with.
+  function isWorkInventoryScenario(record) {
+    if (record && record.scenario) return record.scenario === 'work_inventory';
+    return state.hearingScenarioId === 'work_inventory';
+  }
+
+  // HT-03 (2nd half) / WI-08: the confirm button + its own local
+  // request/result state, independent from the hearing record itself (the
+  // record only learns the server ids on the next full reload — this keeps
+  // the button responsive without waiting on that round trip). The same
+  // `#hearing-handoff` button/status/link elements carry both confirm
+  // actions — which one is live depends on `isWorkInventoryScenario`: the
+  // governed hand-off (`hearingHandoff`/`front_desk:hearing_handoff_*`) for
+  // every other scenario, the "save to the work inventory" confirm
+  // (`hearingInventory`/`front_desk:hearing_inventory_*`) for `work_inventory`.
   function renderHearingHandoff(record, ready) {
     var button = document.getElementById('hearing-handoff');
     var statusEl = document.getElementById('hearing-handoff-status');
     var linkEl = document.getElementById('hearing-handoff-link');
     if (!button || !statusEl || !linkEl) return;
+    statusEl.classList.add('hidden');
+    linkEl.classList.add('hidden');
+
+    if (isWorkInventoryScenario(record)) {
+      button.textContent = vt(state.vocab, 'front_desk:hearing_inventory_button');
+      var inventory = state.hearingInventory;
+      var alreadySaved =
+        Boolean(inventory && inventory.entryId) ||
+        Boolean(record && record.work_inventory_entry_id);
+      button.classList.toggle('hidden', !ready || alreadySaved);
+      if (!inventory) return;
+      if (inventory.pending) {
+        statusEl.textContent = vt(state.vocab, 'front_desk:hearing_inventory_pending');
+        statusEl.classList.remove('hidden');
+        return;
+      }
+      if (inventory.failed) {
+        statusEl.textContent = vt(state.vocab, 'front_desk:hearing_inventory_failed');
+        statusEl.classList.remove('hidden');
+        return;
+      }
+      if (inventory.entryId) {
+        statusEl.textContent =
+          vt(state.vocab, 'front_desk:hearing_inventory_done') +
+          ' ' +
+          formatTemplate(vt(state.vocab, 'front_desk:hearing_inventory_entry_label'), {
+            id: inventory.entryId,
+          });
+        statusEl.classList.remove('hidden');
+        if (inventory.href) {
+          linkEl.textContent = vt(state.vocab, 'front_desk:hearing_inventory_open');
+          linkEl.setAttribute('href', inventory.href);
+          linkEl.classList.remove('hidden');
+        }
+      }
+      return;
+    }
+
     button.textContent = vt(state.vocab, 'front_desk:hearing_handoff_button');
     var handoff = state.hearingHandoff;
     var alreadyHandedOff =
       Boolean(handoff && handoff.refId) || Boolean(record && record.mission_id);
     button.classList.toggle('hidden', !ready || alreadyHandedOff);
-    statusEl.classList.add('hidden');
-    linkEl.classList.add('hidden');
     if (!handoff) return;
     if (handoff.pending) {
       statusEl.textContent = vt(state.vocab, 'front_desk:hearing_handoff_pending');
@@ -572,7 +631,9 @@
       '/api/hearing/' +
         encodeURIComponent(state.sessionId) +
         '?locale=' +
-        encodeURIComponent(state.locale)
+        encodeURIComponent(state.locale) +
+        '&scenario_id=' +
+        encodeURIComponent(state.hearingScenarioId)
     )
       .then(function (result) {
         if (result.ok && result.body && result.body.ok) {
@@ -647,6 +708,44 @@
       });
   }
 
+  // WI-08: "save to the work inventory" — the `work_inventory` scenario's
+  // equivalent of `handoffHearing()` above, confirming a decided record into
+  // a work-inventory entry via `POST /api/hearing/:session/inventory`.
+  // Idempotent server-side: a second click after success returns the same
+  // `entry_id` instead of writing a second entry.
+  function saveWorkInventory() {
+    if (!state.hearingMode || !state.hearingRecord) return;
+    if (state.hearingInventory && state.hearingInventory.pending) return;
+    state.hearingInventory = { pending: true };
+    renderHearing();
+    fetchJson(
+      '/api/hearing/' +
+        encodeURIComponent(state.sessionId) +
+        '/inventory?locale=' +
+        encodeURIComponent(state.locale),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      }
+    )
+      .then(function (result) {
+        if (result.ok && result.body && result.body.ok) {
+          state.hearingInventory = {
+            entryId: result.body.entry_id,
+            href: result.body.next && result.body.next.href,
+          };
+        } else {
+          state.hearingInventory = { failed: true };
+        }
+        renderHearing();
+      })
+      .catch(function () {
+        state.hearingInventory = { failed: true };
+        renderHearing();
+      });
+  }
+
   function updateHearing(text, intentResolution) {
     if (!state.hearingMode) return Promise.resolve();
     return fetchJson('/api/hearing/' + encodeURIComponent(state.sessionId) + '/answer', {
@@ -657,6 +756,7 @@
         request_id: randomId(),
         intent_resolution: intentResolution,
         locale: state.locale,
+        scenario_id: state.hearingScenarioId,
       }),
     }).then(function (result) {
       if (result.ok && result.body && result.body.ok) {
@@ -875,7 +975,15 @@
     var button = document.getElementById('hearing-decide');
     if (button) button.addEventListener('click', decideHearing);
     var handoffButton = document.getElementById('hearing-handoff');
-    if (handoffButton) handoffButton.addEventListener('click', handoffHearing);
+    // WI-08: the same button confirms either the governed hand-off or a
+    // work-inventory save, depending on the current scenario — see
+    // `isWorkInventoryScenario`/`renderHearingHandoff`.
+    if (handoffButton) {
+      handoffButton.addEventListener('click', function () {
+        if (isWorkInventoryScenario(state.hearingRecord)) saveWorkInventory();
+        else handoffHearing();
+      });
+    }
   }
 
   function wireChips() {
@@ -922,7 +1030,12 @@
   function mount() {
     state.locale = normalizeLocale();
     try {
-      state.hearingMode = new URLSearchParams(window.location.search).get('mode') === 'hearing';
+      var hearingParams = new URLSearchParams(window.location.search);
+      state.hearingMode = hearingParams.get('mode') === 'hearing';
+      // WI-08: `?scenario=` picks the hearing scenario (`work_inventory`,
+      // ...); defaults to `web_app_build` when absent/unrecognized-empty.
+      var scenarioParam = hearingParams.get('scenario');
+      if (scenarioParam) state.hearingScenarioId = scenarioParam;
     } catch (err) {
       state.hearingMode = false;
     }

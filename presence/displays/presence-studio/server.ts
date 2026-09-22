@@ -79,6 +79,7 @@ import { registerFrontDeskRoutes } from './front-desk-routes.js';
 import { registerHearingRoutes } from './hearing-routes.js';
 import { registerHearingMissionRoutes } from './hearing-mission-routes.js';
 import { registerTrainingRoutes } from './training-routes.js';
+import { registerWorkInventoryRoutes } from './work-inventory-routes.js';
 import { PRESENCE_STUDIO_VOCABULARY_KEYS } from './front-desk-pages.js';
 
 // Install the real reasoning/intent/voice backend chain before any route
@@ -155,6 +156,9 @@ registerFrontDeskRoutes(presenceStudioData.app);
 registerHearingRoutes(presenceStudioData.app);
 registerHearingMissionRoutes(presenceStudioData.app);
 registerTrainingRoutes(presenceStudioData.app);
+// WI-11: work-inventory automation-candidate panel for the progress page —
+// see work-inventory-routes.ts module doc.
+registerWorkInventoryRoutes(presenceStudioData.app);
 
 presenceStudioData.app.get('/health', (_req, res) => {
   res.json({

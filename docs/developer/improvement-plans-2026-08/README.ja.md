@@ -7,6 +7,7 @@ status: active
 
 # コードベース改善計画 2026-08(索引)
 
+- [業務棚卸しと実データ学習ループ計画](./WORK_INVENTORY_PLAN_2026-09-22.ja.md): 意図ループの前段に「人が PC 上で何をしているか」を観測・分解する発見段を足す。業務を 7 段 × 12 行為のステップに分け、規則で API / 画面操作 / AI / プログラム / 人間に振り分け、自己申告・Kyberion 利用ログ・同意つき PC 操作記録の 3 系統で実データを集め、候補の順位付け → 昇格 → 実績による校正までを WI-01〜12 に分割(ミッション `MSN-WORK-INVENTORY-20260922`)。
 - [ミッションチーム編成の動的化計画](./TEAM_COMPOSITION_DYNAMICS_PLAN_2026-09-20.ja.md): チーム編成を「テンプレート固定」から「義務導出の名簿 + 需要駆動の充当」へ。充当状態 `standby` の導入、義務ポリシーカタログ、再編成・容量信号・LLM 提案者までを TC-01〜14 に分割(ミッション `MSN-TEAM-COMPOSITION-20260920`)。
 - [Local Pads 統合・永続化・デザイン改善計画](./LOCAL_PADS_UNIFICATION_PLAN_2026-09-14.ja.md): 8 pad を単一サーバーへ統合し、tenant・tier・本人境界に沿う保存先と履歴、共通 UI、既存データの copy 移行を LP-01〜08 に分割（MVP 実装済み、専用 adapter 統合は継続）。
 - [ヒアリングエージェントとトレーニング計画](./FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md): 相棒の「頼む」にキャンバス付きヒアリングモード(Web アプリ要件 → alignment gate → mission)、「使い方を見る」にレベル別トレーニングとテナント単位の組織展開。PR #736 の Companion Hub はデータ形(学びカタログ、要件ドラフト)だけ活かし、ページは共有レールに統合済みのため落とす(HT-00〜06)。
@@ -41,6 +42,7 @@ status: active
 | [SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md](./SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md) | シンプルさ・使いやすさ・共通化 改善計画(SX-01〜14)。6 領域監査(core/scripts/実行層/surface/governance/docs)から根本原因 5 つ(未採用 helper・方向境界の欠如・入口多重化・ガバナンス自己増殖・UX 契約非執行)を特定し、adopt-or-delete / 方向 lint / 単一 CLI / manifest-driven check / ChannelAdapter / actuator SDK / 正本一本化 / UX 契約 lint を Wave 0〜4 で実施。削減目標をラチェットで固定 | P0〜P2(EXECUTING; SX-01〜02基盤、SX-03〜11一部実装、SX-12〜14残差) |
 | [AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md](./AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md) | エージェント連携ビュー計画(AC-01〜07: 委譲イベントの相関 ID・agent→agent エッジの redaction 通過・投影の有界読み込み・`composeCollaborationTree` 純関数・terminal-hud パネル 9「連携」(木 + waiting_on + drill-down)・Chronos 同一ツリー・文書)。新規イベント源・新規投影は作らず、既存の worker-event-stream / agent-collaboration-projection の 4 ギャップ(G1〜G4)だけを埋める。ミッション `MSN-AGENT-COLLAB-VIEW-20260906` | P1(AC-01〜11 完了; 実運用受入は次の dispatch 実行時) |
 | [FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md](./FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md) | フロントデスク再設計計画(FD-00〜09)。秘書室(:3050)と相棒(:3031)の人間向け UI を「人の動詞 5 つ」の共有レールに統合し、重複(承認・成果・会話・設定の二重実装)と開発者パネルの露出を解消。テナント常時表示 + narrowing 切替、`GET /api/me`、最小メンバー登録簿(オーナー / 承認者 / 閲覧、ローカル + トークン、SSO なし)、`decided_by` 記録、人とエージェント(NHI)の役割分離とアクター語彙の統一(FD-10)。ワイヤーフレーム 9 枚を設計原本とする | P0〜P2(計画) |
+| [WORK_INVENTORY_PLAN_2026-09-22.ja.md](./WORK_INVENTORY_PLAN_2026-09-22.ja.md) | 業務棚卸しと実データ学習ループ(WI-01〜12)。業務記録型と振り分け規則カタログ、自己申告・利用ログ・同意つき PC 操作記録の収集、候補の順位付けと校正、`pnpm inventory`、ヒアリングの棚卸しシナリオ | P0〜P2(着手) |
 | [FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md](./FRONT_DESK_HEARING_TRAINING_PLAN_2026-09-14.ja.md) | ヒアリングエージェントとトレーニング計画(HT-00〜06)。相棒「頼む」のヒアリングモード(会話 + 生成キャンバス + 要件レコード → alignment gate → mission)、「使い方を見る」のレベル別トレーニング(メンバー単位の進捗、テナント単位の割り当て)。PR #736 Companion Hub の評価と rebase 方針を含む | P1〜P2(計画) |
 
 > Cloudflare OS 計画の最新実装: OS-14 に zod schema 付き Gadget typed operation の discovery / read 実行 / held side-effect 実行を追加し、OS-15 に OAuth state 境界・段階 TTL・callback self-destruct を追加済み。

@@ -82,6 +82,17 @@
     "projectPath": { "type": "string" },
     "trackId": { "type": "string" },
     "trackType": { "type": "string" },
-    "lifecycleModel": { "type": "string" }
+    "lifecycleModel": { "type": "string" },
+    "source": {
+      "type": "object",
+      "description": "Where the brief was authored from (e.g. a work inventory entry), so an idempotent re-run can verify the mission is its own.",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": { "type": "string" },
+        "ref": { "type": "string" },
+        "tenantSlug": { "type": "string" }
+      }
+    }
   }
 }

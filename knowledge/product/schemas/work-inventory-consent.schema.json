@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "work-inventory-consent.schema.json",
+  "title": "Work Inventory Observation Consent (work-inventory-consent.v1)",
+  "description": "A member's own, time-bounded consent to summarize their reviewed desktop/browser recordings into the work inventory (WI-05). Stored only in the member's personal tier. clipboard and screen_frame are never consentable observation kinds.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "consent_id",
+    "member_id",
+    "sources",
+    "observation_kinds",
+    "purpose",
+    "granted_at",
+    "expires_at",
+    "granted_by"
+  ],
+  "properties": {
+    "schema_version": { "const": "work-inventory-consent.v1" },
+    "consent_id": { "type": "string", "pattern": "^WIC-[0-9]{8}-[a-f0-9]{12}$" },
+    "member_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tenant_slug": { "type": "string", "minLength": 1 },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["desktop_recording", "browser_recording"] }
+    },
+    "observation_kinds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Subset of DESKTOP_OBSERVATION_SOURCES ids whose derived facts may be summarized. clipboard and screen_frame are deliberately absent from the enum.",
+      "items": { "type": "string", "enum": ["active_window", "browser_tabs", "focused_input"] }
+    },
+    "purpose": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "granted_at": { "type": "string", "format": "date-time" },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "At most 90 days after granted_at (enforced in code on grant and on load)."
+    },
+    "granted_by": { "$ref": "#/definitions/human_actor" },
+    "revoked_at": { "type": "string", "format": "date-time" },
+    "revoked_by": { "$ref": "#/definitions/human_actor" }
+  },
+  "dependencies": {
+    "revoked_at": ["revoked_by"],
+    "revoked_by": ["revoked_at"]
+  },
+  "definitions": {
+    "human_actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "const": "human" },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

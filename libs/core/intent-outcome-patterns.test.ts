@@ -5,7 +5,7 @@ describe('intent-outcome-patterns', () => {
   it('loads and validates the complete governed catalog', () => {
     const patterns = loadIntentOutcomePatterns();
 
-    expect(patterns).toHaveLength(34);
+    expect(patterns).toHaveLength(35);
     expect(patterns.every((pattern) => pattern.intent_id.length > 0)).toBe(true);
   });
 

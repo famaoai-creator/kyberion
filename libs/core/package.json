@@ -3135,6 +3135,38 @@
       "types": "./dist/training-catalog.d.ts",
       "default": "./dist/training-catalog.js"
     },
+    "./hearing-scenario-catalog": {
+      "types": "./dist/hearing-scenario-catalog.d.ts",
+      "default": "./dist/hearing-scenario-catalog.js"
+    },
+    "./work-inventory": {
+      "types": "./dist/work-inventory.d.ts",
+      "default": "./dist/work-inventory.js"
+    },
+    "./work-inventory-scoring": {
+      "types": "./dist/work-inventory-scoring.d.ts",
+      "default": "./dist/work-inventory-scoring.js"
+    },
+    "./work-inventory-consent": {
+      "types": "./dist/work-inventory-consent.d.ts",
+      "default": "./dist/work-inventory-consent.js"
+    },
+    "./work-inventory-observation": {
+      "types": "./dist/work-inventory-observation.d.ts",
+      "default": "./dist/work-inventory-observation.js"
+    },
+    "./work-inventory-decompose": {
+      "types": "./dist/work-inventory-decompose.d.ts",
+      "default": "./dist/work-inventory-decompose.js"
+    },
+    "./work-inventory-harvest": {
+      "types": "./dist/work-inventory-harvest.d.ts",
+      "default": "./dist/work-inventory-harvest.js"
+    },
+    "./work-inventory-promotion": {
+      "types": "./dist/work-inventory-promotion.d.ts",
+      "default": "./dist/work-inventory-promotion.js"
+    },
     "./agent-prompt-approval": {
       "types": "./dist/agent-prompt-approval.d.ts",
       "default": "./dist/agent-prompt-approval.js"

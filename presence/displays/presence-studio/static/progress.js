@@ -85,6 +85,14 @@
     selectedTitle: '',
   };
 
+  // WI-11: the "業務の自動化候補" panel's own vocab + read model, fetched and
+  // rendered independently of the active/delivered/done columns above — a
+  // failure here never blocks the rest of the page (see `loadWorkInventoryPanel`).
+  var wi = {
+    vocab: {},
+    payload: { scope: null, candidates: [], counts: {} },
+  };
+
   function itemsForFilter(filter) {
     return state.payload[filter] || [];
   }
@@ -537,9 +545,152 @@
     });
   }
 
+  // WI-11: work-inventory automation-candidate panel.
+  var WI_STATUS_KEYS = ['draft', 'confirmed', 'candidate', 'promoted', 'retired'];
+
+  function wiShortDate(iso) {
+    return typeof iso === 'string' && iso.length >= 10 ? iso.slice(0, 10) : '';
+  }
+
+  function renderWorkInventoryCounts(vocab, counts) {
+    var el = document.getElementById('wi-counts');
+    if (!el) return;
+    el.innerHTML = '';
+    WI_STATUS_KEYS.forEach(function (key) {
+      var count = (counts && counts[key]) || 0;
+      var chip = document.createElement('span');
+      chip.className = 'wi-count-chip';
+      chip.textContent = vt(vocab, 'progress_work_inventory_status_' + key) + ' ' + count;
+      el.appendChild(chip);
+    });
+  }
+
+  function renderWorkInventoryRow(vocab, item) {
+    var li = document.createElement('li');
+    li.className = 'wi-row';
+    var ratio = typeof item.automatable_ratio === 'number' ? item.automatable_ratio : 0;
+    var pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+    var hours = typeof item.hours_per_month === 'number' ? item.hours_per_month : 0;
+    var hoursText = renderTemplate(vt(vocab, 'progress_work_inventory_hours_label'), {
+      hours: String(Math.round(hours * 10) / 10),
+    });
+    var scoreLabel = vt(vocab, 'progress_work_inventory_score_label');
+    var scoreText =
+      typeof item.score === 'number' ? String(Math.round(item.score * 10000) / 10000) : '';
+    var statusLabel = vt(vocab, 'progress_work_inventory_status_' + item.status);
+    var ratioLabel = vt(vocab, 'progress_work_inventory_automatable_label');
+    li.innerHTML =
+      '<div class="wi-row-main">' +
+      '<span class="wi-row-title">' +
+      escapeHtml(item.title) +
+      '</span>' +
+      '<span class="wi-row-status">' +
+      escapeHtml(statusLabel) +
+      '</span>' +
+      '</div>' +
+      '<div class="wi-row-meta">' +
+      '<span>' +
+      escapeHtml(scoreLabel) +
+      ' ' +
+      escapeHtml(scoreText) +
+      '</span>' +
+      '<span>' +
+      escapeHtml(hoursText) +
+      '</span>' +
+      '</div>' +
+      '<div class="wi-row-bar" aria-label="' +
+      escapeHtml(ratioLabel) +
+      '"><div class="wi-row-bar-fill" style="width:' +
+      pct +
+      '%"></div></div>';
+    return li;
+  }
+
+  function renderWorkInventoryConsent(vocab, consent) {
+    var el = document.getElementById('wi-consent');
+    if (!el) return;
+    if (!consent) {
+      el.classList.add('hidden');
+      el.textContent = '';
+      return;
+    }
+    el.classList.remove('hidden');
+    if (!consent.active && !consent.pending_summaries) {
+      el.textContent = vt(vocab, 'progress_work_inventory_consent_none');
+      return;
+    }
+    if (consent.expires_soonest) {
+      el.textContent = renderTemplate(vt(vocab, 'progress_work_inventory_consent_line'), {
+        active: consent.active || 0,
+        expires: wiShortDate(consent.expires_soonest),
+        pending: consent.pending_summaries || 0,
+      });
+    } else {
+      el.textContent = renderTemplate(vt(vocab, 'progress_work_inventory_consent_line_no_expiry'), {
+        active: consent.active || 0,
+        pending: consent.pending_summaries || 0,
+      });
+    }
+  }
+
+  function renderWorkInventoryPanel() {
+    var vocab = wi.vocab;
+    var payload = wi.payload || {};
+    var titleEl = document.getElementById('wi-title');
+    if (titleEl) titleEl.textContent = vt(vocab, 'progress_work_inventory_title');
+    renderWorkInventoryCounts(vocab, payload.counts);
+
+    var candidates = payload.candidates || [];
+    var listEl = document.getElementById('wi-list');
+    if (listEl) {
+      listEl.innerHTML = '';
+      candidates.forEach(function (item) {
+        listEl.appendChild(renderWorkInventoryRow(vocab, item));
+      });
+    }
+    var emptyEl = document.getElementById('wi-empty');
+    if (emptyEl) {
+      if (candidates.length === 0) {
+        emptyEl.textContent = vt(vocab, 'progress_work_inventory_empty');
+        emptyEl.classList.remove('hidden');
+      } else {
+        emptyEl.classList.add('hidden');
+      }
+    }
+
+    renderWorkInventoryConsent(vocab, payload.consent);
+
+    var startEl = document.getElementById('wi-start');
+    if (startEl) startEl.textContent = vt(vocab, 'progress_work_inventory_start');
+
+    var hintEl = document.getElementById('wi-hint');
+    if (hintEl) hintEl.textContent = vt(vocab, 'progress_work_inventory_operator_hint');
+  }
+
+  function loadWorkInventoryPanel(locale) {
+    return Promise.all([
+      fetchJson('/api/work-inventory-vocabulary?locale=' + encodeURIComponent(locale)),
+      fetchJson('/api/front-desk/work-inventory'),
+    ])
+      .then(function (pair) {
+        var vocabResult = pair[0];
+        var dataResult = pair[1];
+        if (!vocabResult.ok || !vocabResult.body || !vocabResult.body.ok) return;
+        if (!dataResult.ok || !dataResult.body || !dataResult.body.ok) return;
+        wi.vocab = vocabResult.body.texts || {};
+        wi.payload = dataResult.body;
+        renderWorkInventoryPanel();
+      })
+      .catch(function () {
+        // Additive chrome around the main columns — a fetch failure here
+        // must never throw or block the rest of the page.
+      });
+  }
+
   function mount() {
     var locale = normalizeLocale();
     wireFilters();
+    loadWorkInventoryPanel(locale);
     Promise.all([
       fetchJson('/api/progress-vocabulary?locale=' + encodeURIComponent(locale)),
       fetchJson('/api/progress'),

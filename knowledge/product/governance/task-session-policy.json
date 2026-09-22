@@ -495,6 +495,58 @@
       }
     },
     {
+      "id": "inventory-work",
+      "task_type": "analysis",
+      "goal": {
+        "summary": "Decompose the member's recurring PC-based work into stages/verbs, classify execution methods by rule, and rank automation candidates",
+        "success_condition": "A governed work-inventory entry with rule-classified steps is stored, and a candidate ranking is returned when observation or usage data exists."
+      },
+      "requirements": {
+        "rules": [
+          {
+            "requirement": "work_title",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(棚卸し|inventory|業務|仕事|work)"
+              }
+            ]
+          },
+          {
+            "requirement": "frequency_or_cadence",
+            "omit_when": [
+              {
+                "type": "regex",
+                "value": "(毎日|毎週|毎月|頻度|cadence|frequency|daily|weekly|monthly)"
+              }
+            ]
+          }
+        ]
+      },
+      "payload": {
+        "static": {
+          "analysis_kind": "work_inventory"
+        },
+        "fields": [
+          {
+            "field": "automation_focus",
+            "default": "decompose_and_rank",
+            "rules": [
+              {
+                "when": [
+                  {
+                    "type": "regex",
+                    "value": "(自動化候補|automation candidate)"
+                  }
+                ],
+                "value": "candidate_ranking"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": "evolve-agent-harness",
       "task_type": "analysis",
       "goal": {

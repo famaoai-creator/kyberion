@@ -1,0 +1,406 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "work-inventory-taxonomy.schema.json",
+  "title": "Work Inventory Taxonomy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "stages",
+    "verbs",
+    "methods",
+    "effects",
+    "rules",
+    "review_effects",
+    "scoring_defaults"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["trigger", "gather", "understand", "decide", "act", "verify", "record"]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "verbs": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "default_stage", "candidate_bindings"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "receive",
+              "search",
+              "read",
+              "input",
+              "transform",
+              "judge",
+              "create",
+              "operate",
+              "communicate",
+              "manage",
+              "record",
+              "coordinate"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default_stage": {
+            "type": "string",
+            "enum": ["trigger", "gather", "understand", "decide", "act", "verify", "record"]
+          },
+          "candidate_bindings": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["actuator"],
+              "properties": {
+                "actuator": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]*-actuator$"
+                },
+                "op": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "keywords": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Free-text keyword lists (WI-04) used by the heuristic free-text decomposer to map a description fragment to this verb.",
+            "properties": {
+              "ja": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "en": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "methods": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["api", "computer_operation", "ai_reasoning", "program", "human"]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "effects": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["external_send", "money", "personal_data", "irreversible", "approval"]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "keywords": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Free-text keyword lists used by the heuristic decomposer to detect this effect in a description fragment.",
+            "properties": {
+              "ja": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "en": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "only_with_verbs": {
+            "type": "array",
+            "description": "When set, the effect is detected only on steps whose verb is listed.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule_id", "when", "assign", "rationale"],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "when": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "effects_any": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "enum": ["external_send", "money", "personal_data", "irreversible", "approval"]
+                }
+              },
+              "verbs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "receive",
+                    "search",
+                    "read",
+                    "input",
+                    "transform",
+                    "judge",
+                    "create",
+                    "operate",
+                    "communicate",
+                    "manage",
+                    "record",
+                    "coordinate"
+                  ]
+                }
+              },
+              "stages": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "enum": ["trigger", "gather", "understand", "decide", "act", "verify", "record"]
+                }
+              },
+              "system_has_api": {
+                "type": "boolean"
+              },
+              "data_sensitivity_any": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "enum": ["public", "internal", "confidential", "personal"]
+                }
+              }
+            }
+          },
+          "assign": {
+            "type": "string",
+            "enum": ["api", "computer_operation", "ai_reasoning", "program", "human"]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "review_effects": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["external_send", "money", "personal_data", "irreversible", "approval"]
+      }
+    },
+    "forced_human_effects": {
+      "type": "array",
+      "description": "Effects whose steps always stay human; a human_override may never downgrade them.",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["external_send", "money", "personal_data", "irreversible", "approval"]
+      }
+    },
+    "scoring_defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "weights",
+        "risk_effect_penalty",
+        "method_automatable",
+        "observation_source_confidence"
+      ],
+      "properties": {
+        "weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["frequency", "effort", "automatable_ratio", "confidence", "risk_penalty"],
+          "properties": {
+            "frequency": {
+              "type": "number"
+            },
+            "effort": {
+              "type": "number"
+            },
+            "automatable_ratio": {
+              "type": "number"
+            },
+            "confidence": {
+              "type": "number"
+            },
+            "risk_penalty": {
+              "type": "number"
+            }
+          }
+        },
+        "risk_effect_penalty": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["money", "irreversible", "approval", "external_send", "personal_data"],
+          "properties": {
+            "money": {
+              "type": "number"
+            },
+            "irreversible": {
+              "type": "number"
+            },
+            "approval": {
+              "type": "number"
+            },
+            "external_send": {
+              "type": "number"
+            },
+            "personal_data": {
+              "type": "number"
+            }
+          }
+        },
+        "method_automatable": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["api", "program", "ai_reasoning", "computer_operation", "human"],
+          "properties": {
+            "api": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "program": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "ai_reasoning": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "computer_operation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "human": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "observation_source_confidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["self_report", "kyberion_trace", "desktop_recording", "browser_recording"],
+          "properties": {
+            "self_report": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "kyberion_trace": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "desktop_recording": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "browser_recording": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

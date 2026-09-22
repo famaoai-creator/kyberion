@@ -913,6 +913,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/work-inventory-discovery-stage.md",
+      "tier": "public",
+      "size": 11882,
+      "type": "md"
+    },
+    {
       "path": "product/capability-assets/README.md",
       "tier": "public",
       "size": 981,
@@ -1449,7 +1455,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 49077,
+      "size": 49264,
       "type": "json"
     },
     {
@@ -2247,13 +2253,13 @@
     {
       "path": "product/governance/intent-coverage-matrix.json",
       "tier": "public",
-      "size": 31855,
+      "size": 32738,
       "type": "json"
     },
     {
       "path": "product/governance/intent-domain-ontology.json",
       "tier": "public",
-      "size": 111032,
+      "size": 112057,
       "type": "json"
     },
     {
@@ -2265,7 +2271,7 @@
     {
       "path": "product/governance/intent-outcome-patterns.json",
       "tier": "public",
-      "size": 27496,
+      "size": 28830,
       "type": "json"
     },
     {
@@ -2979,7 +2985,7 @@
     {
       "path": "product/governance/outcome-catalog.json",
       "tier": "public",
-      "size": 32388,
+      "size": 33167,
       "type": "json"
     },
     {
@@ -3615,7 +3621,7 @@
     {
       "path": "product/governance/standard-intents.json",
       "tier": "public",
-      "size": 188284,
+      "size": 189913,
       "type": "json"
     },
     {
@@ -3627,7 +3633,7 @@
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 22600,
+      "size": 25329,
       "type": "json"
     },
     {
@@ -3801,7 +3807,7 @@
     {
       "path": "product/governance/task-session-policy.json",
       "tier": "public",
-      "size": 51823,
+      "size": 53380,
       "type": "json"
     },
     {
@@ -4222,6 +4228,12 @@
       "path": "product/governance/work-coordination-import-catalog.json",
       "tier": "public",
       "size": 486,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/work-inventory-taxonomy.json",
+      "tier": "public",
+      "size": 12264,
       "type": "json"
     },
     {
@@ -4901,6 +4913,12 @@
       "tier": "public",
       "size": 3941,
       "type": "md"
+    },
+    {
+      "path": "product/orchestration/hearing-scenarios.json",
+      "tier": "public",
+      "size": 2973,
+      "type": "json"
     },
     {
       "path": "product/orchestration/hybrid-development-flow.md",
@@ -6177,7 +6195,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 570960,
+      "size": 581427,
       "type": "json"
     },
     {
@@ -8713,6 +8731,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/hearing-scenarios.schema.json",
+      "tier": "public",
+      "size": 2423,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/heuristic-entry.schema.json",
       "tier": "public",
       "size": 1765,
@@ -9423,7 +9447,7 @@
     {
       "path": "product/schemas/mission-brief.schema.json",
       "tier": "public",
-      "size": 2661,
+      "size": 3076,
       "type": "json"
     },
     {
@@ -11848,6 +11872,36 @@
       "path": "product/schemas/work-coordination-import-catalog.schema.json",
       "tier": "public",
       "size": 1071,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/work-inventory-calibration.schema.json",
+      "tier": "public",
+      "size": 2597,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/work-inventory-consent.schema.json",
+      "tier": "public",
+      "size": 2383,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/work-inventory-entry.schema.json",
+      "tier": "public",
+      "size": 8898,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/work-inventory-observation-summary.schema.json",
+      "tier": "public",
+      "size": 4674,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/work-inventory-taxonomy.schema.json",
+      "tier": "public",
+      "size": 11278,
       "type": "json"
     },
     {
