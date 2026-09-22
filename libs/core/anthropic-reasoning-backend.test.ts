@@ -50,7 +50,7 @@ describe('AnthropicReasoningBackend', () => {
     const create = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
     const backend = new AnthropicReasoningBackend({
       model: 'claude-opus-5-5',
-      client: { messages: { create, parse: vi.fn() } } as any,
+      client: { messages: { create, parse: vi.fn() } } as unknown as Anthropic,
     });
 
     await backend.delegateTask('do it');
@@ -60,10 +60,15 @@ describe('AnthropicReasoningBackend', () => {
   it('keeps output_config.format when merging effort into structured calls', async () => {
     const parse = vi.fn().mockResolvedValue({ parsed_output: { tasks: [] } });
     const backend = new AnthropicReasoningBackend({
-      client: { messages: { create: vi.fn(), parse } } as any,
+      client: { messages: { create: vi.fn(), parse } } as unknown as Anthropic,
     });
 
-    await backend.decomposeIntoTasks({ requirementsDraft: {} } as any, { effort: 'medium' });
+    await backend.decomposeIntoTasks(
+      { requirementsDraft: {} } as unknown as Parameters<
+        AnthropicReasoningBackend['decomposeIntoTasks']
+      >[0],
+      { effort: 'medium' }
+    );
     const params = parse.mock.calls[0][0];
     expect(params.output_config.effort).toBe('medium');
     expect(params.output_config.format).toBeDefined();
@@ -73,7 +78,7 @@ describe('AnthropicReasoningBackend', () => {
     const create = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
     const backend = new AnthropicReasoningBackend({
       model: 'claude-haiku-4-5-20251001',
-      client: { messages: { create, parse: vi.fn() } } as any,
+      client: { messages: { create, parse: vi.fn() } } as unknown as Anthropic,
     });
 
     await backend.delegateTask('do it', undefined, { effort: 'low' });
