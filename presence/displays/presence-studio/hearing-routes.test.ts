@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver, safeReadFile, safeRmSync } from '@agent/core';
 import { logger } from '@agent/core/core';
 import { t as catalogT } from '@agent/core/t';
+import { withExecutionContext } from '@agent/core/authority';
 import type express from 'express';
 
 vi.mock('@agent/core/member-registry', async () => {
@@ -37,10 +38,11 @@ vi.mock('./hearing-canvas.js', async () => {
 });
 
 import { resolveMemberByPrincipal } from '@agent/core/member-registry';
+import { loadWorkInventoryEntry } from '@agent/core/work-inventory';
 import { applyHearingTurn, createHearingRecord, type HearingRecord } from './hearing.js';
 import { hearingNamespace, loadHearingRecord, saveHearingRecord } from './hearing-runtime.js';
 import { generateHearingCanvas } from './hearing-canvas.js';
-import { registerHearingRoutes } from './hearing-routes.js';
+import { registerHearingRoutes, type HearingRecordWithInventoryFields } from './hearing-routes.js';
 
 function flushMicrotasks(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
@@ -145,13 +147,14 @@ function fullyAnsweredRecord(sessionId: string): HearingRecord {
 }
 
 describe('hearing-routes.ts route wiring', () => {
-  it('registers the four HT-01/03 hearing endpoints', () => {
+  it('registers the four HT-01/03 hearing endpoints, plus the WI-08 work-inventory hand-off', () => {
     const { app, handlers } = createFakeApp();
     registerHearingRoutes(app);
     expect(handlers.has('GET /api/hearing/:session/canvas')).toBe(true);
     expect(handlers.has('GET /api/hearing/:session')).toBe(true);
     expect(handlers.has('POST /api/hearing/:session/answer')).toBe(true);
     expect(handlers.has('POST /api/hearing/:session/decide')).toBe(true);
+    expect(handlers.has('POST /api/hearing/:session/inventory')).toBe(true);
   });
 
   it('server.ts registers hearing routes at the same guard position as front-desk routes', () => {
@@ -388,5 +391,288 @@ describe('POST /api/hearing/:session/answer canvas generation (HT-02)', () => {
     expect(persisted?.canvas_versions).toEqual(['v1', 'v2', 'v3']);
     expect(persisted?.canvas_generation).toBe('generated');
     expect(vi.mocked(generateHearingCanvas)).toHaveBeenCalledTimes(2);
+  });
+});
+
+// WI-08: `scenario_id` resolution + the `work_inventory_table` canvas path.
+// Its `/answer` handler is `async` (it awaits `renderWorkInventoryCanvasHtml`
+// for this scenario, unlike the synchronous `web_app_build` template path
+// exercised above), so every call here is awaited.
+describe('POST /api/hearing/:session/answer scenario_id resolution (WI-08)', () => {
+  let savedTenant: string | undefined;
+  const { app, handlers } = createFakeApp();
+  registerHearingRoutes(app);
+  const answer = handlers.get('POST /api/hearing/:session/answer')!;
+  const SCENARIO_TEST_TENANT = 'zz-hearing-scenario-id-test';
+
+  beforeEach(() => {
+    savedTenant = process.env.KYBERION_TENANT;
+    process.env.KYBERION_TENANT = SCENARIO_TEST_TENANT;
+    vi.mocked(generateHearingCanvas).mockReset();
+    // Only the legacy-scenario test below reaches the `web_app_preview`
+    // model-generation follow-up; a resolved default keeps that call from
+    // throwing on `undefined.then(...)` the way an un-implemented `vi.fn()`
+    // mock would.
+    vi.mocked(generateHearingCanvas).mockResolvedValue({
+      source: 'template',
+      html: '<html><head></head><body>ok</body></html>',
+    });
+  });
+
+  afterEach(() => {
+    if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = savedTenant;
+    safeRmSync(pathResolver.sharedTmp(`hearing/${SCENARIO_TEST_TENANT}`), {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  it('creates the record from the hearing-scenarios.json catalog entry when scenario_id is given', async () => {
+    const sessionId = `sess-${randomUUID()}`;
+    const res = fakeResponse();
+    await answer(
+      fakeRequest({
+        params: { session: sessionId },
+        body: { text: '毎週の定例報告書の作成', scenario_id: 'work_inventory' },
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    const body = res.body as { record: HearingRecord };
+    expect(body.record.scenario).toBe('work_inventory');
+    expect(body.record.requirements.map((item) => item.id)).toEqual([
+      'task_name',
+      'trigger',
+      'frequency',
+      'effort',
+      'steps',
+      'systems',
+      'decisions',
+      'output',
+    ]);
+    expect(body.record.requirements.find((item) => item.id === 'task_name')?.answer).toBe(
+      '毎週の定例報告書の作成'
+    );
+  });
+
+  it('rejects an unknown scenario_id with 400', async () => {
+    const sessionId = `sess-${randomUUID()}`;
+    const res = fakeResponse();
+    await answer(
+      fakeRequest({
+        params: { session: sessionId },
+        body: { text: 'hi', scenario_id: 'does-not-exist' },
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('still accepts the legacy inline scenario object when no scenario_id is sent', async () => {
+    const sessionId = `sess-${randomUUID()}`;
+    const res = fakeResponse();
+    await answer(
+      fakeRequest({
+        params: { session: sessionId },
+        body: {
+          text: 'answer',
+          scenario: {
+            id: 'legacy_custom',
+            requirements: [{ id: 'only', label_key: 'front_desk:hearing_req_audience' }],
+          },
+        },
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    expect((res.body as { record: HearingRecord }).record.scenario).toBe('legacy_custom');
+  });
+
+  it('renders the work_inventory_table canvas deterministically (final "template" state, no model generation scheduled)', async () => {
+    const sessionId = `sess-${randomUUID()}`;
+    const res = fakeResponse();
+    await answer(
+      fakeRequest({
+        params: { session: sessionId },
+        body: { text: '月次請求書の作成', scenario_id: 'work_inventory' },
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    const body = res.body as { record: HearingRecord };
+    expect(body.record.canvas_generation).toBe('template');
+    expect(generateHearingCanvas).not.toHaveBeenCalled();
+  });
+
+  it("carries ?scenario_id= on canvas_url so the iframe's own separate fetch resolves the right default before anything is persisted", async () => {
+    const sessionId = `sess-${randomUUID()}`;
+    const res = fakeResponse();
+    await answer(
+      fakeRequest({
+        params: { session: sessionId },
+        body: { text: '月次請求書の作成', scenario_id: 'work_inventory' },
+      }),
+      res
+    );
+    const body = res.body as { canvas_url: string };
+    expect(body.canvas_url).toContain('scenario_id=work_inventory');
+  });
+});
+
+describe('POST /api/hearing/:session/inventory (WI-08)', () => {
+  let savedTenant: string | undefined;
+  const { app, handlers } = createFakeApp();
+  registerHearingRoutes(app);
+  const answer = handlers.get('POST /api/hearing/:session/answer')!;
+  const decide = handlers.get('POST /api/hearing/:session/decide')!;
+  const inventory = handlers.get('POST /api/hearing/:session/inventory')!;
+  const INVENTORY_TEST_TENANT = 'zz-hearing-inventory-test';
+  const INVENTORY_TEST_MEMBER_ID = 'zz-hearing-inventory-member';
+  const namespace = hearingNamespace([INVENTORY_TEST_TENANT]);
+
+  const ANSWERS: Record<string, string> = {
+    task_name: '月次請求書の作成',
+    trigger: '毎月末に経理から依頼',
+    frequency: '毎月',
+    effort: '1時間',
+    steps: '請求データを集計する→請求書を作成する→PDF化して送付する',
+    systems: 'Excel、Slack',
+    decisions: '金額が10万円を超える場合は上長の承認が必要',
+    output: 'PDF 請求書を経理チームに渡す',
+  };
+
+  function inventoryFixtureMember(role: 'owner' | 'approver' | 'viewer' = 'approver') {
+    return {
+      member_id: INVENTORY_TEST_MEMBER_ID,
+      display_name: 'ZZ Inventory Tester',
+      status: 'active' as const,
+      memberships: [{ tenant_slug: INVENTORY_TEST_TENANT, role }],
+      access_registrations: [],
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    };
+  }
+
+  async function answerAllWorkInventoryRequirements(sessionId: string): Promise<void> {
+    for (const [id, text] of Object.entries(ANSWERS)) {
+      const res = fakeResponse();
+      await answer(
+        fakeRequest({
+          params: { session: sessionId },
+          body: id === 'task_name' ? { text, scenario_id: 'work_inventory' } : { text },
+        }),
+        res
+      );
+    }
+  }
+
+  beforeEach(() => {
+    savedTenant = process.env.KYBERION_TENANT;
+    process.env.KYBERION_TENANT = INVENTORY_TEST_TENANT;
+    vi.mocked(resolveMemberByPrincipal).mockReset();
+    vi.mocked(generateHearingCanvas).mockReset();
+  });
+
+  afterEach(() => {
+    if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
+    else process.env.KYBERION_TENANT = savedTenant;
+    safeRmSync(pathResolver.sharedTmp(`hearing/${INVENTORY_TEST_TENANT}`), {
+      recursive: true,
+      force: true,
+    });
+    // Confidential-tier cleanup needs the same elevation the route itself
+    // uses to write there (see hearing-routes.ts's `/inventory` handler).
+    withExecutionContext('ecosystem_architect', () =>
+      safeRmSync(pathResolver.rootResolve(`knowledge/confidential/${INVENTORY_TEST_TENANT}`), {
+        recursive: true,
+        force: true,
+      })
+    );
+  });
+
+  it('refuses with 400 when requirements are still unanswered', async () => {
+    const sessionId = `sess-${randomUUID()}`;
+    const seedRes = fakeResponse();
+    await answer(
+      fakeRequest({
+        params: { session: sessionId },
+        body: { text: ANSWERS.task_name, scenario_id: 'work_inventory' },
+      }),
+      seedRes
+    );
+
+    const res = fakeResponse();
+    await inventory(fakeRequest({ params: { session: sessionId } }), res);
+    expect(res.statusCode).toBe(400);
+    expect((res.body as { ok: boolean }).ok).toBe(false);
+  });
+
+  it('refuses with 400 when the record has not been decided yet', async () => {
+    const sessionId = `sess-${randomUUID()}`;
+    await answerAllWorkInventoryRequirements(sessionId);
+
+    const res = fakeResponse();
+    await inventory(fakeRequest({ params: { session: sessionId } }), res);
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('refuses with 400 a hearing scenario that is not registered with handoff: work_inventory', async () => {
+    const sessionId = `sess-${randomUUID()}`;
+    const seedRes = fakeResponse();
+    // No scenario_id -> defaults to web_app_build (handoff: mission).
+    await answer(
+      fakeRequest({ params: { session: sessionId }, body: { text: 'Freelancers.' } }),
+      seedRes
+    );
+
+    const res = fakeResponse();
+    await inventory(fakeRequest({ params: { session: sessionId } }), res);
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('creates a confirmed work inventory entry under the tenant scope, parses frequency/effort/trigger/systems, and is idempotent', async () => {
+    const sessionId = `sess-${randomUUID()}`;
+    await answerAllWorkInventoryRequirements(sessionId);
+
+    vi.mocked(resolveMemberByPrincipal).mockReturnValue(inventoryFixtureMember('approver'));
+    const decideRes = fakeResponse();
+    decide(fakeRequest({ params: { session: sessionId } }), decideRes);
+    expect(decideRes.statusCode).toBe(200);
+
+    const res = fakeResponse();
+    await inventory(fakeRequest({ params: { session: sessionId } }), res);
+    expect(res.statusCode).toBe(200);
+    const body = res.body as {
+      ok: boolean;
+      entry_id: string;
+      scope: { tenant_slug?: string };
+      steps: number;
+      next: { href: string };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.entry_id).toMatch(/^WI-/);
+    expect(body.scope).toEqual({ tenant_slug: INVENTORY_TEST_TENANT });
+    expect(body.steps).toBeGreaterThan(0);
+    expect(body.next.href).toContain('/');
+
+    const entry = withExecutionContext('ecosystem_architect', () =>
+      loadWorkInventoryEntry({ tenant_slug: INVENTORY_TEST_TENANT }, body.entry_id)
+    );
+    expect(entry?.status).toBe('confirmed');
+    expect(entry?.title).toBe(ANSWERS.task_name);
+    expect(entry?.trigger.kind).toBe('schedule');
+    expect(entry?.frequency).toEqual({ per: 'month', count: 1 });
+    expect(entry?.effort_minutes_per_run).toBe(60);
+    expect(entry?.systems).toEqual(['Excel', 'Slack']);
+    expect(entry?.observations?.some((item) => item.ref === `hearing:${sessionId}`)).toBe(true);
+
+    const persisted = loadHearingRecord(namespace, sessionId) as HearingRecordWithInventoryFields;
+    expect(persisted.work_inventory_entry_id).toBe(body.entry_id);
+
+    // Idempotent: a second call returns the same entry_id, no second write.
+    const res2 = fakeResponse();
+    await inventory(fakeRequest({ params: { session: sessionId } }), res2);
+    expect((res2.body as { entry_id: string }).entry_id).toBe(body.entry_id);
   });
 });
