@@ -22,7 +22,15 @@ vi.mock('node:child_process', async (importOriginal) => {
   };
 });
 
-import { safeExec, safeExecResult } from './secure-io.js';
+import {
+  resolveUserLoginShell,
+  safeExec,
+  safeExecResult,
+  safeExecResultAsync,
+  safeExecShellScript,
+  safeExecShellScriptResult,
+  safeSpawn,
+} from './secure-io.js';
 
 describe('safeExecResult / safeExec — shell option hardening (CodeQL js/shell-command-constructed-from-input)', () => {
   it('safeExecResult invokes spawnSync with an explicit shell: false', () => {
@@ -79,5 +87,118 @@ describe('safeExecResult / safeExec — shell option hardening (CodeQL js/shell-
   it('still surfaces a non-zero exit code from safeExecResult without throwing', () => {
     const result = safeExecResult(process.execPath, ['-e', 'process.exit(3)']);
     expect(result.status).toBe(3);
+  });
+});
+
+describe('safeExecShellScript / safeExecShellScriptResult — dedicated shell-script boundary', () => {
+  it('runs `sh -c <script>` via execFileSync with an exact argv and shell: false', () => {
+    childProcessSpies.execFileSync.mockClear();
+    const out = safeExecShellScript('sh', 'printf "%s" "$0-$1"', { scriptArgs: ['a', 'b'] });
+    expect(out).toBe('a-b');
+    expect(childProcessSpies.execFileSync).toHaveBeenCalledTimes(1);
+    const [command, argv, options] = childProcessSpies.execFileSync.mock.calls[0];
+    expect(command).toBe('sh');
+    expect(argv).toEqual(['-c', 'printf "%s" "$0-$1"', 'a', 'b']);
+    expect(options.shell).toBe(false);
+    expect(options.env.FORCE_COLOR).toBe('0');
+  });
+
+  it('uses -lc for login shells and keeps cwd / timeout / maxBuffer', () => {
+    childProcessSpies.spawnSync.mockClear();
+    const result = safeExecShellScriptResult('bash', 'exit 3', {
+      login: true,
+      cwd: process.cwd(),
+      timeoutMs: 5000,
+      maxOutputMB: 1,
+    });
+    expect(result.status).toBe(3);
+    const [command, argv, options] = childProcessSpies.spawnSync.mock.calls[0];
+    expect(command).toBe('bash');
+    expect(argv).toEqual(['-lc', 'exit 3']);
+    expect(options).toMatchObject({
+      cwd: process.cwd(),
+      timeout: 5000,
+      maxBuffer: 1024 * 1024,
+      shell: false,
+    });
+    expect(options).not.toHaveProperty('login');
+    expect(options).not.toHaveProperty('scriptArgs');
+  });
+
+  it('maps cmd to `/c` and appends scriptArgs verbatim (cmd /c start "" <target>)', () => {
+    childProcessSpies.spawnSync.mockClear();
+    // cmd is not present on POSIX hosts; the result carries the spawn error,
+    // but the argv handed to spawnSync is what this asserts.
+    safeExecShellScriptResult('cmd', 'start', { scriptArgs: ['', 'C:\\tmp\\a.html'] });
+    const [command, argv, options] = childProcessSpies.spawnSync.mock.calls[0];
+    expect(command).toBe('cmd');
+    expect(argv).toEqual(['/c', 'start', '', 'C:\\tmp\\a.html']);
+    expect(options.shell).toBe(false);
+  });
+
+  it('rejects login for cmd', () => {
+    expect(() => safeExecShellScript('cmd', 'start', { login: true })).toThrow(
+      /login.*not supported for cmd/
+    );
+  });
+
+  it('resolves the user login shell from $SHELL with a fallback', () => {
+    expect(resolveUserLoginShell('/bin/bash', '/bin/zsh')).toBe('/bin/bash');
+    expect(resolveUserLoginShell(undefined, '/bin/zsh')).toBe('/bin/zsh');
+    expect(resolveUserLoginShell('', '/bin/zsh')).toBe('/bin/zsh');
+  });
+
+  it('still applies the sensitive-text, policy and shell-option checks', () => {
+    childProcessSpies.execFileSync.mockClear();
+    childProcessSpies.spawnSync.mockClear();
+    expect(() => safeExecShellScript('sh', 'cat ~/.ssh/id_ed25519')).toThrow(
+      '[SENSITIVE_PATH_DENIED]'
+    );
+    expect(() => safeExecShellScriptResult('bash', 'cat $HOME/.codex/auth.json')).toThrow(
+      '[SENSITIVE_PATH_DENIED]'
+    );
+    const withShell = { shell: true } as unknown as Parameters<typeof safeExecShellScript>[2];
+    expect(() => safeExecShellScript('sh', 'true', withShell)).toThrow(
+      /do not accept a "shell" option/
+    );
+    const savedRing = process.env.KYBERION_AGENT_RING;
+    process.env.KYBERION_AGENT_RING = '3';
+    try {
+      expect(() => safeExecShellScript('sh', 'true')).toThrow('[POLICY_BLOCKED]');
+      expect(() => safeExecShellScriptResult('sh', 'true')).toThrow('[POLICY_BLOCKED]');
+    } finally {
+      if (savedRing === undefined) delete process.env.KYBERION_AGENT_RING;
+      else process.env.KYBERION_AGENT_RING = savedRing;
+    }
+    expect(childProcessSpies.execFileSync).not.toHaveBeenCalled();
+    expect(childProcessSpies.spawnSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('generic exec helpers reject shell-script invocations', () => {
+  const cases: Array<[string, string[]]> = [
+    ['sh', ['-c', 'echo hi']],
+    ['/bin/sh', ['-c', 'echo hi']],
+    ['bash', ['-lc', 'echo hi']],
+    ['/bin/bash', ['-c', 'echo hi']],
+    ['cmd', ['/c', 'start', '', 'x']],
+    ['C:\\Windows\\System32\\CMD.EXE', ['/C', 'dir']],
+  ];
+
+  it.each(cases)('%s %j is rejected by safeExec / safeExecResult / async / spawn', (cmd, args) => {
+    childProcessSpies.execFileSync.mockClear();
+    childProcessSpies.spawnSync.mockClear();
+    expect(() => safeExec(cmd, args)).toThrow(/safeExecShellScript/);
+    expect(() => safeExecResult(cmd, args)).toThrow(/safeExecShellScript/);
+    expect(() => safeExecResultAsync(cmd, args)).toThrow(/safeExecShellScript/);
+    expect(() => safeSpawn(cmd, args)).toThrow(/safeExecShellScript/);
+    expect(childProcessSpies.execFileSync).not.toHaveBeenCalled();
+    expect(childProcessSpies.spawnSync).not.toHaveBeenCalled();
+  });
+
+  it('leaves non-script shell runs and other interpreters alone', () => {
+    expect(safeExecResult('sh', ['-n', '/dev/null']).status).toBe(0);
+    expect(safeExecResult(process.execPath, ['-e', 'process.exit(0)']).status).toBe(0);
+    expect(safeExec('echo', ['-c'])).toBe('-c\n');
   });
 });
