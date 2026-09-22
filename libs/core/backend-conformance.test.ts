@@ -12,8 +12,8 @@ describe('backend conformance matrix (QM-06)', () => {
       },
     });
 
-    expect(report.results).toHaveLength(8);
-    expect(calls).toHaveLength(16);
+    expect(report.results).toHaveLength(9);
+    expect(calls).toHaveLength(18);
     expect(report.results.every((result) => result.version.status === 'verified')).toBe(true);
     expect(report.results.every((result) => result.help.status === 'verified')).toBe(true);
     expect(report.results[0]?.capabilities.structured_output.status).toBe('verified');
@@ -69,6 +69,7 @@ describe('backend conformance matrix (QM-06)', () => {
       'verified',
       'verified',
       'verified',
+      'verified',
       'unsupported',
       'unsupported',
     ]);
@@ -79,6 +80,7 @@ describe('backend conformance matrix (QM-06)', () => {
       'grok',
       'cursor-agent',
       'opencode',
+      'devin',
     ]);
     expect(calls[0]?.args).toContain('--permission-mode');
     expect(calls[1]?.args).toEqual(expect.arrayContaining(['exec', '--sandbox', 'read-only', '-']));
@@ -93,6 +95,16 @@ describe('backend conformance matrix (QM-06)', () => {
     );
     expect(calls[5]?.args).toEqual(
       expect.arrayContaining(['run', '--format', 'json', '--agent', 'plan'])
+    );
+    expect(calls[6]?.args).toEqual(
+      expect.arrayContaining([
+        '--permission-mode',
+        'normal',
+        '--respect-workspace-trust',
+        'false',
+        '-p',
+        '--',
+      ])
     );
     expect(calls.find(({ command }) => command === 'codex')?.input).toContain(
       'SANDBOX_PROBE_ATTEMPTED'
@@ -234,5 +246,37 @@ describe('backend conformance matrix (QM-06)', () => {
       status: 'verified',
     });
     expect(available).toContain('/custom/opencode');
+  });
+
+  it('uses the registered CLI override for the live Devin sandbox probe', () => {
+    const available: string[] = [];
+    const results = runBackendSandboxConformance({
+      probeId: 'devin-override',
+      env: { KYBERION_DEVIN_CLI_BIN: '/custom/devin' },
+      binaryAvailable: (binary) => {
+        available.push(binary);
+        return binary === '/custom/devin';
+      },
+      fs: { mkdir: () => undefined, exists: () => false, remove: () => undefined },
+      exec: (_command, args) => {
+        const sentinel = args.join(' ').match(/[^\s]+\.sentinel/u)?.[0] ?? 'missing.sentinel';
+        return {
+          stdout: [
+            'SANDBOX_PROBE_ATTEMPTED',
+            `SANDBOX_PROBE_TARGET=${sentinel}`,
+            'SANDBOX_PROBE_BLOCKED',
+            'permission denied',
+          ].join('\n'),
+          stderr: '',
+          status: 1,
+        };
+      },
+    });
+
+    expect(results.find((result) => result.mode === 'devin-cli')).toMatchObject({
+      binary: '/custom/devin',
+      status: 'verified',
+    });
+    expect(available).toContain('/custom/devin');
   });
 });

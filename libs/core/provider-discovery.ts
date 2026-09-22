@@ -627,6 +627,38 @@ function checkOpencode(): ProviderInfo {
   };
 }
 
+function checkDevin(): ProviderInfo {
+  const configuredBinary = getRegisteredEnvText('KYBERION_DEVIN_CLI_BIN')?.trim();
+  const binary = configuredBinary || 'devin';
+  const version = configuredBinary
+    ? run(configuredBinary, ['--version'])
+    : (() => {
+        const which = run('which', [binary]);
+        return which.ok ? run(binary, ['--version']) : which;
+      })();
+  if (!version.ok)
+    return {
+      provider: 'devin',
+      installed: false,
+      version: null,
+      protocol: 'print-json',
+      models: [],
+      healthy: false,
+    };
+
+  const entry = capabilityEntryFor('devin');
+  return {
+    provider: 'devin',
+    installed: true,
+    version: version.stdout || null,
+    protocol: 'print-json',
+    models: entry.models,
+    capabilities: entry.capabilities,
+    modelCapabilities: entry.modelCapabilities,
+    healthy: version.ok,
+  };
+}
+
 /**
  * Discover all available providers. Cached for 5 minutes.
  */
@@ -663,6 +695,7 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
     checkGrok(),
     checkCursor(),
     checkOpencode(),
+    checkDevin(),
   ];
 
   const available = providers.filter((p) => p.installed);
