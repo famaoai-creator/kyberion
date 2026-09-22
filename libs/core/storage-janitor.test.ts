@@ -93,6 +93,13 @@ vi.mock('./path-resolver.js', () => ({
   rootDir: () => pathResolverMock.rootDir || path.join(os.tmpdir(), 'kyberion-janitor-mock-root'),
 }));
 
+// The status-rule sweep runs inside a system execution context; the real
+// authority module needs the full path resolver, which this suite mocks.
+const authorityMock = vi.hoisted(() => ({
+  withExecutionContext: vi.fn(<T>(_role: string, fn: () => T): T => fn()),
+}));
+vi.mock('./authority.js', () => authorityMock);
+
 vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));
@@ -103,6 +110,7 @@ import {
   scanRuntime,
   scanEventStores,
   sweepSupervisorEventFiles,
+  sweepStatusRules,
   scanDataVault,
   sweepDelegationChildren,
   sweepTrash,
@@ -437,6 +445,256 @@ describe('storage-janitor', () => {
       expect(result.deleted).not.toContain(oldDated);
       expect(fs.existsSync(legacy)).toBe(true);
       expect(fs.existsSync(oldDated)).toBe(true);
+    });
+  });
+
+  /** WI-16: entry-level status_rules — per-file status+age expiry. */
+  describe('sweepStatusRules (WI-16)', () => {
+    const statusRulesCatalog = {
+      version: '1.1.0',
+      entries: [
+        {
+          path: 'knowledge/personal/members',
+          artifact_class: 'evidence',
+          action: 'review_required',
+          audit: true,
+          status_rules: [
+            {
+              id: 'wi-observation-pending-review-expiry',
+              path_pattern: '*/work-inventory/observations/*.json',
+              status_field: 'status',
+              statuses: ['pending_review'],
+              age_field: 'created_at',
+              ttl_days: 30,
+              action: 'delete',
+            },
+            {
+              id: 'wi-observation-discarded-expiry',
+              path_pattern: '*/work-inventory/observations/*.json',
+              status_field: 'status',
+              statuses: ['discarded'],
+              age_field: 'discarded_at',
+              ttl_days: 30,
+              action: 'delete',
+            },
+          ],
+        },
+      ],
+    };
+
+    function daysAgoIso(days: number): string {
+      return new Date(Date.now() - days * RETENTION_DAY_MS).toISOString();
+    }
+
+    function observationPath(memberId: string, summaryId: string): string {
+      return path.join(
+        testRootDir(),
+        'knowledge',
+        'personal',
+        'members',
+        memberId,
+        'work-inventory',
+        'observations',
+        `${summaryId}.json`
+      );
+    }
+
+    function writeObservation(
+      memberId: string,
+      summaryId: string,
+      body: Record<string, unknown>
+    ): string {
+      const filePath = observationPath(memberId, summaryId);
+      writeFile(filePath, JSON.stringify(body));
+      return filePath;
+    }
+
+    it('deletes a pending_review summary whose created_at is past the 30d ttl', () => {
+      writeCatalogFile(statusRulesCatalog);
+      const filePath = writeObservation('member1', 'WIO-old', {
+        status: 'pending_review',
+        created_at: daysAgoIso(31),
+      });
+
+      authorityMock.withExecutionContext.mockClear();
+      const result = sweepStatusRules({ dryRun: false });
+      expect(result.deleted).toContain(filePath);
+      expect(fs.existsSync(filePath)).toBe(false);
+      // Tier-guarded knowledge is only readable inside a system context.
+      expect(authorityMock.withExecutionContext).toHaveBeenCalledWith(
+        'ecosystem_architect',
+        expect.any(Function)
+      );
+    });
+
+    it('keeps a pending_review summary whose created_at is within the 30d ttl', () => {
+      writeCatalogFile(statusRulesCatalog);
+      const filePath = writeObservation('member1', 'WIO-fresh', {
+        status: 'pending_review',
+        created_at: daysAgoIso(29),
+      });
+
+      const result = sweepStatusRules({ dryRun: false });
+      expect(result.expired).not.toContain(filePath);
+      expect(result.deleted).not.toContain(filePath);
+      expect(fs.existsSync(filePath)).toBe(true);
+    });
+
+    it('never deletes a confirmed summary, however old its dates are', () => {
+      writeCatalogFile(statusRulesCatalog);
+      const filePath = writeObservation('member1', 'WIO-confirmed', {
+        status: 'confirmed',
+        created_at: daysAgoIso(400),
+        confirmed_at: daysAgoIso(400),
+      });
+
+      const result = sweepStatusRules({ dryRun: false });
+      expect(result.expired).not.toContain(filePath);
+      expect(fs.existsSync(filePath)).toBe(true);
+    });
+
+    it('deletes a discarded summary by discarded_at, not created_at', () => {
+      writeCatalogFile(statusRulesCatalog);
+      const filePath = writeObservation('member1', 'WIO-discarded', {
+        status: 'discarded',
+        created_at: daysAgoIso(60), // old, but irrelevant to this rule
+        discarded_at: daysAgoIso(31),
+      });
+
+      const result = sweepStatusRules({ dryRun: false });
+      expect(result.deleted).toContain(filePath);
+      expect(fs.existsSync(filePath)).toBe(false);
+    });
+
+    it('keeps a discarded summary whose discarded_at is within the 30d ttl', () => {
+      writeCatalogFile(statusRulesCatalog);
+      const filePath = writeObservation('member1', 'WIO-discarded-fresh', {
+        status: 'discarded',
+        created_at: daysAgoIso(60),
+        discarded_at: daysAgoIso(29),
+      });
+
+      const result = sweepStatusRules({ dryRun: false });
+      expect(result.expired).not.toContain(filePath);
+      expect(fs.existsSync(filePath)).toBe(true);
+    });
+
+    it('skips a malformed (non-JSON) matching file — never deletes on doubt', () => {
+      writeCatalogFile(statusRulesCatalog);
+      const filePath = observationPath('member1', 'WIO-malformed');
+      writeFile(filePath, '{not-json');
+
+      const result = sweepStatusRules({ dryRun: false });
+      expect(result.expired).not.toContain(filePath);
+      expect(result.deleted).not.toContain(filePath);
+      expect(fs.existsSync(filePath)).toBe(true);
+    });
+
+    it('skips a matching file missing the age_field — never deletes on doubt', () => {
+      writeCatalogFile(statusRulesCatalog);
+      const filePath = writeObservation('member1', 'WIO-no-age', {
+        status: 'pending_review',
+        // created_at intentionally missing
+      });
+
+      const result = sweepStatusRules({ dryRun: false });
+      expect(result.expired).not.toContain(filePath);
+      expect(fs.existsSync(filePath)).toBe(true);
+    });
+
+    it('dry-run reports expired candidates but deletes nothing', () => {
+      writeCatalogFile(statusRulesCatalog);
+      const filePath = writeObservation('member1', 'WIO-dry', {
+        status: 'pending_review',
+        created_at: daysAgoIso(31),
+      });
+
+      const result = sweepStatusRules({ dryRun: true });
+      expect(result.expired).toContain(filePath);
+      expect(result.deleted).toHaveLength(0);
+      expect(fs.existsSync(filePath)).toBe(true);
+    });
+
+    it('emits an audit record naming the rule id and matched status', () => {
+      writeCatalogFile(statusRulesCatalog);
+      writeObservation('member1', 'WIO-audited', {
+        status: 'pending_review',
+        created_at: daysAgoIso(31),
+      });
+
+      sweepStatusRules({ dryRun: false });
+      const audit = readRetentionAudit();
+      const record = audit.find((entry) => entry.event === 'RETENTION_DELETE');
+      expect(record).toMatchObject({
+        status_rule_id: 'wi-observation-pending-review-expiry',
+        status: 'pending_review',
+        status_field: 'status',
+        age_field: 'created_at',
+        policy_path: 'knowledge/personal/members',
+        policy_ref: RETENTION_CATALOG_REPO_PATH,
+      });
+    });
+
+    it('never matches a file outside the pattern, even directly under the entry path', () => {
+      writeCatalogFile(statusRulesCatalog);
+      // Sits directly under the entry, not under */work-inventory/observations/*.json.
+      const unrelated = path.join(
+        testRootDir(),
+        'knowledge',
+        'personal',
+        'members',
+        'training.json'
+      );
+      writeFile(
+        unrelated,
+        JSON.stringify({ status: 'pending_review', created_at: daysAgoIso(365) })
+      );
+
+      const result = sweepStatusRules({ dryRun: false });
+      expect(result.expired).not.toContain(unrelated);
+      expect(fs.existsSync(unrelated)).toBe(true);
+    });
+
+    it('rejects a status_rules path_pattern that tries to traverse outside the entry (fails catalog validation, falls back to builtin defaults)', () => {
+      writeCatalogFile({
+        version: '1.1.0',
+        entries: [
+          {
+            path: 'knowledge/personal/members',
+            artifact_class: 'evidence',
+            action: 'review_required',
+            status_rules: [
+              {
+                id: 'escape-attempt',
+                path_pattern: '../../etc/*.json',
+                status_field: 'status',
+                statuses: ['pending_review'],
+                age_field: 'created_at',
+                ttl_days: 30,
+                action: 'delete',
+              },
+            ],
+          },
+        ],
+      });
+
+      const report = runJanitor({ dryRun: true });
+      expect(report.retentionCatalogSource).toBe('builtin-defaults');
+      expect(report.retentionCatalogWarnings[0]).toContain('path_pattern');
+    });
+
+    it('is wired into runJanitor and counted in the report', () => {
+      writeCatalogFile(statusRulesCatalog);
+      const filePath = writeObservation('member1', 'WIO-via-janitor', {
+        status: 'pending_review',
+        created_at: daysAgoIso(31),
+      });
+
+      const report = runJanitor({ dryRun: false });
+      expect(report.expiredStatusRules).toBeGreaterThanOrEqual(1);
+      expect(report.deletedStatusRules).toBeGreaterThanOrEqual(1);
+      expect(fs.existsSync(filePath)).toBe(false);
+      expect(report.errors).toEqual([]);
     });
   });
 
@@ -925,6 +1183,8 @@ describe('storage-janitor', () => {
         deletedRuntime: expect.any(Number),
         expiredSupervisorEvents: expect.any(Number),
         deletedSupervisorEvents: expect.any(Number),
+        expiredStatusRules: expect.any(Number),
+        deletedStatusRules: expect.any(Number),
         staleDelegationChildren: expect.any(Number),
         killedDelegationChildren: expect.any(Number),
         errors: expect.any(Array),

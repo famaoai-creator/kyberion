@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/storage-retention-catalog.schema.json",
-  "version": "1.5.0",
-  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams. WI-10 declares the work-inventory personal/member knowledge subtrees (knowledge/personal/work-inventory, knowledge/personal/members) as never-auto-delete evidence, documenting a known gap where per-file status (e.g. pending_review observation summaries) cannot be expressed by this directory-level, mtime-based model.",
+  "version": "1.6.0",
+  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams. WI-10 declares the work-inventory personal/member knowledge subtrees (knowledge/personal/work-inventory, knowledge/personal/members) as never-auto-delete evidence. WI-16 adds an entry-level status_rules vocabulary — a generic, declarative per-file status+age expiry rule nested under a directory entry — and uses it on knowledge/personal/members to expire stale pending_review and discarded work-inventory observation summaries by their own JSON status/date fields (see storage-janitor.ts's sweepStatusRules) without touching confirmed summaries, consents, or unrelated member records.",
   "entries": [
     {
       "path": "active/shared/tmp",
@@ -470,7 +470,27 @@
       "artifact_class": "evidence",
       "action": "review_required",
       "audit": true,
-      "note": "WI-10: member-scoped personal knowledge (knowledge/personal/members/<member_id>/...), including training.json (training-catalog.ts) and, for work inventory, work-inventory/consents/*.json (work-inventory-consent.ts — recording consent grants/revocations; kept while active and retained as audit evidence after revocation or expiry, the same review_required+audit norm this catalog uses for other consent/authorization evidence) and work-inventory/observations/*.json (work-inventory-observation.ts — desktop/browser recording summaries carrying a `pending_review|confirmed|discarded` status field inside each file). Known gap: the design calls for pending_review observation summaries that are never confirmed to expire after ~30 days, but this catalog's retention model is directory-level and mtime-based with no per-file status awareness, and the member_id path segment is a variable this catalog cannot address with a narrower prefix without also catching confirmed/discarded records and unrelated member records (training.json) in the same TTL sweep — applying a blind 30d TTL here would risk deleting confirmed observations and training state. review_required is the closest expressible class; a status-aware purge (if desired) belongs in application code (work-inventory-observation.ts), not the janitor."
+      "note": "WI-10: member-scoped personal knowledge (knowledge/personal/members/<member_id>/...), including training.json (training-catalog.ts) and, for work inventory, work-inventory/consents/*.json (work-inventory-consent.ts — recording consent grants/revocations; kept while active and retained as audit evidence after revocation or expiry, the same review_required+audit norm this catalog uses for other consent/authorization evidence) and work-inventory/observations/*.json (work-inventory-observation.ts — desktop/browser recording summaries carrying a `pending_review|confirmed|discarded` status field inside each file). WI-16: the directory itself stays review_required (member_id is a variable segment, and confirmed observations plus training.json must never be swept by a blind TTL), but the two status_rules below close the per-file gap: a pending_review summary that is never confirmed, or a discarded summary, each expire 30 days after their own status transition — confirmed summaries and consent records are never matched by either rule and are never auto-deleted.",
+      "status_rules": [
+        {
+          "id": "wi-observation-pending-review-expiry",
+          "path_pattern": "*/work-inventory/observations/*.json",
+          "status_field": "status",
+          "statuses": ["pending_review"],
+          "age_field": "created_at",
+          "ttl_days": 30,
+          "action": "delete"
+        },
+        {
+          "id": "wi-observation-discarded-expiry",
+          "path_pattern": "*/work-inventory/observations/*.json",
+          "status_field": "status",
+          "statuses": ["discarded"],
+          "age_field": "discarded_at",
+          "ttl_days": 30,
+          "action": "delete"
+        }
+      ]
     }
   ]
 }
