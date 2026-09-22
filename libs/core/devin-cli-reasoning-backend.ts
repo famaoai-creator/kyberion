@@ -96,10 +96,17 @@ const GOVERNED_ARGUMENTS = new Set([
   '-c',
   '--resume',
   '-r',
+  '--',
 ]);
 
 function validateExtraArgs(args: readonly string[]): string[] {
   for (const arg of args) {
+    // `--` terminates option parsing: extra args are injected before the
+    // backend-owned `-p --`, so a bare `--` would demote them to positional
+    // arguments and restructure the governed invocation.
+    if (arg === '--') {
+      throw new Error('[devin-cli] extra args may not restructure option parsing: --');
+    }
     const flag = arg.split('=', 1)[0];
     if (GOVERNED_ARGUMENTS.has(flag)) {
       throw new Error(`[devin-cli] extra args may not override governed flag: ${flag}`);
