@@ -27,6 +27,7 @@ export function resolveWorkInventoryMember(viewer: ConciergeViewerContext): Memb
       principalId: viewer.principalId,
       source: viewer.source,
       registrationLabel: viewer.registrationLabel,
+      memberId: viewer.memberId,
     })
   );
 }

@@ -1,9 +1,9 @@
 import {
-  authorizeSurfaceOperation,
   type SurfaceAuthorizationContext,
   type SurfaceAuthorizationRole,
   type SurfacePermission,
 } from './surface-authorization.js';
+import { authorizeSurfaceContextOperation } from './surface-authn.js';
 import { nowIso } from './foundation/time.js';
 
 /**
@@ -359,7 +359,7 @@ export function availableHeadlessOperationIds(
   return manifest.operations
     .filter(
       (operation) =>
-        authorizeSurfaceOperation({
+        authorizeSurfaceContextOperation({
           context,
           operation: {
             operationId: operation.operation_id,
@@ -390,7 +390,7 @@ export function filterHeadlessManifestForViewer(
     ...manifest,
     operations: manifest.operations.filter(
       (operation) =>
-        authorizeSurfaceOperation({
+        authorizeSurfaceContextOperation({
           context,
           operation: {
             operationId: operation.operation_id,

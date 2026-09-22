@@ -5,7 +5,7 @@ import { readTrainingAssignments, upsertTrainingAssignment } from '@agent/core/t
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { requireKnownRequestKeys, requireRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
-import { resolveConciergeFrontDeskRole } from '../../../../lib/front-desk-member';
+import { conciergeFrontDeskRoleForTenant } from '../../../../lib/front-desk-member';
 import { frontDeskText, resolveConciergeLocale } from '../../../../lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -40,12 +40,6 @@ export async function POST(req: NextRequest) {
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
-  if (resolveConciergeFrontDeskRole(resolved.context) !== 'owner') {
-    return NextResponse.json(
-      { ok: false, error: frontDeskText('training_assign_owner_only', locale) },
-      { status: 403 }
-    );
-  }
   try {
     const body = requireRequestObject(await req.json().catch(() => null), 'request body');
     requireKnownRequestKeys(body, ['tenant_slug', 'member_id', 'track_id']);
@@ -56,6 +50,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { ok: false, error: frontDeskText('training_assign_invalid_input', locale) },
         { status: 400 }
+      );
+    }
+    // The write lands on `tenant` — owner authority is required on THAT
+    // tenant, not merely the first tenant in the viewer's scope (F2).
+    if (conciergeFrontDeskRoleForTenant(resolved.context, tenant) !== 'owner') {
+      return NextResponse.json(
+        { ok: false, error: frontDeskText('training_assign_owner_only', locale) },
+        { status: 403 }
       );
     }
     const assignments = withExecutionContext('sovereign_concierge', () =>

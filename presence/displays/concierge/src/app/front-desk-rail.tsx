@@ -29,7 +29,7 @@ interface FrontDeskNavItemPayload {
   href: string;
   external: boolean;
   allowed: boolean;
-  min_role: 'owner' | 'approver' | 'viewer';
+  min_role: 'owner' | 'approver' | 'operator' | 'viewer';
 }
 
 interface FrontDeskNavResponse {
@@ -41,7 +41,7 @@ interface FrontDeskNavResponse {
   brand_tagline: string;
   aria_label: string;
   tenant_switch_aria: string;
-  role_labels: { owner: string; approver: string; viewer: string };
+  role_labels: { owner: string; approver: string; operator: string; viewer: string };
   tenant_viewing_summary: string;
   tenant_viewing_single: string;
 }
@@ -49,7 +49,7 @@ interface FrontDeskNavResponse {
 interface FrontDeskTenantView {
   tenant_slug: string;
   display_name: string;
-  role: 'owner' | 'approver' | 'viewer';
+  role: 'owner' | 'approver' | 'operator' | 'viewer';
   status: 'active' | 'suspended' | 'archived';
 }
 
