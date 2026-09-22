@@ -3536,6 +3536,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_TRACE_TEST_PERSIST",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Test-only opt-in: lets vitest exercise real trace persistence to the resolved logs/traces dir (normally skipped under VITEST to stop test traces from leaking into the checkout).",
+      "documented": true,
+      "subsystem": "observability"
+    },
+    {
       "name": "KYBERION_TRUST_PROXY",
       "category": "flag",
       "type": "boolean",

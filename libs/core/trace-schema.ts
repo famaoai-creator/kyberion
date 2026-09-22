@@ -458,6 +458,15 @@ export interface TraceReplayValidationOptions {
   strictUnknownSpans?: boolean;
 }
 
+/** WI-13: the closed `Trace['metadata']['origin']` vocabulary (`TraceOrigin` in `src/trace.ts`). */
+const VALID_TRACE_ORIGINS: ReadonlySet<string> = new Set([
+  'test',
+  'ci',
+  'scheduled',
+  'agent',
+  'interactive',
+]);
+
 interface TraceReplayRecord {
   [key: string]: unknown;
 }
@@ -510,6 +519,20 @@ export function validateTraceReplay(
   if (typeof trace.traceId !== 'string' || !trace.traceId.trim()) {
     issues.push({ path: 'trace.traceId', message: 'traceId must be a non-empty string' });
   }
+  if (trace.metadata !== undefined) {
+    if (!isTraceRecord(trace.metadata)) {
+      issues.push({ path: 'trace.metadata', message: 'metadata must be an object' });
+    } else if (
+      trace.metadata.origin !== undefined &&
+      !VALID_TRACE_ORIGINS.has(String(trace.metadata.origin))
+    ) {
+      issues.push({
+        path: 'trace.metadata.origin',
+        message: `origin must be one of ${[...VALID_TRACE_ORIGINS].join(', ')}`,
+      });
+    }
+  }
+
   if (!isTraceRecord(trace.rootSpan)) {
     issues.push({ path: 'trace.rootSpan', message: 'rootSpan must be an object' });
     return issues;
