@@ -1,0 +1,160 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "authz-policy-engine",
+      "default_provider": "role-scope",
+      "fallback_purpose": "default_surface",
+      "traits": {
+        "tenant_aware": "Evaluates tenant/org/project/tier resource scope, not just role.",
+        "member_aware": "Evaluates member-registry memberships and human roles (owner/approver/viewer).",
+        "expressiveness": "Declarative rule expressiveness (per-principal, per-operation, per-resource).",
+        "fail_closed": "Unknown or unmatched input is denied, never permitted.",
+        "zero_config": "Works with no operator-side policy files.",
+        "deny_everything": "Always denies — the lockdown position.",
+        "permit_everything": "Always permits — the test-only position."
+      },
+      "providers": {
+        "role-scope": {
+          "traits": {
+            "tenant_aware": 1,
+            "member_aware": 0,
+            "expressiveness": 0.3,
+            "fail_closed": 1,
+            "zero_config": 1,
+            "deny_everything": 0,
+            "permit_everything": 0
+          },
+          "trait_basis": {
+            "tenant_aware": "declared",
+            "member_aware": "declared",
+            "expressiveness": "declared",
+            "fail_closed": "declared",
+            "zero_config": "declared",
+            "deny_everything": "declared",
+            "permit_everything": "declared"
+          },
+          "evidence": ["libs/core/surface-authorization.ts"]
+        },
+        "member-membership": {
+          "traits": {
+            "tenant_aware": 1,
+            "member_aware": 1,
+            "expressiveness": 0.5,
+            "fail_closed": 1,
+            "zero_config": 0.6,
+            "deny_everything": 0,
+            "permit_everything": 0
+          },
+          "trait_basis": {
+            "tenant_aware": "declared",
+            "member_aware": "declared",
+            "expressiveness": "declared",
+            "fail_closed": "declared",
+            "zero_config": "declared",
+            "deny_everything": "declared",
+            "permit_everything": "declared"
+          },
+          "evidence": ["libs/core/member-registry.ts", "libs/core/front-desk-roles.ts"]
+        },
+        "policy-file": {
+          "traits": {
+            "tenant_aware": 1,
+            "member_aware": 0.5,
+            "expressiveness": 1,
+            "fail_closed": 1,
+            "zero_config": 0.3,
+            "deny_everything": 0,
+            "permit_everything": 0
+          },
+          "trait_basis": {
+            "tenant_aware": "declared",
+            "member_aware": "declared",
+            "expressiveness": "declared",
+            "fail_closed": "declared",
+            "zero_config": "declared",
+            "deny_everything": "declared",
+            "permit_everything": "declared"
+          }
+        },
+        "allow-all": {
+          "traits": {
+            "tenant_aware": 0,
+            "member_aware": 0,
+            "expressiveness": 0,
+            "fail_closed": 0,
+            "zero_config": 1,
+            "deny_everything": 0,
+            "permit_everything": 1
+          },
+          "trait_basis": {
+            "tenant_aware": "declared",
+            "member_aware": "declared",
+            "expressiveness": "declared",
+            "fail_closed": "declared",
+            "zero_config": "declared",
+            "deny_everything": "declared",
+            "permit_everything": "declared"
+          }
+        },
+        "deny-all": {
+          "traits": {
+            "tenant_aware": 0,
+            "member_aware": 0,
+            "expressiveness": 0,
+            "fail_closed": 1,
+            "zero_config": 1,
+            "deny_everything": 1,
+            "permit_everything": 0
+          },
+          "trait_basis": {
+            "tenant_aware": "declared",
+            "member_aware": "declared",
+            "expressiveness": "declared",
+            "fail_closed": "declared",
+            "zero_config": "declared",
+            "deny_everything": "declared",
+            "permit_everything": "declared"
+          }
+        }
+      },
+      "purposes": {
+        "default_surface": {
+          "description": "Current surface semantics: role + scope containment, zero extra config.",
+          "weights": {
+            "tenant_aware": 0.5,
+            "zero_config": 0.3,
+            "fail_closed": 0.2
+          }
+        },
+        "membership": {
+          "description": "Per-member tenant roles (approver decide flows, per-tenant viewers).",
+          "weights": {
+            "member_aware": 0.7,
+            "tenant_aware": 0.3
+          }
+        },
+        "governed": {
+          "description": "Declarative per-principal/per-operation rules from a governed policy file.",
+          "weights": {
+            "expressiveness": 0.7,
+            "fail_closed": 0.3
+          }
+        },
+        "lockdown": {
+          "description": "Incident/lockdown posture: every query is denied.",
+          "weights": {
+            "deny_everything": 1
+          }
+        },
+        "test": {
+          "description": "Hermetic tests: unconditional allow so the caller's own logic is under test.",
+          "weights": {
+            "permit_everything": 1
+          }
+        }
+      }
+    }
+  ]
+}
