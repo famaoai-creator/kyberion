@@ -87,8 +87,15 @@ export async function POST(req: NextRequest) {
         );
       }
       const purpose = typeof body.purpose === 'string' ? body.purpose : '';
-      const days = Number(body.days);
-      if (!Number.isFinite(days) || days <= 0) {
+      // Validate here, not in core: a huge value would overflow the Date
+      // math below into an Invalid Date and surface as a 500.
+      const days = body.days;
+      if (
+        typeof days !== 'number' ||
+        !Number.isInteger(days) ||
+        days < 1 ||
+        days > MAX_CONSENT_WINDOW_DAYS
+      ) {
         return NextResponse.json(
           { ok: false, error: frontDeskText('settings_recording_grant_invalid', locale) },
           { status: 400 }

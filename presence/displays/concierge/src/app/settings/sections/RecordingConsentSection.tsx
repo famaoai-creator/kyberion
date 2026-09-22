@@ -71,7 +71,7 @@ export function RecordingConsentSection({
     grantForm.sources.length === 0 ||
     grantForm.observationKinds.length === 0 ||
     !grantForm.purpose.trim() ||
-    !Number.isFinite(days) ||
+    !Number.isInteger(days) ||
     days <= 0 ||
     days > maxDays;
   const pendingSummaries = (recordingObservations?.summaries ?? []).filter(

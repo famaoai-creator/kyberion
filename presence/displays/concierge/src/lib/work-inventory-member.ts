@@ -50,6 +50,12 @@ export function requireWorkInventoryMember(
  * `'all'` fallback) resolves to the personal scope; a remote viewer with no
  * concrete tenant resolves to no scope at all — never someone else's
  * personal work inventory.
+ *
+ * Conscious decision (WI-15 review): the loopback viewer is the local owner,
+ * so listing their own personal inventory titles is intentional — the same
+ * rule presence-studio applies — even though the Concierge viewer's default
+ * tier mask excludes `personal`. The personal scope here is the owner's own
+ * inventory, not a tier-mask widening for anyone else.
  */
 export function resolveWorkInventoryScopeForViewer(
   viewer: ConciergeViewerContext

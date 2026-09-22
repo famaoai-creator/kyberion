@@ -34,16 +34,25 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+// WI-16 review: lets a test run code right after a JSON read (e.g. to
+// simulate a member confirming a summary between the scan and the delete).
+const jsonReadHook = vi.hoisted(() => ({
+  afterRead: undefined as undefined | ((p: string) => void),
+}));
+
 vi.mock('./foundation/io.js', () => ({
   getFoundationIo: () => ({
     loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
     loadJsonIfPresent: (p: string) => {
       if (!fs.existsSync(p)) return null;
+      let parsed: unknown;
       try {
-        return JSON.parse(fs.readFileSync(p, 'utf8'));
+        parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
       } catch {
         return null;
       }
+      jsonReadHook.afterRead?.(p);
+      return parsed;
     },
     appendFile: (p: string, data: string) => {
       fs.mkdirSync(path.dirname(p), { recursive: true });
@@ -525,6 +534,32 @@ describe('storage-janitor', () => {
         'ecosystem_architect',
         expect.any(Function)
       );
+    });
+
+    it('re-checks right before deleting: a summary confirmed after the scan read is kept', () => {
+      writeCatalogFile(statusRulesCatalog);
+      const filePath = writeObservation('member1', 'WIO-raced', {
+        status: 'pending_review',
+        created_at: daysAgoIso(31),
+      });
+      let reads = 0;
+      jsonReadHook.afterRead = (p) => {
+        if (p !== filePath) return;
+        reads += 1;
+        // The member confirms it right after the scan read.
+        if (reads === 1) {
+          fs.writeFileSync(p, JSON.stringify({ status: 'confirmed', created_at: daysAgoIso(31) }));
+        }
+      };
+      try {
+        const result = sweepStatusRules({ dryRun: false });
+        expect(reads).toBeGreaterThanOrEqual(2);
+        expect(result.deleted).not.toContain(filePath);
+        expect(result.expired).not.toContain(filePath);
+        expect(fs.existsSync(filePath)).toBe(true);
+      } finally {
+        jsonReadHook.afterRead = undefined;
+      }
     });
 
     it('keeps a pending_review summary whose created_at is within the 30d ttl', () => {
