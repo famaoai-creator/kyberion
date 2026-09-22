@@ -138,3 +138,4 @@ export type {
 // WI-02: work inventory taxonomy, classification, and tenant/personal-scoped
 // storage for the business-inventory discovery stage (work-inventory.v1).
 export * from './work-inventory.js';
+export * from './work-inventory-scoring.js';
