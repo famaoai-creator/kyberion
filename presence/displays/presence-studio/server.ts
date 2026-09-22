@@ -1,7 +1,7 @@
 import { appendJsonLine, nowIso, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
-import { ensureOwnerMember } from '@agent/core/member-registry';
+import { ensureOwnerMember, resolveMemberByPrincipal } from '@agent/core/member-registry';
 import {
   loadPersonalAgentIdentityAtPath,
   loadPersonalIdentityAtPath,
@@ -339,6 +339,45 @@ presenceStudioData.app.get('/api/os/control-plane', (req, res) => {
   }
 });
 
+/**
+ * FD-10/F4: the member actor behind a recorded decision on this loopback
+ * surface — the provisioned owner member resolved via
+ * `resolveMemberByPrincipal`, attributed as `user:<member_id>` with the
+ * membership-derived role. `recordTenant` binds the check to the tenant the
+ * decision lands on; when it cannot be resolved, every membership must be
+ * decision-capable. Returns null when no decision-capable member resolves —
+ * callers fail closed, never writing a synthetic 'presence-studio' or
+ * 'sovereign' identity.
+ */
+function resolveLoopbackDecisionActor(
+  recordTenant?: string
+): { actorId: string; role: 'owner' | 'approver' } | null {
+  return withExecutionContext('ecosystem_architect', () => {
+    const member = resolveMemberByPrincipal({ source: 'loopback' });
+    if (!member) return null;
+    const isDecisionCapable = (role?: string) => role === 'owner' || role === 'approver';
+    if (recordTenant) {
+      const membership = member.memberships.find((item) => item.tenant_slug === recordTenant);
+      if (!isDecisionCapable(membership?.role)) return null;
+      return {
+        actorId: `user:${member.member_id}`,
+        role: membership!.role as 'owner' | 'approver',
+      };
+    }
+    if (
+      member.memberships.length === 0 ||
+      member.memberships.some((item) => !isDecisionCapable(item.role))
+    ) {
+      return null;
+    }
+    const roles = new Set(member.memberships.map((item) => item.role));
+    return {
+      actorId: `user:${member.member_id}`,
+      role: roles.size === 1 ? (member.memberships[0].role as 'owner' | 'approver') : 'approver',
+    };
+  });
+}
+
 presenceStudioData.app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
   const actionId = readPresenceStudioStringParam(req.params.actionId);
   const parsed = presenceStudioApprovalDecisionSchema.safeParse(
@@ -354,11 +393,27 @@ presenceStudioData.app.post('/api/os/held-actions/:actionId/decision', (req, res
   try {
     const access = resolvePresenceStudioViewerContext(req);
     requirePresenceStudioLocalAdmin(access);
-    const item = presenceStudioData.cloudflareOsSurface.decideHeldAction(
-      actionId,
-      decision,
-      access
-    );
+    // The decision lands on the held action's tenant — the member's role is
+    // checked against THAT tenant, and attribution is `user:<member_id>`,
+    // never the synthetic loopback principal id (F2/F4).
+    const heldItem = presenceStudioData.cloudflareOsSurface
+      .snapshot(undefined, access)
+      .heldActions.find((item) => item.id === actionId);
+    const actor = resolveLoopbackDecisionActor(heldItem?.tenantSlug);
+    if (!actor) {
+      logger.warn(
+        presenceStudioData.presenceStudioAuditLine(req, 'os/held-action.decision.reject', {
+          action_id: actionId,
+          status: 403,
+          error: 'member binding could not be verified',
+        })
+      );
+      return res.status(403).json({ ok: false, error: 'member binding could not be verified' });
+    }
+    const item = presenceStudioData.cloudflareOsSurface.decideHeldAction(actionId, decision, {
+      ...access,
+      principalId: actor.actorId,
+    });
     logger.info(
       presenceStudioData.presenceStudioAuditLine(req, 'os/held-action.decision', {
         action_id: actionId,
@@ -479,6 +534,27 @@ presenceStudioData.app.post('/api/approvals/:requestId/decision', (req, res) => 
     return res.status(404).json({ ok: false, error: `approval request not found: ${requestId}` });
   }
 
+  // FD-10/F4: decisions on this loopback surface are attributed to the
+  // provisioned owner member (`user:<member_id>`), never a hardcoded
+  // 'presence-studio'/'sovereign' label — and only through a membership
+  // role that can actually record decisions (owner / approver).
+  const requesterContext = record.requestedByContext as
+    { tenant_slug?: string; tenantSlug?: string } | undefined;
+  const loopContext = record.work_loop?.context as { tenant_slug?: string } | undefined;
+  const recordTenant =
+    requesterContext?.tenant_slug || requesterContext?.tenantSlug || loopContext?.tenant_slug;
+  const decisionActor = resolveLoopbackDecisionActor(recordTenant);
+  if (!decisionActor) {
+    logger.warn(
+      presenceStudioData.presenceStudioAuditLine(req, 'approvals/decision.reject', {
+        request_id: requestId,
+        status: 403,
+        error: 'member binding could not be verified',
+      })
+    );
+    return res.status(403).json({ ok: false, error: 'member binding could not be verified' });
+  }
+
   try {
     logger.info(
       presenceStudioData.presenceStudioAuditLine(req, 'approvals/decision.accept', {
@@ -493,8 +569,8 @@ presenceStudioData.app.post('/api/approvals/:requestId/decision', (req, res) => 
       storageChannel: record.storageChannel,
       requestId,
       decision,
-      decidedBy: 'presence-studio',
-      decidedByRole: 'sovereign',
+      decidedBy: decisionActor.actorId,
+      decidedByRole: decisionActor.role,
       authMethod: 'surface_session',
       decidedByType: 'human',
       authenticated: true,

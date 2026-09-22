@@ -7,9 +7,13 @@
  * approver -> localadmin as the server role (so tenant/tier scope stays the
  * localadmin policy), but with permissions narrowed to
  * `surface.headless.read` + `surface.decision.write` only — never the full
- * `surface.headless.write`. See `surface-authorization.ts`'s
- * `resolveSurfacePermissions`: an explicit `context.permissions` REPLACES the
- * role default, which is what makes this narrowing actually take effect.
+ * `surface.headless.write`. `operator` mirrors that narrowing in the other
+ * direction: localadmin server role with `surface.headless.read` +
+ * `surface.headless.write` — it can execute operations but can never
+ * decide/approve (no `surface.decision.write`). See
+ * `surface-authorization.ts`'s `resolveSurfacePermissions`: an explicit
+ * `context.permissions` REPLACES the role default, which is what makes this
+ * narrowing actually take effect.
  *
  * `ROLE_TIER_ACCESS` (surface-mutation-guard.ts) is untouched by this module
  * on purpose (plan §3 FD-07 item 3: "ROLE_TIER_ACCESS は変更しない").
@@ -21,7 +25,7 @@
 import type { ChronosAccessRole } from './chronos-access-registry.js';
 import type { SurfacePermission } from './surface-authorization.js';
 
-export type FrontDeskHumanRole = 'owner' | 'approver' | 'viewer';
+export type FrontDeskHumanRole = 'owner' | 'approver' | 'operator' | 'viewer';
 
 export interface FrontDeskRoleAuthority {
   /** The server-side role this human role executes as. */
@@ -39,6 +43,10 @@ const FRONT_DESK_ROLE_AUTHORITY: Record<FrontDeskHumanRole, FrontDeskRoleAuthori
     serverRole: 'localadmin',
     permissions: ['surface.headless.read', 'surface.decision.write'],
   },
+  operator: {
+    serverRole: 'localadmin',
+    permissions: ['surface.headless.read', 'surface.headless.write'],
+  },
   viewer: {
     serverRole: 'readonly',
     permissions: ['surface.headless.read'],
@@ -52,6 +60,7 @@ export function frontDeskRoleAuthority(role: FrontDeskHumanRole): FrontDeskRoleA
 /** Every human role, in ascending privilege order — same order as front-desk-nav.ts's rank table. */
 export const FRONT_DESK_HUMAN_ROLES: readonly FrontDeskHumanRole[] = [
   'viewer',
+  'operator',
   'approver',
   'owner',
 ];

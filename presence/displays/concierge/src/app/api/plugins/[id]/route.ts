@@ -12,6 +12,11 @@ import {
   resolveConciergeLocale,
   type ConciergeMessageKey,
 } from '../../../../lib/i18n';
+import { resolveConciergeViewer } from '../../../../lib/viewer-context';
+import {
+  conciergeDecisionDenied,
+  resolveConciergeDecidedBy,
+} from '../../../../lib/front-desk-member';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +42,11 @@ const PLUGIN_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
+  const decisionDenied = conciergeDecisionDenied(resolved.context);
+  if (decisionDenied) return decisionDenied;
+  const decidedBy = resolveConciergeDecidedBy(resolved.context);
 
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
   const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
@@ -113,8 +123,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       storageChannel: record.approvalChannel,
       requestId: record.approvalRequestId,
       decision: decision === 'approve' ? 'approved' : 'rejected',
-      decidedBy: 'concierge',
-      decidedByRole: 'sovereign',
+      decidedBy: decidedBy?.id ?? 'concierge',
+      decidedByRole: decidedBy?.role ?? 'sovereign',
       authMethod: 'surface_session',
       decidedByType: 'human',
       authenticated: true,

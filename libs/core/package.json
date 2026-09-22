@@ -211,6 +211,10 @@
       "types": "./dist/surface-authorization.d.ts",
       "default": "./dist/surface-authorization.js"
     },
+    "./surface-authn": {
+      "types": "./dist/surface-authn.d.ts",
+      "default": "./dist/surface-authn.js"
+    },
     "./surface-mutation-guard": {
       "types": "./dist/surface-mutation-guard.d.ts",
       "default": "./dist/surface-mutation-guard.js"
@@ -2262,6 +2266,10 @@
     "./skill-resource-loader": {
       "types": "./dist/skill-resource-loader.d.ts",
       "default": "./dist/skill-resource-loader.js"
+    },
+    "./skill-wrapper": {
+      "types": "./dist/skill-wrapper.d.ts",
+      "default": "./dist/skill-wrapper.js"
     },
     "./agent-instruction-loader": {
       "types": "./dist/agent-instruction-loader.d.ts",

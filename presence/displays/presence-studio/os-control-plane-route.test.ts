@@ -37,7 +37,12 @@ describe('Presence Studio OS control-plane route contract', () => {
     expect(route).toContain("res.setHeader('Cache-Control', 'private, no-store')");
     expect(route).toContain('readSurfaceStringParam(rawMissionId)');
     expect(route).not.toContain('error: error?.message || String(error)');
-    expect(decisionRoute).toMatch(/decideHeldAction\(\s*actionId,\s*decision,\s*access\s*\)/u);
+    // FD-10/F4: the decision is attributed to the resolved member actor
+    // (`user:<member_id>`), gated on the held action's own tenant — never
+    // the synthetic loopback principal or the first scope entry.
+    expect(decisionRoute).toContain('resolveLoopbackDecisionActor(');
+    expect(decisionRoute).toMatch(/decideHeldAction\(\s*actionId,\s*decision,\s*\{/u);
+    expect(decisionRoute).toContain('principalId: actor.actorId');
     expect(decisionRoute).toContain('readPresenceStudioStringParam(req.params.actionId)');
     expect(decisionRoute).toContain(
       "safeParsePresenceStudioRequestBody(req.body, 'held action decision body')"

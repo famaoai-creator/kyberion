@@ -3,10 +3,8 @@ import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
-import {
-  narrowSurfaceViewerTier,
-  resolveSurfaceViewerScope,
-} from '@agent/core/surface-mutation-guard';
+import { narrowSurfaceViewerTier } from '@agent/core/surface-mutation-guard';
+import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface-authn';
 import { resolveTenant } from '@agent/core/tenant-registry';
 import {
   createLocalPadContext,
@@ -118,13 +116,14 @@ function resolveStartupScope(args: string[]): {
 function scopeForRequest(base: LocalPadContext, requestedTier: unknown): LocalPadContext {
   const tier = requestedTier === undefined ? base.scope.tier : String(requestedTier);
   if (!['public', 'confidential', 'personal'].includes(tier)) throw new Error('invalid tier');
-  const viewerScope = resolveSurfaceViewerScope({
+  const { scope: viewerScope } = resolveAuthnSurfaceViewerScope({
     local: true,
     allowLoopback: true,
     loopbackRole: 'localadmin',
     loopbackUsesServerTenant: true,
     serverTenant: base.scope.tenant_slug,
     principalIds: { localadmin: base.viewer_principal },
+    surface: 'personal-pads',
   });
   narrowSurfaceViewerTier(viewerScope, tier as 'public' | 'confidential' | 'personal');
   if (!allowedPadTiers(base.scope.tier).includes(tier as 'public' | 'confidential' | 'personal')) {

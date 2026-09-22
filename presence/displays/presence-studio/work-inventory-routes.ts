@@ -190,7 +190,12 @@ function readViewerConsentSummary(
 ): WorkInventoryConsentSummary | undefined {
   try {
     const member = withExecutionContext('ecosystem_architect', () =>
-      resolveMemberByPrincipal({ principalId: viewer.principalId, source: viewer.source })
+      resolveMemberByPrincipal({
+        principalId: viewer.principalId,
+        source: viewer.source,
+        registrationLabel: viewer.principal?.registrationLabel,
+        memberId: viewer.principal?.memberId,
+      })
     );
     if (!member) return undefined;
     const consents = withExecutionContext('ecosystem_architect', () =>
