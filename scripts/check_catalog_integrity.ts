@@ -101,6 +101,11 @@ const CHECKS: CatalogCheck[] = [
     dataPath: 'knowledge/product/orchestration/training-catalog.json',
   },
   {
+    id: 'work-inventory-taxonomy',
+    schemaPath: 'knowledge/product/schemas/work-inventory-taxonomy.schema.json',
+    dataPath: 'knowledge/product/governance/work-inventory-taxonomy.json',
+  },
+  {
     id: 'specialist-catalog',
     schemaPath: 'knowledge/product/schemas/specialist-catalog.schema.json',
     dataPath: 'knowledge/product/orchestration/specialist-catalog.json',
