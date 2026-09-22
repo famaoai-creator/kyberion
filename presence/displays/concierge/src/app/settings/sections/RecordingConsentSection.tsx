@@ -44,6 +44,18 @@ function consentStatus(consent: RecordingConsent): ConsentStatus {
 export type RecordingConsentSectionProps = UseRecordingConsentResult & {
   locale: ConciergeLocale;
   sectionRef: (element: HTMLElement | null) => void;
+  /**
+   * WI-18 (user decision 2026-09-22): only `attach` (it mutates a shared
+   * work-inventory entry) needs an owner/approver viewer — grant, revoke,
+   * confirm, and discard are self-service for every member, including a
+   * readonly `viewer`. Derived from `/api/me`'s `viewing.role` on the
+   * settings page (`meViewing?.role !== 'viewer'`), the same signal that
+   * decides `FrontDeskHumanRole` -> `ChronosAccessRole` server-side
+   * (`front-desk-roles.ts`). Defaults to `true` (unrestricted) whenever that
+   * role isn't positively known yet, matching this pane's existing
+   * degrade-gracefully posture.
+   */
+  canAttachToWorkItem: boolean;
 };
 
 export function RecordingConsentSection({
@@ -61,6 +73,7 @@ export function RecordingConsentSection({
   discardRecordingSummary,
   attachRecordingSummary,
   sectionRef,
+  canAttachToWorkItem,
 }: RecordingConsentSectionProps) {
   const availableSources = recordingStanding?.sources ?? [];
   const availableKinds = recordingStanding?.observation_kinds ?? [];
@@ -238,7 +251,11 @@ export function RecordingConsentSection({
                 {frontDeskText('settings_recording_pending_discard', locale)}
               </button>
             </div>
-            {candidateEntries.length === 0 ? (
+            {!canAttachToWorkItem ? (
+              <p className="item-meta">
+                {frontDeskText('settings_recording_pending_attach_restricted', locale)}
+              </p>
+            ) : candidateEntries.length === 0 ? (
               <p className="item-meta">
                 {frontDeskText('settings_recording_pending_attach_none', locale)}
               </p>

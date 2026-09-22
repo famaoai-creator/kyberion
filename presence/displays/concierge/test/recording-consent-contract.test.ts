@@ -65,6 +65,7 @@ describe('concierge recording-consent settings contract', () => {
         'settings_recording_pending_discard',
         'settings_recording_pending_attach_label',
         'settings_recording_pending_attach_submit',
+        'settings_recording_pending_attach_restricted',
       ])
     );
     const frontDesk = vocabulary.domains.front_desk;

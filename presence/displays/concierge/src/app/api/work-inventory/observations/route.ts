@@ -19,6 +19,7 @@ import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 import {
+  requireConciergeSelfServiceAccess,
   requireWorkInventoryMember,
   resolveWorkInventoryScopeForViewer,
   workInventoryErrorResponse,
@@ -75,8 +76,15 @@ export function GET(req: NextRequest) {
   }
 }
 
+/**
+ * WI-18: confirm/discard are self-service — a `readonly`-role member may act
+ * on their own summary (`requireConciergeSelfServiceAccess`). `attach`
+ * mutates a shared tenant/personal work-inventory entry, so it still
+ * requires `requireConciergeMutationAccess` (localadmin/loopback only) —
+ * checked again inline, right before that branch runs.
+ */
 export async function POST(req: NextRequest) {
-  const denied = requireConciergeMutationAccess(req);
+  const denied = requireConciergeSelfServiceAccess(req);
   if (denied) return denied;
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
@@ -121,6 +129,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'attach') {
+      // WI-18: attach updates a shared tenant/personal work-inventory entry
+      // (not just the viewer's own consent/summary), so it keeps the
+      // localadmin/loopback-only gate — the self-service guard above is not
+      // enough here.
+      const attachDenied = requireConciergeMutationAccess(req);
+      if (attachDenied) return attachDenied;
       const entryId = typeof body.entry_id === 'string' ? body.entry_id : '';
       if (!entryId) {
         return NextResponse.json(
