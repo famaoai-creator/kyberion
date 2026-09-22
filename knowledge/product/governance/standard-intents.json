@@ -641,6 +641,44 @@
       "risk_profile": "review_required"
     },
     {
+      "id": "inventory-work",
+      "category": "knowledge_lifecycle",
+      "description": "Decompose the member's recurring PC-based work into structured steps (trigger, stage, verb, execution method), classify likely execution methods by rule, and rank automation candidates from real usage data.",
+      "surface_examples": [
+        "業務棚卸しをして自動化候補を見つけて",
+        "自分の仕事を棚卸しして分解して",
+        "Decompose my recurring PC work into steps and find automation candidates"
+      ],
+      "plan_outline": [
+        "capture the recurring work via hearing or self-report",
+        "decompose into stages/verbs and classify execution method by rule",
+        "rank automation candidates from frequency, effort, and observed usage data"
+      ],
+      "intake_requirements": ["work title or trigger", "frequency or cadence"],
+      "outcome_ids": ["work_inventory_entry", "work_inventory_candidate_ranking"],
+      "specialist_id": "knowledge-specialist",
+      "trigger_keywords": [
+        "業務棚卸し",
+        "棚卸し",
+        "自動化候補",
+        "work inventory",
+        "automation candidates"
+      ],
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "analysis",
+        "result_shape": "candidate_ranking"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "knowledge",
+      "action": "review",
+      "object": "work_inventory",
+      "execution_shape": "task_session",
+      "mission_class": "research_and_absorption",
+      "risk_profile": "review_required"
+    },
+    {
       "id": "contract-review",
       "category": "knowledge_lifecycle",
       "description": "Review a contract, specification, or formal document by converting it to markdown and running adversarial persona critique over legal, operations, and red-team lenses.",

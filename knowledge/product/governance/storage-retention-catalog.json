@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/storage-retention-catalog.schema.json",
-  "version": "1.4.0",
-  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams.",
+  "version": "1.5.0",
+  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered. EV-06 extends coverage beyond active/shared/runtime/ to the append-only event stores (active/shared/observability/, active/shared/coordination/orchestration/events/, presence/bridge/runtime/): these sat outside every janitor scan root, so they were neither TTL-governed nor surfaced as uncovered. scanEventStores enforces their TTLs and listUncoveredEventStoreDirs reports undeclared event streams. WI-10 declares the work-inventory personal/member knowledge subtrees (knowledge/personal/work-inventory, knowledge/personal/members) as never-auto-delete evidence, documenting a known gap where per-file status (e.g. pending_review observation summaries) cannot be expressed by this directory-level, mtime-based model.",
   "entries": [
     {
       "path": "active/shared/tmp",
@@ -391,7 +391,7 @@
       "artifact_class": "evidence",
       "action": "review_required",
       "audit": true,
-      "note": "DA-08: governed tenant knowledge, including each tenant's append-only information-asset ledger (knowledge/confidential/{tenant}/_ledger/assets.jsonl, DA-05) — NEVER auto-deletable. Removal happens only through the audited tenant offboarding ceremony (scope-offboarding.ts, `pnpm kyberion offboard tenant <slug> --execute`), which exports before purging. Declared so the ledger's retention decision is explicit rather than silently uncovered."
+      "note": "DA-08: governed tenant knowledge, including each tenant's append-only information-asset ledger (knowledge/confidential/{tenant}/_ledger/assets.jsonl, DA-05) — NEVER auto-deletable. Removal happens only through the audited tenant offboarding ceremony (scope-offboarding.ts, `pnpm kyberion offboard tenant <slug> --execute`), which exports before purging. Declared so the ledger's retention decision is explicit rather than silently uncovered. WI-10: this prefix also covers each tenant's promoted work-inventory records (knowledge/confidential/{tenant}/work-inventory/entries/*.json, calibration.json, work-inventory.ts) — same never-auto-delete, offboarding-only-removal semantics; declared here rather than as a separate entry because the tenant slug is a variable path segment this catalog's prefix matching already spans."
     },
     {
       "path": "active/shared/observability/mission-control",
@@ -457,6 +457,20 @@
       "ttl_days": 7,
       "action": "delete",
       "note": "EV-06: the KANS stimuli journal (stimuli.jsonl) and bridge scratch state. Stimuli carry TTLs measured in seconds-to-hours and readers only consult a recent window, so 7d is already far beyond usefulness. stimuli-journal.ts additionally self-rotates at 5MB (STIMULI_MAX_BYTES) so a burst cannot outrun the daily janitor."
+    },
+    {
+      "path": "knowledge/personal/work-inventory",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "WI-10: self-reported work-inventory records for non-tenant-scoped personal use (work-inventory.ts's workInventoryRoot fallback) — entries/*.json and calibration.json. Same never-auto-delete, human-review-before-removal semantics as the knowledge/confidential prefix above; these are durable structured records of the member's own recurring work, not disposable scratch."
+    },
+    {
+      "path": "knowledge/personal/members",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "audit": true,
+      "note": "WI-10: member-scoped personal knowledge (knowledge/personal/members/<member_id>/...), including training.json (training-catalog.ts) and, for work inventory, work-inventory/consents/*.json (work-inventory-consent.ts — recording consent grants/revocations; kept while active and retained as audit evidence after revocation or expiry, the same review_required+audit norm this catalog uses for other consent/authorization evidence) and work-inventory/observations/*.json (work-inventory-observation.ts — desktop/browser recording summaries carrying a `pending_review|confirmed|discarded` status field inside each file). Known gap: the design calls for pending_review observation summaries that are never confirmed to expire after ~30 days, but this catalog's retention model is directory-level and mtime-based with no per-file status awareness, and the member_id path segment is a variable this catalog cannot address with a narrower prefix without also catching confirmed/discarded records and unrelated member records (training.json) in the same TTL sweep — applying a blind 30d TTL here would risk deleting confirmed observations and training state. review_required is the closest expressible class; a status-aware purge (if desired) belongs in application code (work-inventory-observation.ts), not the janitor."
     }
   ]
 }

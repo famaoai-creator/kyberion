@@ -208,6 +208,21 @@ export const ASK_VOCABULARY_KEYS = [
   'front_desk:hearing_handoff_failed',
   'front_desk:hearing_mission_label',
   'front_desk:hearing_open_decide',
+  // WI-08: the "save to the work inventory" confirm action for the
+  // `work_inventory` hearing scenario (`handoff: 'work_inventory'` in
+  // `hearing-scenarios.json`) — mirrors the `hearing_handoff_*`/
+  // `hearing_open_decide` set above, which is the equivalent for the
+  // `mission` handoff. The scenario's own requirement labels are resolved
+  // server-side into each `record.requirements[].label` (same mechanism as
+  // `web_app_build`'s `hearing_req_*` keys, also absent from this list) and
+  // rendered inside the canvas iframe, never read by this client script
+  // directly.
+  'front_desk:hearing_inventory_button',
+  'front_desk:hearing_inventory_pending',
+  'front_desk:hearing_inventory_done',
+  'front_desk:hearing_inventory_failed',
+  'front_desk:hearing_inventory_entry_label',
+  'front_desk:hearing_inventory_open',
 ] as const satisfies readonly VocabularyKey[];
 
 // HT-06: exactly the `front_desk` keys `static/help.js` renders for the

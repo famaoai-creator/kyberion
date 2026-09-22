@@ -52,6 +52,8 @@ export interface MissionBrief {
   trackId?: string;
   trackType?: string;
   lifecycleModel?: string;
+  /** Where the brief was authored from (e.g. `{ kind: 'work_inventory', ref: <entry id> }`). */
+  source?: { kind: string; ref: string; tenantSlug?: string };
 }
 
 const MISSION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(

@@ -876,6 +876,20 @@
       "deliverable_kind": "artifact",
       "downloadable": true,
       "previewable": true
+    },
+    "work_inventory_entry": {
+      "label": "Work inventory entry",
+      "description": "A structured work-inventory record (business/task decomposed into trigger, stages, verbs, and per-step execution method) is created or updated in the member's or tenant's governed work-inventory store.",
+      "deliverable_kind": "record",
+      "downloadable": false,
+      "previewable": true
+    },
+    "work_inventory_candidate_ranking": {
+      "label": "Work inventory candidate ranking",
+      "description": "A ranked list of automation candidates over the current work-inventory entries, scored from frequency, effort, automatable share, and observation confidence, is returned.",
+      "deliverable_kind": "report",
+      "downloadable": false,
+      "previewable": true
     }
   }
 }
