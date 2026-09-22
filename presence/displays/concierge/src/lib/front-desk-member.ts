@@ -110,6 +110,8 @@ function isDecisionCapableRole(role: FrontDeskRole | undefined): boolean {
   return role === 'owner' || role === 'approver';
 }
 
+const DECISION_DENIED_ERROR = 'member role does not grant decision authority';
+
 /**
  * Positive decision gate for concierge decide-effect routes (approvals,
  * outcomes, memory-queue, hygiene, secrets, plugins): once a member is
@@ -147,10 +149,7 @@ export function conciergeDecisionDenied(
     viewer.tenantSlugs !== 'all' &&
     !viewer.tenantSlugs.includes(resourceTenant)
   ) {
-    return NextResponse.json(
-      { ok: false, error: 'この member role では決定を記録できません' },
-      { status: 403 }
-    );
+    return NextResponse.json({ ok: false, error: DECISION_DENIED_ERROR }, { status: 403 });
   }
   const scopeTenants =
     viewer.tenantSlugs === 'all'
@@ -167,10 +166,7 @@ export function conciergeDecisionDenied(
       return !isDecisionCapableRole(membership?.role);
     });
   if (!denied) return null;
-  return NextResponse.json(
-    { ok: false, error: 'この member role では決定を記録できません' },
-    { status: 403 }
-  );
+  return NextResponse.json({ ok: false, error: DECISION_DENIED_ERROR }, { status: 403 });
 }
 
 /**
