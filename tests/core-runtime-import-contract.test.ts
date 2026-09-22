@@ -25,7 +25,7 @@ describe('Core runtime import contract', () => {
 
     const failures: Array<{ specifier: string; error: string }> = [];
 
-    // ~740 subpaths × one child node each: sequential spawns take ~85s
+    // ~750 subpaths × one child node each: sequential spawns take ~85s
     // locally and exceed the timeout on shared CI runners. Overlap bounded
     // batches through the governed async exec boundary instead; batches stay
     // sequential so failure order remains deterministic.
@@ -62,5 +62,5 @@ describe('Core runtime import contract', () => {
     }
 
     expect(failures).toEqual([]);
-  }, 180000); // loads every subpath in a child process — slow on shared CI runners
+  }, 300000); // loads every subpath in a child process — slow on shared CI runners
 });
