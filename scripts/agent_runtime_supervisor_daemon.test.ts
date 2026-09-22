@@ -524,9 +524,9 @@ describe('agent_runtime_supervisor_daemon', () => {
 
     const pending1 = askAgent1('a');
     const pending2 = askAgent1('b');
-    // Give both requests a tick to be admitted and increment inflight before the third arrives.
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(resolvers).toHaveLength(2);
+    // Wait until both requests are admitted (inflight incremented) before the
+    // third arrives. A fixed sleep raced admission on slow CI runners.
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2), { timeout: 10_000, interval: 5 });
 
     const rejected = await askAgent1('c');
     expect(rejected).toMatchObject({
