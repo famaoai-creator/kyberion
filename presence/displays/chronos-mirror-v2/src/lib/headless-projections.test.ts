@@ -4,14 +4,15 @@ import {
   readHeadlessCollaboration,
   readHeadlessWorkItems,
 } from './headless-projections';
+import type { ViewerContext } from './viewer-context';
 
-const viewer = {
-  role: 'readonly' as const,
+const viewer: ViewerContext = {
+  role: 'readonly',
   tenantSlugs: ['tenant-a'],
   organizationIds: ['org-a'],
   projectIds: ['project-a'],
   tierAccess: ['public'],
-  source: 'token' as const,
+  source: 'token',
   principalId: 'viewer-a',
 };
 

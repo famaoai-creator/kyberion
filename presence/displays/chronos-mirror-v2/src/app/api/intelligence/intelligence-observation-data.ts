@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import path from 'node:path';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
-import { strictViewerScopeTenantSlugs, strictViewerTier } from '../../../lib/viewer-context';
+import {
+  strictViewerScopeTenantSlugs,
+  strictViewerTier,
+  type ViewerContext,
+} from '../../../lib/viewer-context';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { type CompanyAggregate } from '@agent/core/company';
 import { type ApprovalAuditDrilldownSummary } from '@agent/core/approval-audit';
 import type { FinanceControllerDecision } from '@agent/core/finance-controller';

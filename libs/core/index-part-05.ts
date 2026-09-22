@@ -381,3 +381,5 @@ export * from './authn-providers.js';
 export * from './authz-policy-engine.js';
 
 export * from './authz-providers.js';
+
+export * from './surface-authn.js';

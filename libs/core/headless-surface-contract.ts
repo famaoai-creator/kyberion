@@ -1,5 +1,4 @@
 import {
-  authorizeSurfaceOperation,
   type SurfaceAuthorizationContext,
   type SurfaceAuthorizationRole,
   type SurfacePermission,
@@ -19,6 +18,22 @@ export type HeadlessSurfaceId = 'chronos' | 'concierge' | 'presence-studio' | 'c
 export type HeadlessViewerRole = SurfaceAuthorizationRole;
 export type HeadlessOperationPermission = SurfacePermission;
 export type HeadlessOperationEffect = 'read' | 'write';
+
+/**
+ * Authorization evaluator injected by the caller — this file is a contracts
+ * layer module and must not depend on the authz seam (domain layer). Pass
+ * `authorizeSurfaceContextOperation` from `@agent/core/surface-authn` to keep
+ * manifest filtering on the policy-engine path.
+ */
+export type HeadlessOperationAuthorizer = (input: {
+  context: SurfaceAuthorizationContext;
+  operation: {
+    operationId: string;
+    effect: HeadlessOperationEffect;
+    requiredRole?: SurfaceAuthorizationRole;
+    requiredPermissions?: readonly SurfacePermission[];
+  };
+}) => { allowed: boolean };
 
 export interface HeadlessJsonSchema {
   type?: string;
@@ -344,7 +359,8 @@ export function buildComputerSurfaceManifest(): HeadlessApiManifest {
 
 export function availableHeadlessOperationIds(
   viewer: HeadlessViewerRole | SurfaceAuthorizationContext,
-  manifest: HeadlessApiManifest = buildChronosHeadlessManifest()
+  manifest: HeadlessApiManifest = buildChronosHeadlessManifest(),
+  authorize: HeadlessOperationAuthorizer
 ): string[] {
   const context: SurfaceAuthorizationContext =
     typeof viewer === 'string'
@@ -359,7 +375,7 @@ export function availableHeadlessOperationIds(
   return manifest.operations
     .filter(
       (operation) =>
-        authorizeSurfaceOperation({
+        authorize({
           context,
           operation: {
             operationId: operation.operation_id,
@@ -374,7 +390,8 @@ export function availableHeadlessOperationIds(
 
 export function filterHeadlessManifestForViewer(
   viewer: HeadlessViewerRole | SurfaceAuthorizationContext,
-  manifest: HeadlessApiManifest
+  manifest: HeadlessApiManifest,
+  authorize: HeadlessOperationAuthorizer
 ): HeadlessApiManifest {
   const context: SurfaceAuthorizationContext =
     typeof viewer === 'string'
@@ -390,7 +407,7 @@ export function filterHeadlessManifestForViewer(
     ...manifest,
     operations: manifest.operations.filter(
       (operation) =>
-        authorizeSurfaceOperation({
+        authorize({
           context,
           operation: {
             operationId: operation.operation_id,
@@ -411,6 +428,7 @@ export function createHeadlessEnvelope<T>(input: {
   generatedAt?: string;
   manifest?: HeadlessApiManifest;
   authorizationContext?: SurfaceAuthorizationContext;
+  authorize: HeadlessOperationAuthorizer;
 }): HeadlessApiEnvelope<T> {
   const manifest = input.manifest || buildChronosHeadlessManifest();
   return {
@@ -422,7 +440,8 @@ export function createHeadlessEnvelope<T>(input: {
     scope: input.scope,
     available_operations: availableHeadlessOperationIds(
       input.authorizationContext || input.scope.role,
-      manifest
+      manifest,
+      input.authorize
     ),
     data: input.data,
   };

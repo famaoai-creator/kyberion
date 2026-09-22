@@ -19,7 +19,7 @@ import {
   PresenceStudioViewerError,
   type PresenceStudioViewerContext,
 } from './security.js';
-import { authorizeSurfaceOperation } from '@agent/core/surface-authorization';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface-authn';
 
 const PRESENCE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
   {
@@ -85,7 +85,8 @@ export function presenceManifestForViewer(
 ): HeadlessApiManifest {
   return filterHeadlessManifestForViewer(
     toSurfaceAuthorizationContext(viewer),
-    buildPresenceHeadlessManifest()
+    buildPresenceHeadlessManifest(),
+    authorizeSurfaceContextOperation
   );
 }
 
@@ -99,7 +100,7 @@ export function authorizePresenceOperation(
   );
   if (!operation)
     throw new PresenceStudioViewerError(403, `unknown headless operation: ${operationId}`);
-  const decision = authorizeSurfaceOperation({
+  const decision = authorizeSurfaceContextOperation({
     context: toSurfaceAuthorizationContext(viewer),
     operation: {
       operationId: operation.operation_id,
@@ -108,6 +109,7 @@ export function authorizePresenceOperation(
       requiredPermissions: operation.required_permissions,
     },
     resource,
+    surface: 'presence-studio',
   });
   if (!decision.allowed) throw new PresenceStudioViewerError(403, decision.reason);
 }
@@ -145,13 +147,15 @@ export function presenceEnvelope<T>(
     scope: presenceStudioHeadlessScope(viewer),
     manifest,
     authorizationContext: toSurfaceAuthorizationContext(viewer),
+    authorize: authorizeSurfaceContextOperation,
   });
 }
 
 export function presenceAvailableOperations(viewer: PresenceStudioViewerContext): string[] {
   return availableHeadlessOperationIds(
     toSurfaceAuthorizationContext(viewer),
-    buildPresenceHeadlessManifest()
+    buildPresenceHeadlessManifest(),
+    authorizeSurfaceContextOperation
   );
 }
 

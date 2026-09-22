@@ -87,7 +87,7 @@ function parseTarget(value: unknown): ClientApproval['target'] | undefined {
     secretKey: value.secretKey,
     mutation: value.mutation,
     ...(value.existingValuePresent !== undefined
-      ? { existingValuePresent: value.existingValuePresent }
+      ? { existingValuePresent: value.existingValuePresent as boolean }
       : {}),
   };
 }
@@ -144,7 +144,7 @@ function parseWorkLoop(value: unknown): ClientApproval['workLoop'] | undefined {
     ...(value.project_name !== undefined ? { project_name: value.project_name } : {}),
     ...(value.track_id !== undefined ? { track_id: value.track_id } : {}),
     ...(value.track_name !== undefined ? { track_name: value.track_name } : {}),
-    ...(value.context !== undefined ? { context: value.context } : {}),
+    ...(value.context !== undefined ? { context: value.context as Record<string, unknown> } : {}),
   };
 }
 

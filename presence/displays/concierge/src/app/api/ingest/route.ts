@@ -15,6 +15,7 @@ import {
 } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import { resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 import { parseIngestForm } from '../ingest-input';
 import { parseIngestCliVerdict } from '../ingest-output-parser';
@@ -80,6 +81,8 @@ function toDisplayPath(value: unknown): string | undefined {
 export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
 
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
   const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
@@ -115,6 +118,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { ok: false, error: t('api.ingest.tenant_invalid') },
         { status: 400 }
+      );
+    }
+    // A registered tenant is still only a valid landing when it lies inside
+    // the resolved viewer's own scope — the client parameter may narrow,
+    // never widen (N3).
+    if (resolved.context.tenantSlugs !== 'all' && !resolved.context.tenantSlugs.includes(tenant)) {
+      return NextResponse.json(
+        { ok: false, error: t('api.ingest.tenant_invalid') },
+        { status: 403 }
       );
     }
 

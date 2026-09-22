@@ -187,10 +187,26 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+export type ChronosAgentsBody = {
+  action?: string;
+  provider?: string;
+  agentId?: string;
+  modelId?: string;
+  systemPrompt?: string;
+  query?: string;
+  capabilities?: string[];
+  runtimeMetadata?: Record<string, unknown>;
+  envelope?: Record<string, unknown> & { header?: Record<string, unknown> };
+  limit?: number;
+  logLimit?: number;
+  actionId?: string;
+  commandId?: string;
+};
+
 export function parseChronosAgentsBody(
   raw: unknown,
   options: { requireAgentId?: boolean } = {}
-): { ok: true; body: Record<string, unknown>; action: string } | { ok: false; error: string } {
+): { ok: true; body: ChronosAgentsBody; action: string } | { ok: false; error: string } {
   if (!isRecord(raw)) {
     return { ok: false, error: 'Chronos agents requests must use a JSON object body.' };
   }
@@ -297,7 +313,7 @@ export function parseChronosAgentsBody(
     return { ok: false, error: 'Chronos agents envelope.header must be a JSON object.' };
   }
 
-  return { ok: true, body: raw, action };
+  return { ok: true, body: raw as ChronosAgentsBody, action };
 }
 
 export function intentResolutionA2ui(

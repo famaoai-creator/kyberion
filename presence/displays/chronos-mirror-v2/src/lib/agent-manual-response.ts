@@ -138,7 +138,7 @@ function parseAction(value: unknown): ClientManualDriveAction | null | undefined
     ...(value.description !== undefined ? { description: value.description } : {}),
     ...(value.operation_id !== undefined ? { operation_id: value.operation_id } : {}),
     ...(value.requires_approval !== undefined
-      ? { requires_approval: value.requires_approval }
+      ? { requires_approval: value.requires_approval as boolean }
       : {}),
     status: value.status as ClientManualDriveAction['status'],
     ...(value.approval !== undefined ? { approval: parseApproval(value.approval) } : {}),
@@ -189,9 +189,11 @@ export function parseManualCommandStatusResponse(
       : {}),
     ...(response.action !== undefined ? { action: parseAction(response.action)! } : {}),
     ...(response.approval !== undefined ? { approval: parseApproval(response.approval)! } : {}),
-    ...(response.errorCode !== undefined ? { errorCode: response.errorCode } : {}),
+    ...(response.errorCode !== undefined
+      ? { errorCode: response.errorCode as 'manual_drive_command_failed' }
+      : {}),
     ...(response.resumesCommandId !== undefined
-      ? { resumesCommandId: response.resumesCommandId }
+      ? { resumesCommandId: response.resumesCommandId as string }
       : {}),
   };
 }
@@ -239,8 +241,12 @@ export function parseManualExecutionResponse(
     status: response.status as ClientManualExecutionStatus,
     ...(response.action !== undefined ? { action: parseAction(response.action)! } : {}),
     ...(response.approval !== undefined ? { approval: parseApproval(response.approval)! } : {}),
-    ...(response.errorCode !== undefined ? { errorCode: response.errorCode } : {}),
-    ...(response.correlationId !== undefined ? { correlationId: response.correlationId } : {}),
+    ...(response.errorCode !== undefined
+      ? { errorCode: response.errorCode as 'manual_drive_command_failed' }
+      : {}),
+    ...(response.correlationId !== undefined
+      ? { correlationId: response.correlationId as string }
+      : {}),
   };
 }
 

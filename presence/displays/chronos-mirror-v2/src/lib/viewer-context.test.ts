@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import type { ViewerContext } from './viewer-context';
 
 describe('viewer-context', () => {
   beforeEach(() => {
@@ -121,18 +122,22 @@ describe('viewer-context', () => {
 
   it('denies a data route from selecting a tier outside the resolved viewer scope', async () => {
     const { strictViewerTier } = await import('./viewer-context.js');
-    const viewer = { role: 'readonly' as const, tenantSlugs: 'all', source: 'token' as const };
+    const viewer: ViewerContext = {
+      role: 'readonly',
+      tenantSlugs: 'all',
+      source: 'token',
+    };
     expect(strictViewerTier(viewer, 'public')).toBe('public');
     expect(() => strictViewerTier(viewer, 'personal')).toThrow('viewer tier scope denied');
   });
 
   it('cannot widen tenant or tier scope through client selections', async () => {
     const { strictViewerScopeTenantSlugs, strictViewerTier } = await import('./viewer-context.js');
-    const viewer = {
-      role: 'readonly' as const,
+    const viewer: ViewerContext = {
+      role: 'readonly',
       tenantSlugs: ['tenant-a'],
       tierAccess: ['public'],
-      source: 'token' as const,
+      source: 'token',
     };
     const expectForbidden = (operation: () => unknown) => {
       try {
@@ -152,12 +157,12 @@ describe('viewer-context', () => {
   it('only allows organization and project selections inside the registered sets', async () => {
     const { strictViewerScopeOrganizationIds, strictViewerScopeProjectIds } =
       await import('./viewer-context.js');
-    const viewer = {
-      role: 'readonly' as const,
+    const viewer: ViewerContext = {
+      role: 'readonly',
       tenantSlugs: ['tenant-a'],
       organizationIds: ['org-a'],
       projectIds: ['project-a'],
-      source: 'token' as const,
+      source: 'token',
     };
 
     expect(strictViewerScopeOrganizationIds(viewer, 'org-a')).toEqual(['org-a']);

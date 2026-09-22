@@ -1,6 +1,12 @@
 import { type AttentionItem } from '../lib/operator-console';
 import { optionalStringField, parseJsonRecord } from '../lib/json-record';
-import { chronosSpeechLocale, resolveChronosLocale, uxMessage, uxText } from '../lib/ux-vocabulary';
+import {
+  chronosSpeechLocale,
+  resolveChronosLocale,
+  uxMessage,
+  uxText,
+  type SupportedLocale,
+} from '../lib/ux-vocabulary';
 import type {
   A2AHandoffSummary,
   AgentMessageSummary,
@@ -93,7 +99,7 @@ export function pickDefaultMissionId(
   return prioritized?.missionId || missions[0]?.missionId || null;
 }
 
-function surfaceStateLabel(value: string, locale: string): string {
+function surfaceStateLabel(value: string, locale: SupportedLocale): string {
   const keyByValue: Record<string, string> = {
     running: 'chronos_surface_running',
     stopped: 'chronos_surface_stopped',
@@ -315,7 +321,7 @@ export function ActionStatusBadge({ action }: { action: ControlActionSummary }) 
   );
 }
 
-export function surfaceOperationLabel(operation: string, locale: string) {
+export function surfaceOperationLabel(operation: string, locale: SupportedLocale) {
   const keyByOperation: Record<string, string> = {
     route_to_approvals: 'chronos_action_route_to_approvals',
     mission_control_requested: 'chronos_action_mission_control_requested',
@@ -325,7 +331,10 @@ export function surfaceOperationLabel(operation: string, locale: string) {
   return key ? uxText(key, locale) : operation;
 }
 
-export function missionActionLabel(action: ControlActionDefinition, locale: string): string {
+export function missionActionLabel(
+  action: ControlActionDefinition,
+  locale: SupportedLocale
+): string {
   const keyByOperation: Record<string, string> = {
     refresh_team: 'chronos_action_refresh_team',
     prewarm: 'chronos_action_prewarm',
@@ -359,7 +368,7 @@ export function missionActionLabel(action: ControlActionDefinition, locale: stri
   return key ? uxText(key, locale) : action.label;
 }
 
-export function missionStatusLabel(value: string | undefined, locale: string): string {
+export function missionStatusLabel(value: string | undefined, locale: SupportedLocale): string {
   const normalized = (value || '').toLowerCase().replace(/[- ]/g, '_');
   const keyByStatus: Record<string, string> = {
     active: 'chronos_status_active',
@@ -375,7 +384,7 @@ export function missionStatusLabel(value: string | undefined, locale: string): s
   return key ? uxText(key, locale) : value || uxText('chronos_unknown', locale);
 }
 
-export function attentionSourceLabel(item: AttentionItem, locale: string): string {
+export function attentionSourceLabel(item: AttentionItem, locale: SupportedLocale): string {
   const keyByTargetType: Partial<Record<AttentionItem['targetType'], string>> = {
     mission: 'chronos_mission_control',
     runtime: 'chronos_runtime_incidents',
@@ -387,7 +396,7 @@ export function attentionSourceLabel(item: AttentionItem, locale: string): strin
   return key ? uxText(key, locale) : item.sourceLabel || uxText('chronos_control_plane', locale);
 }
 
-export function attentionReasonLabel(item: AttentionItem, locale: string): string {
+export function attentionReasonLabel(item: AttentionItem, locale: SupportedLocale): string {
   if (item.targetType === 'mission') {
     const match = /^(.*?) · next tasks (\d+)$/.exec(item.reason);
     if (match) {
@@ -416,7 +425,7 @@ export function attentionReasonLabel(item: AttentionItem, locale: string): strin
   return item.reason;
 }
 
-export function attentionNextStepLabel(item: AttentionItem, locale: string): string {
+export function attentionNextStepLabel(item: AttentionItem, locale: SupportedLocale): string {
   const keyByTargetType: Partial<Record<AttentionItem['targetType'], string>> = {
     mission: 'chronos_attention_mission_next_step',
     runtime: 'chronos_runtime_needs_review',
@@ -428,7 +437,7 @@ export function attentionNextStepLabel(item: AttentionItem, locale: string): str
   return key ? uxText(key, locale) : item.nextStep || '';
 }
 
-export function attentionActionLabel(item: AttentionItem, locale: string): string {
+export function attentionActionLabel(item: AttentionItem, locale: SupportedLocale): string {
   if (item.targetType === 'runtime') {
     return uxText(
       item.remediationAction === 'restart_runtime_lease'
@@ -447,7 +456,7 @@ export function attentionActionLabel(item: AttentionItem, locale: string): strin
   return key ? uxText(key, locale) : item.actionLabel || '';
 }
 
-export function actionStatusLabel(status: string, locale: string) {
+export function actionStatusLabel(status: string, locale: SupportedLocale) {
   const keyByStatus: Record<string, string> = {
     queued: 'chronos_action_queued',
     completed: 'chronos_action_completed',

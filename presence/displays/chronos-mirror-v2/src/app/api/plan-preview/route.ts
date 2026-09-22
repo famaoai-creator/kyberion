@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
     if (resolvedViewer.response) return resolvedViewer.response;
 
     const parsedBody = await readChronosJsonObject(req, 'Chronos plan preview');
-    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    if (parsedBody.ok !== true)
+      return NextResponse.json({ error: parsedBody.error }, { status: 400 });
     const { body } = parsedBody;
     const requestText = typeof body?.requestText === 'string' ? body.requestText.trim() : '';
     if (!requestText) {
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest) {
           : undefined,
         runtimeContext:
           typeof body?.runtimeContext === 'object' && body.runtimeContext
-            ? body.runtimeContext
+            ? (body.runtimeContext as Record<string, unknown>)
             : undefined,
       })
     );

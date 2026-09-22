@@ -331,7 +331,11 @@ describe('front-desk-routes.ts route wiring (Deliverables 1-2)', () => {
 
     expect(route).toContain('resolveFrontDeskMenu(');
     expect(route).toContain('readFrontDeskSurfacePorts()');
-    expect(route).toContain('frontDeskRoleFromViewer(');
+    // B1: the rail role is membership-aware — the helper resolves the
+    // member's role for the viewed tenant, falling back to the flat
+    // viewer-scope mapping only for an unregistered principal.
+    expect(route).toContain('resolvePresenceStudioNavRole(viewer)');
+    expect(source).toContain('frontDeskRoleFromViewer(');
     expect(route).toContain("res.setHeader('Cache-Control', 'no-store')");
   });
 });

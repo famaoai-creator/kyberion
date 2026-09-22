@@ -67,6 +67,10 @@ import {
   updateMemoryPromotionCandidateStatus,
 } from '../../../lib/intelligence-primitives';
 import { getProjectManagementView } from '@agent/core/project-management';
+import { resolveCompany } from '@agent/core/company';
+import { withExecutionContext } from '@agent/core/authority';
+import { memberBindingDenied, resolveMemberByPrincipal } from '@agent/core/member-registry';
+import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
 import * as intelligenceData from './intelligence-observation-data';
 import * as intelligenceControlData from './intelligence-control-data';
@@ -291,7 +295,7 @@ export async function GET(req: NextRequest) {
       const tier = inferDeliverableTier(
         artifact,
         artifact.path?.replace(/\\/g, '/'),
-        projectTier || missionTier
+        (projectTier || missionTier) as OsKnowledgeTier | undefined
       );
       return Boolean(tier && allowedTiers.has(tier));
     });
@@ -400,7 +404,8 @@ export async function POST(req: NextRequest) {
     const resolvedViewer = resolveViewerContextForRequest(req);
     if (resolvedViewer.response) return resolvedViewer.response;
     const parsedBody = await readChronosJsonObject(req, 'Chronos intelligence');
-    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    if (parsedBody.ok !== true)
+      return NextResponse.json({ error: parsedBody.error }, { status: 400 });
     const body = parseChronosIntelligenceInput(parsedBody.body);
     const action = body.action;
 
@@ -435,13 +440,81 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
       }
+      // FD-10: resolve the member behind this decision (B4). A resolved
+      // member decides only through the membership role they hold on the
+      // approval's tenant — owner or approver, positively allowed. An
+      // unresolved principal keeps the legacy chronos identity.
+      const decisionMember = withExecutionContext('chronos_gateway', () =>
+        resolveMemberByPrincipal({
+          principalId: resolvedViewer.context.principalId,
+          source: resolvedViewer.context.source,
+          registrationLabel: resolvedViewer.context.registrationLabel,
+          memberId: resolvedViewer.context.memberId,
+        })
+      );
+      // An asserted member binding that fails to resolve (suspended or
+      // removed memberId, or a registration label matching a suspended
+      // member's access_registrations) must never fall back to the legacy
+      // sovereign identity (F1).
+      const bindingDenied =
+        !decisionMember &&
+        withExecutionContext('chronos_gateway', () =>
+          memberBindingDenied({
+            principalId: resolvedViewer.context.principalId,
+            source: resolvedViewer.context.source,
+            registrationLabel: resolvedViewer.context.registrationLabel,
+            memberId: resolvedViewer.context.memberId,
+          })
+        );
+      if (bindingDenied) {
+        return NextResponse.json(
+          { error: 'member binding could not be verified' },
+          { status: 403 }
+        );
+      }
+      let decisionRole: 'owner' | 'approver' | 'sovereign' = 'sovereign';
+      if (decisionMember) {
+        const isDecisionCapable = (role?: string) => role === 'owner' || role === 'approver';
+        if (approvalTenant) {
+          // The decision lands on the approval's tenant — the membership
+          // for THAT tenant decides, never an arbitrary scope entry (F2).
+          const membership = decisionMember.memberships.find(
+            (item) => item.tenant_slug === approvalTenant
+          );
+          if (!isDecisionCapable(membership?.role)) {
+            return NextResponse.json(
+              { error: 'This member role cannot record decisions' },
+              { status: 403 }
+            );
+          }
+          decisionRole = membership.role as 'owner' | 'approver';
+        } else {
+          // The approval's tenant could not be resolved — every membership
+          // must be decision-capable so a viewer/operator membership cannot
+          // be laundered through an ambiguous decision.
+          if (
+            decisionMember.memberships.length === 0 ||
+            decisionMember.memberships.some((item) => !isDecisionCapable(item.role))
+          ) {
+            return NextResponse.json(
+              { error: 'This member role cannot record decisions' },
+              { status: 403 }
+            );
+          }
+          const roles = new Set(decisionMember.memberships.map((item) => item.role));
+          decisionRole =
+            roles.size === 1
+              ? (decisionMember.memberships[0].role as 'owner' | 'approver')
+              : 'approver';
+        }
+      }
       const updated = decideApprovalRequest('chronos_gateway', {
         channel,
         storageChannel,
         requestId,
         decision,
-        decidedBy: 'chronos-localadmin',
-        decidedByRole: 'sovereign',
+        decidedBy: decisionMember ? `user:${decisionMember.member_id}` : 'chronos-localadmin',
+        decidedByRole: decisionRole,
         authMethod: 'surface_session',
         decidedByType: 'human',
         authenticated: true,
@@ -1205,7 +1278,13 @@ export async function POST(req: NextRequest) {
       action,
       why: 'Chronos operator applied runtime lease remediation from the doctor view.',
     });
-    intelligenceControlData.recordRuntimeRemediationArtifacts({ action, agentId, lease });
+    const remediationAction =
+      action === 'cleanup_runtime_lease' ? 'cleanup_runtime_lease' : 'restart_runtime_lease';
+    intelligenceControlData.recordRuntimeRemediationArtifacts({
+      action: remediationAction,
+      agentId,
+      lease,
+    });
     return NextResponse.json({
       status: 'ok',
       action,

@@ -40,12 +40,21 @@ import {
 } from './chronos-access-registry.js';
 import type { OsKnowledgeTier } from './cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { getRegisteredEnvBool } from './foundation/env.js';
+import { getRegisteredEnvBool, isVitestProcess } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { readTextFile } from './foundation/text.js';
 import { getAgentIdentity, deriveAgentNhiId } from './agent-identity.js';
 import { withExecutionContext } from './authority.js';
+import { frontDeskRoleAuthority } from './front-desk-roles.js';
 import { isValidMemberId } from './member-id-grammar.js';
+import {
+  externalIdentityBindingDenied,
+  findMemberByExternalIdentity,
+  memberBindingDenied,
+  readMemberProfile,
+  resolveMemberByPrincipal,
+  type MemberProfile,
+} from './member-registry.js';
 import {
   NhiActorPolicyError,
   enforceNhiActorPolicy,
@@ -123,12 +132,17 @@ const stubProvider: AuthnProvider = {
       // a real-looking bearer/JWT must not resolve to a synthetic identity.
       return { eligible: false, unmet: ['stub resolves only credential-free requests'] };
     }
+    // A configured stub must never authenticate a remote wire request (the
+    // same fail-open class the allow-all authz provider is gated against):
+    // eligible only under the Vitest harness or on adapter-proven loopback.
+    if (!isVitestProcess(deps?.env) && request.loopback !== true) {
+      return { eligible: false, unmet: ['stub resolves only test or proven-loopback requests'] };
+    }
     return { eligible: true };
   },
   resolve(request, deps) {
     if (request.credential.type !== 'none') return null;
-    const principalId =
-      envText(deps, 'KYBERION_AUTHN_STUB_PRINCIPAL')?.trim() || 'stub:anonymous';
+    const principalId = envText(deps, 'KYBERION_AUTHN_STUB_PRINCIPAL')?.trim() || 'stub:anonymous';
     return {
       actor: serviceActor('authn-stub'),
       principalId,
@@ -197,8 +211,17 @@ const envTokenProvider: AuthnProvider = {
     if (request.credential.type !== 'bearer' || !credentialToken(request.credential)) {
       return { eligible: false, unmet: ['requires a bearer credential'] };
     }
-    if (!envText(deps, 'KYBERION_API_TOKEN') && !envText(deps, 'KYBERION_LOCALADMIN_TOKEN')) {
-      return { eligible: false, unmet: ['no KYBERION_API_TOKEN / KYBERION_LOCALADMIN_TOKEN configured'] };
+    if (
+      !envText(deps, 'KYBERION_API_TOKEN') &&
+      !envText(deps, 'KYBERION_LOCALADMIN_TOKEN') &&
+      !deps?.surfaceCredentials?.some((credential) => credential.token?.trim())
+    ) {
+      return {
+        eligible: false,
+        unmet: [
+          'no KYBERION_API_TOKEN / KYBERION_LOCALADMIN_TOKEN / surface credential configured',
+        ],
+      };
     }
     return { eligible: true };
   },
@@ -208,7 +231,9 @@ const envTokenProvider: AuthnProvider = {
       ? 'localadmin'
       : matchesChronosToken(token, envText(deps, 'KYBERION_API_TOKEN'))
         ? 'readonly'
-        : null;
+        : (deps?.surfaceCredentials?.find((credential) =>
+            matchesChronosToken(token, credential.token)
+          )?.role ?? null);
     if (!role) return null; // not ours — a registry/OIDC token may still match
     if (!request.loopback && !request.serverTenant?.trim()) {
       throw new AuthnError(
@@ -279,7 +304,73 @@ const registryTokenProvider: AuthnProvider = {
       : null;
     if (!registration) return null; // not ours — env-token may still match
 
-    const memberId = registration.member_id?.trim();
+    let memberId = registration.member_id?.trim();
+    if (memberId) {
+      // An asserted member binding must resolve to an ACTIVE member. A
+      // suspended or removed member's token must never degrade into the
+      // "unregistered" fallback downstream — for a localadmin-class
+      // registration that would be a privilege *upgrade* to owner
+      // (member PATCH suspends the profile but does not revoke the
+      // registration, so the check belongs here at authentication).
+      const member = withExecutionContext('sovereign_concierge', () =>
+        readMemberProfile(memberId, deps?.memberRegistry ?? {})
+      );
+      if (!member) {
+        throw new AuthnError(403, 'scope_denied', 'viewer token is bound to an unknown member');
+      }
+      if (member.status !== 'active') {
+        throw new AuthnError(403, 'scope_denied', 'viewer token is bound to a suspended member');
+      }
+    } else if (registration.label) {
+      // Legacy label-only registrations carry no member_id, but the label
+      // may still be bound to a member's access_registrations. An ACTIVE
+      // member binding upgrades the credential to that member's identity
+      // (member-aware attribution downstream); a suspended or unverifiable
+      // binding must fail closed here — otherwise it degrades to an
+      // unregistered localadmin on every non-member-aware route (chronos
+      // mission_control, concierge ingest, …).
+      let boundMember: MemberProfile | null = null;
+      try {
+        boundMember = withExecutionContext('sovereign_concierge', () =>
+          resolveMemberByPrincipal(
+            {
+              principalId: registration.label,
+              source: 'token',
+              registrationLabel: registration.label,
+            },
+            deps?.memberRegistry ?? {}
+          )
+        );
+      } catch {
+        boundMember = null;
+      }
+      if (boundMember) {
+        memberId = boundMember.member_id;
+      } else {
+        let denied = false;
+        try {
+          denied = withExecutionContext('sovereign_concierge', () =>
+            memberBindingDenied(
+              {
+                principalId: registration.label,
+                source: 'token',
+                registrationLabel: registration.label,
+              },
+              deps?.memberRegistry ?? {}
+            )
+          );
+        } catch {
+          denied = true;
+        }
+        if (denied) {
+          throw new AuthnError(
+            403,
+            'scope_denied',
+            'viewer token label is bound to a suspended or unverifiable member'
+          );
+        }
+      }
+    }
     const principalId = registration.label || `token:${registration.token_hash.slice(0, 12)}`;
     let tierAccess: OsKnowledgeTier[];
     try {
@@ -371,7 +462,10 @@ const agentContextProvider: AuthnProvider = {
     const record = getAgentIdentity(nhiId);
     // A KNOWN-bad identity is denied at the authentication boundary in every
     // NI-02 mode — 'warn'/'off' only soften the unregistered-identity case.
-    if (record && (record.lifecycle_status === 'suspended' || record.lifecycle_status === 'retired')) {
+    if (
+      record &&
+      (record.lifecycle_status === 'suspended' || record.lifecycle_status === 'retired')
+    ) {
       throw new AuthnError(
         401,
         'unauthenticated',
@@ -394,7 +488,10 @@ const agentContextProvider: AuthnProvider = {
       source: 'agent',
       provider: 'agent-context',
       assurance: mode === 'enforce' ? 'medium' : mode === 'warn' ? 'low' : 'none',
-      claims: { nhi_actor_mode: mode, nhi_verdict: record ? record.lifecycle_status : 'unregistered' },
+      claims: {
+        nhi_actor_mode: mode,
+        nhi_verdict: record ? record.lifecycle_status : 'unregistered',
+      },
     };
   },
 };
@@ -430,8 +527,7 @@ function agentTokenKey(deps?: AuthnResolveDeps): Buffer | null {
   if (envKey) return Buffer.from(envKey, 'utf8');
   try {
     const doc = secretGuard.loadConnectionDocument(AGENT_TOKEN_SECRET_DOC) as
-      | { hmac_key?: string }
-      | undefined;
+      { hmac_key?: string } | undefined;
     const key = doc?.hmac_key?.trim();
     return key ? Buffer.from(key, 'utf8') : null;
   } catch {
@@ -494,10 +590,15 @@ export function issueAgentToken(
     ...(input.tenants?.length ? { tenants: [...input.tenants] } : {}),
   };
   const payloadB64 = b64urlJson(payload);
-  return { token: `${AGENT_TOKEN_PREFIX}${payloadB64}.${signAgentTokenPayload(payloadB64, key)}`, payload };
+  return {
+    token: `${AGENT_TOKEN_PREFIX}${payloadB64}.${signAgentTokenPayload(payloadB64, key)}`,
+    payload,
+  };
 }
 
-function parseAgentToken(token: string): { payloadB64: string; signature: string; payload: AgentTokenPayload } | null {
+function parseAgentToken(
+  token: string
+): { payloadB64: string; signature: string; payload: AgentTokenPayload } | null {
   if (!token.startsWith(AGENT_TOKEN_PREFIX)) return null;
   const body = token.slice(AGENT_TOKEN_PREFIX.length);
   const dot = body.lastIndexOf('.');
@@ -560,7 +661,11 @@ const agentTokenProvider: AuthnProvider = {
       throw new AuthnError(401, 'unauthenticated', 'agent token subject is not a valid nhi_id');
     }
     const record = getAgentIdentity(payload.sub);
-    if (!record || record.lifecycle_status === 'retired' || record.lifecycle_status === 'suspended') {
+    if (
+      !record ||
+      record.lifecycle_status === 'retired' ||
+      record.lifecycle_status === 'suspended'
+    ) {
       throw new AuthnError(
         401,
         'unauthenticated',
@@ -574,7 +679,11 @@ const agentTokenProvider: AuthnProvider = {
       actor: agentActor(payload.sub, onBehalfOf ?? record.accountable_human_id),
       principalId: payload.sub,
       role: 'readonly',
-      tenantSlugs: tenants.length ? tenants : request.serverTenant?.trim() ? [request.serverTenant.trim()] : [],
+      tenantSlugs: tenants.length
+        ? tenants
+        : request.serverTenant?.trim()
+          ? [request.serverTenant.trim()]
+          : [],
       organizationIds: 'all',
       projectIds: 'all',
       tierAccess: defaultSurfaceViewerTierAccess('readonly'),
@@ -626,7 +735,9 @@ function resolveOidcJwks(deps?: AuthnResolveDeps): { keys: JsonWebKeyLike[] } | 
   if (inline) {
     try {
       const parsed = parseSafeJsonInput(inline, 'KYBERION_OIDC_JWKS');
-      return parsed && typeof parsed === 'object' && Array.isArray((parsed as { keys?: unknown }).keys)
+      return parsed &&
+        typeof parsed === 'object' &&
+        Array.isArray((parsed as { keys?: unknown }).keys)
         ? (parsed as { keys: JsonWebKeyLike[] })
         : null;
     } catch {
@@ -639,7 +750,9 @@ function resolveOidcJwks(deps?: AuthnResolveDeps): { keys: JsonWebKeyLike[] } | 
       const safePath = assertSafeRepositoryPath(jwksPath);
       if (!safeExistsSync(safePath)) return null;
       const parsed = parseSafeJsonInput(readTextFile(safePath), 'KYBERION_OIDC_JWKS_PATH');
-      return parsed && typeof parsed === 'object' && Array.isArray((parsed as { keys?: unknown }).keys)
+      return parsed &&
+        typeof parsed === 'object' &&
+        Array.isArray((parsed as { keys?: unknown }).keys)
         ? (parsed as { keys: JsonWebKeyLike[] })
         : null;
     } catch {
@@ -709,7 +822,7 @@ const oidcJwtProvider: AuthnProvider = {
     }
 
     verifyJwtSignature(token, header, claims, config, deps);
-    return claimsToPrincipal(claims, request);
+    return claimsToPrincipal(claims, request, deps);
   },
 };
 
@@ -772,9 +885,7 @@ function verifyJwtSignature(
     }
     for (const jwk of keys) {
       if (jwk.kty !== 'oct' || typeof jwk.k !== 'string') continue;
-      const expected = createHmac('sha256', Buffer.from(jwk.k, 'base64url'))
-        .update(data)
-        .digest();
+      const expected = createHmac('sha256', Buffer.from(jwk.k, 'base64url')).update(data).digest();
       if (expected.length === signature.length && timingSafeEqual(expected, signature)) {
         signatureOk = true;
         break;
@@ -796,7 +907,8 @@ function verifyJwtSignature(
 
 function claimsToPrincipal(
   claims: Record<string, unknown>,
-  request: AuthnRequest
+  request: AuthnRequest,
+  deps?: AuthnResolveDeps
 ): ResolvedPrincipal {
   const sub = typeof claims.sub === 'string' ? claims.sub.trim() : '';
   const memberIdClaim =
@@ -806,22 +918,112 @@ function claimsToPrincipal(
 
   let actor;
   let memberId: string | undefined;
-  if (memberIdClaim) {
-    actor = humanActor(memberIdClaim);
-    memberId = memberIdClaim;
-  } else if (sub.startsWith('user:') && isValidMemberId(sub.slice(5))) {
-    actor = humanActor(sub.slice(5));
-    memberId = sub.slice(5);
+  let mappedMember: MemberProfile | null = null;
+  const claimedMemberId =
+    memberIdClaim ??
+    (sub.startsWith('user:') && isValidMemberId(sub.slice(5)) ? sub.slice(5) : undefined);
+  if (claimedMemberId) {
+    // Claim-borne member ids (custom-claim IdPs) are an asserted member
+    // binding: the member must exist AND be active in the local registry.
+    // A suspended or unknown member fails closed at authentication — the
+    // claim can neither resurrect it nor degrade into the unregistered
+    // `ext-` path where a `kyberion_role` claim would still apply.
+    let profile: MemberProfile | null = null;
+    try {
+      profile = withExecutionContext('sovereign_concierge', () =>
+        readMemberProfile(claimedMemberId, deps?.memberRegistry ?? {})
+      );
+    } catch {
+      // An unreadable profile cannot prove the member is active — deny.
+      profile = null;
+    }
+    if (!profile) {
+      throw new AuthnError(403, 'scope_denied', 'member_id claim names an unknown member');
+    }
+    if (profile.status !== 'active') {
+      throw new AuthnError(403, 'scope_denied', 'member_id claim names a suspended member');
+    }
+    actor = humanActor(claimedMemberId);
+    memberId = claimedMemberId;
   } else {
-    // External subject that is not a known member: keep a grammar-valid,
-    // unregistered human actor id (member-membership authz will deny it —
-    // fail closed by default).
-    const digest = createHash('sha256').update(sub || 'anonymous').digest('hex').slice(0, 10);
-    actor = humanActor(`ext-${digest}`);
+    // External identity mapping: a verified iss+sub that a member profile
+    // binds via `external_identities` resolves to that member — the member's
+    // own memberships become the scope (member-registry.ts). A corrupt or
+    // unreadable registry fails closed to the unregistered path.
+    const iss = typeof claims.iss === 'string' ? claims.iss.trim() : '';
+    if (iss && sub) {
+      try {
+        // Member profiles live under the personal tier — the lookup must run
+        // inside an authorized execution context, same as loadRegistrations.
+        mappedMember = withExecutionContext('sovereign_concierge', () =>
+          findMemberByExternalIdentity(iss, sub, deps?.memberRegistry ?? {})
+        );
+        if (
+          !mappedMember &&
+          withExecutionContext('sovereign_concierge', () =>
+            externalIdentityBindingDenied(iss, sub, deps?.memberRegistry ?? {})
+          )
+        ) {
+          // The identity IS bound — to a suspended member. Failing closed
+          // here (not degrading to `ext-`) prevents a suspended member from
+          // re-entering as an unregistered principal whose `kyberion_role`
+          // claim could grant localadmin.
+          throw new AuthnError(
+            403,
+            'scope_denied',
+            'external identity is bound to a suspended member'
+          );
+        }
+      } catch (error) {
+        if (error instanceof AuthnError) throw error;
+        // The scan itself failed (unreadable registry) — the binding can
+        // neither be proven nor disproven. Degrading to `ext-` would let a
+        // suspended member's `kyberion_role` claim re-enter as localadmin,
+        // so fail closed at authentication.
+        throw new AuthnError(
+          403,
+          'scope_denied',
+          'external identity binding could not be verified'
+        );
+      }
+    }
+    if (mappedMember) {
+      actor = humanActor(mappedMember.member_id);
+      memberId = mappedMember.member_id;
+    } else {
+      // External subject that is not a known member: keep a grammar-valid,
+      // unregistered human actor id (member-membership authz will deny it —
+      // fail closed by default).
+      const digest = createHash('sha256')
+        .update(sub || 'anonymous')
+        .digest('hex')
+        .slice(0, 10);
+      actor = humanActor(`ext-${digest}`);
+    }
   }
 
   const roleClaim = claims.kyberion_role ?? claims.role;
-  const role = roleClaim === 'localadmin' ? 'localadmin' : 'readonly';
+  let role: 'readonly' | 'localadmin';
+  let memberTenants: string[] | null = null;
+  if (mappedMember) {
+    // The flat server role is the member's WEAKEST membership across the
+    // whole scope: flat consumers (role-scope authz, surface mutation gates,
+    // tier policy) apply it to every tenant in `tenantSlugs`, so the
+    // strongest-membership rule would bleed localadmin + personal tier into
+    // tenants where the member only views. Per-tenant precision lives in
+    // the member-membership authz provider, which re-derives the role from
+    // the membership matching the resource tenant.
+    role =
+      mappedMember.memberships.length > 0 &&
+      mappedMember.memberships.every(
+        (membership) => frontDeskRoleAuthority(membership.role).serverRole === 'localadmin'
+      )
+        ? 'localadmin'
+        : 'readonly';
+    memberTenants = mappedMember.memberships.map((membership) => membership.tenant_slug);
+  } else {
+    role = roleClaim === 'localadmin' ? 'localadmin' : 'readonly';
+  }
   const tenantClaims = Array.isArray(claims.kyberion_tenants)
     ? claims.kyberion_tenants
         .filter((slug): slug is string => typeof slug === 'string')
@@ -852,17 +1054,25 @@ function claimsToPrincipal(
     );
   }
 
+  const serverTenant = request.serverTenant?.trim();
+  let tenantSlugs: string[];
+  if (memberTenants) {
+    // Membership-derived scope, narrowed by any tenant claims and by the
+    // server-bound tenant — never widened past what the member holds.
+    tenantSlugs = memberTenants;
+    if (tenantClaims.length) tenantSlugs = tenantSlugs.filter((t) => tenantClaims.includes(t));
+    if (serverTenant) tenantSlugs = tenantSlugs.filter((t) => t === serverTenant);
+  } else {
+    // Fail closed: without tenant claims the principal sees only the
+    // server-bound tenant, and without one of those, nothing.
+    tenantSlugs = tenantClaims.length ? tenantClaims : serverTenant ? [serverTenant] : [];
+  }
+
   return {
     actor,
     principalId: sub || actor.id,
     role,
-    // Fail closed: without tenant claims the principal sees only the
-    // server-bound tenant, and without one of those, nothing.
-    tenantSlugs: tenantClaims.length
-      ? tenantClaims
-      : request.serverTenant?.trim()
-        ? [request.serverTenant.trim()]
-        : [],
+    tenantSlugs,
     organizationIds: orgClaims ?? 'all',
     projectIds: projectClaims ?? 'all',
     tierAccess,

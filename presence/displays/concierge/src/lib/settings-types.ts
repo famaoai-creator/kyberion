@@ -44,7 +44,7 @@ export type Setup = SetupPayload;
 
 export type Notice = { text: string; error?: boolean } | null;
 
-export type SettingsRole = 'owner' | 'approver' | 'viewer';
+export type SettingsRole = 'owner' | 'approver' | 'operator' | 'viewer';
 export type SettingsTenantView = {
   tenant_slug: string;
   display_name: string;
@@ -62,7 +62,7 @@ export type SettingsMember = {
 };
 
 export function isSettingsRole(value: unknown): value is SettingsRole {
-  return value === 'owner' || value === 'approver' || value === 'viewer';
+  return value === 'owner' || value === 'approver' || value === 'operator' || value === 'viewer';
 }
 
 export function isSettingsTenantView(value: unknown): value is SettingsTenantView {

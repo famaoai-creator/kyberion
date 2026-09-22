@@ -191,12 +191,14 @@ function parseProviderResolution(
   }
   return {
     ...(value.preferredProvider !== undefined
-      ? { preferredProvider: value.preferredProvider }
+      ? { preferredProvider: value.preferredProvider as string }
       : {}),
-    ...(value.preferredModelId !== undefined ? { preferredModelId: value.preferredModelId } : {}),
-    ...(value.strategy !== undefined ? { strategy: value.strategy } : {}),
+    ...(value.preferredModelId !== undefined
+      ? { preferredModelId: value.preferredModelId as string }
+      : {}),
+    ...(value.strategy !== undefined ? { strategy: value.strategy as string } : {}),
     ...(value.availableProviders !== undefined
-      ? { availableProviders: value.availableProviders }
+      ? { availableProviders: value.availableProviders as string[] }
       : {}),
   };
 }
@@ -228,14 +230,16 @@ function parseAgent(value: unknown): ClientAgentRecord | undefined {
     modelId: value.modelId,
     status: value.status,
     capabilities: value.capabilities,
-    trustScore: value.trustScore,
-    uptimeMs: value.uptimeMs,
-    idleMs: value.idleMs,
+    trustScore: value.trustScore as number | null,
+    uptimeMs: value.uptimeMs as number | null,
+    idleMs: value.idleMs as number | null,
     runtime: parseRuntime(value.runtime),
     metrics: parseMetrics(value.metrics),
     process: parseProcess(value.process),
     supportsSoftRefresh: value.supportsSoftRefresh,
-    ...(value.providerRuntime !== undefined ? { providerRuntime: value.providerRuntime } : {}),
+    ...(value.providerRuntime !== undefined
+      ? { providerRuntime: value.providerRuntime as Record<string, unknown> }
+      : {}),
     ...(value.providerResolution !== undefined
       ? { providerResolution: parseProviderResolution(value.providerResolution) }
       : {}),
