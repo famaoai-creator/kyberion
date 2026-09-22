@@ -17,6 +17,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { validateTraceReplay } from '../trace-schema.js';
+import { withTriggerCorrelation } from '../trigger-correlation.js';
 
 const originalEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 const originalFetch = globalThis.fetch;
@@ -130,10 +131,47 @@ describe('WI-13: deriveTraceOrigin priority table', () => {
     );
   });
 
-  it('an agent identity env (no VITEST/CI/cron correlation) -> agent', () => {
+  it('an ambient cron trigger delivery scope -> scheduled', () => {
+    const cron = { deliveryId: 'd1', source: 'cron' as const, idempotencyKey: 'cron:x:1' };
+    expect(deriveTraceOrigin(undefined, {}, cron)).toBe('scheduled');
+    expect(deriveTraceOrigin(undefined, {}, { ...cron, source: 'watch' })).toBe('interactive');
+  });
+
+  it('TraceContext inside withTriggerCorrelation(cron) is scheduled when not under vitest', () => {
+    // The real process has VITEST set, so exercise the ambient read through
+    // deriveTraceOrigin's default `trigger` argument with an injected env.
+    const inside = withTriggerCorrelation(
+      { deliveryId: 'd2', source: 'cron', idempotencyKey: 'cron:nightly:2026-09-22T00:00' },
+      () => deriveTraceOrigin(undefined, {})
+    );
+    expect(inside).toBe('scheduled');
+    expect(deriveTraceOrigin(undefined, {})).toBe('interactive');
+  });
+
+  it('a valid KYBERION_RUN_ORIGIN wins right after VITEST/CI; an invalid one is ignored', () => {
+    expect(deriveTraceOrigin(undefined, { KYBERION_RUN_ORIGIN: 'scheduled' })).toBe('scheduled');
+    expect(
+      deriveTraceOrigin(undefined, {
+        KYBERION_RUN_ORIGIN: 'interactive',
+        KYBERION_NHI_ID: 'kyberion://agent/x/y',
+      })
+    ).toBe('interactive');
+    expect(deriveTraceOrigin(undefined, { KYBERION_RUN_ORIGIN: 'agent' })).toBe('agent');
+    expect(deriveTraceOrigin(undefined, { KYBERION_RUN_ORIGIN: 'scheduled', CI: '1' })).toBe('ci');
+    expect(deriveTraceOrigin(undefined, { KYBERION_RUN_ORIGIN: 'test' })).toBe('interactive');
+    expect(deriveTraceOrigin(undefined, { KYBERION_RUN_ORIGIN: 'bogus' })).toBe('interactive');
+  });
+
+  it('an agent-runtime identity env (no VITEST/CI/cron correlation) -> agent', () => {
     expect(deriveTraceOrigin(undefined, { KYBERION_NHI_ID: 'kyberion://agent/x/y' })).toBe('agent');
     expect(deriveTraceOrigin(undefined, { KYBERION_AGENT_ID: 'agent-1' })).toBe('agent');
-    expect(deriveTraceOrigin(undefined, { MISSION_ROLE: 'mission_controller' })).toBe('agent');
+  });
+
+  it('MISSION_ROLE alone (set by pnpm pipeline / withExecutionContext) is interactive, not agent', () => {
+    expect(deriveTraceOrigin(undefined, { MISSION_ROLE: 'mission_controller' })).toBe(
+      'interactive'
+    );
+    expect(deriveTraceOrigin(undefined, { MISSION_ROLE: 'run_pipeline' })).toBe('interactive');
   });
 
   it('none of the above -> interactive', () => {

@@ -44,6 +44,7 @@ import {
   STORAGE_RETENTION_AUDIT_FILENAME,
   type LoadedRetentionCatalog,
   type RetentionCatalogEntry,
+  type RetentionStatusRule,
 } from './storage-retention-catalog.js';
 import {
   listSupervisorEventFiles,
@@ -647,6 +648,37 @@ export function scanEventStores(opts: {
  * the file — it is never deleted on doubt. A file whose status is not one of
  * the rule's `statuses` simply isn't a candidate (not an error).
  */
+/**
+ * Reads `filePath` and returns its status when it is a candidate of `rule`
+ * that is past the rule's ttl at `now`; `null` otherwise (including every
+ * fail-safe skip: malformed JSON, non-object body, missing/wrong-type status or
+ * age field, unparseable date, status outside `rule.statuses`, still in ttl).
+ */
+function expiredStatusRuleMatch(
+  filePath: string,
+  rule: RetentionStatusRule,
+  now: number
+): string | null {
+  let parsed: unknown;
+  try {
+    parsed = loadJsonIfPresent<Record<string, unknown>>(filePath);
+  } catch {
+    parsed = null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null; // malformed → skip
+
+  const record = parsed as Record<string, unknown>;
+  const status = record[rule.status_field];
+  if (typeof status !== 'string' || !rule.statuses.includes(status)) return null; // not a candidate
+
+  const ageRaw = record[rule.age_field];
+  if (typeof ageRaw !== 'string') return null; // missing/wrong-type age field → skip
+  const ageMs = Date.parse(ageRaw);
+  if (!Number.isFinite(ageMs)) return null; // unparseable date → skip
+
+  return now - ageMs > rule.ttl_days * RETENTION_DAY_MS ? status : null;
+}
+
 export function sweepStatusRules(opts: {
   dryRun: boolean;
   catalog?: LoadedRetentionCatalog;
@@ -678,35 +710,28 @@ function sweepStatusRulesInContext(opts: {
         // itself is also validated at load time to reject '..' segments.
         if (!matcher.test(relativeToEntry)) continue;
 
-        let parsed: unknown;
-        try {
-          parsed = loadJsonIfPresent<Record<string, unknown>>(filePath);
-        } catch {
-          parsed = null;
-        }
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue; // malformed → skip
+        const status = expiredStatusRuleMatch(filePath, rule, now);
+        if (status === null) continue;
 
-        const record = parsed as Record<string, unknown>;
-        const status = record[rule.status_field];
-        if (typeof status !== 'string' || !rule.statuses.includes(status)) continue; // not a candidate
-
-        const ageRaw = record[rule.age_field];
-        if (typeof ageRaw !== 'string') continue; // missing/wrong-type age field → skip
-        const ageMs = Date.parse(ageRaw);
-        if (!Number.isFinite(ageMs)) continue; // unparseable date → skip
-
-        if (now - ageMs > rule.ttl_days * RETENTION_DAY_MS) {
+        if (opts.dryRun) {
           expired.push(filePath);
-          if (!opts.dryRun) {
-            expireFilePerPolicy(filePath, entry, outcome, {
-              status_rule_id: rule.id,
-              status,
-              status_field: rule.status_field,
-              age_field: rule.age_field,
-              status_rule_ttl_days: rule.ttl_days,
-            });
-          }
+          continue;
         }
+        // Narrow the scan-vs-confirm race: a member may confirm (or restore)
+        // the file between the scan read above and the delete. Re-read right
+        // before deleting and skip unless the status and age still match.
+        if (expiredStatusRuleMatch(filePath, rule, Date.now()) !== status) {
+          logger.info(`[JANITOR] status changed before delete, kept: ${filePath}`);
+          continue;
+        }
+        expired.push(filePath);
+        expireFilePerPolicy(filePath, entry, outcome, {
+          status_rule_id: rule.id,
+          status,
+          status_field: rule.status_field,
+          age_field: rule.age_field,
+          status_rule_ttl_days: rule.ttl_days,
+        });
       } catch {
         // skip — never delete on doubt
       }

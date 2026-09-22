@@ -12,6 +12,7 @@ import * as pathResolver from '../path-resolver.js';
 import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning-egress-scope.js';
+import { currentTriggerCorrelation, type TriggerCorrelationScope } from '../trigger-correlation.js';
 import {
   sanitizeTraceForPersistence,
   validateTraceReplay,
@@ -37,12 +38,28 @@ export interface TraceArtifact {
  * deterministically at `TraceContext` construction time (never self-reported
  * later) so downstream consumers — work-inventory harvest chief among them —
  * can tell real usage apart from test/CI noise without inspecting free text.
- * Priority: `VITEST` -> test; `CI` -> ci; a `cron:`-prefixed correlationId
- * (Chronos firings, `cron:<schedule_id>:<minute>`) -> scheduled; an agent
- * identity env (`KYBERION_NHI_ID` / `KYBERION_AGENT_ID` / `MISSION_ROLE`) set
- * -> agent; otherwise interactive.
+ * Priority: `VITEST` -> test; `CI` -> ci; an explicit, valid
+ * `KYBERION_RUN_ORIGIN` (scheduled | interactive | agent — set by launchers
+ * such as the baseline-check janitor spawn) -> that value; a `cron:`-prefixed
+ * correlationId (`cron:<schedule_id>:<minute>`) or an ambient cron trigger
+ * delivery scope (`withTriggerCorrelation`, which the trigger runner opens
+ * around every Chronos firing — async-scoped, so overlapping runs never see
+ * each other's origin) -> scheduled; an agent-runtime identity env
+ * (`KYBERION_NHI_ID` / `KYBERION_AGENT_ID`) set -> agent; otherwise
+ * interactive. `MISSION_ROLE` alone is NOT an agent signal: `pnpm pipeline`
+ * and every `withExecutionContext` set it for human-started runs too.
  */
 export type TraceOrigin = 'test' | 'ci' | 'scheduled' | 'agent' | 'interactive';
+
+const EXPLICIT_RUN_ORIGINS = new Set<TraceOrigin>(['scheduled', 'interactive', 'agent']);
+
+/** Reads `KYBERION_RUN_ORIGIN`; an unknown value is ignored (never trusted). */
+export function explicitRunOrigin(
+  env: Record<string, string | undefined> = process.env
+): TraceOrigin | undefined {
+  const raw = getRegisteredEnvText('KYBERION_RUN_ORIGIN', { env })?.trim().toLowerCase();
+  return raw && EXPLICIT_RUN_ORIGINS.has(raw as TraceOrigin) ? (raw as TraceOrigin) : undefined;
+}
 
 /**
  * Exported (rather than a private constructor helper) so the priority table
@@ -52,15 +69,18 @@ export type TraceOrigin = 'test' | 'ci' | 'scheduled' | 'agent' | 'interactive';
  */
 export function deriveTraceOrigin(
   correlationId: string | undefined,
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  trigger: TriggerCorrelationScope | undefined = currentTriggerCorrelation()
 ): TraceOrigin {
   if (isVitestProcess(env)) return 'test';
   if (isCiProcess(env)) return 'ci';
+  const explicit = explicitRunOrigin(env);
+  if (explicit) return explicit;
   if (correlationId?.startsWith('cron:')) return 'scheduled';
+  if (trigger?.source === 'cron') return 'scheduled';
   if (
     getRegisteredEnvText('KYBERION_NHI_ID', { env })?.trim() ||
-    getRegisteredEnvText('KYBERION_AGENT_ID', { env })?.trim() ||
-    getRegisteredEnvText('MISSION_ROLE', { env })?.trim()
+    getRegisteredEnvText('KYBERION_AGENT_ID', { env })?.trim()
   ) {
     return 'agent';
   }

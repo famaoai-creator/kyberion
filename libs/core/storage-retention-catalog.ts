@@ -55,7 +55,9 @@ export const RETENTION_ACTIONS = [
   /**
    * AL-04: no automatic deletion — the directory is declared (so it never
    * shows up as uncovered) and surfaced in the janitor report for a human
-   * retention decision. The janitor MUST NOT delete anything under it.
+   * retention decision. The janitor MUST NOT delete anything under it —
+   * except through a nested `status_rules` entry, the one explicit, opt-in
+   * exception (see `RetentionStatusRule`).
    */
   'review_required',
 ] as const;
@@ -88,6 +90,13 @@ export type StatusRuleAction = (typeof STATUS_RULE_ACTIONS)[number];
  * entry closes that gap by reading one JSON field (`status_field`) and one
  * JSON date field (`age_field`) out of each file the pattern matches, instead
  * of trusting directory mtime.
+ *
+ * Status rules are the one explicit, opt-in exception to "review_required
+ * never becomes a deletion rule" (AL-04): a rule nested under a
+ * `review_required` entry deletes inside it, but only by the rule's own
+ * `action: 'delete'`, scoped to files matching its `path_pattern` whose
+ * `status_field` is one of its `statuses` and past its `ttl_days`. Nothing
+ * else under the entry is ever deleted.
  */
 export interface RetentionStatusRule {
   /** Stable identifier, named in the janitor's deletion audit record. */
@@ -417,6 +426,8 @@ const RUNTIME_PREFIX = 'active/shared/runtime/';
  * the catalog-driven successor of the janitor's former `RUNTIME_RETENTION`
  * constant. Only entries with a `ttl_days` participate; `review_required`
  * entries NEVER become scan rules (AL-04), even if a ttl_days slipped in.
+ * (Status rules are the one explicit, opt-in exception — a rule's own
+ * `action: 'delete'` scoped to its pattern/statuses; see `RetentionStatusRule`.)
  */
 export function runtimeRetentionRules(
   catalog: LoadedRetentionCatalog
@@ -459,7 +470,8 @@ function isEventStorePath(repoRelativePath: string): boolean {
 /**
  * TTL rules for declared event-store directories. Same contract as
  * {@link runtimeRetentionRules}: only entries carrying a `ttl_days`
- * participate, and `review_required` never becomes a deletion rule.
+ * participate, and `review_required` never becomes a deletion rule (status
+ * rules are the one explicit, opt-in exception; see `RetentionStatusRule`).
  */
 export function eventStoreRetentionRules(
   catalog: LoadedRetentionCatalog
@@ -519,6 +531,8 @@ export function retentionEntryForPath(
 /**
  * Repo-relative paths declared `review_required` (AL-04): covered for
  * reporting purposes, never deleted, surfaced for a human retention decision.
+ * The one explicit, opt-in exception is a nested status rule (its own
+ * `action: 'delete'` scoped to its pattern/statuses; see `RetentionStatusRule`).
  */
 export function reviewRequiredCatalogPaths(catalog: LoadedRetentionCatalog): string[] {
   return catalog.entries

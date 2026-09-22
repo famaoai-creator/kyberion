@@ -189,6 +189,8 @@ interface SignalAccumulator {
   durations: number[];
   failure_count: number;
   sample_refs: string[];
+  /** Counted traces tagged `metadata.origin: 'scheduled'`. */
+  scheduled_count: number;
 }
 
 /** WI-13: the closed `Trace['metadata']['origin']` vocabulary (`TraceOrigin` in `src/trace.ts`). */
@@ -196,7 +198,11 @@ const TEST_OR_CI_TRACE_ORIGINS = new Set(['test', 'ci']);
 
 interface TraceSignalScanResult {
   signals: DemandSignal[];
-  /** Signatures that saw at least one `metadata.origin: 'scheduled'` trace. */
+  /**
+   * Signatures whose counted traces are at least half `metadata.origin:
+   * 'scheduled'` — one chronos run among many interactive ones does not turn
+   * a person's work into system cadence.
+   */
   scheduledSignatures: Set<string>;
   stats: DemandSignalHarvestStats;
 }
@@ -286,6 +292,7 @@ function collectTraceSignals(
           durations: [],
           failure_count: 0,
           sample_refs: [],
+          scheduled_count: 0,
         };
         accumulators.set(classification.signature, acc);
       }
@@ -301,12 +308,15 @@ function collectTraceSignals(
       ) {
         acc.sample_refs.push(traceId);
       }
-      if (traceOrigin === 'scheduled') scheduledSignatures.add(classification.signature);
+      if (traceOrigin === 'scheduled') acc.scheduled_count += 1;
     }
   }
 
   const results: DemandSignal[] = [];
   for (const [signature, acc] of accumulators) {
+    if (acc.scheduled_count > 0 && acc.scheduled_count * 2 >= acc.count) {
+      scheduledSignatures.add(signature);
+    }
     results.push({
       signature,
       kind: acc.kind,
@@ -469,8 +479,8 @@ function resolvePipelineOrigin(rootDir: string, pipelineId: string): DemandSigna
 }
 
 /**
- * `scheduledSignatures` are signatures that saw at least one trace tagged
- * `metadata.origin: 'scheduled'` (WI-13, chronos-fired work): they always
+ * `scheduledSignatures` are signatures whose counted traces are at least half
+ * tagged `metadata.origin: 'scheduled'` (WI-13, chronos-fired work): they always
  * resolve to `scheduled`, even for `actuator_op`/`mission` kinds that the
  * per-kind lookup below never derives a non-`unknown` origin for.
  */
@@ -519,7 +529,7 @@ export interface CollectKyberionDemandSignalsResult {
  * payloads, or intent utterance text; sorted by `count` descending, then
  * `signature` ascending. Every signal carries an `origin` (`pipeline:<id>` /
  * `browser-pipeline:<id>` → looked up in `pipelines/<id>.json`; any signature
- * with a `metadata.origin: 'scheduled'` trace → `scheduled`; ad-hoc ledger and
+ * whose traces are at least half `metadata.origin: 'scheduled'` → `scheduled`; ad-hoc ledger and
  * unhandled intents → `on_demand`; everything else → `unknown`).
  */
 export function collectKyberionDemandSignalsWithStats(
@@ -718,17 +728,22 @@ function verbForSignal(signal: DemandSignal, taxonomy: WorkInventoryTaxonomy): W
   return 'operate'; // mission
 }
 
+/**
+ * A binding derived from a demand signal names the exact thing that ran, so it
+ * is explicit evidence: stamped `inferred: false` (WI-17 review) so the
+ * inferred-binding migration can never relabel it as a taxonomy default.
+ */
 function bindingForSignal(signal: DemandSignal): WorkInventoryStepBinding | undefined {
   switch (signal.kind) {
     case 'pipeline': {
       const id = signal.signature.startsWith('browser-pipeline:')
         ? signal.signature.slice('browser-pipeline:'.length)
         : signal.signature.slice('pipeline:'.length);
-      return id ? { pipeline_id: id } : undefined;
+      return id ? { pipeline_id: id, inferred: false } : undefined;
     }
     case 'adhoc_pipeline': {
       const id = signal.signature.slice('adhoc_pipeline:'.length);
-      return id ? { pipeline_id: id } : undefined;
+      return id ? { pipeline_id: id, inferred: false } : undefined;
     }
     case 'actuator_op': {
       const separator = signal.signature.indexOf(':');
@@ -736,11 +751,12 @@ function bindingForSignal(signal: DemandSignal): WorkInventoryStepBinding | unde
       return {
         actuator: signal.signature.slice(0, separator),
         op: signal.signature.slice(separator + 1),
+        inferred: false,
       };
     }
     case 'unhandled_intent': {
       const id = signal.signature.slice('intent:'.length);
-      return id ? { intent_id: id } : undefined;
+      return id ? { intent_id: id, inferred: false } : undefined;
     }
     case 'mission':
     default:
