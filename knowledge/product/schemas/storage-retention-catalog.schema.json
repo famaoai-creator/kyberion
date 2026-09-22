@@ -61,6 +61,62 @@
         "note": {
           "type": "string",
           "description": "Human rationale: why this TTL/action, and any special expiry mechanism."
+        },
+        "status_rules": {
+          "type": "array",
+          "description": "WI-16: per-file status-aware expiry rules nested under this directory. Each rule reads one JSON status field and one JSON date field out of every file its path_pattern matches, instead of trusting directory mtime — closing the gap where a directory-level TTL cannot distinguish a stale pending_review file from a confirmed one in the same tree.",
+          "items": { "$ref": "#/definitions/status_rule" }
+        }
+      }
+    },
+    "status_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path_pattern",
+        "status_field",
+        "statuses",
+        "age_field",
+        "ttl_days",
+        "action"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable identifier, recorded in the janitor's deletion audit line."
+        },
+        "path_pattern": {
+          "type": "string",
+          "description": "Glob-like path relative to the owning entry's directory (no leading/trailing slash, no '..', no absolute path). '*' matches within one path segment only, never across '/'. Example: \"*/work-inventory/observations/*.json\".",
+          "pattern": "^[A-Za-z0-9_.*-]+(/[A-Za-z0-9_.*-]+)*$"
+        },
+        "status_field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Top-level JSON field read from each matched file and tested against \"statuses\"."
+        },
+        "statuses": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The file is a candidate only when status_field's value is one of these."
+        },
+        "age_field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Top-level JSON field (ISO date string) the ttl_days is measured from."
+        },
+        "ttl_days": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Retention period in days, evaluated against age_field's value."
+        },
+        "action": {
+          "type": "string",
+          "enum": ["delete"],
+          "description": "Only delete is implemented: the matched file is expired through the same audited expireFilePerPolicy path a directory-level delete entry uses (soft-delete when the owning entry declares soft_delete_days)."
         }
       }
     }
