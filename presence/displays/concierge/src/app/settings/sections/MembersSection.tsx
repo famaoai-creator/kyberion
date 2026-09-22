@@ -22,6 +22,7 @@ import type {
 const ROLE_LABEL_KEYS: Record<SettingsRole, FrontDeskMessageKey> = {
   owner: 'role_owner',
   approver: 'role_approver',
+  operator: 'role_operator',
   viewer: 'role_viewer',
 };
 
@@ -171,7 +172,7 @@ export function MembersSection({
                       });
                     }}
                   >
-                    {(['owner', 'approver', 'viewer'] as SettingsRole[]).map((role) => (
+                    {(['owner', 'approver', 'operator', 'viewer'] as SettingsRole[]).map((role) => (
                       <option key={role} value={role}>
                         {frontDeskText(ROLE_LABEL_KEYS[role], locale)}
                       </option>
@@ -335,7 +336,7 @@ export function MembersSection({
                 setMemberForm({ ...memberForm, role: event.target.value as SettingsRole })
               }
             >
-              {(['owner', 'approver', 'viewer'] as SettingsRole[]).map((role) => (
+              {(['owner', 'approver', 'operator', 'viewer'] as SettingsRole[]).map((role) => (
                 <option key={role} value={role}>
                   {frontDeskText(ROLE_LABEL_KEYS[role], locale)}
                 </option>

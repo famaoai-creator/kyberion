@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { AlertTriangle, CheckCircle2, CircleStop, Play, RefreshCw } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
-import { uxText } from '../lib/ux-vocabulary';
+import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import {
   parseSurfaceControlActionResponse,
   parseSurfaceControlResponse,
@@ -332,7 +332,7 @@ function ActionButton({
 }: {
   action: ActionDefinition;
   busy: boolean;
-  locale: string;
+  locale: SupportedLocale;
   onClick: () => void;
 }) {
   return (
@@ -348,10 +348,10 @@ function ActionButton({
   );
 }
 
-function ActionStatus({ action, locale }: { action: ActionSummary; locale: string }) {
+function ActionStatus({ action, locale }: { action: ActionSummary; locale: SupportedLocale }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2 text-[10px] kb-text-muted">
-      <span>{surfaceActionLabel({ ...action, risk: 'safe', enabled: true }, locale)}</span>
+      <span>{surfaceActionLabel(action, locale)}</span>
       <span className="font-mono kb-text-secondary">
         {surfaceStatusLabel(action.status, locale)}
       </span>
@@ -365,7 +365,7 @@ function ActionStatus({ action, locale }: { action: ActionSummary; locale: strin
   );
 }
 
-function surfaceStatusLabel(value: ActionSummary['status'], locale: string) {
+function surfaceStatusLabel(value: ActionSummary['status'], locale: SupportedLocale) {
   const keyByValue: Record<ActionSummary['status'], string> = {
     queued: 'chronos_action_queued',
     completed: 'chronos_action_completed',
@@ -374,7 +374,10 @@ function surfaceStatusLabel(value: ActionSummary['status'], locale: string) {
   return uxText(keyByValue[value], locale);
 }
 
-function surfaceActionLabel(action: Pick<ActionDefinition, 'operation'>, locale: string) {
+function surfaceActionLabel(
+  action: { operation: string; label?: string },
+  locale: SupportedLocale
+) {
   const keyByOperation: Record<string, string> = {
     reconcile: 'chronos_surface_reconcile',
     refresh: 'chronos_surface_refresh',
@@ -382,14 +385,14 @@ function surfaceActionLabel(action: Pick<ActionDefinition, 'operation'>, locale:
     stop: 'chronos_surface_stop',
   };
   const key = keyByOperation[action.operation];
-  return key ? uxText(key, locale) : action.label;
+  return key ? uxText(key, locale) : action.label || action.operation;
 }
 
-function surfaceKindLabel(kind: string, locale: string) {
+function surfaceKindLabel(kind: string, locale: SupportedLocale) {
   return kind.toLowerCase() === 'ui' ? uxText('chronos_surface_kind_ui', locale) : kind;
 }
 
-function surfaceStateLabel(value: string, locale: string) {
+function surfaceStateLabel(value: string, locale: SupportedLocale) {
   const keyByValue: Record<string, string> = {
     running: 'chronos_surface_running',
     stopped: 'chronos_surface_stopped',

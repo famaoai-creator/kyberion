@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kyberion.local/schemas/member-profile.schema.json",
   "title": "Member Profile",
-  "description": "FD-07 minimal member model: a human member of a local Kyberion instance, identified as user:<member_id>. Roles (owner/approver/viewer) are per-tenant memberships; a member never carries an authority role directly.",
+  "description": "FD-07 minimal member model: a human member of a local Kyberion instance, identified as user:<member_id>. Roles (owner/approver/operator/viewer) are per-tenant memberships; a member never carries an authority role directly. `external_identities` binds external IdP identities (OIDC issuer+subject, e.g. a Google account) to this member.",
   "type": "object",
   "required": [
     "member_id",
@@ -32,7 +32,7 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]{1,30}$"
           },
-          "role": { "type": "string", "enum": ["owner", "approver", "viewer"] }
+          "role": { "type": "string", "enum": ["owner", "approver", "operator", "viewer"] }
         }
       }
     },
@@ -45,6 +45,20 @@
         "additionalProperties": false,
         "properties": {
           "label": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "external_identities": {
+      "type": "array",
+      "description": "External IdP identities bound to this member. An OIDC bearer token whose verified iss+sub matches an entry resolves to this member (authn oidc-jwt provider).",
+      "items": {
+        "type": "object",
+        "required": ["issuer", "subject"],
+        "additionalProperties": false,
+        "properties": {
+          "issuer": { "type": "string", "minLength": 1 },
+          "subject": { "type": "string", "minLength": 1 },
+          "email": { "type": "string", "minLength": 1 }
         }
       }
     },

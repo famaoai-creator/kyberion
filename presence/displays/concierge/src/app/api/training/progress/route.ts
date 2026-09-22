@@ -9,7 +9,7 @@ import {
   summarizeTrainingProgress,
 } from '@agent/core/training-catalog';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
-import { resolveConciergeFrontDeskRole } from '../../../../lib/front-desk-member';
+import { conciergeFrontDeskRoleForTenant } from '../../../../lib/front-desk-member';
 import { frontDeskText, resolveConciergeLocale } from '../../../../lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +27,17 @@ export function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
   if (resolved.response) return resolved.response;
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
-  if (resolveConciergeFrontDeskRole(resolved.context) !== 'owner') {
+  // The overview spans every tenant the caller is an owner of — a resolved
+  // member sees progress only for tenants where their membership is
+  // `owner`, never the whole scope (F2: tenantSlugs[0] is not authority).
+  // For an unregistered principal `conciergeFrontDeskRoleForTenant` keeps
+  // the legacy localadmin -> owner mapping, preserving pre-FD-07 behavior.
+  const tenants = (
+    resolved.context.tenantSlugs === 'all'
+      ? withExecutionContext('sovereign_concierge', () => listTenantProfileSlugs())
+      : resolved.context.tenantSlugs
+  ).filter((tenant) => conciergeFrontDeskRoleForTenant(resolved.context, tenant) === 'owner');
+  if (tenants.length === 0) {
     return NextResponse.json(
       { ok: false, error: frontDeskText('settings_member_owner_only', locale) },
       { status: 403 }
@@ -35,10 +45,6 @@ export function GET(req: NextRequest) {
   }
   try {
     const overview = withExecutionContext('sovereign_concierge', () => {
-      const tenants =
-        resolved.context.tenantSlugs === 'all'
-          ? listTenantProfileSlugs()
-          : resolved.context.tenantSlugs;
       const catalog = loadTrainingCatalog();
       const members = listMemberIds()
         .map((memberId) => readMemberProfile(memberId))

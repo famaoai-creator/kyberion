@@ -29,6 +29,7 @@ describe('Presence Studio OS viewer scope', () => {
       principalId: 'human:presence-studio-localadmin',
       tenantSlugs: ['tenant-local'],
       source: 'loopback',
+      principal: expect.objectContaining({ provider: 'loopback-local', role: 'localadmin' }),
     });
   });
 
@@ -50,6 +51,7 @@ describe('Presence Studio OS viewer scope', () => {
       principalId: 'human:presence-studio-token',
       tenantSlugs: ['tenant-remote'],
       source: 'token',
+      principal: expect.objectContaining({ provider: 'env-token', role: 'readonly' }),
     });
   });
 

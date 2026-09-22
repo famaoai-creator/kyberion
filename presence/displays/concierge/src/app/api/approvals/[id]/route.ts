@@ -3,18 +3,20 @@ import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { readRequestObject } from '../../../../lib/request-input';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
-import { resolveConciergeDecidedBy } from '../../../../lib/front-desk-member';
+import {
+  conciergeDecisionDenied,
+  resolveConciergeDecidedBy,
+} from '../../../../lib/front-desk-member';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
-  // FD-07: resolving the viewer here is best-effort context for `decided_by`
-  // only — an unresolved viewer still falls through to the pre-FD-07
-  // 'concierge'/'sovereign' identity below, same as before this change.
+  // FD-07: a failed viewer resolution is a hard stop — the request never
+  // proceeds on the legacy 'concierge'/'sovereign' identity.
   const resolved = resolveConciergeViewer(req);
-  const decidedBy = resolved.context ? resolveConciergeDecidedBy(resolved.context) : null;
+  if (resolved.response) return resolved.response;
 
   try {
     const { id } = await context.params;
@@ -47,6 +49,16 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         { status: 404 }
       );
     }
+    // The decision lands on the approval's tenant — the member gate checks
+    // the membership for THAT tenant, not the first scope entry (B4/F2).
+    const requesterContext = record.requestedByContext as
+      { tenant_slug?: string; tenantSlug?: string } | undefined;
+    const loopContext = record.work_loop?.context as { tenant_slug?: string } | undefined;
+    const resourceTenant =
+      requesterContext?.tenant_slug || requesterContext?.tenantSlug || loopContext?.tenant_slug;
+    const decisionDenied = conciergeDecisionDenied(resolved.context, resourceTenant);
+    if (decisionDenied) return decisionDenied;
+    const decidedBy = resolveConciergeDecidedBy(resolved.context, resourceTenant);
     const updated = decideApprovalRequest('sovereign_concierge', {
       channel,
       storageChannel,

@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const parsedBody = await readChronosJsonObject(req, 'Chronos headless work items');
-    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    if (parsedBody.ok !== true)
+      return NextResponse.json({ error: parsedBody.error }, { status: 400 });
     const input = parseHeadlessWorkItemStatusInput(parsedBody.body);
     authorizeHeadlessOperation(resolvedViewer.context, 'chronos.work_items.update_status');
     const item = updateHeadlessWorkItemStatus(resolvedViewer.context, {

@@ -4,7 +4,7 @@ import {
   CloudflareOsReadOnlySurface,
   CloudflareOsSurface,
 } from '@agent/core';
-import { snapshotForViewer } from './route';
+import { snapshotForViewer } from './helpers';
 
 function observation(tenantSlug: string) {
   return {

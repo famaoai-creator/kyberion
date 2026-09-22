@@ -33,7 +33,10 @@ import type { ActorRef, ActorKind } from './actor.js';
 import type { ChronosAccessRole, ChronosTokenRegistration } from './chronos-access-registry.js';
 import type { OsKnowledgeTier } from './cloudflare-os-control-plane.js';
 import type { MemberRegistryPathOptions } from './member-registry.js';
-import type { SurfaceViewerScope } from './surface-mutation-guard.js';
+import type {
+  SurfaceViewerConfiguredCredential,
+  SurfaceViewerScope,
+} from './surface-mutation-guard.js';
 import {
   resolveSeamProviderDecision,
   type SeamProviderCandidate,
@@ -118,9 +121,7 @@ export function toSurfaceViewerScope(principal: ResolvedPrincipal): SurfaceViewe
     projectIds: principal.projectIds,
     tierAccess: principal.tierAccess,
     source:
-      principal.source === 'agent' || principal.source === 'oidc'
-        ? 'token'
-        : principal.source,
+      principal.source === 'agent' || principal.source === 'oidc' ? 'token' : principal.source,
     principalId: principal.principalId,
     ...(principal.registrationLabel ? { registrationLabel: principal.registrationLabel } : {}),
     ...(principal.memberId ? { memberId: principal.memberId } : {}),
@@ -169,7 +170,13 @@ export interface AuthnResolveDeps {
   /** Env overlay (hermetic tests); defaults to process.env. */
   env?: Record<string, string | undefined>;
   /** Pre-loaded chronos-access registrations; undefined = provider reads the registry. */
-  registrations?: ChronosTokenRegistration[] | null;
+  registrations?: readonly ChronosTokenRegistration[] | null;
+  /**
+   * Surface-configured bearer credentials judged by env-token AFTER the
+   * KYBERION_* env tokens — the `configuredCredentials` half of
+   * `SurfaceViewerScopeResolutionOptions` (e.g. PRESENCE_STUDIO_TOKEN).
+   */
+  surfaceCredentials?: readonly SurfaceViewerConfiguredCredential[];
   /**
    * Pre-resolved JWKS document for oidc-jwt (e.g. fetched ahead of time by a
    * surface that owns network egress). Without it the provider only consults
@@ -239,7 +246,11 @@ export interface AuthnResolution {
   principal: ResolvedPrincipal;
   decision: SeamProviderDecision;
   /** Providers tried before the winner (id -> error message), for diagnostics. */
-  attempts: Array<{ provider: string; outcome: 'resolved' | 'not-mine' | 'rejected'; detail?: string }>;
+  attempts: Array<{
+    provider: string;
+    outcome: 'resolved' | 'not-mine' | 'rejected';
+    detail?: string;
+  }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -332,7 +343,11 @@ export function resolveAuthnPrincipal(
       result: 'unresolved',
       reason: decision.rationale,
     });
-    throw new AuthnError(401, 'unauthenticated', `authentication unresolved: ${decision.rationale}`);
+    throw new AuthnError(
+      401,
+      'unauthenticated',
+      `authentication unresolved: ${decision.rationale}`
+    );
   }
 
   const attempts: AuthnResolution['attempts'] = [];
@@ -378,8 +393,7 @@ export function resolveAuthnPrincipal(
   }
 
   const finalError =
-    firstRejection ??
-    new AuthnError(401, 'unauthenticated', 'no provider accepted the credential');
+    firstRejection ?? new AuthnError(401, 'unauthenticated', 'no provider accepted the credential');
   recordAuthn({
     action: 'authn_resolution',
     provider: decision.provider_id,
@@ -399,7 +413,9 @@ function safeEligibility(
   } catch (error) {
     return {
       eligible: false,
-      unmet: [`eligibility check failed: ${error instanceof Error ? error.message : String(error)}`],
+      unmet: [
+        `eligibility check failed: ${error instanceof Error ? error.message : String(error)}`,
+      ],
     };
   }
 }
@@ -408,10 +424,7 @@ function safeEligibility(
 // Shared helpers for providers
 // ---------------------------------------------------------------------------
 
-export function authnEnvText(
-  deps: AuthnResolveDeps | undefined,
-  name: string
-): string | undefined {
+export function authnEnvText(deps: AuthnResolveDeps | undefined, name: string): string | undefined {
   return getRegisteredEnvText(name, deps?.env ? { env: deps.env } : undefined);
 }
 

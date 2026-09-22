@@ -52,7 +52,7 @@ export function parseDeliverableReviewInput(
   return {
     artifactId: artifactId.trim(),
     verdict: verdict as DeliverableVerdict,
-    comment: comment ?? '',
+    comment: typeof comment === 'string' ? comment : '',
     ...(reasonCategory ? { reasonCategory } : {}),
     ...(typeof tenant === 'string' && tenant.trim() ? { tenant: tenant.trim() } : {}),
   };

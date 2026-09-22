@@ -133,7 +133,7 @@ function parseWorkflowStep(value: unknown): ClientPlanPreview['workflow'][number
     actuator: value.actuator,
     phase: value.phase,
     ...(value.requires_confirmation !== undefined
-      ? { requires_confirmation: value.requires_confirmation }
+      ? { requires_confirmation: value.requires_confirmation as boolean }
       : {}),
     ...(value.input_refs !== undefined ? { input_refs: value.input_refs } : {}),
     ...(value.output_refs !== undefined ? { output_refs: value.output_refs } : {}),
@@ -151,8 +151,8 @@ function parseAssignment(value: unknown): ClientPlanPreviewAssignment | undefine
   }
   return {
     team_role: value.team_role,
-    status: value.status,
-    agent_id: value.agent_id,
+    status: value.status as 'assigned' | 'standby' | 'unfilled',
+    agent_id: value.agent_id as string | null,
   };
 }
 
@@ -222,14 +222,15 @@ function parsePreview(value: unknown): ClientPlanPreview | undefined {
     confidence: value.confidence,
     goal: { summary: value.goal.summary, successCondition: value.goal.successCondition },
     delivery: {
-      mode: value.delivery.mode,
+      mode: value.delivery.mode as 'one_shot' | 'managed_program',
       requiresApproval: value.delivery.requiresApproval,
       clarificationNeeded: value.delivery.clarificationNeeded,
       askHumanToConfirm: value.delivery.askHumanToConfirm,
       rationale: value.delivery.rationale,
     },
     execution: {
-      shape: value.execution.shape,
+      shape: value.execution.shape as
+        'direct_reply' | 'task_session' | 'pipeline' | 'mission' | 'project_bootstrap',
       ...(value.execution.taskType !== undefined ? { taskType: value.execution.taskType } : {}),
       requiredInputs: value.execution.requiredInputs,
       missingInputs: value.execution.missingInputs,

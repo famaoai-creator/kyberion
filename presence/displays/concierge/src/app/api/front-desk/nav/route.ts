@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { frontDeskRoleFromViewer } from '@agent/core/front-desk-nav';
 import {
   buildFrontDeskNavPayload,
   resolveFrontDeskNavLocale,
 } from '../../../../lib/front-desk-nav';
+import { resolveConciergeFrontDeskRole } from '../../../../lib/front-desk-member';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 
 /**
@@ -21,7 +21,10 @@ export function GET(req: NextRequest) {
   if (resolved.response) return resolved.response;
   try {
     const locale = resolveFrontDeskNavLocale(req.nextUrl.searchParams.get('locale'));
-    const role = frontDeskRoleFromViewer({ role: resolved.context.role });
+    // Membership-aware role (B1): a mapped member's viewed-tenant role gates
+    // nav items — the flat viewer role alone would show owner menus to an
+    // operator whose memberships happen to be localadmin-class elsewhere.
+    const role = resolveConciergeFrontDeskRole(resolved.context);
     const payload = buildFrontDeskNavPayload({ locale, role });
     return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

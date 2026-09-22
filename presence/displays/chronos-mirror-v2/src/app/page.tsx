@@ -907,11 +907,11 @@ function ChronosMirrorV2Content() {
   );
 
   const homeCopy = useMemo(() => {
-    const counts = operatorHomeSummary?.counts || {};
-    const blocked = Number(counts.blockedMissions || 0);
-    const approvals = Number(counts.pendingApprovals || 0);
+    const counts = operatorHomeSummary?.counts;
+    const blocked = Number(counts?.blockedMissions || 0);
+    const approvals = Number(counts?.pendingApprovals || 0);
     const planned = operatorHomeSummary?.plannedMissions?.length || 0;
-    const inbox = Number(counts.unreadInbox || 0);
+    const inbox = Number(counts?.unreadInbox || 0);
     const status = operatorHomeSummary?.status;
     const statusMessage =
       status === 'blocked'
@@ -977,7 +977,7 @@ function ChronosMirrorV2Content() {
 
   const homePrimaryAction = useMemo(() => {
     if (!operatorHomeSummary) return null;
-    const counts = operatorHomeSummary.counts || {};
+    const counts = operatorHomeSummary.counts;
     const target: { targetId: string; surface: 'mission-intelligence' | 'focused-operator' } =
       counts.blockedMissions > 0
         ? { targetId: 'needs-attention', surface: 'mission-intelligence' }
@@ -1001,7 +1001,7 @@ function ChronosMirrorV2Content() {
    */
   const homeCounters = useMemo(() => {
     if (!operatorHomeSummary) return [];
-    const counts = operatorHomeSummary.counts || {};
+    const counts = operatorHomeSummary.counts;
     return [
       {
         key: 'approvals',

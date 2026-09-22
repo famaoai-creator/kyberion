@@ -69,7 +69,7 @@ export function parseCostSummary(value: unknown): CostSummary | undefined {
 
   const missionBreakdown = parseMissionBreakdown(value.missionBreakdown);
   if (!missionBreakdown) return undefined;
-  return value as CostSummary;
+  return value as unknown as CostSummary;
 }
 
 export function parseCostSummaryResponse(value: unknown): { summary: CostSummary } | undefined {

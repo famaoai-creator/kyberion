@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveRuntimeReferenceScope, resolveSafeRuntimeReferencePath } from './route';
+import { resolveRuntimeReferenceScope, resolveSafeRuntimeReferencePath } from './helpers';
 
 describe('runtime-file scope resolution', () => {
   it('uses the governed tier and tenant path segments', () => {

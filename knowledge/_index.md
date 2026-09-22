@@ -72,6 +72,7 @@
 - [Decision-Support Design Rationale](./product/architecture/decision-support-design-rationale.md) (public | famao)
 - [Enterprise Operating Kernel](./product/architecture/enterprise-operating-kernel.md) (public | Ecosystem Architect)
 - [Execution Improvement Report](./product/architecture/execution-improvement-report.md) (public | Unknown)
+- [External Identity → Member Mapping and the Human Role Model](./product/architecture/external-identity-member-mapping.md) (public | ecosystem_architect)
 - [Gateway Coordination Model](./product/architecture/gateway-coordination-model.md) (public | Ecosystem Architect)
 - [Hardening Backlog](./product/architecture/hardening-backlog.md) (public | Ecosystem Architect)
 - [Harness Adoption Plan 2026-05](./product/architecture/harness-adoption-plan-2026-05.md) (public | Ecosystem Architect)

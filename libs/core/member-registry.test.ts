@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as pathResolver from './path-resolver.js';
-import { safeRmSync } from './secure-io.js';
+import { safeRmSync, safeWriteFile } from './secure-io.js';
 import { writeTenantProfile } from './tenant-registry.js';
 
 vi.mock('./operator-identity.js', () => ({
@@ -14,8 +14,11 @@ vi.mock('./operator-identity.js', () => ({
 
 import {
   ensureOwnerMember,
+  externalIdentityBindingDenied,
+  findMemberByExternalIdentity,
   isValidMemberId,
   listMemberIds,
+  memberBindingDenied,
   memberProfilePath,
   ownerAccountableHumanId,
   readMemberProfile,
@@ -254,11 +257,270 @@ describe('member-registry', () => {
         resolveMemberByPrincipal({ source: 'anonymous' }, { rootDir: fixtureRoot })
       ).toBeNull();
     });
+
+    it('resolves an authn-verified memberId directly (OIDC-mapped member)', () => {
+      writeMemberProfile(makeMember({ member_id: 'dave' }), { rootDir: fixtureRoot });
+      const resolved = resolveMemberByPrincipal(
+        { source: 'token', memberId: 'dave' },
+        { rootDir: fixtureRoot }
+      );
+      expect(resolved?.member_id).toBe('dave');
+    });
+
+    it('a memberId binding never falls back to label or loopback resolution', () => {
+      writeMemberProfile(makeMember({ member_id: 'owner' }), { rootDir: fixtureRoot });
+      writeMemberProfile(
+        makeMember({ member_id: 'bob', access_registrations: [{ label: 'bob-token' }] }),
+        { rootDir: fixtureRoot }
+      );
+      // Missing member id: must not resolve the owner via loopback or bob via label.
+      expect(
+        resolveMemberByPrincipal(
+          { source: 'loopback', memberId: 'ghost' },
+          { rootDir: fixtureRoot }
+        )
+      ).toBeNull();
+      expect(
+        resolveMemberByPrincipal(
+          { source: 'token', memberId: 'ghost', registrationLabel: 'bob-token' },
+          { rootDir: fixtureRoot }
+        )
+      ).toBeNull();
+    });
+
+    it('a suspended member never resolves via memberId', () => {
+      writeMemberProfile(makeMember({ member_id: 'eve', status: 'suspended' }), {
+        rootDir: fixtureRoot,
+      });
+      expect(
+        resolveMemberByPrincipal({ source: 'token', memberId: 'eve' }, { rootDir: fixtureRoot })
+      ).toBeNull();
+    });
+
+    it('the label scan skips a corrupt profile instead of aborting', () => {
+      const isolatedRoot = path.join(fixtureRoot, `corrupt-label-${randomUUID()}`);
+      writeMemberProfile(
+        makeMember({ member_id: 'aaa-first', access_registrations: [{ label: 'aaa-token' }] }),
+        { rootDir: isolatedRoot }
+      );
+      writeMemberProfile(
+        makeMember({ member_id: 'bob', access_registrations: [{ label: 'bob-token' }] }),
+        { rootDir: isolatedRoot }
+      );
+      // Corrupt the alphabetically-first profile — the scan must keep going
+      // so one bad file can't hide a suspended binding or break resolution.
+      const corruptPath = memberProfilePath('aaa-first', { rootDir: isolatedRoot });
+      safeWriteFile(corruptPath, '{not json', { encoding: 'utf8' });
+      expect(
+        resolveMemberByPrincipal(
+          { source: 'token', registrationLabel: 'bob-token' },
+          { rootDir: isolatedRoot }
+        )?.member_id
+      ).toBe('bob');
+    });
+  });
+
+  describe('memberBindingDenied', () => {
+    it('returns true for an asserted memberId that did not resolve', () => {
+      expect(
+        memberBindingDenied({ source: 'token', memberId: 'ghost' }, { rootDir: fixtureRoot })
+      ).toBe(true);
+    });
+
+    it('returns true when a suspended member binds the registration label', () => {
+      writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          status: 'suspended',
+          access_registrations: [{ label: 'carol-token' }],
+        }),
+        { rootDir: fixtureRoot }
+      );
+      expect(
+        memberBindingDenied(
+          { source: 'token', registrationLabel: 'carol-token' },
+          { rootDir: fixtureRoot }
+        )
+      ).toBe(true);
+    });
+
+    it('returns false for a label bound to no member', () => {
+      expect(
+        memberBindingDenied(
+          { source: 'token', registrationLabel: 'unbound-token' },
+          { rootDir: fixtureRoot }
+        )
+      ).toBe(false);
+    });
+
+    it('fails closed when a profile is unreadable — the binding cannot be disproven', () => {
+      const isolatedRoot = path.join(fixtureRoot, `corrupt-denied-${randomUUID()}`);
+      writeMemberProfile(makeMember({ member_id: 'aaa-first' }), { rootDir: isolatedRoot });
+      const corruptPath = memberProfilePath('aaa-first', { rootDir: isolatedRoot });
+      safeWriteFile(corruptPath, '{not json', { encoding: 'utf8' });
+      // Any unreadable profile denies — it may be the suspended binding.
+      expect(
+        memberBindingDenied(
+          { source: 'token', registrationLabel: 'any-token' },
+          { rootDir: isolatedRoot }
+        )
+      ).toBe(true);
+    });
   });
 
   describe('ownerAccountableHumanId', () => {
     it('is the owner actor id', () => {
       expect(ownerAccountableHumanId()).toBe('user:owner');
+    });
+  });
+
+  describe('findMemberByExternalIdentity', () => {
+    const ISS = 'https://accounts.google.com';
+
+    it('resolves an active member by issuer + subject', () => {
+      writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          external_identities: [{ issuer: ISS, subject: 'sub-123', email: 'c@example.com' }],
+        }),
+        { rootDir: fixtureRoot }
+      );
+      const resolved = findMemberByExternalIdentity(ISS, 'sub-123', { rootDir: fixtureRoot });
+      expect(resolved?.member_id).toBe('carol');
+    });
+
+    it('returns null when the subject is bound under a different issuer', () => {
+      writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          external_identities: [{ issuer: 'https://other-idp.example', subject: 'sub-123' }],
+        }),
+        { rootDir: fixtureRoot }
+      );
+      expect(findMemberByExternalIdentity(ISS, 'sub-123', { rootDir: fixtureRoot })).toBeNull();
+    });
+
+    it('returns null for a suspended member (resolves as unregistered)', () => {
+      writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          status: 'suspended',
+          external_identities: [{ issuer: ISS, subject: 'sub-123' }],
+        }),
+        { rootDir: fixtureRoot }
+      );
+      expect(findMemberByExternalIdentity(ISS, 'sub-123', { rootDir: fixtureRoot })).toBeNull();
+    });
+
+    it('externalIdentityBindingDenied flags the suspended binding findMemberByExternalIdentity skips', () => {
+      writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          status: 'suspended',
+          external_identities: [{ issuer: ISS, subject: 'sub-123' }],
+        }),
+        { rootDir: fixtureRoot }
+      );
+      // The fail-closed companion: "unregistered" must not mean "degrade to
+      // ext-" when the identity is bound to a suspended member.
+      expect(externalIdentityBindingDenied(ISS, 'sub-123', { rootDir: fixtureRoot })).toBe(true);
+      // Active binding → not denied (it resolves).
+      writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          status: 'active',
+          external_identities: [{ issuer: ISS, subject: 'sub-123' }],
+        }),
+        { rootDir: fixtureRoot }
+      );
+      expect(externalIdentityBindingDenied(ISS, 'sub-123', { rootDir: fixtureRoot })).toBe(false);
+      expect(externalIdentityBindingDenied(ISS, 'nobody', { rootDir: fixtureRoot })).toBe(false);
+      expect(externalIdentityBindingDenied('', 'sub-123', { rootDir: fixtureRoot })).toBe(false);
+    });
+
+    it('returns null when no member binds the identity', () => {
+      writeMemberProfile(makeMember({ member_id: 'carol' }), { rootDir: fixtureRoot });
+      expect(findMemberByExternalIdentity(ISS, 'nobody', { rootDir: fixtureRoot })).toBeNull();
+    });
+
+    it('skips a corrupt profile instead of aborting the scan', () => {
+      writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          external_identities: [{ issuer: ISS, subject: 'sub-123' }],
+        }),
+        { rootDir: fixtureRoot }
+      );
+      // Plant a profile whose file cannot parse — earlier members must not
+      // take every other external login down with them.
+      const corruptRoot = path.join(fixtureRoot, `corrupt-${randomUUID()}`);
+      writeMemberProfile(makeMember({ member_id: 'aaa-first' }), { rootDir: corruptRoot });
+      writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          external_identities: [{ issuer: ISS, subject: 'sub-123' }],
+        }),
+        { rootDir: corruptRoot }
+      );
+      const corruptPath = memberProfilePath('aaa-first', { rootDir: corruptRoot });
+      safeWriteFile(corruptPath, '{not json', { encoding: 'utf8' });
+      expect(
+        findMemberByExternalIdentity(ISS, 'sub-123', { rootDir: corruptRoot })?.member_id
+      ).toBe('carol');
+    });
+  });
+
+  describe('external identity uniqueness', () => {
+    const ISS = 'https://accounts.google.com';
+
+    it('rejects a second member binding the same issuer + subject', () => {
+      writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          external_identities: [{ issuer: ISS, subject: 'sub-123' }],
+        }),
+        { rootDir: fixtureRoot }
+      );
+      expect(() =>
+        writeMemberProfile(
+          makeMember({
+            member_id: 'mallory',
+            external_identities: [{ issuer: ISS, subject: 'sub-123' }],
+          }),
+          { rootDir: fixtureRoot }
+        )
+      ).toThrow(/already bound/);
+    });
+
+    it('allows the same member to update its own identity list', () => {
+      writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          external_identities: [{ issuer: ISS, subject: 'sub-123' }],
+        }),
+        { rootDir: fixtureRoot }
+      );
+      const updated = writeMemberProfile(
+        makeMember({
+          member_id: 'carol',
+          external_identities: [{ issuer: ISS, subject: 'sub-123' }],
+          display_name: 'Carol C.',
+        }),
+        { rootDir: fixtureRoot }
+      );
+      expect(updated.display_name).toBe('Carol C.');
+    });
+  });
+
+  describe('ext- member id reservation', () => {
+    it('rejects member ids in the reserved ext- namespace at write time', () => {
+      expect(() =>
+        writeMemberProfile(makeMember({ member_id: 'ext-deadbeef' }), { rootDir: fixtureRoot })
+      ).toThrow(/invalid member id/);
+    });
+
+    it('an ext- actor id never resolves to a member', () => {
+      expect(resolveAccountableHuman('user:ext-deadbeef', { rootDir: fixtureRoot })).toBeNull();
     });
   });
 

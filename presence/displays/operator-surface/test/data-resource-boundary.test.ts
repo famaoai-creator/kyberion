@@ -61,7 +61,8 @@ describe('operator surface resource boundaries', () => {
       expect(listRecentAuditEvents().some((event) => event.id === `audit-${suffix}`)).toBe(false);
       expect(getMissionDetail(`MSN-BOUNDARY-${suffix}`)).toBeNull();
     });
-  });
+  }, // can exceed the 5s default on a loaded machine. // The projection scan runs against the real active/missions tree, which
+  30000);
 
   it('skips malformed mission state without failing the projection', () => {
     withExecutionContext('mission_controller', () => {

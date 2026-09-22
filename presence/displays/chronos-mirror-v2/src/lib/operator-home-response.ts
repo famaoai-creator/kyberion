@@ -292,7 +292,7 @@ export function parseOperatorHomeSummary(value: unknown): ClientOperatorHomeSumm
   ) {
     return undefined;
   }
-  return value as ClientOperatorHomeSummary;
+  return value as unknown as ClientOperatorHomeSummary;
 }
 
 export function parseOperatorHomeResponse(

@@ -8,11 +8,12 @@ import {
 import {
   defaultSurfaceViewerTierAccess,
   narrowSurfaceViewerScope,
-  resolveSurfaceViewerScope,
   SurfaceViewerScopeError,
   resolveSurfaceViewerTierAccess,
   extractSurfaceBearerToken,
 } from '@agent/core/surface-mutation-guard';
+import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface-authn';
+import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import type { EventScopeInput } from '@agent/core/event-scope';
 import { withExecutionContext } from '@agent/core/authority';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
@@ -38,6 +39,8 @@ export interface ConciergeViewerContext {
   registrationLabel?: string;
   /** FD-07: the matched registration's member_id, when it declares one. */
   memberId?: string;
+  /** The seam-resolved principal (authz policy-engine input). */
+  principal?: ResolvedPrincipal;
 }
 
 export class ConciergeViewerError extends Error {
@@ -199,7 +202,7 @@ export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewer
   const apiToken = getRegisteredEnvText('KYBERION_API_TOKEN');
   const localadminToken = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN');
   try {
-    return resolveSurfaceViewerScope({
+    const { scope, principal } = resolveAuthnSurfaceViewerScope({
       token,
       local,
       serverTenant: serverTenant(),
@@ -214,7 +217,9 @@ export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewer
         localadmin: 'human:concierge-localadmin',
         readonly: 'human:concierge-token',
       },
+      surface: 'concierge',
     });
+    return { ...scope, principal };
   } catch (error) {
     if (!(error instanceof SurfaceViewerScopeError)) throw error;
     let message = error.message;
@@ -284,6 +289,8 @@ export function toSurfaceAuthorizationContext(
     tierAccess: maskPersonalTier(viewer.tierAccess),
     principalId: viewer.principalId,
     source: viewer.source,
+    ...(viewer.principal ? { principal: viewer.principal } : {}),
+    ...(viewer.memberId ? { memberId: viewer.memberId } : {}),
   };
 }
 

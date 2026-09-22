@@ -195,7 +195,12 @@ export function registerHearingMissionRoutes(app: express.Express): void {
       }
 
       const member = withExecutionContext('ecosystem_architect', () =>
-        resolveMemberByPrincipal({ principalId: viewer.principalId, source: viewer.source })
+        resolveMemberByPrincipal({
+          principalId: viewer.principalId,
+          source: viewer.source,
+          registrationLabel: viewer.principal?.registrationLabel,
+          memberId: viewer.principal?.memberId,
+        })
       );
       if (!member) {
         throw new PresenceStudioViewerError(

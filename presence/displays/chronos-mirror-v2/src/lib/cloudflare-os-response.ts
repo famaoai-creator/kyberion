@@ -74,9 +74,11 @@ function parseHeldAction(value: unknown): HeldAction | undefined {
     submittedAt: value.submittedAt,
     submittedBy: value.submittedBy,
     ...(tenantSlug ? { tenantSlug } : {}),
-    ...(value.irreversible !== undefined ? { irreversible: value.irreversible } : {}),
+    ...(value.irreversible !== undefined ? { irreversible: value.irreversible as boolean } : {}),
     ...(effectBinding ? { effectBinding } : {}),
-    ...(value.failureRecorded !== undefined ? { failureRecorded: value.failureRecorded } : {}),
+    ...(value.failureRecorded !== undefined
+      ? { failureRecorded: value.failureRecorded as boolean }
+      : {}),
   };
 }
 

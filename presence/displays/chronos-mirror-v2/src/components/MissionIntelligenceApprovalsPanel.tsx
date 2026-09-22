@@ -23,6 +23,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
     runMemoryPromotion,
     memoryPromotionTarget,
     expandedActionId,
+    setExpandedActionId,
     jumpToTarget,
     panelVisible,
   } = context;

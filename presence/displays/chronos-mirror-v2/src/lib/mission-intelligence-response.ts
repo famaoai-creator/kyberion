@@ -760,5 +760,5 @@ export function parseMissionIntelligenceResponse(value: unknown): IntelligencePa
   ) {
     return undefined;
   }
-  return value as IntelligencePayload;
+  return value as unknown as IntelligencePayload;
 }

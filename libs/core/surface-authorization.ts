@@ -6,6 +6,8 @@
  * Client supplied scope values must be narrowed before they reach this API.
  */
 
+import type { ResolvedPrincipal } from './authn-principal-resolver.js';
+
 export type SurfaceAuthorizationRole = 'readonly' | 'localadmin';
 export type SurfaceAuthorizationEffect = 'read' | 'write';
 export type SurfacePermission =
@@ -23,6 +25,12 @@ export interface SurfaceAuthorizationContext {
   tierAccess: readonly string[];
   principalId?: string;
   source?: 'token' | 'loopback' | 'anonymous';
+  /** The authenticated principal this context was projected from, when the
+   * authn seam resolved one — lets the authz policy engine reuse actor /
+   * member claims instead of a synthesized principal. */
+  principal?: ResolvedPrincipal;
+  /** Member id declared by the matched token registration (FD-07). */
+  memberId?: string;
 }
 
 export interface SurfaceAuthorizationResource {

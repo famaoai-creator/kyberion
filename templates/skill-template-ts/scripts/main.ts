@@ -9,7 +9,7 @@ import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 
 async function main() {
-  await runSkillAsync('{{SKILL_NAME}}', async (args: any) => {
+  await runSkillAsync('{{SKILL_NAME}}', async () => {
     logger.info('Executing {{SKILL_NAME}}...');
 
     void safeReadFile;

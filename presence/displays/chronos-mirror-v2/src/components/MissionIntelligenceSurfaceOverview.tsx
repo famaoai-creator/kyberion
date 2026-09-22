@@ -6,12 +6,17 @@ import {
   attentionReasonLabel,
   attentionSourceLabel,
 } from './MissionIntelligenceViewHelpers';
-import { MiniSummaryCard, Panel } from './MissionIntelligencePrimitives';
+import { MetricCard, MiniSummaryCard, Panel } from './MissionIntelligencePrimitives';
+import { chronosSpeechLocale } from '../lib/ux-vocabulary';
 
 export function MissionIntelligenceSurfaceOverview(context: Record<string, any>) {
   const {
     workspace,
     focusedView,
+    onClearFocus,
+    locale,
+    buildMissionIntentSummary,
+    resolveNextActionRoute,
     selectedProject,
     selectedMissionId,
     showMissionDetails,

@@ -19,11 +19,15 @@ import {
   type TenantProfile,
   type TenantRegistryPathOptions,
 } from './tenant-registry.js';
-import { resolveMemberByPrincipal, type MemberRegistryPathOptions } from './member-registry.js';
+import {
+  memberBindingDenied,
+  resolveMemberByPrincipal,
+  type MemberRegistryPathOptions,
+} from './member-registry.js';
 import { narrowSurfaceViewerTenant, type SurfaceViewerScope } from './surface-mutation-guard.js';
 
 /** Human-facing role union (plan §2.3). `approver` arrives with FD-07. */
-export type FrontDeskRole = 'owner' | 'approver' | 'viewer';
+export type FrontDeskRole = 'owner' | 'approver' | 'operator' | 'viewer';
 
 /**
  * FD-07: a member resolved by `resolveMemberByPrincipal`, projected to the
@@ -80,6 +84,11 @@ export interface BuildFrontDeskMeInput {
   tenantProfiles: readonly TenantProfile[];
   /** FD-07: caller-resolved member (resolveMemberByPrincipal). null/absent = unregistered principal, legacy behavior. */
   member?: FrontDeskResolvedMember | null;
+  /** The principal asserts a member binding that could not be verified
+   * (suspended/missing member, unreadable registry). Tenant roles fall to
+   * `viewer` — never the legacy localadmin→owner fallback, which would be
+   * an upgrade for a suspended localadmin-class credential. */
+  memberDenied?: boolean;
 }
 
 /**
@@ -133,7 +142,7 @@ function resolveViewing(
 /** Pure: combines a trusted viewer scope with caller-loaded tenant profiles. No I/O. */
 export function buildFrontDeskMe(input: BuildFrontDeskMeInput): FrontDeskMe {
   const { scope, tenantProfiles, availableOperations, onboarded, member } = input;
-  const legacyRole = frontDeskRoleFromViewerScope(scope);
+  const legacyRole = input.memberDenied ? 'viewer' : frontDeskRoleFromViewerScope(scope);
   const isLoopback = scope.source === 'loopback';
   const allowedSlugs = scope.tenantSlugs === 'all' ? null : new Set(scope.tenantSlugs);
 
@@ -208,20 +217,24 @@ export function readFrontDeskMe(
     .map((slug) => readTenantProfile(slug, registryOptions))
     .filter((profile): profile is TenantProfile => profile !== null);
 
+  const memberInput = {
+    principalId: scope.principalId,
+    source: scope.source,
+    registrationLabel: scope.registrationLabel,
+    memberId: scope.memberId,
+  };
   let resolvedMember;
+  let memberDenied = false;
   try {
-    resolvedMember = resolveMemberByPrincipal(
-      {
-        principalId: scope.principalId,
-        source: scope.source,
-        registrationLabel: scope.registrationLabel,
-      },
-      memberRegistryOptions
-    );
+    resolvedMember = resolveMemberByPrincipal(memberInput, memberRegistryOptions);
+    memberDenied = !resolvedMember && memberBindingDenied(memberInput, memberRegistryOptions);
   } catch {
-    // A corrupt/unreadable member profile must never break /api/me — fall
-    // back to the pre-FD-07 unregistered-principal behavior.
+    // A corrupt/unreadable member profile must never break /api/me — but an
+    // asserted binding (memberId or a registration label that could be a
+    // suspended member's) cannot be disproven either, so it is denied, not
+    // "unregistered".
     resolvedMember = null;
+    memberDenied = Boolean(scope.memberId || scope.registrationLabel);
   }
 
   const member: FrontDeskResolvedMember | null = resolvedMember
@@ -251,5 +264,6 @@ export function readFrontDeskMe(
     writeTenant,
     tenantProfiles,
     member,
+    memberDenied,
   });
 }

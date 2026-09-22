@@ -208,19 +208,20 @@ function hearingResponseError(req: Request, res: Response, error: unknown): void
 }
 
 /** FD-10 (plan §2.5 principle 4): the deciding member's role comes from
- * their own per-tenant membership when one exists for the hearing's
- * namespace tenant, else the viewer-scope fallback (`frontDeskRoleFromViewerScope`)
- * `readFrontDeskMe` already uses for an unresolved-membership loopback owner. */
+ * their own per-tenant membership for the hearing's namespace tenant. A
+ * resolved member holding no membership there is a `viewer` — the viewer-
+ * scope fallback would misattribute owner/localadmin authority the member
+ * does not hold on that tenant (B4). The 'all'/'unscoped' namespace keeps
+ * the pre-FD-10 viewer-scope fallback (`frontDeskRoleFromViewerScope`). */
 function resolveHearingDeciderRole(
   member: { memberships: ReadonlyArray<{ tenant_slug: string; role: FrontDeskRole }> },
   namespace: string,
   viewer: PresenceStudioViewerContext
 ): FrontDeskRole {
-  const membership =
-    namespace !== 'all' && namespace !== 'unscoped'
-      ? member.memberships.find((item) => item.tenant_slug === namespace)
-      : undefined;
-  if (membership) return membership.role;
+  if (namespace !== 'all' && namespace !== 'unscoped') {
+    const membership = member.memberships.find((item) => item.tenant_slug === namespace);
+    return membership?.role ?? 'viewer';
+  }
   return frontDeskRoleFromViewerScope(toFrontDeskViewerScope(viewer));
 }
 
@@ -484,7 +485,12 @@ export function registerHearingRoutes(app: express.Express): void {
         );
       }
       const member = withExecutionContext('ecosystem_architect', () =>
-        resolveMemberByPrincipal({ principalId: viewer.principalId, source: viewer.source })
+        resolveMemberByPrincipal({
+          principalId: viewer.principalId,
+          source: viewer.source,
+          registrationLabel: viewer.principal?.registrationLabel,
+          memberId: viewer.principal?.memberId,
+        })
       );
       if (!member) {
         throw new PresenceStudioViewerError(
@@ -493,6 +499,13 @@ export function registerHearingRoutes(app: express.Express): void {
         );
       }
       const role = resolveHearingDeciderRole(member, namespace, viewer);
+      if (role !== 'owner' && role !== 'approver') {
+        // Positive allowlist: only decision-capable membership roles may
+        // record a decision (`surface.decision.write` is granted to owner and
+        // approver only — front-desk-roles.ts). Operators execute but never
+        // decide; viewers observe.
+        throw new PresenceStudioViewerError(403, 'this member role cannot record decisions');
+      }
       const actor = humanActor(member.member_id, member.display_name);
       const decidedBy: HearingDecidedBy = {
         kind: 'human',

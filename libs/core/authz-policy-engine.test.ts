@@ -1,11 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeExistsSync,
-  safeMkdir,
-  safeRmSync,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { AuthzQuery } from './authz-policy-engine.js';
 import type { ResolvedPrincipal } from './authn-principal-resolver.js';
 
@@ -41,9 +36,7 @@ vi.mock('./seam-selection-rules.js', () => ({
       (rule) =>
         rule.seam === seam &&
         (!rule.when.purpose || rule.when.purpose === request.purpose) &&
-        Object.entries(rule.when.context ?? {}).every(
-          ([k, v]) => request.context?.[k] === v
-        )
+        Object.entries(rule.when.context ?? {}).every(([k, v]) => request.context?.[k] === v)
     ) ?? null,
   getSeamTraitOverrides: (seam: string) => overlay.overrides[seam] ?? {},
 }));
@@ -54,12 +47,7 @@ vi.mock('./audit-chain.js', () => ({
 
 vi.mock('./provider-pins-store.js', () => ({
   loadSeamProviderPin: (seam: string, key: string) => pins.get(`${seam}:${key}`) ?? null,
-  pinSeamProviderDecision: (
-    seam: string,
-    key: string,
-    providerId: string,
-    purpose?: string
-  ) => {
+  pinSeamProviderDecision: (seam: string, key: string, providerId: string, purpose?: string) => {
     const entry = {
       seam,
       provider_id: providerId,
@@ -148,9 +136,11 @@ function writeMember(member: Record<string, unknown>): string {
 
 describe('authz seam — registry and selection', () => {
   it('registers all five built-in providers', () => {
-    expect(listAuthzProviders().map((p) => p.id).sort()).toEqual(
-      [...BUILTIN_AUTHZ_PROVIDER_IDS].sort()
-    );
+    expect(
+      listAuthzProviders()
+        .map((p) => p.id)
+        .sort()
+    ).toEqual([...BUILTIN_AUTHZ_PROVIDER_IDS].sort());
   });
 
   it('fails closed (deny) when no provider is eligible', () => {
@@ -259,6 +249,38 @@ describe('authz provider — member-membership', () => {
     expect(resolution.authorization).toMatchObject({
       allowed: true,
       provider: 'member-membership',
+    });
+  });
+
+  it('grants the write effect to an operator member', () => {
+    const root = memberFixture('operator');
+    const resolution = authorizeWithPolicyEngine(
+      {
+        principal: principal(),
+        operation: { operationId: 'surface.exec', effect: 'write' },
+        resource: { tenantSlug: 'default' },
+      },
+      { purpose: 'membership', deps: { env: {}, memberRegistry: { rootDir: root } } }
+    );
+    expect(resolution.authorization).toMatchObject({
+      allowed: true,
+      provider: 'member-membership',
+    });
+  });
+
+  it('denies the decide effect to an operator member', () => {
+    const root = memberFixture('operator');
+    const resolution = authorizeWithPolicyEngine(
+      {
+        principal: principal(),
+        operation: { operationId: 'front-desk.approve', effect: 'decide' },
+        resource: { tenantSlug: 'default' },
+      },
+      { purpose: 'membership', deps: { env: {}, memberRegistry: { rootDir: root } } }
+    );
+    expect(resolution.authorization).toMatchObject({
+      allowed: false,
+      reasonCode: 'permission_denied',
     });
   });
 
@@ -394,9 +416,7 @@ describe('authz provider — policy-file', () => {
   });
 
   it('denies when no rule matches', () => {
-    const file = writePolicy([
-      { rule_id: 'r1', decision: 'allow', operations: ['other.*'] },
-    ]);
+    const file = writePolicy([{ rule_id: 'r1', decision: 'allow', operations: ['other.*'] }]);
     const resolution = authorizeWithPolicyEngine(
       {
         principal: principal(),
@@ -432,7 +452,10 @@ describe('authz provider — policy-file', () => {
 describe('authz providers — allow-all / deny-all', () => {
   it('purpose "test" selects allow-all under the Vitest harness', () => {
     const resolution = authorizeWithPolicyEngine(
-      { principal: principal({ role: 'readonly' }), operation: { operationId: 'x', effect: 'write' } },
+      {
+        principal: principal({ role: 'readonly' }),
+        operation: { operationId: 'x', effect: 'write' },
+      },
       { purpose: 'test', deps: { env: { VITEST: '1' } } }
     );
     expect(resolution.authorization).toMatchObject({

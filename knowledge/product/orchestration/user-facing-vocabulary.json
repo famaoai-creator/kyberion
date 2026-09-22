@@ -10641,6 +10641,11 @@
         "ja": "承認者",
         "qps-ploc": "⟦Ȧṗṗřőṽėř ŀőř⟧"
       },
+      "role_operator": {
+        "en": "Operator",
+        "ja": "オペレーター",
+        "qps-ploc": "⟦Őṗėřȧŧőř ŀőř⟧"
+      },
       "role_viewer": {
         "en": "Viewer",
         "ja": "閲覧",

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
+import type { ManualDriveExecutionResult } from '@agent/core/agent-runtime-manual-drive';
 
 const viewer = {
   context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
@@ -84,7 +85,7 @@ describe('chronos agents route input boundary', () => {
         title: 'Run hook',
         status: 'ready',
       })),
-      executeAction: vi.fn(async () => ({
+      executeAction: vi.fn(async (): Promise<ManualDriveExecutionResult> => ({
         status: 'executed',
         action: {
           action_id: 'step-1',

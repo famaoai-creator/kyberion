@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveMissionAssetTenant, resolveMissionAssetTier } from './route';
+import { resolveMissionAssetTenant, resolveMissionAssetTier } from './helpers';
 
 describe('mission-asset tier resolution', () => {
   it('derives the tier from a canonical repo-relative asset path', () => {

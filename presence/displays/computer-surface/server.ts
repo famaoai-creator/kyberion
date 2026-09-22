@@ -1,10 +1,9 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { createServer } from 'node:http';
 import * as path from 'node:path';
-import {
-  assertSurfaceOperation,
-  type SurfaceAuthorizationContext,
-} from '@agent/core/surface-authorization';
+import { type SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+import { authorizeSurfaceContextOperation } from '@agent/core/surface-authn';
 import {
   buildComputerSurfaceManifest,
   filterHeadlessManifestForViewer,
@@ -33,6 +32,7 @@ import {
   assertComputerSurfacePayloadInScope,
   computerSurfaceServerTenantResource,
   ComputerSurfaceViewerError,
+  isComputerSurfaceLoopbackRequest,
   resolveComputerSurfaceViewerContext,
 } from './auth.js';
 import {
@@ -122,22 +122,22 @@ function authorizeSurface(
     return null;
   }
 
-  try {
-    assertSurfaceOperation({
-      context,
-      operation: {
-        operationId: operation.operation_id,
-        effect: operation.effect,
-        requiredRole: operation.required_role,
-        requiredPermissions: operation.required_permissions,
-      },
-      resource: { ...computerSurfaceServerTenantResource(context), ...resource },
-    });
-    return context;
-  } catch (error) {
-    res.status(403).json(computerSurfaceWireError(error, 403));
+  const authorization = authorizeSurfaceContextOperation({
+    context,
+    operation: {
+      operationId: operation.operation_id,
+      effect: operation.effect,
+      requiredRole: operation.required_role,
+      requiredPermissions: operation.required_permissions,
+    },
+    resource: { ...computerSurfaceServerTenantResource(context), ...resource },
+    surface: 'computer-surface',
+  });
+  if (!authorization.allowed) {
+    res.status(403).json(computerSurfaceWireError(authorization.reason, 403));
     return null;
   }
+  return context;
 }
 
 const state: {
@@ -214,12 +214,36 @@ function emitState(): void {
   for (const client of sseClients) client.write(chunk);
 }
 
+const RATE_LIMIT_DEFAULT_WINDOW_MS = 60_000;
+const RATE_LIMIT_DEFAULT_GET = 180;
+const RATE_LIMIT_DEFAULT_MUTATION = 60;
+
+const computerSurfaceRateLimiter = rateLimit({
+  windowMs: Number(
+    getRegisteredEnvText('COMPUTER_SURFACE_RATE_LIMIT_WINDOW_MS') || RATE_LIMIT_DEFAULT_WINDOW_MS
+  ),
+  limit: (req) =>
+    req.method === 'GET' || req.method === 'HEAD'
+      ? Number(getRegisteredEnvText('COMPUTER_SURFACE_RATE_LIMIT_GET') || RATE_LIMIT_DEFAULT_GET)
+      : Number(
+          getRegisteredEnvText('COMPUTER_SURFACE_RATE_LIMIT_MUTATION') ||
+            RATE_LIMIT_DEFAULT_MUTATION
+        ),
+  skip: (req) => isComputerSurfaceLoopbackRequest(req),
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ ok: false, error: 'Computer Surface rate limit exceeded.' });
+  },
+});
+
 if (!safeExistsSync(staticDir)) {
   safeMkdir(staticDir, { recursive: true });
 }
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(staticDir));
+app.use(['/api', '/a2ui'], computerSurfaceRateLimiter);
 
 app.get('/favicon.ico', (_req, res) => {
   res.status(204).end();
@@ -228,7 +252,13 @@ app.get('/favicon.ico', (_req, res) => {
 app.get('/api/headless/manifest', (req, res) => {
   const context = authorizeSurface(req, res, 'computer_surface.manifest.read');
   if (!context) return;
-  res.json(filterHeadlessManifestForViewer(context, computerSurfaceManifest));
+  res.json(
+    filterHeadlessManifestForViewer(
+      context,
+      computerSurfaceManifest,
+      authorizeSurfaceContextOperation
+    )
+  );
 });
 
 app.get('/api/identity', (req, res) => {

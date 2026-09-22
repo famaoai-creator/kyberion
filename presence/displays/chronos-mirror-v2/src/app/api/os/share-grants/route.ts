@@ -47,7 +47,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const parsedBody = await readChronosJsonObject(req, 'Chronos share grants');
-    if (!parsedBody.ok)
+    if (parsedBody.ok !== true)
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     let input;
     try {

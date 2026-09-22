@@ -168,7 +168,9 @@ export function parseWorkItem(value: unknown): ClientWorkItem | undefined {
     ...(value.claimed_by_user_id !== undefined
       ? { claimed_by_user_id: value.claimed_by_user_id }
       : {}),
-    ...(value.metadata !== undefined ? { metadata: value.metadata } : {}),
+    ...(value.metadata !== undefined
+      ? { metadata: value.metadata as Record<string, unknown> }
+      : {}),
   };
 }
 
@@ -244,11 +246,13 @@ export function parseWorkItemsResponse(value: unknown): ClientWorkItemsResponse 
   ) {
     return undefined;
   }
+  const quality = value.quality as
+    { explicit_context: number; migrated_context: number; missing_context: number } | undefined;
   if (
-    value.quality &&
-    (!nonNegativeInteger(value.quality.explicit_context) ||
-      !nonNegativeInteger(value.quality.migrated_context) ||
-      !nonNegativeInteger(value.quality.missing_context))
+    quality &&
+    (!nonNegativeInteger(quality.explicit_context) ||
+      !nonNegativeInteger(quality.migrated_context) ||
+      !nonNegativeInteger(quality.missing_context))
   ) {
     return undefined;
   }
@@ -260,12 +264,12 @@ export function parseWorkItemsResponse(value: unknown): ClientWorkItemsResponse 
         items,
         scope: value.scope,
         view: value.view,
-        ...(value.quality
+        ...(quality
           ? {
               quality: {
-                explicit_context: value.quality.explicit_context,
-                migrated_context: value.quality.migrated_context,
-                missing_context: value.quality.missing_context,
+                explicit_context: quality.explicit_context,
+                migrated_context: quality.migrated_context,
+                missing_context: quality.missing_context,
               },
             }
           : {}),

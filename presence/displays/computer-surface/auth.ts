@@ -1,8 +1,6 @@
 import type { Request } from 'express';
-import {
-  resolveSurfaceViewerScope,
-  SurfaceViewerScopeError,
-} from '@agent/core/surface-mutation-guard';
+import { SurfaceViewerScopeError } from '@agent/core/surface-mutation-guard';
+import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface-authn';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 
@@ -56,10 +54,15 @@ export function resolveComputerSurfaceViewerContext(
   const principalId = getRegisteredEnvText('KYBERION_COMPUTER_SURFACE_PRINCIPAL', { env }) || '';
 
   try {
-    const scope = resolveSurfaceViewerScope({
+    const { scope, principal } = resolveAuthnSurfaceViewerScope({
       token,
       local,
       serverTenant: tenant,
+      // Legacy accepted only the configured KYBERION_* tokens here — never
+      // the chronos-access registry. null keeps the registry-token provider
+      // from self-loading it (undefined would self-load and widen the
+      // accepted credential set on this surface).
+      registrations: null,
       apiToken,
       localadminToken,
       allowLoopback: getRegisteredEnvText('KYBERION_LOCALHOST_AUTOADMIN', { env }) !== 'false',
@@ -71,6 +74,8 @@ export function resolveComputerSurfaceViewerContext(
           : 'human:computer-surface-localadmin',
         readonly: 'human:computer-surface-viewer',
       },
+      surface: 'computer-surface',
+      deps: { env },
     });
     // Preserve Computer Surface's existing wire order while the shared core
     // resolver remains the sole authority for the allowed tier set.
@@ -78,6 +83,8 @@ export function resolveComputerSurfaceViewerContext(
     return {
       ...scope,
       tierAccess: tierOrder.filter((tier) => scope.tierAccess.includes(tier)),
+      principal,
+      ...(scope.memberId ? { memberId: scope.memberId } : {}),
     };
   } catch (error) {
     if (!(error instanceof SurfaceViewerScopeError)) throw error;

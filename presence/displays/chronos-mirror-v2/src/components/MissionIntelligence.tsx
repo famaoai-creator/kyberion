@@ -105,7 +105,7 @@ export function MissionIntelligence({
     cancelLabel?: string;
     onConfirm: () => Promise<void> | void;
   } | null>(null);
-  const [expandedActionId] = useState<string | null>(null);
+  const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [expandedMissionCardActionId, setExpandedMissionCardActionId] = useState<string | null>(
     null
   );
@@ -578,6 +578,7 @@ export function MissionIntelligence({
         }),
       });
       if (!res.ok) throw new Error('Memory promotion action failed');
+      const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (dryRun) {
         const pending = Array.isArray(body.pending) ? body.pending.length : 0;
         setActionResult(`memory promotion dry-run: ${pending} candidate(s)`);
@@ -1114,6 +1115,10 @@ export function MissionIntelligence({
         context={{
           workspace,
           focusedView,
+          onClearFocus,
+          locale,
+          buildMissionIntentSummary,
+          resolveNextActionRoute,
           selectedProject,
           selectedMissionId,
           showMissionDetails,
@@ -1142,11 +1147,11 @@ export function MissionIntelligence({
           runMemoryPromotion,
           runAttentionAction,
           focusTitle,
-          missionSeedAssessment,
+          missionSeedAssessment: data.missionSeedAssessment,
           memoryCandidateCount,
-          runtime,
-          runtimeLeases,
-          runtimeDoctor,
+          runtime: data.runtime,
+          runtimeLeases: data.runtimeLeases,
+          runtimeDoctor: data.runtimeDoctor,
         }}
       />
 
@@ -1182,14 +1187,14 @@ export function MissionIntelligence({
           filteredMemoryCandidatesByTrack,
           filteredMissionSeedsByTrack,
           hydratedTracks,
-          missionProgress,
-          runtime,
-          runtimeLeases,
-          runtimeDoctor,
-          runtimeTopology,
-          recentSurfaceOutbox,
-          projectManagement,
-          missionSeedAssessment,
+          missionProgress: data.missionProgress,
+          runtime: data.runtime,
+          runtimeLeases: data.runtimeLeases,
+          runtimeDoctor: data.runtimeDoctor,
+          runtimeTopology: data.runtimeTopology,
+          recentSurfaceOutbox: data.recentSurfaceOutbox,
+          projectManagement: data.projectManagement,
+          missionSeedAssessment: data.missionSeedAssessment,
           requestDangerousAction,
           clearOutboxMessage,
           createTrackSeed,
@@ -1236,11 +1241,12 @@ export function MissionIntelligence({
           locale,
           mt,
           panelVisible,
-          runtime,
-          runtimeLeases,
-          runtimeDoctor,
-          runtimeTopology,
-          recentSurfaceOutbox,
+          hideSurfaceControl,
+          runtime: data.runtime,
+          runtimeLeases: data.runtimeLeases,
+          runtimeDoctor: data.runtimeDoctor,
+          runtimeTopology: data.runtimeTopology,
+          recentSurfaceOutbox: data.recentSurfaceOutbox,
           browserSessionTarget,
           surfaceActionTarget,
           expandedSurfaceCardActionId,
@@ -1288,9 +1294,9 @@ export function MissionIntelligence({
           filteredServiceBindings,
           filteredMissionSeedsByTrack,
           hydratedTracks,
-          missionProgress,
-          projectManagement,
-          missionSeedAssessment,
+          missionProgress: data.missionProgress,
+          projectManagement: data.projectManagement,
+          missionSeedAssessment: data.missionSeedAssessment,
           selectedTrack,
         }}
       />
@@ -1318,6 +1324,8 @@ export function MissionIntelligence({
           remediationTarget,
           outboxTarget,
           expandedMissionCardActionId,
+          expandedActionId,
+          setExpandedActionId,
           selectedReferencePath,
           referenceDetail,
           referenceMetadataEntries,
@@ -1331,14 +1339,14 @@ export function MissionIntelligence({
           filteredServiceBindings,
           filteredMissionSeedsByTrack,
           hydratedTracks,
-          missionProgress,
-          runtime,
-          runtimeLeases,
-          runtimeDoctor,
-          runtimeTopology,
-          recentSurfaceOutbox,
-          projectManagement,
-          missionSeedAssessment,
+          missionProgress: data.missionProgress,
+          runtime: data.runtime,
+          runtimeLeases: data.runtimeLeases,
+          runtimeDoctor: data.runtimeDoctor,
+          runtimeTopology: data.runtimeTopology,
+          recentSurfaceOutbox: data.recentSurfaceOutbox,
+          projectManagement: data.projectManagement,
+          missionSeedAssessment: data.missionSeedAssessment,
           requestDangerousAction,
           clearOutboxMessage,
           createTrackSeed,
