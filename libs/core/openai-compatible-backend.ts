@@ -3,7 +3,7 @@ import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-
 import { readTextFile } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import {
-  safeExec,
+  safeExecShellScript,
   assertSafeRepositoryPath,
   safeReadFile,
   safeReaddir,
@@ -868,7 +868,8 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         case 'list_directory':
           return JSON.stringify(safeReaddir(assertSafeRepositoryPath(String(args.path ?? ''))));
         case 'shell_exec':
-          return safeExec('bash', ['-lc', String(args.command ?? '')], {
+          return safeExecShellScript('bash', String(args.command ?? ''), {
+            login: true,
             cwd: pathResolver.rootDir(),
           });
         default:
