@@ -64,11 +64,11 @@ export function parseKnowledgeCandidate(value: unknown): ClientKnowledgeCandidat
   }
   return {
     candidate_id: value.candidate_id,
-    status: value.status,
+    status: value.status as 'queued' | 'approved' | 'rejected' | 'promoted',
     proposed_memory_kind: value.proposed_memory_kind,
     summary: value.summary,
     evidence_refs: value.evidence_refs,
-    sensitivity_tier: value.sensitivity_tier,
+    sensitivity_tier: value.sensitivity_tier as 'personal' | 'confidential' | 'public',
     source_ref: value.source_ref,
     ...(value.tenantSlug !== undefined ? { tenantSlug: value.tenantSlug } : {}),
     ...(value.promoted_ref !== undefined ? { promoted_ref: value.promoted_ref } : {}),

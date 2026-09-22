@@ -38,8 +38,8 @@ export function parseConnectionReviewResponse(
   return {
     ok: true,
     review: {
-      action: value.review.action,
-      ...(value.review.note !== undefined ? { note: value.review.note } : {}),
+      action: value.review.action as 'approve' | 'hold' | 'delete' | 'modify',
+      ...(value.review.note !== undefined ? { note: value.review.note as string } : {}),
       reviewed_at: value.review.reviewed_at,
     },
   };

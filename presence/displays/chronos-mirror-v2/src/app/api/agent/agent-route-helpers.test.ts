@@ -11,8 +11,10 @@ import {
 describe('intentResolutionA2ui', () => {
   it('projects every operator-facing contract decision field', () => {
     const [section] = intentResolutionA2ui({
+      request_id: 'req-test-1',
       normalized_intent: 'send_message',
       missing_inputs: [],
+      resolution_shape: 'task_session',
       authority_level: 'approval_required',
       outcome_kind: 'service_change',
       next_action: {
@@ -20,6 +22,7 @@ describe('intentResolutionA2ui', () => {
         label: 'Review and approve',
         consequence: 'The message will be sent after approval.',
       },
+      rationale: 'test rationale',
     });
 
     const entries = section.props.items[0].props.entries;
@@ -34,11 +37,14 @@ describe('intentResolutionA2ui', () => {
   it('uses the requested locale for projection labels', () => {
     const [section] = intentResolutionA2ui(
       {
+        request_id: 'req-test-2',
         normalized_intent: 'answer_question',
         missing_inputs: [],
+        resolution_shape: 'direct_answer',
         authority_level: 'autonomous',
         outcome_kind: 'answer',
         next_action: { kind: 'continue', label: 'Continue', consequence: 'No side effect.' },
+        rationale: 'test rationale',
       },
       'ja'
     );

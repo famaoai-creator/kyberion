@@ -1,4 +1,4 @@
-import type { ConnectionReviewAction } from '../../../../lib/connection-review';
+import type { ConnectionReviewAction } from '../../../lib/connection-review';
 
 const ACTIONS = new Set<ConnectionReviewAction>(['approve', 'hold', 'delete', 'modify']);
 const SAFE_BINDING_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
@@ -36,7 +36,7 @@ export function parseConnectionReviewInput(value: Record<string, unknown>): Conn
   return {
     bindingId: bindingId.trim(),
     action: action as ConnectionReviewAction,
-    note: note ?? '',
+    note: typeof note === 'string' ? note : '',
     ...(typeof tenant === 'string' && tenant.trim() ? { tenant: tenant.trim() } : {}),
   };
 }

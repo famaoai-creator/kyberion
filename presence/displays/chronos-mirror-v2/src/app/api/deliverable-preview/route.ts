@@ -45,7 +45,7 @@ function missionTier(missionId?: string): OsKnowledgeTier | undefined {
   }
 }
 
-export function resolveDeliverablePreviewTier(
+function resolveDeliverablePreviewTier(
   artifact: Parameters<typeof inferDeliverableTier>[0]
 ): OsKnowledgeTier | undefined {
   const projectTier = artifact.project_id

@@ -20,5 +20,9 @@ export function parseTenantDesignResponse(value: unknown): TenantDesignResponse 
     if (!key.startsWith('--') || key.length < 3 || typeof entry !== 'string') return undefined;
     css_vars[key] = entry;
   }
-  return { source: value.source, brand_name: value.brand_name, css_vars };
+  return {
+    source: value.source,
+    brand_name: value.brand_name as string | null,
+    css_vars,
+  };
 }

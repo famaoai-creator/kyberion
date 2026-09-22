@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveSafeKnowledgeReferencePath } from './route';
+import { resolveSafeKnowledgeReferencePath } from './helpers';
 
 describe('knowledge-ref resource boundary', () => {
   it('rejects a missing or unsafe reference before reading it', () => {

@@ -11,7 +11,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
-import { uxText } from '../lib/ux-vocabulary';
+import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import { parseKnowledgeResponse, type ClientKnowledgeCandidate } from '../lib/knowledge-response';
 import {
   parseKnowledgeFeedbackResponse,
@@ -20,7 +20,7 @@ import {
 
 type Candidate = ClientKnowledgeCandidate;
 
-function knowledgeStatusLabel(value: string, locale: string): string {
+function knowledgeStatusLabel(value: string, locale: SupportedLocale): string {
   const labels: Record<string, string> = {
     queued: 'chronos_knowledge_status_queued',
     approved: 'chronos_knowledge_status_approved',

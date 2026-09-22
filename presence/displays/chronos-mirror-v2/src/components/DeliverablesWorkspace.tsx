@@ -12,7 +12,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useChronosLocale } from '../lib/hooks';
-import { formatChronosDateTime, uxText } from '../lib/ux-vocabulary';
+import { formatChronosDateTime, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import {
   parseDeliverablesResponse,
   type ClientDeliverable as Deliverable,
@@ -61,7 +61,7 @@ function isPdfAsset(item: Deliverable): boolean {
   return extension(item) === 'pdf';
 }
 
-function reviewLabel(verdict: string | undefined, locale: string): string {
+function reviewLabel(verdict: string | undefined, locale: SupportedLocale): string {
   if (!verdict) return uxText('chronos_not_reviewed', locale);
   if (verdict === 'accept') return uxText('chronos_approve', locale);
   if (verdict === 'request-changes') return uxText('chronos_request_changes', locale);

@@ -182,7 +182,7 @@ export function parseShareGrantInput(value: unknown): ShareGrantRequestInput {
         operation,
         resourceRef: requiredString(record, 'resourceRef'),
         role: enumValue(record, 'role', SHARE_GRANT_ROLES),
-        ...(ttlMs !== undefined ? { ttlMs } : {}),
+        ...(typeof ttlMs === 'number' ? { ttlMs } : {}),
         ...(expiresAt ? { expiresAt } : {}),
         ...(audienceFloor ? { audienceFloor } : {}),
       };
