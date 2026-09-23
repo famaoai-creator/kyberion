@@ -43,7 +43,10 @@ import {
   installManagedMlxWhisperStreamingSttBridgeIfAvailable,
   installShellStreamingSttBridgeFromEnv,
 } from '@agent/core/shell-streaming-stt-bridge';
-import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import {
+  getInstalledReasoningMode,
+  installReasoningBackends,
+} from '@agent/core/reasoning-bootstrap';
 import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell-streaming-tts-bridge';
 import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
 import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
@@ -55,10 +58,15 @@ import { recordVadTurn, type VadTurnState } from '@agent/core/vad-turn-recorder'
 import { resolveManagedToolPythonBin } from '@agent/core/tool-runtime-registry';
 import { resolveVadBackend } from '@agent/core/vad-registry';
 import {
+  costTierForReasoningMode,
   describeRealtimeVoiceLoopEvent,
+  detectVoicePowerSource,
   resolveRealtimeVoiceBargeInMode,
+  resolveSpeculativePolicy,
   startRealtimeVoiceLoop,
   type RealtimeVoiceBargeInMode,
+  type VoiceCostTier,
+  type VoicePowerSource,
 } from '@agent/core/realtime-voice-loop';
 import type { StreamingSpeechToTextBridge } from '@agent/core/streaming-stt-bridge';
 import type { StreamingTextToSpeechBridge } from '@agent/core/streaming-tts-bridge';
@@ -518,6 +526,24 @@ export function defaultBargeInMode(
   return options.latencyProfile !== 'balanced' && streamingSttAvailable ? 'two_stage' : 'off';
 }
 
+/**
+ * Inputs of the speculative-reply battery/metered guard: the host power source
+ * and the cost tier of the installed reasoning backend (unknown ⇒ metered).
+ */
+export function resolveSpeculativeReplyGuards(
+  input: {
+    reasoningMode?: string | null;
+    detectPowerSource?: () => VoicePowerSource;
+  } = {}
+): { powerSource: VoicePowerSource; costTier: VoiceCostTier } {
+  const mode =
+    input.reasoningMode !== undefined ? input.reasoningMode : getInstalledReasoningMode();
+  return {
+    powerSource: (input.detectPowerSource ?? (() => detectVoicePowerSource()))(),
+    costTier: costTierForReasoningMode(mode),
+  };
+}
+
 export async function runRealtimeVoiceConversationLoop(
   options: RealtimeVoiceConversationCliOptions,
   print: (value: unknown) => void = () => undefined
@@ -716,9 +742,13 @@ export async function runRealtimeVoiceConversationLoop(
       bargeIn: { mode: bargeInMode },
       eotHold: { enabled: options.eotHold ?? true },
       respondGate: { enabled: options.respondGate ?? true },
-      ...(options.speculativeReply !== undefined
-        ? { speculativeReply: { enabled: options.speculativeReply } }
-        : {}),
+      speculativeReply: {
+        ...(options.speculativeReply !== undefined ? { enabled: options.speculativeReply } : {}),
+        // Probe power/cost only when speculation is actually requested (pmset is synchronous).
+        ...(resolveSpeculativePolicy({ option: options.speculativeReply, env: process.env }).enabled
+          ? resolveSpeculativeReplyGuards()
+          : {}),
+      },
       ...(options.turns !== undefined ? { maxTurns: options.turns } : {}),
       idleTimeoutMs: options.idleTimeoutSeconds * 1000,
       maxSegmentChars: options.speechSegmentChars ?? 120,
