@@ -1,6 +1,13 @@
 'use client';
 
-import { createContext, useContext, useMemo, type ComponentType, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useMemo,
+  type ComponentType,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 
 /** Called when a catalog component with an `action` prop is activated. */
 export type A2UIActionHandler = (actionId: string, payload?: Record<string, unknown>) => void;
@@ -10,6 +17,11 @@ export interface A2UILinkProps {
   href: string;
   className?: string;
   children?: ReactNode;
+  title?: string;
+  target?: '_blank' | '_self';
+  /** `next/link` and `<a>` both forward this; `Button` sets `noopener` when `target="_blank"`. */
+  rel?: string;
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
   'aria-current'?: 'page';
   'aria-disabled'?: boolean;
   'data-active'?: 'true';

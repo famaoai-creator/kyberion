@@ -471,6 +471,31 @@ describe('charts.js — layout contract', () => {
     expect(textOf(ja)).toBe(`✓ ${JA.messages['ui:status_done']}`);
   });
 
+  it('sequence: rows with a status label get enough vertical room to not overlap the next row', () => {
+    // Status text sits below the arrow (y+13, 11px, middle baseline) and the
+    // next row's message label sits above its own arrow (y+rowH-9, 12px) —
+    // at the base compact row height those two collide. Two consecutive
+    // messages that both carry a status is the tightest case.
+    const props = {
+      participants: ['user', 'agent'],
+      messages: [
+        { from: 'user', to: 'agent', label: 'Ask', status: 'done' },
+        { from: 'agent', to: 'user', label: 'Answer', status: 'failed' },
+      ],
+      density: 'compact',
+    };
+    const tree = layout('ui:sequence', props);
+    const statuses = findAll(tree, byClass('kb-chart__status'));
+    const labels = findAll(tree, byClass('kb-chart__message-label'));
+    expect(statuses).toHaveLength(2);
+    expect(labels).toHaveLength(2);
+    const firstStatusY = Number(statuses[0].attrs.y);
+    const secondLabelY = Number(labels[1].attrs.y);
+    // 11px status (centered) needs its lower edge clear of the next row's
+    // 12px label baseline; less than ~8px of raw y gap visually collides.
+    expect(secondLabelY - firstStatusY).toBeGreaterThanOrEqual(8);
+  });
+
   it('flow: node tone from the status vocabulary, never color alone', () => {
     const tree = layout('ui:flow', SAMPLES['ui:flow']);
     const nodes = findAll(tree, byClass('kb-chart__node'));

@@ -34,6 +34,15 @@
   line-height: 1.45;
 }
 
+/* Japanese typography (UI-02): proportional alternates so kana/punctuation
+ * don't sit at full-width (monospaced) metrics, whichever Japanese face the
+ * `--kb-ui-font-sans` stack resolves to. Scoped to the app shell root only
+ * (this file must not restyle anything outside the `.kb-*` contract). */
+.kb-app-shell:lang(ja),
+.kb-app-shell :lang(ja) {
+  font-feature-settings: 'palt' 1;
+}
+
 .kb-app-shell__nav {
   grid-area: nav;
   min-width: 0;

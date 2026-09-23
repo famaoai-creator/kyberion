@@ -487,6 +487,22 @@ describe('kyberion-ui vanilla renderer — markup contract', () => {
     expect(disabled.getAttribute('aria-disabled')).toBe('true');
     expect(disabled.hasAttribute('href')).toBe(false);
   });
+
+  it('button: title on link and button, target="_blank" adds rel="noopener"', () => {
+    const link = render('ui:button', { label: 'x', href: '/docs', title: 'ヒント' })!;
+    expect(link.getAttribute('title')).toBe('ヒント');
+    const btn = render('ui:button', { label: 'x', action: { id: 'a' }, title: 'ヒント' })!;
+    expect(btn.getAttribute('title')).toBe('ヒント');
+    const blank = render('ui:button', { label: 'x', href: '/docs', target: '_blank' })!;
+    expect(blank.getAttribute('target')).toBe('_blank');
+    expect(blank.getAttribute('rel')).toBe('noopener');
+    const self = render('ui:button', { label: 'x', href: '/docs', target: '_self' })!;
+    expect(self.getAttribute('target')).toBe('_self');
+    expect(self.getAttribute('rel')).toBeNull();
+    const noTarget = render('ui:button', { label: 'x', href: '/docs' })!;
+    expect(noTarget.hasAttribute('target')).toBe(false);
+    expect(noTarget.hasAttribute('rel')).toBe(false);
+  });
 });
 
 describe('kyberion-ui vanilla renderer — safety', () => {
