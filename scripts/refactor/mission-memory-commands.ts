@@ -8,6 +8,8 @@ import {
 import {
   listMemoryPromotionCandidates,
   updateMemoryPromotionCandidateStatus,
+  type MemoryCandidate,
+  type MemoryKnowledgeDomain,
 } from '@agent/core/memory-promotion-queue';
 import type { HumanDecidedBy } from '@agent/core/mission-types';
 import {
@@ -15,7 +17,7 @@ import {
   promotePersonalMemoryCandidates,
 } from '@agent/core/memory-promotion-workflow';
 import { logger } from '@agent/core/core';
-import { getRegisteredEnv } from '@agent/core/foundation';
+import { getRegisteredEnv, parseSafeJsonInput } from '@agent/core/foundation';
 import { getOptionValue } from './mission-cli-args.js';
 import { ScriptExitError } from '../lib/harness.js';
 
@@ -87,6 +89,7 @@ export function showMemoryReview(
   print(`Candidate: ${review.candidate_id}`);
   print(`Decision: ${review.review_status}`);
   print(`Summary: ${candidate.summary}`);
+  print(`Curated record: ${candidate.curation ? candidate.curation.title : 'not yet curated'}`);
   print(`Source: ${candidate.source_type} / ${candidate.source_ref}`);
   print(`Kind: ${candidate.proposed_memory_kind} -> ${review.target_kind}`);
   print(`Target: ${review.target_path}`);
@@ -112,7 +115,7 @@ export function showMemoryReview(
   print('');
   print(
     review.review_status === 'ready_to_approve'
-      ? 'Next: memory-approve <CANDIDATE_ID> --note "<reason>"'
+      ? `Next: memory-approve <CANDIDATE_ID>${review.blockers.some((blocker) => blocker.code === 'missing_curation') ? ' --curation-json <JSON>' : ''} --note "<reason>"`
       : review.review_status === 'ready_to_promote'
         ? 'Next: memory-promote <CANDIDATE_ID> --note "<reason>"'
         : 'Next: resolve the blockers before approval or promotion.'
@@ -123,24 +126,84 @@ export function approveMemoryCandidate(
   candidateId: string,
   note?: string,
   tenantSlug?: string,
+  knowledgeDomain?: MemoryKnowledgeDomain,
+  ownerNhi?: string,
+  curationJson?: string,
   decidedBy?: HumanDecidedBy,
   print: Print = () => undefined
 ) {
   if (!candidateId) {
     throw new ScriptExitError(
       1,
-      'Usage: mission_controller memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>] [--decided-by user:<member-id>]'
+      'Usage: mission_controller memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--knowledge-domain product|organization|personal] [--owner-nhi <NHI>] [--curation-json <JSON>] [--note <TEXT>] [--decided-by user:<member-id>]'
     );
   }
   try {
     const review = reviewForCli(candidateId, tenantSlug);
-    assertMemoryPromotionReviewReady(review, 'approve');
+    const parsedCuration = curationJson
+      ? parseSafeJsonInput(curationJson, 'memory candidate curation')
+      : undefined;
+    const curation =
+      parsedCuration && typeof parsedCuration === 'object' && !Array.isArray(parsedCuration)
+        ? (parsedCuration as NonNullable<MemoryCandidate['curation']>)
+        : undefined;
+    if (curationJson && !curation) throw new Error('Curation must be a JSON object.');
+    const currentDomain = review.candidate.knowledge_domain;
+    const selectedDomain = knowledgeDomain || currentDomain;
+    if (
+      review.candidate.source_type === 'mission' &&
+      (!selectedDomain || selectedDomain === 'unclassified')
+    ) {
+      throw new Error(
+        'Mission candidates require --knowledge-domain product|organization|personal before approval.'
+      );
+    }
+    if (
+      selectedDomain === 'product' &&
+      (review.candidate.sensitivity_tier !== 'public' || review.candidate.scope)
+    ) {
+      throw new Error(
+        'Product knowledge must be public and unscoped; create a separately reviewed, redacted public candidate instead of broadening tenant knowledge.'
+      );
+    }
+    if (selectedDomain === 'personal' && review.candidate.sensitivity_tier !== 'personal') {
+      throw new Error('Personal knowledge requires personal tier.');
+    }
+    const personalOwnerNhi = ownerNhi?.trim() || review.candidate.scope?.owner_nhi?.trim();
+    if (selectedDomain === 'personal' && !personalOwnerNhi) {
+      throw new Error('Personal knowledge requires --owner-nhi or an existing owner_nhi.');
+    }
+    const reviewForApproval = {
+      ...review,
+      blockers: review.blockers.filter(
+        (blocker) =>
+          blocker.code !== 'unclassified_domain' &&
+          !(blocker.code === 'missing_curation' && curation) &&
+          !(
+            blocker.code === 'invalid_domain_scope' &&
+            selectedDomain === 'personal' &&
+            personalOwnerNhi
+          )
+      ),
+    };
+    assertMemoryPromotionReviewReady(reviewForApproval, 'approve');
     const updated = updateMemoryPromotionCandidateStatus({
       candidateId,
       status: 'approved',
+      ...(selectedDomain ? { knowledgeDomain: selectedDomain } : {}),
       ratificationNote: note || 'Approved for promotion.',
       ...(review.candidate.scope ? { scope: review.candidate.scope } : {}),
+      ...(selectedDomain === 'personal' && personalOwnerNhi
+        ? {
+            scopeUpdate: {
+              ...(review.candidate.scope || {}),
+              tier: 'personal' as const,
+              owner_nhi: personalOwnerNhi,
+            },
+          }
+        : {}),
       ...(decidedBy ? { decidedBy } : {}),
+      ...(curation ? { curation } : {}),
     });
     if (!updated) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
     logger.success(`✅ Memory candidate approved: ${updated.candidate_id}`);

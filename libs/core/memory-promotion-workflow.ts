@@ -19,6 +19,7 @@ import {
   listMemoryPromotionCandidates,
   type MemoryCandidate,
   updateMemoryPromotionCandidateStatus,
+  isPublicMemoryEvidencePath,
 } from './memory-promotion-queue.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
@@ -269,7 +270,12 @@ function toDistillSourceType(
 }
 
 function buildPromotionMetadata(candidate: MemoryCandidate): Record<string, unknown> {
+  const curatedContent = candidate.curation?.content || candidate.summary;
   const base = {
+    knowledge_domain: candidate.knowledge_domain || 'organization',
+    ...(candidate.knowledge_domain === 'personal' && candidate.scope?.owner_nhi
+      ? { personal_owner_nhi: candidate.scope.owner_nhi }
+      : {}),
     memory_candidate_source_ref: candidate.source_ref,
     memory_candidate_kind: candidate.proposed_memory_kind,
     memory_ratification_required: candidate.ratification_required,
@@ -278,25 +284,25 @@ function buildPromotionMetadata(candidate: MemoryCandidate): Record<string, unkn
     case 'sop':
       return {
         ...base,
-        procedure_steps: [candidate.summary],
+        procedure_steps: [curatedContent],
       };
     case 'template':
       return {
         ...base,
-        template_sections: [candidate.summary],
+        template_sections: [curatedContent],
       };
     case 'risk_rule':
       return {
         ...base,
         applicability: [candidate.source_type, candidate.source_ref],
-        expected_outcome: candidate.summary,
+        expected_outcome: curatedContent,
       };
     case 'heuristic':
     case 'clarification_prompt':
       return {
         ...base,
         hint_scope: candidate.source_type,
-        hint_triggers: [candidate.summary],
+        hint_triggers: [curatedContent],
       };
   }
 }
@@ -305,7 +311,7 @@ function buildDistillCandidateFromMemoryCandidate(
   candidate: MemoryCandidate
 ): DistillCandidateRecord {
   const summary = normalizeMemoryFact(
-    candidate.summary,
+    candidate.curation?.summary || candidate.summary,
     Date.parse(candidate.queued_at) || Date.now()
   );
   const sourceRefParts = parseSourceRef(candidate.source_ref);
@@ -316,11 +322,14 @@ function buildDistillCandidateFromMemoryCandidate(
     mission_id: sourceRefParts.missionId,
     task_session_id: sourceRefParts.taskSessionId,
     artifact_ids: sourceRefParts.artifactIds,
-    title: summary.slice(0, 80) || `Memory candidate ${candidate.candidate_id}`,
+    title:
+      candidate.curation?.title ||
+      summary.slice(0, 80) ||
+      `Memory candidate ${candidate.candidate_id}`,
     summary,
     status: 'proposed',
     target_kind: mapMemoryKindToDistillTarget(candidate.proposed_memory_kind),
-    evidence_refs: candidate.evidence_refs,
+    evidence_refs: candidate.curation?.evidence_refs || candidate.evidence_refs,
     ...(candidate.scope ? { scope: candidate.scope } : {}),
     metadata: buildPromotionMetadata(candidate),
   });
@@ -442,6 +451,28 @@ export async function promoteMemoryCandidateToKnowledge(input: {
   if (!candidateId) throw new Error('candidateId is required.');
   const candidate = loadMemoryPromotionCandidate(candidateId, input.scope);
   if (!candidate) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
+  const domain = candidate.knowledge_domain || 'organization';
+  if (domain === 'unclassified')
+    throw new Error(
+      `Memory promotion candidate ${candidateId} requires an explicit knowledge domain classification.`
+    );
+  if (
+    domain === 'product' &&
+    (candidate.sensitivity_tier !== 'public' ||
+      candidate.scope ||
+      candidate.evidence_refs.some((ref) => !isPublicMemoryEvidencePath(ref)))
+  )
+    throw new Error(
+      'Product knowledge promotion requires public, unscoped records with evidence under knowledge/public or active/missions/public.'
+    );
+  if (
+    domain === 'personal' &&
+    (candidate.sensitivity_tier !== 'personal' || !candidate.scope?.owner_nhi?.trim())
+  ) {
+    throw new Error(
+      'Personal knowledge promotion requires personal tier and an explicit owner_nhi.'
+    );
+  }
   if (candidate.status === 'rejected') {
     throw new Error(
       `Memory promotion candidate ${candidateId} is rejected and cannot be promoted.`
@@ -458,7 +489,10 @@ export async function promoteMemoryCandidateToKnowledge(input: {
           : defaultPromotionReview(),
     };
   }
-  const policy = evaluateBackgroundReviewText(candidate.summary);
+  const policyText = candidate.curation
+    ? `${candidate.curation.title}\n${candidate.curation.summary}\n${candidate.curation.content}`
+    : candidate.summary;
+  const policy = evaluateBackgroundReviewText(policyText);
   if (!policy.allowed) {
     const reason = policy.reason || 'Background review policy rejected the candidate.';
     updateMemoryPromotionCandidateStatus({

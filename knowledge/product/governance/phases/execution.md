@@ -65,9 +65,7 @@ record its verdict with `review-task`, not `record-evidence`.
 
 ### Direct CLI work (worktree / subagents / external PR): the flow that reaches `finish`
 
-Most work is done **directly** — the owner agent edits code in a worktree, delegates to
-subagents, and another agent (e.g. Codex) reviews and merges the PR — not through
-`dispatch-workitems`. That path reaches `finish` without manual repair **only if each
+Most work is done **directly** — the owner agent edits code in a worktree and delegates to subagents — not necessarily through `dispatch-workitems`. Use WorkItems when durable assignment, claims/leases, delegated execution, handoff, or independent review needs coordination evidence. For a single-owner direct task, `NEXT_TASKS` deliverables plus `record-evidence` are sufficient; a coordination message alone is never completion evidence. That path reaches `finish` without manual repair **only if each
 template task is recorded while the work happens**. Verified end to end on 2026-09-22
 (probe mission, ~2 minutes, no human approval needed):
 

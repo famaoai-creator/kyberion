@@ -30,6 +30,8 @@ same thing as the process execution authority that writes mission files.
 
 ## Stable flow
 
+The flow is conditional, not a mandatory dispatch chain. Direct single-owner tasks can use mission task contracts and `record-evidence`; create WorkItems when durable ownership, delegation, lease/handoff, or review routing adds traceability. Preserve both task evidence and any WorkItem coordination receipts when used.
+
 ```text
 Create mission
   -> Start mission
@@ -37,11 +39,10 @@ Create mission
       -> Staff / prewarm runtime
         -> Record task intent
           -> Assemble scoped mission context pack
-          -> Dispatch durable tickets (WorkItem / GitHub / Jira payloads)
-          -> Execute registered work items and reflect results back to tickets
-          -> Create / update board items
-            -> Delegate work via A2A or short transport
-              -> Record evidence and checkpoints
+          -> [when coordination is needed] Register / dispatch WorkItems
+          -> [when delegated] Execute and reflect results to WorkItems
+          -> [optional] Delegate via A2A or short transport
+          -> Record task deliverables, evidence, and checkpoints
                 -> Verify / distill
                   -> Finish mission
 ```
