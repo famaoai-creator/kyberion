@@ -27,7 +27,7 @@ describe('process definition registry', () => {
   it('checks the current catalog, scenario packs, playbooks, and phases', () => {
     const audit = auditProcessDefinitionRegistry();
     expect(audit.ok, audit.errors.join('\n')).toBe(true);
-    expect(audit.sources[0]?.actual_counts).toEqual({ templates: 42, patterns: 8 });
+    expect(audit.sources[0]?.actual_counts).toEqual({ templates: 72, patterns: 8 });
     expect(audit.sources[1]?.actual_counts).toEqual({ scenarios: 24 });
     expect(audit.sources[2]?.actual_counts).toEqual({ scenarios: 26 });
     expect(audit.sources[3]?.missing_entries).toEqual([]);

@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/standard-intents.schema.json",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "ux_contract": "Intent -> Plan -> State -> Result",
   "notes": [
     "This catalog is user-facing first. It describes what people ask Kyberion to do.",
@@ -5236,6 +5236,1167 @@
       "action": "create",
       "object": "track",
       "execution_shape": "project_bootstrap",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "invoice-processing",
+      "category": "outcome_execution",
+      "description": "Invoice processing workflow that extracts invoice details, performs PO/receipt matching, and prepares payment approval with journal-entry notes.",
+      "surface_examples": [
+        "この請求書を処理して支払いまで回して",
+        "届いた請求書の照合と支払承認を進めて",
+        "Process the vendor invoices end to end"
+      ],
+      "plan_outline": [
+        "define intake channels, required fields, and PO/receipt matching rules",
+        "extract invoice details and run matching and duplicate checks",
+        "review exceptions and fraud risk",
+        "prepare payment approval and journal-entry notes"
+      ],
+      "intake_requirements": ["invoice_files", "po_receipt_data", "approval_threshold"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "請求書",
+        "請求書処理",
+        "支払い処理",
+        "買掛",
+        "invoice",
+        "accounts payable"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "invoice_processing",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "business-plan-development",
+      "category": "outcome_execution",
+      "description": "Business planning workflow that coordinates market analysis, strategy outline, and financial modeling into a reviewed business plan.",
+      "surface_examples": [
+        "新規事業の事業計画書を作って",
+        "来期の事業計画を立案して",
+        "Draft a business plan for our new service"
+      ],
+      "plan_outline": [
+        "define plan scope, horizon, and success metrics",
+        "analyze the market and outline the strategy",
+        "build the financial model and milestones",
+        "review from an executive perspective and finalize"
+      ],
+      "intake_requirements": ["business_domain", "plan_horizon", "target_metrics"],
+      "outcome_ids": ["strategy_brief", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "事業計画",
+        "ビジネスプラン",
+        "経営計画",
+        "新規事業計画",
+        "business plan"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "business_plan",
+      "execution_shape": "mission",
+      "mission_class": "decision_support",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "product-roadmap-planning",
+      "category": "outcome_execution",
+      "description": "Product roadmap workflow that collects requests, applies a prioritization framework, and publishes a reviewed roadmap.",
+      "surface_examples": [
+        "プロダクトロードマップを作って",
+        "来期の製品ロードマップを策定して",
+        "Build a product roadmap for next year"
+      ],
+      "plan_outline": [
+        "collect customer requests, strategy goals, and constraints",
+        "define the prioritization framework",
+        "draft the roadmap with milestones and dependencies",
+        "review with stakeholders and publish"
+      ],
+      "intake_requirements": ["customer_requests", "strategy_goals", "existing_backlog"],
+      "outcome_ids": ["priority_roadmap", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": ["ロードマップ", "プロダクト計画", "製品計画", "roadmap", "product plan"],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "product_roadmap",
+      "execution_shape": "mission",
+      "mission_class": "product_delivery",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "project-plan-execution",
+      "category": "outcome_execution",
+      "description": "Project management workflow that charters the project, builds the WBS and schedule, tracks progress, and closes with a completion report.",
+      "surface_examples": [
+        "プロジェクト計画とWBSを作って",
+        "新規プロジェクトの実行計画を立てて",
+        "Create a project plan with WBS and milestones"
+      ],
+      "plan_outline": [
+        "charter the project: goals, scope, team, constraints",
+        "build the WBS, dependencies, and schedule",
+        "track progress, risks, and changes",
+        "review and close with a completion report"
+      ],
+      "intake_requirements": ["project_goal", "deadline", "available_resources"],
+      "outcome_ids": ["task_plan", "execution_result"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "プロジェクト計画",
+        "WBS",
+        "スケジュール",
+        "実行計画",
+        "project plan",
+        "kickoff"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "project_plan",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "expense-reimbursement",
+      "category": "outcome_execution",
+      "description": "Expense reimbursement workflow that validates claims and receipts against policy and prepares approval and payout records.",
+      "surface_examples": [
+        "経費申請を精算して",
+        "出張経費の申請を処理して",
+        "Process the pending expense claims"
+      ],
+      "plan_outline": [
+        "define eligible expenses, policy rules, and approval thresholds",
+        "verify receipts and reconcile claims against policy",
+        "review anomalies and fraud risk",
+        "approve payout and record journal entries"
+      ],
+      "intake_requirements": ["expense_claims", "receipts", "expense_policy"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "経費",
+        "経費申請",
+        "経費精算",
+        "立替",
+        "expense",
+        "expense claim",
+        "reimbursement"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "expense_claim",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "accounts-receivable-collections",
+      "category": "outcome_execution",
+      "description": "Accounts receivable workflow covering invoicing schedule, cash application, aging review, and collection actions.",
+      "surface_examples": [
+        "入金の消込をして",
+        "未回収の売掛金を回収して",
+        "Reconcile incoming payments and chase overdue invoices"
+      ],
+      "plan_outline": [
+        "define invoicing and cash-application rules",
+        "issue invoices and match incoming payments",
+        "review aging and overdue exceptions",
+        "report AR position and collection actions"
+      ],
+      "intake_requirements": ["open_invoices", "payment_data", "aging_rules"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "売掛",
+        "入金消込",
+        "債権回収",
+        "未回収",
+        "accounts receivable",
+        "collections"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "accounts_receivable",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "payroll-cycle",
+      "category": "outcome_execution",
+      "description": "Payroll cycle workflow that consolidates attendance and master changes, verifies gross-to-net calculations, and prepares payout approval.",
+      "surface_examples": [
+        "今月の給与計算を回して",
+        "給与支払い処理を進めて",
+        "Run this month payroll end to end"
+      ],
+      "plan_outline": [
+        "collect attendance, hires, exits, and master changes",
+        "validate inputs and compute gross-to-net pay",
+        "review variances against prior periods",
+        "approve payment files and post journal entries"
+      ],
+      "intake_requirements": ["attendance_data", "employee_master", "payroll_rules"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": ["給与", "給与計算", "勤怠", "賞与", "payroll", "salary calculation"],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "payroll_run",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "quarterly-okr-planning",
+      "category": "outcome_execution",
+      "description": "Quarterly OKR planning workflow that runs a retrospective, drafts objectives, aligns across teams, and finalizes commitments.",
+      "surface_examples": [
+        "来四半期のOKRを立てて",
+        "部門のOKRプランニングをして",
+        "Draft next quarter OKRs for the team"
+      ],
+      "plan_outline": [
+        "review prior-period results and grading",
+        "set design criteria aligned to company strategy",
+        "draft objectives and key results per unit",
+        "reconcile cross-team dependencies and publish"
+      ],
+      "intake_requirements": ["previous_okr_results", "company_strategy", "department_priorities"],
+      "outcome_ids": ["task_plan", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": ["OKR", "目標設定", "四半期計画", "部門目標", "okr", "quarterly goals"],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "okr_plan",
+      "execution_shape": "mission",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "due-diligence-ma",
+      "category": "outcome_execution",
+      "description": "Due diligence workflow that coordinates finance, legal, and business investigation tracks into a decision-ready DD report.",
+      "surface_examples": [
+        "買収対象のデューデリジェンスをして",
+        "M&AのDDレポートを作って",
+        "Run due diligence on the acquisition target"
+      ],
+      "plan_outline": [
+        "scope the diligence workstreams and checklist",
+        "investigate financials, legal, and operations",
+        "consolidate findings and quantify risks",
+        "review with experts and issue the DD report"
+      ],
+      "intake_requirements": ["target_company", "dd_scope", "data_room_access"],
+      "outcome_ids": ["review_findings", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "デューデリ",
+        "M&A",
+        "買収調査",
+        "企業調査",
+        "due diligence",
+        "acquisition"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "review",
+      "object": "due_diligence_report",
+      "execution_shape": "mission",
+      "mission_class": "decision_support",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "product-launch-gtm",
+      "category": "outcome_execution",
+      "description": "Product launch workflow that coordinates product, marketing, and sales tracks into a go-to-market plan and launch approval.",
+      "surface_examples": [
+        "新製品のローンチ計画を立てて",
+        "GTM戦略を作って",
+        "Plan the go-to-market launch for the new product"
+      ],
+      "plan_outline": [
+        "set launch goals, segments, and positioning",
+        "define the GTM strategy and channel plan",
+        "prepare launch assets and readiness checklist",
+        "review readiness and approve launch"
+      ],
+      "intake_requirements": ["product_details", "launch_date", "target_segments"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "ローンチ",
+        "新製品発表",
+        "GTM",
+        "発売準備",
+        "product launch",
+        "go to market",
+        "gtm"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "product_launch",
+      "execution_shape": "mission",
+      "mission_class": "product_delivery",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "rfp-response-proposal",
+      "category": "outcome_execution",
+      "description": "RFP response workflow that decomposes requirements, decides bid strategy, drafts the proposal, and prepares the submission package.",
+      "surface_examples": [
+        "このRFPへの提案書を作って",
+        "入札案件の回答を作成して",
+        "Draft a response to this RFP"
+      ],
+      "plan_outline": [
+        "decompose the RFP requirements and scoring criteria",
+        "make the bid/no-bid decision",
+        "draft the proposal with pricing and compliance matrix",
+        "review and assemble the submission package"
+      ],
+      "intake_requirements": ["rfp_document", "solution_capabilities", "pricing_model"],
+      "outcome_ids": ["artifact:docx", "execution_result"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": ["RFP", "提案書", "入札", "プロポーザル", "rfp", "proposal", "bid"],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "rfp_response",
+      "execution_shape": "mission",
+      "mission_class": "customer_engagement",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "sales-pipeline-review",
+      "category": "outcome_execution",
+      "description": "Sales pipeline review workflow that assesses deal health, validates forecast assumptions, and produces a forecast report.",
+      "surface_examples": [
+        "今期のパイプラインレビューをして",
+        "売上予測の精度を確認して",
+        "Review the sales pipeline and forecast"
+      ],
+      "plan_outline": [
+        "define review scope and forecast method",
+        "score deals by stage, coverage, and momentum",
+        "review forecast accuracy and risks",
+        "publish the pipeline and forecast report"
+      ],
+      "intake_requirements": ["crm_pipeline_data", "forecast_method", "review_period"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "パイプライン",
+        "売上予測",
+        "案件レビュー",
+        "商談",
+        "sales pipeline",
+        "forecast",
+        "deal review"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "review",
+      "object": "sales_pipeline",
+      "execution_shape": "mission",
+      "mission_class": "customer_engagement",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "order-fulfillment-tracking",
+      "category": "outcome_execution",
+      "description": "Order fulfillment workflow that plans order processing, coordinates shipping, reviews exceptions, and reports completion.",
+      "surface_examples": [
+        "受注から出荷まで追跡して",
+        "フルフィルメントの例外を整理して",
+        "Track order fulfillment end to end"
+      ],
+      "plan_outline": [
+        "define order intake and allocation rules",
+        "coordinate picking, packing, and shipping",
+        "review exceptions and late orders",
+        "report fulfillment completion and KPIs"
+      ],
+      "intake_requirements": ["order_data", "inventory_levels", "carrier_options"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "受注",
+        "出荷",
+        "フルフィルメント",
+        "配送",
+        "order fulfillment",
+        "shipping",
+        "delivery tracking"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "order_fulfillment",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "support-ticket-resolution",
+      "category": "outcome_execution",
+      "description": "Customer support workflow that triages tickets, investigates root cause, drafts the response, and feeds learnings into the knowledge base.",
+      "surface_examples": [
+        "このサポートチケットを解決して",
+        "問い合わせ対応を進めて",
+        "Resolve the open support tickets"
+      ],
+      "plan_outline": [
+        "classify tickets and apply SLA priorities",
+        "investigate root cause and draft responses",
+        "review response quality and policy fit",
+        "send resolutions and capture KB articles"
+      ],
+      "intake_requirements": ["ticket_queue", "sla_policy", "product_docs"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "サポートチケット",
+        "問い合わせ対応",
+        "カスタマーサポート",
+        "ヘルプデスク",
+        "support ticket",
+        "customer inquiry",
+        "helpdesk"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "support_ticket",
+      "execution_shape": "mission",
+      "mission_class": "customer_engagement",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "customer-health-qbr",
+      "category": "outcome_execution",
+      "description": "Customer health review workflow that computes health scores, prepares QBR materials, and schedules the review session.",
+      "surface_examples": [
+        "主要顧客のQBR資料を作って",
+        "顧客ヘルススコアを分析して",
+        "Prepare the quarterly business review"
+      ],
+      "plan_outline": [
+        "define health metrics and scoring model",
+        "compute health scores and segment accounts",
+        "draft QBR materials and action plans",
+        "review and schedule the customer meeting"
+      ],
+      "intake_requirements": ["account_usage_data", "contract_info", "stakeholder_map"],
+      "outcome_ids": ["account_strategy_plan", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "QBR",
+        "顧客レビュー",
+        "ヘルススコア",
+        "カスタマーサクセス",
+        "qbr",
+        "customer health",
+        "quarterly business review"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "prepare",
+      "object": "customer_qbr",
+      "execution_shape": "mission",
+      "mission_class": "customer_engagement",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "employee-lifecycle-transition",
+      "category": "outcome_execution",
+      "description": "Employee lifecycle workflow covering onboarding, transfer, and offboarding with account, document, and handover checklists.",
+      "surface_examples": [
+        "新入社員のオンボーディングを進めて",
+        "退職者のアカウント停止手続きをして",
+        "Handle the employee offboarding checklist"
+      ],
+      "plan_outline": [
+        "identify transition type and required steps",
+        "prepare accounts, equipment, and documentation",
+        "execute provisioning or deprovisioning",
+        "review completion and hand over records"
+      ],
+      "intake_requirements": ["employee_record", "transition_type", "it_systems_list"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "入社手続き",
+        "退職手続き",
+        "異動",
+        "オンボーディング",
+        "onboarding",
+        "offboarding",
+        "employee transfer"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "employee_transition",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "internal-audit-compliance",
+      "category": "outcome_execution",
+      "description": "Internal audit workflow that plans the audit, collects evidence, records findings, and produces a remediation-tracked report.",
+      "surface_examples": [
+        "内部監査を実施して",
+        "統制の有効性を検証して",
+        "Run the internal audit for this quarter"
+      ],
+      "plan_outline": [
+        "plan the audit scope and procedures",
+        "execute tests and collect evidence",
+        "document findings and assess severity",
+        "review with stakeholders and issue the report"
+      ],
+      "intake_requirements": ["audit_scope", "control_matrix", "evidence_repository"],
+      "outcome_ids": ["compliance_report", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "内部監査",
+        "監査対応",
+        "コンプライアンス監査",
+        "統制評価",
+        "internal audit",
+        "compliance audit",
+        "controls testing"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "review",
+      "object": "internal_audit",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "regulatory-filing-compliance",
+      "category": "outcome_execution",
+      "description": "Regulatory filing workflow that compiles requirements, drafts submission documents, runs legal review, and prepares submission.",
+      "surface_examples": [
+        "規制当局への申請書類を作って",
+        "ライセンス申請を準備して",
+        "Prepare the regulatory filing package"
+      ],
+      "plan_outline": [
+        "identify filing requirements and deadlines",
+        "design the document structure and evidence set",
+        "draft the filing documents",
+        "review with legal and submit"
+      ],
+      "intake_requirements": ["filing_requirements", "entity_data", "legal_precedents"],
+      "outcome_ids": ["compliance_report", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "規制申請",
+        "届出",
+        "許認可",
+        "当局対応",
+        "regulatory filing",
+        "license application",
+        "regulatory submission"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "prepare",
+      "object": "regulatory_filing",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "business-process-improvement",
+      "category": "outcome_execution",
+      "description": "Business process improvement workflow that scopes the target process, analyzes the as-is state, and produces an approved improvement plan.",
+      "surface_examples": [
+        "この業務プロセスを改善して",
+        "承認フローの効率化を提案して",
+        "Improve the invoice approval process"
+      ],
+      "plan_outline": [
+        "select the target process and pain points",
+        "analyze the current state and bottlenecks",
+        "design the improved process and measure impact",
+        "review and issue the improvement plan"
+      ],
+      "intake_requirements": ["current_process_doc", "pain_points", "improvement_goals"],
+      "outcome_ids": ["process_adr", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "業務改善",
+        "プロセス改善",
+        "BPR",
+        "カイゼン",
+        "process improvement",
+        "bpr",
+        "workflow optimization"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "change",
+      "object": "business_process",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "asset-lifecycle-management",
+      "category": "outcome_execution",
+      "description": "Fixed asset lifecycle workflow covering acquisition policy, ledger registration, depreciation, physical inventory, and disposal.",
+      "surface_examples": [
+        "固定資産の棚卸をして",
+        "資産台帳を整理して",
+        "Run the fixed-asset inventory reconciliation"
+      ],
+      "plan_outline": [
+        "define asset policy and register structure",
+        "reconcile the register against physical inventory",
+        "review discrepancies and disposals",
+        "report asset position and depreciation"
+      ],
+      "intake_requirements": ["asset_register", "depreciation_rules", "physical_inventory"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "固定資産",
+        "資産管理",
+        "資産台帳",
+        "棚卸",
+        "fixed asset",
+        "asset register",
+        "asset inventory"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "asset_register",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "enterprise-risk-assessment",
+      "category": "outcome_execution",
+      "description": "Enterprise risk assessment workflow that scopes the assessment, scores risks by impact and likelihood, and produces a risk register with response plans.",
+      "surface_examples": [
+        "全社リスク評価を実施して",
+        "リスク登録簿を更新して",
+        "Run the enterprise risk assessment"
+      ],
+      "plan_outline": [
+        "define assessment scope and scoring criteria",
+        "identify and score risks across business units",
+        "review the risk map and mitigation plans",
+        "update the risk register and report"
+      ],
+      "intake_requirements": ["risk_categories", "business_units", "prior_risk_register"],
+      "outcome_ids": ["compliance_report", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "リスク評価",
+        "ERM",
+        "リスク登録",
+        "リスクマネジメント",
+        "risk assessment",
+        "erm",
+        "risk register"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "diagnose",
+      "object": "enterprise_risk",
+      "execution_shape": "mission",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "business-continuity-planning",
+      "category": "outcome_execution",
+      "description": "Business continuity planning workflow that runs a business impact analysis, designs recovery strategies, and produces a tested BCP/DR plan.",
+      "surface_examples": [
+        "BCPを策定して",
+        "災害時の復旧計画を作って",
+        "Draft the business continuity plan"
+      ],
+      "plan_outline": [
+        "run the business impact analysis with RTO/RPO",
+        "define recovery strategies per critical process",
+        "draft the BCP and communication plan",
+        "review via tabletop exercise and finalize"
+      ],
+      "intake_requirements": ["critical_processes", "rto_rpo_targets", "existing_dr_assets"],
+      "outcome_ids": ["remediation_plan", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "BCP",
+        "事業継続",
+        "DR",
+        "災害対策",
+        "business continuity",
+        "bcp",
+        "disaster recovery"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "prepare",
+      "object": "business_continuity_plan",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "supplier-onboarding",
+      "category": "outcome_execution",
+      "description": "Supplier onboarding workflow that screens candidates, collects documents, runs credit/compliance checks, and activates the vendor master record.",
+      "surface_examples": [
+        "新規仕入先の登録審査をして",
+        "ベンダーのオンボーディングを進めて",
+        "Onboard the new supplier"
+      ],
+      "plan_outline": [
+        "define vetting criteria and required documents",
+        "verify documents, credit, and compliance checks",
+        "register the supplier master and contract terms",
+        "review and activate trading"
+      ],
+      "intake_requirements": ["supplier_application", "vetting_criteria", "contract_terms"],
+      "outcome_ids": ["execution_result", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "仕入先登録",
+        "取引先審査",
+        "ベンダー登録",
+        "サプライヤー",
+        "supplier onboarding",
+        "vendor registration",
+        "new vendor"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "supplier_record",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "partner-alliance-management",
+      "category": "outcome_execution",
+      "description": "Partner alliance workflow that defines objectives, negotiates terms, drafts the agreement, and sets up joint operations and periodic reviews.",
+      "surface_examples": [
+        "業務提携の条件を整理して",
+        "パートナーアライアンスを立ち上げて",
+        "Structure the partnership agreement"
+      ],
+      "plan_outline": [
+        "define alliance objectives and fit assessment",
+        "design terms, governance, and KPIs",
+        "draft the agreement and operating model",
+        "review and launch with a joint plan"
+      ],
+      "intake_requirements": ["partner_profile", "alliance_objectives", "commercial_terms"],
+      "outcome_ids": ["account_strategy_plan", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "アライアンス",
+        "提携",
+        "パートナーシップ",
+        "業務提携",
+        "alliance",
+        "partnership",
+        "strategic partner"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "partner_alliance",
+      "execution_shape": "mission",
+      "mission_class": "decision_support",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "public-relations-release",
+      "category": "outcome_execution",
+      "description": "Public relations workflow that frames the announcement, drafts the press release, runs legal and comms review, and prepares the distribution package.",
+      "surface_examples": [
+        "新製品のプレスリリースを作って",
+        "メディア向け発表文を準備して",
+        "Draft the press release for the announcement"
+      ],
+      "plan_outline": [
+        "define the announcement purpose and audience",
+        "craft key messages and Q&A",
+        "draft the release and supporting materials",
+        "review with legal and distribute"
+      ],
+      "intake_requirements": ["announcement_subject", "key_messages", "approval_chain"],
+      "outcome_ids": ["stakeholder_message", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "プレスリリース",
+        "広報",
+        "発表資料",
+        "メディア対応",
+        "press release",
+        "media announcement",
+        "pr release"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "press_release",
+      "execution_shape": "mission",
+      "mission_class": "content_and_media",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "knowledge-management-cycle",
+      "category": "outcome_execution",
+      "description": "Knowledge management workflow that defines taxonomy, collects and structures content, reviews quality, and publishes with freshness rules.",
+      "surface_examples": [
+        "ナレッジベースを整理して",
+        "社内の知識管理サイクルを回して",
+        "Organize the knowledge base taxonomy"
+      ],
+      "plan_outline": [
+        "define the taxonomy and curation rules",
+        "collect and structure knowledge articles",
+        "review quality and freshness",
+        "publish and set the maintenance cycle"
+      ],
+      "intake_requirements": ["existing_articles", "taxonomy_goals", "usage_metrics"],
+      "outcome_ids": ["knowledge_organization_report", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "ナレッジ管理",
+        "ナレッジベース",
+        "社内Wiki",
+        "知識共有",
+        "knowledge management",
+        "knowledge base"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "organize",
+      "object": "knowledge_base",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "quality-management-system",
+      "category": "outcome_execution",
+      "description": "Quality management workflow that sets quality policy and inspection criteria, records inspection results, and drives CAPA for nonconformities.",
+      "surface_examples": [
+        "QMSの検査記録を整理して",
+        "不適合のCAPA対応を進めて",
+        "Run the quality inspection and CAPA review"
+      ],
+      "plan_outline": [
+        "set the quality policy and inspection design",
+        "record inspection results and measurements",
+        "handle nonconformances with CAPA",
+        "review and report quality performance"
+      ],
+      "intake_requirements": ["quality_policy", "inspection_criteria", "defect_records"],
+      "outcome_ids": ["compliance_report", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "品質管理",
+        "QMS",
+        "品質検査",
+        "不適合対応",
+        "quality management",
+        "qms",
+        "quality inspection",
+        "capa"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "verify",
+      "object": "quality_records",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "service-delivery-operations",
+      "category": "outcome_execution",
+      "description": "Service delivery workflow that confirms SLA scope, plans service operations, records performance, and produces a service review report.",
+      "surface_examples": [
+        "SLA実績をレビューして",
+        "サービス提供状況を報告して",
+        "Review service delivery against SLAs"
+      ],
+      "plan_outline": [
+        "define service scope and SLA targets",
+        "plan delivery operations and staffing",
+        "track delivery metrics and incidents",
+        "review service health and report"
+      ],
+      "intake_requirements": ["sla_targets", "delivery_metrics", "incident_history"],
+      "outcome_ids": ["service_health_report", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "サービス提供",
+        "SLA",
+        "サービス運用",
+        "提供実績",
+        "service delivery",
+        "sla",
+        "service operations"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "execute",
+      "object": "service_delivery",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "supply-chain-planning",
+      "category": "outcome_execution",
+      "description": "Supply chain planning workflow that builds a demand forecast, designs supply and inventory policy, and produces an S&OP-balanced supply plan.",
+      "surface_examples": [
+        "来期の需給計画を立てて",
+        "サプライチェーン計画を作って",
+        "Build the demand and supply plan"
+      ],
+      "plan_outline": [
+        "build the demand forecast",
+        "set supply, inventory, and capacity policy",
+        "balance demand and supply in the S&OP plan",
+        "review trade-offs and finalize the plan"
+      ],
+      "intake_requirements": ["demand_forecast", "inventory_data", "supplier_capacity"],
+      "outcome_ids": ["task_plan", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "需給計画",
+        "S&OP",
+        "サプライチェーン",
+        "在庫計画",
+        "supply chain",
+        "demand planning"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "prepare",
+      "object": "supply_plan",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "review_required"
+    },
+    {
+      "id": "release-change-management",
+      "category": "outcome_execution",
+      "description": "Release and change management workflow that scopes change requests, assesses impact, runs CAB-style review, and confirms post-release state.",
+      "surface_examples": [
+        "この変更のリリース承認を進めて",
+        "変更要求の影響評価をして",
+        "Assess and approve the release change"
+      ],
+      "plan_outline": [
+        "log the change request and classify impact",
+        "assess risk, dependencies, and rollback plan",
+        "record implementation and test evidence",
+        "CAB review and approve the release"
+      ],
+      "intake_requirements": ["change_request", "impact_scope", "rollback_plan"],
+      "outcome_ids": ["release_readiness_report", "artifact:docx"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "変更管理",
+        "リリース管理",
+        "CAB",
+        "変更承認",
+        "change management",
+        "release management",
+        "cab review"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "change",
+      "object": "release_change",
+      "execution_shape": "mission",
       "mission_class": "operations_and_release",
       "risk_profile": "approval_required"
     }
