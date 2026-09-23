@@ -299,11 +299,31 @@ describe('validatePluginView (EP-05)', () => {
       'a mismatched surface id',
       [...fixtureDocument(), { updateDataModel: { surfaceId: 'other-surface', data: {} } }],
     ],
+    [
+      'a closing tag with whitespace',
+      withComponents([{ id: 'x', type: 'ui:text', props: { text: 'x < / IFRAME >' } }]),
+    ],
   ])('rejects a document with %s', (_label, document) => {
     expectViewError(
       () => validatePluginView(fixtureDeclaration(), document, { providedOps: OPS }),
       'PLUGIN_VIEW_INVALID'
     );
+  });
+});
+
+describe('plugin view markup scan', () => {
+  it('accepts comparison text and stays linear on hostile input', () => {
+    const text = (value: string) =>
+      withComponents([{ id: 'x', type: 'ui:text', props: { text: value } }]);
+    expect(() =>
+      validatePluginView(fixtureDeclaration(), text('a < b and <abbr> tags'), { providedOps: OPS })
+    ).not.toThrow();
+    const hostile = `<${'\t'.repeat(7_990)}x`;
+    const started = performance.now();
+    expect(() =>
+      validatePluginView(fixtureDeclaration(), text(hostile), { providedOps: OPS })
+    ).not.toThrow();
+    expect(performance.now() - started).toBeLessThan(2000);
   });
 });
 

@@ -216,8 +216,55 @@ const FORBIDDEN_PROP_KEYS = new Set([
   'href',
 ]);
 const EVENT_HANDLER_KEY = /^on[A-Z]/u;
-const MARKUP_PATTERN =
-  /<\s*\/?\s*(script|iframe|object|embed|style|link|meta|img|svg|a|form|base|frame)\b/iu;
+const MARKUP_TAGS = new Set([
+  'script',
+  'iframe',
+  'object',
+  'embed',
+  'style',
+  'link',
+  'meta',
+  'img',
+  'svg',
+  'a',
+  'form',
+  'base',
+  'frame',
+]);
+
+function isMarkupWhitespace(char: string | undefined): boolean {
+  return (
+    char === ' ' ||
+    char === '\t' ||
+    char === '\n' ||
+    char === '\r' ||
+    char === '\f' ||
+    char === '\v'
+  );
+}
+
+/** Linear scan for `<tag` / `</tag` of a dangerous element (no backtracking regex). */
+function containsMarkup(text: string): boolean {
+  let index = text.indexOf('<');
+  while (index !== -1) {
+    let cursor = index + 1;
+    while (isMarkupWhitespace(text[cursor])) cursor += 1;
+    if (text[cursor] === '/') cursor += 1;
+    while (isMarkupWhitespace(text[cursor])) cursor += 1;
+    let end = cursor;
+    while (end < text.length && /[a-z]/iu.test(text[end]!)) end += 1;
+    const next = text[end];
+    if (
+      end > cursor &&
+      MARKUP_TAGS.has(text.slice(cursor, end).toLowerCase()) &&
+      !(next && /[\w]/u.test(next))
+    ) {
+      return true;
+    }
+    index = text.indexOf('<', index + 1);
+  }
+  return false;
+}
 const SCRIPT_URL_PATTERN = /(javascript|vbscript)\s*:|data\s*:\s*text\/html/iu;
 
 const ROLE_RANK: Record<PluginViewRole, number> = { readonly: 0, localadmin: 1 };
@@ -347,7 +394,7 @@ interface WalkState {
 function walkValue(value: unknown, at: string, state: WalkState, depth: number): void {
   if (depth > MAX_WALK_DEPTH) throw invalid(`document is nested too deeply at ${at}`);
   if (typeof value === 'string') {
-    if (MARKUP_PATTERN.test(value) || SCRIPT_URL_PATTERN.test(value)) {
+    if (containsMarkup(value) || SCRIPT_URL_PATTERN.test(value)) {
       throw invalid(`markup or script URL is not allowed in a plugin view (${at})`);
     }
     return;

@@ -122,7 +122,7 @@ export function isFailingScenarioStatus(status: ScenarioRunStatus): boolean {
 }
 
 function escapeCell(value: string): string {
-  return value.replace(/\|/gu, '\\|').replace(/\r?\n/gu, ' ');
+  return value.replace(/\\/gu, '\\\\').replace(/\|/gu, '\\|').replace(/\r?\n/gu, ' ');
 }
 
 function checkRows(checks: readonly ScenarioCheckResult[]): string[] {

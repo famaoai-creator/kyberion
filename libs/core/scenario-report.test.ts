@@ -57,7 +57,7 @@ describe('scenario report (ES-05)', () => {
           index: 0,
           kind: 'pipeline',
           status: 'fail',
-          checks: [{ type: 'expectedOp', pass: false, detail: 'demo | x called 0 time(s)' }],
+          checks: [{ type: 'expectedOp', pass: false, detail: 'demo | x\\ called 0 time(s)' }],
           duration_ms: 0,
         },
       ],
@@ -88,7 +88,7 @@ describe('scenario report (ES-05)', () => {
 
     const markdown = renderScenarioReportMarkdown(report);
     expect(markdown).toContain('# Scenario report-fixture: FAIL');
-    expect(markdown).toContain('| FAIL | expectedOp | demo \\| x called 0 time(s) |');
+    expect(markdown).toContain('| FAIL | expectedOp | demo \\| x\\\\ called 0 time(s) |');
     expect(markdown).toContain('## Final checks');
   });
 
