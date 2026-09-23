@@ -20,14 +20,25 @@ export {
 export {
   KB_ALIASES,
   KB_COMPONENT_TYPES,
-  KB_STATUS_LABELS_JA,
+  KB_STATUS_MESSAGE_KEYS,
   KB_STATUS_TONE_MAP,
   TABS_SELECT_ACTION,
   isKbStatus,
   resolveKbType,
-  statusLabelJa,
+  statusLabel,
   statusTone,
 } from './catalog.js';
+export {
+  KB_UI_DEFAULT_LOCALE,
+  KB_UI_DEFAULT_MESSAGES,
+  KB_UI_MESSAGE_KEYS,
+  KbI18nProvider,
+  createKbTranslator,
+  useKbI18n,
+  type KbI18nProviderProps,
+  type KbI18nValue,
+  type KbTranslate,
+} from './i18n.js';
 export { KB_ICON_NAMES, KbIcon, type KbIconProps } from './icons.js';
 export { safeHref } from './safety.js';
 export {

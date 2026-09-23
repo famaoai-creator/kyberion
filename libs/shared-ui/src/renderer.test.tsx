@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { getUiMessageBundle } from '@agent/core';
 import {
   KB_STATUS_VALUES,
   KB_STATUS_TONES,
@@ -11,7 +12,7 @@ import {
   A2UIRenderer,
   KB_ALIASES,
   KB_COMPONENT_TYPES,
-  KB_STATUS_LABELS_JA,
+  KB_STATUS_MESSAGE_KEYS,
   KB_STATUS_TONE_MAP,
   resolveKbType,
   type A2UIRendererComponent,
@@ -25,7 +26,7 @@ describe('client-safe catalog mirror stays in lock-step with @agent/core/a2ui-ca
     expect([...KB_COMPONENT_TYPES]).toEqual([...KYBERION_BASE_COMPONENT_TYPES]);
     expect({ ...KB_ALIASES }).toEqual({ ...KYBERION_BASE_ALIASES });
     expect({ ...KB_STATUS_TONE_MAP }).toEqual({ ...KB_STATUS_TONES });
-    expect(Object.keys(KB_STATUS_LABELS_JA).sort()).toEqual([...KB_STATUS_VALUES].sort());
+    expect(Object.keys(KB_STATUS_MESSAGE_KEYS).sort()).toEqual([...KB_STATUS_VALUES].sort());
     for (const type of ['ui:table', 'text', 'card', 'display:table', 'nope']) {
       expect(resolveKbType(type)).toBe(resolveKyberionBaseType(type));
     }
@@ -132,7 +133,11 @@ describe('A2UIRenderer', () => {
     expect(dev).toContain(
       '<div class="kb-callout" data-tone="warning" role="note" data-unknown-type="kb-mystery">'
     );
-    expect(dev).toContain('<p class="kb-callout__title">未対応のコンポーネント: kb-mystery</p>');
+    expect(dev).toContain('<p class="kb-callout__title">Unsupported component: kb-mystery</p>');
+    const ja = getUiMessageBundle('ja');
+    expect(
+      render({ components, showUnknown: true, locale: ja.locale, messages: ja.messages })
+    ).toContain('<p class="kb-callout__title">未対応のコンポーネント: kb-mystery</p>');
     expect(render({ components, showUnknown: false })).toBe('');
   });
 

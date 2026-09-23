@@ -1,11 +1,14 @@
 <!doctype html>
-<html lang="ja" data-theme="light" data-density="comfortable">
+<html lang="en" data-theme="light" data-density="comfortable">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>UI ギャラリー — Kyberion</title>
+    <title data-i18n="presence_studio:ui_gallery_page_title">UI gallery — Kyberion</title>
     <!-- UI-04: every kyberion-base (`ui:*`) component, rendered by the shared
-         vanilla renderer (libs/shared-ui/vanilla, served at /shared-ui/). -->
+         vanilla renderer (libs/shared-ui/vanilla, served at /shared-ui/).
+         UI-01d: chrome text comes from the vocabulary catalog
+         (`data-i18n` keys, /ui-gallery/vocabulary/<locale>.json); the English
+         text below is only the no-script / load-failure fallback. -->
     <link rel="stylesheet" href="/design-tokens.css" />
     <link rel="stylesheet" href="/kyberion-ui.css" />
     <link rel="stylesheet" href="/ui-gallery.css" />
@@ -14,46 +17,76 @@
   <body class="gallery">
     <header class="gallery-toolbar">
       <div class="gallery-toolbar__titles">
-        <h1 class="gallery-toolbar__title">UI ギャラリー</h1>
-        <p class="gallery-toolbar__subtitle">kyberion-base カタログの全コンポーネント</p>
+        <h1 class="gallery-toolbar__title" data-i18n="presence_studio:ui_gallery_title">
+          UI gallery
+        </h1>
+        <p class="gallery-toolbar__subtitle" data-i18n="presence_studio:ui_gallery_subtitle">
+          Every component in the kyberion-base catalog
+        </p>
       </div>
       <div class="gallery-toolbar__controls">
         <fieldset class="gallery-toggle">
-          <legend>テーマ</legend>
+          <legend data-i18n="presence_studio:ui_gallery_language">Language</legend>
+          <!-- Language names are autonyms: each is written in its own language. -->
+          <button
+            type="button"
+            class="kb-btn kb-btn--secondary"
+            data-set-lang="en"
+            lang="en"
+            aria-pressed="true"
+          >
+            English
+          </button>
+          <button
+            type="button"
+            class="kb-btn kb-btn--secondary"
+            data-set-lang="ja"
+            lang="ja"
+            aria-pressed="false"
+          >
+            日本語
+          </button>
+        </fieldset>
+        <fieldset class="gallery-toggle">
+          <legend data-i18n="presence_studio:ui_gallery_theme">Theme</legend>
           <button
             type="button"
             class="kb-btn kb-btn--secondary"
             data-set-theme="light"
+            data-i18n="presence_studio:ui_gallery_theme_light"
             aria-pressed="true"
           >
-            ライト
+            Light
           </button>
           <button
             type="button"
             class="kb-btn kb-btn--secondary"
             data-set-theme="dark"
+            data-i18n="presence_studio:ui_gallery_theme_dark"
             aria-pressed="false"
           >
-            ダーク
+            Dark
           </button>
         </fieldset>
         <fieldset class="gallery-toggle">
-          <legend>密度</legend>
+          <legend data-i18n="presence_studio:ui_gallery_density">Density</legend>
           <button
             type="button"
             class="kb-btn kb-btn--secondary"
             data-set-density="comfortable"
+            data-i18n="presence_studio:ui_gallery_density_comfortable"
             aria-pressed="true"
           >
-            ゆったり
+            Comfortable
           </button>
           <button
             type="button"
             class="kb-btn kb-btn--secondary"
             data-set-density="compact"
+            data-i18n="presence_studio:ui_gallery_density_compact"
             aria-pressed="false"
           >
-            コンパクト
+            Compact
           </button>
         </fieldset>
       </div>
@@ -62,12 +95,22 @@
     <main class="gallery-main">
       <section class="gallery-block gallery-block--sample" aria-labelledby="sample-title">
         <div class="gallery-block__intro">
-          <h2 class="gallery-block__title" id="sample-title">サンプル画面</h2>
+          <h2
+            class="gallery-block__title"
+            id="sample-title"
+            data-i18n="presence_studio:ui_gallery_sample_screen"
+          >
+            Sample screen
+          </h2>
           <p class="gallery-block__description" id="sample-description"></p>
         </div>
         <div class="gallery-frame" id="sample-screen"></div>
       </section>
-      <nav class="gallery-index" aria-label="コンポーネント一覧">
+      <nav
+        class="gallery-index"
+        aria-label="Component index"
+        data-i18n-aria-label="presence_studio:ui_gallery_index_label"
+      >
         <ul id="gallery-index"></ul>
       </nav>
       <div id="gallery-sections"></div>

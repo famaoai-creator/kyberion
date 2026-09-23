@@ -4,7 +4,11 @@
  * reach attributes (column widths). Everything here is pure.
  */
 
-import { safeHref as safeHrefVanilla } from '../vanilla/kyberion-ui.js';
+import {
+  KB_UI_MESSAGE_KEYS,
+  safeHref as safeHrefVanilla,
+  type KbTranslate,
+} from '../vanilla/kyberion-ui.js';
 
 /**
  * Return `href` when it is safe to put in an `<a href>`, otherwise `undefined`.
@@ -29,9 +33,11 @@ export function asArray<T>(value: T[] | undefined | null): T[] {
   return Array.isArray(value) ? value : [];
 }
 
-/** Display formatting for scalar cell / kv values. */
-export function formatScalar(value: unknown): string {
+/** Display formatting for scalar cell / kv values; booleans go through `translate`. */
+export function formatScalar(value: unknown, translate: KbTranslate): string {
   if (value === null || value === undefined || value === '') return '—';
-  if (typeof value === 'boolean') return value ? 'はい' : 'いいえ';
+  if (typeof value === 'boolean') {
+    return translate(value ? KB_UI_MESSAGE_KEYS.valueYes : KB_UI_MESSAGE_KEYS.valueNo);
+  }
   return String(value);
 }

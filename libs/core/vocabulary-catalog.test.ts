@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   _resetVocabularyCatalogCacheForTests,
+  getUiMessageBundle,
   loadVocabularyCatalog,
   resolveVocabularyEntry,
 } from './vocabulary-catalog.js';
-import { createBrowserVocabularyResolver } from './locale-normalize.js';
+import {
+  SUPPORTED_LOCALES,
+  buildUiMessageBundle,
+  createBrowserVocabularyResolver,
+} from './locale-normalize.js';
 
 afterEach(() => {
   _resetVocabularyCatalogCacheForTests();
@@ -65,5 +70,33 @@ describe('browser vocabulary resolver', () => {
 
   it('keeps missing keys visible instead of inventing user-facing copy', () => {
     expect(resolver.renderText('missing:surface_key', 'ja')).toBe('missing:surface_key');
+  });
+});
+
+describe('UI-01d: ui message bundle', () => {
+  it('builds one locale of the ui domain with qualified keys and default-locale fallback', () => {
+    const bundle = buildUiMessageBundle(
+      {
+        default_locale: 'en',
+        domains: {
+          ui: { a: { en: 'A', ja: 'エー' }, b: { en: 'B' }, c: {} },
+          other: { a: { en: 'not ui' } },
+        },
+      },
+      'ja'
+    );
+    expect(bundle).toEqual({ locale: 'ja', messages: { 'ui:a': 'エー', 'ui:b': 'B' } });
+  });
+
+  it('covers every ui key in every supported locale from the real catalog', () => {
+    const catalog = loadVocabularyCatalog()!;
+    const keys = Object.keys(catalog.domains.ui).map((key) => `ui:${key}`);
+    expect(keys.length).toBeGreaterThan(40);
+    for (const locale of SUPPORTED_LOCALES) {
+      const { messages } = getUiMessageBundle(locale);
+      expect(Object.keys(messages).sort()).toEqual([...keys].sort());
+    }
+    expect(getUiMessageBundle('ja').messages['ui:skeleton_loading']).toBe('読み込み中');
+    expect(getUiMessageBundle('en').messages['ui:skeleton_loading']).toBe('Loading');
   });
 });

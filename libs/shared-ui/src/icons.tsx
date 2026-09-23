@@ -13,9 +13,11 @@ export interface KbIconProps {
   name?: string;
   className?: string;
   size?: number;
+  /** Accessible name; makes the icon `role="img"` instead of decorative (`aria-hidden`). */
+  label?: string;
 }
 
-export function KbIcon({ name, className, size = 18 }: KbIconProps) {
+export function KbIcon({ name, className, size = 18, label }: KbIconProps) {
   const paths =
     name && Object.prototype.hasOwnProperty.call(KB_ICON_PATHS, name) ? KB_ICON_PATHS[name] : null;
   if (!paths) return null;
@@ -30,7 +32,9 @@ export function KbIcon({ name, className, size = 18 }: KbIconProps) {
       strokeWidth={1.8}
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden="true"
+      role={label ? 'img' : undefined}
+      aria-label={label || undefined}
+      aria-hidden={label ? undefined : 'true'}
       focusable="false"
     >
       {paths.map((d, index) => (

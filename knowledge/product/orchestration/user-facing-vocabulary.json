@@ -9674,6 +9674,76 @@
         "en": "Recording stopped (audio was too short; minutes were not generated).",
         "ja": "録音を終了しました（音声が短すぎたため議事録は未生成です）。",
         "qps-ploc": "⟦Řėƈőřḓïñɠ şŧőṗṗėḓ (ȧůḓïő ẇȧş ŧőő şħőřŧ; ɱïñůŧėş ẇėřė ñőŧ ɠėñėřȧŧėḓ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "ui_gallery_page_title": {
+        "en": "UI gallery — Kyberion",
+        "ja": "UI ギャラリー — Kyberion",
+        "qps-ploc": "⟦ŮÏ ɠȧŀŀėřẏ — Ķẏƀėřïőñ ŀőřėɱ ⟧"
+      },
+      "ui_gallery_title": {
+        "en": "UI gallery",
+        "ja": "UI ギャラリー",
+        "qps-ploc": "⟦ŮÏ ɠȧŀŀėřẏ ŀőř⟧"
+      },
+      "ui_gallery_subtitle": {
+        "en": "Every component in the kyberion-base catalog",
+        "ja": "kyberion-base カタログの全コンポーネント",
+        "qps-ploc": "⟦Ėṽėřẏ ƈőɱṗőñėñŧ ïñ ŧħė ķẏƀėřïőñ-ƀȧşė ƈȧŧȧŀőɠ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ui_gallery_language": {
+        "en": "Language",
+        "ja": "言語",
+        "qps-ploc": "⟦Ŀȧñɠůȧɠė ŀőř⟧"
+      },
+      "ui_gallery_theme": {
+        "en": "Theme",
+        "ja": "テーマ",
+        "qps-ploc": "⟦Ŧħėɱė ŀőř⟧"
+      },
+      "ui_gallery_theme_light": {
+        "en": "Light",
+        "ja": "ライト",
+        "qps-ploc": "⟦Ŀïɠħŧ ŀőř⟧"
+      },
+      "ui_gallery_theme_dark": {
+        "en": "Dark",
+        "ja": "ダーク",
+        "qps-ploc": "⟦Ḓȧřķ ŀőř⟧"
+      },
+      "ui_gallery_density": {
+        "en": "Density",
+        "ja": "密度",
+        "qps-ploc": "⟦Ḓėñşïŧẏ ŀőř⟧"
+      },
+      "ui_gallery_density_comfortable": {
+        "en": "Comfortable",
+        "ja": "ゆったり",
+        "qps-ploc": "⟦Ƈőɱƒőřŧȧƀŀė ŀőř⟧"
+      },
+      "ui_gallery_density_compact": {
+        "en": "Compact",
+        "ja": "コンパクト",
+        "qps-ploc": "⟦Ƈőɱṗȧƈŧ ŀőř⟧"
+      },
+      "ui_gallery_sample_screen": {
+        "en": "Sample screen",
+        "ja": "サンプル画面",
+        "qps-ploc": "⟦Şȧɱṗŀė şƈřėėñ ŀőřė⟧"
+      },
+      "ui_gallery_index_label": {
+        "en": "Component index",
+        "ja": "コンポーネント一覧",
+        "qps-ploc": "⟦Ƈőɱṗőñėñŧ ïñḓėẋ ŀőřė⟧"
+      },
+      "ui_gallery_action": {
+        "en": "Action: {id}",
+        "ja": "アクション: {id}",
+        "qps-ploc": "⟦Ȧƈŧïőñ: {id} ŀőř⟧"
+      },
+      "ui_gallery_load_failed": {
+        "en": "Could not load the sample data ({error})",
+        "ja": "サンプルデータを読み込めませんでした ({error})",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ŧħė şȧɱṗŀė ḓȧŧȧ ({error}) ŀőřėɱ ïṗşůɱ ḓ⟧"
       }
     },
     "tui": {
@@ -12050,6 +12120,288 @@
         "en": "Not started yet",
         "ja": "まだ始めていません",
         "qps-ploc": "⟦Ñőŧ şŧȧřŧėḓ ẏėŧ ŀőřė⟧"
+      }
+    },
+    "ui": {
+      "status_active": {
+        "en": "Active",
+        "ja": "進行中",
+        "qps-ploc": "⟦Ȧƈŧïṽė ŀőř⟧"
+      },
+      "status_archived": {
+        "en": "Archived",
+        "ja": "保管済み",
+        "qps-ploc": "⟦Ȧřƈħïṽėḓ ŀőř⟧"
+      },
+      "status_available": {
+        "en": "Available",
+        "ja": "利用可能",
+        "qps-ploc": "⟦Ȧṽȧïŀȧƀŀė ŀőř⟧"
+      },
+      "status_blocked": {
+        "en": "Needs attention",
+        "ja": "要対応",
+        "qps-ploc": "⟦Ñėėḓş ȧŧŧėñŧïőñ ŀőřė⟧"
+      },
+      "status_busy": {
+        "en": "Busy",
+        "ja": "処理中",
+        "qps-ploc": "⟦Ƀůşẏ ŀőř⟧"
+      },
+      "status_completed": {
+        "en": "Completed",
+        "ja": "完了",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ŀőř⟧"
+      },
+      "status_connected": {
+        "en": "Connected",
+        "ja": "接続済み",
+        "qps-ploc": "⟦Ƈőññėƈŧėḓ ŀőř⟧"
+      },
+      "status_connecting": {
+        "en": "Connecting",
+        "ja": "接続中",
+        "qps-ploc": "⟦Ƈőññėƈŧïñɠ ŀőř⟧"
+      },
+      "status_degraded": {
+        "en": "Degraded",
+        "ja": "品質低下",
+        "qps-ploc": "⟦Ḓėɠřȧḓėḓ ŀőř⟧"
+      },
+      "status_disconnected": {
+        "en": "Disconnected",
+        "ja": "未接続",
+        "qps-ploc": "⟦Ḓïşƈőññėƈŧėḓ ŀőř⟧"
+      },
+      "status_distilling": {
+        "en": "Distilling lessons",
+        "ja": "学習整理中",
+        "qps-ploc": "⟦Ḓïşŧïŀŀïñɠ ŀėşşőñş ŀőřėɱ⟧"
+      },
+      "status_done": {
+        "en": "Done",
+        "ja": "完了",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "status_error": {
+        "en": "Error",
+        "ja": "エラー",
+        "qps-ploc": "⟦Ėřřőř ŀőř⟧"
+      },
+      "status_failed": {
+        "en": "Failed",
+        "ja": "失敗",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŀőř⟧"
+      },
+      "status_fallback": {
+        "en": "Fallback",
+        "ja": "代替",
+        "qps-ploc": "⟦Ƒȧŀŀƀȧƈķ ŀőř⟧"
+      },
+      "status_fully_automatable": {
+        "en": "Ready to run",
+        "ja": "そのまま実行可能",
+        "qps-ploc": "⟦Řėȧḓẏ ŧő řůñ ŀőř⟧"
+      },
+      "status_missing": {
+        "en": "Not set up",
+        "ja": "未設定",
+        "qps-ploc": "⟦Ñőŧ şėŧ ůṗ ŀőř⟧"
+      },
+      "status_missing_runtime_prerequisites": {
+        "en": "Missing runtime prerequisites",
+        "ja": "実行環境が不足",
+        "qps-ploc": "⟦Ɱïşşïñɠ řůñŧïɱė ṗřėřėɋůïşïŧėş ŀőřėɱ ïṗş⟧"
+      },
+      "status_not_applicable": {
+        "en": "Not required",
+        "ja": "不要",
+        "qps-ploc": "⟦Ñőŧ řėɋůïřėḓ ŀőř⟧"
+      },
+      "status_needs_assets": {
+        "en": "Needs external assets",
+        "ja": "外部素材が必要",
+        "qps-ploc": "⟦Ñėėḓş ėẋŧėřñȧŀ ȧşşėŧş ŀőřėɱ ⟧"
+      },
+      "status_needs_clarification": {
+        "en": "Needs clarification",
+        "ja": "追加確認が必要",
+        "qps-ploc": "⟦Ñėėḓş ƈŀȧřïƒïƈȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "status_needs_external_assets": {
+        "en": "Needs external assets",
+        "ja": "外部素材が必要",
+        "qps-ploc": "⟦Ñėėḓş ėẋŧėřñȧŀ ȧşşėŧş ŀőřėɱ ⟧"
+      },
+      "status_needs_runtime_prerequisites": {
+        "en": "Missing runtime prerequisites",
+        "ja": "実行環境が不足",
+        "qps-ploc": "⟦Ɱïşşïñɠ řůñŧïɱė ṗřėřėɋůïşïŧėş ŀőřėɱ ïṗş⟧"
+      },
+      "status_needs_setup": {
+        "en": "Setup required",
+        "ja": "設定が必要",
+        "qps-ploc": "⟦Şėŧůṗ řėɋůïřėḓ ŀőřė⟧"
+      },
+      "status_offline": {
+        "en": "Offline",
+        "ja": "未接続",
+        "qps-ploc": "⟦Őƒƒŀïñė ŀőř⟧"
+      },
+      "status_paused": {
+        "en": "Paused",
+        "ja": "一時停止",
+        "qps-ploc": "⟦Ṗȧůşėḓ ŀőř⟧"
+      },
+      "status_pending": {
+        "en": "Pending",
+        "ja": "確認待ち",
+        "qps-ploc": "⟦Ṗėñḓïñɠ ŀőř⟧"
+      },
+      "status_planned": {
+        "en": "Planned",
+        "ja": "予定",
+        "qps-ploc": "⟦Ṗŀȧññėḓ ŀőř⟧"
+      },
+      "status_ready": {
+        "en": "Ready",
+        "ja": "準備完了",
+        "qps-ploc": "⟦Řėȧḓẏ ŀőř⟧"
+      },
+      "status_recovered": {
+        "en": "Recovered",
+        "ja": "復旧",
+        "qps-ploc": "⟦Řėƈőṽėřėḓ ŀőř⟧"
+      },
+      "status_review": {
+        "en": "In review",
+        "ja": "レビュー",
+        "qps-ploc": "⟦Ïñ řėṽïėẇ ŀőř⟧"
+      },
+      "status_running": {
+        "en": "Running",
+        "ja": "稼働中",
+        "qps-ploc": "⟦Řůññïñɠ ŀőř⟧"
+      },
+      "status_stale": {
+        "en": "Slow to respond",
+        "ja": "応答遅延",
+        "qps-ploc": "⟦Şŀőẇ ŧő řėşṗőñḓ ŀőřė⟧"
+      },
+      "status_stopped": {
+        "en": "Stopped",
+        "ja": "停止",
+        "qps-ploc": "⟦Şŧőṗṗėḓ ŀőř⟧"
+      },
+      "status_unavailable": {
+        "en": "Unavailable",
+        "ja": "利用不可",
+        "qps-ploc": "⟦Ůñȧṽȧïŀȧƀŀė ŀőř⟧"
+      },
+      "status_working": {
+        "en": "Working",
+        "ja": "処理中",
+        "qps-ploc": "⟦Ẇőřķïñɠ ŀőř⟧"
+      },
+      "status_readiness_ready": {
+        "en": "Ready to run",
+        "ja": "そのまま実行可能",
+        "qps-ploc": "⟦Řėȧḓẏ ŧő řůñ ŀőř⟧"
+      },
+      "status_connection_ready": {
+        "en": "Connected",
+        "ja": "接続済み",
+        "qps-ploc": "⟦Ƈőññėƈŧėḓ ŀőř⟧"
+      },
+      "status_connection_degraded": {
+        "en": "Connection degraded",
+        "ja": "接続品質が低下",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñ ḓėɠřȧḓėḓ ŀőřėɱ ⟧"
+      },
+      "status_connection_offline": {
+        "en": "Disconnected",
+        "ja": "未接続",
+        "qps-ploc": "⟦Ḓïşƈőññėƈŧėḓ ŀőř⟧"
+      },
+      "status_provider_ready": {
+        "en": "Available",
+        "ja": "利用可能",
+        "qps-ploc": "⟦Ȧṽȧïŀȧƀŀė ŀőř⟧"
+      },
+      "status_provider_missing": {
+        "en": "Not installed",
+        "ja": "未導入",
+        "qps-ploc": "⟦Ñőŧ ïñşŧȧŀŀėḓ ŀőřė⟧"
+      },
+      "status_provider_unavailable": {
+        "en": "Error",
+        "ja": "エラー",
+        "qps-ploc": "⟦Ėřřőř ŀőř⟧"
+      },
+      "status_mission_blocked": {
+        "en": "Stopped",
+        "ja": "停止中",
+        "qps-ploc": "⟦Şŧőṗṗėḓ ŀőř⟧"
+      },
+      "status_mission_done": {
+        "en": "Done",
+        "ja": "完了",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "table_empty": {
+        "en": "No data",
+        "ja": "データがありません",
+        "qps-ploc": "⟦Ñő ḓȧŧȧ ŀőř⟧"
+      },
+      "skeleton_loading": {
+        "en": "Loading",
+        "ja": "読み込み中",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ŀőř⟧"
+      },
+      "unknown_component": {
+        "en": "Unsupported component: {type}",
+        "ja": "未対応のコンポーネント: {type}",
+        "qps-ploc": "⟦Ůñşůṗṗőřŧėḓ ƈőɱṗőñėñŧ: {type} ŀőřėɱ ïṗş⟧"
+      },
+      "value_yes": {
+        "en": "Yes",
+        "ja": "はい",
+        "qps-ploc": "⟦Ẏėş ŀőř⟧"
+      },
+      "value_no": {
+        "en": "No",
+        "ja": "いいえ",
+        "qps-ploc": "⟦Ñő ŀőř⟧"
+      },
+      "disclosure_summary": {
+        "en": "Details",
+        "ja": "詳細",
+        "qps-ploc": "⟦Ḓėŧȧïŀş ŀőř⟧"
+      },
+      "nav_label": {
+        "en": "Navigation",
+        "ja": "ナビゲーション",
+        "qps-ploc": "⟦Ñȧṽïɠȧŧïőñ ŀőř⟧"
+      },
+      "tabs_label": {
+        "en": "Views",
+        "ja": "表示の切り替え",
+        "qps-ploc": "⟦Ṽïėẇş ŀőř⟧"
+      },
+      "metric_trend_up": {
+        "en": "Up",
+        "ja": "増加",
+        "qps-ploc": "⟦Ůṗ ŀőř⟧"
+      },
+      "metric_trend_down": {
+        "en": "Down",
+        "ja": "減少",
+        "qps-ploc": "⟦Ḓőẇñ ŀőř⟧"
+      },
+      "metric_trend_flat": {
+        "en": "No change",
+        "ja": "横ばい",
+        "qps-ploc": "⟦Ñő ƈħȧñɠė ŀőř⟧"
       }
     }
   }
