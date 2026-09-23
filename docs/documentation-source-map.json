@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "manifest_version": 1,
-  "last_reviewed": "2026-08-25",
+  "last_reviewed": "2026-09-23",
   "purpose": "Single navigation authority for overlapping status, concept, and onboarding documentation. Listed supporting documents remain useful but do not override the canonical source for their category or scope.",
   "categories": [
     {
       "id": "status",
       "canonical": "docs/developer/improvement-plans-2026-08/README.ja.md",
-      "canonical_scope": "Current improvement-plan status is indexed here; each plan owns its implementation-status details.",
+      "canonical_scope": "The current improvement-plan status is indexed here; monthly indexes organize current and historical plans.",
       "supporting": [
         "docs/PRODUCTIZATION_ROADMAP.md",
         "docs/ROADMAP.md",

@@ -20,7 +20,7 @@ Computer Surface の `/api/identity`・`/api/state`・`/api/stream`・`/api/os/c
 
 ## フロントデスク(共有レール)
 
-秘書室(concierge)と相棒(presence-studio)は別サーフェスのままだが、人には「人の動詞 5 つ」の 1 つのメニューに見える共有レールを持つ([FRONT_DESK_REDESIGN_PLAN](./developer/improvement-plans-2026-08/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md))。
+秘書室(concierge)と相棒(presence-studio)は別サーフェスのままだが、人には「人の動詞 5 つ」の 1 つのメニューに見える共有レールを持つ([FRONT_DESK_REDESIGN_PLAN](./developer/improvement-plans-2026-09/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md))。
 
 | メニュー     | 答える問い        | ホストするサーフェス  | パス        |
 | ------------ | ----------------- | --------------------- | ----------- |
