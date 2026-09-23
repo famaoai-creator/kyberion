@@ -15,6 +15,7 @@
 
 import { playAudioFile, type PlaybackHandle } from './audio-playback.js';
 import { splitVoiceTextIntoChunks } from './voice-text-chunking.js';
+import { createPlaybackPauseGate } from './streaming-voice-playback.js';
 
 /** Sentence-sized segments: small enough that the first chunk synthesizes fast. */
 export const DEFAULT_SPEECH_SEGMENT_CHARS = 160;
@@ -51,6 +52,9 @@ export interface SegmentedSpeechController {
   done: Promise<SegmentedSpeechResult>;
   /** Stop speaking now: halts playback and discards pending synthesis. Idempotent. */
   stop(): Promise<SegmentedSpeechResult>;
+  /** Hold before the next segment starts (the current file segment plays out). */
+  pause?(): void;
+  resume?(): void;
 }
 
 export function speakSegmented(options: SegmentedSpeechOptions): SegmentedSpeechController {
@@ -62,6 +66,7 @@ export function speakSegmented(options: SegmentedSpeechOptions): SegmentedSpeech
 
   let cancelled = false;
   let currentPlayback: PlaybackHandle | null = null;
+  const gate = createPlaybackPauseGate();
   const startedAt = Date.now();
   let firstAudioMs: number | null = null;
   const audioPaths: string[] = [];
@@ -103,6 +108,8 @@ export function speakSegmented(options: SegmentedSpeechOptions): SegmentedSpeech
         }
         const audioPath = synthesis.path;
         if (cancelled) break;
+        await Promise.race([gate.wait(), cancellation]);
+        if (cancelled) break;
         nextSynthesis =
           index + 1 < segments.length ? synthesize(segments[index + 1], index + 1) : null;
         audioPaths.push(audioPath);
@@ -143,10 +150,13 @@ export function speakSegmented(options: SegmentedSpeechOptions): SegmentedSpeech
 
   return {
     done,
+    pause: () => gate.pause(),
+    resume: () => gate.resume(),
     stop: async () => {
       cancelled = true;
       abortController.abort();
       resolveCancellation?.();
+      gate.resume();
       if (currentPlayback) {
         await currentPlayback.stop();
       }
