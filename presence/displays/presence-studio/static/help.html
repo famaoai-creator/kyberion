@@ -1,52 +1,96 @@
 <!doctype html>
-<html lang="ja">
+<html lang="{{locale}}" data-density="comfortable">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>使い方を見る — Kyberion</title>
-    <!-- Kyberion Design System (DS-01 canonical tokens) -->
-    <link rel="stylesheet" href="./design-system.css" />
-    <link rel="stylesheet" href="/api/design-tokens.css" />
-    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <title>{{t:front_desk:nav_help}} — Kyberion</title>
+    <!-- UI-06: theme + language applied before first paint (kyberion.ui.theme / kyberion.ui.locale) -->
+    <script src="/front-desk-prefs.js"></script>
+    <!-- Kyberion Design System: generated --kb-ui-* tokens + kyberion-base component classes -->
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/kyberion-ui.css" />
+    <link rel="stylesheet" href="/design-system.css" />
+    <!-- FD-00 / UI-05: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
     <link rel="stylesheet" href="/front-desk-rail.css" />
     <!-- FD-08: help page styles -->
     <link rel="stylesheet" href="/help.css" />
   </head>
   <body>
-    <div class="fd-layout">
-      <nav id="front-desk-rail" class="front-desk-rail"></nav>
-      <div class="fd-content">
-        <main class="help-shell">
-          <h1 class="help-title" id="help-title">使い方を見る</h1>
+    <div class="kb-app-shell" data-density="comfortable">
+      <div class="kb-app-shell__nav" id="front-desk-rail">{{partial:rail}}</div>
+      <main class="kb-app-shell__main">
+        <header class="kb-page-header">
+          <div class="kb-page-header__titles">
+            <h1 class="kb-page-header__title">
+              <span id="help-title">{{t:front_desk:nav_help}}</span>
+              <span class="kb-badge" data-role="presence-studio"
+                >{{t:presence_studio:shell_role_badge}}</span
+              >
+            </h1>
+          </div>
+          {{partial:shell-controls}}
+        </header>
 
+        <div class="ps-page">
           <section class="help-tracks" aria-live="polite">
-            <div id="training-content"></div>
+            <div id="training-content">
+              <div
+                class="kb-skeleton"
+                data-shape="card"
+                role="status"
+                aria-busy="true"
+                aria-label="{{t:ui:skeleton_loading}}"
+              >
+                <span class="kb-skeleton__line" aria-hidden="true"></span>
+                <span class="kb-skeleton__line" aria-hidden="true"></span>
+              </div>
+            </div>
           </section>
 
-          <section class="help-card">
-            <h2 class="help-card-title" id="help-ask-title">頼む</h2>
-            <p class="help-card-sub" id="help-ask-sub">話す・書く</p>
-            <a class="help-card-link" id="help-ask-link" href="/ask">頼む</a>
-          </section>
+          <div class="kb-grid help-verbs" data-columns="3">
+            <section class="kb-section help-card">
+              <h2 class="kb-section__title" id="help-ask-title">{{t:front_desk:nav_ask}}</h2>
+              <p class="kb-section__description" id="help-ask-sub">{{t:front_desk:nav_ask_sub}}</p>
+              <div>
+                <a class="kb-btn kb-btn--secondary" id="help-ask-link" href="/ask"
+                  >{{t:front_desk:nav_ask}}</a
+                >
+              </div>
+            </section>
 
-          <section class="help-card">
-            <h2 class="help-card-title" id="help-decide-title">決める</h2>
-            <p class="help-card-sub" id="help-decide-sub">承認・例外</p>
-            <a class="help-card-link" id="help-decide-link" href="#">決める</a>
-          </section>
+            <section class="kb-section help-card">
+              <h2 class="kb-section__title" id="help-decide-title">{{t:front_desk:nav_decide}}</h2>
+              <p class="kb-section__description" id="help-decide-sub">
+                {{t:front_desk:nav_decide_sub}}
+              </p>
+              <div>
+                <a class="kb-btn kb-btn--secondary" id="help-decide-link" href="#"
+                  >{{t:front_desk:nav_decide}}</a
+                >
+              </div>
+            </section>
 
-          <section class="help-card">
-            <h2 class="help-card-title" id="help-progress-title">進み具合</h2>
-            <p class="help-card-sub" id="help-progress-sub">進行中・できたもの</p>
-            <a class="help-card-link" id="help-progress-link" href="/progress">進み具合</a>
-          </section>
-        </main>
-      </div>
+            <section class="kb-section help-card">
+              <h2 class="kb-section__title" id="help-progress-title">
+                {{t:front_desk:nav_progress}}
+              </h2>
+              <p class="kb-section__description" id="help-progress-sub">
+                {{t:front_desk:nav_progress_sub}}
+              </p>
+              <div>
+                <a class="kb-btn kb-btn--secondary" id="help-progress-link" href="/progress"
+                  >{{t:front_desk:nav_progress}}</a
+                >
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
     </div>
-    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
-    <script src="/front-desk-rail.js"></script>
     <script src="/help.js"></script>
-    <script>
+    <!-- FD-00 / UI-05: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script type="module" src="/front-desk-rail.js"></script>
+    <script type="module">
       if (window.FrontDeskRail) {
         window.FrontDeskRail.mount(document.getElementById('front-desk-rail'), { current: null });
       }

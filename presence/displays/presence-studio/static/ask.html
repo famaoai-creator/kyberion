@@ -1,107 +1,160 @@
 <!doctype html>
-<html lang="ja">
+<html lang="{{locale}}" data-density="comfortable">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>頼む — Kyberion</title>
-    <!-- Kyberion Design System (DS-01 canonical tokens) -->
-    <link rel="stylesheet" href="./design-system.css" />
-    <link rel="stylesheet" href="/api/design-tokens.css" />
-    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <title>{{t:front_desk:nav_ask}} — Kyberion</title>
+    <!-- UI-06: theme + language applied before first paint (kyberion.ui.theme / kyberion.ui.locale) -->
+    <script src="/front-desk-prefs.js"></script>
+    <!-- Kyberion Design System: generated --kb-ui-* tokens + kyberion-base component classes -->
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/kyberion-ui.css" />
+    <link rel="stylesheet" href="/design-system.css" />
+    <!-- FD-00 / UI-05: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
     <link rel="stylesheet" href="/front-desk-rail.css" />
     <!-- FD-03: ask page styles -->
     <link rel="stylesheet" href="/ask.css" />
   </head>
   <body>
-    <div class="fd-layout">
-      <nav id="front-desk-rail" class="front-desk-rail"></nav>
-      <div class="fd-content">
-        <main class="ask-shell">
-          <header class="ask-header">
-            <div class="ask-header-spacer"></div>
-            <button
-              type="button"
-              id="handsfree-toggle"
-              class="ask-handsfree-toggle"
-              aria-pressed="false"
-            ></button>
-          </header>
+    <div class="kb-app-shell" data-density="comfortable">
+      <div class="kb-app-shell__nav" id="front-desk-rail">{{partial:rail}}</div>
+      <main class="kb-app-shell__main">
+        <header class="kb-page-header">
+          <div class="kb-page-header__titles">
+            <h1 class="kb-page-header__title">
+              {{t:front_desk:nav_ask}}
+              <span class="kb-badge" data-role="presence-studio"
+                >{{t:presence_studio:shell_role_badge}}</span
+              >
+            </h1>
+            <p class="kb-page-header__subtitle">{{t:front_desk:nav_ask_sub}}</p>
+          </div>
+          {{partial:shell-controls}}
+        </header>
 
-          <div class="ask-columns">
-            <section class="ask-conversation-col" aria-label="会話">
-              <div class="ask-conversation-scroll" id="conversation-scroll">
-                <div class="ask-date-separator" id="date-separator"></div>
-                <ol class="ask-turns" id="turns"></ol>
-                <p class="ask-empty hidden" id="ask-empty"></p>
-              </div>
+        <div class="ps-page ask-columns">
+          <section
+            class="kb-section ask-conversation"
+            aria-label="{{t:presence_studio:ask_conversation_label}}"
+          >
+            <div class="ask-toolbar">
+              <div class="ask-date-separator" id="date-separator">{{t:front_desk:ask_today}}</div>
+              <button
+                type="button"
+                id="handsfree-toggle"
+                class="kb-btn kb-btn--ghost ask-handsfree-toggle"
+                aria-pressed="false"
+              >
+                {{t:front_desk:ask_handsfree_off}}
+              </button>
+            </div>
+            <div class="ask-conversation-scroll" id="conversation-scroll">
+              <ol class="ask-turns" id="turns"></ol>
+              <p class="ask-empty" id="ask-empty">{{t:front_desk:ask_empty}}</p>
+            </div>
 
-              <form id="ask-form" class="ask-input-row">
-                <input type="text" id="ask-input" class="ask-input" autocomplete="off" />
-                <button type="button" id="ask-mic" class="ask-icon-button" aria-label=""></button>
-                <button
-                  type="submit"
-                  id="ask-send"
-                  class="ask-icon-button ask-send-button"
-                  aria-label=""
-                ></button>
-              </form>
-              <div class="ask-chips" id="ask-chips">
-                <button type="button" class="ask-chip" data-chip="email"></button>
-                <button type="button" class="ask-chip" data-chip="minutes"></button>
-                <button type="button" class="ask-chip" data-chip="browser"></button>
-                <button type="button" class="ask-chip" data-chip="webapp"></button>
+            <form id="ask-form" class="ask-input-row">
+              <input
+                type="text"
+                id="ask-input"
+                class="kb-input ask-input"
+                autocomplete="off"
+                placeholder="{{t:front_desk:home_ask_placeholder}}"
+                aria-label="{{t:front_desk:nav_ask}}"
+              />
+              <button
+                type="button"
+                id="ask-mic"
+                class="kb-btn kb-btn--secondary ask-icon-button"
+                aria-label="{{t:front_desk:home_ask_voice}}"
+              ></button>
+              <button
+                type="submit"
+                id="ask-send"
+                class="kb-btn kb-btn--primary ask-icon-button"
+                aria-label="{{t:front_desk:home_ask_send}}"
+              ></button>
+            </form>
+            <div class="ask-chips" id="ask-chips">
+              <button type="button" class="kb-btn kb-btn--secondary ask-chip" data-chip="email">
+                {{t:front_desk:chip_email}}
+              </button>
+              <button type="button" class="kb-btn kb-btn--secondary ask-chip" data-chip="minutes">
+                {{t:front_desk:chip_minutes}}
+              </button>
+              <button type="button" class="kb-btn kb-btn--secondary ask-chip" data-chip="browser">
+                {{t:front_desk:chip_browser}}
+              </button>
+              <button type="button" class="kb-btn kb-btn--secondary ask-chip" data-chip="webapp">
+                {{t:front_desk:chip_webapp}}
+              </button>
+            </div>
+          </section>
+
+          <aside class="ask-about" aria-label="{{t:front_desk:ask_about_title}}">
+            <section class="kb-section hidden" id="hearing-card">
+              <h2 class="kb-section__title" id="hearing-title">{{t:front_desk:hearing_title}}</h2>
+              <p class="ask-about-text" id="hearing-coverage"></p>
+              <iframe id="hearing-canvas" class="hearing-canvas" sandbox=""></iframe>
+              <p class="ask-about-label" id="hearing-canvas-status"></p>
+              <button
+                type="button"
+                class="kb-btn kb-btn--primary hidden"
+                id="hearing-decide"
+              ></button>
+              <button
+                type="button"
+                class="kb-btn kb-btn--primary hidden"
+                id="hearing-handoff"
+              ></button>
+              <p class="ask-about-text hidden" id="hearing-handoff-status"></p>
+              <a class="ask-about-text hidden" id="hearing-handoff-link" href=""></a>
+            </section>
+            <section class="kb-section" id="about-card">
+              <h2 class="kb-section__title" id="about-title">{{t:front_desk:ask_about_title}}</h2>
+              <div class="ask-about-block hidden" id="about-understood-block">
+                <p class="ask-about-label" id="about-understood-label"></p>
+                <p class="ask-about-text" id="about-understood-text"></p>
               </div>
+              <div class="ask-about-block hidden" id="about-state-block">
+                <p class="ask-about-label" id="about-state-label"></p>
+                <p class="ask-about-text" id="about-state-text"></p>
+              </div>
+              <div class="ask-about-block hidden" id="about-decision-block">
+                <p class="ask-about-label" id="about-decision-label"></p>
+                <p class="ask-about-text" id="about-decision-text"></p>
+              </div>
+              <div class="ask-about-block hidden" id="about-deliverable-block">
+                <p class="ask-about-label" id="about-deliverable-label"></p>
+                <p class="ask-about-text" id="about-deliverable-text"></p>
+              </div>
+              <p class="ask-about-empty" id="about-empty">{{t:front_desk:ask_empty}}</p>
             </section>
 
-            <aside class="ask-about-col" aria-label="この依頼について">
-              <div class="ask-card hidden" id="hearing-card">
-                <h2 id="hearing-title"></h2>
-                <p class="ask-about-text" id="hearing-coverage"></p>
-                <iframe id="hearing-canvas" class="hearing-canvas" sandbox=""></iframe>
-                <p class="ask-about-label" id="hearing-canvas-status"></p>
-                <button type="button" class="ask-action-button hidden" id="hearing-decide"></button>
-                <button
-                  type="button"
-                  class="ask-action-button hidden"
-                  id="hearing-handoff"
-                ></button>
-                <p class="ask-about-text hidden" id="hearing-handoff-status"></p>
-                <a class="ask-about-text hidden" id="hearing-handoff-link" href=""></a>
-              </div>
-              <div class="ask-card" id="about-card">
-                <h2 id="about-title"></h2>
-                <div class="ask-about-block" id="about-understood-block">
-                  <p class="ask-about-label" id="about-understood-label"></p>
-                  <p class="ask-about-text" id="about-understood-text"></p>
-                </div>
-                <div class="ask-about-block" id="about-state-block">
-                  <p class="ask-about-label" id="about-state-label"></p>
-                  <p class="ask-about-text" id="about-state-text"></p>
-                </div>
-                <div class="ask-about-block" id="about-decision-block">
-                  <p class="ask-about-label" id="about-decision-label"></p>
-                  <p class="ask-about-text" id="about-decision-text"></p>
-                </div>
-                <div class="ask-about-block" id="about-deliverable-block">
-                  <p class="ask-about-label" id="about-deliverable-label"></p>
-                  <p class="ask-about-text" id="about-deliverable-text"></p>
-                </div>
-                <p class="ask-about-empty" id="about-empty"></p>
-              </div>
-
-              <div class="ask-card" id="recent-card">
-                <h2 id="recent-title"></h2>
-                <ul class="ask-recent-list" id="recent-list"></ul>
-              </div>
-            </aside>
-          </div>
-        </main>
-      </div>
+            <section class="kb-section" id="recent-card">
+              <h2 class="kb-section__title" id="recent-title">{{t:front_desk:ask_recent}}</h2>
+              <ul class="ask-recent-list" id="recent-list">
+                <li>
+                  <div
+                    class="kb-skeleton"
+                    role="status"
+                    aria-busy="true"
+                    aria-label="{{t:ui:skeleton_loading}}"
+                  >
+                    <span class="kb-skeleton__line" aria-hidden="true"></span>
+                    <span class="kb-skeleton__line" aria-hidden="true"></span>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </main>
     </div>
-    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
-    <script src="/front-desk-rail.js"></script>
     <script src="/ask.js"></script>
-    <script>
+    <!-- FD-00 / UI-05: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script type="module" src="/front-desk-rail.js"></script>
+    <script type="module">
       if (window.FrontDeskRail) {
         window.FrontDeskRail.mount(document.getElementById('front-desk-rail'), { current: 'ask' });
       }
