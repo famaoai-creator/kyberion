@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "catalog": "kyberion-base",
+  "sections": [
+    {
+      "id": "talking-avatar",
+      "title": "話すアバター ui:talking-avatar",
+      "description": "発話に合わせて口が動くアバター。口の動きはホストの音量、AnalyserNode、AnimationCue の viseme、合成エンベロープから口パクエンジンが作り、avatar.ready で渡すコントローラ経由で動かします(props では動かしません)。表情はクロスフェードし、まばたきと呼吸は動きを減らす設定では止まります。ボタンで合成発話のデモを再生します。",
+      "components": [
+        {
+          "id": "ta-stack",
+          "type": "ui:stack",
+          "props": {
+            "gap": "lg",
+            "align": "start"
+          },
+          "children": ["ta-row", "ta-demo"]
+        },
+        {
+          "id": "ta-row",
+          "type": "ui:stack",
+          "props": {
+            "gap": "xl",
+            "direction": "horizontal",
+            "align": "center",
+            "wrap": true
+          },
+          "children": ["ta-speaking", "ta-listening", "ta-thinking", "ta-joy", "ta-fallback"]
+        },
+        {
+          "id": "ta-speaking",
+          "type": "ui:talking-avatar",
+          "props": {
+            "name": "kyberion",
+            "label": "Kyberion のアバター",
+            "images": {
+              "neutral": "/assets/avatars/kyberion-neutral.svg",
+              "joy": "/assets/avatars/kyberion-joy.svg",
+              "thinking": "/assets/avatars/kyberion-thinking.svg",
+              "listening": "/assets/avatars/kyberion-listening.svg",
+              "blink": "/assets/avatars/kyberion-blink.svg"
+            },
+            "state": "speaking",
+            "show_state": true,
+            "mouth": {
+              "x": 0.5,
+              "y": 0.51,
+              "width": 0.16
+            },
+            "mouth_mode": "overlay",
+            "size": "lg"
+          }
+        },
+        {
+          "id": "ta-listening",
+          "type": "ui:talking-avatar",
+          "props": {
+            "name": "slack",
+            "label": "Slack アシスタントのアバター",
+            "images": {
+              "neutral": "/assets/avatars/slack-neutral.svg",
+              "joy": "/assets/avatars/slack-joy.svg",
+              "thinking": "/assets/avatars/slack-thinking.svg",
+              "listening": "/assets/avatars/slack-listening.svg"
+            },
+            "state": "listening",
+            "show_state": true,
+            "mouth": {
+              "x": 0.5,
+              "y": 0.51,
+              "width": 0.16
+            },
+            "size": "md"
+          }
+        },
+        {
+          "id": "ta-thinking",
+          "type": "ui:talking-avatar",
+          "props": {
+            "name": "chronos",
+            "label": "Chronos のアバター",
+            "images": {
+              "neutral": "/assets/avatars/chronos-neutral.svg",
+              "joy": "/assets/avatars/chronos-joy.svg",
+              "thinking": "/assets/avatars/chronos-thinking.svg",
+              "listening": "/assets/avatars/chronos-listening.svg"
+            },
+            "state": "thinking",
+            "show_state": true,
+            "mouth": {
+              "x": 0.5,
+              "y": 0.51,
+              "width": 0.16
+            },
+            "size": "md",
+            "shape": "rounded"
+          }
+        },
+        {
+          "id": "ta-joy",
+          "type": "ui:talking-avatar",
+          "props": {
+            "name": "kyberion-joy",
+            "label": "Kyberion のアバター(うれしい)",
+            "images": {
+              "neutral": "/assets/avatars/kyberion-neutral.svg",
+              "joy": "/assets/avatars/kyberion-joy.svg",
+              "thinking": "/assets/avatars/kyberion-thinking.svg",
+              "listening": "/assets/avatars/kyberion-listening.svg"
+            },
+            "expression": "joy",
+            "mouth": {
+              "x": 0.5,
+              "y": 0.51,
+              "width": 0.16
+            },
+            "size": "sm"
+          }
+        },
+        {
+          "id": "ta-fallback",
+          "type": "ui:talking-avatar",
+          "props": {
+            "name": "missing",
+            "label": "画像のないアバター",
+            "images": {
+              "neutral": "/assets/avatars/missing-neutral.svg"
+            },
+            "fallback_initials": "KB",
+            "size": "md"
+          }
+        },
+        {
+          "id": "ta-demo",
+          "type": "ui:button",
+          "props": {
+            "label": "話す(デモ)",
+            "variant": "secondary",
+            "action": {
+              "id": "gallery.avatar.speak",
+              "payload": {
+                "name": "kyberion"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -732,6 +732,26 @@ body {
   font-size: var(--kb-ui-font-size-sm);
 }
 
+/* PA-09: the secretary's talking avatar (48px, ui:talking-avatar) beside the title. */
+.dock-header-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+
+.dock-avatar {
+  display: flex;
+  flex: none;
+}
+
+/* Short viewports keep the dock usable: the header stays one text line. */
+@media (max-height: 480px) {
+  .dock-avatar {
+    display: none;
+  }
+}
+
 .dock-collapse {
   padding: 2px var(--kb-ui-space-2);
   border: none;
