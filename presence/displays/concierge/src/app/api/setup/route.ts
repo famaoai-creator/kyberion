@@ -350,7 +350,9 @@ export async function POST(req: NextRequest) {
           ? ['action', 'tenant', 'agent', 'vision', 'name', 'primary_domain']
           : body.action === 'apply_onboarding'
             ? ['action', 'draft']
-            : ['action'];
+            : body.action === 'avatar_generate'
+              ? ['action', 'consent']
+              : ['action'];
       requireKnownRequestKeys(body, allowedKeys);
     } catch {
       return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
@@ -463,6 +465,17 @@ export async function POST(req: NextRequest) {
         })
       );
       return NextResponse.json({ ok: true, management: result });
+    }
+    if (body?.action === 'avatar_generate' || body?.action === 'avatar_use') {
+      // PA-10: owner-only; the viewer (not the body) supplies the consenting principal.
+      const viewer = resolveConciergeViewer(req);
+      if (viewer.response) return viewer.response;
+      // Loaded on demand so the other setup actions keep their light import graph.
+      const { startAvatarGenerateAction, useGeneratedAvatarAction } =
+        await import('./avatar-actions');
+      return body.action === 'avatar_generate'
+        ? startAvatarGenerateAction(body, viewer.context, t)
+        : useGeneratedAvatarAction(viewer.context, t);
     }
     if (body?.action !== 'apply_onboarding' || !body?.draft) {
       return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });

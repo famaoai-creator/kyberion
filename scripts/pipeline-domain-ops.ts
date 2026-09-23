@@ -646,17 +646,41 @@ export async function runInlineGenerateAvatar(
 ): Promise<Record<string, unknown>> {
   const value = (key: string): string =>
     String(resolveVars(params[key] ?? ctx[key] ?? '', ctx)).trim();
-  await runGenerateAvatar([
+  // An unresolved `{{placeholder}}` counts as absent (never passed as a value).
+  const optional = (flag: string, key: string): string[] =>
+    value(key) && !value(key).startsWith('{{') ? [flag, value(key)] : [];
+  // PA-10: the set lands in output_dir; consent is per run (empty = none, so
+  // cloud / host-bridge providers refuse the photo) and never baked into a pipeline.
+  const result = await runGenerateAvatar([
     '--input-photo',
     value('input_photo'),
-    '--output-path',
-    value('output_path'),
-    '--prompt',
-    value('prompt'),
+    ...optional('--output-path', 'output_path'),
+    ...optional('--output-dir', 'output_dir'),
+    ...optional('--style', 'style'),
+    ...(value('style') ? [] : optional('--prompt', 'prompt')),
     '--bridge-preference',
     value('bridge_preference') || 'auto',
+    ...optional('--consent-provider', 'consent_provider'),
+    ...optional('--consent-granted-by', 'consent_granted_by'),
+    ...(value('cleanup_input') === 'true' ? ['--cleanup-input'] : []),
   ]);
-  return exportValue(params, step, { status: 'succeeded', output_path: value('output_path') }, ctx);
+  if (!result || result.status !== 'succeeded') {
+    throw new Error(
+      `core:generate_avatar did not complete (${result?.status ?? 'failed'}): ${result?.message ?? 'see avatar:generate output'}`
+    );
+  }
+  return exportValue(
+    params,
+    step,
+    {
+      status: 'succeeded',
+      output_path: value('output_path'),
+      output_dir: result.output_dir,
+      profile_path: result.profile_path,
+      provider_id: result.provider_id,
+    },
+    ctx
+  );
 }
 
 export async function runInlineRegisterAvatar(

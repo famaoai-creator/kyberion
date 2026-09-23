@@ -1,16 +1,17 @@
 {
   "action": "pipeline",
   "name": "avatar-onboarding-fragment",
-  "version": "2.0.0",
-  "description": "Capture a reference photo, generate an avatar through the active host bridge or fallback provider, and register the avatar into the personal profile.",
+  "version": "3.0.0",
+  "description": "Capture a reference photo, generate a stylised expression set (neutral/joy/thinking/listening/speaking/mouth_open) from it through a reference-capable provider, and register the neutral frame into the personal profile.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
   "context": {
     "fragment_slug": "avatar-onboarding-fragment",
     "purpose": "Reusable avatar creation flow with bridge-selectable image generation and profile registration.",
-    "required_inputs": "capture_output_path, avatar_output_path, identity_path, profile_name, profile_language, interaction_style, bridge_preference, avatar_prompt",
+    "required_inputs": "capture_output_path, avatar_output_dir, identity_path, profile_name, profile_language, interaction_style, bridge_preference, avatar_style, consent_provider, consent_granted_by",
     "produced_channels": "capture_result, generation_result, registration_result",
-    "failure_modes": "camera unavailable, host bridge unavailable, avatar generation failure, identity write failure",
-    "verification_command": "pnpm pipeline --input pipelines/create-my-avatar.json"
+    "failure_modes": "camera unavailable, host bridge hand-off (exit 100, rerun after the host saves the frames), missing per-run consent for a cloud or host-bridge provider, avatar generation failure, identity write failure",
+    "verification_command": "pnpm pipeline --input pipelines/create-my-avatar.json",
+    "consent_note": "Cloud and host-bridge providers receive the photo only with a per-run consent: pass --context {\"consent_provider\":\"<provider id>\",\"consent_granted_by\":\"<who>\"}. Empty = local providers only."
   },
   "steps": [
     {
@@ -25,20 +26,31 @@
       "id": "capture_photo",
       "role": "source",
       "op": "core:capture_avatar_photo",
-      "produces": { "channel": "capture_result", "type": "Json" },
-      "params": { "output_path": "{{capture_output_path}}" }
+      "produces": {
+        "channel": "capture_result",
+        "type": "Json"
+      },
+      "params": {
+        "output_path": "{{capture_output_path}}"
+      }
     },
     {
       "id": "generate_avatar",
       "role": "source",
       "op": "core:generate_avatar",
       "consumes": "capture_result",
-      "produces": { "channel": "generation_result", "type": "Json" },
+      "produces": {
+        "channel": "generation_result",
+        "type": "Json"
+      },
       "params": {
         "input_photo": "{{capture_output_path}}",
-        "output_path": "{{avatar_output_path}}",
-        "prompt": "{{avatar_prompt}}",
-        "bridge_preference": "{{bridge_preference}}"
+        "output_dir": "{{avatar_output_dir}}",
+        "style": "{{avatar_style}}",
+        "bridge_preference": "{{bridge_preference}}",
+        "consent_provider": "{{consent_provider}}",
+        "consent_granted_by": "{{consent_granted_by}}",
+        "cleanup_input": "true"
       }
     },
     {
@@ -47,7 +59,7 @@
       "op": "core:register_avatar",
       "consumes": "generation_result",
       "params": {
-        "src_avatar": "{{avatar_output_path}}",
+        "src_avatar": "{{avatar_output_dir}}/neutral.png",
         "dest_avatar": "knowledge/personal/avatar.png",
         "identity_path": "{{identity_path}}",
         "avatar_path": "knowledge/personal/avatar.png",
