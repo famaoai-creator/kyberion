@@ -153,6 +153,15 @@ describe('personal avatar overlay', () => {
       expect(loadPersonalAvatarSet(root, 'draft')).toBeNull();
     });
 
+    it('treats a draft with a missing profile-named frame as absent (M2)', () => {
+      writeDraft();
+      safeRmSync(path.join(root, 'avatar', 'draft', 'speaking.png'), { force: true });
+      expect(loadPersonalAvatarSet(root, 'draft')).toBeNull();
+      expect(describePersonalAvatar('/api/me/avatar', root, 'draft')).toBeNull();
+      expect(promotePersonalAvatarDraft(root)).toBeNull();
+      expect(loadPersonalAvatarSet(root)!.profile.provider_id).toBe('gemini_image');
+    });
+
     it('leaves the current set alone when there is no draft', () => {
       expect(promotePersonalAvatarDraft(root)).toBeNull();
       expect(Object.keys(loadPersonalAvatarSet(root)!.files).sort()).toEqual(['joy', 'neutral']);

@@ -19,7 +19,7 @@
  *            `Cache-Control: no-store`, `X-Kyberion-Speech-Engine`,
  *            `X-Kyberion-Speech-Duration-Ms` (from the WAV header),
  *            `X-Kyberion-Speech-Language`
- *   400      `{ ok: false, error: 'invalid_request', reason }`
+ *   400      `{ ok: false, error: 'invalid_request', reason: 'invalid_body' }`
  *   413      `{ ok: false, error: 'text_too_long', max_chars }`
  *   429      `{ ok: false, error: 'synthesis_busy' }`
  *   501      `{ ok: false, error: 'synthesis_unsupported', reason }` — clients fall back
@@ -227,6 +227,9 @@ export type SpeechSynthesizeResult =
   | { kind: 'audio'; status: 200; audio: Uint8Array; headers: Record<string, string> }
   | { kind: 'json'; status: number; body: Record<string, unknown> };
 
+/** Reason codes are short snake_case identifiers (never free text). */
+export const SPEECH_SYNTHESIS_REASON_PATTERN = /^[a-z0-9_]{1,80}$/u;
+
 function jsonResult(status: number, body: Record<string, unknown>): SpeechSynthesizeResult {
   return { kind: 'json', status, body: { ok: false, ...body } };
 }
@@ -249,7 +252,7 @@ export function createSpeechSynthesizeHandler(
               error: 'text_too_long',
               max_chars: SPEECH_SYNTHESIZE_MAX_TEXT_CHARS,
             })
-          : jsonResult(400, { error: 'invalid_request', reason: error.message });
+          : jsonResult(400, { error: 'invalid_request', reason: 'invalid_body' });
       }
       throw error;
     }
@@ -290,12 +293,14 @@ export function createSpeechSynthesizeHandler(
     } catch (error) {
       deps.onError?.(error);
       if (error instanceof SpeechSynthesisUnsupportedError) {
-        return jsonResult(501, { error: 'synthesis_unsupported', reason: error.reason });
+        return jsonResult(501, {
+          error: 'synthesis_unsupported',
+          reason: SPEECH_SYNTHESIS_REASON_PATTERN.test(error.reason) ? error.reason : 'unsupported',
+        });
       }
-      return jsonResult(502, {
-        error: 'synthesis_failed',
-        reason: error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300),
-      });
+      // Fixed reason code only: engine stderr / temp paths stay in the
+      // server log (`onError`) and never reach a client.
+      return jsonResult(502, { error: 'synthesis_failed', reason: 'engine_error' });
     } finally {
       inFlight -= 1;
       if (artifactPath) {

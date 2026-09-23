@@ -247,6 +247,55 @@ describe('concierge avatar generation job flow', () => {
     expect(identity).toMatchObject({ name: 'me', avatar_profile: 'avatar/avatar-profile.json' });
   });
 
+  it('refuses avatar_use with 409 while a generation job is running (M2)', async () => {
+    writeGeneratedSet('draft', 'old_draft');
+    let finish: (value: Awaited<ReturnType<AvatarScriptRunner>>) => void = () => undefined;
+    runner.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    await post({
+      action: 'avatar_generate',
+      consent: { provider_id: 'gemini_image', confirmed: true },
+    });
+    const refused = await post({ action: 'avatar_use' });
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error).toBe('setup.avatar_generate_busy');
+    // Nothing was promoted: the draft is still pending and no set is current.
+    expect(
+      safeReadFile(path.join(fixture.root, 'avatar', 'draft', 'avatar-profile.json'), {
+        encoding: 'utf8',
+      })
+    ).toContain('old_draft');
+    finish({ status: 1, stderr: '', stdout: '' });
+    await flush();
+    expect((await post({ action: 'avatar_use' })).status).toBe(200);
+  });
+
+  it('caches the --plan answer and never runs two plan spawns at once (m6)', async () => {
+    let active = 0;
+    let peak = 0;
+    runner.mockImplementation(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return {
+        status: 0,
+        stderr: '',
+        stdout: `AVATAR_PLAN ${JSON.stringify({ plan: { provider_id: 'local_flux', data_egress: 'local' } })}`,
+      };
+    });
+    const [first, second] = await Promise.all([get(), get()]);
+    expect((await first.json()).plan.provider_id).toBe('local_flux');
+    expect((await second.json()).plan.provider_id).toBe('local_flux');
+    await get();
+    expect(runner).toHaveBeenCalledTimes(1);
+    expect(peak).toBe(1);
+    // A new photo is a new key: the plan is asked again.
+    safeWriteFile(path.join(fixture.root, 'avatar.png'), Buffer.concat([PNG, PNG]));
+    await get();
+    expect(runner).toHaveBeenCalledTimes(2);
+    expect(peak).toBe(1);
+  });
+
   it('keeps the previous set until "Use this avatar" promotes the draft', async () => {
     writeGeneratedSet('current', 'old_provider');
     writeGeneratedSet('draft', 'new_provider');

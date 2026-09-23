@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { buildExecutionEnv } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExecResultAsync } from '@agent/core/secure-io';
+import * as secureIo from '@agent/core/secure-io';
 
 /**
  * PA-10: the concierge "create an avatar from this photo" job. The generator
@@ -45,7 +45,7 @@ type ScriptResult = { stdout: string; stderr: string; status: number | null };
 export type AvatarScriptRunner = (args: string[], timeoutMs: number) => Promise<ScriptResult>;
 
 const defaultRunner: AvatarScriptRunner = (args, timeoutMs) =>
-  safeExecResultAsync(process.execPath, [AVATAR_SCRIPT_RELATIVE, ...args], {
+  secureIo.safeExecResultAsync(process.execPath, [AVATAR_SCRIPT_RELATIVE, ...args], {
     env: buildExecutionEnv(process.env, 'sovereign_concierge'),
     cwd: pathResolver.rootDir(),
     timeoutMs,
@@ -63,6 +63,7 @@ function store(): Store {
 export function _setAvatarScriptRunnerForTests(runner: AvatarScriptRunner | null): void {
   store().runner = runner ?? defaultRunner;
   store().jobs.clear();
+  invalidateAvatarPlanCache();
 }
 
 /** The JSON payload of the last `<prefix>{...}` line, or null. */
@@ -109,8 +110,39 @@ function parsePlan(value: unknown): AvatarGenerationPlan | null {
   };
 }
 
-/** Which provider a run would send the photo to — nothing is generated or sent. */
-export async function planAvatarGeneration(
+/** How long a `--plan` answer is reused (the settings page polls / reloads). */
+export const AVATAR_PLAN_CACHE_TTL_MS = 60 * 1000;
+
+type PlanCache = {
+  entries: Map<string, { at: number; plan: AvatarGenerationPlan | null }>;
+  /** At most one `--plan` child process at a time (m6). */
+  inFlight: Promise<unknown> | null;
+  pending: Map<string, Promise<AvatarGenerationPlan | null>>;
+};
+const PLAN_CACHE_KEY = Symbol.for('kyberion.concierge.avatar-plan-cache');
+function planCache(): PlanCache {
+  const holder = globalThis as unknown as Record<symbol, PlanCache | undefined>;
+  holder[PLAN_CACHE_KEY] ??= { entries: new Map(), inFlight: null, pending: new Map() };
+  return holder[PLAN_CACHE_KEY]!;
+}
+
+/** Forget cached plans (a run started, or the provider configuration changed). */
+export function invalidateAvatarPlanCache(): void {
+  planCache().entries.clear();
+}
+
+function planCacheKey(photoPath: string, outputDir: string): string {
+  let photoStamp = '';
+  try {
+    const stat = secureIo.safeStat(photoPath);
+    photoStamp = `${stat.size}:${stat.mtimeMs}`;
+  } catch {
+    photoStamp = 'missing';
+  }
+  return `${photoPath}\u0000${outputDir}\u0000${photoStamp}`;
+}
+
+async function spawnPlan(
   photoPath: string,
   outputDir: string
 ): Promise<AvatarGenerationPlan | null> {
@@ -120,6 +152,39 @@ export async function planAvatarGeneration(
   );
   if (result.status !== 0) return null;
   return parsePlan(parseAvatarScriptLine(result.stdout, PLAN_PREFIX)?.plan);
+}
+
+/**
+ * Which provider a run would send the photo to — nothing is generated or sent.
+ * The answer is cached for {@link AVATAR_PLAN_CACHE_TTL_MS} per photo (a new
+ * upload changes the key), concurrent callers share one spawn, and at most
+ * one `--plan` child runs at a time.
+ */
+export async function planAvatarGeneration(
+  photoPath: string,
+  outputDir: string
+): Promise<AvatarGenerationPlan | null> {
+  const cache = planCache();
+  const key = planCacheKey(photoPath, outputDir);
+  const cached = cache.entries.get(key);
+  if (cached && Date.now() - cached.at < AVATAR_PLAN_CACHE_TTL_MS) return cached.plan;
+  const pending = cache.pending.get(key);
+  if (pending) return pending;
+  const run = (async () => {
+    while (cache.inFlight) await cache.inFlight.catch(() => undefined);
+    const spawn = spawnPlan(photoPath, outputDir);
+    cache.inFlight = spawn;
+    try {
+      const plan = await spawn;
+      cache.entries.set(key, { at: Date.now(), plan });
+      return plan;
+    } finally {
+      cache.inFlight = null;
+      cache.pending.delete(key);
+    }
+  })();
+  cache.pending.set(key, run);
+  return run;
 }
 
 function prune(now: number): void {
@@ -160,6 +225,7 @@ export function startAvatarGenerationJob(input: {
   }
   const now = Date.now();
   prune(now);
+  invalidateAvatarPlanCache();
   const job: AvatarGenerationJob = {
     id: randomUUID(),
     status: 'running',

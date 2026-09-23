@@ -198,7 +198,11 @@ describe('createSpeechSynthesizeHandler', () => {
   it('answers 400 / 413 before any engine work', async () => {
     const { deps } = fakeDeps();
     const handler = createSpeechSynthesizeHandler(deps);
-    expect(await handler({})).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
+    expect(await handler({ text: 'hi', play: true })).toEqual({
+      kind: 'json',
+      status: 400,
+      body: { ok: false, error: 'invalid_request', reason: 'invalid_body' },
+    });
     expect(await handler({ text: 'a'.repeat(SPEECH_SYNTHESIZE_MAX_TEXT_CHARS + 1) })).toMatchObject(
       { status: 413, body: { error: 'text_too_long' } }
     );
@@ -226,12 +230,28 @@ describe('createSpeechSynthesizeHandler', () => {
   it('answers 502 for a failed engine or a non-WAV artifact, still deleting it', async () => {
     const failing = fakeDeps({
       synthesize: vi.fn(async () => {
-        throw new Error('bridge crashed');
+        throw new Error(
+          'python bridge crashed: Traceback ... /Users/me/kyberion/active/shared/tmp/voice-synth-1.wav'
+        );
       }),
     });
-    expect(await createSpeechSynthesizeHandler(failing.deps)({ text: 'hi' })).toMatchObject({
+    const failed = await createSpeechSynthesizeHandler(failing.deps)({ text: 'hi' });
+    // m4: a fixed reason code; engine stderr and temp paths never reach the client.
+    expect(failed).toEqual({
+      kind: 'json',
       status: 502,
-      body: { error: 'synthesis_failed', reason: 'bridge crashed' },
+      body: { ok: false, error: 'synthesis_failed', reason: 'engine_error' },
+    });
+    expect(JSON.stringify(failed)).not.toMatch(/Traceback|\/Users|voice-synth/u);
+
+    const oddUnsupported = fakeDeps({
+      synthesize: vi.fn(async () => {
+        throw new SpeechSynthesisUnsupportedError('no engine at /opt/tts: exit 1');
+      }),
+    });
+    expect(await createSpeechSynthesizeHandler(oddUnsupported.deps)({ text: 'hi' })).toMatchObject({
+      status: 501,
+      body: { error: 'synthesis_unsupported', reason: 'unsupported' },
     });
 
     const notWav = fakeDeps({ readArtifact: vi.fn(() => new Uint8Array([0, 1, 2, 3])) });

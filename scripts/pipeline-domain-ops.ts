@@ -1,7 +1,9 @@
+import * as path from 'node:path';
 import { grantVoiceConsent } from '@agent/core/voice-consent';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVars } from '@agent/core/logic-utils';
-import { safeExecResult } from '@agent/core/secure-io';
+import { safeExecResult, safeMkdir, safeRmSync } from '@agent/core/secure-io';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import type { PipelineAdfStep } from '@agent/core/pipeline-contract';
 import { validateProductivityTaskPlan } from '@agent/core/productivity-task-plan';
@@ -626,16 +628,66 @@ export async function runInlineMissionStartFromIssues(
   return exportValue(params, step, { status: 'succeeded', started }, ctx);
 }
 
+/**
+ * PA-10 m3: where the create-my-avatar pipeline captures the photo by default
+ * — a profile-root tmp (personal tier), never the shared tmp. The register
+ * step moves it to `<profileRoot>/avatar.png` and deletes it either way.
+ */
+export function defaultAvatarCapturePath(profileRoot: string = resolveActiveProfileRoot()): string {
+  return path.join(profileRoot, 'tmp', 'avatar-capture.jpg');
+}
+
+/** `value` unless empty or an unresolved `{{placeholder}}`, else `fallback`. */
+function valueOr(value: string, fallback: string): string {
+  return value && !value.startsWith('{{') ? value : fallback;
+}
+
+/**
+ * Run a nested `defineScript` entry point without leaking its exit status:
+ * the harness sets `process.exitCode` (and swallows the error) on failure, so
+ * the previous status is restored and a failure is rethrown to the pipeline.
+ */
+async function runNestedScript<T>(
+  name: string,
+  run: () => Promise<T | undefined>,
+  failed: (result: T | undefined) => boolean = () => false
+): Promise<T | undefined> {
+  const previousExitCode = process.exitCode;
+  let result: T | undefined;
+  let exitCode: typeof process.exitCode;
+  try {
+    result = await run();
+  } finally {
+    exitCode = process.exitCode;
+    process.exitCode = previousExitCode;
+  }
+  if ((exitCode !== undefined && exitCode !== 0) || failed(result)) {
+    const error = new Error(`${name} failed (exit ${exitCode ?? 1})`) as Error & {
+      result?: T;
+    };
+    error.result = result;
+    throw error;
+  }
+  return result;
+}
+
 export async function runInlineCaptureAvatarPhoto(
   step: PipelineAdfStep,
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const output = String(
-    resolveVars(params.output_path ?? ctx.capture_output_path ?? '', ctx)
-  ).trim();
-  if (!output) throw new Error('core:capture_avatar_photo requires output_path');
-  await runCapturePhoto([output]);
+  const output = valueOr(
+    String(resolveVars(params.output_path ?? ctx.capture_output_path ?? '', ctx)).trim(),
+    defaultAvatarCapturePath()
+  );
+  safeMkdir(path.dirname(pathResolver.resolve(output)), { recursive: true });
+  try {
+    await runNestedScript('core:capture_avatar_photo', () => runCapturePhoto([output]));
+  } catch (error) {
+    // No partial capture is left behind.
+    safeRmSync(pathResolver.resolve(output), { force: true });
+    throw error;
+  }
   return exportValue(params, step, { status: 'succeeded', output_path: output }, ctx);
 }
 
@@ -649,24 +701,33 @@ export async function runInlineGenerateAvatar(
   // An unresolved `{{placeholder}}` counts as absent (never passed as a value).
   const optional = (flag: string, key: string): string[] =>
     value(key) && !value(key).startsWith('{{') ? [flag, value(key)] : [];
-  // PA-10: the set lands in output_dir; consent is per run (empty = none, so
-  // cloud / host-bridge providers refuse the photo) and never baked into a pipeline.
-  const result = await runGenerateAvatar([
-    '--input-photo',
-    value('input_photo'),
-    ...optional('--output-path', 'output_path'),
-    ...optional('--output-dir', 'output_dir'),
-    ...optional('--style', 'style'),
-    ...(value('style') ? [] : optional('--prompt', 'prompt')),
-    '--bridge-preference',
-    value('bridge_preference') || 'auto',
-    ...optional('--consent-provider', 'consent_provider'),
-    ...optional('--consent-granted-by', 'consent_granted_by'),
-    ...(value('cleanup_input') === 'true' ? ['--cleanup-input'] : []),
-  ]);
-  if (!result || result.status !== 'succeeded') {
+  // PA-10: the set lands in output_dir (empty = the generator default,
+  // `<profileRoot>/avatar/draft`); input_photo empty = the registered photo
+  // `<profileRoot>/avatar.png`. Consent is per run (empty = none, so cloud /
+  // host-bridge providers refuse the photo) and never baked into a pipeline.
+  let result: Awaited<ReturnType<typeof runGenerateAvatar>>;
+  try {
+    result = await runNestedScript(
+      'core:generate_avatar',
+      () =>
+        runGenerateAvatar([
+          ...optional('--input-photo', 'input_photo'),
+          ...optional('--output-path', 'output_path'),
+          ...optional('--output-dir', 'output_dir'),
+          ...optional('--style', 'style'),
+          ...(value('style') ? [] : optional('--prompt', 'prompt')),
+          '--bridge-preference',
+          value('bridge_preference') || 'auto',
+          ...optional('--consent-provider', 'consent_provider'),
+          ...optional('--consent-granted-by', 'consent_granted_by'),
+          ...(value('cleanup_input') === 'true' ? ['--cleanup-input'] : []),
+        ]),
+      (outcome) => !outcome || outcome.status !== 'succeeded'
+    );
+  } catch (error) {
+    const outcome = (error as { result?: Awaited<ReturnType<typeof runGenerateAvatar>> }).result;
     throw new Error(
-      `core:generate_avatar did not complete (${result?.status ?? 'failed'}): ${result?.message ?? 'see avatar:generate output'}`
+      `core:generate_avatar did not complete (${outcome?.status ?? 'failed'}): ${outcome?.message ?? 'see avatar:generate output'}`
     );
   }
   return exportValue(
@@ -675,9 +736,9 @@ export async function runInlineGenerateAvatar(
     {
       status: 'succeeded',
       output_path: value('output_path'),
-      output_dir: result.output_dir,
-      profile_path: result.profile_path,
-      provider_id: result.provider_id,
+      output_dir: result!.output_dir,
+      profile_path: result!.profile_path,
+      provider_id: result!.provider_id,
     },
     ctx
   );
@@ -690,23 +751,46 @@ export async function runInlineRegisterAvatar(
 ): Promise<Record<string, unknown>> {
   const value = (key: string): string =>
     String(resolveVars(params[key] ?? ctx[key] ?? '', ctx)).trim();
-  await runRegisterAvatar([
-    '--src-avatar',
-    value('src_avatar'),
-    '--dest-avatar',
-    value('dest_avatar'),
-    '--identity-path',
-    value('identity_path'),
-    '--avatar-path',
-    value('avatar_path'),
-    '--profile-name',
-    value('profile_name'),
-    '--language',
-    value('language'),
-    '--interaction-style',
-    value('interaction_style'),
-  ]);
-  return exportValue(params, step, { status: 'succeeded', avatar_path: value('dest_avatar') }, ctx);
+  // Empty = the active profile root: the captured photo becomes the registered
+  // reference photo `<profileRoot>/avatar.png` (identity `avatar_path`). The
+  // generated expression set is kept apart under `avatar/` and adopted only
+  // through the explicit "Use this avatar" step.
+  const profileRoot = resolveActiveProfileRoot();
+  const source = valueOr(value('src_avatar'), defaultAvatarCapturePath(profileRoot));
+  const dest = valueOr(value('dest_avatar'), path.join(profileRoot, 'avatar.png'));
+  try {
+    await runNestedScript('core:register_avatar', () =>
+      runRegisterAvatar([
+        '--src-avatar',
+        source,
+        '--dest-avatar',
+        dest,
+        '--dest-avatar-dir',
+        path.dirname(pathResolver.resolve(dest)),
+        '--identity-path',
+        valueOr(value('identity_path'), path.join(profileRoot, 'my-identity.json')),
+        '--avatar-path',
+        valueOr(value('avatar_path'), 'avatar.png'),
+        '--profile-name',
+        value('profile_name'),
+        '--language',
+        value('language'),
+        '--interaction-style',
+        value('interaction_style'),
+      ])
+    );
+  } finally {
+    // m3: the capture is deleted on every terminal status once registered.
+    if (value('cleanup_source') === 'true') {
+      safeRmSync(pathResolver.resolve(source), { force: true });
+    }
+  }
+  return exportValue(
+    params,
+    step,
+    { status: 'succeeded', avatar_path: pathResolver.toRepoRelative(pathResolver.resolve(dest)) },
+    ctx
+  );
 }
 
 export async function runInlineOAuthSetup(

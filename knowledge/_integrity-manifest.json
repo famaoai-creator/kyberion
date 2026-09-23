@@ -1587,7 +1587,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 146778,
+      "size": 147113,
       "type": "json"
     },
     {
@@ -3519,7 +3519,7 @@
     {
       "path": "product/governance/seam-provider-selection/image-generation-provider.json",
       "tier": "public",
-      "size": 5317,
+      "size": 5608,
       "type": "json"
     },
     {
@@ -5853,7 +5853,7 @@
     {
       "path": "product/orchestration/service-presets/gemini.json",
       "tier": "public",
-      "size": 1978,
+      "size": 2236,
       "type": "json"
     },
     {
@@ -6339,7 +6339,7 @@
     {
       "path": "product/pipeline-templates/README.md",
       "tier": "public",
-      "size": 2935,
+      "size": 3269,
       "type": "md"
     },
     {
@@ -6477,7 +6477,7 @@
     {
       "path": "product/pipeline-templates/create-my-avatar.json",
       "tier": "public",
-      "size": 1693,
+      "size": 2067,
       "type": "json"
     },
     {

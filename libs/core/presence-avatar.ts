@@ -362,6 +362,10 @@ export function loadPersonalAvatarSet(
     const fileName = profile.images[expression];
     const file = fileName ? regularFileInside(dir, fileName) : null;
     if (file) files[expression] = file;
+    // A draft is all-or-nothing: one frame its profile names but that is
+    // missing means an interrupted write, so the preview / adoption never
+    // sees it (the generator writes the profile last, after every frame).
+    else if (fileName && kind === 'draft') return null;
   }
   if (!files.neutral) return null;
   return { profile, files };

@@ -8,9 +8,15 @@ export const dynamic = 'force-dynamic';
 /**
  * PA-09 return-audio TTS — proxies voice-hub POST /api/speech/synthesize so
  * the 秘書室 dock can play a reply in the browser (Web Audio → AnalyserNode →
- * talking-avatar mouth) instead of on the host speakers. Guarded like the
- * other voice write routes (it spends host TTS compute). The WAV bytes are
+ * talking-avatar mouth) instead of on the host speakers. The WAV bytes are
  * streamed back with `Cache-Control: no-store` and never persisted here.
+ *
+ * Access: `requireConciergeMutationAccess`, the same guard as every other
+ * concierge voice write route (`listen-once`, `stop`, `selection`). It spends
+ * host TTS compute, so it gets the write guard (same-origin / CSRF check,
+ * rate limit, and a bearer token must resolve to a localadmin viewer). It
+ * reads no personal-tier data, so the loopback-owner-only guard of the avatar
+ * routes is not needed here.
  *
  * Status contract (the browser player falls back to speechSynthesis on any
  * non-200): 200 audio/wav · 400 invalid body · 413 text too long ·
@@ -25,6 +31,17 @@ const FORWARDED_HEADERS: ReadonlyArray<[string, RegExp]> = [
   ['x-kyberion-speech-duration-ms', /^\d{1,9}$/],
   ['x-kyberion-speech-language', /^(ja|en)$/],
 ];
+
+/** voice-hub `/api/speech/synthesize` error codes a client may see. */
+const UPSTREAM_ERRORS = new Set([
+  'invalid_request',
+  'text_too_long',
+  'synthesis_busy',
+  'synthesis_unsupported',
+  'synthesis_failed',
+  'synthesis_artifact_invalid',
+]);
+const REASON_CODE = /^[a-z0-9_]{1,80}$/u;
 
 function noStoreJson(body: Record<string, unknown>, status: number) {
   return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -86,8 +103,16 @@ export async function POST(req: NextRequest) {
   }
   if (contentType.includes('application/json')) {
     const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
-    const error = typeof payload?.error === 'string' ? payload.error.slice(0, 80) : undefined;
-    const reason = typeof payload?.reason === 'string' ? payload.reason.slice(0, 200) : undefined;
+    // Only known error codes and snake_case reason codes pass through —
+    // never upstream free text (stderr, paths).
+    const error =
+      typeof payload?.error === 'string' && UPSTREAM_ERRORS.has(payload.error)
+        ? payload.error
+        : undefined;
+    const reason =
+      typeof payload?.reason === 'string' && REASON_CODE.test(payload.reason)
+        ? payload.reason
+        : undefined;
     return noStoreJson(
       {
         ok: false,
