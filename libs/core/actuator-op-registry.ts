@@ -3,6 +3,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { suggestClosestStrings } from './op-suggestions.js';
 import { isSafeActuatorId, loadActuatorManifestCatalog } from './src/actuator-manifest-index.js';
 import { assertCapabilityAllowed } from './capability-restriction-policy.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 
 export type PipelineStepType = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -12,7 +13,7 @@ export interface ResolvedActuatorOperation {
   actuatorId: string;
   modulePath: string;
   stepType: PipelineStepType;
-  source: 'actuator-op-registry' | 'plugin';
+  source: 'actuator-op-registry' | 'plugin' | 'scenario-fixture';
   manifestPath: string;
   /** Governed per-operation budget, when the op definition declares one. */
   timeoutMs?: number;
@@ -203,6 +204,109 @@ export function determineActuatorStepType(domain: string, action: string): Pipel
   throw buildUnknownActuatorOpError(domain, action);
 }
 
+export interface ScenarioOpOverrideRequest {
+  /** 'domain:action' */
+  op: string;
+  domain: string;
+  action: string;
+  /** 'approval-probe' asks only whether a fixture exists; the override must not record it. */
+  purpose: 'dispatch' | 'approval-probe';
+}
+
+export interface ScenarioOpOverrideResult {
+  handler: ActuatorOperationHandler;
+  stepType?: PipelineStepType;
+}
+
+/**
+ * ES-02: scenario-runner-only op override. `resolve` returns a fixture
+ * handler, `undefined` to leave the op on its normal path, or throws to fail
+ * closed (e.g. `[SCENARIO_UNSTUBBED_OP]`). `approvalGranted` may only grant
+ * an approval for an op that `resolve` serves from a fixture, so a scenario
+ * decision can never admit a real side effect.
+ */
+export interface ScenarioOpOverride {
+  resolve(request: ScenarioOpOverrideRequest): ScenarioOpOverrideResult | undefined;
+  approvalGranted?(request: ScenarioOpOverrideRequest): boolean;
+}
+
+const scenarioOpOverrideSeam = createSeam<ScenarioOpOverride>({
+  key: 'scenario-op-override',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+
+const SCENARIO_OVERRIDE_METADATA: SeamProviderMetadata = {
+  provenance: 'builtin',
+  source: 'libs/core/scenario-interceptor.ts',
+  reason: 'scenario runner op fixtures (never registered in production processes)',
+};
+
+/** Bind the scenario op override (sole seam); returns its disposer. */
+export function registerScenarioOpOverride(
+  override: ScenarioOpOverride,
+  metadata: SeamProviderMetadata = SCENARIO_OVERRIDE_METADATA
+): () => void {
+  return scenarioOpOverrideSeam.register('scenario-runner', override, metadata);
+}
+
+export function getScenarioOpOverride(): ScenarioOpOverride | undefined {
+  return scenarioOpOverrideSeam.getOptional();
+}
+
+function scenarioFixtureStepType(domain: string, action: string): PipelineStepType {
+  try {
+    return determineActuatorStepType(domain, action);
+  } catch {
+    return 'apply';
+  }
+}
+
+/**
+ * Resolve an op through the scenario override. `null` when no override is
+ * registered or the override leaves the op alone; throws when the override
+ * fails the op closed. Capability restrictions still apply to fixture ops.
+ */
+export function resolveScenarioOpOverride(
+  domain: string,
+  action: string
+): ResolvedActuatorOperation | null {
+  const override = scenarioOpOverrideSeam.getOptional();
+  if (!override) return null;
+  const op = `${domain}:${action}`;
+  const result = override.resolve({ op, domain, action, purpose: 'dispatch' });
+  if (!result) return null;
+  assertCapabilityAllowed([op, domain]);
+  return {
+    domain,
+    action,
+    actuatorId: 'scenario-fixture',
+    modulePath: `scenario-fixture:${op}`,
+    stepType: result.stepType ?? scenarioFixtureStepType(domain, action),
+    source: 'scenario-fixture',
+    manifestPath: 'scenario-fixture',
+    handler: result.handler,
+  };
+}
+
+/** True only when a registered override grants approval for an op it serves from a fixture. */
+export function isScenarioApprovalGranted(domain: string, action: string): boolean {
+  const override = scenarioOpOverrideSeam.getOptional();
+  if (!override?.approvalGranted) return false;
+  const request: ScenarioOpOverrideRequest = {
+    op: `${domain}:${action}`,
+    domain,
+    action,
+    purpose: 'approval-probe',
+  };
+  try {
+    if (!override.resolve(request)) return false;
+  } catch {
+    return false;
+  }
+  return override.approvalGranted(request) === true;
+}
+
 /**
  * DH-05: resolve an operation through the governed op and manifest catalogs.
  * The runner keeps a convention fallback for managed/legacy actuators, but
@@ -212,6 +316,8 @@ export function resolveActuatorOperation(
   domain: string,
   action: string
 ): ResolvedActuatorOperation | null {
+  const scenarioOperation = resolveScenarioOpOverride(domain, action);
+  if (scenarioOperation) return scenarioOperation;
   const stepType = determineActuatorStepType(domain, action);
   const plugin = pluginOperations.get(`${domain}:${action}`);
   if (plugin) {

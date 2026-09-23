@@ -32,6 +32,31 @@ const riskyApprovalHandlerSeam = createSeam<RiskyApprovalHandler>({
   catalog: coreSeamCatalog,
 });
 
+/**
+ * ES-02: scoped override consulted before the canonical handler. The
+ * canonical handler registers at import time without keeping its disposer,
+ * so a scenario run cannot swap it out; it binds here instead and disposes
+ * the override afterwards. Unregistered -> canonical behaviour.
+ */
+const riskyApprovalOverrideSeam = createSeam<RiskyApprovalHandler>({
+  key: 'risky-approval-override',
+  multiplicity: 'sole',
+  catalog: coreSeamCatalog,
+});
+
+const OVERRIDE_METADATA: SeamProviderMetadata = {
+  provenance: 'builtin',
+  source: 'libs/core/scenario-interceptor.ts',
+  reason: 'scenario runner approval decisions (never registered in production processes)',
+};
+
+export function overrideRiskyApprovalHandler(
+  handler: RiskyApprovalHandler,
+  metadata: SeamProviderMetadata = OVERRIDE_METADATA
+): () => void {
+  return riskyApprovalOverrideSeam.register('scenario-runner', handler, metadata);
+}
+
 const DEFAULT_METADATA: SeamProviderMetadata = {
   provenance: 'builtin',
   source: 'libs/core/risky-op-approval-port.ts',
@@ -54,7 +79,8 @@ export function registerRiskyApprovalHandler(
 
 /** Deny by default until the governed approval implementation is registered. */
 export function requireRiskyApproval(params: RiskyApprovalRequest): RiskyApprovalResult {
-  const registeredHandler = riskyApprovalHandlerSeam.getOptional();
+  const registeredHandler =
+    riskyApprovalOverrideSeam.getOptional() ?? riskyApprovalHandlerSeam.getOptional();
   return (
     registeredHandler?.(params) ?? {
       allowed: false,
