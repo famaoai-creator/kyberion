@@ -420,7 +420,7 @@ describe('static rail mount (Deliverable 3)', () => {
   it('mounts the rail in home.html as current "home", and in index.html / help.html as expected', () => {
     const homeHtml = readRepoFile('presence/displays/presence-studio/static/home.html');
     expect(homeHtml).toContain('id="front-desk-rail"');
-    expect(homeHtml).toContain('front-desk-rail.css');
+    expect(homeHtml).not.toContain('front-desk-rail.css');
     expect(homeHtml).toContain('front-desk-rail.js');
     expect(homeHtml).toContain("current: 'home'");
     // UI-06: the page title is a server-rendered vocabulary placeholder
@@ -429,7 +429,7 @@ describe('static rail mount (Deliverable 3)', () => {
 
     const indexHtml = readRepoFile('presence/displays/presence-studio/static/index.html');
     expect(indexHtml).toContain('id="front-desk-rail"');
-    expect(indexHtml).toContain('front-desk-rail.css');
+    expect(indexHtml).not.toContain('front-desk-rail.css');
     expect(indexHtml).toContain('front-desk-rail.js');
     // FD-02: index.html moved from `/` to `/work` — nothing renders as
     // "current" there anymore (home.html owns the "home" rail item).
@@ -439,7 +439,7 @@ describe('static rail mount (Deliverable 3)', () => {
     // nothing renders as "current" there.
     const helpHtml = readRepoFile('presence/displays/presence-studio/static/help.html');
     expect(helpHtml).toContain('id="front-desk-rail"');
-    expect(helpHtml).toContain('front-desk-rail.css');
+    expect(helpHtml).not.toContain('front-desk-rail.css');
     expect(helpHtml).toContain('front-desk-rail.js');
     expect(helpHtml).toContain('current: null');
   });
@@ -525,7 +525,7 @@ describe('FD-05 progress page static contract', () => {
   it('mounts the rail in progress.html as current "progress"', () => {
     const progressHtml = readRepoFile('presence/displays/presence-studio/static/progress.html');
     expect(progressHtml).toContain('id="front-desk-rail"');
-    expect(progressHtml).toContain('front-desk-rail.css');
+    expect(progressHtml).not.toContain('front-desk-rail.css');
     expect(progressHtml).toContain('front-desk-rail.js');
     expect(progressHtml).toContain("current: 'progress'");
   });
@@ -639,7 +639,7 @@ describe('FD-03 ask page static contract', () => {
   it('mounts the rail in ask.html as current "ask"', () => {
     const askHtml = readRepoFile('presence/displays/presence-studio/static/ask.html');
     expect(askHtml).toContain('id="front-desk-rail"');
-    expect(askHtml).toContain('front-desk-rail.css');
+    expect(askHtml).not.toContain('front-desk-rail.css');
     expect(askHtml).toContain('front-desk-rail.js');
     expect(askHtml).toContain("current: 'ask'");
   });
@@ -762,7 +762,7 @@ describe('FD-08 help page static contract', () => {
   it('mounts the rail in help.html as current null and links to /ask, decide, and /progress', () => {
     const helpHtml = readRepoFile('presence/displays/presence-studio/static/help.html');
     expect(helpHtml).toContain('id="front-desk-rail"');
-    expect(helpHtml).toContain('front-desk-rail.css');
+    expect(helpHtml).not.toContain('front-desk-rail.css');
     expect(helpHtml).toContain('front-desk-rail.js');
     expect(helpHtml).toContain('current: null');
     expect(helpHtml).toContain('id="help-ask-link"');

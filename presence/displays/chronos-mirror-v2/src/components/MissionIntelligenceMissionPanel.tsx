@@ -19,7 +19,7 @@ import {
 import { Panel, providerResolutionSummary } from './MissionIntelligencePrimitives';
 import { chronosSpeechLocale } from '../lib/ux-vocabulary';
 
-export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
+export function MissionIntelligenceMissionPanel({ context }: { context: Record<string, any> }) {
   const {
     data,
     locale,
@@ -93,7 +93,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
               'chronos_project_bootstrap_notice',
               'This project does not have active missions yet. Current bootstrap work:'
             )}
-            <div className="mt-2 text-[10px] kb-text-accent">
+            <div className="mt-2 text-[11px] kb-text-accent">
               {selectedProjectBootstrapItems
                 .slice(0, 4)
                 .map((item) => `${item.title} [${item.status}]`)
@@ -120,7 +120,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                 <div
                   id={toDomId('mission', mission.missionId)}
                   key={mission.missionId}
-                  className={`rounded-xl border kb-surface-sunken px-4 py-3 ${effectiveMissionId === mission.missionId ? 'kb-border-accent shadow-[0_0_0_1px_rgba(34,211,238,0.08)]' : 'kb-border-subtle'}`}
+                  className={`rounded-xl border kb-surface-sunken px-4 py-3 ${effectiveMissionId === mission.missionId ? 'kb-border-accent' : 'kb-border-subtle'}`}
                 >
                   {(() => {
                     const latestAction = getLatestMissionControlAction(
@@ -129,7 +129,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                     );
                     return latestAction ? (
                       <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2">
-                        <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                        <div className="text-[11px] kb-text-muted">
                           {mt('chronos_latest_intervention', 'Latest action')}
                         </div>
                         <ActionStatusBadge action={latestAction} />
@@ -138,15 +138,15 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                   })()}
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-[12px] font-semibold tracking-[0.03em] kb-text-primary">
+                      <div className="text-[12px] font-semibold kb-text-primary">
                         {missionIntent}
                       </div>
-                      <div className="mt-1 text-[10px] uppercase tracking-[0.2em] kb-text-muted">
+                      <div className="mt-1 text-[11px] kb-text-muted">
                         {mission.missionType || 'development'} · {mission.tier} ·{' '}
                         {mission.missionId}
                       </div>
                       {mission.projectId || mission.trackId ? (
-                        <div className="mt-1 text-[10px] kb-text-muted">
+                        <div className="mt-1 text-[11px] kb-text-muted">
                           {mission.projectId
                             ? `${mt('chronos_project', 'Project')} ${mission.projectId}`
                             : null}
@@ -158,7 +158,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                       ) : null}
                     </div>
                     <div
-                      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
+                      className={`rounded-full px-2 py-1 text-[11px] ${
                         mission.planReady
                           ? 'kb-status-positive-surface kb-status-positive'
                           : 'kb-status-warning-surface kb-status-warning'
@@ -171,15 +171,15 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                   </div>
                   <div className="mt-3 flex items-center gap-2">
                     <div
-                      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${missionSummaryBadgeClass(mission.controlTone)}`}
+                      className={`rounded-full px-2 py-1 text-[11px] ${missionSummaryBadgeClass(mission.controlTone)}`}
                     >
                       {missionStatusLabel(mission.controlSummary, locale)}
                     </div>
-                    <div className="text-[10px] kb-text-muted">
+                    <div className="text-[11px] kb-text-muted">
                       {mt('chronos_current_state', 'Current state')}
                     </div>
                     {mission.controlRequestedBy && (
-                      <div className="text-[10px] kb-text-muted">
+                      <div className="text-[11px] kb-text-muted">
                         {mt('chronos_requested_by', 'Requested by')}{' '}
                         <span className="font-mono kb-text-secondary">
                           {mission.controlRequestedBy}
@@ -187,7 +187,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                       </div>
                     )}
                   </div>
-                  <div className="mt-3 grid gap-2 text-[10px] kb-text-muted">
+                  <div className="mt-3 grid gap-2 text-[11px] kb-text-muted">
                     <div>
                       {mt('chronos_intent', 'Intent')}:{' '}
                       <span className="kb-text-primary">{missionIntent}</span>
@@ -209,7 +209,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                       </span>
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                     <div>
                       {mt('chronos_open_work', 'Open work')}:{' '}
                       <span className="font-mono kb-text-primary">{mission.nextTaskCount}</span>
@@ -241,11 +241,11 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                     <button
                       type="button"
                       onClick={() => focusMissionThread(mission.missionId)}
-                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
+                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                     >
                       <span className="inline-flex items-center gap-2">
                         <span>{mt('chronos_thread', 'Conversation')}</span>
-                        <span className="rounded-full border kb-border-accent kb-surface-accent px-1.5 py-0.5 text-[8px] tracking-[0.18em] kb-text-accent">
+                        <span className="rounded-full border kb-border-accent kb-surface-accent px-1.5 py-0.5 text-[8px] kb-text-accent">
                           T
                         </span>
                       </span>
@@ -253,11 +253,11 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                     <button
                       type="button"
                       onClick={() => focusMissionCard(mission.missionId)}
-                      className="ml-2 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+                      className="ml-2 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
                     >
                       <span className="inline-flex items-center gap-2">
                         <span>{mt('chronos_card', 'Summary')}</span>
-                        <span className="rounded-full border kb-border-subtle kb-surface-raised/8 px-1.5 py-0.5 text-[8px] tracking-[0.18em] kb-text-secondary">
+                        <span className="rounded-full border kb-border-subtle kb-surface-raised/8 px-1.5 py-0.5 text-[8px] kb-text-secondary">
                           C
                         </span>
                       </span>
@@ -284,7 +284,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                                   : latestAction.event_id || null
                               )
                             }
-                            className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
+                            className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                           >
                             {expandedMissionCardActionId === latestAction.event_id
                               ? mt('chronos_hide_latest_action', 'Hide latest action')
@@ -302,7 +302,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                                   `${mission.missionId}:${latestAction.operation}`
                               }
                               title={retryAction?.disabledReason}
-                              className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
+                              className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[11px] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               {missionActionTarget ===
                               `${mission.missionId}:${latestAction.operation}`
@@ -314,7 +314,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                       );
                     })()}
                     <div className="flex flex-wrap gap-2 rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-2">
-                      <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-positive">
+                      <div className="w-full text-[11px] kb-status-positive">
                         {mt('chronos_safe_actions', 'Safe actions')}
                       </div>
                       {safeMissionActions.map((action) => (
@@ -335,11 +335,11 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         </button>
                       ))}
                       {safeDisabledReason && (
-                        <div className="w-full text-[10px] kb-text-muted">{safeDisabledReason}</div>
+                        <div className="w-full text-[11px] kb-text-muted">{safeDisabledReason}</div>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2 rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-2">
-                      <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-negative">
+                      <div className="w-full text-[11px] kb-status-negative">
                         {mt(
                           'chronos_risky_actions_approval_required',
                           'Risky actions · approval required'
@@ -375,7 +375,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         </button>
                       ))}
                       {riskyDisabledReason && (
-                        <div className="w-full text-[10px] kb-text-muted">
+                        <div className="w-full text-[11px] kb-text-muted">
                           {riskyDisabledReason}
                         </div>
                       )}
@@ -420,9 +420,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
         <div className="grid gap-3">
           <div className="grid gap-3 lg:grid-cols-[0.9fr,1.1fr]">
             <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-              <div className="mb-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                owners
-              </div>
+              <div className="mb-2 text-[11px] kb-text-muted">owners</div>
               <div className="space-y-2">
                 {data.runtimeTopology.owners.length === 0 ? (
                   <SurfaceStatusPanel
@@ -437,15 +435,15 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                       key={`${owner.type}:${owner.id}`}
                       className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2"
                     >
-                      <div className="text-[10px] font-mono kb-text-secondary">{owner.id}</div>
-                      <div className="mt-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
+                      <div className="text-[11px] font-mono kb-text-secondary">{owner.id}</div>
+                      <div className="mt-1 text-[11px] kb-text-muted">
                         {owner.type} · runtimes {owner.runtimeCount}
                       </div>
                       <div className="mt-2 flex flex-wrap gap-1">
                         {owner.runtimeIds.map((runtimeId) => (
                           <span
                             key={runtimeId}
-                            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[9px] font-mono kb-text-muted"
+                            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] font-mono kb-text-muted"
                           >
                             {runtimeId}
                           </span>
@@ -457,9 +455,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
               </div>
             </div>
             <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-              <div className="mb-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                managed runtimes
-              </div>
+              <div className="mb-2 text-[11px] kb-text-muted">managed runtimes</div>
               <div className="space-y-2">
                 {data.runtimeTopology.runtimes.length === 0 ? (
                   <SurfaceStatusPanel
@@ -479,11 +475,11 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         return (
                           <>
                             <div className="flex items-center justify-between gap-3">
-                              <div className="text-[10px] font-mono kb-text-primary">
+                              <div className="text-[11px] font-mono kb-text-primary">
                                 {runtime.agentId}
                               </div>
                               <div
-                                className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${
+                                className={`rounded-full px-2 py-1 text-[11px] ${
                                   runtime.status === 'ready'
                                     ? 'kb-status-positive-surface kb-status-positive'
                                     : runtime.status === 'busy'
@@ -496,17 +492,17 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                                 {runtime.status}
                               </div>
                             </div>
-                            <div className="mt-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
+                            <div className="mt-1 text-[11px] kb-text-muted">
                               {runtime.provider}
                               {runtime.modelId ? `/${runtime.modelId}` : ''} · {runtime.ownerType}:
                               {runtime.ownerId}
                             </div>
                             {resolution ? (
-                              <div className="mt-1 text-[9px] kb-text-muted">
+                              <div className="mt-1 text-[11px] kb-text-muted">
                                 preferred {resolution.preferred} · strategy {resolution.strategy}
                               </div>
                             ) : null}
-                            <div className="mt-2 flex flex-wrap gap-2 text-[9px] kb-text-muted">
+                            <div className="mt-2 flex flex-wrap gap-2 text-[11px] kb-text-muted">
                               {runtime.leaseKind && <span>lease {runtime.leaseKind}</span>}
                               {runtime.requestedBy && (
                                 <span>requested by {runtime.requestedBy}</span>
@@ -524,12 +520,10 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
             </div>
           </div>
           <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-            <div className="mb-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-              recent flow
-            </div>
+            <div className="mb-2 text-[11px] kb-text-muted">recent flow</div>
             <div className="space-y-2">
               {data.runtimeTopology.flows.length === 0 ? (
-                <div className="text-[10px] kb-text-muted">
+                <div className="text-[11px] kb-text-muted">
                   No recent A2A or agent-message flow observed.
                 </div>
               ) : (
@@ -539,14 +533,12 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                     className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-[10px] font-mono kb-text-primary">
+                      <div className="text-[11px] font-mono kb-text-primary">
                         {flow.from} → {flow.to}
                       </div>
-                      <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                        {flow.kind}
-                      </div>
+                      <div className="text-[11px] kb-text-muted">{flow.kind}</div>
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-2 text-[9px] kb-text-muted">
+                    <div className="mt-1 flex flex-wrap gap-2 text-[11px] kb-text-muted">
                       <span>count {flow.count}</span>
                       {flow.channel && <span>channel {flow.channel}</span>}
                       {flow.thread && <span>thread {flow.thread}</span>}
@@ -587,7 +579,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                     : 'kb-status-warning-border kb-status-warning-surface'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.18em]">
+                <div className="flex items-center justify-between gap-2 text-[11px]">
                   <span
                     className={
                       finding.severity === 'critical' ? 'kb-status-negative' : 'kb-status-warning'
@@ -597,8 +589,8 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                   </span>
                   <span className="font-mono kb-text-muted">{finding.agentId}</span>
                 </div>
-                <div className="mt-2 text-[10px] kb-text-secondary">owner: {finding.ownerId}</div>
-                <div className="mt-1 text-[10px] kb-text-muted">{finding.reason}</div>
+                <div className="mt-2 text-[11px] kb-text-secondary">owner: {finding.ownerId}</div>
+                <div className="mt-1 text-[11px] kb-text-muted">{finding.reason}</div>
                 <button
                   type="button"
                   onClick={() => {
@@ -619,7 +611,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                     );
                   }}
                   disabled={remediationTarget === finding.agentId}
-                  className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
+                  className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {remediationTarget === finding.agentId
                     ? 'remediating'
@@ -632,21 +624,19 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
           )}
 
           <div className="border-t kb-border-subtle pt-3">
-            <div className="mb-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-              Managed Runtime Leases
-            </div>
+            <div className="mb-2 text-[11px] kb-text-muted">Managed Runtime Leases</div>
             <div className="space-y-2">
               {data.runtimeLeases.slice(0, 6).map((lease) => (
                 <div
                   key={`${lease.agent_id}-${lease.owner_id}`}
                   className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2"
                 >
-                  <div className="text-[10px] font-mono kb-text-secondary">{lease.agent_id}</div>
-                  <div className="mt-1 text-[10px] kb-text-muted">
+                  <div className="text-[11px] font-mono kb-text-secondary">{lease.agent_id}</div>
+                  <div className="mt-1 text-[11px] kb-text-muted">
                     {lease.owner_type}: {lease.owner_id}
                   </div>
                   {typeof lease.metadata?.team_role === 'string' && (
-                    <div className="mt-1 text-[10px] kb-text-muted">
+                    <div className="mt-1 text-[11px] kb-text-muted">
                       team_role: {lease.metadata.team_role}
                     </div>
                   )}
@@ -681,14 +671,14 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                 className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                  <div className="text-[11px] kb-text-muted">
                     {message.surface} · {message.source} · {message.channel}
                   </div>
-                  <div className="text-[9px] font-mono kb-text-muted">
+                  <div className="text-[11px] font-mono kb-text-muted">
                     {new Date(message.created_at).toLocaleString(chronosSpeechLocale())}
                   </div>
                 </div>
-                <div className="mt-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted">
+                <div className="mt-2 text-[11px] kb-text-muted">
                   {mt('chronos_correlation', 'correlation')}: {message.correlation_id}
                 </div>
                 <div className="mt-2 text-[11px] kb-text-primary">{message.text}</div>
@@ -705,7 +695,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                     );
                   }}
                   disabled={outboxTarget === message.message_id}
-                  className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
+                  className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {outboxTarget === message.message_id
                     ? mt('chronos_clearing', 'clearing')
@@ -752,15 +742,15 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                     <>
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                          <div className="text-[11px] font-semibold kb-text-primary">
                             {project.name}
                           </div>
-                          <div className="mt-1 text-[10px] kb-text-muted">
+                          <div className="mt-1 text-[11px] kb-text-muted">
                             {project.project_id} · {project.tier}
                           </div>
                         </div>
                         <div
-                          className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
+                          className={`rounded-full px-2 py-1 text-[11px] ${
                             project.status === 'active'
                               ? 'kb-status-positive-surface kb-status-positive'
                               : project.status === 'draft'
@@ -771,8 +761,8 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                           {project.status}
                         </div>
                       </div>
-                      <div className="mt-3 text-[10px] kb-text-secondary">{project.summary}</div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                      <div className="mt-3 text-[11px] kb-text-secondary">{project.summary}</div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                         <div>
                           {mt('chronos_missions', 'missions')}:{' '}
                           <span className="font-mono kb-text-primary">
@@ -787,7 +777,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         </div>
                       </div>
                       {project.bootstrap_work_items?.length ? (
-                        <div className="mt-3 text-[10px] kb-text-muted">
+                        <div className="mt-3 text-[11px] kb-text-muted">
                           {mt('chronos_next_work', 'next work')}:{' '}
                           {project.bootstrap_work_items
                             .slice(0, 3)
@@ -796,7 +786,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         </div>
                       ) : null}
                       {project.kickoff_task_session_id ? (
-                        <div className="mt-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 text-[11px] kb-text-muted">
                           {mt('chronos_kickoff', 'kickoff')}:{' '}
                           <span className="font-mono kb-text-secondary">
                             {project.kickoff_task_session_id}
@@ -804,8 +794,8 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         </div>
                       ) : null}
                       {management ? (
-                        <div className="mt-3 rounded-lg border kb-border-accent kb-surface-accent px-3 py-3 text-[10px] kb-text-muted">
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-accent">
+                        <div className="mt-3 rounded-lg border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-muted">
+                          <div className="text-[11px] kb-text-accent">
                             {mt('chronos_project_lineage', 'project lineage')}
                           </div>
                           <div className="mt-2 kb-text-primary">
@@ -833,10 +823,8 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                           </div>
                         </div>
                       ) : null}
-                      <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
-                        <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                          work loop
-                        </div>
+                      <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[11px] kb-text-muted">
+                        <div className="text-[11px] kb-text-muted">work loop</div>
                         <div className="mt-2">
                           {mt('chronos_intent', 'intent')}:{' '}
                           <span className="kb-text-primary">{workLoop.intent}</span>
@@ -863,7 +851,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         </div>
                       </div>
                       {learnedRefs.length ? (
-                        <div className="mt-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 text-[11px] kb-text-muted">
                           {mt('chronos_learned', 'learned')}:{' '}
                           <span className="kb-text-secondary">
                             {learnedRefs.map((candidate) => candidate.title).join(', ')}
@@ -882,7 +870,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                               (project.active_missions && project.active_missions[0]) || 'all'
                             );
                           }}
-                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
+                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                         >
                           {selectedProjectId === project.project_id
                             ? mt('chronos_focused', 'focused')
@@ -918,19 +906,17 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
-                      {track.name}
-                    </div>
-                    <div className="mt-1 text-[10px] kb-text-muted">
+                    <div className="text-[11px] font-semibold kb-text-primary">{track.name}</div>
+                    <div className="mt-1 text-[11px] kb-text-muted">
                       {track.track_id} · {track.track_type} · {track.lifecycle_model}
                     </div>
                   </div>
-                  <div className="rounded-full kb-surface-raised px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-secondary">
+                  <div className="rounded-full kb-surface-raised px-2 py-1 text-[11px] kb-text-secondary">
                     {track.status}
                   </div>
                 </div>
-                <div className="mt-3 text-[10px] kb-text-secondary">{track.summary}</div>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                <div className="mt-3 text-[11px] kb-text-secondary">{track.summary}</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                   <div>
                     {mt('chronos_project', 'project')}:{' '}
                     <span className="font-mono kb-text-primary">{track.project_id}</span>
@@ -961,7 +947,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                   ) : null}
                 </div>
                 {track.gate_readiness?.next_required_artifacts?.length ? (
-                  <div className="mt-2 text-[10px] kb-text-muted">
+                  <div className="mt-2 text-[11px] kb-text-muted">
                     {mt('chronos_next_required', 'next required')}:{' '}
                     <span className="font-mono kb-text-secondary">
                       {track.gate_readiness.next_required_artifacts
@@ -971,7 +957,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                   </div>
                 ) : null}
                 {track.release_id ? (
-                  <div className="mt-2 text-[10px] kb-text-muted">
+                  <div className="mt-2 text-[11px] kb-text-muted">
                     release: <span className="font-mono kb-text-secondary">{track.release_id}</span>
                   </div>
                 ) : null}
@@ -980,7 +966,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                     <button
                       type="button"
                       onClick={() => setSelectedTrackId(track.track_id)}
-                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
+                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                     >
                       {selectedTrackId === track.track_id
                         ? mt('chronos_focused', 'focused')
@@ -998,7 +984,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         !track.gate_readiness?.next_required_artifacts?.length ||
                         trackSeedTarget === track.track_id
                       }
-                      className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[11px] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {trackSeedTarget === track.track_id
                         ? 'seeding'
@@ -1035,17 +1021,17 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                 className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                  <div className="text-[11px] font-semibold kb-text-primary">
                     {binding.binding_id}
                   </div>
-                  <div className="rounded-full kb-surface-raised px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-secondary">
+                  <div className="rounded-full kb-surface-raised px-2 py-1 text-[11px] kb-text-secondary">
                     {binding.auth_mode || 'none'}
                   </div>
                 </div>
-                <div className="mt-2 text-[10px] kb-text-muted">
+                <div className="mt-2 text-[11px] kb-text-muted">
                   {binding.service_type} · {binding.scope} · {binding.target}
                 </div>
-                <div className="mt-2 text-[10px] kb-text-muted">
+                <div className="mt-2 text-[11px] kb-text-muted">
                   actions:{' '}
                   <span className="kb-text-secondary">
                     {binding.allowed_actions.slice(0, 4).join(', ') || 'none'}
@@ -1065,7 +1051,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
           Proposed durable work can stay here before it becomes a full mission. Use this panel to
           confirm bootstrap output is structured and attributable.
         </div>
-        <div className="mb-4 rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[10px] leading-5 kb-text-accent">
+        <div className="mb-4 rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[11px] leading-5 kb-text-accent">
           assessment: eligible{' '}
           <span className="font-mono kb-text-accent">
             {data.missionSeedAssessment?.eligible ?? 0}
@@ -1107,15 +1093,15 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                   return (
                     <>
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                        <div className="text-[11px] font-semibold kb-text-primary">
                           {seed.title}
                         </div>
-                        <div className="rounded-full kb-surface-raised px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-secondary">
+                        <div className="rounded-full kb-surface-raised px-2 py-1 text-[11px] kb-text-secondary">
                           {seed.status}
                         </div>
                       </div>
-                      <div className="mt-2 text-[10px] kb-text-secondary">{seed.summary}</div>
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                      <div className="mt-2 text-[11px] kb-text-secondary">{seed.summary}</div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                         <div>
                           project:{' '}
                           <span className="font-mono kb-text-primary">{seed.project_id}</span>
@@ -1138,7 +1124,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         </div>
                       </div>
                       {typeof seed.metadata?.template_ref === 'string' ? (
-                        <div className="mt-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 text-[11px] kb-text-muted">
                           template:{' '}
                           <button
                             type="button"
@@ -1152,7 +1138,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         </div>
                       ) : null}
                       {typeof seed.metadata?.skeleton_path === 'string' ? (
-                        <div className="mt-1 text-[10px] kb-text-muted">
+                        <div className="mt-1 text-[11px] kb-text-muted">
                           skeleton:{' '}
                           <button
                             type="button"
@@ -1166,17 +1152,15 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         </div>
                       ) : null}
                       {seed.promoted_mission_id ? (
-                        <div className="mt-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 text-[11px] kb-text-muted">
                           mission:{' '}
                           <span className="font-mono kb-text-secondary">
                             {seed.promoted_mission_id}
                           </span>
                         </div>
                       ) : null}
-                      <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
-                        <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                          work loop
-                        </div>
+                      <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[11px] kb-text-muted">
+                        <div className="text-[11px] kb-text-muted">work loop</div>
                         <div className="mt-2">
                           {mt('chronos_intent', 'intent')}:{' '}
                           <span className="kb-text-primary">{workLoop.intent}</span>
@@ -1203,7 +1187,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         </div>
                       </div>
                       {learnedRefs.length ? (
-                        <div className="mt-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 text-[11px] kb-text-muted">
                           {mt('chronos_learned', 'learned')}:{' '}
                           <span className="kb-text-secondary">
                             {learnedRefs.map((candidate) => candidate.title).join(', ')}
@@ -1229,7 +1213,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                           disabled={
                             seed.status === 'promoted' || missionSeedTarget === seed.seed_id
                           }
-                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {missionSeedTarget === seed.seed_id
                             ? 'promoting'
@@ -1263,20 +1247,20 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
           <div className="space-y-3">
             <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                <div className="text-[11px] font-semibold kb-text-primary">
                   {referenceDetail.title || 'reference'}
                 </div>
-                <div className="font-mono text-[10px] kb-text-muted">
+                <div className="font-mono text-[11px] kb-text-muted">
                   {selectedReferencePath.split('/').slice(-2).join('/')}
                 </div>
               </div>
-              <div className="mt-2 text-[10px] kb-text-secondary">
+              <div className="mt-2 text-[11px] kb-text-secondary">
                 {referenceDetail.summary || mt('chronos_no_summary', 'No summary available yet.')}
               </div>
-              <div className="mt-2 text-[10px] kb-text-muted">
+              <div className="mt-2 text-[11px] kb-text-muted">
                 path: <span className="font-mono kb-text-secondary">{selectedReferencePath}</span>
               </div>
-              <div className="mt-2 text-[10px]">
+              <div className="mt-2 text-[11px]">
                 <a
                   className="kb-text-accent transition hover:kb-text-accent"
                   href={`${referenceDetail.endpoint}?path=${encodeURIComponent(selectedReferencePath)}`}
@@ -1289,7 +1273,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
               </div>
               {selectedReferenceSeed ? (
                 <>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                     <div>
                       seed:{' '}
                       <span className="font-mono kb-text-secondary">
@@ -1308,7 +1292,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                       <button
                         type="button"
                         onClick={() => setSelectedTrackId(selectedReferenceSeed.track_id || null)}
-                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
                       >
                         {mt('chronos_focus_track', 'focus track')}
                       </button>
@@ -1322,7 +1306,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                             selectedReferenceSeed.metadata?.template_ref as string
                           )
                         }
-                        className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent"
+                        className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                       >
                         {mt('chronos_open_template', 'open template')}
                       </button>
@@ -1336,7 +1320,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                             selectedReferenceSeed.metadata?.skeleton_path as string
                           )
                         }
-                        className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent"
+                        className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                       >
                         {mt('chronos_open_skeleton', 'open skeleton')}
                       </button>
@@ -1360,7 +1344,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                         selectedReferenceSeed.status === 'promoted' ||
                         missionSeedTarget === selectedReferenceSeed.seed_id
                       }
-                      className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[11px] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {missionSeedTarget === selectedReferenceSeed.seed_id
                         ? mt('chronos_processing', 'processing')
@@ -1375,12 +1359,12 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
 
             {referenceMetadataEntries.length ? (
               <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3">
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                <div className="text-[11px] kb-text-muted">
                   {mt('chronos_metadata', 'Metadata')}
                 </div>
                 <div className="mt-2 space-y-1">
                   {referenceMetadataEntries.map(([key, value]) => (
-                    <div key={key} className="text-[10px] kb-text-muted">
+                    <div key={key} className="text-[11px] kb-text-muted">
                       <span className="font-mono kb-text-secondary">{key}</span>: {String(value)}
                     </div>
                   ))}
@@ -1390,7 +1374,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
 
             {referenceDetail.body ? (
               <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3">
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                <div className="text-[11px] kb-text-muted">
                   {mt('chronos_overview', 'Overview')}
                 </div>
                 <div className="mt-2 space-y-1">
@@ -1399,7 +1383,7 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                     .filter((line) => line.trim())
                     .slice(0, 8)
                     .map((line, index) => (
-                      <div key={`${line}-${index}`} className="text-[10px] kb-text-muted">
+                      <div key={`${line}-${index}`} className="text-[11px] kb-text-muted">
                         {line}
                       </div>
                     ))}
@@ -1412,20 +1396,18 @@ export function MissionIntelligenceMissionPanel(context: Record<string, any>) {
                 key={section.title}
                 className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
               >
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  {section.title || 'Section'}
-                </div>
+                <div className="text-[11px] kb-text-muted">{section.title || 'Section'}</div>
                 <div className="mt-2 space-y-1">
                   {section.lines
                     .filter((line) => line.trim())
                     .slice(0, 12)
                     .map((line, index) => (
-                      <div key={`${section.title}-${index}`} className="text-[10px] kb-text-muted">
+                      <div key={`${section.title}-${index}`} className="text-[11px] kb-text-muted">
                         {line}
                       </div>
                     ))}
                   {!section.lines.some((line) => line.trim()) ? (
-                    <div className="text-[10px] kb-text-muted">
+                    <div className="text-[11px] kb-text-muted">
                       {mt('chronos_no_detail', 'No detail.')}
                     </div>
                   ) : null}

@@ -1,223 +1,86 @@
 import type { CloudflareOsSurfaceSnapshot } from '@agent/core/cloudflare-os-surface';
-import type { CSSProperties } from 'react';
+import { Badge, Callout, EmptyState, Grid, List, Section } from '@agent/shared-ui';
+import { operatorTranslator, type OperatorLocale } from '@/lib/i18n';
+import { asKbStatus } from '@/lib/view';
 
+/**
+ * Cloudflare OS projection (read-only). Held actions and observations are
+ * listed only; deciding / applying stays in the guarded surface, which is
+ * offered as a link (never a form or a request from here).
+ */
 export default function OsControlPlanePanel({
   snapshot,
   tenantScope,
   guardedSurfaceUrl,
+  locale,
 }: {
   snapshot: CloudflareOsSurfaceSnapshot;
   tenantScope?: string;
   guardedSurfaceUrl?: string;
+  locale: OperatorLocale;
 }) {
+  const t = operatorTranslator(locale);
+  const held = snapshot.heldActions.slice(0, 8).map((item) => ({
+    title: item.op,
+    meta: [
+      `${item.missionId} · ${item.tenantSlug || 'public'} · ${item.submittedBy}`,
+      `${item.irreversible ? t('os_irreversible') : t('os_reversible')} · ${
+        item.effectBinding || t('os_effect_binding_unavailable')
+      }${item.failureRecorded ? ` · ${t('os_apply_failed')}` : ''}`,
+      t('os_submitted_at', { at: item.submittedAt }),
+    ].join(' · '),
+    status: asKbStatus(item.status) ?? 'pending',
+    status_label: item.status,
+  }));
+  const observations = snapshot.observations.slice(0, 8).map((item) => ({
+    title: `${item.service} · ${item.tier}`,
+    meta: [
+      `${item.resourceRef} · ${item.purpose}`,
+      item.summary,
+      `${item.id} · ${t('os_observed_at', { at: item.observedAt })}`,
+    ].join(' · '),
+  }));
+
   return (
-    <section style={panelStyle} aria-labelledby="os-control-plane-heading">
-      <div style={headerStyle}>
-        <div>
-          <div style={eyebrowStyle}>Cloudflare OS projection</div>
-          <h2 id="os-control-plane-heading" style={headingStyle}>
-            Held actions &amp; observations
-          </h2>
-          <p style={descriptionStyle}>
-            Tenant-scoped read-only projection. Decisions and apply remain in the guarded surface.
-          </p>
-          {!tenantScope ? (
-            <p style={warningStyle}>
-              Tenant scope is not configured. Only public observations are shown; held actions are
-              hidden. Set <code>KYBERION_TENANT</code> before exposing MOS.
-            </p>
-          ) : null}
-        </div>
-        <span style={readOnlyBadge}>READ-ONLY</span>
+    <Section title={t('os_title')} description={t('os_description')}>
+      <div className="operator-chips">
+        <Badge label={t('os_eyebrow')} tone="accent" />
+        <Badge label={t('read_only_badge')} tone="neutral" />
       </div>
-
-      <div style={columnsStyle}>
-        <div>
-          <h3 style={subheadingStyle}>Held actions ({snapshot.heldActions.length})</h3>
-          {snapshot.heldActions.length ? (
-            <div style={stackStyle}>
-              {snapshot.heldActions.slice(0, 8).map((item) => (
-                <article key={item.id} style={itemStyle}>
-                  <div style={rowStyle}>
-                    <strong style={truncateStyle}>{item.op}</strong>
-                    <span style={statusStyle}>{item.status}</span>
-                  </div>
-                  <div style={metaStyle}>
-                    {item.missionId} · {item.tenantSlug || 'public'} · {item.submittedBy}
-                  </div>
-                  <div style={mutedStyle}>
-                    {item.irreversible ? 'irreversible' : 'reversible'} ·{' '}
-                    {item.effectBinding || 'effect binding unavailable'}
-                    {item.failureRecorded ? ' · apply failed' : ''}
-                  </div>
-                  <div style={metaStyle}>submitted {item.submittedAt}</div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p style={emptyStyle}>No held actions are visible to this operator.</p>
-          )}
-        </div>
-
-        <div>
-          <h3 style={subheadingStyle}>Observation audit ({snapshot.observations.length})</h3>
-          {snapshot.observations.length ? (
-            <div style={stackStyle}>
-              {snapshot.observations.slice(0, 8).map((item) => (
-                <article key={item.id} style={itemStyle}>
-                  <div style={rowStyle}>
-                    <strong style={truncateStyle}>{item.service}</strong>
-                    <span style={mutedStyle}>{item.tier}</span>
-                  </div>
-                  <div style={metaStyle}>
-                    {item.resourceRef} · {item.purpose}
-                  </div>
-                  <div style={mutedStyle}>{item.summary}</div>
-                  <div style={metaStyle}>
-                    {item.id} · observed {item.observedAt}
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p style={emptyStyle}>No observations recorded yet.</p>
-          )}
-        </div>
-      </div>
-      {snapshot.heldActions.length ? (
-        <div style={nextActionStyle}>
-          <strong>Human action required.</strong>{' '}
-          {guardedSurfaceUrl ? (
-            <a href={guardedSurfaceUrl} style={linkStyle}>
-              Open the guarded surface to decide or apply.
-            </a>
-          ) : (
-            <span>
-              Configure <code>KYBERION_OS_GUARDED_SURFACE_URL</code> for the decision surface.
-            </span>
-          )}
-        </div>
+      {!tenantScope ? (
+        <Callout tone="warning" title={t('os_no_tenant_title')} body={t('os_no_tenant_body')} />
       ) : null}
-    </section>
+      <Grid min_column_width="md" gap="md">
+        <Section
+          title={t('os_held_actions', { count: snapshot.heldActions.length })}
+          headingLevel={3}
+        >
+          {held.length ? <List items={held} /> : <EmptyState title={t('os_held_actions_empty')} />}
+        </Section>
+        <Section
+          title={t('os_observations', { count: snapshot.observations.length })}
+          headingLevel={3}
+        >
+          {observations.length ? (
+            <List items={observations} variant="timeline" />
+          ) : (
+            <EmptyState title={t('os_observations_empty')} />
+          )}
+        </Section>
+      </Grid>
+      {snapshot.heldActions.length ? (
+        <Callout tone="warning" title={t('os_human_action_required')}>
+          {guardedSurfaceUrl ? (
+            <p className="kb-callout__body">
+              <a href={guardedSurfaceUrl} className="kb-btn kb-btn--secondary">
+                {t('os_open_guarded_surface')}
+              </a>
+            </p>
+          ) : (
+            <p className="kb-callout__body">{t('os_configure_guarded_surface')}</p>
+          )}
+        </Callout>
+      ) : null}
+    </Section>
   );
 }
-
-const panelStyle: CSSProperties = {
-  marginTop: '30px',
-  padding: '20px',
-  border: '1px solid var(--kb-border)',
-  borderRadius: '8px',
-  background: 'var(--kb-panel-bg)',
-};
-const headerStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: '16px',
-  alignItems: 'flex-start',
-};
-const eyebrowStyle: CSSProperties = {
-  color: 'var(--kb-accent-text)',
-  fontSize: '11px',
-  fontWeight: 700,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-};
-const headingStyle: CSSProperties = {
-  margin: '4px 0 0',
-  color: 'var(--kb-text-primary)',
-  fontSize: '20px',
-};
-const descriptionStyle: CSSProperties = {
-  margin: '8px 0 0',
-  color: 'var(--kb-text-secondary)',
-  fontSize: '13px',
-};
-const warningStyle: CSSProperties = {
-  margin: '10px 0 0',
-  padding: '8px 10px',
-  border: '1px solid var(--kb-warning)',
-  borderRadius: '6px',
-  color: 'var(--kb-warning)',
-  fontSize: '12px',
-  lineHeight: 1.5,
-};
-const readOnlyBadge: CSSProperties = {
-  flexShrink: 0,
-  padding: '4px 8px',
-  border: '1px solid var(--kb-border)',
-  borderRadius: '999px',
-  color: 'var(--kb-text-secondary)',
-  fontFamily: 'var(--kb-font-mono)',
-  fontSize: '10px',
-};
-const columnsStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-  gap: '20px',
-  marginTop: '20px',
-};
-const subheadingStyle: CSSProperties = {
-  margin: '0 0 8px',
-  color: 'var(--kb-text-primary)',
-  fontSize: '14px',
-};
-const stackStyle: CSSProperties = { display: 'grid', gap: '8px' };
-const itemStyle: CSSProperties = {
-  padding: '10px 12px',
-  border: '1px solid var(--kb-border)',
-  borderRadius: '6px',
-  background: 'var(--kb-bg-main)',
-};
-const rowStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: '10px',
-  alignItems: 'center',
-};
-const truncateStyle: CSSProperties = {
-  minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-  color: 'var(--kb-text-primary)',
-  fontSize: '12px',
-};
-const statusStyle: CSSProperties = {
-  flexShrink: 0,
-  color: 'var(--kb-accent-text)',
-  fontFamily: 'var(--kb-font-mono)',
-  fontSize: '10px',
-  textTransform: 'uppercase',
-};
-const metaStyle: CSSProperties = {
-  marginTop: '6px',
-  color: 'var(--kb-text-secondary)',
-  fontSize: '11px',
-  lineHeight: 1.5,
-  overflowWrap: 'anywhere',
-};
-const mutedStyle: CSSProperties = {
-  marginTop: '4px',
-  color: 'var(--kb-muted-text)',
-  fontSize: '11px',
-  lineHeight: 1.5,
-  overflowWrap: 'anywhere',
-};
-const emptyStyle: CSSProperties = {
-  margin: 0,
-  padding: '12px',
-  border: '1px dashed var(--kb-border)',
-  borderRadius: '6px',
-  color: 'var(--kb-text-secondary)',
-  fontSize: '13px',
-};
-const nextActionStyle: CSSProperties = {
-  marginTop: '16px',
-  padding: '10px 12px',
-  border: '1px solid var(--kb-warning)',
-  borderRadius: '6px',
-  color: 'var(--kb-text-primary)',
-  fontSize: '12px',
-  lineHeight: 1.5,
-};
-const linkStyle: CSSProperties = { color: 'var(--kb-accent-text)', fontWeight: 600 };

@@ -59,13 +59,19 @@ export function normalizeChronosLocale(value: unknown): SupportedLocale {
 
 // UX-03 Task 5: an explicit operator choice (header toggle) persists in
 // localStorage and wins over the browser language.
-export const CHRONOS_LOCALE_STORAGE_KEY = 'kyberion.chronos.locale';
+// UI-07: the key is shared with the front desk (`kyberion.ui.locale`, see
+// concierge-theme.ts); the former Chronos-only key is still read so an
+// existing choice survives the rename.
+export const CHRONOS_LOCALE_STORAGE_KEY = 'kyberion.ui.locale';
+export const CHRONOS_LEGACY_LOCALE_STORAGE_KEY = 'kyberion.chronos.locale';
 export const CHRONOS_LOCALE_EVENT = 'kyberion-chronos-locale';
 
 export function readStoredChronosLocale(): SupportedLocale | null {
   if (typeof window === 'undefined') return null;
   try {
-    const value = window.localStorage.getItem(CHRONOS_LOCALE_STORAGE_KEY);
+    const value =
+      window.localStorage.getItem(CHRONOS_LOCALE_STORAGE_KEY) ??
+      window.localStorage.getItem(CHRONOS_LEGACY_LOCALE_STORAGE_KEY);
     // I18N-07 finding: this compared against the hardcoded pair `'ja'`/`'en'`
     // instead of the data-driven `SUPPORTED_LOCALES` set (via `normalizeLocale`,
     // already imported below), so a stored `qps-ploc` preference was silently

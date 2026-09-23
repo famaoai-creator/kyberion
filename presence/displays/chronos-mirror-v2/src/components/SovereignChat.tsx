@@ -318,7 +318,7 @@ export function SovereignChat({
   return (
     <div
       ref={panelRef}
-      className="fixed w-[min(420px,calc(100vw-2rem))] h-[min(520px,calc(100dvh-2rem))] kyberion-glass rounded-2xl border kb-status-warning-border flex flex-col overflow-hidden z-50"
+      className="fixed w-[min(420px,calc(100vw-2rem))] h-[min(520px,calc(100dvh-2rem))] kyberion-glass rounded-lg border kb-status-warning-border flex flex-col overflow-hidden z-50"
       style={{ bottom: `${24 - pos.y}px`, right: `${24 - pos.x}px` }}
     >
       {/* Header — drag handle */}
@@ -331,15 +331,13 @@ export function SovereignChat({
         <div className="flex items-center gap-2">
           <GripHorizontal size={12} className="opacity-30" />
           <div className="w-2 h-2 rounded-full kb-status-positive-surface animate-pulse" />
-          <span className="text-[11px] uppercase tracking-[0.2em] font-bold opacity-60">
-            Sovereign Link
-          </span>
+          <span className="text-[11px] font-bold opacity-60">Sovereign Link</span>
         </div>
         <button
           type="button"
           onClick={() => setIsOpen(false)}
           aria-label={uxText('chronos_chat_minimize', locale)}
-          className="text-[10px] opacity-40 hover:opacity-80 transition"
+          className="text-[11px] opacity-40 hover:opacity-80 transition"
           onPointerDown={(e) => e.stopPropagation()}
         >
           {uxText('chronos_chat_minimize', locale)}
@@ -361,7 +359,7 @@ export function SovereignChat({
             </div>
 
             <div className="space-y-3">
-              <div className="px-2 text-[9px] uppercase tracking-widest kb-text-muted">
+              <div className="px-2 text-[11px] kb-text-muted">
                 {uxText('chronos_chat_guided_prompts', locale)}
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -373,10 +371,8 @@ export function SovereignChat({
                     onClick={() => void sendQuery(hint.query)}
                     className="rounded-xl border kb-border-subtle kb-surface-raised/5 p-3 text-left transition hover:kb-border-accent hover:kb-surface-accent"
                   >
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-secondary">
-                      {hint.label}
-                    </div>
-                    <div className="mt-1 text-[9px] leading-5 kb-text-muted">{hint.query}</div>
+                    <div className="text-[11px] kb-text-secondary">{hint.label}</div>
+                    <div className="mt-1 text-[11px] leading-5 kb-text-muted">{hint.query}</div>
                   </button>
                 ))}
               </div>
@@ -408,7 +404,7 @@ export function SovereignChat({
           <div className="flex justify-start">
             <div className="flex items-center gap-2 px-3 py-2 kb-surface-raised/5 border kb-border-subtle rounded-xl">
               <Loader2 className="w-4 h-4 animate-spin opacity-40" />
-              <span className="text-[10px] kb-text-muted" role="status">
+              <span className="text-[11px] kb-text-muted" role="status">
                 {phase === 'sending' && uxText('chronos_chat_phase_sending', locale)}
                 {phase === 'thinking' && uxText('chronos_chat_phase_thinking', locale)}
                 {phase === 'long_running' && uxText('chronos_chat_phase_long_running', locale)}
@@ -417,7 +413,7 @@ export function SovereignChat({
                 type="button"
                 onClick={cancelQuery}
                 aria-label={uxText('chronos_chat_cancel', locale)}
-                className="ml-1 text-[9px] uppercase tracking-widest kb-text-muted hover:kb-status-negative border kb-border-subtle hover:kb-status-negative-border rounded px-1.5 py-0.5 transition"
+                className="ml-1 text-[11px] kb-text-muted hover:kb-status-negative border kb-border-subtle hover:kb-status-negative-border rounded px-1.5 py-0.5 transition"
               >
                 {uxText('chronos_chat_cancel', locale)}
               </button>

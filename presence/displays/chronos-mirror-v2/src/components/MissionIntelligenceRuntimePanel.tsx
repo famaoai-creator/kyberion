@@ -16,7 +16,7 @@ import {
 import { Panel, RuntimeCell } from './MissionIntelligencePrimitives';
 import { chronosSpeechLocale } from '../lib/ux-vocabulary';
 
-export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
+export function MissionIntelligenceRuntimePanel({ context }: { context: Record<string, any> }) {
   const {
     data,
     mt,
@@ -60,15 +60,15 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                   key={`${event.ts}-${index}`}
                   className="border-l kb-status-warning-border pl-3"
                 >
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                  <div className="flex items-center gap-2 text-[11px] kb-text-muted">
                     <Activity size={10} />
                     <span>{event.decision}</span>
                   </div>
                   <div className="mt-1 text-[11px] kb-text-primary">
                     {event.mission_id || 'system'}
                   </div>
-                  {event.why && <div className="mt-1 text-[10px] kb-text-muted">{event.why}</div>}
-                  <div className="mt-1 text-[9px] font-mono kb-text-muted">
+                  {event.why && <div className="mt-1 text-[11px] kb-text-muted">{event.why}</div>}
+                  <div className="mt-1 text-[11px] font-mono kb-text-muted">
                     {new Date(event.ts).toLocaleString(chronosSpeechLocale())}
                   </div>
                 </div>
@@ -93,14 +93,14 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                   className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                    <div className="text-[11px] font-semibold kb-text-primary">
                       {summary.mission_id}
                     </div>
-                    <div className="text-[9px] font-mono kb-text-muted">
+                    <div className="text-[11px] font-mono kb-text-muted">
                       {new Date(summary.ts).toLocaleString(chronosSpeechLocale())}
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-secondary">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-secondary">
                     <div>
                       accepted:{' '}
                       <span className="font-mono kb-text-primary">{summary.accepted_count}</span>
@@ -167,10 +167,10 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                      <div className="text-[11px] font-semibold kb-text-primary">
                         {session.session_id}
                       </div>
-                      <div className="mt-1 text-[10px] kb-text-muted">
+                      <div className="mt-1 text-[11px] kb-text-muted">
                         active tab:{' '}
                         <span className="font-mono kb-text-secondary">{session.active_tab_id}</span>{' '}
                         · tabs:{' '}
@@ -178,7 +178,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                       </div>
                     </div>
                     <div
-                      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
+                      className={`rounded-full px-2 py-1 text-[11px] ${
                         session.lease_status === 'active'
                           ? 'kb-surface-accent kb-text-accent'
                           : session.lease_status === 'expired'
@@ -189,7 +189,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                       {session.lease_status}
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                     <div>
                       retained:{' '}
                       <span className="font-mono kb-text-primary">{String(session.retained)}</span>
@@ -218,7 +218,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                     </div>
                   </div>
                   {session.last_trace_path && (
-                    <div className="mt-2 text-[10px] kb-text-muted">
+                    <div className="mt-2 text-[11px] kb-text-muted">
                       trace:{' '}
                       <span className="font-mono kb-text-secondary">{session.last_trace_path}</span>
                     </div>
@@ -233,7 +233,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                         browserSessionTarget === `${session.session_id}:close_browser_session` ||
                         session.lease_status !== 'active'
                       }
-                      className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {browserSessionTarget === `${session.session_id}:close_browser_session`
                         ? 'closing'
@@ -247,7 +247,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                       disabled={
                         browserSessionTarget === `${session.session_id}:restart_browser_session`
                       }
-                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {browserSessionTarget === `${session.session_id}:restart_browser_session`
                         ? 'restarting'
@@ -255,11 +255,9 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                     </button>
                   </div>
                   <div className="mt-3 space-y-2">
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                      recent browser trail
-                    </div>
+                    <div className="text-[11px] kb-text-muted">recent browser trail</div>
                     {session.recent_actions.length === 0 ? (
-                      <div className="text-[10px] kb-text-muted">No recorded browser actions.</div>
+                      <div className="text-[11px] kb-text-muted">No recorded browser actions.</div>
                     ) : (
                       session.recent_actions.map((action, index) => (
                         <div
@@ -267,14 +265,14 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                           className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                            <div className="text-[11px] kb-text-muted">
                               {action.kind} · {action.op}
                             </div>
-                            <div className="text-[9px] font-mono kb-text-muted">
+                            <div className="text-[11px] font-mono kb-text-muted">
                               {new Date(action.ts).toLocaleTimeString(chronosSpeechLocale())}
                             </div>
                           </div>
-                          <div className="mt-1 text-[10px] kb-text-muted">
+                          <div className="mt-1 text-[11px] kb-text-muted">
                             {action.tab_id && (
                               <span className="mr-2">
                                 tab:{' '}
@@ -361,17 +359,17 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                      <div className="text-[11px] font-semibold kb-text-primary">
                         {session.session_id}
                       </div>
-                      <div className="mt-1 text-[10px] kb-text-muted">
+                      <div className="mt-1 text-[11px] kb-text-muted">
                         surface:{' '}
                         <span className="font-mono kb-text-secondary">{session.surface}</span> ·
                         mode: <span className="font-mono kb-text-secondary">{session.mode}</span>
                       </div>
                     </div>
                     <div
-                      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
+                      className={`rounded-full px-2 py-1 text-[11px] ${
                         session.status === 'completed'
                           ? 'kb-status-positive-surface kb-status-positive'
                           : session.status === 'awaiting_confirmation'
@@ -384,7 +382,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                       {session.status}
                     </div>
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                     <div>
                       intent:{' '}
                       <span className="kb-text-primary">{session.goal_summary || 'n/a'}</span>
@@ -438,7 +436,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                     : null;
                   return latestAction ? (
                     <>
-                      <div className="mr-2 flex items-center rounded-lg border kb-border-subtle kb-surface-raised px-3 py-1.5 text-[10px] kb-text-muted">
+                      <div className="mr-2 flex items-center rounded-lg border kb-border-subtle kb-surface-raised px-3 py-1.5 text-[11px] kb-text-muted">
                         {mt('chronos_surfaces', 'surfaces')}
                         <span className="ml-2">{latestAction.operation}</span>
                         <span className="ml-2">
@@ -455,7 +453,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                                 : latestAction.event_id || null
                             )
                           }
-                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
+                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                         >
                           {expandedGlobalSurfaceActionId === latestAction.event_id
                             ? mt('chronos_hide_latest_action', 'hide latest action')
@@ -471,7 +469,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                             surfaceActionTarget === `all:${latestAction.operation}`
                           }
                           title={retryAction?.disabledReason}
-                          className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
+                          className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[11px] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {surfaceActionTarget === `all:${latestAction.operation}`
                             ? mt('chronos_retrying', 'retrying')
@@ -488,13 +486,13 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                     onClick={() => runSurfaceControl(null, action.operation)}
                     disabled={!action.enabled || surfaceActionTarget === `all:${action.operation}`}
                     title={action.disabledReason}
-                    className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {surfaceActionTarget === `all:${action.operation}` ? 'working' : action.label}
                   </button>
                 ))}
                 {getSharedDisabledReason(data.controlActionAvailability.globalSurface) && (
-                  <div className="w-full text-[10px] kb-text-muted">
+                  <div className="w-full text-[11px] kb-text-muted">
                     {getSharedDisabledReason(data.controlActionAvailability.globalSurface)}
                   </div>
                 )}
@@ -540,7 +538,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                           );
                           return latestAction ? (
                             <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2">
-                              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                              <div className="text-[11px] kb-text-muted">
                                 {mt('chronos_last_control_action', 'last control action')}
                               </div>
                               <ActionStatusBadge action={latestAction} />
@@ -549,10 +547,10 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                         })()}
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                            <div className="text-[11px] font-semibold kb-text-primary">
                               {surface.id}
                             </div>
-                            <div className="mt-1 text-[10px] uppercase tracking-[0.2em] kb-text-muted">
+                            <div className="mt-1 text-[11px] kb-text-muted">
                               {surface.kind} ·{' '}
                               {surface.startupMode || mt('chronos_background', 'background')} ·{' '}
                               {surface.running
@@ -561,7 +559,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                             </div>
                           </div>
                           <div
-                            className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${
+                            className={`rounded-full px-2 py-1 text-[11px] ${
                               surface.health === 'healthy'
                                 ? 'kb-status-positive-surface kb-status-positive'
                                 : surface.health === 'unhealthy'
@@ -572,7 +570,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                             {surface.health}
                           </div>
                         </div>
-                        <div className="mt-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 text-[11px] kb-text-muted">
                           pid:{' '}
                           <span className="font-mono kb-text-secondary">{surface.pid ?? '-'}</span>
                           {surface.detail ? (
@@ -585,15 +583,15 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                         </div>
                         <div className="mt-3 flex items-center gap-2">
                           <div
-                            className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.25em] ${surfaceSummaryBadgeClass(surface.controlTone)}`}
+                            className={`rounded-full px-2 py-1 text-[11px] ${surfaceSummaryBadgeClass(surface.controlTone)}`}
                           >
                             {surface.controlSummary}
                           </div>
-                          <div className="text-[10px] kb-text-muted">
+                          <div className="text-[11px] kb-text-muted">
                             {mt('chronos_control_summary', 'control summary')}
                           </div>
                           {surface.controlRequestedBy && (
-                            <div className="text-[10px] kb-text-muted">
+                            <div className="text-[11px] kb-text-muted">
                               {mt('chronos_requested_by', 'requested by')}{' '}
                               <span className="font-mono kb-text-secondary">
                                 {surface.controlRequestedBy}
@@ -622,7 +620,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                                         : latestAction.event_id || null
                                     )
                                   }
-                                  className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
+                                  className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                                 >
                                   {expandedSurfaceCardActionId === latestAction.event_id
                                     ? mt('chronos_hide_latest_action', 'hide latest action')
@@ -640,7 +638,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                                         `${surface.id}:${latestAction.operation}`
                                     }
                                     title={retryAction?.disabledReason}
-                                    className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[11px] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
                                   >
                                     {surfaceActionTarget ===
                                     `${surface.id}:${latestAction.operation}`
@@ -652,7 +650,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                             );
                           })()}
                           <div className="flex flex-wrap gap-2 rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-2">
-                            <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-positive">
+                            <div className="w-full text-[11px] kb-status-positive">
                               {mt('chronos_safe_actions', 'safe actions')}
                             </div>
                             {safeSurfaceActions.map((action) => (
@@ -673,13 +671,13 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                               </button>
                             ))}
                             {safeDisabledReason && (
-                              <div className="w-full text-[10px] kb-text-muted">
+                              <div className="w-full text-[11px] kb-text-muted">
                                 {safeDisabledReason}
                               </div>
                             )}
                           </div>
                           <div className="flex flex-wrap gap-2 rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-2">
-                            <div className="w-full text-[9px] uppercase tracking-[0.18em] kb-status-negative">
+                            <div className="w-full text-[11px] kb-status-negative">
                               {mt(
                                 'chronos_risky_actions_approval_required',
                                 'risky actions · approval required'
@@ -715,7 +713,7 @@ export function MissionIntelligenceRuntimePanel(context: Record<string, any>) {
                               </button>
                             ))}
                             {riskyDisabledReason && (
-                              <div className="w-full text-[10px] kb-text-muted">
+                              <div className="w-full text-[11px] kb-text-muted">
                                 {riskyDisabledReason}
                               </div>
                             )}

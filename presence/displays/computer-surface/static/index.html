@@ -1,617 +1,245 @@
 <!doctype html>
-<html lang="en">
+<!--
+  UI-09 (SURFACE_UI_UNIFICATION_PLAN_2026-09-23 §6): computer-surface page.
+  A template served by page.ts: the t / locale / vocabulary-json placeholders
+  are filled for the viewer's locale, and the developer sandbox block is only
+  kept for `?dev=1`. Markup uses the kyberion-base classes (kyberion-ui.css) and the
+  shared vanilla renderer (/shared-ui/kyberion-ui.js); no surface-specific
+  colors.
+-->
+<html lang="{{locale}}" data-density="compact" data-dev="{{dev}}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Computer Surface</title>
-    <link rel="stylesheet" href="design-tokens.css" />
-    <style>
-      :root {
-        color-scheme: dark;
-        --bg: var(--kb-bg-main);
-        --panel: var(--kb-panel-bg);
-        --border: var(--kb-border, rgba(255, 255, 255, 0.1));
-        --text: var(--kb-text-primary);
-        --muted: var(--kb-text-secondary);
-        --accent: var(--kb-accent);
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        background: radial-gradient(circle at top, #12324a 0%, var(--bg) 42%, #02060a 100%);
-        color: var(--text);
-        font-family: var(--kb-font-sans);
-      }
-      .shell {
-        width: min(980px, calc(100vw - 32px));
-        margin: 24px auto;
-        display: grid;
-        gap: 16px;
-      }
-      .panel {
-        border: 1px solid var(--border);
-        background: var(--panel);
-        border-radius: 24px;
-        padding: 20px;
-        backdrop-filter: blur(16px);
-      }
-      .eyebrow {
-        font-size: 11px;
-        letter-spacing: 0.24em;
-        text-transform: uppercase;
-        color: var(--muted);
-      }
-      .title {
-        margin-top: 10px;
-        font-size: 28px;
-        font-weight: 700;
-      }
-      .sub {
-        margin-top: 8px;
-        color: var(--muted);
-        line-height: 1.6;
-        font-size: 14px;
-      }
-      .grid {
-        display: grid;
-        gap: 12px;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      }
-      .metric {
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        padding: 14px;
-        background: rgba(0, 0, 0, 0.16);
-      }
-      .metric .label {
-        color: var(--muted);
-        font-size: 11px;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-      }
-      .metric .value {
-        margin-top: 8px;
-        font-size: 16px;
-        font-weight: 600;
-        word-break: break-word;
-      }
-      .path {
-        margin-top: 12px;
-        font-family: ui-monospace, SFMono-Regular, monospace;
-        color: #d1f5ff;
-        font-size: 12px;
-        word-break: break-all;
-      }
-      .intent-resolution-panel {
-        margin-top: 14px;
-        padding: 12px;
-        border: 1px solid rgba(125, 211, 252, 0.24);
-        border-radius: 14px;
-        background: rgba(34, 211, 238, 0.06);
-      }
-      .intent-resolution-panel.hidden {
-        display: none;
-      }
-      .intent-resolution-title {
-        color: rgba(189, 224, 254, 0.85);
-        font-size: 10px;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-      }
-      .intent-resolution-grid {
-        display: grid;
-        gap: 10px;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        margin-top: 10px;
-      }
-      .intent-resolution-label {
-        color: var(--muted);
-        display: block;
-        font-size: 10px;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-      }
-      .intent-resolution-value {
-        display: block;
-        font-size: 13px;
-        margin-top: 4px;
-        overflow-wrap: anywhere;
-      }
-      .intent-resolution-consequence {
-        color: var(--muted);
-        font-size: 12px;
-        line-height: 1.5;
-        margin-top: 10px;
-      }
-      .os-header {
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-        align-items: flex-start;
-      }
-      .os-title {
-        margin-top: 8px;
-        font-size: 20px;
-        font-weight: 700;
-      }
-      .os-sub {
-        margin-top: 6px;
-        color: var(--muted);
-        line-height: 1.5;
-        font-size: 12px;
-      }
-      .os-badge {
-        flex-shrink: 0;
-        border: 1px solid rgba(125, 211, 252, 0.3);
-        border-radius: 999px;
-        padding: 4px 8px;
-        color: rgba(189, 224, 254, 0.85);
-        font-size: 10px;
-        letter-spacing: 0.12em;
-      }
-      .os-warning {
-        margin-top: 10px;
-        padding: 8px 10px;
-        border: 1px solid rgba(253, 230, 138, 0.45);
-        border-radius: 10px;
-        color: rgba(254, 240, 178, 0.95);
-        font-size: 12px;
-        line-height: 1.5;
-      }
-      .os-warning.hidden {
-        display: none;
-      }
-      .os-columns {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 12px;
-        margin-top: 16px;
-      }
-      .os-heading {
-        margin: 0 0 8px;
-        color: var(--text);
-        font-size: 13px;
-      }
-      .os-list {
-        display: grid;
-        gap: 8px;
-      }
-      .os-item {
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 10px 12px;
-        background: rgba(0, 0, 0, 0.14);
-      }
-      .os-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        align-items: center;
-      }
-      .os-item strong {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-size: 12px;
-      }
-      .os-status {
-        color: rgba(125, 211, 252, 0.95);
-        font-family: ui-monospace, SFMono-Regular, monospace;
-        font-size: 10px;
-        text-transform: uppercase;
-      }
-      .os-meta {
-        margin-top: 5px;
-        color: var(--muted);
-        font-size: 11px;
-        line-height: 1.45;
-        overflow-wrap: anywhere;
-      }
-      .os-empty {
-        margin: 0;
-        border: 1px dashed var(--border);
-        border-radius: 12px;
-        padding: 10px 12px;
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .os-next {
-        margin-top: 14px;
-        padding: 10px 12px;
-        border: 1px solid rgba(253, 230, 138, 0.45);
-        border-radius: 10px;
-        color: rgba(237, 246, 255, 0.9);
-        font-size: 12px;
-        line-height: 1.5;
-      }
-      .os-next a {
-        color: rgba(125, 211, 252, 0.95);
-        font-weight: 700;
-      }
-      .os-next.hidden {
-        display: none;
-      }
-      .header-row {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 16px;
-      }
-      .header-meta {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-shrink: 0;
-        margin-top: 6px;
-      }
-      .conn-pill {
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.18em;
-        padding: 3px 8px;
-        border-radius: 999px;
-        border: 1px solid rgba(125, 211, 252, 0.25);
-        background: rgba(34, 211, 238, 0.08);
-        color: rgba(189, 224, 254, 0.85);
-      }
-      .conn-pill.conn-live {
-        border-color: rgba(74, 222, 128, 0.45);
-        background: rgba(74, 222, 128, 0.12);
-        color: rgba(190, 242, 200, 0.95);
-      }
-      .conn-pill.conn-retrying {
-        border-color: rgba(253, 230, 138, 0.45);
-        background: rgba(253, 230, 138, 0.12);
-        color: rgba(254, 240, 178, 0.95);
-      }
-      .conn-pill.conn-offline {
-        border-color: rgba(248, 113, 113, 0.45);
-        background: rgba(248, 113, 113, 0.12);
-        color: rgba(254, 202, 202, 0.95);
-      }
-      .conn-pill.conn-pending {
-        opacity: 0.6;
-      }
-      .updated-text {
-        font-family: ui-monospace, monospace;
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .identity-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 8px;
-        border: 1px solid rgba(34, 211, 238, 0.35);
-        background: rgba(34, 211, 238, 0.05);
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: rgba(237, 246, 255, 0.85);
-      }
-      .identity-badge.hidden {
-        display: none;
-      }
-      .identity-badge .badge-id {
-        color: rgba(125, 211, 252, 0.95);
-      }
-      .identity-badge .badge-tier {
-        color: rgba(237, 246, 255, 0.55);
-      }
-      .identity-badge .badge-sep {
-        color: rgba(237, 246, 255, 0.3);
-      }
-      .identity-badge.identity-badge-warn {
-        border-color: rgba(253, 230, 138, 0.55);
-        background: rgba(253, 230, 138, 0.1);
-        color: rgba(253, 230, 138, 0.9);
-      }
-      .first-run-banner {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        margin-top: 12px;
-        padding: 12px 14px;
-        border-radius: 16px;
-        border: 1px solid rgba(34, 211, 238, 0.25);
-        background: linear-gradient(
-          90deg,
-          rgba(34, 211, 238, 0.08),
-          rgba(125, 211, 252, 0.03) 60%,
-          transparent
-        );
-        font-size: 12.5px;
-        color: rgba(237, 246, 255, 0.85);
-      }
-      .first-run-banner.hidden {
-        display: none;
-      }
-      .first-run-banner .first-run-icon {
-        font-size: 18px;
-        line-height: 1;
-        margin-top: 2px;
-      }
-      .first-run-banner code {
-        font-family: ui-monospace, SFMono-Regular, monospace;
-        font-size: 11px;
-        background: rgba(0, 0, 0, 0.3);
-        padding: 0 4px;
-        border-radius: 3px;
-        color: rgba(189, 224, 254, 0.95);
-      }
-      .first-run-banner ol {
-        margin: 6px 0 0;
-        padding-left: 18px;
-        color: rgba(237, 246, 255, 0.65);
-        font-size: 11.5px;
-      }
-      .first-run-banner .first-run-eyebrow {
-        font-size: 10px;
-        letter-spacing: 0.3em;
-        text-transform: uppercase;
-        color: rgba(125, 211, 252, 0.85);
-      }
-      .first-run-close {
-        background: transparent;
-        border: none;
-        color: rgba(237, 246, 255, 0.5);
-        font-size: 18px;
-        cursor: pointer;
-        padding: 0 4px;
-        line-height: 1;
-        flex-shrink: 0;
-      }
-      .first-run-close:hover {
-        color: rgba(237, 246, 255, 0.9);
-      }
-      .dev-panel {
-        margin-top: 12px;
-        padding: 12px 14px;
-        border-radius: 16px;
-        border: 1px solid var(--border);
-        background: rgba(11, 22, 36, 0.5);
-      }
-      .dev-panel summary {
-        cursor: pointer;
-        list-style: none;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 12px;
-      }
-      .dev-panel summary::-webkit-details-marker {
-        display: none;
-      }
-      .dev-panel-title {
-        font-weight: 700;
-      }
-      .dev-panel-hint {
-        color: var(--muted);
-        font-size: 11.5px;
-      }
-      .dev-panel-body {
-        margin-top: 12px;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-      }
-      .dev-panel-body textarea,
-      .dev-panel-body pre {
-        width: 100%;
-        font-family: ui-monospace, SFMono-Regular, monospace;
-        font-size: 12px;
-        background: rgba(0, 0, 0, 0.45);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 10px;
-        color: rgba(237, 246, 255, 0.9);
-        padding: 10px;
-        box-sizing: border-box;
-      }
-      .dev-panel-body textarea {
-        resize: vertical;
-        min-height: 160px;
-      }
-      .dev-panel-body pre {
-        white-space: pre-wrap;
-        word-break: break-all;
-        margin: 0;
-      }
-      .dev-panel-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-top: 10px;
-      }
-      .dev-panel-actions .button {
-        appearance: none;
-        background: rgba(34, 211, 238, 0.15);
-        border: 1px solid rgba(34, 211, 238, 0.4);
-        color: var(--text);
-        padding: 6px 12px;
-        border-radius: 8px;
-        font-size: 11px;
-        cursor: pointer;
-      }
-      .dev-panel-actions .button-ghost {
-        background: transparent;
-        border: 1px solid rgba(255, 255, 255, 0.16);
-      }
-      .dev-panel-result {
-        font-size: 11px;
-        color: var(--muted);
-      }
-      .dev-panel-result.ok {
-        color: rgba(190, 242, 200, 0.95);
-      }
-      .dev-panel-result.err {
-        color: rgba(254, 202, 202, 0.95);
-      }
-      .dev-label {
-        display: block;
-        font-size: 10px;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--muted);
-        margin-bottom: 6px;
-      }
-      @media (max-width: 720px) {
-        .dev-panel-body {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
+    <meta name="application-name" content="Computer Surface" />
+    <title>{{t:computer_surface:page_title}}</title>
+    <!-- theme + language applied before first paint (kyberion.ui.theme / kyberion.ui.locale) -->
+    <script src="/display-prefs.js"></script>
+    <!-- generated --kb-ui-* tokens + kyberion-base component classes -->
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/kyberion-ui.css" />
+    <link rel="stylesheet" href="/computer-surface.css" />
+    <script type="application/json" id="cs-vocabulary">
+      {{vocabulary-json}}
+    </script>
   </head>
   <body>
-    <main class="shell">
-      <section class="panel">
-        <div class="header-row">
-          <div>
-            <div class="eyebrow" data-tagline-key="surface:computer_surface_tagline">
-              作業の手元ミラー — ブラウザ/ターミナルの現在の手元
-            </div>
-            <div class="title">Computer Surface</div>
-            <div class="sub">
-              Kyberion
-              がいまブラウザ/ターミナルで何をしているかをそのまま映すミラー。表示専用（操作は
-              chronos / studio から）。A2UI state updates from computer interaction executors.
-            </div>
-          </div>
-          <div class="header-meta">
-            <div id="identity-badge" class="identity-badge hidden" title=""></div>
-            <span id="conn-pill" class="conn-pill conn-pending" title="SSE connection state"
-              >…</span
-            >
-            <span id="last-updated" class="updated-text">waiting for state</span>
-          </div>
-        </div>
-        <div id="first-run-banner" class="first-run-banner hidden">
-          <div class="first-run-icon">✨</div>
-          <div style="flex: 1">
-            <div class="first-run-eyebrow">First Run</div>
-            <div>
-              <span id="first-run-greeting">Welcome.</span>
-              <span style="color: rgba(237, 246, 255, 0.6)"
-                >No browser/terminal interaction yet — try one of these.</span
+    <div class="kb-app-shell" data-density="compact" data-role="computer-surface">
+      <main class="kb-app-shell__main">
+        <div class="kb-stack cs-page" data-gap="md">
+          <header class="kb-page-header">
+            <div class="kb-page-header__titles">
+              <h1 class="kb-page-header__title">
+                {{t:computer_surface:title}}
+                <span class="kb-badge" data-role="computer-surface"
+                  >{{t:computer_surface:role_badge}}</span
+                >
+              </h1>
+              <p
+                class="kb-page-header__subtitle"
+                data-tagline-key="surface:computer_surface_tagline"
               >
+                {{t:surface:computer_surface_tagline}}
+              </p>
+              <p class="kb-text kb-text--caption">{{t:computer_surface:display_only_note}}</p>
             </div>
-            <ol>
-              <li>
-                Run a computer-actuator interaction that posts to <code>/a2ui/dispatch</code>.
-              </li>
-              <li>
-                Or open the <strong>Developer</strong> sandbox below and POST a sample
-                <code>updateDataModel</code> message.
-              </li>
-              <li>
-                Once the executor reports back, Session / Executor / Status fill in automatically.
-              </li>
-            </ol>
-          </div>
-          <button id="first-run-close" class="first-run-close" aria-label="Dismiss">×</button>
-        </div>
-      </section>
-      <section class="panel">
-        <div class="grid">
-          <div class="metric">
-            <div class="label">Session</div>
-            <div class="value" id="sessionId">—</div>
-          </div>
-          <div class="metric">
-            <div class="label">Executor</div>
-            <div class="value" id="executor">—</div>
-          </div>
-          <div class="metric">
-            <div class="label">Status</div>
-            <div class="value" id="status">idle</div>
-          </div>
-          <div class="metric">
-            <div class="label">Latest Action</div>
-            <div class="value" id="latestAction">—</div>
-          </div>
-          <div class="metric">
-            <div class="label">Target</div>
-            <div class="value" id="target">—</div>
-          </div>
-          <div class="metric">
-            <div class="label">Action Count</div>
-            <div class="value" id="actionCount">0</div>
-          </div>
-        </div>
-        <div id="intent-resolution-panel" class="intent-resolution-panel hidden">
-          <div class="intent-resolution-title">Intent resolution contract</div>
-          <div class="intent-resolution-grid">
-            <div>
-              <span class="intent-resolution-label">Understanding</span>
-              <strong id="intent-resolution-understanding" class="intent-resolution-value">—</strong>
+            <div class="kb-page-header__actions">
+              <div class="cs-header-meta">
+                <span
+                  id="conn-pill"
+                  class="kb-status-pill"
+                  data-status="connecting"
+                  role="status"
+                  title="{{t:computer_surface:conn_label}}"
+                  ><span class="kb-status-pill__icon" aria-hidden="true"></span
+                  ><span class="kb-status-pill__label" id="conn-pill-label"
+                    >{{t:computer_surface:conn_pending}}</span
+                  ></span
+                >
+                <span
+                  id="identity-badge"
+                  class="cs-header-meta hidden"
+                  aria-label="{{t:computer_surface:identity_label}}"
+                ></span>
+                <span id="tenant-badge" class="kb-badge hidden"></span>
+                <p id="last-updated" class="kb-text kb-text--caption cs-updated">
+                  {{t:computer_surface:updated_waiting}}
+                </p>
+              </div>
+              <div id="display-controls"></div>
             </div>
-            <div>
-              <span class="intent-resolution-label">Missing input</span>
-              <strong id="intent-resolution-missing" class="intent-resolution-value">—</strong>
+          </header>
+
+          <section id="first-run-banner" class="hidden" aria-labelledby="first-run-title">
+            <div class="kb-empty-state">
+              <p class="kb-empty-state__title" id="first-run-title">
+                {{t:computer_surface:first_run_title}}
+              </p>
+              <p class="kb-empty-state__body">
+                <span id="first-run-greeting"></span>
+                {{t:computer_surface:first_run_body}}
+              </p>
+              <ol class="cs-steps" aria-label="{{t:computer_surface:first_run_steps_label}}">
+                <li>{{t:computer_surface:first_run_step_1}}</li>
+                <li>{{t:computer_surface:first_run_step_2}}</li>
+                <li>{{t:computer_surface:first_run_step_3}}</li>
+              </ol>
+              <div class="kb-empty-state__action">
+                <button id="first-run-close" class="kb-btn kb-btn--ghost" type="button">
+                  {{t:computer_surface:first_run_dismiss}}
+                </button>
+              </div>
             </div>
-            <div>
-              <span class="intent-resolution-label">Authority</span>
-              <strong id="intent-resolution-authority" class="intent-resolution-value">—</strong>
+          </section>
+
+          <section class="kb-section" aria-labelledby="current-title">
+            <header class="kb-section__header">
+              <div class="kb-section__heading">
+                <h2 class="kb-section__title" id="current-title">
+                  {{t:computer_surface:section_current}}
+                </h2>
+              </div>
+            </header>
+            <div class="kb-grid cs-metrics" data-gap="sm">
+              <div class="kb-metric">
+                <span class="kb-metric__label">{{t:computer_surface:label_status}}</span>
+                <span class="kb-metric__value" id="status">—</span>
+              </div>
+              <div class="kb-metric">
+                <span class="kb-metric__label">{{t:computer_surface:label_executor}}</span>
+                <span class="kb-metric__value" id="executor">—</span>
+              </div>
+              <div class="kb-metric">
+                <span class="kb-metric__label">{{t:computer_surface:label_latest_action}}</span>
+                <span class="kb-metric__value" id="latestAction">—</span>
+              </div>
+              <div class="kb-metric">
+                <span class="kb-metric__label">{{t:computer_surface:label_action_count}}</span>
+                <span class="kb-metric__value" id="actionCount">0</span>
+              </div>
             </div>
-            <div>
-              <span class="intent-resolution-label">Outcome</span>
-              <strong id="intent-resolution-outcome" class="intent-resolution-value">—</strong>
+            <dl class="kb-kv">
+              <dt class="kb-kv__label">{{t:computer_surface:label_session}}</dt>
+              <dd class="kb-kv__value" data-mono="true" id="sessionId">—</dd>
+              <dt class="kb-kv__label">{{t:computer_surface:label_target}}</dt>
+              <dd class="kb-kv__value" data-mono="true" id="target">—</dd>
+              <dt class="kb-kv__label">{{t:computer_surface:label_updated}}</dt>
+              <dd class="kb-kv__value" id="updatedAt">—</dd>
+            </dl>
+          </section>
+
+          <section class="kb-section" aria-labelledby="detail-title">
+            <header class="kb-section__header">
+              <div class="kb-section__heading">
+                <h2 class="kb-section__title" id="detail-title">
+                  {{t:computer_surface:section_detail}}
+                </h2>
+              </div>
+            </header>
+            <p class="kb-text kb-text--body" id="detail">{{t:computer_surface:detail_empty}}</p>
+            <div id="intent-resolution-panel" class="kb-stack hidden" data-gap="sm">
+              <p class="kb-text kb-text--title">{{t:computer_surface:intent_title}}</p>
+              <dl class="kb-kv">
+                <dt class="kb-kv__label">{{t:computer_surface:intent_understanding}}</dt>
+                <dd class="kb-kv__value" id="intent-resolution-understanding">—</dd>
+                <dt class="kb-kv__label">{{t:computer_surface:intent_missing}}</dt>
+                <dd class="kb-kv__value" id="intent-resolution-missing">—</dd>
+                <dt class="kb-kv__label">{{t:computer_surface:intent_authority}}</dt>
+                <dd class="kb-kv__value" id="intent-resolution-authority">—</dd>
+                <dt class="kb-kv__label">{{t:computer_surface:intent_outcome}}</dt>
+                <dd class="kb-kv__value" id="intent-resolution-outcome">—</dd>
+                <dt class="kb-kv__label">{{t:computer_surface:intent_next_action}}</dt>
+                <dd class="kb-kv__value" id="intent-resolution-next-action">—</dd>
+              </dl>
+              <p class="kb-text kb-text--muted" id="intent-resolution-consequence"></p>
             </div>
-            <div>
-              <span class="intent-resolution-label">Next action</span>
-              <strong id="intent-resolution-next-action" class="intent-resolution-value">—</strong>
+            <dl class="kb-kv hidden" id="screenshot-row">
+              <dt class="kb-kv__label">{{t:computer_surface:label_screenshot}}</dt>
+              <dd class="kb-kv__value" data-mono="true" id="screenshotPath"></dd>
+            </dl>
+            <div id="metadata" class="cs-host"></div>
+          </section>
+
+          <section class="kb-section hidden" id="executor-view" aria-labelledby="executor-title">
+            <header class="kb-section__header">
+              <div class="kb-section__heading">
+                <h2 class="kb-section__title" id="executor-title">
+                  {{t:computer_surface:section_executor_view}}
+                </h2>
+                <p class="kb-section__description">
+                  {{t:computer_surface:section_executor_view_description}}
+                </p>
+              </div>
+            </header>
+            <div id="executor-components" class="kb-stack" data-gap="md"></div>
+          </section>
+
+          <section class="kb-section" id="os-control-plane-panel" aria-labelledby="os-title">
+            <header class="kb-section__header">
+              <div class="kb-section__heading">
+                <h2 class="kb-section__title" id="os-title">
+                  {{t:computer_surface:os_title}}
+                  <span class="kb-badge" data-tone="info">{{t:computer_surface:os_read_only}}</span>
+                </h2>
+                <p class="kb-section__description">{{t:computer_surface:os_description}}</p>
+              </div>
+            </header>
+            <div id="os-scope-warning" class="kb-callout hidden" data-tone="warning" role="note">
+              <span class="kb-callout__icon" aria-hidden="true"></span>
+              <div class="kb-callout__content">
+                <p class="kb-callout__title">{{t:computer_surface:os_scope_warning_title}}</p>
+                <p class="kb-callout__body">{{t:computer_surface:os_scope_warning_body}}</p>
+              </div>
             </div>
-          </div>
-          <div id="intent-resolution-consequence" class="intent-resolution-consequence"></div>
-        </div>
-        <div class="path" id="detail">No interaction detail yet.</div>
-        <div class="path" id="metadata"></div>
-        <div class="path" id="screenshotPath"></div>
-      </section>
-      <section class="panel" id="os-control-plane-panel">
-        <div class="os-header">
-          <div>
-            <div class="eyebrow">Cloudflare OS projection</div>
-            <div class="os-title">Held actions &amp; observations</div>
-            <div class="os-sub">
-              Tenant-scoped read-only projection. Decisions and apply remain in the guarded surface.
+            <div id="os-next-action" class="cs-host"></div>
+            <p class="kb-text kb-text--title">
+              {{t:computer_surface:os_held_title}} (<span id="os-held-count">0</span>)
+            </p>
+            <div id="os-held-actions">
+              <div
+                class="kb-skeleton"
+                data-shape="table"
+                role="status"
+                aria-busy="true"
+                aria-label="{{t:computer_surface:os_loading}}"
+              >
+                <span class="kb-skeleton__line" aria-hidden="true"></span>
+                <span class="kb-skeleton__line" aria-hidden="true"></span>
+              </div>
             </div>
-            <div id="os-scope-warning" class="os-warning hidden">
-              Tenant scope is not configured. Only public observations are shown; held actions are
-              hidden.
+            <p class="kb-text kb-text--title">
+              {{t:computer_surface:os_observations_title}} (<span id="os-observation-count">0</span
+              >)
+            </p>
+            <div id="os-observations">
+              <div
+                class="kb-skeleton"
+                data-shape="table"
+                role="status"
+                aria-busy="true"
+                aria-label="{{t:computer_surface:os_loading}}"
+              >
+                <span class="kb-skeleton__line" aria-hidden="true"></span>
+                <span class="kb-skeleton__line" aria-hidden="true"></span>
+              </div>
             </div>
-          </div>
-          <span class="os-badge">READ-ONLY</span>
-        </div>
-        <div class="os-columns">
-          <div>
-            <h3 class="os-heading">Held actions (<span id="os-held-count">0</span>)</h3>
-            <div id="os-held-actions" class="os-list"><p class="os-empty">Loading…</p></div>
-          </div>
-          <div>
-            <h3 class="os-heading">Observation audit (<span id="os-observation-count">0</span>)</h3>
-            <div id="os-observations" class="os-list"><p class="os-empty">Loading…</p></div>
-          </div>
-        </div>
-        <div id="os-next-action" class="os-next hidden"></div>
-      </section>
-      <details class="dev-panel" id="dev-panel">
-        <summary>
-          <span style="font-size: 14px">⚙</span>
-          <span class="dev-panel-title">Developer · A2UI dispatch sandbox</span>
-          <span class="dev-panel-hint"
-            >Send a sample updateDataModel and watch the metrics update live.</span
-          >
-        </summary>
-        <div class="dev-panel-body">
-          <div>
-            <label class="dev-label" for="dev-a2ui-payload">A2UI message body (JSON)</label>
-            <textarea id="dev-a2ui-payload" rows="9" spellcheck="false">
+          </section>
+
+          <!-- dev-sandbox:begin -->
+          <details class="kb-disclosure" id="dev-panel">
+            <summary>{{t:computer_surface:dev_summary}}</summary>
+            <div class="kb-disclosure__body kb-stack" data-gap="sm">
+              <p class="kb-text kb-text--muted">{{t:computer_surface:dev_hint}}</p>
+              <div class="kb-field">
+                <label class="kb-field__label" for="dev-a2ui-payload"
+                  >{{t:computer_surface:dev_payload_label}}</label
+                >
+                <textarea
+                  class="kb-input kb-textarea"
+                  id="dev-a2ui-payload"
+                  rows="14"
+                  spellcheck="false"
+                >
 {
   "updateDataModel": {
     "surfaceId": "computer-surface",
@@ -622,25 +250,59 @@
       "latestAction": "click",
       "target": "button#confirm",
       "actionCount": 1,
-      "detail": "Sample dispatch from the Developer panel.",
+      "detail": "Sample dispatch from the developer sandbox.",
       "updatedAt": "2026-05-08T03:00:00.000Z"
     }
   }
 }</textarea>
-            <div class="dev-panel-actions">
-              <button id="dev-a2ui-send" class="button" type="button">Dispatch</button>
-              <button id="dev-a2ui-reset" class="button button-ghost" type="button">Reset</button>
-              <span id="dev-a2ui-result" class="dev-panel-result"></span>
+              </div>
+              <div class="cs-dev-actions">
+                <button id="dev-a2ui-send" class="kb-btn kb-btn--primary" type="button">
+                  {{t:computer_surface:dev_dispatch}}
+                </button>
+                <button id="dev-a2ui-reset" class="kb-btn kb-btn--ghost" type="button">
+                  {{t:computer_surface:dev_reset}}
+                </button>
+                <span
+                  id="dev-a2ui-result"
+                  class="kb-text kb-text--caption"
+                  role="status"
+                  aria-live="polite"
+                ></span>
+              </div>
+              <div id="dev-a2ui-curl" data-title="{{t:computer_surface:dev_curl_label}}"></div>
             </div>
-          </div>
-          <div>
-            <label class="dev-label">Equivalent curl</label>
-            <pre><code id="dev-a2ui-curl"></code></pre>
-          </div>
+          </details>
+          <!-- dev-sandbox:end -->
         </div>
-      </details>
-    </main>
-    <script>
+      </main>
+    </div>
+    <script type="module">
+      import { renderA2UI, KB_STATUS_MESSAGE_KEYS } from '/shared-ui/kyberion-ui.js';
+
+      const vocabulary = JSON.parse(document.getElementById('cs-vocabulary').textContent);
+      const locale = vocabulary.locale || document.documentElement.lang || 'en';
+      const prefs = window.KyberionPrefs || null;
+      // Display-only surface: rendered components never trigger operations.
+      const displayOnly = () => {};
+      const renderOptions = { locale, messages: vocabulary.messages || {}, onAction: displayOnly };
+
+      /** Page text by vocabulary key, with `{name}` placeholders filled. */
+      function T(key, params) {
+        const template = (vocabulary.texts && vocabulary.texts[key]) || key;
+        return template.replace(/\{([A-Za-z0-9_]+)\}/g, (match, name) =>
+          params && params[name] !== undefined && params[name] !== null
+            ? String(params[name])
+            : match
+        );
+      }
+      const CS = (name) => T('computer_surface:' + name);
+
+      function render(host, components, extra) {
+        if (!host) return;
+        renderA2UI(host, components, Object.assign({}, renderOptions, extra || {}));
+      }
+
       const ids = {
         sessionId: document.getElementById('sessionId'),
         executor: document.getElementById('executor'),
@@ -648,9 +310,13 @@
         latestAction: document.getElementById('latestAction'),
         target: document.getElementById('target'),
         actionCount: document.getElementById('actionCount'),
+        updatedAt: document.getElementById('updatedAt'),
         detail: document.getElementById('detail'),
         metadata: document.getElementById('metadata'),
+        screenshotRow: document.getElementById('screenshot-row'),
         screenshotPath: document.getElementById('screenshotPath'),
+        executorView: document.getElementById('executor-view'),
+        executorComponents: document.getElementById('executor-components'),
         intentResolutionPanel: document.getElementById('intent-resolution-panel'),
         intentResolutionUnderstanding: document.getElementById('intent-resolution-understanding'),
         intentResolutionMissing: document.getElementById('intent-resolution-missing'),
@@ -668,122 +334,149 @@
         nextAction: document.getElementById('os-next-action'),
       };
       const identityBadgeEl = document.getElementById('identity-badge');
+      const tenantBadgeEl = document.getElementById('tenant-badge');
       const connPillEl = document.getElementById('conn-pill');
+      const connPillLabelEl = document.getElementById('conn-pill-label');
       const lastUpdatedEl = document.getElementById('last-updated');
       const firstRunBanner = document.getElementById('first-run-banner');
       const FIRST_RUN_KEY = 'computer-surface.first-run.dismissed';
+      let stateLoaded = false;
       let lastActionCount = 0;
+      let lastSessionId = '';
 
-      function escapeHtml(value) {
-        return String(value || '').replace(
-          /[&<>"']/g,
-          (ch) =>
-            ({
-              '&': '&amp;',
-              '<': '&lt;',
-              '>': '&gt;',
-              '"': '&quot;',
-              "'": '&#39;',
-            })[ch]
+      // ----------------------------------------------------- display controls
+      const displayControlsHost = document.getElementById('display-controls');
+      function drawDisplayControls() {
+        render(
+          displayControlsHost,
+          [
+            {
+              id: 'display-controls',
+              type: 'ui:display-controls',
+              props: { theme: prefs ? prefs.theme() : 'system', locale },
+            },
+          ],
+          {
+            onAction(action) {
+              const value = action && action.payload ? action.payload.value : undefined;
+              if (!prefs) return;
+              if (action.id === 'display.theme') {
+                prefs.setTheme(value);
+                drawDisplayControls();
+              } else if (action.id === 'display.locale') {
+                prefs.setLocale(value);
+              }
+            },
+          }
         );
       }
+      drawDisplayControls();
 
+      // ------------------------------------------------------------ helpers
       function formatTimestamp(value) {
-        if (!value) return 'waiting for state';
+        if (!value) return '';
         const dt = typeof value === 'string' ? new Date(value) : value;
         if (isNaN(dt.getTime())) return String(value);
         try {
-          return new Intl.DateTimeFormat(undefined, {
+          return new Intl.DateTimeFormat(locale, {
+            month: 'short',
+            day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
             hour12: false,
           }).format(dt);
         } catch (_) {
-          return dt.toLocaleTimeString();
+          return dt.toLocaleString();
         }
       }
 
+      function badge(label, extra) {
+        const node = document.createElement('span');
+        node.className = 'kb-badge';
+        node.textContent = label;
+        if (extra && extra.tone) node.setAttribute('data-tone', extra.tone);
+        if (extra && extra.title) node.title = extra.title;
+        return node;
+      }
+
+      // Connection pill: canonical connection statuses (icon + text).
+      const CONN_STATES = {
+        live: { status: 'connected', key: 'conn_live' },
+        retrying: { status: 'connecting', key: 'conn_retrying' },
+        offline: { status: 'offline', key: 'conn_offline' },
+        pending: { status: 'connecting', key: 'conn_pending' },
+      };
       function setConnState(state) {
-        if (!connPillEl) return;
-        const map = {
-          live: { text: 'LIVE', className: 'conn-pill conn-live', title: 'SSE stream connected' },
-          retrying: {
-            text: 'RETRY',
-            className: 'conn-pill conn-retrying',
-            title: 'Reconnecting...',
-          },
-          offline: {
-            text: 'OFFLINE',
-            className: 'conn-pill conn-offline',
-            title: 'SSE stream closed',
-          },
-          pending: {
-            text: '…',
-            className: 'conn-pill conn-pending',
-            title: 'Awaiting first event',
-          },
-        };
-        const target = map[state] || map.pending;
-        connPillEl.textContent = target.text;
-        connPillEl.className = target.className;
-        connPillEl.title = target.title;
+        const target = CONN_STATES[state] || CONN_STATES.pending;
+        if (connPillEl) connPillEl.setAttribute('data-status', target.status);
+        if (connPillLabelEl) connPillLabelEl.textContent = CS(target.key);
       }
 
       function renderIdentityBadge(payload) {
         if (!identityBadgeEl || !payload) return;
+        identityBadgeEl.replaceChildren();
+        identityBadgeEl.classList.remove('hidden');
         if (!payload.onboarded) {
-          identityBadgeEl.classList.remove('hidden');
-          identityBadgeEl.classList.add('identity-badge-warn');
-          identityBadgeEl.textContent = 'Onboarding required';
-          identityBadgeEl.title = 'knowledge/personal/my-identity.json was not found.';
+          identityBadgeEl.appendChild(
+            badge(CS('identity_onboarding_required'), { tone: 'warning' })
+          );
           return;
         }
-        const name = payload.sovereign?.name || 'Sovereign';
-        const agentId = payload.agent?.agent_id || 'agent';
-        const tier = (payload.agent?.trust_tier || '—').toString();
-        identityBadgeEl.classList.remove('hidden');
-        identityBadgeEl.classList.remove('identity-badge-warn');
-        identityBadgeEl.innerHTML =
-          '<span class="badge-name">' +
-          escapeHtml(name) +
-          '</span>' +
-          '<span class="badge-sep">·</span>' +
-          '<span class="badge-id">' +
-          escapeHtml(agentId) +
-          '</span>' +
-          '<span class="badge-sep">·</span>' +
-          '<span class="badge-tier">' +
-          escapeHtml(tier.toUpperCase()) +
-          '</span>';
-        identityBadgeEl.title = payload.vision || '';
+        const name = (payload.sovereign && payload.sovereign.name) || '';
+        const agentId = (payload.agent && payload.agent.agent_id) || '';
+        const tier = payload.agent && payload.agent.trust_tier;
+        if (name) identityBadgeEl.appendChild(badge(name, { title: payload.vision || '' }));
+        if (agentId) identityBadgeEl.appendChild(badge(agentId, { tone: 'accent' }));
+        if (tier) {
+          identityBadgeEl.appendChild(
+            badge(T('computer_surface:identity_trust_tier', { tier: String(tier) }), {
+              tone: 'info',
+            })
+          );
+        }
       }
 
-      function maybeShowFirstRunBanner(identityPayload) {
-        if (!firstRunBanner) return;
-        let dismissed = false;
+      function renderTenantBadge(tenantScope) {
+        if (!tenantBadgeEl) return;
+        tenantBadgeEl.textContent = tenantScope
+          ? T('computer_surface:tenant_badge', { tenant: tenantScope })
+          : CS('tenant_none');
+        tenantBadgeEl.classList.remove('hidden');
+      }
+
+      // ---------------------------------------------------------- first run
+      function isFirstRunDismissed() {
         try {
-          dismissed = localStorage.getItem(FIRST_RUN_KEY) === '1';
-        } catch (_) {}
-        if (dismissed) return;
-        if (!identityPayload || !identityPayload.onboarded) return;
-        // Only show while no actions have been recorded.
-        if (lastActionCount > 0) return;
-        const greeting = document.getElementById('first-run-greeting');
-        if (greeting && identityPayload.sovereign?.name)
-          greeting.textContent = 'Welcome, ' + identityPayload.sovereign.name + '.';
-        firstRunBanner.classList.remove('hidden');
+          return localStorage.getItem(FIRST_RUN_KEY) === '1';
+        } catch (_) {
+          return false;
+        }
+      }
+      function updateFirstRun() {
+        if (!firstRunBanner) return;
+        const show =
+          stateLoaded && lastActionCount === 0 && !lastSessionId && !isFirstRunDismissed();
+        firstRunBanner.classList.toggle('hidden', !show);
       }
       const firstRunCloseBtn = document.getElementById('first-run-close');
       if (firstRunCloseBtn) {
         firstRunCloseBtn.addEventListener('click', () => {
-          firstRunBanner.classList.add('hidden');
           try {
             localStorage.setItem(FIRST_RUN_KEY, '1');
           } catch (_) {}
+          firstRunBanner.classList.add('hidden');
         });
       }
+      function greet(identityPayload) {
+        const greeting = document.getElementById('first-run-greeting');
+        const name = identityPayload && identityPayload.sovereign && identityPayload.sovereign.name;
+        if (greeting) {
+          greeting.textContent = name ? T('computer_surface:first_run_greeting', { name }) : '';
+        }
+      }
 
+      // -------------------------------------------------- intent resolution
       function isIntentResolutionContract(value) {
         return Boolean(
           value &&
@@ -807,6 +500,19 @@
         );
       }
 
+      const AUTHORITY_KEYS = {
+        autonomous: 'tui:tui_cockpit_authority_autonomous',
+        approval_required: 'tui:tui_cockpit_authority_approval',
+        human_clarification_required: 'tui:tui_cockpit_authority_clarification',
+      };
+      const OUTCOME_KEYS = {
+        answer: 'tui:tui_cockpit_outcome_answer',
+        artifact: 'tui:tui_cockpit_outcome_artifact',
+        approval_ready_plan: 'tui:tui_cockpit_outcome_approval_ready_plan',
+        service_change: 'tui:tui_cockpit_outcome_service_change',
+        status_report: 'tui:tui_cockpit_outcome_status_report',
+      };
+
       function renderIntentResolution(data) {
         const contract = data?.intentResolution || data?.intent_resolution;
         if (!ids.intentResolutionPanel) return;
@@ -814,106 +520,203 @@
           ids.intentResolutionPanel.classList.add('hidden');
           return;
         }
-        const authorityLabels = {
-          autonomous: 'Autonomous',
-          approval_required: 'Approval required',
-          human_clarification_required: 'Human clarification required',
-        };
-        const outcomeLabels = {
-          answer: 'Answer',
-          artifact: 'Artifact',
-          approval_ready_plan: 'Approval-ready plan',
-          service_change: 'Service change',
-          status_report: 'Status report',
-        };
         ids.intentResolutionPanel.classList.remove('hidden');
         ids.intentResolutionUnderstanding.textContent = contract.normalized_intent;
         ids.intentResolutionMissing.textContent = contract.missing_inputs.length
           ? contract.missing_inputs.join(', ')
-          : 'None';
-        ids.intentResolutionAuthority.textContent = authorityLabels[contract.authority_level];
-        ids.intentResolutionOutcome.textContent = outcomeLabels[contract.outcome_kind];
+          : CS('intent_none');
+        ids.intentResolutionAuthority.textContent = T(AUTHORITY_KEYS[contract.authority_level]);
+        ids.intentResolutionOutcome.textContent = T(OUTCOME_KEYS[contract.outcome_kind]);
         ids.intentResolutionNextAction.textContent = contract.next_action.label;
         ids.intentResolutionConsequence.textContent = contract.next_action.consequence;
+      }
+
+      // -------------------------------------------------------------- state
+      const EXECUTOR_KEYS = {
+        browser: 'executor_browser',
+        terminal: 'executor_terminal',
+        system: 'executor_system',
+      };
+
+      function renderStatus(status) {
+        const value = typeof status === 'string' && status ? status : 'idle';
+        const canonical = Object.prototype.hasOwnProperty.call(KB_STATUS_MESSAGE_KEYS, value);
+        const props = canonical
+          ? { status: value }
+          : { status: value, label: value === 'idle' ? CS('status_idle') : value };
+        render(ids.status, [{ id: 'status-pill', type: 'ui:status-pill', props }]);
+      }
+
+      function renderExecutorComponents(surfaces) {
+        if (!ids.executorComponents || !ids.executorView) return;
+        ids.executorComponents.replaceChildren();
+        let any = false;
+        for (const [surfaceId, surface] of Object.entries(surfaces || {})) {
+          const components = Array.isArray(surface && surface.components) ? surface.components : [];
+          if (!components.length) continue;
+          const host = document.createElement('div');
+          host.setAttribute('data-surface-id', surfaceId);
+          ids.executorComponents.appendChild(host);
+          render(host, components);
+          any = true;
+        }
+        ids.executorView.classList.toggle('hidden', !any);
       }
 
       function applyState(payload) {
         const surface = payload?.surfaces?.['computer-surface'];
         const data = surface?.data || {};
+        stateLoaded = true;
         ids.sessionId.textContent = data.sessionId || '—';
-        ids.executor.textContent = data.executor || '—';
-        ids.status.textContent = data.status || 'idle';
+        ids.executor.textContent = EXECUTOR_KEYS[data.executor]
+          ? CS(EXECUTOR_KEYS[data.executor])
+          : data.executor || '—';
+        renderStatus(data.status);
         ids.latestAction.textContent = data.latestAction || '—';
         ids.target.textContent = data.target || '—';
         ids.actionCount.textContent = String(data.actionCount || 0);
-        ids.detail.textContent = data.detail || 'No interaction detail yet.';
-        ids.metadata.textContent =
-          data.metadata && Object.keys(data.metadata).length
-            ? 'metadata: ' + JSON.stringify(data.metadata)
-            : '';
-        ids.screenshotPath.textContent = data.screenshotPath
-          ? 'screenshot: ' + data.screenshotPath
-          : '';
+        const updated = data.updatedAt || payload?.lastUpdatedAt;
+        ids.updatedAt.textContent = updated ? formatTimestamp(updated) : '—';
+        ids.detail.textContent = data.detail || CS('detail_empty');
+        const hasMetadata =
+          data.metadata && typeof data.metadata === 'object' && Object.keys(data.metadata).length;
+        render(
+          ids.metadata,
+          hasMetadata
+            ? [
+                {
+                  id: 'metadata-code',
+                  type: 'ui:code',
+                  props: {
+                    title: CS('label_metadata'),
+                    language: 'json',
+                    code: JSON.stringify(data.metadata, null, 2),
+                  },
+                },
+              ]
+            : []
+        );
+        ids.screenshotPath.textContent = data.screenshotPath || '';
+        ids.screenshotRow.classList.toggle('hidden', !data.screenshotPath);
         renderIntentResolution(data);
+        renderExecutorComponents(payload?.surfaces);
         lastActionCount = Number(data.actionCount || 0);
+        lastSessionId = data.sessionId || '';
         if (lastUpdatedEl) {
-          lastUpdatedEl.textContent = formatTimestamp(data.updatedAt || payload?.lastUpdatedAt);
+          lastUpdatedEl.textContent = updated
+            ? T('computer_surface:updated_at', { time: formatTimestamp(updated) })
+            : CS('updated_waiting');
         }
-        // Auto-dismiss banner once activity arrives.
-        if (lastActionCount > 0 && firstRunBanner) firstRunBanner.classList.add('hidden');
+        updateFirstRun();
+      }
+
+      // ------------------------------------------------- OS control plane
+      function renderTable(host, columns, rows, emptyKey) {
+        render(host, [
+          {
+            id: host.id + '-table',
+            type: 'ui:table',
+            props: { columns, rows, empty: CS(emptyKey) },
+          },
+        ]);
+      }
+
+      function renderOsUnavailable() {
+        for (const host of [osIds.heldActions, osIds.observations]) {
+          if (!host) continue;
+          render(host, [
+            {
+              id: host.id + '-empty',
+              type: 'ui:empty-state',
+              props: { title: CS('os_unavailable') },
+            },
+          ]);
+        }
       }
 
       function renderOsControlPlane(payload) {
         const heldActions = Array.isArray(payload?.heldActions) ? payload.heldActions : [];
         const observations = Array.isArray(payload?.observations) ? payload.observations : [];
+        renderTenantBadge(payload?.tenantScope);
         if (osIds.scopeWarning)
           osIds.scopeWarning.classList.toggle('hidden', Boolean(payload?.tenantScope));
         if (osIds.heldCount) osIds.heldCount.textContent = String(heldActions.length);
         if (osIds.observationCount)
           osIds.observationCount.textContent = String(observations.length);
         if (osIds.heldActions) {
-          osIds.heldActions.innerHTML = heldActions.length
-            ? heldActions
-                .slice(0, 8)
-                .map(
-                  (item) =>
-                    `<article class="os-item"><div class="os-row"><strong>${escapeHtml(item.op)}</strong><span class="os-status">${escapeHtml(item.status)}</span></div><div class="os-meta">${escapeHtml(item.missionId)} · ${escapeHtml(item.tenantSlug || 'public')} · ${escapeHtml(item.submittedBy)}</div><div class="os-meta">${item.irreversible ? 'irreversible' : 'reversible'} · ${escapeHtml(item.effectBinding || 'effect binding unavailable')} · submitted ${escapeHtml(item.submittedAt)}</div></article>`
-                )
-                .join('')
-            : `<p class="os-empty">No held actions are visible to this operator.</p>`;
+          renderTable(
+            osIds.heldActions,
+            [
+              { key: 'op', label: CS('os_col_operation'), mono: true },
+              { key: 'status', label: CS('os_col_status') },
+              { key: 'mission', label: CS('os_col_mission'), mono: true },
+              { key: 'tenant', label: CS('os_col_tenant') },
+              { key: 'submitted_by', label: CS('os_col_submitted_by') },
+              { key: 'reversibility', label: CS('os_col_reversibility') },
+              { key: 'submitted_at', label: CS('os_col_submitted_at') },
+            ],
+            heldActions.slice(0, 8).map((item) => ({
+              op: item.op,
+              status: item.status,
+              mission: item.missionId,
+              tenant: item.tenantSlug || 'public',
+              submitted_by: item.submittedBy,
+              reversibility: item.irreversible ? CS('os_irreversible') : CS('os_reversible'),
+              submitted_at: formatTimestamp(item.submittedAt),
+            })),
+            'os_held_empty'
+          );
         }
         if (osIds.observations) {
-          osIds.observations.innerHTML = observations.length
-            ? observations
-                .slice(0, 8)
-                .map(
-                  (item) =>
-                    `<article class="os-item"><div class="os-row"><strong>${escapeHtml(item.service)}</strong><span class="os-status">${escapeHtml(item.tier)}</span></div><div class="os-meta">${escapeHtml(item.resourceRef)} · ${escapeHtml(item.purpose)}</div><div class="os-meta">${escapeHtml(item.summary)}</div><div class="os-meta">${escapeHtml(item.id)} · observed ${escapeHtml(item.observedAt)}</div></article>`
-                )
-                .join('')
-            : `<p class="os-empty">No observations recorded yet.</p>`;
+          renderTable(
+            osIds.observations,
+            [
+              { key: 'service', label: CS('os_col_service') },
+              { key: 'tier', label: CS('os_col_tier') },
+              { key: 'resource', label: CS('os_col_resource'), mono: true },
+              { key: 'purpose', label: CS('os_col_purpose') },
+              { key: 'summary', label: CS('os_col_summary') },
+              { key: 'observed_at', label: CS('os_col_observed_at') },
+            ],
+            observations.slice(0, 8).map((item) => ({
+              service: item.service,
+              tier: item.tier,
+              resource: item.resourceRef,
+              purpose: item.purpose,
+              summary: item.summary,
+              observed_at: formatTimestamp(item.observedAt),
+            })),
+            'os_observations_empty'
+          );
         }
         if (osIds.nextAction) {
-          if (heldActions.length) {
-            const url = payload?.guardedSurfaceUrl;
-            osIds.nextAction.classList.remove('hidden');
-            osIds.nextAction.innerHTML = url
-              ? `<strong>Human action required.</strong> <a href="${escapeHtml(url)}">Open the guarded surface to decide or apply.</a>`
-              : `<strong>Human action required.</strong> Configure <code>KYBERION_OS_GUARDED_SURFACE_URL</code> for the decision surface.`;
-          } else {
-            osIds.nextAction.classList.add('hidden');
-            osIds.nextAction.textContent = '';
-          }
+          const url = payload?.guardedSurfaceUrl;
+          const callout = url
+            ? {
+                tone: 'warning',
+                title: CS('os_human_action_title'),
+                action: { label: CS('os_open_guarded'), href: url },
+              }
+            : {
+                tone: 'warning',
+                title: CS('os_human_action_title'),
+                body: CS('os_configure_guarded'),
+              };
+          render(
+            osIds.nextAction,
+            heldActions.length
+              ? [{ id: 'os-next-callout', type: 'ui:callout', props: callout }]
+              : []
+          );
         }
       }
 
-      let identityCache = null;
+      // ------------------------------------------------------------ loading
       fetch('/api/identity')
         .then((r) => r.json())
         .then((p) => {
-          identityCache = p;
           renderIdentityBadge(p);
-          maybeShowFirstRunBanner(p);
+          greet(p);
         })
         .catch(() => {});
 
@@ -927,12 +730,7 @@
           return res.json();
         })
         .then(renderOsControlPlane)
-        .catch(() => {
-          if (osIds.heldActions)
-            osIds.heldActions.innerHTML = `<p class="os-empty">OS projection unavailable.</p>`;
-          if (osIds.observations)
-            osIds.observations.innerHTML = `<p class="os-empty">OS projection unavailable.</p>`;
-        });
+        .catch(renderOsUnavailable);
       const source = new EventSource('/api/stream');
       source.addEventListener('open', () => setConnState('live'));
       source.addEventListener('error', () =>
@@ -945,7 +743,7 @@
         } catch (_) {}
       });
 
-      // ----------------- Developer dispatch sandbox -----------------
+      // ------------------------------------------- developer sandbox (?dev=1)
       const devA2uiPayload = document.getElementById('dev-a2ui-payload');
       const devA2uiSend = document.getElementById('dev-a2ui-send');
       const devA2uiReset = document.getElementById('dev-a2ui-reset');
@@ -956,21 +754,34 @@
       function refreshDevCurl() {
         if (!devA2uiCurl || !devA2uiPayload) return;
         const raw = devA2uiPayload.value;
-        let pretty;
+        let compact;
         try {
-          pretty = JSON.stringify(JSON.parse(raw));
+          compact = JSON.stringify(JSON.parse(raw));
         } catch (_) {
-          pretty = raw.replace(/\s+/g, ' ').trim();
+          compact = raw.replace(/\s+/g, ' ').trim();
         }
-        const escaped = pretty.replace(/'/g, "'\\''");
-        devA2uiCurl.textContent =
-          'curl -X POST ' +
-          window.location.origin +
-          '/a2ui/dispatch \\\n' +
-          "  -H 'Content-Type: application/json' \\\n" +
-          "  -d '" +
-          escaped +
-          "'";
+        const escaped = compact.replace(/'/g, "'\\''");
+        render(devA2uiCurl, [
+          {
+            id: 'dev-curl-code',
+            type: 'ui:code',
+            props: {
+              title: devA2uiCurl.getAttribute('data-title') || '',
+              language: 'shell',
+              code:
+                'curl -X POST ' +
+                window.location.origin +
+                '/a2ui/dispatch \\\n' +
+                "  -H 'Content-Type: application/json' \\\n" +
+                "  -d '" +
+                escaped +
+                "'",
+            },
+          },
+        ]);
+      }
+      function setDevResult(text) {
+        if (devA2uiResult) devA2uiResult.textContent = text;
       }
       if (devA2uiPayload) {
         devA2uiPayload.addEventListener('input', refreshDevCurl);
@@ -979,10 +790,7 @@
       if (devA2uiReset) {
         devA2uiReset.addEventListener('click', () => {
           if (devA2uiPayload) devA2uiPayload.value = DEV_DEFAULT;
-          if (devA2uiResult) {
-            devA2uiResult.textContent = '';
-            devA2uiResult.className = 'dev-panel-result';
-          }
+          setDevResult('');
           refreshDevCurl();
         });
       }
@@ -993,17 +801,13 @@
           try {
             payload = JSON.parse(devA2uiPayload.value);
           } catch (err) {
-            if (devA2uiResult) {
-              devA2uiResult.textContent = 'Invalid JSON: ' + (err.message || err);
-              devA2uiResult.className = 'dev-panel-result err';
-            }
+            setDevResult(
+              T('computer_surface:dev_invalid_json', { error: (err && err.message) || err })
+            );
             return;
           }
           devA2uiSend.disabled = true;
-          if (devA2uiResult) {
-            devA2uiResult.textContent = 'Dispatching…';
-            devA2uiResult.className = 'dev-panel-result';
-          }
+          setDevResult(CS('dev_dispatching'));
           try {
             const r = await fetch('/a2ui/dispatch', {
               method: 'POST',
@@ -1012,15 +816,9 @@
             });
             const body = await r.json().catch(() => ({}));
             if (!r.ok || body.ok === false) throw new Error(body.error || 'HTTP ' + r.status);
-            if (devA2uiResult) {
-              devA2uiResult.textContent = 'OK · applied ' + (body.applied || 1);
-              devA2uiResult.className = 'dev-panel-result ok';
-            }
+            setDevResult(T('computer_surface:dev_ok', { count: body.applied || 1 }));
           } catch (err) {
-            if (devA2uiResult) {
-              devA2uiResult.textContent = 'Dispatch failed: ' + (err.message || err);
-              devA2uiResult.className = 'dev-panel-result err';
-            }
+            setDevResult(T('computer_surface:dev_failed', { error: (err && err.message) || err }));
           } finally {
             devA2uiSend.disabled = false;
           }

@@ -12,13 +12,13 @@ export function MetricCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] kb-text-muted">
+    <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4">
+      <div className="flex items-center gap-2 text-[11px] kb-text-muted">
         {icon}
         <span>{label}</span>
       </div>
       <div className="mt-3 text-3xl font-semibold tracking-tight kb-text-primary">{value}</div>
-      <div className="mt-1 text-[10px] kb-text-muted">{detail}</div>
+      <div className="mt-1 text-[11px] kb-text-muted">{detail}</div>
     </div>
   );
 }
@@ -36,12 +36,12 @@ export function MiniSummaryCard({
 }) {
   return (
     <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] kb-text-muted">
+      <div className="flex items-center gap-2 text-[11px] kb-text-muted">
         {icon}
         <span>{label}</span>
       </div>
       <div className="mt-2 text-2xl font-semibold tracking-tight kb-text-primary">{value}</div>
-      <div className="mt-1 text-[10px] kb-text-muted">{detail}</div>
+      <div className="mt-1 text-[11px] kb-text-muted">{detail}</div>
     </div>
   );
 }
@@ -59,9 +59,9 @@ export function Panel({
 }) {
   if (!visible) return null;
   return (
-    <div id={id} className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4 scroll-mt-6">
+    <div id={id} className="rounded-lg border kb-border-subtle kb-surface-sunken p-4 scroll-mt-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="text-[10px] uppercase tracking-[0.3em] kb-status-warning">{title}</div>
+        <div className="text-[11px] kb-status-warning">{title}</div>
       </div>
       {children}
     </div>
@@ -86,7 +86,7 @@ export function RuntimeCell({
 
   return (
     <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-      <div className="text-[9px] uppercase tracking-[0.22em] kb-text-muted">{label}</div>
+      <div className="text-[11px] kb-text-muted">{label}</div>
       <div className={`mt-2 text-lg font-semibold ${accentClass}`}>{value}</div>
     </div>
   );

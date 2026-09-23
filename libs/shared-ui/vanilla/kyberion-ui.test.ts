@@ -81,6 +81,7 @@ const CASES: Record<string, { props: Record<string, unknown>; root: string; tag?
   'ui:table': { props: { columns: [{ key: 'a', label: 'A' }], rows: [] }, root: 'kb-table-wrap' },
   'ui:list': { props: { items: [{ title: 'x' }] }, root: 'kb-list', tag: 'UL' },
   'ui:text': { props: { text: 'hello' }, root: 'kb-text', tag: 'P' },
+  'ui:code': { props: { code: 'pnpm build' }, root: 'kb-code', tag: 'FIGURE' },
   'ui:status-pill': { props: { status: 'ready' }, root: 'kb-status-pill' },
   'ui:badge': { props: { label: 'β' }, root: 'kb-badge' },
   'ui:callout': { props: { tone: 'warning', title: '注意' }, root: 'kb-callout' },
@@ -88,6 +89,7 @@ const CASES: Record<string, { props: Record<string, unknown>; root: string; tag?
   'ui:skeleton': { props: { lines: 2 }, root: 'kb-skeleton' },
   'ui:button': { props: { label: '保存', action: { id: 'save' } }, root: 'kb-btn', tag: 'BUTTON' },
   'ui:disclosure': { props: { summary: '詳細' }, root: 'kb-disclosure', tag: 'DETAILS' },
+  'ui:display-controls': { props: { theme: 'dark', locale: 'ja' }, root: 'kb-display-controls' },
   // UI-01b charts & visualisation (layout: charts.js; see charts.test.ts)
   'ui:bar-chart': {
     props: { data: [{ label: 'a', value: 1 }] },
@@ -651,5 +653,224 @@ describe('kyberion-ui vanilla renderer — UI-01d i18n', () => {
       })
     );
     expect(source).not.toMatch(/[\u3040-\u30ff\u4e00-\u9fff]/u);
+  });
+});
+
+describe('kyberion-ui vanilla renderer — rail slots, list progress, display controls', () => {
+  it('nav-rail renders the brand slot (mark or safe logo) before the items', () => {
+    const rail = render('ui:nav-rail', {
+      brand: { name: 'Kyberion', subtitle: 'あなたの相棒' },
+      items: [{ id: 'home', label: 'ホーム', href: '/' }],
+    })!;
+    const children = rail.children.map((child) => child.className);
+    expect(children[0]).toBe('kb-nav-rail__brand');
+    expect(rail.query('.kb-nav-rail__brand-mark[aria-hidden="true"]')).not.toBeNull();
+    expect(rail.query('.kb-nav-rail__brand-name')!.textContent).toBe('Kyberion');
+    expect(rail.query('.kb-nav-rail__brand-subtitle')!.textContent).toBe('あなたの相棒');
+
+    const withLogo = render('ui:nav-rail', {
+      brand: { name: 'K', logo_url: '/logo.svg' },
+      items: [],
+    })!;
+    expect(withLogo.query('img.kb-nav-rail__brand-logo')!.getAttribute('src')).toBe('/logo.svg');
+    expect(withLogo.query('img.kb-nav-rail__brand-logo')!.getAttribute('alt')).toBe('');
+    const unsafe = render('ui:nav-rail', {
+      brand: { name: 'K', logo_url: 'javascript:alert(1)' },
+      items: [],
+    })!;
+    expect(unsafe.query('img')).toBeNull();
+    expect(unsafe.query('.kb-nav-rail__brand-mark')).not.toBeNull();
+    const mailto = render('ui:nav-rail', {
+      brand: { name: 'K', logo_url: 'mailto:a@b' },
+      items: [],
+    })!;
+    expect(mailto.query('img')).toBeNull();
+  });
+
+  it('nav-rail context switcher opens a listbox and dispatches the action with { value }', () => {
+    const onAction = vi.fn();
+    const rail = render(
+      'ui:nav-rail',
+      {
+        context: {
+          label: '既定のテナント',
+          detail: 'オーナー',
+          switch_label: 'テナントを切り替える',
+          action: { id: 'tenant.switch', payload: { source: 'rail' } },
+          options: [
+            { value: 'default', label: '既定のテナント', selected: true },
+            { value: 'acme', label: 'Acme' },
+          ],
+        },
+        items: [{ id: 'home', label: 'ホーム', href: '/' }],
+      },
+      undefined,
+      { onAction }
+    )!;
+    expect(rail.children[0].className).toBe('kb-nav-rail__context');
+    const button = rail.query('button.kb-nav-rail__context-button')!;
+    expect(button.getAttribute('aria-haspopup')).toBe('listbox');
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    // The switch purpose is part of the accessible name, the visible text stays in it.
+    expect(button.query('.kb-visually-hidden')!.textContent).toBe('テナントを切り替える');
+    expect(button.query('.kb-nav-rail__context-label')!.textContent).toBe('既定のテナント');
+    const menu = rail.query('ul.kb-nav-rail__context-menu[role="listbox"]')! as MiniElement & {
+      hidden: boolean;
+    };
+    expect(menu.hidden).toBe(true);
+    button.click();
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(menu.hidden).toBe(false);
+    const options = rail.queryAll('.kb-nav-rail__context-option[role="option"]');
+    expect(options.map((option) => option.getAttribute('aria-selected'))).toEqual([
+      'true',
+      'false',
+    ]);
+    options[1].click();
+    expect(onAction).toHaveBeenCalledWith(
+      { id: 'tenant.switch', payload: { source: 'rail', value: 'acme' } },
+      expect.objectContaining({ type: 'ui:nav-rail' })
+    );
+    expect(menu.hidden).toBe(true);
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('nav-rail context without options is a button, a link or static text', () => {
+    const onAction = vi.fn();
+    const asButton = render(
+      'ui:nav-rail',
+      { context: { label: 'T', action: { id: 'tenant.open' } }, items: [] },
+      undefined,
+      { onAction }
+    )!;
+    asButton.query('button.kb-nav-rail__context-button[data-action-id="tenant.open"]')!.click();
+    expect(onAction).toHaveBeenCalledWith({ id: 'tenant.open' }, expect.anything());
+    const asLink = render('ui:nav-rail', { context: { label: 'T', href: '/tenants' }, items: [] })!;
+    expect(asLink.query('a.kb-nav-rail__context-button')!.getAttribute('href')).toBe('/tenants');
+    const unsafe = render('ui:nav-rail', {
+      context: { label: 'T', href: 'javascript:alert(1)' },
+      items: [],
+    })!;
+    expect(unsafe.query('a')).toBeNull();
+    expect(unsafe.query('div.kb-nav-rail__context-button[data-static="true"]')).not.toBeNull();
+    expect(unsafe.query('.kb-visually-hidden')).toBeNull();
+    expect(
+      render('ui:nav-rail', { context: { label: '' }, items: [] })!.query('.kb-nav-rail__context')
+    ).toBeNull();
+  });
+
+  it('list items take a status_label override and a progress meter with accessible text', () => {
+    const list = renderJa('ui:list', {
+      items: [
+        { title: 'a', status: 'active', status_label: '作成中', progress: 41.6 },
+        { title: 'b', status: 'active', progress: 180 },
+        { title: 'c', status: 'active', progress: Number.NaN },
+      ],
+    })!;
+    const [first, second, third] = list.queryAll('.kb-list__item');
+    expect(first.query('.kb-status-pill__label')!.textContent).toBe('作成中');
+    const bar = first.query('.kb-list__progress-track[role="progressbar"]')!;
+    expect(bar.getAttribute('aria-valuenow')).toBe('42');
+    expect(bar.getAttribute('aria-valuemin')).toBe('0');
+    expect(bar.getAttribute('aria-valuemax')).toBe('100');
+    expect(bar.getAttribute('aria-label')).toBe(JA.messages['ui:list_progress']);
+    expect(bar.getAttribute('aria-valuetext')).toBe('42% 完了');
+    expect((first.query('.kb-list__progress-fill')!.style as Record<string, string>).width).toBe(
+      '42%'
+    );
+    expect(first.query('.kb-list__progress-value[aria-hidden="true"]')!.textContent).toBe('42%');
+    expect(second.query('.kb-status-pill__label')!.textContent).toBe(
+      JA.messages['ui:status_active']
+    );
+    expect(second.query('.kb-list__progress-track')!.getAttribute('aria-valuenow')).toBe('100');
+    expect(third.query('.kb-list__progress')).toBeNull();
+  });
+
+  it('display-controls renders a theme segmented control + language select and re-emits display actions', () => {
+    const onAction = vi.fn();
+    const { document } = setup();
+    const node = renderComponent(
+      { id: 'prefs', type: 'ui:display-controls', props: { theme: 'dark', locale: 'ja' } },
+      { document, onAction, locale: JA.locale, messages: JA.messages }
+    ) as unknown as MiniElement;
+    expect(node.getAttribute('role')).toBe('group');
+    expect(node.getAttribute('aria-label')).toBe(JA.messages['ui:display_label']);
+    const radios = node.queryAll('fieldset.kb-segmented input.kb-segmented__input');
+    expect(radios.map((radio) => radio.getAttribute('value'))).toEqual(['system', 'light', 'dark']);
+    expect(radios.map((radio) => (radio as unknown as { checked: boolean }).checked)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect(node.queryAll('.kb-segmented__label').map((label) => label.textContent)).toEqual([
+      JA.messages['ui:display_theme_system'],
+      JA.messages['ui:display_theme_light'],
+      JA.messages['ui:display_theme_dark'],
+    ]);
+    const select = node.query('select.kb-select')! as MiniElement & { value: string };
+    expect(select.value).toBe('ja');
+    expect(node.queryAll('option').map((option) => option.textContent)).toEqual([
+      JA.messages['ui:locale_name_ja'],
+      JA.messages['ui:locale_name_en'],
+    ]);
+    // Labels stay the accessible names, visually hidden.
+    expect(node.query('legend.kb-visually-hidden')!.textContent).toBe(
+      JA.messages['ui:display_theme']
+    );
+    expect(node.query('label.kb-visually-hidden')!.textContent).toBe(
+      JA.messages['ui:display_language']
+    );
+
+    (radios[1] as unknown as { checked: boolean }).checked = true;
+    radios[1].dispatch('change');
+    expect(onAction).toHaveBeenLastCalledWith(
+      { id: 'display.theme', payload: { value: 'light' } },
+      expect.objectContaining({ id: 'prefs' })
+    );
+    select.value = 'en';
+    select.dispatch('change');
+    expect(onAction).toHaveBeenLastCalledWith(
+      { id: 'display.locale', payload: { value: 'en' } },
+      expect.objectContaining({ id: 'prefs' })
+    );
+    expect(onAction).toHaveBeenCalledTimes(2);
+  });
+
+  it('display-controls takes custom locales and falls back to auto for an unknown theme', () => {
+    const node = render('ui:display-controls', {
+      theme: 'sepia',
+      locale: 'en',
+      locales: [
+        { value: 'en', label: 'English' },
+        { value: 'EN_bad', label: 'x' },
+        { value: 'fr', label: 'Français' },
+      ],
+    })!;
+    const checked = node
+      .queryAll('input.kb-segmented__input')
+      .find((radio) => (radio as unknown as { checked: boolean }).checked);
+    expect(checked!.getAttribute('value')).toBe('system');
+    expect(node.queryAll('option').map((option) => option.getAttribute('value'))).toEqual([
+      'en',
+      'fr',
+    ]);
+  });
+
+  it('code renders a pre-wrap block, never interpreting the text; unsafe language hints are dropped', () => {
+    const node = render('ui:code', {
+      code: '<script>alert(1)</script>\n  indented',
+      language: 'html',
+      title: 'Snippet',
+    })!;
+    expect(node.getAttribute('data-language')).toBe('html');
+    expect(node.query('figcaption.kb-code__header .kb-code__title')!.textContent).toBe('Snippet');
+    expect(node.query('.kb-code__language')!.textContent).toBe('html');
+    expect(node.query('pre.kb-code__body > code')!.textContent).toBe(
+      '<script>alert(1)</script>\n  indented'
+    );
+    expect(node.query('script')).toBeNull();
+    const plain = render('ui:code', { code: 'x', language: 'bad lang!' })!;
+    expect(plain.hasAttribute('data-language')).toBe(false);
+    expect(plain.query('figcaption')).toBeNull();
   });
 });

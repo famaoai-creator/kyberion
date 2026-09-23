@@ -8,6 +8,9 @@ import { pathResolver, safeReadFile } from '@agent/core';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import {
   FRONT_DESK_PAGE_PARTIALS,
+  FRONT_DESK_TEMPLATE_FILE_REDIRECTS,
+  frontDeskTemplateRedirect,
+  registerFrontDeskHomeWorkPages,
   renderFrontDeskPageTemplate,
   resolveFrontDeskPageLocale,
 } from './front-desk-pages.js';
@@ -94,7 +97,6 @@ describe('renderFrontDeskPageTemplate', () => {
   it('keeps presence-studio stylesheets on --kb-ui-* tokens (no raw hex / rgb colors, no teal)', () => {
     const sheets = [
       'design-system.css',
-      'front-desk-rail.css',
       'home.css',
       'ask.css',
       'progress.css',
@@ -117,5 +119,72 @@ describe('renderFrontDeskPageTemplate', () => {
     expect(prefs).toContain("LOCALE_KEY = 'kyberion.ui.locale'");
     expect(prefs).toContain("LOCALE_COOKIE = 'kb-ui-locale'");
     expect(prefs).toContain('try {');
+  });
+});
+
+describe('raw template files are never served unrendered', () => {
+  type Handler = (req: Record<string, unknown>, res: Record<string, unknown>) => void;
+
+  function recordRoutes() {
+    const routes = new Map<string, Handler>();
+    const app = { get: (route: string, handler: Handler) => routes.set(route, handler) };
+    registerFrontDeskHomeWorkPages(app as never, pathResolver.rootResolve(STATIC_DIR));
+    return routes;
+  }
+
+  function fakeRes() {
+    const res: Record<string, unknown> & {
+      sent?: unknown;
+      statusCode?: number;
+      location?: string;
+    } = {};
+    res.redirect = (status: number, location: string) => {
+      res.statusCode = status;
+      res.location = location;
+      return res;
+    };
+    res.status = (status: number) => {
+      res.statusCode = status;
+      return res;
+    };
+    res.type = () => res;
+    res.setHeader = () => res;
+    res.send = (body: unknown) => {
+      res.sent = body;
+      return res;
+    };
+    return res;
+  }
+
+  it('covers every page template and maps it to its canonical route', () => {
+    expect(Object.keys(FRONT_DESK_TEMPLATE_FILE_REDIRECTS).sort()).toEqual(
+      PAGES.map((page) => `/${page}`).sort()
+    );
+    expect(frontDeskTemplateRedirect('/home.html')).toBe('/');
+    expect(frontDeskTemplateRedirect('/progress.html?tenant=acme#x')).toBe(
+      '/progress?tenant=acme#x'
+    );
+    expect(frontDeskTemplateRedirect('/ui-gallery.html')).toBeNull();
+  });
+
+  it('registers redirects for /<page>.html and 404s for the shell partials, ahead of express.static', () => {
+    const routes = recordRoutes();
+    for (const [file, target] of Object.entries(FRONT_DESK_TEMPLATE_FILE_REDIRECTS)) {
+      const res = fakeRes();
+      routes.get(file)!({ originalUrl: `${file}?a=1` }, res);
+      expect(res.statusCode, file).toBe(302);
+      expect(res.location, file).toBe(`${target}?a=1`);
+    }
+    for (const partial of Object.values(FRONT_DESK_PAGE_PARTIALS)) {
+      const res = fakeRes();
+      routes.get(`/${partial}`)!({}, res);
+      expect(res.statusCode, partial).toBe(404);
+      expect(String(res.sent)).not.toContain('{{');
+    }
+    // The canonical routes still render the template (no placeholder left).
+    const home = fakeRes();
+    routes.get('/')!({ headers: { 'accept-language': 'ja' } }, home);
+    expect(String(home.sent)).toContain('<html lang="ja"');
+    expect(String(home.sent)).not.toMatch(/\{\{(t|partial|locale)[:}]/);
   });
 });
