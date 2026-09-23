@@ -144,13 +144,20 @@ env: `KYBERION_SCENARIO_LANE`、`KYBERION_SCENARIO_KEEP_ROOT`(subsystem `eval`)�
 
 ## 7. 実装状況
 
-| ID           | 状態 | 備考 |
-| ------------ | ---- | ---- |
-| EV-01〜EV-08 | todo |      |
-| ES-01〜ES-08 | todo |      |
-| EP-01〜EP-06 | todo |      |
+2026-09-24 時点で全項目を実装(ブランチ `agent/eliza-adoption-20260924`)。独立レビュー 2 ラウンドの指摘(Blocking 4 件を含む)を修正済み。
+
+| ID           | 状態 | 備考                                                                                                                                                                                            |
+| ------------ | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EV-01〜EV-08 | done | 二段階 barge-in は CLI の `low_latency` + streaming STT で既定 on。推測応答は明示有効 + AC 電源 + 非従量課金のときだけ。日本語の手がかり語は `knowledge/product/voice/turn-taking-lexicon.json` |
+| ES-01〜ES-08 | done | `pnpm scenario run eval/scenarios`(5 本)と CI gate `scenario-pr-deterministic`。時計は foundation のモジュール状態(seam ではない)                                                               |
+| EP-01〜EP-06 | done | 予約 seam(承認・op 解決)と official 専用 seam(secret-resolver 等)、返り値(ストリーム・クロージャ・コレクション)まで grant 内で実行、ネストした manifest は拒否                                  |
 
 ## 8. 後続候補(今回対象外)
+
+- シナリオの上書き(承認・op 解決)をプロセス全体ではなくシナリオ実行の非同期コンテキストに限定する(レビュー N7)。現状は simulated かつ fixture のある op に限定済み。
+- 承認済み `human` 権限のビュー action を実行する経路(現状は承認要求の作成まで)。
+- `playAudioFile` に一時停止(SIGSTOP/SIGCONT)を追加し、区切り再生の一時停止を「止めて頭から再生」から「その場で停止」にする。
+- 推測応答のコスト区分をコードの一覧から reasoning provider 記述子へ移す。
 
 - 動画の取り込みと理解(yt-dlp + ffmpeg + 字幕優先の文字起こし、content hash キャッシュ)。
 - ビジョンの Set-of-Marks(要素に番号を振り VLM に番号で指させる)と変化タイルだけの再記述。
