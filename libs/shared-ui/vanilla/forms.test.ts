@@ -20,6 +20,7 @@ import {
   formatBytes,
   formFieldIds,
   screenFiles,
+  secretFieldNotice,
   secretStatusText,
   sliderValueText,
 } from './forms.js';
@@ -135,6 +136,34 @@ describe('forms.js pure helpers', () => {
       'ui:secret_configured_plain'
     );
     expect(secretStatusText({}, t)).toBe('ui:secret_not_configured');
+  });
+
+  it('secret outcome: a local submit stays pending until the host status changes', () => {
+    const t = (key: string) => key;
+    expect(secretFieldNotice({}, null, t)).toEqual({ status: 'idle', text: '' });
+    const submitted = { kind: 'submitted', under: 'idle' } as const;
+    expect(secretFieldNotice({}, submitted, t)).toEqual({
+      status: 'pending',
+      text: 'ui:secret_pending',
+    });
+    // Host moved on: its outcome wins over the local submit.
+    expect(secretFieldNotice({ status: 'saved' }, submitted, t).status).toBe('saved');
+    expect(secretFieldNotice({ status: 'error' }, submitted, t)).toEqual({
+      status: 'error',
+      text: 'ui:secret_error',
+    });
+    // A re-submit under an old "saved" is pending again, never "saved".
+    const resubmitted = { kind: 'submitted', under: 'saved' } as const;
+    expect(secretFieldNotice({ status: 'saved' }, resubmitted, t).status).toBe('pending');
+    // Typing again hides the old outcome until the host changes it.
+    const dismissed = { kind: 'dismissed', under: 'error' } as const;
+    expect(secretFieldNotice({ status: 'error' }, dismissed, t)).toEqual({
+      status: 'idle',
+      text: '',
+    });
+    expect(secretFieldNotice({ status: 'error', status_error: '  Nope  ' }, null, t).text).toBe(
+      'Nope'
+    );
   });
 });
 
@@ -518,11 +547,48 @@ describe('ui:secret-field keeps the secret out of markup, props and field.change
     const after = root.query('input.kb-secret-field__input')! as MiniElement & { value: string };
     expect(after.value ?? '').toBe('');
     expect(after.getAttribute('type')).toBe('password');
+    // Submitting is not saving: the field says "sending" until the host
+    // reports the outcome through `status`.
+    expect(root.query('.kb-secret-field')!.getAttribute('data-status')).toBe('pending');
     expect(root.query('.kb-secret-field__notice')!.textContent).toBe(
-      'Sent. The value is not kept on this page.'
+      'Sending… The value is not kept on this page.'
     );
     expect(serialize(root)).not.toContain(SECRET);
     expect(JSON.stringify(component)).not.toContain(SECRET);
+    // Typing again dismisses the pending notice.
+    after.value = 'x';
+    after.dispatch('input');
+    expect(root.query('.kb-secret-field__notice')!.textContent).toBe('');
+    expect(root.query('.kb-secret-field')!.getAttribute('data-status')).toBe('idle');
+  });
+
+  it('host status: saved / error (with the host reason) / pending; error reopens the input', () => {
+    const saved = one('ui:secret-field', { ...props, configured: true, status: 'saved' });
+    expect(saved.root.query('.kb-secret-field')!.getAttribute('data-status')).toBe('saved');
+    expect(saved.root.query('.kb-secret-field__notice')!.textContent).toBe(
+      'Saved. The value is not kept on this page.'
+    );
+    const pending = one('ui:secret-field', { ...props, status: 'pending' });
+    expect(pending.root.query('.kb-secret-field__notice')!.textContent).toBe(
+      'Sending… The value is not kept on this page.'
+    );
+    const failed = one('ui:secret-field', { ...props, configured: true, status: 'error' });
+    const field = failed.root.query('.kb-secret-field')!;
+    expect(field.getAttribute('data-status')).toBe('error');
+    expect(field.getAttribute('data-state')).toBe('editing');
+    expect(failed.root.query('input.kb-secret-field__input')).not.toBeNull();
+    expect(failed.root.query('.kb-secret-field__notice')!.textContent).toBe(
+      'Could not save the value. Enter it again.'
+    );
+    const reason = one('ui:secret-field', {
+      ...props,
+      status: 'error',
+      status_error: 'Approval expired.',
+    });
+    expect(reason.root.query('.kb-secret-field__notice')!.textContent).toBe('Approval expired.');
+    const unknown = one('ui:secret-field', { ...props, status: 'done' });
+    expect(unknown.root.query('.kb-secret-field')!.getAttribute('data-status')).toBe('idle');
+    expect(unknown.root.query('.kb-secret-field__notice')!.textContent).toBe('');
   });
 
   it('Enter submits; an empty value does not', () => {
@@ -742,6 +808,84 @@ describe('ui:camera-capture', () => {
     await started;
     expect(track.stop).toHaveBeenCalledTimes(1);
     expect(controller.state.phase).toBe('idle');
+  });
+
+  describe('controller: start → cancel → start with streams resolving out of order', () => {
+    type Pending = { resolve: (stream: unknown) => void; reject: (error: unknown) => void };
+    function racingCamera() {
+      const pending: Pending[] = [];
+      const win = {
+        navigator: {
+          mediaDevices: {
+            getUserMedia: () => new Promise((resolve, reject) => pending.push({ resolve, reject })),
+          },
+        },
+      };
+      const stream = () => {
+        const track = { stop: vi.fn() };
+        return { track, stream: { getTracks: () => [track] } };
+      };
+      return { win, pending, stream };
+    }
+
+    it('the stale first stream resolving first is stopped; the second one goes live', async () => {
+      const cam = racingCamera();
+      const controller = createCameraController({ win: cam.win });
+      const first = controller.start();
+      controller.cancel();
+      const second = controller.start();
+      const a = cam.stream();
+      const b = cam.stream();
+      cam.pending[0].resolve(a.stream);
+      await first;
+      expect(a.track.stop).toHaveBeenCalledTimes(1);
+      expect(controller.state.phase).toBe('starting');
+      expect(controller.stream).toBeNull();
+      cam.pending[1].resolve(b.stream);
+      await second;
+      expect(controller.state.phase).toBe('live');
+      expect(controller.stream).toBe(b.stream);
+      expect(b.track.stop).not.toHaveBeenCalled();
+      controller.cancel();
+      expect(b.track.stop).toHaveBeenCalledTimes(1);
+    });
+
+    it('the stale first stream resolving last is stopped and never replaces the live one', async () => {
+      const cam = racingCamera();
+      const controller = createCameraController({ win: cam.win });
+      const first = controller.start();
+      controller.cancel();
+      const second = controller.start();
+      const a = cam.stream();
+      const b = cam.stream();
+      cam.pending[1].resolve(b.stream);
+      await second;
+      expect(controller.stream).toBe(b.stream);
+      cam.pending[0].resolve(a.stream);
+      await first;
+      expect(a.track.stop).toHaveBeenCalledTimes(1);
+      expect(controller.stream).toBe(b.stream);
+      expect(b.track.stop).not.toHaveBeenCalled();
+      expect(controller.state.phase).toBe('live');
+      controller.dispose();
+      expect(b.track.stop).toHaveBeenCalledTimes(1);
+    });
+
+    it('a stale request failing does not knock the current one into fallback', async () => {
+      const cam = racingCamera();
+      const controller = createCameraController({ win: cam.win });
+      const first = controller.start();
+      controller.cancel();
+      const second = controller.start();
+      cam.pending[0].reject(new Error('NotAllowedError'));
+      await first;
+      expect(controller.state.phase).toBe('starting');
+      const b = cam.stream();
+      cam.pending[1].resolve(b.stream);
+      await second;
+      expect(controller.state.phase).toBe('live');
+      expect(controller.stream).toBe(b.stream);
+    });
   });
 });
 

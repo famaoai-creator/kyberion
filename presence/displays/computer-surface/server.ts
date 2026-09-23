@@ -42,7 +42,7 @@ import {
   getComputerSurfaceTenantScope,
   recordComputerSurfaceRead,
 } from './os-control-plane.js';
-import { registerComputerSurfacePageRoutes } from './page.js';
+import { registerComputerSurfacePageRoutes, registerComputerSurfaceStaticFiles } from './page.js';
 
 type Client = express.Response;
 
@@ -244,9 +244,10 @@ if (!safeExistsSync(staticDir)) {
 
 app.use(express.json({ limit: '1mb' }));
 // UI-09: the page template + shared vanilla renderer (fixed routes) come
-// before express.static so the raw template is never served unfilled.
+// before the static files, and the static files refuse any path that names
+// the template, so the raw template is never served unfilled.
 registerComputerSurfacePageRoutes(app, staticDir);
-app.use(express.static(staticDir, { index: false }));
+registerComputerSurfaceStaticFiles(app, staticDir);
 app.use(['/api', '/a2ui'], computerSurfaceRateLimiter);
 
 app.get('/favicon.ico', (_req, res) => {

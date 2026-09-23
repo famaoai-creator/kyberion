@@ -7,7 +7,7 @@ import {
   KB_UI_STATUS_TONES_PLACEHOLDER,
   KB_UI_TOKEN_BLOCK_END,
   KB_UI_TOKEN_BLOCK_START,
-  KYBERION_UI_STYLESHEET_SOURCE,
+  KB_UI_STYLESHEET_SOURCE,
   concatKyberionUiStylesheetSources,
   listKyberionUiStylesheetSources,
   readKyberionDesignTokens,
@@ -122,7 +122,7 @@ describe('UI token layer and component stylesheet (UI-02)', () => {
 
   it('stamps the base stylesheet first, then every kyberion-ui.<part>.source.css', () => {
     const sources = listKyberionUiStylesheetSources();
-    expect(sources[0]).toBe(KYBERION_UI_STYLESHEET_SOURCE);
+    expect(sources[0]).toBe(KB_UI_STYLESHEET_SOURCE);
     expect(sources).toContain('knowledge/public/design-patterns/web/kyberion-ui.charts.source.css');
     expect([...sources.slice(1)].sort()).toEqual(sources.slice(1));
     const joined = concatKyberionUiStylesheetSources((relativePath) => `/* ${relativePath} */`);

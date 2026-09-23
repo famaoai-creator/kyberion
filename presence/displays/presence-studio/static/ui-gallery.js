@@ -15,13 +15,17 @@
  * renderer defaults (status labels, empty/loading text, ...) come from the
  * `ui` vocabulary bundle at `/shared-ui/messages/<locale>.json`, handed to
  * `renderA2UI({ locale, messages })`. The locale is `?lang=`, else the
- * browser language, else the catalog default (en).
+ * shared stored language (`kyberion.ui.locale`), else the browser language,
+ * else the catalog default (en).
  *
- * Theme / density toggles set `data-theme` / `data-density` on <html>; the
- * initial values can come from `?theme=dark&density=compact` (used for
- * screenshot baselines).
+ * Theme / density toggles set `data-theme` / `data-density` on <html>. The
+ * initial theme is applied before paint by `ui-gallery-prefs.js`: `?theme=`,
+ * else the shared stored theme (`kyberion.ui.theme`), else the system
+ * preference. `?theme=dark&density=compact` are used for screenshot baselines.
  */
 /* global document, window, fetch, navigator, URLSearchParams, Element */
+// Resolved before paint by ui-gallery-prefs.js (absent if that script failed).
+const prefs = window.KyberionGalleryPrefs || {};
 import { KB_UI_DEFAULT_LOCALE, renderA2UI } from '/shared-ui/kyberion-ui.js';
 
 const THEMES = ['light', 'dark'];
@@ -55,10 +59,14 @@ function setChoice(attribute, value) {
   setParam(attribute, value);
 }
 
-/** `?lang=` (exact supported locale), else the browser language, else the default. */
+/**
+ * `?lang=` (exact supported locale), else the shared stored language (both
+ * resolved by ui-gallery-prefs.js), else the browser language, else the default.
+ */
 function resolveLocale() {
   const requested = new URLSearchParams(window.location.search).get('lang');
   if (requested && LOCALES.includes(requested)) return requested;
+  if (LOCALES.includes(prefs.locale)) return prefs.locale;
   const browser = (navigator.languages && navigator.languages[0]) || navigator.language || '';
   const primary = String(browser).toLowerCase().split('-')[0];
   return LOCALES.includes(primary) ? primary : KB_UI_DEFAULT_LOCALE;
@@ -88,7 +96,17 @@ function initToggles() {
   const params = new URLSearchParams(window.location.search);
   const theme = params.get('theme');
   const density = params.get('density');
-  setChoice('theme', THEMES.includes(theme) ? theme : 'light');
+  if (THEMES.includes(theme)) {
+    setChoice('theme', theme);
+  } else {
+    // No `?theme=`: keep what ui-gallery-prefs.js applied before paint (the
+    // stored theme, or none = follow the system) and only mark the toggle.
+    const applied = html.getAttribute('data-theme');
+    const systemDark =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setPressed('theme', THEMES.includes(applied) ? applied : systemDark ? 'dark' : 'light');
+  }
   setChoice('density', DENSITIES.includes(density) ? density : 'comfortable');
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest('button') : null;

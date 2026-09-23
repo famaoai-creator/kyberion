@@ -17,7 +17,7 @@
  *      backward-compat window) every bare `key` form that is unambiguous
  *      across namespaces. Referencing an unknown key in `t()` is then a
  *      typecheck error.
- *   3. UI-01d: `libs/shared-ui/vanilla/kyberion-ui.js`'s built-in fallback
+ *   3. UI-01d: `libs/shared-ui/vanilla/kyberion-ui-vocabulary.js`'s built-in fallback
  *      bundle (spliced between `GENERATED-UI-MESSAGES:BEGIN`/`END` markers)
  *      — the `ui` domain in the catalog's `default_locale`. The shared UI
  *      renderers resolve a key from the caller's locale bundle first, then
@@ -49,7 +49,9 @@ interface VocabularyCatalogFile {
 const CATALOG_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
 const LOCALE_NORMALIZE_PATH = pathResolver.rootResolve('libs/core/locale-normalize.ts');
 const VOCABULARY_KEYS_PATH = pathResolver.rootResolve('libs/core/vocabulary-keys.generated.ts');
-const SHARED_UI_VANILLA_PATH = pathResolver.rootResolve('libs/shared-ui/vanilla/kyberion-ui.js');
+const SHARED_UI_VANILLA_PATH = pathResolver.rootResolve(
+  'libs/shared-ui/vanilla/kyberion-ui-vocabulary.js'
+);
 
 const LOCALES_BEGIN_MARKER = '// GENERATED-LOCALES:BEGIN';
 const LOCALES_END_MARKER = '// GENERATED-LOCALES:END';
@@ -126,7 +128,7 @@ export function spliceUiMessagesBlock(source: string, catalog: VocabularyCatalog
   const endIndex = source.indexOf(UI_MESSAGES_END_MARKER);
   if (beginIndex === -1 || endIndex === -1) {
     throw new Error(
-      `kyberion-ui.js is missing the ${UI_MESSAGES_BEGIN_MARKER}/${UI_MESSAGES_END_MARKER} markers`
+      `kyberion-ui-vocabulary.js is missing the ${UI_MESSAGES_BEGIN_MARKER}/${UI_MESSAGES_END_MARKER} markers`
     );
   }
   const before = source.slice(0, beginIndex);

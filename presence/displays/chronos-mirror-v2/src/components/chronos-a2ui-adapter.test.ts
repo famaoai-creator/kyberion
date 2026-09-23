@@ -19,6 +19,17 @@ const root = (list: ChronosA2UIComponent[]) => byId(list, 'x')!;
 const kids = (list: ChronosA2UIComponent[], id: string) =>
   (byId(list, id)?.children ?? []).map((childId) => byId(list, childId)!);
 
+/** The adapter's output props, narrowed to the fields these assertions read. */
+interface AdaptedProps {
+  columns?: unknown[];
+  rows?: Array<Record<string, unknown>>;
+  items?: Array<{ status?: string } & Record<string, unknown>>;
+  tone?: string;
+  thresholds?: Array<{ tone?: string }>;
+  nodes?: Array<{ status?: string }>;
+}
+const propsOf = (component: ChronosA2UIComponent) => (component.props ?? {}) as AdaptedProps;
+
 const LOCAL_TYPES = new Set([CHRONOS_CODE_TYPE, 'kb-artifact-tile', 'kb-intervention-panel']);
 
 /** Every emitted component is a catalog type or a registered chronos-local fallback. */
@@ -97,8 +108,8 @@ describe('expandChronosComponents: display:* → kyberion-base', () => {
     });
     // Row objects and rows wider than the headers still render.
     const wide = one('display:table', { headers: ['A'], rows: [{ a: 1, b: 2 }] });
-    expect((root(wide).props as any).columns).toHaveLength(2);
-    expect((root(wide).props as any).rows[0]).toEqual({ c0: 1, c1: 2 });
+    expect(propsOf(root(wide)).columns).toHaveLength(2);
+    expect(propsOf(root(wide)).rows?.[0]).toEqual({ c0: 1, c1: 2 });
   });
 
   it('display:kv → ui:kv (titled blocks become a caption + block stack)', () => {
@@ -159,7 +170,7 @@ describe('expandChronosComponents: display:* → kyberion-base', () => {
     });
     // Non-canonical status keeps its text in the meta line.
     expect(
-      (root(one('display:status', { label: 'L', status: 'weird' })).props as any).items[0]
+      propsOf(root(one('display:status', { label: 'L', status: 'weird' }))).items?.[0]
     ).toEqual({ title: 'L', meta: 'weird' });
   });
 
@@ -169,7 +180,7 @@ describe('expandChronosComponents: display:* → kyberion-base', () => {
       type: 'ui:callout',
       props: { tone: 'danger', title: 'T', body: 'M' },
     });
-    expect((root(one('display:alert', { severity: 'bogus', title: 'T' })).props as any).tone).toBe(
+    expect(propsOf(root(one('display:alert', { severity: 'bogus', title: 'T' }))).tone).toBe(
       'info'
     );
   });
@@ -217,21 +228,13 @@ describe('expandChronosComponents: display:* → kyberion-base', () => {
       type: 'ui:meter',
       props: { label: 'Pipeline', value: 1, max: 3 },
     });
-    expect((steps.props as any).items.map((i: any) => i.status)).toEqual([
-      'done',
-      'active',
-      'pending',
-    ]);
+    expect(propsOf(steps).items?.map((i) => i.status)).toEqual(['done', 'active', 'pending']);
     const gauge = root(one('display:gauge', { label: 'CPU', value: 140, unit: '%' }));
     expect(gauge).toMatchObject({
       type: 'ui:meter',
       props: { label: 'CPU', value: 100, max: 100 },
     });
-    expect((gauge.props as any).thresholds.map((t: any) => t.tone)).toEqual([
-      'danger',
-      'warning',
-      'success',
-    ]);
+    expect(propsOf(gauge).thresholds?.map((t) => t.tone)).toEqual(['danger', 'warning', 'success']);
   });
 
   it('display:badges → ui:badge list with normalized tones', () => {
@@ -373,7 +376,7 @@ describe('expandChronosComponents: display:* → kyberion-base', () => {
       one('kb-status-orbit', { currentPhase: 'state', status: 'running', label: 'Go' })
     );
     expect(orbit.type).toBe('ui:flow');
-    expect((orbit.props as any).nodes.map((n: any) => n.status)).toEqual([
+    expect(propsOf(orbit).nodes?.map((n) => n.status)).toEqual([
       'done',
       'done',
       'running',
@@ -494,7 +497,7 @@ describe('rendering through the shared renderer', () => {
       actionQueue: [{ title: 'Review', kind: 'approval', nextAction: 'open' }],
       nextAction: { title: 'Unblock MSN-1' },
     } as never);
-    const components = (message as any).updateComponents.components;
+    const components: ChronosA2UIComponent[] = message.updateComponents?.components ?? [];
     const html = renderList(components);
     for (const cls of ['kb-next-action', 'kb-metric', 'kb-list', 'kb-table', 'kb-status-pill'])
       expect(html).toContain(cls);

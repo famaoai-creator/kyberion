@@ -2,6 +2,8 @@
 //
 // Never imports `server.ts` routes directly (it listens outside tests only,
 // but the page contract is exercised here against a recording app).
+import type { AddressInfo } from 'node:net';
+import express from 'express';
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
 import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
@@ -14,8 +16,10 @@ import {
   SHARED_UI_VANILLA_SOURCE,
   buildComputerSurfacePageVocabulary,
   isComputerSurfaceDevMode,
+  isComputerSurfaceTemplatePath,
   parseLocaleFile,
   registerComputerSurfacePageRoutes,
+  registerComputerSurfaceStaticFiles,
   renderComputerSurfacePage,
   resolveComputerSurfacePageLocale,
   toInlineJson,
@@ -186,6 +190,17 @@ describe('computer-surface page routes', () => {
       expect(res.sent).toBe(pathResolver.rootResolve(source));
       expect(safeExistsSync(pathResolver.rootResolve(source))).toBe(true);
     }
+    // Exactly the renderer's transitive sibling imports: every module loads, nothing else is reachable.
+    const seen = new Set<string>();
+    const queue = [SHARED_UI_VANILLA_SOURCE];
+    while (queue.length) {
+      for (const [, file] of readRepoFile(queue.shift()!).matchAll(/from '\.\/([\w-]+\.js)'/g)) {
+        if (seen.has(file)) continue;
+        seen.add(file);
+        queue.push(`libs/shared-ui/vanilla/${file}`);
+      }
+    }
+    expect([...seen].sort()).toEqual(Object.keys(SHARED_UI_MODULE_SOURCES).sort());
     for (const file of ['../x.js', 'kyberion-ui.test.ts', 'index.html', '']) {
       const res = fakeResponse();
       routes.get(SHARED_UI_MODULE_ROUTE)!({ params: { file } }, res);
@@ -203,5 +218,48 @@ describe('computer-surface page routes', () => {
     const missing = fakeResponse();
     routes.get(SHARED_UI_MESSAGES_ROUTE)!({ params: { file: 'xx.json' } }, missing);
     expect(missing.statusCode).toBe(404);
+  });
+});
+
+describe('computer-surface static files never leak the raw template', () => {
+  it('recognises every spelling of the template path', () => {
+    for (const p of [
+      '/index.html',
+      '/index%2Ehtml',
+      '/index%2ehtml',
+      '/INDEX.html',
+      '/Index.HTML.',
+      '/a/index.html',
+    ]) {
+      expect(isComputerSurfaceTemplatePath(p), p).toBe(true);
+    }
+    for (const p of ['/', '/kyberion-ui.css', '/index.htm', '/index%252Ehtml', '/%E0%A4%A']) {
+      expect(isComputerSurfaceTemplatePath(p), p).toBe(false);
+    }
+  });
+
+  it('answers encoded / re-cased template paths with the filled page or 404, never the template', async () => {
+    const app = express();
+    const staticDir = pathResolver.rootResolve(STATIC_DIR);
+    registerComputerSurfacePageRoutes(app, staticDir);
+    registerComputerSurfaceStaticFiles(app, staticDir);
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise<void>((resolve) => server.once('listening', () => resolve()));
+    const { port } = server.address() as AddressInfo;
+    try {
+      for (const target of ['/index%2Ehtml', '/index%2ehtml', '/INDEX.html', '/INDEX%2EHTML']) {
+        const res = await fetch(`http://127.0.0.1:${port}${target}`);
+        const body = await res.text();
+        expect(body, target).not.toContain('dev-sandbox:begin');
+        expect(body, target).not.toContain('id="dev-a2ui-payload"');
+        expect(body, target).not.toMatch(/\{\{[^}]*\}\}/);
+        expect([200, 404], target).toContain(res.status);
+      }
+      expect((await fetch(`http://127.0.0.1:${port}/index%2Ehtml`)).status).toBe(404);
+      // Real static assets are still served.
+      expect((await fetch(`http://127.0.0.1:${port}/kyberion-ui.css`)).status).toBe(200);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });
