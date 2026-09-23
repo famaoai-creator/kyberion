@@ -1,0 +1,15 @@
+{
+  "id": "backchannel-resumes",
+  "description": "A short backchannel (「うん」) during playback has no confirming words, so playback resumes after the grace window.",
+  "timeline": [
+    {
+      "at_ms": 0,
+      "event": { "type": "tts_start", "text": "来週の出張の手配について説明します。" }
+    },
+    { "at_ms": 800, "event": { "type": "vad_start", "rms": 3000 } },
+    { "at_ms": 950, "event": { "type": "stt_partial", "text": "うん" } },
+    { "at_ms": 1000, "event": { "type": "vad_silence" } },
+    { "at_ms": 4000, "event": { "type": "tts_end" } }
+  ],
+  "expect": { "commits": [], "hard_stops": 0, "resumes": 1, "cancelled_reasons": [] }
+}
