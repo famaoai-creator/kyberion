@@ -462,7 +462,7 @@ export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
       (payload) =>
         payload?.project_id === PROJECT_ID &&
         payload.organization_id === ORGANIZATION_ID &&
-        payload.tier === 'personal'
+        payload.tier === 'public'
     ),
     runCommand(
       'mission',
