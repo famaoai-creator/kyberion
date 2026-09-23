@@ -1,0 +1,23 @@
+{
+  "id": "no-stt-fallback-hard-stop",
+  "description": "Without streaming STT, sustained speech past the fallback window hard-stops playback.",
+  "options": { "streaming_stt": false },
+  "timeline": [
+    {
+      "at_ms": 0,
+      "event": { "type": "tts_start", "text": "会議の議事録を読み上げます。最初の議題は予算です。" }
+    },
+    { "at_ms": 1000, "event": { "type": "vad_start", "rms": 4000 } },
+    { "at_ms": 2500, "event": { "type": "vad_silence" } },
+    {
+      "at_ms": 2600,
+      "event": { "type": "stt_final", "text": "すみません、別の話をしてもいいですか" }
+    }
+  ],
+  "expect": {
+    "commits": ["すみません、別の話をしてもいいですか"],
+    "hard_stops": 1,
+    "resumes": 0,
+    "cancelled_reasons": ["barge_in"]
+  }
+}

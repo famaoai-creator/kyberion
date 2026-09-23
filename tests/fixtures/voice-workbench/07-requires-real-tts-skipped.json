@@ -1,0 +1,11 @@
+{
+  "id": "requires-real-tts-skipped",
+  "description": "Needs a real TTS backend; without it the scenario must report skipped, never pass.",
+  "requires": ["real_tts"],
+  "timeline": [
+    { "at_ms": 0, "event": { "type": "vad_start" } },
+    { "at_ms": 800, "event": { "type": "vad_silence" } },
+    { "at_ms": 900, "event": { "type": "stt_final", "text": "今日の予定を教えてください" } }
+  ],
+  "expect": { "commits": ["今日の予定を教えてください"] }
+}
