@@ -108,6 +108,24 @@ describe('secret-guard plugin grants (EP-03)', () => {
     expect(getSecret('PLUGIN_OTHER_KEY')).toBe('other-secret-value');
   });
 
+  it('never exposes the raw active secret list to plugin code, but still masks', async () => {
+    getSecret('PLUGIN_OTHER_KEY');
+    expect(getActiveSecrets()).toContain('other-secret-value');
+    withPluginExecutionFrame(frame(['*']), () => {
+      expect(() => getActiveSecrets()).toThrow(
+        "[PLUGIN_GRANT_DENIED] plugin 'secret-plugin' is not granted secrets 'active-secrets'"
+      );
+      expect(() => secretGuard.getActiveSecrets()).toThrow('[PLUGIN_GRANT_DENIED]');
+      expect(secretGuard.maskActiveSecrets('token=other-secret-value;')).toBe(
+        'token=[REDACTED_SECRET];'
+      );
+    });
+    const { redactSensitiveString } = await import('./network.js');
+    expect(
+      withPluginExecutionFrame(frame([]), () => redactSensitiveString('x other-secret-value y'))
+    ).toBe('x [REDACTED_SECRET] y');
+  });
+
   it('never lets plugin code mint auth grants, even with a wildcard secrets grant', async () => {
     withPluginExecutionFrame(frame(['*']), () => {
       expect(() => secretGuard.grantAccess('MSN-X', 'slack')).toThrow('[PLUGIN_GRANT_DENIED]');

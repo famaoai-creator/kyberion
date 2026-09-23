@@ -25,6 +25,7 @@ import * as path from 'node:path';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
+import { isRecord } from './foundation/text.js';
 import {
   createApprovalRequest,
   computeApprovalPayloadHash,
@@ -35,6 +36,7 @@ import {
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  findDisallowedOfficialOnlySeam,
   isLegacyCoworkPermissionsBlock,
   loadPluginPermissionPolicy,
   narrowPluginPermissions,
@@ -49,6 +51,7 @@ import {
 } from './plugin-permissions.js';
 import { isValidTenantSlug } from './foundation/scope.js';
 import { setManagedPluginGrantLookup } from './plugin-grant-runtime.js';
+import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
 
 // Re-exported so install surfaces can render/handle narrowing through this
 // module's existing package export.
@@ -148,13 +151,8 @@ const MANAGED_RECORD_FILENAME = '.kyberion-managed-plugin.json';
 const MANAGED_RECORD_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/managed-plugin-record.schema.json'
 );
-// Keep the Kyberion/Cowork and Claude Code locations first for compatibility,
-// then accept the Agent Plugins v1 portable root manifest.
-const MANIFEST_CANDIDATE_RELATIVE_PATHS = [
-  'plugin-manifest.json',
-  '.claude-plugin/plugin.json',
-  'plugin.json',
-];
+// Shared precedence (plugin-manifest-candidates.ts); a package may contain only one.
+const MANIFEST_CANDIDATE_RELATIVE_PATHS = PLUGIN_MANIFEST_CANDIDATES;
 const DEFAULT_APPROVAL_CHANNEL = 'plugin-install';
 const SHA256_HEX = /^[a-f0-9]{64}$/;
 
@@ -184,9 +182,18 @@ function readPluginManifestSafely(pluginRoot: string): {
   diagnostics: PluginManifestDiagnostic[];
 } {
   const diagnostics: PluginManifestDiagnostic[] = [];
-  const candidatePath = MANIFEST_CANDIDATE_RELATIVE_PATHS.map((rel) =>
-    path.join(pluginRoot, rel)
-  ).find((candidate) => safeExistsSync(candidate));
+  const present = MANIFEST_CANDIDATE_RELATIVE_PATHS.filter((rel) =>
+    safeExistsSync(path.join(pluginRoot, rel))
+  );
+  if (present.length > 1) {
+    diagnostics.push({
+      code: 'manifest_ambiguous',
+      message: `Package contains more than one plugin manifest (${present.join(', ')}); keep exactly one so every reader agrees on it.`,
+      severity: 'error',
+    });
+    return { manifest: null, diagnostics };
+  }
+  const candidatePath = present.length === 1 ? path.join(pluginRoot, present[0]) : undefined;
   if (!candidatePath) {
     diagnostics.push({
       code: 'manifest_missing',
@@ -875,6 +882,18 @@ export function installPluginManaged(params: InstallPluginManagedParams): Manage
           severity: 'error',
         });
       }
+    }
+    const provides = manifest?.raw.provides;
+    const officialOnlySeam = findDisallowedOfficialOnlySeam(
+      isRecord(provides) && Array.isArray(provides.seams) ? provides.seams : [],
+      trust.label
+    );
+    if (officialOnlySeam) {
+      diagnostics.push({
+        code: 'manifest_official_only_seam',
+        message: `Manifest declares the official-only seam '${officialOnlySeam}', which a ${trust.label} plugin may not provide.`,
+        severity: 'error',
+      });
     }
     const brokenManifest = diagnostics.some((d) => d.severity === 'error');
     let narrowed: NarrowPluginPermissionsResult;

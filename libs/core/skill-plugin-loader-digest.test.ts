@@ -36,7 +36,9 @@ afterEach(() => {
 describe('loadAuthorizedSkillPlugins digest re-verification (EP-01)', () => {
   it('refuses to import when the digest changes between authorization and import()', async () => {
     const id = `${process.pid}-${randomUUID()}`;
-    const managedRoot = tracked(pathResolver.shared(`plugins/managed-test-digest-${id}`));
+    const managedRoot = tracked(
+      pathResolver.sharedTmp(`skill-plugin-loader-digest-test/managed-${id}`)
+    );
     const src = tracked(pathResolver.sharedTmp(`skill-plugin-loader-digest-test/src-${id}`));
     const cwd = tracked(pathResolver.sharedTmp(`skill-plugin-loader-digest-test/cwd-${id}`));
     const markerPath = path.join(src, 'marker.log');
