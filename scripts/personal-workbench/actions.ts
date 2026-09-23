@@ -11,6 +11,7 @@ import {
   type OcrRequest,
 } from '@agent/core';
 import { nowIso } from '@agent/core/foundation';
+import { t as catalogT } from '@agent/core/t';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { withLock } from '@agent/core/lock-utils';
 import { assertSafeRepositoryPath } from '@agent/core/path-resolver';
@@ -105,7 +106,7 @@ function writeLocalEmailDraft(
     delivery: 'local-only',
     draft_path: markdownPath,
     json_path: jsonPath,
-    note: 'この pad はローカル下書きだけを作成します。外部メールサービスへは接続しません。',
+    note: catalogT('personal_workbench:note_email_local_draft'),
   };
 }
 
@@ -393,7 +394,7 @@ async function applyCalendarEventUnlocked(input: {
       stage: 'apply',
       status: 'reconciliation_required',
       approval_request_id: approvalRequestId,
-      note: '外部カレンダーへの反映結果が確定していないため、重複作成を避けて停止しました。provider 側を確認してから運用者が reconciliation してください。',
+      note: catalogT('personal_workbench:note_calendar_outcome_unknown'),
     };
   }
 
@@ -411,7 +412,7 @@ async function applyCalendarEventUnlocked(input: {
       status: 'approval_required',
       approval_request_id: approvalRequestId,
       approval_status: 'pending',
-      note: '承認レコードが pending です。承認ワークフローで明示承認してから再実行してください。',
+      note: catalogT('personal_workbench:note_approval_pending'),
     };
   }
   if (approval.status !== 'approved' && approval.status !== 'applied') {
@@ -509,7 +510,7 @@ async function reconcileCalendarEventUnlocked(input: {
       status: 'not_needed',
       approval_request_id: approvalRequestId,
       approval_status: approval.status,
-      note: 'provider 照合は明示承認済みの proposal にだけ実行できます。',
+      note: catalogT('personal_workbench:note_reconcile_needs_approval'),
     };
   }
   const expectedHash = computeApprovalPayloadHash(calendarBindingPayload(proposal.event));
@@ -556,7 +557,7 @@ async function reconcileCalendarEventUnlocked(input: {
       status: 'reconciliation_required',
       approval_request_id: approvalRequestId,
       candidates: 0,
-      note: 'provider の照合が利用できません。proposal は unknown のまま保持します。',
+      note: catalogT('personal_workbench:note_reconcile_unavailable'),
     };
   }
   const matches = matchCalendarReconciliationEvents(proposal, agenda.events);
@@ -568,8 +569,8 @@ async function reconcileCalendarEventUnlocked(input: {
       candidates: matches.length,
       note:
         matches.length === 0
-          ? '一致する provider event が見つかりません。再作成せず運用者の確認を待ちます。'
-          : '複数の provider event が一致しました。誤った確定を避けるため運用者の確認を待ちます。',
+          ? catalogT('personal_workbench:note_reconcile_no_match')
+          : catalogT('personal_workbench:note_reconcile_multiple'),
     };
   }
   const matched = matches[0]!;
