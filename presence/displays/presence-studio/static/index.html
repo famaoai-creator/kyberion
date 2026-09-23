@@ -1,510 +1,45 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{locale}}" data-density="comfortable">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Presence Studio</title>
-    <style>
-      :root {
-        --bg: #091018;
-        --panel: rgba(17, 27, 39, 0.86);
-        --panel-border: rgba(143, 197, 255, 0.14);
-        --accent: #7dd3fc;
-        --accent-strong: #22d3ee;
-        --text: #edf6ff;
-        --muted: #8aa3bd;
-        --warm: #fde68a;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        font-family: "Avenir Next", "Segoe UI", sans-serif;
-        background:
-          radial-gradient(circle at top, rgba(34,211,238,0.18), transparent 32%),
-          radial-gradient(circle at 80% 20%, rgba(253,230,138,0.12), transparent 22%),
-          linear-gradient(180deg, #0a1220 0%, #071019 100%);
-        color: var(--text);
-      }
-      .shell {
-        max-width: 1120px;
-        margin: 0 auto;
-        padding: 32px 20px 48px;
-      }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-        align-items: baseline;
-        margin-bottom: 20px;
-      }
-      .hint-text {
-        display: inline-block;
-        margin-top: 4px;
-        color: rgba(237, 246, 255, 0.45);
-        font-size: 11px;
-        line-height: 1.45;
-      }
-      .eyebrow {
-        font-size: 12px;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--warm);
-      }
-      .header-meta {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-      .conn-stamp {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-      .updated-text {
-        color: var(--muted);
-      }
-      .conn-pill {
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.18em;
-        padding: 3px 8px;
-        border-radius: 999px;
-        border: 1px solid rgba(125, 211, 252, 0.25);
-        background: rgba(34, 211, 238, 0.08);
-        color: rgba(189, 224, 254, 0.85);
-      }
-      .conn-pill.conn-live {
-        border-color: rgba(74, 222, 128, 0.45);
-        background: rgba(74, 222, 128, 0.12);
-        color: rgba(190, 242, 200, 0.95);
-      }
-      .conn-pill.conn-retrying {
-        border-color: rgba(253, 230, 138, 0.45);
-        background: rgba(253, 230, 138, 0.12);
-        color: rgba(254, 240, 178, 0.95);
-      }
-      .conn-pill.conn-offline {
-        border-color: rgba(248, 113, 113, 0.45);
-        background: rgba(248, 113, 113, 0.12);
-        color: rgba(254, 202, 202, 0.95);
-      }
-      .conn-pill.conn-pending {
-        opacity: 0.6;
-      }
-      .identity-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 8px;
-        border: 1px solid rgba(34, 211, 238, 0.35);
-        background: rgba(34, 211, 238, 0.05);
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: rgba(237, 246, 255, 0.85);
-      }
-      .identity-badge.hidden {
-        display: none;
-      }
-      .identity-badge .badge-id {
-        color: rgba(125, 211, 252, 0.95);
-      }
-      .identity-badge .badge-tier {
-        color: rgba(237, 246, 255, 0.55);
-      }
-      .identity-badge .badge-sep {
-        color: rgba(237, 246, 255, 0.3);
-      }
-      .identity-badge.identity-badge-warn {
-        border-color: rgba(253, 230, 138, 0.55);
-        background: rgba(253, 230, 138, 0.1);
-        color: rgba(253, 230, 138, 0.9);
-      }
-      .button-ghost {
-        background: transparent !important;
-        border: 1px solid rgba(255,255,255,0.16) !important;
-      }
-      h1 {
-        margin: 6px 0 0;
-        font-size: clamp(32px, 5vw, 56px);
-        line-height: 0.94;
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: 1.4fr 1fr;
-        gap: 18px;
-      }
-      .panel {
-        background: var(--panel);
-        border: 1px solid var(--panel-border);
-        border-radius: 24px;
-        padding: 20px;
-        backdrop-filter: blur(20px);
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
-      }
-      .avatar {
-        min-height: 420px;
-        display: grid;
-        place-items: center;
-        position: relative;
-        overflow: hidden;
-      }
-      .avatar::before {
-        content: "";
-        position: absolute;
-        inset: 30px;
-        border-radius: 50%;
-        background: radial-gradient(circle, rgba(125,211,252,0.18), transparent 65%);
-        filter: blur(8px);
-      }
-      .orb {
-        position: relative;
-        width: 230px;
-        height: 230px;
-        border-radius: 50%;
-        background: radial-gradient(circle at 35% 30%, #fef3c7 0%, #7dd3fc 30%, #0f172a 70%);
-        box-shadow: 0 0 80px rgba(34, 211, 238, 0.25);
-        display: grid;
-        place-items: center;
-        animation: float 4.5s ease-in-out infinite;
-      }
-      .avatar-media {
-        position: relative;
-        width: min(320px, 78%);
-        aspect-ratio: 1;
-        border-radius: 28px;
-        object-fit: cover;
-        border: 1px solid rgba(125, 211, 252, 0.26);
-        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
-        z-index: 1;
-      }
-      .avatar-media.hidden {
-        display: none;
-      }
-      .avatar-media:not(.hidden) + .orb {
-        display: none;
-      }
-      .expression {
-        position: absolute;
-        bottom: 22px;
-        left: 22px;
-        padding: 8px 12px;
-        border-radius: 999px;
-        background: rgba(0,0,0,0.34);
-        color: var(--warm);
-        font-size: 13px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      .status {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 14px;
-        border-radius: 999px;
-        background: rgba(125,211,252,0.1);
-        color: var(--accent);
-        font-size: 14px;
-      }
-      .dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: currentColor;
-        box-shadow: 0 0 16px currentColor;
-      }
-      .subtitle {
-        margin-top: 18px;
-        font-size: clamp(20px, 3vw, 34px);
-        line-height: 1.18;
-      }
-      .list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .item {
-        padding: 14px 16px;
-        border-radius: 16px;
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.05);
-      }
-      .label {
-        font-size: 12px;
-        letter-spacing: 0.16em;
-        color: var(--muted);
-        text-transform: uppercase;
-        margin-bottom: 8px;
-      }
-      .chips {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-      }
-      .chip {
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: rgba(125,211,252,0.1);
-        border: 1px solid rgba(125,211,252,0.18);
-        color: var(--accent);
-        font-size: 12px;
-      }
-      .candidate-index {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 20px;
-        height: 20px;
-        padding: 0 6px;
-        border-radius: 999px;
-        background: rgba(253, 230, 138, 0.12);
-        border: 1px solid rgba(253, 230, 138, 0.28);
-        color: var(--warm);
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.06em;
-      }
-      .capability-card {
-        display: grid;
-        gap: 12px;
-      }
-      .small {
-        color: var(--muted);
-        font-size: 13px;
-        line-height: 1.45;
-      }
-      .button-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        margin-top: 10px;
-        text-decoration: none;
-      }
-      .task-session-entry {
-        cursor: pointer;
-      }
-      .task-session-entry.selected {
-        border-color: rgba(253, 230, 138, 0.32);
-        background: rgba(253, 230, 138, 0.06);
-      }
-      .history-list {
-        display: grid;
-        gap: 8px;
-        margin-top: 12px;
-      }
-      .row {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        align-items: center;
-      }
-      .mono {
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        color: var(--muted);
-        font-size: 12px;
-      }
-      .footer {
-        margin-top: 16px;
-        color: var(--muted);
-        font-size: 13px;
-      }
-      .controls {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        margin-top: 18px;
-        flex-wrap: wrap;
-      }
-      .button {
-        border: 1px solid rgba(125, 211, 252, 0.25);
-        background: rgba(125, 211, 252, 0.1);
-        color: var(--text);
-        border-radius: 999px;
-        padding: 10px 16px;
-        font: inherit;
-        cursor: pointer;
-      }
-      .button[disabled] {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-      .button.active {
-        background: rgba(253, 230, 138, 0.14);
-        border-color: rgba(253, 230, 138, 0.42);
-        color: var(--warm);
-      }
-      .hint {
-        color: #93c5fd;
-        font-size: 13px;
-      }
-      .select {
-        border: 1px solid rgba(125, 211, 252, 0.35);
-        background: rgba(13, 23, 36, 0.95);
-        color: #edf6ff;
-        border-radius: 12px;
-        padding: 10px 12px;
-        font: inherit;
-        min-width: 240px;
-      }
-      .text-input {
-        border: 1px solid rgba(125, 211, 252, 0.35);
-        background: rgba(13, 23, 36, 0.95);
-        color: #edf6ff;
-        border-radius: 12px;
-        padding: 10px 12px;
-        font: inherit;
-        min-width: 240px;
-      }
-      .notes-area {
-        width: 100%;
-        min-height: 180px;
-        resize: vertical;
-        border: 1px solid rgba(125, 211, 252, 0.35);
-        background: rgba(13, 23, 36, 0.95);
-        color: #f8fafc;
-        border-radius: 16px;
-        padding: 14px 16px;
-        font: inherit;
-        line-height: 1.55;
-      }
-      .notes-area::placeholder {
-        color: rgba(226, 232, 240, 0.5);
-      }
-      .artifact-view {
-        width: 100%;
-        min-height: 180px;
-        white-space: pre-wrap;
-        overflow: auto;
-        border: 1px solid rgba(125, 211, 252, 0.35);
-        background: rgba(13, 23, 36, 0.95);
-        color: #f8fafc;
-        border-radius: 16px;
-        padding: 14px 16px;
-        font: inherit;
-        line-height: 1.55;
-      }
-      .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        background: rgba(2, 8, 20, 0.72);
-        backdrop-filter: blur(10px);
-        z-index: 40;
-        padding: 24px;
-      }
-      .modal-backdrop.open {
-        display: flex;
-      }
-      .modal {
-        width: min(560px, 100%);
-        border: 1px solid rgba(125, 211, 252, 0.28);
-        background: rgba(10, 18, 28, 0.96);
-        border-radius: 24px;
-        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
-        padding: 22px;
-      }
-      .modal-title {
-        font-size: 1.12rem;
-        font-weight: 700;
-        margin-bottom: 8px;
-      }
-      .modal-body {
-        color: var(--muted);
-        line-height: 1.55;
-        font-size: 0.95rem;
-        max-height: min(48vh, 420px);
-        overflow: auto;
-        padding-right: 6px;
-      }
-      .modal-summary {
-        display: grid;
-        gap: 12px;
-      }
-      .modal-summary-grid {
-        display: grid;
-        gap: 6px;
-        grid-template-columns: 1fr;
-      }
-      .modal-summary-row {
-        display: grid;
-        gap: 4px;
-      }
-      .modal-summary-label {
-        color: var(--muted-2);
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-      .modal-summary-value {
-        color: var(--text);
-        word-break: break-word;
-      }
-      .modal-summary-preview {
-        white-space: pre-wrap;
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(125, 211, 252, 0.14);
-        border-radius: 16px;
-        padding: 14px;
-      }
-      .modal-note {
-        margin-top: 6px;
-        color: var(--muted-2);
-        font-size: 0.82rem;
-        line-height: 1.45;
-      }
-      .modal-shortcuts {
-        margin-top: 4px;
-        color: var(--muted-2);
-        font-size: 0.78rem;
-        line-height: 1.45;
-      }
-      .modal-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        margin-top: 18px;
-        flex-wrap: wrap;
-      }
-      @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-12px); }
-      }
-      @media (max-width: 860px) {
-        .grid { grid-template-columns: 1fr; }
-        .avatar { min-height: 320px; }
-        .controls { align-items: stretch; }
-        .controls .button,
-        .controls .select,
-        .controls .text-input {
-          width: 100%;
-          min-width: 0;
-        }
-      }
-      @media (max-width: 560px) {
-        .panel { padding: 16px; }
-        .controls { gap: 10px; }
-      }
-    </style>
-    <!-- Kyberion Design System (DS-01 canonical tokens) -->
+    <title>{{t:presence_studio:work_page_title}} — Kyberion</title>
+    <!-- UI-06: theme + language applied before first paint (kyberion.ui.theme / kyberion.ui.locale) -->
+    <script src="/front-desk-prefs.js"></script>
+    <!-- Kyberion Design System: generated --kb-ui-* tokens + kyberion-base component classes,
+         then the presence-studio base (design-system.css) and this page's panels (work.css). -->
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/kyberion-ui.css" />
     <link rel="stylesheet" href="./design-system.css" />
-    <link rel="stylesheet" href="/api/design-tokens.css" />
     <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
     <link rel="stylesheet" href="/front-desk-rail.css" />
+    <link rel="stylesheet" href="/work.css" />
   </head>
   <body>
-    <div class="fd-layout">
-      <nav id="front-desk-rail" class="front-desk-rail"></nav>
-      <div class="fd-content">
+    <div class="kb-app-shell" data-density="comfortable">
+      <div class="kb-app-shell__nav" id="front-desk-rail">{{partial:rail}}</div>
+      <main class="kb-app-shell__main">
+        <header class="kb-page-header">
+          <div class="kb-page-header__titles">
+            <h1 class="kb-page-header__title">
+              {{t:presence_studio:work_page_title}}
+              <span class="kb-badge" data-role="presence-studio"
+                >{{t:presence_studio:shell_role_badge}}</span
+              >
+            </h1>
+            <p
+              class="kb-page-header__subtitle"
+              data-tagline-key="surface:presence_studio_surface_tagline"
+            >
+              {{t:surface:presence_studio_surface_tagline}}
+            </p>
+          </div>
+          {{partial:shell-controls}}
+        </header>
     <div class="shell">
       <div class="header">
         <div>
-          <div class="eyebrow" data-tagline-key="surface:presence_studio_surface_tagline">相棒 — いっしょに作業するワークベンチ</div>
-          <h1 id="title">Presence Studio</h1>
+          <h2 id="title" class="work-title">Presence Studio</h2>
         </div>
         <div class="header-meta">
           <div id="identity-badge" class="identity-badge hidden" title=""></div>
@@ -716,11 +251,11 @@
         <div class="list" id="memory-detail"></div>
       </div>
     </div>
-      </div>
+      </main>
     </div>
-    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
-    <script src="/front-desk-rail.js"></script>
-    <script>
+    <!-- FD-00 / UI-05: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script type="module" src="/front-desk-rail.js"></script>
+    <script type="module">
       if (window.FrontDeskRail) {
         // FD-02: this page moved from `/` to `/work`; `/` is now the home.html
         // rail's own page, so nothing here should render as "current".
@@ -1663,7 +1198,9 @@
       }
 
       function normalizeUiLocale(value) {
-        return String(value || navigator.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
+        // UI-06: the front-desk language choice (front-desk-prefs.js) wins.
+        const preferred = window.KyberionPrefs ? window.KyberionPrefs.locale() : "";
+        return String(value || preferred || navigator.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
       }
 
       let presenceStudioVocabulary = {};

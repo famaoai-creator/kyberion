@@ -1,370 +1,216 @@
 /*
- * ask.css — FD-03: the presence-studio "頼む" (ask) page.
- *
- * Tokens come from design-tokens.css (--kb-*) only. Responsive breakpoint
- * matches front-desk-rail.css / home.css / progress.css (720px: rail becomes
- * a bottom tab bar, and the two ask columns stack — conversation first, the
- * "about this request" panel below it).
+ * FD-03 / UI-06 ask page ("頼む"). Cards, buttons, inputs and badges are
+ * kyberion-base classes (`.kb-section`, `.kb-btn`, `.kb-input`, `.kb-badge`);
+ * this file lays out the two columns and the conversation bubbles.
+ * Tokens: `--kb-ui-*` only.
  */
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: var(--kb-font-sans, Inter, 'Noto Sans JP', sans-serif);
-  background: var(--kb-bg-main, #ffffff);
-  color: var(--kb-text-primary, #0f172a);
-}
-
-.ask-shell {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 20px 24px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  height: 100vh;
-}
-
-.ask-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex: 0 0 auto;
-}
-
-.ask-header-spacer {
-  flex: 1 1 auto;
-}
-
-.ask-handsfree-toggle {
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--kb-border, #e2e8f0);
-  background: var(--kb-surface, #f1f5f9);
-  color: var(--kb-text-primary, #0f172a);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.ask-handsfree-toggle[aria-pressed='true'] {
-  background: var(--kb-accent, #0066cc);
-  border-color: var(--kb-accent, #0066cc);
-  color: #ffffff;
-}
-
 .ask-columns {
-  display: flex;
-  gap: 20px;
-  align-items: stretch;
-  flex: 1 1 auto;
-  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  align-items: start;
+  gap: var(--kb-ui-space-5);
 }
 
-.ask-conversation-col {
-  flex: 2 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--kb-border, #e2e8f0);
-  border-radius: 14px;
-  background: var(--kb-bg-main, #ffffff);
-  padding: 16px 18px;
-  min-height: 0;
+.ask-conversation {
+  min-height: min(72vh, 760px);
 }
 
 .ask-conversation-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+  max-height: 60vh;
   overflow-y: auto;
-  padding-bottom: 8px;
+}
+
+.ask-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2);
 }
 
 .ask-date-separator {
-  text-align: center;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--kb-muted-text, #475569);
-  margin: 4px 0 14px;
+  padding: 0 var(--kb-ui-space-3);
+  border-radius: 999px;
+  background: var(--kb-ui-surface-sunken);
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-xs);
 }
 
 .ask-turns {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--kb-ui-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .ask-turn {
   display: flex;
   flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  max-width: min(640px, 88%);
 }
 
 .ask-turn-user {
+  align-self: flex-end;
   align-items: flex-end;
 }
 
 .ask-turn-companion {
+  align-self: flex-start;
   align-items: flex-start;
 }
 
 .ask-bubble {
-  max-width: 80%;
-  padding: 10px 14px;
-  border-radius: 14px;
-  font-size: 14px;
-  line-height: 1.5;
+  padding: var(--kb-ui-space-3) var(--kb-ui-space-4);
+  border-radius: var(--kb-ui-radius-lg);
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .ask-turn-user .ask-bubble {
-  background: var(--kb-primary, #0f172a);
-  color: #ffffff;
-  border-bottom-right-radius: 4px;
+  background: var(--kb-ui-accent);
+  color: var(--kb-ui-text-on-accent);
 }
 
 .ask-turn-companion .ask-bubble {
-  background: var(--kb-bg-main, #ffffff);
-  border: 1px solid var(--kb-border, #e2e8f0);
-  color: var(--kb-text-primary, #0f172a);
-  border-bottom-left-radius: 4px;
-}
-
-.ask-turn-shape {
-  display: inline-block;
-  margin-top: 6px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--kb-accent-text, #005a9c);
-  background: #e0efff;
+  background: var(--kb-ui-surface-sunken);
+  border: 1px solid var(--kb-ui-border);
+  color: var(--kb-ui-text);
 }
 
 .ask-turn-next-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.ask-quick-reply {
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--kb-accent, #0066cc);
-  background: #ffffff;
-  color: var(--kb-accent-text, #005a9c);
-  font-size: 13px;
-  cursor: pointer;
+  gap: var(--kb-ui-space-2);
 }
 
 .ask-empty {
-  margin: 24px 0 0;
-  font-size: 14px;
+  margin: auto 0;
+  padding: var(--kb-ui-space-6) var(--kb-ui-space-4);
+  color: var(--kb-ui-text-muted);
   text-align: center;
-  color: var(--kb-muted-text, #475569);
 }
 
 .ask-input-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-  margin-top: 10px;
+  gap: var(--kb-ui-space-2);
 }
 
-.ask-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--kb-border, #e2e8f0);
-  background: var(--kb-surface, #f1f5f9);
-  color: var(--kb-text-primary, #0f172a);
-  font-size: 15px;
-  font-family: inherit;
+.ask-input.kb-input {
+  flex: 1;
 }
 
-.ask-input:focus {
-  outline: 2px solid var(--kb-accent, #0066cc);
-  outline-offset: 1px;
-}
-
-.ask-icon-button {
-  flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  border: 1px solid var(--kb-border, #e2e8f0);
-  background: var(--kb-surface, #f1f5f9);
-  color: var(--kb-text-primary, #0f172a);
-  cursor: pointer;
-}
-
-.ask-icon-button[aria-pressed='true'] {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #991b1b;
-}
-
-.ask-send-button {
-  background: var(--kb-accent, #0066cc);
-  border-color: var(--kb-accent, #0066cc);
-  color: #ffffff;
+.ask-icon-button.kb-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
 }
 
 .ask-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.ask-icon-button[aria-pressed='true'] {
+  background: var(--kb-ui-accent-soft);
+  border-color: var(--kb-ui-accent);
+  color: var(--kb-ui-accent-text);
 }
 
 .ask-chips {
-  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  flex: 0 0 auto;
+  gap: var(--kb-ui-space-2);
 }
 
-.ask-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--kb-border, #e2e8f0);
-  background: var(--kb-surface, #f1f5f9);
-  color: var(--kb-text-primary, #0f172a);
-  font-size: 13px;
-  cursor: pointer;
+.ask-chip.kb-btn {
+  font-weight: 500;
 }
 
-.ask-chip .ask-icon {
-  width: 16px;
-  height: 16px;
+.ask-handsfree-toggle[aria-pressed='true'] {
+  background: var(--kb-ui-accent-soft);
+  border-color: var(--kb-ui-accent);
+  color: var(--kb-ui-accent-text);
 }
 
-.ask-about-col {
-  flex: 1 1 0;
-  min-width: 260px;
+.ask-about {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
-}
-
-.hearing-canvas {
-  display: block;
-  width: 100%;
-  min-height: 360px;
-  margin-top: 14px;
-  border: 1px solid var(--kb-border, #e2e8f0);
-  border-radius: 10px;
-  background: var(--kb-bg-main, #ffffff);
-}
-
-.ask-card {
-  background: var(--kb-bg-main, #ffffff);
-  border: 1px solid var(--kb-border, #e2e8f0);
-  border-radius: 14px;
-  padding: 16px 18px;
-}
-
-.ask-card h2 {
-  margin: 0 0 10px;
-  font-size: 15px;
-  font-weight: 600;
+  gap: var(--kb-ui-space-4);
 }
 
 .ask-about-block {
-  margin-top: 10px;
-}
-
-.ask-about-block:first-of-type {
-  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .ask-about-label {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--kb-ui-font-size-xs);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--kb-muted-text, #475569);
+  color: var(--kb-ui-text-muted);
 }
 
 .ask-about-text {
-  margin: 4px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--kb-text-primary, #0f172a);
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  overflow-wrap: anywhere;
 }
 
 .ask-about-empty {
   margin: 0;
-  font-size: 13px;
-  color: var(--kb-muted-text, #475569);
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
 }
 
 .ask-recent-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .ask-recent-row {
   display: block;
-  padding: 8px 0;
-  border-top: 1px solid var(--kb-border, #e2e8f0);
-  color: inherit;
+  padding: var(--kb-ui-space-2) 0;
+  border-bottom: 1px solid var(--kb-ui-border);
+  color: var(--kb-ui-text);
+  font-size: var(--kb-ui-font-size-sm);
   text-decoration: none;
-  font-size: 13px;
 }
 
-.ask-recent-list li:first-child .ask-recent-row {
-  border-top: none;
-  padding-top: 0;
+.ask-recent-list li:last-child .ask-recent-row {
+  border-bottom: 0;
 }
 
-.hidden {
-  display: none !important;
+.ask-recent-row:hover {
+  color: var(--kb-ui-accent-text);
+  text-decoration: underline;
 }
 
-@media (max-width: 720px) {
-  .ask-shell {
-    height: auto;
-    padding: 16px 16px 72px;
-  }
+.hearing-canvas {
+  width: 100%;
+  min-height: 320px;
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface);
+}
 
+@media (max-width: 1080px) {
   .ask-columns {
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  /* Desktop uses `flex: 1 1 0` on both columns so they share the row's
-   * fixed height evenly. Stacked, the shell is auto-height (content-sized),
-   * so a `flex-basis: 0` item has nothing to grow into and collapses to 0 —
-   * switch both to size from their own content instead. */
-  .ask-conversation-col,
-  .ask-about-col {
-    flex: 0 0 auto;
-  }
-
-  .ask-conversation-col {
-    min-height: 60vh;
+  .ask-conversation {
+    min-height: 0;
   }
 }

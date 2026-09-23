@@ -55,9 +55,11 @@
       .replace(/'/g, '&#39;');
   }
 
+  // UI-06: the viewer's stored language choice (`front-desk-prefs.js`),
+  // falling back to the language the page was served in.
   function normalizeLocale() {
-    var raw = String((navigator && navigator.language) || 'en').toLowerCase();
-    return raw.indexOf('ja') === 0 ? 'ja' : 'en';
+    if (window.KyberionPrefs) return window.KyberionPrefs.locale();
+    return document.documentElement.getAttribute('lang') === 'ja' ? 'ja' : 'en';
   }
 
   function fetchJson(url, options) {
@@ -357,6 +359,9 @@
     if (titleEl) titleEl.textContent = vt(state.vocab, 'front_desk:ask_recent');
     var listEl = document.getElementById('recent-list');
     if (!listEl) return;
+    // UI-06: no recent requests -> no empty card.
+    var card = document.getElementById('recent-card');
+    if (card) card.classList.toggle('hidden', !(items && items.length));
     listEl.innerHTML = (items || [])
       .slice(0, 3)
       .map(function (item) {
@@ -382,7 +387,7 @@
     var shapeLabel = vt(state.vocab, turnShapeLabelKey(turn.shape)) || humanizeSlug(turn.shape);
     var shapeHtml =
       turn.role === 'companion' && turn.shape && turn.shape !== 'reply'
-        ? '<span class="ask-turn-shape">' + escapeHtml(shapeLabel) + '</span>'
+        ? '<span class="kb-badge ask-turn-shape">' + escapeHtml(shapeLabel) + '</span>'
         : '';
     var actionsHtml = '';
     if (turn.role === 'companion' && Array.isArray(turn.next_actions) && turn.next_actions.length) {
@@ -392,7 +397,7 @@
           .map(function (action) {
             var label = quickReplyLabel(action);
             return (
-              '<button type="button" class="ask-quick-reply" data-quick-reply="' +
+              '<button type="button" class="kb-btn kb-btn--secondary ask-quick-reply" data-quick-reply="' +
               escapeHtml(label) +
               '">' +
               escapeHtml(label) +

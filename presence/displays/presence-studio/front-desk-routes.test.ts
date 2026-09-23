@@ -423,7 +423,9 @@ describe('static rail mount (Deliverable 3)', () => {
     expect(homeHtml).toContain('front-desk-rail.css');
     expect(homeHtml).toContain('front-desk-rail.js');
     expect(homeHtml).toContain("current: 'home'");
-    expect(homeHtml).toContain('<title>ホーム — Kyberion</title>');
+    // UI-06: the page title is a server-rendered vocabulary placeholder
+    // (see front-desk-pages.test.ts), not a hardcoded Japanese literal.
+    expect(homeHtml).toContain('<title>{{t:front_desk:nav_home}} — Kyberion</title>');
 
     const indexHtml = readRepoFile('presence/displays/presence-studio/static/index.html');
     expect(indexHtml).toContain('id="front-desk-rail"');

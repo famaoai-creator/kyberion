@@ -1,120 +1,107 @@
 /*
- * help.css — FD-08: the "使い方を見る" page.
- *
- * Tokens come from design-tokens.css (--kb-*) only. Responsive breakpoint
- * matches front-desk-rail.css (720px: rail becomes a bottom tab bar).
+ * FD-08 / HT-05 / UI-06 help page ("使い方を見る"). Cards, buttons and
+ * badges are kyberion-base classes; this file lays out the training track
+ * list and lessons. Tokens: `--kb-ui-*` only.
  */
 
-* {
-  box-sizing: border-box;
+.help-tracks #training-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--kb-ui-space-4);
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: var(--kb-font-sans, Inter, 'Noto Sans JP', sans-serif);
-  background: var(--kb-bg-main, #ffffff);
-  color: var(--kb-text-primary, #0f172a);
-}
-
-.help-shell {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 32px 24px 56px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.help-title {
-  margin: 0;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--kb-text-primary, #0f172a);
-}
-
-.help-card {
-  background: var(--kb-bg-main, #ffffff);
-  border: 1px solid var(--kb-border, #e2e8f0);
-  border-radius: 14px;
-  padding: 20px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.help-card-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--kb-text-primary, #0f172a);
-}
-
-.help-card-sub {
-  margin: 0;
-  font-size: 14px;
-  color: var(--kb-muted-text, #475569);
-}
-
-.help-card-link {
-  align-self: flex-start;
-  margin-top: 4px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: var(--kb-primary, #0b5fff);
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.help-card-link:hover {
-  opacity: 0.9;
-}
-
-.help-tracks {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.help-track-card {
-  text-decoration: none;
-  color: inherit;
-}
-.help-track-card h2,
+.help-training-title,
+.help-back,
 .help-track-title,
-.help-training-title {
+.help-track-audience,
+.help-lesson {
+  grid-column: 1 / -1;
+}
+
+.help-training-title,
+.help-track-title {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  font-weight: 600;
+}
+
+.help-track-audience {
+  margin: 0;
+  color: var(--kb-ui-text-muted);
+}
+
+.help-back {
+  justify-self: start;
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+/* Track cards (`a.help-card.help-track-card`, rendered by help.js). */
+.help-track-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-5);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-lg);
+  box-shadow: var(--kb-ui-shadow-sm);
+  color: var(--kb-ui-text);
+  text-decoration: none;
+}
+
+.help-track-card:hover {
+  border-color: var(--kb-ui-accent);
+}
+
+.help-track-card h2 {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+}
+
+.help-track-card p {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.help-track-card .help-card-link {
+  margin-top: auto;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+  color: var(--kb-ui-accent-text);
+}
+
+.help-lesson {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-5);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-lg);
+}
+
+.help-lesson h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  margin: 0;
+  font-size: var(--kb-ui-font-size-md);
+}
+
+.help-lesson p {
   margin: 0;
 }
-.help-track-audience,
-.help-check {
-  color: var(--kb-muted-text, #475569);
+
+.help-lesson-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-2);
 }
-.help-lesson {
-  border-top: 1px solid var(--kb-border, #e2e8f0);
-  padding: 18px 0;
-}
-.help-lesson h3 {
-  margin: 0 0 6px;
-}
-.help-lesson p {
-  margin: 6px 0 14px;
-}
-.help-back {
-  color: var(--kb-primary, #0b5fff);
-}
-.help-mark-done {
-  border: none;
-  cursor: pointer;
-  margin-left: 8px;
-  background: var(--kb-muted-text, #475569);
-}
-.help-mark-done:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
+
+.help-check,
 .help-mark-done-message {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--kb-muted-text, #475569);
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
 }
