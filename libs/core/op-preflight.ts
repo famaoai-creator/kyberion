@@ -61,8 +61,20 @@ export interface OpPreflightGuard {
     | Promise<{ decision?: 'block' | 'ask'; reason?: string; terminate?: boolean } | void>;
 }
 
+/**
+ * Fires exactly once per call, after the decision is final (every listener
+ * and guard has run, or an earlier stage was terminal). Observers cannot
+ * change the decision — the callback returns nothing — and a throwing
+ * observer never affects the call or other observers.
+ */
+export type OpPreflightOutcomeObserver = (
+  call: OpPreflightCall,
+  result: OpPreflightResult & { input: Record<string, unknown> }
+) => void;
+
 const listeners = new Map<string, OpPreflightListener>();
 const guards = new Map<string, OpPreflightGuard>();
+const outcomeObservers = new Set<OpPreflightOutcomeObserver>();
 
 function ordered<T extends { id: string; order?: number }>(entries: Iterable<T>): T[] {
   return [...entries].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.id.localeCompare(b.id));
@@ -89,6 +101,17 @@ export function registerOpGuard(guard: OpPreflightGuard): () => void {
   return () => guards.delete(id);
 }
 
+/**
+ * Register a hook that observes the final decision for every call, after all
+ * guards (including built-ins) have run. Returns a disposer.
+ */
+export function registerOpPreflightOutcomeObserver(
+  observer: OpPreflightOutcomeObserver
+): () => void {
+  outcomeObservers.add(observer);
+  return () => outcomeObservers.delete(observer);
+}
+
 export function listOpPreflightListeners(): OpPreflightListener[] {
   return ordered(listeners.values());
 }
@@ -101,6 +124,7 @@ export function listOpGuards(): OpPreflightGuard[] {
 export function resetOpPreflight(): void {
   listeners.clear();
   guards.clear();
+  outcomeObservers.clear();
 }
 
 function approvalGuard(
@@ -146,7 +170,9 @@ export async function runOpPreflight(
   call: OpPreflightCall
 ): Promise<OpPreflightResult & { input: Record<string, unknown> }> {
   const pluginDenied = pluginGrantOpsGuard(call);
-  if (pluginDenied) return assertPreflightResult({ ...pluginDenied, input: { ...call.params } });
+  if (pluginDenied) {
+    return finalizePreflightResult(call, { ...pluginDenied, input: { ...call.params } });
+  }
   let input = { ...call.params };
   const originalInput = input;
   const listenerIds: string[] = [];
@@ -160,7 +186,7 @@ export async function runOpPreflight(
     if (result.repaired_input) input = { ...input, ...result.repaired_input };
     if (result.terminate !== undefined) terminate = result.terminate;
     if (result.decision === 'block' || result.decision === 'ask') {
-      return assertPreflightResult({
+      return finalizePreflightResult(call, {
         decision: result.decision,
         ...(result.reason ? { reason: result.reason } : {}),
         ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
@@ -174,7 +200,7 @@ export async function runOpPreflight(
 
   const builtInApproval = approvalGuard(call);
   if (builtInApproval) {
-    return assertPreflightResult({
+    return finalizePreflightResult(call, {
       ...builtInApproval,
       ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
       ...(terminate !== undefined ? { terminate } : {}),
@@ -189,7 +215,7 @@ export async function runOpPreflight(
     const result = await guard.check(call, input);
     if (!result) continue;
     if (result?.decision === 'block' || result?.decision === 'ask') {
-      return assertPreflightResult({
+      return finalizePreflightResult(call, {
         decision: result.decision,
         ...(result.reason ? { reason: result.reason } : {}),
         ...(result.terminate !== undefined ? { terminate: result.terminate } : {}),
@@ -201,7 +227,7 @@ export async function runOpPreflight(
     }
   }
 
-  return assertPreflightResult({
+  return finalizePreflightResult(call, {
     decision: 'allow',
     ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
     ...(terminate !== undefined ? { terminate } : {}),
@@ -222,7 +248,9 @@ export function runOpPreflightSync(
   call: OpPreflightCall
 ): OpPreflightResult & { input: Record<string, unknown> } {
   const pluginDenied = pluginGrantOpsGuard(call);
-  if (pluginDenied) return assertPreflightResult({ ...pluginDenied, input: { ...call.params } });
+  if (pluginDenied) {
+    return finalizePreflightResult(call, { ...pluginDenied, input: { ...call.params } });
+  }
   let input = { ...call.params };
   const originalInput = input;
   const listenerIds: string[] = [];
@@ -241,7 +269,7 @@ export function runOpPreflightSync(
     if (result.repaired_input) input = { ...input, ...result.repaired_input };
     if (result.terminate !== undefined) terminate = result.terminate;
     if (result.decision === 'block' || result.decision === 'ask') {
-      return assertPreflightResult({
+      return finalizePreflightResult(call, {
         decision: result.decision,
         ...(result.reason ? { reason: result.reason } : {}),
         ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
@@ -255,7 +283,7 @@ export function runOpPreflightSync(
 
   const builtInApproval = approvalGuard(call);
   if (builtInApproval) {
-    return assertPreflightResult({
+    return finalizePreflightResult(call, {
       ...builtInApproval,
       ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
       ...(terminate !== undefined ? { terminate } : {}),
@@ -273,7 +301,7 @@ export function runOpPreflightSync(
     }
     if (!result) continue;
     if (result.decision === 'block' || result.decision === 'ask') {
-      return assertPreflightResult({
+      return finalizePreflightResult(call, {
         decision: result.decision,
         ...(result.reason ? { reason: result.reason } : {}),
         ...(result.terminate !== undefined ? { terminate: result.terminate } : {}),
@@ -285,7 +313,7 @@ export function runOpPreflightSync(
     }
   }
 
-  return assertPreflightResult({
+  return finalizePreflightResult(call, {
     decision: 'allow',
     ...(inputChanged(originalInput, input) ? { repaired_input: input } : {}),
     ...(terminate !== undefined ? { terminate } : {}),
@@ -305,6 +333,32 @@ function assertPreflightResult(
   assertModuleInvariant('op-preflight', 'decision-domain', result);
   assertModuleInvariant('op-preflight', 'input-record', result);
   return result;
+}
+
+/**
+ * Every return path funnels through here: validate the result, then notify
+ * outcome observers exactly once with the now-final decision. Observers run
+ * after the fact and cannot influence what is returned.
+ */
+function finalizePreflightResult(
+  call: OpPreflightCall,
+  result: OpPreflightResult & { input: Record<string, unknown> }
+): OpPreflightResult & { input: Record<string, unknown> } {
+  const asserted = assertPreflightResult(result);
+  if (outcomeObservers.size > 0) {
+    // Observers see a frozen snapshot, never the object returned to the
+    // caller, so a mutation attempt (throws under strict-mode ESM, or is a
+    // silent no-op) can never change what the call site sees.
+    const snapshot = Object.freeze({ ...asserted });
+    for (const observer of outcomeObservers) {
+      try {
+        observer(call, snapshot);
+      } catch (error) {
+        console.error('[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR]', error);
+      }
+    }
+  }
+  return asserted;
 }
 
 function inputChanged(

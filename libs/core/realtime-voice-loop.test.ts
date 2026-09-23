@@ -613,7 +613,7 @@ describe('realtime voice loop', () => {
         },
         vad: { rmsThreshold: 800, endpointMs: 700 },
         streamingStt: scriptedStreamingStt('こんにちは元気です', 'こんにちは、元気です。'),
-        speculativeReply: { enabled: true },
+        speculativeReply: { enabled: true, powerSource: 'ac', costTier: 'free' },
         maxTurns: 1,
         transcribe: async () => 'batch-unused',
         reply: async () => 'unused',
@@ -665,7 +665,7 @@ describe('realtime voice loop', () => {
         },
         vad: { rmsThreshold: 800, endpointMs: 700 },
         streamingStt: scriptedStreamingStt('明日の予定', '明日の予定を教えて'),
-        speculativeReply: { enabled: true },
+        speculativeReply: { enabled: true, powerSource: 'ac', costTier: 'free' },
         maxTurns: 1,
         transcribe: async () => 'batch-unused',
         reply: async () => 'unused',
@@ -737,6 +737,36 @@ describe('realtime voice loop', () => {
       vad: { rmsThreshold: 800, endpointMs: 700 },
       streamingStt: scriptedStreamingStt(null, 'unused'),
       speculativeReply: { enabled: true, powerSource: 'ac', costTier: 'metered' },
+      transcribe: async () => 'unused',
+      reply: async () => 'unused',
+      streamReply: async () => 'unused',
+      synthesizeSegment: async () => '/tmp/fake.wav',
+      play: () => immediateHandle(),
+      onEvent: (event) => events.push(event),
+    });
+    await handle.done;
+    expect(events).toContainEqual({
+      kind: 'degraded',
+      what: 'speculative_reply',
+      reason: 'metered guard; disabled',
+    });
+  });
+
+  it('fails closed (not open) when a caller requests speculation without wiring powerSource/costTier (N8)', async () => {
+    const events: RealtimeVoiceLoopEvent[] = [];
+    const handle = await startRealtimeVoiceLoop({
+      recordingDir: testDir,
+      consent: { requireRecordingConsent: false },
+      mic: {
+        command: [process.execPath, '-e', 'process.stdout.write(Buffer.alloc(3200))'],
+        sampleRateHz: 16000,
+        chunkMs: 100,
+      },
+      vad: { rmsThreshold: 800, endpointMs: 700 },
+      streamingStt: scriptedStreamingStt(null, 'unused'),
+      // No powerSource/costTier: a caller of the library that merely flips
+      // `enabled: true` must not get speculation on by default.
+      speculativeReply: { enabled: true },
       transcribe: async () => 'unused',
       reply: async () => 'unused',
       streamReply: async () => 'unused',

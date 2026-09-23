@@ -75,7 +75,7 @@ export interface SpeculativeReplyPolicy {
   /** Minimum partial transcript length worth speculating on. */
   minPartialChars: number;
   /** Why the policy is disabled, when it is. */
-  disabled_reason?: 'default_off' | 'battery' | 'metered';
+  disabled_reason?: 'default_off' | 'battery' | 'metered' | 'power_unknown';
 }
 
 export interface ResolveSpeculativePolicyInput {
@@ -86,6 +86,13 @@ export interface ResolveSpeculativePolicyInput {
   costTier?: VoiceCostTier;
   tentativeSilenceMs?: number;
   minPartialChars?: number;
+  /**
+   * A caller that has its own reason to trust a non-AC/unknown power source
+   * (or that has no battery, e.g. a desktop/server) may opt back in. Missing
+   * powerSource/costTier otherwise fail closed: a caller that flips the
+   * option on without wiring the probes must not silently get speculation.
+   */
+  allowUnknownPower?: boolean;
 }
 
 export const DEFAULT_TENTATIVE_SILENCE_MS = 250;
@@ -94,6 +101,14 @@ export const DEFAULT_MIN_PARTIAL_CHARS = 4;
 function envEnabled(env: Record<string, string | undefined> | undefined): boolean {
   const raw = getRegisteredEnvText(SPECULATIVE_REPLY_ENV, env ? { env } : {});
   return raw !== undefined && /^(1|true|yes|on)$/i.test(raw.trim());
+}
+
+/** Whether speculation was requested at all, before any power/cost guard runs. */
+export function isSpeculativeReplyRequested(
+  option: boolean | undefined,
+  env?: Record<string, string | undefined>
+): boolean {
+  return option ?? envEnabled(env);
 }
 
 export function resolveSpeculativePolicy(
@@ -109,11 +124,18 @@ export function resolveSpeculativePolicy(
   if (!Number.isFinite(base.minPartialChars) || base.minPartialChars < 0) {
     throw new Error('speculative minPartialChars must be a finite non-negative number');
   }
-  const requested = input.option ?? envEnabled(input.env);
+  const requested = isSpeculativeReplyRequested(input.option, input.env);
   if (!requested) return { enabled: false, ...base, disabled_reason: 'default_off' };
+  // A caller enabling speculation without wiring the cost probe fails closed
+  // as metered, not open as free.
+  const costTier = input.costTier ?? 'metered';
+  if (costTier === 'metered') return { enabled: false, ...base, disabled_reason: 'metered' };
   if (input.powerSource === 'battery')
     return { enabled: false, ...base, disabled_reason: 'battery' };
-  if (input.costTier === 'metered') return { enabled: false, ...base, disabled_reason: 'metered' };
+  // Missing/unknown power fails closed unless the caller explicitly accepts it.
+  if (input.powerSource !== 'ac' && input.allowUnknownPower !== true) {
+    return { enabled: false, ...base, disabled_reason: 'power_unknown' };
+  }
   return { enabled: true, ...base };
 }
 
