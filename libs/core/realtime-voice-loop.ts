@@ -69,6 +69,15 @@ import {
   type ResolveSpeculativePolicyInput,
 } from './voice-speculative-policy.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+
+// Callers derive the speculative-reply guard inputs through the loop's entry point.
+export {
+  costTierForReasoningMode,
+  detectVoicePowerSource,
+  resolveSpeculativePolicy,
+  type VoiceCostTier,
+  type VoicePowerSource,
+} from './voice-speculative-policy.js';
 import { t } from './t.js';
 import type { SupportedLocale } from './locale.js';
 import type { TraceContext } from './src/trace.js';
@@ -453,6 +462,16 @@ export async function startRealtimeVoiceLoop(
       kind: 'degraded',
       what: 'speculative_reply',
       reason: 'requires streamReply and streaming STT; disabled',
+    });
+  }
+  if (
+    speculativePolicy.disabled_reason === 'battery' ||
+    speculativePolicy.disabled_reason === 'metered'
+  ) {
+    options.onEvent?.({
+      kind: 'degraded',
+      what: 'speculative_reply',
+      reason: `${speculativePolicy.disabled_reason} guard; disabled`,
     });
   }
 
@@ -1218,11 +1237,8 @@ export async function startRealtimeVoiceLoop(
 
         if (state === 'speaking' && bargeInMode === 'two_stage' && twoStage) {
           const feedBefore = bargeFeed;
-          const actions = twoStage.observeAudio(chunk);
+          const actions = twoStage.observeTick(chunk, bargePartials.splice(0));
           if (feedBefore && twoStage.state === 'paused') feedBefore.push(chunk);
-          for (const partial of bargePartials.splice(0)) {
-            actions.push(...twoStage.observePartial(partial));
-          }
           const replay = applyBargeInActions(actions);
           if (replay && speech) await confirmBargeIn(replay, 'two_stage');
           continue;

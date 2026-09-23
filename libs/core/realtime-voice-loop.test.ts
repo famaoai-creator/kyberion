@@ -724,6 +724,34 @@ describe('realtime voice loop', () => {
     expect(report.turns_completed).toBe(0);
   });
 
+  it('reports the metered guard when a requested speculative reply is disabled', async () => {
+    const events: RealtimeVoiceLoopEvent[] = [];
+    const handle = await startRealtimeVoiceLoop({
+      recordingDir: testDir,
+      consent: { requireRecordingConsent: false },
+      mic: {
+        command: [process.execPath, '-e', 'process.stdout.write(Buffer.alloc(3200))'],
+        sampleRateHz: 16000,
+        chunkMs: 100,
+      },
+      vad: { rmsThreshold: 800, endpointMs: 700 },
+      streamingStt: scriptedStreamingStt(null, 'unused'),
+      speculativeReply: { enabled: true, powerSource: 'ac', costTier: 'metered' },
+      transcribe: async () => 'unused',
+      reply: async () => 'unused',
+      streamReply: async () => 'unused',
+      synthesizeSegment: async () => '/tmp/fake.wav',
+      play: () => immediateHandle(),
+      onEvent: (event) => events.push(event),
+    });
+    await handle.done;
+    expect(events).toContainEqual({
+      kind: 'degraded',
+      what: 'speculative_reply',
+      reason: 'metered guard; disabled',
+    });
+  });
+
   it('fails closed when a mission id is set but consent is missing', async () => {
     delete process.env.KYBERION_SUDO;
     await expect(

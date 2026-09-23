@@ -9,6 +9,7 @@ import {
   defaultBargeInMode,
   parseRecorderBridgeResponse,
   parseRealtimeVoiceConversationCli,
+  resolveSpeculativeReplyGuards,
   runRealtimeVoiceConversationInteractive,
 } from './run_realtime_voice_conversation.js';
 
@@ -92,6 +93,22 @@ describe('run_realtime_voice_conversation cli', () => {
     expect(() => parseRealtimeVoiceConversationCli({ ...base, 'barge-in-mode': 'always' })).toThrow(
       /--barge-in-mode/
     );
+  });
+
+  it('derives the speculative-reply guard from power source and backend cost tier', () => {
+    expect(
+      resolveSpeculativeReplyGuards({
+        reasoningMode: 'claude-cli',
+        detectPowerSource: () => 'battery',
+      })
+    ).toEqual({ powerSource: 'battery', costTier: 'free' });
+    expect(
+      resolveSpeculativeReplyGuards({ reasoningMode: 'anthropic', detectPowerSource: () => 'ac' })
+    ).toEqual({ powerSource: 'ac', costTier: 'metered' });
+    expect(
+      resolveSpeculativeReplyGuards({ reasoningMode: null, detectPowerSource: () => 'unknown' })
+        .costTier
+    ).toBe('metered');
   });
 
   it('parses realtime loop flags', () => {

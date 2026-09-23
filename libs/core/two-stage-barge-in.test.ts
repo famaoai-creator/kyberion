@@ -81,6 +81,39 @@ describe('TwoStageBargeIn', () => {
     expect(bargeIn.tick()).toEqual([{ type: 'resume_tts', reason: 'no_words' }]);
   });
 
+  it('a tick applies queued word partials before grace expiry can resume', () => {
+    const pausedAtExpiry = () => {
+      const h = harness();
+      for (let i = 0; i < 3; i += 1) h.bargeIn.observeAudio(chunk(3_000));
+      expect(h.bargeIn.state).toBe('paused');
+      h.advance(600);
+      return h.bargeIn;
+    };
+    // Audio first (the old order) resumes and then drops the words.
+    const audioFirst = pausedAtExpiry();
+    const lost = [
+      ...audioFirst.observeAudio(chunk(3_000)),
+      ...audioFirst.observePartial('wait stop'),
+    ];
+    expect(lost).toEqual([{ type: 'resume_tts', reason: 'no_words' }]);
+
+    const bargeIn = pausedAtExpiry();
+    expect(bargeIn.observeTick(chunk(3_000), ['wait stop'])).toEqual([
+      { type: 'hard_stop', words: 'wait stop' },
+    ]);
+    expect(bargeIn.state).toBe('stopped');
+    expect(bargeIn.bufferedChunks()).toHaveLength(4);
+  });
+
+  it('a tick without partials behaves like observeAudio', () => {
+    const { bargeIn, advance } = harness();
+    for (let i = 0; i < 3; i += 1) bargeIn.observeTick(chunk(3_000), []);
+    advance(600);
+    expect(bargeIn.observeTick(chunk(3_000), ['um'])).toEqual([
+      { type: 'resume_tts', reason: 'no_words' },
+    ]);
+  });
+
   it('ignores a VAD onset below the barge-in threshold', () => {
     const { bargeIn } = harness();
     expect(bargeIn.observeVadStart(1_000)).toEqual([]);
