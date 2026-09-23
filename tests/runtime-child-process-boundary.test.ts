@@ -59,6 +59,7 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/video-render-backend.ts',
   'libs/core/virtual-audio-input-recording-bridge.ts',
   'satellites/voice-hub/server.ts',
+  'satellites/voice-hub/speech-synthesis-runtime.ts',
 ].sort((a, b) => a.localeCompare(b));
 
 function normalize(relPath: string): string {

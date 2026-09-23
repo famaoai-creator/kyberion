@@ -213,6 +213,7 @@
     "libs/core/video-render-backend.ts",
     "libs/core/virtual-audio-input-recording-bridge.ts",
     "satellites/voice-hub/server.ts",
+    "satellites/voice-hub/speech-synthesis-runtime.ts",
     "scripts/capability_discovery_entry.mjs",
     "scripts/check_chronos_dom_contrast.ts",
     "scripts/check_chronos_perf_baseline.ts",
