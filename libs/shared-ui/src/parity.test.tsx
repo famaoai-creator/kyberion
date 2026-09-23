@@ -16,7 +16,13 @@
 // (status labels, empty/loading text, trend words) must also agree.
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { getUiMessageBundle, pathResolver, safeReadFile, type SupportedLocale } from '@agent/core';
+import {
+  getUiMessageBundle,
+  pathResolver,
+  safeReaddir,
+  safeReadFile,
+  type SupportedLocale,
+} from '@agent/core';
 import { renderA2UI } from '../vanilla/kyberion-ui.js';
 import { MiniDocument, MiniElement, MiniText } from '../vanilla/mini-dom.test-support.js';
 import { A2UIRenderer, KB_COMPONENT_TYPES, type A2UIRendererComponent } from './index.js';
@@ -49,13 +55,27 @@ interface FixtureFile {
 
 const LOCALES: readonly SupportedLocale[] = ['en', 'ja'];
 
+const FIXTURE_DIR = 'presence/displays/presence-studio/static';
+
+/**
+ * The base `ui-gallery.fixtures.<locale>.json` plus every part file
+ * (`ui-gallery.fixtures.<part>.<locale>.json`: charts, forms, ...) — the same
+ * set the gallery's `/ui-gallery/fixtures/<locale>.json` route merges.
+ */
 function loadFixtures(locale: SupportedLocale): FixtureScenario[] {
-  const path = pathResolver.rootResolve(
-    `presence/displays/presence-studio/static/ui-gallery.fixtures.${locale}.json`
-  );
-  const raw = String(safeReadFile(path, { encoding: 'utf8' }));
-  const fixtures = JSON.parse(raw) as FixtureFile;
+  const dir = pathResolver.rootResolve(FIXTURE_DIR);
+  const read = (file: string) =>
+    JSON.parse(String(safeReadFile(`${dir}/${file}`, { encoding: 'utf8' })));
+  const fixtures = read(`ui-gallery.fixtures.${locale}.json`) as FixtureFile;
   expect(fixtures.catalog).toBe('kyberion-base');
+  const partPattern = new RegExp(`^ui-gallery\\.fixtures\\.[a-z0-9-]+\\.${locale}\\.json$`);
+  for (const file of safeReaddir(dir)
+    .filter((name) => partPattern.test(name))
+    .sort()) {
+    const part = read(file) as { catalog: string; sections: FixtureFile['sections'] };
+    expect(part.catalog, file).toBe('kyberion-base');
+    fixtures.sections.push(...part.sections);
+  }
   const scenarios: FixtureScenario[] = [
     {
       id: 'sample_screen',
@@ -91,7 +111,10 @@ interface NormElement {
 }
 type NormNode = NormElement | { text: string };
 
-const KEEP_ATTR = /^(?:data-[\w-]+|aria-[\w-]+|role|href)$/;
+// UI-01b: chart SVG geometry is part of the contract too (one layout module,
+// so both renderers must emit the same coordinates and paths).
+const KEEP_ATTR =
+  /^(?:data-[\w-]+|aria-[\w-]+|role|href|viewBox|d|x|y|x1|x2|y1|y2|cx|cy|r|rx|width|height|text-anchor|dominant-baseline|scope)$/;
 
 function keepAttrs(
   names: Iterable<string>,

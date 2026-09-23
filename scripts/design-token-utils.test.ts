@@ -8,6 +8,8 @@ import {
   KB_UI_TOKEN_BLOCK_END,
   KB_UI_TOKEN_BLOCK_START,
   KYBERION_UI_STYLESHEET_SOURCE,
+  concatKyberionUiStylesheetSources,
+  listKyberionUiStylesheetSources,
   readKyberionDesignTokens,
   renderKyberionDesignTokenBlock,
   renderKyberionTailwindColorsBlock,
@@ -118,8 +120,19 @@ describe('UI token layer and component stylesheet (UI-02)', () => {
     expect(() => renderKyberionUiStylesheet('.kb-x {}')).toThrow('must contain');
   });
 
+  it('stamps the base stylesheet first, then every kyberion-ui.<part>.source.css', () => {
+    const sources = listKyberionUiStylesheetSources();
+    expect(sources[0]).toBe(KYBERION_UI_STYLESHEET_SOURCE);
+    expect(sources).toContain('knowledge/public/design-patterns/web/kyberion-ui.charts.source.css');
+    expect([...sources.slice(1)].sort()).toEqual(sources.slice(1));
+    const joined = concatKyberionUiStylesheetSources((relativePath) => `/* ${relativePath} */`);
+    expect(joined.indexOf('kyberion-ui.source.css')).toBeLessThan(joined.indexOf('.charts.'));
+  });
+
   it('keeps the authored component stylesheet free of literal colors', () => {
-    const source = readTextFile(pathResolver.rootResolve(KYBERION_UI_STYLESHEET_SOURCE));
+    const source = concatKyberionUiStylesheetSources((relativePath) =>
+      readTextFile(pathResolver.rootResolve(relativePath))
+    );
     expect(source.match(/#[0-9a-f]{3,8}\b|\brgba?\s*\(|\bhsla?\s*\(/giu)).toBeNull();
     expect(source).not.toMatch(/gradient\(|backdrop-filter|blur\(/u);
   });

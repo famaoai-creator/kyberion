@@ -49,6 +49,18 @@ export interface BrandUiPalette {
   status: Record<BrandUiStatusName, { fg: string; bg: string; border: string }>;
   role: Record<BrandUiRoleName, string>;
   shadow: { sm: string; md: string };
+  /**
+   * UI-01b data-viz palettes (`--kb-ui-viz-cat-1..8`, `-seq-1..5`, `-div-1..5`).
+   * Categorical is a fixed order (never cycled); sequential low -> high;
+   * diverging negative pole -> neutral midpoint -> positive pole.
+   */
+  viz: BrandUiVizPalette;
+}
+
+export interface BrandUiVizPalette {
+  categorical: string[];
+  sequential: string[];
+  diverging: string[];
 }
 
 /** Web UI semantic token layer (`tokens.ui`), separate from the media palette. */

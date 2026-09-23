@@ -18,6 +18,10 @@
  *   - Actions are never evaluated; they are handed to `onAction`.
  */
 /* global document, window */
+// UI-01b charts & visualisation: geometry lives in ./charts.js (shared with React).
+import { KB_CHART_TYPES, layoutChart } from './charts.js';
+// UI-01c settings & forms: renderers + pure helpers live in ./forms.js (shared with React).
+import { createFormRenderers } from './forms.js';
 
 // ---------------------------------------------------------------------------
 // Vocabulary (single place) — keys only; text comes from the vocabulary catalog
@@ -42,11 +46,113 @@ export const KB_UI_DEFAULT_LOCALE = 'en';
  * @type {Readonly<Record<string, string>>}
  */
 export const KB_UI_DEFAULT_MESSAGES = Object.freeze({
+  'ui:avatar_cancel': 'Cancel',
+  'ui:avatar_current_alt': 'Current picture',
+  'ui:avatar_empty': 'No picture',
+  'ui:avatar_preview_alt': 'New picture preview (square crop)',
+  'ui:avatar_remove': 'Remove',
+  'ui:avatar_take': 'Take photo',
+  'ui:avatar_upload': 'Upload photo',
+  'ui:avatar_use': 'Use this photo',
+  'ui:camera_cancel': 'Cancel',
+  'ui:camera_choose_file': 'Choose a photo',
+  'ui:camera_denied': 'Camera access was blocked. Choose a photo instead.',
+  'ui:camera_live_label': 'Camera preview',
+  'ui:camera_preview_alt': 'Captured photo preview',
+  'ui:camera_retake': 'Retake',
+  'ui:camera_start': 'Start camera',
+  'ui:camera_starting': 'Starting camera…',
+  'ui:camera_take': 'Take photo',
+  'ui:camera_unavailable': "The camera isn't available here. Choose a photo instead.",
+  'ui:camera_use': 'Use this photo',
+  'ui:chart_empty': 'No data to chart',
+  'ui:chart_labelled': '{title}. {summary}',
+  'ui:chart_legend': 'Legend',
+  'ui:chart_no_value': 'No value',
+  'ui:chart_other': 'Other',
+  'ui:chart_scale_high': 'High',
+  'ui:chart_scale_low': 'Low',
+  'ui:chart_summary_bar':
+    'Bar chart: {categories} categories, {series} series, values from {min} to {max}.',
+  'ui:chart_summary_donut':
+    'Donut chart: {count} parts totalling {total}; the largest is {top} ({share}).',
+  'ui:chart_summary_flow':
+    'Flow diagram: {nodes} steps in {stages} stages with {edges} connections.',
+  'ui:chart_summary_heatmap':
+    'Heatmap: {rows} rows by {columns} columns, values from {min} to {max}.',
+  'ui:chart_summary_line':
+    'Line chart: {series} series over {points} points, values from {min} to {max}.',
+  'ui:chart_summary_meter': '{value} of {max} ({percent})',
+  'ui:chart_summary_sequence':
+    'Sequence diagram: {messages} messages between {participants} participants.',
+  'ui:chart_summary_sparkline':
+    'Trend of {count} points from {first} to {last} (low {min}, high {max}).',
+  'ui:chart_table_category': 'Category',
+  'ui:chart_table_from': 'From',
+  'ui:chart_table_message': 'Message',
+  'ui:chart_table_next': 'Leads to',
+  'ui:chart_table_point': 'Point',
+  'ui:chart_table_series': 'Series',
+  'ui:chart_table_share': 'Share',
+  'ui:chart_table_stage': 'Stage',
+  'ui:chart_table_status': 'Status',
+  'ui:chart_table_step': 'Step',
+  'ui:chart_table_time': 'Time',
+  'ui:chart_table_to': 'To',
+  'ui:chart_table_value': 'Value',
+  'ui:chart_total': 'Total',
   'ui:disclosure_summary': 'Details',
+  'ui:field_required': 'Required',
+  'ui:file_cancel': 'Cancel upload of {file}',
+  'ui:file_drop_accept': 'Accepted: {types}',
+  'ui:file_drop_added': 'Files added: {count}',
+  'ui:file_drop_browse': 'Choose files',
+  'ui:file_drop_browse_single': 'Choose a file',
+  'ui:file_drop_max_files': 'Up to {count} files',
+  'ui:file_drop_max_size': 'Up to {size} each',
+  'ui:file_drop_prompt': 'Drag files here or paste',
+  'ui:file_drop_prompt_single': 'Drag a file here or paste',
+  'ui:file_drop_reject_count': 'Only {count} files can be added',
+  'ui:file_drop_reject_size': '{file} is larger than {size}',
+  'ui:file_drop_reject_type': "{file} isn't an accepted file type",
+  'ui:file_list_label': 'Selected files',
+  'ui:file_remove': 'Remove {file}',
+  'ui:file_status_done': 'Uploaded',
+  'ui:file_status_error': 'Failed',
+  'ui:file_status_queued': 'Waiting',
+  'ui:file_status_uploading': 'Uploading',
+  'ui:integration_connected': 'Connected',
+  'ui:integration_disconnected': 'Not connected',
+  'ui:integration_error': 'Connection error',
+  'ui:integration_needs_reauth': 'Reconnect needed',
+  'ui:meter_state_danger': 'Over the limit',
+  'ui:meter_state_success': 'Within range',
+  'ui:meter_state_warning': 'Near the limit',
   'ui:metric_trend_down': 'Down',
   'ui:metric_trend_flat': 'No change',
   'ui:metric_trend_up': 'Up',
   'ui:nav_label': 'Navigation',
+  'ui:save_bar_clean': 'No changes',
+  'ui:save_bar_dirty': 'You have unsaved changes',
+  'ui:save_bar_discard': 'Discard',
+  'ui:save_bar_error': "Couldn't save your changes. Try again.",
+  'ui:save_bar_label': 'Unsaved changes',
+  'ui:save_bar_save': 'Save',
+  'ui:save_bar_saved': 'All changes saved',
+  'ui:save_bar_saving': 'Saving…',
+  'ui:secret_cancel': 'Cancel',
+  'ui:secret_configured': 'Set · ••••{last4}',
+  'ui:secret_configured_plain': 'Set',
+  'ui:secret_hide': 'Hide',
+  'ui:secret_not_configured': 'Not set',
+  'ui:secret_paste': 'Paste',
+  'ui:secret_paste_unavailable': 'Paste with Ctrl+V or ⌘V',
+  'ui:secret_remove': 'Remove',
+  'ui:secret_replace': 'Replace',
+  'ui:secret_save': 'Save',
+  'ui:secret_show': 'Show',
+  'ui:secret_submitted': 'Sent. The value is not kept on this page.',
+  'ui:select_placeholder': 'Select…',
   'ui:skeleton_loading': 'Loading',
   'ui:status_active': 'Active',
   'ui:status_archived': 'Archived',
@@ -95,6 +201,7 @@ export const KB_UI_DEFAULT_MESSAGES = Object.freeze({
   'ui:status_working': 'Working',
   'ui:table_empty': 'No data',
   'ui:tabs_label': 'Views',
+  'ui:text_count': '{count} / {max}',
   'ui:unknown_component': 'Unsupported component: {type}',
   'ui:value_no': 'No',
   'ui:value_yes': 'Yes',
@@ -865,6 +972,53 @@ const RENDERERS = {
   },
 };
 
+// UI-01b: chart / visualisation types — `charts.js` lays out a vnode tree,
+// built here with createElement / createElementNS (never innerHTML).
+const SVG_TAGS = new Set(['svg', 'g', 'path', 'line', 'rect', 'circle', 'text', 'tspan', 'title']);
+
+function buildVNode(ctx, node, inSvg) {
+  if (!node) return null;
+  if (typeof node.text === 'string') return ctx.doc.createTextNode(node.text);
+  const svg = inSvg || node.tag === 'svg';
+  const element =
+    svg && SVG_TAGS.has(node.tag)
+      ? ctx.doc.createElementNS(SVG_NS, node.tag)
+      : ctx.doc.createElement(node.tag);
+  for (const [name, value] of Object.entries(node.attrs || {})) element.setAttribute(name, value);
+  for (const child of node.children || []) {
+    const built = buildVNode(ctx, child, svg);
+    if (built) element.appendChild(built);
+  }
+  return element;
+}
+
+// UI-01c settings & forms (catalog order: base types → forms → charts).
+Object.assign(
+  RENDERERS,
+  createFormRenderers({
+    el,
+    setData,
+    actionButton,
+    statusPill,
+    appendChildren,
+    safeHref,
+    iconPaths: KB_ICON_PATHS,
+  })
+);
+
+for (const type of KB_CHART_TYPES) {
+  RENDERERS[type] = (ctx, p) =>
+    buildVNode(
+      ctx,
+      layoutChart(type, p, {
+        t: ctx.t,
+        locale: ctx.locale,
+        statusLabel: (status) => statusLabel(status, undefined, undefined, ctx.t),
+      }),
+      false
+    );
+}
+
 function badge(ctx, p) {
   const node = el(ctx, 'span', 'kb-badge', p.label);
   setData(node, 'tone', p.tone);
@@ -957,6 +1111,8 @@ function makeContext(options, doc, components) {
     t: createTranslator(options),
     lookup: options.lookup instanceof Map ? options.lookup : lookup,
     visiting: new Set(),
+    // UI-01c: disposers (camera streams, object URLs) run on the next render / disposeA2UI.
+    cleanups: [],
   };
 }
 
@@ -1030,9 +1186,32 @@ export function renderA2UI(container, components, options = {}) {
     const node = renderById(ctx, id, 0);
     if (node) fragment.appendChild(node);
   }
+  disposeA2UI(container);
   while (container.firstChild) container.removeChild(container.firstChild);
   container.appendChild(fragment);
+  if (ctx.cleanups.length > 0) RENDER_CLEANUPS.set(container, ctx.cleanups);
   return container;
+}
+
+const RENDER_CLEANUPS = new WeakMap();
+
+/**
+ * UI-01c: release what the last `renderA2UI` into `container` holds (stop
+ * camera tracks, revoke object URLs). Runs automatically before a re-render;
+ * call it when removing the container. Never throws.
+ * @param {Element} container
+ */
+export function disposeA2UI(container) {
+  const cleanups = container ? RENDER_CLEANUPS.get(container) : undefined;
+  if (!cleanups) return;
+  RENDER_CLEANUPS.delete(container);
+  for (const cleanup of cleanups) {
+    try {
+      cleanup();
+    } catch {
+      // best effort
+    }
+  }
 }
 
 export const KB_RENDERED_TYPES = Object.freeze(Object.keys(RENDERERS));

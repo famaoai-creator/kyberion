@@ -39,5 +39,17 @@ describe('tokens.ui contrast (UI-02)', () => {
     expect(flat['danger-fg']).toBe(ui!.dark.status.danger.fg);
     expect(flat['role-concierge']).toBe(ui!.dark.role.concierge);
     expect(flat.status).toBeUndefined();
+    expect(flat['viz-cat-1']).toBe(ui!.dark.viz.categorical[0]);
+    expect(flat['viz-div-5']).toBe(ui!.dark.viz.diverging[4]);
+  });
+
+  it('holds every data-viz categorical slot to 3:1 on every UI surface (UI-01b)', async () => {
+    const { buildUiVizContrastPairs } = await import('./check_design_contrast.js');
+    const pairs = buildUiVizContrastPairs();
+    expect(pairs.filter((pair) => pair.foreground.startsWith('viz-cat-'))).toHaveLength(8 * 4);
+    expect(pairs.every((pair) => pair.minRatio >= 2)).toBe(true);
+    expect(pairs.map((pair) => pair.label)).toContain(
+      'ui viz categorical 8 mark on surface-sunken'
+    );
   });
 });

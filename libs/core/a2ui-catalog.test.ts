@@ -67,6 +67,126 @@ const VALID_EXAMPLES: Record<KyberionBaseComponentType, Record<string, unknown>>
   'ui:skeleton': { lines: 3, shape: 'table' },
   'ui:button': { label: '保存', variant: 'secondary', action: { id: 'save', payload: { a: 1 } } },
   'ui:disclosure': { summary: '開発者向け', open: false },
+  // UI-01c settings & forms
+  'ui:settings-group': { title: '通知', description: 'いつ知らせるか' },
+  'ui:setting-row': { label: 'メール通知', description: '承認待ちを知らせる', tone: 'neutral' },
+  'ui:switch': { name: 'notify.email', label: 'メール通知', value: true, hide_label: true },
+  'ui:checkbox': { name: 'agree', label: '同意する', value: false, required: true },
+  'ui:select': {
+    name: 'lang',
+    label: '言語',
+    value: 'ja',
+    options: [
+      { value: 'ja', label: '日本語' },
+      { value: 'en', label: 'English' },
+    ],
+    placeholder: '選択',
+  },
+  'ui:radio-group': {
+    name: 'plan',
+    label: 'プラン',
+    options: [{ value: 'a', label: 'A', description: '基本' }],
+    direction: 'horizontal',
+  },
+  'ui:segmented': {
+    name: 'density',
+    label: '表示密度',
+    value: 'compact',
+    options: [
+      { value: 'comfortable', label: 'ゆったり' },
+      { value: 'compact', label: 'コンパクト' },
+    ],
+  },
+  'ui:text-field': {
+    name: 'email',
+    label: 'メール',
+    type: 'email',
+    value: 'a@example.com',
+    help: '通知の宛先',
+    error: '形式が正しくありません',
+    required: true,
+    maxlength: 120,
+  },
+  'ui:textarea': { name: 'bio', label: '自己紹介', rows: 4, maxlength: 400, value: '' },
+  'ui:slider': { name: 'volume', label: '音量', value: 40, min: 0, max: 100, step: 5, unit: '%' },
+  'ui:integration-item': {
+    title: 'Google Workspace',
+    state: 'needs_reauth',
+    detail: 'a@example.com',
+    actions: [{ label: '再接続', action: { id: 'oauth.begin', payload: { service: 'google' } } }],
+  },
+  'ui:save-bar': {
+    state: 'dirty',
+    save_action: { id: 'settings.save' },
+    discard_action: { id: 'settings.discard' },
+  },
+  'ui:file-drop': {
+    name: 'docs',
+    label: '資料',
+    accept: '.pdf,.docx,image/*',
+    multiple: true,
+    max_bytes: 26214400,
+    files: [{ id: 'f1', name: 'a.pdf', size: 1024, status: 'uploading', progress: 40 }],
+    action: { id: 'ingest.add' },
+  },
+  'ui:camera-capture': { name: 'photo', label: '撮影', facing: 'user', aspect: 'square' },
+  'ui:avatar-picker': {
+    name: 'avatar',
+    label: 'アバター',
+    image_url: '/api/avatar',
+    initials: 'KB',
+    removable: true,
+  },
+  'ui:secret-field': {
+    name: 'openai',
+    label: 'API トークン',
+    configured: true,
+    last4: 'x9Qa',
+    service_id: 'openai',
+    secret_key: 'api_key',
+    action: { id: 'secret.introduce' },
+    remove_action: { id: 'secret.remove' },
+  },
+  // UI-01b charts & visualisation
+  'ui:bar-chart': {
+    title: '週次の件数',
+    categories: ['月', '火'],
+    series: [{ name: '承認', values: [3, null] }],
+    orientation: 'horizontal',
+    stacked: false,
+  },
+  'ui:line-chart': {
+    series: [
+      {
+        name: '応答',
+        points: [
+          { x: '09:00', y: 1.2 },
+          { x: '10:00', y: null },
+        ],
+      },
+    ],
+    area: true,
+    y_unit: 's',
+  },
+  'ui:donut': { segments: [{ label: '完了', value: 4 }], center_label: '合計' },
+  'ui:sparkline': { points: [1, 3, null, 2], tone: 'accent' },
+  'ui:heatmap': { rows: ['月'], columns: ['9時'], values: [[2]], scale: 'sequential' },
+  'ui:meter': { label: '予算', value: 72, max: 100, thresholds: [{ value: 80, tone: 'warning' }] },
+  'ui:sequence': {
+    participants: ['user', { id: 'agent', label: '相棒' }],
+    messages: [
+      { from: 'user', to: 'agent', label: '依頼', at: '09:00', status: 'done', kind: 'call' },
+    ],
+  },
+  'ui:flow': {
+    nodes: [
+      { id: 'm', label: 'ミッション', stage: 'mission', status: 'active' },
+      { id: 't', label: 'タスク', stage: 'task' },
+    ],
+    edges: [{ from: 'm', to: 't', label: '分解' }],
+    stages: [{ id: 'mission', label: 'ミッション' }, 'task'],
+  },
+  'ui:stat-list': { items: [{ label: '中央値', value: 1.4, unit: 's', hint: 'p50' }] },
 };
 
 describe('kyberion-base A2UI catalog', () => {
