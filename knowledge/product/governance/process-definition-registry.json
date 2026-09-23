@@ -13,7 +13,10 @@
         "libs/core/mission-creation.ts",
         "scripts/mission_controller.ts"
       ],
-      "expected_counts": { "templates": 42, "patterns": 8 }
+      "expected_counts": {
+        "templates": 72,
+        "patterns": 8
+      }
     },
     {
       "id": "mission-orchestration-scenarios",
@@ -25,7 +28,9 @@
         "scripts/check_governance_rules.ts",
         "tests/scenario-coverage-contract.test.ts"
       ],
-      "expected_counts": { "scenarios": 24 }
+      "expected_counts": {
+        "scenarios": 24
+      }
     },
     {
       "id": "mission-task-classification-scenarios",
@@ -37,7 +42,9 @@
         "scripts/check_governance_rules.ts",
         "libs/core/mission-task-classification-scenarios.test.ts"
       ],
-      "expected_counts": { "scenarios": 26 }
+      "expected_counts": {
+        "scenarios": 26
+      }
     },
     {
       "id": "mission-playbooks",
