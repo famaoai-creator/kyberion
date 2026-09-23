@@ -3,7 +3,7 @@ import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { PAD_UI_ROUTES, resolvePadLocale } from '../lib/pad-ui.js';
 import { DAILY_DESK_CLIENT_SCRIPT, DAILY_DESK_TEXT_KEYS, dailyDeskPageHtml } from './desk-page.js';
-import { padBootstrapOf } from '../lib/pad-ui.test-support.js';
+import { padBootstrapOf, withoutScriptBlocks } from '../lib/pad-ui.test-support.js';
 
 const KANA = /[぀-ヿ]/u;
 const NATIVE_DIALOG = /(?<![\w.$])(?:window\.)?(?:confirm|prompt|alert)\s*\(/u;
@@ -33,7 +33,7 @@ describe('daily desk page (shared A2UI kit)', () => {
     for (const text of Object.values(bootstrap.texts as Record<string, string>)) {
       expect(text).not.toMatch(KANA);
     }
-    expect(html.replace(/<script[\s\S]*?<\/script>/gu, '')).not.toMatch(KANA);
+    expect(withoutScriptBlocks(html)).not.toMatch(KANA);
   });
 
   it('renders Japanese by default for a ja operator', () => {

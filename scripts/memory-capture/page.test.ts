@@ -7,7 +7,7 @@ import {
   MEMORY_CAPTURE_TEXT_KEYS,
   memoryCapturePageHtml,
 } from './page.js';
-import { padBootstrapOf } from '../lib/pad-ui.test-support.js';
+import { padBootstrapOf, withoutScriptBlocks } from '../lib/pad-ui.test-support.js';
 
 const KANA = /[぀-ヿ]/u;
 const NATIVE_DIALOG = /(?<![\w.$])(?:window\.)?(?:confirm|prompt|alert)\s*\(/u;
@@ -32,7 +32,7 @@ describe('memory capture page (shared A2UI kit)', () => {
     for (const text of Object.values(bootstrap.texts as Record<string, string>)) {
       expect(text).not.toMatch(KANA);
     }
-    expect(html.replace(/<script[\s\S]*?<\/script>/gu, '')).not.toMatch(KANA);
+    expect(withoutScriptBlocks(html)).not.toMatch(KANA);
   });
 
   it('renders Japanese by default for a ja operator', () => {

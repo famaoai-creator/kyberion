@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   assertPadAdaptersComplete,
   getPadAdapter,
@@ -106,6 +106,8 @@ describe('personal pad adapter seam', () => {
   });
 
   it('accepts typed action fields as a restorable workbench capture', () => {
+    // The body is composed in the process locale; pin it so CI (en) matches.
+    vi.stubEnv('KYBERION_LOCALE', 'ja');
     const result = getPadAdapter('personal-workbench').composeCapture({
       body: '',
       fields: {
@@ -116,6 +118,7 @@ describe('personal pad adapter seam', () => {
     });
     expect(result.body).toContain('期限:');
     expect(result.payload).toMatchObject({ email_body: '本文' });
+    vi.unstubAllEnvs();
   });
 
   it('declares screenshot annotation as a reusable image-overlay field', () => {
