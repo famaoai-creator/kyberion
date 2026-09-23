@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withPluginExecutionFrame } from './sandbox-policy.js';
 import {
+  opPreflightCallKey,
   PLUGIN_GRANT_OPS_GUARD_ID,
   registerOpGuard,
   registerOpPreflightListener,
@@ -178,6 +179,96 @@ describe('op preflight waterfall', () => {
       });
       const result = await runOpPreflight({ op: 'demo:op', params: {}, source: 'pipeline' });
       expect(result.decision).toBe('allow');
+    });
+
+    it('hands observers a detached snapshot of the input and call (S7)', async () => {
+      registerOpPreflightListener({
+        id: 'repair',
+        run: () => ({ repaired_input: { nested: { value: 'repaired' } } }),
+      });
+      const mutations: string[] = [];
+      registerOpPreflightOutcomeObserver((call, result) => {
+        const attempt = (fn: () => void, label: string) => {
+          try {
+            fn();
+          } catch {
+            mutations.push(`${label}:rejected`);
+          }
+        };
+        attempt(() => {
+          (result.input.nested as { value: string }).value = 'observer';
+        }, 'input');
+        attempt(() => {
+          (result.repaired_input!.nested as { value: string }).value = 'observer';
+        }, 'repaired');
+        attempt(() => {
+          (call.params.nested as { value: string }).value = 'observer';
+        }, 'params');
+        attempt(() => {
+          (call as { op: string }).op = 'other:op';
+        }, 'op');
+      });
+      const params = { nested: { value: 'original' } };
+      const call = { op: 'demo:op', params, source: 'pipeline' as const };
+      const result = await runOpPreflight(call);
+      expect(result.input).toEqual({ nested: { value: 'repaired' } });
+      expect(result.repaired_input).toEqual({ nested: { value: 'repaired' } });
+      expect(params.nested.value).toBe('original');
+      expect(call.op).toBe('demo:op');
+      expect(mutations).toEqual([
+        'input:rejected',
+        'repaired:rejected',
+        'params:rejected',
+        'op:rejected',
+      ]);
+    });
+
+    it('lets listeners and observers correlate a call through its key (S7)', async () => {
+      const keys: object[] = [];
+      const calls: unknown[] = [];
+      registerOpPreflightListener({
+        id: 'record',
+        run: (call) => {
+          keys.push(opPreflightCallKey(call));
+          calls.push(call);
+        },
+      });
+      registerOpPreflightOutcomeObserver((call) => {
+        keys.push(opPreflightCallKey(call));
+        calls.push(call);
+      });
+      await runOpPreflight({ op: 'demo:op', params: {}, source: 'pipeline' });
+      expect(keys).toHaveLength(2);
+      expect(keys[0]).toBe(keys[1]);
+      expect(calls[0]).not.toBe(calls[1]);
+    });
+
+    it('snapshots uncloneable inputs without failing the call (S7)', async () => {
+      const seen: unknown[] = [];
+      registerOpPreflightOutcomeObserver((call, result) => {
+        seen.push(call.params.callback, result.input.callback);
+      });
+      const callback = () => 1;
+      const result = await runOpPreflight({
+        op: 'demo:op',
+        params: { callback },
+        source: 'pipeline',
+      });
+      expect(result.decision).toBe('allow');
+      expect(result.input.callback).toBe(callback);
+      expect(seen).toEqual(['[uncloneable:function]', '[uncloneable:function]']);
+    });
+
+    it('logs an async observer rejection instead of leaving it unhandled (S7)', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      registerOpPreflightOutcomeObserver(async () => {
+        throw new Error('async observer boom');
+      });
+      const result = await runOpPreflight({ op: 'demo:op', params: {}, source: 'pipeline' });
+      expect(result.decision).toBe('allow');
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      expect(spy).toHaveBeenCalledWith('[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR]', expect.any(Error));
+      spy.mockRestore();
     });
 
     it('swallows and logs a throwing observer without affecting the call', async () => {
