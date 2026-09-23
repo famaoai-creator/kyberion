@@ -59,9 +59,9 @@ const MISSION_ID = 'MSN-FIRST-WIN-SMOKE';
 const PROJECT_PATH = 'active/shared/tmp/first-win-lifecycle';
 const LIFECYCLE_PIPELINE = 'pipelines/first-win-lifecycle-weekly.json';
 const LIVE_CONFIRMATION = 'FIRST-WIN-LIFECYCLE-LIVE';
-// Personal organization scope is tenant-bound. Keep the dry-run fixture
-// explicit so it exercises the same governed scope contract as real runs.
-const TENANT_SLUG = 'first-win-smoke';
+// The dry-run fixture must be hermetic: personal/confidential scopes require
+// a registered tenant profile, while this check intentionally creates no
+// tenant state. Tenant-bound lifecycle coverage belongs to integration tests.
 
 export function resolveFirstWinResourcePath(filePath: string, allowMissingLeaf = true): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(filePath), { allowMissingLeaf });
@@ -426,9 +426,7 @@ export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
         '--name',
         'First Win Smoke Organization',
         '--tier',
-        'personal',
-        '--tenant-slug',
-        TENANT_SLUG,
+        'public',
         '--purpose',
         'Validate the first lifecycle path',
         '--dry-run',
@@ -453,9 +451,7 @@ export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
         '--summary',
         'Validate project attachment in the lifecycle path',
         '--tier',
-        'personal',
-        '--tenant-slug',
-        TENANT_SLUG,
+        'public',
         '--organization-id',
         ORGANIZATION_ID,
         '--project-path',
@@ -476,9 +472,7 @@ export function runFirstWinLifecycleDryRun(): FirstWinLifecycleReport {
         'create',
         MISSION_ID,
         '--tier',
-        'personal',
-        '--tenant-slug',
-        TENANT_SLUG,
+        'public',
         '--organization-id',
         ORGANIZATION_ID,
         '--project-id',
