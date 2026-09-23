@@ -33,6 +33,7 @@ import { nowIso } from './foundation/time.js';
 
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
 import {
   assertSafeRepositoryPath,
   safeExecResult,
@@ -319,7 +320,7 @@ function defaultFetcher(
 
 // Existing Kyberion and Claude Code packs remain supported alongside the
 // Agent Plugins v1 portable root manifest.
-const MANIFEST_NAMES = ['plugin-manifest.json', '.claude-plugin/plugin.json', 'plugin.json'];
+const MANIFEST_NAMES = PLUGIN_MANIFEST_CANDIDATES;
 
 function manifestPathFor(dir: string, name: string): string | null {
   try {

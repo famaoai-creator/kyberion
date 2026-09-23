@@ -53,6 +53,9 @@ import {
   type PluginContributionDeclaration,
   type PluginContributionModule,
 } from './plugin-contributions.js';
+import type { PluginPermissionGrant } from './plugin-permissions.js';
+import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
+import { resolvePluginExecutionGrant, runWithPluginGrant } from './plugin-grant-runtime.js';
 
 export const SKILL_PLUGINS_CONFIG_FILENAME = '.kyberion-plugins.json';
 
@@ -75,6 +78,12 @@ export interface SkillPluginAuthorization {
   /** EP-01: managed copy root and the approved content digest, re-verified before import(). */
   managedPath?: string;
   managedContentDigest?: string;
+  /**
+   * Verified trust of the managed record. The managed copy lives outside
+   * `plugins/`, so `trust` (derived from the path) never reads official for
+   * it; the grant decision uses this instead.
+   */
+  managedTrust?: PluginTrustLabel;
   reason: string;
 }
 
@@ -83,6 +92,8 @@ export interface LoadedSkillPlugin {
   resolvedPath: string;
   module: SkillPluginHookModule;
   contributions?: PluginContributionActivation;
+  /** EP-03: the grant the module was imported under (null = legacy unwrapped). */
+  grant?: PluginPermissionGrant | null;
 }
 
 export interface SkillPluginLoadResult {
@@ -317,11 +328,7 @@ function readPluginManifestProvides(resolvedPath: string): {
 } {
   let cursor = path.dirname(resolvedPath);
   for (let depth = 0; depth < 6; depth += 1) {
-    const candidates = [
-      path.join(cursor, 'plugin-manifest.json'),
-      path.join(cursor, 'plugin.json'),
-      path.join(cursor, '.claude-plugin', 'plugin.json'),
-    ];
+    const candidates = PLUGIN_MANIFEST_CANDIDATES.map((candidate) => path.join(cursor, candidate));
     const manifestPath = candidates
       .map((candidate) => assertNoSymlinkTraversal(candidate))
       .find((candidate) => safeExistsSync(candidate));
@@ -403,6 +410,7 @@ export function authorizeSkillPlugin(
         allowed: true,
         managedPluginId: managed.pluginId,
         managedPath: managed.managedPath,
+        managedTrust: managed.trust,
         ...(managed.contentDigest ? { managedContentDigest: managed.contentDigest } : {}),
         reason: `Managed-copy install '${managed.pluginId}' is activatable (trust=${managed.trust}).`,
       };
@@ -523,10 +531,34 @@ export async function loadAuthorizedSkillPlugins(
       continue;
     }
     try {
-      const mod = (await import(
-        /* webpackIgnore: true */
-        pathToFileURL(authorization.resolvedPath).href
-      )) as SkillPluginHookModule;
+      // EP-03: resolved once, before import, and shared by the import frame,
+      // the contribution activation and the skill hooks.
+      const trust =
+        (authorization.managedTrust ?? authorization.trust) === 'official'
+          ? 'official'
+          : 'third-party';
+      const { grant } = resolvePluginExecutionGrant(
+        {
+          pluginId: authorization.managedPluginId || path.basename(authorization.resolvedPath),
+          sourcePath: authorization.resolvedPath,
+          trust,
+        },
+        { managedRoot }
+      );
+      const load = () =>
+        import(
+          /* webpackIgnore: true */
+          pathToFileURL(authorization.resolvedPath).href
+        ) as Promise<SkillPluginHookModule>;
+      // Best effort: top-level module code usually inherits this async context.
+      const mod =
+        grant === null
+          ? await load()
+          : await runWithPluginGrant(
+              grant,
+              authorization.managedPluginId || path.basename(authorization.resolvedPath),
+              load
+            );
       let contributions: PluginContributionActivation | undefined;
       if (typeof mod.registerKyberionContributions === 'function') {
         const manifest = readPluginManifestProvides(authorization.resolvedPath);
@@ -543,15 +575,18 @@ export async function loadAuthorizedSkillPlugins(
               manifest.pluginId ||
               path.basename(authorization.resolvedPath),
             sourcePath: authorization.resolvedPath,
-            trust: authorization.trust === 'official' ? 'official' : 'third-party',
+            trust,
+            grant,
           },
-          mod
+          mod,
+          { managedRoot }
         );
       }
       loaded.push({
         configuredPath: authorization.configuredPath,
         resolvedPath: authorization.resolvedPath,
         module: mod,
+        grant,
         ...(contributions ? { contributions } : {}),
       });
     } catch (err) {

@@ -44,7 +44,11 @@ import {
   type OpPreflightListener,
 } from './op-preflight.js';
 import { coreSeamCatalog } from './seam.js';
-import { PLUGIN_RESERVED_SEAMS } from './plugin-permissions.js';
+import {
+  findDisallowedOfficialOnlySeam,
+  PLUGIN_OFFICIAL_ONLY_SEAMS,
+  PLUGIN_RESERVED_SEAMS,
+} from './plugin-permissions.js';
 import { listPluginFacetContributions, registerPluginFacet } from './facet-registry.js';
 import type { PluginPermissionGrant } from './plugin-permissions.js';
 import {
@@ -220,7 +224,7 @@ function recordOwnership(
  * resolution or the clock (test/eval-only overrides). Checked when the
  * declaration is activated and again at registration — fail closed.
  */
-export { PLUGIN_RESERVED_SEAMS };
+export { PLUGIN_OFFICIAL_ONLY_SEAMS, PLUGIN_RESERVED_SEAMS };
 
 function reservedSeamError(seamKey: string): Error {
   return new Error(`[PLUGIN_CONTRIBUTION_INVALID] reserved seam: ${seamKey}`);
@@ -232,6 +236,21 @@ export function assertNoReservedPluginSeams(declaration: PluginContributionDecla
     .map((seam) => String(seam).trim())
     .find((seam) => PLUGIN_RESERVED_SEAMS.includes(seam));
   if (reserved) throw reservedSeamError(reserved);
+}
+
+function officialOnlySeamError(seamKey: string): Error {
+  return new Error(
+    `[PLUGIN_CONTRIBUTION_INVALID] official-only seam: ${seamKey} (requires official provenance)`
+  );
+}
+
+/** Throws when a non-official plugin declares an official-only seam. */
+export function assertOfficialOnlyPluginSeams(
+  declaration: PluginContributionDeclaration,
+  trust: PluginContributionProvenance['trust']
+): void {
+  const seam = findDisallowedOfficialOnlySeam(declaration.seams, trust);
+  if (seam) throw officialOnlySeamError(seam);
 }
 
 const promptSections = new Map<
@@ -294,6 +313,7 @@ export async function activatePluginContributions(
   options: ActivatePluginContributionsOptions = {}
 ): Promise<PluginContributionActivation> {
   assertNoReservedPluginSeams(declaration);
+  assertOfficialOnlyPluginSeams(declaration, provenance.trust);
   const declared = normalizedDeclarations(declaration);
   const registered = normalizedDeclarations({});
   const disposers: Array<() => void> = [];
@@ -315,6 +335,9 @@ export async function activatePluginContributions(
   const api: PluginContributionApi = {
     registerSeamProvider(seamKey, providerId, implementation) {
       if (PLUGIN_RESERVED_SEAMS.includes(String(seamKey).trim())) throw reservedSeamError(seamKey);
+      if (findDisallowedOfficialOnlySeam([seamKey], provenance.trust)) {
+        throw officialOnlySeamError(seamKey);
+      }
       requireDeclared('seams', seamKey, declared);
       const seam = coreSeamCatalog.get(seamKey);
       if (!seam) throw new Error(`[PLUGIN_CONTRIBUTION_INVALID] unknown seam: ${seamKey}`);

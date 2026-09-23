@@ -35,6 +35,7 @@ import {
   type ManagedPluginRecord,
 } from './plugin-managed-install.js';
 import type { PluginPermissionGrant } from './plugin-permissions.js';
+import { loadApprovalRequest } from './approval-store.js';
 import {
   activatePluginContributions,
   disposeOwnedContribution,
@@ -47,10 +48,9 @@ import {
   type PluginContributionProvenance,
 } from './plugin-contributions.js';
 import {
-  EMPTY_PLUGIN_GRANT,
   findPluginManifestFor,
-  hasEp02PermissionDeclaration,
   isPluginGrantWithin,
+  resolveManagedRecordExecutionGrant,
   resolvePluginExecutionGrant,
   runWithPluginGrant,
 } from './plugin-grant-runtime.js';
@@ -283,10 +283,7 @@ function targetFromRecord(
   }
   const raw = record.manifest.raw;
   const trust = record.trust === 'official' ? 'official' : 'third-party';
-  const grant =
-    trust === 'official' && !hasEp02PermissionDeclaration(raw)
-      ? null
-      : (record.grantedPermissions ?? EMPTY_PLUGIN_GRANT);
+  const { grant } = resolveManagedRecordExecutionGrant(record);
   return {
     pluginId: record.pluginId,
     trust,
@@ -380,6 +377,20 @@ async function activateTarget(
   return { ...target, module, activation, managedRoot: options.managedRoot };
 }
 
+/**
+ * Grant for re-activating the previous module after a failed reload: the
+ * narrower of the previous and the new grant (null = unwrapped legacy).
+ * Undefined when neither contains the other (no representable intersection).
+ */
+function rollbackGrant(
+  previous: PluginPermissionGrant | null,
+  next: PluginPermissionGrant | null
+): { grant: PluginPermissionGrant | null } | undefined {
+  if (isPluginGrantWithin(next, previous)) return { grant: next };
+  if (isPluginGrantWithin(previous, next)) return { grant: previous };
+  return undefined;
+}
+
 function snapshotOf(target: ActivationTarget, grant: PluginPermissionGrant | null) {
   return { contentDigest: target.contentDigest, provides: target.declaration, grant };
 }
@@ -451,11 +462,54 @@ export function deactivatePlugin(pluginId: string): PluginLifecycleResult {
 }
 
 /**
+ * Why a managed plugin that failed to re-resolve must not keep running: it
+ * was removed, its content no longer matches the approval, or its approval
+ * was rejected / expired / cancelled. A new version still awaiting a decision
+ * (approval `pending`) and non-managed resolution failures return undefined.
+ */
+function revocationReason(
+  source: ActivatePluginInput,
+  options: PluginLifecycleOptions
+): string | undefined {
+  const managedId =
+    'record' in source ? source.record.pluginId : source.authorization.managedPluginId;
+  if (!managedId) return undefined;
+  try {
+    const record = listManagedPlugins(options.managedRoot).find(
+      (candidate) => candidate.pluginId === managedId
+    );
+    if (!record) return 'managed install was removed';
+    if (record.activationStatus === 'pending_approval') {
+      const approval =
+        record.approvalChannel && record.approvalRequestId
+          ? loadApprovalRequest(record.approvalChannel, record.approvalRequestId)
+          : null;
+      return approval?.status === 'pending'
+        ? undefined
+        : `approval ${approval?.status ?? 'missing'}`;
+    }
+    if (record.activationStatus !== 'activatable') return `status=${record.activationStatus}`;
+    if (
+      record.contentDigest &&
+      computePluginContentDigest(record.managedPath) !== record.contentDigest
+    ) {
+      return 'content digest changed since approval';
+    }
+    return undefined;
+  } catch (error) {
+    return `activation state could not be verified (${errorText(error)})`;
+  }
+}
+
+/**
  * Re-resolves the plugin from its original source, classifies the change and
  * applies the least disruptive rung. A failing new module rolls back to the
- * previous module; if that also fails the plugin stays inactive and the
- * result is `restart_required`. A plugin not active in this process is
- * activated.
+ * previous module under the narrower of the old and new grant; if that is
+ * not representable or also fails, the plugin stays inactive and the result
+ * is `restart_required`. A managed plugin that is no longer activatable
+ * (removed, tampered, approval rejected) is deactivated; one whose new
+ * version awaits approval keeps its previous activation. A plugin not active
+ * in this process is activated.
  */
 export async function reloadPlugin(
   pluginId: string,
@@ -480,6 +534,16 @@ export async function reloadPlugin(
   try {
     target = resolveTarget(source, effectiveOptions);
   } catch (error) {
+    const revoked = revocationReason(source, effectiveOptions);
+    if (revoked) {
+      const deactivated = deactivatePlugin(pluginId);
+      return {
+        ...deactivated,
+        ok: false,
+        rolledBack: false,
+        reason: `plugin is no longer activatable (${revoked}); previous activation deactivated (${deactivated.reason})`,
+      };
+    }
     return {
       pluginId,
       ok: false,
@@ -522,8 +586,22 @@ export async function reloadPlugin(
     return { ...base, ok: true, ...decision };
   } catch (error) {
     const failure = errorText(error);
+    // The previous module never regains a grant wider than the new approval.
+    const rollback = rollbackGrant(state.activation.grant.grant, target.grant);
+    if (!rollback) {
+      return {
+        ...base,
+        ok: false,
+        mode: 'restart_required',
+        rolledBack: false,
+        reason: `reload failed (${failure}); the previous grant is not within the new grant, so the previous module was not re-activated; plugin is inactive until restart`,
+      };
+    }
     try {
-      activePlugins.set(pluginId, await activateTarget(state, state.module, effectiveOptions));
+      activePlugins.set(
+        pluginId,
+        await activateTarget({ ...state, grant: rollback.grant }, state.module, effectiveOptions)
+      );
       return {
         ...base,
         ok: false,

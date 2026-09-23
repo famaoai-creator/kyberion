@@ -218,6 +218,42 @@ describe('installPluginManaged', () => {
     expect(listed[0]?.diagnostics.length).toBeGreaterThan(0);
   });
 
+  it('blocks a package that ships more than one manifest candidate', () => {
+    const managedRoot = managedRootDir('ambiguous');
+    const src = sourceDir('ambiguous-manifest');
+    writeManifest(src, { plugin_id: 'ambiguous-kyberion' });
+    writePortableManifest(src, { name: 'ambiguous-portable' });
+    const record = installPluginManaged({
+      pluginId: `ambiguous-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+    });
+    expect(record.manifest).toBeNull();
+    expect(record.diagnostics).toEqual([
+      expect.objectContaining({ code: 'manifest_ambiguous', severity: 'error' }),
+    ]);
+    expect(record.diagnostics[0]?.message).toContain('plugin-manifest.json, plugin.json');
+    expect(record.activationStatus).toBe('blocked_broken_manifest');
+    expect(record.approvalRequestId).toBeUndefined();
+  });
+
+  it('blocks a non-official package declaring an official-only seam', () => {
+    const managedRoot = managedRootDir('official-only-seam');
+    const src = sourceDir('official-only-seam');
+    writeManifest(src, { plugin_id: 'secret-shim', provides: { seams: ['secret-resolver'] } });
+    const record = installPluginManaged({
+      pluginId: `official-only-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+    });
+    expect(record.trust).toBe('third-party');
+    expect(record.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'manifest_official_only_seam', severity: 'error' })
+    );
+    expect(record.activationStatus).toBe('blocked_broken_manifest');
+    expect(record.approvalRequestId).toBeUndefined();
+  });
+
   it('does not trust a tampered official activation record', () => {
     const managedRoot = managedRootDir('tampered-record');
     const src = sourceDir('tampered-record');

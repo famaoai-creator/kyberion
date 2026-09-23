@@ -47,6 +47,7 @@ import {
 } from './approval-store.js';
 import { resolveActuatorOperation } from './actuator-op-registry.js';
 import { runOpPreflight } from './op-preflight.js';
+import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -553,7 +554,7 @@ function readViewDocument(pluginRoot: string, relative: string): unknown {
 }
 
 function readRootManifest(pluginRoot: string): Record<string, unknown> {
-  for (const candidate of ['plugin-manifest.json', 'plugin.json']) {
+  for (const candidate of PLUGIN_MANIFEST_CANDIDATES) {
     const manifestPath = path.join(pluginRoot, candidate);
     if (!safeExistsSync(manifestPath)) continue;
     const stat = safeLstat(manifestPath);

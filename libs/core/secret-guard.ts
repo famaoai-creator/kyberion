@@ -458,7 +458,30 @@ function _saveGrants(grants: AuthGrant[]) {
   }
 }
 
-export const getActiveSecrets = () => Array.from(_activeSecrets);
+/**
+ * EP-03: the raw active secret values are host-only; inside a plugin frame
+ * this throws. Masking that must also work while a plugin's governed call is
+ * in flight uses `maskActiveSecrets`, which never returns a value.
+ */
+export const getActiveSecrets = (): string[] => {
+  const context = getPluginExecutionContext();
+  if (context) throw new PluginGrantDeniedError(context.pluginId, 'secrets', 'active-secrets');
+  return Array.from(_activeSecrets);
+};
+
+/** Replaces every active secret value (longer than `minLength`) occurring in `text`. */
+export const maskActiveSecrets = (
+  text: string,
+  replacement = '[REDACTED_SECRET]',
+  minLength = 5
+): string => {
+  let masked = text;
+  for (const secret of _activeSecrets) {
+    if (!secret || secret.length <= minLength) continue;
+    masked = masked.split(secret).join(replacement);
+  }
+  return masked;
+};
 
 export const isSecretPath = (filePath: string): boolean => {
   const resolved = path.resolve(filePath);
@@ -474,6 +497,7 @@ export const isSecretPath = (filePath: string): boolean => {
 export const secretGuard = {
   getSecret,
   getActiveSecrets,
+  maskActiveSecrets,
   grantAccess,
   grantAccessGuarded,
   checkAuthority,

@@ -157,6 +157,8 @@ export function runSkill<T>(skillName: string, fn: () => T): SkillOutput<T> {
 function skillPluginGrantBinding(plugin: LoadedSkillPlugin): PluginGrantBinding {
   if (plugin.contributions) return plugin.contributions.grant;
   const pluginId = path.basename(plugin.resolvedPath);
+  // The loader already resolved the grant from the managed record's trust.
+  if (plugin.grant !== undefined) return createPluginGrantBinding(pluginId, plugin.grant);
   try {
     const trust =
       derivePluginTrustLabel(plugin.resolvedPath).label === 'official' ? 'official' : 'third-party';
