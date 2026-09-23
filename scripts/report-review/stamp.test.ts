@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync, safeWriteFile } from '@agent/core/secure-io';
-import { RV_LAYER_CLOSE, RV_LAYER_OPEN } from './review-layer.js';
+import { reviewLayerMarkup, RV_LAYER_CLOSE, RV_LAYER_OPEN } from './review-layer.js';
 import { main, planReportReviewStamp, readReportReviewStampTextFile } from './stamp.js';
 
 describe('report review stamp plan', () => {
@@ -12,6 +12,19 @@ describe('report review stamp plan', () => {
     expect(plan.changed).toBe(true);
     expect(plan.content).toContain(`${RV_LAYER_OPEN}`);
     expect(plan.content.indexOf(RV_LAYER_OPEN)).toBeLessThan(plan.content.indexOf('</body>'));
+  });
+
+  it('stamps a self-contained layer verbatim and strips it back to the original', () => {
+    const html = '<html><body><main>report $& $1 $` </main></body></html>';
+    const plan = planReportReviewStamp(html, false);
+
+    // The layer carries script sources; `$` sequences must not be read as replace patterns.
+    expect(plan.content).toBe(html.replace('</body>', () => `${reviewLayerMarkup()}\n</body>`));
+    expect(plan.content).toContain('"assets":"inline"');
+    expect(plan.content).toContain('"modules":[');
+    expect(planReportReviewStamp(plan.content, true).content).toBe(
+      html.replace('</body>', '\n</body>')
+    );
   });
 
   it('removes only a previously stamped layer', () => {

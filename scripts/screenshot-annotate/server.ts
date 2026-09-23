@@ -27,6 +27,7 @@ import {
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveTenant } from '@agent/core/tenant-registry';
+import { t as catalogT } from '@agent/core/t';
 import {
   LOCAL_PAD_COMMON_FLAGS,
   LocalPadRequestBodyTooLargeError,
@@ -42,6 +43,7 @@ import {
   screenshotAnnotateSessionDir,
 } from './context.js';
 import { screenshotAnnotatePageHtml } from './page.js';
+import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { composeLegacyCapture } from '../personal-pads/legacy.js';
 
@@ -98,77 +100,20 @@ function isPng(buf: Buffer): boolean {
   return buf.byteLength >= 8 && buf.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
 }
 
-export async function main(
-  args: string[] = [],
-  options: {
-    dryRun?: boolean;
-    check?: boolean;
-    json?: boolean;
-    print?: (value: unknown) => void;
-  } = {}
-): Promise<ScreenshotAnnotateServerResult | undefined> {
-  const positionals = positionalArgs(args, LOCAL_PAD_COMMON_FLAGS);
-  const port = Number(positionals[0] || SCREENSHOT_ANNOTATE_DEFAULT_PORT);
-  const out = option(args, '--out') || defaultScreenshotAnnotateOutputDir();
-  const defaultInstruction = option(args, '--instruction') || '';
-  assertProtocolServiceRegistered('screenshot-annotate');
+export interface ScreenshotAnnotateRequestHandlerOptions {
+  token: string;
+  out: string;
+  handoff: string;
+  defaultInstruction: string;
+  padContext: ReturnType<typeof createScreenshotAnnotateContext>;
+  print: (value: unknown) => void;
+}
 
-  const tier = (option(args, '--tier') || 'personal') as 'public' | 'confidential' | 'personal';
-  if (!['public', 'confidential', 'personal'].includes(tier)) {
-    throw new ScriptExitError(1, `invalid tier: ${tier}`);
-  }
-  const serverTenant = getRegisteredEnvText('KYBERION_TENANT')?.trim();
-  const cliTenant = option(args, '--tenant')?.trim();
-  if (serverTenant && cliTenant && serverTenant !== cliTenant) {
-    throw new ScriptExitError(1, 'CLI tenant does not match server-side KYBERION_TENANT scope');
-  }
-  if (tier !== 'public' && !serverTenant) {
-    throw new ScriptExitError(
-      1,
-      'confidential and personal pads require server-side KYBERION_TENANT scope'
-    );
-  }
-  const requestedTenant = serverTenant || cliTenant;
-  if (requestedTenant?.trim()) {
-    resolveTenant(requestedTenant.trim());
-  }
-  const padContext = createScreenshotAnnotateContext({
-    artifact_ref: option(args, '--artifact-ref') || out,
-    viewer_principal:
-      getRegisteredEnvText('KYBERION_VIEWER_PRINCIPAL') ||
-      getRegisteredEnvText('KYBERION_MCP_PRINCIPAL') ||
-      'local-annotator',
-    tier,
-    tenant_slug: requestedTenant,
-    organization_id: option(args, '--organization-id'),
-    project_id: option(args, '--project-id'),
-    mission_id: option(args, '--mission-id'),
-  });
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new ScriptExitError(1, `invalid port: ${port}`);
-  }
-
-  const handoff = screenshotAnnotateHandoffLogicalPath(out);
-  const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
-  const url = `http://127.0.0.1:${port}/`;
-  const preview: ScreenshotAnnotateServerResult = {
-    ok: true,
-    mode,
-    out,
-    handoff,
-    port,
-    url,
-    artifact_ref: padContext.artifact_ref,
-    scope: padContext.scope,
-    listening: false,
-  };
-  const print = options.print ?? (() => undefined);
-  if (options.dryRun || options.check) {
-    print(preview);
-    return preview;
-  }
-
-  const TOKEN = randomBytes(16).toString('hex');
+/** The pad's request handler (page, shared UI assets, health, screenshot, export). */
+export function createScreenshotAnnotateRequestHandler(
+  options: ScreenshotAnnotateRequestHandlerOptions
+): http.RequestListener {
+  const { token: TOKEN, out, handoff, defaultInstruction, padContext, print } = options;
   let activeHeavyRequests = 0;
   function acquireHeavyRequest(): (() => void) | undefined {
     if (activeHeavyRequests >= SCREENSHOT_ANNOTATE_MAX_CONCURRENT_HEAVY_REQUESTS) return undefined;
@@ -346,9 +291,11 @@ export async function main(
     };
   }
 
-  const server = http.createServer((req, res) => {
+  return (req, res) => {
     try {
-      if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+      if (handlePadUiAsset(req, res)) return;
+      const pathname = (req.url || '').split(/[?#]/, 1)[0];
+      if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
         const release = acquireHeavyRequest();
         if (!release) {
           res.writeHead(503, { 'Retry-After': '1' });
@@ -358,6 +305,7 @@ export async function main(
         res.once('finish', release);
         res.once('close', release);
         const html = screenshotAnnotatePageHtml({
+          locale: resolvePadLocale(req),
           token: TOKEN,
           exportUrl: '/export',
           screenshotUrl: '/screenshot',
@@ -454,7 +402,90 @@ export async function main(
         res.end(e instanceof Error ? e.message : String(e));
       }
     }
+  };
+}
+
+export async function main(
+  args: string[] = [],
+  options: {
+    dryRun?: boolean;
+    check?: boolean;
+    json?: boolean;
+    print?: (value: unknown) => void;
+  } = {}
+): Promise<ScreenshotAnnotateServerResult | undefined> {
+  const positionals = positionalArgs(args, LOCAL_PAD_COMMON_FLAGS);
+  const port = Number(positionals[0] || SCREENSHOT_ANNOTATE_DEFAULT_PORT);
+  const out = option(args, '--out') || defaultScreenshotAnnotateOutputDir();
+  const defaultInstruction = option(args, '--instruction') || '';
+  assertProtocolServiceRegistered('screenshot-annotate');
+
+  const tier = (option(args, '--tier') || 'personal') as 'public' | 'confidential' | 'personal';
+  if (!['public', 'confidential', 'personal'].includes(tier)) {
+    throw new ScriptExitError(1, `invalid tier: ${tier}`);
+  }
+  const serverTenant = getRegisteredEnvText('KYBERION_TENANT')?.trim();
+  const cliTenant = option(args, '--tenant')?.trim();
+  if (serverTenant && cliTenant && serverTenant !== cliTenant) {
+    throw new ScriptExitError(1, 'CLI tenant does not match server-side KYBERION_TENANT scope');
+  }
+  if (tier !== 'public' && !serverTenant) {
+    throw new ScriptExitError(
+      1,
+      'confidential and personal pads require server-side KYBERION_TENANT scope'
+    );
+  }
+  const requestedTenant = serverTenant || cliTenant;
+  if (requestedTenant?.trim()) {
+    resolveTenant(requestedTenant.trim());
+  }
+  const padContext = createScreenshotAnnotateContext({
+    artifact_ref: option(args, '--artifact-ref') || out,
+    viewer_principal:
+      getRegisteredEnvText('KYBERION_VIEWER_PRINCIPAL') ||
+      getRegisteredEnvText('KYBERION_MCP_PRINCIPAL') ||
+      'local-annotator',
+    tier,
+    tenant_slug: requestedTenant,
+    organization_id: option(args, '--organization-id'),
+    project_id: option(args, '--project-id'),
+    mission_id: option(args, '--mission-id'),
   });
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new ScriptExitError(1, `invalid port: ${port}`);
+  }
+
+  const handoff = screenshotAnnotateHandoffLogicalPath(out);
+  const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
+  const url = `http://127.0.0.1:${port}/`;
+  const preview: ScreenshotAnnotateServerResult = {
+    ok: true,
+    mode,
+    out,
+    handoff,
+    port,
+    url,
+    artifact_ref: padContext.artifact_ref,
+    scope: padContext.scope,
+    listening: false,
+  };
+  const print = options.print ?? (() => undefined);
+  if (options.dryRun || options.check) {
+    print(preview);
+    return preview;
+  }
+
+  const TOKEN = randomBytes(16).toString('hex');
+  const server = http.createServer(
+    createScreenshotAnnotateRequestHandler({
+      token: TOKEN,
+      out,
+      handoff,
+      defaultInstruction,
+      padContext,
+      print,
+    })
+  );
   server.requestTimeout = SCREENSHOT_ANNOTATE_REQUEST_TIMEOUT_MS;
   server.headersTimeout = SCREENSHOT_ANNOTATE_HEADERS_TIMEOUT_MS;
   server.keepAliveTimeout = SCREENSHOT_ANNOTATE_KEEP_ALIVE_TIMEOUT_MS;
@@ -503,7 +534,7 @@ export async function main(
           `  scope  : ${padContext.scope.scope_kind}/${padContext.scope.tenant_slug || 'system'}`
         );
         print(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only)`);
-        print('  Prefer paste/drop; OS capture is best-effort on darwin.');
+        print(`  ${catalogT('screenshot_annotate:server_usage_hint')}`);
       }
       resolve();
     });
