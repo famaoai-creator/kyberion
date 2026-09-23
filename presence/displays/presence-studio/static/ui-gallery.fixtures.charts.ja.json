@@ -1,0 +1,990 @@
+{
+  "version": 1,
+  "catalog": "kyberion-base",
+  "sections": [
+    {
+      "id": "bar-chart",
+      "title": "棒グラフ ui:bar-chart",
+      "description": "グループ・積み上げ(2px の隙間)・単一系列。2 系列以上は凡例を出し、隠しテーブルが全値を持ちます。",
+      "components": [
+        {
+          "id": "bar-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "md"
+          },
+          "children": ["bar-c1", "bar-c2", "bar-c3"]
+        },
+        {
+          "id": "bar-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["bar1"]
+        },
+        {
+          "id": "bar-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["bar2"]
+        },
+        {
+          "id": "bar-c3",
+          "type": "ui:section",
+          "props": {},
+          "children": ["bar3"]
+        },
+        {
+          "id": "bar1",
+          "type": "ui:bar-chart",
+          "props": {
+            "title": "曜日別の依頼件数",
+            "categories": ["月", "火", "水", "木", "金"],
+            "series": [
+              {
+                "name": "承認",
+                "values": [12, 15, 9, 18, 14]
+              },
+              {
+                "name": "差し戻し",
+                "values": [3, 2, 5, 1, 4]
+              }
+            ]
+          }
+        },
+        {
+          "id": "bar2",
+          "type": "ui:bar-chart",
+          "props": {
+            "title": "エージェント別のタスク",
+            "orientation": "horizontal",
+            "stacked": true,
+            "categories": ["Claude", "Codex", "Gemini", "Grok"],
+            "series": [
+              {
+                "name": "完了",
+                "values": [14, 9, 6, 3]
+              },
+              {
+                "name": "実行中",
+                "values": [3, 4, 2, 1]
+              },
+              {
+                "name": "要対応",
+                "values": [1, 0, 2, 1]
+              }
+            ]
+          }
+        },
+        {
+          "id": "bar3",
+          "type": "ui:bar-chart",
+          "props": {
+            "title": "応答時間の中央値",
+            "orientation": "horizontal",
+            "unit": "s",
+            "data": [
+              {
+                "label": "検索",
+                "value": 1.2
+              },
+              {
+                "label": "要約",
+                "value": 3.4
+              },
+              {
+                "label": "メール下書き",
+                "value": 2.1
+              },
+              {
+                "label": "翻訳",
+                "value": 0.8
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "line-chart",
+      "title": "折れ線グラフ ui:line-chart",
+      "description": "ラベル(等間隔)でも数値(線形)でも。2〜4 系列は線の終端にも名前を出します。",
+      "components": [
+        {
+          "id": "line-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "md"
+          },
+          "children": ["line-c1", "line-c2"]
+        },
+        {
+          "id": "line-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["line1"]
+        },
+        {
+          "id": "line-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["line2"]
+        },
+        {
+          "id": "line1",
+          "type": "ui:line-chart",
+          "props": {
+            "title": "日別の進行中ミッション",
+            "series": [
+              {
+                "name": "今週",
+                "points": [
+                  {
+                    "x": "月",
+                    "y": 4
+                  },
+                  {
+                    "x": "火",
+                    "y": 6
+                  },
+                  {
+                    "x": "水",
+                    "y": 5
+                  },
+                  {
+                    "x": "木",
+                    "y": 8
+                  },
+                  {
+                    "x": "金",
+                    "y": 7
+                  },
+                  {
+                    "x": "土",
+                    "y": 3
+                  },
+                  {
+                    "x": "日",
+                    "y": 2
+                  }
+                ]
+              },
+              {
+                "name": "先週",
+                "points": [
+                  {
+                    "x": "月",
+                    "y": 3
+                  },
+                  {
+                    "x": "火",
+                    "y": 4
+                  },
+                  {
+                    "x": "水",
+                    "y": 4
+                  },
+                  {
+                    "x": "木",
+                    "y": 5
+                  },
+                  {
+                    "x": "金",
+                    "y": 6
+                  },
+                  {
+                    "x": "土",
+                    "y": 2
+                  },
+                  {
+                    "x": "日",
+                    "y": 1
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "line2",
+          "type": "ui:line-chart",
+          "props": {
+            "title": "トークン消費(千)",
+            "area": true,
+            "y_unit": "k",
+            "series": [
+              {
+                "name": "消費",
+                "points": [
+                  {
+                    "x": 1,
+                    "y": 12
+                  },
+                  {
+                    "x": 2,
+                    "y": 18
+                  },
+                  {
+                    "x": 3,
+                    "y": 15
+                  },
+                  {
+                    "x": 4,
+                    "y": 22
+                  },
+                  {
+                    "x": 5,
+                    "y": 30
+                  },
+                  {
+                    "x": 6,
+                    "y": 26
+                  },
+                  {
+                    "x": 7,
+                    "y": 19
+                  },
+                  {
+                    "x": 8,
+                    "y": 24
+                  },
+                  {
+                    "x": 9,
+                    "y": 35
+                  },
+                  {
+                    "x": 10,
+                    "y": 31
+                  },
+                  {
+                    "x": 11,
+                    "y": 28
+                  },
+                  {
+                    "x": 12,
+                    "y": 40
+                  },
+                  {
+                    "x": 13,
+                    "y": 37
+                  },
+                  {
+                    "x": 14,
+                    "y": 33
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "donut",
+      "title": "ドーナツ ui:donut",
+      "description": "構成比。凡例に値と割合を出し、9 区分以上は「その他」にまとめます。",
+      "components": [
+        {
+          "id": "donut-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "md"
+          },
+          "children": ["donut-c1", "donut-c2"]
+        },
+        {
+          "id": "donut-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["donut1"]
+        },
+        {
+          "id": "donut-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["donut2"]
+        },
+        {
+          "id": "donut1",
+          "type": "ui:donut",
+          "props": {
+            "title": "ミッションの結果",
+            "segments": [
+              {
+                "label": "完了",
+                "value": 42
+              },
+              {
+                "label": "実行中",
+                "value": 11
+              },
+              {
+                "label": "要対応",
+                "value": 4
+              },
+              {
+                "label": "中止",
+                "value": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "donut2",
+          "type": "ui:donut",
+          "props": {
+            "title": "プロバイダ別の費用",
+            "unit": " USD",
+            "center_label": "今月",
+            "data": [
+              {
+                "label": "Anthropic",
+                "value": 120
+              },
+              {
+                "label": "OpenAI",
+                "value": 64
+              },
+              {
+                "label": "Google",
+                "value": 31
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sparkline",
+      "title": "スパークライン ui:sparkline",
+      "description": "指標カードの中の小さな推移。最後の点を強調し、欠損は線を切ります。",
+      "components": [
+        {
+          "id": "spark-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 3,
+            "gap": "md"
+          },
+          "children": ["spark-c1", "spark-c2", "spark-c3"]
+        },
+        {
+          "id": "spark-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["spark-m1", "spark1"]
+        },
+        {
+          "id": "spark-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["spark-m2", "spark2"]
+        },
+        {
+          "id": "spark-c3",
+          "type": "ui:section",
+          "props": {},
+          "children": ["spark-m3", "spark3"]
+        },
+        {
+          "id": "spark-m1",
+          "type": "ui:metric",
+          "props": {
+            "label": "承認待ち",
+            "value": 7
+          }
+        },
+        {
+          "id": "spark1",
+          "type": "ui:sparkline",
+          "props": {
+            "label": "承認待ち(直近 14 日)",
+            "points": [3, 4, 6, 5, 8, 7, 9, 6, 5, 7, 8, 6, 7, 7]
+          }
+        },
+        {
+          "id": "spark-m2",
+          "type": "ui:metric",
+          "props": {
+            "label": "エラー率",
+            "value": "2.4",
+            "unit": "%"
+          }
+        },
+        {
+          "id": "spark2",
+          "type": "ui:sparkline",
+          "props": {
+            "label": "エラー率(直近 14 日)",
+            "tone": "danger",
+            "unit": "%",
+            "show_value": true,
+            "points": [1.2, 1.4, 1.1, null, 2.0, 2.6, 2.2, 2.9, 3.1, 2.8, 2.5, 2.7, 2.3, 2.4]
+          }
+        },
+        {
+          "id": "spark-m3",
+          "type": "ui:metric",
+          "props": {
+            "label": "学びの蒸留",
+            "value": 31
+          }
+        },
+        {
+          "id": "spark3",
+          "type": "ui:sparkline",
+          "props": {
+            "label": "学びの蒸留(直近 14 日)",
+            "tone": "success",
+            "points": [1, 2, 2, 3, 5, 6, 8, 11, 13, 17, 20, 24, 27, 31]
+          }
+        }
+      ]
+    },
+    {
+      "id": "stat-list",
+      "title": "統計のまとめ ui:stat-list",
+      "description": "平均・中央値・p95 などを 1 行に。狭い画面では折り返します。",
+      "components": [
+        {
+          "id": "stat-card",
+          "type": "ui:section",
+          "props": {},
+          "children": ["stat1"]
+        },
+        {
+          "id": "stat1",
+          "type": "ui:stat-list",
+          "props": {
+            "title": "応答時間(直近 7 日)",
+            "items": [
+              {
+                "label": "平均",
+                "value": 1.8,
+                "unit": "s"
+              },
+              {
+                "label": "中央値",
+                "value": 1.4,
+                "unit": "s"
+              },
+              {
+                "label": "p95",
+                "value": 4.2,
+                "unit": "s",
+                "hint": "95% の依頼はこれより速い"
+              },
+              {
+                "label": "最大",
+                "value": 7.9,
+                "unit": "s",
+                "hint": "火曜 14:05"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "heatmap",
+      "title": "ヒートマップ ui:heatmap",
+      "description": "密度は単色の濃淡、増減は 2 色+中間の灰色。値のないセルは破線です。",
+      "components": [
+        {
+          "id": "heat-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "md"
+          },
+          "children": ["heat-c1", "heat-c2"]
+        },
+        {
+          "id": "heat-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["heat1"]
+        },
+        {
+          "id": "heat-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["heat2"]
+        },
+        {
+          "id": "heat1",
+          "type": "ui:heatmap",
+          "props": {
+            "title": "曜日×時間帯の依頼数",
+            "rows": ["月", "火", "水", "木", "金", "土", "日"],
+            "columns": ["8:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00"],
+            "values": [
+              [1, 3, 6, 8, 7, 4, 2],
+              [2, 4, 7, 9, 8, 5, 1],
+              [1, 3, 5, 7, 9, 6, 2],
+              [2, 5, 8, 9, 7, 4, 1],
+              [1, 4, 6, 8, 6, 3, 1],
+              [0, 1, 1, 2, 1, 1, 0],
+              [0, 0, 1, 1, 1, 0, null]
+            ]
+          }
+        },
+        {
+          "id": "heat2",
+          "type": "ui:heatmap",
+          "props": {
+            "title": "前週比の増減",
+            "scale": "diverging",
+            "show_values": true,
+            "rows": ["営業", "サポート", "経理"],
+            "columns": ["W1", "W2", "W3", "W4", "W5"],
+            "values": [
+              [4, 2, -1, -3, 5],
+              [-6, -2, 0, 3, 6],
+              [1, -4, -5, 2, 0]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "meter",
+      "title": "メーター ui:meter",
+      "description": "上限に対する使用量。しきい値を超えると記号と言葉で状態を示し、色だけに頼りません。",
+      "components": [
+        {
+          "id": "meter-card",
+          "type": "ui:section",
+          "props": {},
+          "children": ["meter1", "meter2", "meter3", "meter4", "meter5"]
+        },
+        {
+          "id": "meter1",
+          "type": "ui:meter",
+          "props": {
+            "label": "今月の予算",
+            "value": 62,
+            "max": 100,
+            "unit": "%",
+            "thresholds": [
+              {
+                "value": 0,
+                "tone": "success"
+              },
+              {
+                "value": 80,
+                "tone": "warning"
+              },
+              {
+                "value": 95,
+                "tone": "danger"
+              }
+            ]
+          }
+        },
+        {
+          "id": "meter2",
+          "type": "ui:meter",
+          "props": {
+            "label": "コンテキスト",
+            "value": 86,
+            "max": 100,
+            "unit": "%",
+            "thresholds": [
+              {
+                "value": 80,
+                "tone": "warning"
+              },
+              {
+                "value": 95,
+                "tone": "danger"
+              }
+            ]
+          }
+        },
+        {
+          "id": "meter3",
+          "type": "ui:meter",
+          "props": {
+            "label": "ストレージ",
+            "value": 97,
+            "max": 100,
+            "unit": " GB",
+            "thresholds": [
+              {
+                "value": 80,
+                "tone": "warning"
+              },
+              {
+                "value": 95,
+                "tone": "danger"
+              }
+            ],
+            "description": "古い証跡はアーカイブできます。"
+          }
+        },
+        {
+          "id": "meter4",
+          "type": "ui:meter",
+          "props": {
+            "label": "完了したタスク",
+            "value": 18,
+            "max": 24
+          }
+        },
+        {
+          "id": "meter5",
+          "type": "ui:meter",
+          "props": {
+            "label": "完了率",
+            "value": 72,
+            "max": 100,
+            "unit": "%",
+            "direction": "higher_is_better",
+            "thresholds": [
+              {
+                "value": 0,
+                "tone": "danger"
+              },
+              {
+                "value": 50,
+                "tone": "warning"
+              },
+              {
+                "value": 80,
+                "tone": "success"
+              }
+            ],
+            "description": "高いほど良い指標: 状態は目標に対して表示します。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sequence",
+      "title": "シーケンス ui:sequence",
+      "description": "参加者レーン間のやり取りを時系列で。返信は破線、自分宛ては折り返し、状態は記号+言葉で示します。",
+      "components": [
+        {
+          "id": "seq-card",
+          "type": "ui:section",
+          "props": {},
+          "children": ["seq1"]
+        },
+        {
+          "id": "seq1",
+          "type": "ui:sequence",
+          "props": {
+            "title": "承認の受け渡し",
+            "participants": [
+              {
+                "id": "user",
+                "label": "あなた"
+              },
+              {
+                "id": "concierge",
+                "label": "秘書室"
+              },
+              {
+                "id": "agent",
+                "label": "Claude"
+              },
+              {
+                "id": "chronos",
+                "label": "管制塔"
+              }
+            ],
+            "messages": [
+              {
+                "from": "user",
+                "to": "concierge",
+                "label": "Q3 レポートを作って",
+                "at": "09:02"
+              },
+              {
+                "from": "concierge",
+                "to": "chronos",
+                "label": "ミッション開始",
+                "at": "09:03",
+                "status": "done"
+              },
+              {
+                "from": "chronos",
+                "to": "agent",
+                "label": "タスクを割当",
+                "at": "09:03"
+              },
+              {
+                "from": "agent",
+                "to": "agent",
+                "label": "構成を計画",
+                "at": "09:05",
+                "kind": "note"
+              },
+              {
+                "from": "agent",
+                "to": "chronos",
+                "label": "下書き完了",
+                "at": "09:21",
+                "kind": "reply",
+                "status": "review"
+              },
+              {
+                "from": "chronos",
+                "to": "user",
+                "label": "承認しますか?",
+                "at": "09:22",
+                "status": "pending"
+              },
+              {
+                "from": "user",
+                "to": "chronos",
+                "label": "承認",
+                "at": "09:40",
+                "kind": "reply",
+                "status": "completed"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "flow",
+      "title": "フロー ui:flow",
+      "description": "左から右への段階的な DAG。並びは決定的で、ノードの状態は状態ピルの語彙を使います。",
+      "components": [
+        {
+          "id": "flow-card1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["flow1"]
+        },
+        {
+          "id": "flow-card2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["flow2"]
+        },
+        {
+          "id": "flow1",
+          "type": "ui:flow",
+          "props": {
+            "title": "ミッション → タスク → エージェント",
+            "stages": [
+              {
+                "id": "mission",
+                "label": "ミッション"
+              },
+              {
+                "id": "task",
+                "label": "タスク"
+              },
+              {
+                "id": "agent",
+                "label": "エージェント"
+              }
+            ],
+            "nodes": [
+              {
+                "id": "m1",
+                "label": "Q3 レポート",
+                "stage": "mission",
+                "status": "active"
+              },
+              {
+                "id": "t1",
+                "label": "数値を集める",
+                "stage": "task",
+                "status": "completed"
+              },
+              {
+                "id": "t2",
+                "label": "下書きを書く",
+                "stage": "task",
+                "status": "running"
+              },
+              {
+                "id": "t3",
+                "label": "レビュー",
+                "stage": "task",
+                "status": "pending"
+              },
+              {
+                "id": "a1",
+                "label": "Claude",
+                "stage": "agent",
+                "status": "busy"
+              },
+              {
+                "id": "a2",
+                "label": "Codex",
+                "stage": "agent",
+                "status": "available"
+              }
+            ],
+            "edges": [
+              {
+                "from": "m1",
+                "to": "t1"
+              },
+              {
+                "from": "m1",
+                "to": "t2"
+              },
+              {
+                "from": "m1",
+                "to": "t3"
+              },
+              {
+                "from": "t1",
+                "to": "a2",
+                "label": "担当"
+              },
+              {
+                "from": "t2",
+                "to": "a1",
+                "label": "担当"
+              },
+              {
+                "from": "t3",
+                "to": "a1"
+              }
+            ]
+          }
+        },
+        {
+          "id": "flow2",
+          "type": "ui:flow",
+          "props": {
+            "title": "公開パイプライン(段階指定なし: 最長経路で配置)",
+            "nodes": [
+              {
+                "id": "fetch",
+                "label": "取得",
+                "status": "done"
+              },
+              {
+                "id": "parse",
+                "label": "解析",
+                "status": "done"
+              },
+              {
+                "id": "validate",
+                "label": "検証",
+                "status": "failed"
+              },
+              {
+                "id": "enrich",
+                "label": "補強",
+                "meta": "任意"
+              },
+              {
+                "id": "publish",
+                "label": "公開",
+                "status": "blocked"
+              }
+            ],
+            "edges": [
+              {
+                "from": "fetch",
+                "to": "parse"
+              },
+              {
+                "from": "parse",
+                "to": "validate"
+              },
+              {
+                "from": "parse",
+                "to": "enrich"
+              },
+              {
+                "from": "validate",
+                "to": "publish"
+              },
+              {
+                "from": "enrich",
+                "to": "publish"
+              },
+              {
+                "from": "validate",
+                "to": "fetch",
+                "label": "再試行"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "chart-empty",
+      "title": "データなし ui:bar-chart / ui:meter / ui:sparkline / ui:sequence",
+      "description": "データがない・不正なときは、壊れたグラフではなく落ち着いた空状態を表示します。",
+      "components": [
+        {
+          "id": "empty-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 3,
+            "gap": "md"
+          },
+          "children": ["empty-c1", "empty-c2", "empty-c3"]
+        },
+        {
+          "id": "empty-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["empty1"]
+        },
+        {
+          "id": "empty-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["empty2", "empty4"]
+        },
+        {
+          "id": "empty-c3",
+          "type": "ui:section",
+          "props": {},
+          "children": ["empty3"]
+        },
+        {
+          "id": "empty1",
+          "type": "ui:bar-chart",
+          "props": {
+            "title": "曜日別の依頼件数",
+            "categories": [],
+            "series": []
+          }
+        },
+        {
+          "id": "empty2",
+          "type": "ui:meter",
+          "props": {
+            "label": "今月の予算",
+            "value": null
+          }
+        },
+        {
+          "id": "empty4",
+          "type": "ui:sparkline",
+          "props": {
+            "label": "エラー率",
+            "points": []
+          }
+        },
+        {
+          "id": "empty3",
+          "type": "ui:sequence",
+          "props": {
+            "title": "承認の受け渡し",
+            "participants": [],
+            "messages": []
+          }
+        }
+      ]
+    }
+  ]
+}

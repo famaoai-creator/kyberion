@@ -983,6 +983,37 @@ export function checkContractSchemas(): string[] {
     violations.push('a2ui-message: expected invalid payload to fail');
   }
 
+  // UI-01: kyberion-base catalog props contract (draft 2020-12, union types).
+  const a2uiCatalogValidate = compileSchema(
+    pathResolver.rootResolve('knowledge/product/schemas/a2ui-catalog-kyberion-base.schema.json'),
+    createAjv2020({ allowUnionTypes: true })
+  );
+  const validCatalogComponents = [
+    { type: 'ui:metric', props: { label: 'Active', value: 3, trend: 'up' } },
+    { type: 'ui:status-pill', props: { status: 'blocked', domain: 'mission' } },
+    { id: 'go', type: 'ui:button', props: { label: 'Open', href: '/missions' } },
+  ];
+  for (const payload of validCatalogComponents) {
+    if (!a2uiCatalogValidate(payload)) {
+      violations.push(
+        `a2ui-catalog-kyberion-base: expected valid payload to pass (${JSON.stringify(a2uiCatalogValidate.errors || [])})`
+      );
+    }
+  }
+  const invalidCatalogComponents = [
+    { type: 'ui:metric', props: { label: 'Active' } },
+    { type: 'ui:status-pill', props: { status: 'green' } },
+    { type: 'ui:button', props: { label: 'Open', href: '/', style: 'x' } },
+    { type: 'display:metric', props: {} },
+  ];
+  for (const payload of invalidCatalogComponents) {
+    if (a2uiCatalogValidate(payload)) {
+      violations.push(
+        `a2ui-catalog-kyberion-base: expected invalid payload to fail (${JSON.stringify(payload)})`
+      );
+    }
+  }
+
   return violations;
 }
 

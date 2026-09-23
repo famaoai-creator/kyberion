@@ -1,7 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, CheckCircle2, CircleStop, Play, RefreshCw } from 'lucide-react';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
+import { Badge, Button, Callout, Section, Select, Table, TextField } from '@agent/shared-ui';
+import { ChronosFieldScope, ChronosInline, ChronosMeta, ChronosToolbar } from './chronos-ui';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import {
@@ -125,75 +127,57 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
     ['unhealthy', 'degraded', 'unknown'].includes(surface.health.toLowerCase())
   ).length;
 
-  return (
-    <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-            {uxText('chronos_nav_surface_control', locale)}
-          </div>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
-            {uxText('chronos_surface_control', locale)}
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 kb-text-secondary">
-            {uxText('chronos_surface_control_description', locale)}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          className="rounded-xl border kb-border-subtle kb-surface-sunken p-2 kb-text-secondary"
-          aria-label={uxText('chronos_refresh', locale)}
-        >
-          <RefreshCw size={14} />
-        </button>
-      </div>
+  const onFieldChange = (name: string, value: unknown) => {
+    const text = typeof value === 'string' ? value : '';
+    if (name === 'surface_query') setSurfaceQuery(text);
+    else if (
+      name === 'surface_filter' &&
+      (text === 'all' || text === 'attention' || text === 'running' || text === 'stopped')
+    ) {
+      setSurfaceFilter(text);
+    }
+  };
+  const globalLatest = latestAction('surface-runtime');
 
-      {error ? (
-        <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-          {error}
-        </div>
-      ) : null}
+  return (
+    <Section
+      title={uxText('chronos_surface_control', locale)}
+      description={uxText('chronos_surface_control_description', locale)}
+      actions={[
+        {
+          label: uxText('chronos_refresh', locale),
+          variant: 'ghost',
+          onClick: () => void refresh(),
+        },
+      ]}
+    >
+      {error ? <Callout tone="danger" title={error} /> : null}
 
       {pendingAction ? (
-        <div className="mt-4 rounded-2xl border kb-status-warning-border kb-status-warning-surface p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={16} className="mt-0.5 kb-status-warning" />
-            <div className="min-w-0">
-              <div className="text-[11px] font-semibold kb-status-warning">
-                {uxText('chronos_surface_control_confirm_title', locale)}
-              </div>
-              <div className="mt-1 text-[11px] kb-text-secondary">
-                {surfaceActionLabel(pendingAction.action, locale)} ·{' '}
-                {pendingAction.surfaceId || uxText('chronos_surfaces', locale)}
-              </div>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void execute(pendingAction.surfaceId, pendingAction.action)}
-                  className="rounded-lg border kb-status-warning-border kb-status-warning-surface px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-status-warning"
-                >
-                  {uxText('chronos_surface_control_confirm', locale)}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingAction(null)}
-                  className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary"
-                >
-                  {uxText('chronos_cb_back', locale)}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Callout
+          tone="warning"
+          title={uxText('chronos_surface_control_confirm_title', locale)}
+          body={`${surfaceActionLabel(pendingAction.action, locale)} · ${
+            pendingAction.surfaceId || uxText('chronos_surfaces', locale)
+          }`}
+        >
+          <ChronosInline>
+            <Button
+              variant="danger"
+              label={uxText('chronos_surface_control_confirm', locale)}
+              onClick={() => void execute(pendingAction.surfaceId, pendingAction.action)}
+            />
+            <Button
+              variant="ghost"
+              label={uxText('chronos_cb_back', locale)}
+              onClick={() => setPendingAction(null)}
+            />
+          </ChronosInline>
+        </Callout>
       ) : null}
 
-      <div className="mt-5 rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] kb-text-secondary">
-          <Play size={13} />
-          {uxText('chronos_surface_control_global', locale)}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+      <Section headingLevel={3} title={uxText('chronos_surface_control_global', locale)}>
+        <ChronosInline>
           {data.controlActionAvailability.globalSurface.map((action) => (
             <ActionButton
               key={action.operation}
@@ -204,125 +188,117 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
             />
           ))}
           {data.controlActionAvailability.globalSurface.length === 0 ? (
-            <span className="text-[11px] kb-text-muted">
-              {uxText('chronos_surface_control_no_actions', locale)}
-            </span>
+            <ChronosMeta>{uxText('chronos_surface_control_no_actions', locale)}</ChronosMeta>
           ) : null}
-        </div>
-        {latestAction('surface-runtime') ? (
-          <ActionStatus action={latestAction('surface-runtime') as ActionSummary} locale={locale} />
-        ) : null}
-      </div>
+        </ChronosInline>
+        {globalLatest ? <ActionStatus action={globalLatest} locale={locale} /> : null}
+      </Section>
 
-      <div className="mt-4 grid gap-3">
-        {data.surfaces.length === 0 ? (
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
-            {uxText('chronos_no_managed_surfaces', locale)}
-          </div>
-        ) : (
-          <>
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-[11px] kb-text-secondary">
-                  {uxText('chronos_surface_list_detail', locale)}
-                </div>
-                <div className="flex flex-wrap gap-2 text-[10px]">
-                  <span className="rounded-full kb-status-warning-surface px-2 py-1 kb-status-warning">
-                    {uxText('chronos_attention', locale)} {surfaceAttentionCount}
-                  </span>
-                  <span className="rounded-full kb-surface-raised px-2 py-1 kb-text-secondary">
-                    {uxText('chronos_surface_visible_count', locale)} {visibleSurfaces.length}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <input
-                  value={surfaceQuery}
-                  onChange={(event) => setSurfaceQuery(event.target.value)}
-                  placeholder={uxText('chronos_surface_search_placeholder', locale)}
-                  aria-label={uxText('chronos_surface_search_label', locale)}
-                  className="min-w-[220px] flex-1 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-primary placeholder:kb-text-muted"
+      <Section
+        headingLevel={3}
+        title={uxText('chronos_surfaces', locale)}
+        description={uxText('chronos_surface_list_detail', locale)}
+      >
+        <ChronosFieldScope onChange={onFieldChange}>
+          <ChronosToolbar>
+            <TextField
+              name="surface_query"
+              type="search"
+              label={uxText('chronos_surface_search_label', locale)}
+              hide_label
+              placeholder={uxText('chronos_surface_search_placeholder', locale)}
+              value={surfaceQuery}
+            />
+            <Select
+              name="surface_filter"
+              label={uxText('chronos_surface_filter_label', locale)}
+              hide_label
+              value={surfaceFilter}
+              options={[
+                { value: 'all', label: uxText('chronos_surface_filter_all', locale) },
+                { value: 'attention', label: uxText('chronos_surface_filter_attention', locale) },
+                { value: 'running', label: uxText('chronos_surface_filter_running', locale) },
+                { value: 'stopped', label: uxText('chronos_surface_filter_stopped', locale) },
+              ]}
+            />
+            <div className="chronos-toolbar__end">
+              <ChronosInline>
+                <Badge
+                  tone={surfaceAttentionCount > 0 ? 'warning' : 'neutral'}
+                  label={`${uxText('chronos_attention', locale)} ${surfaceAttentionCount}`}
                 />
-                <select
-                  value={surfaceFilter}
-                  onChange={(event) => setSurfaceFilter(event.target.value as typeof surfaceFilter)}
-                  aria-label={uxText('chronos_surface_filter_label', locale)}
-                  className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-primary"
-                >
-                  <option value="all">{uxText('chronos_surface_filter_all', locale)}</option>
-                  <option value="attention">
-                    {uxText('chronos_surface_filter_attention', locale)}
-                  </option>
-                  <option value="running">
-                    {uxText('chronos_surface_filter_running', locale)}
-                  </option>
-                  <option value="stopped">
-                    {uxText('chronos_surface_filter_stopped', locale)}
-                  </option>
-                </select>
-              </div>
+                <Badge
+                  label={`${uxText('chronos_surface_visible_count', locale)} ${visibleSurfaces.length}`}
+                />
+              </ChronosInline>
             </div>
-            {visibleSurfaces.length === 0 ? (
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
-                {uxText('chronos_surface_no_matches', locale)}
-              </div>
-            ) : null}
-            {visibleSurfaces.map((surface) => {
-              const actions = data.controlActionAvailability.surface[surface.id] || [];
-              return (
-                <article
-                  key={surface.id}
-                  className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold kb-text-primary">{surface.id}</div>
-                      <div className="mt-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                        {surfaceKindLabel(surface.kind, locale)} ·{' '}
-                        {surfaceStateLabel(surface.running ? 'running' : 'stopped', locale)} ·{' '}
-                        {surfaceStateLabel(surface.health, locale)}
-                      </div>
-                    </div>
-                    <div
-                      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${surface.running ? 'kb-status-positive-surface kb-status-positive' : 'kb-surface-raised kb-text-secondary'}`}
-                    >
-                      {surface.running ? (
-                        <CheckCircle2 size={11} className="inline" />
-                      ) : (
-                        <CircleStop size={11} className="inline" />
-                      )}{' '}
-                      {surfaceStateLabel(surface.health, locale)}
-                    </div>
-                  </div>
-                  {surface.detail ? (
-                    <div className="mt-2 text-[10px] kb-text-muted">{surface.detail}</div>
-                  ) : null}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {actions.map((action) => (
-                      <ActionButton
-                        key={action.operation}
-                        action={action}
-                        busy={busyKey === `${surface.id}:${action.operation}`}
-                        locale={locale}
-                        onClick={() => requestAction(surface.id, action)}
-                      />
-                    ))}
-                  </div>
-                  {latestAction(surface.id) ? (
-                    <ActionStatus
-                      action={latestAction(surface.id) as ActionSummary}
+          </ChronosToolbar>
+        </ChronosFieldScope>
+        <Table
+          columns={[
+            { key: 'surface', label: uxText('chronos_surface_col_surface', locale) },
+            { key: 'running', label: uxText('chronos_surface_col_running', locale), width: '8rem' },
+            { key: 'health', label: uxText('chronos_surface_col_health', locale), width: '8rem' },
+            { key: 'actions', label: uxText('chronos_surface_col_actions', locale), align: 'end' },
+          ]}
+          row_key="id"
+          empty={
+            data.surfaces.length === 0
+              ? uxText('chronos_no_managed_surfaces', locale)
+              : uxText('chronos_surface_no_matches', locale)
+          }
+          rows={visibleSurfaces.map((surface) => {
+            const actions = data.controlActionAvailability.surface[surface.id] || [];
+            const latest = latestAction(surface.id);
+            return {
+              id: surface.id,
+              surface: (
+                <span className="chronos-work-cell">
+                  <span className="chronos-work-cell__title">{surface.id}</span>
+                  <ChronosMeta>
+                    {[surfaceKindLabel(surface.kind, locale), surface.detail]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </ChronosMeta>
+                  {latest ? <ActionStatus action={latest} locale={locale} /> : null}
+                </span>
+              ),
+              running: {
+                status: surface.running ? 'running' : 'stopped',
+                label: surfaceStateLabel(surface.running ? 'running' : 'stopped', locale),
+              },
+              health: {
+                status: HEALTH_STATUS[surface.health.toLowerCase()] || 'n/a',
+                label: surfaceStateLabel(surface.health, locale),
+              },
+              actions: (
+                <ChronosInline>
+                  {actions.map((action) => (
+                    <ActionButton
+                      key={action.operation}
+                      action={action}
+                      busy={busyKey === `${surface.id}:${action.operation}`}
                       locale={locale}
+                      onClick={() => requestAction(surface.id, action)}
                     />
-                  ) : null}
-                </article>
-              );
-            })}
-          </>
-        )}
-      </div>
-    </section>
+                  ))}
+                </ChronosInline>
+              ),
+            };
+          })}
+        />
+      </Section>
+    </Section>
   );
 }
+
+/** Surface health → canonical `ui:status-pill` status. */
+const HEALTH_STATUS: Record<string, KbStatus> = {
+  healthy: 'ready',
+  degraded: 'degraded',
+  unhealthy: 'error',
+  unknown: 'n/a',
+};
 
 function ActionButton({
   action,
@@ -336,32 +312,31 @@ function ActionButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!action.enabled || busy}
-      title={action.disabledReason}
-      className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-40 ${action.risk === 'risky' ? 'kb-status-negative-border kb-status-negative-surface kb-status-negative' : 'kb-border-accent kb-surface-accent kb-text-accent'}`}
-    >
-      {busy ? uxText('chronos_working', locale) : surfaceActionLabel(action, locale)}
-    </button>
+    <span title={action.disabledReason}>
+      <Button
+        variant={action.risk === 'risky' ? 'danger' : 'secondary'}
+        disabled={!action.enabled || busy}
+        label={busy ? uxText('chronos_working', locale) : surfaceActionLabel(action, locale)}
+        onClick={onClick}
+      />
+    </span>
   );
 }
 
 function ActionStatus({ action, locale }: { action: ActionSummary; locale: SupportedLocale }) {
   return (
-    <div className="mt-3 flex flex-wrap gap-2 text-[10px] kb-text-muted">
-      <span>{surfaceActionLabel(action, locale)}</span>
-      <span className="font-mono kb-text-secondary">
-        {surfaceStatusLabel(action.status, locale)}
-      </span>
-      {action.requested_by ? (
-        <span>
-          {uxText('chronos_requested_by', locale)} {action.requested_by}
-        </span>
-      ) : null}
-      {action.error ? <span className="kb-status-negative">{action.error}</span> : null}
-    </div>
+    <ChronosMeta>
+      {[
+        surfaceActionLabel(action, locale),
+        surfaceStatusLabel(action.status, locale),
+        action.requested_by
+          ? `${uxText('chronos_requested_by', locale)} ${action.requested_by}`
+          : '',
+        action.error || '',
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+    </ChronosMeta>
   );
 }
 

@@ -19,7 +19,7 @@ import {
   Ruler,
 } from 'lucide-react';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createChronosWebDesignSystem } from '@agent/core/web-design-system';
 import { AgentOpsBoards } from '../components/AgentOpsBoards';
 import {
@@ -62,6 +62,7 @@ import { useChronosLocale } from '../lib/hooks';
 import {
   CONSOLE_SECTIONS,
   buildPlanPreviewSignature,
+  resolveConsoleSectionParam,
   buildQuickActionGroups,
   buildStatusCards,
   isPlanPreviewStale,
@@ -74,6 +75,7 @@ import {
 } from './chronos-page-config';
 import { ChronosMirrorShell } from './ChronosMirrorShell';
 import {
+  applyChronosThemeMode,
   nextChronosThemeMode,
   resolveChronosThemeMode,
   type ChronosThemeMode,
@@ -112,6 +114,8 @@ export default function ChronosMirrorV2() {
 function ChronosMirrorV2Content() {
   const locale = useChronosLocale();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const tenant = useChronosTenant();
   const organizationId = searchParams.get('organization_id') || '';
   const projectId = searchParams.get('project_id') || '';
@@ -128,6 +132,9 @@ function ChronosMirrorV2Content() {
   const [tenantCssVars, setTenantCssVars] = useState<Record<string, string>>({});
   const [tenantLabel, setTenantLabel] = useState<string | null>(null);
   const [themeModePreference, setThemeModePreference] = useState<ChronosThemeMode>('system');
+  // The stored choice is read after mount (SSR renders 'system'); until then
+  // the head bootstrap script's data-theme must not be cleared or overwritten.
+  const [themeModeLoaded, setThemeModeLoaded] = useState(false);
   const [systemPrefersDark, setSystemPrefersDark] = useState(true);
   const [planRequestText, setPlanRequestText] = useState('');
   const [planMissionType, setPlanMissionType] = useState('proposal-brief');
@@ -212,6 +219,7 @@ function ChronosMirrorV2Content() {
   useEffect(() => {
     const prefs = loadChronosThemeMode();
     if (prefs) setThemeModePreference(prefs);
+    setThemeModeLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -228,17 +236,18 @@ function ChronosMirrorV2Content() {
   }, []);
 
   useEffect(() => {
+    if (!themeModeLoaded) return;
     saveChronosThemeMode(themeModePreference);
-  }, [themeModePreference]);
+    applyChronosThemeMode(themeModePreference);
+  }, [themeModeLoaded, themeModePreference]);
 
   const themeMode = resolveChronosThemeMode(themeModePreference, systemPrefersDark);
   const webDesignSystem = useMemo(() => createChronosWebDesignSystem(themeMode), [themeMode]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    document.documentElement.dataset.theme = themeMode;
-    document.documentElement.style.colorScheme = themeMode;
-  }, [themeMode]);
+    document.documentElement.lang = locale === 'ja' ? 'ja' : 'en';
+  }, [locale]);
 
   useEffect(() => {
     let cancelled = false;
@@ -455,60 +464,41 @@ function ChronosMirrorV2Content() {
 
   const [a2uiActionNotice, setA2uiActionNotice] = useState<string | null>(null);
   const sectionFromUrl = searchParams.get('section');
-  const initialSection: ConsoleSectionId =
-    sectionFromUrl &&
-    [
-      'home',
-      'organization',
-      'missions',
-      'work-items',
-      'surface-control',
-      'deliverables',
-      'approvals',
-      'knowledge',
-      'operations',
-      'governance',
-      'diagnostics',
-      'surface',
-    ].includes(sectionFromUrl)
-      ? (sectionFromUrl as ConsoleSectionId)
-      : 'home';
+  // UI-07: `?section=` addresses a section inside the five nav groups;
+  // retired ids (e.g. `governance`) resolve through CHRONOS_SECTION_ALIASES.
+  const initialSection: ConsoleSectionId = resolveConsoleSectionParam(sectionFromUrl) ?? 'home';
   const [consoleSection, setConsoleSection] = useState<ConsoleSectionId>(initialSection);
   const [surfaceOrigin, setSurfaceOrigin] = useState<ConsoleContentSection>('home');
 
   useEffect(() => {
-    if (!sectionFromUrl) return;
-    if (
-      [
-        'home',
-        'organization',
-        'missions',
-        'work-items',
-        'surface-control',
-        'deliverables',
-        'approvals',
-        'knowledge',
-        'operations',
-        'governance',
-        'diagnostics',
-        'surface',
-      ].includes(sectionFromUrl)
-    ) {
-      setConsoleSection(sectionFromUrl as ConsoleSectionId);
-    }
+    const resolved = resolveConsoleSectionParam(sectionFromUrl);
+    if (resolved) setConsoleSection(resolved);
   }, [sectionFromUrl]);
 
-  const openConsoleSection = useCallback((section: ConsoleSectionId) => {
-    if (section === 'surface') {
-      setSurfaceOrigin('home');
-    }
-    setConsoleSection(section);
-    setSurface(null);
-    setFocusedOperatorView(null);
-    setFocusedOperatorMissionId(null);
-    setMissionIntelligenceFocus(null);
-    setMissionIntelligenceFocusedMissionId(null);
-  }, []);
+  const openConsoleSection = useCallback(
+    (requested: ConsoleSectionId) => {
+      const section = resolveConsoleSectionParam(requested) ?? 'home';
+      if (section === 'surface') {
+        setSurfaceOrigin('home');
+      }
+      setConsoleSection(section);
+      setSurface(null);
+      setFocusedOperatorView(null);
+      setFocusedOperatorMissionId(null);
+      setMissionIntelligenceFocus(null);
+      setMissionIntelligenceFocusedMissionId(null);
+      // Keep the address bar a deep link to the open section (tenant /
+      // organization / project params are preserved).
+      if (section !== 'surface') {
+        const params = new URLSearchParams(searchParams.toString());
+        if (section === 'home') params.delete('section');
+        else params.set('section', section);
+        const query = params.toString();
+        router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
+      }
+    },
+    [pathname, router, searchParams]
+  );
 
   // SU-02: operator clicks on actionable A2UI components move things forward.
   const handleA2UIComponentAction = useCallback(async (action: any) => {
@@ -906,94 +896,21 @@ function ChronosMirrorV2Content() {
     [deliverables, showCleanedDeliverables]
   );
 
-  const homeCopy = useMemo(() => {
-    const counts = operatorHomeSummary?.counts;
-    const blocked = Number(counts?.blockedMissions || 0);
-    const approvals = Number(counts?.pendingApprovals || 0);
-    const planned = operatorHomeSummary?.plannedMissions?.length || 0;
-    const inbox = Number(counts?.unreadInbox || 0);
-    const status = operatorHomeSummary?.status;
-    const statusMessage =
-      status === 'blocked'
-        ? uxMessage(
-            'chronos_home_status_blocked',
-            { count: blocked },
-            'Paused or failed missions need review.',
-            locale
-          )
-        : status === 'attention'
-          ? uxText('chronos_home_status_attention', locale)
-          : operatorHomeSummary
-            ? uxText('chronos_home_status_clear', locale)
-            : uxText('chronos_cb_reading_state', locale);
-    const actionTitle =
-      blocked > 0
-        ? uxText('chronos_home_action_blocked', locale)
-        : approvals > 0
-          ? uxText('chronos_home_action_approvals', locale)
-          : planned > 0
-            ? uxText('chronos_home_action_planned', locale)
-            : inbox > 0
-              ? uxText('chronos_home_action_inbox', locale)
-              : uxText('chronos_home_action_clear', locale);
-    const actionReason =
-      blocked > 0
-        ? uxMessage(
-            'chronos_home_reason_blocked',
-            { count: blocked },
-            'Review the cause and next step for the paused or failed missions.',
-            locale
-          )
-        : approvals > 0
-          ? uxMessage(
-              'chronos_home_reason_approvals',
-              { count: approvals },
-              'Review the requested changes waiting for approval.',
-              locale
-            )
-          : planned > 0
-            ? uxMessage(
-                'chronos_home_reason_planned',
-                { count: planned },
-                'Review what the planned missions cover.',
-                locale
-              )
-            : inbox > 0
-              ? uxMessage(
-                  'chronos_home_reason_inbox',
-                  { count: inbox },
-                  'Review the items waiting for your check.',
-                  locale
-                )
-              : uxText('chronos_cb_all_clear_detail', locale);
-    const statusLabel =
-      status === 'blocked' || status === 'attention'
-        ? uxText('chronos_status_needs_action', locale)
-        : operatorHomeSummary
-          ? uxText('chronos_status_clear', locale)
-          : uxText('chronos_working', locale);
-    return { statusMessage, actionTitle, actionReason, statusLabel };
-  }, [locale, operatorHomeSummary]);
-
-  const homePrimaryAction = useMemo(() => {
-    if (!operatorHomeSummary) return null;
-    const counts = operatorHomeSummary.counts;
-    const target: { targetId: string; surface: 'mission-intelligence' | 'focused-operator' } =
-      counts.blockedMissions > 0
-        ? { targetId: 'needs-attention', surface: 'mission-intelligence' }
-        : counts.pendingApprovals > 0
-          ? { targetId: 'approvals', surface: 'mission-intelligence' }
-          : (operatorHomeSummary.plannedMissions?.length ?? 0) > 0
-            ? { targetId: 'mission-control-plane', surface: 'mission-intelligence' }
-            : counts.unreadInbox > 0
-              ? { targetId: 'recent-surface-outbox', surface: 'mission-intelligence' }
-              : { targetId: 'mission-control-plane', surface: 'mission-intelligence' };
-    return {
-      title: homeCopy.actionTitle,
-      reason: homeCopy.actionReason,
-      ...target,
-    };
-  }, [homeCopy, operatorHomeSummary]);
+  /**
+   * Human titles for mission ids (goal summaries from the control plane and
+   * mission history); rows fall back to a humanized id with the id in mono.
+   */
+  const missionTitles = useMemo(() => {
+    const titles: Record<string, string> = {};
+    for (const mission of missionHistory) {
+      const title = mission.goalSummary || mission.intentText;
+      if (title) titles[mission.missionId] = title;
+    }
+    for (const mission of operatorHomeSummary?.activeMissions ?? []) {
+      if (mission.goalSummary) titles[mission.missionId] = mission.goalSummary;
+    }
+    return titles;
+  }, [missionHistory, operatorHomeSummary]);
 
   /**
    * The counters double as navigation: each one is the shortest path to the
@@ -1219,8 +1136,7 @@ function ChronosMirrorV2Content() {
     activeScenario,
     cleanedDeliverableCount,
     visibleDeliverables,
-    homeCopy,
-    homePrimaryAction,
+    missionTitles,
     homeCounters,
     webTheme,
     webLayout,

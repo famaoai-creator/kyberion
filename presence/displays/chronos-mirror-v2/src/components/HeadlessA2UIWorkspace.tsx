@@ -1,12 +1,21 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { A2UIRenderer } from './A2UIComponentLibrary';
+import { Callout, Section, Skeleton } from '@agent/shared-ui';
+import { ChronosA2UIRenderer } from './A2UIComponentLibrary';
+import { ChronosKbI18n } from './chronos-kb-i18n';
+import { useChronosLocale } from '../lib/hooks';
+import { uxTextOr } from '../lib/ux-vocabulary';
 import {
   parseHeadlessA2UIResponse,
   type HeadlessA2UIComponent,
 } from '../lib/headless-a2ui-response';
 
+/**
+ * The scoped operator-home projection fetched from the headless API and
+ * rendered through the same A2UI path as every other chronos surface
+ * (`ChronosA2UIRenderer` → shared `@agent/shared-ui` renderer).
+ */
 export function HeadlessA2UIWorkspace({
   tenant,
   organizationId,
@@ -16,7 +25,8 @@ export function HeadlessA2UIWorkspace({
   organizationId?: string;
   projectId?: string;
 }) {
-  const [components, setComponents] = useState<HeadlessA2UIComponent[]>([]);
+  const locale = useChronosLocale();
+  const [components, setComponents] = useState<HeadlessA2UIComponent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -55,33 +65,31 @@ export function HeadlessA2UIWorkspace({
   }, [query]);
 
   return (
-    <section className="rounded-[24px] border kb-border-subtle kb-surface-well p-4">
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.24em] kb-text-accent">
-            Headless API → A2UI
-          </div>
-          <div className="mt-1 text-[11px] kb-text-secondary">
-            The same scoped operator projection rendered through the A2UI adapter.
-          </div>
-        </div>
-        <code className="text-[9px] kb-text-muted">operator-home</code>
-      </div>
-      {error ? (
-        <div className="rounded-xl border kb-status-negative-border kb-status-negative-surface p-3 text-[10px] kb-status-negative">
-          {error}
-        </div>
-      ) : components.length === 0 ? (
-        <div className="rounded-xl border kb-border-subtle p-3 text-[10px] kb-text-secondary">
-          Loading headless projection…
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {components.map((component) => (
-            <A2UIRenderer key={component.id} type={component.type} props={component.props} />
-          ))}
-        </div>
-      )}
-    </section>
+    <ChronosKbI18n>
+      <Section
+        title={uxTextOr('chronos_headless_a2ui_title', 'Headless API → A2UI', locale)}
+        description={uxTextOr(
+          'chronos_headless_a2ui_description',
+          'The same scoped operator projection rendered through the A2UI adapter.',
+          locale
+        )}
+      >
+        {error ? (
+          <Callout
+            tone="danger"
+            title={uxTextOr(
+              'chronos_headless_a2ui_error',
+              'The headless projection could not be loaded.',
+              locale
+            )}
+            body={error}
+          />
+        ) : components === null ? (
+          <Skeleton shape="card" lines={4} />
+        ) : (
+          <ChronosA2UIRenderer components={components} />
+        )}
+      </Section>
+    </ChronosKbI18n>
   );
 }

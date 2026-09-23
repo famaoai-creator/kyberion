@@ -1,82 +1,166 @@
 <!doctype html>
-<html lang="ja">
+<html lang="{{locale}}" data-density="comfortable">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>ホーム — Kyberion</title>
-    <!-- Kyberion Design System (DS-01 canonical tokens) -->
-    <link rel="stylesheet" href="./design-system.css" />
-    <link rel="stylesheet" href="/api/design-tokens.css" />
-    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
-    <link rel="stylesheet" href="/front-desk-rail.css" />
+    <title>{{t:front_desk:nav_home}} — Kyberion</title>
+    <!-- UI-06: theme + language applied before first paint (kyberion.ui.theme / kyberion.ui.locale) -->
+    <script src="/front-desk-prefs.js"></script>
+    <!-- Kyberion Design System: generated --kb-ui-* tokens + kyberion-base component classes -->
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/kyberion-ui.css" />
+    <link rel="stylesheet" href="/design-system.css" />
     <!-- FD-02: home page styles -->
     <link rel="stylesheet" href="/home.css" />
   </head>
   <body>
-    <div class="fd-layout">
-      <nav id="front-desk-rail" class="front-desk-rail"></nav>
-      <div class="fd-content">
-        <main class="home-shell">
-          <section class="home-briefing" id="briefing-card">
-            <div class="home-briefing-date" id="briefing-date"></div>
-            <p class="home-briefing-sentence" id="briefing-sentence"></p>
-            <p class="home-briefing-recommend hidden" id="briefing-recommend"></p>
-          </section>
+    <div class="kb-app-shell" data-density="comfortable">
+      <div class="kb-app-shell__nav" id="front-desk-rail">{{partial:rail}}</div>
+      <main class="kb-app-shell__main">
+        <header class="kb-page-header">
+          <div class="kb-page-header__titles">
+            <h1 class="kb-page-header__title">
+              {{t:front_desk:nav_home}}
+              <span class="kb-badge" data-role="presence-studio"
+                >{{t:presence_studio:shell_role_badge}}</span
+              >
+            </h1>
+            <p class="kb-page-header__subtitle">{{t:front_desk:nav_home_sub}}</p>
+          </div>
+          {{partial:shell-controls}}
+        </header>
 
-          <section class="home-ask" aria-label="頼む">
+        <div class="ps-page">
+          <!-- FD-02 briefing, rendered as the kyberion-base `ui:next-action` -->
+          <div id="home-next">
+            <section class="kb-next-action" data-state="loading" aria-busy="true">
+              <div class="kb-next-action__body">
+                <div
+                  class="kb-skeleton"
+                  role="status"
+                  aria-busy="true"
+                  aria-label="{{t:ui:skeleton_loading}}"
+                >
+                  <span class="kb-skeleton__line" aria-hidden="true"></span>
+                  <span class="kb-skeleton__line" aria-hidden="true"></span>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section class="kb-section home-ask" aria-label="{{t:front_desk:nav_ask}}">
             <form id="ask-form" class="home-ask-form">
               <div class="home-ask-row">
-                <input type="text" id="ask-input" class="home-ask-input" autocomplete="off" />
+                <input
+                  type="text"
+                  id="ask-input"
+                  class="kb-input home-ask-input"
+                  autocomplete="off"
+                  placeholder="{{t:front_desk:home_ask_placeholder}}"
+                  aria-label="{{t:front_desk:nav_ask}}"
+                />
                 <button
                   type="button"
                   id="ask-mic"
-                  class="home-ask-icon-button"
-                  aria-label=""
+                  class="kb-btn kb-btn--secondary home-icon-button"
+                  aria-label="{{t:front_desk:home_ask_voice}}"
                 ></button>
                 <button
                   type="submit"
                   id="ask-send"
-                  class="home-ask-icon-button home-ask-send-button"
-                  aria-label=""
+                  class="kb-btn kb-btn--primary home-icon-button"
+                  aria-label="{{t:front_desk:home_ask_send}}"
                 ></button>
               </div>
-              <div class="home-ask-chips" id="ask-chips">
-                <button type="button" class="home-chip" data-chip="email"></button>
-                <button type="button" class="home-chip" data-chip="minutes"></button>
-                <button type="button" class="home-chip" data-chip="browser"></button>
-                <button type="button" class="home-chip" data-chip="webapp"></button>
+              <div class="home-chips" id="ask-chips">
+                <button type="button" class="kb-btn kb-btn--secondary home-chip" data-chip="email">
+                  {{t:front_desk:chip_email}}
+                </button>
+                <button
+                  type="button"
+                  class="kb-btn kb-btn--secondary home-chip"
+                  data-chip="minutes"
+                >
+                  {{t:front_desk:chip_minutes}}
+                </button>
+                <button
+                  type="button"
+                  class="kb-btn kb-btn--secondary home-chip"
+                  data-chip="browser"
+                >
+                  {{t:front_desk:chip_browser}}
+                </button>
+                <button type="button" class="kb-btn kb-btn--secondary home-chip" data-chip="webapp">
+                  {{t:front_desk:chip_webapp}}
+                </button>
               </div>
             </form>
           </section>
 
-          <section class="home-columns">
-            <div class="home-card" id="decide-card">
-              <div class="home-card-header">
-                <h2 id="decide-title"></h2>
-                <span class="home-card-count" id="decide-count"></span>
-              </div>
-              <ul class="home-list" id="decide-list"></ul>
-              <p class="home-empty hidden" id="decide-empty"></p>
-              <a class="home-card-footer" id="decide-more" href="#"></a>
-            </div>
+          <div id="home-metrics"></div>
 
-            <div class="home-card" id="progress-card">
-              <div class="home-card-header">
-                <h2 id="progress-title"></h2>
+          <div class="kb-grid home-columns" data-columns="2" data-gap="lg">
+            <section class="kb-section" id="decide-card">
+              <header class="kb-section__header">
+                <div class="kb-section__heading">
+                  <h2 class="kb-section__title">{{t:front_desk:home_decide_title}}</h2>
+                </div>
+                <div class="kb-section__actions">
+                  <span class="kb-badge" id="decide-count" hidden></span>
+                </div>
+              </header>
+              <div id="decide-body">
+                <div
+                  class="kb-skeleton"
+                  role="status"
+                  aria-busy="true"
+                  aria-label="{{t:ui:skeleton_loading}}"
+                >
+                  <span class="kb-skeleton__line" aria-hidden="true"></span>
+                  <span class="kb-skeleton__line" aria-hidden="true"></span>
+                  <span class="kb-skeleton__line" aria-hidden="true"></span>
+                </div>
               </div>
-              <p class="home-card-summary" id="progress-summary"></p>
-              <ul class="home-list" id="progress-list"></ul>
-              <p class="home-empty hidden" id="progress-empty"></p>
-              <a class="home-card-footer" id="progress-more" href="/progress"></a>
-            </div>
-          </section>
-        </main>
-      </div>
+              <div>
+                <a class="kb-btn kb-btn--ghost home-more" id="decide-more" href="#"
+                  >{{t:front_desk:home_decide_more}}</a
+                >
+              </div>
+            </section>
+
+            <section class="kb-section" id="progress-card">
+              <header class="kb-section__header">
+                <div class="kb-section__heading">
+                  <h2 class="kb-section__title">{{t:front_desk:home_progress_title}}</h2>
+                  <p class="kb-section__description" id="progress-summary"></p>
+                </div>
+              </header>
+              <div id="progress-body">
+                <div
+                  class="kb-skeleton"
+                  role="status"
+                  aria-busy="true"
+                  aria-label="{{t:ui:skeleton_loading}}"
+                >
+                  <span class="kb-skeleton__line" aria-hidden="true"></span>
+                  <span class="kb-skeleton__line" aria-hidden="true"></span>
+                  <span class="kb-skeleton__line" aria-hidden="true"></span>
+                </div>
+              </div>
+              <div>
+                <a class="kb-btn kb-btn--ghost home-more" id="progress-more" href="/progress"
+                  >{{t:front_desk:home_progress_more}}</a
+                >
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
     </div>
-    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
-    <script src="/front-desk-rail.js"></script>
     <script src="/home.js"></script>
-    <script>
+    <!-- FD-00 / UI-05: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script type="module" src="/front-desk-rail.js"></script>
+    <script type="module">
       if (window.FrontDeskRail) {
         window.FrontDeskRail.mount(document.getElementById('front-desk-rail'), { current: 'home' });
       }

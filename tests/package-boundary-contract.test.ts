@@ -18,7 +18,13 @@ const IGNORED_DIRS = new Set([
   'work',
   'vault',
 ]);
-const RUNTIME_ROOTS = ['scripts', 'libs/actuators', 'presence/displays', 'satellites'];
+const RUNTIME_ROOTS = [
+  'scripts',
+  'libs/actuators',
+  'libs/shared-ui',
+  'presence/displays',
+  'satellites',
+];
 const TEST_ROOTS = ['tests'];
 const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
   [

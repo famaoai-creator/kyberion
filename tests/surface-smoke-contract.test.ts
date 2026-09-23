@@ -39,10 +39,11 @@ describe('surface smoke contract', () => {
     expect(banner).toContain('chronos_first_run_step_agent');
     expect(banner).toContain('chronos_first_run_step_diagnostics');
     expect(banner).toContain('chronos_first_run_step_tutorial');
-    expect(banner).toContain('Open');
-    expect(banner).toContain('Prereq Check');
-    expect(banner).toContain('Setup Report');
-    expect(banner).toContain('Vital Check');
+    // UI-07 wave 3b: the steps render from the vocabulary in every locale
+    // (the English JSX branch is gone); the quick-action names live there.
+    const vocabulary = read('knowledge/product/orchestration/user-facing-vocabulary.json');
+    expect(banner).not.toContain("locale === 'ja'");
+    expect(vocabulary).toContain('Run Prereq Check and Setup Report');
   });
 
   it('keeps the browser recording example catalog and voice first-win pipeline in place', () => {

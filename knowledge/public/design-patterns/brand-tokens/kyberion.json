@@ -44,12 +44,42 @@
       "_meta": "MP-01 modular type scale. size_pt is the pptx/doc surface size; min_size_pt is the floor layout-fit may shrink to. Weight contrast between display/headline and body is intentional.",
       "scale_ratio": 1.25,
       "roles": {
-        "display": { "size_pt": 36, "min_size_pt": 24, "weight": 800, "line_spacing_pct": 110 },
-        "headline": { "size_pt": 26, "min_size_pt": 18, "weight": 700, "line_spacing_pct": 120 },
-        "title": { "size_pt": 20, "min_size_pt": 14, "weight": 700, "line_spacing_pct": 130 },
-        "body": { "size_pt": 13, "min_size_pt": 10, "weight": 400, "line_spacing_pct": 155 },
-        "label": { "size_pt": 11, "min_size_pt": 9, "weight": 600, "line_spacing_pct": 130 },
-        "caption": { "size_pt": 9, "min_size_pt": 8, "weight": 400, "line_spacing_pct": 125 }
+        "display": {
+          "size_pt": 36,
+          "min_size_pt": 24,
+          "weight": 800,
+          "line_spacing_pct": 110
+        },
+        "headline": {
+          "size_pt": 26,
+          "min_size_pt": 18,
+          "weight": 700,
+          "line_spacing_pct": 120
+        },
+        "title": {
+          "size_pt": 20,
+          "min_size_pt": 14,
+          "weight": 700,
+          "line_spacing_pct": 130
+        },
+        "body": {
+          "size_pt": 13,
+          "min_size_pt": 10,
+          "weight": 400,
+          "line_spacing_pct": 155
+        },
+        "label": {
+          "size_pt": 11,
+          "min_size_pt": 9,
+          "weight": 600,
+          "line_spacing_pct": 130
+        },
+        "caption": {
+          "size_pt": 9,
+          "min_size_pt": 8,
+          "weight": 400,
+          "line_spacing_pct": 125
+        }
       }
     },
     "spacing": {
@@ -71,6 +101,176 @@
         "uniform-font-weight",
         "centered-everything"
       ]
+    },
+    "ui": {
+      "_meta": "UI-02 web UI semantic layer (kyberion-base catalog). Emitted as --kb-ui-* by scripts/generate_design_tokens.ts; tokens.colors stays the media palette. Every text pair is WCAG AA 4.5:1 and border-strong/focus-ring/accent are >= 3:1 against canvas/surface in both themes (scripts/check_design_contrast.ts). 'border' is a decorative divider; controls use border-strong. Role colors are for badges/active markers only.",
+      "light": {
+        "canvas": "#f5f7fa",
+        "surface": "#ffffff",
+        "surface-raised": "#ffffff",
+        "surface-sunken": "#eef1f5",
+        "border": "#dde3ea",
+        "border-strong": "#778599",
+        "text": "#0f172a",
+        "text-muted": "#475569",
+        "text-subtle": "#5b6779",
+        "text-on-accent": "#ffffff",
+        "accent": "#1d4ed8",
+        "accent-hover": "#1e40af",
+        "accent-soft": "#e8effc",
+        "accent-text": "#1d4ed8",
+        "focus-ring": "#2563eb",
+        "status": {
+          "success": {
+            "fg": "#166534",
+            "bg": "#edf7f0",
+            "border": "#a9d8b8"
+          },
+          "warning": {
+            "fg": "#8a4b08",
+            "bg": "#fdf5e6",
+            "border": "#ecc98f"
+          },
+          "danger": {
+            "fg": "#b42318",
+            "bg": "#fdf0ef",
+            "border": "#f1b8b2"
+          },
+          "info": {
+            "fg": "#1d4f91",
+            "bg": "#edf3fb",
+            "border": "#b5cbe9"
+          }
+        },
+        "role": {
+          "concierge": "#8a5a12",
+          "presence-studio": "#0f766e",
+          "chronos-mirror-v2": "#4338ca",
+          "operator-surface": "#a3305f",
+          "computer-surface": "#4d6a16"
+        },
+        "shadow": {
+          "sm": "0 1px 2px rgba(15, 23, 42, 0.06)",
+          "md": "0 2px 6px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06)"
+        },
+        "viz": {
+          "categorical": [
+            "#2a78d6",
+            "#dc5d28",
+            "#189866",
+            "#b07500",
+            "#d4507f",
+            "#008300",
+            "#4a3aa7",
+            "#e34948"
+          ],
+          "sequential": ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#0d366b"],
+          "diverging": ["#1c5cab", "#86b6ef", "#e3e6eb", "#f2a097", "#c4312f"],
+          "sequential_ink": ["#0f172a", "#0f172a", "#000000", "#ffffff", "#ffffff"],
+          "diverging_ink": ["#ffffff", "#0f172a", "#0f172a", "#0f172a", "#ffffff"]
+        }
+      },
+      "dark": {
+        "canvas": "#0d131e",
+        "surface": "#141b29",
+        "surface-raised": "#1a2334",
+        "surface-sunken": "#0a0f18",
+        "border": "#28324a",
+        "border-strong": "#5f7090",
+        "text": "#e6ebf2",
+        "text-muted": "#a6b1c3",
+        "text-subtle": "#8f9bb0",
+        "text-on-accent": "#0b1220",
+        "accent": "#7aa7ff",
+        "accent-hover": "#9dbcff",
+        "accent-soft": "#172746",
+        "accent-text": "#9dbcff",
+        "focus-ring": "#7aa7ff",
+        "status": {
+          "success": {
+            "fg": "#6fd39b",
+            "bg": "#0f2519",
+            "border": "#285c3f"
+          },
+          "warning": {
+            "fg": "#eec26a",
+            "bg": "#2a200b",
+            "border": "#6b5118"
+          },
+          "danger": {
+            "fg": "#ff9b8f",
+            "bg": "#301518",
+            "border": "#7a3238"
+          },
+          "info": {
+            "fg": "#8ec1ff",
+            "bg": "#0f2140",
+            "border": "#2d5288"
+          }
+        },
+        "role": {
+          "concierge": "#e0ad62",
+          "presence-studio": "#5cc4b5",
+          "chronos-mirror-v2": "#aab6ff",
+          "operator-surface": "#f19ac0",
+          "computer-surface": "#a9cb72"
+        },
+        "shadow": {
+          "sm": "0 1px 2px rgba(0, 0, 0, 0.35)",
+          "md": "0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3)"
+        },
+        "viz": {
+          "categorical": [
+            "#3987e5",
+            "#d95926",
+            "#199e70",
+            "#c98500",
+            "#d55181",
+            "#008300",
+            "#9085e9",
+            "#e66767"
+          ],
+          "sequential": ["#184f95", "#256abf", "#3987e5", "#6da7ec", "#b7d3f6"],
+          "diverging": ["#6da7ec", "#2a5a96", "#3a4252", "#9a4541", "#e66767"],
+          "sequential_ink": ["#e6ebf2", "#e6ebf2", "#0b1220", "#0b1220", "#0b1220"],
+          "diverging_ink": ["#0b1220", "#e6ebf2", "#e6ebf2", "#e6ebf2", "#0b1220"]
+        }
+      },
+      "radius": {
+        "sm": "4px",
+        "md": "8px",
+        "lg": "12px"
+      },
+      "space": {
+        "1": "4px",
+        "2": "8px",
+        "3": "12px",
+        "4": "16px",
+        "5": "24px",
+        "6": "32px",
+        "7": "48px"
+      },
+      "font_size": {
+        "comfortable": {
+          "xs": "12px",
+          "sm": "13px",
+          "md": "15px",
+          "lg": "18px",
+          "xl": "22px",
+          "xxl": "28px"
+        },
+        "compact": {
+          "xs": "11px",
+          "sm": "12px",
+          "md": "13px",
+          "lg": "15px",
+          "xl": "18px",
+          "xxl": "22px"
+        }
+      },
+      "font_family": {
+        "sans": "Inter, \"Hiragino Sans\", \"Noto Sans JP\", \"Yu Gothic UI\", Meiryo, system-ui, sans-serif"
+      }
     }
   }
 }

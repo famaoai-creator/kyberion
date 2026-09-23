@@ -3,16 +3,26 @@
 
 import * as React from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
 import {
-  CheckCircle2,
-  Eye,
-  FileText,
-  Image as ImageIcon,
-  MessageSquare,
-  XCircle,
-} from 'lucide-react';
+  Badge,
+  Button,
+  Callout,
+  EmptyState,
+  KeyValue,
+  Section,
+  Skeleton,
+  StatusPill,
+} from '@agent/shared-ui';
+import { WsPreformatted, WsSelectTable, WsTextareaField, WsTitleCell } from './ChronosWsParts';
 import { useChronosLocale } from '../lib/hooks';
-import { formatChronosDateTime, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
+import {
+  formatChronosDateTime,
+  uxMessage,
+  uxText,
+  uxTextOr,
+  type SupportedLocale,
+} from '../lib/ux-vocabulary';
 import {
   parseDeliverablesResponse,
   type ClientDeliverable as Deliverable,
@@ -143,12 +153,14 @@ export function DeliverablesWorkspace({
       })
       .catch((err) => {
         if (!cancelled)
-          setPreview(`Preview error: ${err instanceof Error ? err.message : String(err)}`);
+          setPreview(
+            `${uxTextOr('chronos_ws_preview_error', 'Preview error', locale)}: ${err instanceof Error ? err.message : String(err)}`
+          );
       });
     return () => {
       cancelled = true;
     };
-  }, [selected]);
+  }, [selected, locale]);
 
   const review = async (verdict: 'accept' | 'request-changes' | 'reject') => {
     if (!selected) return;
@@ -170,224 +182,209 @@ export function DeliverablesWorkspace({
     }
   };
 
+  const localAdmin = accessRole === 'localadmin';
+  const scopeLabel = `${tenant || uxText('chronos_ac_scope_all', locale)} · ${items.length}`;
+  const showAllHref = (() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('tenant');
+    params.set('section', 'deliverables');
+    return `${pathname}${params.size ? `?${params.toString()}` : ''}`;
+  })();
+  const selectedUrl = selected ? assetUrl(selected) : null;
+
   return (
-    <section className="kyberion-glass rounded-[30px] border kb-border-subtle p-5 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-            {uxText('chronos_deliverables', locale)}
-          </div>
-          <h2 className="mt-1 text-xl font-semibold kb-text-primary">
-            {uxText('chronos_deliverables_preview_title', locale)}
-          </h2>
-          <p className="mt-2 text-sm leading-6 kb-text-secondary">
-            {uxText('chronos_deliverables_description', locale)}
-          </p>
+    <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.5fr)]">
+      <Section
+        title={uxText('chronos_deliverables_preview_title', locale)}
+        description={uxText('chronos_deliverables_description', locale)}
+      >
+        <div className="flex flex-wrap gap-2">
+          <Badge label={scopeLabel} tone="accent" />
         </div>
-        <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[10px] kb-text-accent">
-          {tenant || uxText('chronos_ac_scope_all', locale)} · {items.length}
-        </span>
-      </div>
-      {error ? (
-        <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface p-3 text-[11px] kb-status-negative">
-          {error}
-        </div>
-      ) : null}
-      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.5fr)]">
-        <div className="chronos-scroll max-h-[calc(100vh-18rem)] space-y-2 overflow-y-auto pr-1">
-          {loading ? (
-            <div className="rounded-xl border kb-border-subtle p-4 text-[11px] kb-text-muted">
-              {uxText('chronos_loading', locale)}…
-            </div>
-          ) : null}
-          {!loading && items.length === 0 ? (
-            <div className="rounded-xl border kb-border-subtle kb-surface-sunken p-4 text-[11px] kb-text-muted">
-              <div>{uxText('chronos_deliverables_empty', locale)}</div>
-              {tenant ? (
-                <>
-                  <div className="mt-2 leading-5">
-                    {uxText('chronos_deliverables_empty_tenant_hint', locale)}
-                  </div>
-                  <a
-                    href={(() => {
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.delete('tenant');
-                      params.set('section', 'deliverables');
-                      return `${pathname}${params.size ? `?${params.toString()}` : ''}`;
-                    })()}
-                    className="mt-3 rounded-lg border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] font-semibold kb-text-accent"
-                  >
-                    {uxText('chronos_deliverables_show_all', locale)}
-                  </a>
-                </>
-              ) : null}
-            </div>
-          ) : null}
-          {items.map((item) => (
-            <button
-              key={item.artifactId}
-              type="button"
-              aria-pressed={selected?.artifactId === item.artifactId}
-              onClick={() => setSelectedId(item.artifactId)}
-              className={`w-full rounded-xl border p-3 text-left transition ${selected?.artifactId === item.artifactId ? 'kb-border-accent kb-surface-accent' : 'kb-border-subtle kb-surface-sunken hover:kb-surface-raised'}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-xs font-semibold kb-text-primary">{item.kind}</span>
-                <span className="text-[9px] kb-text-muted">
-                  {reviewLabel(item.reviewVerdict, locale)}
-                </span>
-              </div>
-              <div className="mt-2 truncate text-[10px] kb-text-secondary">
-                {item.tenantSlug || uxText('chronos_org_not_configured', locale)} /{' '}
-                {item.projectId || uxText('chronos_org_not_configured', locale)}
-              </div>
-              <div className="mt-1 truncate text-[10px] kb-text-muted">
-                {item.path || item.externalRef || item.artifactId}
-              </div>
-            </button>
-          ))}
-        </div>
-        {selected ? (
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] kb-text-accent">
-                  <Eye size={13} /> {uxText('chronos_preview_review', locale)}
+        {error ? (
+          <Callout
+            tone="danger"
+            title={uxTextOr('chronos_ws_load_failed', 'Could not load this view', locale)}
+            body={error}
+          />
+        ) : null}
+        {loading && items.length === 0 ? (
+          <Skeleton shape="table" lines={4} label={uxText('chronos_loading', locale)} />
+        ) : items.length === 0 ? (
+          <EmptyState
+            title={uxText('chronos_deliverables_empty', locale)}
+            body={tenant ? uxText('chronos_deliverables_empty_tenant_hint', locale) : undefined}
+            action={
+              tenant
+                ? { label: uxText('chronos_deliverables_show_all', locale), href: showAllHref }
+                : undefined
+            }
+          />
+        ) : (
+          <WsSelectTable
+            columns={[
+              { key: 'kind', label: uxTextOr('chronos_ws_col_deliverable', 'Deliverable', locale) },
+              { key: 'review', label: uxText('chronos_col_status', locale), width: '8rem' },
+            ]}
+            rows={items}
+            rowKey={(item) => item.artifactId}
+            selectedKey={selected?.artifactId}
+            onSelect={setSelectedId}
+            empty={uxText('chronos_deliverables_empty', locale)}
+            renderCell={(item, key, select) =>
+              key === 'kind' ? (
+                <div className="flex flex-col gap-0.5">
+                  <WsTitleCell
+                    title={item.kind}
+                    id={item.path || item.externalRef || item.artifactId}
+                    onSelect={select}
+                    selected={selected?.artifactId === item.artifactId}
+                  />
+                  <span className="kb-list__meta">
+                    {item.tenantSlug || uxText('chronos_org_not_configured', locale)} /{' '}
+                    {item.projectId || uxText('chronos_org_not_configured', locale)}
+                  </span>
                 </div>
-                <h3 className="mt-1 text-lg font-semibold kb-text-primary">{selected.kind}</h3>
-                <p className="mt-1 break-all text-[10px] kb-text-muted">
-                  {selected.path || selected.externalRef || selected.artifactId}
-                </p>
-              </div>
-              <span className="rounded-full border kb-border-subtle px-2 py-1 text-[10px] kb-text-secondary">
-                {reviewLabel(selected.reviewVerdict, locale)}
-              </span>
-            </div>
-            <div className="mt-4 grid gap-2 text-[10px] sm:grid-cols-3">
-              <div>
-                <span className="kb-text-muted">{uxText('chronos_tenant', locale)}</span>
-                <div className="kb-text-primary">{selected.tenantSlug || '-'}</div>
-              </div>
-              <div>
-                <span className="kb-text-muted">{uxText('chronos_project_mission', locale)}</span>
-                <div className="kb-text-primary">
-                  {selected.projectId || '-'} /{' '}
-                  {selected.missionId && onOpenMission ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenMission(selected.missionId!)}
-                      className="font-mono kb-text-accent hover:underline"
-                    >
-                      {selected.missionId}
-                    </button>
-                  ) : (
-                    selected.missionId || '-'
-                  )}
-                </div>
-              </div>
-              <div>
-                <span className="kb-text-muted">{uxText('chronos_updated', locale)}</span>
-                <div className="kb-text-primary">
-                  {formatChronosDateTime(selected.updatedAt, locale)}
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 overflow-hidden rounded-xl border kb-border-subtle kb-surface-raised">
-              {selected.missing ? (
-                <div className="p-5 text-[11px] kb-status-negative">
-                  {uxText('chronos_deliverable_missing', locale)}
-                </div>
-              ) : isTextAsset(selected) || selected.previewText ? (
-                <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap p-4 text-[11px] leading-5 kb-text-secondary">
-                  {preview ?? selected.previewText ?? uxText('chronos_no_inline_preview', locale)}
-                </pre>
-              ) : isImageAsset(selected) && assetUrl(selected) ? (
-                <img
-                  src={assetUrl(selected) || ''}
-                  alt={selected.kind}
-                  className="max-h-[28rem] w-full object-contain"
-                />
-              ) : isPdfAsset(selected) && assetUrl(selected) ? (
-                <iframe
-                  title={`${selected.kind} preview`}
-                  src={assetUrl(selected) || ''}
-                  className="h-[28rem] w-full bg-white"
-                />
-              ) : selected.previewText ? (
-                <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap p-4 text-[11px] leading-5 kb-text-secondary">
-                  {selected.previewText}
-                </pre>
               ) : (
-                <div className="p-5 text-[11px] kb-text-muted">
-                  <FileText size={16} className="mb-2" />
-                  {uxText('chronos_no_inline_preview', locale)}
-                </div>
+                <StatusPill
+                  status={reviewStatus(item.reviewVerdict)}
+                  label={reviewLabel(item.reviewVerdict, locale)}
+                />
+              )
+            }
+          />
+        )}
+      </Section>
+
+      {selected ? (
+        <Section title={selected.kind} description={uxText('chronos_preview_review', locale)}>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill
+              status={reviewStatus(selected.reviewVerdict)}
+              label={reviewLabel(selected.reviewVerdict, locale)}
+            />
+            <span className="chronos-mission-cell__id">
+              {selected.path || selected.externalRef || selected.artifactId}
+            </span>
+          </div>
+          <dl className="kb-kv">
+            <dt className="kb-kv__label">{uxText('chronos_tenant', locale)}</dt>
+            <dd className="kb-kv__value" data-mono="true">
+              {selected.tenantSlug || '-'}
+            </dd>
+            <dt className="kb-kv__label">{uxText('chronos_project_mission', locale)}</dt>
+            <dd className="kb-kv__value" data-mono="true">
+              {selected.projectId || '-'} /{' '}
+              {selected.missionId && onOpenMission ? (
+                <button
+                  type="button"
+                  className="chronos-mission-cell__title"
+                  onClick={() => onOpenMission(selected.missionId!)}
+                >
+                  {selected.missionId}
+                </button>
+              ) : (
+                selected.missionId || '-'
               )}
-            </div>
-            {assetUrl(selected) ? (
+            </dd>
+            <dt className="kb-kv__label">{uxText('chronos_updated', locale)}</dt>
+            <dd className="kb-kv__value">{formatChronosDateTime(selected.updatedAt, locale)}</dd>
+          </dl>
+          {selected.missing ? (
+            <Callout tone="danger" title={uxText('chronos_deliverable_missing', locale)} />
+          ) : isTextAsset(selected) || selected.previewText ? (
+            <WsPreformatted
+              text={preview ?? selected.previewText ?? uxText('chronos_no_inline_preview', locale)}
+            />
+          ) : isImageAsset(selected) && selectedUrl ? (
+            <img
+              src={selectedUrl}
+              alt={selected.kind}
+              className="max-h-[28rem] w-full object-contain"
+            />
+          ) : isPdfAsset(selected) && selectedUrl ? (
+            <iframe
+              title={uxMessage(
+                'chronos_ws_preview_frame_title',
+                { kind: selected.kind },
+                '{kind} preview',
+                locale
+              )}
+              src={selectedUrl}
+              className="h-[28rem] w-full"
+              style={{
+                border: '1px solid var(--kb-ui-border)',
+                borderRadius: 'var(--kb-ui-radius-md)',
+              }}
+            />
+          ) : (
+            <EmptyState title={uxText('chronos_no_inline_preview', locale)} />
+          )}
+          {selectedUrl ? (
+            <div>
               <a
-                href={assetUrl(selected) || '#'}
+                href={selectedUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-[10px] kb-text-accent hover:underline"
+                className="kb-btn kb-btn--ghost"
               >
-                <ImageIcon size={12} />
                 {uxText('chronos_open_new_window', locale)}
               </a>
-            ) : null}
-            <textarea
-              aria-label="Review comment"
-              value={comment}
-              onChange={(event) => setComment(event.target.value)}
-              placeholder={uxText('chronos_review_comment', locale)}
-              className="mt-4 min-h-20 w-full rounded-xl border kb-border-subtle kb-surface-raised p-3 text-xs kb-text-primary outline-none"
-            />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={busy || selected.missing || accessRole !== 'localadmin'}
-                onClick={() => void review('accept')}
-                className="inline-flex items-center gap-1 rounded-lg kb-surface-positive px-3 py-2 text-[11px] kb-status-positive disabled:opacity-50"
-              >
-                <CheckCircle2 size={14} />
-                {uxText('chronos_approve', locale)}
-              </button>
-              <button
-                type="button"
-                disabled={busy || selected.missing || accessRole !== 'localadmin'}
-                onClick={() => void review('request-changes')}
-                className="inline-flex items-center gap-1 rounded-lg kb-surface-accent px-3 py-2 text-[11px] kb-text-accent disabled:opacity-50"
-              >
-                <MessageSquare size={14} />
-                {uxText('chronos_request_changes', locale)}
-              </button>
-              <button
-                type="button"
-                disabled={busy || selected.missing || accessRole !== 'localadmin'}
-                onClick={() => void review('reject')}
-                className="inline-flex items-center gap-1 rounded-lg kb-surface-negative px-3 py-2 text-[11px] kb-status-negative disabled:opacity-50"
-              >
-                <XCircle size={14} />
-                {uxText('chronos_reject', locale)}
-              </button>
             </div>
-            {accessRole !== 'localadmin' ? (
-              <div className="mt-3 text-[10px] kb-text-muted">
-                {uxText('chronos_localadmin_required', locale)}
-              </div>
-            ) : null}
-            {selected.reviewComment ? (
-              <div className="mt-3 rounded-lg border kb-border-subtle p-3 text-[11px] kb-text-secondary">
-                {uxText('chronos_previous_note', locale)}: {selected.reviewComment}
-              </div>
-            ) : null}
+          ) : null}
+          {selected.reviewComment ? (
+            <KeyValue
+              items={[
+                { label: uxText('chronos_previous_note', locale), value: selected.reviewComment },
+              ]}
+            />
+          ) : null}
+          <WsTextareaField
+            id="chronos-deliverable-comment"
+            label={uxTextOr('chronos_ws_review_comment_label', 'Review comment', locale)}
+            value={comment}
+            onChange={setComment}
+            placeholder={uxText('chronos_review_comment', locale)}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              label={uxText('chronos_approve', locale)}
+              variant="primary"
+              disabled={busy || selected.missing || !localAdmin}
+              onClick={() => void review('accept')}
+            />
+            <Button
+              label={uxText('chronos_request_changes', locale)}
+              variant="secondary"
+              disabled={busy || selected.missing || !localAdmin}
+              onClick={() => void review('request-changes')}
+            />
+            <Button
+              label={uxText('chronos_reject', locale)}
+              variant="danger"
+              disabled={busy || selected.missing || !localAdmin}
+              onClick={() => void review('reject')}
+            />
           </div>
-        ) : (
-          <div className="rounded-2xl border kb-border-subtle p-6 text-sm kb-text-muted">
-            {uxText('chronos_select_deliverable', locale)}
-          </div>
-        )}
-      </div>
-    </section>
+          {!localAdmin ? (
+            <p className="kb-text kb-text--muted">
+              {uxText('chronos_localadmin_required', locale)}
+            </p>
+          ) : null}
+        </Section>
+      ) : loading ? null : (
+        <Section>
+          <EmptyState title={uxText('chronos_select_deliverable', locale)} />
+        </Section>
+      )}
+    </div>
   );
+}
+
+function reviewStatus(verdict: string | undefined): KbStatus {
+  if (!verdict) return 'pending';
+  if (verdict === 'accept') return 'completed';
+  if (verdict === 'request-changes') return 'needs_clarification';
+  if (verdict === 'reject') return 'failed';
+  return 'n/a';
 }

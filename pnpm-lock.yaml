@@ -746,6 +746,28 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  libs/shared-ui:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.7
+        version: 19.2.7(@types/react@19.2.18)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   libs/shared-vision:
     dependencies:
       '@agent/core':
@@ -772,6 +794,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../../libs/core
+      '@agent/shared-ui':
+        specifier: workspace:*
+        version: link:../../../libs/shared-ui
       '@copilotkit/react-core':
         specifier: ^1.70.3
         version: 1.70.3(@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(supports-color@7.2.0)(zod@4.5.4))(@types/mdast@4.0.4)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(graphql@16.13.1)(micromark-util-types@2.0.2)(micromark@4.0.2(supports-color@7.2.0))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(supports-color@7.2.0)(zod@4.5.4)
@@ -833,6 +858,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../../libs/core
+      '@agent/shared-ui':
+        specifier: workspace:*
+        version: link:../../../libs/shared-ui
       next:
         specifier: ^16.3.4
         version: 16.3.4(@babel/core@7.29.7(supports-color@7.2.0))(@opentelemetry/api@1.9.0)(@playwright/test@1.62.0)(@types/node@26.1.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -864,6 +892,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../../libs/core
+      '@agent/shared-ui':
+        specifier: workspace:*
+        version: link:../../../libs/shared-ui
       next:
         specifier: ^16.3.4
         version: 16.3.4(@babel/core@7.29.7(supports-color@7.2.0))(@opentelemetry/api@1.9.0)(@playwright/test@1.62.0)(@types/node@26.1.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

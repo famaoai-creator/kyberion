@@ -1,249 +1,241 @@
 /*
- * FD-00 / FD-01 front-desk rail — shared "5 human verbs" navigation shell.
+ * front-desk-rail.js — the presence-studio front-desk shell (FD-00/FD-01,
+ * restyled for UI-05/UI-06 of SURFACE_UI_UNIFICATION_PLAN_2026-09-23).
  *
- * Plain browser script (no modules, no external resources): both
- * presence-studio pages (`index.html`, `home.html`, `ask.html`, `progress.html`,
- * `help.html`) load this file
- * with a plain <script> tag and call `FrontDeskRail.mount(el, { current })`.
+ * ES module. Renders the shared "human verbs" rail as the kyberion-base
+ * `ui:nav-rail` component through the shared vanilla renderer
+ * (`/shared-ui/kyberion-ui.js`), so it is the same markup and CSS as the
+ * concierge React `NavRail`. Menu items, labels, hrefs and role gates come
+ * from the server (`/api/front-desk/nav`, `/api/me`; items the viewer's
+ * role does not allow are not shown) — this file never hardcodes a surface
+ * port or host, and cross-surface items stay same-tab links.
  *
- * All labels, hrefs, and ports come from the server (`/api/front-desk/nav`,
- * `/api/me`) — this file never hardcodes a surface port or host. See
- * docs/developer/improvement-plans-2026-08/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md
- * §2.1 / §2.2 / §3 FD-00 / FD-01.
+ * It also renders the header's theme / language controls (the shared
+ * `ui:display-controls`, into `front-desk-shell-controls.partial.html`'s
+ * slot) and persists their actions through `window.KyberionPrefs`
+ * (`front-desk-prefs.js`), and exposes `FrontDeskRail.render(container,
+ * components)` so the page scripts can draw kyberion-base components with
+ * the viewer's locale and the shared `ui` message bundle.
  */
-/* global window, document, navigator, fetch */
-(function () {
-  'use strict';
+/* global window, document, fetch */
+import { renderA2UI } from '/shared-ui/kyberion-ui.js';
 
-  var STORAGE_KEY = 'front-desk.tenant';
+const TENANT_STORAGE_KEY = 'front-desk.tenant';
 
-  // Every injected string goes through this before it reaches innerHTML —
-  // including attribute values (href, aria-label, data-*), so quotes and
-  // ampersands are escaped too, not only `<`.
-  function escapeHtml(value) {
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+/** Rail item id -> kyberion-base icon name (`KB_ICON_PATHS`). */
+const NAV_ICONS = {
+  home: 'home',
+  ask: 'chat',
+  decide: 'approval',
+  progress: 'chart',
+  settings: 'settings',
+};
+
+const prefs = window.KyberionPrefs || {
+  locale: () => 'en',
+  theme: () => 'system',
+  setTheme: () => {},
+  setLocale: () => {},
+};
+const locale = prefs.locale();
+
+function fetchJson(url) {
+  return fetch(url).then((response) => response.json());
+}
+
+let messagesPromise = null;
+/** The renderer's `ui:*` bundle for the viewer's locale (`{}` on failure). */
+function uiMessages() {
+  if (!messagesPromise) {
+    messagesPromise = fetchJson('/shared-ui/messages/' + encodeURIComponent(locale) + '.json')
+      .then((body) => (body && body.ok && body.messages ? body.messages : {}))
+      .catch(() => ({}));
   }
+  return messagesPromise;
+}
 
-  function normalizeLocale() {
-    var raw = String((navigator && navigator.language) || 'en').toLowerCase();
-    return raw.indexOf('ja') === 0 ? 'ja' : 'en';
+let navPromise = null;
+/** `/api/front-desk/nav` for the viewer's locale (null on failure). */
+function loadNav() {
+  if (!navPromise) {
+    navPromise = fetchJson('/api/front-desk/nav?locale=' + encodeURIComponent(locale))
+      .then((body) => (body && body.ok ? body : null))
+      .catch(() => null);
   }
+  return navPromise;
+}
 
-  function renderTemplate(template, params) {
-    return String(template || '').replace(/\{(\w+)\}/g, function (match, key) {
-      return Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : match;
+function readStoredTenant() {
+  try {
+    return window.localStorage.getItem(TENANT_STORAGE_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+function storeTenant(slug) {
+  try {
+    window.localStorage.setItem(TENANT_STORAGE_KEY, slug);
+  } catch {
+    // Best-effort only — the rail still works without persistence.
+  }
+}
+
+function loadMe(tenantSlug) {
+  const url = tenantSlug ? '/api/me?tenant=' + encodeURIComponent(tenantSlug) : '/api/me';
+  return fetchJson(url)
+    .then((body) => (body && body.ok ? body : null))
+    .catch(() => null);
+}
+
+function renderTemplate(template, params) {
+  return String(template || '').replace(/\{(\w+)\}/g, (match, key) =>
+    Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : match
+  );
+}
+
+/**
+ * Render kyberion-base components into `container` with the viewer's locale
+ * and the shared `ui` message bundle. Resolves to the container.
+ */
+function render(container, components, options) {
+  return uiMessages().then((messages) =>
+    renderA2UI(container, components, Object.assign({ locale, messages }, options || {}))
+  );
+}
+
+/** `ui:nav-rail` context switcher action (payload `{ value: tenant_slug }`). */
+const TENANT_SWITCH_ACTION = 'tenant.switch';
+
+function tenantSummaryText(nav, me) {
+  const roleLabel = (nav.role_labels && nav.role_labels[me.viewing.role]) || me.viewing.role;
+  if (me.can_switch) {
+    return renderTemplate(nav.tenant_viewing_summary, {
+      role: roleLabel,
+      count: (me.tenants || []).length,
     });
   }
+  return renderTemplate(nav.tenant_viewing_single, { role: roleLabel });
+}
 
-  function readStoredTenant() {
-    try {
-      return window.localStorage.getItem(STORAGE_KEY) || null;
-    } catch (err) {
-      return null;
-    }
-  }
-
-  function storeTenant(slug) {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, slug);
-    } catch (err) {
-      // Best-effort only — the rail still works without persistence.
-    }
-  }
-
-  var ICON_PATHS = {
-    home: '<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
-    ask: '<path d="M4 5h16v11H9l-5 4z"/>',
-    decide: '<path d="M4 12l5 5L20 6"/>',
-    progress: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
-    settings:
-      '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>',
-    help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17h0"/>',
+/**
+ * The `ui:nav-rail` context slot for the tenant being viewed — only once a
+ * tenant is actually viewed (an empty name/role block reads as broken). With
+ * more than one tenant it is a switcher (`tenant.switch`).
+ */
+function tenantContext(nav, me) {
+  if (!me || !me.viewing) return undefined;
+  const context = {
+    label: me.viewing.display_name || me.viewing.tenant_slug,
+    detail: tenantSummaryText(nav, me),
+    switch_label: nav.tenant_switch_aria || undefined,
   };
+  if (me.can_switch) {
+    context.action = { id: TENANT_SWITCH_ACTION };
+    context.options = (me.tenants || []).map((tenant) => ({
+      value: tenant.tenant_slug,
+      label: tenant.display_name,
+      selected: tenant.tenant_slug === me.viewing.tenant_slug,
+    }));
+  }
+  return context;
+}
 
-  function svgIcon(id) {
-    var body = ICON_PATHS[id] || '';
-    return (
-      '<svg class="fd-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      body +
-      '</svg>'
+/**
+ * The whole rail as one `ui:nav-rail`: brand + tenant context slots, the
+ * role-gated verb items and help in the footer — same component (and so the
+ * same markup / CSS) as the concierge React rail.
+ */
+function railComponents(nav, me, current) {
+  const helpActive = window.location.pathname.indexOf('/help') === 0;
+  const items = (nav.items || [])
+    .filter((item) => item.allowed !== false)
+    .map((item) => ({
+      id: item.id,
+      label: item.label,
+      hint: item.sublabel,
+      href: item.href,
+      icon: NAV_ICONS[item.id],
+      active: Boolean(current) && item.id === current,
+    }));
+  const footer = nav.help
+    ? [{ id: 'help', label: nav.help.label, href: nav.help.href, icon: 'help', active: helpActive }]
+    : [];
+  const props = {
+    label: nav.aria_label,
+    brand: { name: 'Kyberion', subtitle: nav.brand_tagline || undefined },
+    items,
+    footer_items: footer,
+  };
+  const context = tenantContext(nav, me);
+  if (context) props.context = context;
+  return [{ id: 'front-desk-rail', type: 'ui:nav-rail', props }];
+}
+
+function drawRail(el, nav, me, current) {
+  return render(el, railComponents(nav, me, current), {
+    onAction(action) {
+      if (!action || action.id !== TENANT_SWITCH_ACTION) return;
+      const slug = action.payload && action.payload.value;
+      if (typeof slug !== 'string' || !slug) return;
+      storeTenant(slug);
+      loadMe(slug).then((next) => {
+        if (next) drawRail(el, nav, next, current);
+      });
+    },
+  });
+}
+
+/**
+ * The header's theme / language controls: the shared `ui:display-controls`
+ * (same component as the concierge header). It only emits `display.*`
+ * actions; `window.KyberionPrefs` persists them (`kyberion.ui.theme` /
+ * `kyberion.ui.locale` + the `kb-ui-locale` cookie).
+ */
+function mountDisplayControls() {
+  const host = document.querySelector('[data-front-desk-display-controls]');
+  if (!host) return Promise.resolve(null);
+  const draw = () =>
+    render(
+      host,
+      [
+        {
+          id: 'display-controls',
+          type: 'ui:display-controls',
+          props: { theme: prefs.theme(), locale },
+        },
+      ],
+      {
+        onAction(action) {
+          const value = action && action.payload ? action.payload.value : undefined;
+          if (action.id === 'display.theme') {
+            prefs.setTheme(value);
+            draw();
+          } else if (action.id === 'display.locale') {
+            prefs.setLocale(value);
+          }
+        },
+      }
     );
-  }
+  return draw();
+}
 
-  function renderItem(item, current) {
-    if (item.allowed === false) return '';
-    var isCurrent = current && item.id === current;
-    return (
-      '<a class="fd-item' +
-      (isCurrent ? ' fd-item-current' : '') +
-      '" href="' +
-      escapeHtml(item.href) +
-      '"' +
-      (isCurrent ? ' aria-current="page"' : '') +
-      '>' +
-      svgIcon(item.id) +
-      '<span class="fd-item-text">' +
-      '<span class="fd-item-label">' +
-      escapeHtml(item.label) +
-      '</span>' +
-      '<span class="fd-item-sublabel">' +
-      escapeHtml(item.sublabel) +
-      '</span>' +
-      '</span>' +
-      '</a>'
-    );
-  }
+/**
+ * Mount the rail into `el` (the `.kb-app-shell__nav` slot) with the item
+ * `options.current` marked as the current page. The server-rendered
+ * placeholder stays until the menu has loaded; a fetch failure never blocks
+ * the rest of the page.
+ */
+function mount(el, options) {
+  mountDisplayControls().catch(() => null);
+  if (!el) return Promise.resolve(null);
+  const current = (options && options.current) || null;
+  return Promise.all([loadNav(), loadMe(readStoredTenant())])
+    .then(([nav, me]) => {
+      if (!nav) return null;
+      return drawRail(el, nav, me, current).then(() => nav);
+    })
+    .catch(() => null);
+}
 
-  function tenantSummaryText(nav, me) {
-    var roleLabel = (nav.role_labels && nav.role_labels[me.viewing.role]) || me.viewing.role;
-    if (me.can_switch) {
-      return renderTemplate(nav.tenant_viewing_summary, {
-        role: roleLabel,
-        count: me.tenants.length,
-      });
-    }
-    return renderTemplate(nav.tenant_viewing_single, { role: roleLabel });
-  }
-
-  function renderTenantBlock(nav, me) {
-    if (!me.viewing) return '';
-    var summary = tenantSummaryText(nav, me);
-    var listItems = me.can_switch
-      ? me.tenants
-          .map(function (tenant) {
-            var selected = tenant.tenant_slug === me.viewing.tenant_slug;
-            return (
-              '<li role="option" aria-selected="' +
-              (selected ? 'true' : 'false') +
-              '" data-tenant-slug="' +
-              escapeHtml(tenant.tenant_slug) +
-              '" class="fd-tenant-option' +
-              (selected ? ' fd-tenant-option-selected' : '') +
-              '">' +
-              escapeHtml(tenant.display_name) +
-              '</li>'
-            );
-          })
-          .join('')
-      : '';
-    return (
-      '<div class="fd-tenant">' +
-      '<button type="button" class="fd-tenant-button" aria-label="' +
-      escapeHtml(nav.tenant_switch_aria) +
-      '" aria-haspopup="listbox" aria-expanded="false"' +
-      (me.can_switch ? '' : ' disabled') +
-      '>' +
-      '<span class="fd-tenant-name">' +
-      escapeHtml(me.viewing.display_name) +
-      '</span>' +
-      '<span class="fd-tenant-summary">' +
-      escapeHtml(summary) +
-      '</span>' +
-      '</button>' +
-      (me.can_switch
-        ? '<ul class="fd-tenant-list hidden" role="listbox">' + listItems + '</ul>'
-        : '') +
-      '</div>'
-    );
-  }
-
-  function render(el, nav, me, current) {
-    el.setAttribute('aria-label', nav.aria_label || '');
-    var itemsHtml = (nav.items || []).map(function (item) {
-      return renderItem(item, current);
-    });
-    el.innerHTML =
-      '<div class="fd-brand">' +
-      '<span class="fd-brand-mark" aria-hidden="true"></span>' +
-      '<span class="fd-brand-text"><strong>Kyberion</strong><small>' +
-      escapeHtml(nav.brand_tagline) +
-      '</small></span>' +
-      '</div>' +
-      '<div class="fd-tenant-slot">' +
-      renderTenantBlock(nav, me) +
-      '</div>' +
-      '<nav class="fd-nav">' +
-      itemsHtml.join('') +
-      '</nav>' +
-      (nav.help
-        ? '<a class="fd-help" href="' +
-          escapeHtml(nav.help.href) +
-          '">' +
-          svgIcon('help') +
-          '<span class="fd-item-label">' +
-          escapeHtml(nav.help.label) +
-          '</span></a>'
-        : '');
-
-    var tenantButton = el.querySelector('.fd-tenant-button');
-    var tenantList = el.querySelector('.fd-tenant-list');
-    if (tenantButton && tenantList) {
-      tenantButton.addEventListener('click', function () {
-        var expanded = tenantButton.getAttribute('aria-expanded') === 'true';
-        tenantButton.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-        tenantList.classList.toggle('hidden', expanded);
-      });
-      tenantList.querySelectorAll('.fd-tenant-option').forEach(function (option) {
-        option.addEventListener('click', function () {
-          var slug = option.getAttribute('data-tenant-slug');
-          if (!slug) return;
-          storeTenant(slug);
-          tenantList.classList.add('hidden');
-          tenantButton.setAttribute('aria-expanded', 'false');
-          loadMe(el, nav, current, slug);
-        });
-      });
-    }
-  }
-
-  function loadMe(el, nav, current, tenantSlug) {
-    var url = tenantSlug ? '/api/me?tenant=' + encodeURIComponent(tenantSlug) : '/api/me';
-    return fetch(url)
-      .then(function (response) {
-        return response.json();
-      })
-      .then(function (me) {
-        if (me && me.ok) render(el, nav, me, current);
-        return me;
-      })
-      .catch(function () {
-        // A failed refresh must not blank out the previously rendered rail.
-      });
-  }
-
-  function mount(el, options) {
-    if (!el) return;
-    var current = (options && options.current) || null;
-    var locale = normalizeLocale();
-    fetch('/api/front-desk/nav?locale=' + encodeURIComponent(locale))
-      .then(function (response) {
-        return response.json();
-      })
-      .then(function (nav) {
-        if (!nav || !nav.ok) return;
-        var storedTenant = readStoredTenant();
-        var meUrl = storedTenant ? '/api/me?tenant=' + encodeURIComponent(storedTenant) : '/api/me';
-        return fetch(meUrl)
-          .then(function (response) {
-            return response.json();
-          })
-          .then(function (me) {
-            if (!me || !me.ok) return;
-            render(el, nav, me, current);
-          });
-      })
-      .catch(function () {
-        // The rail is additive chrome — a fetch failure must never block the
-        // rest of the page (voice panel, onboarding wizard, etc.) from
-        // working.
-      });
-  }
-
-  window.FrontDeskRail = { mount: mount };
-})();
+window.FrontDeskRail = { mount, render, nav: loadNav, locale: () => locale };

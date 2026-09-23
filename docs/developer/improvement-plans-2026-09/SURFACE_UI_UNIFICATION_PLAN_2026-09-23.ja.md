@@ -1,0 +1,168 @@
+---
+title: サーフェス UI 統一計画(A2UI base catalog)
+tags: [design-system, a2ui, surfaces, ui-ux, improvement-plan, 2026-09]
+last_updated: 2026-09-23
+status: active
+mission: MSN-SURFACE-UI-UNIFY-20260923
+---
+
+# サーフェス UI 統一計画(UI-01〜UI-10)
+
+## 実装状況(2026-09-23 時点)
+
+全項目実装済み(Wave 1〜5)。
+
+| ID                      | 状態 | 備考                                                                                                        |
+| ----------------------- | ---- | ----------------------------------------------------------------------------------------------------------- |
+| UI-01 / 01b / 01c / 01d | done | `kyberion-base` catalog、チャート/可視化、設定・フォーム、i18n(`ui` ドメイン)                               |
+| UI-02                   | done | `tokens.ui`(light/dark)+ `kyberion-ui.css` 生成、concierge を生成対象に追加                                 |
+| UI-03 / UI-04           | done | `@agent/shared-ui`(React)+ vanilla レンダラ、`/ui-gallery`                                                  |
+| UI-05 / UI-06           | done | 共通 `ui:nav-rail`、秘書室・相棒をトークン化(茶/teal 廃止)                                                  |
+| UI-07                   | done | 管制塔タブ 11→5 グループ、compact 密度、ガラス調廃止                                                        |
+| UI-08                   | done | 監査モニタを `ui:app-shell`+`ui:table`+`ui:status-pill` へ、日本語化                                        |
+| UI-09                   | done | computer-surface を標準テーマへ(暗グラデ廃止)                                                               |
+| UI-10                   | done | before/after スクリーンショット(evidence/screenshots/{before-v2,after})、README/SURFACES/DESIGN_SYSTEM 更新 |
+
+## 1. 背景(ヒアリング結果 2026-09-23)
+
+利用者の不満は「見た目がバラバラ」「何をすればいいか分からない」「見た目が古い/安っぽい」。対象は 5 サーフェスすべて。
+
+| サーフェス            | 現状の主な問題                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 秘書室(concierge)     | 独自色(茶)。トークン生成対象外で `globals.css` 1,491 行に生 hex。本文カラムが狭く余白過多                          |
+| 相棒(presence-studio) | 同じレールなのに teal。ホームが狭く空白が大きい                                                                    |
+| 管制塔(chronos)       | タブ 11 個が 2 段折返し。ヒーローが「読み取っています…」。大文字 mission ID と同形カードの羅列。ガラス調で安っぽい |
+| 監査モニタ(operator)  | 素の HTML テーブル・下線リンク・英語のみ。状態が色文字だけ                                                         |
+| computer-surface      | 暗グラデ+ガラスでコントラスト不足、First run 案内が判読不能、開発者 sandbox が常時露出                             |
+
+技術的な根本原因: A2UI はメッセージ形式だけで **コンポーネントの定義(props の契約)がない**。唯一のレンダラは chronos 内の React+Tailwind(`A2UIComponentLibrary.tsx`)。各サーフェスは別スタック(Next×3 / Express 静的 HTML×2)で、それぞれ独自 CSS を持つ。
+
+## 2. 合意した方針
+
+1. **共通デザイン基盤 → 全サーフェスへ順次適用**。1 PR にまとめる。
+2. **基本 UI 部品は A2UI コンポーネントとして定義**する(catalog `kyberion-base`)。props は JSON Schema で契約化し、`validateA2UIMessage` が catalog 既知の型について props も検証する。
+3. **見た目の実体は 1 枚の CSS**(`kyberion-ui.css`、トークンから生成/同梱)。レンダラは props → マークアップ(`kb-*` クラス)の薄い写像に徹し、React 版と vanilla DOM 版の 2 つを持つ。静的 HTML サーフェスは A2UI を使わず同じクラスを直接書いてもよい(クラス契約が正)。
+4. **ブランド: deep blue**。全サーフェス共通のアクセントを 1 色にし、サーフェス固有の「役割色」はヘッダの役割バッジとナビの active 表示にだけ使う。
+5. **light / dark 両対応**。`:root[data-theme]` + `prefers-color-scheme`。両テーマで WCAG AA(本文 4.5:1、UI 部品 3:1)。
+6. **密度は画面ごと**: フロントデスク(秘書室・相棒)= `comfortable`(平易な日本語、ID を隠す、次の一手が最上位)、管制塔・監査モニタ = `compact`(一覧性・情報密度)。`data-density` 属性で切替。
+
+## 3. `kyberion-base` catalog(UI-01)
+
+型 ID は `ui:` 接頭辞。既存の `text`/`button`/`card`/`container` は対応する `ui:*` の別名として扱う。chronos の `display:*` のうち重複するもの(table/kv/metric/status/alert/list/timeline/progress/badges/section)は同じ CSS クラスで描画し、段階的に `ui:*` へ寄せる(`display:*` の型は互換のため残す)。
+
+| 区分       | 型                     | 主な props                                                                                                       |
+| ---------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 骨格       | `ui:app-shell`         | `density`, `theme?`; children = nav / header / main                                                              |
+|            | `ui:page-header`       | `title`, `subtitle?`, `role_badge?{label,tone}`, `actions?`                                                      |
+|            | `ui:nav-rail`          | `items[{id,label,hint?,href,icon?,active?}]`, `footer_items?`                                                    |
+|            | `ui:tabs`              | `items[{id,label,count?,href?}]`, `active`, `overflow`(wrap / menu)                                              |
+| レイアウト | `ui:stack` / `ui:grid` | `gap`, `columns?`(grid は auto-fit)                                                                              |
+| 内容       | `ui:section`           | `title?`, `description?`, `tone?`, `actions?`                                                                    |
+|            | `ui:next-action`       | `eyebrow?`, `title`, `reason?`, `primary{label, href or action}`, `secondary?`, `state`(ready / loading / empty) |
+|            | `ui:metric`            | `label`, `value`, `unit?`, `delta?`, `tone?`                                                                     |
+|            | `ui:kv`                | `items[{label,value,mono?}]`                                                                                     |
+|            | `ui:table`             | `columns[{key,label,align?,mono?,width?}]`, `rows`, `row_href_key?`, `empty?`                                    |
+|            | `ui:list`              | `items[{title,meta?,status?,href?}]`, `variant`(plain / timeline)                                                |
+|            | `ui:text`              | `text`, `variant`(body / muted / caption / mono / title)                                                         |
+| 状態       | `ui:status-pill`       | `status`(正規語彙), `label?` — アイコン+文字で、色だけに頼らない                                                 |
+|            | `ui:badge`             | `label`, `tone`                                                                                                  |
+|            | `ui:callout`           | `tone`(info / success / warning / danger), `title`, `body?`, `action?`                                           |
+|            | `ui:empty-state`       | `title`, `body?`, `action?`                                                                                      |
+|            | `ui:skeleton`          | `lines?`, `shape`(text / card / table)                                                                           |
+| 操作       | `ui:button`            | `label`, `variant`(primary / secondary / danger / ghost), `href` または `action`, `disabled?`                    |
+|            | `ui:disclosure`        | `summary`, `open?` — 開発者向け要素を畳むため                                                                    |
+
+- 正本: `knowledge/product/schemas/a2ui-catalog-kyberion-base.schema.json`(型ごとの props schema)+ `libs/core/a2ui-catalog.ts`(型・検証・catalog ID 定数)。
+- `status-pill` の語彙は既存のダッシュボード状態語彙(ui-ux governance check が見ている語彙)に合わせ、日本語ラベルは i18n 辞書から引く。
+- `ui:page-header.role_badge` の文言は `surface-roles.json` の `role_ja` / `tagline_ja` を正とする。
+
+### 3.1 国際化(UI-01d、ギャラリー確認時の追加要件 2026-09-23)
+
+- **i18n は必須**。まず `en` と `ja`(既存の `required_locales` に従い `qps-ploc` も)。独自辞書は作らず、既存の `knowledge/product/orchestration/user-facing-vocabulary.json` に `ui` ドメインを追加し、状態ラベル・空状態・スケルトンの読み上げ・チャートの説明文などレンダラ既定文言はすべてキー経由で引く。
+- レンダラは locale と語彙バンドル(`ui` ドメインを locale 別に抽出した生成物)を受け取る: React は provider、vanilla は `renderA2UI` の option。ハードコードした日本語既定ラベルは廃止。
+- props で渡す文言(タイトル・本文・データラベル)は呼び出し側が翻訳済みで渡す。ギャラリーは言語切替を持ち、サンプルデータも en / ja の両方を用意する。
+
+### 3.2 チャート・可視化(UI-01b、追加要件)
+
+SVG で描画し、幾何計算は共通のレイアウト関数(renderer 非依存の仮想ノード木を返す)に置いて React / vanilla が同じ SVG を出す。色は `tokens.ui` のカテゴリ・連続・発散パレット(両テーマで検証)から取り、凡例と数値ラベルで色だけに頼らない。各チャートは `aria-label` と表形式の代替(`<table>` を視覚的に隠して併置)を持つ。
+
+| 型              | 用途                                                   | 主な props                                                   |
+| --------------- | ------------------------------------------------------ | ------------------------------------------------------------ |
+| `ui:bar-chart`  | 件数比較・ヒストグラム                                 | `series[]`, `categories[]`, `orientation`, `stacked?`        |
+| `ui:line-chart` | 時系列(折れ線 / 面)                                    | `series[{name,points[{x,y}]}]`, `area?`, `y_unit?`           |
+| `ui:donut`      | 構成比                                                 | `segments[{label,value}]`, `center_label?`                   |
+| `ui:sparkline`  | 行内・指標カード内の推移                               | `points[]`, `tone?`                                          |
+| `ui:heatmap`    | 曜日×時間帯などの密度                                  | `rows[]`, `columns[]`, `values[][]`                          |
+| `ui:meter`      | 上限に対する使用量・進捗                               | `value`, `max`, `thresholds?`                                |
+| `ui:sequence`   | **メッセージの流れ**(参加者レーン間の送受信を時系列で) | `participants[]`, `messages[{from,to,label,at?,status?}]`    |
+| `ui:flow`       | ミッション→タスク→エージェント等の段階フロー / DAG     | `nodes[{id,label,stage,status?}]`, `edges[{from,to,label?}]` |
+| `ui:stat-list`  | 統計のまとめ(平均・中央値・p95 等)                     | `items[{label,value,unit?,hint?}]`                           |
+
+### 3.3 設定・フォーム(UI-01c、追加要件)
+
+制御値は `value` で受け、変更は `onAction('field.change', {name, value})`、保存は `action` で親へ返す(A2UI の data model 連携は呼び出し側)。
+
+| 型                                              | 用途                                                                                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ui:settings-group`                             | 設定の見出し付きまとまり(子に setting-row)                                                                                                 |
+| `ui:setting-row`                                | ラベル・説明・制御の 1 行(子に制御 1 つ)                                                                                                   |
+| `ui:switch` / `ui:checkbox`                     | オン/オフ                                                                                                                                  |
+| `ui:select` / `ui:radio-group` / `ui:segmented` | 選択                                                                                                                                       |
+| `ui:text-field` / `ui:textarea`                 | 入力(`type`, `help`, `error`, `required`)                                                                                                  |
+| `ui:slider`                                     | 数値範囲                                                                                                                                   |
+| `ui:integration-item`                           | 外部連携の状態(接続済み / 要再認証 / 未接続)と操作                                                                                         |
+| `ui:save-bar`                                   | 未保存変更の固定バー(保存 / 破棄)                                                                                                          |
+| `ui:file-drop`                                  | ドラッグ&ドロップ+クリック選択+貼り付け。`accept`, `multiple`, `max_bytes`、選択後のファイル一覧(進捗・エラー・取消)                       |
+| `ui:camera-capture`                             | カメラで撮影(`getUserMedia`、非対応/拒否時は `<input capture>` にフォールバック)→ プレビュー → 確定 / 撮り直し                             |
+| `ui:avatar-picker`                              | 現在のアバター表示+アップロード / 撮影 / 削除。正方形トリミングのプレビュー                                                                |
+| `ui:secret-field`                               | API トークン等の入力。既定で伏字、表示切替、貼り付け、`autocomplete=off`。保存済みの値は返さず「設定済み(末尾 4 桁)」表示と置換 / 削除のみ |
+
+**ファイルと秘密情報の扱い(必須)**
+
+- ファイル・撮影画像・秘密値は A2UI の props / data model / ログに載せない。コンポーネントは `onAction` にファイル(Blob)または値を直接渡すだけで、保存は各サーフェスの既存の governed API(アップロードは secure-io 経由の取り込み、トークンは既存の secret 登録経路)が行う。
+- `secret-field` は値を DOM 属性・`data-*`・localStorage に残さず、送信後は入力をクリアする。
+- カメラは利用者の操作で起動し、ページ離脱・確定・取消でストリームを停止する。
+
+## 4. トークンと CSS(UI-02)
+
+- `kyberion.json` に Web UI 用の意味トークン層 `tokens.ui`(light/dark)を追加する。既存の `tokens.colors` は media(pptx/動画)も使うため値を変えない。
+  - 面: `canvas`, `surface`, `surface-raised`, `surface-sunken`, `border`, `border-strong`
+  - 文字: `text`, `text-muted`, `text-subtle`, `text-on-accent`
+  - アクセント(deep blue): `accent`, `accent-hover`, `accent-soft`(背景), `accent-text`, `focus-ring`
+  - 状態: `success|warning|danger|info` × `{fg, bg, border}`
+  - 役割色: `role.concierge`, `role.presence-studio`, `role.chronos-mirror-v2`, `role.operator-surface`, `role.computer-surface`(バッジ/active 限定)
+  - 形: `radius.{sm,md,lg}`, `shadow.{sm,md}`(控えめ。ガラス/ぼかし/グラデーション背景は廃止), `space.*`, `font-size.*`(comfortable/compact の 2 スケール)
+- `scripts/generate_design_tokens.ts` が `--kb-ui-*` 変数と `kyberion-ui.css`(コンポーネントクラス)を各サーフェスへ出力する。**concierge を生成対象に追加**。
+- `check_ui_ux_governance.ts` の生色禁止を operator だけでなく全サーフェス(生成ファイル除く)へ拡張。既存違反は ratchet ベースラインで固定し、本計画で触る画面は 0 にする。
+- `check_design_contrast.ts` に `tokens.ui` の light/dark 全組合せを追加。
+
+## 5. レンダラ(UI-03 / UI-04)
+
+- **React**: 新パッケージ `libs/shared-ui`(`@agent/shared-ui`)。`A2UIRenderer`(catalog 型 → コンポーネント)と、各 `ui:*` をそのまま使える React コンポーネントを export。ビルド済み ESM を出荷し、Next 3 面から使う(`@agent/core` の server-external 設定とは別に client から import 可能にする)。
+- **vanilla**: `libs/shared-ui/vanilla/`(依存なしの ES module 1 本)。`renderA2UI(container, components)`。presence-studio / computer-surface が static 配信する。
+- **ギャラリー**: 全 `ui:*` を light/dark × comfortable/compact で並べる静的ページ。presence-studio の `/ui-gallery` で配信し、スクリーンショットの基準にする。
+
+## 6. サーフェス適用
+
+| ID    | 対象             | 内容                                                                                                                                                                                                                                                                              |
+| ----- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UI-05 | 共通レール       | `ui:nav-rail` 1 実装を concierge(React)と presence-studio(vanilla)で共有。定義は従来どおり `front-desk-nav.ts`                                                                                                                                                                    |
+| UI-06 | 秘書室・相棒     | 共通トークンへ移行(茶/teal 廃止)。本文カラム拡幅、ホーム/決めるの最上位に `ui:next-action`。承認カードを `ui:section`+`ui:button` へ                                                                                                                                              |
+| UI-07 | 管制塔           | タブ 11 → 5 グループ(ホーム / 仕事 = ミッション・作業一覧・成果物 / 判断 = 承認・ナレッジ / 運用 = 運用・画面の管理・診断 / 組織)。ヒーローは実データの `ui:next-action`、読込中は `ui:skeleton`。mission ID は人間向けタイトル+ID は mono の補助表示。ガラス調廃止。compact 密度 |
+| UI-08 | 監査モニタ       | `ui:app-shell`+`ui:table`+`ui:status-pill`。日本語化(i18n)、compact 密度、読み取り専用バッジ維持                                                                                                                                                                                  |
+| UI-09 | computer-surface | 標準テーマへ移行(暗グラデ廃止)でコントラスト解消。First run は `ui:empty-state`、sandbox は `ui:disclosure` + 開発者フラグ時のみ表示                                                                                                                                              |
+| UI-10 | 検証と文書       | Playwright で before/after(light/dark)撮影、README/SURFACES の画像更新、`DESIGN_SYSTEM.md` に catalog とクラス契約を追記                                                                                                                                                          |
+
+## 7. 進め方
+
+- Wave 1: UI-01〜04(基盤)→ **ギャラリーで見た目を確認して合意** → Wave 2: UI-05/06 → Wave 3: UI-07 → Wave 4: UI-08/09 → Wave 5: UI-10。
+- 各 wave はサブエージェント実装 + 独立レビュー + ゲート(vitest、`pnpm check -- --only ui-ux`、contrast、`--scope pr`)。
+- 触らないもの: A2UI メッセージの op 形式、`kb-*` Chronos 固有コンポーネントの意味、各サーフェスの API と認可。見た目とマークアップだけを変える。
+
+## 8. 受け入れ条件
+
+- `kyberion-base` の全型に props schema があり、未知 props / 型不一致を `validateA2UIMessage` が拒否するテストがある。
+- 5 サーフェスが同じトークンと `kyberion-ui.css` を読み、生色の新規追加が 0。
+- light/dark 両方で主要画面のコントラストが AA を満たす(自動チェック)。
+- 管制塔のタブが 1 行に収まり(1280px 幅)、各サーフェスのファーストビューに「次の一手」または目的の一覧がある。
+- before/after スクリーンショットがミッション evidence と PR に添付されている。

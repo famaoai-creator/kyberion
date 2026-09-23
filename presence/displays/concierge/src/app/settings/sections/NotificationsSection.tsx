@@ -1,16 +1,18 @@
 'use client';
 
 import * as React from 'react';
+import { Button, Select, SettingRow, SettingsGroup, TextField } from '@agent/shared-ui';
 import { frontDeskText } from '../../../lib/i18n';
-import type { ConciergeLocale, ConciergeMessageKey } from '../../../lib/i18n';
+import type { ConciergeLocale } from '../../../lib/i18n';
 import type { NotificationChannelOption, NotificationTarget } from '../../../lib/settings-types';
+import { FormScope, asText, type SettingsTranslate } from './form-scope';
 
 /** FD-06 通知設定 pane (`#setup-notifications`) — extracted from
  * settings/page.tsx; the save handler and channel list stay owned by the
- * page. */
+ * page. UI-06: shared `Select` / `TextField` rows. */
 export type NotificationsSectionProps = {
   locale: ConciergeLocale;
-  t: (key: ConciergeMessageKey, params?: Record<string, string | number>) => string;
+  t: SettingsTranslate;
   notifCurrent: NotificationTarget | null;
   notif: NotificationTarget;
   setNotif: (notif: NotificationTarget) => void;
@@ -34,55 +36,70 @@ export function NotificationsSection({
   sectionRef,
 }: NotificationsSectionProps) {
   return (
-    <section
-      className="pane"
+    <div
+      className="settings-section"
       id="setup-notifications"
       ref={sectionRef}
       aria-label={frontDeskText('settings_nav_notifications', locale)}
     >
-      <h2>{frontDeskText('settings_nav_notifications', locale)}</h2>
-      <h3 className="pane-subheading">{t('setup.notifications_title')}</h3>
-      <p className="pane-subtitle">{t('setup.notifications_description')}</p>
-      <p className="item-meta">
-        {notifCurrent
-          ? t('setup.notification_current', {
-              value: `${channelDisplayName(notifCurrent.surface)} ${notifCurrent.target}`,
-            })
-          : t('setup.notification_none')}
-      </p>
-      <label className="field-label">
-        {t('setup.notification_surface')}
-        <select
-          value={notif.surface}
-          onChange={(event) => setNotif({ ...notif, surface: event.target.value })}
+      <FormScope
+        fields={{
+          'notification.surface': (value) => setNotif({ ...notif, surface: asText(value) }),
+          'notification.target': (value) => setNotif({ ...notif, target: asText(value) }),
+        }}
+      >
+        <SettingsGroup
+          id="settings-notifications"
+          title={frontDeskText('settings_nav_notifications', locale)}
+          description={t('setup.notifications_description')}
         >
-          <option value="none">{t('setup.notification_off_option')}</option>
-          {notifChannels.map((channel) => (
-            <option key={channel.surface} value={channel.surface}>
-              {channel.display_name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {notif.surface !== 'none' ? (
-        <label className="field-label">
-          {t('setup.notification_target')}
-          <input
-            value={notif.target}
-            onChange={(event) => setNotif({ ...notif, target: event.target.value })}
-            placeholder={t('setup.notification_target_placeholder')}
-          />
-        </label>
-      ) : null}
-      <div className="button-row">
-        <button
-          className="action-button"
-          disabled={busy || (notif.surface !== 'none' && !notif.target.trim())}
-          onClick={onSaveNotification}
-        >
-          {t('setup.notification_save')}
-        </button>
-      </div>
-    </section>
+          <SettingRow
+            label={t('setup.notification_surface')}
+            description={
+              notifCurrent
+                ? t('setup.notification_current', {
+                    value: `${channelDisplayName(notifCurrent.surface)} ${notifCurrent.target}`,
+                  })
+                : t('setup.notification_none')
+            }
+          >
+            <Select
+              id="notification-surface"
+              name="notification.surface"
+              label={t('setup.notification_surface')}
+              hide_label
+              value={notif.surface}
+              options={[
+                { value: 'none', label: t('setup.notification_off_option') },
+                ...notifChannels.map((channel) => ({
+                  value: channel.surface,
+                  label: channel.display_name,
+                })),
+              ]}
+            />
+          </SettingRow>
+          {notif.surface !== 'none' ? (
+            <SettingRow label={t('setup.notification_target')}>
+              <TextField
+                id="notification-target"
+                name="notification.target"
+                label={t('setup.notification_target')}
+                hide_label
+                value={notif.target}
+                placeholder={t('setup.notification_target_placeholder')}
+              />
+            </SettingRow>
+          ) : null}
+          <div className="settings-row-actions">
+            <Button
+              label={t('setup.notification_save')}
+              variant="primary"
+              disabled={busy || (notif.surface !== 'none' && !notif.target.trim())}
+              onClick={onSaveNotification}
+            />
+          </div>
+        </SettingsGroup>
+      </FormScope>
+    </div>
   );
 }

@@ -59,7 +59,7 @@ describe('Presence Studio OS control-plane route contract', () => {
     expect(source).toContain('function fetchOsMutation(url, options)');
     expect(source).toContain('if (!response.ok || body.ok === false)');
     expect(source).toContain('if (!osControlPlaneResponse.ok || osControlPlaneBody?.ok === false)');
-    expect(source).toContain('window.confirm(uiText(');
+    expect(source).toContain('window.confirm(uiTextKey(');
     expect(source).toContain('item.failureRecorded');
     expect(source).not.toContain('item.applyError');
   });

@@ -1,9 +1,10 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-09-21T13:42:46.382Z",
+  "generated_at": "2026-09-23T08:26:54.127Z",
   "scan_roots": [
     "libs/core",
+    "libs/shared-ui",
     "scripts",
     "libs/actuators/agent-actuator",
     "libs/actuators/android-actuator",
@@ -155,7 +156,6 @@
     "libs/actuators/voice-actuator/src/index.ts": 10,
     "libs/actuators/voice-actuator/src/voice-action-helpers.ts": 4,
     "satellites/voice-hub/server.ts": 1,
-    "presence/displays/chronos-mirror-v2/src/app/ChronosMirrorShell.tsx": 11,
     "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-observation-data.ts": 2,
     "presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts": 3,
     "presence/displays/chronos-mirror-v2/src/app/chronos-page-config.ts": 1,
@@ -163,7 +163,6 @@
     "presence/displays/chronos-mirror-v2/src/components/AgentCollaborationBoard.tsx": 5,
     "presence/displays/concierge/src/app/api/approvals/[id]/route.ts": 1,
     "presence/displays/concierge/src/app/api/outcomes/[id]/route.ts": 3,
-    "presence/displays/operator-surface/src/app/layout.tsx": 2,
     "presence/displays/presence-studio/presence-studio-runtime-data.ts": 3
   }
 }
