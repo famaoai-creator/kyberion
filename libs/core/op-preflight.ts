@@ -75,6 +75,21 @@ export type OpPreflightOutcomeObserver = (
 const listeners = new Map<string, OpPreflightListener>();
 const guards = new Map<string, OpPreflightGuard>();
 const outcomeObservers = new Set<OpPreflightOutcomeObserver>();
+const callKeys = new WeakMap<object, object>();
+
+/**
+ * Stable opaque key shared by a call and the detached snapshot observers
+ * receive for it, so a listener and an observer can correlate one call
+ * without the observer holding the mutable original.
+ */
+export function opPreflightCallKey(call: OpPreflightCall): object {
+  let key = callKeys.get(call);
+  if (!key) {
+    key = Object.freeze({});
+    callKeys.set(call, key);
+  }
+  return key;
+}
 
 function ordered<T extends { id: string; order?: number }>(entries: Iterable<T>): T[] {
   return [...entries].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.id.localeCompare(b.id));
@@ -346,19 +361,100 @@ function finalizePreflightResult(
 ): OpPreflightResult & { input: Record<string, unknown> } {
   const asserted = assertPreflightResult(result);
   if (outcomeObservers.size > 0) {
-    // Observers see a frozen snapshot, never the object returned to the
-    // caller, so a mutation attempt (throws under strict-mode ESM, or is a
-    // silent no-op) can never change what the call site sees.
-    const snapshot = Object.freeze({ ...asserted });
+    // Observers see a deep-frozen detached snapshot of the result and the
+    // call, never the objects the caller or the dispatcher keep, so a
+    // mutation attempt can never change what executes or what is returned.
+    const snapshot = Object.freeze({
+      ...asserted,
+      listener_ids: Object.freeze([...asserted.listener_ids]),
+      guard_ids: Object.freeze([...asserted.guard_ids]),
+      input: detachedSnapshot(asserted.input),
+      ...(asserted.repaired_input
+        ? { repaired_input: detachedSnapshot(asserted.repaired_input) }
+        : {}),
+    }) as OpPreflightResult & { input: Record<string, unknown> };
+    const callSnapshot = Object.freeze({
+      ...call,
+      params: detachedSnapshot(call.params),
+      ...(call.context ? { context: detachedSnapshot(call.context) } : {}),
+    }) as OpPreflightCall;
+    callKeys.set(callSnapshot, opPreflightCallKey(call));
     for (const observer of outcomeObservers) {
       try {
-        observer(call, snapshot);
+        const returned: unknown = observer(callSnapshot, snapshot);
+        if (isPromiseLike(returned)) {
+          Promise.resolve(returned).then(undefined, (error: unknown) => {
+            console.error('[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR]', error);
+          });
+        }
       } catch (error) {
         console.error('[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR]', error);
       }
     }
   }
   return asserted;
+}
+
+/**
+ * Deep-frozen copy detached from `value`. structuredClone first; values it
+ * cannot clone (functions, class instances with private state) fall back to
+ * a plain-data copy in which uncloneable members become a type marker.
+ */
+function detachedSnapshot<T extends Record<string, unknown>>(value: T): T {
+  let copy: unknown;
+  try {
+    copy = structuredClone(value);
+  } catch {
+    copy = plainDataCopy(value, new Map());
+  }
+  return deepFreeze(copy) as T;
+}
+
+function plainDataCopy(value: unknown, seen: Map<object, unknown>): unknown {
+  if (typeof value === 'function') return `[uncloneable:function]`;
+  if (value === null || typeof value !== 'object') return value;
+  const known = seen.get(value);
+  if (known !== undefined) return known;
+  if (Array.isArray(value)) {
+    const out: unknown[] = [];
+    seen.set(value, out);
+    for (const item of value) out.push(plainDataCopy(item, seen));
+    return out;
+  }
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) {
+    try {
+      const cloned = structuredClone(value);
+      seen.set(value, cloned);
+      return cloned;
+    } catch {
+      return `[uncloneable:${proto?.constructor?.name ?? 'object'}]`;
+    }
+  }
+  const out: Record<string, unknown> = {};
+  seen.set(value, out);
+  for (const [key, item] of Object.entries(value)) out[key] = plainDataCopy(item, seen);
+  return out;
+}
+
+function deepFreeze(value: unknown, seen = new Set<object>()): unknown {
+  if (value === null || typeof value !== 'object' || seen.has(value)) return value;
+  seen.add(value);
+  if (value instanceof Map) {
+    for (const [key, item] of value) {
+      deepFreeze(key, seen);
+      deepFreeze(item, seen);
+    }
+  } else if (value instanceof Set) {
+    for (const item of value) deepFreeze(item, seen);
+  } else if (!ArrayBuffer.isView(value)) {
+    for (const key of Reflect.ownKeys(value)) {
+      deepFreeze((value as Record<PropertyKey, unknown>)[key], seen);
+    }
+  }
+  // Typed arrays with elements cannot be frozen; they are detached copies anyway.
+  if (!ArrayBuffer.isView(value)) Object.freeze(value);
+  return value;
 }
 
 function inputChanged(
