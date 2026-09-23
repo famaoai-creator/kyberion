@@ -72,6 +72,11 @@ import {
   readVoiceHubEventScope,
   readVoiceHubRequestObject,
 } from './request-input.js';
+import {
+  createVoiceHubSpeechSynthesizeHandler,
+  estimateHostSpeechMs,
+  readWavDurationMs,
+} from './speech-synthesis-runtime.js';
 
 interface VoiceHubRecord {
   id: string;
@@ -108,6 +113,8 @@ interface SpeechPlaybackState {
   startedAt?: number;
   pid?: number;
   engine_id?: string;
+  /** PA-09: expected playback length (WAV header, else a text estimate). */
+  estimated_ms?: number;
 }
 
 interface RecentSpeechGuardState {
@@ -677,7 +684,9 @@ async function runVoiceTtsPythonBridge(
     pathResolver.rootResolve(engine.bridge_script),
     'TTS bridge script'
   );
-  const tmpPath = pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
+  const tmpPath = pathResolver.sharedTmp(
+    `voice-playback-${Date.now()}-${randomUUID().slice(0, 8)}.wav`
+  );
   const samples = profile?.sample_refs || [];
   const refAudio =
     samples.length > 0
@@ -763,6 +772,7 @@ async function playVoiceArtifact(
   engineId: string
 ): Promise<void> {
   const safeArtifactPath = resolveRegularRepositoryFile(artifactPath, 'TTS artifact');
+  const estimatedMs = readWavDurationMs(safeArtifactPath) ?? estimateHostSpeechMs(text);
   await new Promise<void>((resolve, reject) => {
     const player = spawn('/usr/bin/afplay', [safeArtifactPath], {
       cwd: pathResolver.rootDir(),
@@ -776,6 +786,7 @@ async function playVoiceArtifact(
       engine_id: engineId,
       startedAt: Date.now(),
       pid: player.pid,
+      estimated_ms: estimatedMs,
     };
     player.on('close', () => {
       if (activeSpeechProcess === player) {
@@ -837,6 +848,7 @@ async function speakWithVoiceEngine(
       engine_id: engine.engine_id,
       startedAt: Date.now(),
       pid: child.pid,
+      estimated_ms: estimateHostSpeechMs(text),
     };
     await new Promise<void>((resolve, reject) => {
       let stderr = '';
@@ -859,24 +871,32 @@ async function speakWithVoiceEngine(
   throw new Error(`TTS adapter '${adapter.adapter_id}' is not implemented for ${engine.engine_id}`);
 }
 
-async function speakReplyManaged(text: string): Promise<void> {
-  await stopSpeechPlayback('replace_reply');
-
-  const language = detectReplyLanguage(text);
-  const normalized = normalizeTextForTts(text, language);
+function resolvePreferredTtsEngine(): VoiceEngineRecord {
   const selection = getVoiceSelectionSnapshot();
   const selected = selection.tts.candidates.find(
     (candidate) =>
       candidate.engine_id === selection.preferences.tts_engine_id && candidate.selectable
   );
   const requestedEngineId = selected?.engine_id || getVoiceEngineRegistry().default_engine_id;
-  const engine = resolveVoiceEngineForPlatform(requestedEngineId);
-  let voiceProfile: any = null;
+  return resolveVoiceEngineForPlatform(requestedEngineId);
+}
+
+function loadVoiceProfileOrNull(): any {
   try {
-    voiceProfile = getVoiceProfileRecord();
+    return getVoiceProfileRecord();
   } catch (error) {
     logger.warn(`[voice-hub] Failed to load voice profile record: ${error}`);
+    return null;
   }
+}
+
+async function speakReplyManaged(text: string): Promise<void> {
+  await stopSpeechPlayback('replace_reply');
+
+  const language = detectReplyLanguage(text);
+  const normalized = normalizeTextForTts(text, language);
+  const engine = resolvePreferredTtsEngine();
+  const voiceProfile = loadVoiceProfileOrNull();
 
   try {
     await speakWithVoiceEngine(engine, normalized, language, voiceProfile);
@@ -890,6 +910,20 @@ async function speakReplyManaged(text: string): Promise<void> {
     await speakWithVoiceEngine(fallback, normalized, language, voiceProfile);
   }
 }
+
+const handleSpeechSynthesize = createVoiceHubSpeechSynthesizeHandler({
+  resolvePreferredEngine: resolvePreferredTtsEngine,
+  loadVoiceProfile: loadVoiceProfileOrNull,
+  runPythonBridge: runVoiceTtsPythonBridge,
+  detectLanguage: detectReplyLanguage,
+  normalizeText: normalizeTextForTts,
+  // The browser plays this audio into the same room as the mic: extend the
+  // echo guard over the playback window (+ the usual 8 s tail).
+  onSynthesized: ({ text, durationMs }) => {
+    recentSpeechGuardState = { text, finishedAt: Date.now() + durationMs };
+  },
+  warn: (message) => logger.warn(message),
+});
 
 async function processIngest(input: {
   requestId: string;
@@ -1274,6 +1308,17 @@ app.get('/api/speech/state', (_req, res) => {
     ok: true,
     speech: getSpeechPlaybackState(),
   });
+});
+
+// PA-09: synthesize and RETURN the audio (no host playback). Host playback via
+// /api/ingest-text auto_reply stays the default path.
+app.post('/api/speech/synthesize', async (req, res) => {
+  const result = await handleSpeechSynthesize(req.body === undefined ? {} : req.body);
+  if (result.kind === 'json') return res.status(result.status).json(result.body);
+  res.status(200).set(result.headers);
+  return res.end(
+    Buffer.from(result.audio.buffer, result.audio.byteOffset, result.audio.byteLength)
+  );
 });
 
 app.post('/api/stop-speaking', async (req, res) => {
