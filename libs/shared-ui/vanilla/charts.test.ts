@@ -369,8 +369,15 @@ describe('charts.js — layout contract', () => {
     it(`${type}: no inline colors, localized role=img label`, () => {
       const tree = layout(type, props);
       walk(tree, (node) => {
-        for (const name of ['fill', 'stroke', 'style', 'color']) {
+        for (const name of ['fill', 'stroke', 'color']) {
           expect(node.attrs[name], `${type} <${node.tag} ${name}>`).toBeUndefined();
+        }
+        // `style` is allowed only to carry non-color custom properties (e.g.
+        // `--kb-chart-vbw`, which the charts CSS reads via a container query
+        // so tick/label text stays readable however far the viewBox scales
+        // down) — every visual/color property still comes from CSS classes.
+        if (node.attrs.style !== undefined) {
+          expect(node.attrs.style, `${type} <${node.tag} style>`).toMatch(/^--[\w-]+:[^;]+$/u);
         }
         for (const series of [node.attrs['data-series']].filter(Boolean)) {
           expect(Number(series)).toBeGreaterThanOrEqual(1);
@@ -470,6 +477,54 @@ describe('charts.js — layout contract', () => {
     expect(nodes.map((node) => node.attrs['data-tone'])).toEqual(['info', 'danger']);
     expect(findAll(nodes[1], byClass('kb-chart__node-status')).map(textOf)).toEqual(['✕ Failed']);
     expect(findAll(tree, byClass('kb-chart__edge-label')).map(textOf)).toEqual(['plan']);
+  });
+
+  it('flow: a back edge spanning layers routes below every node row it spans, not just its own ends', () => {
+    // Publish pipeline (gallery sample): retry (validate -> fetch) spans the
+    // "parse" layer and the 2-row "validate/enrich" layer. A back edge drawn
+    // as a plain S-curve between the two ends can dip through "parse" before
+    // it has descended — this asserts the routed path stays below every
+    // spanned row instead.
+    const tree = layout('ui:flow', {
+      title: 'Publish pipeline',
+      nodes: [
+        { id: 'fetch', label: 'Fetch', status: 'done' },
+        { id: 'parse', label: 'Parse', status: 'done' },
+        { id: 'validate', label: 'Validate', status: 'failed' },
+        { id: 'enrich', label: 'Enrich', meta: 'optional' },
+        { id: 'publish', label: 'Publish', status: 'blocked' },
+      ],
+      edges: [
+        { from: 'fetch', to: 'parse' },
+        { from: 'parse', to: 'validate' },
+        { from: 'parse', to: 'enrich' },
+        { from: 'validate', to: 'publish' },
+        { from: 'enrich', to: 'publish' },
+        { from: 'validate', to: 'fetch', label: 'retry' },
+      ],
+    });
+    const boxes = findAll(tree, byClass('kb-chart__node-box'));
+    // Node order follows layer order: fetch, parse, validate, enrich, publish.
+    const bottomOf = (box: KbVElement) => Number(box.attrs.y) + Number(box.attrs.height);
+    const spannedBottoms = boxes.slice(0, 4).map(bottomOf); // fetch, parse, validate, enrich
+    const maxSpannedBottom = Math.max(...spannedBottoms);
+
+    const backEdge = findAll(tree, byClass('kb-chart__edge')).find(
+      (edge) => edge.attrs['data-direction'] === 'back'
+    )!;
+    expect(backEdge).toBeDefined();
+    const line = findAll(backEdge, byClass('kb-chart__edge-line'))[0];
+    // Elbow routing (L/Q), not a smooth S-curve that only asymptotically dips.
+    expect(line.attrs.d).not.toContain('C');
+    const numbers = (line.attrs.d.match(/-?\d+(?:\.\d+)?/gu) || []).map(Number);
+    // Coordinates alternate x, y for every M / L / Q command in this path.
+    const ys = numbers.filter((_, i) => i % 2 === 1);
+    // The routed path dips at least to `maxSpannedBottom + 18` — comfortably
+    // below every node box the edge spans, never merely behind one.
+    expect(Math.max(...ys)).toBeGreaterThanOrEqual(maxSpannedBottom + 18);
+    // ...and it does not dip below "publish" (layer 3), which the edge never spans.
+    const publishBottom = bottomOf(boxes[4]);
+    expect(publishBottom).toBeLessThan(maxSpannedBottom + 18);
   });
 
   it('meter: glyph + state word when a threshold applies', () => {

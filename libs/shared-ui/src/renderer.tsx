@@ -15,9 +15,13 @@ import { Grid, NextAction, Section, Stack } from './components/layout.js';
 import { AppShell, NavRail, PageHeader, Tabs } from './components/shell.js';
 import { KB_UI_MESSAGE_KEYS, KbI18nProvider, useKbI18n, type KbTranslate } from './i18n.js';
 // UI-01c settings & forms render through their own switch (component id → DOM ids).
-import { renderFormComponent } from './forms/index.js';
+import {
+  renderFormComponent,
+  isKbFormComponentType,
+  type KbFormComponentType,
+} from './forms/index.js';
 // UI-01b charts & visualisation: one layout (vanilla/charts.js) for both renderers.
-import { KbChart, isKbChartType } from './charts/ChartView.js';
+import { KbChart, isKbChartType, type KbChartType } from './charts/ChartView.js';
 
 // Module-local: the package does not depend on @types/node, and bundlers
 // replace `process.env.NODE_ENV` textually.
@@ -136,8 +140,11 @@ function normalizeAliasProps(
   }
 }
 
+/** Base catalog types only: form and chart types dispatch before `renderCatalog` is called. */
+type KbBaseCatalogType = Exclude<KyberionBaseComponentType, KbFormComponentType | KbChartType>;
+
 function renderCatalog(
-  type: KyberionBaseComponentType,
+  type: KbBaseCatalogType,
   rawProps: Record<string, unknown>,
   children: ReactNode,
   navChildren: ReactNode,
@@ -190,10 +197,13 @@ function renderCatalog(
       return <Button {...(p as { label: string })} />;
     case 'ui:disclosure':
       return <Disclosure {...props<'ui:disclosure'>()}>{children}</Disclosure>;
-    default:
-      // Extension groups (UI-01c forms, ...) are dispatched before this switch;
-      // the React ↔ vanilla parity test covers every catalog type.
-      return null;
+    default: {
+      // Extension groups (UI-01c forms, UI-01b charts) are dispatched before
+      // this switch and excluded from `type`, so this is exhaustive: a new
+      // catalog type that reaches here fails to compile until handled above.
+      const exhaustive: never = type;
+      return exhaustive;
+    }
   }
 }
 
@@ -264,13 +274,14 @@ export function A2UIRenderer({
           renderChildren(main)
         );
       }
-      const formNode = renderFormComponent(
-        catalogType,
-        id,
-        props,
-        childIds.length ? renderChildren(childIds) : null
-      );
-      if (formNode !== undefined) return formNode;
+      if (isKbFormComponentType(catalogType)) {
+        return renderFormComponent(
+          catalogType,
+          id,
+          props,
+          childIds.length ? renderChildren(childIds) : null
+        );
+      }
       if (isKbChartType(catalogType)) return <KbChart type={catalogType} props={props} />;
       return renderCatalog(
         catalogType,

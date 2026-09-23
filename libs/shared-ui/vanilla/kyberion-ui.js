@@ -854,12 +854,18 @@ const RENDERERS = {
         setData(td, 'align', col.align);
         if (col.mono === true) setData(td, 'mono', 'true');
         const value = row[col.key];
+        const isStatusColumn = col.key === 'status' || col.key.endsWith('_status');
         // Convention: a `status` / `*_status` column holding a canonical
         // status value renders as a status pill (icon + text).
-        if ((col.key === 'status' || col.key.endsWith('_status')) && isStatusValue(value)) {
+        if (isStatusColumn && isStatusValue(value)) {
           td.appendChild(statusPill(ctx, value));
         } else {
-          td.textContent = displayScalar(ctx, value);
+          const text = displayScalar(ctx, value);
+          td.textContent = text;
+          // Mono columns (ids, hashes) never wrap mid-token (see the source
+          // CSS); the title gives the full value back when the column stays
+          // narrower than it.
+          if (col.mono === true && text) td.title = text;
         }
         tr.appendChild(td);
       }

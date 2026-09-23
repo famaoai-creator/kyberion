@@ -135,7 +135,9 @@
             "#e34948"
           ],
           "sequential": ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#0d366b"],
-          "diverging": ["#1c5cab", "#86b6ef", "#e3e6eb", "#f2a097", "#c4312f"]
+          "diverging": ["#1c5cab", "#86b6ef", "#e3e6eb", "#f2a097", "#c4312f"],
+          "sequential_ink": ["#0f172a", "#0f172a", "#000000", "#ffffff", "#ffffff"],
+          "diverging_ink": ["#ffffff", "#0f172a", "#0f172a", "#0f172a", "#ffffff"]
         }
       },
       "dark": {
@@ -199,7 +201,9 @@
             "#e66767"
           ],
           "sequential": ["#184f95", "#256abf", "#3987e5", "#6da7ec", "#b7d3f6"],
-          "diverging": ["#6da7ec", "#2a5a96", "#3a4252", "#9a4541", "#e66767"]
+          "diverging": ["#6da7ec", "#2a5a96", "#3a4252", "#9a4541", "#e66767"],
+          "sequential_ink": ["#e6ebf2", "#e6ebf2", "#0b1220", "#0b1220", "#0b1220"],
+          "diverging_ink": ["#0b1220", "#e6ebf2", "#e6ebf2", "#e6ebf2", "#0b1220"]
         }
       },
       "radius": {

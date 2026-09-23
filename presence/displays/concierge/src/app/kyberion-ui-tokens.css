@@ -53,6 +53,16 @@
   --kb-ui-viz-div-3: #e3e6eb;
   --kb-ui-viz-div-4: #f2a097;
   --kb-ui-viz-div-5: #c4312f;
+  --kb-ui-viz-seq-ink-1: #0f172a;
+  --kb-ui-viz-seq-ink-2: #0f172a;
+  --kb-ui-viz-seq-ink-3: #000000;
+  --kb-ui-viz-seq-ink-4: #ffffff;
+  --kb-ui-viz-seq-ink-5: #ffffff;
+  --kb-ui-viz-div-ink-1: #ffffff;
+  --kb-ui-viz-div-ink-2: #0f172a;
+  --kb-ui-viz-div-ink-3: #0f172a;
+  --kb-ui-viz-div-ink-4: #0f172a;
+  --kb-ui-viz-div-ink-5: #ffffff;
   --kb-ui-radius-sm: 4px;
   --kb-ui-radius-md: 8px;
   --kb-ui-radius-lg: 12px;
@@ -146,6 +156,16 @@
     --kb-ui-viz-div-3: #3a4252;
     --kb-ui-viz-div-4: #9a4541;
     --kb-ui-viz-div-5: #e66767;
+    --kb-ui-viz-seq-ink-1: #e6ebf2;
+    --kb-ui-viz-seq-ink-2: #e6ebf2;
+    --kb-ui-viz-seq-ink-3: #0b1220;
+    --kb-ui-viz-seq-ink-4: #0b1220;
+    --kb-ui-viz-seq-ink-5: #0b1220;
+    --kb-ui-viz-div-ink-1: #0b1220;
+    --kb-ui-viz-div-ink-2: #e6ebf2;
+    --kb-ui-viz-div-ink-3: #e6ebf2;
+    --kb-ui-viz-div-ink-4: #e6ebf2;
+    --kb-ui-viz-div-ink-5: #0b1220;
   }
 }
 
@@ -203,5 +223,15 @@
   --kb-ui-viz-div-3: #3a4252;
   --kb-ui-viz-div-4: #9a4541;
   --kb-ui-viz-div-5: #e66767;
+  --kb-ui-viz-seq-ink-1: #e6ebf2;
+  --kb-ui-viz-seq-ink-2: #e6ebf2;
+  --kb-ui-viz-seq-ink-3: #0b1220;
+  --kb-ui-viz-seq-ink-4: #0b1220;
+  --kb-ui-viz-seq-ink-5: #0b1220;
+  --kb-ui-viz-div-ink-1: #0b1220;
+  --kb-ui-viz-div-ink-2: #e6ebf2;
+  --kb-ui-viz-div-ink-3: #e6ebf2;
+  --kb-ui-viz-div-ink-4: #e6ebf2;
+  --kb-ui-viz-div-ink-5: #0b1220;
 }
 /* end kyberion-ui tokens */
