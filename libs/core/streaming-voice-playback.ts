@@ -43,6 +43,65 @@ export interface StreamingVoicePlaybackController {
   end(): void;
   done: Promise<StreamingVoicePlaybackResult>;
   stop(): Promise<StreamingVoicePlaybackResult>;
+  /**
+   * Provisionally hold playback (two-stage barge-in). PCM output buffers
+   * chunks before the player; file output does not start the next segment.
+   * Optional so test doubles and older controllers stay valid.
+   */
+  pause?(): void;
+  resume?(): void;
+}
+
+/** A playback handle that can additionally hold and release its output. */
+export interface PausablePlaybackHandle extends PlaybackHandle {
+  pause(): void;
+  resume(): void;
+}
+
+export interface PlaybackPauseGate {
+  readonly paused: boolean;
+  pause(): void;
+  resume(): void;
+  /** Resolves immediately when not paused, otherwise on the next resume(). */
+  wait(): Promise<void>;
+}
+
+export function createPlaybackPauseGate(): PlaybackPauseGate {
+  let paused = false;
+  let waiters: Array<() => void> = [];
+  return {
+    get paused() {
+      return paused;
+    },
+    pause: () => {
+      paused = true;
+    },
+    resume: () => {
+      paused = false;
+      const release = waiters;
+      waiters = [];
+      for (const waiter of release) waiter();
+    },
+    wait: () =>
+      paused
+        ? new Promise<void>((resolve) => {
+            waiters.push(resolve);
+          })
+        : Promise.resolve(),
+  };
+}
+
+/** Hold chunks of `audio` while `gate` is paused; nothing is dropped. */
+export function gateAudioStream(
+  audio: AsyncIterable<AudioChunk>,
+  gate: PlaybackPauseGate
+): AsyncIterable<AudioChunk> {
+  return (async function* (): AsyncGenerator<AudioChunk> {
+    for await (const chunk of audio) {
+      await gate.wait();
+      yield chunk;
+    }
+  })();
 }
 
 export interface StreamingTtsAudioPlaybackOptions {
@@ -62,7 +121,8 @@ export interface StreamingTtsAudioPlaybackOptions {
 export function playPcmAudioStream(
   audio: AsyncIterable<AudioChunk>,
   options: { command?: string[]; onFirstChunk?: () => void } = {}
-): PlaybackHandle {
+): PausablePlaybackHandle {
+  const gate = createPlaybackPauseGate();
   let child: ChildProcessWithoutNullStreams | null = null;
   let iterator: AsyncIterator<AudioChunk> | null = null;
   let settled = false;
@@ -88,6 +148,9 @@ export function playPcmAudioStream(
         const next = await iterator.next();
         if (next.done) break;
         const chunk = next.value;
+        if (interrupted) return;
+        // Paused: hold the chunk here instead of feeding the player.
+        await gate.wait();
         if (interrupted) return;
         format ||= chunk.format;
         if (firstChunk) {
@@ -165,8 +228,11 @@ export function playPcmAudioStream(
 
   return {
     done,
+    pause: () => gate.pause(),
+    resume: () => gate.resume(),
     stop: async () => {
       interrupted = true;
+      gate.resume();
       try {
         await iterator?.return?.();
         child?.stdin.end();
@@ -187,9 +253,14 @@ export function probePcmAudioStreaming(): { available: boolean; reason?: string 
     : { available: true };
 }
 
+function pauseHandle(handle: PlaybackHandle | null, action: 'pause' | 'resume'): void {
+  (handle as Partial<PausablePlaybackHandle> | null)?.[action]?.();
+}
+
 export function streamVoicePlayback(
   options: StreamingVoicePlaybackOptions
 ): StreamingVoicePlaybackController {
+  const gate = createPlaybackPauseGate();
   const queue: string[] = [];
   let notify: (() => void) | null = null;
   let ended = false;
@@ -228,13 +299,16 @@ export function streamVoicePlayback(
           cancellation.then(() => null),
         ]);
         if (audio === null || cancelled) break;
+        // A provisional barge-in pause holds the next segment until resume/stop.
+        await Promise.race([gate.wait(), cancellation]);
+        if (cancelled) break;
         options.onSegmentStart?.({ index, text: segment });
         if (typeof audio === 'string') {
           audioPaths.push(audio);
           currentPlayback = (options.play ?? ((path) => playAudioFile(path)))(audio, index);
         } else {
           currentPlayback = (options.playStream ?? ((stream) => playPcmAudioStream(stream)))(
-            audio,
+            gateAudioStream(audio, gate),
             index
           );
         }
@@ -282,11 +356,20 @@ export function streamVoicePlayback(
       wake();
     },
     done,
+    pause: () => {
+      gate.pause();
+      pauseHandle(currentPlayback, 'pause');
+    },
+    resume: () => {
+      gate.resume();
+      pauseHandle(currentPlayback, 'resume');
+    },
     stop: async () => {
       if (cancelled) return done;
       cancelled = true;
       abortController.abort();
       resolveCancellation?.();
+      gate.resume();
       if (currentPlayback) await currentPlayback.stop();
       return done;
     },
@@ -297,6 +380,7 @@ export function streamVoicePlayback(
 export function streamTtsAudioPlayback(
   options: StreamingTtsAudioPlaybackOptions
 ): StreamingVoicePlaybackController {
+  const gate = createPlaybackPauseGate();
   const queue: string[] = [];
   let notify: (() => void) | null = null;
   let ended = false;
@@ -327,7 +411,7 @@ export function streamTtsAudioPlayback(
 
   const run = async (): Promise<StreamingVoicePlaybackResult> => {
     try {
-      const audio = options.synthesizeStream(text, options.voiceProfileId);
+      const audio = gateAudioStream(options.synthesizeStream(text, options.voiceProfileId), gate);
       currentPlayback = (
         options.playStream ??
         ((stream) =>
@@ -379,11 +463,20 @@ export function streamTtsAudioPlayback(
       wake();
     },
     done,
+    pause: () => {
+      gate.pause();
+      pauseHandle(currentPlayback, 'pause');
+    },
+    resume: () => {
+      gate.resume();
+      pauseHandle(currentPlayback, 'resume');
+    },
     stop: async () => {
       if (cancelled) return done;
       cancelled = true;
       abortController.abort();
       ended = true;
+      gate.resume();
       wake();
       resolveCancellation?.();
       if (currentPlayback) await currentPlayback.stop();

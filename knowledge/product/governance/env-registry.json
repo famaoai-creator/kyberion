@@ -3821,6 +3821,16 @@
       "documented": true
     },
     {
+      "name": "KYBERION_VOICE_BARGE_IN_MODE",
+      "category": "tuning",
+      "type": "enum",
+      "enum": ["off", "legacy", "two_stage"],
+      "required": false,
+      "description": "Overrides the realtime voice loop barge-in mode: off = half-duplex, legacy = stop playback on sustained speech, two_stage = pause on speech and stop only when streaming STT confirms words.",
+      "documented": true,
+      "subsystem": "voice"
+    },
+    {
       "name": "KYBERION_VOICE_BRIDGE_PATH",
       "category": "path",
       "type": "path",
@@ -3923,6 +3933,15 @@
       "required": false,
       "description": "Override for the voice sample-ingestion policy catalog; the selected file is schema-validated before profile registration.",
       "documented": true
+    },
+    {
+      "name": "KYBERION_VOICE_SPECULATIVE_REPLY",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Set to 1 to let the realtime voice loop start reasoning speculatively on tentative silence (buffered, spoken only on a matching final transcript); forced off on battery or metered backends.",
+      "documented": true,
+      "subsystem": "voice"
     },
     {
       "name": "KYBERION_VOICE_UPGRADE_ALIAS",

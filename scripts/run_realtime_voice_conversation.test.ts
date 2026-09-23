@@ -6,6 +6,7 @@ import {
   type SpeechToTextBridge,
 } from '@agent/core';
 import {
+  defaultBargeInMode,
   parseRecorderBridgeResponse,
   parseRealtimeVoiceConversationCli,
   runRealtimeVoiceConversationInteractive,
@@ -50,6 +51,47 @@ describe('run_realtime_voice_conversation cli', () => {
     expect(parsed.speechSegmentChars).toBe(80);
     expect(parsed.mission).toBe('MSN-CLI-TEST-001');
     expect(parsed.vadBackend).toBeUndefined();
+  });
+
+  it('parses turn-taking flags and resolves the default barge-in mode', () => {
+    const base = {
+      'session-id': 'rtc-tt',
+      interactive: true,
+      mission: 'MSN-CLI-TEST-003',
+    };
+    const defaults = parseRealtimeVoiceConversationCli(base);
+    expect(defaults.bargeInMode).toBeUndefined();
+    expect(defaults.speculativeReply).toBeUndefined();
+    expect(defaults.firstPhraseCache).toBe(false);
+    expect(defaults.eotHold).toBe(true);
+    expect(defaults.respondGate).toBe(true);
+    expect(defaultBargeInMode(defaults, true)).toBe('two_stage');
+    expect(defaultBargeInMode(defaults, false)).toBe('off');
+    expect(defaultBargeInMode({ latencyProfile: 'balanced' }, true)).toBe('off');
+
+    const explicit = parseRealtimeVoiceConversationCli({
+      ...base,
+      'barge-in-mode': 'two_stage',
+      'speculative-reply': true,
+      'first-phrase-cache': true,
+      'eot-hold': false,
+      'respond-gate': false,
+    });
+    expect(explicit.bargeInMode).toBe('two_stage');
+    expect(explicit.speculativeReply).toBe(true);
+    expect(explicit.firstPhraseCache).toBe(true);
+    expect(explicit.eotHold).toBe(false);
+    expect(explicit.respondGate).toBe(false);
+
+    expect(parseRealtimeVoiceConversationCli({ ...base, 'barge-in': true }).bargeInMode).toBe(
+      'legacy'
+    );
+    expect(parseRealtimeVoiceConversationCli({ ...base, 'barge-in': false }).bargeInMode).toBe(
+      'off'
+    );
+    expect(() => parseRealtimeVoiceConversationCli({ ...base, 'barge-in-mode': 'always' })).toThrow(
+      /--barge-in-mode/
+    );
   });
 
   it('parses realtime loop flags', () => {

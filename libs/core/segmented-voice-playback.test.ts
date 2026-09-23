@@ -133,4 +133,30 @@ describe('speakSegmented', () => {
     expect(result.interrupted).toBe(true);
     expect(result.completed).toBe(false);
   });
+
+  it('pause() lets the current segment finish but holds the next until resume()', async () => {
+    const played: string[] = [];
+    const first = pendingHandle();
+    const controller = speakSegmented({
+      text: 'ひとつめの文です。ふたつめの文です。',
+      maxSegmentChars: 12,
+      synthesize: async (_segment, index) => `/tmp/seg-${index}.wav`,
+      play: (audioPath) => {
+        played.push(audioPath);
+        return played.length === 1 ? first : immediateHandle();
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(played).toEqual(['/tmp/seg-0.wav']);
+
+    controller.pause?.();
+    first.finish();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(played).toEqual(['/tmp/seg-0.wav']);
+
+    controller.resume?.();
+    const result = await controller.done;
+    expect(result.completed).toBe(true);
+    expect(played).toEqual(['/tmp/seg-0.wav', '/tmp/seg-1.wav']);
+  });
 });

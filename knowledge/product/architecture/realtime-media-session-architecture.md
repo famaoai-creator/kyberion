@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, realtime, voice, meeting, diarization, viseme, avatar, media-session]
 importance: 10
 author: Ecosystem Architect
-last_updated: 2026-09-16
+last_updated: 2026-09-24
 kind: architecture
 scope: repository
 authority: reference
@@ -407,3 +407,92 @@ represented as `audio_output_delta` and receives the fixed session voice profile
 id explicitly. Reusing a session id with a changed voice/language/persona is
 rejected, which keeps the media session and the persisted conversation session
 bound to one identity.
+
+## 13. Turn-taking contract (2026-09-24)
+
+`startRealtimeVoiceLoop` composes the turn-taking parts in
+`libs/core/voice-turn-cancellation.ts`, `two-stage-barge-in.ts`,
+`voice-eot-scorer.ts`, `voice-respond-gate.ts`, `voice-phrase-chunker.ts`,
+`voice-first-phrase-cache.ts`, and `voice-speculative-policy.ts`. The pure
+`VoiceTurnTakingMachine` / voice workbench replays the same decisions on a
+fake clock. Operator flags are listed in
+[`realtime-voice-conversation-operations.md`](../voice/realtime-voice-conversation-operations.md).
+
+**Cancellation.** Every reply turn arms one token
+(`VoiceTurnCancellationCoordinator.arm`). Arming does not cancel a previous
+token, so the loop aborts a still-live one first. The token's `signal` goes
+directly to `streamReply` / `reply`, and its abort listener stops playback,
+closes the barge-in STT feed, emits `turn_cancelled`, and traces
+`realtime_voice.turn_cancelled{turn, reason}`. The first reason wins, and a
+turn releases its listener when it finishes, so a completed turn is never
+reported as cancelled.
+
+| reason        | raised by                                                                                            |
+| ------------- | ---------------------------------------------------------------------------------------------------- |
+| `barge_in`    | a confirmed barge-in (legacy trigger or two-stage `hard_stop`)                                       |
+| `eot_revoked` | a speculative reply whose utterance continued or whose final did not match                           |
+| `external`    | `handle.stop()`, the upstream `signal`, loop shutdown, or a respond-gate drop of a speculative reply |
+| `timeout`     | a token armed with `budgetMs` (not armed by the loop today)                                          |
+| `user_cancel` | reserved for an explicit operator cancel surface                                                     |
+
+**Barge-in modes.** `bargeIn.mode` is `off` (half-duplex, default), `legacy`
+(`enabled: true`; sustained speech stops playback), or `two_stage`.
+`KYBERION_VOICE_BARGE_IN_MODE` overrides the option. The CLI defaults to
+`two_stage` only for `low_latency` with streaming STT. Two-stage timing
+constants:
+
+| constant                       | default                 | meaning                                                         |
+| ------------------------------ | ----------------------- | --------------------------------------------------------------- |
+| energy threshold               | segmenter threshold × 2 | same separation multiplier as legacy                            |
+| `provisional_speech_ms`        | 150 ms                  | sustained speech that pauses playback (`barge_in_provisional`)  |
+| `words_grace_ms`               | 600 ms                  | wait for a partial with words; none ⇒ `resume_tts('no_words')`  |
+| `min_confirm_words`            | 1                       | Latin words, or 2 non-filler CJK characters per word            |
+| `fallback_hard_stop_speech_ms` | 700 ms                  | without streaming STT, sustained speech that stops playback     |
+| echo                           | bigram overlap ≥ 0.7    | a partial matching the text being spoken ⇒ `resume_tts('echo')` |
+
+A pause holds output rather than dropping it. PCM output buffers chunks
+before the player; artifact output does not start the next segment, while the
+current file segment plays out. A confirmed stop replays the audio captured
+since the pause into the segmenter so the interrupting utterance keeps its
+first syllables. If playback ends while a pause is still open, the captured
+audio is replayed as the start of the next utterance.
+
+**EOT hold (`eotHold`).** A final transcript that ends in a Japanese
+continuation particle (て/で/けど/が/し/から/ので/のに/たら/と/、), a filler, or
+an English trailing conjunction is held. The loop returns to listening and
+joins the next utterance's transcript with no separator (Japanese) or a space
+(English). Sentence-final punctuation or です/ます/ください/か commits
+immediately. A held turn commits after `maxHoldMs` (1500 ms) of listening
+silence. The committed turn uses the latest utterance's recording and the
+summed listen/STT durations.
+
+**Respond gate (`respondGate`).** Empty and filler-only turns never reach
+reasoning. The own-TTS echo check (character-bigram overlap ≥ 0.7 within 9 s
+of the last reply) is armed only when barge-in is not `off`, because the
+half-duplex loop already discards microphone input during playback and the
+drain window. A drop emits `degraded{what: 'respond_gate', reason}`.
+
+**Speculative reply invariants (`speculativeReply`).** This is off unless it
+is set explicitly or `KYBERION_VOICE_SPECULATIVE_REPLY=1`. It is forced off on
+battery power or a metered backend, and it needs `streamReply` plus streaming
+STT.
+
+- Inference starts after 250 ms of silence inside an utterance, on a partial
+  of at least 4 characters, under its own token.
+- Segments are buffered only: nothing is synthesized, played, published as
+  `assistant_text_delta`, or passed to `onTurn` before adoption.
+- Resumed speech, an EOT hold, an empty final, or a respond-gate drop aborts
+  it. A final that does not match after NFKC, case, punctuation, and
+  whitespace normalization also aborts it (`eot_revoked`).
+- On a match the buffer is flushed into the turn's playback, and the turn
+  token takes over cancellation of the speculative inference. Only the
+  committed turn is recorded in conversation history.
+
+**Phrase chunking.** `streamRealtimeAssistantReply` cuts provider deltas
+with `VoicePhraseChunker`. The first phrase may break on `、`/`,` within 24
+characters; later phrases break on a sentence end or at 80 characters. The
+two-sentence speech budget still applies. The opt-in first-phrase cache
+(`--first-phrase-cache`) serves segment 0 of artifact synthesis from
+`active/shared/runtime/voice-first-phrase-cache`. It is keyed by engine,
+voice profile, a profile-record revision fingerprint, a
+language/personal-voice settings fingerprint, and the text.

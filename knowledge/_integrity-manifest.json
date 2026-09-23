@@ -771,7 +771,7 @@
     {
       "path": "product/architecture/realtime-media-session-architecture.md",
       "tier": "public",
-      "size": 18294,
+      "size": 24364,
       "type": "md"
     },
     {
@@ -1587,7 +1587,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 146778,
+      "size": 147630,
       "type": "json"
     },
     {
@@ -6279,7 +6279,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 965131,
+      "size": 968543,
       "type": "json"
     },
     {
@@ -12129,7 +12129,7 @@
     {
       "path": "product/voice/realtime-voice-conversation-operations.md",
       "tier": "public",
-      "size": 7002,
+      "size": 10642,
       "type": "md"
     },
     {
