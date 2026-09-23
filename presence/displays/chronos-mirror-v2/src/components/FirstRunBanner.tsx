@@ -63,38 +63,19 @@ export function FirstRunBanner() {
       <span className="kb-callout__icon" aria-hidden="true" />
       <div className="kb-callout__content">
         <p className="kb-callout__title">{uxText('chronos_first_run_eyebrow', locale)}</p>
-        <div className="kb-callout__body">
+        <p className="kb-callout__body">
           {uxMessage(
             'chronos_first_run_welcome',
             { name, agent: agentId },
             'Welcome, {name}. Identity is registered as {agent}, but no agent is running yet.',
             locale
           )}
-        </div>
-        <ol className="kb-callout__body mt-1 list-decimal space-y-0.5 pl-4">
-          {locale === 'ja' ? (
-            <>
-              <li>{uxText('chronos_first_run_step_prereq', locale)}</li>
-              <li>{uxText('chronos_first_run_step_agent', locale)}</li>
-              <li>{uxText('chronos_first_run_step_diagnostics', locale)}</li>
-              <li>{uxText('chronos_first_run_step_tutorial', locale)}</li>
-            </>
-          ) : (
-            <>
-              <li>
-                Run <span className="font-bold kb-text-primary">Prereq Check</span> and{' '}
-                <span className="font-bold kb-text-primary">Setup Report</span> from the left rail.
-              </li>
-              <li>
-                Open <span className="font-bold kb-text-primary">Agent Runtimes</span> (top-right)
-                and Spawn First Agent.
-              </li>
-              <li>
-                Run a Verify check (Vital Check / Diagnostics) to confirm the ecosystem is healthy.
-              </li>
-              <li>Promote the simulated Tutorial into a real Mission once you're ready.</li>
-            </>
-          )}
+        </p>
+        <ol className="kb-callout__body chronos-steps">
+          <li>{uxText('chronos_first_run_step_prereq', locale)}</li>
+          <li>{uxText('chronos_first_run_step_agent', locale)}</li>
+          <li>{uxText('chronos_first_run_step_diagnostics', locale)}</li>
+          <li>{uxText('chronos_first_run_step_tutorial', locale)}</li>
         </ol>
       </div>
       <button

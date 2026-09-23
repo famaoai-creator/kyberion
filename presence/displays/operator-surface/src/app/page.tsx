@@ -1,5 +1,4 @@
-import Link from 'next/link';
-import { Badge, Grid, KbChart, Metric, Section, StatusPill, Tabs } from '@agent/shared-ui';
+import { Grid, KbChart, Metric, Section, Table, Tabs } from '@agent/shared-ui';
 import {
   getCapabilities,
   getCloudflareOsSnapshot,
@@ -14,7 +13,7 @@ import { getRequestLocale } from '@/lib/request-locale';
 import { formatCount, missionStatus, statusText, tierLabel, tierTone } from '@/lib/view';
 import CapabilityDashboard from '@/components/CapabilityDashboard';
 import OsControlPlanePanel from '@/components/OsControlPlanePanel';
-import { DataTable, type DataTableRow } from '@/components/DataTable';
+import { ROW_HREF, ROW_KEY, tableRows, type OperatorTableRow } from '@/lib/table-rows';
 import { OperatorPageHeader } from './operator-shell';
 
 export const dynamic = 'force-dynamic';
@@ -67,29 +66,20 @@ export default async function MissionsPage({
   const statusName = (status: string) => statusText(status, locale, 'mission');
   const failed = counts.get('failed') ?? 0;
 
-  const rows: DataTableRow[] = visible.map((mission) => {
+  const rows: OperatorTableRow[] = visible.map((mission) => {
     const href = `/missions/${encodeURIComponent(mission.mission_id)}`;
     const pill = missionStatus(mission.status);
     return {
       id: mission.mission_id,
       href,
       cells: {
-        mission: (
-          <span className="operator-cell operator-cell--primary">
-            <Link href={href} className="operator-cell__title">
-              {mission.title}
-            </Link>
-            <span className="operator-cell__meta operator-mono">{mission.mission_id}</span>
-          </span>
-        ),
-        status: <StatusPill status={pill.status} domain="mission" label={pill.label} />,
-        tier: <Badge label={tierLabel(mission.tier, t)} tone={tierTone(mission.tier)} />,
-        tenant: <span className="operator-mono">{mission.tenant_slug ?? '—'}</span>,
-        persona: mission.assigned_persona ?? '—',
+        mission: { title: mission.title, id: mission.mission_id, href },
+        status: { status: pill.status, domain: 'mission', label: pill.label },
+        tier: { badge: tierLabel(mission.tier, t), tone: tierTone(mission.tier) },
+        tenant: mission.tenant_slug ?? null,
+        persona: mission.assigned_persona ?? null,
         checkpoints: formatCount(mission.checkpoints_count ?? 0, locale),
-        commit: (
-          <span className="operator-mono operator-muted">{mission.latest_commit ?? '—'}</span>
-        ),
+        commit: mission.latest_commit ?? null,
       },
     };
   });
@@ -152,17 +142,19 @@ export default async function MissionsPage({
             })),
           ]}
         />
-        <DataTable
+        <Table
+          row_key={ROW_KEY}
+          row_href_key={ROW_HREF}
           columns={[
             { key: 'mission', label: t('col_mission') },
             { key: 'status', label: t('col_status') },
             { key: 'tier', label: t('col_tier') },
-            { key: 'tenant', label: t('col_tenant') },
+            { key: 'tenant', label: t('col_tenant'), mono: true },
             { key: 'persona', label: t('col_persona') },
             { key: 'checkpoints', label: t('col_checkpoints'), align: 'end' },
-            { key: 'commit', label: t('col_latest_commit') },
+            { key: 'commit', label: t('col_latest_commit'), mono: true },
           ]}
-          rows={rows}
+          rows={tableRows(rows)}
           empty={t('missions_empty')}
         />
       </Section>

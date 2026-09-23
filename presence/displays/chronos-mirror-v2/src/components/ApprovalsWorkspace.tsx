@@ -1,9 +1,25 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, CheckCircle2, FileCheck2, ShieldAlert, XCircle } from 'lucide-react';
+import {
+  Badge,
+  Button,
+  Callout,
+  Disclosure,
+  EmptyState,
+  KeyValue,
+  List,
+  Section,
+  StatusPill,
+} from '@agent/shared-ui';
+import { WsPreformatted, WsSelectTable, WsTextareaField, WsTitleCell } from './ChronosWsParts';
 import { useChronosLocale } from '../lib/hooks';
-import { formatChronosDateTime, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
+import {
+  formatChronosDateTime,
+  uxText,
+  uxTextOr,
+  type SupportedLocale,
+} from '../lib/ux-vocabulary';
 import { parseApprovalsResponse, type ClientApproval } from '../lib/approvals-response';
 
 type Approval = ClientApproval;
@@ -90,217 +106,228 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
     }
   };
 
+  const localAdmin = accessRole === 'localadmin';
+  const scopeLabel = `${tenant || uxText('chronos_ac_scope_all', locale)} · ${items.length}`;
+  const kindFallback = uxTextOr('chronos_ws_approval_kind_default', 'Approval', locale);
+
   return (
-    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] kb-text-accent">承認</div>
-          <h2 className="mt-1 text-xl font-semibold kb-text-primary">
-            {uxText('chronos_approvals_title', locale)}
-          </h2>
-          <p className="mt-2 text-sm leading-6 kb-text-secondary">
-            {uxText('chronos_approvals_description', locale)}
-          </p>
+    <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.5fr)]">
+      <Section
+        title={uxText('chronos_approvals_title', locale)}
+        description={uxText('chronos_approvals_description', locale)}
+      >
+        <div className="flex flex-wrap gap-2">
+          <Badge label={scopeLabel} tone="accent" />
         </div>
-        <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] kb-text-accent">
-          {tenant || uxText('chronos_ac_scope_all', locale)} · {items.length}
-        </span>
-      </div>
-      {error ? (
-        <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface p-3 text-[11px] kb-status-negative">
-          {error}
-        </div>
-      ) : null}
-      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.5fr)]">
-        <div className="chronos-scroll max-h-[calc(100vh-18rem)] space-y-2 overflow-y-auto pr-1">
-          {items.length === 0 ? (
-            <div className="rounded-xl border kb-border-subtle p-4 text-[11px] kb-text-muted">
-              {uxText('chronos_approvals_empty', locale)}
-            </div>
-          ) : (
-            items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={selected?.id === item.id}
-                onClick={() => setSelectedId(item.id)}
-                className={`w-full rounded-xl border p-3 text-left ${selected?.id === item.id ? 'kb-border-accent kb-surface-accent' : 'kb-border-subtle kb-surface-sunken hover:kb-surface-raised'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <ShieldAlert size={13} className="kb-text-accent" />
-                  <span className="truncate text-xs font-semibold kb-text-primary">
-                    {item.title}
-                  </span>
-                </div>
-                <div className="mt-2 text-[11px] kb-text-secondary">
-                  {item.tenantSlug || uxText('chronos_org_not_configured', locale)} /{' '}
-                  {item.kind || '承認'}
-                </div>
-                <div className="mt-1 text-[11px] kb-text-muted">
+        {error ? (
+          <Callout
+            tone="danger"
+            title={uxTextOr('chronos_ws_load_failed', 'Could not load this view', locale)}
+            body={error}
+          />
+        ) : null}
+        <WsSelectTable
+          columns={[
+            { key: 'title', label: uxTextOr('chronos_ws_col_request', 'Request', locale) },
+            {
+              key: 'risk',
+              label: uxText('chronos_risk', locale),
+              width: '6rem',
+            },
+          ]}
+          rows={items}
+          rowKey={(item) => item.id}
+          selectedKey={selected?.id}
+          onSelect={setSelectedId}
+          empty={uxText('chronos_approvals_empty', locale)}
+          renderCell={(item, key, select) =>
+            key === 'title' ? (
+              <div className="flex flex-col gap-0.5">
+                <WsTitleCell
+                  title={item.title}
+                  id={`${item.tenantSlug || uxText('chronos_org_not_configured', locale)} / ${item.kind || kindFallback}`}
+                  onSelect={select}
+                  selected={selected?.id === item.id}
+                />
+                <span className="kb-list__meta">
                   {item.requestedBy} · {formatChronosDateTime(item.requestedAt, locale)}
-                </div>
-              </button>
-            ))
-          )}
-        </div>
-        {selected ? (
-          <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 text-[11px] kb-text-accent">
-                  <FileCheck2 size={13} />
-                  承認内容
-                </div>
-                <h3 className="mt-1 text-lg font-semibold kb-text-primary">{selected.title}</h3>
+                </span>
               </div>
-              <span className="rounded-full border kb-border-subtle px-2 py-1 text-[11px] kb-text-secondary">
-                {approvalRiskLabel(selected.risk?.level, locale)} / {uxText('chronos_risk', locale)}
-              </span>
-            </div>
-            <p className="mt-4 whitespace-pre-wrap text-sm leading-6 kb-text-primary">
+            ) : (
+              <Badge
+                label={approvalRiskLabel(item.risk?.level, locale)}
+                tone={riskTone(item.risk?.level)}
+              />
+            )
+          }
+        />
+      </Section>
+
+      {selected ? (
+        <Section
+          title={selected.title}
+          description={uxTextOr('chronos_ws_approval_detail_eyebrow', 'Approval content', locale)}
+        >
+          <div className="flex flex-wrap gap-2">
+            <Badge
+              label={`${uxText('chronos_risk', locale)}: ${approvalRiskLabel(selected.risk?.level, locale)}`}
+              tone={riskTone(selected.risk?.level)}
+            />
+            {selected.risk?.level === 'critical' ? (
+              <StatusPill
+                status="blocked"
+                label={uxText('chronos_additional_confirmation_hint', locale)}
+              />
+            ) : null}
+          </div>
+          {selected.summary ? (
+            <p className="kb-text kb-text--body" style={{ whiteSpace: 'pre-wrap' }}>
               {selected.summary}
             </p>
-            {selected.details ? (
-              <section className="mt-4 rounded-xl border kb-border-subtle kb-surface-raised p-3">
-                <h4 className="text-[11px] kb-text-accent">詳細</h4>
-                <p className="mt-2 whitespace-pre-wrap text-[11px] leading-5 kb-text-secondary">
-                  {selected.details}
-                </p>
-              </section>
-            ) : null}
-            {selected.sourceText ? (
-              <details className="mt-3 rounded-xl border kb-border-subtle kb-surface-raised p-3">
-                <summary className="cursor-pointer text-[11px] font-semibold kb-text-primary">
-                  {uxText('chronos_request_source', locale)}
-                </summary>
-                <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap text-[11px] kb-text-secondary">
-                  {selected.sourceText}
-                </pre>
-              </details>
-            ) : null}
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl border kb-border-subtle p-3">
-                <h4 className="text-[11px] kb-text-accent">
-                  {uxText('chronos_approval_change_details', locale)}
-                </h4>
-                <dl className="mt-2 space-y-1 text-[11px] kb-text-secondary">
-                  <div>
-                    {uxText('chronos_approval_service', locale)}:{' '}
-                    {selected.target?.serviceId || '-'}
-                  </div>
-                  <div>
-                    {uxText('chronos_approval_operation', locale)}:{' '}
-                    {approvalMutationLabel(selected.target?.mutation, locale)}
-                  </div>
-                  <div>
-                    {uxText('chronos_approval_key', locale)}: {selected.target?.secretKey || '-'}
-                  </div>
-                  <div>
-                    {uxText('chronos_approval_current_value', locale)}:{' '}
-                    {selected.target?.existingValuePresent
+          ) : null}
+          {selected.details ? (
+            <Disclosure summary={uxTextOr('chronos_ws_details', 'Details', locale)} open>
+              <p className="kb-text kb-text--muted" style={{ whiteSpace: 'pre-wrap' }}>
+                {selected.details}
+              </p>
+            </Disclosure>
+          ) : null}
+          <div className="chronos-two-col">
+            <div className="chronos-feed">
+              <h3 className="chronos-feed__title">
+                {uxText('chronos_approval_change_details', locale)}
+              </h3>
+              <KeyValue
+                items={[
+                  {
+                    label: uxText('chronos_approval_service', locale),
+                    value: selected.target?.serviceId || '-',
+                    mono: true,
+                  },
+                  {
+                    label: uxText('chronos_approval_operation', locale),
+                    value: approvalMutationLabel(selected.target?.mutation, locale),
+                  },
+                  {
+                    label: uxText('chronos_approval_key', locale),
+                    value: selected.target?.secretKey || '-',
+                    mono: true,
+                  },
+                  {
+                    label: uxText('chronos_approval_current_value', locale),
+                    value: selected.target?.existingValuePresent
                       ? uxText('chronos_approval_value_present', locale)
-                      : uxText('chronos_approval_value_missing', locale)}
-                  </div>
-                </dl>
-              </div>
-              <div className="rounded-xl border kb-border-subtle p-3">
-                <h4 className="text-[11px] kb-text-accent">注意点</h4>
-                <dl className="mt-2 space-y-1 text-[11px] kb-text-secondary">
-                  <div>
-                    {uxText('chronos_approval_restart', locale)}:{' '}
-                    {selected.risk?.restartScope || uxText('chronos_approval_not_needed', locale)}
-                  </div>
-                  <div>
-                    {uxText('chronos_approval_strong_auth', locale)}:{' '}
-                    {selected.risk?.requiresStrongAuth
+                      : uxText('chronos_approval_value_missing', locale),
+                  },
+                ]}
+              />
+            </div>
+            <div className="chronos-feed">
+              <h3 className="chronos-feed__title">
+                {uxTextOr('chronos_ws_approval_cautions', 'Points to check', locale)}
+              </h3>
+              <KeyValue
+                items={[
+                  {
+                    label: uxText('chronos_approval_restart', locale),
+                    value:
+                      selected.risk?.restartScope || uxText('chronos_approval_not_needed', locale),
+                  },
+                  {
+                    label: uxText('chronos_approval_strong_auth', locale),
+                    value: selected.risk?.requiresStrongAuth
                       ? uxText('chronos_required', locale)
-                      : uxText('chronos_not_required', locale)}
-                  </div>
-                  <div>
-                    {uxText('chronos_approval_policy', locale)}:{' '}
-                    {selected.risk?.policyId || uxText('chronos_approval_default_policy', locale)}
-                  </div>
-                </dl>
-              </div>
+                      : uxText('chronos_not_required', locale),
+                  },
+                  {
+                    label: uxText('chronos_approval_policy', locale),
+                    value:
+                      selected.risk?.policyId || uxText('chronos_approval_default_policy', locale),
+                    mono: Boolean(selected.risk?.policyId),
+                  },
+                ]}
+              />
             </div>
-            {selected.justification ? (
-              <section className="mt-3 rounded-xl border kb-border-subtle p-3">
-                <h4 className="text-[11px] kb-text-accent">
-                  {uxText('chronos_reason_impact', locale)}
-                </h4>
-                <p className="mt-2 text-[11px] kb-text-secondary">
-                  {selected.justification.reason}
+          </div>
+          {selected.justification ? (
+            <div className="chronos-feed">
+              <h3 className="chronos-feed__title">{uxText('chronos_reason_impact', locale)}</h3>
+              <p className="kb-text kb-text--body">{selected.justification.reason}</p>
+              {selected.justification.impactSummary ? (
+                <p className="kb-text kb-text--muted">
+                  {uxTextOr('chronos_ws_impact', 'Impact', locale)}:{' '}
+                  {selected.justification.impactSummary}
                 </p>
-                {selected.justification.impactSummary ? (
-                  <p className="mt-2 text-[11px] kb-text-secondary">
-                    影響: {selected.justification.impactSummary}
-                  </p>
-                ) : null}
-                {selected.justification.requestedEffects?.length ? (
-                  <ul className="mt-2 list-disc pl-4 text-[11px] kb-text-secondary">
-                    {selected.justification.requestedEffects.map((effect) => (
-                      <li key={effect}>{effect}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </section>
-            ) : null}
-            <div className="mt-3 flex flex-wrap gap-2 text-[11px] kb-text-muted">
-              <span>
-                {uxText('chronos_tenant', locale)}: {selected.tenantSlug || '-'}
-              </span>
-              <span>
-                {uxText('chronos_project', locale)}: {selected.workLoop?.project_id || '-'}
-              </span>
-              <span>
-                {uxText('chronos_mission', locale)}: {selected.missionId || '-'}
-              </span>
+              ) : null}
+              {selected.justification.requestedEffects?.length ? (
+                <List
+                  items={selected.justification.requestedEffects.map((effect) => ({
+                    title: effect,
+                  }))}
+                />
+              ) : null}
             </div>
-            <textarea
-              aria-label="Decision note"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder={uxText('chronos_decision_note', locale)}
-              className="mt-4 min-h-20 w-full rounded-xl border kb-border-subtle kb-surface-raised p-3 text-xs kb-text-primary outline-none"
+          ) : null}
+          <KeyValue
+            items={[
+              {
+                label: uxText('chronos_tenant', locale),
+                value: selected.tenantSlug || '-',
+                mono: true,
+              },
+              {
+                label: uxText('chronos_project', locale),
+                value: selected.workLoop?.project_id || '-',
+                mono: true,
+              },
+              {
+                label: uxText('chronos_mission', locale),
+                value: selected.missionId || '-',
+                mono: true,
+              },
+            ]}
+          />
+          {selected.sourceText ? (
+            <Disclosure summary={uxText('chronos_request_source', locale)}>
+              <WsPreformatted text={selected.sourceText} />
+            </Disclosure>
+          ) : null}
+          <WsTextareaField
+            id="chronos-approval-note"
+            label={uxTextOr('chronos_ws_decision_note_label', 'Decision note', locale)}
+            value={note}
+            onChange={setNote}
+            placeholder={uxText('chronos_decision_note', locale)}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              label={uxText('chronos_approve', locale)}
+              variant="primary"
+              disabled={busy || !localAdmin}
+              onClick={() => void decide('approved')}
             />
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                disabled={busy || accessRole !== 'localadmin'}
-                onClick={() => void decide('approved')}
-                className="inline-flex items-center gap-1 rounded-lg kb-surface-positive px-3 py-2 text-[11px] kb-status-positive disabled:opacity-50"
-              >
-                <CheckCircle2 size={14} />
-                承認
-              </button>
-              <button
-                type="button"
-                disabled={busy || accessRole !== 'localadmin'}
-                onClick={() => void decide('rejected')}
-                className="inline-flex items-center gap-1 rounded-lg kb-surface-negative px-3 py-2 text-[11px] kb-status-negative disabled:opacity-50"
-              >
-                <XCircle size={14} />
-                却下
-              </button>
-            </div>
-            {accessRole !== 'localadmin' ? (
-              <div className="mt-3 text-[11px] kb-text-muted">
-                {uxText('chronos_admin_action_hint', locale)}
-              </div>
-            ) : null}
-            {selected.risk?.level === 'critical' ? (
-              <div className="mt-3 flex items-center gap-2 text-[11px] kb-status-negative">
-                <AlertTriangle size={13} />
-                {uxText('chronos_additional_confirmation_hint', locale)}
-              </div>
-            ) : null}
+            <Button
+              label={uxText('chronos_reject', locale)}
+              variant="danger"
+              disabled={busy || !localAdmin}
+              onClick={() => void decide('rejected')}
+            />
           </div>
-        ) : (
-          <div className="rounded-lg border kb-border-subtle p-6 text-sm kb-text-muted">
-            {uxText('chronos_select_approval', locale)}
-          </div>
-        )}
-      </div>
-    </section>
+          {!localAdmin ? (
+            <p className="kb-text kb-text--muted">{uxText('chronos_admin_action_hint', locale)}</p>
+          ) : null}
+        </Section>
+      ) : (
+        <Section>
+          <EmptyState title={uxText('chronos_select_approval', locale)} />
+        </Section>
+      )}
+    </div>
   );
+}
+
+function riskTone(level: string | undefined): 'neutral' | 'warning' | 'danger' {
+  if (level === 'high' || level === 'critical') return 'danger';
+  if (level === 'medium') return 'warning';
+  return 'neutral';
 }

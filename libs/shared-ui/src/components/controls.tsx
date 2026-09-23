@@ -37,7 +37,8 @@ export interface ButtonProps {
   variant?: KbButtonVariant;
   disabled?: boolean;
   href?: string;
-  action?: KbAction;
+  /** Dispatched through the enclosing `A2UIActionProvider`'s `onAction` (an id alone = no payload). */
+  action?: KbAction | string;
   /** React-only click handler; runs before the context `onAction` dispatch. */
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
   type?: 'button' | 'submit' | 'reset';
@@ -69,7 +70,7 @@ export function Button(props: ButtonProps) {
     );
   }
 
-  const action = props.action;
+  const action = normalizeAction(props.action);
   return (
     <button
       type={props.type ?? 'button'}
@@ -87,15 +88,40 @@ export function Button(props: ButtonProps) {
   );
 }
 
-/** Render a catalog `KbActionRef` (label + href | action) as a `Button`. */
+/** `{ id, payload? }` or a bare action id → `KbAction`; anything else → undefined. */
+export function normalizeAction(action: KbAction | string | undefined): KbAction | undefined {
+  if (typeof action === 'string') return action ? { id: action } : undefined;
+  return action && typeof action.id === 'string' && action.id ? action : undefined;
+}
+
+/**
+ * React-only action reference: the catalog `KbActionRef` shape with an
+ * `onClick` handler instead of (or in addition to) an `action`. Hosts use it
+ * for in-page handlers; an `action` still dispatches through the enclosing
+ * `A2UIActionProvider` after `onClick` (unless it calls `preventDefault`).
+ */
+export interface KbReactActionRef {
+  label: string;
+  variant?: KbButtonVariant;
+  disabled?: boolean;
+  action?: KbAction | string;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  href?: never;
+}
+
+/** An action reference accepted by React components with `actions` (catalog or React-only). */
+export type ActionRefLike = KbActionRef | KbReactActionRef;
+
+/** Render a catalog `KbActionRef` (label + href | action) or a `KbReactActionRef` as a `Button`. */
 export function ActionRefButton({
   actionRef,
   defaultVariant = 'secondary',
 }: {
-  actionRef: KbActionRef | undefined;
+  actionRef: ActionRefLike | undefined;
   defaultVariant?: KbButtonVariant;
 }) {
   if (!actionRef || typeof actionRef.label !== 'string') return null;
+  const onClick = 'onClick' in actionRef ? actionRef.onClick : undefined;
   return (
     <Button
       label={actionRef.label}
@@ -103,6 +129,7 @@ export function ActionRefButton({
       disabled={actionRef.disabled}
       href={actionRef.href}
       action={actionRef.action}
+      onClick={typeof onClick === 'function' ? onClick : undefined}
     />
   );
 }

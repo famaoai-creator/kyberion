@@ -434,7 +434,7 @@
     {
       "id": "tabs",
       "title": "タブ ui:tabs",
-      "description": "wrap(折り返し)と menu(横スクロール)。href ありはリンク、なしは tablist。",
+      "description": "wrap(折り返し)と menu(横スクロール)。href ありはリンク、なしは tablist。secondary はピル型のサブナビゲーションです。",
       "components": [
         {
           "id": "tabs-root",
@@ -442,7 +442,7 @@
           "props": {
             "gap": "md"
           },
-          "children": ["tabs1", "tabs2"]
+          "children": ["tabs1", "tabs2", "tabs3"]
         },
         {
           "id": "tabs1",
@@ -505,6 +505,34 @@
                 "id": "m6",
                 "label": "設定",
                 "href": "#m6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "tabs3",
+          "type": "ui:tabs",
+          "props": {
+            "active": "s2",
+            "variant": "secondary",
+            "items": [
+              {
+                "id": "s1",
+                "label": "すべて",
+                "href": "#s1",
+                "count": 12
+              },
+              {
+                "id": "s2",
+                "label": "自分の担当",
+                "href": "#s2",
+                "count": 5
+              },
+              {
+                "id": "s3",
+                "label": "自分の対応待ち",
+                "href": "#s3",
+                "count": 2
               }
             ]
           }
@@ -603,7 +631,7 @@
             "gap": "md",
             "min_column_width": "sm"
           },
-          "children": ["sec-n", "sec-a", "sec-s", "sec-w", "sec-d"]
+          "children": ["sec-n", "sec-a", "sec-s", "sec-w", "sec-d", "sec-act"]
         },
         {
           "id": "sec-n",
@@ -656,6 +684,34 @@
             "title": "危険",
             "description": "tone: danger",
             "tone": "danger"
+          }
+        },
+        {
+          "id": "sec-act",
+          "type": "ui:section",
+          "props": {
+            "title": "操作付き",
+            "description": "actions: アクション ID(onAction)とリンク",
+            "actions": [
+              {
+                "label": "更新",
+                "action": "gallery.section.refresh"
+              },
+              {
+                "label": "一覧を開く",
+                "href": "#section",
+                "variant": "ghost"
+              }
+            ]
+          },
+          "children": ["sec-act-t"]
+        },
+        {
+          "id": "sec-act-t",
+          "type": "ui:text",
+          "props": {
+            "text": "見出しのボタンはアクション ID をホストへ送るか、href へ移動します。",
+            "variant": "muted"
           }
         }
       ]
@@ -766,7 +822,7 @@
     {
       "id": "data",
       "title": "データ ui:kv / ui:table",
-      "description": "キー・値と表。status 列は状態ピルで表示します。",
+      "description": "キー・値と表。status 列は状態ピルで表示します。リッチセル: タイトル+等幅の ID、状態ピル、バッジ。",
       "components": [
         {
           "id": "data-root",
@@ -775,7 +831,7 @@
             "gap": "lg",
             "min_column_width": "lg"
           },
-          "children": ["kv-sec", "audit"]
+          "children": ["kv-sec", "audit", "missions"]
         },
         {
           "id": "kv-sec",
@@ -888,6 +944,82 @@
             ],
             "rows": [],
             "empty": "まだ依頼はありません"
+          }
+        },
+        {
+          "id": "missions",
+          "type": "ui:table",
+          "props": {
+            "caption": "ミッション(リッチセル)",
+            "row_href_key": "href",
+            "columns": [
+              {
+                "key": "mission",
+                "label": "ミッション"
+              },
+              {
+                "key": "state",
+                "label": "状態"
+              },
+              {
+                "key": "tier",
+                "label": "区分"
+              },
+              {
+                "key": "updated",
+                "label": "更新",
+                "mono": true,
+                "align": "end"
+              }
+            ],
+            "rows": [
+              {
+                "href": "#missions",
+                "mission": {
+                  "title": "Acme 更新の見積もり",
+                  "id": "MSN-ACME-RENEWAL-20260923",
+                  "href": "#missions"
+                },
+                "state": {
+                  "status": "running",
+                  "label": "進行中",
+                  "domain": "mission"
+                },
+                "tier": {
+                  "badge": "社外秘",
+                  "tone": "warning"
+                },
+                "updated": "09:12"
+              },
+              {
+                "mission": {
+                  "title": "週次の受信箱整理",
+                  "id": "MSN-INBOX-TRIAGE-20260922"
+                },
+                "state": {
+                  "status": "pending"
+                },
+                "tier": {
+                  "badge": "公開",
+                  "tone": "neutral"
+                },
+                "updated": "08:40"
+              },
+              {
+                "mission": {
+                  "title": "バックアップの検証",
+                  "id": "MSN-BACKUP-VERIFY-20260921"
+                },
+                "state": {
+                  "status": "completed"
+                },
+                "tier": {
+                  "badge": "社外秘",
+                  "tone": "warning"
+                },
+                "updated": "07:05"
+              }
+            ]
           }
         }
       ]

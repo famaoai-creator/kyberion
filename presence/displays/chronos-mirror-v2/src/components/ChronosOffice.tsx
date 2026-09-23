@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import type { KbStatus } from '@agent/core/a2ui-catalog';
-import { Section, Skeleton, StatusPill } from '@agent/shared-ui';
+import { Callout, Section, Skeleton, StatusPill } from '@agent/shared-ui';
 import { useChronosLocale } from '../lib/hooks';
 import { uxMessage, uxText } from '../lib/ux-vocabulary';
 import {
@@ -273,10 +273,10 @@ export function ChronosOffice({
 
   return (
     <Section
-      title={uxText('chronos_office', locale)}
-      description={uxText('chronos_office_description', locale)}
+      title={uxText('chronos_home_missions_title', locale)}
+      description={uxText('chronos_home_missions_description', locale)}
     >
-      {error ? <p className="chronos-scope__error">{error}</p> : null}
+      {error ? <Callout tone="danger" title={error} /> : null}
       {loading && !office ? (
         <Skeleton shape="table" lines={4} />
       ) : (

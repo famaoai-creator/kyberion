@@ -1,5 +1,7 @@
 'use client';
 
+import { Callout, Disclosure, Section } from '@agent/shared-ui';
+
 type ViewModel = Record<string, any>;
 
 export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
@@ -623,135 +625,97 @@ export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
       ) : null}
 
       {consoleSection === 'operations' ? (
-        <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-[11px] kb-text-accent">
-                {uxText('chronos_nav_operations', locale)}
-              </div>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
-                {uxText('chronos_office', locale)}
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 kb-text-secondary">
-                {uxText('chronos_office_description', locale)}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleScenarioOpen('mission-control-plane', 'mission-intelligence')}
-              className="rounded-xl border kb-border-accent kb-surface-accent px-4 py-2 text-[11px] font-bold kb-text-accent"
-            >
-              {uxText('chronos_nav_active_surface', locale)} →
-            </button>
-          </div>
+        <>
+          <Section
+            title={uxText('chronos_office', locale)}
+            description={uxText('chronos_office_description', locale)}
+            actions={[
+              {
+                label: uxText('chronos_nav_active_surface', locale),
+                onClick: () => handleScenarioOpen('mission-control-plane', 'mission-intelligence'),
+              },
+            ]}
+          />
           <AgentOpsBoards
             tenant={tenant}
-            onOpenMission={(missionId) =>
+            onOpenMission={(missionId: string) =>
               handleOperatorViewOpen('mission-control-plane', missionId)
             }
-            onOpenView={(viewId) => handleOperatorViewOpen(viewId)}
+            onOpenView={(viewId: string) => handleOperatorViewOpen(viewId)}
           />
-          <details className="mt-6 rounded-lg border kb-border-subtle kb-surface-sunken p-4">
-            <summary className="cursor-pointer text-sm font-semibold kb-text-primary">
-              {uxText('chronos_operations_mission_details_title', locale)}
-              <span className="ml-2 text-[11px] font-normal kb-text-muted">
-                {uxText('chronos_operations_mission_details_hint', locale)}
-              </span>
-            </summary>
-            <div className="mt-4">
-              <MissionIntelligence
-                tenant={tenant}
-                workspace="operations"
-                onOpenWorkspace={(target) => openConsoleSection(target)}
-              />
-            </div>
-          </details>
-        </section>
+          <Disclosure summary={uxText('chronos_operations_mission_details_title', locale)}>
+            <p className="kb-text kb-text--muted">
+              {uxText('chronos_operations_mission_details_hint', locale)}
+            </p>
+            <MissionIntelligence
+              tenant={tenant}
+              workspace="operations"
+              onOpenWorkspace={(target: string) => openConsoleSection(target)}
+            />
+          </Disclosure>
+        </>
       ) : null}
 
       {consoleSection === 'work-items' ? (
-        <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
-          <WorkItemsWorkspace
-            tenant={tenant || undefined}
-            organizationId={organizationId || undefined}
-            projectId={projectId || undefined}
-            onOpenMission={(missionId) =>
-              handleOperatorViewOpen('mission-control-plane', missionId)
-            }
-          />
-        </section>
+        <WorkItemsWorkspace
+          tenant={tenant || undefined}
+          organizationId={organizationId || undefined}
+          projectId={projectId || undefined}
+          onOpenMission={(missionId: string) =>
+            handleOperatorViewOpen('mission-control-plane', missionId)
+          }
+        />
       ) : null}
 
       {consoleSection === 'surface-control' ? (
         <>
           <SurfaceControlWorkspace tenant={tenant || undefined} />
-          <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
+          <Disclosure summary={uxText('chronos_surface_control_history_title', locale)}>
             <MissionIntelligence
               tenant={tenant}
               workspace="surface-control"
               hideSurfaceControl
-              onOpenWorkspace={(target) => openConsoleSection(target)}
+              onOpenWorkspace={(target: string) => openConsoleSection(target)}
             />
-          </section>
+          </Disclosure>
         </>
       ) : null}
 
       {consoleSection === 'governance' ? (
-        <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
-          <div className="mb-5">
-            <div className="text-[11px] kb-text-accent">
-              {uxText('chronos_nav_governance', locale)}
-            </div>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
-              {uxText('chronos_nav_governance_hint', locale)}
-            </h2>
+        <Section
+          title={uxText('chronos_nav_governance_hint', locale)}
+          description={uxText('chronos_governance_description', locale)}
+        >
+          <div className="chronos-two-col">
+            <Section
+              headingLevel={3}
+              title={uxText('chronos_governance_approvals_title', locale)}
+              description={uxText('chronos_governance_approvals_description', locale)}
+              actions={[
+                {
+                  label: uxText('chronos_governance_approvals_action', locale),
+                  variant: 'primary',
+                  onClick: () => openConsoleSection('approvals'),
+                },
+              ]}
+            />
+            <Section
+              headingLevel={3}
+              title={uxText('chronos_governance_knowledge_title', locale)}
+              description={uxText('chronos_governance_knowledge_description', locale)}
+              actions={[
+                {
+                  label: uxText('chronos_governance_knowledge_action', locale),
+                  onClick: () => openConsoleSection('knowledge'),
+                },
+              ]}
+            />
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => openConsoleSection('approvals')}
-              className="rounded-lg border kb-border-accent kb-surface-accent p-5 text-left transition"
-            >
-              <div className="text-[11px] kb-text-accent">
-                {uxText('chronos_governance_approvals_label', locale)}
-              </div>
-              <div className="mt-2 text-lg font-semibold kb-text-primary">
-                {uxText('chronos_governance_approvals_title', locale)}
-              </div>
-              <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-                {uxText('chronos_governance_approvals_description', locale)}
-              </div>
-              <div className="mt-4 text-[11px] font-semibold kb-text-accent">
-                {uxText('chronos_governance_approvals_action', locale)} →
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => openConsoleSection('knowledge')}
-              className="rounded-lg border kb-border-accent kb-surface-accent p-5 text-left transition"
-            >
-              <div className="text-[11px] kb-text-accent">
-                {uxText('chronos_governance_knowledge_label', locale)}
-              </div>
-              <div className="mt-2 text-lg font-semibold kb-text-primary">
-                {uxText('chronos_governance_knowledge_title', locale)}
-              </div>
-              <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
-                {uxText('chronos_governance_knowledge_description', locale)}
-              </div>
-              <div className="mt-4 text-[11px] font-semibold kb-text-accent">
-                {uxText('chronos_governance_knowledge_action', locale)} →
-              </div>
-            </button>
-          </div>
-          <div className="mt-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
-            {uxText('chronos_governance_description', locale)}
-          </div>
-        </section>
+        </Section>
       ) : null}
 
       {consoleSection === 'diagnostics' && focusedOperatorView ? (
-        <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
+        <Section>
           <FocusedOperatorView
             tenant={tenant || undefined}
             organizationId={organizationId || undefined}
@@ -761,57 +725,42 @@ export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
               setFocusedOperatorView(null);
               setFocusedOperatorMissionId(null);
             }}
-            onOpenView={(targetId, missionId) =>
+            onOpenView={(targetId: string, missionId?: string | null) =>
               handleOperatorViewOpen(targetId, missionId || null)
             }
             focusedMissionId={focusedOperatorMissionId}
-            onOpenMissionThread={(missionId) =>
+            onOpenMissionThread={(missionId: string) =>
               handleOperatorViewOpen('mission-control-plane', missionId)
             }
           />
-        </section>
+        </Section>
       ) : null}
 
       {consoleSection === 'diagnostics' ? (
         <DiagnosticsAttentionSummary
           tenant={tenant || undefined}
-          onOpenView={(viewId, missionId) => handleOperatorViewOpen(viewId, missionId)}
+          onOpenView={(viewId: string, missionId?: string) =>
+            handleOperatorViewOpen(viewId, missionId)
+          }
         />
       ) : null}
 
       {consoleSection === 'surface' ? (
-        <section
-          ref={mainSurfaceRef}
-          className="kyberion-glass flex min-h-[65vh] flex-col overflow-hidden rounded-xl border kb-border-accent"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b kb-border-subtle px-5 py-4 md:px-6">
-            <div>
-              <div className="text-[11px] kb-text-accent">
-                {uxText('chronos_nav_active_surface', locale)}
-              </div>
-              <div className="mt-1 text-lg font-semibold tracking-tight kb-text-primary">
-                {activeSurfaceTitle}
-              </div>
-              <div className="mt-1 text-[11px] kb-text-secondary">
-                {uxText('chronos_nav_active_surface_hint', locale)}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => openConsoleSection(surfaceOrigin)}
-              className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-2 text-[11px] font-bold kb-text-secondary hover:kb-surface-raised"
-            >
-              ← {uxText('chronos_cb_back', locale)}
-            </button>
-          </div>
-          <div className="chronos-scroll min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+        <div ref={mainSurfaceRef} className="chronos-stack">
+          <Section
+            title={activeSurfaceTitle}
+            description={uxText('chronos_nav_active_surface_hint', locale)}
+            actions={[
+              {
+                label: uxText('chronos_cb_back', locale),
+                variant: 'ghost',
+                onClick: () => openConsoleSection(surfaceOrigin),
+              },
+            ]}
+          >
             {surface ? (
-              <div className="flex flex-col gap-6">
-                {a2uiActionNotice ? (
-                  <div className="rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[11px] kb-text-accent">
-                    {a2uiActionNotice}
-                  </div>
-                ) : null}
+              <div className="chronos-stack">
+                {a2uiActionNotice ? <Callout tone="info" title={a2uiActionNotice} /> : null}
                 {surface.components?.map((component: any, index: number) => (
                   <A2UIRenderer
                     key={component.id || index}
@@ -831,16 +780,16 @@ export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
                   setFocusedOperatorView(null);
                   setFocusedOperatorMissionId(null);
                 }}
-                onOpenView={(targetId, missionId) =>
+                onOpenView={(targetId: string, missionId?: string | null) =>
                   handleOperatorViewOpen(targetId, missionId || null)
                 }
                 focusedMissionId={focusedOperatorMissionId}
-                onOpenMissionThread={(missionId) =>
+                onOpenMissionThread={(missionId: string) =>
                   handleOperatorViewOpen('mission-control-plane', missionId)
                 }
               />
             ) : (
-              <div className="flex flex-col gap-6">
+              <div className="chronos-stack">
                 <MissionIntelligence
                   tenant={tenant}
                   focusedView={missionIntelligenceFocus}
@@ -858,8 +807,8 @@ export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
                 />
               </div>
             )}
-          </div>
-        </section>
+          </Section>
+        </div>
       ) : null}
     </>
   );

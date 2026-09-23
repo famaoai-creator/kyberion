@@ -75,6 +75,18 @@ export declare function displayLocaleProps(
   props: { locale?: unknown; locales?: unknown }
 ): KbDisplayFieldProps;
 
+/** A language's own name via `Intl.DisplayNames` in that language; `fallback` otherwise. */
+export declare function localeEndonym(code: string, fallback: string): string;
+
+/** `ui:table` cell kind: rich `title` / `status` / `badge` object, else `scalar`. */
+export declare function tableCellKind(value: unknown): 'title' | 'status' | 'badge' | 'scalar';
+
+/** True when a row click started on a link / control inside `row`. */
+export declare function isInteractiveTarget(target: unknown, row: unknown): boolean;
+
+/** `ui:tabs` `data-variant`: `'secondary'` or undefined (primary). */
+export declare function tabsVariant(value: unknown): 'secondary' | undefined;
+
 /** `ui:code` language hint (short token) or null. */
 export declare function codeLanguage(value: unknown): string | null;
 

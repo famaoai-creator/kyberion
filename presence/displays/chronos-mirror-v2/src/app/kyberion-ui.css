@@ -429,6 +429,39 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Secondary tabs: pill-style sub-navigation under a primary tab bar or a
+ * section title (no rule line; the active item is a filled accent pill). */
+.kb-tabs[data-variant='secondary'] {
+  gap: var(--kb-ui-space-1);
+  border-bottom: 0;
+}
+
+.kb-tabs[data-variant='secondary'] .kb-tabs__tab {
+  margin-bottom: 0;
+  padding: var(--kb-ui-space-1) var(--kb-ui-space-3);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: 999px;
+  background: var(--kb-ui-surface);
+  font-size: var(--kb-ui-font-size-xs);
+}
+
+.kb-tabs[data-variant='secondary'] .kb-tabs__tab:hover {
+  border-color: var(--kb-ui-border-strong);
+}
+
+.kb-tabs[data-variant='secondary'] .kb-tabs__tab:is([aria-selected='true'], [aria-current='page']) {
+  border-color: var(--kb-ui-accent);
+  background: var(--kb-ui-accent-soft);
+  color: var(--kb-ui-accent-text);
+}
+
+.kb-tabs[data-variant='secondary']
+  .kb-tabs__tab:is([aria-selected='true'], [aria-current='page'])
+  .kb-tabs__count {
+  background: var(--kb-ui-surface);
+  color: var(--kb-ui-accent-text);
+}
+
 /* -------------------------------------------------------- stack / grid -- */
 
 .kb-stack {
@@ -839,6 +872,32 @@
   background: var(--kb-ui-surface-sunken);
 }
 
+/* Rich cells: a title (link when `href`) over a secondary mono id line. */
+.kb-table__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kb-table__title {
+  color: var(--kb-ui-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a.kb-table__title:hover {
+  color: var(--kb-ui-accent-text);
+  text-decoration: underline;
+}
+
+.kb-table__id {
+  color: var(--kb-ui-text-muted);
+  font-family: var(--kb-ui-font-mono);
+  font-size: var(--kb-ui-font-size-xs);
+  white-space: nowrap;
+}
+
 .kb-table__empty {
   padding: var(--kb-ui-space-5);
   text-align: center;
@@ -1146,6 +1205,70 @@ a.kb-list__title:hover {
   --kb-ui-pill-fg: var(--kb-ui-text-muted);
   --kb-ui-pill-bg: var(--kb-ui-surface-sunken);
   --kb-ui-pill-border: var(--kb-ui-border);
+  --kb-ui-pill-icon: "\25CB";
+}
+
+/* status family: done */
+.kb-status-pill[data-status="available"],
+.kb-status-pill[data-status="completed"],
+.kb-status-pill[data-status="connected"],
+.kb-status-pill[data-status="done"],
+.kb-status-pill[data-status="fully_automatable"],
+.kb-status-pill[data-status="ready"],
+.kb-status-pill[data-status="recovered"] {
+  --kb-ui-pill-icon: "\2713";
+}
+
+/* status family: running */
+.kb-status-pill[data-status="active"],
+.kb-status-pill[data-status="busy"],
+.kb-status-pill[data-status="connecting"],
+.kb-status-pill[data-status="distilling"],
+.kb-status-pill[data-status="running"],
+.kb-status-pill[data-status="working"] {
+  --kb-ui-pill-icon: "\25D0";
+}
+
+/* status family: waiting */
+.kb-status-pill[data-status="missing_runtime_prerequisites"],
+.kb-status-pill[data-status="needs_assets"],
+.kb-status-pill[data-status="needs_clarification"],
+.kb-status-pill[data-status="needs_external_assets"],
+.kb-status-pill[data-status="needs_runtime_prerequisites"],
+.kb-status-pill[data-status="needs_setup"],
+.kb-status-pill[data-status="pending"],
+.kb-status-pill[data-status="review"] {
+  --kb-ui-pill-icon: "!";
+}
+
+/* status family: paused */
+.kb-status-pill[data-status="paused"] {
+  --kb-ui-pill-icon: "\2016";
+}
+
+/* status family: degraded */
+.kb-status-pill[data-status="degraded"],
+.kb-status-pill[data-status="fallback"],
+.kb-status-pill[data-status="stale"] {
+  --kb-ui-pill-icon: "\25B2";
+}
+
+/* status family: failed */
+.kb-status-pill[data-status="blocked"],
+.kb-status-pill[data-status="disconnected"],
+.kb-status-pill[data-status="error"],
+.kb-status-pill[data-status="failed"],
+.kb-status-pill[data-status="missing"],
+.kb-status-pill[data-status="offline"],
+.kb-status-pill[data-status="unavailable"] {
+  --kb-ui-pill-icon: "\2715";
+}
+
+/* status family: idle */
+.kb-status-pill[data-status="archived"],
+.kb-status-pill[data-status="n/a"],
+.kb-status-pill[data-status="planned"],
+.kb-status-pill[data-status="stopped"] {
   --kb-ui-pill-icon: "\25CB";
 }
 
@@ -1510,6 +1633,7 @@ a.kb-list__title:hover {
   .kb-nav-rail__context-option,
   .kb-tabs__tab,
   .kb-list__title,
+  .kb-table__title,
   .kb-table tbody tr[data-href],
   .kb-disclosure > summary,
   .kb-app-shell a,
