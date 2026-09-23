@@ -34,27 +34,27 @@ mission: MSN-SURFACE-UI-UNIFY-20260923
 
 型 ID は `ui:` 接頭辞。既存の `text`/`button`/`card`/`container` は対応する `ui:*` の別名として扱う。chronos の `display:*` のうち重複するもの(table/kv/metric/status/alert/list/timeline/progress/badges/section)は同じ CSS クラスで描画し、段階的に `ui:*` へ寄せる(`display:*` の型は互換のため残す)。
 
-| 区分       | 型                     | 主な props                                                                    |
-| ---------- | ---------------------- | ----------------------------------------------------------------------------- |
-| 骨格       | `ui:app-shell`         | `density`, `theme?`; children = nav / header / main                           |
-|            | `ui:page-header`       | `title`, `subtitle?`, `role_badge?{label,tone}`, `actions?`                   |
-|            | `ui:nav-rail`          | `items[{id,label,hint?,href,icon?,active?}]`, `footer_items?`                 |
-|            | `ui:tabs`              | `items[{id,label,count?,href?}]`, `active`, `overflow: 'wrap'                 | 'menu'`                                 |
-| レイアウト | `ui:stack` / `ui:grid` | `gap`, `columns?`(grid は auto-fit)                                           |
-| 内容       | `ui:section`           | `title?`, `description?`, `tone?`, `actions?`                                 |
-|            | `ui:next-action`       | `eyebrow?`, `title`, `reason?`, `primary{label,href                           | action}`, `secondary?`, `state: 'ready' | 'loading' | 'empty'`                             |
-|            | `ui:metric`            | `label`, `value`, `unit?`, `delta?`, `tone?`                                  |
-|            | `ui:kv`                | `items[{label,value,mono?}]`                                                  |
-|            | `ui:table`             | `columns[{key,label,align?,mono?,width?}]`, `rows`, `row_href_key?`, `empty?` |
-|            | `ui:list`              | `items[{title,meta?,status?,href?}]`, `variant: 'plain'                       | 'timeline'`                             |
-|            | `ui:text`              | `text`, `variant: 'body'                                                      | 'muted'                                 | 'caption' | 'mono'                               | 'title'`             |
-| 状態       | `ui:status-pill`       | `status`(正規語彙), `label?` — アイコン+文字で、色だけに頼らない              |
-|            | `ui:badge`             | `label`, `tone`                                                               |
-|            | `ui:callout`           | `tone: info                                                                   | success                                 | warning   | danger`, `title`, `body?`, `action?` |
-|            | `ui:empty-state`       | `title`, `body?`, `action?`                                                   |
-|            | `ui:skeleton`          | `lines?`, `shape: 'text'                                                      | 'card'                                  | 'table'`  |
-| 操作       | `ui:button`            | `label`, `variant: primary                                                    | secondary                               | danger    | ghost`, `href                        | action`, `disabled?` |
-|            | `ui:disclosure`        | `summary`, `open?` — 開発者向け要素を畳むため                                 |
+| 区分       | 型                     | 主な props                                                                                                       |
+| ---------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 骨格       | `ui:app-shell`         | `density`, `theme?`; children = nav / header / main                                                              |
+|            | `ui:page-header`       | `title`, `subtitle?`, `role_badge?{label,tone}`, `actions?`                                                      |
+|            | `ui:nav-rail`          | `items[{id,label,hint?,href,icon?,active?}]`, `footer_items?`                                                    |
+|            | `ui:tabs`              | `items[{id,label,count?,href?}]`, `active`, `overflow`(wrap / menu)                                              |
+| レイアウト | `ui:stack` / `ui:grid` | `gap`, `columns?`(grid は auto-fit)                                                                              |
+| 内容       | `ui:section`           | `title?`, `description?`, `tone?`, `actions?`                                                                    |
+|            | `ui:next-action`       | `eyebrow?`, `title`, `reason?`, `primary{label, href or action}`, `secondary?`, `state`(ready / loading / empty) |
+|            | `ui:metric`            | `label`, `value`, `unit?`, `delta?`, `tone?`                                                                     |
+|            | `ui:kv`                | `items[{label,value,mono?}]`                                                                                     |
+|            | `ui:table`             | `columns[{key,label,align?,mono?,width?}]`, `rows`, `row_href_key?`, `empty?`                                    |
+|            | `ui:list`              | `items[{title,meta?,status?,href?}]`, `variant`(plain / timeline)                                                |
+|            | `ui:text`              | `text`, `variant`(body / muted / caption / mono / title)                                                         |
+| 状態       | `ui:status-pill`       | `status`(正規語彙), `label?` — アイコン+文字で、色だけに頼らない                                                 |
+|            | `ui:badge`             | `label`, `tone`                                                                                                  |
+|            | `ui:callout`           | `tone`(info / success / warning / danger), `title`, `body?`, `action?`                                           |
+|            | `ui:empty-state`       | `title`, `body?`, `action?`                                                                                      |
+|            | `ui:skeleton`          | `lines?`, `shape`(text / card / table)                                                                           |
+| 操作       | `ui:button`            | `label`, `variant`(primary / secondary / danger / ghost), `href` または `action`, `disabled?`                    |
+|            | `ui:disclosure`        | `summary`, `open?` — 開発者向け要素を畳むため                                                                    |
 
 - 正本: `knowledge/product/schemas/a2ui-catalog-kyberion-base.schema.json`(型ごとの props schema)+ `libs/core/a2ui-catalog.ts`(型・検証・catalog ID 定数)。
 - `status-pill` の語彙は既存のダッシュボード状態語彙(ui-ux governance check が見ている語彙)に合わせ、日本語ラベルは i18n 辞書から引く。
