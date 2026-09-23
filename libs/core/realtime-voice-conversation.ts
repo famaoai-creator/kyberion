@@ -21,10 +21,18 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { nowIso } from './foundation/time.js';
+import { logger } from './core.js';
 import {
   resolveVoiceEngineForPlatform,
   type VoiceEngineArtifactFormat,
 } from './voice-engine-registry.js';
+import { VoicePhraseChunker, type VoicePhraseChunkerOptions } from './voice-phrase-chunker.js';
+import {
+  FirstPhraseCache,
+  fingerprintVoiceSettings,
+  type FirstPhraseCacheKey,
+  type FirstPhraseCacheOptions,
+} from './voice-first-phrase-cache.js';
 
 function resolveVoiceArtifactFormat(
   supportedFormats: readonly VoiceEngineArtifactFormat[],
@@ -103,6 +111,7 @@ const SESSION_SCHEMA_PATH = pathResolver.knowledge(
 /** Keep spoken replies short enough to start TTS quickly and sound natural. */
 export const REALTIME_VOICE_REPLY_MAX_CHARS = 160;
 export const REALTIME_VOICE_REPLY_MAX_SENTENCES = 2;
+/** @deprecated Streaming replies are cut by `VoicePhraseChunker` (80-char cap after the first phrase). */
 export const REALTIME_VOICE_REPLY_STREAM_FLUSH_CHARS = 120;
 
 export type RealtimeVoiceReplySegmentHandler = (segment: string) => void | Promise<void>;
@@ -350,6 +359,8 @@ export interface RealtimeVoiceReplyOptions {
   modelTier?: 'fast' | 'standard' | 'deep';
   /** Forward the provider-supported effort hint to the active reasoning route. */
   effort?: 'low' | 'medium' | 'high';
+  /** Phrase boundaries for streamed replies (first-phrase cap, later cap, first-phrase breaks). */
+  phraseChunker?: VoicePhraseChunkerOptions;
 }
 
 /**
@@ -431,11 +442,45 @@ export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesi
   };
 }
 
+/** Opt-in on-disk cache for the first spoken phrase of a reply (EV-04). */
+export function createRealtimeFirstPhraseCache(
+  options?: FirstPhraseCacheOptions
+): FirstPhraseCache {
+  return new FirstPhraseCache(options);
+}
+
+function firstPhraseCacheKey(input: RealtimeVoiceSynthesisInput): FirstPhraseCacheKey {
+  const profile = getVoiceProfileRecord(input.profileId);
+  return {
+    engine: profile.default_engine_id,
+    voiceId: input.profileId,
+    // Any profile edit (engine, samples, effects) changes the revision, so stale audio misses.
+    voiceRevision: fingerprintVoiceSettings({ ...profile }),
+    settingsFingerprint: fingerprintVoiceSettings({
+      language: input.language,
+      personal_voice_mode: input.personalVoiceMode,
+    }),
+    text: input.text,
+  };
+}
+
 export async function synthesizeRealtimeVoice(
   input: RealtimeVoiceSynthesisInput,
   executor?: VoiceActuatorExecutor,
-  signal?: AbortSignal
-): Promise<{ result: Record<string, unknown>; artifactPath?: string }> {
+  signal?: AbortSignal,
+  firstPhraseCache?: FirstPhraseCache
+): Promise<{ result: Record<string, unknown>; artifactPath?: string; cached?: boolean }> {
+  const cacheKey = firstPhraseCache ? firstPhraseCacheKey(input) : null;
+  if (firstPhraseCache && cacheKey) {
+    const hit = firstPhraseCache.get(cacheKey);
+    if (hit) {
+      return {
+        result: { status: 'success', artifact_refs: [hit] },
+        artifactPath: hit,
+        cached: true,
+      };
+    }
+  }
   const { payload, artifactPath } = buildRealtimeVoiceGenerationPayload(input);
   const result = executor
     ? await executor(payload, signal)
@@ -444,6 +489,15 @@ export async function synthesizeRealtimeVoice(
   const artifacts = Array.isArray(result.artifact_refs) ? (result.artifact_refs as string[]) : [];
   const resolvedArtifact =
     artifacts[0] || (safeExistsSync(artifactPath) ? artifactPath : undefined);
+  if (firstPhraseCache && cacheKey && resolvedArtifact) {
+    try {
+      firstPhraseCache.put(cacheKey, resolvedArtifact);
+    } catch (error: unknown) {
+      logger.warn(
+        `[realtime-voice] first-phrase cache write skipped: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
   return { result, ...(resolvedArtifact ? { artifactPath: resolvedArtifact } : {}) };
 }
 
@@ -530,9 +584,12 @@ export async function streamRealtimeAssistantReply(
       })();
 
   let rawText = '';
-  let pending = '';
   let sentencesEmitted = 0;
+  // Short first phrase (may cut on 、) for time-to-first-audio, then
+  // sentence-or-cap phrases; the max-sentence speech budget still applies.
+  const chunker = new VoicePhraseChunker(options?.phraseChunker);
   const emit = async (text: string): Promise<void> => {
+    if (sentencesEmitted >= REALTIME_VOICE_REPLY_MAX_SENTENCES) return;
     const normalized = normalizeRealtimeVoiceReply(text);
     if (!normalized) return;
     sentencesEmitted += (normalized.match(/[。！？!?]/gu) || []).length;
@@ -543,28 +600,11 @@ export async function streamRealtimeAssistantReply(
     if (signal?.aborted) throw new Error('realtime voice reply stream aborted');
     if (!delta) continue;
     rawText += delta;
-    pending += delta;
-    while (sentencesEmitted < REALTIME_VOICE_REPLY_MAX_SENTENCES) {
-      const end = sentenceEndAt(pending, 0);
-      if (end < 0) break;
-      const segment = pending.slice(0, end + 1).trim();
-      pending = pending.slice(end + 1).trimStart();
-      await emit(segment);
-    }
-    if (
-      sentencesEmitted < REALTIME_VOICE_REPLY_MAX_SENTENCES &&
-      pending.length >= REALTIME_VOICE_REPLY_STREAM_FLUSH_CHARS
-    ) {
-      const segment = pending.slice(0, REALTIME_VOICE_REPLY_STREAM_FLUSH_CHARS).trim();
-      pending = pending.slice(REALTIME_VOICE_REPLY_STREAM_FLUSH_CHARS).trimStart();
-      await emit(segment);
-    }
+    for (const phrase of chunker.push(delta)) await emit(phrase);
     if (sentencesEmitted >= REALTIME_VOICE_REPLY_MAX_SENTENCES) break;
   }
 
-  if (pending.trim() && sentencesEmitted < REALTIME_VOICE_REPLY_MAX_SENTENCES) {
-    await emit(pending);
-  }
+  for (const phrase of chunker.flush()) await emit(phrase);
   const assistantText = normalizeRealtimeVoiceReply(rawText);
   if (!assistantText) {
     throw new Error(

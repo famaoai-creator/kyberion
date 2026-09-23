@@ -19,13 +19,56 @@ import {
   buildRealtimeVoiceGenerationPayload,
   loadRealtimeVoiceConversationSessionAtPath,
   normalizeRealtimeVoiceReply,
+  createRealtimeFirstPhraseCache,
   runRealtimeVoiceConversationTurn,
   streamRealtimeAssistantReply,
+  synthesizeRealtimeVoice,
 } from './realtime-voice-conversation.js';
 
 const TMP_DIR = pathResolver.sharedTmp('realtime-voice-conversation-tests');
 const PROFILE_REGISTRY_PATH = `${TMP_DIR}/voice-profile-registry.json`;
 const ENGINE_REGISTRY_PATH = `${TMP_DIR}/voice-engine-registry.json`;
+
+function writeOpenVoiceRegistries(): void {
+  safeMkdir(TMP_DIR, { recursive: true });
+  safeWriteFile(
+    PROFILE_REGISTRY_PATH,
+    JSON.stringify({
+      version: 'test',
+      default_profile_id: 'me-ja',
+      profiles: [
+        {
+          profile_id: 'me-ja',
+          display_name: 'Me JA',
+          tier: 'personal',
+          languages: ['ja'],
+          default_engine_id: 'open_voice_clone',
+          status: 'active',
+        },
+      ],
+    })
+  );
+  safeWriteFile(
+    ENGINE_REGISTRY_PATH,
+    JSON.stringify({
+      version: 'test',
+      default_engine_id: 'open_voice_clone',
+      engines: [
+        {
+          engine_id: 'open_voice_clone',
+          display_name: 'Open Voice Clone',
+          kind: 'voice_clone_service',
+          provider: 'test',
+          status: 'active',
+          platforms: ['any'],
+          supports: { list_voices: false, playback: true, artifact_formats: ['wav'] },
+        },
+      ],
+    })
+  );
+  process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = PROFILE_REGISTRY_PATH;
+  process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = ENGINE_REGISTRY_PATH;
+}
 
 describe('realtime voice conversation', () => {
   afterEach(() => {
@@ -280,6 +323,64 @@ describe('realtime voice conversation', () => {
       model_tier: 'fast',
       effort: 'low',
     });
+  });
+
+  it('streams a short first phrase at a comma and keeps the max-sentence budget', async () => {
+    writeOpenVoiceRegistries();
+    ensureRealtimeVoiceConversationSession({
+      sessionId: 'rtc-phrases',
+      profileId: 'me-ja',
+      language: 'ja',
+    });
+    registerReasoningBackend({
+      ...stubReasoningBackend,
+      name: 'fake-reasoner',
+      async *streamPrompt() {
+        yield 'はい、';
+        yield '承知しました。明日の会議';
+        yield 'は十時からです。三つ目の文は読みません。';
+      },
+    });
+
+    const segments: string[] = [];
+    const reply = await streamRealtimeAssistantReply('rtc-phrases', '明日の会議は？', (segment) => {
+      segments.push(segment);
+    });
+    expect(segments).toEqual(['はい、', '承知しました。', '明日の会議は十時からです。']);
+    expect(reply).toBe('はい、承知しました。明日の会議は十時からです。');
+  });
+
+  it('serves the first phrase from the opt-in cache on a repeat request', async () => {
+    writeOpenVoiceRegistries();
+    const produced = `${TMP_DIR}/produced.wav`;
+    safeWriteFile(produced, 'RIFF-fake');
+    const cache = createRealtimeFirstPhraseCache({ dir: `${TMP_DIR}/first-phrase-cache` });
+    let executions = 0;
+    const executor = async () => {
+      executions += 1;
+      return { status: 'success', artifact_refs: [produced] };
+    };
+    const input = {
+      sessionId: 'rtc-cache',
+      profileId: 'me-ja',
+      language: 'ja',
+      text: 'はい、',
+      deliveryMode: 'artifact' as const,
+      personalVoiceMode: 'require_personal_voice' as const,
+    };
+
+    const first = await synthesizeRealtimeVoice(input, executor, undefined, cache);
+    expect(first.cached).toBeUndefined();
+    expect(first.artifactPath).toBe(produced);
+    const second = await synthesizeRealtimeVoice(input, executor, undefined, cache);
+    expect(second.cached).toBe(true);
+    expect(second.artifactPath).not.toBe(produced);
+    expect(executions).toBe(1);
+
+    await synthesizeRealtimeVoice({ ...input, text: 'えっと、' }, executor, undefined, cache);
+    expect(executions).toBe(2);
+    await synthesizeRealtimeVoice(input, executor);
+    expect(executions).toBe(3);
   });
 
   it('revalidates strict personal voice policy when reusing a fallback session', () => {

@@ -20548,6 +20548,63 @@
         "ja": "問題が発生しました",
         "qps-ploc": "⟦Şőɱėŧħïñɠ ẇėñŧ ẇřőñɠ ŀőřėɱ ⟧"
       }
+    },
+    "voice": {
+      "loop_state_calibrating": {
+        "en": "🎚  Calibrating the noise floor… (please stay quiet)",
+        "ja": "🎚  ノイズフロア較正中… (静かにしてください)",
+        "qps-ploc": "⟦🎚  Ƈȧŀïƀřȧŧïñɠ ŧħė ñőïşė ƒŀőőř… (ṗŀėȧşė şŧȧẏ ɋůïėŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "loop_state_listening": {
+        "en": "🎤 Listening… (the turn ends automatically when you stop talking)",
+        "ja": "🎤 聞き取り中… (話し終えると自動で区切ります)",
+        "qps-ploc": "⟦🎤 Ŀïşŧėñïñɠ… (ŧħė ŧůřñ ėñḓş ȧůŧőɱȧŧïƈȧŀŀẏ ẇħėñ ẏőů şŧőṗ ŧȧŀķïñɠ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "loop_state_thinking": {
+        "en": "💭 Generating a reply…",
+        "ja": "💭 応答を生成中…",
+        "qps-ploc": "⟦💭 Ɠėñėřȧŧïñɠ ȧ řėṗŀẏ… ŀőřėɱ ï⟧"
+      },
+      "loop_state_speaking": {
+        "en": "🔊 Playing the reply…",
+        "ja": "🔊 応答を再生中…",
+        "qps-ploc": "⟦🔊 Ṗŀȧẏïñɠ ŧħė řėṗŀẏ… ŀőřėɱ ⟧"
+      },
+      "loop_barge_in": {
+        "en": "✋ Interruption detected — stopping playback and listening again",
+        "ja": "✋ 割り込みを検知 — 再生を停止して聞き取りに戻ります",
+        "qps-ploc": "⟦✋ Ïñŧėřřůṗŧïőñ ḓėŧėƈŧėḓ — şŧőṗṗïñɠ ṗŀȧẏƀȧƈķ ȧñḓ ŀïşŧėñïñɠ ȧɠȧïñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "loop_barge_in_provisional": {
+        "en": "⏸  Possible interruption — pausing playback to check…",
+        "ja": "⏸  割り込みの可能性 — 再生を一時停止して確認中…",
+        "qps-ploc": "⟦⏸  Ṗőşşïƀŀė ïñŧėřřůṗŧïőñ — ṗȧůşïñɠ ṗŀȧẏƀȧƈķ ŧő ƈħėƈķ… ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "loop_barge_in_resumed": {
+        "en": "▶️  Not an interruption ({reason}) — resuming playback",
+        "ja": "▶️  割り込みではありませんでした ({reason}) — 再生を再開します",
+        "qps-ploc": "⟦▶️  Ñőŧ ȧñ ïñŧėřřůṗŧïőñ ({reason}) — řėşůɱïñɠ ṗŀȧẏƀȧƈķ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "loop_turn_cancelled": {
+        "en": "⏹  Turn {turn} cancelled ({reason})",
+        "ja": "⏹  ターン {turn} を中止しました ({reason})",
+        "qps-ploc": "⟦⏹  Ŧůřñ {turn} ƈȧñƈėŀŀėḓ ({reason}) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "loop_utterance_endpoint": {
+        "en": "   ({seconds}s captured, endpoint)",
+        "ja": "   ({seconds} 秒を取得、発話終了を検出)",
+        "qps-ploc": "⟦   ({seconds}ş ƈȧṗŧůřėḓ, ėñḓṗőïñŧ) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "loop_utterance_cap": {
+        "en": "   ({seconds}s captured, length cap)",
+        "ja": "   ({seconds} 秒を取得、長さの上限で区切り)",
+        "qps-ploc": "⟦   ({seconds}ş ƈȧṗŧůřėḓ, ŀėñɠŧħ ƈȧṗ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "loop_degraded": {
+        "en": "⚠️  {what}: {reason}",
+        "ja": "⚠️  {what}: {reason}",
+        "qps-ploc": "⟦⚠️  {what}: {reason} ŀőřėɱ ⟧"
+      }
     }
   }
 }
