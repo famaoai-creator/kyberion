@@ -1,7 +1,7 @@
 {
   "plugin_id": "plugin-permissions-fixture",
   "version": "1.0.0",
-  "description": "EP-03/EP-04 test fixture: ops that exercise governed host probes under the plugin grant.",
+  "description": "EP-03/EP-04/EP-05 test fixture: ops that exercise governed host probes under the plugin grant, plus one declarative A2UI view.",
   "provides": {
     "ops": [
       "permfixture:write",
@@ -9,11 +9,65 @@
       "permfixture:invoke",
       "permfixture:secret",
       "permfixture:env"
+    ],
+    "views": [
+      {
+        "id": "status",
+        "titleKey": "plugin:fixture_status_view_title",
+        "document": "views/status.a2ui.json",
+        "isolation": "in-process-a2ui",
+        "capabilities": [],
+        "roleGate": {
+          "minRole": "readonly",
+          "tiers": ["public"]
+        },
+        "actions": [
+          {
+            "id": "probe_env",
+            "authority": "agent",
+            "op": "permfixture:env",
+            "paramsSchema": {
+              "type": "object",
+              "properties": {},
+              "additionalProperties": false
+            }
+          },
+          {
+            "id": "write_probe",
+            "authority": "human",
+            "op": "permfixture:write",
+            "paramsSchema": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "maxLength": 512
+                }
+              },
+              "required": ["path"],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "lifecycle": {
+          "refresh": "on_open"
+        }
+      }
     ]
   },
   "permissions": {
-    "network": { "mode": "none" },
-    "fs": { "mode": "readonly", "paths": [{ "tier": "public", "prefix": "" }] },
+    "network": {
+      "mode": "none"
+    },
+    "fs": {
+      "mode": "readonly",
+      "paths": [
+        {
+          "tier": "public",
+          "prefix": ""
+        }
+      ]
+    },
     "ops_invoke": ["permfixture:env"],
     "env": ["PLUGIN_FIXTURE_*"]
   }
