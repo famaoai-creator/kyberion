@@ -1,6 +1,6 @@
 ---
 title: サーフェス UI 統一計画(A2UI base catalog)
-tags: [design-system, a2ui, surfaces, ui-ux, improvement-plan, 2026-08]
+tags: [design-system, a2ui, surfaces, ui-ux, improvement-plan, 2026-09]
 last_updated: 2026-09-23
 status: active
 mission: MSN-SURFACE-UI-UNIFY-20260923
