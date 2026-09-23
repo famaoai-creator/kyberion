@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { parseScenarioDefinition, type ScenarioDefinition } from './scenario-definition.js';
+import { evaluateFinalCheck } from './scenario-final-checks.js';
 import { createScenarioRunContext, type ScenarioRunContext } from './scenario-run-context.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { createScenarioSideEffectLog } from './scenario-side-effect-log.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 function scenario(overrides: Partial<ScenarioDefinition> = {}): ScenarioDefinition {
   return parseScenarioDefinition({
@@ -49,12 +51,57 @@ describe('createScenarioRunContext', () => {
     expect(a.runId).not.toBe(b.runId);
   });
 
-  it('places runRoot under active/shared/tmp/scenarios/<runId>', () => {
+  it('places runRoot under active/shared/tmp/scenarios/<runId>-<nonce>', () => {
     const ctx = createScenarioRunContext(scenario());
     contexts.push(ctx);
     expect(ctx.runRoot.replaceAll('\\', '/')).toMatch(
-      new RegExp(`active/shared/tmp/scenarios/${ctx.runId}$`)
+      new RegExp(`active/shared/tmp/scenarios/${ctx.runId}-[0-9a-z]+-[0-9a-z]+-[0-9a-f]{8}$`)
     );
+  });
+
+  it('gives two runs of the same scenario distinct roots (same runId)', () => {
+    const a = createScenarioRunContext(scenario());
+    const b = createScenarioRunContext(scenario());
+    contexts.push(a, b);
+    expect(a.runId).toBe(b.runId);
+    expect(a.runRoot).not.toBe(b.runRoot);
+    a.materializeSeedFiles();
+    b.materializeSeedFiles();
+    b.dispose();
+    expect(safeExistsSync(a.runRoot)).toBe(true);
+  });
+
+  it('a kept previous run leaves no stale file for artifactExists in a rerun', () => {
+    const previous = createScenarioRunContext(scenario(), { keep: true });
+    contexts.push(previous);
+    previous.materializeSeedFiles();
+    safeMkdir(`${previous.runRoot}/out`, { recursive: true });
+    safeWriteFile(`${previous.runRoot}/out/stale.txt`, 'stale');
+
+    const rerun = createScenarioRunContext(scenario());
+    contexts.push(rerun);
+    rerun.materializeSeedFiles();
+    const check = evaluateFinalCheck(
+      { type: 'artifactExists', path: 'out/stale.txt' },
+      createScenarioSideEffectLog(),
+      undefined,
+      rerun
+    );
+    expect(check.pass).toBe(false);
+  });
+
+  it('materializeSeedFiles clears files already under the root before seeding', () => {
+    const first = createScenarioRunContext(scenario(), { keep: true });
+    contexts.push(first);
+    first.materializeSeedFiles();
+    safeWriteFile(`${first.runRoot}/leftover.txt`, 'old');
+    const reused = createScenarioRunContext(
+      scenario({ seed: { files: [{ path: 'seed.txt', content: 'fresh' }] } }),
+      { rootOverride: first.runRoot }
+    );
+    reused.materializeSeedFiles();
+    expect(safeExistsSync(`${first.runRoot}/leftover.txt`)).toBe(false);
+    expect(safeReadFile(`${first.runRoot}/seed.txt`, { encoding: 'utf8' })).toBe('fresh');
   });
 
   it('deterministicId is stable for the same (namespace, n) and formatted as a UUID', () => {

@@ -16,6 +16,8 @@ export interface ScenarioOpRecord {
    * apply: a fixture served the op. unstubbed: the op failed closed.
    */
   stage: 'preflight' | 'apply' | 'unstubbed';
+  /** preflight only: every listener and guard admitted the call. */
+  admitted?: boolean;
   params?: Record<string, unknown>;
   source?: OpPreflightCall['source'];
   requiresApproval?: boolean;

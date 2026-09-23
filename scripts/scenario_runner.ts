@@ -49,6 +49,8 @@ export interface ScenarioRunSummaryEntry {
   status: ScenarioRunStatus;
   reason?: string;
   report_dir?: string;
+  /** Repo-relative run root, present only when it was kept (`--keep`). */
+  run_root?: string;
 }
 
 export interface ScenarioRunSummary {
@@ -164,9 +166,13 @@ export async function runScenarioFiles(
     try {
       const def = loadScenarioFile(file);
       let trajectory: TrajectoryRecord | undefined;
+      let runRoot: string | undefined;
       const report = await runScenario(def, {
         ...(args.lane ? { lane: args.lane } : {}),
         keep: args.keep,
+        onRunRoot: (value) => {
+          runRoot = value;
+        },
         exportTrajectory: args.exportTrajectory,
         onTrajectory: (value) => {
           trajectory = value;
@@ -181,6 +187,7 @@ export async function runScenarioFiles(
         status: report.status,
         ...(report.reason ? { reason: report.reason } : {}),
         report_dir: writeReportFiles(report, trajectory),
+        ...(args.keep && runRoot ? { run_root: pathResolver.toRepoRelative(runRoot) } : {}),
       };
       const failures = [
         ...report.turns.flatMap((turn) => [

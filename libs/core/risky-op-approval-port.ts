@@ -26,6 +26,11 @@ export interface RiskyApprovalResult {
 
 export type RiskyApprovalHandler = (params: RiskyApprovalRequest) => RiskyApprovalResult;
 
+/** An override may return `undefined` to defer to the canonical handler. */
+export type RiskyApprovalOverride = (
+  params: RiskyApprovalRequest
+) => RiskyApprovalResult | undefined;
+
 const riskyApprovalHandlerSeam = createSeam<RiskyApprovalHandler>({
   key: 'risky-approval-handler',
   multiplicity: 'sole',
@@ -36,9 +41,10 @@ const riskyApprovalHandlerSeam = createSeam<RiskyApprovalHandler>({
  * ES-02: scoped override consulted before the canonical handler. The
  * canonical handler registers at import time without keeping its disposer,
  * so a scenario run cannot swap it out; it binds here instead and disposes
- * the override afterwards. Unregistered -> canonical behaviour.
+ * the override afterwards. Unregistered (or an `undefined` answer) ->
+ * canonical behaviour.
  */
-const riskyApprovalOverrideSeam = createSeam<RiskyApprovalHandler>({
+const riskyApprovalOverrideSeam = createSeam<RiskyApprovalOverride>({
   key: 'risky-approval-override',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
@@ -51,7 +57,7 @@ const OVERRIDE_METADATA: SeamProviderMetadata = {
 };
 
 export function overrideRiskyApprovalHandler(
-  handler: RiskyApprovalHandler,
+  handler: RiskyApprovalOverride,
   metadata: SeamProviderMetadata = OVERRIDE_METADATA
 ): () => void {
   return riskyApprovalOverrideSeam.register('scenario-runner', handler, metadata);
@@ -79,8 +85,9 @@ export function registerRiskyApprovalHandler(
 
 /** Deny by default until the governed approval implementation is registered. */
 export function requireRiskyApproval(params: RiskyApprovalRequest): RiskyApprovalResult {
-  const registeredHandler =
-    riskyApprovalOverrideSeam.getOptional() ?? riskyApprovalHandlerSeam.getOptional();
+  const overridden = riskyApprovalOverrideSeam.getOptional()?.(params);
+  if (overridden) return overridden;
+  const registeredHandler = riskyApprovalHandlerSeam.getOptional();
   return (
     registeredHandler?.(params) ?? {
       allowed: false,

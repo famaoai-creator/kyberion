@@ -80,8 +80,12 @@ describe('runScenario (ES-05)', () => {
     let seenNow = 0;
     let seedPresent = false;
     let trajectory: TrajectoryRecord | undefined;
+    let runRoot = '';
     const report = await runScenario(scenario(), {
       seedNonce: `exec-${process.pid}-1`,
+      onRunRoot: (value) => {
+        runRoot = value;
+      },
       exportTrajectory: true,
       onTrajectory: (value) => {
         trajectory = value;
@@ -108,7 +112,8 @@ describe('runScenario (ES-05)', () => {
     // Everything is torn down: clock, interceptor, run root.
     expect(getClock()).toBe(systemClock);
     expect(getScenarioOpOverride()).toBeUndefined();
-    expect(safeExistsSync(pathResolver.sharedTmp(`scenarios/${report.run_id}`))).toBe(false);
+    expect(runRoot.replaceAll('\\', '/')).toContain(`scenarios/${report.run_id}-`);
+    expect(safeExistsSync(runRoot)).toBe(false);
   });
 
   it('keeps the run root with keep and records the turn artifact and approval transition', async () => {
@@ -134,13 +139,16 @@ describe('runScenario (ES-05)', () => {
         { type: 'traceSpanExists', name: 'scenario.turn' },
       ],
     });
+    let root = '';
     const report = await runScenario(def, {
       seedNonce: `exec-${process.pid}-2`,
       keep: true,
+      onRunRoot: (value) => {
+        root = value;
+        roots.push(value);
+      },
       runPipeline: fakeRunner(),
     });
-    const root = pathResolver.sharedTmp(`scenarios/${report.run_id}`);
-    roots.push(root);
 
     expect(report.status).toBe('pass');
     expect(report.duration_ms).toBe(1500);

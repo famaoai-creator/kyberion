@@ -20,9 +20,11 @@ pnpm scenario run eval/scenarios --json                        # machine-readabl
 Exit code is 1 when any scenario is `fail` or `error`; `skipped` and
 `lane_skipped` never fail. Reports go to
 `active/shared/tmp/scenario-reports/<run-id>/report.{json,md}` (plus
-`trajectory.jsonl` with `--export-trajectory`). The run root
-`active/shared/tmp/scenarios/<run-id>/` is removed after each run unless
-`--keep` / `KYBERION_SCENARIO_KEEP_ROOT=1` is set. `KYBERION_SCENARIO_LANE`
+`trajectory.jsonl` with `--export-trajectory`). Each invocation gets a fresh
+run root `active/shared/tmp/scenarios/<run-id>-<nonce>/` (so reruns and
+concurrent runs never share files); it is removed after each run unless
+`--keep` / `KYBERION_SCENARIO_KEEP_ROOT=1` is set, in which case the `--json`
+summary lists it as `run_root`. `KYBERION_SCENARIO_LANE`
 sets the default `--lane`.
 
 ## Starter suite
