@@ -11,6 +11,8 @@ import {
   type OcrRequest,
 } from '@agent/core';
 import { nowIso } from '@agent/core/foundation';
+import { t as catalogT, type VocabularyKey } from '@agent/core/t';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { withLock } from '@agent/core/lock-utils';
 import { assertSafeRepositoryPath } from '@agent/core/path-resolver';
@@ -36,6 +38,13 @@ export interface PersonalWorkbenchActionInput {
   outDir: string;
   /** Injectable gateway for deterministic reconciliation tests and hosts. */
   calendar_gateway?: PersonalWorkbenchCalendarGateway;
+  /** Request locale of the user-facing `note` (default: the process locale). */
+  locale?: SupportedLocale;
+}
+
+/** A user-facing note in the request's locale (the process locale when unset). */
+function note(key: VocabularyKey, locale: SupportedLocale | undefined): string {
+  return catalogT(key, undefined, locale);
 }
 
 export interface PersonalWorkbenchCalendarGateway {
@@ -62,7 +71,8 @@ export type CalendarProposalRecord = {
 
 function writeLocalEmailDraft(
   payload: Record<string, unknown>,
-  outDir: string
+  outDir: string,
+  locale?: SupportedLocale
 ): Record<string, unknown> {
   const body = String(payload.body_markdown || '').trim();
   if (!body) throw new Error('body_markdown is required');
@@ -105,7 +115,7 @@ function writeLocalEmailDraft(
     delivery: 'local-only',
     draft_path: markdownPath,
     json_path: jsonPath,
-    note: 'この pad はローカル下書きだけを作成します。外部メールサービスへは接続しません。',
+    note: note('personal_workbench:note_email_local_draft', locale),
   };
 }
 
@@ -333,6 +343,7 @@ export async function applyCalendarEvent(input: {
   outDir: string;
   confirmed?: boolean;
   calendar_gateway?: PersonalWorkbenchCalendarGateway;
+  locale?: SupportedLocale;
 }): Promise<Record<string, unknown>> {
   const approvalRequestId = String(input.payload.approval_request_id || '').trim();
   if (!approvalRequestId) {
@@ -349,6 +360,7 @@ async function applyCalendarEventUnlocked(input: {
   outDir: string;
   confirmed?: boolean;
   calendar_gateway?: PersonalWorkbenchCalendarGateway;
+  locale?: SupportedLocale;
 }): Promise<Record<string, unknown>> {
   if (input.confirmed !== true) {
     throw new Error(
@@ -393,7 +405,7 @@ async function applyCalendarEventUnlocked(input: {
       stage: 'apply',
       status: 'reconciliation_required',
       approval_request_id: approvalRequestId,
-      note: '外部カレンダーへの反映結果が確定していないため、重複作成を避けて停止しました。provider 側を確認してから運用者が reconciliation してください。',
+      note: note('personal_workbench:note_calendar_outcome_unknown', input.locale),
     };
   }
 
@@ -411,7 +423,7 @@ async function applyCalendarEventUnlocked(input: {
       status: 'approval_required',
       approval_request_id: approvalRequestId,
       approval_status: 'pending',
-      note: '承認レコードが pending です。承認ワークフローで明示承認してから再実行してください。',
+      note: note('personal_workbench:note_approval_pending', input.locale),
     };
   }
   if (approval.status !== 'approved' && approval.status !== 'applied') {
@@ -473,6 +485,7 @@ export async function reconcileCalendarEvent(input: {
   context: LocalPadContext;
   outDir: string;
   calendar_gateway?: PersonalWorkbenchCalendarGateway;
+  locale?: SupportedLocale;
 }): Promise<Record<string, unknown>> {
   const approvalRequestId = String(input.payload.approval_request_id || '').trim();
   if (!approvalRequestId)
@@ -487,6 +500,7 @@ async function reconcileCalendarEventUnlocked(input: {
   context: LocalPadContext;
   outDir: string;
   calendar_gateway?: PersonalWorkbenchCalendarGateway;
+  locale?: SupportedLocale;
 }): Promise<Record<string, unknown>> {
   const approvalRequestId = String(input.payload.approval_request_id || '').trim();
   if (!approvalRequestId)
@@ -509,7 +523,7 @@ async function reconcileCalendarEventUnlocked(input: {
       status: 'not_needed',
       approval_request_id: approvalRequestId,
       approval_status: approval.status,
-      note: 'provider 照合は明示承認済みの proposal にだけ実行できます。',
+      note: note('personal_workbench:note_reconcile_needs_approval', input.locale),
     };
   }
   const expectedHash = computeApprovalPayloadHash(calendarBindingPayload(proposal.event));
@@ -556,7 +570,7 @@ async function reconcileCalendarEventUnlocked(input: {
       status: 'reconciliation_required',
       approval_request_id: approvalRequestId,
       candidates: 0,
-      note: 'provider の照合が利用できません。proposal は unknown のまま保持します。',
+      note: note('personal_workbench:note_reconcile_unavailable', input.locale),
     };
   }
   const matches = matchCalendarReconciliationEvents(proposal, agenda.events);
@@ -568,8 +582,8 @@ async function reconcileCalendarEventUnlocked(input: {
       candidates: matches.length,
       note:
         matches.length === 0
-          ? '一致する provider event が見つかりません。再作成せず運用者の確認を待ちます。'
-          : '複数の provider event が一致しました。誤った確定を避けるため運用者の確認を待ちます。',
+          ? note('personal_workbench:note_reconcile_no_match', input.locale)
+          : note('personal_workbench:note_reconcile_multiple', input.locale),
     };
   }
   const matched = matches[0]!;
@@ -592,7 +606,7 @@ export async function executePersonalWorkbenchAction(
 ): Promise<Record<string, unknown>> {
   switch (input.action) {
     case 'email': {
-      return writeLocalEmailDraft(input.payload, input.outDir);
+      return writeLocalEmailDraft(input.payload, input.outDir, input.locale);
     }
     case 'calendar': {
       const stage = String(input.payload.stage || 'propose').trim();
@@ -611,6 +625,7 @@ export async function executePersonalWorkbenchAction(
           outDir: input.outDir,
           confirmed: input.confirmed,
           calendar_gateway: input.calendar_gateway,
+          locale: input.locale,
         });
       }
       if (stage === 'reconcile') {
@@ -619,6 +634,7 @@ export async function executePersonalWorkbenchAction(
           context: input.context,
           outDir: input.outDir,
           calendar_gateway: input.calendar_gateway,
+          locale: input.locale,
         });
       }
       throw new Error('calendar stage must be propose, apply, or reconcile');

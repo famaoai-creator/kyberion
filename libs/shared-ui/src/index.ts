@@ -149,3 +149,52 @@ export {
   type KbChartEnv,
   type KbVNode,
 } from '../vanilla/charts.js';
+// PA-02 voice (audio files / transcripts reach the host only through onAction
+// payloads — see src/voice/* and vanilla/voice-controller.js).
+export {
+  KB_VOICE_COMPONENT_TYPES,
+  VoiceInput,
+  VoiceState,
+  isKbVoiceComponentType,
+  renderVoiceComponent,
+  type KbVoiceComponentType,
+} from './voice/index.js';
+export {
+  KB_VOICE_ACTIONS,
+  KB_VOICE_MESSAGE_KEYS,
+  createVoiceController,
+  type KbVoiceController,
+  type KbVoiceControllerOptions,
+  type KbVoiceErrorCode,
+  type KbVoiceInputState,
+} from '../vanilla/voice.js';
+// PA-01 pads (toolbar files / sketch images reach the host only through
+// onAction payloads — see src/pads/* and vanilla/pads.js).
+export {
+  Dialog,
+  DialogView,
+  DrawingPalette,
+  KB_PAD_COMPONENT_TYPES,
+  PaletteView,
+  SketchBoard,
+  Toolbar,
+  isKbPadComponentType,
+  renderPadComponent,
+  type KbPadComponentType,
+} from './pads/index.js';
+export type { DialogProps, DialogViewProps } from './pads/dialog.js';
+export type { DrawingPaletteProps, PaletteViewProps, SketchBoardProps } from './pads/drawing.js';
+export type { ToolbarProps } from './pads/toolbar.js';
+export {
+  KB_DIALOG_ACTIONS,
+  KB_DIALOG_MESSAGE_KEYS,
+  KB_DRAWING_ACTIONS,
+  KB_DRAWING_DEFAULT_COLORS,
+  KB_DRAWING_MESSAGE_KEYS,
+  KB_DRAWING_TOOLS,
+  KB_TOOLBAR_ACTIONS,
+  createDrawingEngine,
+  type KbDrawingEngine,
+  type KbDrawingEngineOptions,
+  type KbSketchControllerRuntime,
+} from '../vanilla/pads.js';

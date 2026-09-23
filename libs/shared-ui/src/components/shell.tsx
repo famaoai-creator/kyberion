@@ -7,6 +7,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
 } from 'react';
 import type {
@@ -19,6 +20,7 @@ import type {
   KbTabsProps,
 } from '@agent/core/a2ui-catalog';
 import {
+  isPlainActivation,
   navBrandLogo,
   navContextOptions,
   navContextPayload,
@@ -29,7 +31,7 @@ import { TABS_SELECT_ACTION } from '../catalog.js';
 import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
 import { KB_ICON_NAMES, KbIcon } from '../icons.js';
 import { asArray, safeHref } from '../safety.js';
-import { ActionRefButton, KbLink, type ActionRefLike } from './controls.js';
+import { ActionRefButton, KbLink, normalizeAction, type ActionRefLike } from './controls.js';
 import { Badge, roleAttr } from './feedback.js';
 
 /** Custom properties only (`--brand-accent`, ...): tenant brand variables, never raw styling. */
@@ -130,7 +132,9 @@ export function PageHeader({ title, subtitle, role_badge, actions, children }: P
 }
 
 function NavRailItem({ item }: { item: KbNavItem }) {
+  const { onAction } = useA2UIActions();
   const href = safeHref(item.href);
+  const action = normalizeAction(item.action);
   const active = item.active === true;
   const inner = (
     <>
@@ -145,27 +149,33 @@ function NavRailItem({ item }: { item: KbNavItem }) {
       </span>
     </>
   );
+  const common = {
+    className: 'kb-nav-rail__item',
+    'data-nav-id': item.id,
+    'aria-current': active ? ('page' as const) : undefined,
+    'data-active': active ? ('true' as const) : undefined,
+  };
+  const dispatch = action
+    ? (event: MouseEvent<HTMLElement>) => {
+        if (href) {
+          if (!isPlainActivation(event)) return;
+          event.preventDefault();
+        }
+        onAction?.(action.id, action.payload);
+      }
+    : undefined;
   return (
     <li>
       {href ? (
-        <KbLink
-          href={href}
-          className="kb-nav-rail__item"
-          data-nav-id={item.id}
-          aria-current={active ? 'page' : undefined}
-          data-active={active ? 'true' : undefined}
-        >
+        <KbLink href={href} {...common} data-action-id={action?.id} onClick={dispatch}>
           {inner}
         </KbLink>
-      ) : (
-        <span
-          className="kb-nav-rail__item"
-          data-nav-id={item.id}
-          aria-current={active ? 'page' : undefined}
-          data-active={active ? 'true' : undefined}
-        >
+      ) : action ? (
+        <button type="button" {...common} data-action-id={action.id} onClick={dispatch}>
           {inner}
-        </span>
+        </button>
+      ) : (
+        <span {...common}>{inner}</span>
       )}
     </li>
   );

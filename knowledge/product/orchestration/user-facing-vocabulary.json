@@ -11830,6 +11830,11 @@
         "ja": "失敗: {error}",
         "qps-ploc": "⟦Ƒȧïŀėḓ: {error} ŀőřė⟧"
       },
+      "offline_copy": {
+        "en": "This is an offline copy; open the brief from the approval server to decide.",
+        "ja": "これはオフラインのコピーです。判断するには承認サーバーからブリーフを開いてください。",
+        "qps-ploc": "⟦Ŧħïş ïş ȧñ őƒƒŀïñė ƈőṗẏ; őṗėñ ŧħė ƀřïėƒ ƒřőɱ ŧħė ȧṗṗřőṽȧŀ şėřṽėř ŧő ḓėƈïḓė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
       "approved_short": {
         "en": "Approved",
         "ja": "承認",
@@ -11966,6 +11971,1370 @@
         "qps-ploc": "⟦Ṗėñḓïñɠ. Ẇȧïŧïñɠ ƒőř ŧħė Şőṽėřėïɠñ ŧő ȧṗṗřőṽė őř řėɋůėşŧ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       }
     },
+    "local_pads": {
+      "page_title": {
+        "en": "{title} — Kyberion",
+        "ja": "{title} — Kyberion",
+        "qps-ploc": "⟦{title} — Ķẏƀėřïőñ ŀőřėɱ⟧"
+      },
+      "badge": {
+        "en": "Local pad",
+        "ja": "ローカルパッド",
+        "qps-ploc": "⟦Ŀőƈȧŀ ṗȧḓ ŀőř⟧"
+      },
+      "noscript_notice": {
+        "en": "This pad needs JavaScript. Turn it on and reload the page.",
+        "ja": "このパッドには JavaScript が必要です。有効にしてからページを再読み込みしてください。",
+        "qps-ploc": "⟦Ŧħïş ṗȧḓ ñėėḓş ĴȧṽȧŞƈřïṗŧ. Ŧůřñ ïŧ őñ ȧñḓ řėŀőȧḓ ŧħė ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      }
+    },
+    "personal_pads": {
+      "pad_memory_capture": {
+        "en": "Memory capture",
+        "ja": "Memory capture",
+        "qps-ploc": "⟦Ɱėɱőřẏ ƈȧṗŧůřė ŀőřė⟧"
+      },
+      "pad_memory_capture_description": {
+        "en": "Jot down ideas, tags, and next actions quickly",
+        "ja": "思いつき、タグ、次の行動をすばやく記録",
+        "qps-ploc": "⟦Ĵőŧ ḓőẇñ ïḓėȧş, ŧȧɠş, ȧñḓ ñėẋŧ ȧƈŧïőñş ɋůïƈķŀẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "pad_meeting_notepad": {
+        "en": "Meeting notepad",
+        "ja": "Meeting notepad",
+        "qps-ploc": "⟦Ɱėėŧïñɠ ñőŧėṗȧḓ ŀőřė⟧"
+      },
+      "pad_meeting_notepad_description": {
+        "en": "Organize meeting notes, decisions, and handoffs",
+        "ja": "会議のメモ、決定事項、受け渡しを整理",
+        "qps-ploc": "⟦Őřɠȧñïẑė ɱėėŧïñɠ ñőŧėş, ḓėƈïşïőñş, ȧñḓ ħȧñḓőƒƒş ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "pad_sketch_input": {
+        "en": "Sketch input",
+        "ja": "Sketch input",
+        "qps-ploc": "⟦Şķėŧƈħ ïñṗůŧ ŀőř⟧"
+      },
+      "pad_sketch_input_description": {
+        "en": "Keep screens and ideas as hand-drawn sketches",
+        "ja": "画面やアイデアを手描きで残す",
+        "qps-ploc": "⟦Ķėėṗ şƈřėėñş ȧñḓ ïḓėȧş ȧş ħȧñḓ-ḓřȧẇñ şķėŧƈħėş ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "pad_clipboard_inbox": {
+        "en": "Clipboard inbox",
+        "ja": "Clipboard inbox",
+        "qps-ploc": "⟦Ƈŀïṗƀőȧřḓ ïñƀőẋ ŀőřė⟧"
+      },
+      "pad_clipboard_inbox_description": {
+        "en": "Send copied text and links to a temporary inbox",
+        "ja": "コピーした文章やリンクを一時受信箱へ",
+        "qps-ploc": "⟦Şėñḓ ƈőṗïėḓ ŧėẋŧ ȧñḓ ŀïñķş ŧő ȧ ŧėɱṗőřȧřẏ ïñƀőẋ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "pad_daily_desk": {
+        "en": "Daily desk",
+        "ja": "Daily desk",
+        "qps-ploc": "⟦Ḓȧïŀẏ ḓėşķ ŀőř⟧"
+      },
+      "pad_daily_desk_description": {
+        "en": "See Journal, TODO, and NOW on one desk",
+        "ja": "Journal、TODO、NOW を一つの机で見渡す",
+        "qps-ploc": "⟦Şėė Ĵőůřñȧŀ, ŦŐḒŐ, ȧñḓ ÑŐẆ őñ őñė ḓėşķ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "pad_doc_drop": {
+        "en": "Doc drop",
+        "ja": "Doc drop",
+        "qps-ploc": "⟦Ḓőƈ ḓřőṗ ŀőř⟧"
+      },
+      "pad_doc_drop_description": {
+        "en": "Receive documents and record them for review",
+        "ja": "文書を受け取り、確認待ちの記録にする",
+        "qps-ploc": "⟦Řėƈėïṽė ḓőƈůɱėñŧş ȧñḓ řėƈőřḓ ŧħėɱ ƒőř řėṽïėẇ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "pad_screenshot_annotate": {
+        "en": "Screenshot annotate",
+        "ja": "Screenshot annotate",
+        "qps-ploc": "⟦Şƈřėėñşħőŧ ȧññőŧȧŧė ŀőřėɱ ⟧"
+      },
+      "pad_screenshot_annotate_description": {
+        "en": "Layer your findings on a screenshot",
+        "ja": "スクリーンショットに気づきを重ねる",
+        "qps-ploc": "⟦Ŀȧẏėř ẏőůř ƒïñḓïñɠş őñ ȧ şƈřėėñşħőŧ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "pad_personal_workbench": {
+        "en": "Personal workbench",
+        "ja": "Personal workbench",
+        "qps-ploc": "⟦Ṗėřşőñȧŀ ẇőřķƀėñƈħ ŀőřėɱ⟧"
+      },
+      "pad_personal_workbench_description": {
+        "en": "Send links, tasks, and follow-ups to the secretary inbox",
+        "ja": "リンク、タスク、フォローアップを秘書 inbox へ",
+        "qps-ploc": "⟦Şėñḓ ŀïñķş, ŧȧşķş, ȧñḓ ƒőŀŀőẇ-ůṗş ŧő ŧħė şėƈřėŧȧřẏ ïñƀőẋ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "storage_scope_managed": {
+        "en": "Managed area for the selected scope",
+        "ja": "scope に応じた管理領域",
+        "qps-ploc": "⟦Ɱȧñȧɠėḓ ȧřėȧ ƒőř ŧħė şėŀėƈŧėḓ şƈőṗė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "top_title": {
+        "en": "Capture desk",
+        "ja": "Capture desk",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ḓėşķ ŀőř⟧"
+      },
+      "top_subtitle": {
+        "en": "Capture from one place and review it safely later",
+        "ja": "ひとつの作業場所から記録し、あとで安全に振り返る",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ƒřőɱ őñė ṗŀȧƈė ȧñḓ řėṽïėẇ ïŧ şȧƒėŀẏ ŀȧŧėř ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "storage_personal": {
+        "en": "This tenant's personal records",
+        "ja": "このテナントの個人記録",
+        "qps-ploc": "⟦Ŧħïş ŧėñȧñŧ'ş ṗėřşőñȧŀ řėƈőřḓş ŀőřėɱ ïṗşů⟧"
+      },
+      "storage_confidential": {
+        "en": "This tenant's shared records",
+        "ja": "このテナントの共有記録",
+        "qps-ploc": "⟦Ŧħïş ŧėñȧñŧ'ş şħȧřėḓ řėƈőřḓş ŀőřėɱ ïṗş⟧"
+      },
+      "storage_public": {
+        "en": "{pad} in the public scope",
+        "ja": "公開 scope の {pad}",
+        "qps-ploc": "⟦{pad} ïñ ŧħė ṗůƀŀïƈ şƈőṗė ŀőřėɱ ïṗ⟧"
+      },
+      "voice_input": {
+        "en": "Voice input",
+        "ja": "音声入力",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ ŀőř⟧"
+      },
+      "option_choose": {
+        "en": "Choose…",
+        "ja": "選択してください",
+        "qps-ploc": "⟦Ƈħőőşė… ŀőř⟧"
+      },
+      "option_note": {
+        "en": "Note",
+        "ja": "Note",
+        "qps-ploc": "⟦Ñőŧė ŀőř⟧"
+      },
+      "option_now": {
+        "en": "NOW",
+        "ja": "NOW",
+        "qps-ploc": "⟦ÑŐẆ ŀőř⟧"
+      },
+      "option_todo": {
+        "en": "TODO",
+        "ja": "TODO",
+        "qps-ploc": "⟦ŦŐḒŐ ŀőř⟧"
+      },
+      "option_ingest": {
+        "en": "Ingest",
+        "ja": "Ingest",
+        "qps-ploc": "⟦Ïñɠėşŧ ŀőř⟧"
+      },
+      "field_capture_note": {
+        "en": "Capture note",
+        "ja": "取り込みメモ",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ñőŧė ŀőř⟧"
+      },
+      "field_capture_note_placeholder": {
+        "en": "What should be organized",
+        "ja": "整理してほしいこと",
+        "qps-ploc": "⟦Ẇħȧŧ şħőůŀḓ ƀė őřɠȧñïẑėḓ ŀőřėɱ ï⟧"
+      },
+      "field_target": {
+        "en": "Suggested destination",
+        "ja": "保存先の候補",
+        "qps-ploc": "⟦Şůɠɠėşŧėḓ ḓėşŧïñȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "drawing_attached_marker": {
+        "en": "(drawing artifact attached)",
+        "ja": "（描画 artifact を添付）",
+        "qps-ploc": "⟦(ḓřȧẇïñɠ ȧřŧïƒȧƈŧ ȧŧŧȧƈħėḓ) ŀőřėɱ ïṗ⟧"
+      },
+      "field_tags": {
+        "en": "Tags",
+        "ja": "タグ",
+        "qps-ploc": "⟦Ŧȧɠş ŀőř⟧"
+      },
+      "field_tags_placeholder": {
+        "en": "idea, follow-up",
+        "ja": "idea, follow-up",
+        "qps-ploc": "⟦ïḓėȧ, ƒőŀŀőẇ-ůṗ ŀőřė⟧"
+      },
+      "field_next_action": {
+        "en": "Next action",
+        "ja": "次のアクション",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ ŀőř⟧"
+      },
+      "field_next_action_placeholder": {
+        "en": "Who does what, and when",
+        "ja": "誰が、いつ、何をするか",
+        "qps-ploc": "⟦Ẇħő ḓőėş ẇħȧŧ, ȧñḓ ẇħėñ ŀőřėɱ ï⟧"
+      },
+      "preview_memory_capture": {
+        "en": "{body}\n\nTags: {tags}\nNext action: {next_action}\nCapture note: {instruction}\nDestination: {target}",
+        "ja": "{body}\n\nタグ: {tags}\n次のアクション: {next_action}\n取り込みメモ: {instruction}\n候補: {target}",
+        "qps-ploc": "⟦{body}\n\nŦȧɠş: {tags}\nÑėẋŧ ȧƈŧïőñ: {next_action}\nƇȧṗŧůřė ñőŧė: {instruction}\nḒėşŧïñȧŧïőñ: {target} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "field_attendees": {
+        "en": "Attendees",
+        "ja": "参加者",
+        "qps-ploc": "⟦Ȧŧŧėñḓėėş ŀőř⟧"
+      },
+      "field_attendees_placeholder": {
+        "en": "Names, comma-separated",
+        "ja": "名前をカンマ区切り",
+        "qps-ploc": "⟦Ñȧɱėş, ƈőɱɱȧ-şėṗȧřȧŧėḓ ŀőřėɱ ï⟧"
+      },
+      "field_minutes_instruction": {
+        "en": "Minutes instructions",
+        "ja": "議事録の指示",
+        "qps-ploc": "⟦Ɱïñůŧėş ïñşŧřůƈŧïőñş ŀőřėɱ ⟧"
+      },
+      "field_minutes_instruction_placeholder": {
+        "en": "Points to summarize or check",
+        "ja": "要約の観点や確認事項",
+        "qps-ploc": "⟦Ṗőïñŧş ŧő şůɱɱȧřïẑė őř ƈħėƈķ ŀőřėɱ ïṗş⟧"
+      },
+      "field_decisions": {
+        "en": "Decisions",
+        "ja": "決定事項",
+        "qps-ploc": "⟦Ḓėƈïşïőñş ŀőř⟧"
+      },
+      "field_decisions_placeholder": {
+        "en": "What was decided",
+        "ja": "決まったこと",
+        "qps-ploc": "⟦Ẇħȧŧ ẇȧş ḓėƈïḓėḓ ŀőřėɱ⟧"
+      },
+      "field_handoff": {
+        "en": "Handoff",
+        "ja": "受け渡し",
+        "qps-ploc": "⟦Ħȧñḓőƒƒ ŀőř⟧"
+      },
+      "field_handoff_placeholder": {
+        "en": "What to pass to the next owner",
+        "ja": "次の担当へ伝えること",
+        "qps-ploc": "⟦Ẇħȧŧ ŧő ṗȧşş ŧő ŧħė ñėẋŧ őẇñėř ŀőřėɱ ïṗşů⟧"
+      },
+      "field_action_items": {
+        "en": "Action items",
+        "ja": "アクション項目",
+        "qps-ploc": "⟦Ȧƈŧïőñ ïŧėɱş ŀőř⟧"
+      },
+      "field_action_items_placeholder": {
+        "en": "Owners and next steps",
+        "ja": "担当者と次の行動",
+        "qps-ploc": "⟦Őẇñėřş ȧñḓ ñėẋŧ şŧėṗş ŀőřėɱ ⟧"
+      },
+      "field_summary": {
+        "en": "Summary",
+        "ja": "要約",
+        "qps-ploc": "⟦Şůɱɱȧřẏ ŀőř⟧"
+      },
+      "field_summary_placeholder": {
+        "en": "Summary of the minutes",
+        "ja": "議事録の要約",
+        "qps-ploc": "⟦Şůɱɱȧřẏ őƒ ŧħė ɱïñůŧėş ŀőřėɱ ï⟧"
+      },
+      "field_open_questions": {
+        "en": "Open questions",
+        "ja": "未解決事項",
+        "qps-ploc": "⟦Őṗėñ ɋůėşŧïőñş ŀőřė⟧"
+      },
+      "field_open_questions_placeholder": {
+        "en": "What still needs checking",
+        "ja": "確認が必要なこと",
+        "qps-ploc": "⟦Ẇħȧŧ şŧïŀŀ ñėėḓş ƈħėƈķïñɠ ŀőřėɱ ïṗ⟧"
+      },
+      "field_raw_notes": {
+        "en": "Raw notes",
+        "ja": "原メモ",
+        "qps-ploc": "⟦Řȧẇ ñőŧėş ŀőř⟧"
+      },
+      "field_raw_notes_placeholder": {
+        "en": "Notes taken during the meeting",
+        "ja": "会議中のメモ",
+        "qps-ploc": "⟦Ñőŧėş ŧȧķėñ ḓůřïñɠ ŧħė ɱėėŧïñɠ ŀőřėɱ ïṗşů⟧"
+      },
+      "field_transcript": {
+        "en": "Transcript",
+        "ja": "文字起こし",
+        "qps-ploc": "⟦Ŧřȧñşƈřïṗŧ ŀőř⟧"
+      },
+      "field_transcript_placeholder": {
+        "en": "Transcript from the audio",
+        "ja": "音声からの文字起こし",
+        "qps-ploc": "⟦Ŧřȧñşƈřïṗŧ ƒřőɱ ŧħė ȧůḓïő ŀőřėɱ ïṗ⟧"
+      },
+      "field_language": {
+        "en": "Language",
+        "ja": "言語",
+        "qps-ploc": "⟦Ŀȧñɠůȧɠė ŀőř⟧"
+      },
+      "option_language_ja": {
+        "en": "日本語",
+        "ja": "日本語",
+        "qps-ploc": "⟦日本語 ŀőř⟧"
+      },
+      "option_language_en": {
+        "en": "English",
+        "ja": "English",
+        "qps-ploc": "⟦Ėñɠŀïşħ ŀőř⟧"
+      },
+      "field_recording": {
+        "en": "Recording",
+        "ja": "録音ファイル",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ ŀőř⟧"
+      },
+      "field_recording_help": {
+        "en": "Choose a recorded file, or record continuously in the browser",
+        "ja": "録音済みファイルを選ぶか、ブラウザで連続録音できます",
+        "qps-ploc": "⟦Ƈħőőşė ȧ řėƈőřḓėḓ ƒïŀė, őř řėƈőřḓ ƈőñŧïñůőůşŀẏ ïñ ŧħė ƀřőẇşėř ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "field_meeting_attachments": {
+        "en": "Meeting materials and attachments",
+        "ja": "会議資料・添付",
+        "qps-ploc": "⟦Ɱėėŧïñɠ ɱȧŧėřïȧŀş ȧñḓ ȧŧŧȧƈħɱėñŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "field_meeting_attachments_help": {
+        "en": "You can choose several meeting documents or images",
+        "ja": "会議資料や画像を複数選択できます",
+        "qps-ploc": "⟦Ẏőů ƈȧñ ƈħőőşė şėṽėřȧŀ ɱėėŧïñɠ ḓőƈůɱėñŧş őř ïɱȧɠėş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "action_meeting_transcribe": {
+        "en": "Transcribe",
+        "ja": "文字起こし",
+        "qps-ploc": "⟦Ŧřȧñşƈřïƀė ŀőř⟧"
+      },
+      "action_meeting_transcribe_description": {
+        "en": "Transcribe the selected recording with the authorized speech-to-text bridge",
+        "ja": "選択した録音を認可済みの speech-to-text bridge で文字にします",
+        "qps-ploc": "⟦Ŧřȧñşƈřïƀė ŧħė şėŀėƈŧėḓ řėƈőřḓïñɠ ẇïŧħ ŧħė ȧůŧħőřïẑėḓ şṗėėƈħ-ŧő-ŧėẋŧ ƀřïḓɠė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "action_meeting_minutes": {
+        "en": "Generate minutes",
+        "ja": "議事録を生成",
+        "qps-ploc": "⟦Ɠėñėřȧŧė ɱïñůŧėş ŀőřėɱ⟧"
+      },
+      "action_meeting_minutes_description": {
+        "en": "Draft minutes from the notes and the transcript",
+        "ja": "メモと文字起こしから議事録の下書きを作ります",
+        "qps-ploc": "⟦Ḓřȧƒŧ ɱïñůŧėş ƒřőɱ ŧħė ñőŧėş ȧñḓ ŧħė ŧřȧñşƈřïṗŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "preview_meeting_notepad": {
+        "en": "Meeting notes\nAttendees: {attendees}\nLanguage: {language}\n\nSummary:\n{summary}\n\nDecisions:\n{decisions}\n\nHandoff:\n{handoff}\n\nAction items:\n{action_items}\n\nOpen questions:\n{open_questions}\n\nRaw notes:\n{notes}\n\nTranscript:\n{transcript}\n\nRecording: {audio_name}\nAttachments: {attachment_name}\n\nNotes:\n{body}",
+        "ja": "会議メモ\n参加者: {attendees}\n言語: {language}\n\n要約:\n{summary}\n\n決定事項:\n{decisions}\n\n受け渡し:\n{handoff}\n\nアクション項目:\n{action_items}\n\n未解決事項:\n{open_questions}\n\n原メモ:\n{notes}\n\n文字起こし:\n{transcript}\n\n録音: {audio_name}\n添付: {attachment_name}\n\nメモ:\n{body}",
+        "qps-ploc": "⟦Ɱėėŧïñɠ ñőŧėş\nȦŧŧėñḓėėş: {attendees}\nĿȧñɠůȧɠė: {language}\n\nŞůɱɱȧřẏ:\n{summary}\n\nḒėƈïşïőñş:\n{decisions}\n\nĦȧñḓőƒƒ:\n{handoff}\n\nȦƈŧïőñ ïŧėɱş:\n{action_items}\n\nŐṗėñ ɋůėşŧïőñş:\n{open_questions}\n\nŘȧẇ ñőŧėş:\n{notes}\n\nŦřȧñşƈřïṗŧ:\n{transcript}\n\nŘėƈőřḓïñɠ: {audio_name}\nȦŧŧȧƈħɱėñŧş: {attachment_name}\n\nÑőŧėş:\n{body} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ⟧"
+      },
+      "field_drawing_note": {
+        "en": "Drawing note",
+        "ja": "描画メモ",
+        "qps-ploc": "⟦Ḓřȧẇïñɠ ñőŧė ŀőř⟧"
+      },
+      "field_drawing_note_placeholder": {
+        "en": "What this drawing should convey",
+        "ja": "この図で伝えたいこと",
+        "qps-ploc": "⟦Ẇħȧŧ ŧħïş ḓřȧẇïñɠ şħőůŀḓ ƈőñṽėẏ ŀőřėɱ ïṗşů⟧"
+      },
+      "field_canvas": {
+        "en": "Canvas",
+        "ja": "キャンバス",
+        "qps-ploc": "⟦Ƈȧñṽȧş ŀőř⟧"
+      },
+      "field_canvas_help": {
+        "en": "Drag to draw",
+        "ja": "ドラッグして描画できます",
+        "qps-ploc": "⟦Ḓřȧɠ ŧő ḓřȧẇ ŀőř⟧"
+      },
+      "preview_sketch_input": {
+        "en": "Sketch\n{instruction}\n\n{body}\n\n[Drawing attached]",
+        "ja": "スケッチ\n{instruction}\n\n{body}\n\n[描画データを添付]",
+        "qps-ploc": "⟦Şķėŧƈħ\n{instruction}\n\n{body}\n\n[Ḓřȧẇïñɠ ȧŧŧȧƈħėḓ] ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "field_source": {
+        "en": "Source",
+        "ja": "出典",
+        "qps-ploc": "⟦Şőůřƈė ŀőř⟧"
+      },
+      "field_source_placeholder": {
+        "en": "Where it was copied from",
+        "ja": "どこからコピーしたか",
+        "qps-ploc": "⟦Ẇħėřė ïŧ ẇȧş ƈőṗïėḓ ƒřőɱ ŀőřėɱ ï⟧"
+      },
+      "field_link": {
+        "en": "Link",
+        "ja": "リンク",
+        "qps-ploc": "⟦Ŀïñķ ŀőř⟧"
+      },
+      "field_link_placeholder": {
+        "en": "https://…",
+        "ja": "https://…",
+        "qps-ploc": "⟦ħŧŧṗş://… ŀőř⟧"
+      },
+      "field_clip_items": {
+        "en": "Clipped items",
+        "ja": "クリップ項目",
+        "qps-ploc": "⟦Ƈŀïṗṗėḓ ïŧėɱş ŀőřė⟧"
+      },
+      "field_clip_items_placeholder": {
+        "en": "Copied text (several allowed)",
+        "ja": "コピーした文章（複数可）",
+        "qps-ploc": "⟦Ƈőṗïėḓ ŧėẋŧ (şėṽėřȧŀ ȧŀŀőẇėḓ) ŀőřėɱ ïṗş⟧"
+      },
+      "action_clipboard_read": {
+        "en": "Read clipboard",
+        "ja": "クリップボードを読む",
+        "qps-ploc": "⟦Řėȧḓ ƈŀïṗƀőȧřḓ ŀőřė⟧"
+      },
+      "action_clipboard_read_description": {
+        "en": "Read the OS clipboard into the draft before saving",
+        "ja": "OS のクリップボードを読み、貼り付け前の下書きへ反映します",
+        "qps-ploc": "⟦Řėȧḓ ŧħė ŐŞ ƈŀïṗƀőȧřḓ ïñŧő ŧħė ḓřȧƒŧ ƀėƒőřė şȧṽïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "preview_clipboard_inbox": {
+        "en": "{body}\n\nClipped items:\n{items}\n\nSource: {source}\nLink: {url}\nCapture note: {instruction}\nDestination: {target}",
+        "ja": "{body}\n\nクリップ項目:\n{items}\n\n出典: {source}\nリンク: {url}\n取り込みメモ: {instruction}\n候補: {target}",
+        "qps-ploc": "⟦{body}\n\nƇŀïṗṗėḓ ïŧėɱş:\n{items}\n\nŞőůřƈė: {source}\nĿïñķ: {url}\nƇȧṗŧůřė ñőŧė: {instruction}\nḒėşŧïñȧŧïőñ: {target} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "field_journal": {
+        "en": "Journal",
+        "ja": "Journal",
+        "qps-ploc": "⟦Ĵőůřñȧŀ ŀőř⟧"
+      },
+      "field_journal_placeholder": {
+        "en": "Today's log",
+        "ja": "今日の記録",
+        "qps-ploc": "⟦Ŧőḓȧẏ'ş ŀőɠ ŀőř⟧"
+      },
+      "field_todo": {
+        "en": "TODO",
+        "ja": "TODO",
+        "qps-ploc": "⟦ŦŐḒŐ ŀőř⟧"
+      },
+      "field_todo_placeholder": {
+        "en": "What to do today",
+        "ja": "今日やること",
+        "qps-ploc": "⟦Ẇħȧŧ ŧő ḓő ŧőḓȧẏ ŀőřėɱ⟧"
+      },
+      "field_now": {
+        "en": "NOW",
+        "ja": "NOW",
+        "qps-ploc": "⟦ÑŐẆ ŀőř⟧"
+      },
+      "field_now_placeholder": {
+        "en": "What to focus on right now",
+        "ja": "いま集中すること",
+        "qps-ploc": "⟦Ẇħȧŧ ŧő ƒőƈůş őñ řïɠħŧ ñőẇ ŀőřėɱ ïṗ⟧"
+      },
+      "field_period_key": {
+        "en": "Date",
+        "ja": "対象日",
+        "qps-ploc": "⟦Ḓȧŧė ŀőř⟧"
+      },
+      "field_period_key_placeholder": {
+        "en": "YYYY-MM-DD (blank = today)",
+        "ja": "YYYY-MM-DD（空欄は今日）",
+        "qps-ploc": "⟦ẎẎẎẎ-ⱮⱮ-ḒḒ (ƀŀȧñķ = ŧőḓȧẏ) ŀőřėɱ ïṗ⟧"
+      },
+      "field_daily_note": {
+        "en": "Notes",
+        "ja": "補足",
+        "qps-ploc": "⟦Ñőŧėş ŀőř⟧"
+      },
+      "field_daily_note_placeholder": {
+        "en": "Notes for organizing today",
+        "ja": "今日の整理メモ",
+        "qps-ploc": "⟦Ñőŧėş ƒőř őřɠȧñïẑïñɠ ŧőḓȧẏ ŀőřėɱ ïṗ⟧"
+      },
+      "action_daily_load": {
+        "en": "Load today's working memory",
+        "ja": "今日の working-memory を読む",
+        "qps-ploc": "⟦Ŀőȧḓ ŧőḓȧẏ'ş ẇőřķïñɠ ɱėɱőřẏ ŀőřėɱ ïṗ⟧"
+      },
+      "action_daily_load_description": {
+        "en": "Load the Journal / TODO / NOW of the current personal scope into the draft",
+        "ja": "現在の personal scope に紐づく Journal / TODO / NOW を下書きへ読み込みます",
+        "qps-ploc": "⟦Ŀőȧḓ ŧħė Ĵőůřñȧŀ / ŦŐḒŐ / ÑŐẆ őƒ ŧħė ƈůřřėñŧ ṗėřşőñȧŀ şƈőṗė ïñŧő ŧħė ḓřȧƒŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "preview_daily_desk": {
+        "en": "Journal\n{journal}\n\nTODO\n{todo}\n\nNOW\n{now}\n\nNotes\n{instruction}\n{body}",
+        "ja": "Journal\n{journal}\n\nTODO\n{todo}\n\nNOW\n{now}\n\n補足\n{instruction}\n{body}",
+        "qps-ploc": "⟦Ĵőůřñȧŀ\n{journal}\n\nŦŐḒŐ\n{todo}\n\nÑŐẆ\n{now}\n\nÑőŧėş\n{instruction}\n{body} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "field_documents": {
+        "en": "Document files",
+        "ja": "文書ファイル",
+        "qps-ploc": "⟦Ḓőƈůɱėñŧ ƒïŀėş ŀőřė⟧"
+      },
+      "field_documents_help": {
+        "en": "Choose one or more original files; the files themselves are stored",
+        "ja": "複数の原本ファイルを選択できます。実体を保存します",
+        "qps-ploc": "⟦Ƈħőőşė őñė őř ɱőřė őřïɠïñȧŀ ƒïŀėş; ŧħė ƒïŀėş ŧħėɱşėŀṽėş ȧřė şŧőřėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "field_review_note": {
+        "en": "Review note",
+        "ja": "確認メモ",
+        "qps-ploc": "⟦Řėṽïėẇ ñőŧė ŀőř⟧"
+      },
+      "field_review_note_placeholder": {
+        "en": "What should be checked",
+        "ja": "確認してほしい点",
+        "qps-ploc": "⟦Ẇħȧŧ şħőůŀḓ ƀė ƈħėƈķėḓ ŀőřėɱ ï⟧"
+      },
+      "preview_doc_drop": {
+        "en": "Documents: {file_name}\nReview note:\n{review_note}\n\nNotes:\n{body}",
+        "ja": "文書: {file_name}\n確認メモ:\n{review_note}\n\n補足:\n{body}",
+        "qps-ploc": "⟦Ḓőƈůɱėñŧş: {file_name}\nŘėṽïėẇ ñőŧė:\n{review_note}\n\nÑőŧėş:\n{body} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "field_screenshot": {
+        "en": "Screenshot",
+        "ja": "スクリーンショット",
+        "qps-ploc": "⟦Şƈřėėñşħőŧ ŀőř⟧"
+      },
+      "field_screenshot_help": {
+        "en": "The chosen, pasted, or dropped image becomes the background of the annotation canvas",
+        "ja": "選んだ・貼り付けた・ドロップした画像が注釈キャンバスの背景になります",
+        "qps-ploc": "⟦Ŧħė ƈħőşėñ, ṗȧşŧėḓ, őř ḓřőṗṗėḓ ïɱȧɠė ƀėƈőɱėş ŧħė ƀȧƈķɠřőůñḓ őƒ ŧħė ȧññőŧȧŧïőñ ƈȧñṽȧş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "field_annotation": {
+        "en": "Annotation",
+        "ja": "注釈",
+        "qps-ploc": "⟦Ȧññőŧȧŧïőñ ŀőř⟧"
+      },
+      "field_annotation_placeholder": {
+        "en": "Findings or fixes",
+        "ja": "気づきや修正点",
+        "qps-ploc": "⟦Ƒïñḓïñɠş őř ƒïẋėş ŀőřėɱ⟧"
+      },
+      "field_drawn_annotation": {
+        "en": "Drawn annotation",
+        "ja": "描画注釈",
+        "qps-ploc": "⟦Ḓřȧẇñ ȧññőŧȧŧïőñ ŀőřėɱ⟧"
+      },
+      "field_drawn_annotation_help": {
+        "en": "Draw lines and marks over the image",
+        "ja": "画像の上に重ねたい線や印を描けます",
+        "qps-ploc": "⟦Ḓřȧẇ ŀïñėş ȧñḓ ɱȧřķş őṽėř ŧħė ïɱȧɠė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "action_screenshot_capture": {
+        "en": "Capture screen",
+        "ja": "画面をキャプチャ",
+        "qps-ploc": "⟦Ƈȧṗŧůřė şƈřėėñ ŀőřė⟧"
+      },
+      "action_screenshot_capture_description": {
+        "en": "Capture the OS screen as a PNG into the draft",
+        "ja": "OS の画面を PNG として下書きへ取り込みます",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ŧħė ŐŞ şƈřėėñ ȧş ȧ ṖÑƓ ïñŧő ŧħė ḓřȧƒŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "preview_screenshot_annotate": {
+        "en": "Image: {image_name}\nAnnotation:\n{annotation}\n\nDrawn annotation: {annotation_data}\n\nNotes:\n{body}",
+        "ja": "画像: {image_name}\n注釈:\n{annotation}\n\n描画注釈: {annotation_data}\n\n補足:\n{body}",
+        "qps-ploc": "⟦Ïɱȧɠė: {image_name}\nȦññőŧȧŧïőñ:\n{annotation}\n\nḒřȧẇñ ȧññőŧȧŧïőñ: {annotation_data}\n\nÑőŧėş:\n{body} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "field_entry_type": {
+        "en": "Purpose",
+        "ja": "用途",
+        "qps-ploc": "⟦Ṗůřṗőşė ŀőř⟧"
+      },
+      "option_entry_link": {
+        "en": "Link inbox",
+        "ja": "Link inbox",
+        "qps-ploc": "⟦Ŀïñķ ïñƀőẋ ŀőř⟧"
+      },
+      "option_entry_task": {
+        "en": "Task triage",
+        "ja": "Task triage",
+        "qps-ploc": "⟦Ŧȧşķ ŧřïȧɠė ŀőř⟧"
+      },
+      "option_entry_follow_up": {
+        "en": "Follow-up desk",
+        "ja": "Follow-up desk",
+        "qps-ploc": "⟦Ƒőŀŀőẇ-ůṗ ḓėşķ ŀőřė⟧"
+      },
+      "option_entry_decision": {
+        "en": "Decision log",
+        "ja": "Decision log",
+        "qps-ploc": "⟦Ḓėƈïşïőñ ŀőɠ ŀőř⟧"
+      },
+      "option_entry_expense": {
+        "en": "Expense",
+        "ja": "Expense",
+        "qps-ploc": "⟦Ėẋṗėñşė ŀőř⟧"
+      },
+      "option_entry_daily_review": {
+        "en": "Daily review",
+        "ja": "Daily review",
+        "qps-ploc": "⟦Ḓȧïŀẏ řėṽïėẇ ŀőř⟧"
+      },
+      "field_due": {
+        "en": "Due",
+        "ja": "期限",
+        "qps-ploc": "⟦Ḓůė ŀőř⟧"
+      },
+      "field_date_placeholder": {
+        "en": "2026-09-30",
+        "ja": "2026-09-30",
+        "qps-ploc": "⟦2026-09-30 ŀőř⟧"
+      },
+      "action_email_draft": {
+        "en": "Email draft",
+        "ja": "メール下書き",
+        "qps-ploc": "⟦Ėɱȧïŀ ḓřȧƒŧ ŀőř⟧"
+      },
+      "action_email_draft_description": {
+        "en": "Create an unsent email draft from the recipient, subject, and body",
+        "ja": "宛先・件名・本文から送信しないメール下書きを作ります",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧñ ůñşėñŧ ėɱȧïŀ ḓřȧƒŧ ƒřőɱ ŧħė řėƈïṗïėñŧ, şůƀĵėƈŧ, ȧñḓ ƀőḓẏ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "field_email_to": {
+        "en": "To",
+        "ja": "宛先",
+        "qps-ploc": "⟦Ŧő ŀőř⟧"
+      },
+      "field_email_to_placeholder": {
+        "en": "name@example.com",
+        "ja": "name@example.com",
+        "qps-ploc": "⟦ñȧɱė@ėẋȧɱṗŀė.ƈőɱ ŀőřėɱ⟧"
+      },
+      "field_email_subject": {
+        "en": "Subject",
+        "ja": "件名",
+        "qps-ploc": "⟦Şůƀĵėƈŧ ŀőř⟧"
+      },
+      "field_email_body": {
+        "en": "Body",
+        "ja": "本文",
+        "qps-ploc": "⟦Ƀőḓẏ ŀőř⟧"
+      },
+      "field_email_account": {
+        "en": "Account (optional)",
+        "ja": "アカウント（任意）",
+        "qps-ploc": "⟦Ȧƈƈőůñŧ (őṗŧïőñȧŀ) ŀőřėɱ⟧"
+      },
+      "action_calendar_propose": {
+        "en": "Propose calendar event",
+        "ja": "カレンダー提案",
+        "qps-ploc": "⟦Ṗřőṗőşė ƈȧŀėñḓȧř ėṽėñŧ ŀőřėɱ ï⟧"
+      },
+      "action_calendar_propose_description": {
+        "en": "Create the event as a proposal awaiting approval",
+        "ja": "予定を承認待ちの proposal として作ります",
+        "qps-ploc": "⟦Ƈřėȧŧė ŧħė ėṽėñŧ ȧş ȧ ṗřőṗőşȧŀ ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "field_calendar_summary": {
+        "en": "Event title",
+        "ja": "予定名",
+        "qps-ploc": "⟦Ėṽėñŧ ŧïŧŀė ŀőř⟧"
+      },
+      "field_calendar_start": {
+        "en": "Start",
+        "ja": "開始",
+        "qps-ploc": "⟦Şŧȧřŧ ŀőř⟧"
+      },
+      "field_calendar_start_placeholder": {
+        "en": "2026-09-30T10:00:00+09:00",
+        "ja": "2026-09-30T10:00:00+09:00",
+        "qps-ploc": "⟦2026-09-30Ŧ10:00:00+09:00 ŀőřėɱ ïṗ⟧"
+      },
+      "field_calendar_end": {
+        "en": "End",
+        "ja": "終了",
+        "qps-ploc": "⟦Ėñḓ ŀőř⟧"
+      },
+      "field_calendar_end_placeholder": {
+        "en": "2026-09-30T10:30:00+09:00",
+        "ja": "2026-09-30T10:30:00+09:00",
+        "qps-ploc": "⟦2026-09-30Ŧ10:30:00+09:00 ŀőřėɱ ïṗ⟧"
+      },
+      "field_calendar_description": {
+        "en": "Description",
+        "ja": "説明",
+        "qps-ploc": "⟦Ḓėşƈřïṗŧïőñ ŀőř⟧"
+      },
+      "field_calendar_location": {
+        "en": "Location",
+        "ja": "場所",
+        "qps-ploc": "⟦Ŀőƈȧŧïőñ ŀőř⟧"
+      },
+      "field_calendar_attendees_placeholder": {
+        "en": "a@example.com,b@example.com",
+        "ja": "a@example.com,b@example.com",
+        "qps-ploc": "⟦ȧ@ėẋȧɱṗŀė.ƈőɱ,ƀ@ėẋȧɱṗŀė.ƈőɱ ŀőřėɱ ïṗ⟧"
+      },
+      "field_calendar_provider": {
+        "en": "Provider",
+        "ja": "プロバイダ",
+        "qps-ploc": "⟦Ṗřőṽïḓėř ŀőř⟧"
+      },
+      "option_provider_google": {
+        "en": "Google Workspace",
+        "ja": "Google Workspace",
+        "qps-ploc": "⟦Ɠőőɠŀė Ẇőřķşṗȧƈė ŀőřėɱ⟧"
+      },
+      "option_provider_m365": {
+        "en": "Microsoft 365",
+        "ja": "Microsoft 365",
+        "qps-ploc": "⟦Ɱïƈřőşőƒŧ 365 ŀőřė⟧"
+      },
+      "field_calendar_id": {
+        "en": "Calendar ID (optional)",
+        "ja": "カレンダー ID（任意）",
+        "qps-ploc": "⟦Ƈȧŀėñḓȧř ÏḒ (őṗŧïőñȧŀ) ŀőřėɱ ï⟧"
+      },
+      "field_calendar_time_zone": {
+        "en": "Time zone (optional)",
+        "ja": "タイムゾーン（任意）",
+        "qps-ploc": "⟦Ŧïɱė ẑőñė (őṗŧïőñȧŀ) ŀőřėɱ ⟧"
+      },
+      "field_calendar_time_zone_placeholder": {
+        "en": "Asia/Tokyo",
+        "ja": "Asia/Tokyo",
+        "qps-ploc": "⟦Ȧşïȧ/Ŧőķẏő ŀőř⟧"
+      },
+      "action_calendar_apply": {
+        "en": "Create approved event",
+        "ja": "承認済み予定を作成",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧṗṗřőṽėḓ ėṽėñŧ ŀőřėɱ ⟧"
+      },
+      "action_calendar_apply_description": {
+        "en": "Re-verify the saved proposal's approval, then create the event",
+        "ja": "保存済み proposal の approval を再検証してから作成します",
+        "qps-ploc": "⟦Řė-ṽėřïƒẏ ŧħė şȧṽėḓ ṗřőṗőşȧŀ'ş ȧṗṗřőṽȧŀ, ŧħėñ ƈřėȧŧė ŧħė ėṽėñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "field_approval_request_id": {
+        "en": "Approval request ID",
+        "ja": "承認リクエスト ID",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ ÏḒ ŀőřėɱ ⟧"
+      },
+      "field_calendar_confirm": {
+        "en": "I have checked the details",
+        "ja": "内容を確認しました",
+        "qps-ploc": "⟦Ï ħȧṽė ƈħėƈķėḓ ŧħė ḓėŧȧïŀş ŀőřėɱ ïṗ⟧"
+      },
+      "option_confirm_required": {
+        "en": "Confirmation required",
+        "ja": "確認が必要です",
+        "qps-ploc": "⟦Ƈőñƒïřɱȧŧïőñ řėɋůïřėḓ ŀőřėɱ ⟧"
+      },
+      "option_confirm_create": {
+        "en": "Checked — create it",
+        "ja": "確認して作成",
+        "qps-ploc": "⟦Ƈħėƈķėḓ — ƈřėȧŧė ïŧ ŀőřėɱ ⟧"
+      },
+      "action_calendar_reconcile": {
+        "en": "Reconcile unknown event",
+        "ja": "不明な予定を照合",
+        "qps-ploc": "⟦Řėƈőñƈïŀė ůñķñőẇñ ėṽėñŧ ŀőřėɱ ï⟧"
+      },
+      "action_calendar_reconcile_description": {
+        "en": "Match the provider agenda read-only and settle the proposal only on a unique match",
+        "ja": "provider agenda を read-only 照合し、一意一致時だけ proposal を確定します",
+        "qps-ploc": "⟦Ɱȧŧƈħ ŧħė ṗřőṽïḓėř ȧɠėñḓȧ řėȧḓ-őñŀẏ ȧñḓ şėŧŧŀė ŧħė ṗřőṗőşȧŀ őñŀẏ őñ ȧ ůñïɋůė ɱȧŧƈħ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "action_ocr_extract": {
+        "en": "OCR attachment",
+        "ja": "添付を OCR",
+        "qps-ploc": "⟦ŐƇŘ ȧŧŧȧƈħɱėñŧ ŀőřė⟧"
+      },
+      "action_ocr_extract_description": {
+        "en": "Run scoped OCR on an artifact ID of a saved record",
+        "ja": "保存済み record の artifact ID を指定して scoped OCR を実行します",
+        "qps-ploc": "⟦Řůñ şƈőṗėḓ ŐƇŘ őñ ȧñ ȧřŧïƒȧƈŧ ÏḒ őƒ ȧ şȧṽėḓ řėƈőřḓ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "field_ocr_artifact_id": {
+        "en": "Artifact ID",
+        "ja": "artifact ID",
+        "qps-ploc": "⟦Ȧřŧïƒȧƈŧ ÏḒ ŀőř⟧"
+      },
+      "field_ocr_artifact_id_placeholder": {
+        "en": "01-…",
+        "ja": "01-…",
+        "qps-ploc": "⟦01-… ŀőř⟧"
+      },
+      "field_ocr_language": {
+        "en": "Language (optional)",
+        "ja": "言語（任意）",
+        "qps-ploc": "⟦Ŀȧñɠůȧɠė (őṗŧïőñȧŀ) ŀőřėɱ ⟧"
+      },
+      "field_ocr_language_placeholder": {
+        "en": "ja",
+        "ja": "ja",
+        "qps-ploc": "⟦ĵȧ ŀőř⟧"
+      },
+      "field_ocr_mode": {
+        "en": "OCR mode",
+        "ja": "OCR モード",
+        "qps-ploc": "⟦ŐƇŘ ɱőḓė ŀőř⟧"
+      },
+      "option_ocr_privacy_first": {
+        "en": "Privacy first",
+        "ja": "privacy first",
+        "qps-ploc": "⟦Ṗřïṽȧƈẏ ƒïřşŧ ŀőřė⟧"
+      },
+      "option_ocr_balanced": {
+        "en": "Balanced",
+        "ja": "balanced",
+        "qps-ploc": "⟦Ƀȧŀȧñƈėḓ ŀőř⟧"
+      },
+      "field_ocr_structure": {
+        "en": "Extract structure",
+        "ja": "構造を抽出",
+        "qps-ploc": "⟦Ėẋŧřȧƈŧ şŧřůƈŧůřė ŀőřėɱ⟧"
+      },
+      "option_no": {
+        "en": "No",
+        "ja": "しない",
+        "qps-ploc": "⟦Ñő ŀőř⟧"
+      },
+      "option_yes": {
+        "en": "Yes",
+        "ja": "する",
+        "qps-ploc": "⟦Ẏėş ŀőř⟧"
+      },
+      "action_knowledge_propose": {
+        "en": "Propose knowledge candidate",
+        "ja": "知識候補を提案",
+        "qps-ploc": "⟦Ṗřőṗőşė ķñőẇŀėḓɠė ƈȧñḓïḓȧŧė ŀőřėɱ ïṗ⟧"
+      },
+      "action_knowledge_propose_description": {
+        "en": "Create a candidate for human review, grounded in the saved handoff",
+        "ja": "保存済み handoff を根拠に human review 用の候補を作ります",
+        "qps-ploc": "⟦Ƈřėȧŧė ȧ ƈȧñḓïḓȧŧė ƒőř ħůɱȧñ řėṽïėẇ, ɠřőůñḓėḓ ïñ ŧħė şȧṽėḓ ħȧñḓőƒƒ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "field_knowledge_summary": {
+        "en": "Candidate summary",
+        "ja": "候補の要約",
+        "qps-ploc": "⟦Ƈȧñḓïḓȧŧė şůɱɱȧřẏ ŀőřėɱ⟧"
+      },
+      "preview_personal_workbench": {
+        "en": "Purpose: {entry_type}\nDue: {due}\n\n{body}",
+        "ja": "用途: {entry_type}\n期限: {due}\n\n{body}",
+        "qps-ploc": "⟦Ṗůřṗőşė: {entry_type}\nḒůė: {due}\n\n{body} ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "action_transcribe_empty": {
+        "en": "The transcript was empty. Check the recording.",
+        "ja": "文字起こし結果が空でした。録音を確認してください。",
+        "qps-ploc": "⟦Ŧħė ŧřȧñşƈřïṗŧ ẇȧş ėɱṗŧẏ. Ƈħėƈķ ŧħė řėƈőřḓïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "action_transcribe_done": {
+        "en": "Transcription finished ({backend})",
+        "ja": "文字起こし完了（{backend}）",
+        "qps-ploc": "⟦Ŧřȧñşƈřïṗŧïőñ ƒïñïşħėḓ ({backend}) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "action_stt_unavailable": {
+        "en": "Speech-to-text is unavailable. Check the settings and permissions.",
+        "ja": "speech-to-text を利用できません。設定と権限を確認してください。",
+        "qps-ploc": "⟦Şṗėėƈħ-ŧő-ŧėẋŧ ïş ůñȧṽȧïŀȧƀŀė. Ƈħėƈķ ŧħė şėŧŧïñɠş ȧñḓ ṗėřɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "action_minutes_need_input": {
+        "en": "Enter raw notes or a transcript.",
+        "ja": "原メモまたは文字起こしを入力してください。",
+        "qps-ploc": "⟦Ėñŧėř řȧẇ ñőŧėş őř ȧ ŧřȧñşƈřïṗŧ. ŀőřėɱ ïṗşů⟧"
+      },
+      "action_minutes_done": {
+        "en": "Drafted the minutes ({backend}). Review them before saving.",
+        "ja": "議事録の下書きを生成しました（{backend}）。内容を確認して保存してください。",
+        "qps-ploc": "⟦Ḓřȧƒŧėḓ ŧħė ɱïñůŧėş ({backend}). Řėṽïėẇ ŧħėɱ ƀėƒőřė şȧṽïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "action_screenshot_not_png": {
+        "en": "KYBERION_SCREENSHOT_PATH is not a PNG.",
+        "ja": "KYBERION_SCREENSHOT_PATH は PNG ではありません。",
+        "qps-ploc": "⟦ĶẎɃĖŘÏŐÑ_ŞƇŘĖĖÑŞĦŐŦ_ṖȦŦĦ ïş ñőŧ ȧ ṖÑƓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "action_screenshot_configured_done": {
+        "en": "Loaded the configured PNG into the draft.",
+        "ja": "指定された PNG を下書きへ取り込みました。",
+        "qps-ploc": "⟦Ŀőȧḓėḓ ŧħė ƈőñƒïɠůřėḓ ṖÑƓ ïñŧő ŧħė ḓřȧƒŧ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "action_screenshot_configured_unreadable": {
+        "en": "Cannot read the configured PNG. Check the settings and permissions.",
+        "ja": "指定 PNG を読めません。設定と権限を確認してください。",
+        "qps-ploc": "⟦Ƈȧññőŧ řėȧḓ ŧħė ƈőñƒïɠůřėḓ ṖÑƓ. Ƈħėƈķ ŧħė şėŧŧïñɠş ȧñḓ ṗėřɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "action_screenshot_os_unsupported": {
+        "en": "OS capture works on macOS only. Choose an image file instead.",
+        "ja": "OS キャプチャは darwin のみ対応です。画像ファイルを選択してください。",
+        "qps-ploc": "⟦ŐŞ ƈȧṗŧůřė ẇőřķş őñ ɱȧƈŐŞ őñŀẏ. Ƈħőőşė ȧñ ïɱȧɠė ƒïŀė ïñşŧėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "action_screenshot_failed": {
+        "en": "Screen capture failed. Check the permissions.",
+        "ja": "画面キャプチャに失敗しました。権限を確認してください。",
+        "qps-ploc": "⟦Şƈřėėñ ƈȧṗŧůřė ƒȧïŀėḓ. Ƈħėƈķ ŧħė ṗėřɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "action_screenshot_no_png": {
+        "en": "screencapture did not produce a PNG.",
+        "ja": "screencapture が PNG を生成しませんでした。",
+        "qps-ploc": "⟦şƈřėėñƈȧṗŧůřė ḓïḓ ñőŧ ṗřőḓůƈė ȧ ṖÑƓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "action_screenshot_done": {
+        "en": "Captured the screen as a PNG into the draft.",
+        "ja": "画面を PNG として下書きへ取り込みました。",
+        "qps-ploc": "⟦Ƈȧṗŧůřėḓ ŧħė şƈřėėñ ȧş ȧ ṖÑƓ ïñŧő ŧħė ḓřȧƒŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "action_email_need_body": {
+        "en": "Enter the email body.",
+        "ja": "メール本文を入力してください。",
+        "qps-ploc": "⟦Ėñŧėř ŧħė ėɱȧïŀ ƀőḓẏ. ŀőřėɱ ⟧"
+      },
+      "action_email_done": {
+        "en": "Created an email draft (nothing is sent).",
+        "ja": "メール下書きを作成しました（送信は行いません）。",
+        "qps-ploc": "⟦Ƈřėȧŧėḓ ȧñ ėɱȧïŀ ḓřȧƒŧ (ñőŧħïñɠ ïş şėñŧ). ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "action_calendar_pending": {
+        "en": "Created a calendar proposal awaiting approval.",
+        "ja": "承認待ちのカレンダー提案を作成しました。",
+        "qps-ploc": "⟦Ƈřėȧŧėḓ ȧ ƈȧŀėñḓȧř ṗřőṗőşȧŀ ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "action_calendar_proposed": {
+        "en": "Created a calendar proposal.",
+        "ja": "カレンダー提案を作成しました。",
+        "qps-ploc": "⟦Ƈřėȧŧėḓ ȧ ƈȧŀėñḓȧř ṗřőṗőşȧŀ. ŀőřėɱ ïṗş⟧"
+      },
+      "action_need_approval_id": {
+        "en": "Enter the approval request ID.",
+        "ja": "承認リクエスト ID を入力してください。",
+        "qps-ploc": "⟦Ėñŧėř ŧħė ȧṗṗřőṽȧŀ řėɋůėşŧ ÏḒ. ŀőřėɱ ïṗşů⟧"
+      },
+      "action_calendar_approval_required": {
+        "en": "An approval record is required. Run this again after explicit approval.",
+        "ja": "承認レコードが必要です。明示承認後に再実行してください。",
+        "qps-ploc": "⟦Ȧñ ȧṗṗřőṽȧŀ řėƈőřḓ ïş řėɋůïřėḓ. Řůñ ŧħïş ȧɠȧïñ ȧƒŧėř ėẋṗŀïƈïŧ ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "action_calendar_reconciliation_required": {
+        "en": "The external result is not settled yet. Stopped to prevent duplicates.",
+        "ja": "外部反映の結果が未確定です。重複防止のため停止しました。",
+        "qps-ploc": "⟦Ŧħė ėẋŧėřñȧŀ řėşůŀŧ ïş ñőŧ şėŧŧŀėḓ ẏėŧ. Şŧőṗṗėḓ ŧő ṗřėṽėñŧ ḓůṗŀïƈȧŧėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "action_calendar_applied": {
+        "en": "Processed the approved calendar proposal.",
+        "ja": "承認済みのカレンダー提案を処理しました。",
+        "qps-ploc": "⟦Ṗřőƈėşşėḓ ŧħė ȧṗṗřőṽėḓ ƈȧŀėñḓȧř ṗřőṗőşȧŀ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "action_calendar_reconciled": {
+        "en": "Matched a unique provider event and settled the proposal.",
+        "ja": "provider の一意イベントを照合し、proposal を確定しました。",
+        "qps-ploc": "⟦Ɱȧŧƈħėḓ ȧ ůñïɋůė ṗřőṽïḓėř ėṽėñŧ ȧñḓ şėŧŧŀėḓ ŧħė ṗřőṗőşȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "action_calendar_already_applied": {
+        "en": "This proposal is already settled.",
+        "ja": "この proposal は既に確定済みです。",
+        "qps-ploc": "⟦Ŧħïş ṗřőṗőşȧŀ ïş ȧŀřėȧḓẏ şėŧŧŀėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "action_calendar_reconcile_not_needed": {
+        "en": "This proposal does not need reconciliation.",
+        "ja": "この proposal は照合が必要な状態ではありません。",
+        "qps-ploc": "⟦Ŧħïş ṗřőṗőşȧŀ ḓőėş ñőŧ ñėėḓ řėƈőñƈïŀïȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "action_calendar_reconcile_ambiguous": {
+        "en": "The provider match is not unique, so the proposal stays unsettled.",
+        "ja": "provider の照合結果が一意でないため、proposal は未確定のままです。",
+        "qps-ploc": "⟦Ŧħė ṗřőṽïḓėř ɱȧŧƈħ ïş ñőŧ ůñïɋůė, şő ŧħė ṗřőṗőşȧŀ şŧȧẏş ůñşėŧŧŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "action_ocr_need_record": {
+        "en": "OCR works on attachments of a saved record. Save first.",
+        "ja": "OCR は保存済み record の添付を対象にします。先に保存してください。",
+        "qps-ploc": "⟦ŐƇŘ ẇőřķş őñ ȧŧŧȧƈħɱėñŧş őƒ ȧ şȧṽėḓ řėƈőřḓ. Şȧṽė ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "action_ocr_need_artifact": {
+        "en": "Enter the artifact ID.",
+        "ja": "artifact ID を入力してください。",
+        "qps-ploc": "⟦Ėñŧėř ŧħė ȧřŧïƒȧƈŧ ÏḒ. ŀőřėɱ ï⟧"
+      },
+      "action_ocr_artifact_missing": {
+        "en": "That artifact ID is not in this record.",
+        "ja": "指定された artifact ID はこの record にありません。",
+        "qps-ploc": "⟦Ŧħȧŧ ȧřŧïƒȧƈŧ ÏḒ ïş ñőŧ ïñ ŧħïş řėƈőřḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "action_ocr_artifact_unreadable": {
+        "en": "Could not read the attachment artifact safely.",
+        "ja": "添付 artifact を安全に読み込めませんでした。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėȧḓ ŧħė ȧŧŧȧƈħɱėñŧ ȧřŧïƒȧƈŧ şȧƒėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "action_ocr_done": {
+        "en": "OCR of the scoped artifact finished.",
+        "ja": "scoped artifact の OCR が完了しました。",
+        "qps-ploc": "⟦ŐƇŘ őƒ ŧħė şƈőṗėḓ ȧřŧïƒȧƈŧ ƒïñïşħėḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "action_knowledge_need_record": {
+        "en": "Knowledge candidates are grounded in a saved handoff. Save first.",
+        "ja": "知識候補は保存済み handoff を根拠に作成します。先に保存してください。",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ƈȧñḓïḓȧŧėş ȧřė ɠřőůñḓėḓ ïñ ȧ şȧṽėḓ ħȧñḓőƒƒ. Şȧṽė ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "action_knowledge_need_summary": {
+        "en": "Enter the candidate summary.",
+        "ja": "候補の要約を入力してください。",
+        "qps-ploc": "⟦Ėñŧėř ŧħė ƈȧñḓïḓȧŧė şůɱɱȧřẏ. ŀőřėɱ ïṗş⟧"
+      },
+      "action_knowledge_done": {
+        "en": "Created a knowledge candidate for human review.",
+        "ja": "human review 用の知識候補を作成しました。",
+        "qps-ploc": "⟦Ƈřėȧŧėḓ ȧ ķñőẇŀėḓɠė ƈȧñḓïḓȧŧė ƒőř ħůɱȧñ řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "action_clipboard_unreadable": {
+        "en": "Cannot read the clipboard. Check the permissions and OS settings.",
+        "ja": "クリップボードを読み込めません。権限と OS 設定を確認してください。",
+        "qps-ploc": "⟦Ƈȧññőŧ řėȧḓ ŧħė ƈŀïṗƀőȧřḓ. Ƈħėƈķ ŧħė ṗėřɱïşşïőñş ȧñḓ ŐŞ şėŧŧïñɠş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "action_clipboard_done": {
+        "en": "Loaded the clipboard into the draft.",
+        "ja": "クリップボードを下書きへ読み込みました。",
+        "qps-ploc": "⟦Ŀőȧḓėḓ ŧħė ƈŀïṗƀőȧřḓ ïñŧő ŧħė ḓřȧƒŧ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "action_daily_scope_required": {
+        "en": "Working memory can be loaded only in a tenant-bound personal scope.",
+        "ja": "working-memory は tenant-bound personal scope でのみ読み込めます。",
+        "qps-ploc": "⟦Ẇőřķïñɠ ɱėɱőřẏ ƈȧñ ƀė ŀőȧḓėḓ őñŀẏ ïñ ȧ ŧėñȧñŧ-ƀőůñḓ ṗėřşőñȧŀ şƈőṗė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "action_daily_unbound": {
+        "en": "Working memory has no tenant binding yet. Set KYBERION_WORKING_MEMORY_ROOT to the managed root.",
+        "ja": "working-memory の tenant binding が未設定です。KYBERION_WORKING_MEMORY_ROOT に管理 root を設定してください。",
+        "qps-ploc": "⟦Ẇőřķïñɠ ɱėɱőřẏ ħȧş ñő ŧėñȧñŧ ƀïñḓïñɠ ẏėŧ. Şėŧ ĶẎɃĖŘÏŐÑ_ẆŐŘĶÏÑƓ_ⱮĖⱮŐŘẎ_ŘŐŐŦ ŧő ŧħė ɱȧñȧɠėḓ řőőŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "action_daily_done": {
+        "en": "Loaded the tenant-bound working memory into the draft.",
+        "ja": "tenant-bound working-memory を下書きへ読み込みました。",
+        "qps-ploc": "⟦Ŀőȧḓėḓ ŧħė ŧėñȧñŧ-ƀőůñḓ ẇőřķïñɠ ɱėɱőřẏ ïñŧő ŧħė ḓřȧƒŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "action_busy": {
+        "en": "The same action is already running. Try again when it finishes.",
+        "ja": "同じ操作が実行中です。完了してから再度お試しください。",
+        "qps-ploc": "⟦Ŧħė şȧɱė ȧƈŧïőñ ïş ȧŀřėȧḓẏ řůññïñɠ. Ŧřẏ ȧɠȧïñ ẇħėñ ïŧ ƒïñïşħėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "availability_screenshot_configured": {
+        "en": "The configured PNG can be loaded",
+        "ja": "設定済み PNG を取り込めます",
+        "qps-ploc": "⟦Ŧħė ƈőñƒïɠůřėḓ ṖÑƓ ƈȧñ ƀė ŀőȧḓėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "availability_screenshot_permission": {
+        "en": "macOS screen-recording permission is checked on click",
+        "ja": "クリック時に macOS の画面収録権限を確認します",
+        "qps-ploc": "⟦ɱȧƈŐŞ şƈřėėñ-řėƈőřḓïñɠ ṗėřɱïşşïőñ ïş ƈħėƈķėḓ őñ ƈŀïƈķ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "availability_screenshot_unsupported": {
+        "en": "Screen capture is not supported on this OS",
+        "ja": "この OS の画面キャプチャは未対応です",
+        "qps-ploc": "⟦Şƈřėėñ ƈȧṗŧůřė ïş ñőŧ şůṗṗőřŧėḓ őñ ŧħïş ŐŞ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "availability_clipboard_permission": {
+        "en": "Reads the OS clipboard on click",
+        "ja": "クリック時に OS クリップボードを読みます",
+        "qps-ploc": "⟦Řėȧḓş ŧħė ŐŞ ƈŀïṗƀőȧřḓ őñ ƈŀïƈķ ŀőřėɱ ïṗşů⟧"
+      },
+      "availability_clipboard_unsupported": {
+        "en": "Clipboard reading is not supported on this OS",
+        "ja": "この OS のクリップボード読み込みは未対応です",
+        "qps-ploc": "⟦Ƈŀïṗƀőȧřḓ řėȧḓïñɠ ïş ñőŧ şůṗṗőřŧėḓ őñ ŧħïş ŐŞ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "availability_stt_ready": {
+        "en": "Speech-to-text: {name}",
+        "ja": "speech-to-text: {name}",
+        "qps-ploc": "⟦Şṗėėƈħ-ŧő-ŧėẋŧ: {name} ŀőřėɱ ï⟧"
+      },
+      "availability_stt_unavailable": {
+        "en": "The speech-to-text bridge is unavailable",
+        "ja": "speech-to-text bridge が利用できません",
+        "qps-ploc": "⟦Ŧħė şṗėėƈħ-ŧő-ŧėẋŧ ƀřïḓɠė ïş ůñȧṽȧïŀȧƀŀė ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "availability_ready": {
+        "en": "Available",
+        "ja": "利用可能",
+        "qps-ploc": "⟦Ȧṽȧïŀȧƀŀė ŀőř⟧"
+      },
+      "availability_host_provided": {
+        "en": "Provided by the host",
+        "ja": "ホストが提供する操作",
+        "qps-ploc": "⟦Ṗřőṽïḓėḓ ƀẏ ŧħė ħőşŧ ŀőřėɱ ⟧"
+      },
+      "error_capture_busy": {
+        "en": "This pad is already saving as much as it can. Wait for it to finish.",
+        "ja": "同じ pad の保存処理が上限に達しています。完了を待ってください。",
+        "qps-ploc": "⟦Ŧħïş ṗȧḓ ïş ȧŀřėȧḓẏ şȧṽïñɠ ȧş ɱůƈħ ȧş ïŧ ƈȧñ. Ẇȧïŧ ƒőř ïŧ ŧő ƒïñïşħ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "error_storage_or_provider": {
+        "en": "The operation could not be completed. Check the settings and permissions.",
+        "ja": "操作を完了できませんでした。設定と権限を確認してください。",
+        "qps-ploc": "⟦Ŧħė őṗėřȧŧïőñ ƈőůŀḓ ñőŧ ƀė ƈőɱṗŀėŧėḓ. Ƈħėƈķ ŧħė şėŧŧïñɠş ȧñḓ ṗėřɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "error_request_failed": {
+        "en": "The operation could not be completed.",
+        "ja": "操作を完了できませんでした。",
+        "qps-ploc": "⟦Ŧħė őṗėřȧŧïőñ ƈőůŀḓ ñőŧ ƀė ƈőɱṗŀėŧėḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "nav_label": {
+        "en": "Pads",
+        "ja": "パッド",
+        "qps-ploc": "⟦Ṗȧḓş ŀőř⟧"
+      },
+      "scope_tenant": {
+        "en": "Tenant: {tenant}",
+        "ja": "テナント: {tenant}",
+        "qps-ploc": "⟦Ŧėñȧñŧ: {tenant} ŀőřėɱ⟧"
+      },
+      "scope_tier": {
+        "en": "Tier: {tier}",
+        "ja": "tier: {tier}",
+        "qps-ploc": "⟦Ŧïėř: {tier} ŀőř⟧"
+      },
+      "scope_viewer": {
+        "en": "Viewer: {viewer}",
+        "ja": "閲覧者: {viewer}",
+        "qps-ploc": "⟦Ṽïėẇėř: {viewer} ŀőřėɱ⟧"
+      },
+      "tier_label": {
+        "en": "Save to tier",
+        "ja": "保存する tier",
+        "qps-ploc": "⟦Şȧṽė ŧő ŧïėř ŀőř⟧"
+      },
+      "tier_personal": {
+        "en": "personal · Personal",
+        "ja": "personal · 個人",
+        "qps-ploc": "⟦ṗėřşőñȧŀ · Ṗėřşőñȧŀ ŀőřėɱ ⟧"
+      },
+      "tier_confidential": {
+        "en": "confidential · Shared in the tenant",
+        "ja": "confidential · テナント共有",
+        "qps-ploc": "⟦ƈőñƒïḓėñŧïȧŀ · Şħȧřėḓ ïñ ŧħė ŧėñȧñŧ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "tier_public": {
+        "en": "public · Public",
+        "ja": "public · 公開",
+        "qps-ploc": "⟦ṗůƀŀïƈ · Ṗůƀŀïƈ ŀőřė⟧"
+      },
+      "actions_label": {
+        "en": "Pad actions",
+        "ja": "pad の操作",
+        "qps-ploc": "⟦Ṗȧḓ ȧƈŧïőñş ŀőř⟧"
+      },
+      "title_label": {
+        "en": "Title",
+        "ja": "タイトル",
+        "qps-ploc": "⟦Ŧïŧŀė ŀőř⟧"
+      },
+      "title_placeholder": {
+        "en": "A name that is easy to find later",
+        "ja": "あとで見つけやすい名前",
+        "qps-ploc": "⟦Ȧ ñȧɱė ŧħȧŧ ïş ėȧşẏ ŧő ƒïñḓ ŀȧŧėř ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "body_label": {
+        "en": "Content",
+        "ja": "内容",
+        "qps-ploc": "⟦Ƈőñŧėñŧ ŀőř⟧"
+      },
+      "body_label_composed": {
+        "en": "Saved content (generated)",
+        "ja": "保存される内容（自動生成）",
+        "qps-ploc": "⟦Şȧṽėḓ ƈőñŧėñŧ (ɠėñėřȧŧėḓ) ŀőřėɱ ïṗ⟧"
+      },
+      "body_placeholder": {
+        "en": "Write your record here",
+        "ja": "ここに記録します",
+        "qps-ploc": "⟦Ẇřïŧė ẏőůř řėƈőřḓ ħėřė ŀőřėɱ ï⟧"
+      },
+      "body_placeholder_composed": {
+        "en": "The saved content is generated from the fields above",
+        "ja": "入力欄から保存内容を生成します",
+        "qps-ploc": "⟦Ŧħė şȧṽėḓ ƈőñŧėñŧ ïş ɠėñėřȧŧėḓ ƒřőɱ ŧħė ƒïėŀḓş ȧƀőṽė ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "save": {
+        "en": "Save",
+        "ja": "保存する",
+        "qps-ploc": "⟦Şȧṽė ŀőř⟧"
+      },
+      "clear_draft": {
+        "en": "Clear draft",
+        "ja": "下書きを消去",
+        "qps-ploc": "⟦Ƈŀėȧř ḓřȧƒŧ ŀőř⟧"
+      },
+      "storage_note": {
+        "en": "Stored in: {label} · physical paths are never shown",
+        "ja": "保存先: {label} · 物理パスは表示しません",
+        "qps-ploc": "⟦Şŧőřėḓ ïñ: {label} · ṗħẏşïƈȧŀ ṗȧŧħş ȧřė ñėṽėř şħőẇñ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "history_title": {
+        "en": "History",
+        "ja": "履歴",
+        "qps-ploc": "⟦Ħïşŧőřẏ ŀőř⟧"
+      },
+      "history_refresh": {
+        "en": "Refresh",
+        "ja": "更新",
+        "qps-ploc": "⟦Řėƒřėşħ ŀőř⟧"
+      },
+      "history_more": {
+        "en": "Load more",
+        "ja": "さらに読み込む",
+        "qps-ploc": "⟦Ŀőȧḓ ɱőřė ŀőř⟧"
+      },
+      "history_empty": {
+        "en": "No saved records for this pad yet.",
+        "ja": "この pad の保存履歴はまだありません。",
+        "qps-ploc": "⟦Ñő şȧṽėḓ řėƈőřḓş ƒőř ŧħïş ṗȧḓ ẏėŧ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "history_empty_body": {
+        "en": "Saved records appear here. Open one to copy it into the editor.",
+        "ja": "保存した記録がここに表示されます。開くとエディタへコピーして編集できます。",
+        "qps-ploc": "⟦Şȧṽėḓ řėƈőřḓş ȧṗṗėȧř ħėřė. Őṗėñ őñė ŧő ƈőṗẏ ïŧ ïñŧő ŧħė ėḓïŧőř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "history_saved_record": {
+        "en": "Saved record",
+        "ja": "保存済み記録",
+        "qps-ploc": "⟦Şȧṽėḓ řėƈőřḓ ŀőř⟧"
+      },
+      "history_attachments": {
+        "en": "Attachments: {count}",
+        "ja": "添付 {count} 件",
+        "qps-ploc": "⟦Ȧŧŧȧƈħɱėñŧş: {count} ŀőřėɱ ⟧"
+      },
+      "result_title": {
+        "en": "Action result",
+        "ja": "操作結果",
+        "qps-ploc": "⟦Ȧƈŧïőñ řėşůŀŧ ŀőřė⟧"
+      },
+      "record_in_browser": {
+        "en": "Record in the browser",
+        "ja": "ブラウザで録音",
+        "qps-ploc": "⟦Řėƈőřḓ ïñ ŧħė ƀřőẇşėř ŀőřėɱ ⟧"
+      },
+      "action_checking": {
+        "en": "Checking…",
+        "ja": "確認中…",
+        "qps-ploc": "⟦Ƈħėƈķïñɠ… ŀőř⟧"
+      },
+      "action_check_on_click": {
+        "en": "Availability is checked when you click",
+        "ja": "クリック時に利用可否を確認します",
+        "qps-ploc": "⟦Ȧṽȧïŀȧƀïŀïŧẏ ïş ƈħėƈķėḓ ẇħėñ ẏőů ƈŀïƈķ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "request_failed": {
+        "en": "Request failed",
+        "ja": "リクエストに失敗しました",
+        "qps-ploc": "⟦Řėɋůėşŧ ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "status_wait_busy": {
+        "en": "Wait until the scope switch, save, or attachment loading finishes.",
+        "ja": "scope 切替、保存、または添付の読み込みが完了してから操作してください",
+        "qps-ploc": "⟦Ẇȧïŧ ůñŧïŀ ŧħė şƈőṗė şẇïŧƈħ, şȧṽė, őř ȧŧŧȧƈħɱėñŧ ŀőȧḓïñɠ ƒïñïşħėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "status_wait_history": {
+        "en": "Wait until the scope switch, save, or attachment loading finishes before opening history.",
+        "ja": "scope 切替、保存、または添付の読み込みが完了してから履歴を開いてください",
+        "qps-ploc": "⟦Ẇȧïŧ ůñŧïŀ ŧħė şƈőṗė şẇïŧƈħ, şȧṽė, őř ȧŧŧȧƈħɱėñŧ ŀőȧḓïñɠ ƒïñïşħėş ƀėƒőřė őṗėñïñɠ ħïşŧőřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "status_wait_switch": {
+        "en": "Wait for the scope switch or the running action to finish.",
+        "ja": "scope 切替または操作の完了を待ってください",
+        "qps-ploc": "⟦Ẇȧïŧ ƒőř ŧħė şƈőṗė şẇïŧƈħ őř ŧħė řůññïñɠ ȧƈŧïőñ ŧő ƒïñïşħ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "status_action_running": {
+        "en": "{label}…",
+        "ja": "{label}…",
+        "qps-ploc": "⟦{label}… ŀőř⟧"
+      },
+      "status_action_unavailable": {
+        "en": "This action is unavailable",
+        "ja": "この操作は利用できません",
+        "qps-ploc": "⟦Ŧħïş ȧƈŧïőñ ïş ůñȧṽȧïŀȧƀŀė ŀőřėɱ ïṗ⟧"
+      },
+      "status_action_done": {
+        "en": "The action finished",
+        "ja": "操作が完了しました",
+        "qps-ploc": "⟦Ŧħė ȧƈŧïőñ ƒïñïşħėḓ ŀőřėɱ ⟧"
+      },
+      "status_action_failed": {
+        "en": "The action failed: {error}",
+        "ja": "操作できません: {error}",
+        "qps-ploc": "⟦Ŧħė ȧƈŧïőñ ƒȧïŀėḓ: {error} ŀőřėɱ ïṗ⟧"
+      },
+      "status_attachment_read_failed": {
+        "en": "Could not read the attachment",
+        "ja": "添付の読み込みに失敗しました",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėȧḓ ŧħė ȧŧŧȧƈħɱėñŧ ŀőřėɱ ïṗş⟧"
+      },
+      "status_attachment_load_failed": {
+        "en": "Cannot load the attachment: {error}",
+        "ja": "添付を読み込めません: {error}",
+        "qps-ploc": "⟦Ƈȧññőŧ ŀőȧḓ ŧħė ȧŧŧȧƈħɱėñŧ: {error} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "status_loading_attachments": {
+        "en": "Loading attachments…",
+        "ja": "添付を読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ȧŧŧȧƈħɱėñŧş… ŀőřėɱ ⟧"
+      },
+      "status_need_content": {
+        "en": "Enter some content",
+        "ja": "内容を入力してください",
+        "qps-ploc": "⟦Ėñŧėř şőɱė ƈőñŧėñŧ ŀőřėɱ⟧"
+      },
+      "status_saving": {
+        "en": "Saving…",
+        "ja": "保存中…",
+        "qps-ploc": "⟦Şȧṽïñɠ… ŀőř⟧"
+      },
+      "status_saved": {
+        "en": "Saved · {id}",
+        "ja": "保存しました · {id}",
+        "qps-ploc": "⟦Şȧṽėḓ · {id} ŀőř⟧"
+      },
+      "status_saved_kept": {
+        "en": "Saved (your current draft is kept) · {id}",
+        "ja": "保存しました（現在の下書きは保持） · {id}",
+        "qps-ploc": "⟦Şȧṽėḓ (ẏőůř ƈůřřėñŧ ḓřȧƒŧ ïş ķėṗŧ) · {id} ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "status_save_failed": {
+        "en": "Cannot save: {error}",
+        "ja": "保存できません: {error}",
+        "qps-ploc": "⟦Ƈȧññőŧ şȧṽė: {error} ŀőřėɱ ⟧"
+      },
+      "status_cleared": {
+        "en": "Draft cleared",
+        "ja": "下書きを消去しました",
+        "qps-ploc": "⟦Ḓřȧƒŧ ƈŀėȧřėḓ ŀőřė⟧"
+      },
+      "status_restored": {
+        "en": "Copied from history — you can edit it",
+        "ja": "履歴をコピーして編集できます",
+        "qps-ploc": "⟦Ƈőṗïėḓ ƒřőɱ ħïşŧőřẏ — ẏőů ƈȧñ ėḓïŧ ïŧ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "status_recording_captured": {
+        "en": "The recording is in the draft. Check it before saving.",
+        "ja": "録音を下書きへ取り込みました。保存前に内容を確認してください",
+        "qps-ploc": "⟦Ŧħė řėƈőřḓïñɠ ïş ïñ ŧħė ḓřȧƒŧ. Ƈħėƈķ ïŧ ƀėƒőřė şȧṽïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "status_recording_read_failed": {
+        "en": "Could not read the recording",
+        "ja": "録音データの読み込みに失敗しました",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėȧḓ ŧħė řėƈőřḓïñɠ ŀőřėɱ ïṗş⟧"
+      },
+      "status_drawing_export_failed": {
+        "en": "Could not export the drawing",
+        "ja": "描画を書き出せませんでした",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ėẋṗőřŧ ŧħė ḓřȧẇïñɠ ŀőřėɱ ïṗş⟧"
+      },
+      "dialog_unsaved_title": {
+        "en": "Unsaved changes",
+        "ja": "未保存の変更",
+        "qps-ploc": "⟦Ůñşȧṽėḓ ƈħȧñɠėş ŀőřė⟧"
+      },
+      "dialog_unsaved_message": {
+        "en": "This draft has unsaved changes. Save it, discard it, or keep editing.",
+        "ja": "未保存の内容があります。保存 / 破棄 / キャンセルを選んでください。",
+        "qps-ploc": "⟦Ŧħïş ḓřȧƒŧ ħȧş ůñşȧṽėḓ ƈħȧñɠėş. Şȧṽė ïŧ, ḓïşƈȧřḓ ïŧ, őř ķėėṗ ėḓïŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "dialog_save": {
+        "en": "Save",
+        "ja": "保存",
+        "qps-ploc": "⟦Şȧṽė ŀőř⟧"
+      },
+      "dialog_discard": {
+        "en": "Discard",
+        "ja": "破棄",
+        "qps-ploc": "⟦Ḓïşƈȧřḓ ŀőř⟧"
+      },
+      "dialog_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      }
+    },
     "report_review": {
       "bar_title": {
         "en": "Review and edit layer (local only; no external upload)",
@@ -12037,16 +13406,6 @@
         "ja": "この欄はOSのディクテーション（端末内・外部送信なし）でそのまま話せます。ブラウザの音声認識は機種により音声が提供元のクラウドへ送信される場合があります。機微な内容はOSディクテーション推奨。",
         "qps-ploc": "⟦ŐŞ ḓïƈŧȧŧïőñ ïş ṗřőƈėşşėḓ őñ-ḓėṽïƈė. Ƀřőẇşėř şṗėėƈħ řėƈőɠñïŧïőñ ɱȧẏ şėñḓ ȧůḓïő ŧő ŧħė ƀřőẇşėř ṗřőṽïḓėř'ş ƈŀőůḓ; ůşė ŐŞ ḓïƈŧȧŧïőñ ƒőř şėñşïŧïṽė ƈőñŧėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
       },
-      "voice": {
-        "en": "Voice",
-        "ja": "音声",
-        "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
-      },
-      "voice_stop": {
-        "en": "Stop",
-        "ja": "停止",
-        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
-      },
       "review_available": {
         "en": "Ready for review",
         "ja": "レビュー可",
@@ -12086,26 +13445,6 @@
         "en": "Comment mode off",
         "ja": "コメント オフ",
         "qps-ploc": "⟦Ƈőɱɱėñŧ ɱőḓė őƒƒ ŀőřėɱ⟧"
-      },
-      "voice_stopped": {
-        "en": "Voice input stopped",
-        "ja": "音声入力を停止",
-        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ şŧőṗṗėḓ ŀőřėɱ ⟧"
-      },
-      "voice_error": {
-        "en": "Speech recognition error: {error}",
-        "ja": "音声認識エラー: {error}",
-        "qps-ploc": "⟦Şṗėėƈħ řėƈőɠñïŧïőñ ėřřőř: {error} ŀőřėɱ ïṗşůɱ⟧"
-      },
-      "voice_started": {
-        "en": "Voice input active — use OS dictation for sensitive content",
-        "ja": "音声入力中…（機微な内容はOSディクテーション推奨）",
-        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ ȧƈŧïṽė — ůşė ŐŞ ḓïƈŧȧŧïőñ ƒőř şėñşïŧïṽė ƈőñŧėñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
-      },
-      "voice_start_failed": {
-        "en": "Could not start voice input: {error}",
-        "ja": "音声を開始できません: {error}",
-        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şŧȧřŧ ṽőïƈė ïñṗůŧ: {error} ŀőřėɱ ïṗşůɱ ⟧"
       },
       "no_comments": {
         "en": "No comments",
@@ -12181,6 +13520,153 @@
         "en": "Comment",
         "ja": "コメント",
         "qps-ploc": "⟦Ƈőɱɱėñŧ ŀőř⟧"
+      },
+      "toolbar_label": {
+        "en": "Review tools",
+        "ja": "レビューツール",
+        "qps-ploc": "⟦Řėṽïėẇ ŧőőŀş ŀőř⟧"
+      },
+      "comment_item_meta": {
+        "en": "#{index} · “{anchor}”",
+        "ja": "#{index} ・「{anchor}」",
+        "qps-ploc": "⟦#{index} · “{anchor}” ŀőřėɱ ⟧"
+      },
+      "comment_dialog_title": {
+        "en": "Add a comment",
+        "ja": "コメントを追加",
+        "qps-ploc": "⟦Ȧḓḓ ȧ ƈőɱɱėñŧ ŀőřė⟧"
+      },
+      "comment_dialog_message": {
+        "en": "On: “{anchor}”",
+        "ja": "対象: 「{anchor}」",
+        "qps-ploc": "⟦Őñ: “{anchor}” ŀőřė⟧"
+      },
+      "comment_voice_label": {
+        "en": "Dictate the comment",
+        "ja": "コメントを音声で入力",
+        "qps-ploc": "⟦Ḓïƈŧȧŧė ŧħė ƈőɱɱėñŧ ŀőřėɱ ⟧"
+      },
+      "restore_title": {
+        "en": "Restore the previous edit?",
+        "ja": "前回の編集を復元しますか？",
+        "qps-ploc": "⟦Řėşŧőřė ŧħė ṗřėṽïőůş ėḓïŧ? ŀőřėɱ ïṗ⟧"
+      },
+      "discard_title": {
+        "en": "Discard local changes?",
+        "ja": "ローカルの変更を破棄しますか？",
+        "qps-ploc": "⟦Ḓïşƈȧřḓ ŀőƈȧŀ ƈħȧñɠėş? ŀőřėɱ ï⟧"
+      },
+      "server_usage_hint": {
+        "en": "Open the URL, review (edit / comment / voice), then Save to write back. Ctrl-C to stop.",
+        "ja": "URL を開いてレビュー（編集 / コメント / 音声）し、「保存」でファイルへ書き戻します。Ctrl-C で停止。",
+        "qps-ploc": "⟦Őṗėñ ŧħė ŮŘĿ, řėṽïėẇ (ėḓïŧ / ƈőɱɱėñŧ / ṽőïƈė), ŧħėñ Şȧṽė ŧő ẇřïŧė ƀȧƈķ. Ƈŧřŀ-Ƈ ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      }
+    },
+    "screenshot_annotate": {
+      "title": {
+        "en": "Screenshot Annotate",
+        "ja": "スクリーンショット注釈",
+        "qps-ploc": "⟦Şƈřėėñşħőŧ Ȧññőŧȧŧė ŀőřėɱ ⟧"
+      },
+      "subtitle": {
+        "en": "Paste or drop an image, annotate it, and hand off PNG + instruction to Kyberion.",
+        "ja": "画像を貼り付け／ドロップして注釈を描き、PNG + 指示を Kyberion に渡します。",
+        "qps-ploc": "⟦Ṗȧşŧė őř ḓřőṗ ȧñ ïɱȧɠė, ȧññőŧȧŧė ïŧ, ȧñḓ ħȧñḓ őƒƒ ṖÑƓ + ïñşŧřůƈŧïőñ ŧő Ķẏƀėřïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "toolbar_label": {
+        "en": "Screenshot actions",
+        "ja": "スクリーンショットの操作",
+        "qps-ploc": "⟦Şƈřėėñşħőŧ ȧƈŧïőñş ŀőřėɱ⟧"
+      },
+      "board_label": {
+        "en": "Annotation board",
+        "ja": "注釈ボード",
+        "qps-ploc": "⟦Ȧññőŧȧŧïőñ ƀőȧřḓ ŀőřėɱ⟧"
+      },
+      "load_image": {
+        "en": "Load image",
+        "ja": "画像を読み込む",
+        "qps-ploc": "⟦Ŀőȧḓ ïɱȧɠė ŀőř⟧"
+      },
+      "os_capture": {
+        "en": "Try OS capture",
+        "ja": "OSキャプチャ試行",
+        "qps-ploc": "⟦Ŧřẏ ŐŞ ƈȧṗŧůřė ŀőřė⟧"
+      },
+      "handoff": {
+        "en": "Hand off to Kyberion",
+        "ja": "Kyberionへ渡す",
+        "qps-ploc": "⟦Ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŀőřėɱ ⟧"
+      },
+      "ready": {
+        "en": "Ready — paste, drop or load an image",
+        "ja": "準備完了 — 画像を貼り付け／ドロップ／読み込んでください",
+        "qps-ploc": "⟦Řėȧḓẏ — ṗȧşŧė, ḓřőṗ őř ŀőȧḓ ȧñ ïɱȧɠė ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "exporting": {
+        "en": "Exporting…",
+        "ja": "書き出し中…",
+        "qps-ploc": "⟦Ėẋṗőřŧïñɠ… ŀőř⟧"
+      },
+      "exported_detail": {
+        "en": "Exported — {path}",
+        "ja": "書き出し完了 — {path}",
+        "qps-ploc": "⟦Ėẋṗőřŧėḓ — {path} ŀőřėɱ⟧"
+      },
+      "export_failed_detail": {
+        "en": "Export failed: {error}",
+        "ja": "書き出し失敗: {error}",
+        "qps-ploc": "⟦Ėẋṗőřŧ ƒȧïŀėḓ: {error} ŀőřėɱ ï⟧"
+      },
+      "image_loaded": {
+        "en": "Image loaded",
+        "ja": "画像を読み込みました",
+        "qps-ploc": "⟦Ïɱȧɠė ŀőȧḓėḓ ŀőř⟧"
+      },
+      "image_needed": {
+        "en": "Load an image first",
+        "ja": "先に画像を読み込んでください",
+        "qps-ploc": "⟦Ŀőȧḓ ȧñ ïɱȧɠė ƒïřşŧ ŀőřėɱ ⟧"
+      },
+      "capture_ok": {
+        "en": "OS capture loaded",
+        "ja": "OSキャプチャ完了",
+        "qps-ploc": "⟦ŐŞ ƈȧṗŧůřė ŀőȧḓėḓ ŀőřėɱ⟧"
+      },
+      "capture_failed_detail": {
+        "en": "OS capture unavailable — paste instead: {error}",
+        "ja": "OSキャプチャ不可 — 貼り付けてください: {error}",
+        "qps-ploc": "⟦ŐŞ ƈȧṗŧůřė ůñȧṽȧïŀȧƀŀė — ṗȧşŧė ïñşŧėȧḓ: {error} ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "instruction": {
+        "en": "Instruction for Kyberion",
+        "ja": "Kyberion への指示",
+        "qps-ploc": "⟦Ïñşŧřůƈŧïőñ ƒőř Ķẏƀėřïőñ ŀőřėɱ ï⟧"
+      },
+      "instruction_placeholder": {
+        "en": "How to process this annotated image",
+        "ja": "この注釈付き画像をどう処理するか",
+        "qps-ploc": "⟦Ħőẇ ŧő ṗřőƈėşş ŧħïş ȧññőŧȧŧėḓ ïɱȧɠė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "voice_label": {
+        "en": "Dictate the instruction",
+        "ja": "指示を音声で入力",
+        "qps-ploc": "⟦Ḓïƈŧȧŧė ŧħė ïñşŧřůƈŧïőñ ŀőřėɱ ï⟧"
+      },
+      "dictation_note": {
+        "en": "Prefer paste for sensitive screens. Browser speech recognition may send audio to the cloud.",
+        "ja": "機微な画面は貼り付け推奨。ブラウザの音声認識はクラウドへ送信される場合があります。",
+        "qps-ploc": "⟦Ṗřėƒėř ṗȧşŧė ƒőř şėñşïŧïṽė şƈřėėñş. Ƀřőẇşėř şṗėėƈħ řėƈőɠñïŧïőñ ɱȧẏ şėñḓ ȧůḓïő ŧő ŧħė ƈŀőůḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "out_path": {
+        "en": "Output: {path}",
+        "ja": "出力先: {path}",
+        "qps-ploc": "⟦Őůŧṗůŧ: {path} ŀőřė⟧"
+      },
+      "server_usage_hint": {
+        "en": "Prefer paste/drop; OS capture is best-effort on darwin. Ctrl-C to stop.",
+        "ja": "貼り付け／ドロップ推奨。OSキャプチャは darwin でのベストエフォートです。Ctrl-C で停止。",
+        "qps-ploc": "⟦Ṗřėƒėř ṗȧşŧė/ḓřőṗ; ŐŞ ƈȧṗŧůřė ïş ƀėşŧ-ėƒƒőřŧ őñ ḓȧřẇïñ. Ƈŧřŀ-Ƈ ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       }
     },
     "sketch_input": {
@@ -12193,61 +13679,6 @@
         "en": "Draw diagrams and text, export PNG, and hand off to Kyberion",
         "ja": "図とテキストを描いて PNG を書き出し、Kyberion へ渡します",
         "qps-ploc": "⟦Ḓřȧẇ ḓïȧɠřȧɱş ȧñḓ ŧėẋŧ, ėẋṗőřŧ ṖÑƓ, ȧñḓ ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
-      },
-      "pen": {
-        "en": "Pen",
-        "ja": "ペン",
-        "qps-ploc": "⟦Ṗėñ ŀőř⟧"
-      },
-      "rect": {
-        "en": "Rect",
-        "ja": "矩形",
-        "qps-ploc": "⟦Řėƈŧ ŀőř⟧"
-      },
-      "ellipse": {
-        "en": "Ellipse",
-        "ja": "楕円",
-        "qps-ploc": "⟦Ėŀŀïṗşė ŀőř⟧"
-      },
-      "line": {
-        "en": "Line",
-        "ja": "直線",
-        "qps-ploc": "⟦Ŀïñė ŀőř⟧"
-      },
-      "arrow": {
-        "en": "Arrow",
-        "ja": "矢印",
-        "qps-ploc": "⟦Ȧřřőẇ ŀőř⟧"
-      },
-      "text": {
-        "en": "Text",
-        "ja": "テキスト",
-        "qps-ploc": "⟦Ŧėẋŧ ŀőř⟧"
-      },
-      "eraser": {
-        "en": "Eraser",
-        "ja": "消しゴム",
-        "qps-ploc": "⟦Ėřȧşėř ŀőř⟧"
-      },
-      "undo": {
-        "en": "Undo",
-        "ja": "元に戻す",
-        "qps-ploc": "⟦Ůñḓő ŀőř⟧"
-      },
-      "clear": {
-        "en": "Clear",
-        "ja": "消去",
-        "qps-ploc": "⟦Ƈŀėȧř ŀőř⟧"
-      },
-      "color": {
-        "en": "Color",
-        "ja": "色",
-        "qps-ploc": "⟦Ƈőŀőř ŀőř⟧"
-      },
-      "width": {
-        "en": "Width",
-        "ja": "太さ",
-        "qps-ploc": "⟦Ẇïḓŧħ ŀőř⟧"
       },
       "instruction": {
         "en": "Instruction for Kyberion",
@@ -12264,21 +13695,6 @@
         "ja": "指示欄はOSディクテーション（端末内）推奨。ブラウザ🎤は機種によりクラウド送信の場合があります。",
         "qps-ploc": "⟦Ṗřėƒėř ŐŞ ḓïƈŧȧŧïőñ (őñ-ḓėṽïƈė) ƒőř ŧħė ïñşŧřůƈŧïőñ. Ƀřőẇşėř 🎤 ɱȧẏ şėñḓ ȧůḓïő ŧő ȧ ƈŀőůḓ ṗřőṽïḓėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       },
-      "voice": {
-        "en": "Voice",
-        "ja": "音声",
-        "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
-      },
-      "voice_stop": {
-        "en": "Stop",
-        "ja": "停止",
-        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
-      },
-      "download": {
-        "en": "Download PNG",
-        "ja": "PNGダウンロード",
-        "qps-ploc": "⟦Ḓőẇñŀőȧḓ ṖÑƓ ŀőř⟧"
-      },
       "handoff": {
         "en": "Hand off to Kyberion",
         "ja": "Kyberionへ渡す",
@@ -12288,6 +13704,143 @@
         "en": "Ready to draw and export",
         "ja": "描画してエクスポートできます",
         "qps-ploc": "⟦Řėȧḓẏ ŧő ḓřȧẇ ȧñḓ ėẋṗőřŧ ŀőřėɱ ï⟧"
+      },
+      "exporting": {
+        "en": "Exporting…",
+        "ja": "書き出し中…",
+        "qps-ploc": "⟦Ėẋṗőřŧïñɠ… ŀőř⟧"
+      },
+      "server_usage_hint": {
+        "en": "Draw, then Hand off to Kyberion to write PNG + handoff.json. Ctrl-C to stop.",
+        "ja": "描画し、「Kyberionへ渡す」で PNG + handoff.json を書き出します。Ctrl-C で停止。",
+        "qps-ploc": "⟦Ḓřȧẇ, ŧħėñ Ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŧő ẇřïŧė ṖÑƓ + ħȧñḓőƒƒ.ĵşőñ. Ƈŧřŀ-Ƈ ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "toolbar_label": {
+        "en": "Sketch actions",
+        "ja": "スケッチの操作",
+        "qps-ploc": "⟦Şķėŧƈħ ȧƈŧïőñş ŀőřė⟧"
+      },
+      "board_label": {
+        "en": "Sketch board",
+        "ja": "スケッチボード",
+        "qps-ploc": "⟦Şķėŧƈħ ƀőȧřḓ ŀőř⟧"
+      },
+      "voice_label": {
+        "en": "Dictate the instruction",
+        "ja": "指示を音声で入力",
+        "qps-ploc": "⟦Ḓïƈŧȧŧė ŧħė ïñşŧřůƈŧïőñ ŀőřėɱ ï⟧"
+      },
+      "exported_detail": {
+        "en": "Exported — {detail}",
+        "ja": "書き出し完了 — {detail}",
+        "qps-ploc": "⟦Ėẋṗőřŧėḓ — {detail} ŀőřėɱ ⟧"
+      },
+      "export_failed_detail": {
+        "en": "Export failed: {error}",
+        "ja": "書き出し失敗: {error}",
+        "qps-ploc": "⟦Ėẋṗőřŧ ƒȧïŀėḓ: {error} ŀőřėɱ ï⟧"
+      },
+      "out_path": {
+        "en": "Output: {path}",
+        "ja": "出力先: {path}",
+        "qps-ploc": "⟦Őůŧṗůŧ: {path} ŀőřė⟧"
+      }
+    },
+    "memory_capture": {
+      "title": {
+        "en": "Memory Capture",
+        "ja": "メモリキャプチャ",
+        "qps-ploc": "⟦Ɱėɱőřẏ Ƈȧṗŧůřė ŀőřė⟧"
+      },
+      "subtitle": {
+        "en": "Brain-dump notes and hand them to Kyberion. No mission starts automatically.",
+        "ja": "思いつき・メモを書き留めて Kyberion に渡します（mission は自動で起動しません）。",
+        "qps-ploc": "⟦Ƀřȧïñ-ḓůɱṗ ñőŧėş ȧñḓ ħȧñḓ ŧħėɱ ŧő Ķẏƀėřïőñ. Ñő ɱïşşïőñ şŧȧřŧş ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "toolbar_label": {
+        "en": "Memory capture actions",
+        "ja": "メモリキャプチャの操作",
+        "qps-ploc": "⟦Ɱėɱőřẏ ƈȧṗŧůřė ȧƈŧïőñş ŀőřėɱ ï⟧"
+      },
+      "notes": {
+        "en": "Notes",
+        "ja": "メモ",
+        "qps-ploc": "⟦Ñőŧėş ŀőř⟧"
+      },
+      "notes_placeholder": {
+        "en": "Dump thoughts here…",
+        "ja": "自由に書き出す…",
+        "qps-ploc": "⟦Ḓůɱṗ ŧħőůɠħŧş ħėřė… ŀőřėɱ ⟧"
+      },
+      "tags": {
+        "en": "Tags (comma-separated)",
+        "ja": "タグ（カンマ区切り）",
+        "qps-ploc": "⟦Ŧȧɠş (ƈőɱɱȧ-şėṗȧřȧŧėḓ) ŀőřėɱ ï⟧"
+      },
+      "tags_placeholder": {
+        "en": "idea, follow-up",
+        "ja": "アイデア, フォローアップ",
+        "qps-ploc": "⟦ïḓėȧ, ƒőŀŀőẇ-ůṗ ŀőřė⟧"
+      },
+      "target": {
+        "en": "Target",
+        "ja": "宛先",
+        "qps-ploc": "⟦Ŧȧřɠėŧ ŀőř⟧"
+      },
+      "target_memory": {
+        "en": "Memory",
+        "ja": "メモリ",
+        "qps-ploc": "⟦Ɱėɱőřẏ ŀőř⟧"
+      },
+      "target_now": {
+        "en": "Now",
+        "ja": "いま",
+        "qps-ploc": "⟦Ñőẇ ŀőř⟧"
+      },
+      "target_todo": {
+        "en": "TODO",
+        "ja": "TODO",
+        "qps-ploc": "⟦ŦŐḒŐ ŀőř⟧"
+      },
+      "instruction": {
+        "en": "Instruction for Kyberion",
+        "ja": "Kyberion への指示",
+        "qps-ploc": "⟦Ïñşŧřůƈŧïőñ ƒőř Ķẏƀėřïőñ ŀőřėɱ ï⟧"
+      },
+      "instruction_placeholder": {
+        "en": "How to process these notes (optional)",
+        "ja": "このメモをどう処理するか（任意）",
+        "qps-ploc": "⟦Ħőẇ ŧő ṗřőƈėşş ŧħėşė ñőŧėş (őṗŧïőñȧŀ) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "dictation_label": {
+        "en": "Dictate into notes",
+        "ja": "メモに口述",
+        "qps-ploc": "⟦Ḓïƈŧȧŧė ïñŧő ñőŧėş ŀőřėɱ⟧"
+      },
+      "dictation_note": {
+        "en": "Prefer OS dictation for sensitive content (browser speech recognition may leave the device).",
+        "ja": "機微な内容は OS ディクテーションを推奨（ブラウザの音声認識はクラウドへ送信される場合があります）。",
+        "qps-ploc": "⟦Ṗřėƒėř ŐŞ ḓïƈŧȧŧïőñ ƒőř şėñşïŧïṽė ƈőñŧėñŧ (ƀřőẇşėř şṗėėƈħ řėƈőɠñïŧïőñ ɱȧẏ ŀėȧṽė ŧħė ḓėṽïƈė). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "handoff": {
+        "en": "Hand off",
+        "ja": "Kyberionへ渡す",
+        "qps-ploc": "⟦Ħȧñḓ őƒƒ ŀőř⟧"
+      },
+      "restore": {
+        "en": "Restore draft",
+        "ja": "下書き復元",
+        "qps-ploc": "⟦Řėşŧőřė ḓřȧƒŧ ŀőřė⟧"
+      },
+      "clear": {
+        "en": "Clear draft",
+        "ja": "下書き消去",
+        "qps-ploc": "⟦Ƈŀėȧř ḓřȧƒŧ ŀőř⟧"
+      },
+      "ready": {
+        "en": "Ready",
+        "ja": "準備完了",
+        "qps-ploc": "⟦Řėȧḓẏ ŀőř⟧"
       },
       "exporting": {
         "en": "Exporting…",
@@ -12305,44 +13858,847 @@
         "qps-ploc": "⟦Ėẋṗőřŧ ƒȧïŀėḓ ŀőřė⟧"
       },
       "clear_confirm": {
-        "en": "Clear the canvas?",
-        "ja": "キャンバスを消去しますか？",
-        "qps-ploc": "⟦Ƈŀėȧř ŧħė ƈȧñṽȧş? ŀőřėɱ⟧"
+        "en": "Clear the local draft?",
+        "ja": "下書きを消しますか？",
+        "qps-ploc": "⟦Ƈŀėȧř ŧħė ŀőƈȧŀ ḓřȧƒŧ? ŀőřėɱ ï⟧"
       },
-      "text_prompt": {
-        "en": "Enter text",
-        "ja": "テキストを入力",
-        "qps-ploc": "⟦Ėñŧėř ŧėẋŧ ŀőř⟧"
+      "clear_confirm_body": {
+        "en": "Notes, tags and the target are reset and the draft saved on this device is removed.",
+        "ja": "メモ・タグ・宛先をリセットし、この端末に保存した下書きを削除します。",
+        "qps-ploc": "⟦Ñőŧėş, ŧȧɠş ȧñḓ ŧħė ŧȧřɠėŧ ȧřė řėşėŧ ȧñḓ ŧħė ḓřȧƒŧ şȧṽėḓ őñ ŧħïş ḓėṽïƈė ïş řėɱőṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
-      "out_label": {
-        "en": "Output",
-        "ja": "出力先",
-        "qps-ploc": "⟦Őůŧṗůŧ ŀőř⟧"
+      "draft_restored": {
+        "en": "Draft restored",
+        "ja": "下書きを復元しました",
+        "qps-ploc": "⟦Ḓřȧƒŧ řėşŧőřėḓ ŀőřė⟧"
       },
-      "voice_started": {
-        "en": "Listening…",
-        "ja": "音声入力中…",
-        "qps-ploc": "⟦Ŀïşŧėñïñɠ… ŀőř⟧"
+      "draft_cleared": {
+        "en": "Draft cleared",
+        "ja": "下書きを消去しました",
+        "qps-ploc": "⟦Ḓřȧƒŧ ƈŀėȧřėḓ ŀőřė⟧"
       },
-      "voice_stopped": {
-        "en": "Voice stopped",
-        "ja": "音声入力を停止",
-        "qps-ploc": "⟦Ṽőïƈė şŧőṗṗėḓ ŀőřė⟧"
+      "no_draft": {
+        "en": "No saved draft",
+        "ja": "保存された下書きはありません",
+        "qps-ploc": "⟦Ñő şȧṽėḓ ḓřȧƒŧ ŀőřė⟧"
       },
-      "voice_error": {
-        "en": "Voice error",
-        "ja": "音声エラー",
-        "qps-ploc": "⟦Ṽőïƈė ėřřőř ŀőř⟧"
+      "out_path": {
+        "en": "Output: {path}",
+        "ja": "出力先: {path}",
+        "qps-ploc": "⟦Őůŧṗůŧ: {path} ŀőřė⟧"
+      }
+    },
+    "doc_drop": {
+      "title": {
+        "en": "Doc Drop (local only)",
+        "ja": "Doc Drop（ローカルのみ）",
+        "qps-ploc": "⟦Ḓőƈ Ḓřőṗ (ŀőƈȧŀ őñŀẏ) ŀőřėɱ ⟧"
       },
-      "voice_unavailable": {
-        "en": "Speech recognition unavailable (OS dictation still works)",
-        "ja": "このブラウザでは音声認識を使えません（OSディクテーションは可）",
-        "qps-ploc": "⟦Şṗėėƈħ řėƈőɠñïŧïőñ ůñȧṽȧïŀȧƀŀė (ŐŞ ḓïƈŧȧŧïőñ şŧïŀŀ ẇőřķş) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      "subtitle": {
+        "en": "Drop PDFs, images, or text files and hand them off to Kyberion. Nothing is committed to knowledge automatically.",
+        "ja": "PDF・画像・テキストなどをドロップして Kyberion へ渡します。knowledge へ自動で書き込むことはありません。",
+        "qps-ploc": "⟦Ḓřőṗ ṖḒƑş, ïɱȧɠėş, őř ŧėẋŧ ƒïŀėş ȧñḓ ħȧñḓ ŧħėɱ őƒƒ ŧő Ķẏƀėřïőñ. Ñőŧħïñɠ ïş ƈőɱɱïŧŧėḓ ŧő ķñőẇŀėḓɠė ȧůŧőɱȧŧïƈȧŀŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
       },
-      "server_usage_hint": {
-        "en": "Draw, then Hand off to Kyberion to write PNG + handoff.json. Ctrl-C to stop.",
-        "ja": "描画し、「Kyberionへ渡す」で PNG + handoff.json を書き出します。Ctrl-C で停止。",
-        "qps-ploc": "⟦Ḓřȧẇ, ŧħėñ Ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŧő ẇřïŧė ṖÑƓ + ħȧñḓőƒƒ.ĵşőñ. Ƈŧřŀ-Ƈ ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      "toolbar_label": {
+        "en": "Doc drop actions",
+        "ja": "Doc Drop の操作",
+        "qps-ploc": "⟦Ḓőƈ ḓřőṗ ȧƈŧïőñş ŀőřėɱ⟧"
+      },
+      "files_label": {
+        "en": "Documents",
+        "ja": "資料",
+        "qps-ploc": "⟦Ḓőƈůɱėñŧş ŀőř⟧"
+      },
+      "attach": {
+        "en": "Choose files",
+        "ja": "ファイル選択",
+        "qps-ploc": "⟦Ƈħőőşė ƒïŀėş ŀőř⟧"
+      },
+      "camera": {
+        "en": "Camera",
+        "ja": "カメラ",
+        "qps-ploc": "⟦Ƈȧɱėřȧ ŀőř⟧"
+      },
+      "camera_label": {
+        "en": "Photo of a document",
+        "ja": "資料を撮影",
+        "qps-ploc": "⟦Ṗħőŧő őƒ ȧ ḓőƈůɱėñŧ ŀőřėɱ ⟧"
+      },
+      "handoff": {
+        "en": "Hand off",
+        "ja": "Kyberionへ渡す",
+        "qps-ploc": "⟦Ħȧñḓ őƒƒ ŀőř⟧"
+      },
+      "clear": {
+        "en": "Clear",
+        "ja": "クリア",
+        "qps-ploc": "⟦Ƈŀėȧř ŀőř⟧"
+      },
+      "instruction": {
+        "en": "Instruction for Kyberion",
+        "ja": "Kyberionへの指示",
+        "qps-ploc": "⟦Ïñşŧřůƈŧïőñ ƒőř Ķẏƀėřïőñ ŀőřėɱ ï⟧"
+      },
+      "instruction_placeholder": {
+        "en": "e.g. Parse this pack and extract key points…",
+        "ja": "例: この資料をパースして要点を抽出…",
+        "qps-ploc": "⟦ė.ɠ. Ṗȧřşė ŧħïş ṗȧƈķ ȧñḓ ėẋŧřȧƈŧ ķėẏ ṗőïñŧş… ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "ready": {
+        "en": "Ready",
+        "ja": "準備完了",
+        "qps-ploc": "⟦Řėȧḓẏ ŀőř⟧"
+      },
+      "exporting": {
+        "en": "Exporting…",
+        "ja": "書き出し中…",
+        "qps-ploc": "⟦Ėẋṗőřŧïñɠ… ŀőř⟧"
+      },
+      "exported": {
+        "en": "Exported",
+        "ja": "書き出し完了",
+        "qps-ploc": "⟦Ėẋṗőřŧėḓ ŀőř⟧"
+      },
+      "export_failed": {
+        "en": "Export failed",
+        "ja": "書き出し失敗",
+        "qps-ploc": "⟦Ėẋṗőřŧ ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "need_files": {
+        "en": "Add at least one file",
+        "ja": "ファイルを 1 件以上追加してください",
+        "qps-ploc": "⟦Ȧḓḓ ȧŧ ŀėȧşŧ őñė ƒïŀė ŀőřėɱ ⟧"
+      },
+      "attach_added": {
+        "en": "Added",
+        "ja": "追加しました",
+        "qps-ploc": "⟦Ȧḓḓėḓ ŀőř⟧"
+      },
+      "attach_too_large": {
+        "en": "Too large (12 MB max)",
+        "ja": "大きすぎます（最大 12 MB）",
+        "qps-ploc": "⟦Ŧőő ŀȧřɠė (12 ⱮɃ ɱȧẋ) ŀőřėɱ ⟧"
+      },
+      "attach_read_failed": {
+        "en": "Could not read the file",
+        "ja": "ファイルを読み込めませんでした",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėȧḓ ŧħė ƒïŀė ŀőřėɱ ï⟧"
+      },
+      "clear_confirm": {
+        "en": "Clear attachments and instruction?",
+        "ja": "添付と指示を消しますか？",
+        "qps-ploc": "⟦Ƈŀėȧř ȧŧŧȧƈħɱėñŧş ȧñḓ ïñşŧřůƈŧïőñ? ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "clear_confirm_body": {
+        "en": "The files and instruction on this page and the draft saved on this device are removed.",
+        "ja": "このページのファイルと指示、この端末に保存した下書きを削除します。",
+        "qps-ploc": "⟦Ŧħė ƒïŀėş ȧñḓ ïñşŧřůƈŧïőñ őñ ŧħïş ṗȧɠė ȧñḓ ŧħė ḓřȧƒŧ şȧṽėḓ őñ ŧħïş ḓėṽïƈė ȧřė řėɱőṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "cleared": {
+        "en": "Cleared",
+        "ja": "消去しました",
+        "qps-ploc": "⟦Ƈŀėȧřėḓ ŀőř⟧"
+      },
+      "out_path": {
+        "en": "Output: {path}",
+        "ja": "出力先: {path}",
+        "qps-ploc": "⟦Őůŧṗůŧ: {path} ŀőřė⟧"
+      }
+    },
+    "clipboard_inbox": {
+      "title": {
+        "en": "Clipboard Inbox",
+        "ja": "クリップボード受信箱",
+        "qps-ploc": "⟦Ƈŀïṗƀőȧřḓ Ïñƀőẋ ŀőřė⟧"
+      },
+      "subtitle": {
+        "en": "Park clipboard snippets, then hand them to Kyberion (watch for secrets).",
+        "ja": "一時的にクリップを溜めてから Kyberion に渡します（秘密情報に注意）。",
+        "qps-ploc": "⟦Ṗȧřķ ƈŀïṗƀőȧřḓ şñïṗṗėŧş, ŧħėñ ħȧñḓ ŧħėɱ ŧő Ķẏƀėřïőñ (ẇȧŧƈħ ƒőř şėƈřėŧş). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "toolbar_label": {
+        "en": "Clipboard inbox actions",
+        "ja": "クリップボード受信箱の操作",
+        "qps-ploc": "⟦Ƈŀïṗƀőȧřḓ ïñƀőẋ ȧƈŧïőñş ŀőřėɱ ï⟧"
+      },
+      "items": {
+        "en": "Items",
+        "ja": "アイテム",
+        "qps-ploc": "⟦Ïŧėɱş ŀőř⟧"
+      },
+      "empty": {
+        "en": "No items yet",
+        "ja": "まだアイテムがありません",
+        "qps-ploc": "⟦Ñő ïŧėɱş ẏėŧ ŀőř⟧"
+      },
+      "empty_body": {
+        "en": "Paste text into New text and choose Add, or pull the clipboard.",
+        "ja": "「新規テキスト」に貼り付けて「追加」を押すか、クリップボードを取得します。",
+        "qps-ploc": "⟦Ṗȧşŧė ŧėẋŧ ïñŧő Ñėẇ ŧėẋŧ ȧñḓ ƈħőőşė Ȧḓḓ, őř ṗůŀŀ ŧħė ƈŀïṗƀőȧřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "item_title": {
+        "en": "Item {index}",
+        "ja": "アイテム {index}",
+        "qps-ploc": "⟦Ïŧėɱ {index} ŀőř⟧"
+      },
+      "item_meta": {
+        "en": "{count} characters",
+        "ja": "{count} 文字",
+        "qps-ploc": "⟦{count} ƈħȧřȧƈŧėřş ŀőřėɱ⟧"
+      },
+      "new_item": {
+        "en": "New text",
+        "ja": "新規テキスト",
+        "qps-ploc": "⟦Ñėẇ ŧėẋŧ ŀőř⟧"
+      },
+      "new_placeholder": {
+        "en": "Paste here…",
+        "ja": "ここに貼り付け…",
+        "qps-ploc": "⟦Ṗȧşŧė ħėřė… ŀőř⟧"
+      },
+      "label": {
+        "en": "Label (optional)",
+        "ja": "ラベル（任意）",
+        "qps-ploc": "⟦Ŀȧƀėŀ (őṗŧïőñȧŀ) ŀőřėɱ⟧"
+      },
+      "label_placeholder": {
+        "en": "e.g. URL / note",
+        "ja": "例: URL / メモ",
+        "qps-ploc": "⟦ė.ɠ. ŮŘĿ / ñőŧė ŀőřė⟧"
+      },
+      "add": {
+        "en": "Add",
+        "ja": "追加",
+        "qps-ploc": "⟦Ȧḓḓ ŀőř⟧"
+      },
+      "pull": {
+        "en": "Pull clipboard",
+        "ja": "クリップボード取得",
+        "qps-ploc": "⟦Ṗůŀŀ ƈŀïṗƀőȧřḓ ŀőřė⟧"
+      },
+      "delete": {
+        "en": "Delete",
+        "ja": "削除",
+        "qps-ploc": "⟦Ḓėŀėŧė ŀőř⟧"
+      },
+      "instruction": {
+        "en": "Instruction for Kyberion",
+        "ja": "Kyberion への指示",
+        "qps-ploc": "⟦Ïñşŧřůƈŧïőñ ƒőř Ķẏƀėřïőñ ŀőřėɱ ï⟧"
+      },
+      "instruction_placeholder": {
+        "en": "How to process these clips",
+        "ja": "これらのクリップをどう処理するか",
+        "qps-ploc": "⟦Ħőẇ ŧő ṗřőƈėşş ŧħėşė ƈŀïṗş ŀőřėɱ ïṗ⟧"
+      },
+      "handoff": {
+        "en": "Hand off",
+        "ja": "Kyberionへ渡す",
+        "qps-ploc": "⟦Ħȧñḓ őƒƒ ŀőř⟧"
+      },
+      "clear_all": {
+        "en": "Clear all",
+        "ja": "全消去",
+        "qps-ploc": "⟦Ƈŀėȧř ȧŀŀ ŀőř⟧"
+      },
+      "ready": {
+        "en": "Ready",
+        "ja": "準備完了",
+        "qps-ploc": "⟦Řėȧḓẏ ŀőř⟧"
+      },
+      "exporting": {
+        "en": "Exporting…",
+        "ja": "書き出し中…",
+        "qps-ploc": "⟦Ėẋṗőřŧïñɠ… ŀőř⟧"
+      },
+      "exported": {
+        "en": "Exported",
+        "ja": "書き出し完了",
+        "qps-ploc": "⟦Ėẋṗőřŧėḓ ŀőř⟧"
+      },
+      "export_failed": {
+        "en": "Export failed",
+        "ja": "書き出し失敗",
+        "qps-ploc": "⟦Ėẋṗőřŧ ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "added": {
+        "en": "Added",
+        "ja": "追加しました",
+        "qps-ploc": "⟦Ȧḓḓėḓ ŀőř⟧"
+      },
+      "removed": {
+        "en": "Removed",
+        "ja": "削除しました",
+        "qps-ploc": "⟦Řėɱőṽėḓ ŀőř⟧"
+      },
+      "pulled": {
+        "en": "Pulled",
+        "ja": "取得しました",
+        "qps-ploc": "⟦Ṗůŀŀėḓ ŀőř⟧"
+      },
+      "pull_fail": {
+        "en": "Pull unavailable — paste manually",
+        "ja": "取得不可 — 手動で貼り付けてください",
+        "qps-ploc": "⟦Ṗůŀŀ ůñȧṽȧïŀȧƀŀė — ṗȧşŧė ɱȧñůȧŀŀẏ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "need_items": {
+        "en": "Add at least one item",
+        "ja": "アイテムを追加してください",
+        "qps-ploc": "⟦Ȧḓḓ ȧŧ ŀėȧşŧ őñė ïŧėɱ ŀőřėɱ ⟧"
+      },
+      "need_text": {
+        "en": "Paste or type some text first",
+        "ja": "先にテキストを入力してください",
+        "qps-ploc": "⟦Ṗȧşŧė őř ŧẏṗė şőɱė ŧėẋŧ ƒïřşŧ ŀőřėɱ ïṗş⟧"
+      },
+      "clear_confirm": {
+        "en": "Clear all items?",
+        "ja": "すべてのアイテムを消しますか？",
+        "qps-ploc": "⟦Ƈŀėȧř ȧŀŀ ïŧėɱş? ŀőřėɱ⟧"
+      },
+      "clear_confirm_body": {
+        "en": "Every clip parked on this page is removed. This cannot be undone.",
+        "ja": "このページに溜めたクリップをすべて削除します。元に戻せません。",
+        "qps-ploc": "⟦Ėṽėřẏ ƈŀïṗ ṗȧřķėḓ őñ ŧħïş ṗȧɠė ïş řėɱőṽėḓ. Ŧħïş ƈȧññőŧ ƀė ůñḓőñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "cleared": {
+        "en": "All items cleared",
+        "ja": "すべて消去しました",
+        "qps-ploc": "⟦Ȧŀŀ ïŧėɱş ƈŀėȧřėḓ ŀőřėɱ⟧"
+      },
+      "redact_title": {
+        "en": "Check for secrets",
+        "ja": "秘密情報を確認",
+        "qps-ploc": "⟦Ƈħėƈķ ƒőř şėƈřėŧş ŀőřėɱ⟧"
+      },
+      "redact_hint": {
+        "en": "Remove passwords/tokens before handoff.",
+        "ja": "パスワードやトークンは渡す前に削除してください。",
+        "qps-ploc": "⟦Řėɱőṽė ṗȧşşẇőřḓş/ŧőķėñş ƀėƒőřė ħȧñḓőƒƒ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "out_path": {
+        "en": "Output: {path}",
+        "ja": "出力先: {path}",
+        "qps-ploc": "⟦Őůŧṗůŧ: {path} ŀőřė⟧"
+      }
+    },
+    "daily_desk": {
+      "title": {
+        "en": "Daily Desk (local only)",
+        "ja": "Daily Desk（ローカルのみ）",
+        "qps-ploc": "⟦Ḓȧïŀẏ Ḓėşķ (ŀőƈȧŀ őñŀẏ) ŀőřėɱ ï⟧"
+      },
+      "subtitle": {
+        "en": "Edit today’s Journal / TODO / NOW, save a local draft, or hand off to Kyberion. Working-memory faces seed the panels when found.",
+        "ja": "今日の Journal / TODO / NOW を編集し、下書き保存または Kyberion へ Hand off します。作業メモリ面が見つかれば初期表示に使います。",
+        "qps-ploc": "⟦Ėḓïŧ ŧőḓȧẏ’ş Ĵőůřñȧŀ / ŦŐḒŐ / ÑŐẆ, şȧṽė ȧ ŀőƈȧŀ ḓřȧƒŧ, őř ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ. Ẇőřķïñɠ-ɱėɱőřẏ ƒȧƈėş şėėḓ ŧħė ṗȧñėŀş ẇħėñ ƒőůñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "toolbar_label": {
+        "en": "Daily desk actions",
+        "ja": "Daily Desk の操作",
+        "qps-ploc": "⟦Ḓȧïŀẏ ḓėşķ ȧƈŧïőñş ŀőřėɱ⟧"
+      },
+      "journal": {
+        "en": "Journal",
+        "ja": "Journal",
+        "qps-ploc": "⟦Ĵőůřñȧŀ ŀőř⟧"
+      },
+      "todo": {
+        "en": "TODO",
+        "ja": "TODO",
+        "qps-ploc": "⟦ŦŐḒŐ ŀőř⟧"
+      },
+      "now": {
+        "en": "NOW",
+        "ja": "NOW",
+        "qps-ploc": "⟦ÑŐẆ ŀőř⟧"
+      },
+      "face_path": {
+        "en": "Working-memory face: {path}",
+        "ja": "作業メモリ面: {path}",
+        "qps-ploc": "⟦Ẇőřķïñɠ-ɱėɱőřẏ ƒȧƈė: {path} ŀőřėɱ ïṗ⟧"
+      },
+      "face_none": {
+        "en": "No working-memory face",
+        "ja": "作業メモリ面なし",
+        "qps-ploc": "⟦Ñő ẇőřķïñɠ-ɱėɱőřẏ ƒȧƈė ŀőřėɱ ï⟧"
+      },
+      "faces_pending": {
+        "en": "Today’s working-memory faces ({period}) load when you choose Reload from disk.",
+        "ja": "今日の作業メモリ面（{period}）は「ディスクから再読込」で読み込みます。",
+        "qps-ploc": "⟦Ŧőḓȧẏ’ş ẇőřķïñɠ-ɱėɱőřẏ ƒȧƈėş ({period}) ŀőȧḓ ẇħėñ ẏőů ƈħőőşė Řėŀőȧḓ ƒřőɱ ḓïşķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "faces_seeded": {
+        "en": "Loaded from the working-memory faces. Hand off writes copies under the output folder; syncing back is up to the operator.",
+        "ja": "作業メモリ面から読み込みました。Hand off は出力先へコピーを書き出します（面への反映は運用者が行います）。",
+        "qps-ploc": "⟦Ŀőȧḓėḓ ƒřőɱ ŧħė ẇőřķïñɠ-ɱėɱőřẏ ƒȧƈėş. Ħȧñḓ őƒƒ ẇřïŧėş ƈőṗïėş ůñḓėř ŧħė őůŧṗůŧ ƒőŀḓėř; şẏñƈïñɠ ƀȧƈķ ïş ůṗ ŧő ŧħė őṗėřȧŧőř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+      },
+      "faces_missing": {
+        "en": "No working-memory faces for {period}. The panels are saved to the output folder as journal.md / todo.md / now.md.",
+        "ja": "{period} の作業メモリ面は見つかりません。パネルは出力先に journal.md / todo.md / now.md として保存されます。",
+        "qps-ploc": "⟦Ñő ẇőřķïñɠ-ɱėɱőřẏ ƒȧƈėş ƒőř {period}. Ŧħė ṗȧñėŀş ȧřė şȧṽėḓ ŧő ŧħė őůŧṗůŧ ƒőŀḓėř ȧş ĵőůřñȧŀ.ɱḓ / ŧőḓő.ɱḓ / ñőẇ.ɱḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "instruction": {
+        "en": "Instruction for Kyberion",
+        "ja": "Kyberionへの指示",
+        "qps-ploc": "⟦Ïñşŧřůƈŧïőñ ƒőř Ķẏƀėřïőñ ŀőřėɱ ï⟧"
+      },
+      "instruction_placeholder": {
+        "en": "e.g. Organize today’s focus…",
+        "ja": "例: 今日のフォーカスを整理して…",
+        "qps-ploc": "⟦ė.ɠ. Őřɠȧñïẑė ŧőḓȧẏ’ş ƒőƈůş… ŀőřėɱ ïṗş⟧"
+      },
+      "handoff": {
+        "en": "Hand off",
+        "ja": "Kyberionへ渡す",
+        "qps-ploc": "⟦Ħȧñḓ őƒƒ ŀőř⟧"
+      },
+      "save_draft": {
+        "en": "Save draft",
+        "ja": "下書き保存",
+        "qps-ploc": "⟦Şȧṽė ḓřȧƒŧ ŀőř⟧"
+      },
+      "load_disk": {
+        "en": "Reload from disk",
+        "ja": "ディスクから再読込",
+        "qps-ploc": "⟦Řėŀőȧḓ ƒřőɱ ḓïşķ ŀőřėɱ⟧"
+      },
+      "clear": {
+        "en": "Clear",
+        "ja": "クリア",
+        "qps-ploc": "⟦Ƈŀėȧř ŀőř⟧"
+      },
+      "ready": {
+        "en": "Ready",
+        "ja": "準備完了",
+        "qps-ploc": "⟦Řėȧḓẏ ŀőř⟧"
+      },
+      "draft_saved": {
+        "en": "Draft saved",
+        "ja": "下書きを保存しました",
+        "qps-ploc": "⟦Ḓřȧƒŧ şȧṽėḓ ŀőř⟧"
+      },
+      "exporting": {
+        "en": "Exporting…",
+        "ja": "書き出し中…",
+        "qps-ploc": "⟦Ėẋṗőřŧïñɠ… ŀőř⟧"
+      },
+      "exported": {
+        "en": "Exported",
+        "ja": "書き出し完了",
+        "qps-ploc": "⟦Ėẋṗőřŧėḓ ŀőř⟧"
+      },
+      "export_failed": {
+        "en": "Export failed",
+        "ja": "書き出し失敗",
+        "qps-ploc": "⟦Ėẋṗőřŧ ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "loading": {
+        "en": "Loading…",
+        "ja": "読込中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ… ŀőř⟧"
+      },
+      "loaded": {
+        "en": "Loaded",
+        "ja": "読込完了",
+        "qps-ploc": "⟦Ŀőȧḓėḓ ŀőř⟧"
+      },
+      "load_failed": {
+        "en": "Load failed",
+        "ja": "読込失敗",
+        "qps-ploc": "⟦Ŀőȧḓ ƒȧïŀėḓ ŀőř⟧"
+      },
+      "clear_confirm": {
+        "en": "Clear draft and panel contents?",
+        "ja": "下書きと入力内容を消しますか？",
+        "qps-ploc": "⟦Ƈŀėȧř ḓřȧƒŧ ȧñḓ ṗȧñėŀ ƈőñŧėñŧş? ŀőřėɱ ïṗşů⟧"
+      },
+      "clear_confirm_body": {
+        "en": "Journal, TODO, NOW and the instruction are emptied and the draft saved on this device is removed. Files on disk are not changed.",
+        "ja": "Journal・TODO・NOW・指示を空にし、この端末の下書きを削除します。ディスク上のファイルは変更しません。",
+        "qps-ploc": "⟦Ĵőůřñȧŀ, ŦŐḒŐ, ÑŐẆ ȧñḓ ŧħė ïñşŧřůƈŧïőñ ȧřė ėɱṗŧïėḓ ȧñḓ ŧħė ḓřȧƒŧ şȧṽėḓ őñ ŧħïş ḓėṽïƈė ïş řėɱőṽėḓ. Ƒïŀėş őñ ḓïşķ ȧřė ñőŧ ƈħȧñɠėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
+      },
+      "cleared": {
+        "en": "Cleared",
+        "ja": "消去しました",
+        "qps-ploc": "⟦Ƈŀėȧřėḓ ŀőř⟧"
+      },
+      "out_path": {
+        "en": "Output: {path}",
+        "ja": "出力先: {path}",
+        "qps-ploc": "⟦Őůŧṗůŧ: {path} ŀőřė⟧"
+      }
+    },
+    "personal_workbench": {
+      "title": {
+        "en": "Personal Workbench",
+        "ja": "Personal Workbench",
+        "qps-ploc": "⟦Ṗėřşőñȧŀ Ẇőřķƀėñƈħ ŀőřėɱ⟧"
+      },
+      "subtitle": {
+        "en": "Saving to the inbox only creates proposals. Calendar events go propose → review → approve and create. Mail stays a draft; knowledge candidates need an explicit action.",
+        "ja": "Inbox 保存は提案のみ。カレンダーは「提案 → 内容確認 → 承認して作成」の順。メールは下書き、知識候補は明示操作です。",
+        "qps-ploc": "⟦Şȧṽïñɠ ŧő ŧħė ïñƀőẋ őñŀẏ ƈřėȧŧėş ṗřőṗőşȧŀş. Ƈȧŀėñḓȧř ėṽėñŧş ɠő ṗřőṗőşė → řėṽïėẇ → ȧṗṗřőṽė ȧñḓ ƈřėȧŧė. Ɱȧïŀ şŧȧẏş ȧ ḓřȧƒŧ; ķñőẇŀėḓɠė ƈȧñḓïḓȧŧėş ñėėḓ ȧñ ėẋṗŀïƈïŧ ȧƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ï⟧"
+      },
+      "capture_title": {
+        "en": "Capture",
+        "ja": "取り込み",
+        "qps-ploc": "⟦Ƈȧṗŧůřė ŀőř⟧"
+      },
+      "kind": {
+        "en": "Use",
+        "ja": "用途",
+        "qps-ploc": "⟦Ůşė ŀőř⟧"
+      },
+      "kind_link": {
+        "en": "Link Inbox",
+        "ja": "リンク受信箱",
+        "qps-ploc": "⟦Ŀïñķ Ïñƀőẋ ŀőř⟧"
+      },
+      "kind_task": {
+        "en": "Task Triage",
+        "ja": "タスク仕分け",
+        "qps-ploc": "⟦Ŧȧşķ Ŧřïȧɠė ŀőř⟧"
+      },
+      "kind_follow_up": {
+        "en": "Follow-up Desk",
+        "ja": "フォローアップ",
+        "qps-ploc": "⟦Ƒőŀŀőẇ-ůṗ Ḓėşķ ŀőřė⟧"
+      },
+      "kind_decision": {
+        "en": "Decision Log",
+        "ja": "意思決定ログ",
+        "qps-ploc": "⟦Ḓėƈïşïőñ Ŀőɠ ŀőř⟧"
+      },
+      "kind_expense": {
+        "en": "Receipt / Expense",
+        "ja": "領収書・経費",
+        "qps-ploc": "⟦Řėƈėïṗŧ / Ėẋṗėñşė ŀőřėɱ⟧"
+      },
+      "kind_daily_review": {
+        "en": "Daily Review",
+        "ja": "日次レビュー",
+        "qps-ploc": "⟦Ḓȧïŀẏ Řėṽïėẇ ŀőř⟧"
+      },
+      "entry_title": {
+        "en": "Title",
+        "ja": "タイトル",
+        "qps-ploc": "⟦Ŧïŧŀė ŀőř⟧"
+      },
+      "entry_body": {
+        "en": "Content",
+        "ja": "内容",
+        "qps-ploc": "⟦Ƈőñŧėñŧ ŀőř⟧"
+      },
+      "metadata": {
+        "en": "Details (JSON)",
+        "ja": "補足（JSON）",
+        "qps-ploc": "⟦Ḓėŧȧïŀş (ĴŞŐÑ) ŀőřė⟧"
+      },
+      "metadata_placeholder": {
+        "en": "{\"due\":\"2026-09-14\"}",
+        "ja": "{\"due\":\"2026-09-14\"}",
+        "qps-ploc": "⟦{\"due\":\"2026-09-14\"} ŀőřėɱ ⟧"
+      },
+      "save": {
+        "en": "Save as proposal",
+        "ja": "提案として保存",
+        "qps-ploc": "⟦Şȧṽė ȧş ṗřőṗőşȧŀ ŀőřėɱ⟧"
+      },
+      "saving": {
+        "en": "Saving…",
+        "ja": "保存中…",
+        "qps-ploc": "⟦Şȧṽïñɠ… ŀőř⟧"
+      },
+      "saved": {
+        "en": "Saved (proposal)",
+        "ja": "保存しました（提案）",
+        "qps-ploc": "⟦Şȧṽėḓ (ṗřőṗőşȧŀ) ŀőřėɱ⟧"
+      },
+      "save_failed": {
+        "en": "Save failed",
+        "ja": "保存失敗",
+        "qps-ploc": "⟦Şȧṽė ƒȧïŀėḓ ŀőř⟧"
+      },
+      "metadata_invalid": {
+        "en": "Details must be valid JSON",
+        "ja": "補足 JSON が不正です",
+        "qps-ploc": "⟦Ḓėŧȧïŀş ɱůşŧ ƀė ṽȧŀïḓ ĴŞŐÑ ŀőřėɱ ïṗ⟧"
+      },
+      "out_path": {
+        "en": "Output: {path}",
+        "ja": "出力先: {path}",
+        "qps-ploc": "⟦Őůŧṗůŧ: {path} ŀőřė⟧"
+      },
+      "saved_title": {
+        "en": "Saved",
+        "ja": "保存済み",
+        "qps-ploc": "⟦Şȧṽėḓ ŀőř⟧"
+      },
+      "load": {
+        "en": "Read saved data",
+        "ja": "認証済みデータを読む",
+        "qps-ploc": "⟦Řėȧḓ şȧṽėḓ ḓȧŧȧ ŀőřė⟧"
+      },
+      "entries_empty": {
+        "en": "Nothing saved yet",
+        "ja": "まだありません",
+        "qps-ploc": "⟦Ñőŧħïñɠ şȧṽėḓ ẏėŧ ŀőřėɱ⟧"
+      },
+      "entries_not_loaded": {
+        "en": "Not loaded yet",
+        "ja": "未読込",
+        "qps-ploc": "⟦Ñőŧ ŀőȧḓėḓ ẏėŧ ŀőřė⟧"
+      },
+      "entries_not_loaded_body": {
+        "en": "Choose Read saved data to list the proposals.",
+        "ja": "「認証済みデータを読む」で提案を一覧します。",
+        "qps-ploc": "⟦Ƈħőőşė Řėȧḓ şȧṽėḓ ḓȧŧȧ ŧő ŀïşŧ ŧħė ṗřőṗőşȧŀş. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "loading": {
+        "en": "Loading…",
+        "ja": "読込中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ… ŀőř⟧"
+      },
+      "loaded": {
+        "en": "Loaded",
+        "ja": "読込完了",
+        "qps-ploc": "⟦Ŀőȧḓėḓ ŀőř⟧"
+      },
+      "load_failed": {
+        "en": "Load failed",
+        "ja": "読込失敗",
+        "qps-ploc": "⟦Ŀőȧḓ ƒȧïŀėḓ ŀőř⟧"
+      },
+      "entry_meta": {
+        "en": "{kind} · {status} · {created_at}",
+        "ja": "{kind} · {status} · {created_at}",
+        "qps-ploc": "⟦{kind} · {status} · {created_at} ŀőřėɱ ïṗşů⟧"
+      },
+      "status_proposed": {
+        "en": "Proposed",
+        "ja": "提案",
+        "qps-ploc": "⟦Ṗřőṗőşėḓ ŀőř⟧"
+      },
+      "calendar_title": {
+        "en": "Calendar (propose → approve → create)",
+        "ja": "カレンダー（提案 → 承認 → 作成）",
+        "qps-ploc": "⟦Ƈȧŀėñḓȧř (ṗřőṗőşė → ȧṗṗřőṽė → ƈřėȧŧė) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "cal_summary": {
+        "en": "Subject",
+        "ja": "件名",
+        "qps-ploc": "⟦Şůƀĵėƈŧ ŀőř⟧"
+      },
+      "cal_summary_placeholder": {
+        "en": "Weekly sync",
+        "ja": "定例ミーティング",
+        "qps-ploc": "⟦Ẇėėķŀẏ şẏñƈ ŀőř⟧"
+      },
+      "cal_start": {
+        "en": "Start (ISO)",
+        "ja": "開始（ISO）",
+        "qps-ploc": "⟦Şŧȧřŧ (ÏŞŐ) ŀőř⟧"
+      },
+      "cal_start_placeholder": {
+        "en": "2026-09-14T10:00:00+09:00",
+        "ja": "2026-09-14T10:00:00+09:00",
+        "qps-ploc": "⟦2026-09-14Ŧ10:00:00+09:00 ŀőřėɱ ïṗ⟧"
+      },
+      "cal_end": {
+        "en": "End (ISO)",
+        "ja": "終了（ISO）",
+        "qps-ploc": "⟦Ėñḓ (ÏŞŐ) ŀőř⟧"
+      },
+      "cal_end_placeholder": {
+        "en": "2026-09-14T10:30:00+09:00",
+        "ja": "2026-09-14T10:30:00+09:00",
+        "qps-ploc": "⟦2026-09-14Ŧ10:30:00+09:00 ŀőřėɱ ïṗ⟧"
+      },
+      "cal_description": {
+        "en": "Description",
+        "ja": "説明",
+        "qps-ploc": "⟦Ḓėşƈřïṗŧïőñ ŀőř⟧"
+      },
+      "cal_propose": {
+        "en": "1. Propose",
+        "ja": "1. 提案する",
+        "qps-ploc": "⟦1. Ṗřőṗőşė ŀőř⟧"
+      },
+      "cal_confirm": {
+        "en": "2. I checked the proposal; it may be created in the calendar",
+        "ja": "2. 提案内容を確認し、カレンダーへ作成してよい",
+        "qps-ploc": "⟦2. Ï ƈħėƈķėḓ ŧħė ṗřőṗőşȧŀ; ïŧ ɱȧẏ ƀė ƈřėȧŧėḓ ïñ ŧħė ƈȧŀėñḓȧř ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cal_apply": {
+        "en": "3. Approve and create",
+        "ja": "3. 承認して作成",
+        "qps-ploc": "⟦3. Ȧṗṗřőṽė ȧñḓ ƈřėȧŧė ŀőřėɱ ⟧"
+      },
+      "cal_approval_id": {
+        "en": "Approval request ID",
+        "ja": "承認リクエスト ID",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧ ÏḒ ŀőřėɱ ⟧"
+      },
+      "cal_approval_placeholder": {
+        "en": "Filled in after Propose",
+        "ja": "propose 後に自動入力",
+        "qps-ploc": "⟦Ƒïŀŀėḓ ïñ ȧƒŧėř Ṗřőṗőşė ŀőřėɱ ï⟧"
+      },
+      "cal_initial": {
+        "en": "No proposal yet. You can also approve from the CLI: {command}",
+        "ja": "まだ提案がありません。CLI でも承認できます: {command}",
+        "qps-ploc": "⟦Ñő ṗřőṗőşȧŀ ẏėŧ. Ẏőů ƈȧñ ȧŀşő ȧṗṗřőṽė ƒřőɱ ŧħė ƇĿÏ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "cal_proposing": {
+        "en": "Proposing…",
+        "ja": "提案中…",
+        "qps-ploc": "⟦Ṗřőṗőşïñɠ… ŀőř⟧"
+      },
+      "cal_proposed": {
+        "en": "Proposed. Review it, tick the box and choose Approve and create. Approval: {id}",
+        "ja": "提案しました。内容を確認し、チェックして「承認して作成」へ。approval={id}",
+        "qps-ploc": "⟦Ṗřőṗőşėḓ. Řėṽïėẇ ïŧ, ŧïƈķ ŧħė ƀőẋ ȧñḓ ƈħőőşė Ȧṗṗřőṽė ȧñḓ ƈřėȧŧė. Ȧṗṗřőṽȧŀ: {id} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "cal_propose_failed": {
+        "en": "Proposal failed",
+        "ja": "提案失敗",
+        "qps-ploc": "⟦Ṗřőṗőşȧŀ ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "cal_need_id": {
+        "en": "An approval request ID is required",
+        "ja": "approval_request_id が必要です",
+        "qps-ploc": "⟦Ȧñ ȧṗṗřőṽȧŀ řėɋůėşŧ ÏḒ ïş řėɋůïřėḓ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "cal_need_confirm": {
+        "en": "Tick the confirmation box before creating",
+        "ja": "作成前に確認チェックを入れてください",
+        "qps-ploc": "⟦Ŧïƈķ ŧħė ƈőñƒïřɱȧŧïőñ ƀőẋ ƀėƒőřė ƈřėȧŧïñɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cal_applying": {
+        "en": "Approving and creating…",
+        "ja": "承認・作成中…",
+        "qps-ploc": "⟦Ȧṗṗřőṽïñɠ ȧñḓ ƈřėȧŧïñɠ… ŀőřėɱ ï⟧"
+      },
+      "cal_applied": {
+        "en": "Done",
+        "ja": "完了",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "cal_apply_failed": {
+        "en": "Create failed",
+        "ja": "作成失敗",
+        "qps-ploc": "⟦Ƈřėȧŧė ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "cal_latest": {
+        "en": "Proposal {status}: {summary} / {id}",
+        "ja": "提案 {status}: {summary} / {id}",
+        "qps-ploc": "⟦Ṗřőṗőşȧŀ {status}: {summary} / {id} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "actions_title": {
+        "en": "Other governed actions",
+        "ja": "その他の governed actions",
+        "qps-ploc": "⟦Őŧħėř ɠőṽėřñėḓ ȧƈŧïőñş ŀőřėɱ ï⟧"
+      },
+      "action": {
+        "en": "Action",
+        "ja": "操作",
+        "qps-ploc": "⟦Ȧƈŧïőñ ŀőř⟧"
+      },
+      "action_ocr": {
+        "en": "OCR",
+        "ja": "OCR",
+        "qps-ploc": "⟦ŐƇŘ ŀőř⟧"
+      },
+      "action_knowledge": {
+        "en": "Knowledge candidate",
+        "ja": "知識候補登録",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ƈȧñḓïḓȧŧė ŀőřėɱ ⟧"
+      },
+      "action_email": {
+        "en": "Mail draft",
+        "ja": "メール下書き",
+        "qps-ploc": "⟦Ɱȧïŀ ḓřȧƒŧ ŀőř⟧"
+      },
+      "action_payload": {
+        "en": "Input (JSON)",
+        "ja": "入力（JSON）",
+        "qps-ploc": "⟦Ïñṗůŧ (ĴŞŐÑ) ŀőř⟧"
+      },
+      "action_payload_placeholder": {
+        "en": "{\"path\":\"active/shared/tmp/receipt.png\"}",
+        "ja": "{\"path\":\"active/shared/tmp/receipt.png\"}",
+        "qps-ploc": "⟦{\"path\":\"active/shared/tmp/receipt.png\"} ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "run_action": {
+        "en": "Run action",
+        "ja": "操作を実行",
+        "qps-ploc": "⟦Řůñ ȧƈŧïőñ ŀőř⟧"
+      },
+      "actions_hint": {
+        "en": "Knowledge candidates are only created on an explicit action. Mail is draft-only.",
+        "ja": "知識候補は明示操作時のみ。メールは下書きのみ。",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ƈȧñḓïḓȧŧėş ȧřė őñŀẏ ƈřėȧŧėḓ őñ ȧñ ėẋṗŀïƈïŧ ȧƈŧïőñ. Ɱȧïŀ ïş ḓřȧƒŧ-őñŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "running": {
+        "en": "Running…",
+        "ja": "実行中…",
+        "qps-ploc": "⟦Řůññïñɠ… ŀőř⟧"
+      },
+      "action_done": {
+        "en": "Done",
+        "ja": "完了",
+        "qps-ploc": "⟦Ḓőñė ŀőř⟧"
+      },
+      "action_failed": {
+        "en": "Action failed",
+        "ja": "操作失敗",
+        "qps-ploc": "⟦Ȧƈŧïőñ ƒȧïŀėḓ ŀőřė⟧"
+      },
+      "payload_invalid": {
+        "en": "The action input must be valid JSON",
+        "ja": "操作 JSON が不正です",
+        "qps-ploc": "⟦Ŧħė ȧƈŧïőñ ïñṗůŧ ɱůşŧ ƀė ṽȧŀïḓ ĴŞŐÑ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "result_title": {
+        "en": "Result",
+        "ja": "結果",
+        "qps-ploc": "⟦Řėşůŀŧ ŀőř⟧"
+      },
+      "note_email_local_draft": {
+        "en": "This pad only creates a local draft. It does not connect to an external mail service.",
+        "ja": "この pad はローカル下書きだけを作成します。外部メールサービスへは接続しません。",
+        "qps-ploc": "⟦Ŧħïş ṗȧḓ őñŀẏ ƈřėȧŧėş ȧ ŀőƈȧŀ ḓřȧƒŧ. Ïŧ ḓőėş ñőŧ ƈőññėƈŧ ŧő ȧñ ėẋŧėřñȧŀ ɱȧïŀ şėřṽïƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "note_calendar_outcome_unknown": {
+        "en": "Stopped to avoid a duplicate: the result in the external calendar is not confirmed. Check the provider, then have an operator reconcile it.",
+        "ja": "外部カレンダーへの反映結果が確定していないため、重複作成を避けて停止しました。provider 側を確認してから運用者が reconciliation してください。",
+        "qps-ploc": "⟦Şŧőṗṗėḓ ŧő ȧṽőïḓ ȧ ḓůṗŀïƈȧŧė: ŧħė řėşůŀŧ ïñ ŧħė ėẋŧėřñȧŀ ƈȧŀėñḓȧř ïş ñőŧ ƈőñƒïřɱėḓ. Ƈħėƈķ ŧħė ṗřőṽïḓėř, ŧħėñ ħȧṽė ȧñ őṗėřȧŧőř řėƈőñƈïŀė ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
+      "note_approval_pending": {
+        "en": "The approval record is pending. Approve it explicitly in the approval workflow, then run again.",
+        "ja": "承認レコードが pending です。承認ワークフローで明示承認してから再実行してください。",
+        "qps-ploc": "⟦Ŧħė ȧṗṗřőṽȧŀ řėƈőřḓ ïş ṗėñḓïñɠ. Ȧṗṗřőṽė ïŧ ėẋṗŀïƈïŧŀẏ ïñ ŧħė ȧṗṗřőṽȧŀ ẇőřķƒŀőẇ, ŧħėñ řůñ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "note_reconcile_needs_approval": {
+        "en": "Provider reconciliation runs only for explicitly approved proposals.",
+        "ja": "provider 照合は明示承認済みの proposal にだけ実行できます。",
+        "qps-ploc": "⟦Ṗřőṽïḓėř řėƈőñƈïŀïȧŧïőñ řůñş őñŀẏ ƒőř ėẋṗŀïƈïŧŀẏ ȧṗṗřőṽėḓ ṗřőṗőşȧŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "note_reconcile_unavailable": {
+        "en": "Provider reconciliation is unavailable. The proposal stays unknown.",
+        "ja": "provider の照合が利用できません。proposal は unknown のまま保持します。",
+        "qps-ploc": "⟦Ṗřőṽïḓėř řėƈőñƈïŀïȧŧïőñ ïş ůñȧṽȧïŀȧƀŀė. Ŧħė ṗřőṗőşȧŀ şŧȧẏş ůñķñőẇñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "note_reconcile_no_match": {
+        "en": "No matching provider event was found. Waiting for an operator instead of creating it again.",
+        "ja": "一致する provider event が見つかりません。再作成せず運用者の確認を待ちます。",
+        "qps-ploc": "⟦Ñő ɱȧŧƈħïñɠ ṗřőṽïḓėř ėṽėñŧ ẇȧş ƒőůñḓ. Ẇȧïŧïñɠ ƒőř ȧñ őṗėřȧŧőř ïñşŧėȧḓ őƒ ƈřėȧŧïñɠ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "note_reconcile_multiple": {
+        "en": "Several provider events matched. Waiting for an operator to avoid confirming the wrong one.",
+        "ja": "複数の provider event が一致しました。誤った確定を避けるため運用者の確認を待ちます。",
+        "qps-ploc": "⟦Şėṽėřȧŀ ṗřőṽïḓėř ėṽėñŧş ɱȧŧƈħėḓ. Ẇȧïŧïñɠ ƒőř ȧñ őṗėřȧŧőř ŧő ȧṽőïḓ ƈőñƒïřɱïñɠ ŧħė ẇřőñɠ őñė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
       }
     },
     "meeting_notepad": {
@@ -12400,26 +14756,6 @@
         "en": "Prefer OS dictation (on-device) for notes. Browser 🎤 may send audio to a cloud provider.",
         "ja": "メモ欄はOSディクテーション（端末内）推奨。ブラウザ🎤は機種によりクラウド送信の場合があります。",
         "qps-ploc": "⟦Ṗřėƒėř ŐŞ ḓïƈŧȧŧïőñ (őñ-ḓėṽïƈė) ƒőř ñőŧėş. Ƀřőẇşėř 🎤 ɱȧẏ şėñḓ ȧůḓïő ŧő ȧ ƈŀőůḓ ṗřőṽïḓėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
-      },
-      "voice": {
-        "en": "Voice",
-        "ja": "音声",
-        "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
-      },
-      "voice_stop": {
-        "en": "Stop",
-        "ja": "停止",
-        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
-      },
-      "record": {
-        "en": "Record",
-        "ja": "録音",
-        "qps-ploc": "⟦Řėƈőřḓ ŀőř⟧"
-      },
-      "record_stop": {
-        "en": "Stop recording",
-        "ja": "録音停止",
-        "qps-ploc": "⟦Şŧőṗ řėƈőřḓïñɠ ŀőřė⟧"
       },
       "camera": {
         "en": "Camera",
@@ -12531,25 +14867,10 @@
         "ja": "添付はまだありません",
         "qps-ploc": "⟦Ñő ȧŧŧȧƈħɱėñŧş ẏėŧ ŀőřėɱ⟧"
       },
-      "voice_started": {
-        "en": "Listening…",
-        "ja": "音声入力中…",
-        "qps-ploc": "⟦Ŀïşŧėñïñɠ… ŀőř⟧"
-      },
-      "voice_stopped": {
-        "en": "Voice stopped",
-        "ja": "音声入力を停止",
-        "qps-ploc": "⟦Ṽőïƈė şŧőṗṗėḓ ŀőřė⟧"
-      },
       "voice_error": {
         "en": "Voice error",
         "ja": "音声エラー",
         "qps-ploc": "⟦Ṽőïƈė ėřřőř ŀőř⟧"
-      },
-      "voice_unavailable": {
-        "en": "Speech recognition unavailable (OS dictation still works)",
-        "ja": "このブラウザでは音声認識を使えません（OSディクテーションは可）",
-        "qps-ploc": "⟦Şṗėėƈħ řėƈőɠñïŧïőñ ůñȧṽȧïŀȧƀŀė (ŐŞ ḓïƈŧȧŧïőñ şŧïŀŀ ẇőřķş) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "preview": {
         "en": "Preview",
@@ -12560,6 +14881,86 @@
         "en": "Capture notes, create minutes, then Hand off to Kyberion. Ctrl-C to stop.",
         "ja": "メモを取り込み、議事録を作成し、「Kyberionへ渡す」で書き出します。Ctrl-C で停止。",
         "qps-ploc": "⟦Ƈȧṗŧůřė ñőŧėş, ƈřėȧŧė ɱïñůŧėş, ŧħėñ Ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ. Ƈŧřŀ-Ƈ ŧő şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "toolbar_label": {
+        "en": "Meeting notepad actions",
+        "ja": "メモ帳の操作",
+        "qps-ploc": "⟦Ɱėėŧïñɠ ñőŧėṗȧḓ ȧƈŧïőñş ŀőřėɱ ï⟧"
+      },
+      "dictation_label": {
+        "en": "Dictate into notes",
+        "ja": "メモに口述",
+        "qps-ploc": "⟦Ḓïƈŧȧŧė ïñŧő ñőŧėş ŀőřėɱ⟧"
+      },
+      "record_label": {
+        "en": "Record and transcribe",
+        "ja": "録音して文字起こし",
+        "qps-ploc": "⟦Řėƈőřḓ ȧñḓ ŧřȧñşƈřïƀė ŀőřėɱ ⟧"
+      },
+      "record_help": {
+        "en": "While you record, audio goes to this pad's local transcription endpoint and the transcript fills in as results arrive.",
+        "ja": "録音中の音声はこのパッドのローカル文字起こしエンドポイントへ送られ、結果が届くたびに文字起こし欄が更新されます。",
+        "qps-ploc": "⟦Ẇħïŀė ẏőů řėƈőřḓ, ȧůḓïő ɠőėş ŧő ŧħïş ṗȧḓ'ş ŀőƈȧŀ ŧřȧñşƈřïṗŧïőñ ėñḓṗőïñŧ ȧñḓ ŧħė ŧřȧñşƈřïṗŧ ƒïŀŀş ïñ ȧş řėşůŀŧş ȧřřïṽė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "transcribing": {
+        "en": "Transcribing…",
+        "ja": "文字起こし中…",
+        "qps-ploc": "⟦Ŧřȧñşƈřïƀïñɠ… ŀőřė⟧"
+      },
+      "transcribe_unavailable": {
+        "en": "Transcription is unavailable — this recording is not being transcribed",
+        "ja": "文字起こしを利用できません。この録音は文字起こしされません",
+        "qps-ploc": "⟦Ŧřȧñşƈřïṗŧïőñ ïş ůñȧṽȧïŀȧƀŀė — ŧħïş řėƈőřḓïñɠ ïş ñőŧ ƀėïñɠ ŧřȧñşƈřïƀėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "attach_too_large": {
+        "en": "Too large to attach (6 MB max)",
+        "ja": "大きすぎて添付できません（最大 6 MB）",
+        "qps-ploc": "⟦Ŧőő ŀȧřɠė ŧő ȧŧŧȧƈħ (6 ⱮɃ ɱȧẋ) ŀőřėɱ ïṗşů⟧"
+      },
+      "attach_read_failed": {
+        "en": "Could not read the file",
+        "ja": "ファイルを読み込めませんでした",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėȧḓ ŧħė ƒïŀė ŀőřėɱ ï⟧"
+      },
+      "camera_label": {
+        "en": "Photo attachment",
+        "ja": "写真を添付",
+        "qps-ploc": "⟦Ṗħőŧő ȧŧŧȧƈħɱėñŧ ŀőřėɱ⟧"
+      },
+      "clear_confirm_body": {
+        "en": "Notes, transcript, attachments and the draft saved on this device are removed.",
+        "ja": "メモ・文字起こし・添付と、この端末に保存した下書きを消去します。",
+        "qps-ploc": "⟦Ñőŧėş, ŧřȧñşƈřïṗŧ, ȧŧŧȧƈħɱėñŧş ȧñḓ ŧħė ḓřȧƒŧ şȧṽėḓ őñ ŧħïş ḓėṽïƈė ȧřė řėɱőṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "preview_empty": {
+        "en": "Create minutes to see them here.",
+        "ja": "議事録を作成するとここに表示されます。",
+        "qps-ploc": "⟦Ƈřėȧŧė ɱïñůŧėş ŧő şėė ŧħėɱ ħėřė. ŀőřėɱ ïṗşů⟧"
+      },
+      "draft_restored": {
+        "en": "Draft restored",
+        "ja": "下書きを復元しました",
+        "qps-ploc": "⟦Ḓřȧƒŧ řėşŧőřėḓ ŀőřė⟧"
+      },
+      "draft_without_attachments": {
+        "en": "Draft saved without attachments (too large for this browser's storage)",
+        "ja": "添付が大きすぎるため、添付を除いて下書きを保存しました",
+        "qps-ploc": "⟦Ḓřȧƒŧ şȧṽėḓ ẇïŧħőůŧ ȧŧŧȧƈħɱėñŧş (ŧőő ŀȧřɠė ƒőř ŧħïş ƀřőẇşėř'ş şŧőřȧɠė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "no_draft": {
+        "en": "No saved draft",
+        "ja": "保存された下書きはありません",
+        "qps-ploc": "⟦Ñő şȧṽėḓ ḓřȧƒŧ ŀőřė⟧"
+      },
+      "cleared": {
+        "en": "Notepad cleared",
+        "ja": "メモ帳を消去しました",
+        "qps-ploc": "⟦Ñőŧėṗȧḓ ƈŀėȧřėḓ ŀőřė⟧"
+      },
+      "out_path": {
+        "en": "Output: {path}",
+        "ja": "出力先: {path}",
+        "qps-ploc": "⟦Őůŧṗůŧ: {path} ŀőřė⟧"
       }
     },
     "minutes_record": {
@@ -17472,6 +19873,11 @@
         "ja": "待機中",
         "qps-ploc": "⟦Ẇȧïŧïñɠ ŀőř⟧"
       },
+      "file_status_ready": {
+        "en": "Attached — not sent yet",
+        "ja": "添付済み（未送信）",
+        "qps-ploc": "⟦Ȧŧŧȧƈħėḓ — ñőŧ şėñŧ ẏėŧ ŀőřėɱ ï⟧"
+      },
       "file_status_uploading": {
         "en": "Uploading",
         "ja": "アップロード中",
@@ -17891,6 +20297,256 @@
         "en": "{percent}% complete",
         "ja": "{percent}% 完了",
         "qps-ploc": "⟦{percent}% ƈőɱṗŀėŧė ŀőřėɱ ⟧"
+      },
+      "dialog_confirm": {
+        "en": "OK",
+        "ja": "OK",
+        "qps-ploc": "⟦ŐĶ ŀőř⟧"
+      },
+      "dialog_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "drawing_tools": {
+        "en": "Drawing tools",
+        "ja": "描画ツール",
+        "qps-ploc": "⟦Ḓřȧẇïñɠ ŧőőŀş ŀőřė⟧"
+      },
+      "drawing_colors": {
+        "en": "Colors",
+        "ja": "色",
+        "qps-ploc": "⟦Ƈőŀőřş ŀőř⟧"
+      },
+      "drawing_color": {
+        "en": "Color {color}",
+        "ja": "色 {color}",
+        "qps-ploc": "⟦Ƈőŀőř {color} ŀőřė⟧"
+      },
+      "drawing_custom_color": {
+        "en": "Custom color",
+        "ja": "任意の色",
+        "qps-ploc": "⟦Ƈůşŧőɱ ƈőŀőř ŀőř⟧"
+      },
+      "drawing_width": {
+        "en": "Width",
+        "ja": "太さ",
+        "qps-ploc": "⟦Ẇïḓŧħ ŀőř⟧"
+      },
+      "drawing_width_value": {
+        "en": "{width} px",
+        "ja": "{width} px",
+        "qps-ploc": "⟦{width} ṗẋ ŀőř⟧"
+      },
+      "drawing_undo": {
+        "en": "Undo",
+        "ja": "元に戻す",
+        "qps-ploc": "⟦Ůñḓő ŀőř⟧"
+      },
+      "drawing_clear": {
+        "en": "Clear",
+        "ja": "消去",
+        "qps-ploc": "⟦Ƈŀėȧř ŀőř⟧"
+      },
+      "drawing_tool_pen": {
+        "en": "Pen",
+        "ja": "ペン",
+        "qps-ploc": "⟦Ṗėñ ŀőř⟧"
+      },
+      "drawing_tool_highlighter": {
+        "en": "Highlighter",
+        "ja": "蛍光ペン",
+        "qps-ploc": "⟦Ħïɠħŀïɠħŧėř ŀőř⟧"
+      },
+      "drawing_tool_rect": {
+        "en": "Rectangle",
+        "ja": "四角形",
+        "qps-ploc": "⟦Řėƈŧȧñɠŀė ŀőř⟧"
+      },
+      "drawing_tool_ellipse": {
+        "en": "Ellipse",
+        "ja": "楕円",
+        "qps-ploc": "⟦Ėŀŀïṗşė ŀőř⟧"
+      },
+      "drawing_tool_line": {
+        "en": "Line",
+        "ja": "直線",
+        "qps-ploc": "⟦Ŀïñė ŀőř⟧"
+      },
+      "drawing_tool_arrow": {
+        "en": "Arrow",
+        "ja": "矢印",
+        "qps-ploc": "⟦Ȧřřőẇ ŀőř⟧"
+      },
+      "drawing_tool_text": {
+        "en": "Text",
+        "ja": "テキスト",
+        "qps-ploc": "⟦Ŧėẋŧ ŀőř⟧"
+      },
+      "drawing_tool_eraser": {
+        "en": "Eraser",
+        "ja": "消しゴム",
+        "qps-ploc": "⟦Ėřȧşėř ŀőř⟧"
+      },
+      "sketch_canvas": {
+        "en": "{label}: drawing canvas",
+        "ja": "{label}（描画キャンバス）",
+        "qps-ploc": "⟦{label}: ḓřȧẇïñɠ ƈȧñṽȧş ŀőřėɱ ï⟧"
+      },
+      "sketch_text_input": {
+        "en": "Text to place on the canvas",
+        "ja": "キャンバスに置くテキスト",
+        "qps-ploc": "⟦Ŧėẋŧ ŧő ṗŀȧƈė őñ ŧħė ƈȧñṽȧş ŀőřėɱ ïṗ⟧"
+      },
+      "sketch_download": {
+        "en": "Download PNG",
+        "ja": "PNG をダウンロード",
+        "qps-ploc": "⟦Ḓőẇñŀőȧḓ ṖÑƓ ŀőř⟧"
+      },
+      "sketch_clear_title": {
+        "en": "Clear the drawing?",
+        "ja": "描いた内容を消去しますか？",
+        "qps-ploc": "⟦Ƈŀėȧř ŧħė ḓřȧẇïñɠ? ŀőřėɱ⟧"
+      },
+      "sketch_clear_message": {
+        "en": "Everything you drew is removed. The background image stays.",
+        "ja": "描いた内容はすべて消えます。背景画像は残ります。",
+        "qps-ploc": "⟦Ėṽėřẏŧħïñɠ ẏőů ḓřėẇ ïş řėɱőṽėḓ. Ŧħė ƀȧƈķɠřőůñḓ ïɱȧɠė şŧȧẏş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "sketch_clear_confirm": {
+        "en": "Clear drawing",
+        "ja": "消去する",
+        "qps-ploc": "⟦Ƈŀėȧř ḓřȧẇïñɠ ŀőřė⟧"
+      },
+      "sketch_drop_hint": {
+        "en": "Drop or paste an image to use it as the background.",
+        "ja": "画像をドロップまたは貼り付けると背景になります。",
+        "qps-ploc": "⟦Ḓřőṗ őř ṗȧşŧė ȧñ ïɱȧɠė ŧő ůşė ïŧ ȧş ŧħė ƀȧƈķɠřőůñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "sketch_background_added": {
+        "en": "Background image added.",
+        "ja": "背景画像を追加しました。",
+        "qps-ploc": "⟦Ƀȧƈķɠřőůñḓ ïɱȧɠė ȧḓḓėḓ. ŀőřėɱ ï⟧"
+      },
+      "sketch_background_rejected": {
+        "en": "{file} is not an image.",
+        "ja": "{file} は画像ではありません。",
+        "qps-ploc": "⟦{file} ïş ñőŧ ȧñ ïɱȧɠė. ŀőřėɱ ï⟧"
+      },
+      "voice_input_dictate": {
+        "en": "Dictate",
+        "ja": "音声入力",
+        "qps-ploc": "⟦Ḓïƈŧȧŧė ŀőř⟧"
+      },
+      "voice_input_record": {
+        "en": "Record",
+        "ja": "録音",
+        "qps-ploc": "⟦Řėƈőřḓ ŀőř⟧"
+      },
+      "voice_input_hold": {
+        "en": "Hold to talk",
+        "ja": "押して話す",
+        "qps-ploc": "⟦Ħőŀḓ ŧő ŧȧŀķ ŀőř⟧"
+      },
+      "voice_input_hold_hint": {
+        "en": "Hold the button, or hold Space, while you talk.",
+        "ja": "話している間、ボタン(またはスペースキー)を押し続けてください。",
+        "qps-ploc": "⟦Ħőŀḓ ŧħė ƀůŧŧőñ, őř ħőŀḓ Şṗȧƈė, ẇħïŀė ẏőů ŧȧŀķ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "voice_input_requesting": {
+        "en": "Waiting for microphone access…",
+        "ja": "マイクの許可を待っています…",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ɱïƈřőṗħőñė ȧƈƈėşş… ŀőřėɱ ïṗşů⟧"
+      },
+      "voice_input_listening": {
+        "en": "Listening…",
+        "ja": "聞き取っています…",
+        "qps-ploc": "⟦Ŀïşŧėñïñɠ… ŀőř⟧"
+      },
+      "voice_input_recording": {
+        "en": "Recording…",
+        "ja": "録音しています…",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ… ŀőř⟧"
+      },
+      "voice_input_processing": {
+        "en": "Finishing…",
+        "ja": "仕上げています…",
+        "qps-ploc": "⟦Ƒïñïşħïñɠ… ŀőř⟧"
+      },
+      "voice_input_transcribing": {
+        "en": "Transcribing…",
+        "ja": "文字起こししています…",
+        "qps-ploc": "⟦Ŧřȧñşƈřïƀïñɠ… ŀőřė⟧"
+      },
+      "voice_input_stopped": {
+        "en": "Stopped",
+        "ja": "停止しました",
+        "qps-ploc": "⟦Şŧőṗṗėḓ ŀőř⟧"
+      },
+      "voice_input_unsupported_dictation": {
+        "en": "Voice input isn't available in this browser.",
+        "ja": "このブラウザでは音声入力を使えません。",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ ïşñ'ŧ ȧṽȧïŀȧƀŀė ïñ ŧħïş ƀřőẇşėř. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "voice_input_unsupported_record": {
+        "en": "Recording isn't available in this browser.",
+        "ja": "このブラウザでは録音を使えません。",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ ïşñ'ŧ ȧṽȧïŀȧƀŀė ïñ ŧħïş ƀřőẇşėř. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "voice_input_error_permission_denied": {
+        "en": "Microphone access was blocked.",
+        "ja": "マイクへのアクセスが許可されませんでした。",
+        "qps-ploc": "⟦Ɱïƈřőṗħőñė ȧƈƈėşş ẇȧş ƀŀőƈķėḓ. ŀőřėɱ ïṗşů⟧"
+      },
+      "voice_input_error_no_speech": {
+        "en": "No speech was heard. Try again.",
+        "ja": "音声を聞き取れませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ñő şṗėėƈħ ẇȧş ħėȧřḓ. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşů⟧"
+      },
+      "voice_input_error_network": {
+        "en": "Voice recognition needs a network connection.",
+        "ja": "音声認識にはネットワーク接続が必要です。",
+        "qps-ploc": "⟦Ṽőïƈė řėƈőɠñïŧïőñ ñėėḓş ȧ ñėŧẇőřķ ƈőññėƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "voice_input_error_aborted": {
+        "en": "Voice input was interrupted.",
+        "ja": "音声入力が中断されました。",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ ẇȧş ïñŧėřřůṗŧėḓ. ŀőřėɱ ïṗş⟧"
+      },
+      "voice_input_error_unknown": {
+        "en": "Voice input stopped because of an error.",
+        "ja": "エラーのため音声入力を停止しました。",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ şŧőṗṗėḓ ƀėƈȧůşė őƒ ȧñ ėřřőř. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "voice_state_idle": {
+        "en": "Idle",
+        "ja": "待機中",
+        "qps-ploc": "⟦Ïḓŀė ŀőř⟧"
+      },
+      "voice_state_listening": {
+        "en": "Listening",
+        "ja": "聞いています",
+        "qps-ploc": "⟦Ŀïşŧėñïñɠ ŀőř⟧"
+      },
+      "voice_state_thinking": {
+        "en": "Thinking",
+        "ja": "考えています",
+        "qps-ploc": "⟦Ŧħïñķïñɠ ŀőř⟧"
+      },
+      "voice_state_speaking": {
+        "en": "Speaking",
+        "ja": "話しています",
+        "qps-ploc": "⟦Şṗėȧķïñɠ ŀőř⟧"
+      },
+      "voice_state_muted": {
+        "en": "Muted",
+        "ja": "ミュート中",
+        "qps-ploc": "⟦Ɱůŧėḓ ŀőř⟧"
+      },
+      "voice_state_error": {
+        "en": "Something went wrong",
+        "ja": "問題が発生しました",
+        "qps-ploc": "⟦Şőɱėŧħïñɠ ẇėñŧ ẇřőñɠ ŀőřėɱ ⟧"
       }
     }
   }

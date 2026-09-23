@@ -5,6 +5,7 @@
  * migration window, but payload normalization and the handoff shape are owned
  * here so a new unified adapter cannot silently diverge from an old CLI.
  */
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 import type { PadRecord } from './storage.js';
 import { getPadAdapter, type AdapterCaptureInput, type AdapterCaptureResult } from './adapters.js';
 import type { PadId } from './registry.js';
@@ -156,9 +157,16 @@ export function legacyPayloadToAdapterInput(
   }
 }
 
-/** Parse and validate a legacy body through the same adapter as the unified UI. */
-export function composeLegacyCapture(padId: PadId, payload: LegacyPayload): AdapterCaptureResult {
-  const adapter = getPadAdapter(padId);
+/**
+ * Parse and validate a legacy body through the same adapter as the unified UI.
+ * `locale` selects the composed body's wording (defaults to the process locale).
+ */
+export function composeLegacyCapture(
+  padId: PadId,
+  payload: LegacyPayload,
+  locale?: SupportedLocale
+): AdapterCaptureResult {
+  const adapter = getPadAdapter(padId, locale);
   // Preserve historical route semantics (memory/daily/meeting accepted an
   // explicit empty submit) while still forcing every payload through the
   // typed adapter. The unified shell keeps its stricter input gate.
