@@ -3,10 +3,13 @@ import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
 import { readSafeJsonFile } from '../lib/json-input.js';
+import { safeWriteFile } from '@agent/core/secure-io';
 import { isLocalPadOriginAllowed } from '../lib/local-artifact-pad.js';
+import { padT } from '../lib/pad-ui.js';
 import {
   main,
   PERSONAL_WORKBENCH_DEFAULT_PORT,
+  readPersonalWorkbenchEntries,
   validatePersonalWorkbenchContentLength,
 } from './server.js';
 import {
@@ -46,8 +49,33 @@ describe('personal workbench', () => {
     expect(source).toContain('isLocalPadOriginAllowed');
     expect(source).toContain('requires_human_approval: true');
     expect(source).toContain('Capture stores proposals only');
-    expect(source).toContain('承認して作成');
+    // The approve-and-create step is a kit button whose label comes from the vocabulary.
+    const client = readTextFile(
+      pathResolver.rootResolve('scripts/personal-workbench/workbench-client.js')
+    );
+    expect(client).toContain("K('cal_apply')");
+    expect(padT('ja')('personal_workbench:cal_apply')).toContain('承認して作成');
     expect(source).not.toContain('node:fs');
+  });
+
+  it('reads the saved proposal index (a JSON array) back', () => {
+    const dir = pathResolver.sharedTmp('personal-workbench-test-entries');
+    const indexPath = `${dir}/entries.json`;
+    const entry = {
+      id: 'pwb-test',
+      kind: 'task',
+      title: 'File taxes',
+      body: 'Before Friday',
+      metadata: {},
+      status: 'proposed',
+      created_at: '2026-09-24T00:00:00.000Z',
+    };
+    safeWriteFile(indexPath, JSON.stringify([entry, { kind: 'bogus', title: 1 }]), {
+      mkdir: true,
+      encoding: 'utf8',
+    });
+    expect(readPersonalWorkbenchEntries(indexPath)).toEqual([entry]);
+    expect(readPersonalWorkbenchEntries(`${dir}/missing.json`)).toEqual([]);
   });
 
   it('allows only localhost origins', () => {
