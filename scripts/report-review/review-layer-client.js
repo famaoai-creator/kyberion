@@ -456,8 +456,14 @@ async function start() {
   }
 
   function saveToFile() {
+    // Resolve against the page origin, never the report's <base href>.
+    const saveUrl = sameOriginModuleUrl(saveConfig.url, window.location);
+    if (!saveUrl) {
+      setStatus(t('report_review:save_failed', { error: 'same-origin' }), 'danger');
+      return;
+    }
     setStatus(t('report_review:saving'), 'info');
-    fetch(saveConfig.url, {
+    fetch(saveUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/html', 'x-rv-token': saveConfig.token },
       body: documentHtml(false),

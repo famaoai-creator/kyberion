@@ -134,9 +134,7 @@ export function createReportReviewRequestHandler(
   function serveHtml(locale: SupportedLocale): string {
     let html = stripInjected(readReportReviewTextFile(target));
     const cfg = `${CFG_OPEN}<script>window.__RV_SAVE__={url:'/save',token:'${TOKEN}'};</script>${CFG_CLOSE}`;
-    html = /<head[^>]*>/i.test(html)
-      ? html.replace(/<head[^>]*>/i, (m) => `${m}\n${cfg}`)
-      : cfg + html;
+    html = injectSaveConfig(html, cfg);
     // レイヤが未焼き込みの場合のみ、配信時にオーバーレイ注入する
     if (!/id="rv-bar"/.test(html)) {
       const layer = reviewLayerMarkup({
@@ -304,6 +302,18 @@ export function createReportReviewRequestHandler(
       }
     }
   };
+}
+
+// Keep both save-config markers inside <head>: a report without one would
+// otherwise leave the opening marker on the Document node, so the saved
+// file could not be stripped of the token script.
+export function injectSaveConfig(html: string, cfg: string): string {
+  if (/<head[\s>]/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => `${m}\n${cfg}`);
+  if (/<html[\s>]/i.test(html))
+    return html.replace(/<html[^>]*>/i, (m) => `${m}<head>${cfg}</head>`);
+  if (/<!doctype[^>]*>/i.test(html))
+    return html.replace(/<!doctype[^>]*>/i, (m) => `${m}<head>${cfg}</head>`);
+  return `<head>${cfg}</head>${html}`;
 }
 
 export async function main(

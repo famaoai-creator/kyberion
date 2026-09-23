@@ -7,6 +7,7 @@ import { safeReaddir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { RV_LAYER_CLOSE, RV_LAYER_OPEN } from './review-layer.js';
 import {
+  injectSaveConfig,
   createReportReviewRequestHandler,
   main,
   readReportReviewRequestBody,
@@ -102,6 +103,23 @@ describe('report review server harness boundary', () => {
     expect(source).toContain('server.requestTimeout = REPORT_REVIEW_REQUEST_TIMEOUT_MS');
     expect(source).toContain('REPORT_REVIEW_MAX_CONCURRENT_HEAVY_REQUESTS');
     expect(source).toContain('request body too large');
+  });
+});
+
+describe('injectSaveConfig', () => {
+  const cfg = '<!--RV-SAVE-CONFIG--><script>x</script><!--/RV-SAVE-CONFIG-->';
+  it('keeps both markers inside <head> whatever the report structure', () => {
+    for (const report of [
+      '<!doctype html><html><head><title>T</title></head><body>b</body></html>',
+      '<!doctype html><html lang="en"><body>b</body></html>',
+      '<!doctype html><p>b</p>',
+      '<p>b</p>',
+    ]) {
+      const html = injectSaveConfig(report, cfg);
+      const head = /<head[^>]*>([\s\S]*?)<\/head>/i.exec(html);
+      expect(head?.[1]).toContain(cfg);
+      expect(html.indexOf(cfg)).toBeGreaterThan(html.search(/<head[\s>]/i));
+    }
   });
 });
 

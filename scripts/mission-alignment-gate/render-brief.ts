@@ -118,6 +118,7 @@ function briefMessages(locale?: SupportedLocale) {
     deciderNamePrompt: mt('mission_alignment:decider_name_prompt'),
     sending: mt('mission_alignment:sending'),
     failed: (error: string) => mt('mission_alignment:failed', { error }),
+    offline: mt('mission_alignment:offline_copy'),
     approvedShort: mt('mission_alignment:approved_short'),
     changesShort: mt('mission_alignment:changes_short'),
     submitted: (requestId: string) => mt('mission_alignment:approval_submitted', { requestId }),
@@ -330,11 +331,12 @@ function renderGateSection(
       submitted: m.submitted('__REQUEST_ID__'),
       sending: m.sending,
       failed: m.failed('__ERROR__'),
+      offline: m.offline,
       deciderNamePrompt: m.deciderNamePrompt,
     })};
     async function mgDecide(d){
       var cfg = window.__MG_APPROVAL__;
-      if (!cfg) { document.getElementById('mg-status').textContent = MG_MESSAGES.failed.replace('__ERROR__', 'offline copy'); return; }
+      if (!cfg) { document.getElementById('mg-status').textContent = MG_MESSAGES.offline; return; }
       var status = document.getElementById('mg-status');
       var reason = document.getElementById('mg-reason').value;
       if (d === 'rejected' && !reason) { status.textContent = MG_MESSAGES.chooseReason; return; }
