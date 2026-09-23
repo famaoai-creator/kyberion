@@ -79,6 +79,22 @@ describe('parsePluginPermissionRequest', () => {
 });
 
 describe('narrowPluginPermissions', () => {
+  it('keeps a wildcard host that equals a wildcard ceiling entry', () => {
+    const wildcardPolicy = policy();
+    wildcardPolicy.ceilings.curated.network = {
+      mode: 'allowlist',
+      hosts: ['*.cdn.example.com'],
+      allow_wildcard_hosts: true,
+    };
+    const request = parsePluginPermissionRequest({
+      network: { mode: 'allowlist', hosts: ['*.cdn.example.com', 'a.cdn.example.com'] },
+    });
+    const { granted } = narrowPluginPermissions(request, wildcardPolicy, { trust: 'curated' });
+    expect(granted.network).toEqual({
+      mode: 'allowlist',
+      hosts: ['*.cdn.example.com', 'a.cdn.example.com'],
+    });
+  });
   it('never widens: third-party gets readonly public only, other capabilities stripped', () => {
     const request = parsePluginPermissionRequest({
       fs: { mode: 'readwrite', paths: [{ tier: 'public', prefix: 'docs/guides' }] },

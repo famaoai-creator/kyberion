@@ -131,6 +131,30 @@ describe('plugin grant binding and comparison', () => {
     expect(() => legacy.narrow(EMPTY_PLUGIN_GRANT)).toThrow('[PLUGIN_GRANT_RELOAD_REQUIRED]');
   });
 
+  it('wraps results deeply but leaves pure data and frozen objects usable', async () => {
+    const binding = createPluginGrantBinding('deep', EMPTY_PLUGIN_GRANT);
+    const data = { rows: [1, 2], nested: { label: 'x' } };
+    const frozen = Object.freeze({ policy: () => getActiveSandboxPolicy()?.mode });
+    const api = binding.wrapObject({
+      data: () => data,
+      frozen: () => frozen,
+      *sync(): Generator<string | undefined> {
+        yield getActiveSandboxPolicy()?.mode;
+      },
+      fluent() {
+        return this;
+      },
+    });
+    expect(api.data()).toBe(data);
+    expect(structuredClone(api.data())).toEqual(data);
+    expect(api.frozen().policy()).toBe('read-only');
+    expect(await Promise.resolve(api.frozen()).then((value) => value.policy())).toBe('read-only');
+    expect([...api.sync()]).toEqual(['read-only']);
+    expect(api.fluent()).toBe(api);
+    expect(api.frozen).toBe(api.frozen);
+    expect(getActiveSandboxPolicy()).toBeUndefined();
+  });
+
   it('compares grants capability by capability', () => {
     const wide = grant({
       network: { mode: 'allowlist', hosts: ['*.example.com'] },

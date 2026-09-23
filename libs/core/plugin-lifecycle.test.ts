@@ -25,6 +25,7 @@ import {
 import { runOpPreflight } from './op-preflight.js';
 import { getSecret } from './secret-guard.js';
 import { getPluginEnv } from './plugin-grant-runtime.js';
+import { getPluginExecutionContext } from './sandbox-policy.js';
 import type { PluginPermissionGrant } from './plugin-permissions.js';
 import {
   activatePlugin,
@@ -288,6 +289,51 @@ describe('plugin lifecycle e2e with the permissions fixture (EP-03/EP-04)', () =
     expect(ownerOf('ops', 'permfixture:write')).toBe(pluginId);
   });
 
+  it('deactivates the previous activation when the new version is rejected', async () => {
+    const { pluginId, managedRoot } = newIds('permfixture-rejected');
+    const record = installApproved(pluginId, fixtureSource(), managedRoot);
+    await activatePlugin({ record }, { managedRoot });
+    const pending = installApproved(
+      pluginId,
+      fixtureSource('export const x = 1;\n'),
+      managedRoot,
+      false
+    );
+    const request = loadApprovalRequest(
+      pending.approvalChannel as string,
+      pending.approvalRequestId as string
+    );
+    decideApprovalRequest('mission_controller', {
+      channel: pending.approvalChannel as string,
+      requestId: pending.approvalRequestId as string,
+      decision: 'rejected',
+      decidedBy: 'human:operator',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: request?.accountability?.payloadHash,
+      effectBinding: request?.accountability?.effectBinding,
+    });
+    const result = await reloadPlugin(pluginId);
+    expect(result).toMatchObject({ ok: false, rolledBack: false });
+    expect(result.reason).toMatch(/no longer activatable \(approval rejected\)/);
+    expect(isPluginActive(pluginId)).toBe(false);
+    expect(ownerOf('ops', 'permfixture:write')).toBeUndefined();
+  });
+
+  it('deactivates the previous activation when the managed copy was tampered with', async () => {
+    const { pluginId, managedRoot } = newIds('permfixture-tampered');
+    const record = installApproved(pluginId, fixtureSource(), managedRoot);
+    await activatePlugin({ record }, { managedRoot });
+    withExecutionContext('mission_controller', () =>
+      safeWriteFile(path.join(record.managedPath, 'index.mjs'), 'export const tampered = 1;\n')
+    );
+    const result = await reloadPlugin(pluginId);
+    expect(result).toMatchObject({ ok: false, rolledBack: false });
+    expect(result.reason).toMatch(/no longer activatable \(status=blocked_digest_mismatch\)/);
+    expect(isPluginActive(pluginId)).toBe(false);
+    expect(listOwned(pluginId)).toEqual([]);
+  });
+
   it('rolls back to the previous module when the new module fails to activate', async () => {
     const { pluginId, managedRoot } = newIds('permfixture-rollback');
     const record = installApproved(pluginId, fixtureSource(), managedRoot);
@@ -305,6 +351,52 @@ describe('plugin lifecycle e2e with the permissions fixture (EP-03/EP-04)', () =
     expect(isPluginActive(pluginId)).toBe(true);
     expect(ownerOf('ops', 'permfixture:write')).toBe(pluginId);
     await expect(runOp('env', {}, probe)).resolves.toEqual({});
+  });
+
+  function withFsPermission(source: string, fs: Record<string, unknown>): string {
+    const manifestPath = path.join(source, 'plugin-manifest.json');
+    const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
+    manifest.permissions.fs = fs;
+    safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
+    return source;
+  }
+  const broken =
+    "export const registerKyberionContributions = () => { throw new Error('v2 is broken'); };\n";
+  const fsModeProbe = { ...probe, env: () => getPluginExecutionContext()?.grant.fs };
+
+  it('rolls back under the narrower new grant, never the previous wider one', async () => {
+    const { pluginId, managedRoot } = newIds('permfixture-rollback-narrow');
+    const record = installApproved(pluginId, fixtureSource(), managedRoot);
+    expect(record.grantedPermissions?.fs.mode).toBe('readonly');
+    await activatePlugin({ record }, { managedRoot });
+    const v2 = installApproved(
+      pluginId,
+      withFsPermission(fixtureSource(broken), { mode: 'none' }),
+      managedRoot
+    );
+    expect(v2.grantedPermissions?.fs.mode).toBe('none');
+    const result = await reloadPlugin(pluginId);
+    expect(result).toMatchObject({ ok: false, mode: 'plugin_reload', rolledBack: true });
+    await expect(runOp('env', {}, fsModeProbe)).resolves.toMatchObject({ mode: 'none' });
+  });
+
+  it('does not re-activate the previous module when the grants are incomparable', async () => {
+    const { pluginId, managedRoot } = newIds('permfixture-rollback-disjoint');
+    const scoped = (prefix: string) => ({
+      mode: 'readonly',
+      paths: [{ tier: 'public', prefix }],
+    });
+    const record = installApproved(
+      pluginId,
+      withFsPermission(fixtureSource(), scoped('alpha')),
+      managedRoot
+    );
+    await activatePlugin({ record }, { managedRoot });
+    installApproved(pluginId, withFsPermission(fixtureSource(broken), scoped('beta')), managedRoot);
+    const result = await reloadPlugin(pluginId);
+    expect(result).toMatchObject({ ok: false, mode: 'restart_required', rolledBack: false });
+    expect(isPluginActive(pluginId)).toBe(false);
+    expect(listOwned(pluginId)).toEqual([]);
   });
 
   it('reports restart_required when the rollback also fails', async () => {

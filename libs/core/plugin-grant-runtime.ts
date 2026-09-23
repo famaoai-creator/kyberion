@@ -30,6 +30,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
 import { readJson } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
+import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
 import {
   isLegacyCoworkPermissionsBlock,
   loadPluginPermissionPolicy,
@@ -188,9 +189,55 @@ export interface PluginGrantBinding {
   /** Narrow-only replacement (config_apply); throws when `next` would widen. */
   narrow(next: PluginPermissionGrant): void;
   run<T>(fn: () => T): T;
+  /**
+   * The call and everything it hands back run under the grant: returned
+   * functions, (async) iterators, promise results and objects with methods
+   * or getters are wrapped recursively (lazily, on access).
+   */
   wrapFunction<F extends (...args: any[]) => any>(fn: F): F;
-  /** Shallow: function-valued members run under the grant. */
+  /** Function-valued members, getters and their results run under the grant. */
   wrapObject<T>(value: T): T;
+}
+
+// Built-in data containers are returned as-is: proxying them breaks internal
+// slots (typed arrays, Map/Set) and structured cloning.
+function isBuiltinData(value: object): boolean {
+  return (
+    Array.isArray(value) ||
+    ArrayBuffer.isView(value) ||
+    value instanceof ArrayBuffer ||
+    value instanceof Date ||
+    value instanceof RegExp ||
+    value instanceof Map ||
+    value instanceof Set ||
+    value instanceof WeakMap ||
+    value instanceof WeakSet ||
+    value instanceof Error
+  );
+}
+
+const MAX_PLAIN_SCAN_DEPTH = 4;
+const MAX_PLAIN_SCAN_KEYS = 256;
+
+/**
+ * Plain data objects are only proxied when they (transitively) carry
+ * executable members, so pure data results stay cloneable. Class instances,
+ * generators and iterators always carry prototype methods.
+ */
+function carriesExecutable(value: object, depth = 0): boolean {
+  if (isBuiltinData(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return true;
+  const keys = Reflect.ownKeys(value);
+  if (keys.length > MAX_PLAIN_SCAN_KEYS || depth >= MAX_PLAIN_SCAN_DEPTH) return true;
+  return keys.some((key) => {
+    const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+    if (!descriptor) return false;
+    if (!('value' in descriptor)) return true;
+    const member: unknown = descriptor.value;
+    if (typeof member === 'function') return true;
+    return member !== null && typeof member === 'object' && carriesExecutable(member, depth + 1);
+  });
 }
 
 export function createPluginGrantBinding(
@@ -203,12 +250,85 @@ export function createPluginGrantBinding(
   const legacy = current === null;
   const run = <T>(fn: () => T): T =>
     current === null ? fn() : runWithPluginGrant(current, pluginId, fn);
+
+  const wrappedFunctions = new WeakMap<Function, Function>();
+  const proxies = new WeakMap<object, object>();
+  const produced = new WeakSet<object>();
+
+  const wrapCallable = (fn: Function): Function => {
+    if (produced.has(fn)) return fn;
+    const cached = wrappedFunctions.get(fn);
+    if (cached) return cached;
+    const wrapped = function wrapped(this: unknown, ...args: unknown[]): unknown {
+      if (new.target) return wrapResult(run(() => Reflect.construct(fn, args, fn)));
+      return wrapResult(run(() => Reflect.apply(fn, this, args)));
+    };
+    wrappedFunctions.set(fn, wrapped);
+    produced.add(wrapped);
+    return wrapped;
+  };
+
+  const wrapTarget = (target: object): object => {
+    if (produced.has(target)) return target;
+    const cached = proxies.get(target);
+    if (cached) return cached;
+    const methods = new Map<PropertyKey, { member: Function; bound: Function }>();
+    const readMember = (property: PropertyKey): unknown => {
+      // Getters are plugin code too.
+      const member: unknown = run(() => Reflect.get(target, property, target));
+      if (typeof member !== 'function') return wrapResult(member);
+      const known = methods.get(property);
+      if (known && known.member === member) return known.bound;
+      const bound = function method(this: unknown, ...args: unknown[]): unknown {
+        const result: unknown = run(() => Reflect.apply(member, target, args));
+        // Fluent / iterator-protocol methods returning the target keep the wrapper.
+        return result === target ? proxy : wrapResult(result);
+      };
+      produced.add(bound);
+      methods.set(property, { member, bound });
+      return bound;
+    };
+    // A shadow target keeps Proxy invariants satisfiable for frozen objects.
+    const proxy: object = new Proxy(Object.create(null) as object, {
+      get: (_shadow, property) => readMember(property),
+      set: (_shadow, property, value) => run(() => Reflect.set(target, property, value, target)),
+      has: (_shadow, property) => Reflect.has(target, property),
+      ownKeys: () => Reflect.ownKeys(target),
+      deleteProperty: (_shadow, property) => Reflect.deleteProperty(target, property),
+      getPrototypeOf: () => Reflect.getPrototypeOf(target),
+      getOwnPropertyDescriptor: (_shadow, property) => {
+        const descriptor = Reflect.getOwnPropertyDescriptor(target, property);
+        if (!descriptor) return undefined;
+        return 'value' in descriptor
+          ? {
+              value: readMember(property),
+              writable: descriptor.writable,
+              enumerable: descriptor.enumerable,
+              configurable: true,
+            }
+          : {
+              get: () => readMember(property),
+              enumerable: descriptor.enumerable,
+              configurable: true,
+            };
+      },
+    });
+    proxies.set(target, proxy);
+    produced.add(proxy);
+    return proxy;
+  };
+
+  function wrapResult(value: unknown): unknown {
+    if (legacy) return value;
+    if (typeof value === 'function') return wrapCallable(value);
+    if (value === null || typeof value !== 'object') return value;
+    if (value instanceof Promise) return value.then((resolved: unknown) => wrapResult(resolved));
+    return carriesExecutable(value) ? wrapTarget(value) : value;
+  }
+
   const wrapFunction = <F extends (...args: any[]) => any>(fn: F): F =>
-    legacy
-      ? fn
-      : (function wrapped(this: unknown, ...args: unknown[]) {
-          return run(() => fn.apply(this, args));
-        } as unknown as F);
+    legacy ? fn : (wrapCallable(fn) as F);
+
   return {
     pluginId,
     get grant() {
@@ -232,15 +352,9 @@ export function createPluginGrantBinding(
     wrapFunction,
     wrapObject<T>(value: T): T {
       if (legacy) return value;
-      if (typeof value === 'function') return wrapFunction(value as any) as unknown as T;
+      if (typeof value === 'function') return wrapCallable(value) as T;
       if (value === null || typeof value !== 'object') return value;
-      return new Proxy(value as object, {
-        get(target, property) {
-          const member = Reflect.get(target, property, target);
-          if (typeof member !== 'function') return member;
-          return (...args: unknown[]) => run(() => member.apply(target, args));
-        },
-      }) as T;
+      return wrapTarget(value) as T;
     },
   };
 }
@@ -273,15 +387,13 @@ export interface ResolvedPluginExecutionGrant {
   reason: string;
 }
 
-const MANIFEST_CANDIDATES = ['plugin-manifest.json', 'plugin.json', '.claude-plugin/plugin.json'];
-
 /** Locates the nearest plugin manifest above an entry path (mirrors the loader walk). */
 export function findPluginManifestFor(
   sourcePath: string
 ): { path: string; raw: Record<string, unknown> } | undefined {
   let cursor = path.dirname(path.resolve(sourcePath));
   for (let depth = 0; depth < 6; depth += 1) {
-    for (const candidate of MANIFEST_CANDIDATES) {
+    for (const candidate of PLUGIN_MANIFEST_CANDIDATES) {
       const manifestPath = path.join(cursor, candidate);
       if (!safeExistsSync(manifestPath)) continue;
       const stat = safeLstat(manifestPath);
@@ -319,6 +431,9 @@ const undeclaredOfficialLogged = new Set<string>();
  */
 export interface ManagedPluginGrantRecord {
   pluginId: string;
+  /** Verified provenance trust of the managed install (official / curated / third-party). */
+  trust?: string;
+  manifest?: { raw: Record<string, unknown> } | null;
   grantedPermissions?: PluginPermissionGrant;
 }
 export type ManagedPluginGrantLookup = (
@@ -330,6 +445,56 @@ let managedPluginGrantLookup: ManagedPluginGrantLookup | undefined;
 
 export function setManagedPluginGrantLookup(lookup: ManagedPluginGrantLookup | undefined): void {
   managedPluginGrantLookup = lookup;
+}
+
+function narrowOfficialDeclaration(manifest: Record<string, unknown>): PluginPermissionGrant {
+  return narrowPluginPermissions(
+    parsePluginPermissionRequest(manifest.permissions),
+    loadPluginPermissionPolicy(),
+    { trust: 'official' }
+  ).granted;
+}
+
+/**
+ * The execution grant of a managed install, shared by the skill path and the
+ * lifecycle so both treat the same record identically. The managed copy lives
+ * outside `plugins/`, so its path never reads as official: the record's
+ * verified trust decides. Official without an EP-02 declaration => null
+ * (unwrapped legacy path); official with one => its approved grant;
+ * everything else => its approved grant or the empty grant.
+ */
+export function resolveManagedRecordExecutionGrant(
+  record: ManagedPluginGrantRecord
+): ResolvedPluginExecutionGrant {
+  if (record.trust === 'official') {
+    const raw = record.manifest?.raw;
+    if (!hasEp02PermissionDeclaration(raw)) {
+      return {
+        grant: null,
+        source: 'undeclared_official',
+        reason: `official managed install '${record.pluginId}' without an EP-02 declaration (legacy trusted path)`,
+      };
+    }
+    return {
+      grant: parsePluginPermissionGrant(
+        record.grantedPermissions ?? narrowOfficialDeclaration(raw as Record<string, unknown>)
+      ),
+      source: 'managed_record',
+      reason: `approved grant of official managed install '${record.pluginId}'`,
+    };
+  }
+  if (record.grantedPermissions) {
+    return {
+      grant: parsePluginPermissionGrant(record.grantedPermissions),
+      source: 'managed_record',
+      reason: `approved grant of managed install '${record.pluginId}'`,
+    };
+  }
+  return {
+    grant: EMPTY_PLUGIN_GRANT,
+    source: 'deny_by_default',
+    reason: `managed install '${record.pluginId}' has no approved permission grant`,
+  };
 }
 
 function findManagedRecord(
@@ -359,13 +524,7 @@ export function resolvePluginExecutionGrant(
         };
       }
       const record = findManagedRecord(subject.sourcePath, options.managedRoot);
-      if (record?.grantedPermissions) {
-        return {
-          grant: parsePluginPermissionGrant(record.grantedPermissions),
-          source: 'managed_record',
-          reason: `approved grant of managed install '${record.pluginId}'`,
-        };
-      }
+      if (record) return resolveManagedRecordExecutionGrant(record);
       return deny('no approved permission grant; third-party plugins are deny-by-default');
     }
 
@@ -392,13 +551,8 @@ export function resolvePluginExecutionGrant(
         reason: 'official plugin without an EP-02 declaration (legacy trusted path)',
       };
     }
-    const { granted } = narrowPluginPermissions(
-      parsePluginPermissionRequest(manifest!.raw.permissions),
-      loadPluginPermissionPolicy(),
-      { trust: 'official' }
-    );
     return {
-      grant: granted,
+      grant: narrowOfficialDeclaration(manifest!.raw),
       source: 'manifest_declaration',
       reason: 'official declaration narrowed against the official ceiling',
     };

@@ -4,7 +4,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import { decideApprovalRequest, loadApprovalRequest } from './approval-store.js';
-import { installPluginManaged, refreshManagedPluginActivation } from './plugin-managed-install.js';
+import {
+  installPluginManaged,
+  refreshManagedPluginActivation,
+  type ManagedPluginRecord,
+} from './plugin-managed-install.js';
+import { activatePlugin, deactivatePlugin } from './plugin-lifecycle.js';
+import { getActiveSandboxPolicy, getPluginExecutionContext } from './sandbox-policy.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -25,7 +31,7 @@ import {
   readSkillPluginsConfig,
   SKILL_PLUGINS_CONFIG_FILENAME,
 } from './skill-plugin-loader.js';
-import { resolveActuatorOperation } from './actuator-op-registry.js';
+import { resolveActuatorOperation, type ActuatorOperationHandler } from './actuator-op-registry.js';
 
 // Checked-in fixture (see the file itself for why it can't be written at
 // test time): resolves inside this repo's own plugins/ tree, so it is the
@@ -409,6 +415,134 @@ describe('loadAuthorizedSkillPlugins', () => {
     expect(diagnostics[0]?.reason).toMatch(/trust is unresolved/);
   });
 });
+function approveManaged(record: ManagedPluginRecord, managedRoot: string): ManagedPluginRecord {
+  const pending = loadApprovalRequest(
+    record.approvalChannel as string,
+    record.approvalRequestId as string
+  );
+  decideApprovalRequest('mission_controller', {
+    channel: record.approvalChannel as string,
+    requestId: record.approvalRequestId as string,
+    decision: 'approved',
+    decidedBy: 'human:operator',
+    decidedByType: 'human',
+    authenticated: true,
+    payloadHash: pending?.accountability?.payloadHash,
+    effectBinding: pending?.accountability?.effectBinding,
+  });
+  const refreshed = refreshManagedPluginActivation(record.pluginId, managedRoot);
+  expect(refreshed?.activationStatus).toBe('activatable');
+  return refreshed as ManagedPluginRecord;
+}
+
+describe('plugin grants on the skill path (EP-03)', () => {
+  const frameProbe = () => getPluginExecutionContext()?.grant ?? 'host';
+
+  async function invokeOp(domain: string, action: string, probe: object): Promise<unknown> {
+    const handler = resolveActuatorOperation(domain, action)?.handler as ActuatorOperationHandler;
+    return (await handler(action, {}, { probe }, 'apply')).ctx;
+  }
+
+  it('treats an undeclared official managed install as unwrapped, like the lifecycle', async () => {
+    const managedRoot = managedRootDir('official-parity');
+    const record = installPluginManaged({
+      pluginId: `official-parity-${process.pid}`,
+      sourcePath: path.dirname(CONTRIBUTION_FIXTURE_PATH),
+      managedRoot,
+    });
+    expect(record).toMatchObject({ trust: 'official', activationStatus: 'activatable' });
+    const cwd = cwdDir('official-parity');
+    writeConfig(cwd, [path.join(record.managedPath, 'index.mjs')]);
+
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, managedRoot, undefined, {
+      trustResolved: true,
+    });
+    expect(diagnostics).toEqual([]);
+    expect(loaded[0]?.grant).toBeNull();
+    expect(loaded[0]?.contributions?.grant.grant).toBeNull();
+    // The fixture op returns its context; a wrapped plugin would run the probe in its frame.
+    const viaSkill = (
+      (await invokeOp('fixture', 'run', frameProbe)) as { probe: () => unknown }
+    ).probe();
+    disposeSkillPluginContributions(loaded);
+
+    await activatePlugin({ record }, { managedRoot });
+    const viaLifecycle = (
+      (await invokeOp('fixture', 'run', frameProbe)) as { probe: () => unknown }
+    ).probe();
+    deactivatePlugin(record.pluginId);
+    expect(viaSkill).toBe('host');
+    expect(viaLifecycle).toBe('host');
+  });
+
+  it('gives a declared official managed install its approved grant on both paths', async () => {
+    const managedRoot = managedRootDir('official-declared');
+    const record = installPluginManaged({
+      pluginId: `official-declared-${process.pid}`,
+      sourcePath: pathResolver.rootResolve('plugins/fixtures/plugin-permissions-fixture'),
+      managedRoot,
+    });
+    expect(record).toMatchObject({ trust: 'official', activationStatus: 'activatable' });
+    const cwd = cwdDir('official-declared');
+    writeConfig(cwd, [path.join(record.managedPath, 'index.mjs')]);
+    const envProbe = { env: frameProbe };
+
+    const { loaded } = await loadAuthorizedSkillPlugins(cwd, managedRoot, undefined, {
+      trustResolved: true,
+    });
+    expect(loaded[0]?.grant).toEqual(record.grantedPermissions);
+    const viaSkill = ((await invokeOp('permfixture', 'env', envProbe)) as { result: unknown })
+      .result;
+    disposeSkillPluginContributions(loaded);
+
+    await activatePlugin({ record }, { managedRoot });
+    const viaLifecycle = ((await invokeOp('permfixture', 'env', envProbe)) as { result: unknown })
+      .result;
+    deactivatePlugin(record.pluginId);
+    expect(viaSkill).toEqual(record.grantedPermissions);
+    expect(viaLifecycle).toEqual(record.grantedPermissions);
+  });
+
+  it('imports a managed plugin module under its approved grant', async () => {
+    const managedRoot = managedRootDir('import-grant');
+    const src = sourceDir('import-grant-source');
+    safeMkdir(src, { recursive: true });
+    safeWriteFile(
+      path.join(src, 'plugin-manifest.json'),
+      JSON.stringify({ plugin_id: 'import-grant-sample' })
+    );
+    safeWriteFile(
+      path.join(src, 'index.mjs'),
+      'export const importFrame = globalThis.__kyberionImportFrameProbe?.();\n'
+    );
+    const pluginId = `import-grant-${process.pid}-${randomUUID()}`.slice(0, 60);
+    const record = approveManaged(
+      installPluginManaged({ pluginId, sourcePath: src, managedRoot }),
+      managedRoot
+    );
+    const cwd = cwdDir('import-grant');
+    writeConfig(cwd, [path.join(record.managedPath, 'index.mjs')]);
+    const probeHost = globalThis as { __kyberionImportFrameProbe?: () => unknown };
+    probeHost.__kyberionImportFrameProbe = () => ({
+      pluginId: getPluginExecutionContext()?.pluginId,
+      sandbox: getActiveSandboxPolicy()?.mode,
+    });
+    try {
+      const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(
+        cwd,
+        managedRoot,
+        undefined,
+        { trustResolved: true }
+      );
+      expect(diagnostics).toEqual([]);
+      expect(loaded[0]?.grant).toEqual(record.grantedPermissions);
+      expect(loaded[0]?.module.importFrame).toEqual({ pluginId, sandbox: 'read-only' });
+    } finally {
+      delete probeHost.__kyberionImportFrameProbe;
+    }
+  });
+});
+
 describe('restricted skill policy', () => {
   it('allows overlays to narrow but never to reopen a restricted skill', () => {
     expect(

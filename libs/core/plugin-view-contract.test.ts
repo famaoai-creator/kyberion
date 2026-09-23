@@ -4,6 +4,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import type { A2UIMessage } from './a2ui.js';
+import { findPluginManifestFor } from './plugin-grant-runtime.js';
 import {
   decideApprovalRequest,
   listApprovalRequests,
@@ -316,6 +317,26 @@ describe('loadPluginViews (EP-05)', () => {
     expect(result.views[0].providedOps).toContain('permfixture:env');
   });
 
+  it('reads the Claude Code manifest location with the shared precedence', () => {
+    const dir = fixtureCopy();
+    const manifest = readFixture('plugin-manifest.json');
+    safeRmSync(path.join(dir, 'plugin-manifest.json'));
+    safeMkdir(path.join(dir, '.claude-plugin'), { recursive: true });
+    safeWriteFile(path.join(dir, '.claude-plugin/plugin.json'), manifest);
+    expect(loadPluginViews(dir).views.map((view) => view.declaration.id)).toEqual(['status']);
+
+    // With two candidates every reader picks the same one (installs refuse this).
+    safeWriteFile(
+      path.join(dir, 'plugin.json'),
+      JSON.stringify({ ...JSON.parse(manifest), plugin_id: 'portable-shadow' })
+    );
+    const views = loadPluginViews(dir).views;
+    expect(views[0]?.pluginId).toBe('plugin-permissions-fixture');
+    expect(findPluginManifestFor(path.join(dir, 'index.mjs'))?.path).toBe(
+      path.join(dir, '.claude-plugin/plugin.json')
+    );
+  });
+
   it('reports a symlinked document per view instead of following it', () => {
     const dir = fixtureCopy();
     const outside = path.join(TMP_ROOT, `outside-${randomUUID()}.json`);
@@ -509,12 +530,13 @@ describe('plugin views e2e with the permissions fixture (EP-05/EP-06)', () => {
       }).mode
     ).toBe('config_apply');
     // ...but the approval is bound to the content digest: the view disappears
-    // and a reload keeps the previous activation until a re-approval.
+    // and a reload deactivates the plugin until a re-approval.
     expect(listPluginViewsForViewer([mismatched], publicReader).views).toEqual([]);
     expectViewError(() => loadPluginViews(mismatched), 'PLUGIN_VIEW_DENIED');
     const blockedReload = await reloadPlugin(pluginId);
     expect(blockedReload).toMatchObject({ ok: false, rolledBack: false });
-    expect(blockedReload.reason).toContain('not activatable');
+    expect(blockedReload.reason).toContain('no longer activatable');
+    expect(listOwned(pluginId)).toEqual([]);
 
     // Re-install the edited version and approve it again.
     const edited = fixtureCopy({ 'views/status.a2ui.json': JSON.stringify(document) });
@@ -522,8 +544,8 @@ describe('plugin views e2e with the permissions fixture (EP-05/EP-06)', () => {
     const relisted = listPluginViewsForViewer(listManagedPlugins(managedRoot), publicReader);
     expect(relisted.views).toHaveLength(1);
     expect(relisted.views[0].contentDigest).toBe(v2.contentDigest);
-    // reloadPlugin does not know which paths changed, so it re-imports.
-    const reloaded = await reloadPlugin(pluginId);
+    // The deactivated plugin is activated again from the re-approved copy.
+    const reloaded = await reloadPlugin(pluginId, { managedRoot });
     expect(reloaded).toMatchObject({ ok: true, mode: 'plugin_reload' });
 
     expect(deactivatePlugin(pluginId).ok).toBe(true);

@@ -35,6 +35,28 @@ export const PLUGIN_RESERVED_SEAMS: readonly string[] = Object.freeze([
   'scenario-op-override',
 ]);
 
+/**
+ * Seams only official-provenance plugins may provide: they resolve secrets,
+ * identity context or receive the audit stream. Refused at install for
+ * non-official packages and again at activation — fail closed.
+ */
+export const PLUGIN_OFFICIAL_ONLY_SEAMS: readonly string[] = Object.freeze([
+  'audit-forwarder',
+  'identity-context-resolver',
+  'secret-resolver',
+]);
+
+/** The first declared official-only seam a plugin of `trust` may not provide. */
+export function findDisallowedOfficialOnlySeam(
+  seams: readonly unknown[] | undefined,
+  trust: string
+): string | undefined {
+  if (trust === 'official') return undefined;
+  return (seams ?? [])
+    .map((seam) => String(seam).trim())
+    .find((seam) => PLUGIN_OFFICIAL_ONLY_SEAMS.includes(seam));
+}
+
 export type PluginNetworkMode = 'none' | 'loopback' | 'allowlist';
 export type PluginFsMode = 'none' | 'readonly' | 'readwrite';
 export type PluginPermissionTier = 'public' | 'confidential' | 'personal';
@@ -287,7 +309,7 @@ function normalizeHost(raw: string, allowWildcard: boolean): string | null {
 }
 
 function hostCovered(requested: string, ceiling: string): boolean {
-  if (ceiling === '*') return true;
+  if (ceiling === '*' || requested === ceiling) return true;
   if (ceiling.startsWith('*.')) {
     const suffix = ceiling.slice(1); // ".example.com"
     const candidate = requested.startsWith('*.') ? requested.slice(1) : requested;
