@@ -370,3 +370,5 @@ export { say, speak } from './voice-synth.js';
 export * from './voice-stt.js';
 
 export * from './voice-provider-adapters.js';
+export * from './voice-tts-readiness-adopters.js';
+export * from './voice-stt-readiness-adopters.js';

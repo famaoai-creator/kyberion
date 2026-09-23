@@ -13,6 +13,8 @@
       "display_name": "Local FLUX Image Generation",
       "kind": "cli",
       "provider": "mflux",
+      "probe_adapter_id": "tool_runtime",
+      "runtime_id": "mflux",
       "status": "active",
       "platforms": ["darwin"],
       "supports": {

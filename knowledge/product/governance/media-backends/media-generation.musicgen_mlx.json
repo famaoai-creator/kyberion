@@ -13,6 +13,8 @@
       "display_name": "Local MusicGen (MLX)",
       "kind": "cli",
       "provider": "musicgen_mlx",
+      "probe_adapter_id": "tool_runtime",
+      "runtime_id": "musicgen_mlx",
       "status": "active",
       "platforms": ["darwin"],
       "supports": {

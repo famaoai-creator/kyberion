@@ -12,6 +12,7 @@ import {
   _resetMediaBackendAvailabilityCacheForTests,
   resolveMediaBackendWithAvailability,
 } from './media-backend-registry.js';
+import { resolveMediaBackendProbeAdopter } from './media-backend-probe-adopters.js';
 
 describe('media backend registry', () => {
   beforeEach(() => {
@@ -149,6 +150,43 @@ describe('media backend registry', () => {
     expect(backend.modality).toBe('voice');
     expect(backend.kind).toBe('local');
     expect(backend.provider).toBe('system_tts');
+  });
+
+  it('declares runtime probe adapters independently of provider identity', () => {
+    expect(getMediaBackendRecord('media-generation.comfyui', 'image')).toMatchObject({
+      probe_adapter_id: 'service_runtime',
+      service_id: 'media-generation',
+    });
+    expect(getMediaBackendRecord('media-generation.local_flux', 'image')).toMatchObject({
+      probe_adapter_id: 'tool_runtime',
+      runtime_id: 'mflux',
+    });
+    expect(getMediaBackendRecord('media-generation.apple_playground', 'image')).toMatchObject({
+      probe_adapter_id: 'apple_image_generation',
+    });
+  });
+
+  it('fails closed when a declared runtime adopter lacks its required runtime id', async () => {
+    const adopter = resolveMediaBackendProbeAdopter('tool_runtime');
+    const result = await adopter!.probe(
+      {
+        backend_id: 'test.tool',
+        modality: 'image',
+        display_name: 'Test tool',
+        kind: 'local',
+        provider: 'provider-name-is-not-used',
+        probe_adapter_id: 'tool_runtime',
+        status: 'active',
+        platforms: ['any'],
+        supports: {},
+      },
+      'linux'
+    );
+    expect(result).toEqual({
+      available: false,
+      probe_kind: 'registry',
+      reason: 'runtime_id is not configured',
+    });
   });
 
   it('uses a shared platform probe contract before live runtime probes', async () => {

@@ -3,6 +3,7 @@ import { createLogger } from './logger.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import { isLocalOnlyReasoningBackend } from './backend-capability-profile.js';
 import { assertSandboxNetworkAllowed } from './sandbox-policy.js';
+import { providerEndpointDomains } from './provider-endpoint-domains.js';
 
 /**
  * Tier context for reasoning-backend sends.
@@ -56,27 +57,31 @@ export function isLocalReasoningBackend(backendName: string): boolean {
  * handed tenant material.
  */
 export function reasoningBackendEndpoint(backendName: string): string {
-  const endpoints: Record<string, string> = {
-    anthropic: 'https://api.anthropic.com',
-    'claude-agent': 'https://api.anthropic.com',
-    'claude-cli': 'https://api.anthropic.com',
-    'shell-claude-cli': 'https://api.anthropic.com',
-    openai: 'https://api.openai.com',
-    'codex-cli': 'https://api.openai.com',
-    gemini: 'https://generativelanguage.googleapis.com',
-    'gemini-api': 'https://generativelanguage.googleapis.com',
-    'gemini-cli': 'https://generativelanguage.googleapis.com',
-    copilot: 'https://api.githubcopilot.com',
-    'copilot-acp': 'https://api.githubcopilot.com',
-    'grok-cli': 'https://api.x.ai',
-    'shell-grok-cli': 'https://api.x.ai',
-    'grok-api': 'https://api.x.ai',
-    'cursor-cli': 'https://api2.cursor.sh',
-    'opencode-cli': 'https://opencode.ai',
-    'devin-cli': 'https://api.devin.ai',
-    'agy-cli': 'https://generativelanguage.googleapis.com',
+  const providerAliases: Record<string, string> = {
+    anthropic: 'claude',
+    'claude-agent': 'claude',
+    'claude-cli': 'claude',
+    'shell-claude-cli': 'claude',
+    openai: 'codex',
+    'codex-cli': 'codex',
+    gemini: 'gemini',
+    'gemini-api': 'gemini',
+    'gemini-cli': 'gemini',
+    copilot: 'copilot',
+    'copilot-acp': 'copilot',
+    'grok-cli': 'grok',
+    'shell-grok-cli': 'grok',
+    'grok-api': 'grok',
+    'cursor-cli': 'cursor',
+    'opencode-cli': 'opencode',
+    'devin-cli': 'devin',
+    'agy-cli': 'agy',
   };
-  return endpoints[backendName] ?? `https://${backendName}.unknown-provider.invalid`;
+  const providerId = providerAliases[backendName] ?? backendName;
+  const endpointDomain = providerEndpointDomains(providerId)[0];
+  return endpointDomain
+    ? `https://${endpointDomain}`
+    : `https://${backendName}.unknown-provider.invalid`;
 }
 
 export class ReasoningEgressDeniedError extends Error {

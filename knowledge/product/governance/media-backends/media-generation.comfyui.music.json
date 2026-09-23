@@ -13,6 +13,7 @@
       "display_name": "ComfyUI Music Generation",
       "kind": "service_preset",
       "provider": "comfyui",
+      "probe_adapter_id": "service_runtime",
       "status": "active",
       "platforms": ["any"],
       "supports": {

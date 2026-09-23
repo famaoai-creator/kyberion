@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 
@@ -24,8 +23,11 @@ import {
   type VoiceSttAvailability,
   type VoiceSttBackend,
 } from './voice-stt.js';
-import { hasBuiltInTts } from './native-tts.js';
-import { probeToolRuntime } from './tool-runtime-registry.js';
+import { resolveVoiceTtsReadiness } from './voice-tts-readiness-adopters.js';
+import {
+  resolveVoiceSttAvailability,
+  resolveVoiceSttReadinessAdopter,
+} from './voice-stt-readiness-adopters.js';
 import { pathResolver } from './path-resolver.js';
 import { listVoiceSttAdapters, resolveVoiceTtsAdapter } from './voice-provider-adapters.js';
 
@@ -137,26 +139,14 @@ function getPreferences(): VoiceSelectionPreferences {
 
 function resolveTtsCandidate(engine: VoiceEngineRecord): VoiceTtsSelectionCandidate {
   const adapter = resolveVoiceTtsAdapter(engine);
-  let status: VoiceSelectionStatus = 'unsupported';
-  let reason =
-    'This engine is available to governed voice artifacts, but not live Presence replies yet.';
+  const readiness = resolveVoiceTtsReadiness(engine);
+  let status: VoiceSelectionStatus = readiness.status;
+  let reason = readiness.reason;
   const livePresence = engine.live_presence === true && adapter.live_presence;
 
   if (!livePresence) {
+    status = 'unsupported';
     reason = engine.notes || reason;
-  } else if (adapter.adapter_id === 'native_tts') {
-    status = hasBuiltInTts() ? 'ready' : 'needs_setup';
-    reason = hasBuiltInTts()
-      ? 'Uses the host OS voice without network access.'
-      : 'Install the host OS TTS command before selecting this engine.';
-  } else if (adapter.adapter_id === 'python_bridge') {
-    const runtime = engine.runtime_id
-      ? probeToolRuntime(engine.runtime_id, 'installed')
-      : { installed: Boolean(engine.bridge_script) };
-    status = runtime.installed ? 'ready' : 'needs_setup';
-    reason = runtime.installed
-      ? `Uses the governed ${engine.runtime_id || 'Python'} bridge adapter.`
-      : `Prepare the ${engine.runtime_id || 'Python'} runtime before selecting this engine.`;
   }
 
   return {
@@ -173,59 +163,7 @@ function resolveTtsCandidate(engine: VoiceEngineRecord): VoiceTtsSelectionCandid
   };
 }
 
-function resolveSttAvailability(): VoiceSttAvailability {
-  const mlxWhisper = probeToolRuntime('mlx_whisper', 'installed');
-  const fluidAudio = Boolean(
-    process.platform === 'darwin' &&
-    getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
-  );
-  const fasterWhisper = Boolean(
-    process.platform === 'win32' &&
-    (getRegisteredEnvText('KYBERION_WINDOWS_STT_BACKEND') === 'faster_whisper' ||
-      getRegisteredEnvText('KYBERION_STT_MODEL_DIR')?.trim())
-  );
-  return {
-    server: Boolean(
-      getRegisteredEnvText('VOICE_HUB_STT_BASE_URL')?.trim() ||
-      getRegisteredEnvText('WHISPERKIT_BASE_URL')?.trim() ||
-      getRegisteredEnvText('MLX_AUDIO_BASE_URL')?.trim()
-    ),
-    fluidAudio,
-    fasterWhisper,
-    mlxWhisper: mlxWhisper.installed,
-    whisperCpp:
-      safeExistsSync(pathResolver.resolve('active/shared/tmp/whisper.cpp/build/bin/whisper-cli')) &&
-      safeExistsSync(pathResolver.resolve('active/shared/tmp/whisper.cpp/models/ggml-small.bin')),
-    nativeSpeech:
-      safeExistsSync(pathResolver.resolve('satellites/voice-hub/native-stt.swift')) &&
-      (process.platform === 'darwin' ||
-        process.platform === 'win32' ||
-        process.platform === 'linux'),
-  };
-}
-
 function sttCandidates(availability: VoiceSttAvailability): VoiceSttSelectionCandidate[] {
-  const isAvailable = (backend: VoiceSttBackend): boolean => {
-    if (backend === 'server') return availability.server;
-    if (backend === 'fluid_audio') return availability.fluidAudio === true;
-    if (backend === 'faster_whisper') return availability.fasterWhisper === true;
-    if (backend === 'mlx_whisper') return availability.mlxWhisper === true;
-    if (backend === 'whisper_cpp') return availability.whisperCpp;
-    if (backend === 'native_speech') return availability.nativeSpeech;
-    return false;
-  };
-  const reasonFor = (backend: VoiceSttBackend): string => {
-    if (backend === 'server') return 'Set VOICE_HUB_STT_BASE_URL or a provider-specific STT URL.';
-    if (backend === 'fluid_audio')
-      return 'Set KYBERION_FLUID_AUDIO_STT_COMMAND to a local FluidAudio/Parakeet JSON bridge command.';
-    if (backend === 'faster_whisper')
-      return 'Set KYBERION_WINDOWS_STT_BACKEND=faster_whisper and install faster-whisper in the selected Python runtime.';
-    if (backend === 'mlx_whisper') return 'Uses the managed mlx-whisper runtime on Apple Silicon.';
-    if (backend === 'whisper_cpp') return 'Requires the configured whisper.cpp CLI and model.';
-    if (backend === 'native_speech')
-      return 'Uses the host OS speech API and microphone permission.';
-    return 'Uses the configured fallback order and skips unavailable backends.';
-  };
   return [
     {
       backend: 'auto' as const,
@@ -233,22 +171,28 @@ function sttCandidates(availability: VoiceSttAvailability): VoiceSttSelectionCan
       adapter_id: 'policy',
       status: 'ready' as const,
       selectable: true,
-      reason: reasonFor('auto'),
+      reason: 'Uses the configured fallback order and skips unavailable backends.',
     },
-    ...listVoiceSttAdapters().map((adapter) => ({
-      backend: adapter.backend,
-      display_name: adapter.display_name,
-      adapter_id: adapter.adapter_id,
-      status: isAvailable(adapter.backend) ? ('ready' as const) : ('needs_setup' as const),
-      selectable: isAvailable(adapter.backend),
-      reason: reasonFor(adapter.backend),
-    })),
+    ...listVoiceSttAdapters().map((adapter) => {
+      const readinessAdopter = resolveVoiceSttReadinessAdopter(adapter);
+      const available = readinessAdopter.availability_key
+        ? availability[readinessAdopter.availability_key] === true
+        : false;
+      return {
+        backend: adapter.backend,
+        display_name: adapter.display_name,
+        adapter_id: adapter.adapter_id,
+        status: available ? ('ready' as const) : ('needs_setup' as const),
+        selectable: available,
+        reason: readinessAdopter.setup_message,
+      };
+    }),
   ];
 }
 
 export function getVoiceSelectionSnapshot(): VoiceSelectionSnapshot {
   const preferences = getPreferences();
-  const availability = resolveSttAvailability();
+  const availability = resolveVoiceSttAvailability();
   // Display only: the voice-hub listen path records the decision it acts on.
   const selectedOrder = resolveVoiceSttBackendOrder(
     preferences.stt_backend,

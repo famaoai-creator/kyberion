@@ -32,6 +32,11 @@
             "enum": ["service_preset", "api", "cli", "local", "agent_tool"]
           },
           "provider": { "type": "string", "minLength": 1 },
+          "probe_adapter_id": {
+            "type": "string",
+            "enum": ["service_runtime", "tool_runtime", "apple_image_generation", "unavailable"]
+          },
+          "runtime_id": { "type": "string", "minLength": 1 },
           "status": { "type": "string", "enum": ["active", "shadow", "disabled"] },
           "platforms": {
             "type": "array",

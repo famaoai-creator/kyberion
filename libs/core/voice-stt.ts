@@ -6,6 +6,7 @@ import {
   resolveSeamProviderDecision,
 } from './seam-provider-selection.js';
 import { matchSeamSelectionRule } from './seam-selection-rules.js';
+import { resolveVoiceSttReadinessAdopter } from './voice-stt-readiness-adopters.js';
 
 export type VoiceSttBackend =
   | 'auto'
@@ -111,13 +112,10 @@ function isVoiceSttBackendAvailable(
   availability: VoiceSttAvailability
 ): boolean {
   const adapter = resolveVoiceSttAdapter(backend);
-  if (adapter.adapter_id === 'openai_compatible_server') return availability.server;
-  if (adapter.adapter_id === 'fluid_audio_native') return availability.fluidAudio === true;
-  if (adapter.adapter_id === 'faster_whisper_python') return availability.fasterWhisper === true;
-  if (adapter.adapter_id === 'managed_python_bridge') return availability.mlxWhisper === true;
-  if (adapter.adapter_id === 'whisper_cpp_cli') return availability.whisperCpp;
-  if (adapter.adapter_id === 'native_speech') return availability.nativeSpeech;
-  return false;
+  const readinessAdopter = resolveVoiceSttReadinessAdopter(adapter);
+  return readinessAdopter.availability_key
+    ? availability[readinessAdopter.availability_key] === true
+    : false;
 }
 
 /**

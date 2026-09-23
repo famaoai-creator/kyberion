@@ -13,6 +13,8 @@
       "display_name": "Local Stable Audio 3 Small-Music",
       "kind": "cli",
       "provider": "stable_audio_3",
+      "probe_adapter_id": "tool_runtime",
+      "runtime_id": "stable_audio_3",
       "status": "active",
       "platforms": ["any"],
       "supports": {

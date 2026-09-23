@@ -18,6 +18,8 @@ export type VoiceSttAdapterId =
   | 'whisper_cpp_cli'
   | 'openai_compatible_server'
   | 'unsupported';
+export type VoiceSttAvailabilityKey =
+  'server' | 'fluidAudio' | 'fasterWhisper' | 'mlxWhisper' | 'whisperCpp' | 'nativeSpeech';
 
 export interface VoiceTtsAdapterDescriptor {
   adapter_id: VoiceTtsAdapterId;
@@ -94,6 +96,7 @@ const STT_ADAPTERS: Record<VoiceSttBackend, VoiceSttAdapterDescriptor> = {
     backend: 'native_speech',
     adapter_id: 'native_speech',
     display_name: 'Host native speech adapter',
+    bridge_script: 'satellites/voice-hub/native-stt.swift',
   },
 };
 

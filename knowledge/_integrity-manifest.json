@@ -2445,25 +2445,25 @@
     {
       "path": "product/governance/media-backends/media-generation.apple_playground.json",
       "tier": "public",
-      "size": 957,
+      "size": 1009,
       "type": "json"
     },
     {
       "path": "product/governance/media-backends/media-generation.comfyui.json",
       "tier": "public",
-      "size": 1039,
+      "size": 1084,
       "type": "json"
     },
     {
       "path": "product/governance/media-backends/media-generation.comfyui.music.json",
       "tier": "public",
-      "size": 863,
+      "size": 908,
       "type": "json"
     },
     {
       "path": "product/governance/media-backends/media-generation.comfyui.video.json",
       "tier": "public",
-      "size": 924,
+      "size": 969,
       "type": "json"
     },
     {
@@ -2499,7 +2499,7 @@
     {
       "path": "product/governance/media-backends/media-generation.local_flux.json",
       "tier": "public",
-      "size": 967,
+      "size": 1038,
       "type": "json"
     },
     {
@@ -2511,7 +2511,7 @@
     {
       "path": "product/governance/media-backends/media-generation.musicgen_mlx.json",
       "tier": "public",
-      "size": 1051,
+      "size": 1129,
       "type": "json"
     },
     {
@@ -2541,7 +2541,7 @@
     {
       "path": "product/governance/media-backends/media-generation.stable_audio_3_small_music.json",
       "tier": "public",
-      "size": 1146,
+      "size": 1226,
       "type": "json"
     },
     {
@@ -9309,7 +9309,7 @@
     {
       "path": "product/schemas/media-backend-registry.schema.json",
       "tier": "public",
-      "size": 3245,
+      "size": 3479,
       "type": "json"
     },
     {

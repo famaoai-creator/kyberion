@@ -13,6 +13,7 @@
       "display_name": "Apple Image Playground",
       "kind": "local",
       "provider": "apple_image_playground",
+      "probe_adapter_id": "apple_image_generation",
       "status": "active",
       "platforms": ["darwin"],
       "supports": {

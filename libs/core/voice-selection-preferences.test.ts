@@ -12,9 +12,9 @@ vi.mock('./profile-root.js', () => ({
 import { loadVoiceSelectionPreferences } from './voice-selection-preferences.js';
 
 describe('voice-selection-preferences persistence boundary', () => {
-  it('routes STT availability environment reads through the governed accessor', () => {
+  it('routes STT readiness environment reads through its adopter and governed accessor', () => {
     const source = String(
-      safeReadFile(pathResolver.rootResolve('libs/core/voice-selection-preferences.ts'), {
+      safeReadFile(pathResolver.rootResolve('libs/core/voice-stt-readiness-adopters.ts'), {
         encoding: 'utf8',
       })
     );

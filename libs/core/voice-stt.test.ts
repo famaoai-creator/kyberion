@@ -7,6 +7,8 @@ import {
   resolveVoiceSttServerConfig,
 } from './voice-stt.js';
 import { resolveVoiceSttAdapter, resolveVoiceTtsAdapter } from './voice-provider-adapters.js';
+import { resolveVoiceTtsReadiness } from './voice-tts-readiness-adopters.js';
+import { resolveVoiceSttReadinessAdopter } from './voice-stt-readiness-adopters.js';
 
 describe('voice STT helpers', () => {
   it('routes STT environment reads through the governed accessor', () => {
@@ -129,6 +131,11 @@ describe('voice STT helpers', () => {
     ).toBe('native_tts');
     expect(resolveVoiceSttAdapter('mlx_whisper').adapter_id).toBe('managed_python_bridge');
     expect(resolveVoiceSttAdapter('whisper_cpp').adapter_id).toBe('whisper_cpp_cli');
+    expect(resolveVoiceSttReadinessAdopter(resolveVoiceSttAdapter('fluid_audio'))).toMatchObject({
+      adapter_id: 'fluid_audio_native',
+      availability_key: 'fluidAudio',
+      setup_message: expect.stringContaining('KYBERION_FLUID_AUDIO_STT_COMMAND'),
+    });
     expect(
       resolveVoiceTtsAdapter({
         tts_adapter_id: 'future_external_adapter',
@@ -136,5 +143,17 @@ describe('voice STT helpers', () => {
         supports: { list_voices: false, playback: true, artifact_formats: ['wav'] },
       }).adapter_id
     ).toBe('unsupported');
+    expect(
+      resolveVoiceTtsReadiness({
+        engine_id: 'future',
+        display_name: 'Future',
+        provider: 'future',
+        kind: 'native_local',
+        status: 'active',
+        platforms: ['any'],
+        supports: { list_voices: false, playback: true, artifact_formats: ['wav'] },
+        tts_adapter_id: 'future_external_adapter',
+      })
+    ).toMatchObject({ status: 'unsupported' });
   });
 });

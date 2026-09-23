@@ -74,6 +74,7 @@ export * from './history-search-index.js';
 export * from './voice-engine-registry.js';
 
 export * from './media-backend-registry.js';
+export * from './media-backend-probe-adopters.js';
 
 export * from './adapter-default-preferences.js';
 
@@ -128,6 +129,7 @@ export * from './provider-capability-scanner.js';
 export * from './provider-capability-overview.js';
 
 export * from './provider-bridge.js';
+export * from './provider-cli-invocation-adopters.js';
 
 export * from './provider-permission-profiles.js';
 

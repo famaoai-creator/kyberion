@@ -6,9 +6,7 @@ import {
   resolveRegistryDirectory,
   type RegistryDirectoryOptions,
 } from './registry-directory.js';
-import { probeToolRuntime } from './tool-runtime-registry.js';
-import { probeServiceRuntime } from './service-runtime-registry.js';
-import { probeAppleImageGeneration } from './apple-intelligence-bridge.js';
+import { resolveMediaBackendProbeAdopter } from './media-backend-probe-adopters.js';
 import { getAdapterDefault } from './adapter-default-preferences.js';
 import {
   getVoiceEngineRegistry,
@@ -22,6 +20,8 @@ export type MediaBackendKind = 'service_preset' | 'api' | 'cli' | 'local' | 'age
 export type MediaBackendPlatform = 'any' | 'darwin' | 'linux' | 'win32';
 export type MediaBackendProbeKind =
   'service_runtime' | 'tool_runtime' | 'native_bridge' | 'registry';
+export type MediaBackendProbeAdapterId =
+  'service_runtime' | 'tool_runtime' | 'apple_image_generation' | 'unavailable';
 
 export interface MediaBackendRecord {
   backend_id: string;
@@ -29,6 +29,9 @@ export interface MediaBackendRecord {
   display_name: string;
   kind: MediaBackendKind;
   provider: string;
+  /** Runtime probe protocol; provider identity never selects probe behavior. */
+  probe_adapter_id?: MediaBackendProbeAdapterId;
+  runtime_id?: string;
   status: MediaBackendStatus;
   platforms: MediaBackendPlatform[];
   supports: {
@@ -281,54 +284,15 @@ async function probeMediaBackendAvailabilityUncached(
     };
   }
 
-  if (backend.provider === 'comfyui') {
-    const resolution = await probeServiceRuntime('comfyui', 'trial', platform);
+  const probeAdopter = resolveMediaBackendProbeAdopter(backend.probe_adapter_id);
+  if (probeAdopter) {
+    const resolution = await probeAdopter.probe(backend, platform);
     return {
       backend_id: backend.backend_id,
       modality: backend.modality,
       available: resolution.available,
-      probe_kind: 'service_runtime',
+      probe_kind: resolution.probe_kind,
       reason: resolution.reason,
-    };
-  }
-  if (backend.provider === 'mflux') {
-    const resolution = probeToolRuntime('mflux', 'trial', platform);
-    return {
-      backend_id: backend.backend_id,
-      modality: backend.modality,
-      available: resolution.selected_action !== 'install',
-      probe_kind: 'tool_runtime',
-      reason: resolution.reason,
-    };
-  }
-  if (backend.provider === 'musicgen_mlx') {
-    const resolution = probeToolRuntime('musicgen_mlx', 'trial', platform);
-    return {
-      backend_id: backend.backend_id,
-      modality: backend.modality,
-      available: resolution.selected_action !== 'install',
-      probe_kind: 'tool_runtime',
-      reason: resolution.reason,
-    };
-  }
-  if (backend.provider === 'stable_audio_3') {
-    const resolution = probeToolRuntime('stable_audio_3', 'trial', platform);
-    return {
-      backend_id: backend.backend_id,
-      modality: backend.modality,
-      available: resolution.selected_action !== 'install',
-      probe_kind: 'tool_runtime',
-      reason: resolution.reason,
-    };
-  }
-  if (backend.provider === 'apple_image_playground') {
-    const resolution = await probeAppleImageGeneration();
-    return {
-      backend_id: backend.backend_id,
-      modality: backend.modality,
-      available: resolution.available,
-      probe_kind: 'native_bridge',
-      reason: resolution.reason || 'Image Playground probe completed',
     };
   }
 

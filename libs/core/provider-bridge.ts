@@ -7,6 +7,11 @@ import {
   scanProviderCapabilities,
 } from './provider-capability-scanner.js';
 import { logger } from './core.js';
+import {
+  resolveProviderCliBinary,
+  resolveProviderCliInvocationAdopter,
+  type ProviderInvocationPlan,
+} from './provider-cli-invocation-adopters.js';
 
 export interface ProviderInvokeParams {
   capabilityId: string;
@@ -14,11 +19,6 @@ export interface ProviderInvokeParams {
   payload?: unknown;
   context?: Record<string, unknown>;
 }
-
-type InvocationPlan = {
-  bin: string;
-  args: string[];
-};
 
 let cachedCapabilities: DiscoveredCapability[] | null = null;
 
@@ -37,82 +37,24 @@ function normalizePayload(payload: unknown): string {
   return JSON.stringify(payload);
 }
 
-function resolveProviderBinary(provider: string): string {
-  if (provider === 'gh') return 'gh';
-  if (provider === 'gemini-cli') return 'gemini';
-  if (provider === 'codex-cli') return 'codex';
-  return provider.replace('-cli', '');
-}
-
 export function buildProviderInvocationPlan(
   capability: CapabilityRegistryEntry,
   params: ProviderInvokeParams
-): InvocationPlan {
+): ProviderInvocationPlan {
   if (capability.source.type !== 'cli_native') {
     throw new Error(`[PROVIDER_BRIDGE] Capability is not CLI-native: ${capability.capability_id}`);
   }
 
-  const bin = resolveProviderBinary(capability.source.provider);
-  const name = capability.source.name;
-  const extraArgs = params.args ?? [];
+  const provider = capability.source.provider;
+  const bin = resolveProviderCliBinary(provider);
   const payloadText =
     params.payload === undefined || params.payload === null ? '' : normalizePayload(params.payload);
-
-  if (capability.source.provider === 'gemini-cli') {
-    if (name === 'prompt') {
-      if (!payloadText) {
-        throw new Error(
-          `[PROVIDER_BRIDGE] Gemini prompt requires payload: ${capability.capability_id}`
-        );
-      }
-      return {
-        bin,
-        args: ['-p', payloadText, '-o', 'json', '-y', ...extraArgs],
-      };
-    }
-
-    return {
-      bin,
-      args: [name, ...extraArgs],
-    };
-  }
-
-  if (capability.source.provider === 'codex-cli') {
-    if (name === 'exec') {
-      if (!payloadText) {
-        throw new Error(
-          `[PROVIDER_BRIDGE] Codex exec requires payload: ${capability.capability_id}`
-        );
-      }
-      return {
-        bin,
-        args: ['exec', '--json', payloadText, ...extraArgs],
-      };
-    }
-
-    return {
-      bin,
-      args: [name, ...extraArgs],
-    };
-  }
-
-  if (capability.source.provider === 'gh') {
-    if (name === 'run-workflow') {
-      return {
-        bin,
-        args: ['workflow', 'run', ...extraArgs],
-      };
-    }
-    return {
-      bin,
-      args: [name, ...extraArgs],
-    };
-  }
-
-  return {
+  return resolveProviderCliInvocationAdopter(provider).buildPlan(
+    capability,
+    params,
     bin,
-    args: [name, ...extraArgs],
-  };
+    payloadText
+  );
 }
 
 /**
