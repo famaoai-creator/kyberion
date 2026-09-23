@@ -325,6 +325,7 @@ export {
 // A2UI Protocol
 
 export * from './a2ui.js';
+export * from './a2ui-catalog.js';
 
 export * from './headless-surface-contract.js';
 export * from './surface-authorization.js';

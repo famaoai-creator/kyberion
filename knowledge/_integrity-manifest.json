@@ -7567,6 +7567,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/a2ui-catalog-kyberion-base.schema.json",
+      "tier": "public",
+      "size": 23266,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/a2ui-message.schema.json",
       "tier": "public",
       "size": 2861,
@@ -7941,7 +7947,7 @@
     {
       "path": "product/schemas/brand-tokens.schema.json",
       "tier": "public",
-      "size": 2345,
+      "size": 8544,
       "type": "json"
     },
     {
@@ -12225,7 +12231,7 @@
     {
       "path": "public/design-patterns/brand-tokens/kyberion.json",
       "tier": "public",
-      "size": 2684,
+      "size": 6654,
       "type": "json"
     },
     {

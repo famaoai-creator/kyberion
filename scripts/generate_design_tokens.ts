@@ -5,11 +5,15 @@ import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 import {
+  KYBERION_UI_STYLESHEET_SOURCE,
   readKyberionDesignTokens,
   renderKyberionDesignTokenBlock,
   renderKyberionTailwindColorsBlock,
+  renderKyberionUiStylesheet,
+  renderKyberionUiTokenBlock,
   updateThemesJson,
   replaceTokenBlock,
+  replaceUiTokenBlock,
 } from './design-token-utils.js';
 
 const ROOT = pathResolver.rootDir();
@@ -26,6 +30,20 @@ const COMPUTER_TOKENS_CSS_PATH = path.join(
   ROOT,
   'presence/displays/computer-surface/static/design-tokens.css'
 );
+// Concierge themes itself at runtime (/api/theme sets the legacy --kb-* vars),
+// so it receives only the --kb-ui-* layer, never the legacy block.
+const CONCIERGE_UI_TOKENS_CSS_PATH = path.join(
+  ROOT,
+  'presence/displays/concierge/src/app/kyberion-ui-tokens.css'
+);
+/** Every surface gets the component stylesheet next to its token file. */
+export const KYBERION_UI_STYLESHEET_PATHS = [
+  'presence/displays/chronos-mirror-v2/src/app/kyberion-ui.css',
+  'presence/displays/operator-surface/src/app/kyberion-ui.css',
+  'presence/displays/presence-studio/static/kyberion-ui.css',
+  'presence/displays/computer-surface/static/kyberion-ui.css',
+  'presence/displays/concierge/src/app/kyberion-ui.css',
+].map((relativePath) => path.join(ROOT, relativePath));
 const TAILWIND_CONFIG_PATH = path.join(
   ROOT,
   'presence/displays/chronos-mirror-v2/tailwind.config.cjs'
@@ -52,10 +70,22 @@ function renderUpdatedFile(filePath: string, content: string): GeneratedFile | u
   return content === source ? undefined : { path: filePath, content };
 }
 
-function renderTokenSurface(filePath: string, tokenBlock: string): GeneratedFile | undefined {
+function renderTokenSurface(
+  filePath: string,
+  tokenBlock: string,
+  uiTokenBlock: string
+): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
   const source = readDesignTokenTextFile(filePath);
-  return renderUpdatedFile(filePath, replaceTokenBlock(source, tokenBlock));
+  return renderUpdatedFile(
+    filePath,
+    replaceUiTokenBlock(replaceTokenBlock(source, tokenBlock), uiTokenBlock)
+  );
+}
+
+function renderWholeFile(filePath: string, content: string): GeneratedFile | undefined {
+  if (safeExistsSync(filePath) && readDesignTokenTextFile(filePath) === content) return;
+  return { path: filePath, content };
 }
 
 function renderTailwindConfig(filePath: string): GeneratedFile | undefined {
@@ -82,12 +112,18 @@ function renderThemesCatalog(
 function render(): GeneratedFile[] {
   const tokens = readKyberionDesignTokens();
   const tokenBlock = renderKyberionDesignTokenBlock(tokens);
+  const uiTokenBlock = renderKyberionUiTokenBlock(tokens);
+  const uiStylesheet = renderKyberionUiStylesheet(
+    readDesignTokenTextFile(path.join(ROOT, KYBERION_UI_STYLESHEET_SOURCE))
+  );
 
   return [
-    renderTokenSurface(GLOBALS_CSS_PATH, tokenBlock),
-    renderTokenSurface(OPERATOR_GLOBALS_CSS_PATH, tokenBlock),
-    renderTokenSurface(PRESENCE_TOKENS_CSS_PATH, tokenBlock),
-    renderTokenSurface(COMPUTER_TOKENS_CSS_PATH, tokenBlock),
+    renderTokenSurface(GLOBALS_CSS_PATH, tokenBlock, uiTokenBlock),
+    renderTokenSurface(OPERATOR_GLOBALS_CSS_PATH, tokenBlock, uiTokenBlock),
+    renderTokenSurface(PRESENCE_TOKENS_CSS_PATH, tokenBlock, uiTokenBlock),
+    renderTokenSurface(COMPUTER_TOKENS_CSS_PATH, tokenBlock, uiTokenBlock),
+    renderWholeFile(CONCIERGE_UI_TOKENS_CSS_PATH, `${uiTokenBlock}\n`),
+    ...KYBERION_UI_STYLESHEET_PATHS.map((filePath) => renderWholeFile(filePath, uiStylesheet)),
     renderTailwindConfig(TAILWIND_CONFIG_PATH),
     renderThemesCatalog(THEMES_JSON_PATH, tokens, true),
     renderThemesCatalog(THEMES_JSON_NESTED_PATH, tokens, false),
@@ -101,6 +137,8 @@ export const runGenerateDesignTokens = defineGenerator({
     OPERATOR_GLOBALS_CSS_PATH,
     PRESENCE_TOKENS_CSS_PATH,
     COMPUTER_TOKENS_CSS_PATH,
+    CONCIERGE_UI_TOKENS_CSS_PATH,
+    ...KYBERION_UI_STYLESHEET_PATHS,
     TAILWIND_CONFIG_PATH,
     THEMES_JSON_PATH,
     THEMES_JSON_NESTED_PATH,
