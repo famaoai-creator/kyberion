@@ -14,6 +14,8 @@ last_updated: 2026-09-11
 
 ## 1. 目的と非目的
 
+通信経路全体の選択基準は[Agent Communication and Coordination Model](./agent-communication-layer-model.md)を正本とする。本書はそのうち同一 checkout の provider CLI が共有する調整面を定める。localhost で起動した別 Kyberion runtime は Co-Session 参加者ではなく、Peer Messaging の peer として扱う。
+
 ### 目的
 
 - 同じ cwd / repo root で並走する CLI が、共有ゴール・存在確認・書き込み排他・引き継ぎを共有できる。
@@ -59,7 +61,7 @@ co-session はその coordination の **same-checkout 面**である。
 [`multi-provider-coexecution-contract.md`](../governance/multi-provider-coexecution-contract.md) を継承する。
 
 1. **読み取り**は全参加者並行可。
-2. **書き込み**は path lease 保持者のみ（短 TTL、heartbeat 切れで解放可）。
+2. **mission-optional の書き込み調整**には path lease を使う（短 TTL、heartbeat 切れで解放可）。これは協調用の目印であり、認可や強制的な permission enforcement ではない。WorkItem claim が必要な作業では claim が書き込み権限の正本となる。
 3. **`.git` / repo config** は co-session では触らない。commit が要る場合は mission owner へ昇格。
 4. **一時ファイル**は `active/shared/tmp/` または session 配下のみ。
 5. **peer / Mesh の禁止を継承**: co-session → peer の bridge は mission を作らない・承認しない（Mesh ADR）。
@@ -111,11 +113,13 @@ Handoff / 依頼の `kind` は Mesh Hub の allowlist と同系:
 
 ## 7. 昇格ゲート
 
-| 状況                   | 行く先                          |
-| ---------------------- | ------------------------------- |
-| 同じ checkout 内の分業 | co-session のみ                 |
-| 別ホスト / 別 Kyberion | peer messaging + 明示 accept    |
-| git・承認・顧客証跡    | mission（`mission_controller`） |
+同じ host にあるという理由だけで Co-Session と Peer Messaging を混同しない。同一 checkout を共有する provider CLI は Co-Session、別 Kyberion runtime は peer として扱う。別 runtime は peer ID、port、secret、runtime root / namespace を分離する。
+
+| 状況                   | 行く先                                             |
+| ---------------------- | -------------------------------------------------- |
+| 同じ checkout 内の分業 | co-session のみ（mission-optional lease は協調用） |
+| 別ホスト / 別 Kyberion | peer messaging + 明示 accept                       |
+| git・承認・顧客証跡    | mission（`mission_controller`）                    |
 
 ## 8. 実装マップ
 

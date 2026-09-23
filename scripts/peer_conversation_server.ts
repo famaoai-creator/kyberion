@@ -73,6 +73,16 @@ async function main(
       default: 30_000,
       description: 'Mesh presence freshness window',
     })
+    .option('max-inflight', {
+      type: 'number',
+      default: 8,
+      description: 'Maximum concurrent inbound peer message handlers',
+    })
+    .option('max-queued', {
+      type: 'number',
+      default: 64,
+      description: 'Maximum inbound requests waiting for a handler slot before retryable overload',
+    })
     .parseSync();
 
   const peerId = String(argv['peer-id']);
@@ -89,6 +99,16 @@ async function main(
   if (!tenantId) {
     throw new Error('Missing tenant id. Set KYBERION_TENANT_ID or pass --tenant-id.');
   }
+  const maxInflight = Number(argv['max-inflight']);
+  const maxQueued = Number(argv['max-queued']);
+  if (
+    !Number.isInteger(maxInflight) ||
+    maxInflight < 1 ||
+    !Number.isInteger(maxQueued) ||
+    maxQueued < 0
+  ) {
+    throw new Error('invalid_peer_receive_capacity');
+  }
   if (options.dryRun === true || options.check === true) {
     return {
       dry_run: true,
@@ -97,6 +117,8 @@ async function main(
       tenant_id: tenantId,
       host,
       port,
+      max_inflight: maxInflight,
+      max_queued: maxQueued,
     };
   }
   const meshNamespace = String(argv['mesh-namespace'] || '').trim() || undefined;
@@ -111,6 +133,8 @@ async function main(
     peerId,
     tenantId,
     sharedSecret,
+    maxInflight,
+    maxQueued,
     responder: createPeerConversationResponder({
       peerId,
       tenantId,
@@ -151,13 +175,17 @@ async function main(
   const heartbeat = (health: 'healthy' | 'maintenance' = 'healthy') => {
     if (!tenantId) return;
     const now = Date.now();
+    const capacity = server.getCapacity();
     recordMeshHeartbeat({
       peer_id: peerId,
       tenant_id: tenantId,
       heartbeat_at: new Date(now),
       expires_at: new Date(health === 'maintenance' ? now : now + Number(argv['presence-ttl-ms'])),
       health,
-      capacity: { accepting_new_work: health === 'healthy' },
+      capacity: {
+        ...capacity,
+        accepting_new_work: health === 'healthy' && capacity.accepting_new_work,
+      },
       receive_modes: ['request', 'capability_query', 'workitem'],
     });
   };

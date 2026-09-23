@@ -82,7 +82,33 @@ describe('runMeshDeliveryPass', () => {
     // receiver's dedup survives redelivery.
     expect(dispatchInput.request.idempotency_key).toBe('IDEM-1');
     expect(dispatchInput.request.sender_peer_id).toBe('peer-a');
+    expect(dispatchInput.messageId).toBe(delivery.message_id);
     expect(mocks.acknowledgeMeshDelivery).toHaveBeenCalledWith('DLV-1', {});
+  });
+
+  it('retries non-success HTTP receipts instead of acknowledging delivery', async () => {
+    const delivery = buildDelivery();
+    mocks.claimDueMeshDeliveries.mockResolvedValue([delivery]);
+    mocks.retryMeshDelivery.mockResolvedValue({ ...delivery, status: 'queued', attempt_count: 2 });
+    const dispatcher = {
+      dispatchToPeer: vi.fn().mockResolvedValue({
+        ok: false,
+        accepted: false,
+        status: 503,
+        message_id: delivery.message_id,
+      }),
+    };
+
+    const report = await runMeshDeliveryPass({
+      senderPeerId: 'peer-a',
+      dispatcher,
+      resolvePeer: () => PEER_B,
+    });
+
+    expect(report.delivered).toBe(0);
+    expect(report.retried).toBe(1);
+    expect(mocks.acknowledgeMeshDelivery).not.toHaveBeenCalled();
+    expect(mocks.retryMeshDelivery).toHaveBeenCalledWith('DLV-1', expect.any(String), undefined);
   });
 
   it('feeds transport failures back into the broker retry state machine', async () => {
