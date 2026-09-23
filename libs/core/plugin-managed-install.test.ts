@@ -264,6 +264,44 @@ describe('installPluginManaged', () => {
     expect(listManagedPlugins(managedRoot)[0]?.activationStatus).toBe('blocked_broken_manifest');
   });
 
+  it('matches nested manifest candidates case-insensitively (S9)', () => {
+    const managedRoot = managedRootDir('nested-case');
+    const src = sourceDir('nested-case');
+    writeManifest(src, { plugin_id: 'nested-case-root' });
+    safeMkdir(path.join(src, 'node_modules', 'dep'), { recursive: true });
+    safeWriteFile(path.join(src, 'node_modules', 'dep', 'Plugin.JSON'), '{}');
+    const record = installPluginManaged({
+      pluginId: `nested-case-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+    });
+    expect(record.manifest).toBeNull();
+    expect(record.diagnostics).toEqual([
+      expect.objectContaining({ code: 'manifest_nested', severity: 'error' }),
+    ]);
+    expect(record.diagnostics[0]?.message).toContain('node_modules/dep/Plugin.JSON');
+    expect(record.activationStatus).toBe('blocked_broken_manifest');
+  });
+
+  it('fails closed on a package tree deeper than the manifest walk cap (S9)', () => {
+    const managedRoot = managedRootDir('deep-tree');
+    const src = sourceDir('deep-tree');
+    writeManifest(src, { plugin_id: 'deep-tree-root' });
+    const deep = path.join(src, ...Array.from({ length: 34 }, (_, i) => `d${i}`));
+    safeMkdir(deep, { recursive: true });
+    safeWriteFile(path.join(deep, 'leaf.txt'), 'x');
+    const record = installPluginManaged({
+      pluginId: `deep-tree-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+    });
+    expect(record.manifest).toBeNull();
+    expect(record.diagnostics).toEqual([
+      expect.objectContaining({ code: 'manifest_tree_too_large', severity: 'error' }),
+    ]);
+    expect(record.activationStatus).toBe('blocked_broken_manifest');
+  });
+
   it('blocks a non-official package declaring an official-only seam', () => {
     const managedRoot = managedRootDir('official-only-seam');
     const src = sourceDir('official-only-seam');

@@ -295,3 +295,20 @@ Rules (`libs/core/plugin-view-contract.ts`,
 `plugins/fixtures/plugin-permissions-fixture/` is the reference fixture (ops,
 permissions and one view). Design and threat model:
 [plugin-permissions-and-views](../knowledge/product/architecture/plugin-permissions-and-views.md).
+
+## Release notes (EP-01 to EP-05)
+
+Upgrading a host that already has managed plugins:
+
+- Legacy third-party managed records (written before digest-bound approval)
+  are `pending_approval`: reinstall each one and approve it again.
+- Packages that contain a plugin manifest candidate below their root —
+  including anywhere under `node_modules/`, matched case-insensitively — are
+  rejected (`manifest_nested`); package trees too large to scan fail closed
+  (`manifest_tree_too_large`).
+- Follow every reinstall with a reload in each long-running host
+  (`pnpm plugin:install --reload <plugin-id>`): revocation and grant changes
+  are enforced when the plugin is reloaded, not while the old activation runs.
+- Lowering a ceiling in `plugin-permission-policy.json` (or a tenant
+  override) can block an already installed plugin until it is reinstalled and
+  its narrowed grant approved.

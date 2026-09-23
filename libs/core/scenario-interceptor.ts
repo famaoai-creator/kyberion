@@ -28,8 +28,8 @@ import {
 import { redactSensitiveObject } from './network.js';
 import {
   registerOpPreflightListener,
+  opPreflightCallKey,
   registerOpPreflightOutcomeObserver,
-  type OpPreflightCall,
 } from './op-preflight.js';
 import {
   overrideRiskyApprovalHandler,
@@ -170,7 +170,7 @@ export function installScenarioInterceptor(
   const decisions = seedApprovalDecisions(def);
   const passthrough = new Set(SCENARIO_SIMULATED_PASSTHROUGH_OPS);
   const disposers: Array<() => void> = [];
-  const preflightRecords = new WeakMap<OpPreflightCall, ScenarioOpRecord>();
+  const preflightRecords = new WeakMap<object, ScenarioOpRecord>();
   let baseline = snapshotRunRoot(ctx.runRoot);
   let disposed = false;
 
@@ -212,7 +212,7 @@ export function installScenarioInterceptor(
             requiresApproval: call.requiresApproval === true,
             approvalGranted: call.approvalGranted === true,
           });
-          preflightRecords.set(call, record);
+          preflightRecords.set(opPreflightCallKey(call), record);
           if (call.requiresApproval && !call.approvalGranted) {
             appendScenarioApproval(log, {
               op: call.op,
@@ -231,7 +231,7 @@ export function installScenarioInterceptor(
     // order (see op-preflight.ts N6 fix); it only ever reads that decision.
     disposers.push(
       registerOpPreflightOutcomeObserver((call, result) => {
-        const record = preflightRecords.get(call);
+        const record = preflightRecords.get(opPreflightCallKey(call));
         if (record && result.decision === 'allow') record.admitted = true;
       })
     );

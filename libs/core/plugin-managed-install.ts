@@ -173,29 +173,52 @@ function codepointCompare(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+const MAX_MANIFEST_WALK_ENTRIES = 20_000;
+const MAX_MANIFEST_WALK_DEPTH = 32;
+const MANIFEST_CANDIDATES_LOWER = MANIFEST_CANDIDATE_RELATIVE_PATHS.map((candidate) =>
+  candidate.toLowerCase()
+);
+
+class ManifestTreeTooLargeError extends Error {}
+
 /**
  * Manifest candidates below the package root (e.g. `dist/plugin.json`). A
  * reader walking up from a nested entry would pick such a manifest instead of
- * the approved root one, so packages that ship any are refused. Symlinks are
- * not followed (the managed copy never contains them).
+ * the approved root one, so packages that ship any are refused. Names are
+ * compared case-insensitively (case-insensitive filesystems resolve
+ * `Plugin.json` too). Symlinks are not followed (the managed copy never
+ * contains them). The walk is bounded; an oversized tree fails closed.
  */
 function findNestedManifestCandidates(pluginRoot: string): string[] {
   const nested: string[] = [];
-  const walk = (dir: string, relDir: string): void => {
+  let entries = 0;
+  const walk = (dir: string, relDir: string, depth: number): void => {
+    if (depth > MAX_MANIFEST_WALK_DEPTH) {
+      throw new ManifestTreeTooLargeError(
+        `directory nesting exceeds ${MAX_MANIFEST_WALK_DEPTH} levels at ${relDir}`
+      );
+    }
     for (const name of safeReaddir(dir).sort(codepointCompare)) {
+      entries += 1;
+      if (entries > MAX_MANIFEST_WALK_ENTRIES) {
+        throw new ManifestTreeTooLargeError(
+          `package tree exceeds ${MAX_MANIFEST_WALK_ENTRIES} entries`
+        );
+      }
       const relative = relDir ? `${relDir}/${name}` : name;
+      const lower = relative.toLowerCase();
       if (
-        !MANIFEST_CANDIDATE_RELATIVE_PATHS.includes(relative) &&
-        MANIFEST_CANDIDATE_RELATIVE_PATHS.some((candidate) => relative.endsWith(`/${candidate}`))
+        !MANIFEST_CANDIDATES_LOWER.includes(lower) &&
+        MANIFEST_CANDIDATES_LOWER.some((candidate) => lower.endsWith(`/${candidate}`))
       ) {
         nested.push(relative);
       }
       const absolute = path.join(dir, name);
       const stat = safeLstat(absolute);
-      if (stat.isDirectory() && !stat.isSymbolicLink()) walk(absolute, relative);
+      if (stat.isDirectory() && !stat.isSymbolicLink()) walk(absolute, relative, depth + 1);
     }
   };
-  walk(pluginRoot, '');
+  walk(pluginRoot, '', 0);
   return nested;
 }
 
@@ -212,6 +235,14 @@ function readPluginManifestSafely(pluginRoot: string): {
   try {
     nested = findNestedManifestCandidates(pluginRoot);
   } catch (err: unknown) {
+    if (err instanceof ManifestTreeTooLargeError) {
+      diagnostics.push({
+        code: 'manifest_tree_too_large',
+        message: `Package tree is too large to scan for nested manifests (${err.message}); refusing it.`,
+        severity: 'error',
+      });
+      return { manifest: null, diagnostics };
+    }
     diagnostics.push({
       code: 'manifest_unreadable',
       message: `Package tree could not be scanned for manifests: ${err instanceof Error ? err.message : String(err)}`,
