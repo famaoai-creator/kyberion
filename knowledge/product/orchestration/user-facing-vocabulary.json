@@ -12402,6 +12402,486 @@
         "en": "No change",
         "ja": "横ばい",
         "qps-ploc": "⟦Ñő ƈħȧñɠė ŀőř⟧"
+      },
+      "field_required": {
+        "en": "Required",
+        "ja": "必須",
+        "qps-ploc": "⟦Řėɋůïřėḓ ŀőř⟧"
+      },
+      "select_placeholder": {
+        "en": "Select…",
+        "ja": "選択してください",
+        "qps-ploc": "⟦Şėŀėƈŧ… ŀőř⟧"
+      },
+      "text_count": {
+        "en": "{count} / {max}",
+        "ja": "{count} / {max}",
+        "qps-ploc": "⟦{count} / {max} ŀőřė⟧"
+      },
+      "integration_connected": {
+        "en": "Connected",
+        "ja": "接続済み",
+        "qps-ploc": "⟦Ƈőññėƈŧėḓ ŀőř⟧"
+      },
+      "integration_needs_reauth": {
+        "en": "Reconnect needed",
+        "ja": "再接続が必要",
+        "qps-ploc": "⟦Řėƈőññėƈŧ ñėėḓėḓ ŀőřėɱ⟧"
+      },
+      "integration_disconnected": {
+        "en": "Not connected",
+        "ja": "未接続",
+        "qps-ploc": "⟦Ñőŧ ƈőññėƈŧėḓ ŀőřė⟧"
+      },
+      "integration_error": {
+        "en": "Connection error",
+        "ja": "接続エラー",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñ ėřřőř ŀőřėɱ⟧"
+      },
+      "save_bar_label": {
+        "en": "Unsaved changes",
+        "ja": "未保存の変更",
+        "qps-ploc": "⟦Ůñşȧṽėḓ ƈħȧñɠėş ŀőřė⟧"
+      },
+      "save_bar_clean": {
+        "en": "No changes",
+        "ja": "変更はありません",
+        "qps-ploc": "⟦Ñő ƈħȧñɠėş ŀőř⟧"
+      },
+      "save_bar_dirty": {
+        "en": "You have unsaved changes",
+        "ja": "保存していない変更があります",
+        "qps-ploc": "⟦Ẏőů ħȧṽė ůñşȧṽėḓ ƈħȧñɠėş ŀőřėɱ ï⟧"
+      },
+      "save_bar_saving": {
+        "en": "Saving…",
+        "ja": "保存しています…",
+        "qps-ploc": "⟦Şȧṽïñɠ… ŀőř⟧"
+      },
+      "save_bar_saved": {
+        "en": "All changes saved",
+        "ja": "すべて保存しました",
+        "qps-ploc": "⟦Ȧŀŀ ƈħȧñɠėş şȧṽėḓ ŀőřėɱ⟧"
+      },
+      "save_bar_error": {
+        "en": "Couldn't save your changes. Try again.",
+        "ja": "保存できませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ƈőůŀḓñ'ŧ şȧṽė ẏőůř ƈħȧñɠėş. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "save_bar_save": {
+        "en": "Save",
+        "ja": "保存",
+        "qps-ploc": "⟦Şȧṽė ŀőř⟧"
+      },
+      "save_bar_discard": {
+        "en": "Discard",
+        "ja": "破棄",
+        "qps-ploc": "⟦Ḓïşƈȧřḓ ŀőř⟧"
+      },
+      "file_drop_prompt": {
+        "en": "Drag files here or paste",
+        "ja": "ここにファイルをドラッグするか貼り付け",
+        "qps-ploc": "⟦Ḓřȧɠ ƒïŀėş ħėřė őř ṗȧşŧė ŀőřėɱ ï⟧"
+      },
+      "file_drop_prompt_single": {
+        "en": "Drag a file here or paste",
+        "ja": "ここにファイルをドラッグするか貼り付け",
+        "qps-ploc": "⟦Ḓřȧɠ ȧ ƒïŀė ħėřė őř ṗȧşŧė ŀőřėɱ ïṗ⟧"
+      },
+      "file_drop_browse": {
+        "en": "Choose files",
+        "ja": "ファイルを選ぶ",
+        "qps-ploc": "⟦Ƈħőőşė ƒïŀėş ŀőř⟧"
+      },
+      "file_drop_browse_single": {
+        "en": "Choose a file",
+        "ja": "ファイルを選ぶ",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ƒïŀė ŀőřė⟧"
+      },
+      "file_drop_accept": {
+        "en": "Accepted: {types}",
+        "ja": "対応形式: {types}",
+        "qps-ploc": "⟦Ȧƈƈėṗŧėḓ: {types} ŀőřėɱ⟧"
+      },
+      "file_drop_max_size": {
+        "en": "Up to {size} each",
+        "ja": "1 ファイル {size} まで",
+        "qps-ploc": "⟦Ůṗ ŧő {size} ėȧƈħ ŀőřėɱ⟧"
+      },
+      "file_drop_max_files": {
+        "en": "Up to {count} files",
+        "ja": "最大 {count} ファイル",
+        "qps-ploc": "⟦Ůṗ ŧő {count} ƒïŀėş ŀőřėɱ ⟧"
+      },
+      "file_drop_added": {
+        "en": "Files added: {count}",
+        "ja": "{count} 件のファイルを追加しました",
+        "qps-ploc": "⟦Ƒïŀėş ȧḓḓėḓ: {count} ŀőřėɱ ⟧"
+      },
+      "file_drop_reject_type": {
+        "en": "{file} isn't an accepted file type",
+        "ja": "{file} は対応していない形式です",
+        "qps-ploc": "⟦{file} ïşñ'ŧ ȧñ ȧƈƈėṗŧėḓ ƒïŀė ŧẏṗė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "file_drop_reject_size": {
+        "en": "{file} is larger than {size}",
+        "ja": "{file} は {size} を超えています",
+        "qps-ploc": "⟦{file} ïş ŀȧřɠėř ŧħȧñ {size} ŀőřėɱ ïṗş⟧"
+      },
+      "file_drop_reject_count": {
+        "en": "Only {count} files can be added",
+        "ja": "追加できるのは {count} ファイルまでです",
+        "qps-ploc": "⟦Őñŀẏ {count} ƒïŀėş ƈȧñ ƀė ȧḓḓėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "file_list_label": {
+        "en": "Selected files",
+        "ja": "選択したファイル",
+        "qps-ploc": "⟦Şėŀėƈŧėḓ ƒïŀėş ŀőřė⟧"
+      },
+      "file_status_queued": {
+        "en": "Waiting",
+        "ja": "待機中",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ŀőř⟧"
+      },
+      "file_status_uploading": {
+        "en": "Uploading",
+        "ja": "アップロード中",
+        "qps-ploc": "⟦Ůṗŀőȧḓïñɠ ŀőř⟧"
+      },
+      "file_status_done": {
+        "en": "Uploaded",
+        "ja": "アップロード済み",
+        "qps-ploc": "⟦Ůṗŀőȧḓėḓ ŀőř⟧"
+      },
+      "file_status_error": {
+        "en": "Failed",
+        "ja": "失敗",
+        "qps-ploc": "⟦Ƒȧïŀėḓ ŀőř⟧"
+      },
+      "file_remove": {
+        "en": "Remove {file}",
+        "ja": "{file} を削除",
+        "qps-ploc": "⟦Řėɱőṽė {file} ŀőřė⟧"
+      },
+      "file_cancel": {
+        "en": "Cancel upload of {file}",
+        "ja": "{file} のアップロードを取り消す",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ůṗŀőȧḓ őƒ {file} ŀőřėɱ ï⟧"
+      },
+      "camera_start": {
+        "en": "Start camera",
+        "ja": "カメラを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ƈȧɱėřȧ ŀőř⟧"
+      },
+      "camera_starting": {
+        "en": "Starting camera…",
+        "ja": "カメラを起動しています…",
+        "qps-ploc": "⟦Şŧȧřŧïñɠ ƈȧɱėřȧ… ŀőřėɱ⟧"
+      },
+      "camera_live_label": {
+        "en": "Camera preview",
+        "ja": "カメラのプレビュー",
+        "qps-ploc": "⟦Ƈȧɱėřȧ ṗřėṽïėẇ ŀőřė⟧"
+      },
+      "camera_take": {
+        "en": "Take photo",
+        "ja": "撮影",
+        "qps-ploc": "⟦Ŧȧķė ṗħőŧő ŀőř⟧"
+      },
+      "camera_retake": {
+        "en": "Retake",
+        "ja": "撮り直す",
+        "qps-ploc": "⟦Řėŧȧķė ŀőř⟧"
+      },
+      "camera_use": {
+        "en": "Use this photo",
+        "ja": "この写真を使う",
+        "qps-ploc": "⟦Ůşė ŧħïş ṗħőŧő ŀőřė⟧"
+      },
+      "camera_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "camera_choose_file": {
+        "en": "Choose a photo",
+        "ja": "写真を選ぶ",
+        "qps-ploc": "⟦Ƈħőőşė ȧ ṗħőŧő ŀőřė⟧"
+      },
+      "camera_preview_alt": {
+        "en": "Captured photo preview",
+        "ja": "撮影した写真のプレビュー",
+        "qps-ploc": "⟦Ƈȧṗŧůřėḓ ṗħőŧő ṗřėṽïėẇ ŀőřėɱ ï⟧"
+      },
+      "camera_unavailable": {
+        "en": "The camera isn't available here. Choose a photo instead.",
+        "ja": "この環境ではカメラを使えません。写真を選んでください。",
+        "qps-ploc": "⟦Ŧħė ƈȧɱėřȧ ïşñ'ŧ ȧṽȧïŀȧƀŀė ħėřė. Ƈħőőşė ȧ ṗħőŧő ïñşŧėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "camera_denied": {
+        "en": "Camera access was blocked. Choose a photo instead.",
+        "ja": "カメラへのアクセスが許可されませんでした。写真を選んでください。",
+        "qps-ploc": "⟦Ƈȧɱėřȧ ȧƈƈėşş ẇȧş ƀŀőƈķėḓ. Ƈħőőşė ȧ ṗħőŧő ïñşŧėȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "avatar_upload": {
+        "en": "Upload photo",
+        "ja": "写真をアップロード",
+        "qps-ploc": "⟦Ůṗŀőȧḓ ṗħőŧő ŀőř⟧"
+      },
+      "avatar_take": {
+        "en": "Take photo",
+        "ja": "撮影する",
+        "qps-ploc": "⟦Ŧȧķė ṗħőŧő ŀőř⟧"
+      },
+      "avatar_remove": {
+        "en": "Remove",
+        "ja": "削除",
+        "qps-ploc": "⟦Řėɱőṽė ŀőř⟧"
+      },
+      "avatar_use": {
+        "en": "Use this photo",
+        "ja": "この写真を使う",
+        "qps-ploc": "⟦Ůşė ŧħïş ṗħőŧő ŀőřė⟧"
+      },
+      "avatar_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "avatar_current_alt": {
+        "en": "Current picture",
+        "ja": "現在の画像",
+        "qps-ploc": "⟦Ƈůřřėñŧ ṗïƈŧůřė ŀőřė⟧"
+      },
+      "avatar_preview_alt": {
+        "en": "New picture preview (square crop)",
+        "ja": "新しい画像のプレビュー(正方形に切り抜き)",
+        "qps-ploc": "⟦Ñėẇ ṗïƈŧůřė ṗřėṽïėẇ (şɋůȧřė ƈřőṗ) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "avatar_empty": {
+        "en": "No picture",
+        "ja": "画像なし",
+        "qps-ploc": "⟦Ñő ṗïƈŧůřė ŀőř⟧"
+      },
+      "secret_configured": {
+        "en": "Set · ••••{last4}",
+        "ja": "設定済み · ••••{last4}",
+        "qps-ploc": "⟦Şėŧ · ••••{last4} ŀőřėɱ⟧"
+      },
+      "secret_configured_plain": {
+        "en": "Set",
+        "ja": "設定済み",
+        "qps-ploc": "⟦Şėŧ ŀőř⟧"
+      },
+      "secret_not_configured": {
+        "en": "Not set",
+        "ja": "未設定",
+        "qps-ploc": "⟦Ñőŧ şėŧ ŀőř⟧"
+      },
+      "secret_show": {
+        "en": "Show",
+        "ja": "表示",
+        "qps-ploc": "⟦Şħőẇ ŀőř⟧"
+      },
+      "secret_hide": {
+        "en": "Hide",
+        "ja": "隠す",
+        "qps-ploc": "⟦Ħïḓė ŀőř⟧"
+      },
+      "secret_paste": {
+        "en": "Paste",
+        "ja": "貼り付け",
+        "qps-ploc": "⟦Ṗȧşŧė ŀőř⟧"
+      },
+      "secret_paste_unavailable": {
+        "en": "Paste with Ctrl+V or ⌘V",
+        "ja": "Ctrl+V または ⌘V で貼り付けてください",
+        "qps-ploc": "⟦Ṗȧşŧė ẇïŧħ Ƈŧřŀ+Ṽ őř ⌘Ṽ ŀőřėɱ ï⟧"
+      },
+      "secret_save": {
+        "en": "Save",
+        "ja": "保存",
+        "qps-ploc": "⟦Şȧṽė ŀőř⟧"
+      },
+      "secret_replace": {
+        "en": "Replace",
+        "ja": "置き換える",
+        "qps-ploc": "⟦Řėṗŀȧƈė ŀőř⟧"
+      },
+      "secret_remove": {
+        "en": "Remove",
+        "ja": "削除",
+        "qps-ploc": "⟦Řėɱőṽė ŀőř⟧"
+      },
+      "secret_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "secret_submitted": {
+        "en": "Sent. The value is not kept on this page.",
+        "ja": "送信しました。値はこの画面に残りません。",
+        "qps-ploc": "⟦Şėñŧ. Ŧħė ṽȧŀůė ïş ñőŧ ķėṗŧ őñ ŧħïş ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "chart_empty": {
+        "en": "No data to chart",
+        "ja": "表示できるデータがありません",
+        "qps-ploc": "⟦Ñő ḓȧŧȧ ŧő ƈħȧřŧ ŀőřėɱ⟧"
+      },
+      "chart_labelled": {
+        "en": "{title}. {summary}",
+        "ja": "{title}。{summary}",
+        "qps-ploc": "⟦{title}. {summary} ŀőřėɱ⟧"
+      },
+      "chart_legend": {
+        "en": "Legend",
+        "ja": "凡例",
+        "qps-ploc": "⟦Ŀėɠėñḓ ŀőř⟧"
+      },
+      "chart_other": {
+        "en": "Other",
+        "ja": "その他",
+        "qps-ploc": "⟦Őŧħėř ŀőř⟧"
+      },
+      "chart_total": {
+        "en": "Total",
+        "ja": "合計",
+        "qps-ploc": "⟦Ŧőŧȧŀ ŀőř⟧"
+      },
+      "chart_no_value": {
+        "en": "No value",
+        "ja": "値なし",
+        "qps-ploc": "⟦Ñő ṽȧŀůė ŀőř⟧"
+      },
+      "chart_scale_low": {
+        "en": "Low",
+        "ja": "少",
+        "qps-ploc": "⟦Ŀőẇ ŀőř⟧"
+      },
+      "chart_scale_high": {
+        "en": "High",
+        "ja": "多",
+        "qps-ploc": "⟦Ħïɠħ ŀőř⟧"
+      },
+      "chart_summary_bar": {
+        "en": "Bar chart: {categories} categories, {series} series, values from {min} to {max}.",
+        "ja": "棒グラフ: {categories} 項目・{series} 系列、値は {min}〜{max}。",
+        "qps-ploc": "⟦Ƀȧř ƈħȧřŧ: {categories} ƈȧŧėɠőřïėş, {series} şėřïėş, ṽȧŀůėş ƒřőɱ {min} ŧő {max}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "chart_summary_line": {
+        "en": "Line chart: {series} series over {points} points, values from {min} to {max}.",
+        "ja": "折れ線グラフ: {series} 系列・{points} 点、値は {min}〜{max}。",
+        "qps-ploc": "⟦Ŀïñė ƈħȧřŧ: {series} şėřïėş őṽėř {points} ṗőïñŧş, ṽȧŀůėş ƒřőɱ {min} ŧő {max}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "chart_summary_donut": {
+        "en": "Donut chart: {count} parts totalling {total}; the largest is {top} ({share}).",
+        "ja": "ドーナツグラフ: {count} 区分・合計 {total}、最大は {top}({share})。",
+        "qps-ploc": "⟦Ḓőñůŧ ƈħȧřŧ: {count} ṗȧřŧş ŧőŧȧŀŀïñɠ {total}; ŧħė ŀȧřɠėşŧ ïş {top} ({share}). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "chart_summary_sparkline": {
+        "en": "Trend of {count} points from {first} to {last} (low {min}, high {max}).",
+        "ja": "{count} 点の推移: {first} → {last}(最小 {min}・最大 {max})。",
+        "qps-ploc": "⟦Ŧřėñḓ őƒ {count} ṗőïñŧş ƒřőɱ {first} ŧő {last} (ŀőẇ {min}, ħïɠħ {max}). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "chart_summary_heatmap": {
+        "en": "Heatmap: {rows} rows by {columns} columns, values from {min} to {max}.",
+        "ja": "ヒートマップ: {rows} 行 × {columns} 列、値は {min}〜{max}。",
+        "qps-ploc": "⟦Ħėȧŧɱȧṗ: {rows} řőẇş ƀẏ {columns} ƈőŀůɱñş, ṽȧŀůėş ƒřőɱ {min} ŧő {max}. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "chart_summary_meter": {
+        "en": "{value} of {max} ({percent})",
+        "ja": "{max} 中 {value}({percent})",
+        "qps-ploc": "⟦{value} őƒ {max} ({percent}) ŀőřėɱ ïṗş⟧"
+      },
+      "chart_summary_sequence": {
+        "en": "Sequence diagram: {messages} messages between {participants} participants.",
+        "ja": "シーケンス図: {participants} 者の間で {messages} 件のやり取り。",
+        "qps-ploc": "⟦Şėɋůėñƈė ḓïȧɠřȧɱ: {messages} ɱėşşȧɠėş ƀėŧẇėėñ {participants} ṗȧřŧïƈïṗȧñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "chart_summary_flow": {
+        "en": "Flow diagram: {nodes} steps in {stages} stages with {edges} connections.",
+        "ja": "フロー図: {stages} 段階・{nodes} ステップ・{edges} 本のつながり。",
+        "qps-ploc": "⟦Ƒŀőẇ ḓïȧɠřȧɱ: {nodes} şŧėṗş ïñ {stages} şŧȧɠėş ẇïŧħ {edges} ƈőññėƈŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "chart_table_category": {
+        "en": "Category",
+        "ja": "項目",
+        "qps-ploc": "⟦Ƈȧŧėɠőřẏ ŀőř⟧"
+      },
+      "chart_table_series": {
+        "en": "Series",
+        "ja": "系列",
+        "qps-ploc": "⟦Şėřïėş ŀőř⟧"
+      },
+      "chart_table_value": {
+        "en": "Value",
+        "ja": "値",
+        "qps-ploc": "⟦Ṽȧŀůė ŀőř⟧"
+      },
+      "chart_table_share": {
+        "en": "Share",
+        "ja": "割合",
+        "qps-ploc": "⟦Şħȧřė ŀőř⟧"
+      },
+      "chart_table_point": {
+        "en": "Point",
+        "ja": "時点",
+        "qps-ploc": "⟦Ṗőïñŧ ŀőř⟧"
+      },
+      "chart_table_time": {
+        "en": "Time",
+        "ja": "時刻",
+        "qps-ploc": "⟦Ŧïɱė ŀőř⟧"
+      },
+      "chart_table_from": {
+        "en": "From",
+        "ja": "送信元",
+        "qps-ploc": "⟦Ƒřőɱ ŀőř⟧"
+      },
+      "chart_table_to": {
+        "en": "To",
+        "ja": "送信先",
+        "qps-ploc": "⟦Ŧő ŀőř⟧"
+      },
+      "chart_table_message": {
+        "en": "Message",
+        "ja": "内容",
+        "qps-ploc": "⟦Ɱėşşȧɠė ŀőř⟧"
+      },
+      "chart_table_status": {
+        "en": "Status",
+        "ja": "状態",
+        "qps-ploc": "⟦Şŧȧŧůş ŀőř⟧"
+      },
+      "chart_table_step": {
+        "en": "Step",
+        "ja": "ステップ",
+        "qps-ploc": "⟦Şŧėṗ ŀőř⟧"
+      },
+      "chart_table_stage": {
+        "en": "Stage",
+        "ja": "段階",
+        "qps-ploc": "⟦Şŧȧɠė ŀőř⟧"
+      },
+      "chart_table_next": {
+        "en": "Leads to",
+        "ja": "次へ",
+        "qps-ploc": "⟦Ŀėȧḓş ŧő ŀőř⟧"
+      },
+      "meter_state_success": {
+        "en": "Within range",
+        "ja": "範囲内",
+        "qps-ploc": "⟦Ẇïŧħïñ řȧñɠė ŀőř⟧"
+      },
+      "meter_state_warning": {
+        "en": "Near the limit",
+        "ja": "上限に接近",
+        "qps-ploc": "⟦Ñėȧř ŧħė ŀïɱïŧ ŀőřė⟧"
+      },
+      "meter_state_danger": {
+        "en": "Over the limit",
+        "ja": "上限超過",
+        "qps-ploc": "⟦Őṽėř ŧħė ŀïɱïŧ ŀőřė⟧"
       }
     }
   }

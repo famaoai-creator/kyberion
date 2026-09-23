@@ -116,6 +116,14 @@ export class MiniElement extends ChildHost {
   hasAttribute(name: string): boolean {
     return this.attrs.has(name);
   }
+  removeAttribute(name: string): void {
+    this.attrs.delete(name);
+  }
+  /** UI-01c: focus management is observable through `MiniElement.focused`. */
+  static focused: MiniElement | null = null;
+  focus(): void {
+    MiniElement.focused = this;
+  }
   /** Mirrors `Element.getAttributeNames()`, for tests that enumerate all set attributes. */
   getAttributeNames(): string[] {
     return [...this.attrs.keys()];

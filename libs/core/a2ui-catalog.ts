@@ -39,6 +39,33 @@ export const KYBERION_BASE_COMPONENT_TYPES = [
   'ui:skeleton',
   'ui:button',
   'ui:disclosure',
+  // UI-01c settings & forms (SURFACE_UI_UNIFICATION_PLAN §3.3)
+  'ui:settings-group',
+  'ui:setting-row',
+  'ui:switch',
+  'ui:checkbox',
+  'ui:select',
+  'ui:radio-group',
+  'ui:segmented',
+  'ui:text-field',
+  'ui:textarea',
+  'ui:slider',
+  'ui:integration-item',
+  'ui:save-bar',
+  'ui:file-drop',
+  'ui:camera-capture',
+  'ui:avatar-picker',
+  'ui:secret-field',
+  // UI-01b charts & visualisation (SURFACE_UI_UNIFICATION_PLAN §3.2)
+  'ui:bar-chart',
+  'ui:line-chart',
+  'ui:donut',
+  'ui:sparkline',
+  'ui:heatmap',
+  'ui:meter',
+  'ui:sequence',
+  'ui:flow',
+  'ui:stat-list',
 ] as const;
 
 export type KyberionBaseComponentType = (typeof KYBERION_BASE_COMPONENT_TYPES)[number];
@@ -340,6 +367,325 @@ export interface KyberionBasePropsByType {
   'ui:skeleton': KbSkeletonProps;
   'ui:button': KbButtonProps;
   'ui:disclosure': KbDisclosureProps;
+  'ui:settings-group': KbSettingsGroupProps;
+  'ui:setting-row': KbSettingRowProps;
+  'ui:switch': KbSwitchProps;
+  'ui:checkbox': KbCheckboxProps;
+  'ui:select': KbSelectProps;
+  'ui:radio-group': KbRadioGroupProps;
+  'ui:segmented': KbSegmentedProps;
+  'ui:text-field': KbTextFieldProps;
+  'ui:textarea': KbTextareaProps;
+  'ui:slider': KbSliderProps;
+  'ui:integration-item': KbIntegrationItemProps;
+  'ui:save-bar': KbSaveBarProps;
+  'ui:file-drop': KbFileDropProps;
+  'ui:camera-capture': KbCameraCaptureProps;
+  'ui:avatar-picker': KbAvatarPickerProps;
+  'ui:secret-field': KbSecretFieldProps;
+  'ui:bar-chart': KbBarChartProps;
+  'ui:line-chart': KbLineChartProps;
+  'ui:donut': KbDonutProps;
+  'ui:sparkline': KbSparklineProps;
+  'ui:heatmap': KbHeatmapProps;
+  'ui:meter': KbMeterProps;
+  'ui:sequence': KbSequenceProps;
+  'ui:flow': KbFlowProps;
+  'ui:stat-list': KbStatListProps;
+}
+
+// ---------------------------------------------------------------------------
+// UI-01c settings & forms (SURFACE_UI_UNIFICATION_PLAN §3.3)
+// ---------------------------------------------------------------------------
+//
+// Interaction contract: controls are controlled by `value`; every edit is
+// reported as `onAction('field.change', { name, value })` (the caller owns the
+// data model). Files, captured images and secret values are NEVER props: the
+// schema has no slot for file contents or a secret `value`, and the renderers
+// hand those only to `onAction` at runtime (see `KB_FORM_ACTIONS`).
+
+/** Action ids the form components dispatch when the props give no explicit `action`. */
+export const KB_FORM_ACTIONS = Object.freeze({
+  /** `{ name, value }` — every controlled field edit (never for `ui:secret-field`). */
+  fieldChange: 'field.change',
+  /** `{ name, files: File[], rejected: [{ name, size, reason }] }` */
+  filesAdd: 'file.add',
+  /** `{ name, file_id }` — remove / cancel one `files[]` entry. */
+  fileRemove: 'file.remove',
+  /** `{ name, file: File }` — confirmed camera photo. */
+  cameraCapture: 'camera.capture',
+  /** `{ name }` */
+  cameraCancel: 'camera.cancel',
+  /** `{ name, file: File, source: 'upload' | 'camera' }` — square-cropped image. */
+  avatarChange: 'avatar.change',
+  /** `{ name }` */
+  avatarRemove: 'avatar.remove',
+} as const);
+
+export interface KbFieldBase {
+  /** Field key reported in `field.change` / action payloads. */
+  name: string;
+  label: string;
+  /** Visually hide the label (it stays the accessible name), e.g. inside a `ui:setting-row`. */
+  hide_label?: boolean;
+  help?: string;
+  error?: string;
+  required?: boolean;
+  disabled?: boolean;
+}
+
+export interface KbFieldOption {
+  value: string;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}
+
+export interface KbSettingsGroupProps {
+  title: string;
+  description?: string;
+}
+
+export interface KbSettingRowProps {
+  label: string;
+  description?: string;
+  /** Visual separation for dangerous settings (delete, reset). */
+  tone?: 'neutral' | 'danger';
+}
+
+export interface KbSwitchProps extends KbFieldBase {
+  value?: boolean;
+}
+
+export interface KbCheckboxProps extends KbFieldBase {
+  value?: boolean;
+}
+
+export interface KbSelectProps extends KbFieldBase {
+  value?: string;
+  options: KbFieldOption[];
+  placeholder?: string;
+}
+
+export interface KbRadioGroupProps extends KbFieldBase {
+  value?: string;
+  options: KbFieldOption[];
+  direction?: 'vertical' | 'horizontal';
+}
+
+export interface KbSegmentedProps extends KbFieldBase {
+  value?: string;
+  options: KbFieldOption[];
+}
+
+export interface KbTextFieldProps extends KbFieldBase {
+  value?: string | number;
+  type?: 'text' | 'email' | 'url' | 'number' | 'search';
+  placeholder?: string;
+  maxlength?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  readonly?: boolean;
+}
+
+export interface KbTextareaProps extends KbFieldBase {
+  value?: string;
+  placeholder?: string;
+  maxlength?: number;
+  rows?: number;
+  readonly?: boolean;
+}
+
+export interface KbSliderProps extends KbFieldBase {
+  value?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+}
+
+export type KbIntegrationState = 'connected' | 'needs_reauth' | 'disconnected' | 'error';
+
+export interface KbIntegrationItemProps {
+  title: string;
+  state: KbIntegrationState;
+  description?: string;
+  /** Account / scope detail, e.g. the connected address. */
+  detail?: string;
+  icon?: string;
+  actions?: KbActionRef[];
+}
+
+export interface KbSaveBarProps {
+  state: 'clean' | 'dirty' | 'saving' | 'saved' | 'error';
+  message?: string;
+  save_action: KbAction;
+  discard_action?: KbAction;
+  save_label?: string;
+  discard_label?: string;
+}
+
+/** One selected file's metadata — never its contents. */
+export interface KbFileEntry {
+  id: string;
+  name: string;
+  size?: number;
+  status: 'queued' | 'uploading' | 'done' | 'error';
+  /** 0–100 while `uploading`. */
+  progress?: number;
+  error?: string;
+}
+
+export interface KbFileDropProps extends KbFieldBase {
+  description?: string;
+  /** `<input accept>` list: extensions (`.pdf`) and MIME types (`image/*`). */
+  accept?: string;
+  multiple?: boolean;
+  max_bytes?: number;
+  max_files?: number;
+  files?: KbFileEntry[];
+  action?: KbAction;
+  remove_action?: KbAction;
+}
+
+export interface KbCameraCaptureProps extends KbFieldBase {
+  description?: string;
+  facing?: 'user' | 'environment';
+  aspect?: 'square' | 'landscape';
+  action?: KbAction;
+  cancel_action?: KbAction;
+}
+
+export interface KbAvatarPickerProps extends KbFieldBase {
+  /** Current image (http(s) / same-origin URL); never inline data. */
+  image_url?: string;
+  initials?: string;
+  shape?: 'circle' | 'square';
+  allow_camera?: boolean;
+  removable?: boolean;
+  action?: KbAction;
+  remove_action?: KbAction;
+}
+
+/**
+ * Secret input (API tokens). There is deliberately no `value`: a stored
+ * secret is never sent back to the page — only `configured` and `last4`.
+ * Submit dispatches `action` with `{ name, service_id?, secret_key?, value }`.
+ */
+export interface KbSecretFieldProps extends KbFieldBase {
+  action: KbAction;
+  remove_action?: KbAction;
+  configured?: boolean;
+  last4?: string;
+  placeholder?: string;
+  service_id?: string;
+  secret_key?: string;
+}
+
+// ---------------------------------------------------------------------------
+// UI-01b charts & visualisation (SURFACE_UI_UNIFICATION_PLAN §3.2)
+// ---------------------------------------------------------------------------
+//
+// Layout (scales, ticks, stacking, DAG layering, sequence ordering) lives once
+// in `libs/shared-ui/vanilla/charts.js`; both renderers draw its vnode tree.
+// Colors come only from the `--kb-ui-viz-*` tokens (categorical slots 1..8,
+// sequential / diverging steps 1..5). More than 8 series are never cycled:
+// only the first 8 are drawn (a donut folds the rest into "Other").
+
+interface KbChartCommonProps {
+  title?: string;
+  description?: string;
+  density?: KbDensity;
+  /** Override for the localized "no data" empty state. */
+  empty?: string;
+}
+
+export interface KbChartDatum {
+  label: string;
+  value: number | null;
+}
+
+export interface KbBarChartProps extends KbChartCommonProps {
+  categories?: string[];
+  series?: Array<{ name: string; values: Array<number | null> }>;
+  /** Single-series shorthand (chronos `display:bar-chart` compatible). */
+  data?: KbChartDatum[];
+  orientation?: 'vertical' | 'horizontal';
+  stacked?: boolean;
+  unit?: string;
+  show_values?: boolean;
+}
+
+export interface KbLineChartProps extends KbChartCommonProps {
+  series: Array<{ name: string; points: Array<{ x: string | number; y: number | null }> }>;
+  area?: boolean;
+  y_unit?: string;
+}
+
+export interface KbDonutProps extends KbChartCommonProps {
+  segments?: KbChartDatum[];
+  /** chronos `display:donut` shorthand. */
+  data?: KbChartDatum[];
+  center_label?: string;
+  center_value?: string | number;
+  unit?: string;
+}
+
+export interface KbSparklineProps {
+  points: Array<number | null>;
+  label?: string;
+  tone?: KbTone;
+  unit?: string;
+  show_value?: boolean;
+  empty?: string;
+}
+
+export interface KbHeatmapProps extends KbChartCommonProps {
+  rows: string[];
+  columns: string[];
+  values: Array<Array<number | null>>;
+  unit?: string;
+  scale?: 'sequential' | 'diverging';
+  midpoint?: number;
+  show_values?: boolean;
+}
+
+export interface KbMeterProps {
+  label?: string;
+  value: number | null;
+  /** Default 100. */
+  max?: number;
+  unit?: string;
+  thresholds?: Array<{ value: number; tone: 'success' | 'warning' | 'danger' }>;
+  description?: string;
+  empty?: string;
+}
+
+export interface KbSequenceProps extends KbChartCommonProps {
+  participants: Array<string | { id: string; label?: string }>;
+  messages: Array<{
+    from: string;
+    to: string;
+    label: string;
+    at?: string | number;
+    status?: KbStatus;
+    /** `reply` draws a dashed arrow. */
+    kind?: 'call' | 'reply' | 'note';
+  }>;
+}
+
+export interface KbFlowProps extends KbChartCommonProps {
+  nodes: Array<{ id: string; label: string; stage?: string; status?: KbStatus; meta?: string }>;
+  edges?: Array<{ from: string; to: string; label?: string }>;
+  stages?: Array<string | { id: string; label?: string }>;
+}
+
+export interface KbStatListProps {
+  title?: string;
+  density?: KbDensity;
+  empty?: string;
+  items: Array<{ label: string; value: string | number; unit?: string; hint?: string }>;
 }
 
 // ---------------------------------------------------------------------------

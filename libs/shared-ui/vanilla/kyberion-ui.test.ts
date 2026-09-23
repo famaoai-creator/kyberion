@@ -88,6 +88,70 @@ const CASES: Record<string, { props: Record<string, unknown>; root: string; tag?
   'ui:skeleton': { props: { lines: 2 }, root: 'kb-skeleton' },
   'ui:button': { props: { label: '保存', action: { id: 'save' } }, root: 'kb-btn', tag: 'BUTTON' },
   'ui:disclosure': { props: { summary: '詳細' }, root: 'kb-disclosure', tag: 'DETAILS' },
+  // UI-01b charts & visualisation (layout: charts.js; see charts.test.ts)
+  'ui:bar-chart': {
+    props: { data: [{ label: 'a', value: 1 }] },
+    root: 'kb-chart',
+    tag: 'FIGURE',
+  },
+  'ui:line-chart': {
+    props: { series: [{ name: 's', points: [{ x: 'a', y: 1 }] }] },
+    root: 'kb-chart',
+    tag: 'FIGURE',
+  },
+  'ui:donut': { props: { segments: [{ label: 'a', value: 1 }] }, root: 'kb-chart', tag: 'FIGURE' },
+  'ui:sparkline': { props: { points: [1, 2] }, root: 'kb-sparkline', tag: 'SPAN' },
+  'ui:heatmap': {
+    props: { rows: ['r'], columns: ['c'], values: [[1]] },
+    root: 'kb-chart',
+    tag: 'FIGURE',
+  },
+  'ui:meter': { props: { value: 3, max: 10 }, root: 'kb-meter' },
+  'ui:sequence': {
+    props: { participants: ['a', 'b'], messages: [{ from: 'a', to: 'b', label: 'x' }] },
+    root: 'kb-chart',
+    tag: 'FIGURE',
+  },
+  'ui:flow': { props: { nodes: [{ id: 'a', label: 'A' }] }, root: 'kb-chart', tag: 'FIGURE' },
+  'ui:stat-list': { props: { items: [{ label: 'p95', value: 2 }] }, root: 'kb-stat-list' },
+  // UI-01c settings & forms (renderers: forms.js; see forms.test.ts)
+  'ui:settings-group': { props: { title: '通知' }, root: 'kb-settings-group', tag: 'SECTION' },
+  'ui:setting-row': { props: { label: 'メール' }, root: 'kb-setting-row' },
+  'ui:switch': { props: { name: 'a', label: 'A' }, root: 'kb-field' },
+  'ui:checkbox': { props: { name: 'a', label: 'A' }, root: 'kb-field' },
+  'ui:select': {
+    props: { name: 'a', label: 'A', options: [{ value: 'x', label: 'X' }] },
+    root: 'kb-field',
+  },
+  'ui:radio-group': {
+    props: { name: 'a', label: 'A', options: [{ value: 'x', label: 'X' }] },
+    root: 'kb-choice-group',
+    tag: 'FIELDSET',
+  },
+  'ui:segmented': {
+    props: {
+      name: 'a',
+      label: 'A',
+      options: [
+        { value: 'x', label: 'X' },
+        { value: 'y', label: 'Y' },
+      ],
+    },
+    root: 'kb-segmented',
+    tag: 'FIELDSET',
+  },
+  'ui:text-field': { props: { name: 'a', label: 'A' }, root: 'kb-field' },
+  'ui:textarea': { props: { name: 'a', label: 'A' }, root: 'kb-field' },
+  'ui:slider': { props: { name: 'a', label: 'A' }, root: 'kb-field' },
+  'ui:integration-item': { props: { title: 'Slack', state: 'connected' }, root: 'kb-integration' },
+  'ui:save-bar': { props: { state: 'dirty', save_action: { id: 's' } }, root: 'kb-save-bar' },
+  'ui:file-drop': { props: { name: 'a', label: 'A' }, root: 'kb-file-drop' },
+  'ui:camera-capture': { props: { name: 'a', label: 'A' }, root: 'kb-camera' },
+  'ui:avatar-picker': { props: { name: 'a', label: 'A' }, root: 'kb-avatar-picker' },
+  'ui:secret-field': {
+    props: { name: 'a', label: 'A', action: { id: 'secret.introduce' } },
+    root: 'kb-secret-field',
+  },
 };
 
 describe('kyberion-ui vanilla renderer — catalog coverage', () => {

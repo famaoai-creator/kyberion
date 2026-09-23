@@ -14,6 +14,10 @@ import { Badge, Callout, EmptyState, Skeleton, StatusPill } from './components/f
 import { Grid, NextAction, Section, Stack } from './components/layout.js';
 import { AppShell, NavRail, PageHeader, Tabs } from './components/shell.js';
 import { KB_UI_MESSAGE_KEYS, KbI18nProvider, useKbI18n, type KbTranslate } from './i18n.js';
+// UI-01c settings & forms render through their own switch (component id → DOM ids).
+import { renderFormComponent } from './forms/index.js';
+// UI-01b charts & visualisation: one layout (vanilla/charts.js) for both renderers.
+import { KbChart, isKbChartType } from './charts/ChartView.js';
 
 // Module-local: the package does not depend on @types/node, and bundlers
 // replace `process.env.NODE_ENV` textually.
@@ -186,10 +190,10 @@ function renderCatalog(
       return <Button {...(p as { label: string })} />;
     case 'ui:disclosure':
       return <Disclosure {...props<'ui:disclosure'>()}>{children}</Disclosure>;
-    default: {
-      const exhaustive: never = type;
-      return exhaustive;
-    }
+    default:
+      // Extension groups (UI-01c forms, ...) are dispatched before this switch;
+      // the React ↔ vanilla parity test covers every catalog type.
+      return null;
   }
 }
 
@@ -260,6 +264,14 @@ export function A2UIRenderer({
           renderChildren(main)
         );
       }
+      const formNode = renderFormComponent(
+        catalogType,
+        id,
+        props,
+        childIds.length ? renderChildren(childIds) : null
+      );
+      if (formNode !== undefined) return formNode;
+      if (isKbChartType(catalogType)) return <KbChart type={catalogType} props={props} />;
       return renderCatalog(
         catalogType,
         props,

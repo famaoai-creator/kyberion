@@ -11,6 +11,7 @@ import {
   expectedKyberionThemeEntries,
   extractKyberionTokenBlock,
   extractKyberionUiTokenBlock,
+  concatKyberionUiStylesheetSources,
   KYBERION_UI_STYLESHEET_SOURCE,
   renderKyberionUiStylesheet,
   renderKyberionUiTokenBlock,
@@ -818,7 +819,9 @@ function validateDesignTokenCatalog(violations: string[]) {
     violations.push(`design-tokens: missing file ${KYBERION_UI_STYLESHEET_SOURCE}`);
   } else {
     const expectedStylesheet = renderKyberionUiStylesheet(
-      readCatalogTextFile(stylesheetSourcePath)
+      concatKyberionUiStylesheetSources((relativePath) =>
+        readCatalogTextFile(pathResolver.rootResolve(relativePath))
+      )
     );
     for (const relativePath of [
       'presence/displays/chronos-mirror-v2/src/app/kyberion-ui.css',

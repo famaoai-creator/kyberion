@@ -6255,7 +6255,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 602382,
+      "size": 620597,
       "type": "json"
     },
     {
@@ -7569,7 +7569,7 @@
     {
       "path": "product/schemas/a2ui-catalog-kyberion-base.schema.json",
       "tier": "public",
-      "size": 23266,
+      "size": 63355,
       "type": "json"
     },
     {
@@ -7947,7 +7947,7 @@
     {
       "path": "product/schemas/brand-tokens.schema.json",
       "tier": "public",
-      "size": 8544,
+      "size": 9656,
       "type": "json"
     },
     {
@@ -12231,7 +12231,7 @@
     {
       "path": "public/design-patterns/brand-tokens/kyberion.json",
       "tier": "public",
-      "size": 6654,
+      "size": 7476,
       "type": "json"
     },
     {

@@ -124,3 +124,10 @@ export declare function renderA2UI(
   components: A2UIComponent[],
   options?: RenderOptions & { rootId?: string }
 ): Element;
+
+/**
+ * UI-01c: release what the last `renderA2UI` into `container` holds (stops
+ * camera tracks, revokes preview object URLs). Runs automatically before a
+ * re-render; call it when removing the container. Never throws.
+ */
+export declare function disposeA2UI(container: Element): void;

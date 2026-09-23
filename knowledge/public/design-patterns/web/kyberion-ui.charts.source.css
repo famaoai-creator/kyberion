@@ -1,0 +1,720 @@
+/* ------------------------------------------------ charts & visualisation --
+ * UI-01b (SURFACE_UI_UNIFICATION_PLAN §3.2). Stamped into kyberion-ui.css
+ * after kyberion-ui.source.css by scripts/generate_design_tokens.ts.
+ *
+ * Markup comes from libs/shared-ui/vanilla/charts.js (one layout for both
+ * renderers). Marks carry `data-series` (categorical slot 1..8),
+ * `data-level` (sequential 1..5), `data-div` (diverging 1..5) or `data-tone`;
+ * this file maps them to the `--kb-ui-viz-*` / status tokens only.
+ * Text never wears a series color: values, ticks and legends stay in text ink.
+ */
+
+.kb-chart {
+  --kb-chart-color: var(--kb-ui-viz-cat-1);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  min-width: 0;
+  margin: 0;
+  color: var(--kb-ui-text);
+  font-family: var(--kb-ui-font-sans);
+}
+
+.kb-chart [data-series='1'] {
+  --kb-chart-color: var(--kb-ui-viz-cat-1);
+}
+.kb-chart [data-series='2'] {
+  --kb-chart-color: var(--kb-ui-viz-cat-2);
+}
+.kb-chart [data-series='3'] {
+  --kb-chart-color: var(--kb-ui-viz-cat-3);
+}
+.kb-chart [data-series='4'] {
+  --kb-chart-color: var(--kb-ui-viz-cat-4);
+}
+.kb-chart [data-series='5'] {
+  --kb-chart-color: var(--kb-ui-viz-cat-5);
+}
+.kb-chart [data-series='6'] {
+  --kb-chart-color: var(--kb-ui-viz-cat-6);
+}
+.kb-chart [data-series='7'] {
+  --kb-chart-color: var(--kb-ui-viz-cat-7);
+}
+.kb-chart [data-series='8'] {
+  --kb-chart-color: var(--kb-ui-viz-cat-8);
+}
+
+.kb-chart [data-level='1'] {
+  --kb-chart-color: var(--kb-ui-viz-seq-1);
+}
+.kb-chart [data-level='2'] {
+  --kb-chart-color: var(--kb-ui-viz-seq-2);
+}
+.kb-chart [data-level='3'] {
+  --kb-chart-color: var(--kb-ui-viz-seq-3);
+}
+.kb-chart [data-level='4'] {
+  --kb-chart-color: var(--kb-ui-viz-seq-4);
+}
+.kb-chart [data-level='5'] {
+  --kb-chart-color: var(--kb-ui-viz-seq-5);
+}
+
+.kb-chart [data-div='1'] {
+  --kb-chart-color: var(--kb-ui-viz-div-1);
+}
+.kb-chart [data-div='2'] {
+  --kb-chart-color: var(--kb-ui-viz-div-2);
+}
+.kb-chart [data-div='3'] {
+  --kb-chart-color: var(--kb-ui-viz-div-3);
+}
+.kb-chart [data-div='4'] {
+  --kb-chart-color: var(--kb-ui-viz-div-4);
+}
+.kb-chart [data-div='5'] {
+  --kb-chart-color: var(--kb-ui-viz-div-5);
+}
+
+.kb-chart__title {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+  color: var(--kb-ui-text);
+}
+
+.kb-chart__description {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.kb-chart__empty {
+  margin: 0;
+  padding: var(--kb-ui-space-4);
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+  text-align: center;
+  background: var(--kb-ui-surface-sunken);
+  border: 1px dashed var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+}
+
+/* Responsive: the SVG scales with its container through its viewBox. */
+.kb-chart__svg {
+  display: block;
+  width: 100%;
+  max-width: 720px;
+  height: auto;
+  overflow: visible;
+  font-family: var(--kb-ui-font-sans);
+  font-size: 12px;
+}
+
+.kb-chart__svg--donut {
+  max-width: 200px;
+}
+
+.kb-chart__svg--heatmap,
+.kb-chart__svg--diagram {
+  max-width: 100%;
+}
+
+/* Diagrams keep a readable scale and scroll sideways instead of shrinking. */
+.kb-chart[data-chart='sequence'],
+.kb-chart[data-chart='flow'] {
+  overflow-x: auto;
+}
+
+.kb-chart[data-chart='sequence'] .kb-chart__svg,
+.kb-chart[data-chart='flow'] .kb-chart__svg {
+  flex: none;
+  align-self: flex-start;
+  width: auto;
+  height: auto;
+  max-width: none;
+}
+
+/* ----------------------------------------------------------------- axes -- */
+
+.kb-chart__grid {
+  stroke: var(--kb-ui-border);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.kb-chart__baseline {
+  stroke: var(--kb-ui-border-strong);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.kb-chart__tick {
+  fill: var(--kb-ui-text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-chart__tick--category {
+  fill: var(--kb-ui-text-muted);
+}
+
+.kb-chart__value,
+.kb-chart__direct-label {
+  fill: var(--kb-ui-text);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- marks -- */
+
+.kb-chart__bar,
+.kb-chart__arc {
+  fill: var(--kb-chart-color);
+  transition: opacity 120ms ease-out;
+}
+
+/* 2px surface ring between donut segments. */
+.kb-chart__arc {
+  stroke: var(--kb-ui-surface);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.kb-chart__line {
+  fill: none;
+  stroke: var(--kb-chart-color);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.kb-chart__area {
+  fill: var(--kb-chart-color);
+  fill-opacity: 0.16;
+  stroke: none;
+}
+
+/* Markers: >= 8px, with a 2px surface ring where they overlap the line. */
+.kb-chart__point {
+  fill: var(--kb-chart-color);
+  stroke: var(--kb-ui-surface);
+  stroke-width: 2;
+}
+
+.kb-chart__marks:hover .kb-chart__bar:not(:hover),
+.kb-chart__marks:hover .kb-chart__arc:not(:hover) {
+  opacity: 0.55;
+}
+
+.kb-chart__center-value {
+  fill: var(--kb-ui-text);
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-chart__center-label {
+  fill: var(--kb-ui-text-muted);
+  font-size: 12px;
+}
+
+/* Heatmap cells: sequential / diverging steps; an empty cell is hatched-free
+   sunken surface with a dashed outline (never a color that means "value"). */
+.kb-chart__cell {
+  fill: var(--kb-chart-color);
+}
+
+.kb-chart__cell[data-empty='true'] {
+  fill: var(--kb-ui-surface-sunken);
+  stroke: var(--kb-ui-border);
+  stroke-dasharray: 2 2;
+}
+
+.kb-chart__cell-value {
+  fill: var(--kb-ui-text);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  paint-order: stroke;
+  stroke: var(--kb-ui-surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+/* --------------------------------------------------------------- legend -- */
+
+.kb-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-1) var(--kb-ui-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.kb-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  min-width: 0;
+}
+
+.kb-chart__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--kb-chart-color);
+}
+
+.kb-chart__legend-label {
+  color: var(--kb-ui-text);
+}
+
+.kb-chart__legend-value {
+  color: var(--kb-ui-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-chart[data-chart='donut'] {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) minmax(0, 1fr);
+  grid-template-areas:
+    'title title'
+    'desc desc'
+    'svg legend';
+  align-items: center;
+  gap: var(--kb-ui-space-2) var(--kb-ui-space-5);
+}
+
+.kb-chart[data-chart='donut'] > .kb-chart__title {
+  grid-area: title;
+}
+.kb-chart[data-chart='donut'] > .kb-chart__description {
+  grid-area: desc;
+}
+.kb-chart[data-chart='donut'] > .kb-chart__svg {
+  grid-area: svg;
+}
+.kb-chart[data-chart='donut'] > .kb-chart__legend {
+  grid-area: legend;
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+.kb-chart[data-chart='donut'][data-empty='true'] {
+  display: flex;
+}
+
+.kb-chart__scale {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-chart__scale-ramp {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.kb-chart__scale-step {
+  width: 18px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--kb-chart-color);
+}
+
+/* Data table fallback: visually hidden, always present for assistive tech. */
+.kb-chart__data {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------- diagrams -- */
+
+.kb-chart__lifeline {
+  stroke: var(--kb-ui-border-strong);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.kb-chart__participant-box {
+  fill: var(--kb-ui-surface-raised);
+  stroke: var(--kb-ui-border-strong);
+  stroke-width: 1;
+}
+
+.kb-chart__participant-label,
+.kb-chart__node-label {
+  fill: var(--kb-ui-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kb-chart__message {
+  fill: none;
+  stroke: var(--kb-ui-text-muted);
+  stroke-width: 1.5;
+}
+
+.kb-chart__message[data-kind='reply'] {
+  stroke-dasharray: 5 4;
+}
+
+.kb-chart__message[data-kind='note'] {
+  stroke-dasharray: 1 3;
+}
+
+.kb-chart__arrowhead {
+  fill: var(--kb-ui-text-muted);
+}
+
+.kb-chart__message-label {
+  fill: var(--kb-ui-text);
+  font-size: 12px;
+}
+
+.kb-chart__time {
+  font-size: 11px;
+}
+
+.kb-chart__status,
+.kb-chart__node-status {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--kb-ui-text-muted);
+}
+
+.kb-chart [data-tone='success'] {
+  --kb-chart-tone: var(--kb-ui-success-fg);
+}
+.kb-chart [data-tone='info'] {
+  --kb-chart-tone: var(--kb-ui-info-fg);
+}
+.kb-chart [data-tone='warning'] {
+  --kb-chart-tone: var(--kb-ui-warning-fg);
+}
+.kb-chart [data-tone='danger'] {
+  --kb-chart-tone: var(--kb-ui-danger-fg);
+}
+.kb-chart [data-tone='neutral'] {
+  --kb-chart-tone: var(--kb-ui-text-muted);
+}
+
+.kb-chart__status[data-tone],
+.kb-chart__node[data-tone] .kb-chart__node-status {
+  fill: var(--kb-chart-tone);
+}
+
+.kb-chart__node-box {
+  fill: var(--kb-ui-surface-raised);
+  stroke: var(--kb-ui-border-strong);
+  stroke-width: 1;
+}
+
+.kb-chart__node-bar {
+  fill: var(--kb-ui-border-strong);
+}
+
+.kb-chart__node[data-tone] .kb-chart__node-bar {
+  fill: var(--kb-chart-tone);
+}
+
+.kb-chart__node-meta {
+  fill: var(--kb-ui-text-muted);
+  font-size: 11px;
+}
+
+.kb-chart__edge-line {
+  fill: none;
+  stroke: var(--kb-ui-border-strong);
+  stroke-width: 1.5;
+}
+
+.kb-chart__edge[data-direction='back'] .kb-chart__edge-line {
+  stroke-dasharray: 5 4;
+}
+
+.kb-chart__edge .kb-chart__arrowhead {
+  fill: var(--kb-ui-border-strong);
+}
+
+.kb-chart__edge-label,
+.kb-chart__stage-label {
+  fill: var(--kb-ui-text-muted);
+  font-size: 11px;
+  paint-order: stroke;
+  stroke: var(--kb-ui-surface);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.kb-chart__stage-label {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ------------------------------------------------------------ sparkline -- */
+
+.kb-sparkline {
+  --kb-sparkline-color: var(--kb-ui-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  vertical-align: middle;
+  color: var(--kb-ui-text);
+}
+
+.kb-sparkline[data-tone='neutral'] {
+  --kb-sparkline-color: var(--kb-ui-text-muted);
+}
+.kb-sparkline[data-tone='info'] {
+  --kb-sparkline-color: var(--kb-ui-info-fg);
+}
+.kb-sparkline[data-tone='success'] {
+  --kb-sparkline-color: var(--kb-ui-success-fg);
+}
+.kb-sparkline[data-tone='warning'] {
+  --kb-sparkline-color: var(--kb-ui-warning-fg);
+}
+.kb-sparkline[data-tone='danger'] {
+  --kb-sparkline-color: var(--kb-ui-danger-fg);
+}
+
+.kb-sparkline__svg {
+  display: block;
+  width: 120px;
+  height: 32px;
+  overflow: visible;
+}
+
+[data-density='compact'] .kb-sparkline__svg {
+  width: 96px;
+  height: 24px;
+}
+
+.kb-sparkline__line {
+  fill: none;
+  stroke: var(--kb-sparkline-color);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.kb-sparkline__point {
+  fill: var(--kb-sparkline-color);
+}
+
+.kb-sparkline__value {
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-sparkline__empty {
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+/* ---------------------------------------------------------------- meter -- */
+
+.kb-meter {
+  --kb-meter-color: var(--kb-ui-accent);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  min-width: 0;
+  color: var(--kb-ui-text);
+}
+
+.kb-meter[data-tone='success'] {
+  --kb-meter-color: var(--kb-ui-success-fg);
+}
+.kb-meter[data-tone='warning'] {
+  --kb-meter-color: var(--kb-ui-warning-fg);
+}
+.kb-meter[data-tone='danger'] {
+  --kb-meter-color: var(--kb-ui-danger-fg);
+}
+
+.kb-meter__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--kb-ui-space-3);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-meter__label {
+  color: var(--kb-ui-text-muted);
+}
+
+.kb-meter__value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-meter__max {
+  font-weight: 400;
+  color: var(--kb-ui-text-muted);
+}
+
+.kb-meter__svg {
+  display: block;
+  width: 100%;
+  height: 8px;
+  overflow: visible;
+}
+
+[data-density='compact'] .kb-meter__svg {
+  height: 6px;
+}
+
+.kb-meter__track {
+  fill: var(--kb-ui-surface-sunken);
+  stroke: var(--kb-ui-border);
+  stroke-width: 1;
+}
+
+.kb-meter__fill {
+  fill: var(--kb-meter-color);
+}
+
+.kb-meter__threshold {
+  stroke: var(--kb-ui-text-muted);
+  stroke-width: 2;
+}
+
+.kb-meter__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-1);
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+  color: var(--kb-meter-color);
+}
+
+.kb-meter__description {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.kb-meter .kb-chart__empty {
+  padding: var(--kb-ui-space-2);
+}
+
+/* ------------------------------------------------------------ stat list -- */
+
+.kb-stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  min-width: 0;
+}
+
+.kb-stat-list__title {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+}
+
+.kb-stat-list__items {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: var(--kb-ui-space-3);
+  margin: 0;
+}
+
+.kb-stat-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--kb-ui-space-3);
+  background: var(--kb-ui-surface-sunken);
+  border-radius: var(--kb-ui-radius-sm);
+}
+
+[data-density='compact'] .kb-stat-list__item,
+.kb-stat-list[data-density='compact'] .kb-stat-list__item {
+  padding: var(--kb-ui-space-2);
+}
+
+.kb-stat-list__label {
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.kb-stat-list__value {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--kb-ui-text);
+}
+
+.kb-stat-list__unit {
+  margin-left: 2px;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 400;
+  color: var(--kb-ui-text-muted);
+}
+
+.kb-stat-list__hint {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-subtle);
+}
+
+/* ---------------------------------------------------- density & motion -- */
+
+[data-density='compact'] .kb-chart,
+.kb-chart[data-density='compact'] {
+  gap: var(--kb-ui-space-1);
+}
+
+@media (max-width: 720px) {
+  .kb-chart[data-chart='donut'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'title'
+      'desc'
+      'svg'
+      'legend';
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-chart__bar,
+  .kb-chart__arc {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .kb-chart__bar,
+  .kb-chart__arc,
+  .kb-chart__cell,
+  .kb-chart__swatch,
+  .kb-meter__fill {
+    forced-color-adjust: none;
+  }
+}

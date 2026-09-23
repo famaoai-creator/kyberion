@@ -188,3 +188,9 @@
     padding: var(--kb-ui-space-3);
   }
 }
+
+/* UI-01c: the gallery shows several save bars at once; keep them in flow
+   (on a real settings page the single save bar stays sticky). */
+.gallery-demo .kb-save-bar {
+  position: static;
+}

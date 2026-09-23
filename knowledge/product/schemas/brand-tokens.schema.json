@@ -248,6 +248,9 @@
           },
           "required": ["sm", "md"],
           "additionalProperties": false
+        },
+        "viz": {
+          "$ref": "#/definitions/uiViz"
         }
       },
       "required": [
@@ -268,8 +271,35 @@
         "focus-ring",
         "status",
         "role",
-        "shadow"
+        "shadow",
+        "viz"
       ],
+      "additionalProperties": false
+    },
+    "uiViz": {
+      "type": "object",
+      "description": "UI-01b data-viz palettes, validated with the dataviz palette validator in both modes (marks >= 3:1 on every UI surface: scripts/check_design_contrast.ts). Categorical slots are assigned in this fixed order and never cycled; sequential runs low -> high magnitude; diverging runs negative pole -> neutral midpoint -> positive pole.",
+      "properties": {
+        "categorical": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/uiColor" },
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "sequential": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/uiColor" },
+          "minItems": 5,
+          "maxItems": 5
+        },
+        "diverging": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/uiColor" },
+          "minItems": 5,
+          "maxItems": 5
+        }
+      },
+      "required": ["categorical", "sequential", "diverging"],
       "additionalProperties": false
     },
     "uiColor": {
