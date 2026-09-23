@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver } from '../libs/core/path-resolver.js';
+import { pathResolver } from './path-resolver.js';
 import {
   loadVoiceWorkbenchScenarios,
   runVoiceWorkbenchScenario,
   type VoiceWorkbenchScenario,
-} from '../libs/core/voice-workbench.js';
+} from './voice-workbench.js';
 
 const FIXTURE_DIR = pathResolver.rootResolve('tests/fixtures/voice-workbench');
 

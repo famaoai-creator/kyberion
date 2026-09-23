@@ -1,13 +1,14 @@
 /**
- * ES-03: injectable clock seam.
+ * ES-03: injectable clock.
  *
  * `foundation/time.ts` `nowIso()` reads `getClock().now()` as its default
  * argument so a scenario run (or a test) can bind a virtual clock without
- * touching every `Date.now()` call site in the codebase. Unregistered ->
+ * touching every `Date.now()` call site in the codebase. Nothing bound ->
  * `systemClock` (real wall time) — today's behavior is unchanged.
+ *
+ * This is plain module state rather than a capability seam: foundation must
+ * not depend on the domain-layer seam catalog.
  */
-
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface KyberionClock {
   now(): number;
@@ -17,33 +18,28 @@ export const systemClock: KyberionClock = {
   now: () => Date.now(),
 };
 
-const DEFAULT_METADATA: SeamProviderMetadata = {
-  provenance: 'builtin',
-  source: 'libs/core/foundation/clock.ts',
-  reason: 'virtual clock override (scenario runs, tests)',
-};
+let boundClock: KyberionClock | undefined;
 
-const clockSeam = createSeam<KyberionClock>({
-  key: 'core-clock',
-  multiplicity: 'sole',
-  catalog: coreSeamCatalog,
-});
-
-/** Currently bound clock; falls back to the real system clock when nothing is registered. */
+/** Currently bound clock; falls back to the real system clock when nothing is bound. */
 export function getClock(): KyberionClock {
-  return clockSeam.getOptional() ?? systemClock;
+  return boundClock ?? systemClock;
 }
 
 /**
  * Bind a clock (e.g. a scenario run's virtual clock). Only one clock can be
- * bound at a time (sole seam) — call the returned disposer before binding
- * another one, otherwise registration throws `SEAM_DUPLICATE_PROVIDER`.
+ * bound at a time — call the returned disposer before binding another one.
  */
-export function setClock(
-  clock: KyberionClock,
-  metadata: SeamProviderMetadata = DEFAULT_METADATA
-): () => void {
-  return clockSeam.register('override', clock, metadata);
+export function setClock(clock: KyberionClock): () => void {
+  if (boundClock) {
+    throw new Error('[CLOCK_ALREADY_BOUND] a clock is already registered; dispose it first');
+  }
+  boundClock = clock;
+  let disposed = false;
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    if (boundClock === clock) boundClock = undefined;
+  };
 }
 
 export interface VirtualClock extends KyberionClock {
@@ -53,7 +49,7 @@ export interface VirtualClock extends KyberionClock {
   set(ms: number): void;
 }
 
-/** A clock with no side effects outside itself — safe to create many of, register at most one at a time. */
+/** A clock with no side effects outside itself — safe to create many of, bind at most one at a time. */
 export function createVirtualClock(startMs: number): VirtualClock {
   let current = startMs;
   return {
