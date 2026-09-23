@@ -35,6 +35,22 @@
       "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope."
     },
     {
+      "id": "scenario-pr-deterministic",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/scenario_runner.ts",
+        "run",
+        "eval/scenarios",
+        "--lane",
+        "pr-deterministic"
+      ],
+      "owner": "quality",
+      "rationale": "Runs the pr-deterministic scenario suite (eval/scenarios, simulated and model-free) so fixture-served pipelines, approval gates and fail-closed unstubbed ops keep their contract; same as pnpm scenario run eval/scenarios --lane pr-deterministic."
+    },
+    {
       "id": "memory-benchmark",
       "scope": "pr",
       "executable": "node",

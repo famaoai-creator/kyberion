@@ -98,6 +98,8 @@ export interface ScenarioPipelineTurn {
   pipeline?: string;
   steps?: readonly Record<string, unknown>[];
   context?: Record<string, unknown>;
+  /** Negative scenario: the pipeline must fail with an error containing this substring. */
+  expectError?: string;
   checks?: ScenarioTurnChecks;
 }
 

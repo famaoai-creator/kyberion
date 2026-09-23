@@ -191,6 +191,11 @@
         },
         "steps": { "type": "array", "items": { "type": "object" } },
         "context": { "type": "object" },
+        "expectError": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Negative scenario: the pipeline must fail and one step error must contain this substring; a success fails the turn."
+        },
         "checks": { "$ref": "#/$defs/turnChecks" }
       },
       "anyOf": [{ "required": ["pipeline"] }, { "required": ["steps"] }],

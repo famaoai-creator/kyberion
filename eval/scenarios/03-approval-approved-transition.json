@@ -1,0 +1,45 @@
+{
+  "schema_version": "kyberion-scenario.v1",
+  "id": "approval-approved-transition",
+  "title": "Approving a pending op lets the retry apply",
+  "description": "The gated update is held while its approval is pending; after an hour the operator approves it and the retry applies exactly once.",
+  "tier": 1,
+  "lane": "pr-deterministic",
+  "executionProfile": "simulated",
+  "modelFixtures": "model-free",
+  "requires": {},
+  "seed": { "clock": { "start_iso": "2026-01-05T09:00:00.000Z" } },
+  "fixtures": {
+    "ops": {
+      "service:update_ticket": { "ctx_patch": { "ticket_closed": true } }
+    }
+  },
+  "turns": [
+    {
+      "kind": "pipeline",
+      "pipeline": "fixtures/gated-apply.pipeline.json",
+      "expectError": "[OP_PREFLIGHT_BLOCK]",
+      "checks": { "forbiddenOps": ["service:update_ticket"] }
+    },
+    { "kind": "advance_clock", "ms": 3600000 },
+    { "kind": "approval_decision", "op": "service:update_ticket", "decision": "approved" },
+    {
+      "kind": "pipeline",
+      "pipeline": "fixtures/gated-apply.pipeline.json",
+      "checks": {
+        "expectedOps": ["service:update_ticket"],
+        "responseMatchers": [{ "path": "ticket_closed", "equals": true }]
+      }
+    }
+  ],
+  "finalChecks": [
+    { "type": "approvalRequested", "op": "service:update_ticket" },
+    {
+      "type": "approvalTransition",
+      "op": "service:update_ticket",
+      "from": "pending",
+      "to": "approved"
+    },
+    { "type": "opCalled", "op": "service:update_ticket", "times": 1 }
+  ]
+}

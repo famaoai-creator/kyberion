@@ -1,0 +1,14 @@
+{
+  "action": "pipeline",
+  "name": "scenario-gated-apply",
+  "version": "1.0.0",
+  "description": "Scenario fixture: an approval-gated ticket update. Whether it runs depends on the scenario's approval decision.",
+  "steps": [
+    {
+      "id": "close",
+      "op": "service:update_ticket",
+      "params": { "ticket_id": "T-200", "status": "closed" },
+      "budget": { "approval_required": true }
+    }
+  ]
+}

@@ -3235,6 +3235,26 @@
       "types": "./dist/scenario-side-effect-log.d.ts",
       "default": "./dist/scenario-side-effect-log.js"
     },
+    "./scenario-final-checks": {
+      "types": "./dist/scenario-final-checks.d.ts",
+      "default": "./dist/scenario-final-checks.js"
+    },
+    "./scenario-report": {
+      "types": "./dist/scenario-report.d.ts",
+      "default": "./dist/scenario-report.js"
+    },
+    "./scenario-judge": {
+      "types": "./dist/scenario-judge.d.ts",
+      "default": "./dist/scenario-judge.js"
+    },
+    "./scenario-trajectory": {
+      "types": "./dist/scenario-trajectory.d.ts",
+      "default": "./dist/scenario-trajectory.js"
+    },
+    "./scenario-executor": {
+      "types": "./dist/scenario-executor.d.ts",
+      "default": "./dist/scenario-executor.js"
+    },
     "./plugin-permissions": {
       "types": "./dist/plugin-permissions.d.ts",
       "default": "./dist/plugin-permissions.js"

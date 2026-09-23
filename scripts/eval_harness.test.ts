@@ -8,7 +8,12 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { loadEvalHarnessTable, runEvalHarnessTable } from './eval_harness.js';
+import { createScenarioSideEffectLog } from '@agent/core/scenario-side-effect-log';
+import {
+  createEvalHarnessFixtureExecutor,
+  loadEvalHarnessTable,
+  runEvalHarnessTable,
+} from './eval_harness.js';
 
 const RUN_PATH = `active/shared/tmp/pi18-eval-${process.pid}.jsonl`;
 const TABLE_DIR = `active/shared/tmp/pi18-eval-table-${process.pid}`;
@@ -216,5 +221,57 @@ describe('PI-18 named eval harness table', () => {
         qualityJudge: () => ({ status: 'pass', score: 101, findings: [] }),
       })
     ).rejects.toThrow('[EVAL_HARNESS_QUALITY] judge returned an invalid score.');
+  });
+
+  it('answers through the scenario fixture backend by default (hash-only reasoning log)', async () => {
+    const log = createScenarioSideEffectLog();
+    const executor = createEvalHarnessFixtureExecutor(log);
+    const [configuration] = loadEvalHarnessTable();
+    const seen: string[] = [];
+    const result = await runEvalHarnessTable({
+      table: [configuration!],
+      brief: 'fixture brief',
+      runPath: RUN_PATH,
+      executor: async (prompt, context) => {
+        const output = await executor(prompt, context);
+        seen.push(output);
+        return output;
+      },
+    });
+    expect(JSON.parse(seen[0]!)).toMatchObject({ model: 'stub', reload_count: 0 });
+    expect(log.reasoning).toMatchObject([
+      { backend: 'scenario-fixtures', outcome: 'fixture', prompt_length: 'fixture brief'.length },
+    ]);
+    expect(JSON.stringify(log)).not.toContain('fixture brief');
+    expect(result.results[0]?.prompt_receipts[0]?.output_length).toBe(seen[0]!.length);
+
+    const defaulted = await runEvalHarnessTable({
+      table: [{ name: 'defaulted' }],
+      brief: 'fixture brief',
+      runPath: RUN_PATH,
+    });
+    expect(defaulted.results[0]?.model).toBe('stub');
+    expect(defaulted.results[0]?.quality.status).toBe('pass');
+  });
+
+  it('fails closed for a non-stub model without an injected executor', async () => {
+    await expect(
+      runEvalHarnessTable({
+        table: [{ name: 'baseline' }, { name: 'live', model: 'claude-opus' }],
+        brief: 'judge this output',
+        runPath: RUN_PATH,
+      })
+    ).rejects.toThrow(
+      '[EVAL_HARNESS_EXECUTOR] live (model claude-opus) need an injected executor; the built-in fixture executor only serves model "stub".'
+    );
+    expect(safeExistsSync(pathResolver.rootResolve(RUN_PATH))).toBe(false);
+
+    const injected = await runEvalHarnessTable({
+      table: [{ name: 'live', model: 'claude-opus' }],
+      brief: 'judge this output',
+      runPath: RUN_PATH,
+      executor: () => 'live answer',
+    });
+    expect(injected.results[0]?.model).toBe('claude-opus');
   });
 });

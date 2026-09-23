@@ -1,0 +1,18 @@
+{
+  "action": "pipeline",
+  "name": "scenario-publish-report",
+  "version": "1.0.0",
+  "description": "Scenario fixture: log progress and publish a report through a fixture-served op.",
+  "steps": [
+    {
+      "id": "announce",
+      "op": "system:log",
+      "params": { "message": "publishing weekly report" }
+    },
+    {
+      "id": "publish",
+      "op": "service:publish_report",
+      "params": { "report": "weekly", "channel": "ops" }
+    }
+  ]
+}
