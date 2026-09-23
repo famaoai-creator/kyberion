@@ -11,7 +11,7 @@ status: active
 > **対象**: `presence/displays/concierge`(秘書室 :3050)と `presence/displays/presence-studio`(相棒 :3031)の人間向け UI 全体、両者が共有するレール、viewer 識別 API、最小限のメンバーモデル、人とエージェント(NHI)の役割・アクター語彙の整合
 > **設計原本**: ワイヤーフレーム 9 枚(Claude Design キャンバス「Kyberion フロントデスク再設計」。方向確定後に `docs/assets/surfaces/` へ PNG を書き出して固定する)
 > **ステータス表記**: 各フェーズ末尾の「実装状況」節に記録(07 月次規約と同一)
-> **前提**: [CONCIERGE_SECRETARY_UX_PLAN](./CONCIERGE_SECRETARY_UX_PLAN_2026-08-02.ja.md)(CS-00〜05 完了)、[SX-08b](./SX-08B_SURFACE_INTENT_CONSOLIDATION_PLAN.ja.md)(意図解釈入口の統合)、[SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN](./SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md)(server-side viewer scope)
+> **前提**: [CONCIERGE_SECRETARY_UX_PLAN](../improvement-plans-2026-08/CONCIERGE_SECRETARY_UX_PLAN_2026-08-02.ja.md)(CS-00〜05 完了)、[SX-08b](../improvement-plans-2026-08/SX-08B_SURFACE_INTENT_CONSOLIDATION_PLAN.ja.md)(意図解釈入口の統合)、[SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN](../improvement-plans-2026-08/SURFACE_SCOPED_RBAC_AUTHORIZATION_PLAN_2026-08-24.ja.md)(server-side viewer scope)
 
 ---
 
