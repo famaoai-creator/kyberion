@@ -79,6 +79,7 @@ import { registerFrontDeskRoutes } from './front-desk-routes.js';
 import { registerHearingRoutes } from './hearing-routes.js';
 import { registerHearingMissionRoutes } from './hearing-mission-routes.js';
 import { registerTrainingRoutes } from './training-routes.js';
+import { registerVoiceSynthesizeRoute } from './voice-synthesize-route.js';
 import { registerWorkInventoryRoutes } from './work-inventory-routes.js';
 import { PRESENCE_STUDIO_VOCABULARY_KEYS } from './front-desk-pages.js';
 
@@ -159,6 +160,8 @@ registerTrainingRoutes(presenceStudioData.app);
 // WI-11: work-inventory automation-candidate panel for the progress page —
 // see work-inventory-routes.ts module doc.
 registerWorkInventoryRoutes(presenceStudioData.app);
+// PA-09: return-audio TTS for the talking avatar — see voice-synthesize-route.ts.
+registerVoiceSynthesizeRoute(presenceStudioData.app);
 
 presenceStudioData.app.get('/health', (_req, res) => {
   res.json({
