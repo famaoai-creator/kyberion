@@ -901,3 +901,74 @@ describe('kyberion-ui vanilla renderer — rail slots, list progress, display co
     expect(plain.query('figcaption')).toBeNull();
   });
 });
+
+describe('kyberion-ui vanilla renderer — item actions (list / nav-rail)', () => {
+  const withActions = (type: string, props: Record<string, unknown>) => {
+    const { document, root } = setup();
+    const actions: Array<{ id: string; payload?: unknown }> = [];
+    renderInto(root as unknown as MiniElement, [{ id: 'x1', type, props }], {
+      document,
+      onAction: (action: { id: string; payload?: unknown }) => actions.push(action),
+    });
+    return { root: root as unknown as MiniElement, actions };
+  };
+
+  it('nav-rail: an action-only item is a button; a link with an action dispatches on plain click', () => {
+    const { root, actions } = withActions('ui:nav-rail', {
+      items: [
+        { id: 'a', label: 'A', action: { id: 'pad.open', payload: { pad: 'a' } } },
+        { id: 'b', label: 'B', href: '#pad=b', action: 'pad.open-b' },
+        { id: 'c', label: 'C', href: '/c' },
+      ],
+    });
+    const items = root.queryAll('.kb-nav-rail__item');
+    expect(items.map((item) => item.tagName)).toEqual(['BUTTON', 'A', 'A']);
+    expect(items[0].getAttribute('type')).toBe('button');
+    expect(items[0].getAttribute('data-action-id')).toBe('pad.open');
+    items[0].click();
+    let prevented = 0;
+    items[1].dispatch('click', { button: 0, preventDefault: () => (prevented += 1) });
+    // A modified click (new tab) is left to the browser.
+    items[1].dispatch('click', {
+      button: 0,
+      metaKey: true,
+      preventDefault: () => (prevented += 1),
+    });
+    items[2].click();
+    expect(prevented).toBe(1);
+    expect(actions).toEqual([{ id: 'pad.open', payload: { pad: 'a' } }, { id: 'pad.open-b' }]);
+  });
+
+  it('list: action titles and trailing row actions described by the title', () => {
+    const { root, actions } = withActions('ui:list', {
+      items: [
+        {
+          title: 'Clip 1',
+          action: { id: 'clip.open', payload: { index: 0 } },
+          actions: [
+            { label: 'Remove', action: { id: 'clip.remove', payload: { index: 0 } } },
+            { label: 'Docs', href: '/docs' },
+          ],
+        },
+        { title: 'Plain' },
+      ],
+    });
+    const [first, second] = root.queryAll('.kb-list__item');
+    const title = first.query('.kb-list__title')!;
+    expect(title.tagName).toBe('BUTTON');
+    expect(title.getAttribute('id')).toBe('kbl-x1-0-title');
+    const rowActions = first.query('.kb-list__actions')!.children;
+    expect(rowActions.map((node) => node.tagName)).toEqual(['BUTTON', 'A']);
+    expect(rowActions[0].getAttribute('aria-describedby')).toBe('kbl-x1-0-title');
+    expect(rowActions[1].getAttribute('aria-describedby')).toBeNull();
+    title.click();
+    rowActions[0].click();
+    expect(actions).toEqual([
+      { id: 'clip.open', payload: { index: 0 } },
+      { id: 'clip.remove', payload: { index: 0 } },
+    ]);
+    expect(second.query('.kb-list__title')!.tagName).toBe('SPAN');
+    expect(second.query('.kb-list__actions')).toBeNull();
+    expect(second.query('.kb-list__title')!.getAttribute('id')).toBeNull();
+  });
+});

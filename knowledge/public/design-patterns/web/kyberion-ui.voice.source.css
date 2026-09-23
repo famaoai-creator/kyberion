@@ -146,7 +146,6 @@
 }
 
 .kb-voice-input__transcript {
-  min-height: 1.5em;
   margin: 0;
   color: var(--kb-ui-text-muted);
   font-size: var(--kb-ui-font-size-sm);
@@ -158,6 +157,22 @@
   margin: 0;
   color: var(--kb-ui-text-muted);
   font-size: var(--kb-ui-font-size-sm);
+}
+
+/* Idle with nothing to say: no empty lines under the button. The empty
+ * transcript collapses; the empty status leaves the flow but stays in the
+ * accessibility tree (it is the live region the next state is announced in). */
+.kb-voice-input__transcript:empty {
+  display: none;
+}
+
+.kb-voice-input__status:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
 .kb-voice-input[data-state='error'] .kb-voice-input__status,
@@ -247,8 +262,9 @@
   border-radius: 50%;
 }
 
-/* Per-state glyph (shape cue besides colour). Centered on orb / dot, a
- * corner badge on bars. */
+/* Per-state glyph (shape cue besides colour). Centered on orb / dot; on
+ * bars it sits inline after the bars, vertically centred with them and the
+ * label. */
 .kb-voice-state__glyph {
   position: absolute;
   inset: 0;
@@ -262,8 +278,12 @@
 }
 
 .kb-voice-state[data-variant='bars'] .kb-voice-state__glyph {
-  inset: auto calc(var(--kb-voice-size) * -0.35) calc(var(--kb-voice-size) * -0.2) auto;
-  font-size: calc(var(--kb-voice-size) * 0.4);
+  position: static;
+  flex: none;
+  height: 100%;
+  margin-inline-start: calc(var(--kb-voice-size) / 8);
+  color: inherit;
+  font-size: calc(var(--kb-voice-size) * 0.55);
 }
 
 .kb-voice-state[data-variant='dot'] .kb-voice-state__glyph {

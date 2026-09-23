@@ -51,6 +51,8 @@ export interface ButtonProps {
   type?: 'button' | 'submit' | 'reset';
   /** Replaces the visible label (the label stays the accessible name). */
   children?: ReactNode;
+  /** `aria-describedby` on the button (e.g. a list row's title for its row actions). */
+  describedBy?: string;
 }
 
 /** `ui:button` → `.kb-btn.kb-btn--{variant}`; a link when `href` is safe, else a `<button>`. */
@@ -99,6 +101,7 @@ export function Button(props: ButtonProps) {
       title={props.title}
       data-action-id={action?.id}
       aria-label={props.children ? props.label : undefined}
+      aria-describedby={props.describedBy}
       onClick={(event) => {
         props.onClick?.(event);
         if (!event.defaultPrevented && action && onAction) onAction(action.id, action.payload);
@@ -137,9 +140,12 @@ export type ActionRefLike = KbActionRef | KbReactActionRef;
 export function ActionRefButton({
   actionRef,
   defaultVariant = 'secondary',
+  describedBy,
 }: {
   actionRef: ActionRefLike | undefined;
   defaultVariant?: KbButtonVariant;
+  /** `aria-describedby` for an action button (links ignore it). */
+  describedBy?: string;
 }) {
   if (!actionRef || typeof actionRef.label !== 'string') return null;
   const onClick = 'onClick' in actionRef ? actionRef.onClick : undefined;
@@ -151,6 +157,7 @@ export function ActionRefButton({
       href={actionRef.href}
       action={actionRef.action}
       onClick={typeof onClick === 'function' ? onClick : undefined}
+      describedBy={describedBy}
     />
   );
 }

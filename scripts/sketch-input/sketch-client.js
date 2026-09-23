@@ -61,6 +61,7 @@ function renderToolbar() {
       type: 'ui:toolbar',
       props: {
         label: t('sketch_input:toolbar_label'),
+        sticky: true,
         items: [
           {
             type: 'button',

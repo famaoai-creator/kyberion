@@ -13,6 +13,8 @@ export type KbVoiceErrorCode =
 export declare const KB_VOICE_INPUT_STATES: readonly KbVoiceInputState[];
 export declare const KB_VOICE_ERROR_CODES: readonly KbVoiceErrorCode[];
 export declare const KB_VOICE_RECORDER_TYPES: readonly string[];
+/** Continuous dictation: self-ended recognitions restarted in a row before giving up. */
+export declare const KB_VOICE_MAX_RESTARTS: number;
 
 export declare function voiceLang(lang: unknown, locale: unknown): string;
 export declare function formatElapsed(ms: number): string;
@@ -32,10 +34,14 @@ export interface KbVoiceControllerOptions {
   mode?: 'dictation' | 'record';
   /** BCP-47 recognition language (dictation). */
   lang?: string;
+  /** Dictation: keep listening; a recognition that ends on its own is restarted (bounded). */
   continuous?: boolean;
   /** Open an AnalyserNode level meter on the mic stream (default true). */
   meter?: boolean;
-  /** Record mode: deliver one file per slice of this many ms. */
+  /**
+   * Record mode: deliver one complete, independently decodable file per
+   * chunk of this many ms (the recorder restarts on the same stream).
+   */
   chunkMs?: number;
   /** Stop automatically after this many seconds. */
   maxSeconds?: number;
@@ -47,7 +53,14 @@ export interface KbVoiceControllerOptions {
   onLevel?: (level: number) => void;
   onElapsed?: (ms: number) => void;
   onTranscript?: (result: { text: string; final: boolean }) => void;
-  onRecording?: (result: { file: Blob; durationMs: number; final: boolean }) => void;
+  onRecording?: (result: {
+    file: Blob;
+    /** Duration of this file (the chunk, or the whole recording). */
+    durationMs: number;
+    /** Start of this file relative to the start of the recording. */
+    offsetMs: number;
+    final: boolean;
+  }) => void;
   onError?: (code: KbVoiceErrorCode) => void;
 }
 

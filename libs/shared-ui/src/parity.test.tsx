@@ -114,7 +114,7 @@ type NormNode = NormElement | { text: string };
 // UI-01b: chart SVG geometry is part of the contract too (one layout module,
 // so both renderers must emit the same coordinates and paths).
 const KEEP_ATTR =
-  /^(?:data-[\w-]+|aria-[\w-]+|role|href|viewBox|d|x|y|x1|x2|y1|y2|cx|cy|r|rx|width|height|text-anchor|dominant-baseline|scope)$/;
+  /^(?:data-[\w-]+|aria-[\w-]+|role|href|id|name|viewBox|d|x|y|x1|x2|y1|y2|cx|cy|r|rx|width|height|text-anchor|dominant-baseline|scope)$/;
 
 function keepAttrs(
   names: Iterable<string>,
@@ -402,6 +402,96 @@ const EXTRA_SCENARIOS: FixtureScenario[] = [
     id: 'display-controls-no-id-defaults',
     title: 'display controls defaults',
     components: [{ id: 'dc', type: 'ui:display-controls', props: {} }],
+  },
+  // Item actions: nav-rail action-only / link+action items, list action
+  // titles and trailing row actions (described by the row title).
+  {
+    id: 'nav-rail-item-actions',
+    title: 'nav-rail item actions',
+    components: [
+      {
+        id: 'ra',
+        type: 'ui:nav-rail',
+        props: {
+          items: [
+            {
+              id: 'a',
+              label: 'A',
+              icon: 'home',
+              action: { id: 'pad.open', payload: { pad: 'a' } },
+            },
+            { id: 'b', label: 'B', href: '#pad=b', action: 'pad.open', active: true },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: 'list-item-actions',
+    title: 'list item actions',
+    components: [
+      {
+        id: 'la',
+        type: 'ui:list',
+        props: {
+          items: [
+            {
+              title: 'Clip',
+              meta: 'text',
+              action: { id: 'clip.open' },
+              actions: [
+                { label: 'Remove', action: { id: 'clip.remove', payload: { index: 0 } } },
+                { label: 'Docs', href: '/docs' },
+              ],
+            },
+            { title: 'Link', href: '/x', action: 'x.open', status: 'done' },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: 'toolbar-descriptions',
+    title: 'toolbar item descriptions',
+    components: [
+      {
+        id: 'tb',
+        type: 'ui:toolbar',
+        props: {
+          label: 'Tools',
+          sticky: true,
+          items: [
+            { type: 'button', id: 'save', label: 'Save', description: 'Save to disk' },
+            {
+              type: 'file',
+              id: 'add',
+              label: 'Add',
+              icon: '+',
+              hide_label: true,
+              description: 'Add files',
+            },
+            { type: 'toggle', id: 'x', label: 'X', icon: 'x', hide_label: true },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: 'dialog-children',
+    title: 'dialog with a content child',
+    components: [
+      {
+        id: 'dc1',
+        type: 'ui:dialog',
+        props: { open: true, title: 'Note', input: { name: 'n', label: 'Note', multiline: true } },
+        children: ['dc1-voice'],
+      },
+      {
+        id: 'dc1-voice',
+        type: 'ui:voice-input',
+        props: { name: 'v', label: 'Dictate', show_transcript: true },
+      },
+    ],
   },
   // Secret field host outcomes (`status`): pending, saved, error (+ reason).
   ...(['pending', 'saved', 'error'] as const).map((status) => ({

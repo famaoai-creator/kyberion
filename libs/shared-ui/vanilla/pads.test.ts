@@ -27,11 +27,14 @@ import {
   KB_DIALOG_MESSAGE_KEYS,
   containFit,
   createDrawingEngine,
+  dialogFocusables,
   dialogTrapTarget,
   drawingPaletteState,
   normalizeHexColor,
   rovingIndex,
   sketchFileName,
+  sketchDownloadName,
+  sketchImageSource,
   toolbarItems,
   toolbarRovingTarget,
 } from './pads.js';
@@ -356,6 +359,122 @@ describe('ui:dialog (vanilla)', () => {
   });
 });
 
+describe('ui:dialog children and shadow roots (vanilla)', () => {
+  const prompt = {
+    open: true,
+    title: 'Note',
+    input: { name: 'note', label: 'Note', multiline: true },
+  };
+  const withChild = (open: boolean) => [
+    { id: 'd', type: 'ui:dialog', props: { ...prompt, open }, children: ['extra'] },
+    { id: 'extra', type: 'ui:button', props: { label: 'Extra', action: 'extra.go' } },
+  ];
+  const tab = (panel: MiniElement, shiftKey = false) => {
+    let prevented = false;
+    panel.dispatch('keydown', {
+      key: 'Tab',
+      shiftKey,
+      preventDefault() {
+        prevented = true;
+      },
+    });
+    return prevented;
+  };
+
+  it('renders children in the body between the input and the buttons', () => {
+    const m = mount(withChild(true));
+    const panel = m.q('.kb-dialog__panel');
+    const classes = panel.children.map((child) => child.className);
+    expect(classes).toEqual([
+      'kb-dialog__title',
+      'kb-field kb-dialog__field',
+      'kb-dialog__content',
+      'kb-dialog__actions',
+    ]);
+    expect(m.q('.kb-dialog__content button').textContent).toBe('Extra');
+    const closed = mount(withChild(false));
+    expect(closed.root.query('.kb-dialog__content')).toBeNull();
+    expect(closed.root.query('button')).toBeNull();
+  });
+
+  it('the focus trap includes the children controls', () => {
+    const document = new MiniDocument();
+    const m = mount(withChild(true), {}, document);
+    const panel = m.q('.kb-dialog__panel');
+    const textarea = m.q('textarea');
+    const extra = m.q('.kb-dialog__content button');
+    const confirm = m.q('[data-dialog-button="confirm"]');
+    expect(dialogFocusables(panel)).toEqual([
+      textarea,
+      extra,
+      m.q('[data-dialog-button="cancel"]'),
+      confirm,
+    ]);
+    const doc = document as unknown as { activeElement: unknown };
+    // Inside the children: the browser moves on (no wrap to the start).
+    doc.activeElement = extra;
+    expect(tab(panel)).toBe(false);
+    doc.activeElement = confirm;
+    expect(tab(panel)).toBe(true);
+    expect(MiniElement.focused).toBe(textarea);
+    doc.activeElement = textarea;
+    expect(tab(panel, true)).toBe(true);
+    expect(MiniElement.focused).toBe(confirm);
+  });
+
+  it('reads focus from the shadow root it is rendered into', async () => {
+    const proto = MiniElement.prototype as unknown as { getRootNode?: () => unknown };
+    const topOf = (start: MiniElement) => {
+      let node = start;
+      while (node.parentNode instanceof MiniElement) node = node.parentNode;
+      return node;
+    };
+    proto.getRootNode = function (this: MiniElement) {
+      return topOf(this);
+    };
+    try {
+      const document = new MiniDocument();
+      const shadowHost = document.createElement('div');
+      const shadow = document.createElement('div') as MiniElement & { activeElement: unknown };
+      shadow.activeElement = null;
+      const opener = document.createElement('button');
+      shadow.appendChild(opener);
+      const box = document.createElement('div');
+      shadow.appendChild(box);
+      const doc = document as unknown as { activeElement: unknown };
+      // Focus is inside the shadow tree: the document only sees the host.
+      doc.activeElement = shadowHost;
+      shadow.activeElement = opener;
+      const actions: Action[] = [];
+      const render = (open: boolean) =>
+        renderA2UI(
+          box as unknown as Element,
+          [{ id: 'sd', type: 'ui:dialog', props: { ...prompt, open } }] as never,
+          {
+            document: document as unknown as Document,
+            onAction: (a: Action) => actions.push(a),
+          } as never
+        );
+      render(true);
+      await tick();
+      const panel = box.query('.kb-dialog__panel') as MiniElement;
+      const cancel = box.query('[data-dialog-button="cancel"]') as MiniElement;
+      // A middle control focused inside the shadow root: no wrap.
+      shadow.activeElement = cancel;
+      expect(tab(panel)).toBe(false);
+      shadow.activeElement = box.query('[data-dialog-button="confirm"]');
+      expect(tab(panel)).toBe(true);
+      expect(MiniElement.focused).toBe(box.query('textarea'));
+      // Close: focus returns to the opener inside the shadow root, not the host.
+      render(false);
+      await tick();
+      expect(MiniElement.focused).toBe(opener);
+    } finally {
+      delete proto.getRootNode;
+    }
+  });
+});
+
 describe('ui:drawing-palette (vanilla)', () => {
   const base = { name: 'pen', label: 'Palette', tool: 'pen', color: '#0090ff', width: 4 };
 
@@ -569,6 +688,205 @@ describe('ui:sketch-board (vanilla)', () => {
     stroke(m.q('canvas'), [1, 1], [30, 30]);
     // mini-dom has no removeEventListener: the disposed engine ignores input.
     expect(m.actions).toEqual([]);
+  });
+});
+
+// Fake `Image` + `URL` for background / drawing-layer image loads: each load
+// waits until the test calls `images[i].load()` / `.fail()`.
+function imageWin() {
+  const images: FakeImage[] = [];
+  const revoked: string[] = [];
+  let next = 0;
+  class FakeImage {
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    naturalWidth = 200;
+    naturalHeight = 100;
+    width = 200;
+    height = 100;
+    crossOrigin = '';
+    source = '';
+    set src(value: string) {
+      this.source = value;
+      images.push(this);
+    }
+    load() {
+      this.onload?.();
+    }
+    fail() {
+      this.onerror?.();
+    }
+  }
+  const win = {
+    Image: FakeImage,
+    URL: {
+      createObjectURL: () => `blob:test/${next++}`,
+      revokeObjectURL: (url: string) => revoked.push(url),
+    },
+  };
+  return { win, images, revoked };
+}
+
+describe('sketch board runtime images (vanilla)', () => {
+  const board = { name: 'sketch', label: 'Sketch', canvas_width: 800, canvas_height: 400 };
+  const PNG = 'data:image/png;base64,iVBORw0KGgo=';
+  type Controller = {
+    setBackgroundImage(source: unknown): Promise<boolean>;
+    loadImage(source: unknown, options?: { layer?: string }): Promise<boolean>;
+    isEmpty(): boolean;
+    clear(): void;
+  };
+  const ready = async (m: ReturnType<typeof one>) => {
+    await tick();
+    const action = m.actions.find((a) => a.id === 'drawing.ready');
+    return action?.payload?.controller as Controller;
+  };
+
+  it('classifies runtime sources: Blob, blob:, data:image raster, safe URLs', () => {
+    const safe = (value: unknown) =>
+      typeof value === 'string' && value.startsWith('/') ? value : null;
+    const png = file('a.png', 'image/png');
+    expect(sketchImageSource(png, safe)).toEqual({ kind: 'blob', blob: png });
+    expect(sketchImageSource('blob:http://x/1', safe)).toMatchObject({ kind: 'url' });
+    expect(sketchImageSource(PNG, safe)).toMatchObject({ kind: 'url', url: PNG });
+    expect(sketchImageSource('data:image/svg+xml;base64,PHN2Zz4=', safe)).toBeNull();
+    expect(sketchImageSource('data:text/html,<b>x</b>', safe)).toBeNull();
+    expect(sketchImageSource('javascript:alert(1)', safe)).toBeNull();
+    expect(sketchImageSource('/shot.png', safe)).toEqual({
+      kind: 'url',
+      url: '/shot.png',
+      crossOrigin: false,
+    });
+    expect(sketchImageSource(42, safe)).toBeNull();
+  });
+
+  it('controller.setBackgroundImage takes File / data: URLs and never clears on bad input', async () => {
+    const fake = imageWin();
+    const m = one('ui:sketch-board', board, { window: fake.win });
+    const controller = await ready(m);
+    const first = controller.setBackgroundImage(PNG);
+    expect(fake.images[0].source).toBe(PNG);
+    fake.images[0].load();
+    expect(await first).toBe(true);
+    expect(controller.isEmpty()).toBe(false);
+    // Unsupported input: resolves false, the background stays.
+    expect(await controller.setBackgroundImage('data:text/html,hi')).toBe(false);
+    expect(fake.images).toHaveLength(1);
+    expect(controller.isEmpty()).toBe(false);
+    const blob = controller.setBackgroundImage(file('b.png', 'image/png'));
+    fake.images[1].load();
+    expect(await blob).toBe(true);
+    expect(fake.revoked).toEqual(['blob:test/0']);
+    expect(await controller.setBackgroundImage(null)).toBe(true);
+    expect(controller.isEmpty()).toBe(true);
+  });
+
+  it('the latest background call wins (slower earlier loads and pending loads after null)', async () => {
+    const fake = imageWin();
+    const engine = createDrawingEngine({ canvas: null, win: fake.win });
+    const slow = engine.setBackgroundImage('/slow.png');
+    const fast = engine.setBackgroundImage('/fast.png');
+    fake.images[1].load();
+    expect(await fast).toBe(true);
+    fake.images[0].load();
+    expect(await slow).toBe(false);
+    expect(engine.hasBackground()).toBe(true);
+    const pending = engine.setBackgroundImage('/late.png');
+    await engine.setBackgroundImage(null);
+    fake.images[2].load();
+    expect(await pending).toBe(false);
+    expect(engine.hasBackground()).toBe(false);
+  });
+
+  it("loadImage({ layer: 'drawing' }) is undoable and removed by Clear", async () => {
+    const fake = imageWin();
+    const m = one('ui:sketch-board', board, { window: fake.win });
+    const controller = await ready(m);
+    const loading = controller.loadImage(file('saved.png', 'image/png'), { layer: 'drawing' });
+    fake.images[0].load();
+    expect(await loading).toBe(true);
+    expect(m.actions.at(-1)).toEqual({
+      id: 'drawing.change',
+      payload: { name: 'sketch', dirty: true, strokes: 1 },
+    });
+    expect(m.q('[data-palette-action="undo"]').disabled).toBe(false);
+    controller.clear();
+    expect(controller.isEmpty()).toBe(true);
+    // Background layer by default.
+    const bg = controller.loadImage(PNG);
+    fake.images[1].load();
+    expect(await bg).toBe(true);
+    expect(m.q('[data-palette-action="undo"]').disabled).toBe(true);
+    expect(await controller.loadImage('data:text/html,x', { layer: 'drawing' })).toBe(false);
+  });
+
+  it("paste_scope 'document' takes a pasted image anywhere except editable fields", () => {
+    const document = new MiniDocument() as MiniDocument & {
+      listeners?: Map<string, Array<(event: unknown) => void>>;
+      addEventListener?: (type: string, fn: (event: unknown) => void) => void;
+      removeEventListener?: (type: string, fn: (event: unknown) => void) => void;
+    };
+    const listeners = new Map<string, Array<(event: unknown) => void>>();
+    document.addEventListener = (type, fn) =>
+      listeners.set(type, [...(listeners.get(type) ?? []), fn]);
+    document.removeEventListener = (type, fn) =>
+      listeners.set(
+        type,
+        (listeners.get(type) ?? []).filter((f) => f !== fn)
+      );
+    const paste = (target: unknown, files: File[]) => {
+      let prevented = false;
+      for (const fn of listeners.get('paste') ?? [])
+        fn({ target, clipboardData: { files }, preventDefault: () => (prevented = true) });
+      return prevented;
+    };
+    const m = mount(
+      [
+        {
+          id: 'sb',
+          type: 'ui:sketch-board',
+          props: { ...board, accept_image_drop: true, paste_scope: 'document' },
+        },
+      ],
+      {},
+      document
+    );
+    const png = file('clip.png', 'image/png');
+    const field = document.createElement('textarea');
+    expect(paste(field, [png])).toBe(false);
+    expect(paste(document.createElement('div'), [png])).toBe(true);
+    expect(m.actions.filter((a) => a.id === 'drawing.background')).toHaveLength(1);
+    disposeA2UI(m.root as unknown as Element);
+    expect(listeners.get('paste')).toEqual([]);
+  });
+
+  it('download_name names the PNG (sanitized, .png ensured)', () => {
+    expect(sketchDownloadName({ name: 'sketch', download_name: 'Weekly board' })).toBe(
+      'Weekly board.png'
+    );
+    expect(sketchDownloadName({ name: 'sketch', download_name: 'a/b:c.PNG' })).toBe('a-b-c.png');
+    expect(sketchDownloadName({ name: 'my sketch' })).toBe('my-sketch.png');
+    expect(sketchDownloadName({ download_name: '...' })).toBe('sketch.png');
+  });
+
+  it('the custom colour control is a "+" picker, marked active for a non-swatch colour', () => {
+    const m = one('ui:drawing-palette', {
+      name: 'p',
+      label: 'P',
+      colors: ['#ffffff'],
+      color: '#ffffff',
+      allow_custom_color: true,
+    });
+    const custom = m.q('.kb-drawing-palette__custom');
+    expect(custom.getAttribute('title')).toBe('Custom color');
+    expect(m.q('.kb-drawing-palette__custom-glyph').getAttribute('aria-hidden')).toBe('true');
+    expect(m.q('.kb-drawing-palette__custom-glyph svg')).toBeTruthy();
+    expect(custom.getAttribute('data-active')).toBeNull();
+    const input = m.q('.kb-drawing-palette__custom-input');
+    input.value = '#123456';
+    input.dispatch('input');
+    expect(custom.getAttribute('data-active')).toBe('true');
+    expect(m.q('.kb-drawing-palette__custom-dot').getAttribute('aria-hidden')).toBe('true');
   });
 });
 

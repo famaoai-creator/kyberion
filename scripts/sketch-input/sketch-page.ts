@@ -11,7 +11,13 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import type { VocabularyKey } from '@agent/core/t';
-import { escapePadHtml, padT, renderPadHeader, renderPadPage } from '../lib/pad-ui.js';
+import {
+  escapePadHtml,
+  padT,
+  renderPadHeader,
+  renderPadPage,
+  renderPadStickyHost,
+} from '../lib/pad-ui.js';
 
 export interface SketchPageConfig {
   locale: SupportedLocale;
@@ -49,7 +55,7 @@ export function sketchPageHtml(config: SketchPageConfig): string {
   const bodyHtml = [
     renderPadHeader({ locale: config.locale, title, subtitle: t('sketch_input:subtitle') }),
     '<div class="kb-stack" data-gap="md">',
-    '<div id="sk-toolbar"></div>',
+    renderPadStickyHost('sk-toolbar'),
     '<div id="sk-board"></div>',
     '<section class="kb-section">',
     '<div id="sk-instruction"></div>',

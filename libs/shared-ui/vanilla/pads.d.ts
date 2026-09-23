@@ -35,6 +35,8 @@ export interface KbToolbarItemModel {
   accept: string;
   multiple: boolean;
   text: string;
+  /** Tooltip + `aria-describedby` text (controls only; '' when unset). */
+  description: string;
   tone: string;
   control: boolean;
   focusable: boolean;
@@ -48,6 +50,11 @@ export declare function toolbarRovingTarget(
   key: string | undefined
 ): number;
 export declare function toolbarItemAction(item: KbToolbarItemModel): KbResolvedPadAction;
+export declare function toolbarDescriptionId(
+  componentId: unknown,
+  item: KbToolbarItemModel
+): string;
+export declare function toolbarItemTitle(item: KbToolbarItemModel): string;
 export declare function toolbarPayload(
   item: KbToolbarItemModel,
   runtime: Record<string, unknown>
@@ -107,6 +114,9 @@ export declare function dialogTrapTarget<T>(
   active: unknown,
   shiftKey: boolean
 ): T | null;
+export declare function dialogFocusables<T = HTMLElement>(panel: unknown): T[];
+export declare function focusRootOf(node: unknown, doc: unknown): unknown;
+export declare function activeElementFor(node: unknown, doc: unknown): Element | null;
 export declare function isConnected(node: unknown): boolean;
 
 // -- drawing -----------------------------------------------------------------
@@ -161,6 +171,7 @@ export interface KbDrawingPaletteState {
 }
 
 export declare function normalizeHexColor(value: unknown): string | null;
+export declare function customColorView(state: unknown): { active: boolean; color: string };
 export declare function drawingTools(value: unknown): KbDrawingToolName[];
 export declare function drawingColors(value: unknown): string[];
 export declare function drawingWidthRange(p: unknown): { min: number; max: number };
@@ -179,6 +190,9 @@ export declare function rovingIndex(
   count: number
 ): number;
 export declare function sketchFileName(name: unknown): string;
+export declare function sketchDownloadName(p: unknown): string;
+export declare function sketchPasteScope(p: unknown): 'board' | 'document';
+export declare function isEditablePasteTarget(event: unknown): boolean;
 export declare function drawingIds(
   componentId: unknown,
   name: unknown
@@ -225,6 +239,8 @@ export interface KbDrawingEngine {
   clear(): void;
   addText(at: KbDrawingPoint, value: string): boolean;
   setBackgroundImage(source: Blob | string | null): Promise<boolean>;
+  /** Place an image into the undoable / clearable drawing layer. */
+  addImage(source: Blob | string): Promise<boolean>;
   toBlob(): Promise<Blob>;
   render(): void;
   dispose(): void;
@@ -236,8 +252,26 @@ export interface KbSketchControllerRuntime {
   isEmpty(): boolean;
   clear(): void;
   undo(): void;
+  /** File/Blob, `blob:` / `data:image/*` URL, http(s) / same-origin URL; null removes. */
   setBackgroundImage(source: Blob | string | null): Promise<boolean>;
+  loadImage(
+    source: Blob | string,
+    options?: { layer?: 'background' | 'drawing' }
+  ): Promise<boolean>;
 }
+
+export declare function sketchImageSource(
+  source: unknown,
+  safeHref: (value: unknown) => string | null
+): { kind: 'blob'; blob: Blob } | { kind: 'url'; url: string; crossOrigin: boolean } | null;
+export declare function createSketchController(
+  engine: KbDrawingEngine,
+  options: {
+    safeHref: (value: unknown) => string | null;
+    onChange?: () => void;
+    live?: () => boolean;
+  }
+): KbSketchControllerRuntime;
 
 export declare function createDrawingEngine(options: KbDrawingEngineOptions): KbDrawingEngine;
 export declare function paintStroke(g: unknown, stroke: unknown): void;
@@ -264,4 +298,5 @@ export declare function createPadRenderers(h: {
   el: (...args: never[]) => unknown;
   setData: (...args: never[]) => unknown;
   safeHref: (value: unknown) => string | null;
+  appendChildren?: (...args: never[]) => unknown;
 }): Record<string, (ctx: unknown, props: Record<string, unknown>, component: unknown) => unknown>;

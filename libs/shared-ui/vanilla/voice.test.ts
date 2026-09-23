@@ -12,6 +12,7 @@ import { KB_VOICE_ACTIONS as CORE_VOICE_ACTIONS } from '@agent/core/a2ui-catalog
 import { disposeA2UI, renderA2UI } from './kyberion-ui.js';
 import {
   KB_VOICE_ACTIONS,
+  KB_VOICE_MAX_RESTARTS,
   KB_VOICE_MESSAGE_KEYS,
   createVoiceController,
   formatElapsed,
@@ -189,6 +190,77 @@ describe('createVoiceController — dictation', () => {
     expect(fakes.live()).toMatchObject({ streams: 0, contexts: 0, frames: 0, intervals: 0 });
   });
 
+  it('continuous: a recognition that ends on its own restarts until the user stops', async () => {
+    const fakes = createVoiceFakes();
+    const { controller, of } = controllerWith(fakes, { continuous: true });
+    await controller.start();
+    const recognition = fakes.recognitions[0];
+    recognition.fireStart();
+    expect(recognition.continuous).toBe(true);
+    // Chrome: silence → no-speech error, then end. Neither fails continuous dictation.
+    recognition.fireError('no-speech');
+    recognition.started = false;
+    recognition.fireEnd();
+    expect(recognition.started).toBe(true);
+    expect(controller.state).toBe('listening');
+    recognition.fireStart();
+    // The restart keeps one meter context and one ticker.
+    expect(fakes.contexts).toHaveLength(1);
+    recognition.fireResult([['hello', true]]);
+    expect(of('transcript')).toEqual([{ text: 'hello', final: true }]);
+    controller.stop();
+    recognition.fireEnd();
+    expect(controller.state).toBe('idle');
+    expect(of('state')).toEqual(['requesting', 'listening', 'processing', 'idle']);
+    expect(of('error')).toEqual([]);
+    expect(fakes.live()).toEqual(NO_LEAKS);
+  });
+
+  it('continuous restarts are bounded without results', async () => {
+    const fakes = createVoiceFakes();
+    const { controller } = controllerWith(fakes, { continuous: true });
+    await controller.start();
+    const recognition = fakes.recognitions[0];
+    recognition.fireStart();
+    let starts = 0;
+    const original = recognition.start.bind(recognition);
+    recognition.start = () => {
+      starts += 1;
+      original();
+    };
+    for (let i = 0; i < 20; i += 1) recognition.fireEnd();
+    expect(starts).toBe(KB_VOICE_MAX_RESTARTS);
+    expect(controller.state).toBe('idle');
+    expect(fakes.live()).toEqual(NO_LEAKS);
+  });
+
+  it('continuous: a stale recognition ending after stop → start does not restart', async () => {
+    const fakes = createVoiceFakes();
+    const { controller } = controllerWith(fakes, { continuous: true });
+    await controller.start();
+    const first = fakes.recognitions[0];
+    first.fireStart();
+    controller.stop();
+    first.fireEnd();
+    await controller.start();
+    fakes.recognitions[1].fireStart();
+    first.started = false;
+    first.fireEnd();
+    expect(first.started).toBe(false);
+    expect(controller.state).toBe('listening');
+    controller.dispose();
+    expect(fakes.live()).toEqual(NO_LEAKS);
+  });
+
+  it('without continuous, no-speech is still an error', async () => {
+    const fakes = createVoiceFakes();
+    const { controller } = controllerWith(fakes);
+    await controller.start();
+    fakes.recognitions[0].fireStart();
+    fakes.recognitions[0].fireError('no-speech');
+    expect(controller.state).toBe('error');
+  });
+
   it('maps recognition errors and releases everything', async () => {
     for (const [error, code] of [
       ['no-speech', 'no_speech'],
@@ -264,20 +336,60 @@ describe('createVoiceController — record', () => {
     expect(fakes.live()).toEqual(NO_LEAKS);
   });
 
-  it('with chunk_ms delivers chunks while recording and the last one as final', async () => {
+  it('with chunk_ms restarts the recorder per chunk so every file is complete', async () => {
     const fakes = createVoiceFakes();
     const { controller, of } = controllerWith(fakes, { mode: 'record', chunkMs: 1000 });
     await controller.start();
-    const recorder = fakes.recorders[0];
-    expect(recorder.timeslice).toBe(1000);
-    recorder.emit('a');
-    recorder.emit('b');
+    const first = fakes.recorders[0];
+    // No timeslice: a timeslice yields header-less fragments after the first.
+    expect(first.timeslice).toBeUndefined();
+    fakes.advance(1000);
+    // Boundary: the first recorder stops, a fresh one records the same stream.
+    expect(first.stopCalls).toBe(1);
+    expect(fakes.recorders).toHaveLength(2);
+    expect(fakes.recorders[1].stream).toBe(first.stream);
+    expect(fakes.recorders[1].state).toBe('recording');
+    first.emit('a');
+    first.finish();
+    fakes.advance(1000);
+    expect(fakes.recorders).toHaveLength(3);
+    // Stop right after a boundary: the rotated-out recorder still delivers,
+    // in order, before the final chunk.
+    fakes.advance(400);
     controller.stop();
-    recorder.emit('c');
-    recorder.finish();
-    const results = of('recording') as Array<{ file: File; final: boolean }>;
+    expect(controller.state).toBe('processing');
+    fakes.recorders[2].emit('c');
+    fakes.recorders[2].finish();
+    expect(controller.state).toBe('processing');
+    fakes.recorders[1].emit('b');
+    fakes.recorders[1].finish();
+    expect(controller.state).toBe('idle');
+    const results = of('recording') as Array<{
+      file: File;
+      final: boolean;
+      durationMs: number;
+      offsetMs: number;
+    }>;
     expect(results.map((r) => r.final)).toEqual([false, false, true]);
     expect(await Promise.all(results.map((r) => r.file.text()))).toEqual(['a', 'b', 'c']);
+    expect(results.map((r) => r.durationMs)).toEqual([1000, 1000, 400]);
+    expect(results.map((r) => r.offsetMs)).toEqual([0, 1000, 2000]);
+    expect(results.every((r) => r.file.name === 'recording.webm')).toBe(true);
+    expect(fakes.live()).toEqual(NO_LEAKS);
+  });
+
+  it('with chunk_ms dispose drops pending chunks and stops the rotation', async () => {
+    const fakes = createVoiceFakes();
+    const { controller, of } = controllerWith(fakes, { mode: 'record', chunkMs: 500 });
+    await controller.start();
+    fakes.advance(500);
+    controller.dispose();
+    fakes.recorders[0].emit('late');
+    fakes.recorders[0].finish();
+    fakes.advance(2000);
+    expect(fakes.recorders).toHaveLength(2);
+    expect(of('recording')).toEqual([]);
+    expect(fakes.live()).toEqual(NO_LEAKS);
   });
 
   it('max_seconds stops the recording', async () => {
@@ -518,6 +630,11 @@ describe('ui:voice-input (vanilla)', () => {
     expect(recording?.payload).toMatchObject({ pad: 'notes', name: 'note', final: true });
     expect(recording?.payload?.file).toBeInstanceOf(File);
     expect(recording?.payload?.duration_ms).toBe(0);
+    // Same payload shape as the React renderer (voice.test.tsx).
+    expect(Object.keys(recording?.payload ?? {}).sort()).toEqual(
+      ['duration_ms', 'file', 'final', 'name', 'offset_ms', 'pad'].sort()
+    );
+    expect(recording?.payload?.offset_ms).toBe(0);
 
     // Space: keydown starts (repeats ignored), keyup stops.
     button.dispatch('keydown', { key: ' ', code: 'Space', preventDefault() {} });

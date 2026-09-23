@@ -198,7 +198,7 @@ function renderCatalog(
     case 'ui:table':
       return <Table {...props<'ui:table'>()} />;
     case 'ui:list':
-      return <List {...props<'ui:list'>()} />;
+      return <List id={id} {...props<'ui:list'>()} />;
     case 'ui:text':
       return <Text {...props<'ui:text'>()} />;
     case 'ui:code':
@@ -309,7 +309,13 @@ export function A2UIRenderer({
       // PA-02 voice
       if (isKbVoiceComponentType(catalogType)) return renderVoiceComponent(catalogType, id, props);
       // PA-01 pads
-      if (isKbPadComponentType(catalogType)) return renderPadComponent(catalogType, id, props);
+      if (isKbPadComponentType(catalogType))
+        return renderPadComponent(
+          catalogType,
+          id,
+          props,
+          childIds.length ? renderChildren(childIds) : null
+        );
       return renderCatalog(
         id,
         catalogType,

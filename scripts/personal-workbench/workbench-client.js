@@ -79,8 +79,9 @@ async function post(path, body, withJsonType = true) {
   return json;
 }
 
-function setControl(componentId, value) {
-  const node = document.getElementById(`kbf-${componentId}`);
+/** Write a field value into its rendered control (addressed by field name) without re-rendering it. */
+function setControl(name, value) {
+  const node = document.querySelector(`.kb-app-shell [name="${name}"]`);
   if (!node) return;
   if (node.type === 'checkbox') node.checked = value === true;
   else node.value = value;
@@ -368,7 +369,7 @@ async function loadEntries(announce) {
     if (proposals.length > 0) {
       const latest = proposals[0];
       model.cal_approval_id = latest.approval_request_id || '';
-      setControl('pw-cal-approval', model.cal_approval_id);
+      setControl('cal_approval_id', model.cal_approval_id);
       callout(
         host.calendarStatus,
         'pw-cal-callout',
@@ -405,8 +406,8 @@ async function save() {
     callout(host.captureStatus, 'pw-capture-callout', 'success', K('saved'));
     model.title = '';
     model.body = '';
-    setControl('pw-title', '');
-    setControl('pw-body', '');
+    setControl('title', '');
+    setControl('body', '');
     await loadEntries(false);
   } catch (error) {
     callout(host.captureStatus, 'pw-capture-callout', 'danger', K('save_failed'), errorText(error));
@@ -429,8 +430,8 @@ async function proposeCalendar() {
     const result = body.result || {};
     model.cal_approval_id = result.approval_request_id || '';
     model.cal_confirm = false;
-    setControl('pw-cal-approval', model.cal_approval_id);
-    setControl('pw-cal-confirm', false);
+    setControl('cal_approval_id', model.cal_approval_id);
+    setControl('cal_confirm', false);
     callout(
       host.calendarStatus,
       'pw-cal-callout',
@@ -466,7 +467,7 @@ async function applyCalendar() {
       payload: { stage: 'apply', approval_request_id: id },
     });
     model.cal_confirm = false;
-    setControl('pw-cal-confirm', false);
+    setControl('cal_confirm', false);
     callout(
       host.calendarStatus,
       'pw-cal-callout',

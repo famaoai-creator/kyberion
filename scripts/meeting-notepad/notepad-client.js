@@ -7,7 +7,7 @@
  *   #mn-toolbar      ui:toolbar        actions + attach + camera toggle + status (status updated in place)
  *   #mn-fields       ui:text-field / ui:textarea  title + notes (values live in the model)
  *   #mn-dictation    ui:voice-input    dictation → appended to the notes
- *   #mn-record       ui:voice-input    record, 5 s chunks → /transcribe → transcript
+ *   #mn-record       ui:voice-input    record, 10 s chunks → /transcribe → transcript
  *   #mn-record-state ui:voice-state    listening / transcribing indicator
  *   #mn-fields-more  ui:textarea       transcript + instruction + output path
  *   #mn-attachments  ui:file-drop      attachments with per-file status
@@ -16,22 +16,22 @@
  *   #pad-dialog      ui:dialog         clear confirmation
  *
  * Server contract (unchanged): POST exportUrl / minutesUrl / transcribeUrl with
- * header `X-MN-Token`; draft in localStorage `meeting-notepad.draft.v1`.
+ * header `X-MN-Token`; draft in localStorage `meeting-notepad.draft.v1`. When
+ * the attachments (base64) exceed the storage quota, the draft is kept
+ * without them and the toolbar says so — notes and transcript keep saving.
  *
- * Recording: MediaRecorder timeslices after the first one carry no container
- * header, so a single slice cannot be decoded on its own. Each transcription
- * pass therefore sends the recording so far (all slices) and replaces this
- * recording's part of the transcript; passes are serialized, spaced out, and
- * stop while recording once the audio is large — the pass after "stop"
- * always covers the whole recording.
+ * Recording: every `voice.recording` chunk is a complete audio file (the kit
+ * restarts the recorder per chunk), so each chunk goes to /transcribe on its
+ * own and its text is appended in order. Chunks are processed one at a time;
+ * when the backend reports `unavailable` (or a request fails) the rest of
+ * this recording is not sent.
  */
-/* global document, window, FileReader, Blob */
+/* global document, window, FileReader */
 import { bootPad } from '/pad-ui/pad-client.js';
 
 const DRAFT_KEY = 'meeting-notepad.draft.v1';
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
-const LIVE_PASS_MAX_BYTES = 4 * 1024 * 1024;
-const LIVE_PASS_MIN_INTERVAL_MS = 15000;
+const RECORD_CHUNK_MS = 10000;
 const ATTACH_ACCEPT = 'image/*,.pdf,.txt,.md,.doc,.docx,.png,.jpg,.jpeg,.webp';
 const TEXT_FIELDS = ['title', 'notes', 'transcript', 'instruction'];
 
@@ -65,14 +65,13 @@ let dialog = null;
 let cameraOpen = false;
 const rec = {
   recording: false,
-  chunks: [],
-  mime: '',
-  base: null,
+  /** Chunks waiting for /transcribe, in recording order. */
+  queue: [],
   busy: false,
-  again: false,
-  finalChunks: null,
+  /** False once the backend is unavailable / failed for this recording. */
   live: true,
-  lastPass: 0,
+  /** The next text starts a new paragraph (first chunk of a recording). */
+  paragraph: true,
 };
 
 // -- helpers ---------------------------------------------------------------
@@ -121,9 +120,9 @@ function setStatus(text, tone) {
   else node.removeAttribute('data-tone');
 }
 
-/** Write a field value into its rendered control without re-rendering it. */
-function setControl(componentId, value) {
-  const node = document.getElementById(`kbf-${componentId}`);
+/** Write a field value into its rendered control (addressed by field name) without re-rendering it. */
+function setControl(name, value) {
+  const node = document.querySelector(`.kb-app-shell [name="${name}"]`);
   if (node) node.value = value;
 }
 
@@ -135,20 +134,35 @@ function joinText(base, addition, separator) {
 
 // -- draft -------------------------------------------------------------------
 
+/** The draft to keep on this device; attachments only while they fit the storage quota. */
+function draftPayload(withAttachments) {
+  return JSON.stringify({
+    title: model.title,
+    notes: model.notes,
+    transcript: model.transcript,
+    instruction: model.instruction,
+    attachments: withAttachments ? readyAttachments() : [],
+  });
+}
+
+let draftWithoutAttachments = false;
+
 function saveDraft() {
   try {
-    window.localStorage.setItem(
-      DRAFT_KEY,
-      JSON.stringify({
-        title: model.title,
-        notes: model.notes,
-        transcript: model.transcript,
-        instruction: model.instruction,
-        attachments: readyAttachments(),
-      })
-    );
+    window.localStorage.setItem(DRAFT_KEY, draftPayload(true));
+    draftWithoutAttachments = false;
+    return;
   } catch {
-    // storage full or blocked: the page still works
+    // Most likely the quota (base64 photos are large): keep the text at least.
+  }
+  try {
+    window.localStorage.setItem(DRAFT_KEY, draftPayload(false));
+    if (!draftWithoutAttachments && readyAttachments().length) {
+      setStatus(K('draft_without_attachments'), 'warning');
+    }
+    draftWithoutAttachments = true;
+  } catch {
+    // storage blocked: the page still works
   }
 }
 
@@ -174,7 +188,7 @@ function applyDraft(draft) {
       mime: String(item.mime || 'application/octet-stream'),
       size: Math.round(item.data_base64.length * 0.75),
       data_base64: item.data_base64,
-      status: 'done',
+      status: 'ready',
     }));
 }
 
@@ -182,7 +196,7 @@ function applyDraft(draft) {
 
 function readyAttachments() {
   return model.attachments
-    .filter((item) => item.status === 'done')
+    .filter((item) => item.status === 'ready')
     .map((item) => ({ name: item.name, mime: item.mime, data_base64: item.data_base64 }));
 }
 
@@ -205,7 +219,7 @@ async function addFiles(files, rename) {
     renderAttachments();
     try {
       entry.data_base64 = await blobToBase64(file);
-      entry.status = 'done';
+      entry.status = 'ready';
       setStatus(`${K('attach_added')}: ${entry.name}`, 'success');
     } catch {
       entry.status = 'error';
@@ -231,6 +245,7 @@ function renderToolbar() {
       type: 'ui:toolbar',
       props: {
         label: K('toolbar_label'),
+        sticky: true,
         items: [
           { type: 'button', id: 'minutes', label: K('create_minutes'), variant: 'primary' },
           { type: 'button', id: 'handoff', label: K('handoff'), variant: 'primary' },
@@ -351,7 +366,7 @@ function renderVoiceInputs() {
         name: 'record',
         label: K('record_label'),
         mode: 'record',
-        chunk_ms: 5000,
+        chunk_ms: RECORD_CHUNK_MS,
         help: K('record_help'),
       },
     },
@@ -362,7 +377,7 @@ function renderRecordState() {
   let props = null;
   if (rec.busy) props = { state: 'thinking', label: K('transcribing') };
   else if (rec.recording && !rec.live)
-    props = { state: 'listening', label: K('transcribing_later') };
+    props = { state: 'listening', label: K('transcribe_unavailable') };
   else if (rec.recording) props = { state: 'listening', label: K('recording') };
   pad.render(
     host.recordState,
@@ -527,64 +542,49 @@ function clearAll() {
 
 function onRecording(payload) {
   if (!payload || !payload.file) return;
-  rec.chunks.push(payload.file);
-  if (payload.file.type) rec.mime = payload.file.type;
-  if (payload.final) {
-    rec.finalChunks = rec.chunks;
-    rec.chunks = [];
-  }
-  pumpTranscription();
-}
-
-async function pumpTranscription() {
-  if (rec.busy) {
-    rec.again = true;
+  if (!rec.live) {
+    if (payload.final) setStatus(K('recording_stopped'));
     return;
   }
-  const final = Boolean(rec.finalChunks);
-  const chunks = final ? rec.finalChunks : rec.chunks;
-  if (chunks.length === 0) return;
-  const blob = new Blob(chunks, { type: rec.mime || 'audio/webm' });
-  if (!final) {
-    if (!rec.live || Date.now() - rec.lastPass < LIVE_PASS_MIN_INTERVAL_MS) return;
-    if (blob.size > LIVE_PASS_MAX_BYTES) {
-      rec.live = false;
-      renderRecordState();
-      return;
-    }
-  }
-  if (rec.base === null) rec.base = model.transcript;
-  const base = rec.base;
-  if (final) {
-    rec.finalChunks = null;
-    rec.base = null;
-    rec.live = true;
-  }
+  rec.queue.push({ file: payload.file, final: payload.final === true });
+  void pumpTranscription();
+}
+
+/** Send queued chunks to /transcribe one at a time, appending text in order. */
+async function pumpTranscription() {
+  if (rec.busy) return;
+  const next = rec.queue.shift();
+  if (!next) return;
   rec.busy = true;
-  rec.lastPass = Date.now();
   renderRecordState();
   try {
     const body = await post(bootstrap.transcribeUrl, {
-      audio_base64: await blobToBase64(blob),
-      mime: blob.type || 'audio/webm',
+      audio_base64: await blobToBase64(next.file),
+      mime: next.file.type || 'audio/webm',
       language: bootstrap.language,
     });
-    const text = String(body.text || '').trim();
-    if (!final && (body.backend === 'unavailable' || !text)) rec.live = false;
-    model.transcript = joinText(base, text, '\n');
-    setControl('mn-transcript', model.transcript);
-    saveDraft();
-    if (final) setStatus(`${K('recording_stopped')}${text ? ' + STT' : ''}`, 'success');
+    if (body.backend === 'unavailable') {
+      rec.live = false;
+      rec.queue = [];
+      setStatus(K('transcribe_unavailable'), 'warning');
+    } else {
+      const text = String(body.text || '').trim();
+      if (text) {
+        model.transcript = joinText(model.transcript, text, rec.paragraph ? '\n' : ' ');
+        rec.paragraph = false;
+        setControl('transcript', model.transcript);
+        saveDraft();
+      }
+      if (next.final) setStatus(K('recording_stopped'), 'success');
+    }
   } catch (error) {
+    rec.live = false;
+    rec.queue = [];
     setStatus(`${K('recording_error')}: ${errorText(error)}`, 'danger');
-    if (!final) rec.live = false;
   } finally {
     rec.busy = false;
     renderRecordState();
-    if (rec.again || rec.finalChunks) {
-      rec.again = false;
-      pumpTranscription();
-    }
+    if (rec.queue.length) void pumpTranscription();
   }
 }
 
@@ -593,7 +593,7 @@ function onVoiceState(payload) {
   const recording = payload.state === 'recording';
   if (recording && !rec.recording) {
     rec.live = true;
-    rec.lastPass = Date.now();
+    rec.paragraph = true;
     setStatus(K('recording'));
   }
   rec.recording = recording;
@@ -648,7 +648,7 @@ function handleAction(action) {
     case 'voice.transcript':
       if (payload.name === 'dictation' && payload.final && payload.text) {
         model.notes = joinText(model.notes, payload.text, ' ');
-        setControl('mn-notes', model.notes);
+        setControl('notes', model.notes);
         saveDraft();
       }
       return;

@@ -516,6 +516,12 @@
                 "status": "queued"
               },
               {
+                "id": "ff-5",
+                "name": "写真.jpg",
+                "size": 1048576,
+                "status": "ready"
+              },
+              {
                 "id": "ff-4",
                 "name": "scan.pdf",
                 "size": 31457280,

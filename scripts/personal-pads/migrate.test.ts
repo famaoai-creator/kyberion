@@ -419,3 +419,76 @@ describe('legacy pad migration', () => {
     expect(records.some((record) => record.payload.summary === 'repaired summary')).toBe(true);
   });
 });
+
+// R7: the reconstructed legacy bodies (Japanese fixed strings) are hashed into
+// the migration idempotency identity. Changing their wording would re-import
+// every legacy record as a duplicate, so body, content hash and key are
+// golden-pinned here.
+describe('legacy migration identity (golden)', () => {
+  const scope = { scope_kind: 'tenant', tier: 'public', tenant_slug: 'tenant-golden' };
+
+  function migrateOne(padId: string, handoff: (session: string) => Record<string, unknown>) {
+    const base = pathResolver.sharedTmp(`personal-pads-migrate-golden-${padId}-${Date.now()}`);
+    const root = `${base}/${padId}`;
+    const session = `${root}/sessions/golden-1`;
+    safeMkdir(session, { recursive: true });
+    safeWriteFile(`${session}/handoff.json`, JSON.stringify(handoff(session)), {
+      mkdir: true,
+      encoding: 'utf8',
+    });
+    const storageRoot = `${base}-dest`;
+    const report = migrateLegacyPads({ roots: [root], storageRoot, dryRun: false });
+    expect(report.migrated, JSON.stringify(report.items)).toBe(1);
+    const record = new PadRecordStore(
+      scope as never,
+      'human:golden',
+      padId as never,
+      undefined,
+      storageRoot
+    ).list({ limit: 10 }).records[0];
+    return { item: report.items[0], record };
+  }
+
+  it('sketch-input: an image-only handoff', () => {
+    const { item, record } = migrateOne('sketch-input', (session) => {
+      safeWriteFile(`${session}/sketch.png`, 'golden-png-bytes', { mkdir: true, encoding: 'utf8' });
+      return {
+        session_id: 'golden-sketch-1',
+        viewer_principal: 'human:golden',
+        scope,
+        instruction: '',
+        image_path: `${session}/sketch.png`,
+      };
+    });
+    expect(record.body).toBe('（画像 artifact）');
+    expect(item.content_sha256).toBe(GOLDEN.sketch.content);
+    expect(record.idempotency_key).toBe(GOLDEN.sketch.key);
+  });
+
+  it('doc-drop: attachments + instruction', () => {
+    const { item, record } = migrateOne('doc-drop', (session) => {
+      safeWriteFile(`${session}/spec.txt`, 'golden-attachment', { mkdir: true, encoding: 'utf8' });
+      return {
+        session_id: 'golden-doc-1',
+        viewer_principal: 'human:golden',
+        scope,
+        instruction: 'check the spec',
+        attachments: [{ name: 'spec.txt', mime: 'text/plain', path: `${session}/spec.txt` }],
+      };
+    });
+    expect(record.body).toBe('添付: spec.txt\n確認メモ: check the spec');
+    expect(item.content_sha256).toBe(GOLDEN.doc.content);
+    expect(record.idempotency_key).toBe(GOLDEN.doc.key);
+  });
+});
+
+const GOLDEN = {
+  sketch: {
+    content: 'f9c3986f61e96be9dd7092d8e1aec53c7b3d1efa9756fa5b4dea971d956366a3',
+    key: 'legacy:2:5a56b97903d9d1cd7da6324609733d86bbffc45f939f3f7c90d8589c07846fbe',
+  },
+  doc: {
+    content: 'ec69d0f22c8a58e2e5f9c8fad3558ba2731b7fd7b2bbeca46b03ca335d24e6bb',
+    key: 'legacy:2:0d1452ade31bdff851d1a17f64565b28d64a7e364a644813157aca8bfc577d17',
+  },
+};
