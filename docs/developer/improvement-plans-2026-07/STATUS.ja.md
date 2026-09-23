@@ -7,7 +7,7 @@ status: archived
 
 # 改善計画 実装状況履歴台帳(STATUS)
 
-> この文書は 2026-07 時点の凍結記録です。現在の状態正本は [2026-08 の状態索引](../improvement-plans-2026-08/README.ja.md) です。
+> この文書は 2026-07 時点の凍結記録です。現在の状態正本は [2026-09 の状態索引](../improvement-plans-2026-08/README.ja.md) です。
 
 > **監査日**: 以下は日付順の監査・訂正履歴(同日内の複数エントリは「同日」に基づき同じ日付を割り当て)。
 
@@ -39,7 +39,7 @@ status: archived
 | 2026-07-15 | CO-05 の受入2(procurement-vendor/hiring-workflow の decision-rights 接続)を実装。副次的に enforceApprovalGate の decision-rights エスカレーションが approval-policy.json 側の対応ルール欠如で一度も発火していなかった構造的欠落を発見・修正(decision-rights-escalation ルール追加)。PARTIAL のまま(残5テンプレート + 受入条件網羅突合) |
 | 2026-07-17 | DS-04 Task 4 完了(ダミーテナント client-a の ADF → HyperFrames MP4/PNG 実写を目視確認。サマリ 65/28 → 66/27)                                                                                                                                                                                                                           |
 
-> **更新規約**: この文書は 2026-07 時点の凍結記録であり、現在の判定には使用しない。計画の実装・レビュー完了時は、現在の状態正本である [2026-08 の状態索引](../improvement-plans-2026-08/README.ja.md) と各計画文書の「実装状況」節を更新する。
+> **更新規約**: この文書は 2026-07 時点の凍結記録であり、現在の判定には使用しない。計画の実装・レビュー完了時は、現在の状態正本である [2026-09 の状態索引](../improvement-plans-2026-08/README.ja.md) と各計画文書の「実装状況」節を更新する。
 
 ### DR(Skill Recorder 概念取り込み)
 

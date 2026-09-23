@@ -56,4 +56,4 @@ Do not assume shared browser session IDs, explicit profiles, or CDP connections 
 merely because a task has a tenant label. Their ownership across all execution paths remains
 an audit item. Video stream existence does not prove timing, readable subtitles, or editorial
 quality. See the evidence and remaining work in
-[the concept review and improvement plan](../../../docs/developer/improvement-plans-2026-08/TENANT_KNOWLEDGE_ACTUATOR_REVIEW_2026-09-11.ja.md).
+[the concept review and improvement plan](../../../docs/developer/improvement-plans-2026-09/TENANT_KNOWLEDGE_ACTUATOR_REVIEW_2026-09-11.ja.md).

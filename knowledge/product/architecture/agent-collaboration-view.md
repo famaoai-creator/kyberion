@@ -13,7 +13,7 @@ last_updated: 2026-09-06
 
 「各エージェントが連携して動く様を把握する」ための、ターミナル主体の kyberion 利用者向け入口。ミッション → タスク → エージェント → 子エージェントがどう連携し、誰が誰を待っているかを一目で見せる。`pnpm tui`(terminal-hud)のパネル 9「連携」と、Chronos の `AgentCollaborationBoard` が同じデータ源・同じ合成関数から描画する。
 
-設計の背景と決定事項の全体は計画書を参照: [`AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md`](../../../docs/developer/improvement-plans-2026-08/AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md)(AC-01〜07)。
+設計の背景と決定事項の全体は計画書を参照: [`AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md`](../../../docs/developer/improvement-plans-2026-09/AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md)(AC-01〜07)。
 
 ## 2. データフロー
 
@@ -64,7 +64,7 @@ a2a-bridge.ts             →   active/shared/observability/
 
 ## 関連ドキュメント
 
-- 計画書: [`docs/developer/improvement-plans-2026-08/AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md`](../../../docs/developer/improvement-plans-2026-08/AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md)
+- 計画書: [`docs/developer/improvement-plans-2026-09/AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md`](../../../docs/developer/improvement-plans-2026-09/AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md)
 - [`agent-mission-control-model.md`](./agent-mission-control-model.md) — ミッション/エージェント/ランタイム所有の全体モデル
 - [`multi-provider-coexecution-contract.md`](../governance/multi-provider-coexecution-contract.md) — 複数プロバイダ CLI の並行実行契約
 - [`docs/SURFACES.md`](../../../docs/SURFACES.md) — サーフェス一覧(`pnpm tui` パネル 9 の位置づけ)

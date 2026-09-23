@@ -40,7 +40,7 @@ Kyberion の強みは、モデルの判断、実行する actuator、権限・�
 
 既存基盤: `knowledge-scope.ts`、`tenant-knowledge-retrieval.ts`、`scope-context.ts`、
 `knowledge-feedback-loop`。既存計画の正本は
-[スコープ運用性計画](./KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16.ja.md)。
+[スコープ運用性計画](../improvement-plans-2026-08/KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16.ja.md)。
 
 ## actuator の使い分け
 
