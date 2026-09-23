@@ -66,7 +66,7 @@ FD-08 で廃止した旧 Companion Hub(Home / Learn / Discover / Work / Connect 
 
 ## ローカル pad(127.0.0.1 限定・取り込み専用)
 
-手元にあるもの(図・会議メモ・スクリーンショット・ファイル・クリップボード・今日の TODO)を一つの localhost capture desk から取り込み、tenant・tier ごとの管理領域へ保存して履歴を確認できる。`pnpm pads` が一つの listener とメニューを提供する。外部リソース読込ゼロ、ファイル I/O は `secure-io` 経由、mission の自動起動や送信は行わない。スクリーンショット付きの一覧は [README の Local Pads](../README.md#local-pads--capture-at-your-desk-hand-off-to-kyberion)、索引は [`scripts/personal-pads/README.md`](../scripts/personal-pads/README.md)。既存の個別ポートは移行期間の互換入口として残る。
+手元にあるもの(図・会議メモ・スクリーンショット・ファイル・クリップボード・今日の TODO)を一つの localhost capture desk から取り込み、tenant・tier ごとの管理領域へ保存して履歴を確認できる。`pnpm pads` が一つの listener とメニューを提供する。外部リソース読込ゼロ、ファイル I/O は `secure-io` 経由、mission の自動起動や送信は行わない。スクリーンショット付きの一覧は [README の Local Pads](../README.md#local-pads--capture-at-your-desk-hand-off-to-kyberion)、索引は [`scripts/personal-pads/README.md`](../scripts/personal-pads/README.md)。既存の個別ポートは移行期間の互換入口として残る。全 pad は共通 UI(A2UI `kyberion-base`: `ui:toolbar` / `ui:dialog` / `ui:sketch-board` / `ui:voice-input` など、light/dark、en/ja)で描画され、表示言語はリクエストごとに決まる(`?lang=` → `kb-ui-locale` cookie → `Accept-Language`)。
 
 | pad                                                    | port | 取り込むもの → 出力                                                                                      |
 | ------------------------------------------------------ | ---: | -------------------------------------------------------------------------------------------------------- |

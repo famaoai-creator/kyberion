@@ -1,7 +1,7 @@
 ---
 title: ローカルパッドの A2UI 化と話すアバター計画
 tags: [design-system, a2ui, local-pads, voice, avatar, improvement-plan, 2026-09]
-last_updated: 2026-09-23
+last_updated: 2026-09-24
 status: active
 mission: MSN-PADS-A2UI-20260923
 ---
@@ -9,6 +9,18 @@ mission: MSN-PADS-A2UI-20260923
 # ローカルパッドの A2UI 化と話すアバター計画(PA-01〜PA-10)
 
 [サーフェス UI 統一計画](./SURFACE_UI_UNIFICATION_PLAN_2026-09-23.ja.md)(PR #778)の続き。対象は `scripts/*` 配下のローカルパッド 9 種 + `personal-pads` 統合シェル。
+
+## 実装状況(2026-09-24 時点)
+
+PR 1(PA-01〜PA-08)実装済み。PR 2(PA-09 / PA-10)は未着手。
+
+| ID            | 状態 | 備考                                                                                        |
+| ------------- | ---- | ------------------------------------------------------------------------------------------- |
+| PA-01 / PA-02 | done | 6 コンポーネント追加(React / vanilla パリティ、en/ja)                                       |
+| PA-03         | done | `scripts/lib/pad-ui.ts`(資産配信、リクエスト単位ロケール、ページシェル、テーマ cookie 共有) |
+| PA-04〜PA-07  | done | 10 pad を移行、`confirm()` / `prompt()` 全廃、i18n ベースライン 297 件削減                  |
+| PA-08         | done | before / after スクリーンショット(mission evidence)、README / SURFACES / DESIGN_SYSTEM 更新 |
+| PA-09 / PA-10 | todo | §6 の設計メモを参照                                                                         |
 
 ## 1. 背景(ヒアリング結果 2026-09-23)
 
