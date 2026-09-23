@@ -210,6 +210,82 @@ const VALID_EXAMPLES: Record<KyberionBaseComponentType, Record<string, unknown>>
     stages: [{ id: 'mission', label: 'ミッション' }, 'task'],
   },
   'ui:stat-list': { items: [{ label: '中央値', value: 1.4, unit: 's', hint: 'p50' }] },
+  // PA-02 voice
+  'ui:voice-input': {
+    name: 'memo',
+    label: '音声メモ',
+    mode: 'record',
+    lang: 'ja-JP',
+    push_to_talk: true,
+    show_level: true,
+    chunk_ms: 1000,
+    max_seconds: 60,
+    status: 'transcribing',
+    help: '話し終えたら離してください',
+    actions: { recording: { id: 'memo.audio', payload: { pad: 'notes' } } },
+  },
+  'ui:voice-state': { state: 'speaking', level: 0.4, variant: 'orb', size: 'lg' },
+  // PA-01 pads
+  'ui:toolbar': {
+    label: 'レビュー',
+    sticky: true,
+    density: 'compact',
+    items: [
+      { type: 'button', id: 'save', label: '保存', icon: '💾', variant: 'primary' },
+      { type: 'toggle', id: 'comments', label: 'コメント', pressed: true, hide_label: true },
+      { type: 'file', id: 'import', label: '読み込む', accept: '.md,image/*', multiple: true },
+      { type: 'separator' },
+      { type: 'spacer' },
+      { type: 'status', id: 'saved', text: '保存しました', tone: 'success' },
+    ],
+  },
+  'ui:dialog': {
+    open: true,
+    title: '名前を付ける',
+    message: 'ファイル名を入力',
+    tone: 'neutral',
+    input: {
+      name: 'file',
+      label: 'ファイル名',
+      placeholder: 'notes',
+      value: 'a',
+      multiline: false,
+    },
+    confirm_label: '保存',
+    cancel_label: 'やめる',
+    action: { id: 'file.rename' },
+    cancel_action: { id: 'file.rename.cancel' },
+  },
+  'ui:drawing-palette': {
+    name: 'pen',
+    label: '描画パレット',
+    tools: ['pen', 'highlighter', 'text'],
+    tool: 'pen',
+    colors: ['#e5484d', '#0af'],
+    color: '#0af',
+    allow_custom_color: true,
+    width: 6,
+    min_width: 2,
+    max_width: 30,
+    can_undo: true,
+    show_clear: true,
+    orientation: 'vertical',
+  },
+  'ui:sketch-board': {
+    name: 'sketch',
+    label: 'スケッチ',
+    tools: ['pen', 'rect', 'text', 'eraser'],
+    default_tool: 'rect',
+    default_color: '#30a46c',
+    default_width: 3,
+    canvas_width: 800,
+    canvas_height: 600,
+    background: 'light',
+    background_image_url: '/api/screenshot.png',
+    accept_image_drop: true,
+    max_undo: 40,
+    show_download: true,
+  },
 };
 
 describe('kyberion-base A2UI catalog', () => {
@@ -284,6 +360,83 @@ describe('kyberion-base A2UI catalog', () => {
     expect(() =>
       validateA2UIComponentProps('ui:next-action', { title: 'x', state: 'loading' })
     ).not.toThrow();
+  });
+
+  // PA-02 voice
+  it('bounds the voice-input / voice-state props (no audio or transcript slots)', () => {
+    const base = { name: 'memo', label: 'Memo' };
+    expect(() => validateA2UIComponentProps('ui:voice-input', base)).not.toThrow();
+    expect(() => validateA2UIComponentProps('ui:voice-input', { ...base, mode: 'stream' })).toThrow(
+      /mode/u
+    );
+    expect(() =>
+      validateA2UIComponentProps('ui:voice-input', { ...base, lang: 'ja JP' })
+    ).toThrow();
+    expect(() => validateA2UIComponentProps('ui:voice-input', { ...base, chunk_ms: 10 })).toThrow();
+    expect(() =>
+      validateA2UIComponentProps('ui:voice-input', { ...base, max_seconds: 0 })
+    ).toThrow();
+    expect(() =>
+      validateA2UIComponentProps('ui:voice-input', { ...base, status: 'recording' })
+    ).toThrow(/status/u);
+    expect(() =>
+      validateA2UIComponentProps('ui:voice-input', { ...base, transcript: 'hello' })
+    ).toThrow(/transcript/u);
+    expect(() =>
+      validateA2UIComponentProps('ui:voice-input', { ...base, actions: { audio: { id: 'x' } } })
+    ).toThrow();
+    expect(() => validateA2UIComponentProps('ui:voice-state', {})).toThrow(/state/u);
+    expect(() => validateA2UIComponentProps('ui:voice-state', { state: 'talking' })).toThrow();
+    expect(() =>
+      validateA2UIComponentProps('ui:voice-state', { state: 'idle', level: 1.5 })
+    ).toThrow();
+  });
+
+  // PA-01 pads
+  it('bounds the toolbar / dialog / drawing props (no file or image data slots)', () => {
+    const toolbar = (item: Record<string, unknown>) =>
+      validateA2UIComponentProps('ui:toolbar', { label: 'T', items: [item] });
+    expect(() => toolbar({ type: 'button', id: 'a' })).toThrow(/label/u);
+    expect(() => toolbar({ type: 'status', id: 's' })).toThrow(/text/u);
+    expect(() => toolbar({ type: 'menu', id: 'a', label: 'A' })).toThrow();
+    expect(() => toolbar({ type: 'file', id: 'f', label: 'F', files: [] })).toThrow(/files/u);
+    expect(() => toolbar({ type: 'separator' })).not.toThrow();
+    expect(() => validateA2UIComponentProps('ui:toolbar', { items: [] })).toThrow(/label/u);
+    expect(() => validateA2UIComponentProps('ui:dialog', { title: 'x' })).toThrow(/open/u);
+    expect(() =>
+      validateA2UIComponentProps('ui:dialog', { open: false, title: 'x', tone: 'warning' })
+    ).toThrow(/tone/u);
+    expect(() =>
+      validateA2UIComponentProps('ui:dialog', {
+        open: true,
+        title: 'x',
+        choices: [{ id: 'save', label: 'Save', variant: 'primary' }],
+      })
+    ).not.toThrow();
+    const palette = { name: 'p', label: 'P' };
+    expect(() => validateA2UIComponentProps('ui:drawing-palette', palette)).not.toThrow();
+    expect(() =>
+      validateA2UIComponentProps('ui:drawing-palette', { ...palette, tool: 'spray' })
+    ).toThrow(/tool/u);
+    expect(() =>
+      validateA2UIComponentProps('ui:drawing-palette', { ...palette, color: 'red' })
+    ).toThrow();
+    expect(() =>
+      validateA2UIComponentProps('ui:drawing-palette', { ...palette, width: 0 })
+    ).toThrow();
+    const board = { name: 's', label: 'S' };
+    expect(() =>
+      validateA2UIComponentProps('ui:sketch-board', {
+        ...board,
+        background_image_url: 'data:image/png;base64,AAAA',
+      })
+    ).toThrow();
+    expect(() =>
+      validateA2UIComponentProps('ui:sketch-board', { ...board, canvas_width: 10 })
+    ).toThrow();
+    expect(() => validateA2UIComponentProps('ui:sketch-board', { ...board, image: 'x' })).toThrow(
+      /image/u
+    );
   });
 
   it('resolves legacy aliases and leaves non-catalog types alone', () => {

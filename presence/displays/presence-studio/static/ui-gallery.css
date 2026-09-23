@@ -194,3 +194,18 @@
 .gallery-demo .kb-save-bar {
   position: static;
 }
+
+/* PA-01: the gallery shows open dialogs inline (in a page `ui:dialog` is a
+   fixed full-screen overlay) and keeps sticky toolbars in flow. */
+.gallery-demo .kb-dialog {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  min-height: 18rem;
+  border-radius: var(--kb-ui-radius-md);
+  overflow: hidden;
+}
+
+.gallery-demo .kb-toolbar[data-sticky='true'] {
+  position: static;
+}

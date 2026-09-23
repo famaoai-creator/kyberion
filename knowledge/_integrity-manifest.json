@@ -2229,7 +2229,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 7481,
+      "size": 6816,
       "type": "json"
     },
     {
@@ -6273,7 +6273,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 838794,
+      "size": 965131,
       "type": "json"
     },
     {
@@ -7587,7 +7587,7 @@
     {
       "path": "product/schemas/a2ui-catalog-kyberion-base.schema.json",
       "tier": "public",
-      "size": 71058,
+      "size": 86801,
       "type": "json"
     },
     {

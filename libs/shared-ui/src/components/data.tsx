@@ -27,11 +27,13 @@ import { KbIcon } from '../icons.js';
 import {
   codeLanguage,
   isInteractiveTarget,
+  isPlainActivation,
+  listItemTitleId,
   listProgressPercent,
   tableCellKind,
 } from '../../vanilla/kyberion-ui.js';
 import { asArray, formatScalar, safeCssLength, safeHref } from '../safety.js';
-import { KbLink } from './controls.js';
+import { ActionRefButton, KbLink, normalizeAction } from './controls.js';
 import { Badge, StatusPill, toneAttr } from './feedback.js';
 
 const TREND_ICONS = { up: 'arrow-up', down: 'arrow-down', flat: 'arrow-right' } as const;
@@ -301,26 +303,71 @@ function ListProgress({ value }: { value: unknown }) {
 }
 
 /** `ui:list` → `ul.kb-list[data-variant]` of `__item[data-status]` (`__body` > `__title` + `__meta`, optional status pill). */
-export function List({ items, variant }: KbListProps) {
+export function List({ items, variant, id }: KbListProps & { id?: string }) {
+  const { onAction } = useA2UIActions();
   return (
     <ul className="kb-list" data-variant={variant === 'timeline' ? 'timeline' : 'plain'}>
       {asArray(items).map((item, index) => {
         const href = safeHref(item.href);
+        const action = normalizeAction(item.action);
+        const actions = asArray(item.actions).filter(
+          (ref) => ref && typeof ref.label === 'string' && ref.label
+        );
+        const titleId = actions.length ? listItemTitleId(id, index) : undefined;
+        const dispatch = action
+          ? (event: MouseEvent<HTMLElement>) => {
+              if (href) {
+                if (!isPlainActivation(event)) return;
+                event.preventDefault();
+              }
+              onAction?.(action.id, action.payload);
+            }
+          : undefined;
         return (
           <li key={`${item.title}-${index}`} className="kb-list__item" data-status={item.status}>
             <div className="kb-list__body">
               {href ? (
-                <KbLink href={href} className="kb-list__title">
+                <KbLink
+                  href={href}
+                  className="kb-list__title"
+                  data-action-id={action?.id}
+                  id={titleId}
+                  onClick={dispatch}
+                >
                   {item.title}
                 </KbLink>
+              ) : action ? (
+                <button
+                  type="button"
+                  className="kb-list__title"
+                  data-action-id={action.id}
+                  id={titleId}
+                  onClick={dispatch}
+                >
+                  {item.title}
+                </button>
               ) : (
-                <span className="kb-list__title">{item.title}</span>
+                <span className="kb-list__title" id={titleId}>
+                  {item.title}
+                </span>
               )}
               {item.meta ? <span className="kb-list__meta">{item.meta}</span> : null}
               <ListProgress value={item.progress} />
             </div>
             {isKbStatus(item.status) ? (
               <StatusPill status={item.status} label={item.status_label} />
+            ) : null}
+            {actions.length ? (
+              <div className="kb-list__actions">
+                {actions.map((ref, refIndex) => (
+                  <ActionRefButton
+                    key={`${ref.label}-${refIndex}`}
+                    actionRef={ref}
+                    defaultVariant="ghost"
+                    describedBy={titleId}
+                  />
+                ))}
+              </div>
             ) : null}
           </li>
         );

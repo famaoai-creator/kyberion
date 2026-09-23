@@ -1,11 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { assertPadAdaptersComplete, getPadAdapter, PAD_ADAPTERS } from './adapters.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  assertPadAdaptersComplete,
+  getPadAdapter,
+  PAD_ADAPTER_DEFINITIONS,
+  publicPadAdapterConfigs,
+} from './adapters.js';
 import { PAD_IDS } from './registry.js';
 
 describe('personal pad adapter seam', () => {
   it('covers every menu entry without server branches', () => {
     assertPadAdaptersComplete();
-    expect(PAD_ADAPTERS.map((adapter) => adapter.pad_id)).toEqual([...PAD_IDS]);
+    expect(PAD_ADAPTER_DEFINITIONS.map((adapter) => adapter.pad_id)).toEqual([...PAD_IDS]);
   });
 
   it('composes each pad input through its adapter contract', () => {
@@ -53,7 +58,7 @@ describe('personal pad adapter seam', () => {
 
   it('promotes managed file and canvas data into typed artifacts', () => {
     const png = Buffer.from('png-bytes').toString('base64');
-    const sketch = getPadAdapter('sketch-input').composeCapture({
+    const sketch = getPadAdapter('sketch-input', 'ja').composeCapture({
       body: '',
       fields: { drawing_data: `data:image/png;base64,${png}` },
     });
@@ -101,6 +106,8 @@ describe('personal pad adapter seam', () => {
   });
 
   it('accepts typed action fields as a restorable workbench capture', () => {
+    // The body is composed in the process locale; pin it so CI (en) matches.
+    vi.stubEnv('KYBERION_LOCALE', 'ja');
     const result = getPadAdapter('personal-workbench').composeCapture({
       body: '',
       fields: {
@@ -111,6 +118,7 @@ describe('personal pad adapter seam', () => {
     });
     expect(result.body).toContain('期限:');
     expect(result.payload).toMatchObject({ email_body: '本文' });
+    vi.unstubAllEnvs();
   });
 
   it('declares screenshot annotation as a reusable image-overlay field', () => {
@@ -132,9 +140,10 @@ describe('personal pad adapter seam', () => {
       'eraser',
     ]);
     expect(
-      getPadAdapter('screenshot-annotate').fields.find((candidate) => candidate.id === 'annotation')
-        ?.voice_input
-    ).toEqual(expect.objectContaining({ label: '🎤 音声入力' }));
+      getPadAdapter('screenshot-annotate', 'en').fields.find(
+        (candidate) => candidate.id === 'annotation'
+      )?.voice_input
+    ).toEqual({ label: 'Voice input' });
     expect(field?.download).toEqual(
       expect.objectContaining({ filename: 'screenshot-annotate.png' })
     );
@@ -142,5 +151,41 @@ describe('personal pad adapter seam', () => {
       getPadAdapter('screenshot-annotate').fields.find((candidate) => candidate.id === 'image_name')
         ?.paste_drop
     ).toBe(true);
+  });
+
+  it('declares vocabulary keys only and resolves them per locale (PA-07)', () => {
+    const keyOf = (value: unknown) =>
+      typeof value === 'string' && /^personal_pads:[a-z0-9_]+$/u.test(value);
+    for (const definition of PAD_ADAPTER_DEFINITIONS) {
+      expect(keyOf(definition.preview_template)).toBe(true);
+      const fields = [
+        ...definition.fields,
+        ...definition.actions.flatMap((action) => action.input_fields ?? []),
+      ];
+      for (const action of definition.actions) {
+        expect(keyOf(action.label) && keyOf(action.description)).toBe(true);
+      }
+      for (const field of fields) {
+        expect(keyOf(field.label)).toBe(true);
+        for (const text of [field.placeholder, field.help, field.voice_input?.label]) {
+          if (text !== undefined) expect(keyOf(text)).toBe(true);
+        }
+        for (const option of field.options ?? []) expect(keyOf(option.label)).toBe(true);
+      }
+    }
+    const png = Buffer.from('png-bytes').toString('base64');
+    const drawing = { body: '', fields: { drawing_data: `data:image/png;base64,${png}` } };
+    const en = getPadAdapter('sketch-input', 'en').composeCapture(drawing);
+    expect(en.body).toContain('[Drawing attached]');
+    expect(en.body).not.toMatch(/[\u3040-\u30ff]/u);
+    const annotated = getPadAdapter('screenshot-annotate', 'en').composeCapture({
+      body: '',
+      fields: { annotation_data: `data:image/png;base64,${png}` },
+    });
+    expect(annotated.body).toContain('Drawn annotation: (drawing artifact attached)');
+    const enConfigs = JSON.stringify(publicPadAdapterConfigs('en'));
+    expect(enConfigs).not.toMatch(/[\u3040-\u30ff]/u);
+    expect(enConfigs).toContain('"label":"Tags"');
+    expect(JSON.stringify(publicPadAdapterConfigs('ja'))).toContain('"label":"タグ"');
   });
 });

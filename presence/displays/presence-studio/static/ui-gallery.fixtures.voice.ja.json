@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "catalog": "kyberion-base",
+  "sections": [
+    {
+      "id": "voice-input",
+      "title": "音声入力 ui:voice-input",
+      "description": "入力レベルのメーター、経過時間、読み上げ対象の状態表示が付いたマイクボタン。マイクはボタンを押したときだけ開きます。認識結果と録音は onAction(voice.transcript / voice.recording)で渡し、props には入れません。",
+      "components": [
+        {
+          "id": "vi-stack",
+          "type": "ui:stack",
+          "props": {
+            "gap": "lg"
+          },
+          "children": ["vi-dictation", "vi-record", "vi-transcribing", "vi-error"]
+        },
+        {
+          "id": "vi-dictation",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "note.dictation",
+            "label": "メモを音声入力",
+            "mode": "dictation",
+            "continuous": true,
+            "show_transcript": true,
+            "help": "話すと文字が表示されます。もう一度押すと止まります。"
+          }
+        },
+        {
+          "id": "vi-record",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "memo.audio",
+            "label": "ボイスメモ",
+            "mode": "record",
+            "push_to_talk": true,
+            "chunk_ms": 5000,
+            "max_seconds": 120,
+            "help": "録音は 2 分で自動的に止まります。"
+          }
+        },
+        {
+          "id": "vi-transcribing",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "meeting.audio",
+            "label": "会議の録音",
+            "mode": "record",
+            "status": "transcribing"
+          }
+        },
+        {
+          "id": "vi-error",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "search.voice",
+            "label": "音声で検索",
+            "mode": "dictation",
+            "show_level": false,
+            "status": "error",
+            "status_error": "文字起こしサービスに接続できません。質問を入力してください。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "voice-state",
+      "title": "会話の状態 ui:voice-state",
+      "description": "音声エージェントやアバターの会話状態。状態ごとに名前・記号・形が異なり、色だけに頼りません。動きを減らす設定ではアニメーションを止めます。",
+      "components": [
+        {
+          "id": "vs-row",
+          "type": "ui:stack",
+          "props": {
+            "gap": "lg",
+            "direction": "horizontal",
+            "align": "center",
+            "wrap": true
+          },
+          "children": [
+            "vs-idle",
+            "vs-listening",
+            "vs-thinking",
+            "vs-speaking",
+            "vs-muted",
+            "vs-error",
+            "vs-orb",
+            "vs-dot",
+            "vs-custom"
+          ]
+        },
+        {
+          "id": "vs-idle",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "idle"
+          }
+        },
+        {
+          "id": "vs-listening",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "listening",
+            "level": 0.6
+          }
+        },
+        {
+          "id": "vs-thinking",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "thinking"
+          }
+        },
+        {
+          "id": "vs-speaking",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "speaking"
+          }
+        },
+        {
+          "id": "vs-muted",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "muted",
+            "size": "sm"
+          }
+        },
+        {
+          "id": "vs-error",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "error"
+          }
+        },
+        {
+          "id": "vs-orb",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "speaking",
+            "variant": "orb",
+            "size": "lg",
+            "level": 0.4
+          }
+        },
+        {
+          "id": "vs-dot",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "listening",
+            "variant": "dot",
+            "show_label": false
+          }
+        },
+        {
+          "id": "vs-custom",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "speaking",
+            "label": "要約を読み上げています",
+            "level": 0.8
+          }
+        }
+      ]
+    }
+  ]
+}

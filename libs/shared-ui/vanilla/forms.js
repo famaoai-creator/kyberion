@@ -249,6 +249,8 @@ export function createFormRenderers(h) {
     input.setAttribute('type', 'checkbox');
     if (control === 'switch') input.setAttribute('role', 'switch');
     controlAttrs(input, p, ids);
+    // The field key, like every other form control (hosts may address it).
+    input.setAttribute('name', String(p.name ?? ''));
     input.checked = p.value === true;
     listen(input, 'change', () => fieldChange(ctx, c, p.name, input.checked === true));
     wrap.appendChild(input);

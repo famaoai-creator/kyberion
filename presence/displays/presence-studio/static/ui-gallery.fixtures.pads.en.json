@@ -1,0 +1,217 @@
+{
+  "version": 1,
+  "catalog": "kyberion-base",
+  "sections": [
+    {
+      "id": "pad-toolbar",
+      "title": "Toolbar ui:toolbar",
+      "description": "A WAI-ARIA toolbar: arrow keys move between buttons, Tab leaves it. Buttons, toggles, a file picker, separators, a spacer and a live status. Wraps on narrow widths.",
+      "components": [
+        {
+          "id": "pt-review",
+          "type": "ui:toolbar",
+          "props": {
+            "label": "Review tools",
+            "items": [
+              {
+                "type": "button",
+                "id": "save",
+                "label": "Save",
+                "icon": "💾",
+                "variant": "primary"
+              },
+              {
+                "type": "button",
+                "id": "export",
+                "label": "Export",
+                "icon": "⬇",
+                "description": "Download the report as PDF"
+              },
+              { "type": "separator" },
+              {
+                "type": "toggle",
+                "id": "comments",
+                "label": "Comments",
+                "icon": "💬",
+                "pressed": true
+              },
+              {
+                "type": "toggle",
+                "id": "focus",
+                "label": "Focus mode",
+                "icon": "◎",
+                "hide_label": true
+              },
+              {
+                "type": "file",
+                "id": "import",
+                "label": "Import",
+                "icon": "📂",
+                "accept": ".md,.txt",
+                "multiple": true
+              },
+              {
+                "type": "button",
+                "id": "delete",
+                "label": "Delete",
+                "variant": "danger",
+                "disabled": true
+              },
+              { "type": "spacer" },
+              { "type": "status", "id": "saved", "text": "Saved 2 minutes ago", "tone": "success" }
+            ]
+          }
+        },
+        {
+          "id": "pt-compact",
+          "type": "ui:toolbar",
+          "props": {
+            "label": "Formatting",
+            "density": "compact",
+            "items": [
+              {
+                "type": "toggle",
+                "id": "bold",
+                "label": "Bold",
+                "icon": "B",
+                "hide_label": true,
+                "pressed": true
+              },
+              {
+                "type": "toggle",
+                "id": "italic",
+                "label": "Italic",
+                "icon": "I",
+                "hide_label": true
+              },
+              { "type": "separator" },
+              {
+                "type": "button",
+                "id": "undo",
+                "label": "Undo",
+                "icon": "↶",
+                "variant": "secondary"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad-dialog",
+      "title": "Dialog ui:dialog",
+      "description": "Replaces confirm() and prompt(): focus moves into the dialog, Tab stays inside, Escape cancels, Enter confirms a single-line input, and focus returns where it was. Shown inline here; in a page it covers the screen. It can hold other components between the input and the buttons (here a dictation input).",
+      "components": [
+        {
+          "id": "pd-rename",
+          "type": "ui:dialog",
+          "props": {
+            "open": true,
+            "title": "Rename the note",
+            "message": "The new name is used for the file and in the list.",
+            "input": {
+              "name": "title",
+              "label": "Name",
+              "placeholder": "Meeting notes",
+              "value": "Weekly sync"
+            },
+            "confirm_label": "Rename"
+          }
+        },
+        {
+          "id": "pd-unsaved",
+          "type": "ui:dialog",
+          "props": {
+            "open": true,
+            "title": "Save changes before closing?",
+            "message": "You have edits that are not saved yet.",
+            "tone": "danger",
+            "choices": [
+              { "id": "save", "label": "Save", "variant": "primary" },
+              { "id": "discard", "label": "Discard", "variant": "danger" },
+              { "id": "cancel", "label": "Keep editing", "variant": "ghost" }
+            ]
+          }
+        },
+        {
+          "id": "pd-note",
+          "type": "ui:dialog",
+          "props": {
+            "open": true,
+            "title": "Add a comment",
+            "input": { "name": "note", "label": "Comment", "multiline": true }
+          },
+          "children": ["pd-note-voice"]
+        },
+        {
+          "id": "pd-note-voice",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "note-voice",
+            "label": "Dictate the comment",
+            "mode": "dictation",
+            "show_transcript": true
+          }
+        },
+        {
+          "id": "pd-closed",
+          "type": "ui:dialog",
+          "props": { "open": false, "title": "Hidden until opened" }
+        }
+      ]
+    },
+    {
+      "id": "pad-drawing-palette",
+      "title": "Drawing palette ui:drawing-palette",
+      "description": "Tools, color swatches that read on dark and light canvases, a custom color, stroke width, undo and clear. The host owns the values.",
+      "components": [
+        {
+          "id": "pp-palette",
+          "type": "ui:drawing-palette",
+          "props": {
+            "name": "annotate",
+            "label": "Annotation palette",
+            "tool": "arrow",
+            "color": "#0090ff",
+            "width": 6,
+            "allow_custom_color": true,
+            "can_undo": true,
+            "show_clear": true
+          }
+        },
+        {
+          "id": "pp-vertical",
+          "type": "ui:drawing-palette",
+          "props": {
+            "name": "marker",
+            "label": "Marker palette",
+            "tools": ["pen", "highlighter", "eraser"],
+            "colors": ["#e5484d", "#30a46c", "#8e4ec6"],
+            "orientation": "vertical",
+            "min_width": 2,
+            "max_width": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad-sketch-board",
+      "title": "Sketch board ui:sketch-board",
+      "description": "Palette and canvas in one: draw with mouse, pen or touch, place text inline, undo, clear with a confirmation and download a PNG. Drop or paste an image to use it as the background.",
+      "components": [
+        {
+          "id": "ps-board",
+          "type": "ui:sketch-board",
+          "props": {
+            "name": "sketch",
+            "label": "Sketch",
+            "canvas_width": 960,
+            "canvas_height": 540,
+            "accept_image_drop": true,
+            "show_download": true
+          }
+        }
+      ]
+    }
+  ]
+}

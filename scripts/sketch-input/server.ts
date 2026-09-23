@@ -27,6 +27,7 @@ import {
   sketchReceiptLogicalPath,
 } from './context.js';
 import { sketchPageHtml } from './sketch-page.js';
+import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { composeLegacyCapture } from '../personal-pads/legacy.js';
 
@@ -116,65 +117,20 @@ function positionalArgs(args: string[]): string[] {
   return out;
 }
 
-export async function main(
-  args: string[] = [],
-  options: {
-    dryRun?: boolean;
-    check?: boolean;
-    json?: boolean;
-    print?: (value: unknown) => void;
-  } = {}
-): Promise<SketchInputServerResult | undefined> {
-  const positionals = positionalArgs(args);
-  const port = Number(positionals[0] || SKETCH_INPUT_DEFAULT_PORT);
-  const out = option(args, '--out') || defaultSketchOutputPath();
-  const defaultInstruction = option(args, '--instruction') || '';
-  if (!out.toLowerCase().endsWith('.png')) {
-    throw new ScriptExitError(1, 'output path must end with .png');
-  }
-  assertProtocolServiceRegistered('sketch-input');
+export interface SketchInputRequestHandlerOptions {
+  token: string;
+  out: string;
+  handoff: string;
+  defaultInstruction: string;
+  sketchContext: ReturnType<typeof createSketchInputContext>;
+  print: (value: unknown) => void;
+}
 
-  const tier = (option(args, '--tier') || 'public') as 'public' | 'confidential' | 'personal';
-  if (!['public', 'confidential', 'personal'].includes(tier)) {
-    throw new ScriptExitError(1, `invalid tier: ${tier}`);
-  }
-  const sketchContext = createSketchInputContext({
-    artifact_ref: option(args, '--artifact-ref') || out,
-    viewer_principal:
-      getRegisteredEnvText('KYBERION_VIEWER_PRINCIPAL') ||
-      getRegisteredEnvText('KYBERION_MCP_PRINCIPAL') ||
-      'local-sketcher',
-    tier,
-    tenant_slug: option(args, '--tenant') || getRegisteredEnvText('KYBERION_TENANT'),
-    organization_id: option(args, '--organization-id'),
-    project_id: option(args, '--project-id'),
-    mission_id: option(args, '--mission-id'),
-  });
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new ScriptExitError(1, `invalid port: ${port}`);
-  }
-
-  const handoff = sketchHandoffLogicalPath(out);
-  const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
-  const url = `http://127.0.0.1:${port}/`;
-  const preview: SketchInputServerResult = {
-    ok: true,
-    mode,
-    out,
-    handoff,
-    port,
-    url,
-    artifact_ref: sketchContext.artifact_ref,
-    scope: sketchContext.scope,
-    listening: false,
-  };
-  const print = options.print ?? (() => undefined);
-  if (options.dryRun || options.check) {
-    print(preview);
-    return preview;
-  }
-
-  const TOKEN = randomBytes(16).toString('hex');
+/** The pad's request handler (page, shared UI assets, health, export). */
+export function createSketchInputRequestHandler(
+  options: SketchInputRequestHandlerOptions
+): http.RequestListener {
+  const { token: TOKEN, out, handoff, defaultInstruction, sketchContext, print } = options;
   let activeHeavyRequests = 0;
   function acquireHeavyRequest(): (() => void) | undefined {
     if (activeHeavyRequests >= SKETCH_INPUT_MAX_CONCURRENT_HEAVY_REQUESTS) return undefined;
@@ -187,9 +143,11 @@ export async function main(
     };
   }
 
-  const server = http.createServer((req, res) => {
+  return (req, res) => {
     try {
-      if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+      if (handlePadUiAsset(req, res)) return;
+      const pathname = (req.url || '').split(/[?#]/, 1)[0];
+      if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
         const release = acquireHeavyRequest();
         if (!release) {
           res.writeHead(503, { 'Retry-After': '1' });
@@ -199,6 +157,7 @@ export async function main(
         res.once('finish', release);
         res.once('close', release);
         const html = sketchPageHtml({
+          locale: resolvePadLocale(req),
           token: TOKEN,
           exportUrl: '/export',
           defaultInstruction,
@@ -353,7 +312,78 @@ export async function main(
         res.end(e instanceof Error ? e.message : String(e));
       }
     }
+  };
+}
+
+export async function main(
+  args: string[] = [],
+  options: {
+    dryRun?: boolean;
+    check?: boolean;
+    json?: boolean;
+    print?: (value: unknown) => void;
+  } = {}
+): Promise<SketchInputServerResult | undefined> {
+  const positionals = positionalArgs(args);
+  const port = Number(positionals[0] || SKETCH_INPUT_DEFAULT_PORT);
+  const out = option(args, '--out') || defaultSketchOutputPath();
+  const defaultInstruction = option(args, '--instruction') || '';
+  if (!out.toLowerCase().endsWith('.png')) {
+    throw new ScriptExitError(1, 'output path must end with .png');
+  }
+  assertProtocolServiceRegistered('sketch-input');
+
+  const tier = (option(args, '--tier') || 'public') as 'public' | 'confidential' | 'personal';
+  if (!['public', 'confidential', 'personal'].includes(tier)) {
+    throw new ScriptExitError(1, `invalid tier: ${tier}`);
+  }
+  const sketchContext = createSketchInputContext({
+    artifact_ref: option(args, '--artifact-ref') || out,
+    viewer_principal:
+      getRegisteredEnvText('KYBERION_VIEWER_PRINCIPAL') ||
+      getRegisteredEnvText('KYBERION_MCP_PRINCIPAL') ||
+      'local-sketcher',
+    tier,
+    tenant_slug: option(args, '--tenant') || getRegisteredEnvText('KYBERION_TENANT'),
+    organization_id: option(args, '--organization-id'),
+    project_id: option(args, '--project-id'),
+    mission_id: option(args, '--mission-id'),
   });
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new ScriptExitError(1, `invalid port: ${port}`);
+  }
+
+  const handoff = sketchHandoffLogicalPath(out);
+  const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
+  const url = `http://127.0.0.1:${port}/`;
+  const preview: SketchInputServerResult = {
+    ok: true,
+    mode,
+    out,
+    handoff,
+    port,
+    url,
+    artifact_ref: sketchContext.artifact_ref,
+    scope: sketchContext.scope,
+    listening: false,
+  };
+  const print = options.print ?? (() => undefined);
+  if (options.dryRun || options.check) {
+    print(preview);
+    return preview;
+  }
+
+  const TOKEN = randomBytes(16).toString('hex');
+  const server = http.createServer(
+    createSketchInputRequestHandler({
+      token: TOKEN,
+      out,
+      handoff,
+      defaultInstruction,
+      sketchContext,
+      print,
+    })
+  );
   server.requestTimeout = SKETCH_INPUT_REQUEST_TIMEOUT_MS;
   server.headersTimeout = SKETCH_INPUT_HEADERS_TIMEOUT_MS;
   server.keepAliveTimeout = SKETCH_INPUT_KEEP_ALIVE_TIMEOUT_MS;

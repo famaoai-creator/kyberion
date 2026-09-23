@@ -3,26 +3,31 @@
  * The server owns transport and authorization. Adapters own the input shape
  * and canonical capture representation, so adding a pad does not require a
  * new route or a branch in the server.
+ *
+ * PA-07: adapter definitions carry vocabulary keys (`personal_pads:*`), never
+ * literal text. `getPadAdapter(padId, locale)` resolves them for one request
+ * locale; the browser receives the localized descriptors.
  */
+import type { SupportedLocale } from '@agent/core/locale-normalize';
+import type { VocabularyKey } from '@agent/core/t';
+import { defaultPadLocale, padsText } from './i18n.js';
 import { getPadRegistryEntry, PAD_REGISTRY, type PadId, type PadInputKind } from './registry.js';
 
 export type AdapterFieldKind =
   'text' | 'textarea' | 'select' | 'file' | 'image' | 'drawing' | 'recording';
 
+/** Drawing tools of the shared `ui:sketch-board` (the kit renders their localized labels). */
 export type DrawingToolId = 'pen' | 'rect' | 'ellipse' | 'line' | 'arrow' | 'text' | 'eraser';
 
 export interface DrawingToolDescriptor {
   id: DrawingToolId;
-  label: string;
 }
 
 export interface VoiceInputDescriptor {
   label: string;
-  stop_label: string;
 }
 
 export interface DrawingDownloadDescriptor {
-  label: string;
   filename: string;
 }
 
@@ -33,13 +38,16 @@ export interface DrawingDownloadDescriptor {
  */
 export type PadActionEffect = 'read' | 'derive' | 'propose' | 'apply';
 
+export type PadActionCapability =
+  'os-clipboard' | 'os-screenshot' | 'speech-to-text' | 'reasoning' | 'governed';
+
 export interface PadActionDescriptor {
   id: string;
   label: string;
   description: string;
   effect: PadActionEffect;
   /** Capability hint for the host. It never grants permission by itself. */
-  capability?: 'os-clipboard' | 'os-screenshot' | 'speech-to-text' | 'reasoning' | 'governed';
+  capability?: PadActionCapability;
   /** Fail fast when an expensive local action is already running. */
   max_concurrent?: number;
   /** Optional typed form rendered only for this action. */
@@ -66,6 +74,38 @@ export interface AdapterField {
   voice_input?: VoiceInputDescriptor;
   /** Optional local PNG export affordance for a drawing field. */
   download?: DrawingDownloadDescriptor;
+}
+
+/** An adapter field as declared: every user-visible string is a vocabulary key. */
+export interface AdapterFieldDefinition extends Omit<
+  AdapterField,
+  'label' | 'placeholder' | 'help' | 'options' | 'voice_input'
+> {
+  label: VocabularyKey;
+  placeholder?: VocabularyKey;
+  help?: VocabularyKey;
+  options?: readonly { value: string; label: VocabularyKey }[];
+  voice_input?: { label: VocabularyKey };
+}
+
+export interface PadActionDefinition extends Omit<
+  PadActionDescriptor,
+  'label' | 'description' | 'input_fields'
+> {
+  label: VocabularyKey;
+  description: VocabularyKey;
+  input_fields?: readonly AdapterFieldDefinition[];
+}
+
+export interface PadAdapterDefinition {
+  id: string;
+  pad_id: PadId;
+  input_kind: PadInputKind;
+  body_mode: 'freeform' | 'composed';
+  fields: readonly AdapterFieldDefinition[];
+  actions: readonly PadActionDefinition[];
+  /** Vocabulary key of the `{field}` template that composes the saved body. */
+  preview_template: VocabularyKey;
 }
 
 export interface AdapterCaptureInput {
@@ -106,6 +146,11 @@ export interface PadAdapter {
   composeCapture(input: AdapterCaptureInput): AdapterCaptureResult;
 }
 
+type AdapterConfig = Omit<
+  PadAdapter,
+  'parseInput' | 'validateInput' | 'renderPreview' | 'composeCapture'
+>;
+
 function text(fields: Record<string, unknown>, id: string): string {
   return typeof fields[id] === 'string' ? fields[id].trim() : '';
 }
@@ -132,9 +177,7 @@ function dataUrl(value: string): { mime: string; data_base64: string } | undefin
   return { mime: match[1] || 'application/octet-stream', data_base64 };
 }
 
-function makeAdapter(
-  config: Omit<PadAdapter, 'parseInput' | 'validateInput' | 'renderPreview' | 'composeCapture'>
-): PadAdapter {
+function makeAdapter(config: AdapterConfig, drawingMarker: string): PadAdapter {
   const declaredFields = [
     ...config.fields,
     ...config.actions.flatMap((action) => action.input_fields ?? []),
@@ -234,7 +277,7 @@ function makeAdapter(
       const previewValues = { ...values };
       for (const field of declaredFields) {
         if (field.kind === 'drawing' && dataUrl(previewValues[field.id])) {
-          previewValues[field.id] = '（描画 artifact を添付）';
+          previewValues[field.id] = drawingMarker;
         }
       }
       const body = (this as PadAdapter).renderPreview({ ...parsed, fields: previewValues });
@@ -249,46 +292,57 @@ function makeAdapter(
   };
 }
 
-const ADAPTER_CONFIGS: readonly Omit<
-  PadAdapter,
-  'parseInput' | 'validateInput' | 'renderPreview' | 'composeCapture'
->[] = [
+const TARGET_OPTIONS = {
+  choose: { value: '', label: 'personal_pads:option_choose' },
+  note: { value: 'note', label: 'personal_pads:option_note' },
+  now: { value: 'now', label: 'personal_pads:option_now' },
+  todo: { value: 'todo', label: 'personal_pads:option_todo' },
+  ingest: { value: 'ingest', label: 'personal_pads:option_ingest' },
+} as const;
+
+const VOICE_INPUT = { label: 'personal_pads:voice_input' } as const;
+
+export const PAD_ADAPTER_DEFINITIONS: readonly PadAdapterDefinition[] = [
   {
     id: 'memory-capture.v1',
     pad_id: 'memory-capture',
     input_kind: 'text',
     body_mode: 'freeform',
     fields: [
-      { id: 'tags', label: 'タグ', kind: 'text', placeholder: 'idea, follow-up' },
+      {
+        id: 'tags',
+        label: 'personal_pads:field_tags',
+        kind: 'text',
+        placeholder: 'personal_pads:field_tags_placeholder',
+      },
       {
         id: 'next_action',
-        label: '次のアクション',
+        label: 'personal_pads:field_next_action',
         kind: 'text',
-        placeholder: '誰が、いつ、何をするか',
+        placeholder: 'personal_pads:field_next_action_placeholder',
       },
       {
         id: 'instruction',
-        label: '取り込みメモ',
+        label: 'personal_pads:field_capture_note',
         kind: 'text',
-        placeholder: '整理してほしいこと',
-        voice_input: { label: '🎤 音声入力', stop_label: '停止' },
+        placeholder: 'personal_pads:field_capture_note_placeholder',
+        voice_input: VOICE_INPUT,
       },
       {
         id: 'target',
-        label: '保存先の候補',
+        label: 'personal_pads:field_target',
         kind: 'select',
         options: [
-          { value: '', label: '選択してください' },
-          { value: 'note', label: 'Note' },
-          { value: 'now', label: 'NOW' },
-          { value: 'todo', label: 'TODO' },
-          { value: 'ingest', label: 'Ingest' },
+          TARGET_OPTIONS.choose,
+          TARGET_OPTIONS.note,
+          TARGET_OPTIONS.now,
+          TARGET_OPTIONS.todo,
+          TARGET_OPTIONS.ingest,
         ],
       },
     ],
     actions: [],
-    preview_template:
-      '{body}\n\nタグ: {tags}\n次のアクション: {next_action}\n取り込みメモ: {instruction}\n候補: {target}',
+    preview_template: 'personal_pads:preview_memory_capture',
   },
   {
     id: 'meeting-notepad.v1',
@@ -296,82 +350,106 @@ const ADAPTER_CONFIGS: readonly Omit<
     input_kind: 'mixed',
     body_mode: 'composed',
     fields: [
-      { id: 'attendees', label: '参加者', kind: 'text', placeholder: '名前をカンマ区切り' },
+      {
+        id: 'attendees',
+        label: 'personal_pads:field_attendees',
+        kind: 'text',
+        placeholder: 'personal_pads:field_attendees_placeholder',
+      },
       {
         id: 'instruction',
-        label: '議事録の指示',
+        label: 'personal_pads:field_minutes_instruction',
         kind: 'textarea',
-        placeholder: '要約の観点や確認事項',
-        voice_input: { label: '🎤 音声入力', stop_label: '停止' },
+        placeholder: 'personal_pads:field_minutes_instruction_placeholder',
+        voice_input: VOICE_INPUT,
       },
-      { id: 'decisions', label: '決定事項', kind: 'textarea', placeholder: '決まったこと' },
-      { id: 'handoff', label: '受け渡し', kind: 'textarea', placeholder: '次の担当へ伝えること' },
+      {
+        id: 'decisions',
+        label: 'personal_pads:field_decisions',
+        kind: 'textarea',
+        placeholder: 'personal_pads:field_decisions_placeholder',
+      },
+      {
+        id: 'handoff',
+        label: 'personal_pads:field_handoff',
+        kind: 'textarea',
+        placeholder: 'personal_pads:field_handoff_placeholder',
+      },
       {
         id: 'action_items',
-        label: 'アクション項目',
+        label: 'personal_pads:field_action_items',
         kind: 'textarea',
-        placeholder: '担当者と次の行動',
+        placeholder: 'personal_pads:field_action_items_placeholder',
       },
-      { id: 'summary', label: '要約', kind: 'textarea', placeholder: '議事録の要約' },
+      {
+        id: 'summary',
+        label: 'personal_pads:field_summary',
+        kind: 'textarea',
+        placeholder: 'personal_pads:field_summary_placeholder',
+      },
       {
         id: 'open_questions',
-        label: '未解決事項',
+        label: 'personal_pads:field_open_questions',
         kind: 'textarea',
-        placeholder: '確認が必要なこと',
+        placeholder: 'personal_pads:field_open_questions_placeholder',
       },
-      { id: 'notes', label: '原メモ', kind: 'textarea', placeholder: '会議中のメモ' },
+      {
+        id: 'notes',
+        label: 'personal_pads:field_raw_notes',
+        kind: 'textarea',
+        placeholder: 'personal_pads:field_raw_notes_placeholder',
+      },
       {
         id: 'transcript',
-        label: '文字起こし',
+        label: 'personal_pads:field_transcript',
         kind: 'textarea',
-        placeholder: '音声からの文字起こし',
+        placeholder: 'personal_pads:field_transcript_placeholder',
       },
       {
         id: 'language',
-        label: '言語',
+        label: 'personal_pads:field_language',
         kind: 'select',
         options: [
-          { value: '', label: '選択してください' },
-          { value: 'ja', label: '日本語' },
-          { value: 'en', label: 'English' },
+          TARGET_OPTIONS.choose,
+          { value: 'ja', label: 'personal_pads:option_language_ja' },
+          { value: 'en', label: 'personal_pads:option_language_en' },
         ],
       },
       {
         id: 'audio_name',
-        label: '録音ファイル',
+        label: 'personal_pads:field_recording',
         kind: 'recording',
         accept: 'audio/*',
-        help: '録音済みファイルを選ぶか、ブラウザで連続録音できます',
+        help: 'personal_pads:field_recording_help',
       },
       {
         id: 'attachment_name',
-        label: '会議資料・添付',
+        label: 'personal_pads:field_meeting_attachments',
         kind: 'file',
         multiple: true,
         accept: '.txt,.md,.json,.csv,image/*,application/pdf',
-        help: '会議資料や画像を複数選択できます',
+        help: 'personal_pads:field_meeting_attachments_help',
       },
     ],
     actions: [
       {
         id: 'meeting.transcribe',
-        label: '文字起こし',
-        description: '選択した録音を認可済みの speech-to-text bridge で文字にします',
+        label: 'personal_pads:action_meeting_transcribe',
+        description: 'personal_pads:action_meeting_transcribe_description',
         effect: 'derive',
         capability: 'speech-to-text',
         max_concurrent: 2,
       },
       {
         id: 'meeting.minutes',
-        label: '議事録を生成',
-        description: 'メモと文字起こしから議事録の下書きを作ります',
+        label: 'personal_pads:action_meeting_minutes',
+        description: 'personal_pads:action_meeting_minutes_description',
         effect: 'derive',
         capability: 'reasoning',
         max_concurrent: 2,
       },
     ],
-    preview_template:
-      '会議メモ\n参加者: {attendees}\n言語: {language}\n\n要約:\n{summary}\n\n決定事項:\n{decisions}\n\n受け渡し:\n{handoff}\n\nアクション項目:\n{action_items}\n\n未解決事項:\n{open_questions}\n\n原メモ:\n{notes}\n\n文字起こし:\n{transcript}\n\n録音: {audio_name}\n添付: {attachment_name}\n\nメモ:\n{body}',
+    preview_template: 'personal_pads:preview_meeting_notepad',
   },
   {
     id: 'sketch-input.v1',
@@ -381,30 +459,30 @@ const ADAPTER_CONFIGS: readonly Omit<
     fields: [
       {
         id: 'instruction',
-        label: '描画メモ',
+        label: 'personal_pads:field_drawing_note',
         kind: 'textarea',
-        placeholder: 'この図で伝えたいこと',
-        voice_input: { label: '🎤 音声入力', stop_label: '停止' },
+        placeholder: 'personal_pads:field_drawing_note_placeholder',
+        voice_input: VOICE_INPUT,
       },
       {
         id: 'drawing_data',
-        label: 'キャンバス',
+        label: 'personal_pads:field_canvas',
         kind: 'drawing',
         drawing_tools: [
-          { id: 'pen', label: 'ペン' },
-          { id: 'rect', label: '矩形' },
-          { id: 'ellipse', label: '楕円' },
-          { id: 'line', label: '線' },
-          { id: 'arrow', label: '矢印' },
-          { id: 'text', label: 'テキスト' },
-          { id: 'eraser', label: '消しゴム' },
+          { id: 'pen' },
+          { id: 'rect' },
+          { id: 'ellipse' },
+          { id: 'line' },
+          { id: 'arrow' },
+          { id: 'text' },
+          { id: 'eraser' },
         ],
-        download: { label: 'PNGをダウンロード', filename: 'sketch-input.png' },
-        help: 'ドラッグして描画できます',
+        download: { filename: 'sketch-input.png' },
+        help: 'personal_pads:field_canvas_help',
       },
     ],
     actions: [],
-    preview_template: 'スケッチ\n{instruction}\n\n{body}\n\n[描画データを添付]',
+    preview_template: 'personal_pads:preview_sketch_input',
   },
   {
     id: 'clipboard-inbox.v1',
@@ -412,39 +490,53 @@ const ADAPTER_CONFIGS: readonly Omit<
     input_kind: 'text',
     body_mode: 'freeform',
     fields: [
-      { id: 'source', label: '出典', kind: 'text', placeholder: 'どこからコピーしたか' },
-      { id: 'url', label: 'リンク', kind: 'text', placeholder: 'https://…' },
+      {
+        id: 'source',
+        label: 'personal_pads:field_source',
+        kind: 'text',
+        placeholder: 'personal_pads:field_source_placeholder',
+      },
+      {
+        id: 'url',
+        label: 'personal_pads:field_link',
+        kind: 'text',
+        placeholder: 'personal_pads:field_link_placeholder',
+      },
       {
         id: 'items',
-        label: 'クリップ項目',
+        label: 'personal_pads:field_clip_items',
         kind: 'textarea',
-        placeholder: 'コピーした文章（複数可）',
+        placeholder: 'personal_pads:field_clip_items_placeholder',
       },
-      { id: 'instruction', label: '取り込みメモ', kind: 'text', placeholder: '整理してほしいこと' },
+      {
+        id: 'instruction',
+        label: 'personal_pads:field_capture_note',
+        kind: 'text',
+        placeholder: 'personal_pads:field_capture_note_placeholder',
+      },
       {
         id: 'target',
-        label: '保存先の候補',
+        label: 'personal_pads:field_target',
         kind: 'select',
         options: [
-          { value: '', label: '選択してください' },
-          { value: 'note', label: 'Note' },
-          { value: 'todo', label: 'TODO' },
-          { value: 'ingest', label: 'Ingest' },
+          TARGET_OPTIONS.choose,
+          TARGET_OPTIONS.note,
+          TARGET_OPTIONS.todo,
+          TARGET_OPTIONS.ingest,
         ],
       },
     ],
     actions: [
       {
         id: 'clipboard.read',
-        label: 'クリップボードを読む',
-        description: 'OS のクリップボードを読み、貼り付け前の下書きへ反映します',
+        label: 'personal_pads:action_clipboard_read',
+        description: 'personal_pads:action_clipboard_read_description',
         effect: 'read',
         capability: 'os-clipboard',
         max_concurrent: 2,
       },
     ],
-    preview_template:
-      '{body}\n\nクリップ項目:\n{items}\n\n出典: {source}\nリンク: {url}\n取り込みメモ: {instruction}\n候補: {target}',
+    preview_template: 'personal_pads:preview_clipboard_inbox',
   },
   {
     id: 'daily-desk.v1',
@@ -452,23 +544,47 @@ const ADAPTER_CONFIGS: readonly Omit<
     input_kind: 'mixed',
     body_mode: 'composed',
     fields: [
-      { id: 'journal', label: 'Journal', kind: 'textarea', placeholder: '今日の記録' },
-      { id: 'todo', label: 'TODO', kind: 'textarea', placeholder: '今日やること' },
-      { id: 'now', label: 'NOW', kind: 'textarea', placeholder: 'いま集中すること' },
-      { id: 'period_key', label: '対象日', kind: 'text', placeholder: 'YYYY-MM-DD（空欄は今日）' },
-      { id: 'instruction', label: '補足', kind: 'textarea', placeholder: '今日の整理メモ' },
+      {
+        id: 'journal',
+        label: 'personal_pads:field_journal',
+        kind: 'textarea',
+        placeholder: 'personal_pads:field_journal_placeholder',
+      },
+      {
+        id: 'todo',
+        label: 'personal_pads:field_todo',
+        kind: 'textarea',
+        placeholder: 'personal_pads:field_todo_placeholder',
+      },
+      {
+        id: 'now',
+        label: 'personal_pads:field_now',
+        kind: 'textarea',
+        placeholder: 'personal_pads:field_now_placeholder',
+      },
+      {
+        id: 'period_key',
+        label: 'personal_pads:field_period_key',
+        kind: 'text',
+        placeholder: 'personal_pads:field_period_key_placeholder',
+      },
+      {
+        id: 'instruction',
+        label: 'personal_pads:field_daily_note',
+        kind: 'textarea',
+        placeholder: 'personal_pads:field_daily_note_placeholder',
+      },
     ],
     actions: [
       {
         id: 'daily.load-working-memory',
-        label: '今日の working-memory を読む',
-        description: '現在の personal scope に紐づく Journal / TODO / NOW を下書きへ読み込みます',
+        label: 'personal_pads:action_daily_load',
+        description: 'personal_pads:action_daily_load_description',
         effect: 'read',
         max_concurrent: 2,
       },
     ],
-    preview_template:
-      'Journal\n{journal}\n\nTODO\n{todo}\n\nNOW\n{now}\n\n補足\n{instruction}\n{body}',
+    preview_template: 'personal_pads:preview_daily_desk',
   },
   {
     id: 'doc-drop.v1',
@@ -478,17 +594,22 @@ const ADAPTER_CONFIGS: readonly Omit<
     fields: [
       {
         id: 'file_name',
-        label: '文書ファイル',
+        label: 'personal_pads:field_documents',
         kind: 'file',
         multiple: true,
         accept:
           '.txt,.md,.json,.csv,.doc,.docx,text/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        help: '複数の原本ファイルを選択できます。実体を保存します',
+        help: 'personal_pads:field_documents_help',
       },
-      { id: 'review_note', label: '確認メモ', kind: 'textarea', placeholder: '確認してほしい点' },
+      {
+        id: 'review_note',
+        label: 'personal_pads:field_review_note',
+        kind: 'textarea',
+        placeholder: 'personal_pads:field_review_note_placeholder',
+      },
     ],
     actions: [],
-    preview_template: '文書: {file_name}\n確認メモ:\n{review_note}\n\n補足:\n{body}',
+    preview_template: 'personal_pads:preview_doc_drop',
   },
   {
     id: 'screenshot-annotate.v1',
@@ -498,47 +619,46 @@ const ADAPTER_CONFIGS: readonly Omit<
     fields: [
       {
         id: 'image_name',
-        label: 'スクリーンショット',
+        label: 'personal_pads:field_screenshot',
         kind: 'image',
         accept: 'image/*',
         paste_drop: true,
-        help: '画像を選ぶと下にプレビューが表示されます',
+        help: 'personal_pads:field_screenshot_help',
       },
       {
         id: 'annotation',
-        label: '注釈',
+        label: 'personal_pads:field_annotation',
         kind: 'textarea',
-        placeholder: '気づきや修正点',
-        voice_input: { label: '🎤 音声入力', stop_label: '停止' },
+        placeholder: 'personal_pads:field_annotation_placeholder',
+        voice_input: VOICE_INPUT,
       },
       {
         id: 'annotation_data',
-        label: '描画注釈',
+        label: 'personal_pads:field_drawn_annotation',
         kind: 'drawing',
         overlay_field: 'image_name',
         drawing_tools: [
-          { id: 'pen', label: 'ペン' },
-          { id: 'rect', label: '矩形' },
-          { id: 'arrow', label: '矢印' },
-          { id: 'text', label: 'テキスト' },
-          { id: 'eraser', label: '消しゴム' },
+          { id: 'pen' },
+          { id: 'rect' },
+          { id: 'arrow' },
+          { id: 'text' },
+          { id: 'eraser' },
         ],
-        download: { label: 'PNGをダウンロード', filename: 'screenshot-annotate.png' },
-        help: '画像の上に重ねたい線や印を描けます',
+        download: { filename: 'screenshot-annotate.png' },
+        help: 'personal_pads:field_drawn_annotation_help',
       },
     ],
     actions: [
       {
         id: 'screenshot.capture-screen',
-        label: '画面をキャプチャ',
-        description: 'OS の画面を PNG として下書きへ取り込みます',
+        label: 'personal_pads:action_screenshot_capture',
+        description: 'personal_pads:action_screenshot_capture_description',
         effect: 'read',
         capability: 'os-screenshot',
         max_concurrent: 1,
       },
     ],
-    preview_template:
-      '画像: {image_name}\n注釈:\n{annotation}\n\n描画注釈: {annotation_data}\n\n補足:\n{body}',
+    preview_template: 'personal_pads:preview_screenshot_annotate',
   },
   {
     id: 'personal-workbench.v1',
@@ -548,165 +668,260 @@ const ADAPTER_CONFIGS: readonly Omit<
     fields: [
       {
         id: 'entry_type',
-        label: '用途',
+        label: 'personal_pads:field_entry_type',
         kind: 'select',
         options: [
-          { value: '', label: '選択してください' },
-          { value: 'link', label: 'Link inbox' },
-          { value: 'task', label: 'Task triage' },
-          { value: 'follow-up', label: 'Follow-up desk' },
-          { value: 'decision', label: 'Decision log' },
-          { value: 'expense', label: 'Expense' },
-          { value: 'daily-review', label: 'Daily review' },
+          TARGET_OPTIONS.choose,
+          { value: 'link', label: 'personal_pads:option_entry_link' },
+          { value: 'task', label: 'personal_pads:option_entry_task' },
+          { value: 'follow-up', label: 'personal_pads:option_entry_follow_up' },
+          { value: 'decision', label: 'personal_pads:option_entry_decision' },
+          { value: 'expense', label: 'personal_pads:option_entry_expense' },
+          { value: 'daily-review', label: 'personal_pads:option_entry_daily_review' },
         ],
       },
-      { id: 'due', label: '期限', kind: 'text', placeholder: '2026-09-30' },
+      {
+        id: 'due',
+        label: 'personal_pads:field_due',
+        kind: 'text',
+        placeholder: 'personal_pads:field_date_placeholder',
+      },
     ],
     actions: [
       {
         id: 'workbench.email-draft',
-        label: 'メール下書き',
-        description: '宛先・件名・本文から送信しないメール下書きを作ります',
+        label: 'personal_pads:action_email_draft',
+        description: 'personal_pads:action_email_draft_description',
         effect: 'propose',
         capability: 'governed',
         max_concurrent: 2,
         input_fields: [
-          { id: 'email_to', label: '宛先', kind: 'text', placeholder: 'name@example.com' },
-          { id: 'email_subject', label: '件名', kind: 'text' },
-          { id: 'email_body', label: '本文', kind: 'textarea' },
-          { id: 'email_account', label: 'アカウント（任意）', kind: 'text' },
+          {
+            id: 'email_to',
+            label: 'personal_pads:field_email_to',
+            kind: 'text',
+            placeholder: 'personal_pads:field_email_to_placeholder',
+          },
+          { id: 'email_subject', label: 'personal_pads:field_email_subject', kind: 'text' },
+          { id: 'email_body', label: 'personal_pads:field_email_body', kind: 'textarea' },
+          { id: 'email_account', label: 'personal_pads:field_email_account', kind: 'text' },
         ],
       },
       {
         id: 'workbench.calendar-propose',
-        label: 'カレンダー提案',
-        description: '予定を承認待ちの proposal として作ります',
+        label: 'personal_pads:action_calendar_propose',
+        description: 'personal_pads:action_calendar_propose_description',
         effect: 'propose',
         capability: 'governed',
         max_concurrent: 2,
         input_fields: [
-          { id: 'calendar_summary', label: '予定名', kind: 'text' },
+          { id: 'calendar_summary', label: 'personal_pads:field_calendar_summary', kind: 'text' },
           {
             id: 'calendar_start',
-            label: '開始',
+            label: 'personal_pads:field_calendar_start',
             kind: 'text',
-            placeholder: '2026-09-30T10:00:00+09:00',
+            placeholder: 'personal_pads:field_calendar_start_placeholder',
           },
           {
             id: 'calendar_end',
-            label: '終了',
+            label: 'personal_pads:field_calendar_end',
             kind: 'text',
-            placeholder: '2026-09-30T10:30:00+09:00',
+            placeholder: 'personal_pads:field_calendar_end_placeholder',
           },
-          { id: 'calendar_description', label: '説明', kind: 'textarea' },
-          { id: 'calendar_location', label: '場所', kind: 'text' },
+          {
+            id: 'calendar_description',
+            label: 'personal_pads:field_calendar_description',
+            kind: 'textarea',
+          },
+          { id: 'calendar_location', label: 'personal_pads:field_calendar_location', kind: 'text' },
           {
             id: 'calendar_attendees',
-            label: '参加者',
+            label: 'personal_pads:field_attendees',
             kind: 'text',
-            placeholder: 'a@example.com,b@example.com',
+            placeholder: 'personal_pads:field_calendar_attendees_placeholder',
           },
           {
             id: 'calendar_provider',
-            label: 'プロバイダ',
+            label: 'personal_pads:field_calendar_provider',
             kind: 'select',
             options: [
-              { value: 'google-workspace', label: 'Google Workspace' },
-              { value: 'm365', label: 'Microsoft 365' },
+              { value: 'google-workspace', label: 'personal_pads:option_provider_google' },
+              { value: 'm365', label: 'personal_pads:option_provider_m365' },
             ],
           },
-          { id: 'calendar_id', label: 'カレンダー ID（任意）', kind: 'text' },
+          { id: 'calendar_id', label: 'personal_pads:field_calendar_id', kind: 'text' },
           {
             id: 'calendar_time_zone',
-            label: 'タイムゾーン（任意）',
+            label: 'personal_pads:field_calendar_time_zone',
             kind: 'text',
-            placeholder: 'Asia/Tokyo',
+            placeholder: 'personal_pads:field_calendar_time_zone_placeholder',
           },
         ],
       },
       {
         id: 'workbench.calendar-apply',
-        label: '承認済み予定を作成',
-        description: '保存済み proposal の approval を再検証してから作成します',
+        label: 'personal_pads:action_calendar_apply',
+        description: 'personal_pads:action_calendar_apply_description',
         effect: 'apply',
         capability: 'governed',
         max_concurrent: 1,
         input_fields: [
-          { id: 'calendar_approval_request_id', label: '承認リクエスト ID', kind: 'text' },
+          {
+            id: 'calendar_approval_request_id',
+            label: 'personal_pads:field_approval_request_id',
+            kind: 'text',
+          },
           {
             id: 'calendar_confirm',
-            label: '内容を確認しました',
+            label: 'personal_pads:field_calendar_confirm',
             kind: 'select',
             options: [
-              { value: '', label: '確認が必要です' },
-              { value: 'yes', label: '確認して作成' },
+              { value: '', label: 'personal_pads:option_confirm_required' },
+              { value: 'yes', label: 'personal_pads:option_confirm_create' },
             ],
           },
         ],
       },
       {
         id: 'workbench.calendar-reconcile',
-        label: '不明な予定を照合',
-        description: 'provider agenda を read-only 照合し、一意一致時だけ proposal を確定します',
+        label: 'personal_pads:action_calendar_reconcile',
+        description: 'personal_pads:action_calendar_reconcile_description',
         effect: 'derive',
         capability: 'governed',
         max_concurrent: 1,
         input_fields: [
           {
             id: 'calendar_reconcile_approval_request_id',
-            label: '承認リクエスト ID',
+            label: 'personal_pads:field_approval_request_id',
             kind: 'text',
           },
         ],
       },
       {
         id: 'workbench.ocr-extract',
-        label: '添付を OCR',
-        description: '保存済み record の artifact ID を指定して scoped OCR を実行します',
+        label: 'personal_pads:action_ocr_extract',
+        description: 'personal_pads:action_ocr_extract_description',
         effect: 'derive',
         capability: 'governed',
         max_concurrent: 2,
         input_fields: [
-          { id: 'ocr_artifact_id', label: 'artifact ID', kind: 'text', placeholder: '01-…' },
-          { id: 'ocr_language', label: '言語（任意）', kind: 'text', placeholder: 'ja' },
+          {
+            id: 'ocr_artifact_id',
+            label: 'personal_pads:field_ocr_artifact_id',
+            kind: 'text',
+            placeholder: 'personal_pads:field_ocr_artifact_id_placeholder',
+          },
+          {
+            id: 'ocr_language',
+            label: 'personal_pads:field_ocr_language',
+            kind: 'text',
+            placeholder: 'personal_pads:field_ocr_language_placeholder',
+          },
           {
             id: 'ocr_mode',
-            label: 'OCR モード',
+            label: 'personal_pads:field_ocr_mode',
             kind: 'select',
             options: [
-              { value: 'privacy_first', label: 'privacy first' },
-              { value: 'balanced', label: 'balanced' },
+              { value: 'privacy_first', label: 'personal_pads:option_ocr_privacy_first' },
+              { value: 'balanced', label: 'personal_pads:option_ocr_balanced' },
             ],
           },
           {
             id: 'ocr_extract_structure',
-            label: '構造を抽出',
+            label: 'personal_pads:field_ocr_structure',
             kind: 'select',
             options: [
-              { value: '', label: 'しない' },
-              { value: 'yes', label: 'する' },
+              { value: '', label: 'personal_pads:option_no' },
+              { value: 'yes', label: 'personal_pads:option_yes' },
             ],
           },
         ],
       },
       {
         id: 'workbench.knowledge-propose',
-        label: '知識候補を提案',
-        description: '保存済み handoff を根拠に human review 用の候補を作ります',
+        label: 'personal_pads:action_knowledge_propose',
+        description: 'personal_pads:action_knowledge_propose_description',
         effect: 'propose',
         capability: 'governed',
         max_concurrent: 2,
-        input_fields: [{ id: 'knowledge_summary', label: '候補の要約', kind: 'textarea' }],
+        input_fields: [
+          {
+            id: 'knowledge_summary',
+            label: 'personal_pads:field_knowledge_summary',
+            kind: 'textarea',
+          },
+        ],
       },
     ],
-    preview_template: '用途: {entry_type}\n期限: {due}\n\n{body}',
+    preview_template: 'personal_pads:preview_personal_workbench',
   },
 ];
 
-export const PAD_ADAPTERS: readonly PadAdapter[] = ADAPTER_CONFIGS.map(makeAdapter);
+function localizeField(field: AdapterFieldDefinition, locale: SupportedLocale): AdapterField {
+  const { label, placeholder, help, options, voice_input, ...rest } = field;
+  return {
+    ...rest,
+    label: padsText(label, locale),
+    ...(placeholder ? { placeholder: padsText(placeholder, locale) } : {}),
+    ...(help ? { help: padsText(help, locale) } : {}),
+    ...(options
+      ? {
+          options: options.map((option) => ({
+            value: option.value,
+            label: padsText(option.label, locale),
+          })),
+        }
+      : {}),
+    ...(voice_input ? { voice_input: { label: padsText(voice_input.label, locale) } } : {}),
+  };
+}
 
-export function getPadAdapter(padId: PadId): PadAdapter {
-  const adapter = PAD_ADAPTERS.find((candidate) => candidate.pad_id === padId);
+function localizeAction(action: PadActionDefinition, locale: SupportedLocale): PadActionDescriptor {
+  const { label, description, input_fields, ...rest } = action;
+  return {
+    ...rest,
+    label: padsText(label, locale),
+    description: padsText(description, locale),
+    ...(input_fields
+      ? { input_fields: input_fields.map((field) => localizeField(field, locale)) }
+      : {}),
+  };
+}
+
+/** Resolve one adapter definition's vocabulary for `locale`. */
+export function localizePadAdapter(
+  definition: PadAdapterDefinition,
+  locale?: SupportedLocale
+): PadAdapter {
+  const resolved = defaultPadLocale(locale);
+  return makeAdapter(
+    {
+      ...definition,
+      fields: definition.fields.map((field) => localizeField(field, resolved)),
+      actions: definition.actions.map((action) => localizeAction(action, resolved)),
+      preview_template: padsText(definition.preview_template, resolved),
+    },
+    padsText('personal_pads:drawing_attached_marker', resolved)
+  );
+}
+
+const LOCALIZED_ADAPTERS = new Map<SupportedLocale, readonly PadAdapter[]>();
+
+/** Every adapter, localized for `locale` (cached per locale). */
+export function padAdaptersFor(locale?: SupportedLocale): readonly PadAdapter[] {
+  const resolved = defaultPadLocale(locale);
+  let adapters = LOCALIZED_ADAPTERS.get(resolved);
+  if (!adapters) {
+    adapters = PAD_ADAPTER_DEFINITIONS.map((definition) =>
+      localizePadAdapter(definition, resolved)
+    );
+    LOCALIZED_ADAPTERS.set(resolved, adapters);
+  }
+  return adapters;
+}
+
+export function getPadAdapter(padId: PadId, locale?: SupportedLocale): PadAdapter {
+  const adapter = padAdaptersFor(locale).find((candidate) => candidate.pad_id === padId);
   if (!adapter || !getPadRegistryEntry(padId))
     throw new Error(`adapter is not registered: ${padId}`);
   return adapter;
@@ -714,22 +929,30 @@ export function getPadAdapter(padId: PadId): PadAdapter {
 
 export function assertPadAdaptersComplete(): void {
   for (const entry of PAD_REGISTRY) {
-    const adapter = getPadAdapter(entry.id);
-    if (adapter.id !== entry.adapter_id || adapter.input_kind !== entry.input_kind) {
+    const definition = PAD_ADAPTER_DEFINITIONS.find((candidate) => candidate.pad_id === entry.id);
+    if (!definition) throw new Error(`adapter is not registered: ${entry.id}`);
+    if (definition.id !== entry.adapter_id || definition.input_kind !== entry.input_kind) {
       throw new Error(`adapter contract mismatch: ${entry.id}`);
     }
   }
 }
 
-export function publicPadAdapterConfigs(): readonly {
+export interface PublicPadAdapterConfig {
   pad_id: PadId;
   input_kind: PadInputKind;
   body_mode: PadAdapter['body_mode'];
   fields: readonly AdapterField[];
   actions: readonly PadActionDescriptor[];
   preview_template: string;
-}[] {
-  return PAD_ADAPTERS.map(
+  /** Localized marker the browser preview shows instead of a drawing's data URL. */
+  drawing_marker: string;
+}
+
+export function publicPadAdapterConfigs(
+  locale?: SupportedLocale
+): readonly PublicPadAdapterConfig[] {
+  const marker = padsText('personal_pads:drawing_attached_marker', defaultPadLocale(locale));
+  return padAdaptersFor(locale).map(
     ({ pad_id, input_kind, body_mode, fields, actions, preview_template }) => ({
       pad_id,
       input_kind,
@@ -737,6 +960,7 @@ export function publicPadAdapterConfigs(): readonly {
       fields,
       actions,
       preview_template,
+      drawing_marker: marker,
     })
   );
 }

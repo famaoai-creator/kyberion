@@ -12,6 +12,7 @@
  *       サーバ経由(server.ts)なら localhost=セキュアコンテキストで 🎤 も使える。
  *       confidential階層への書込は適切な PERSONA が必要。
  */
+import * as path from 'node:path';
 import { safeWriteFile, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
@@ -38,7 +39,12 @@ export function readReportReviewStampTextFile(filePath: string): string {
   return readTextFile(filePath);
 }
 
-export function planReportReviewStamp(html: string, remove: boolean): ReportReviewStampPlan {
+export function planReportReviewStamp(
+  html: string,
+  remove: boolean,
+  /** Report identity for the layer's snapshot key (e.g. the absolute file path). */
+  reportId?: string
+): ReportReviewStampPlan {
   const re = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   if (remove) {
@@ -52,9 +58,9 @@ export function planReportReviewStamp(html: string, remove: boolean): ReportRevi
   if (html.includes(RV_LAYER_OPEN) || /id="rv-bar"/.test(html))
     return { action: 'noop', changed: false, content: html };
 
-  const layer = reviewLayerMarkup();
+  const layer = reviewLayerMarkup({ reportId });
   const content = html.includes('</body>')
-    ? html.replace('</body>', `${layer}\n</body>`)
+    ? html.replace('</body>', () => `${layer}\n</body>`)
     : html + layer;
   return { action: 'add', changed: true, content };
 }
@@ -73,7 +79,11 @@ export function main(
   if (!target) throw new ScriptExitError(1, 'usage: stamp <report.html> [--remove]');
   if (!safeExistsSync(target)) throw new ScriptExitError(1, `report not found: ${target}`);
 
-  const plan = planReportReviewStamp(readReportReviewStampTextFile(target), remove);
+  const plan = planReportReviewStamp(
+    readReportReviewStampTextFile(target),
+    remove,
+    path.resolve(target)
+  );
   const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
   if (!options.check && !options.dryRun && plan.changed)
     safeWriteFile(target, plan.content, { mkdir: false, encoding: 'utf8' });

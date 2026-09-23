@@ -49,6 +49,16 @@ export const SHARED_UI_MODULE_SOURCES: Readonly<Record<string, string>> = Object
   'forms-core.js': 'libs/shared-ui/vanilla/forms-core.js',
   'forms-camera.js': 'libs/shared-ui/vanilla/forms-camera.js',
   'kyberion-ui-vocabulary.js': 'libs/shared-ui/vanilla/kyberion-ui-vocabulary.js',
+  // PA-02 voice
+  'voice.js': 'libs/shared-ui/vanilla/voice.js',
+  'voice-controller.js': 'libs/shared-ui/vanilla/voice-controller.js',
+  // PA-01 pads
+  'pads.js': 'libs/shared-ui/vanilla/pads.js',
+  'toolbar.js': 'libs/shared-ui/vanilla/toolbar.js',
+  'dialog.js': 'libs/shared-ui/vanilla/dialog.js',
+  'drawing.js': 'libs/shared-ui/vanilla/drawing.js',
+  'drawing-core.js': 'libs/shared-ui/vanilla/drawing-core.js',
+  'drawing-engine.js': 'libs/shared-ui/vanilla/drawing-engine.js',
 });
 // Gallery sample data: `ui-gallery.fixtures.<locale>.json` (base, with the
 // sample screen) plus every `ui-gallery.fixtures.<part>.<locale>.json`

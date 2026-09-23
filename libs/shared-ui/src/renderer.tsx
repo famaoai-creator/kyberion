@@ -23,6 +23,14 @@ import {
 } from './forms/index.js';
 // UI-01b charts & visualisation: one layout (vanilla/charts.js) for both renderers.
 import { KbChart, isKbChartType, type KbChartType } from './charts/ChartView.js';
+// PA-02 voice: ui:voice-input / ui:voice-state (controller shared with vanilla/voice.js).
+import {
+  isKbVoiceComponentType,
+  renderVoiceComponent,
+  type KbVoiceComponentType,
+} from './voice/index.js';
+// PA-01 pads: ui:toolbar / ui:dialog / ui:drawing-palette / ui:sketch-board (vanilla/pads.js helpers).
+import { isKbPadComponentType, renderPadComponent, type KbPadComponentType } from './pads/index.js';
 
 // Module-local: the package does not depend on @types/node, and bundlers
 // replace `process.env.NODE_ENV` textually.
@@ -142,7 +150,15 @@ function normalizeAliasProps(
 }
 
 /** Base catalog types only: form and chart types dispatch before `renderCatalog` is called. */
-type KbBaseCatalogType = Exclude<KyberionBaseComponentType, KbFormComponentType | KbChartType>;
+type KbBaseCatalogType = Exclude<
+  KyberionBaseComponentType,
+  | KbFormComponentType
+  | KbChartType
+  // PA-02 voice
+  | KbVoiceComponentType
+  // PA-01 pads
+  | KbPadComponentType
+>;
 
 function renderCatalog(
   id: string,
@@ -182,7 +198,7 @@ function renderCatalog(
     case 'ui:table':
       return <Table {...props<'ui:table'>()} />;
     case 'ui:list':
-      return <List {...props<'ui:list'>()} />;
+      return <List id={id} {...props<'ui:list'>()} />;
     case 'ui:text':
       return <Text {...props<'ui:text'>()} />;
     case 'ui:code':
@@ -290,6 +306,16 @@ export function A2UIRenderer({
         );
       }
       if (isKbChartType(catalogType)) return <KbChart type={catalogType} props={props} />;
+      // PA-02 voice
+      if (isKbVoiceComponentType(catalogType)) return renderVoiceComponent(catalogType, id, props);
+      // PA-01 pads
+      if (isKbPadComponentType(catalogType))
+        return renderPadComponent(
+          catalogType,
+          id,
+          props,
+          childIds.length ? renderChildren(childIds) : null
+        );
       return renderCatalog(
         id,
         catalogType,

@@ -21,8 +21,13 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { resolveLocale } from '@agent/core/locale';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import { reviewLayerMarkup } from '../report-review/review-layer.js';
+import {
+  reviewLayerMarkup,
+  RV_SAVE_CONFIG_CLOSE,
+  RV_SAVE_CONFIG_OPEN,
+} from '../report-review/review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import {
   loadMissionBriefAtPath,
@@ -47,18 +52,25 @@ const HTML_ESCAPES: Record<string, string> = {
   '"': '&quot;',
   "'": '&#39;',
 };
+// Quotes too: values also land in `data-*="…"` attributes.
 const esc = (s: unknown) =>
-  String(s == null ? '' : s).replace(/[<>&]/g, (c) => HTML_ESCAPES[c] ?? c);
+  String(s == null ? '' : s).replace(/[<>&"']/g, (c) => HTML_ESCAPES[c] ?? c);
 const li = (arr: string[] | undefined) =>
   arr && arr.length
     ? '<ul>' + arr.map((x) => `<li>${esc(x)}</li>`).join('') + '</ul>'
     : '<p class="muted">—</p>';
 
-function mt(key: VocabularyKey, params?: Record<string, string | number>): string {
-  return catalogT(key, params);
+function mt(
+  key: VocabularyKey,
+  params?: Record<string, string | number>,
+  locale?: SupportedLocale
+): string {
+  return catalogT(key, params, locale);
 }
 
-function briefMessages() {
+function briefMessages(locale?: SupportedLocale) {
+  const mt = (key: VocabularyKey, params?: Record<string, string | number>) =>
+    catalogT(key, params, locale);
   return {
     title: mt('mission_alignment:brief_title'),
     persona: mt('mission_alignment:label_persona'),
@@ -106,12 +118,18 @@ function briefMessages() {
     deciderNamePrompt: mt('mission_alignment:decider_name_prompt'),
     sending: mt('mission_alignment:sending'),
     failed: (error: string) => mt('mission_alignment:failed', { error }),
+    offline: mt('mission_alignment:offline_copy'),
     approvedShort: mt('mission_alignment:approved_short'),
     changesShort: mt('mission_alignment:changes_short'),
     submitted: (requestId: string) => mt('mission_alignment:approval_submitted', { requestId }),
     staticPreviewNotice: mt('mission_alignment:static_preview_notice'),
     staticPreviewCommands: mt('mission_alignment:static_preview_commands'),
   };
+}
+
+/** JSON that cannot close an inline `<script>` early. */
+function toInlineJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
 }
 
 function flowRows(flow: MissionBriefFlowStep[] | undefined, empty: string, adHoc: string): string {
@@ -156,16 +174,22 @@ export interface BriefApprovalBinding {
 
 export function renderMissionBriefHtml(
   b: MissionBrief,
-  options: { approval?: BriefApprovalBinding } = {}
+  options: {
+    approval?: BriefApprovalBinding;
+    /** Page + review-layer language (serve-brief: the request locale); default: the process locale. */
+    locale?: SupportedLocale;
+  } = {}
 ): string {
   const gate = b.gate || {};
   const sw = b.sovereignSwitch || 'governance-first';
-  const m = briefMessages();
-  const htmlLang = resolveLocale();
+  const locale = options.locale ?? resolveLocale();
+  const m = briefMessages(locale);
+  const htmlLang = locale;
 
   return `<!doctype html>
 <html lang="${esc(htmlLang)}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+${approvalConfigScript(options.approval)}
 <title>${esc(m.title)} — ${esc(b.title || b.missionId || 'mission')}</title>
 <style>
   :root{--bg:#f6f7f9;--panel:#fff;--ink:#1a1f29;--muted:#5b6472;--line:#e3e7ee;--accent:#1f3a5f;--accent2:#2f5c9e;--soft:#eef3fb;--warn:#a8451a;--warn-bg:#fbede6;--ok:#1f7a4d;--ok-bg:#e6f5ec}
@@ -238,8 +262,26 @@ export function renderMissionBriefHtml(
        This HTML is a renderer, not the source of truth. -->
   ${renderGateSection(options.approval, m)}
 </div>
-${reviewLayerMarkup()}
+${reviewLayerMarkup({
+  locale,
+  ...(b.missionId ? { reportId: `mission-brief:${b.missionId}` } : {}),
+})}
 </body></html>`;
+}
+
+/**
+ * The decision endpoint + CSRF token of a pending approval, in a save-config
+ * region in `<head>` (outside the reviewed content): the review layer strips
+ * it from every export / saved copy (like `window.__RV_SAVE__`) and it never
+ * enters a local snapshot, so an exported brief never carries the token.
+ */
+function approvalConfigScript(approval: BriefApprovalBinding | undefined): string {
+  if (!approval || approval.status !== 'pending') return '';
+  return `${RV_SAVE_CONFIG_OPEN}<script>window.__MG_APPROVAL__ = ${toInlineJson({
+    requestId: approval.requestId,
+    endpoint: approval.endpoint || '/decision',
+    token: approval.token || '',
+  })};</script>${RV_SAVE_CONFIG_CLOSE}`;
 }
 
 function renderGateSection(
@@ -289,15 +331,12 @@ function renderGateSection(
       submitted: m.submitted('__REQUEST_ID__'),
       sending: m.sending,
       failed: m.failed('__ERROR__'),
+      offline: m.offline,
       deciderNamePrompt: m.deciderNamePrompt,
-    })};
-    window.__MG_APPROVAL__ = ${JSON.stringify({
-      requestId: approval.requestId,
-      endpoint: approval.endpoint || '/decision',
-      token: approval.token || '',
     })};
     async function mgDecide(d){
       var cfg = window.__MG_APPROVAL__;
+      if (!cfg) { document.getElementById('mg-status').textContent = MG_MESSAGES.offline; return; }
       var status = document.getElementById('mg-status');
       var reason = document.getElementById('mg-reason').value;
       if (d === 'rejected' && !reason) { status.textContent = MG_MESSAGES.chooseReason; return; }
@@ -318,7 +357,7 @@ function renderGateSection(
         var responseStatus = validBody && typeof body.status === 'string' ? body.status : '';
         if (!res.ok || !validBody || body.ok !== true || responseRequestId !== cfg.requestId ||
             (responseStatus !== 'approved' && responseStatus !== 'rejected')) {
-          status.textContent = '失敗: ' + responseError;
+          status.textContent = MG_MESSAGES.failed.replace('__ERROR__', responseError);
           return;
         }
         document.getElementById('mg-gate').setAttribute('data-decision', body.status);

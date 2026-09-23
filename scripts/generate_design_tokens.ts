@@ -36,6 +36,9 @@ const CONCIERGE_UI_TOKENS_CSS_PATH = path.join(
   ROOT,
   'presence/displays/concierge/src/app/kyberion-ui-tokens.css'
 );
+// PA-03: the local pads (scripts/lib/pad-ui.ts serves these) carry their own
+// page CSS for layout, so they too receive only the --kb-ui-* layer.
+export const PAD_UI_TOKENS_CSS_PATH = path.join(ROOT, 'scripts/lib/pad-ui/design-tokens.css');
 /** Every surface gets the component stylesheet next to its token file. */
 export const KB_UI_STYLESHEET_PATHS = [
   'presence/displays/chronos-mirror-v2/src/app/kyberion-ui.css',
@@ -43,6 +46,7 @@ export const KB_UI_STYLESHEET_PATHS = [
   'presence/displays/presence-studio/static/kyberion-ui.css',
   'presence/displays/computer-surface/static/kyberion-ui.css',
   'presence/displays/concierge/src/app/kyberion-ui.css',
+  'scripts/lib/pad-ui/kyberion-ui.css',
 ].map((relativePath) => path.join(ROOT, relativePath));
 const TAILWIND_CONFIG_PATH = path.join(
   ROOT,
@@ -126,6 +130,7 @@ function render(): GeneratedFile[] {
     renderTokenSurface(PRESENCE_TOKENS_CSS_PATH, tokenBlock, uiTokenBlock),
     renderTokenSurface(COMPUTER_TOKENS_CSS_PATH, tokenBlock, uiTokenBlock),
     renderWholeFile(CONCIERGE_UI_TOKENS_CSS_PATH, `${uiTokenBlock}\n`),
+    renderWholeFile(PAD_UI_TOKENS_CSS_PATH, `${uiTokenBlock}\n`),
     ...KB_UI_STYLESHEET_PATHS.map((filePath) => renderWholeFile(filePath, uiStylesheet)),
     renderTailwindConfig(TAILWIND_CONFIG_PATH),
     renderThemesCatalog(THEMES_JSON_PATH, tokens, true),
@@ -141,6 +146,7 @@ export const runGenerateDesignTokens = defineGenerator({
     PRESENCE_TOKENS_CSS_PATH,
     COMPUTER_TOKENS_CSS_PATH,
     CONCIERGE_UI_TOKENS_CSS_PATH,
+    PAD_UI_TOKENS_CSS_PATH,
     ...KB_UI_STYLESHEET_PATHS,
     TAILWIND_CONFIG_PATH,
     THEMES_JSON_PATH,

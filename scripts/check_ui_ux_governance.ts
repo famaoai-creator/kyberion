@@ -94,6 +94,8 @@ const GENERATED_TOKEN_FILES: Record<string, readonly string[]> = {
   'presence/displays/presence-studio/static/kyberion-ui.css': UI_COMPONENT_STYLESHEET_REQUIREMENTS,
   'presence/displays/computer-surface/static/kyberion-ui.css': UI_COMPONENT_STYLESHEET_REQUIREMENTS,
   'presence/displays/concierge/src/app/kyberion-ui.css': UI_COMPONENT_STYLESHEET_REQUIREMENTS,
+  'scripts/lib/pad-ui/design-tokens.css': REQUIRED_UI_TOKENS,
+  'scripts/lib/pad-ui/kyberion-ui.css': UI_COMPONENT_STYLESHEET_REQUIREMENTS,
 };
 const RAW_COLOR_PATTERN = /(?:#[0-9a-f]{3,8}\b|\brgba?\s*\()/giu;
 

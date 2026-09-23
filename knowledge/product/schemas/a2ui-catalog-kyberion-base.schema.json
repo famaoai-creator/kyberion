@@ -56,7 +56,13 @@
         "ui:meter",
         "ui:sequence",
         "ui:flow",
-        "ui:stat-list"
+        "ui:stat-list",
+        "ui:voice-input",
+        "ui:voice-state",
+        "ui:toolbar",
+        "ui:dialog",
+        "ui:drawing-palette",
+        "ui:sketch-board"
       ]
     },
     "props": {
@@ -870,6 +876,108 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:voice-input"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:voice-input"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:voice-state"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:voice-state"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:toolbar"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:toolbar"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:dialog"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:dialog"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:drawing-palette"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:drawing-palette"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:sketch-board"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:sketch-board"
+          }
+        }
+      }
     }
   ],
   "$defs": {
@@ -1090,6 +1198,17 @@
         "href": {
           "$ref": "#/$defs/href"
         },
+        "action": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/action"
+            },
+            {
+              "$ref": "#/$defs/id"
+            }
+          ],
+          "description": "Dispatched on activation. Without href the item is a button; with href a plain click dispatches instead of navigating."
+        },
         "icon": {
           "type": "string",
           "pattern": "^[a-z0-9-]{1,40}$"
@@ -1098,7 +1217,15 @@
           "type": "boolean"
         }
       },
-      "required": ["id", "label", "href"],
+      "required": ["id", "label"],
+      "anyOf": [
+        {
+          "required": ["href"]
+        },
+        {
+          "required": ["action"]
+        }
+      ],
       "additionalProperties": false
     },
     "props:ui:app-shell": {
@@ -1535,6 +1662,25 @@
               },
               "href": {
                 "$ref": "#/$defs/href"
+              },
+              "action": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/action"
+                  },
+                  {
+                    "$ref": "#/$defs/id"
+                  }
+                ],
+                "description": "Dispatched when the title is activated (the title becomes a button, or a link whose plain click dispatches)."
+              },
+              "actions": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "$ref": "#/$defs/action-ref"
+                },
+                "description": "Trailing row actions (e.g. Delete), described by the row title."
               }
             },
             "required": ["title"],
@@ -1805,7 +1951,7 @@
           "minimum": 0
         },
         "status": {
-          "enum": ["queued", "uploading", "done", "error"]
+          "enum": ["queued", "ready", "uploading", "done", "error"]
         },
         "progress": {
           "type": "number",
@@ -3039,6 +3185,440 @@
         }
       },
       "required": ["items"],
+      "additionalProperties": false
+    },
+    "props:ui:voice-input": {
+      "type": "object",
+      "description": "PA-02 microphone input with a live level meter, elapsed time and (dictation) interim transcript. The mic opens only from a user action; audio files and transcripts reach the host only as onAction payloads (voice.state / voice.transcript / voice.recording / voice.error).",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/field-name"
+        },
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "hide_label": {
+          "type": "boolean"
+        },
+        "help": {
+          "$ref": "#/$defs/field-help"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": ["dictation", "record"]
+        },
+        "lang": {
+          "type": "string",
+          "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$",
+          "maxLength": 35
+        },
+        "continuous": {
+          "type": "boolean"
+        },
+        "push_to_talk": {
+          "type": "boolean"
+        },
+        "show_level": {
+          "type": "boolean"
+        },
+        "show_transcript": {
+          "type": "boolean"
+        },
+        "chunk_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 600000
+        },
+        "max_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 3600
+        },
+        "status": {
+          "enum": ["idle", "transcribing", "error"]
+        },
+        "status_error": {
+          "$ref": "#/$defs/field-help"
+        },
+        "actions": {
+          "type": "object",
+          "properties": {
+            "state": {
+              "$ref": "#/$defs/action"
+            },
+            "transcript": {
+              "$ref": "#/$defs/action"
+            },
+            "recording": {
+              "$ref": "#/$defs/action"
+            },
+            "error": {
+              "$ref": "#/$defs/action"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["name", "label"],
+      "additionalProperties": false
+    },
+    "props:ui:voice-state": {
+      "type": "object",
+      "description": "PA-02 display-only conversation state (idle / listening / thinking / speaking / muted / error) with an optional host-driven level 0..1. Reused by the talking avatar.",
+      "properties": {
+        "state": {
+          "enum": ["idle", "listening", "thinking", "speaking", "muted", "error"]
+        },
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "level": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "variant": {
+          "enum": ["bars", "orb", "dot"]
+        },
+        "size": {
+          "enum": ["sm", "md", "lg"]
+        },
+        "show_label": {
+          "type": "boolean"
+        }
+      },
+      "required": ["state"],
+      "additionalProperties": false
+    },
+    "drawing-tool": {
+      "enum": ["pen", "highlighter", "rect", "ellipse", "line", "arrow", "text", "eraser"]
+    },
+    "drawing-tools": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/drawing-tool"
+      }
+    },
+    "hex-color": {
+      "type": "string",
+      "pattern": "^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$"
+    },
+    "drawing-colors": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 24,
+      "items": {
+        "$ref": "#/$defs/hex-color"
+      }
+    },
+    "drawing-width": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 48
+    },
+    "props:ui:toolbar": {
+      "type": "object",
+      "description": "PA-01 WAI-ARIA toolbar (roving tabindex, arrow keys) of buttons / toggles / file pickers / separators / spacers / status text. Dispatches toolbar.click {id}, toolbar.toggle {id, pressed}, toolbar.files {id, files} (File objects only in the payload) unless an item declares its own action.",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "enum": ["button", "toggle", "file", "separator", "spacer", "status"]
+              },
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "label": {
+                "$ref": "#/$defs/text"
+              },
+              "icon": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 8
+              },
+              "hide_label": {
+                "type": "boolean"
+              },
+              "description": {
+                "$ref": "#/$defs/field-help"
+              },
+              "variant": {
+                "$ref": "#/$defs/button-variant"
+              },
+              "pressed": {
+                "type": "boolean"
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "action": {
+                "$ref": "#/$defs/action"
+              },
+              "accept": {
+                "type": "string",
+                "maxLength": 400,
+                "pattern": "^[A-Za-z0-9.+*/_ ,-]*$"
+              },
+              "multiple": {
+                "type": "boolean"
+              },
+              "text": {
+                "$ref": "#/$defs/text"
+              },
+              "tone": {
+                "$ref": "#/$defs/tone"
+              }
+            },
+            "required": ["type"],
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "enum": ["button", "toggle", "file"]
+                    }
+                  }
+                },
+                "then": {
+                  "required": ["id", "label"]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "status"
+                    }
+                  }
+                },
+                "then": {
+                  "required": ["text"]
+                }
+              }
+            ]
+          }
+        },
+        "sticky": {
+          "type": "boolean"
+        },
+        "density": {
+          "$ref": "#/$defs/density"
+        }
+      },
+      "required": ["label", "items"],
+      "additionalProperties": false
+    },
+    "props:ui:dialog": {
+      "type": "object",
+      "description": "PA-01 modal dialog replacing window.confirm() / window.prompt(): confirm, single input, or several choices. Controlled by open. Dispatches action (default dialog.confirm) with {choice?, value?} and cancel_action (default dialog.cancel) on Cancel / Escape. The component's children render in the body between the message / input and the buttons (focus trap included).",
+      "properties": {
+        "open": {
+          "type": "boolean"
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "message": {
+          "$ref": "#/$defs/long-text"
+        },
+        "tone": {
+          "enum": ["neutral", "danger"]
+        },
+        "input": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/field-name"
+            },
+            "label": {
+              "$ref": "#/$defs/text"
+            },
+            "placeholder": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "value": {
+              "type": "string",
+              "maxLength": 4000
+            },
+            "multiline": {
+              "type": "boolean"
+            }
+          },
+          "required": ["name", "label"],
+          "additionalProperties": false
+        },
+        "choices": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "label": {
+                "$ref": "#/$defs/text"
+              },
+              "variant": {
+                "$ref": "#/$defs/button-variant"
+              }
+            },
+            "required": ["id", "label"],
+            "additionalProperties": false
+          }
+        },
+        "confirm_label": {
+          "$ref": "#/$defs/text"
+        },
+        "cancel_label": {
+          "$ref": "#/$defs/text"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "cancel_action": {
+          "$ref": "#/$defs/action"
+        }
+      },
+      "required": ["open", "title"],
+      "additionalProperties": false
+    },
+    "props:ui:drawing-palette": {
+      "type": "object",
+      "description": "PA-01 controlled drawing palette: tools, color swatches (+ optional custom color), stroke width, undo / clear. Dispatches drawing.change {name, tool? | color? | width?}, drawing.undo {name}, drawing.clear {name}.",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/field-name"
+        },
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "tools": {
+          "$ref": "#/$defs/drawing-tools"
+        },
+        "tool": {
+          "$ref": "#/$defs/drawing-tool"
+        },
+        "colors": {
+          "$ref": "#/$defs/drawing-colors"
+        },
+        "color": {
+          "$ref": "#/$defs/hex-color"
+        },
+        "allow_custom_color": {
+          "type": "boolean"
+        },
+        "width": {
+          "$ref": "#/$defs/drawing-width"
+        },
+        "min_width": {
+          "$ref": "#/$defs/drawing-width"
+        },
+        "max_width": {
+          "$ref": "#/$defs/drawing-width"
+        },
+        "can_undo": {
+          "type": "boolean"
+        },
+        "show_clear": {
+          "type": "boolean"
+        },
+        "orientation": {
+          "enum": ["horizontal", "vertical"]
+        }
+      },
+      "required": ["name", "label"],
+      "additionalProperties": false
+    },
+    "props:ui:sketch-board": {
+      "type": "object",
+      "description": "PA-01 stateful sketch board (palette + canvas): pointer drawing with live shape preview, inline text input, undo, clear confirmation, PNG download. Dispatches drawing.ready {name, controller} on mount, drawing.change {name, dirty, strokes} after each stroke / undo / clear, drawing.background {name, file} for a dropped / pasted image (File only in the payload).",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/field-name"
+        },
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "tools": {
+          "$ref": "#/$defs/drawing-tools"
+        },
+        "colors": {
+          "$ref": "#/$defs/drawing-colors"
+        },
+        "default_tool": {
+          "$ref": "#/$defs/drawing-tool"
+        },
+        "default_color": {
+          "$ref": "#/$defs/hex-color"
+        },
+        "default_width": {
+          "$ref": "#/$defs/drawing-width"
+        },
+        "min_width": {
+          "$ref": "#/$defs/drawing-width"
+        },
+        "max_width": {
+          "$ref": "#/$defs/drawing-width"
+        },
+        "allow_custom_color": {
+          "type": "boolean"
+        },
+        "canvas_width": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 4096
+        },
+        "canvas_height": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 4096
+        },
+        "background": {
+          "enum": ["dark", "light", "transparent"]
+        },
+        "background_image_url": {
+          "$ref": "#/$defs/href"
+        },
+        "accept_image_drop": {
+          "type": "boolean"
+        },
+        "max_undo": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "show_download": {
+          "type": "boolean"
+        },
+        "download_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\\\/:*?\"<>|\\u0000-\\u001f]+$",
+          "description": "File name of the PNG download (default: from name); .png is ensured."
+        },
+        "paste_scope": {
+          "enum": ["board", "document"],
+          "description": "With accept_image_drop: board (default) takes pasted images while the board has focus; document anywhere on the page except editable fields."
+        }
+      },
+      "required": ["name", "label"],
       "additionalProperties": false
     }
   }

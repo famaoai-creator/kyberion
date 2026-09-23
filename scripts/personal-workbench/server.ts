@@ -32,10 +32,12 @@ import {
   type LocalPadContext,
 } from '../lib/local-artifact-pad.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
-import { readSafeJsonFile } from '../lib/json-input.js';
+import { readSafeJsonFile, readSafeJsonValueFile } from '../lib/json-input.js';
 import { composeLegacyCapture } from '../personal-pads/legacy.js';
 import { executePersonalWorkbenchAction, type PersonalWorkbenchAction } from './actions.js';
 import type { CalendarProposalRecord } from './actions.js';
+import { personalWorkbenchPageHtml } from './page.js';
+import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
 
 export const PERSONAL_WORKBENCH_DEFAULT_PORT = 8154;
 export const PERSONAL_WORKBENCH_MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -120,10 +122,12 @@ function readCalendarProposals(outDir: string): CalendarProposalRecord[] {
   }
 }
 
-function readEntries(indexPath: string): WorkbenchEntry[] {
+/** The saved proposal index (`<out>/entries.json`, an array); [] when absent or unreadable. */
+export function readPersonalWorkbenchEntries(indexPath: string): WorkbenchEntry[] {
   if (!safeExistsSync(indexPath)) return [];
   try {
-    const parsed = readSafeJsonFile<unknown>(indexPath, 'personal-workbench entries');
+    // entries.json is an array: readSafeJsonFile only accepts objects and read every index as [].
+    const parsed = readSafeJsonValueFile<unknown>(indexPath, 'personal-workbench entries');
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((entry): entry is WorkbenchEntry => {
       if (!entry || typeof entry !== 'object') return false;
@@ -150,51 +154,6 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown): 
     'Cache-Control': 'no-store',
   });
   res.end(JSON.stringify(body));
-}
-
-function pageHtml(token: string, out: string): string {
-  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Personal Workbench</title><style>
-  :root{font-family:-apple-system,BlinkMacSystemFont,"Yu Gothic",sans-serif;color:#17202b;background:#eef2f6}body{max-width:1100px;margin:auto;padding:18px}main{display:grid;grid-template-columns:1fr 1fr;gap:14px}.card{background:#fff;border:1px solid #d5dbe5;border-radius:12px;padding:14px;display:grid;gap:8px}textarea,input,select{font:inherit;padding:9px;border:1px solid #cbd3df;border-radius:8px}textarea{min-height:130px}.wide{grid-column:1/-1}.muted{font-size:12px;color:#5c6778}button{padding:9px 13px;border:0;border-radius:8px;background:#356d5b;color:white;cursor:pointer}button.secondary{background:#4a5a6a}#status{min-height:1.4em}.entry{border-top:1px solid #e1e5eb;padding:8px 0}.entry small{color:#687487}.entry p{white-space:pre-wrap;margin:5px 0}
-  </style></head><body><h1>Personal Workbench</h1><p class="muted">Inbox 保存は提案のみ。カレンダーは「提案 → 内容確認 → 承認して作成」の順。メールは下書き、知識候補は明示操作です。</p>
-  <main>
-  <section class="card"><label>用途<select id="kind"><option value="link">Link Inbox</option><option value="task">Task Triage</option><option value="follow-up">Follow-up Desk</option><option value="decision">Decision Log</option><option value="expense">Receipt / Expense</option><option value="daily-review">Daily Review</option></select></label><label>タイトル<input id="title" maxlength="200"/></label><label>内容<textarea id="body"></textarea></label><label>補足（JSON）<input id="meta" placeholder='{"due":"2026-09-14"}'/></label><button id="save">提案として保存</button><div id="status"></div><div class="muted">出力先: ${escapeHtml(out)}</div></section>
-  <section class="card"><h2>保存済み</h2><button id="load" class="secondary">認証済みデータを読む</button><div id="entries" class="muted">未読込</div></section>
-  <section class="card wide"><h2>カレンダー（提案 → 承認 → 作成）</h2>
-    <label>件名<input id="calSummary" placeholder="定例ミーティング"/></label>
-    <label>開始（ISO）<input id="calStart" placeholder="2026-09-14T10:00:00+09:00"/></label>
-    <label>終了（ISO）<input id="calEnd" placeholder="2026-09-14T10:30:00+09:00"/></label>
-    <label>説明<textarea id="calDesc" style="min-height:72px"></textarea></label>
-    <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
-      <button id="calPropose">1. 提案する</button>
-      <button id="calApply" class="secondary">3. 承認して作成</button>
-    </div>
-    <label><input id="calConfirm" type="checkbox"/> 2. 提案内容を確認し、カレンダーへ作成してよい</label>
-    <label>承認リクエスト ID<input id="calApprovalId" placeholder="propose 後に自動入力"/></label>
-    <div id="calStatus" class="muted">まだ提案がありません。CLI でも承認できます: pnpm kyberion approve &lt;id&gt; personal-workbench</div>
-  </section>
-  <section class="card wide"><h2>その他の governed actions</h2><label>操作<select id="action"><option value="ocr">OCR</option><option value="knowledge">知識候補登録</option><option value="email">メール下書き</option></select></label><label>入力（JSON）<textarea id="actionPayload" placeholder='{"path":"active/shared/tmp/receipt.png"}'></textarea></label><button id="runAction">操作を実行</button><div class="muted">知識候補は明示操作時のみ。メールは下書きのみ。</div></section>
-  </main>
-  <script>(function(){
-  var token=${JSON.stringify(token)},status=document.getElementById('status'),entries=document.getElementById('entries'),calStatus=document.getElementById('calStatus');
-  function say(x){status.textContent=x}
-  function sayCal(x){calStatus.textContent=x}
-  function esc(x){return String(x||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-  function render(rows){entries.innerHTML=rows.length?rows.map(function(e){return '<div class="entry"><b>'+esc(e.kind)+' — '+esc(e.title)+'</b><small> '+esc(e.status)+' / '+esc(e.created_at)+'</small><p>'+esc(e.body)+'</p></div>'}).join(''):'<span class="muted">まだありません</span>'}
-  function postAction(body){return fetch('/action',{method:'POST',headers:{'Content-Type':'application/json','X-PW-Token':token},body:JSON.stringify(body)}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})}
-  document.getElementById('save').onclick=function(){var meta={};try{meta=JSON.parse(document.getElementById('meta').value||'{}')}catch(e){say('補足 JSON が不正です');return}say('保存中…');fetch('/capture',{method:'POST',headers:{'Content-Type':'application/json','X-PW-Token':token},body:JSON.stringify({kind:document.getElementById('kind').value,title:document.getElementById('title').value,body:document.getElementById('body').value,metadata:meta})}).then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})}).then(function(x){if(!x.ok||!x.j.ok)throw Error(x.j.error||'保存失敗');say('保存しました（提案）');document.getElementById('title').value='';document.getElementById('body').value='';return fetch('/load',{method:'POST',headers:{'X-PW-Token':token},body:'{}'})}).then(function(r){return r.json()}).then(function(j){if(j.ok)render(j.entries||[])}).catch(function(e){say(e.message||'保存失敗')});};
-  document.getElementById('load').onclick=function(){say('読込中…');fetch('/load',{method:'POST',headers:{'X-PW-Token':token},body:'{}'}).then(function(r){return r.json()}).then(function(j){if(!j.ok)throw Error(j.error||'読込失敗');render(j.entries||[]);if(j.calendar_proposals&&j.calendar_proposals.length){var latest=j.calendar_proposals[0];document.getElementById('calApprovalId').value=latest.approval_request_id||'';sayCal('提案 '+latest.status+': '+latest.event.summary+' / '+latest.approval_request_id)}say('読込完了')}).catch(function(e){say(e.message||'読込失敗')})};
-  document.getElementById('calPropose').onclick=function(){sayCal('提案中…');postAction({action:'calendar',payload:{stage:'propose',summary:document.getElementById('calSummary').value,start:document.getElementById('calStart').value,end:document.getElementById('calEnd').value,description:document.getElementById('calDesc').value}}).then(function(x){if(!x.ok||!x.j.ok)throw Error(x.j.error||'提案失敗');var r=x.j.result||{};document.getElementById('calApprovalId').value=r.approval_request_id||'';document.getElementById('calConfirm').checked=false;sayCal('提案しました。内容を確認し、チェックして「承認して作成」へ。approval='+r.approval_request_id)}).catch(function(e){sayCal(e.message||'提案失敗')})};
-  document.getElementById('calApply').onclick=function(){var id=document.getElementById('calApprovalId').value.trim();if(!id){sayCal('approval_request_id が必要です');return}if(!document.getElementById('calConfirm').checked){sayCal('作成前に確認チェックを入れてください');return}sayCal('承認・作成中…');postAction({action:'calendar',confirmed:true,payload:{stage:'apply',approval_request_id:id}}).then(function(x){if(!x.ok||!x.j.ok)throw Error(x.j.error||'作成失敗');sayCal('完了: '+JSON.stringify(x.j.result));document.getElementById('calConfirm').checked=false}).catch(function(e){sayCal(e.message||'作成失敗')})};
-  document.getElementById('runAction').onclick=function(){var payload={};try{payload=JSON.parse(document.getElementById('actionPayload').value||'{}')}catch(e){say('操作 JSON が不正です');return}say('実行中…');postAction({action:document.getElementById('action').value,payload:payload}).then(function(x){if(!x.ok||!x.j.ok)throw Error(x.j.error||'操作失敗');say('完了: '+JSON.stringify(x.j.result))}).catch(function(e){say(e.message||'操作失敗')})};
-  })();</script></body></html>`;
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (char) =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char
-  );
 }
 
 export async function main(
@@ -297,7 +256,9 @@ export async function main(
       status: 'proposed',
       created_at: nowIso(),
     };
-    const entries = [...readEntries(indexPath), entry].slice(-PERSONAL_WORKBENCH_MAX_ENTRIES);
+    const entries = [...readPersonalWorkbenchEntries(indexPath), entry].slice(
+      -PERSONAL_WORKBENCH_MAX_ENTRIES
+    );
     safeWriteFile(indexPath, JSON.stringify(entries, null, 2), { mkdir: true, encoding: 'utf8' });
     const sessionDir = localPadSessionDir(out, entry.id);
     safeMkdir(sessionDir, { recursive: true });
@@ -356,15 +317,17 @@ export async function main(
     };
   }
   const server = http.createServer((req, res) => {
-    if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+    if (handlePadUiAsset(req, res)) return;
+    const pathname = (req.url || '').split(/[?#]/)[0];
+    if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store',
       });
-      res.end(pageHtml(token, out));
+      res.end(personalWorkbenchPageHtml({ token, outLabel: out, locale: resolvePadLocale(req) }));
       return;
     }
-    if (req.method === 'GET' && req.url === '/health') {
+    if (req.method === 'GET' && pathname === '/health') {
       res.writeHead(200);
       res.end('ok');
       return;
@@ -380,7 +343,7 @@ export async function main(
           if (req.url === '/load') {
             jsonResponse(res, 200, {
               ok: true,
-              entries: readEntries(indexPath),
+              entries: readPersonalWorkbenchEntries(indexPath),
               calendar_proposals: readCalendarProposals(out),
             });
             return;
@@ -417,6 +380,7 @@ export async function main(
               context,
               evidenceRef: portableProtocolServicePathRef(handoff),
               outDir: out,
+              locale: resolvePadLocale(req),
             });
             jsonResponse(res, 200, { ok: true, action: actionPayload.action, result });
             return;
