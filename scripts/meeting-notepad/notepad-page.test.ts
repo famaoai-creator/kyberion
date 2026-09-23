@@ -7,6 +7,7 @@ import {
   MEETING_NOTEPAD_TEXT_KEYS,
   meetingNotepadPageHtml,
 } from './notepad-page.js';
+import { padBootstrapOf } from '../lib/pad-ui.test-support.js';
 
 const KANA = /[぀-ヿ]/u;
 const NATIVE_DIALOG = /(?<![\w.$])(?:window\.)?(?:confirm|prompt|alert)\s*\(/u;
@@ -24,20 +25,12 @@ function page(url: string) {
   });
 }
 
-function bootstrapOf(html: string): Record<string, any> {
-  const match = /<script type="application\/json" id="pad-bootstrap">([\s\S]*?)<\/script>/u.exec(
-    html
-  );
-  expect(match).not.toBeNull();
-  return JSON.parse(match![1]);
-}
-
 describe('meeting notepad page (shared A2UI kit)', () => {
   it('renders English for ?lang=en with no Japanese text', () => {
     const html = page('/?lang=en');
     expect(html).toContain('<html lang="en">');
     expect(html).toContain('Meeting Notepad (local only)');
-    const bootstrap = bootstrapOf(html);
+    const bootstrap = padBootstrapOf(html);
     expect(bootstrap.locale).toBe('en');
     expect(bootstrap.language).toBe('en');
     for (const text of Object.values(bootstrap.texts as Record<string, string>)) {
@@ -49,13 +42,13 @@ describe('meeting notepad page (shared A2UI kit)', () => {
   it('renders Japanese by default for a ja operator', () => {
     const html = page('/');
     expect(html).toContain('<html lang="ja">');
-    const bootstrap = bootstrapOf(html);
+    const bootstrap = padBootstrapOf(html);
     expect(bootstrap.texts['meeting_notepad:handoff']).toBe('Kyberionへ渡す');
     expect(bootstrap.language).toBe('ja');
   });
 
   it('embeds the server contract and every client text in the bootstrap', () => {
-    const bootstrap = bootstrapOf(page('/?lang=en'));
+    const bootstrap = padBootstrapOf(page('/?lang=en'));
     expect(bootstrap).toMatchObject({
       token: 'tok-123',
       exportUrl: '/export',
