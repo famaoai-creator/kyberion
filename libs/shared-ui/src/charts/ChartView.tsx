@@ -46,12 +46,32 @@ function reactPropName(name: string): string {
   return name.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
 }
 
+/**
+ * `svgRoot` (vanilla/charts.js) sets `style` as a plain CSS-text string (a
+ * DOM attribute); React only accepts a property→value object. Declarations
+ * here are simple (`--custom-prop:value`), so a `;`/`:` split is enough —
+ * this never needs to parse arbitrary author CSS.
+ */
+function styleStringToObject(css: string): Record<string, string> {
+  const style: Record<string, string> = {};
+  for (const decl of css.split(';')) {
+    const i = decl.indexOf(':');
+    if (i === -1) continue;
+    const prop = decl.slice(0, i).trim();
+    const value = decl.slice(i + 1).trim();
+    if (prop && value) style[prop] = value;
+  }
+  return style;
+}
+
 /** Map a chart vnode tree to React elements. */
 export function renderVNode(node: KbVNode | null, key?: number): ReactNode {
   if (!node) return null;
   if ('text' in node) return node.text;
   const props: Record<string, unknown> = { key };
-  for (const [name, value] of Object.entries(node.attrs)) props[reactPropName(name)] = value;
+  for (const [name, value] of Object.entries(node.attrs)) {
+    props[reactPropName(name)] = name === 'style' ? styleStringToObject(value) : value;
+  }
   const children = node.children.map((child, index) => renderVNode(child, index));
   return createElement(node.tag, props, ...(children.length ? [children] : []));
 }

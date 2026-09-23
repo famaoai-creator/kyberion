@@ -174,6 +174,9 @@ export class FakeElement extends FakeNode {
     super(1, html ? tag.toUpperCase() : tag, doc);
     this.tagName = html ? tag.toUpperCase() : tag;
     this.localName = tag.toLowerCase();
+    // Own-property `value` only where no subclass accessor exists (see the
+    // note on `value` below); <select>/<option> use their prototype accessors.
+    if (!('value' in Object.getPrototypeOf(this))) (this as { value?: string }).value = '';
   }
   get className(): string {
     return this.attrs.get('class') ?? '';
@@ -228,6 +231,18 @@ export class FakeElement extends FakeNode {
   set id(value: string) {
     this.attrs.set('id', String(value));
   }
+  /**
+   * Plain `value` passthrough (input, textarea, ...). `<select>` / `<option>`
+   * override this — see `FakeSelectElement` / `FakeOptionElement` below.
+   *
+   * This must stay a plain property, not an accessor, on `FakeElement`
+   * itself: react-dom's input value tracking
+   * (`Object.getOwnPropertyDescriptor(node.constructor.prototype, 'value')`)
+   * only wraps `value` when it finds a get/set pair, and that wrapper's
+   * change bookkeeping doesn't match this fake's semantics for a plain
+   * input. Subclassing keeps that lookup — and the wrapping it triggers —
+   * scoped to `<select>` / `<option>`, where it mirrors the real DOM.
+   */
   focus(): void {
     if (this.ownerDocument) this.ownerDocument.activeElement = this;
   }
@@ -260,6 +275,63 @@ export class FakeElement extends FakeNode {
   }
   querySelector(selector: string): FakeElement | null {
     return this.querySelectorAll(selector)[0] ?? null;
+  }
+}
+
+/** `<option>` — `value` (explicit attribute, else trimmed text) and `selected`. */
+export class FakeOptionElement extends FakeElement {
+  get value(): string {
+    return this.hasAttribute('value') ? this.getAttribute('value')! : this.textContent.trim();
+  }
+  set value(value: string) {
+    this.setAttribute('value', value);
+  }
+  get selected(): boolean {
+    return this.hasAttribute('selected');
+  }
+  set selected(value: boolean) {
+    if (value) this.setAttribute('selected', '');
+    else this.removeAttribute('selected');
+  }
+  get index(): number {
+    const parent = this.parentNode;
+    return parent instanceof FakeSelectElement ? parent.options.indexOf(this) : -1;
+  }
+}
+
+/**
+ * `<select>` — `options` (its `<option>` children, in order), `selectedIndex`
+ * and `value` (finds / marks the matching option; no match clears selection,
+ * as in the real DOM). A separate class so `FakeElement.prototype` (input,
+ * textarea, ...) never gains a `value` accessor — see the note on `value`
+ * there for why that matters to react-dom's input value tracking.
+ */
+export class FakeSelectElement extends FakeElement {
+  get options(): FakeOptionElement[] {
+    return this.children.filter(
+      (child): child is FakeOptionElement => child instanceof FakeOptionElement
+    );
+  }
+  get selectedIndex(): number {
+    return this.options.findIndex((option) => option.selected);
+  }
+  set selectedIndex(index: number) {
+    this.options.forEach((option, i) => {
+      option.selected = i === index;
+    });
+  }
+  get value(): string {
+    const selected = this.options.find((option) => option.selected);
+    return selected ? selected.value : '';
+  }
+  set value(value: string) {
+    const target = String(value);
+    let matched = false;
+    for (const option of this.options) {
+      const isMatch: boolean = !matched && option.value === target;
+      option.selected = isMatch;
+      matched = matched || isMatch;
+    }
   }
 }
 
@@ -317,6 +389,9 @@ export class FakeDocument extends FakeNode {
     this.documentElement.appendChild(this.body);
   }
   createElement(tag: string): FakeElement {
+    const lower = tag.toLowerCase();
+    if (lower === 'select') return new FakeSelectElement(this, tag);
+    if (lower === 'option') return new FakeOptionElement(this, tag);
     return new FakeElement(this, tag);
   }
   createElementNS(ns: string, tag: string): FakeElement {

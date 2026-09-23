@@ -1595,6 +1595,9 @@ export function createFormRenderers(h) {
       const ids = formFieldIds(c.id, p.name);
       const root = fieldRoot(ctx, p, 'select');
       root.appendChild(fieldLabel(ctx, p, ids, 'label'));
+      // Wrapper carries the token-colored chevron (`::after`, see the source
+      // CSS); native `<select>` doesn't reliably support pseudo-elements.
+      const wrap = el(ctx, 'div', 'kb-select-wrap');
       const select = el(ctx, 'select', 'kb-input kb-select');
       controlAttrs(select, p, ids);
       select.setAttribute('name', String(p.name ?? ''));
@@ -1616,7 +1619,8 @@ export function createFormRenderers(h) {
       }
       if (hasValue) select.value = String(p.value);
       listen(select, 'change', () => fieldChange(ctx, c, p.name, select.value));
-      root.appendChild(select);
+      wrap.appendChild(select);
+      root.appendChild(wrap);
       appendHelpAndError(ctx, root, p, ids);
       return root;
     },

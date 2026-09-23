@@ -637,6 +637,10 @@
 .kb-table td[data-mono='true'] {
   font-family: var(--kb-ui-font-mono);
   font-variant-numeric: tabular-nums;
+  /* Ids / hashes read as one token — never break mid-word; a narrower
+     `width` column grows to fit instead (the `title` attr gives the value
+     back either way). */
+  white-space: nowrap;
 }
 
 .kb-table tbody tr[data-href] {
@@ -1312,7 +1316,11 @@ a.kb-list__title:hover {
  * renderers). Marks carry `data-series` (categorical slot 1..8),
  * `data-level` (sequential 1..5), `data-div` (diverging 1..5) or `data-tone`;
  * this file maps them to the `--kb-ui-viz-*` / status tokens only.
- * Text never wears a series color: values, ticks and legends stay in text ink.
+ * Text never wears a mark's own hue: values, ticks and legends stay in text
+ * ink, EXCEPT a heatmap cell's value label (`.kb-chart__cell-value`), which
+ * sits ON that mark's fill and needs a per-step *ink* (`--kb-ui-viz-*-ink-N`,
+ * >= 4.5:1 on that step — scripts/check_design_contrast.ts), not the mark
+ * color itself and not a halo.
  */
 
 .kb-chart {
@@ -1354,34 +1362,44 @@ a.kb-list__title:hover {
 
 .kb-chart [data-level='1'] {
   --kb-chart-color: var(--kb-ui-viz-seq-1);
+  --kb-chart-ink: var(--kb-ui-viz-seq-ink-1);
 }
 .kb-chart [data-level='2'] {
   --kb-chart-color: var(--kb-ui-viz-seq-2);
+  --kb-chart-ink: var(--kb-ui-viz-seq-ink-2);
 }
 .kb-chart [data-level='3'] {
   --kb-chart-color: var(--kb-ui-viz-seq-3);
+  --kb-chart-ink: var(--kb-ui-viz-seq-ink-3);
 }
 .kb-chart [data-level='4'] {
   --kb-chart-color: var(--kb-ui-viz-seq-4);
+  --kb-chart-ink: var(--kb-ui-viz-seq-ink-4);
 }
 .kb-chart [data-level='5'] {
   --kb-chart-color: var(--kb-ui-viz-seq-5);
+  --kb-chart-ink: var(--kb-ui-viz-seq-ink-5);
 }
 
 .kb-chart [data-div='1'] {
   --kb-chart-color: var(--kb-ui-viz-div-1);
+  --kb-chart-ink: var(--kb-ui-viz-div-ink-1);
 }
 .kb-chart [data-div='2'] {
   --kb-chart-color: var(--kb-ui-viz-div-2);
+  --kb-chart-ink: var(--kb-ui-viz-div-ink-2);
 }
 .kb-chart [data-div='3'] {
   --kb-chart-color: var(--kb-ui-viz-div-3);
+  --kb-chart-ink: var(--kb-ui-viz-div-ink-3);
 }
 .kb-chart [data-div='4'] {
   --kb-chart-color: var(--kb-ui-viz-div-4);
+  --kb-chart-ink: var(--kb-ui-viz-div-ink-4);
 }
 .kb-chart [data-div='5'] {
   --kb-chart-color: var(--kb-ui-viz-div-5);
+  --kb-chart-ink: var(--kb-ui-viz-div-ink-5);
 }
 
 .kb-chart__title {
@@ -1408,7 +1426,10 @@ a.kb-list__title:hover {
   border-radius: var(--kb-ui-radius-md);
 }
 
-/* Responsive: the SVG scales with its container through its viewBox. */
+/* Responsive: the SVG scales with its container through its viewBox. Marks
+ * (bars, lines, grid) scale fine at any size, but text should not — below
+ * this container query lets tick/value/label text counter-scale (see
+ * `--kb-chart-vbw` below) so it never renders unreadably small. */
 .kb-chart__svg {
   display: block;
   width: 100%;
@@ -1417,6 +1438,30 @@ a.kb-list__title:hover {
   overflow: visible;
   font-family: var(--kb-ui-font-sans);
   font-size: 12px;
+}
+
+/*
+ * `--kb-chart-vbw` (the viewBox width, set inline per chart instance) over
+ * the container's actual rendered width (`100cqw`) is exactly the SVG's own
+ * scale factor; multiplying a text class's authored px size by this ratio
+ * pre-compensates it, so the *rendered* (post-viewBox-scale) size stays
+ * constant at the authored size no matter how far the SVG shrinks.
+ *
+ * Diagrams (`--diagram`) render at their natural size (no viewBox scaling —
+ * see the `width: auto` rule below) and get `--kb-chart-text-scale: 1` (a
+ * no-op) instead: `contain: inline-size` — what a container query needs —
+ * forces a box to size as if it had no content, which collapses a
+ * `width: auto` replaced element (the SVG) to 0 rather than its intrinsic
+ * `width`/`height` attributes, so diagrams must never become a query
+ * container.
+ */
+.kb-chart__svg:not(.kb-chart__svg--diagram) {
+  container-type: inline-size;
+  --kb-chart-text-scale: calc(var(--kb-chart-vbw, 100) * 1px / 100cqw);
+}
+
+.kb-chart__svg--diagram {
+  --kb-chart-text-scale: 1;
 }
 
 .kb-chart__svg--donut {
@@ -1459,7 +1504,7 @@ a.kb-list__title:hover {
 
 .kb-chart__tick {
   fill: var(--kb-ui-text-muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--kb-chart-text-scale));
   font-variant-numeric: tabular-nums;
 }
 
@@ -1470,7 +1515,7 @@ a.kb-list__title:hover {
 .kb-chart__value,
 .kb-chart__direct-label {
   fill: var(--kb-ui-text);
-  font-size: 11px;
+  font-size: calc(11px * var(--kb-chart-text-scale));
   font-variant-numeric: tabular-nums;
 }
 
@@ -1517,14 +1562,14 @@ a.kb-list__title:hover {
 
 .kb-chart__center-value {
   fill: var(--kb-ui-text);
-  font-size: 24px;
+  font-size: calc(24px * var(--kb-chart-text-scale));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .kb-chart__center-label {
   fill: var(--kb-ui-text-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--kb-chart-text-scale));
 }
 
 /* Heatmap cells: sequential / diverging steps; an empty cell is hatched-free
@@ -1540,13 +1585,13 @@ a.kb-list__title:hover {
 }
 
 .kb-chart__cell-value {
-  fill: var(--kb-ui-text);
-  font-size: 10px;
+  /* Per-level/div ink (set above), not a halo: each ramp step carries its
+     own text color that's actually >= 4.5:1 on that step
+     (scripts/check_design_contrast.ts), light or dark cells alike. An empty
+     cell has neither attribute and falls back to the ordinary text color. */
+  fill: var(--kb-chart-ink, var(--kb-ui-text));
+  font-size: calc(10px * var(--kb-chart-text-scale));
   font-variant-numeric: tabular-nums;
-  paint-order: stroke;
-  stroke: var(--kb-ui-surface);
-  stroke-width: 3px;
-  stroke-linejoin: round;
 }
 
 /* --------------------------------------------------------------- legend -- */
@@ -2191,8 +2236,40 @@ legend.kb-field__label {
   resize: vertical;
 }
 
+/* Native selects render an inconsistent OS arrow across browsers; draw our
+   own token-colored chevron instead. `<select>` doesn't reliably support
+   `::after`, so `.kb-select-wrap` (a plain positioning box around it)
+   carries the pseudo-element. */
+.kb-select-wrap {
+  position: relative;
+}
+
 .kb-select {
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: calc(var(--kb-ui-space-3) + 22px);
+}
+
+.kb-select-wrap::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: var(--kb-ui-space-3);
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+  background-color: var(--kb-ui-text-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  pointer-events: none;
+}
+
+.kb-field[data-disabled='true'] .kb-select-wrap::after {
+  background-color: var(--kb-ui-text-subtle);
 }
 
 [data-density='compact'] .kb-input {

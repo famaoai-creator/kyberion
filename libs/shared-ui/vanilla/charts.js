@@ -611,6 +611,10 @@ function svgRoot(width, height, label, className, ...children) {
       viewBox: `0 0 ${fmtCoord(width)} ${fmtCoord(height)}`,
       width: natural ? width : undefined,
       height: natural ? height : undefined,
+      // Ticks / labels read this back (container-query font-size, see the
+      // charts source CSS) so their *rendered* size stays readable even when
+      // the viewBox scales the whole plot down to fit a narrow container.
+      style: `--kb-chart-vbw:${fmtCoord(width)}`,
       role: 'img',
       'aria-label': label,
       focusable: 'false',
@@ -1524,6 +1528,9 @@ function layoutHeatmap(p, env) {
             'text',
             {
               class: 'kb-chart__cell-value',
+              // Per-level/div ink (source CSS), not a halo: each ramp step
+              // gets a text color that's actually >= 4.5:1 on it.
+              [diverging ? 'data-div' : 'data-level']: level === null ? undefined : level,
               x: cx + cellW / 2,
               y: cy + cellH / 2,
               'text-anchor': 'middle',
@@ -1930,6 +1937,45 @@ function laneLabel(lanes, laneIndex, id) {
 // ui:flow
 // ---------------------------------------------------------------------------
 
+/** Bottom edge (y + height) of the lowest node row across layers `lo..hi` inclusive. */
+function layerRowsBottom(layers, pos, nodeH, lo, hi) {
+  let bottom = -Infinity;
+  for (let l = lo; l <= hi; l++) {
+    for (const id of layers[l] || []) {
+      const p = pos.get(id);
+      if (p) bottom = Math.max(bottom, p.y + nodeH);
+    }
+  }
+  return bottom;
+}
+
+/**
+ * SVG path through `points` (>= 2), straight segments with rounded corners
+ * (radius `r`, clamped to half the shorter adjoining segment).
+ */
+function roundedPolyline(points, r) {
+  const c = fmtCoord;
+  let d = `M${c(points[0].x)} ${c(points[0].y)}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1];
+    const cur = points[i];
+    const next = points[i + 1];
+    const d1x = cur.x - prev.x;
+    const d1y = cur.y - prev.y;
+    const len1 = Math.hypot(d1x, d1y) || 1;
+    const d2x = next.x - cur.x;
+    const d2y = next.y - cur.y;
+    const len2 = Math.hypot(d2x, d2y) || 1;
+    const rr = Math.min(r, len1 / 2, len2 / 2);
+    const p1 = { x: cur.x - (d1x / len1) * rr, y: cur.y - (d1y / len1) * rr };
+    const p2 = { x: cur.x + (d2x / len2) * rr, y: cur.y + (d2y / len2) * rr };
+    d += `L${c(p1.x)} ${c(p1.y)}Q${c(cur.x)} ${c(cur.y)} ${c(p2.x)} ${c(p2.y)}`;
+  }
+  const last = points[points.length - 1];
+  d += `L${c(last.x)} ${c(last.y)}`;
+  return d;
+}
+
 function layoutFlow(p, env) {
   const nodes = (Array.isArray(p.nodes) ? p.nodes : []).filter(
     (node) => isRecord(node) && typeof node.id === 'string' && node.id
@@ -1988,7 +2034,6 @@ function layoutFlow(p, env) {
   const validEdges = edges.filter(
     (edge) => pos.has(edge.from) && pos.has(edge.to) && edge.from !== edge.to
   );
-  const bottomY = top + maxRows * pitch - rowGap;
   const edgeNodes = [];
   const edgeLabels = [];
   const c = fmtCoord;
@@ -2008,19 +2053,49 @@ function layoutFlow(p, env) {
       d = `M${c(sx)} ${c(sy)}C${c(sx + bend)} ${c(sy)} ${c(tx - 8 - bend)} ${c(ty)} ${c(tx - 8)} ${c(ty)}`;
       tip = arrowHead(tx, ty, 1);
       mid = { x: (sx + tx) / 2, y: (sy + ty) / 2 };
-    } else {
-      // Back / same-stage edge: routed below the diagram.
+    } else if (layerOf.get(edge.from) === layerOf.get(edge.to)) {
+      // Same-stage loop: no columns to cross, drop below just this layer.
+      const layer = layerOf.get(edge.from);
       const sx = a.x + nodeW / 2;
       const sy = a.y + nodeH;
       const tx = b.x + nodeW / 2;
       const ty = b.y + nodeH + 2;
-      const low = bottomY + 18;
+      const low = layerRowsBottom(layers, pos, nodeH, layer, layer) + 18;
       d = `M${c(sx)} ${c(sy)}C${c(sx)} ${c(low)} ${c(tx)} ${c(low)} ${c(tx)} ${c(ty + 8)}`;
       tip = h('path', {
         class: 'kb-chart__arrowhead',
         d: `M${c(tx)} ${c(ty)}L${c(tx - 4)} ${c(ty + 7)}L${c(tx + 4)} ${c(ty + 7)}Z`,
       });
       mid = { x: (sx + tx) / 2, y: low - 6 };
+    } else {
+      // Back edge spanning earlier layers: exit/enter the box sides (never
+      // straight down through same-column siblings) and detour, in the
+      // column gaps, below the lowest node row of every layer it spans —
+      // so the edge never passes behind an intermediate node.
+      const fromLayer = layerOf.get(edge.from);
+      const toLayer = layerOf.get(edge.to);
+      const lo = Math.min(fromLayer, toLayer);
+      const hi = Math.max(fromLayer, toLayer);
+      const low = layerRowsBottom(layers, pos, nodeH, lo, hi) + 18;
+      const midYa = a.y + nodeH / 2;
+      const midYb = b.y + nodeH / 2;
+      const gap = Math.max(10, Math.min(24, colGap / 2 - 4));
+      const exitX = a.x - gap;
+      const entryStubX = b.x + nodeW + gap;
+      const entryTipX = b.x + nodeW + 2;
+      d = roundedPolyline(
+        [
+          { x: a.x, y: midYa },
+          { x: exitX, y: midYa },
+          { x: exitX, y: low },
+          { x: entryStubX, y: low },
+          { x: entryStubX, y: midYb },
+          { x: entryTipX + 6, y: midYb },
+        ],
+        8
+      );
+      tip = arrowHead(entryTipX, midYb, -1);
+      mid = { x: (exitX + entryStubX) / 2, y: low - 6 };
     }
     const label = str(edge.label);
     edgeNodes.push(

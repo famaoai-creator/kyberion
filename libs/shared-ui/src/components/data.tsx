@@ -141,17 +141,18 @@ export function Table({ caption, columns, rows, row_href_key, empty }: KbTablePr
                     // canonical status value renders as a status pill.
                     const isStatusColumn =
                       column.key === 'status' || column.key.endsWith('_status');
+                    const text = formatScalar(value, t);
                     return (
                       <td
                         key={column.key}
                         data-align={alignAttr(column.align)}
                         data-mono={column.mono ? 'true' : undefined}
+                        // Mono columns (ids, hashes) never wrap mid-token
+                        // (see the source CSS); the title gives the full
+                        // value back when the column stays narrower than it.
+                        title={column.mono && !isStatusColumn && text ? text : undefined}
                       >
-                        {isStatusColumn && isKbStatus(value) ? (
-                          <StatusPill status={value} />
-                        ) : (
-                          formatScalar(value, t)
-                        )}
+                        {isStatusColumn && isKbStatus(value) ? <StatusPill status={value} /> : text}
                       </td>
                     );
                   })}

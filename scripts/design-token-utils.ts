@@ -335,6 +335,8 @@ function uiPaletteDeclarations(
       ['cat', viz.categorical],
       ['seq', viz.sequential],
       ['div', viz.diverging],
+      ['seq-ink', viz.sequential_ink],
+      ['div-ink', viz.diverging_ink],
     ] as const) {
       list.forEach((value, index) =>
         lines.push(`${indent}--kb-ui-viz-${prefix}-${index + 1}: ${value};`)

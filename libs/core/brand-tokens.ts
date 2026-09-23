@@ -61,6 +61,15 @@ export interface BrandUiVizPalette {
   categorical: string[];
   sequential: string[];
   diverging: string[];
+  /**
+   * Text ink for a value label painted directly on a `sequential[N]` /
+   * `diverging[N]` cell (e.g. `ui:heatmap`), one per step, >= 4.5:1 against
+   * that step (`scripts/check_design_contrast.ts`). A ramp step's own
+   * lightness varies too much for one ink (`text` or `text-on-accent`) to
+   * clear 4.5:1 on every step, so each step gets its own.
+   */
+  sequential_ink: string[];
+  diverging_ink: string[];
 }
 
 /** Web UI semantic token layer (`tokens.ui`), separate from the media palette. */

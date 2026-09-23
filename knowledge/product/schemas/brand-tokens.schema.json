@@ -297,9 +297,23 @@
           "items": { "$ref": "#/definitions/uiColor" },
           "minItems": 5,
           "maxItems": 5
+        },
+        "sequential_ink": {
+          "description": "Value-label text ink for each `sequential[N]` cell, >= 4.5:1 on that step.",
+          "type": "array",
+          "items": { "$ref": "#/definitions/uiColor" },
+          "minItems": 5,
+          "maxItems": 5
+        },
+        "diverging_ink": {
+          "description": "Value-label text ink for each `diverging[N]` cell, >= 4.5:1 on that step.",
+          "type": "array",
+          "items": { "$ref": "#/definitions/uiColor" },
+          "minItems": 5,
+          "maxItems": 5
         }
       },
-      "required": ["categorical", "sequential", "diverging"],
+      "required": ["categorical", "sequential", "diverging", "sequential_ink", "diverging_ink"],
       "additionalProperties": false
     },
     "uiColor": {

@@ -90,6 +90,10 @@ export class MiniElement extends ChildHost {
   disabled = false;
   open = false;
   tabIndex = -1;
+  /** `<option>` only — a plain property, the same as `kyberion-ui.js` sets it. */
+  selected = false;
+  /** Backing field for `value` on elements where it isn't attribute-reflected (input, textarea, ...). */
+  private valueProp: string | undefined;
 
   constructor(
     tag: string,
@@ -118,6 +122,47 @@ export class MiniElement extends ChildHost {
   }
   removeAttribute(name: string): void {
     this.attrs.delete(name);
+  }
+  // `<select>` (`options` / `selectedIndex` / `value`) and `<option>`
+  // (`value` / `index`, `selected` is the plain field above) — what
+  // `kyberion-ui.js`'s `ui:select` renderer reads and writes on `change`.
+  get options(): MiniElement[] {
+    return this.children.filter((child) => child.tagName === 'OPTION');
+  }
+  get index(): number {
+    const parent = this.parentNode;
+    return parent instanceof MiniElement ? parent.options.indexOf(this) : -1;
+  }
+  get selectedIndex(): number {
+    return this.options.findIndex((option) => option.selected);
+  }
+  set selectedIndex(index: number) {
+    this.options.forEach((option, i) => {
+      option.selected = i === index;
+    });
+  }
+  get value(): string {
+    if (this.tagName === 'OPTION') {
+      return this.hasAttribute('value') ? this.getAttribute('value')! : this.textContent.trim();
+    }
+    if (this.tagName === 'SELECT') {
+      const selected = this.options.find((option) => option.selected);
+      return selected ? selected.value : '';
+    }
+    return this.valueProp ?? this.getAttribute('value') ?? '';
+  }
+  set value(value: string) {
+    if (this.tagName === 'SELECT') {
+      const target = String(value);
+      let matched = false;
+      for (const option of this.options) {
+        const isMatch = !matched && option.value === target;
+        option.selected = isMatch;
+        matched = matched || isMatch;
+      }
+      return;
+    }
+    this.valueProp = String(value);
   }
   /** UI-01c: focus management is observable through `MiniElement.focused`. */
   static focused: MiniElement | null = null;
