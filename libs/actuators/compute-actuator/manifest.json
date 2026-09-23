@@ -1,0 +1,39 @@
+{
+  "actuator_id": "compute-actuator",
+  "version": "1.0.0",
+  "description": "Remote and local compute orchestration actuator for heavy batch workloads, fine-tuning, and model execution across local and ephemeral substrates (such as Google Colab).",
+  "resilience_tier": "fail_fast",
+  "recovery_policy": {
+    "fallback_strategy": "none",
+    "retry": {
+      "maxRetries": 0,
+      "initialDelayMs": 0,
+      "maxDelayMs": 0,
+      "factor": 1,
+      "jitter": false
+    },
+    "retryable_categories": []
+  },
+  "capabilities": [
+    {
+      "op": "submit_job",
+      "description": "Submits a compute contract (job specification, entry script/notebook, input payloads) to the resolved compute execution provider (local or colab).",
+      "platforms": ["darwin", "linux"]
+    },
+    {
+      "op": "poll_status",
+      "description": "Checks execution status, duration, and output telemetry of an active or finished compute job.",
+      "platforms": ["darwin", "linux"]
+    },
+    {
+      "op": "collect_artifact",
+      "description": "Reconciles and lands generated artifacts from the compute scratch location into governed tenant storage paths.",
+      "platforms": ["darwin", "linux"]
+    },
+    {
+      "op": "cancel_job",
+      "description": "Cancels an in-flight compute job to conserve resources and compute units.",
+      "platforms": ["darwin", "linux"]
+    }
+  ]
+}

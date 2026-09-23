@@ -309,7 +309,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 7531,
+      "size": 7739,
       "type": "md"
     },
     {
@@ -412,6 +412,12 @@
       "path": "product/architecture/gateway-coordination-model.md",
       "tier": "public",
       "size": 2229,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/google-drive-ingest-adapter.md",
+      "tier": "public",
+      "size": 2029,
       "type": "md"
     },
     {
@@ -766,6 +772,12 @@
       "path": "product/architecture/realtime-media-session-architecture.md",
       "tier": "public",
       "size": 18294,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/remote-compute-actuator-model.md",
+      "tier": "public",
+      "size": 3985,
       "type": "md"
     },
     {
@@ -1173,7 +1185,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 21550,
+      "size": 21695,
       "type": "json"
     },
     {
@@ -3499,6 +3511,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/seam-provider-selection/compute-execution-provider.json",
+      "tier": "public",
+      "size": 2412,
+      "type": "json"
+    },
+    {
       "path": "product/governance/seam-provider-selection/image-generation-provider.json",
       "tier": "public",
       "size": 5317,
@@ -3507,7 +3525,7 @@
     {
       "path": "product/governance/seam-provider-selection/index.json",
       "tier": "public",
-      "size": 409,
+      "size": 443,
       "type": "json"
     },
     {
@@ -4593,7 +4611,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1437166,
+      "size": 1440689,
       "type": "json"
     },
     {
@@ -4959,13 +4977,13 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19234,
+      "size": 19705,
       "type": "json"
     },
     {
       "path": "product/orchestration/global_skill_index.json",
       "tier": "public",
-      "size": 8877,
+      "size": 9302,
       "type": "json"
     },
     {
