@@ -72,6 +72,7 @@ import { probeMicCapture } from '@agent/core/mic-capture';
 import { resolveEmailTriagePath } from '@agent/core/email-workflow';
 import { collectDoctorReport } from '../../../scripts/run_doctor.js';
 import { registerFrontDeskAuxPages, registerFrontDeskHomeWorkPages } from './front-desk-pages.js';
+import { registerUiGalleryRoutes } from './ui-gallery-routes.js';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('presence-studio');
@@ -1187,6 +1188,9 @@ app.get('/api/headless/a2ui/overview', (req, res) => {
 // `.html` file the route serves. (Route bodies live in `front-desk-pages.ts`,
 // split out to keep this file under the `max-file-lines` gate.)
 registerFrontDeskAuxPages(app, staticDir);
+
+// UI-04: `/ui-gallery` + the shared vanilla renderer (`ui-gallery-routes.ts`).
+registerUiGalleryRoutes(app, staticDir);
 
 // Browsers always probe /favicon.ico — return 204 to silence noisy console 404.
 app.get('/favicon.ico', (_req, res) => {

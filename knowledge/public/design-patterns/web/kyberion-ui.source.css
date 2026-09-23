@@ -156,6 +156,20 @@
   font-weight: 600;
 }
 
+.kb-nav-rail__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 1.6em;
+}
+
+.kb-nav-rail__icon svg {
+  width: 18px;
+  height: 18px;
+}
+
 .kb-nav-rail__text {
   display: flex;
   flex-direction: column;
@@ -358,6 +372,13 @@
   gap: var(--kb-ui-space-2) var(--kb-ui-space-3);
 }
 
+.kb-section__heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  min-width: 0;
+}
+
 .kb-section__title {
   margin: 0;
   font-size: var(--kb-ui-font-size-lg);
@@ -412,6 +433,11 @@
   color: var(--kb-ui-text);
 }
 
+[data-density='compact'] .kb-next-action {
+  gap: var(--kb-ui-space-2) var(--kb-ui-space-4);
+  padding: var(--kb-ui-space-4);
+}
+
 .kb-next-action__body {
   display: flex;
   flex-direction: column;
@@ -464,6 +490,10 @@
   border-radius: var(--kb-ui-radius-md);
 }
 
+[data-density='compact'] .kb-metric {
+  padding: var(--kb-ui-space-3);
+}
+
 .kb-metric__label {
   font-size: var(--kb-ui-font-size-sm);
   color: var(--kb-ui-text-muted);
@@ -485,6 +515,9 @@
 }
 
 .kb-metric__delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25em;
   font-size: var(--kb-ui-font-size-xs);
   font-weight: 600;
   color: var(--kb-ui-text-muted);
@@ -637,6 +670,11 @@
   border-bottom: 1px solid var(--kb-ui-border);
 }
 
+[data-density='compact'] .kb-list__item {
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-2) 0;
+}
+
 .kb-list__item:last-child {
   border-bottom: 0;
 }
@@ -693,6 +731,10 @@ a.kb-list__title:hover {
   background: var(--kb-ui-surface);
 }
 
+[data-density='compact'] .kb-list[data-variant='timeline'] .kb-list__item::after {
+  top: calc(var(--kb-ui-space-2) + 0.35em);
+}
+
 /* ---------------------------------------------------------------- text -- */
 
 .kb-text {
@@ -744,10 +786,17 @@ a.kb-list__title:hover {
   white-space: nowrap;
 }
 
-.kb-status-pill::before {
-  content: var(--kb-ui-pill-icon, '\25CB');
+/* The glyph lives on an `aria-hidden` element (`.kb-status-pill__icon`) so
+ * screen readers read only the label, never the decorative character. */
+.kb-status-pill__icon {
+  display: inline-flex;
+  flex: none;
   font-size: 0.9em;
   line-height: 1;
+}
+
+.kb-status-pill__icon::before {
+  content: var(--kb-ui-pill-icon, '\25CB');
 }
 
 /* @kb-generated status-tones */
@@ -842,12 +891,22 @@ a.kb-list__title:hover {
   color: var(--kb-ui-text);
 }
 
-.kb-callout::before {
-  content: var(--kb-ui-callout-icon, '\25CF');
+/* Decorative glyph on an `aria-hidden` element (`.kb-callout__icon`); the
+ * title carries the meaning. */
+[data-density='compact'] .kb-callout {
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+}
+
+.kb-callout__icon {
   flex: none;
   font-weight: 700;
   line-height: 1.6;
   color: var(--kb-ui-callout-fg, var(--kb-ui-info-fg));
+}
+
+.kb-callout__icon::before {
+  content: var(--kb-ui-callout-icon, '\25CF');
 }
 
 .kb-callout__content {
@@ -907,6 +966,7 @@ a.kb-list__title:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--kb-ui-space-2);
   padding: var(--kb-ui-space-6) var(--kb-ui-space-5);
   background: var(--kb-ui-surface);
@@ -914,6 +974,10 @@ a.kb-list__title:hover {
   border-radius: var(--kb-ui-radius-lg);
   color: var(--kb-ui-text-muted);
   text-align: center;
+}
+
+[data-density='compact'] .kb-empty-state {
+  padding: var(--kb-ui-space-5) var(--kb-ui-space-4);
 }
 
 .kb-empty-state__title {
@@ -1092,18 +1156,18 @@ a.kb-list__title:hover {
 /* --------------------------------------------------------------- focus -- */
 
 :where(
-    .kb-btn,
-    .kb-nav-rail__item,
-    .kb-tabs__tab,
-    .kb-list__title,
-    .kb-table tbody tr[data-href],
-    .kb-disclosure > summary,
-    .kb-app-shell a,
-    .kb-app-shell button,
-    .kb-app-shell input,
-    .kb-app-shell select,
-    .kb-app-shell textarea
-  ):focus-visible {
+  .kb-btn,
+  .kb-nav-rail__item,
+  .kb-tabs__tab,
+  .kb-list__title,
+  .kb-table tbody tr[data-href],
+  .kb-disclosure > summary,
+  .kb-app-shell a,
+  .kb-app-shell button,
+  .kb-app-shell input,
+  .kb-app-shell select,
+  .kb-app-shell textarea
+):focus-visible {
   outline: 2px solid var(--kb-ui-focus-ring);
   outline-offset: 2px;
 }
