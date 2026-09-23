@@ -3187,6 +3187,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/plugin-permission-policy.json",
+      "tier": "public",
+      "size": 980,
+      "type": "json"
+    },
+    {
       "path": "product/governance/portfolio-status.md",
       "tier": "public",
       "size": 2789,
@@ -9181,6 +9187,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/kyberion-scenario.schema.json",
+      "tier": "public",
+      "size": 10151,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/layout-template-catalog.schema.json",
       "tier": "public",
       "size": 505,
@@ -9231,7 +9243,7 @@
     {
       "path": "product/schemas/managed-plugin-record.schema.json",
       "tier": "public",
-      "size": 1967,
+      "size": 4341,
       "type": "json"
     },
     {
@@ -10432,6 +10444,12 @@
       "path": "product/schemas/plugin-pack-registry.schema.json",
       "tier": "public",
       "size": 1626,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/plugin-permission-policy.schema.json",
+      "tier": "public",
+      "size": 3612,
       "type": "json"
     },
     {
