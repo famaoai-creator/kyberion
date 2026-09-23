@@ -1,0 +1,287 @@
+/**
+ * ES-02: scenario side-effect interceptor.
+ *
+ * Installs, for one scenario run, every seam the runner needs and returns a
+ * single disposer that restores the previous state:
+ *  - an observe-only preflight listener (`scenario-capture`) that records
+ *    each admitted op; it never returns a decision, so it cannot re-permit a
+ *    block/ask from another listener or guard;
+ *  - the `scenario-op-override` seam: ops with a fixture are served by it,
+ *    and in the `simulated` profile every other leaf op fails closed with
+ *    `[SCENARIO_UNSTUBBED_OP]` (real actuators are never imported);
+ *  - the risky-approval override, answering with the seed/turn decision;
+ *  - the fixture reasoning backend (ES-04, optional);
+ *  - write detection by before/after snapshots of the run root.
+ */
+
+import * as crypto from 'node:crypto';
+import * as path from 'node:path';
+import {
+  registerScenarioOpOverride,
+  type ActuatorOperationHandler,
+  type ScenarioOpOverrideRequest,
+} from './actuator-op-registry.js';
+import { redactSensitiveObject } from './network.js';
+import { registerOpPreflightListener } from './op-preflight.js';
+import {
+  overrideRiskyApprovalHandler,
+  type RiskyApprovalResult,
+} from './risky-op-approval-port.js';
+import type {
+  ScenarioApprovalDecision,
+  ScenarioDefinition,
+  ScenarioOpFixture,
+} from './scenario-definition.js';
+import { installScenarioFixtureBackend } from './scenario-model-fixtures.js';
+import type { ScenarioRunContext } from './scenario-run-context.js';
+import {
+  appendScenarioApproval,
+  appendScenarioOp,
+  appendScenarioWrite,
+  createScenarioSideEffectLog,
+  type ScenarioSideEffectLog,
+} from './scenario-side-effect-log.js';
+import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
+
+export type {
+  ScenarioApprovalRecord,
+  ScenarioOpRecord,
+  ScenarioReasoningRecord,
+  ScenarioSideEffectLog,
+  ScenarioWriteRecord,
+} from './scenario-side-effect-log.js';
+
+export const SCENARIO_CAPTURE_LISTENER_ID = 'scenario-capture';
+
+/**
+ * Leaf ops that stay on their normal path in the simulated profile without a
+ * fixture: pure in-process ops, plus reasoning leaves (served by the fixture
+ * backend, which fails closed on its own).
+ */
+export const SCENARIO_SIMULATED_PASSTHROUGH_OPS: readonly string[] = [
+  'system:log',
+  'core:transform',
+  'reasoning:analyze',
+  'reasoning:transform',
+  'reasoning:synthesize',
+];
+
+const APPROVAL_DECISIONS = new Set<ScenarioApprovalDecision>(['approved', 'rejected', 'pending']);
+
+export interface ScenarioInterceptorOptions {
+  /** Bind the ES-04 fixture reasoning backend (default true). */
+  installReasoning?: boolean;
+}
+
+export interface ScenarioInterceptor {
+  readonly log: ScenarioSideEffectLog;
+  setApprovalDecision(op: string, decision: ScenarioApprovalDecision): void;
+  getApprovalDecision(op: string): ScenarioApprovalDecision;
+  /** Diff the run root against the previous snapshot and append write records. */
+  snapshotWrites(): void;
+  dispose(): void;
+}
+
+function sanitizeParams(params: Record<string, unknown>): Record<string, unknown> {
+  const visible = Object.fromEntries(
+    Object.entries(params).filter(([key]) => !key.startsWith('_'))
+  );
+  return redactSensitiveObject(visible);
+}
+
+function seedApprovalDecisions(def: ScenarioDefinition): Map<string, ScenarioApprovalDecision> {
+  const decisions = new Map<string, ScenarioApprovalDecision>();
+  (def.seed.approvals ?? []).forEach((entry, index) => {
+    const op = entry.op;
+    const decision = entry.decision;
+    if (
+      typeof op !== 'string' ||
+      !op.includes(':') ||
+      typeof decision !== 'string' ||
+      !APPROVAL_DECISIONS.has(decision as ScenarioApprovalDecision)
+    ) {
+      throw new Error(
+        `[SCENARIO_INVALID_SEED_APPROVAL] seed.approvals[${index}] must be { op: "domain:action", decision: approved|rejected|pending }`
+      );
+    }
+    decisions.set(op, decision as ScenarioApprovalDecision);
+  });
+  return decisions;
+}
+
+type RunRootSnapshot = Map<string, { sha256: string; bytes: number }>;
+
+function snapshotRunRoot(runRoot: string): RunRootSnapshot {
+  const snapshot: RunRootSnapshot = new Map();
+  if (!safeExistsSync(runRoot)) return snapshot;
+  const walk = (dir: string): void => {
+    for (const entry of safeReaddir(dir).sort()) {
+      const abs = path.join(dir, entry);
+      const stat = safeLstat(abs);
+      if (stat.isDirectory()) {
+        walk(abs);
+        continue;
+      }
+      if (!stat.isFile()) continue;
+      const content = safeReadFile(abs, { encoding: null }) as Buffer;
+      const relative = path.relative(runRoot, abs).split(path.sep).join('/');
+      snapshot.set(relative, {
+        sha256: crypto.createHash('sha256').update(content).digest('hex'),
+        bytes: content.length,
+      });
+    }
+  };
+  walk(runRoot);
+  return snapshot;
+}
+
+export function installScenarioInterceptor(
+  ctx: ScenarioRunContext,
+  def: ScenarioDefinition,
+  options: ScenarioInterceptorOptions = {}
+): ScenarioInterceptor {
+  const log = createScenarioSideEffectLog();
+  const decisions = seedApprovalDecisions(def);
+  const passthrough = new Set(SCENARIO_SIMULATED_PASSTHROUGH_OPS);
+  const disposers: Array<() => void> = [];
+  let baseline = snapshotRunRoot(ctx.runRoot);
+  let disposed = false;
+
+  const decisionFor = (op: string): ScenarioApprovalDecision => decisions.get(op) ?? 'pending';
+  const fixtureFor = (op: string): ScenarioOpFixture | undefined =>
+    Object.hasOwn(def.fixtures.ops, op) ? def.fixtures.ops[op] : undefined;
+
+  function fixtureHandler(op: string, fixture: ScenarioOpFixture): ActuatorOperationHandler {
+    return async (_action, params, context, stepType) => {
+      const record = { op, stage: 'apply' as const, params: sanitizeParams(params), stepType };
+      if (fixture.error !== undefined) {
+        appendScenarioOp(log, { ...record, outcome: 'error', error: fixture.error });
+        throw new Error(fixture.error);
+      }
+      appendScenarioOp(log, { ...record, outcome: 'ok' });
+      const exportKey = typeof params.export_as === 'string' ? params.export_as : undefined;
+      return {
+        handled: true,
+        ctx: {
+          ...context,
+          ...(fixture.ctx_patch ?? {}),
+          ...(exportKey && fixture.result !== undefined ? { [exportKey]: fixture.result } : {}),
+        },
+      };
+    };
+  }
+
+  try {
+    disposers.push(
+      registerOpPreflightListener({
+        id: SCENARIO_CAPTURE_LISTENER_ID,
+        order: Number.MIN_SAFE_INTEGER,
+        run: (call) => {
+          appendScenarioOp(log, {
+            op: call.op,
+            stage: 'preflight',
+            params: sanitizeParams(call.params),
+            source: call.source,
+            requiresApproval: call.requiresApproval === true,
+            approvalGranted: call.approvalGranted === true,
+          });
+          if (call.requiresApproval && !call.approvalGranted) {
+            appendScenarioApproval(log, {
+              op: call.op,
+              kind: 'requested',
+              channel: 'pipeline',
+              decision: decisionFor(call.op),
+            });
+          }
+          return undefined;
+        },
+      })
+    );
+
+    disposers.push(
+      registerScenarioOpOverride({
+        resolve(request: ScenarioOpOverrideRequest) {
+          const fixture = fixtureFor(request.op);
+          if (fixture) return { handler: fixtureHandler(request.op, fixture) };
+          if (def.executionProfile !== 'simulated' || passthrough.has(request.op)) {
+            return undefined;
+          }
+          if (request.purpose !== 'approval-probe') {
+            appendScenarioOp(log, { op: request.op, stage: 'unstubbed' });
+          }
+          throw new Error(
+            `[SCENARIO_UNSTUBBED_OP] ${request.op} has no fixture in scenario ${def.id} (simulated profile fails closed)`
+          );
+        },
+        approvalGranted(request: ScenarioOpOverrideRequest) {
+          return fixtureFor(request.op) !== undefined && decisionFor(request.op) === 'approved';
+        },
+      })
+    );
+
+    disposers.push(
+      overrideRiskyApprovalHandler((params): RiskyApprovalResult => {
+        const decision = decisionFor(params.opId);
+        appendScenarioApproval(log, {
+          op: params.opId,
+          kind: 'requested',
+          channel: 'risky-approval',
+          decision,
+        });
+        if (decision === 'approved') return { allowed: true, status: 'approved' };
+        return {
+          allowed: false,
+          status: 'pending',
+          message:
+            decision === 'rejected'
+              ? `[SCENARIO_APPROVAL_REJECTED] ${params.opId}`
+              : `[SCENARIO_APPROVAL_PENDING] ${params.opId}`,
+        };
+      })
+    );
+
+    if (options.installReasoning !== false) {
+      disposers.push(installScenarioFixtureBackend(def, log));
+    }
+  } catch (error) {
+    for (const dispose of disposers.reverse()) dispose();
+    throw error;
+  }
+
+  return {
+    log,
+    setApprovalDecision(op, decision) {
+      if (!APPROVAL_DECISIONS.has(decision)) {
+        throw new Error(`[SCENARIO_INVALID_APPROVAL_DECISION] ${String(decision)}`);
+      }
+      const previous = decisionFor(op);
+      decisions.set(op, decision);
+      appendScenarioApproval(log, { op, kind: 'decided', channel: 'scenario', decision, previous });
+    },
+    getApprovalDecision: decisionFor,
+    snapshotWrites() {
+      const current = snapshotRunRoot(ctx.runRoot);
+      const paths = [...new Set([...baseline.keys(), ...current.keys()])].sort();
+      for (const relative of paths) {
+        const before = baseline.get(relative);
+        const after = current.get(relative);
+        if (before && !after) {
+          appendScenarioWrite(log, { path: relative, change: 'deleted' });
+        } else if (after && (!before || before.sha256 !== after.sha256)) {
+          appendScenarioWrite(log, {
+            path: relative,
+            change: before ? 'modified' : 'created',
+            sha256: after.sha256,
+            bytes: after.bytes,
+          });
+        }
+      }
+      baseline = current;
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      for (const dispose of disposers.reverse()) dispose();
+    },
+  };
+}
