@@ -252,3 +252,17 @@ describe('display-controls language endonyms', () => {
     }
   });
 });
+
+describe('AvatarPicker preview never turns picked file data into an src URL', () => {
+  it('draws the picked image on a canvas instead of an object URL', async () => {
+    const { pathResolver, safeReadFile } = await import('@agent/core');
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/shared-ui/src/forms/camera.tsx'), {
+        encoding: 'utf8',
+      })
+    );
+    const avatar = source.slice(source.indexOf('export function AvatarPicker('));
+    expect(avatar).not.toContain('createObjectURL');
+    expect(avatar).toContain('<BlobImage');
+  });
+});
