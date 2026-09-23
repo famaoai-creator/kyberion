@@ -26,7 +26,7 @@
 // the parameter never reaches anything but a fixed-list lookup.
 import * as path from 'node:path';
 import type express from 'express';
-import { getUiMessageBundle, pathResolver, safeReaddir } from '@agent/core';
+import { getUiMessageBundle, pathResolver, safeReaddir, safeReadFile } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 import { SUPPORTED_LOCALES, type SupportedLocale } from '@agent/core/locale-normalize';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
@@ -165,10 +165,12 @@ export function registerUiGalleryRoutes(app: express.Express, staticDir: string)
     res.sendFile(pathResolver.rootResolve(SHARED_UI_VANILLA_SOURCE));
   });
   for (const [file, source] of Object.entries(SHARED_UI_PAGE_MODULE_SOURCES)) {
+    // Read once at registration: the handler does no file-system work.
+    const body = String(safeReadFile(pathResolver.rootResolve(source), { encoding: 'utf8' }));
     app.get(`/shared-ui/${file}`, (_req, res) => {
       res.type('text/javascript; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache');
-      res.sendFile(pathResolver.rootResolve(source));
+      res.send(body);
     });
   }
   app.get(SHARED_UI_MODULE_ROUTE, (req, res) => {
