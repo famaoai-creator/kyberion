@@ -31,6 +31,7 @@ import {
 } from '../src/app/settings/settings-api';
 import { IntroduceSecretPanel } from '../src/app/settings/sections/IntroduceSecretPanel';
 import { VoiceSection, VOICE_SAMPLE_ACCEPT } from '../src/app/settings/sections/VoiceSection';
+import { AvatarGenerationPanel } from '../src/app/settings/sections/AvatarGenerationPanel';
 import { conciergeText, type ConciergeMessageKey } from '../src/lib/i18n';
 import type { Setup } from '../src/lib/settings-types';
 
@@ -367,6 +368,8 @@ describe('settings interaction', () => {
   it('voice sample FileDrop hands the File to the page upload handler', () => {
     const onVoiceSampleFileChange = vi.fn();
     const onAvatarChange = vi.fn();
+    // PA-10: the avatar-generation panel asks for its plan on mount.
+    mockFetch(() => ({ ok: true, photo_available: false, plan: null, avatar: null }));
     const setup = {
       profile: { name: 'Ada', avatar_registered: false },
     } as unknown as Setup;
@@ -401,6 +404,67 @@ describe('settings interaction', () => {
     expect(onVoiceSampleFileChange).toHaveBeenCalledTimes(1);
     expect(onVoiceSampleFileChange.mock.calls[0][0]).toBe(sample);
     expect(serializeFake(m.container)).not.toContain('voice.webm');
+    m.unmount();
+  });
+
+  it('PA-10: the consent dialog names the provider; cancel sends nothing, confirm starts the job', async () => {
+    const calls = mockFetch((url) =>
+      url === '/api/setup'
+        ? { ok: true, job: { id: 'job-1', status: 'running', provider_id: 'gemini_image' } }
+        : {
+            ok: true,
+            photo_available: true,
+            plan: {
+              provider_id: 'gemini_image',
+              display_name: 'Google Gemini API',
+              data_egress: 'cloud',
+              interactive_handoff: false,
+            },
+            avatar: null,
+          }
+    );
+    const m = mount(createElement(AvatarGenerationPanel, { t, busy: false, photoVersion: 'v1' }));
+    await flush();
+    expect(calls.map((call) => call.url)).toEqual(['/api/setup/avatar-generation']);
+    const open = () => act(() => fireEvent(m.q('.kb-setting-row .kb-btn'), 'click'));
+
+    open();
+    const consent = t('setup.avatar_consent_cloud', { provider: 'Google Gemini API' });
+    expect(serializeFake(m.q('.kb-dialog__message'))).toContain('Google Gemini API');
+    expect(consent).toContain('Google Gemini API');
+    act(() => fireEvent(m.q('[data-dialog-button="cancel"]'), 'click'));
+    await flush();
+    expect(calls.some((call) => call.url === '/api/setup')).toBe(false);
+
+    open();
+    act(() => fireEvent(m.q('[data-dialog-button="confirm"]'), 'click'));
+    await flush();
+    const post = calls.find((call) => call.url === '/api/setup')!;
+    expect(JSON.parse(String(post.init?.body))).toEqual({
+      action: 'avatar_generate',
+      consent: { provider_id: 'gemini_image', confirmed: true },
+    });
+    m.unmount();
+  });
+
+  it('PA-10: a generated set previews through the authenticated avatar URLs only', async () => {
+    mockFetch(() => ({
+      ok: true,
+      photo_available: true,
+      plan: null,
+      avatar: {
+        images: { neutral: '/api/me/avatar/neutral', joy: '/api/me/avatar/joy' },
+        mouth: { x: 0.5, y: 0.68, width: 0.22 },
+        generated_at: '2026-09-24T00:00:00Z',
+        adopted: false,
+      },
+    }));
+    const m = mount(createElement(AvatarGenerationPanel, { t, busy: false, photoVersion: 'v1' }));
+    await flush();
+    const html = serializeFake(m.container);
+    expect(html).toContain('/api/me/avatar/joy?v=');
+    expect(html).not.toContain('knowledge/personal');
+    expect(html).toContain(t('setup.avatar_use'));
     m.unmount();
   });
 });

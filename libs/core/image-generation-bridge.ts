@@ -9,6 +9,7 @@ import {
   safeExecResult,
   safeExistsSync,
   safeMkdir,
+  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { executeServicePreset } from './service-engine.js';
@@ -26,7 +27,16 @@ import {
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageGenerationProvider,
+  ImageReference,
 } from './image-generation-types.js';
+import {
+  assertReferenceEgressAllowed,
+  hasReferenceImages,
+  imageProviderDataEgress,
+  recordReferenceEgressReceipt,
+  referenceImageViolation,
+  resolveReferenceImagePath,
+} from './image-reference-consent.js';
 import {
   generateImageWithWindowsNativeApi,
   probeWindowsNativeImageGeneration,
@@ -181,6 +191,15 @@ function resolveLocalFluxDimensions(request: ImageGenerationRequest): {
   }
 }
 
+function pickLocalInitImage(references: ImageReference[] | undefined): ImageReference | undefined {
+  if (!references || references.length === 0) return undefined;
+  return (
+    references.find((ref) => ref.role === 'consistency') ||
+    references.find((ref) => (ref.role ?? 'subject') === 'subject') ||
+    references[0]
+  );
+}
+
 async function runLocalFluxGeneration(
   request: ImageGenerationRequest,
   startedAt: number,
@@ -238,6 +257,13 @@ async function runLocalFluxGeneration(
   const seed = getRegisteredEnvText('KYBERION_MFLUX_SEED')?.trim();
   if (seed) {
     args.push('--seed', seed);
+  }
+  // PA-10: mflux img2img takes one init image (`--image-path`). A consistency
+  // frame (e.g. the generated neutral) keeps an expression set coherent, so it
+  // wins over the raw subject photo. Local only — nothing leaves the machine.
+  const initImage = pickLocalInitImage(request.referenceImages);
+  if (initImage) {
+    args.push('--image-path', resolveReferenceImagePath(initImage), '--image-strength', '0.45');
   }
 
   const result = safeExecResult(runner.command, args, {
@@ -433,6 +459,139 @@ export class GeminiServiceImageGenerationProvider implements ImageGenerationProv
   }
 }
 
+/** Default Gemini image model for reference-conditioned generation (PA-10). */
+export const DEFAULT_GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
+/** Keeps the inline-data request under the network guardrail (2 MB by default). */
+const GEMINI_REFERENCE_MAX_BYTES = 1024 * 1024;
+const GEMINI_REFERENCE_TOTAL_MAX_BYTES = 1400 * 1024;
+
+export function resolveGeminiImageModel(): string {
+  const configured = getRegisteredEnvText('KYBERION_GEMINI_IMAGE_MODEL')?.trim();
+  if (!configured) return DEFAULT_GEMINI_IMAGE_MODEL;
+  if (!/^[a-z0-9][a-z0-9.-]{0,79}$/u.test(configured)) {
+    throw new Error(`KYBERION_GEMINI_IMAGE_MODEL is not a valid model id: ${configured}`);
+  }
+  return configured;
+}
+
+/** `generateContent` contents: every reference as `inlineData`, then the text prompt. */
+export function buildGeminiImageContents(request: ImageGenerationRequest): Array<{
+  role: 'user';
+  parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>;
+}> {
+  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+  let total = 0;
+  for (const reference of request.referenceImages ?? []) {
+    const referencePath = resolveReferenceImagePath(reference);
+    const bytes = safeReadFile(referencePath, { encoding: null }) as Buffer;
+    if (bytes.length > GEMINI_REFERENCE_MAX_BYTES) {
+      throw new Error(
+        `reference image too large for inline upload (${Math.ceil(bytes.length / 1024)}KB > ${GEMINI_REFERENCE_MAX_BYTES / 1024}KB)`
+      );
+    }
+    total += bytes.length;
+    if (total > GEMINI_REFERENCE_TOTAL_MAX_BYTES) {
+      throw new Error('reference images exceed the inline upload budget');
+    }
+    parts.push({ inlineData: { mimeType: reference.mimeType, data: bytes.toString('base64') } });
+  }
+  parts.push({ text: request.prompt });
+  return [{ role: 'user', parts }];
+}
+
+/** First image part of a `generateContent` response (`candidates[0].content.parts[*].inlineData`). */
+export function geminiContentImageBytes(value: unknown): string | undefined {
+  let safeValue: Record<string, unknown>;
+  try {
+    safeValue = parseSafeJsonObjectValue(value, 'Gemini generateContent response');
+  } catch {
+    return undefined;
+  }
+  const candidates = Array.isArray(safeValue.candidates) ? safeValue.candidates : [];
+  const first = candidates[0];
+  if (!isRecord(first) || !isRecord(first.content) || !Array.isArray(first.content.parts)) {
+    return undefined;
+  }
+  for (const part of first.content.parts) {
+    if (!isRecord(part)) continue;
+    const inline = isRecord(part.inlineData)
+      ? part.inlineData
+      : isRecord(part.inline_data)
+        ? part.inline_data
+        : undefined;
+    const bytes = inline ? normalizeImageBytes(inline.data) : undefined;
+    if (bytes) return bytes;
+  }
+  return undefined;
+}
+
+/**
+ * PA-10: Gemini image model through `models/<model>:generateContent`
+ * (service preset `gemini.generate_content_image`). Unlike Imagen
+ * `generateImages` it accepts reference images as `inlineData` parts, so it
+ * can stylise a user photo. Cloud egress: reference requests need consent.
+ */
+export class GeminiImageModelGenerationProvider implements ImageGenerationProvider {
+  readonly id = 'gemini_image';
+  readonly displayName = 'Google Gemini API';
+  readonly costTier = 'paid';
+  readonly dataPolicy = 'training_eligible';
+  readonly executionLocality = 'remote';
+  readonly dataEgress = 'cloud';
+  readonly supportsReferenceImages = true;
+
+  async isAvailable(): Promise<boolean> {
+    if (!resolveGeminiApiKey()) return false;
+    try {
+      resolveServiceBinding('gemini', 'secret-guard');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
+    const startedAt = Date.now();
+    // Consent is checked before any byte of a reference is read.
+    assertReferenceEgressAllowed(request, this);
+    try {
+      const response = await executeServicePreset(
+        'gemini',
+        'generate_content_image',
+        {
+          model: resolveGeminiImageModel(),
+          contents: buildGeminiImageContents(request),
+          generation_config: {
+            responseModalities: ['IMAGE'],
+            imageConfig: { aspectRatio: request.aspectRatio || '1:1' },
+          },
+        },
+        'secret-guard'
+      );
+      const imageBytes = geminiContentImageBytes(response);
+      if (!imageBytes) throw new Error('Gemini image model returned no image bytes');
+      const targetPath = getFallbackTargetPath(request);
+      const outputDir = path.dirname(targetPath);
+      if (!safeExistsSync(outputDir)) safeMkdir(outputDir, { recursive: true });
+      safeWriteFile(targetPath, Buffer.from(imageBytes, 'base64'));
+      return {
+        status: 'succeeded',
+        provider: this.id,
+        path: targetPath,
+        elapsedMs: Date.now() - startedAt,
+      };
+    } catch (error: any) {
+      logger.error(`[image_generation_bridge] Gemini image model failed: ${error.message}`);
+      return {
+        status: 'failed',
+        provider: this.id,
+        elapsedMs: Date.now() - startedAt,
+        error: error.message || 'gemini_image_generation_failed',
+      };
+    }
+  }
+}
+
 export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'llm_api';
   readonly costTier = 'paid';
@@ -566,6 +725,9 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
 }
 
 export class LocalDiffusionImageGenerationProvider implements ImageGenerationProvider {
+  /** mflux img2img (`--image-path`): one local init image, nothing leaves the machine. */
+  readonly supportsReferenceImages = true;
+  readonly dataEgress = 'local';
   readonly id = 'local_diffusion';
   readonly costTier = 'self_hosted';
   readonly dataPolicy = 'local_only';
@@ -581,6 +743,9 @@ export class LocalDiffusionImageGenerationProvider implements ImageGenerationPro
 }
 
 export class LocalFluxImageGenerationProvider implements ImageGenerationProvider {
+  /** mflux img2img (`--image-path`): one local init image, nothing leaves the machine. */
+  readonly supportsReferenceImages = true;
+  readonly dataEgress = 'local';
   readonly id = 'local_flux';
   readonly costTier = 'self_hosted';
   readonly dataPolicy = 'local_only';
@@ -695,6 +860,25 @@ interface HostBridgeProviderConfig {
   availability: () => boolean;
 }
 
+/** Repo-relative reference entries for a host hand-off (paths only, never bytes). */
+export function hostBridgeReferenceEntries(
+  request: ImageGenerationRequest
+): Array<{ path: string; mimeType: string; role: string }> {
+  return (request.referenceImages ?? []).map((reference) => ({
+    path: pathResolver.toRepoRelative(resolveReferenceImagePath(reference)),
+    mimeType: reference.mimeType,
+    role: reference.role ?? 'subject',
+  }));
+}
+
+function hostBridgeReferenceInstruction(request: ImageGenerationRequest): string {
+  const entries = hostBridgeReferenceEntries(request);
+  if (entries.length === 0) return '';
+  return ` Use these reference image(s) as input images (do not copy them elsewhere): ${entries
+    .map((entry) => `"${entry.path}" (${entry.role})`)
+    .join(', ')}.`;
+}
+
 function writeHostBridgeRequest(
   config: HostBridgeProviderConfig,
   request: ImageGenerationRequest,
@@ -719,6 +903,17 @@ function writeHostBridgeRequest(
           prompt: request.prompt,
           targetPath,
           aspectRatio: request.aspectRatio || '1:1',
+          ...(hasReferenceImages(request)
+            ? {
+                referenceImages: hostBridgeReferenceEntries(request),
+                egressConsent: request.egressConsent
+                  ? {
+                      provider_id: request.egressConsent.provider_id,
+                      granted_at: request.egressConsent.granted_at,
+                    }
+                  : null,
+              }
+            : {}),
           timestamp: nowIso(),
         },
         null,
@@ -736,7 +931,14 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
   readonly dataPolicy = 'zero_retention';
   readonly executionLocality = 'local';
   readonly requiresInteractiveHandoff = true;
+  /** The host agent forwards the request (and any reference photo) to its own model. */
+  readonly dataEgress = 'cloud';
+  readonly supportsReferenceImages = true;
   protected abstract readonly config: HostBridgeProviderConfig;
+
+  get displayName(): string {
+    return this.config.displayName;
+  }
 
   async isAvailable(): Promise<boolean> {
     return this.config.availability();
@@ -758,9 +960,10 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
       };
     }
 
+    assertReferenceEgressAllowed(request, this);
     writeHostBridgeRequest(this.config, request, targetPath);
 
-    const errMessage = `${this.config.errorCode}: ${this.config.displayName} is required. Please use your 'generate_image' tool with prompt: "${request.prompt}" and save the image to "${targetPath}". After saving, please rerun the task.`;
+    const errMessage = `${this.config.errorCode}: ${this.config.displayName} is required. Please use your 'generate_image' tool with prompt: "${request.prompt}" and save the image to "${targetPath}".${hostBridgeReferenceInstruction(request)} After saving, please rerun the task.`;
     logger.warn(`[image_generation_bridge] ${errMessage}`);
     throw new Error(errMessage);
   }
@@ -902,6 +1105,20 @@ export class AdaptivePolicyRouter {
   }
 
   /**
+   * Every hard constraint: the mode's filters, then PA-10 reference-image
+   * rules (reference support; cloud egress needs a consent naming the provider).
+   */
+  private hardViolation(
+    request: ImageGenerationRequest,
+    provider: ImageGenerationProvider,
+    options: { ignoreConsent?: boolean } = {}
+  ): string | null {
+    return (
+      this.modeViolation(request, provider) ?? referenceImageViolation(request, provider, options)
+    );
+  }
+
+  /**
    * Eligibility of every registered provider for this request: the mode's
    * hard constraints, availability and (unless allowed) interactive hand-off.
    */
@@ -912,7 +1129,7 @@ export class AdaptivePolicyRouter {
     const candidates: SeamProviderCandidate[] = [];
     for (const provider of this.providers.values()) {
       const unmet: string[] = [];
-      const violation = this.modeViolation(request, provider);
+      const violation = this.hardViolation(request, provider);
       if (violation) unmet.push(violation);
       if (provider.requiresInteractiveHandoff && !allowHostHandoff) {
         unmet.push('interactive host hand-off not allowed (allow_host_handoff)');
@@ -988,7 +1205,10 @@ export class AdaptivePolicyRouter {
     return [decision.provider_id];
   }
 
-  async resolveCandidateChain(request: ImageGenerationRequest): Promise<ImageGenerationProvider[]> {
+  async resolveCandidateChain(
+    request: ImageGenerationRequest,
+    options: { ignoreConsent?: boolean } = {}
+  ): Promise<ImageGenerationProvider[]> {
     const purpose = request.purpose?.trim();
     const hasPreference = Boolean(request.providerPreference && request.providerPreference.length);
     if (purpose && !hasPreference) {
@@ -1000,7 +1220,7 @@ export class AdaptivePolicyRouter {
 
     const addIfAvailableAndCompliant = async (provider: ImageGenerationProvider | undefined) => {
       if (!provider || seenIds.has(provider.id)) return;
-      if (this.modeViolation(request, provider)) return;
+      if (this.hardViolation(request, provider, options)) return;
       if (await provider.isAvailable()) {
         candidates.push(provider);
         seenIds.add(provider.id);
@@ -1026,6 +1246,7 @@ export class AdaptivePolicyRouter {
       defaultChain = [
         'gemini_fast',
         'gemini_service',
+        'gemini_image',
         'apple_playground',
         'windows_native',
         'local_flux',
@@ -1044,6 +1265,7 @@ export class AdaptivePolicyRouter {
         'windows_native',
         'gemini_service',
         'gemini_fast',
+        'gemini_image',
         'llm_api',
         'local_flux',
         'comfyui',
@@ -1061,6 +1283,7 @@ export class AdaptivePolicyRouter {
         'comfyui',
         'gemini_fast',
         'gemini_service',
+        'gemini_image',
         'llm_api',
       ];
     }
@@ -1093,9 +1316,36 @@ export class AdaptivePolicyRouter {
     throw new Error('No available Image Generation provider could be resolved.');
   }
 
+  /**
+   * PA-10: the provider a request would reach once any required consent is
+   * given — for consent prompts that must name the provider before anything
+   * is sent. Mode filters, reference support and availability still apply.
+   */
+  async planProvider(request: ImageGenerationRequest): Promise<ImageGenerationProvider | null> {
+    const chain = await this.resolveCandidateChain(request, { ignoreConsent: true });
+    return chain[0] ?? null;
+  }
+
   async generateWithFallback(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
     const candidates = await this.resolveCandidateChain(request);
     if (candidates.length === 0) {
+      if (hasReferenceImages(request)) {
+        const blocked = (await this.resolveCandidateChain(request, { ignoreConsent: true }))[0];
+        if (blocked) {
+          recordReferenceEgressReceipt(
+            request,
+            blocked,
+            'denied',
+            referenceImageViolation(request, blocked) ?? undefined
+          );
+          throw new Error(
+            `[IMAGE_REFERENCE_EGRESS_DENIED] ${blocked.id} would receive the reference image(s) but no valid user_photo consent names it.`
+          );
+        }
+        throw new Error(
+          'No available Image Generation provider can honour reference images for this request.'
+        );
+      }
       throw new Error('No available Image Generation provider could be resolved.');
     }
 
@@ -1107,6 +1357,12 @@ export class AdaptivePolicyRouter {
         logger.info(
           `[image_generation_bridge] Routing generation request to provider: ${provider.id}`
         );
+        if (hasReferenceImages(request)) {
+          // Re-checked at dispatch (a consent can expire between routing and
+          // the call); the receipt precedes any egress.
+          assertReferenceEgressAllowed(request, provider);
+          recordReferenceEgressReceipt(request, provider, 'allowed');
+        }
         const result = await provider.generate(request);
         if (result.status === 'failed' && isRateLimitOrQuotaError(result.error)) {
           logger.warn(
@@ -1140,6 +1396,7 @@ function ensureBuiltinImageGenerationProviders(): void {
     new ComfyUiImageGenerationProvider(),
     new GeminiFastImageGenerationProvider(),
     new GeminiServiceImageGenerationProvider(),
+    new GeminiImageModelGenerationProvider(),
     new LlmApiImageGenerationProvider(),
     new LocalFluxImageGenerationProvider(),
     new WindowsNativeImageGenerationProvider(),
@@ -1177,6 +1434,32 @@ export async function listImageGenerationCandidates(
   request: ImageGenerationRequest
 ): Promise<SeamProviderCandidate[]> {
   return await getRouter().listCandidates(request);
+}
+
+export interface ImageGenerationPlan {
+  provider_id: string;
+  display_name: string;
+  data_egress: 'local' | 'cloud';
+  /** A cloud provider with references needs a per-run user_photo consent. */
+  requires_consent: boolean;
+  /** Host bridges hand the request to the host agent and need a rerun. */
+  interactive_handoff: boolean;
+}
+
+/** Which provider this request would use (consent not yet given), or null. */
+export async function planImageGeneration(
+  request: ImageGenerationRequest
+): Promise<ImageGenerationPlan | null> {
+  const provider = await getRouter().planProvider(request);
+  if (!provider) return null;
+  const egress = imageProviderDataEgress(provider);
+  return {
+    provider_id: provider.id,
+    display_name: provider.displayName || provider.id,
+    data_egress: egress,
+    requires_consent: egress === 'cloud' && hasReferenceImages(request),
+    interactive_handoff: provider.requiresInteractiveHandoff === true,
+  };
 }
 
 export async function generateImage(
