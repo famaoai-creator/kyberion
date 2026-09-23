@@ -322,12 +322,20 @@ function findManagedRecordFor(
   );
 }
 
-function readPluginManifestProvides(resolvedPath: string): {
+/**
+ * Managed installs read only the manifest at the managed root — the one the
+ * approval was bound to (nested candidates are refused at install); other
+ * paths walk up from the entry.
+ */
+function readPluginManifestProvides(
+  resolvedPath: string,
+  managedPath?: string
+): {
   pluginId?: string;
   provides?: PluginContributionDeclaration;
 } {
-  let cursor = path.dirname(resolvedPath);
-  for (let depth = 0; depth < 6; depth += 1) {
+  let cursor = managedPath ?? path.dirname(resolvedPath);
+  for (let depth = 0; depth < (managedPath ? 1 : 6); depth += 1) {
     const candidates = PLUGIN_MANIFEST_CANDIDATES.map((candidate) => path.join(cursor, candidate));
     const manifestPath = candidates
       .map((candidate) => assertNoSymlinkTraversal(candidate))
@@ -561,7 +569,10 @@ export async function loadAuthorizedSkillPlugins(
             );
       let contributions: PluginContributionActivation | undefined;
       if (typeof mod.registerKyberionContributions === 'function') {
-        const manifest = readPluginManifestProvides(authorization.resolvedPath);
+        const manifest = readPluginManifestProvides(
+          authorization.resolvedPath,
+          authorization.managedPath
+        );
         if (!manifest.provides) {
           throw new Error(
             '[PLUGIN_CONTRIBUTION_DENIED] registerKyberionContributions requires manifest provides declaration'

@@ -122,8 +122,25 @@ describe('secret-guard plugin grants (EP-03)', () => {
     });
     const { redactSensitiveString } = await import('./network.js');
     expect(
+      // Host log redaction masks non-granted secrets too: a governed op the
+      // plugin invoked may carry host secrets it was never granted.
       withPluginExecutionFrame(frame([]), () => redactSensitiveString('x other-secret-value y'))
     ).toBe('x [REDACTED_SECRET] y');
+  });
+
+  it('masks only granted secrets inside a plugin frame, so masking is no oracle (N9)', () => {
+    getSecret('PLUGIN_GRANTED_KEY');
+    getSecret('PLUGIN_OTHER_KEY');
+    const text = 'a=granted-secret-value b=other-secret-value';
+    expect(secretGuard.maskActiveSecrets(text)).toBe('a=[REDACTED_SECRET] b=[REDACTED_SECRET]');
+    withPluginExecutionFrame(frame(['PLUGIN_GRANTED_*']), () => {
+      expect(secretGuard.maskActiveSecrets(text, '#', 0)).toBe('a=# b=other-secret-value');
+      // Nested frames: a secret must be granted by every enclosing plugin.
+      withPluginExecutionFrame(frame([]), () => {
+        expect(secretGuard.maskActiveSecrets(text)).toBe(text);
+      });
+    });
+    expect(secretGuard.maskActiveSecrets(text, '#', 0)).toBe('a=# b=#');
   });
 
   it('never lets plugin code mint auth grants, even with a wildcard secrets grant', async () => {

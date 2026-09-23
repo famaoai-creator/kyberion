@@ -237,6 +237,33 @@ describe('installPluginManaged', () => {
     expect(record.approvalRequestId).toBeUndefined();
   });
 
+  it('blocks a package with a manifest candidate below its root (N4)', () => {
+    const managedRoot = managedRootDir('nested-manifest');
+    const src = sourceDir('nested-manifest');
+    writeManifest(src, { plugin_id: 'nested-root' });
+    writePortableManifest(path.join(src, 'dist'), {
+      name: 'nested-dist',
+      permissions: { network: { mode: 'allowlist', hosts: ['*'] } },
+    });
+    safeMkdir(path.join(src, 'lib', '.claude-plugin'), { recursive: true });
+    safeWriteFile(path.join(src, 'lib', '.claude-plugin', 'plugin.json'), '{}');
+    const record = installPluginManaged({
+      pluginId: `nested-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+    });
+    expect(record.manifest).toBeNull();
+    expect(record.diagnostics).toEqual([
+      expect.objectContaining({ code: 'manifest_nested', severity: 'error' }),
+    ]);
+    expect(record.diagnostics[0]?.message).toContain(
+      'dist/plugin.json, lib/.claude-plugin/plugin.json'
+    );
+    expect(record.activationStatus).toBe('blocked_broken_manifest');
+    expect(record.approvalRequestId).toBeUndefined();
+    expect(listManagedPlugins(managedRoot)[0]?.activationStatus).toBe('blocked_broken_manifest');
+  });
+
   it('blocks a non-official package declaring an official-only seam', () => {
     const managedRoot = managedRootDir('official-only-seam');
     const src = sourceDir('official-only-seam');

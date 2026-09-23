@@ -174,6 +174,32 @@ function codepointCompare(a: string, b: string): number {
 }
 
 /**
+ * Manifest candidates below the package root (e.g. `dist/plugin.json`). A
+ * reader walking up from a nested entry would pick such a manifest instead of
+ * the approved root one, so packages that ship any are refused. Symlinks are
+ * not followed (the managed copy never contains them).
+ */
+function findNestedManifestCandidates(pluginRoot: string): string[] {
+  const nested: string[] = [];
+  const walk = (dir: string, relDir: string): void => {
+    for (const name of safeReaddir(dir).sort(codepointCompare)) {
+      const relative = relDir ? `${relDir}/${name}` : name;
+      if (
+        !MANIFEST_CANDIDATE_RELATIVE_PATHS.includes(relative) &&
+        MANIFEST_CANDIDATE_RELATIVE_PATHS.some((candidate) => relative.endsWith(`/${candidate}`))
+      ) {
+        nested.push(relative);
+      }
+      const absolute = path.join(dir, name);
+      const stat = safeLstat(absolute);
+      if (stat.isDirectory() && !stat.isSymbolicLink()) walk(absolute, relative);
+    }
+  };
+  walk(pluginRoot, '');
+  return nested;
+}
+
+/**
  * Reads a plugin manifest via JSON.parse only. Never requires/imports the
  * manifest or any plugin code — this function must stay side-effect free.
  */
@@ -182,6 +208,25 @@ function readPluginManifestSafely(pluginRoot: string): {
   diagnostics: PluginManifestDiagnostic[];
 } {
   const diagnostics: PluginManifestDiagnostic[] = [];
+  let nested: string[];
+  try {
+    nested = findNestedManifestCandidates(pluginRoot);
+  } catch (err: unknown) {
+    diagnostics.push({
+      code: 'manifest_unreadable',
+      message: `Package tree could not be scanned for manifests: ${err instanceof Error ? err.message : String(err)}`,
+      severity: 'error',
+    });
+    return { manifest: null, diagnostics };
+  }
+  if (nested.length > 0) {
+    diagnostics.push({
+      code: 'manifest_nested',
+      message: `Package contains plugin manifest candidates below its root (${nested.join(', ')}); only the root manifest may exist so every reader resolves the approved one.`,
+      severity: 'error',
+    });
+    return { manifest: null, diagnostics };
+  }
   const present = MANIFEST_CANDIDATE_RELATIVE_PATHS.filter((rel) =>
     safeExistsSync(path.join(pluginRoot, rel))
   );

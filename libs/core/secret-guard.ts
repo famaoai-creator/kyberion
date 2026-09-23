@@ -18,6 +18,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import {
   assertPluginGrantAllows,
+  findPluginGrantDenial,
   getPluginExecutionContext,
   PluginGrantDeniedError,
 } from './sandbox-policy.js';
@@ -33,6 +34,14 @@ const SECRETS_FILE = pathResolver.resolve('vault/secrets/secrets.json');
 const PERSONAL_CONNECTIONS_DIR = pathResolver.resolve('knowledge/personal/connections');
 const GRANTS_FILE = pathResolver.resolve('active/shared/auth-grants.json');
 const _activeSecrets = new Set<string>();
+// Active secret value -> the secret names it was resolved under (plugin masking scope).
+const _activeSecretNames = new Map<string, Set<string>>();
+const _rememberActiveSecret = (key: string, value: string): void => {
+  _activeSecrets.add(value);
+  const names = _activeSecretNames.get(value) ?? new Set<string>();
+  names.add(key);
+  _activeSecretNames.set(value, names);
+};
 const _cachedPersonalSecrets = new Map<string, string>();
 // Keep these as lazy wrappers: secure-io and audit-chain have a pre-existing
 // import cycle, so the mediation function cannot be invoked during module load.
@@ -328,7 +337,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   //    resolver falls through to the local vault chain below.
   const upstream = resolveSecretSync({ key, scope, operation });
   if (upstream && upstream.length > 0) {
-    if (upstream.length > 8) _activeSecrets.add(upstream);
+    if (upstream.length > 8) _rememberActiveSecret(key, upstream);
     return upstream;
   }
 
@@ -348,7 +357,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   }
 
   if (value && typeof value === 'string') {
-    if (value.length > 8) _activeSecrets.add(value);
+    if (value.length > 8) _rememberActiveSecret(key, value);
     return value;
   }
 
@@ -368,7 +377,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
     if (identity) {
       const bridged = fetchSecretSync(identity.keychainService, identity.keychainAccount);
       if (bridged && bridged.length > 0) {
-        if (bridged.length > 8) _activeSecrets.add(bridged);
+        if (bridged.length > 8) _rememberActiveSecret(key, bridged);
         return bridged;
       }
     }
@@ -469,15 +478,54 @@ export const getActiveSecrets = (): string[] => {
   return Array.from(_activeSecrets);
 };
 
-/** Replaces every active secret value (longer than `minLength`) occurring in `text`. */
+const DEFAULT_MASK_MIN_LENGTH = 5;
+
+/**
+ * Replaces every active secret value (longer than `minLength`) occurring in
+ * `text`. Inside a plugin frame only secrets granted to every enclosing frame
+ * are masked and `minLength` cannot go below the default, so masking is no
+ * oracle for other secrets.
+ */
 export const maskActiveSecrets = (
   text: string,
   replacement = '[REDACTED_SECRET]',
-  minLength = 5
+  minLength = DEFAULT_MASK_MIN_LENGTH
 ): string => {
+  const inPlugin = getPluginExecutionContext() !== undefined;
+  const threshold = inPlugin ? Math.max(minLength, DEFAULT_MASK_MIN_LENGTH) : minLength;
   let masked = text;
   for (const secret of _activeSecrets) {
-    if (!secret || secret.length <= minLength) continue;
+    if (!secret || secret.length <= threshold) continue;
+    if (inPlugin) {
+      const names = _activeSecretNames.get(secret);
+      const granted =
+        names !== undefined &&
+        [...names].some((name) => findPluginGrantDenial('secrets', name) === undefined);
+      if (!granted) continue;
+    }
+    masked = masked.split(secret).join(replacement);
+  }
+  return masked;
+};
+
+/**
+ * Host log redaction: masks every active secret even while a plugin frame is
+ * active, because a governed op the plugin invoked may carry host secrets the
+ * plugin was never granted. Inside a plugin frame `minLength` is still clamped
+ * to the default so short guesses cannot be probed.
+ */
+export const redactActiveSecretsForHostLog = (
+  text: string,
+  replacement = '[REDACTED_SECRET]',
+  minLength = DEFAULT_MASK_MIN_LENGTH
+): string => {
+  const threshold =
+    getPluginExecutionContext() !== undefined
+      ? Math.max(minLength, DEFAULT_MASK_MIN_LENGTH)
+      : minLength;
+  let masked = text;
+  for (const secret of _activeSecrets) {
+    if (!secret || secret.length <= threshold) continue;
     masked = masked.split(secret).join(replacement);
   }
   return masked;
@@ -498,6 +546,7 @@ export const secretGuard = {
   getSecret,
   getActiveSecrets,
   maskActiveSecrets,
+  redactActiveSecretsForHostLog,
   grantAccess,
   grantAccessGuarded,
   checkAuthority,

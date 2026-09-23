@@ -463,9 +463,11 @@ export function deactivatePlugin(pluginId: string): PluginLifecycleResult {
 
 /**
  * Why a managed plugin that failed to re-resolve must not keep running: it
- * was removed, its content no longer matches the approval, or its approval
- * was rejected / expired / cancelled. A new version still awaiting a decision
- * (approval `pending`) and non-managed resolution failures return undefined.
+ * was removed, its content no longer matches the approval, its approval was
+ * rejected / expired / cancelled, or a new version awaits approval. The
+ * install replaces the managed copy in place, so the previous module could
+ * lazily load the unapproved files — fail closed. Only non-managed
+ * resolution failures return undefined.
  */
 function revocationReason(
   source: ActivatePluginInput,
@@ -485,7 +487,7 @@ function revocationReason(
           ? loadApprovalRequest(record.approvalChannel, record.approvalRequestId)
           : null;
       return approval?.status === 'pending'
-        ? undefined
+        ? 'new version awaits approval; its files replaced the approved copy'
         : `approval ${approval?.status ?? 'missing'}`;
     }
     if (record.activationStatus !== 'activatable') return `status=${record.activationStatus}`;
@@ -507,9 +509,8 @@ function revocationReason(
  * previous module under the narrower of the old and new grant; if that is
  * not representable or also fails, the plugin stays inactive and the result
  * is `restart_required`. A managed plugin that is no longer activatable
- * (removed, tampered, approval rejected) is deactivated; one whose new
- * version awaits approval keeps its previous activation. A plugin not active
- * in this process is activated.
+ * (removed, tampered, approval rejected, or a new version awaiting approval)
+ * is deactivated. A plugin not active in this process is activated.
  */
 export async function reloadPlugin(
   pluginId: string,
