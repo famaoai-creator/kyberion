@@ -8,10 +8,11 @@ import { FormScope, type SettingsTranslate } from './form-scope';
  * PA-10 "create an avatar from this photo" (settings → 写真・音声). Flow:
  * button → consent `ui:dialog` naming the provider the server planned and
  * what is sent (cancel = nothing sent) → `POST /api/setup`
- * `action: 'avatar_generate'` (async job) → poll `GET
- * /api/setup/avatar-generation?job=` → preview of the generated set (served
- * only through the authenticated `/api/me/avatar/:expression`) → "Use this
- * avatar" (`action: 'avatar_use'`, sets `identity.avatar_profile`).
+ * `action: 'avatar_generate'` (async job, writes `avatar/draft/`) → poll `GET
+ * /api/setup/avatar-generation?job=` → preview of the draft (served only
+ * through the authenticated `/api/me/avatar/:expression?set=draft`) while the
+ * current avatar stays in use → "Use this avatar" (`action: 'avatar_use'`
+ * promotes the draft and sets `identity.avatar_profile`).
  */
 type Plan = {
   provider_id: string;
@@ -24,6 +25,7 @@ type AvatarWire = {
   mouth: { x: number; y: number; width: number };
   generated_at: string;
   adopted: boolean;
+  set?: 'current' | 'draft';
 };
 type Job = {
   id: string;
@@ -31,7 +33,12 @@ type Job = {
   reason?: 'consent_denied' | 'no_provider' | 'generation_failed';
   handoff_manifest?: string;
 };
-type Overview = { photo_available: boolean; plan: Plan | null; avatar: AvatarWire | null };
+type Overview = {
+  photo_available: boolean;
+  plan: Plan | null;
+  avatar: AvatarWire | null;
+  draft: AvatarWire | null;
+};
 
 const PREVIEW_ORDER = [
   'neutral',
@@ -80,6 +87,7 @@ export function AvatarGenerationPanel({
         photo_available: body.photo_available === true,
         plan: (body.plan as Plan | null) ?? null,
         avatar: (body.avatar as AvatarWire | null) ?? null,
+        draft: (body.draft as AvatarWire | null) ?? null,
       });
       const running = body.running_job as Job | null | undefined;
       if (running?.status === 'running') setJob(running);
@@ -191,9 +199,11 @@ export function AvatarGenerationPanel({
   }, [load, t]);
 
   const running = job?.status === 'running';
-  const avatar = overview?.avatar ?? null;
+  // A pending draft is previewed first; the current set stays in use until adopted.
+  const draft = overview?.draft ?? null;
+  const avatar = draft ?? overview?.avatar ?? null;
   const version = encodeURIComponent(avatar?.generated_at ?? '');
-  const withVersion = (url: string) => `${url}?v=${version}`;
+  const withVersion = (url: string) => `${url}${url.includes('?') ? '&' : '?'}v=${version}`;
   const consentMessage = !plan
     ? ''
     : plan.data_egress === 'local'
@@ -230,7 +240,7 @@ export function AvatarGenerationPanel({
       {avatar ? (
         <div className="settings-row-block">
           <SettingRow label={t('setup.avatar_preview_title')}>
-            {avatar.adopted ? (
+            {avatar.adopted && !draft ? (
               <StatusPill status="completed" label={t('setup.avatar_in_use')} />
             ) : (
               <Button
@@ -241,6 +251,9 @@ export function AvatarGenerationPanel({
               />
             )}
           </SettingRow>
+          {draft && overview?.avatar?.adopted ? (
+            <p className="kb-text kb-text--muted">{t('setup.avatar_draft_pending')}</p>
+          ) : null}
           <TalkingAvatar
             name="generated-avatar-preview"
             label={t('setup.avatar_preview_title')}

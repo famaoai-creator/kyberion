@@ -14,13 +14,17 @@ export declare function estimateSpeechMs(text: unknown): number;
 export declare function speechSynthesisSupported(win: unknown): boolean;
 export declare function audioContextCtor(win: unknown): (new () => unknown) | null;
 
-/** The subset of the `lipsync.js` controller the player drives (all optional). */
+/**
+ * The subset of the `lipsync.js` controller the player drives (all optional).
+ * Method syntax on purpose: a `ui:talking-avatar` controller
+ * (`attachAnalyser(node: KbAnalyserLike)`) must be assignable as is.
+ */
 export interface KbSpeechLipsyncLike {
-  attachAnalyser?: (analyser: unknown) => unknown;
-  detachAnalyser?: () => void;
-  startSynthetic?: (opts?: { wordsPerMinute?: number; seed?: number }) => void;
-  stopSynthetic?: () => void;
-  pulse?: () => void;
+  attachAnalyser?(analyser: unknown): unknown;
+  detachAnalyser?(): void;
+  startSynthetic?(opts?: { wordsPerMinute?: number; seed?: number }): void;
+  stopSynthetic?(): void;
+  pulse?(): void;
 }
 
 export interface KbSpeechTimers {

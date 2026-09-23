@@ -49,9 +49,14 @@
       </div>
       <div class="grid" style="margin-top: 22px;">
         <section class="panel avatar" id="voice-panel">
-          <img class="avatar-media hidden" id="avatar-image" alt="Kyberion avatar" />
-          <div class="orb"></div>
-          <div class="expression" id="expression">neutral</div>
+          <!-- PA-09: ui:talking-avatar (static/partner-avatar.js), rendered once and driven
+               through its controller: page state via setState, host speech via followHost. -->
+          <div
+            class="partner-avatar"
+            id="partner-avatar"
+            data-label="{{t:presence_studio:partner_avatar_label}}"
+            data-personal-label="{{t:presence_studio:partner_avatar_personal_label}}"
+          ></div>
         </section>
         <section class="panel">
           <div class="status"><span class="dot"></span><span id="status">ready</span></div>
@@ -260,6 +265,22 @@
         window.FrontDeskRail.mount(document.getElementById("front-desk-rail"), { current: null });
       }
     </script>
+    <script type="module">
+      // PA-09: the partner's talking avatar (see static/partner-avatar.js).
+      import { mountPartnerAvatar } from "/partner-avatar.js";
+      const container = document.getElementById("partner-avatar");
+      if (container) {
+        const handle = mountPartnerAvatar(container, {
+          name: "partner",
+          label: container.getAttribute("data-label") || "",
+          personalLabel: container.getAttribute("data-personal-label") || "",
+          size: "xl",
+          showState: true,
+          locale: window.KyberionPrefs ? window.KyberionPrefs.locale() : document.documentElement.lang,
+        });
+        if (typeof window.onPartnerAvatarReady === "function") window.onPartnerAvatarReady(handle);
+      }
+    </script>
     <script>
       const titleEl = document.getElementById("title");
       const updatedEl = document.getElementById("updated");
@@ -329,8 +350,11 @@
         })
         .catch(() => { /* leave badge hidden */ });
 
-      const expressionEl = document.getElementById("expression");
-      const avatarImageEl = document.getElementById("avatar-image");
+      // PA-09: the talking avatar handle (static/partner-avatar.js). The module
+      // script above runs after this classic script and hands it over through
+      // window.onPartnerAvatarReady; null until then.
+      let partnerAvatar = null;
+      let partnerAvatarMapKey = "";
       const statusEl = document.getElementById("status");
       const subtitleEl = document.getElementById("subtitle");
       const transcriptEl = document.getElementById("transcript");
@@ -968,6 +992,7 @@
         previousSpeechStatus = latestSpeechState?.status || "idle";
         latestSpeechState = nextSpeechState || { status: "idle" };
         isSpeechPlaying = latestSpeechState.status === "speaking";
+        followHostSpeechOnAvatar(latestSpeechState);
         const speechJustFinished = previousSpeechStatus === "speaking" && latestSpeechState.status !== "speaking";
         if (speechJustFinished && isHandsFreeActive && !isPushToTalkActive && !recognition && !browserSendInFlight) {
           micHintEl.textContent = `Hands-free ready in ${selectedConversationMode()} mode.`;
@@ -1731,29 +1756,60 @@
         };
       }
 
+      // PA-09: page state -> avatar controller (never a re-render). The agent
+      // profile's expression map is the fallback image set; the partner-avatar
+      // module prefers the user's adopted personal set when the owner session has one.
+      function partnerAvatarState(derived) {
+        const status = String(derived.status || "");
+        if (status.startsWith("speaking")) return "speaking";
+        if (status.startsWith("listening")) return "listening";
+        if (status.startsWith("thinking")) return "thinking";
+        return null;
+      }
+
+      function syncPartnerAvatar(derived, data) {
+        if (!partnerAvatar) return;
+        const map = data && data.expressionAvatarMap && typeof data.expressionAvatarMap === "object"
+          ? data.expressionAvatarMap
+          : null;
+        const mapKey = map ? JSON.stringify(map) : "";
+        if (map && mapKey !== partnerAvatarMapKey) {
+          partnerAvatarMapKey = mapKey;
+          partnerAvatar.setFallbackImages(map);
+        }
+        partnerAvatar.setState(partnerAvatarState(derived));
+        partnerAvatar.setExpression(derived.expression || data?.expression || null);
+      }
+
+      // Host speech (voice-hub plays on this machine's speakers): synthetic
+      // lip-sync while SSE speech_state says speaking, bounded by estimated_ms.
+      function followHostSpeechOnAvatar(speech) {
+        if (!partnerAvatar) return;
+        const estimated = Number(speech && speech.estimated_ms);
+        partnerAvatar.followHost({
+          speaking: Boolean(speech && speech.status === "speaking"),
+          ...(Number.isFinite(estimated) && estimated > 0 ? { estimatedMs: estimated } : {}),
+        });
+      }
+
+      window.onPartnerAvatarReady = (handle) => {
+        partnerAvatar = handle;
+        followHostSpeechOnAvatar(latestSpeechState);
+        if (latestState) render(latestState);
+      };
+
       function render(state) {
         latestState = state;
-        const surface = state.surfaces["presence-studio"] || { data: {} };
+        // `/api/state` may answer without `surfaces` (summary shape) — keep rendering.
+        const surface = state?.surfaces?.["presence-studio"] || { data: {} };
         const data = surface.data || {};
         const derivedVoiceUiState = deriveVoiceUiState(data);
         titleEl.textContent = data.title || "Presence Studio";
         updatedEl.textContent = formatTimestamp(data.updatedAt || state.lastUpdatedAt);
-        expressionEl.textContent = derivedVoiceUiState.expression || data.expression || "neutral";
         statusEl.textContent = derivedVoiceUiState.status || data.status || "idle";
         subtitleEl.textContent = derivedVoiceUiState.subtitle || data.subtitle || "Ready for your next request.";
 
-        const expressionKey = String(derivedVoiceUiState.expression || data.expression || "neutral");
-        const expressionAvatarMap = data.expressionAvatarMap && typeof data.expressionAvatarMap === "object"
-          ? data.expressionAvatarMap
-          : {};
-        const avatarPath = expressionAvatarMap[expressionKey] || data.avatarAssetPath || "";
-        if (avatarPath) {
-          avatarImageEl.src = avatarPath;
-          avatarImageEl.classList.remove("hidden");
-        } else {
-          avatarImageEl.removeAttribute("src");
-          avatarImageEl.classList.add("hidden");
-        }
+        syncPartnerAvatar(derivedVoiceUiState, data);
 
         renderList(transcriptEl, data.transcript || [], (item) =>
           `<div class="row"><strong>${item.speaker || "speaker"}</strong><span class="mono">${(item.text || "").replace(/</g, "&lt;")}</span></div>`

@@ -8,6 +8,7 @@ import {
   getUserPresenceAvatarProfile,
   loadPersonalAvatarSet,
   parsePersonalAvatarProfile,
+  promotePersonalAvatarDraft,
   readPersonalAvatarAsset,
 } from './presence-avatar.js';
 
@@ -91,6 +92,70 @@ describe('personal avatar overlay', () => {
       agentId: 'user',
       defaultAvatarAssetPath: '/api/me/avatar/neutral',
       expressionAvatarMap: { neutral: '/api/me/avatar/neutral', joy: '/api/me/avatar/joy' },
+    });
+  });
+
+  describe('draft set', () => {
+    const draftDir = path.join(dir, 'draft');
+    const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1]);
+
+    function writeDraft() {
+      safeMkdir(draftDir, { recursive: true });
+      safeWriteFile(path.join(draftDir, 'neutral.png'), JPEG);
+      safeWriteFile(path.join(draftDir, 'speaking.png'), JPEG);
+      safeWriteFile(
+        path.join(draftDir, 'avatar-profile.json'),
+        JSON.stringify({
+          version: 1,
+          images: { neutral: 'neutral.png', speaking: 'speaking.png' },
+          mouth: { x: 0.5, y: 0.6, width: 0.3 },
+          generated_at: '2026-09-25T00:00:00Z',
+          provider_id: 'mflux',
+          style: 'new',
+        })
+      );
+    }
+
+    it('keeps the draft apart from the current set and serves it only when asked', () => {
+      writeDraft();
+      expect(loadPersonalAvatarSet(root)!.profile.provider_id).toBe('gemini_image');
+      expect(loadPersonalAvatarSet(root, 'draft')!.profile.provider_id).toBe('mflux');
+      expect(readPersonalAvatarAsset('neutral', root)!.contentType).toBe('image/png');
+      expect(readPersonalAvatarAsset('neutral', root, 'draft')!.contentType).toBe('image/jpeg');
+      expect(readPersonalAvatarAsset('speaking', root)).toBeNull();
+
+      safeWriteFile(
+        path.join(root, 'my-identity.json'),
+        JSON.stringify({ name: 'me', avatar_profile: AVATAR_PROFILE_POINTER })
+      );
+      expect(describePersonalAvatar('/api/me/avatar', root, 'draft')).toMatchObject({
+        images: {
+          neutral: '/api/me/avatar/neutral?set=draft',
+          speaking: '/api/me/avatar/speaking?set=draft',
+        },
+        adopted: false,
+        set: 'draft',
+      });
+      expect(describePersonalAvatar('/api/me/avatar', root)).toMatchObject({
+        adopted: true,
+        set: 'current',
+      });
+    });
+
+    it('promotes the draft over the current set and removes the draft', () => {
+      writeDraft();
+      const promoted = promotePersonalAvatarDraft(root);
+      expect(promoted!.profile).toMatchObject({ provider_id: 'mflux', style: 'new' });
+      expect(Object.keys(promoted!.files).sort()).toEqual(['neutral', 'speaking']);
+      expect(readPersonalAvatarAsset('neutral', root)!.contentType).toBe('image/jpeg');
+      // joy belonged only to the previous set.
+      expect(readPersonalAvatarAsset('joy', root)).toBeNull();
+      expect(loadPersonalAvatarSet(root, 'draft')).toBeNull();
+    });
+
+    it('leaves the current set alone when there is no draft', () => {
+      expect(promotePersonalAvatarDraft(root)).toBeNull();
+      expect(Object.keys(loadPersonalAvatarSet(root)!.files).sort()).toEqual(['joy', 'neutral']);
     });
   });
 

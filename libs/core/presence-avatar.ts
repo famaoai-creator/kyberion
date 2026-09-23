@@ -2,7 +2,17 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import {
+  assertSafeRepositoryPath,
+  safeCopyFileSync,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeRmSync,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
@@ -199,6 +209,12 @@ export const DEFAULT_GENERATED_AVATAR_EXPRESSIONS: readonly AvatarExpression[] =
 ];
 
 export const AVATAR_DIRNAME = 'avatar';
+/**
+ * A fresh generation lands in `<profileRoot>/avatar/draft/` so the set in use
+ * stays untouched until the user picks "Use this avatar"
+ * (`promotePersonalAvatarDraft`).
+ */
+export const AVATAR_DRAFT_DIRNAME = 'draft';
 export const AVATAR_PROFILE_FILENAME = 'avatar-profile.json';
 /** Value of `my-identity.json` `avatar_profile` once the user adopts a generated set. */
 export const AVATAR_PROFILE_POINTER = `${AVATAR_DIRNAME}/${AVATAR_PROFILE_FILENAME}`;
@@ -227,6 +243,22 @@ export interface PersonalAvatarSet {
   profile: PersonalAvatarProfileFile;
   /** Expression → absolute file path (only frames that exist on disk). */
   files: Partial<Record<AvatarExpression, string>>;
+}
+
+/** `current` = `<profileRoot>/avatar/` (the set in use once adopted); `draft` = its `draft/` child. */
+export type PersonalAvatarSetKind = 'current' | 'draft';
+
+export function isPersonalAvatarSetKind(value: unknown): value is PersonalAvatarSetKind {
+  return value === 'current' || value === 'draft';
+}
+
+/** Absolute directory of the `kind` set under `profileRoot`. */
+export function personalAvatarDir(
+  profileRoot: string = resolveActiveProfileRoot(),
+  kind: PersonalAvatarSetKind = 'current'
+): string {
+  const dir = path.join(path.resolve(profileRoot), AVATAR_DIRNAME);
+  return kind === 'draft' ? path.join(dir, AVATAR_DRAFT_DIRNAME) : dir;
 }
 
 const AVATAR_FILE_NAME = /^[a-z0-9_-]{1,64}\.(png|jpe?g|webp)$/u;
@@ -306,18 +338,20 @@ function regularFileInside(dir: string, fileName: string): string | null {
 }
 
 /**
- * The generated set under `<profileRoot>/avatar/` (draft or adopted), or null.
- * Callers run inside the personal-tier execution context of their surface.
+ * The generated set under `<profileRoot>/avatar/` (`current`) or
+ * `<profileRoot>/avatar/draft/` (`draft`), or null. Callers run inside the
+ * personal-tier execution context of their surface.
  */
 export function loadPersonalAvatarSet(
-  profileRoot: string = resolveActiveProfileRoot()
+  profileRoot: string = resolveActiveProfileRoot(),
+  kind: PersonalAvatarSetKind = 'current'
 ): PersonalAvatarSet | null {
-  const dir = path.join(path.resolve(profileRoot), AVATAR_DIRNAME);
+  const dir = personalAvatarDir(profileRoot, kind);
   const profilePath = regularFileInside(dir, AVATAR_PROFILE_FILENAME);
   if (!profilePath) return null;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(profilePath, { encoding: 'utf8' })));
+    parsed = readJson<unknown>(profilePath);
   } catch {
     return null;
   }
@@ -336,10 +370,11 @@ export function loadPersonalAvatarSet(
 /** Bytes + sniffed content type of one frame; null for unknown / missing / non-image files. */
 export function readPersonalAvatarAsset(
   expression: string,
-  profileRoot?: string
+  profileRoot?: string,
+  kind: PersonalAvatarSetKind = 'current'
 ): { bytes: Buffer; contentType: string } | null {
   if (!isAvatarExpression(expression)) return null;
-  const set = loadPersonalAvatarSet(profileRoot);
+  const set = loadPersonalAvatarSet(profileRoot, kind);
   const file = set?.files[expression];
   if (!file) return null;
   const bytes = safeReadFile(file, { encoding: null }) as Buffer;
@@ -353,7 +388,9 @@ export interface PersonalAvatarWire {
   mouth: AvatarMouthAnchor;
   generated_at: string;
   provider_id: string;
+  /** True only for the `current` set once `my-identity.json` points at it (never for a draft). */
   adopted: boolean;
+  set: PersonalAvatarSetKind;
 }
 
 function isAdopted(profileRoot: string): boolean {
@@ -367,24 +404,68 @@ function isAdopted(profileRoot: string): boolean {
   }
 }
 
-/** Set → wire with per-frame URLs under `assetUrlBase` (e.g. `/api/me/avatar`). */
+/**
+ * Set → wire with per-frame URLs under `assetUrlBase` (e.g. `/api/me/avatar`).
+ * Draft frame URLs carry `?set=draft` so only a caller that asked for the
+ * draft (the settings preview) ever loads it.
+ */
 export function describePersonalAvatar(
   assetUrlBase: string,
-  profileRoot: string = resolveActiveProfileRoot()
+  profileRoot: string = resolveActiveProfileRoot(),
+  kind: PersonalAvatarSetKind = 'current'
 ): PersonalAvatarWire | null {
-  const set = loadPersonalAvatarSet(profileRoot);
+  const set = loadPersonalAvatarSet(profileRoot, kind);
   if (!set) return null;
   const base = assetUrlBase.replace(/\/+$/u, '');
+  const suffix = kind === 'draft' ? '?set=draft' : '';
   const images = Object.fromEntries(
-    Object.keys(set.files).map((expression) => [expression, `${base}/${expression}`])
+    Object.keys(set.files).map((expression) => [expression, `${base}/${expression}${suffix}`])
   ) as PersonalAvatarWire['images'];
   return {
     images,
     mouth: set.profile.mouth,
     generated_at: set.profile.generated_at,
     provider_id: set.profile.provider_id,
-    adopted: isAdopted(profileRoot),
+    adopted: kind === 'current' && isAdopted(profileRoot),
+    set: kind,
   };
+}
+
+/**
+ * "Use this avatar": copy the draft frames over `<profileRoot>/avatar/`, write
+ * its `avatar-profile.json` last (the set switches in one write), drop frames
+ * of the previous set the new one no longer names, then remove `draft/`.
+ * Returns the promoted set, or null when there is no valid draft (the current
+ * set is left as it was). Callers run in the personal-tier write context.
+ */
+export function promotePersonalAvatarDraft(
+  profileRoot: string = resolveActiveProfileRoot()
+): PersonalAvatarSet | null {
+  const draft = loadPersonalAvatarSet(profileRoot, 'draft');
+  if (!draft) return null;
+  const dir = personalAvatarDir(profileRoot, 'current');
+  const previous = loadPersonalAvatarSet(profileRoot, 'current');
+  const images: Partial<Record<AvatarExpression, string>> = {};
+  for (const [expression, file] of Object.entries(draft.files) as Array<
+    [AvatarExpression, string]
+  >) {
+    const name = path.basename(file);
+    safeCopyFileSync(file, path.join(dir, name));
+    images[expression] = name;
+  }
+  const profile: PersonalAvatarProfileFile = {
+    ...draft.profile,
+    images: images as PersonalAvatarProfileFile['images'],
+  };
+  safeWriteFile(path.join(dir, AVATAR_PROFILE_FILENAME), JSON.stringify(profile, null, 2), {
+    encoding: 'utf8',
+  });
+  const kept = new Set(Object.values(images));
+  for (const file of Object.values(previous?.files ?? {})) {
+    if (file && !kept.has(path.basename(file))) safeUnlinkSync(file);
+  }
+  safeRmSync(personalAvatarDir(profileRoot, 'draft'), { recursive: true, force: true });
+  return loadPersonalAvatarSet(profileRoot, 'current');
 }
 
 /**

@@ -19,6 +19,7 @@ import {
   AVATAR_PROFILE_FILENAME,
   DEFAULT_GENERATED_AVATAR_EXPRESSIONS,
   DEFAULT_AVATAR_MOUTH_ANCHOR,
+  personalAvatarDir,
   sniffAvatarImageContentType,
   type AvatarExpression,
   type PersonalAvatarProfileFile,
@@ -32,7 +33,7 @@ import {
   safeUnlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
@@ -161,7 +162,7 @@ function isHostHandoff(message: string): boolean {
 export interface AvatarSetOptions {
   /** Absolute path of the user's photo (personal/profile tier or transient capture). */
   inputPhoto: string;
-  /** Absolute output directory (default `<profileRoot>/avatar`). */
+  /** Absolute output directory (CLI default `<profileRoot>/avatar/draft`, adopted via settings). */
   outputDir: string;
   style: string;
   expressions: AvatarExpression[];
@@ -292,7 +293,7 @@ export async function generateAvatarSet(options: AvatarSetOptions): Promise<Avat
     version: 1,
     images: images as PersonalAvatarProfileFile['images'],
     mouth: { ...DEFAULT_AVATAR_MOUTH_ANCHOR },
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     provider_id: providerId ?? 'unknown',
     style: options.style,
   };
@@ -360,7 +361,8 @@ export async function main(
   const outputDir =
     typeof args['output-dir'] === 'string'
       ? args['output-dir']
-      : path.join(resolveActiveProfileRoot(), 'avatar');
+      : // A new set never overwrites the one in use: it waits in draft/ until adopted.
+        personalAvatarDir(resolveActiveProfileRoot(), 'draft');
   // `--prompt` (v1) was the whole prompt; it now seeds the shared style.
   const style =
     typeof args.style === 'string'

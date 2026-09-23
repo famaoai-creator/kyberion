@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { NextResponse } from 'next/server';
 import { withExecutionContext } from '@agent/core/authority';
+import type { PersonalAvatarSetKind } from '@agent/core/presence-avatar';
 import * as secureIo from '@agent/core/secure-io';
 import type { ConciergeViewerContext } from './viewer-context';
 
@@ -19,6 +20,16 @@ export function requireConciergeAvatarOwner(context: ConciergeViewerContext): Ne
     { ok: false, error: 'The personal avatar requires the local owner session.' },
     { status: 403, headers: { 'Cache-Control': 'no-store' } }
   );
+}
+
+/**
+ * The set a request asks for: `?set=draft` (the settings preview of a
+ * generation not yet adopted), otherwise the current set.
+ */
+export function requestedAvatarSet(req: {
+  nextUrl?: { searchParams: URLSearchParams };
+}): PersonalAvatarSetKind {
+  return req.nextUrl?.searchParams.get('set') === 'draft' ? 'draft' : 'current';
 }
 
 export function readConciergePersonal<T>(fn: () => T): T {
