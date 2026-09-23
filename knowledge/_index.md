@@ -123,6 +123,7 @@
 - [Organization Work Loop](./product/architecture/organization-work-loop.md) (public | Ecosystem Architect)
 - [Pane Agent Prompt Handling](./product/architecture/agent-prompt-handling.md) (public | Unknown)
 - [Personal Voice Narrated Video Delivery Plan](./product/architecture/personal-voice-narrated-video-delivery-plan.md) (public | Ecosystem Architect)
+- [Plugin Permissions, Lifecycle and Views](./product/architecture/plugin-permissions-and-views.md) (public | Unknown)
 - [Presence Layer: Sensors, Displays, and Intervention](./product/architecture/presence-layer.md) (public | Ecosystem Architect)
 - [Project Mission Artifact Service Model](./product/architecture/project-mission-artifact-service-model.md) (public | Ecosystem Architect)
 - [Project Operational State Store](./product/architecture/project-operational-state-store.md) (public | Ecosystem Architect)

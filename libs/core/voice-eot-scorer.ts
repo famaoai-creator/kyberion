@@ -11,6 +11,8 @@
  * Pure + injectable clock/timer — no globals, no real timers in tests.
  */
 
+import { loadVoiceTurnTakingLexicon } from './voice-turn-taking-lexicon.js';
+
 export type VoiceEotLang = 'ja' | 'en' | 'auto';
 
 export interface EotScore {
@@ -33,28 +35,8 @@ export interface EotScore {
 // Japanese rule table
 // ---------------------------------------------------------------------------
 
-/** Continuation particles at the end of an utterance imply the speaker is mid-clause. */
-const JA_CONTINUATION_PARTICLES = [
-  'けれど',
-  'けど',
-  'ので',
-  'のに',
-  'たら',
-  'って',
-  'て',
-  'で',
-  'が',
-  'し',
-  'から',
-  'と',
-  '、',
-];
-
-/** Spoken fillers/hedges — the speaker is holding the floor, not done. */
-const JA_FILLERS = ['えーと', 'えっと', 'あの', 'その', 'まあ', 'うーん', 'ええと'];
-
-/** Sentence-final markers / polite endings that read as complete. */
-const JA_COMMIT_ENDINGS = ['です', 'ます', 'ください', 'か'];
+// Japanese continuation particles, fillers and commit endings live in
+// knowledge/product/voice/turn-taking-lexicon.json (loadVoiceTurnTakingLexicon).
 
 const JA_SENTENCE_FINAL_PUNCTUATION = /[。！？!?]$/;
 
@@ -76,15 +58,15 @@ const EN_TRAILING_CONJUNCTIONS = new Set([
 const EN_SENTENCE_FINAL_PUNCTUATION = /[.!?]$/;
 
 function hasHiragana(text: string): boolean {
-  return /[぀-ゟ]/u.test(text);
+  return /[\u3040-\u309f]/u.test(text);
 }
 
 function hasKatakana(text: string): boolean {
-  return /[゠-ヿ]/u.test(text);
+  return /[\u30a0-\u30ff]/u.test(text);
 }
 
 function hasKanji(text: string): boolean {
-  return /[一-鿿]/u.test(text);
+  return /[\u4e00-\u9fff]/u.test(text);
 }
 
 /** Auto-detect: any hiragana/katakana/kanji present → Japanese, else English. */
@@ -96,17 +78,17 @@ function scoreJapanese(text: string): EotScore {
   if (JA_SENTENCE_FINAL_PUNCTUATION.test(text)) {
     return { probability: 0.95, lang: 'ja', rule: 'sentence_final_punctuation' };
   }
-  for (const ending of JA_COMMIT_ENDINGS) {
+  for (const ending of loadVoiceTurnTakingLexicon().ja.commit_endings) {
     if (text.endsWith(ending)) {
       return { probability: 0.9, lang: 'ja', rule: 'commit_ending' };
     }
   }
-  for (const filler of JA_FILLERS) {
+  for (const filler of loadVoiceTurnTakingLexicon().ja.eot_fillers) {
     if (text.endsWith(filler)) {
       return { probability: 0.15, lang: 'ja', rule: 'filler' };
     }
   }
-  for (const particle of JA_CONTINUATION_PARTICLES) {
+  for (const particle of loadVoiceTurnTakingLexicon().ja.continuation_particles) {
     if (text.endsWith(particle)) {
       return { probability: 0.2, lang: 'ja', rule: 'continuation_particle' };
     }

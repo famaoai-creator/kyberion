@@ -8,6 +8,7 @@
  * already run their own VAD can drive stage 1 with `observeVadStart/End`.
  */
 
+import { loadVoiceTurnTakingLexicon } from './voice-turn-taking-lexicon.js';
 import type { AudioChunk } from './meeting-session-types.js';
 import { BargeInController } from './barge-in-controller.js';
 import { computeChunkDurationMs, computeChunkRms } from './voice-activity-detector.js';
@@ -54,25 +55,13 @@ const LATIN_FILLERS = new Set([
   'uhhuh',
 ]);
 
-// Longest first so "えーっと" is stripped before "えー".
-const CJK_FILLERS = [
-  'えーっと',
-  'えーと',
-  'えっと',
-  'あのー',
-  'うーん',
-  'うんうん',
-  'そのー',
-  'まあ',
-  'まー',
-  'えー',
-  'あー',
-  'あの',
-  'うん',
-  'ええ',
-  'んー',
-  'ん',
-];
+// Japanese backchannels come from the turn-taking lexicon; longest first so a
+// long filler is stripped before its prefix.
+function cjkBackchannels(): string[] {
+  return [...loadVoiceTurnTakingLexicon().ja.barge_in_backchannels].sort(
+    (a, b) => b.length - a.length
+  );
+}
 
 const CJK_CHAR = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
 
@@ -84,8 +73,8 @@ export function countBargeInWords(text: string): number {
   if (isPureDisfluency(text)) return 0;
   const normalized = text.normalize('NFKC').toLowerCase();
   let cjk = normalized.replace(/[\p{P}\p{S}\s]+/gu, ' ');
-  for (const filler of CJK_FILLERS) cjk = cjk.split(filler).join(' ');
-  const cjkChars = (cjk.replace(/ー/g, '').match(CJK_CHAR) ?? []).length;
+  for (const filler of cjkBackchannels()) cjk = cjk.split(filler).join(' ');
+  const cjkChars = (cjk.replace(/\u30fc/gu, '').match(CJK_CHAR) ?? []).length;
   const latinWords = cjk
     .replace(CJK_CHAR, ' ')
     .split(/\s+/)
