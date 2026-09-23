@@ -475,6 +475,10 @@ export type KbButtonProps = {
   label: string;
   variant?: KbButtonVariant;
   disabled?: boolean;
+  /** Native `title` attribute (tooltip / accessible description). */
+  title?: string;
+  /** Link target, only meaningful with `href`. `_blank` always gets `rel="noopener"`. */
+  target?: '_blank' | '_self';
 } & ({ href: string; action?: never } | { action: KbAction; href?: never });
 
 export interface KbDisclosureProps {

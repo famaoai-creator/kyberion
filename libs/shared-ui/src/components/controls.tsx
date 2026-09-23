@@ -37,10 +37,17 @@ export interface ButtonProps {
   variant?: KbButtonVariant;
   disabled?: boolean;
   href?: string;
+  /** Native `title` attribute (tooltip / accessible description), on either the link or the button. */
+  title?: string;
+  /** Link target, only meaningful with `href`. `_blank` always gets `rel="noopener"`. */
+  target?: '_blank' | '_self';
   /** Dispatched through the enclosing `A2UIActionProvider`'s `onAction` (an id alone = no payload). */
   action?: KbAction | string;
-  /** React-only click handler; runs before the context `onAction` dispatch. */
-  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+  /**
+   * React-only click handler; runs before the context `onAction` dispatch,
+   * and alongside `href` (before navigation, unless it calls `preventDefault`).
+   */
+  onClick?: (event: MouseEvent<HTMLButtonElement | HTMLAnchorElement>) => void;
   type?: 'button' | 'submit' | 'reset';
   /** Replaces the visible label (the label stays the accessible name). */
   children?: ReactNode;
@@ -57,14 +64,27 @@ export function Button(props: ButtonProps) {
     const href = safeHref(props.href);
     if (href && !props.disabled) {
       return (
-        <KbLink href={href} className={className}>
+        <KbLink
+          href={href}
+          className={className}
+          title={props.title}
+          target={props.target}
+          rel={props.target === '_blank' ? 'noopener' : undefined}
+          onClick={props.onClick}
+        >
           {content}
         </KbLink>
       );
     }
     // Unsafe or disabled link: keep the visual, drop the navigation target.
     return (
-      <a className={className} aria-disabled="true" role="link" aria-label={props.label}>
+      <a
+        className={className}
+        aria-disabled="true"
+        role="link"
+        aria-label={props.label}
+        title={props.title}
+      >
         {content}
       </a>
     );
@@ -76,6 +96,7 @@ export function Button(props: ButtonProps) {
       type={props.type ?? 'button'}
       className={className}
       disabled={props.disabled || undefined}
+      title={props.title}
       data-action-id={action?.id}
       aria-label={props.children ? props.label : undefined}
       onClick={(event) => {
@@ -105,7 +126,7 @@ export interface KbReactActionRef {
   variant?: KbButtonVariant;
   disabled?: boolean;
   action?: KbAction | string;
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  onClick: (event: MouseEvent<HTMLButtonElement | HTMLAnchorElement>) => void;
   href?: never;
 }
 

@@ -93,7 +93,7 @@ export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
   'presence_studio:voice_handsfree_conversation_work_subtitle',
   'presence_studio:voice_handsfree_conversation_subtitle',
   'presence_studio:voice_handsfree_mode_subtitle',
-  'presence_studio:candidate_index_suffix',
+  'presence_studio:candidate_index_spoken',
   'presence_studio:no_requested_work',
   'presence_studio:requested_work_hint',
   'presence_studio:select_work_item_hint',

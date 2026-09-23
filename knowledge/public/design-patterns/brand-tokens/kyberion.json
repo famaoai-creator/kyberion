@@ -37,7 +37,7 @@
       }
     },
     "fonts": {
-      "sans": "Inter, 'Noto Sans JP', sans-serif",
+      "sans": "Inter, \"Hiragino Sans\", \"Noto Sans JP\", \"Yu Gothic UI\", \"Meiryo\", system-ui, sans-serif",
       "mono": "'JetBrains Mono', monospace"
     },
     "typography": {

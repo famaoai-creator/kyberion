@@ -10,7 +10,7 @@ import type {
 } from '@agent/core/a2ui-catalog';
 import { statusLabel } from '../catalog.js';
 import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
-import { ActionRefButton } from './controls.js';
+import { ActionRefButton, type ActionRefLike } from './controls.js';
 
 const TONES: ReadonlySet<string> = new Set([
   'neutral',
@@ -64,14 +64,14 @@ export function Badge({ label, tone, role }: KbBadgeProps) {
   );
 }
 
+export type CalloutProps = Omit<KbCalloutProps, 'action'> & {
+  /** Catalog ref (`href` or `action`) or React-only `{ label, onClick }` (see `SectionProps.actions`). */
+  action?: ActionRefLike;
+  children?: ReactNode;
+};
+
 /** `ui:callout` → `.kb-callout[data-tone]` with `__icon`, `__content`, `__title`, `__body`, `__action`. */
-export function Callout({
-  tone,
-  title,
-  body,
-  action,
-  children,
-}: KbCalloutProps & { children?: ReactNode }) {
+export function Callout({ tone, title, body, action, children }: CalloutProps) {
   const resolvedTone = typeof tone === 'string' && CALLOUT_TONES.has(tone) ? tone : 'info';
   return (
     <div
@@ -94,8 +94,13 @@ export function Callout({
   );
 }
 
+export type EmptyStateProps = Omit<KbEmptyStateProps, 'action'> & {
+  /** Catalog ref (`href` or `action`) or React-only `{ label, onClick }` (see `SectionProps.actions`). */
+  action?: ActionRefLike;
+};
+
 /** `ui:empty-state` → `.kb-empty-state` with `__title`, `__body`, `__action`. */
-export function EmptyState({ title, body, action }: KbEmptyStateProps) {
+export function EmptyState({ title, body, action }: EmptyStateProps) {
   return (
     <div className="kb-empty-state">
       <p className="kb-empty-state__title">{title}</p>

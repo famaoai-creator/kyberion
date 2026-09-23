@@ -1681,6 +1681,14 @@
         },
         "disabled": {
           "type": "boolean"
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "target": {
+          "type": "string",
+          "enum": ["_blank", "_self"],
+          "description": "Link target, only meaningful with href. _blank always gets rel=\"noopener\"."
         }
       },
       "required": ["label"],

@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { ReactElement, ReactNode } from 'react';
+import { act, type ReactElement, type ReactNode } from 'react';
 import { getUiMessageBundle } from '@agent/core';
+import {
+  fireEvent,
+  installFakeDom,
+  type FakeDocument,
+  type FakeElement,
+} from '../vanilla/fake-dom.test-support.js';
 import {
   A2UIActionProvider,
   AppShell,
@@ -433,6 +439,16 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
     );
   });
 
+  it('Callout / EmptyState: action accepts a React-only { label, onClick } ref (like Section/PageHeader)', () => {
+    const onClick = () => {};
+    expect(html(<Callout tone="info" title="t" action={{ label: '再試行', onClick }} />)).toContain(
+      '<button type="button" class="kb-btn kb-btn--secondary">再試行</button>'
+    );
+    expect(html(<EmptyState title="t" action={{ label: '再試行', onClick }} />)).toContain(
+      '<button type="button" class="kb-btn kb-btn--primary">再試行</button>'
+    );
+  });
+
   it('Skeleton: shape and clamped line count', () => {
     const out = html(<Skeleton shape="table" lines={2} />);
     expect(out).toBe(
@@ -455,6 +471,21 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
     );
     expect(html(<Button label="x" variant={'neon' as never} action={{ id: 'a' }} />)).toContain(
       'kb-btn--secondary'
+    );
+  });
+
+  it('Button: title on link and button, target="_blank" adds rel="noopener"', () => {
+    expect(html(<Button label="開く" href="https://example.com/x" title="外部サイト" />)).toBe(
+      '<a href="https://example.com/x" class="kb-btn kb-btn--secondary" title="外部サイト">開く</a>'
+    );
+    expect(html(<Button label="開く" action={{ id: 'a' }} title="ヒント" />)).toBe(
+      '<button type="button" class="kb-btn kb-btn--secondary" title="ヒント" data-action-id="a">開く</button>'
+    );
+    expect(html(<Button label="開く" href="https://example.com/x" target="_blank" />)).toBe(
+      '<a href="https://example.com/x" class="kb-btn kb-btn--secondary" target="_blank" rel="noopener">開く</a>'
+    );
+    expect(html(<Button label="開く" href="https://example.com/x" target="_self" />)).toBe(
+      '<a href="https://example.com/x" class="kb-btn kb-btn--secondary" target="_self">開く</a>'
     );
   });
 
@@ -576,5 +607,52 @@ describe('UI-01d i18n: renderer defaults come from the ui vocabulary bundle', ()
     expect(Object.keys(KB_UI_DEFAULT_MESSAGES).sort()).toEqual(
       Object.keys(getUiMessageBundle('en').messages).sort()
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Interaction (react-dom/client on the fake DOM) — Button's onClick + href.
+// ---------------------------------------------------------------------------
+
+type ClientModule = typeof import('react-dom/client');
+let client: ClientModule;
+let dom: ReturnType<typeof installFakeDom>;
+
+beforeAll(async () => {
+  dom = installFakeDom();
+  client = await import('react-dom/client');
+});
+
+afterAll(() => {
+  dom.restore();
+});
+
+function mountButton(element: ReactElement): { link: FakeElement; unmount: () => void } {
+  const document = dom.document as FakeDocument;
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = client.createRoot(container as unknown as Element);
+  act(() => root.render(element));
+  const link = container.querySelector('a');
+  if (!link) throw new Error('no <a> rendered');
+  return { link, unmount: () => act(() => root.unmount()) };
+}
+
+describe('Button: interaction', () => {
+  it('onClick fires alongside href, before navigation, unless preventDefault is called', () => {
+    let clicked = false;
+    const m = mountButton(
+      <Button
+        label="開く"
+        href="https://example.com/x"
+        onClick={() => {
+          clicked = true;
+        }}
+      />
+    );
+    expect(m.link.getAttribute('href')).toBe('https://example.com/x');
+    act(() => fireEvent(m.link, 'click'));
+    expect(clicked).toBe(true);
+    m.unmount();
   });
 });

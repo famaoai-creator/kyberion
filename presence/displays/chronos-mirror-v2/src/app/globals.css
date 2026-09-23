@@ -19,7 +19,7 @@
   --kb-border: #e2e8f0;
   --kb-success: #15803d;
   --kb-danger: #b91c1c;
-  --kb-font-sans: Inter, 'Noto Sans JP', sans-serif;
+  --kb-font-sans: Inter, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
   --kb-font-mono: 'JetBrains Mono', monospace;
   --kb-blur: blur(12px);
   --kb-glow-cyan: 0 0 15px rgba(0, 242, 255, 0.4);
@@ -28,16 +28,16 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #020617;
-    --foreground: #f8fafc;
+    --foreground: #F8FAFC;
     --kb-bg-main: #020617;
     --kb-panel-bg: rgba(10, 25, 47, 0.82);
-    --kb-primary: #0a192f;
-    --kb-secondary: #31415b;
-    --kb-accent: #00f2ff;
+    --kb-primary: #0A192F;
+    --kb-secondary: #31415B;
+    --kb-accent: #00F2FF;
     --kb-warning: #f59e0b;
-    --kb-text-primary: #f8fafc;
+    --kb-text-primary: #F8FAFC;
     --kb-text-secondary: rgba(248, 250, 252, 0.62);
-    --kb-accent-text: #00f2ff;
+    --kb-accent-text: #00F2FF;
     --kb-surface: #0f172a;
     --kb-muted-text: #94a3b8;
     --kb-border: #1e293b;
@@ -69,16 +69,16 @@
 [data-theme='dark'] {
   color-scheme: dark;
   --background: #020617;
-  --foreground: #f8fafc;
+  --foreground: #F8FAFC;
   --kb-bg-main: #020617;
   --kb-panel-bg: rgba(10, 25, 47, 0.82);
-  --kb-primary: #0a192f;
-  --kb-secondary: #31415b;
-  --kb-accent: #00f2ff;
+  --kb-primary: #0A192F;
+  --kb-secondary: #31415B;
+  --kb-accent: #00F2FF;
   --kb-warning: #f59e0b;
-  --kb-text-primary: #f8fafc;
+  --kb-text-primary: #F8FAFC;
   --kb-text-secondary: rgba(248, 250, 252, 0.62);
-  --kb-accent-text: #00f2ff;
+  --kb-accent-text: #00F2FF;
   --kb-surface: #0f172a;
   --kb-muted-text: #94a3b8;
   --kb-border: #1e293b;
@@ -161,7 +161,7 @@
   --kb-ui-space-5: 24px;
   --kb-ui-space-6: 32px;
   --kb-ui-space-7: 48px;
-  --kb-ui-font-sans: Inter, 'Noto Sans JP', sans-serif;
+  --kb-ui-font-sans: Inter, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
   --kb-ui-font-mono: 'JetBrains Mono', monospace;
   --kb-ui-font-size-xs: 12px;
   --kb-ui-font-size-sm: 13px;
@@ -171,7 +171,7 @@
   --kb-ui-font-size-xxl: 28px;
 }
 
-[data-density='comfortable'] {
+[data-density="comfortable"] {
   --kb-ui-font-size-xs: 12px;
   --kb-ui-font-size-sm: 13px;
   --kb-ui-font-size-md: 15px;
@@ -180,7 +180,7 @@
   --kb-ui-font-size-xxl: 28px;
 }
 
-[data-density='compact'] {
+[data-density="compact"] {
   --kb-ui-font-size-xs: 11px;
   --kb-ui-font-size-sm: 12px;
   --kb-ui-font-size-md: 13px;
@@ -190,7 +190,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme="light"]) {
     --kb-ui-color-scheme: dark;
     --kb-ui-canvas: #0d131e;
     --kb-ui-surface: #141b29;
@@ -257,7 +257,7 @@
   }
 }
 
-:root[data-theme='dark'] {
+:root[data-theme="dark"] {
   --kb-ui-color-scheme: dark;
   --kb-ui-canvas: #0d131e;
   --kb-ui-surface: #141b29;
@@ -1351,29 +1351,6 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: var(--kb-ui-space-2);
-}
-
-/*
- * Japanese typography (UI-07 wave 3b). Neither Inter nor Noto Sans JP ships
- * with the surface, so Japanese text fell through to Hiragino Kaku Gothic
- * ProN with full-width (monospaced) kana and punctuation metrics — the "wide
- * letter-spacing" look. Prefer the modern system Japanese faces and turn on
- * proportional alternates (`palt`) for Japanese content only. The generated
- * token block above stays untouched (tokens.ui owns the default stack).
- */
-:root {
-  --kb-ui-font-sans:
-    Inter, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI',
-    'Yu Gothic', Meiryo, system-ui, sans-serif;
-}
-
-:lang(ja) {
-  font-feature-settings: 'palt' 1;
-  line-break: strict;
-}
-
-:lang(ja) :where(code, pre, kbd, samp, .kb-code, [data-mono='true']) {
-  font-feature-settings: normal;
 }
 
 /* Keep the floating chat launcher (≈30–36px, 16px from the edge) off the last row. */

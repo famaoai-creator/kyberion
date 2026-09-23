@@ -1789,7 +1789,7 @@
           : [];
         renderList(browserConversationCandidatesEl, candidates.map((item, index) => ({ ...item, candidateIndex: index + 1 })), (item) =>
           `<div class="row"><div style="display:flex;align-items:center;gap:10px;"><span class="candidate-index">${item.candidateIndex}</span><strong>${(item.label || item.text || item.element_id || "candidate").replace(/</g, "&lt;")}</strong></div><span class="mono">${item.region_hint || "unknown"}</span></div>
-           <div class="small">say: <span class="mono">${item.candidateIndex}${escapeHtml(uiTextKey("presence_studio:candidate_index_suffix", ""))}</span> · ref: <span class="mono">${(item.element_id || "").replace(/</g, "&lt;")}</span> · confidence: <span class="mono">${item.confidence ?? "n/a"}</span></div>`
+           <div class="small">say: <span class="mono">${escapeHtml(uiMessage("presence_studio:candidate_index_spoken", { index: item.candidateIndex }, `number ${item.candidateIndex}`))}</span> · ref: <span class="mono">${(item.element_id || "").replace(/</g, "&lt;")}</span> · confidence: <span class="mono">${item.confidence ?? "n/a"}</span></div>`
         );
         renderBrowserSessionSelect();
         renderVoicePresenceState();

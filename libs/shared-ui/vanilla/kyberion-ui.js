@@ -575,10 +575,12 @@ function actionButton(ctx, ref, defaultVariant, source) {
     : defaultVariant;
   const className = `kb-btn kb-btn--${variant}`;
   const disabled = ref.disabled === true;
+  const title = str(ref.title);
   const action = normalizeAction(ref.action);
   if (action) {
     const button = el(ctx, 'button', className, label);
     button.setAttribute('type', 'button');
+    if (title) button.setAttribute('title', title);
     setData(button, 'action-id', action.id);
     if (disabled) button.disabled = true;
     button.addEventListener('click', () => {
@@ -589,8 +591,14 @@ function actionButton(ctx, ref, defaultVariant, source) {
   if (ref.href === undefined) return null;
   const href = safeHref(ref.href);
   const link = el(ctx, 'a', className, label);
+  if (title) link.setAttribute('title', title);
   if (href && !disabled) {
     link.setAttribute('href', href);
+    const target = ref.target === '_blank' || ref.target === '_self' ? ref.target : undefined;
+    if (target) {
+      link.setAttribute('target', target);
+      if (target === '_blank') link.setAttribute('rel', 'noopener');
+    }
     return link;
   }
   // Unsafe or disabled link: keep the visual, drop the navigation target.

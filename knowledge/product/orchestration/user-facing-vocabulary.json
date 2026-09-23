@@ -13130,10 +13130,10 @@
         "ja": "Hands-free {mode} mode が有効です。",
         "qps-ploc": "⟦Ħȧñḓş-ƒřėė {mode} ɱőḓė ïş őñ. ŀőřėɱ ïṗş⟧"
       },
-      "candidate_index_suffix": {
-        "en": "",
-        "ja": "つ目",
-        "qps-ploc": "⟦ ŀőř⟧"
+      "candidate_index_spoken": {
+        "en": "number {index}",
+        "ja": "{index}つ目",
+        "qps-ploc": "⟦ñůɱƀėř {index} ŀőřė⟧"
       },
       "no_requested_work": {
         "en": "No requested work yet.",
