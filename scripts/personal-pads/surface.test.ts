@@ -29,9 +29,19 @@ describe('personal pads surface seams', () => {
 
   it('keeps top scope and history access in the application seam', () => {
     expect(getTop(context)).toMatchObject({ title: 'Capture desk', scope: context.scope });
-    expect(getHistory(context, 'memory-capture', { limit: 1 })).toMatchObject({
+    expect(getHistory(context, 'memory-capture', { limit: 1 }, undefined, 'ja')).toMatchObject({
       records: expect.any(Array),
       storage_label: '公開 scope の Memory capture',
+    });
+    expect(getHistory(context, 'memory-capture', { limit: 1 }, undefined, 'en')).toMatchObject({
+      storage_label: 'Memory capture in the public scope',
+    });
+    expect(getTop(context, 'en').subtitle).toBe(
+      'Capture from one place and review it safely later'
+    );
+    expect(getMenu('en')[0]).toMatchObject({
+      label: 'Memory capture',
+      description: 'Jot down ideas, tags, and next actions quickly',
     });
   });
 

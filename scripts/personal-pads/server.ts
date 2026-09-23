@@ -17,6 +17,12 @@ import {
   type LocalPadContext,
 } from '../lib/local-artifact-pad.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
+import { PERSONAL_PADS_CLIENT_MODULES } from './client-runtime.js';
+import { padsT } from './i18n.js';
 import { assertPadAdaptersComplete } from './adapters.js';
 import { executePadAction, getPadActionAvailability } from './actions.js';
 import { personalPadsPage } from './page.js';
@@ -63,6 +69,20 @@ function json(res: http.ServerResponse, status: number, value: unknown): void {
 function html(res: http.ServerResponse, value: string): void {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(value);
+}
+
+/** One browser runtime module (`client/*.js`, allow-listed) as an ES module. */
+function sendClientModule(res: http.ServerResponse, source: string): void {
+  const body = safeReadFile(pathResolver.rootResolve(source), {
+    encoding: null,
+  }) as Buffer;
+  res.writeHead(200, {
+    'Content-Type': 'text/javascript; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Length': String(body.byteLength),
+  });
+  res.end(body);
 }
 
 /** History is a browser-facing projection; handoff paths stay server-side. */
@@ -161,7 +181,11 @@ function requestErrorStatus(error: unknown): number {
 }
 
 /** Keep transport errors useful without reflecting repository/provider paths. */
-export function toPublicRequestError(error: unknown): { code: string; message: string } {
+export function toPublicRequestError(
+  error: unknown,
+  locale?: SupportedLocale
+): { code: string; message: string } {
+  const t = padsT(locale);
   const raw = error instanceof Error ? error.message : String(error);
   if (
     /(?:ENOENT|EACCES|EPERM|secure-io|(?:^|[\s:(])(?:[A-Za-z]:[\\/]|\/|active[\\/])|(?:path|directory|out_dir|file_path))/iu.test(
@@ -170,12 +194,12 @@ export function toPublicRequestError(error: unknown): { code: string; message: s
   ) {
     return {
       code: 'storage_or_provider_error',
-      message: '操作を完了できませんでした。設定と権限を確認してください。',
+      message: t('personal_pads:error_storage_or_provider'),
     };
   }
   return {
     code: 'request_failed',
-    message: raw || '操作を完了できませんでした。',
+    message: raw || t('personal_pads:error_request_failed'),
   };
 }
 
@@ -228,18 +252,32 @@ export function createPersonalPadsServer(
 
   return http.createServer(async (req, res) => {
     let releaseCapture: (() => void) | undefined;
+    // Per-request page / message language (`?lang=` → cookie → Accept-Language → default).
+    const locale = resolvePadLocale(req);
     try {
+      // Shared kit assets (/shared-ui/*, /kyberion-ui.css, /pad-ui/pad-client.js).
+      if (handlePadUiAsset(req, res)) return;
       const url = new URL(req.url || '/', 'http://127.0.0.1');
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-        html(res, personalPadsPage(token, base, surface));
+        html(res, personalPadsPage(token, base, surface, locale));
+        return;
+      }
+      const clientModule = Object.prototype.hasOwnProperty.call(
+        PERSONAL_PADS_CLIENT_MODULES,
+        url.pathname
+      )
+        ? PERSONAL_PADS_CLIENT_MODULES[url.pathname]
+        : undefined;
+      if (req.method === 'GET' && clientModule) {
+        sendClientModule(res, clientModule);
         return;
       }
       if (!authorize(req, res)) return;
       const context = scopeForRequest(base, url.searchParams.get('tier') || undefined);
       if (req.method === 'GET' && url.pathname === '/api/context') {
         json(res, 200, {
-          top: surface.getTop(context),
-          ...surface.getSurfaceContract(),
+          top: surface.getTop(context, locale),
+          ...surface.getSurfaceContract(locale),
           scope: context.scope,
           viewer_principal: context.viewer_principal,
         });
@@ -247,26 +285,27 @@ export function createPersonalPadsServer(
       }
       if (req.method === 'GET' && url.pathname === '/api/pads') {
         json(res, 200, {
-          menu: surface.getMenu(),
-          content: surface.getSurfaceContract().content,
+          menu: surface.getMenu(locale),
+          content: surface.getSurfaceContract(locale).content,
           scope: context.scope,
         });
         return;
       }
       if (req.method === 'GET' && url.pathname === '/api/action-readiness') {
-        const content = surface.getContent(url.searchParams.get('pad'));
+        const content = surface.getContent(url.searchParams.get('pad'), locale);
         json(res, 200, {
           actions: content.adapter.actions.map((action) => {
             try {
               return (
                 surface.getActionAvailability ??
-                ((padId, actionId) => getPadActionAvailability(padId, actionId, content.adapter))
-              )(content.entry.id, action.id);
+                ((padId, actionId, requestLocale) =>
+                  getPadActionAvailability(padId, actionId, content.adapter, requestLocale))
+              )(content.entry.id, action.id, locale);
             } catch {
               return {
                 action_id: action.id,
                 status: 'ready' as const,
-                message: 'host-provided action',
+                message: padsT(locale)('personal_pads:availability_host_provided'),
               };
             }
           }),
@@ -276,7 +315,7 @@ export function createPersonalPadsServer(
       }
       if (req.method === 'GET' && url.pathname === '/api/history') {
         const padId = url.searchParams.get('pad');
-        const content = surface.getContent(padId);
+        const content = surface.getContent(padId, locale);
         const history = surface.getHistory(
           context,
           content.entry.id,
@@ -284,7 +323,8 @@ export function createPersonalPadsServer(
             cursor: url.searchParams.get('cursor') || undefined,
             limit: Number(url.searchParams.get('limit') || 25),
           },
-          storageRoot
+          storageRoot,
+          locale
         );
         json(res, 200, {
           ...history,
@@ -328,13 +368,11 @@ export function createPersonalPadsServer(
           'personal pads capture'
         ) as Record<string, unknown>;
         const padId = body.pad_id;
-        const content = surface.getContent(padId);
+        const content = surface.getContent(padId, locale);
         const { adapter } = content;
         releaseCapture = acquireCapture(content.entry.id, content.entry.max_concurrent);
         if (!releaseCapture) {
-          json(res, 503, {
-            error: '同じ pad の保存処理が上限に達しています。完了を待ってください。',
-          });
+          json(res, 503, { error: padsT(locale)('personal_pads:error_capture_busy') });
           return;
         }
         if (body.tier !== undefined && body.tier !== context.scope.tier) {
@@ -402,7 +440,7 @@ export function createPersonalPadsServer(
           'personal pads action'
         ) as Record<string, unknown>;
         const padId = body.pad_id;
-        const content = surface.getContent(padId);
+        const content = surface.getContent(padId, locale);
         if (Buffer.byteLength(JSON.stringify(body), 'utf8') > content.entry.max_body_bytes) {
           json(res, 413, { error: 'action input exceeds pad adapter size limit' });
           return;
@@ -448,6 +486,7 @@ export function createPersonalPadsServer(
           context,
           storage_root: storageRoot,
           adapter: content.adapter,
+          locale,
           ...(record ? { record } : {}),
         });
         json(res, 200, { ...result, scope: context.scope });
@@ -455,7 +494,7 @@ export function createPersonalPadsServer(
       }
       json(res, 404, { error: 'not found' });
     } catch (error) {
-      const publicError = toPublicRequestError(error);
+      const publicError = toPublicRequestError(error, locale);
       json(res, requestErrorStatus(error), {
         error: publicError.message,
         code: publicError.code,
