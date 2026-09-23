@@ -1,6 +1,6 @@
 {
   "v": "2.0.0",
-  "t": 32,
+  "t": 33,
   "actuators": [
     {
       "n": "agent-actuator",
@@ -116,6 +116,16 @@
       "ops": ["impact_analysis", "pipeline", "reconcile", "semgrep_scan"],
       "contract_schema": "knowledge/product/schemas/code-pipeline.schema.json",
       "prerequisites_summary": "bin:semgrep, os:darwin, os:linux"
+    },
+    {
+      "n": "compute-actuator",
+      "path": "libs/actuators/compute-actuator",
+      "d": "Remote and local compute orchestration actuator for heavy batch workloads, fine-tuning, and model execution across local and ephemeral substrates (such as Google Colab).",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 4,
+      "ops": ["cancel_job", "collect_artifact", "poll_status", "submit_job"],
+      "prerequisites_summary": "-"
     },
     {
       "n": "deployment-actuator",
