@@ -27,6 +27,17 @@ const VALID_EXAMPLES: Record<KyberionBaseComponentType, Record<string, unknown>>
     actions: [{ label: '新規', href: '/missions/new', variant: 'primary' }],
   },
   'ui:nav-rail': {
+    brand: { name: 'Kyberion', subtitle: 'あなたの秘書室', logo_url: '/logo.svg' },
+    context: {
+      label: '既定のテナント',
+      detail: 'オーナー · 2 件から切替',
+      switch_label: 'テナントを切り替える',
+      action: { id: 'tenant.switch' },
+      options: [
+        { value: 'default', label: '既定のテナント', selected: true },
+        { value: 'acme', label: 'Acme' },
+      ],
+    },
     items: [{ id: 'home', label: 'ホーム', href: '/', active: true, icon: 'home' }],
     footer_items: [{ id: 'settings', label: '設定', href: '/settings' }],
   },
@@ -53,10 +64,14 @@ const VALID_EXAMPLES: Record<KyberionBaseComponentType, Record<string, unknown>>
     empty: 'まだありません',
   },
   'ui:list': {
-    items: [{ title: 'build', meta: '10:02', status: 'completed', href: '/t/1' }],
+    items: [
+      { title: 'build', meta: '10:02', status: 'completed', href: '/t/1' },
+      { title: 'deploy', status: 'active', status_label: '進行中', progress: 40 },
+    ],
     variant: 'timeline',
   },
   'ui:text': { text: 'hello', variant: 'muted' },
+  'ui:code': { code: 'pnpm build\n  ok', language: 'shell', title: 'ビルド' },
   'ui:status-pill': { status: 'n/a', domain: 'connection', label: '該当なし' },
   'ui:badge': { label: '読み取り専用', tone: 'neutral' },
   'ui:callout': { tone: 'danger', title: '接続できません', body: '再試行してください' },
@@ -67,6 +82,14 @@ const VALID_EXAMPLES: Record<KyberionBaseComponentType, Record<string, unknown>>
   'ui:skeleton': { lines: 3, shape: 'table' },
   'ui:button': { label: '保存', variant: 'secondary', action: { id: 'save', payload: { a: 1 } } },
   'ui:disclosure': { summary: '開発者向け', open: false },
+  'ui:display-controls': {
+    theme: 'dark',
+    locale: 'ja',
+    locales: [
+      { value: 'ja', label: '日本語' },
+      { value: 'en', label: 'English' },
+    ],
+  },
   // UI-01c settings & forms
   'ui:settings-group': { title: '通知', description: 'いつ知らせるか' },
   'ui:setting-row': { label: 'メール通知', description: '承認待ちを知らせる', tone: 'neutral' },
@@ -227,6 +250,28 @@ describe('kyberion-base A2UI catalog', () => {
       validateA2UIComponentProps('ui:callout', { tone: 'accent', title: 'x' })
     ).toThrow();
     expect(() => validateA2UIComponentProps('ui:app-shell', { density: 'cozy' })).toThrow();
+  });
+
+  it('bounds the nav-rail slots, list progress and display-controls values', () => {
+    expect(() =>
+      validateA2UIComponentProps('ui:nav-rail', { items: [], brand: { subtitle: 'x' } })
+    ).toThrow(/name/u);
+    expect(() =>
+      validateA2UIComponentProps('ui:nav-rail', {
+        items: [],
+        context: { label: 't', href: 'javascript:alert(1)' },
+      })
+    ).toThrow();
+    expect(() =>
+      validateA2UIComponentProps('ui:list', { items: [{ title: 'x', progress: 140 }] })
+    ).toThrow();
+    expect(() =>
+      validateA2UIComponentProps('ui:list', { items: [{ title: 'x', status_label: '' }] })
+    ).toThrow();
+    expect(() => validateA2UIComponentProps('ui:display-controls', { theme: 'sepia' })).toThrow(
+      /theme/u
+    );
+    expect(() => validateA2UIComponentProps('ui:display-controls', {})).not.toThrow();
   });
 
   it('enforces link/action and state-dependent requirements', () => {

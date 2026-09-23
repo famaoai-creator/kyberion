@@ -112,6 +112,8 @@ export function getGuardedSurfaceUrl(): string | undefined {
 
 export interface MissionRow {
   mission_id: string;
+  /** Human-readable title: the agreed goal summary, else the humanized id. */
+  title: string;
   status: string;
   tier: 'personal' | 'confidential' | 'public';
   tenant_slug?: string;
@@ -136,6 +138,23 @@ function readMissionState(absPath: string) {
   } catch {
     return null;
   }
+}
+
+/**
+ * UI-08: a human-readable mission title for list/detail views — the agreed
+ * intent goal summary when the mission carries one, otherwise the mission id
+ * without its `MSN-` prefix and trailing date stamp (`SURFACE UI UNIFY`).
+ */
+export function missionDisplayTitle(state: {
+  mission_id: string;
+  intent?: { goal_summary?: string };
+}): string {
+  const goal = (state.intent?.goal_summary || '').trim().replace(/\s+/g, ' ');
+  if (goal) return goal.length > 80 ? `${goal.slice(0, 79)}…` : goal;
+  const bare = String(state.mission_id || '')
+    .replace(/^MSN-/i, '')
+    .replace(/-\d{8}[A-Z]?$/i, '');
+  return bare.replace(/[-_]+/g, ' ').trim() || state.mission_id;
 }
 
 function safeResourcePath(absPath: string): string | null {
@@ -196,6 +215,7 @@ function listMissionsForTier(tier: 'personal' | 'confidential' | 'public'): Miss
         if (!state) continue;
         rows.push({
           mission_id: state.mission_id,
+          title: missionDisplayTitle(state),
           status: state.status,
           tier,
           tenant_slug: detectMissionTenantSlug(state, abs),
@@ -279,6 +299,7 @@ export function getMissionDetail(missionId: string): MissionDetail | null {
         if (scope && state.tier !== 'public' && tenantSlug !== scope) continue;
         const detail: MissionDetail = {
           mission_id: state.mission_id,
+          title: missionDisplayTitle(state),
           status: state.status,
           tier: state.tier,
           mission_type: state.mission_type,

@@ -1,13 +1,23 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import type {
   KbAppShellProps,
+  KbNavBrand,
+  KbNavContext,
   KbNavItem,
   KbNavRailProps,
   KbPageHeaderProps,
   KbTabsProps,
 } from '@agent/core/a2ui-catalog';
+import { navBrandLogo, navContextOptions, navContextPayload } from '../../vanilla/kyberion-ui.js';
 import { useA2UIActions } from '../actions.js';
 import { TABS_SELECT_ACTION } from '../catalog.js';
 import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
@@ -127,9 +137,150 @@ function NavRailItem({ item }: { item: KbNavItem }) {
   );
 }
 
-/** `ui:nav-rail` → `nav.kb-nav-rail` (`ul.__list` of `a.__item`, optional `__footer`). */
+/** `ui:nav-rail` brand slot → `.kb-nav-rail__brand` (logo or mark + name / subtitle). */
+function NavBrand({ brand }: { brand: KbNavBrand }) {
+  const logo = navBrandLogo(brand.logo_url);
+  return (
+    <div className="kb-nav-rail__brand">
+      {logo ? (
+        <img className="kb-nav-rail__brand-logo" src={logo} alt="" />
+      ) : (
+        <span className="kb-nav-rail__brand-mark" aria-hidden="true" />
+      )}
+      <span className="kb-nav-rail__brand-text">
+        <strong className="kb-nav-rail__brand-name">{brand.name}</strong>
+        {brand.subtitle ? (
+          <span className="kb-nav-rail__brand-subtitle">{brand.subtitle}</span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+function NavContextBody({ context, hiddenLabel }: { context: KbNavContext; hiddenLabel?: string }) {
+  return (
+    <>
+      {hiddenLabel ? <span className="kb-visually-hidden">{hiddenLabel}</span> : null}
+      <span className="kb-nav-rail__context-label">{context.label}</span>
+      {context.detail ? (
+        <span className="kb-nav-rail__context-detail">{context.detail}</span>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * `ui:nav-rail` context slot → `.kb-nav-rail__context`: options + action =
+ * switcher (button + listbox; choosing dispatches `action` with `{ value }`),
+ * action alone = button, href alone = link, else static text. Same markup as
+ * the vanilla renderer (the option list is always rendered, `hidden` when
+ * closed).
+ */
+function NavContext({ context }: { context: KbNavContext }) {
+  const { onAction } = useA2UIActions();
+  const { t } = useKbI18n();
+  const [open, setOpen] = useState(false);
+  const action = context.action && typeof context.action.id === 'string' ? context.action : null;
+  const options = navContextOptions(context);
+  const switchLabel = context.switch_label || t(KB_UI_MESSAGE_KEYS.navContextSwitch);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const onKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === 'Escape' && open) setOpen(false);
+    },
+    [open]
+  );
+  // A pointer press outside the block closes the open list (like Escape).
+  useEffect(() => {
+    if (!open || typeof document === 'undefined') return undefined;
+    const onOutside = (event: Event) => {
+      const root = rootRef.current;
+      if (root && root.contains(event.target as Node | null)) return;
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', onOutside);
+    return () => document.removeEventListener('pointerdown', onOutside);
+  }, [open]);
+  if (action && options.length > 0) {
+    return (
+      <div className="kb-nav-rail__context" ref={rootRef} onKeyDown={onKeyDown}>
+        <button
+          type="button"
+          className="kb-nav-rail__context-button"
+          aria-haspopup="listbox"
+          aria-expanded={open ? 'true' : 'false'}
+          onClick={() => setOpen((previous) => !previous)}
+        >
+          <NavContextBody context={context} hiddenLabel={switchLabel} />
+        </button>
+        <ul
+          className="kb-nav-rail__context-menu"
+          role="listbox"
+          aria-label={switchLabel}
+          hidden={!open}
+        >
+          {options.map((option) => (
+            <li key={option.value} role="presentation">
+              <button
+                type="button"
+                className="kb-nav-rail__context-option"
+                role="option"
+                aria-selected={option.selected === true ? 'true' : 'false'}
+                data-value={option.value}
+                onClick={() => {
+                  setOpen(false);
+                  onAction?.(action.id, navContextPayload(action, option.value));
+                }}
+              >
+                {option.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  if (action) {
+    return (
+      <div className="kb-nav-rail__context">
+        <button
+          type="button"
+          className="kb-nav-rail__context-button"
+          data-action-id={action.id}
+          onClick={() => onAction?.(action.id, action.payload)}
+        >
+          <NavContextBody context={context} hiddenLabel={switchLabel} />
+        </button>
+      </div>
+    );
+  }
+  const href = safeHref(context.href);
+  if (href) {
+    return (
+      <div className="kb-nav-rail__context">
+        <KbLink href={href} className="kb-nav-rail__context-button">
+          <NavContextBody context={context} hiddenLabel={switchLabel} />
+        </KbLink>
+      </div>
+    );
+  }
+  return (
+    <div className="kb-nav-rail__context">
+      <div className="kb-nav-rail__context-button" data-static="true">
+        <NavContextBody context={context} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * `ui:nav-rail` → `nav.kb-nav-rail` (optional `__brand` and `__context`
+ * slots, `ul.__list` of `a.__item`, optional `__footer`).
+ */
 export function NavRail({
   label,
+  brand,
+  context,
   items,
   footer_items,
   children,
@@ -138,12 +289,18 @@ export function NavRail({
   const footer = asArray(footer_items);
   return (
     <nav className="kb-nav-rail" aria-label={label || t(KB_UI_MESSAGE_KEYS.navLabel)}>
+      {brand && typeof brand.name === 'string' && brand.name ? <NavBrand brand={brand} /> : null}
+      {context && typeof context.label === 'string' && context.label ? (
+        <NavContext context={context} />
+      ) : null}
       {children}
-      <ul className="kb-nav-rail__list">
-        {asArray(items).map((item) => (
-          <NavRailItem key={item.id} item={item} />
-        ))}
-      </ul>
+      {asArray(items).length ? (
+        <ul className="kb-nav-rail__list">
+          {asArray(items).map((item) => (
+            <NavRailItem key={item.id} item={item} />
+          ))}
+        </ul>
+      ) : null}
       {footer.length ? (
         <div className="kb-nav-rail__footer">
           <ul className="kb-nav-rail__list">

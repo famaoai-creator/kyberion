@@ -126,10 +126,10 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
   ).length;
 
   return (
-    <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+          <div className="text-[11px] kb-text-accent">
             {uxText('chronos_nav_surface_control', locale)}
           </div>
           <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
@@ -156,7 +156,7 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
       ) : null}
 
       {pendingAction ? (
-        <div className="mt-4 rounded-2xl border kb-status-warning-border kb-status-warning-surface p-4">
+        <div className="mt-4 rounded-lg border kb-status-warning-border kb-status-warning-surface p-4">
           <div className="flex items-start gap-3">
             <AlertTriangle size={16} className="mt-0.5 kb-status-warning" />
             <div className="min-w-0">
@@ -171,14 +171,14 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
                 <button
                   type="button"
                   onClick={() => void execute(pendingAction.surfaceId, pendingAction.action)}
-                  className="rounded-lg border kb-status-warning-border kb-status-warning-surface px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-status-warning"
+                  className="rounded-lg border kb-status-warning-border kb-status-warning-surface px-3 py-2 text-[11px] font-bold kb-status-warning"
                 >
                   {uxText('chronos_surface_control_confirm', locale)}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPendingAction(null)}
-                  className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.16em] kb-text-secondary"
+                  className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] kb-text-secondary"
                 >
                   {uxText('chronos_cb_back', locale)}
                 </button>
@@ -188,8 +188,8 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
         </div>
       ) : null}
 
-      <div className="mt-5 rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] kb-text-secondary">
+      <div className="mt-5 rounded-lg border kb-border-subtle kb-surface-sunken p-4">
+        <div className="flex items-center gap-2 text-[11px] font-bold kb-text-secondary">
           <Play size={13} />
           {uxText('chronos_surface_control_global', locale)}
         </div>
@@ -216,17 +216,17 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
 
       <div className="mt-4 grid gap-3">
         {data.surfaces.length === 0 ? (
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
+          <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
             {uxText('chronos_no_managed_surfaces', locale)}
           </div>
         ) : (
           <>
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+            <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-[11px] kb-text-secondary">
                   {uxText('chronos_surface_list_detail', locale)}
                 </div>
-                <div className="flex flex-wrap gap-2 text-[10px]">
+                <div className="flex flex-wrap gap-2 text-[11px]">
                   <span className="rounded-full kb-status-warning-surface px-2 py-1 kb-status-warning">
                     {uxText('chronos_attention', locale)} {surfaceAttentionCount}
                   </span>
@@ -263,7 +263,7 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
               </div>
             </div>
             {visibleSurfaces.length === 0 ? (
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
+              <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
                 {uxText('chronos_surface_no_matches', locale)}
               </div>
             ) : null}
@@ -272,19 +272,19 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
               return (
                 <article
                   key={surface.id}
-                  className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4"
+                  className="rounded-lg border kb-border-subtle kb-surface-sunken p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold kb-text-primary">{surface.id}</div>
-                      <div className="mt-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                      <div className="mt-1 text-[11px] kb-text-muted">
                         {surfaceKindLabel(surface.kind, locale)} ·{' '}
                         {surfaceStateLabel(surface.running ? 'running' : 'stopped', locale)} ·{' '}
                         {surfaceStateLabel(surface.health, locale)}
                       </div>
                     </div>
                     <div
-                      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${surface.running ? 'kb-status-positive-surface kb-status-positive' : 'kb-surface-raised kb-text-secondary'}`}
+                      className={`rounded-full px-2 py-1 text-[11px] ${surface.running ? 'kb-status-positive-surface kb-status-positive' : 'kb-surface-raised kb-text-secondary'}`}
                     >
                       {surface.running ? (
                         <CheckCircle2 size={11} className="inline" />
@@ -295,7 +295,7 @@ export function SurfaceControlWorkspace({ tenant }: { tenant?: string }) {
                     </div>
                   </div>
                   {surface.detail ? (
-                    <div className="mt-2 text-[10px] kb-text-muted">{surface.detail}</div>
+                    <div className="mt-2 text-[11px] kb-text-muted">{surface.detail}</div>
                   ) : null}
                   <div className="mt-3 flex flex-wrap gap-2">
                     {actions.map((action) => (
@@ -341,7 +341,7 @@ function ActionButton({
       onClick={onClick}
       disabled={!action.enabled || busy}
       title={action.disabledReason}
-      className={`rounded-lg border px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition disabled:cursor-not-allowed disabled:opacity-40 ${action.risk === 'risky' ? 'kb-status-negative-border kb-status-negative-surface kb-status-negative' : 'kb-border-accent kb-surface-accent kb-text-accent'}`}
+      className={`rounded-lg border px-3 py-2 text-[11px] transition disabled:cursor-not-allowed disabled:opacity-40 ${action.risk === 'risky' ? 'kb-status-negative-border kb-status-negative-surface kb-status-negative' : 'kb-border-accent kb-surface-accent kb-text-accent'}`}
     >
       {busy ? uxText('chronos_working', locale) : surfaceActionLabel(action, locale)}
     </button>
@@ -350,7 +350,7 @@ function ActionButton({
 
 function ActionStatus({ action, locale }: { action: ActionSummary; locale: SupportedLocale }) {
   return (
-    <div className="mt-3 flex flex-wrap gap-2 text-[10px] kb-text-muted">
+    <div className="mt-3 flex flex-wrap gap-2 text-[11px] kb-text-muted">
       <span>{surfaceActionLabel(action, locale)}</span>
       <span className="font-mono kb-text-secondary">
         {surfaceStatusLabel(action.status, locale)}

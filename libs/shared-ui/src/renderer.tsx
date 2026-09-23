@@ -9,7 +9,8 @@ import type {
 import { A2UIActionProvider, type A2UIActionHandler } from './actions.js';
 import { resolveKbType } from './catalog.js';
 import { Button, Disclosure } from './components/controls.js';
-import { Metric, KeyValue, Table, List, Text } from './components/data.js';
+import { Code, Metric, KeyValue, Table, List, Text } from './components/data.js';
+import { DisplayControls } from './components/display.js';
 import { Badge, Callout, EmptyState, Skeleton, StatusPill } from './components/feedback.js';
 import { Grid, NextAction, Section, Stack } from './components/layout.js';
 import { AppShell, NavRail, PageHeader, Tabs } from './components/shell.js';
@@ -144,6 +145,7 @@ function normalizeAliasProps(
 type KbBaseCatalogType = Exclude<KyberionBaseComponentType, KbFormComponentType | KbChartType>;
 
 function renderCatalog(
+  id: string,
   type: KbBaseCatalogType,
   rawProps: Record<string, unknown>,
   children: ReactNode,
@@ -183,6 +185,8 @@ function renderCatalog(
       return <List {...props<'ui:list'>()} />;
     case 'ui:text':
       return <Text {...props<'ui:text'>()} />;
+    case 'ui:code':
+      return <Code {...props<'ui:code'>()} />;
     case 'ui:status-pill':
       return <StatusPill {...props<'ui:status-pill'>()} />;
     case 'ui:badge':
@@ -197,6 +201,8 @@ function renderCatalog(
       return <Button {...(p as { label: string })} />;
     case 'ui:disclosure':
       return <Disclosure {...props<'ui:disclosure'>()}>{children}</Disclosure>;
+    case 'ui:display-controls':
+      return <DisplayControls id={id} {...props<'ui:display-controls'>()} />;
     default: {
       // Extension groups (UI-01c forms, UI-01b charts) are dispatched before
       // this switch and excluded from `type`, so this is exhaustive: a new
@@ -267,6 +273,7 @@ export function A2UIRenderer({
         const nav = childIds.filter(isNav);
         const main = childIds.filter((childId) => !isNav(childId));
         return renderCatalog(
+          id,
           catalogType,
           props,
           null,
@@ -284,6 +291,7 @@ export function A2UIRenderer({
       }
       if (isKbChartType(catalogType)) return <KbChart type={catalogType} props={props} />;
       return renderCatalog(
+        id,
         catalogType,
         props,
         childIds.length ? renderChildren(childIds) : null,

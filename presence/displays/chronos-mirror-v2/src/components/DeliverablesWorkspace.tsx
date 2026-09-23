@@ -171,12 +171,10 @@ export function DeliverablesWorkspace({
   };
 
   return (
-    <section className="kyberion-glass rounded-[30px] border kb-border-subtle p-5 md:p-6">
+    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-            {uxText('chronos_deliverables', locale)}
-          </div>
+          <div className="text-[11px] kb-text-accent">{uxText('chronos_deliverables', locale)}</div>
           <h2 className="mt-1 text-xl font-semibold kb-text-primary">
             {uxText('chronos_deliverables_preview_title', locale)}
           </h2>
@@ -184,7 +182,7 @@ export function DeliverablesWorkspace({
             {uxText('chronos_deliverables_description', locale)}
           </p>
         </div>
-        <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[10px] kb-text-accent">
+        <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] kb-text-accent">
           {tenant || uxText('chronos_ac_scope_all', locale)} · {items.length}
         </span>
       </div>
@@ -215,7 +213,7 @@ export function DeliverablesWorkspace({
                       params.set('section', 'deliverables');
                       return `${pathname}${params.size ? `?${params.toString()}` : ''}`;
                     })()}
-                    className="mt-3 rounded-lg border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] font-semibold kb-text-accent"
+                    className="mt-3 rounded-lg border kb-border-accent kb-surface-accent px-3 py-2 text-[11px] font-semibold kb-text-accent"
                   >
                     {uxText('chronos_deliverables_show_all', locale)}
                   </a>
@@ -233,37 +231,37 @@ export function DeliverablesWorkspace({
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-xs font-semibold kb-text-primary">{item.kind}</span>
-                <span className="text-[9px] kb-text-muted">
+                <span className="text-[11px] kb-text-muted">
                   {reviewLabel(item.reviewVerdict, locale)}
                 </span>
               </div>
-              <div className="mt-2 truncate text-[10px] kb-text-secondary">
+              <div className="mt-2 truncate text-[11px] kb-text-secondary">
                 {item.tenantSlug || uxText('chronos_org_not_configured', locale)} /{' '}
                 {item.projectId || uxText('chronos_org_not_configured', locale)}
               </div>
-              <div className="mt-1 truncate text-[10px] kb-text-muted">
+              <div className="mt-1 truncate text-[11px] kb-text-muted">
                 {item.path || item.externalRef || item.artifactId}
               </div>
             </button>
           ))}
         </div>
         {selected ? (
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+          <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] kb-text-accent">
+                <div className="flex items-center gap-2 text-[11px] kb-text-accent">
                   <Eye size={13} /> {uxText('chronos_preview_review', locale)}
                 </div>
                 <h3 className="mt-1 text-lg font-semibold kb-text-primary">{selected.kind}</h3>
-                <p className="mt-1 break-all text-[10px] kb-text-muted">
+                <p className="mt-1 break-all text-[11px] kb-text-muted">
                   {selected.path || selected.externalRef || selected.artifactId}
                 </p>
               </div>
-              <span className="rounded-full border kb-border-subtle px-2 py-1 text-[10px] kb-text-secondary">
+              <span className="rounded-full border kb-border-subtle px-2 py-1 text-[11px] kb-text-secondary">
                 {reviewLabel(selected.reviewVerdict, locale)}
               </span>
             </div>
-            <div className="mt-4 grid gap-2 text-[10px] sm:grid-cols-3">
+            <div className="mt-4 grid gap-2 text-[11px] sm:grid-cols-3">
               <div>
                 <span className="kb-text-muted">{uxText('chronos_tenant', locale)}</span>
                 <div className="kb-text-primary">{selected.tenantSlug || '-'}</div>
@@ -329,7 +327,7 @@ export function DeliverablesWorkspace({
                 href={assetUrl(selected) || '#'}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-2 inline-flex items-center gap-1 text-[10px] kb-text-accent hover:underline"
+                className="mt-2 inline-flex items-center gap-1 text-[11px] kb-text-accent hover:underline"
               >
                 <ImageIcon size={12} />
                 {uxText('chronos_open_new_window', locale)}
@@ -372,7 +370,7 @@ export function DeliverablesWorkspace({
               </button>
             </div>
             {accessRole !== 'localadmin' ? (
-              <div className="mt-3 text-[10px] kb-text-muted">
+              <div className="mt-3 text-[11px] kb-text-muted">
                 {uxText('chronos_localadmin_required', locale)}
               </div>
             ) : null}
@@ -383,7 +381,7 @@ export function DeliverablesWorkspace({
             ) : null}
           </div>
         ) : (
-          <div className="rounded-2xl border kb-border-subtle p-6 text-sm kb-text-muted">
+          <div className="rounded-lg border kb-border-subtle p-6 text-sm kb-text-muted">
             {uxText('chronos_select_deliverable', locale)}
           </div>
         )}

@@ -288,7 +288,9 @@ function normalizeReact(
       messages={i18n.messages}
     />
   );
-  return parseStaticMarkup(html);
+  // React 19 hoists an `<img>` into a `<link rel="preload" as="image">`
+  // resource hint in static markup; that is SSR plumbing, not component markup.
+  return parseStaticMarkup(html.replace(/<link rel="preload" as="image"[^>]*\/>/g, ''));
 }
 
 // ---------------------------------------------------------------------------
@@ -332,5 +334,86 @@ for (const locale of LOCALES) {
       const other = getUiMessageBundle(locale === 'en' ? 'ja' : 'en');
       expect(texts).not.toContain(other.messages['ui:status_blocked']);
     });
+  });
+}
+
+// Branches the gallery fixtures do not show (they render one switcher rail):
+// every nav-rail context / brand variant and the list progress edge values.
+const EXTRA_SCENARIOS: FixtureScenario[] = [
+  {
+    id: 'nav-rail-context-link-logo',
+    title: 'context link + logo',
+    components: [
+      {
+        id: 'r1',
+        type: 'ui:nav-rail',
+        props: {
+          brand: { name: 'K', logo_url: '/logo.svg' },
+          context: { label: 'T', detail: 'd', href: '/tenants' },
+          items: [{ id: 'a', label: 'A', href: '/a' }],
+        },
+      },
+    ],
+  },
+  {
+    id: 'nav-rail-context-button',
+    title: 'context button',
+    components: [
+      {
+        id: 'r2',
+        type: 'ui:nav-rail',
+        props: {
+          brand: { name: 'K', logo_url: 'javascript:alert(1)' },
+          context: { label: 'T', switch_label: 'Switch', action: { id: 'tenant.open' } },
+          items: [],
+        },
+      },
+    ],
+  },
+  {
+    id: 'nav-rail-context-static',
+    title: 'context static',
+    components: [
+      {
+        id: 'r3',
+        type: 'ui:nav-rail',
+        props: { context: { label: 'T', href: 'javascript:alert(1)' }, items: [] },
+      },
+    ],
+  },
+  {
+    id: 'list-progress-edges',
+    title: 'list progress edges',
+    components: [
+      {
+        id: 'l1',
+        type: 'ui:list',
+        props: {
+          items: [
+            { title: 'a', progress: -3 },
+            { title: 'b', progress: 99.5, status: 'active', status_label: 'Going' },
+            { title: 'c', progress: 0, status: 'done' },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: 'display-controls-no-id-defaults',
+    title: 'display controls defaults',
+    components: [{ id: 'dc', type: 'ui:display-controls', props: {} }],
+  },
+];
+
+for (const locale of LOCALES) {
+  const bundle = getUiMessageBundle(locale);
+  describe(`React ↔ vanilla parity — extra branches (${locale})`, () => {
+    for (const scenario of EXTRA_SCENARIOS) {
+      it(`${scenario.id}: React and vanilla render identical trees`, () => {
+        expect(normalizeReact(scenario.components, scenario.rootId, bundle)).toEqual(
+          normalizeVanilla(scenario.components, scenario.rootId, bundle)
+        );
+      });
+    }
   });
 }

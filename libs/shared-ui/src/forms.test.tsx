@@ -20,9 +20,11 @@ import {
   AvatarPicker,
   CameraCapture,
   Checkbox,
+  DisplayControls,
   FileDrop,
   IntegrationItem,
   KbI18nProvider,
+  NavRail,
   RadioGroup,
   SaveBar,
   SecretField,
@@ -467,5 +469,70 @@ describe('React form components: interaction', () => {
     } finally {
       delete w.navigator;
     }
+  });
+});
+
+describe('React shell controls: interaction (display controls, rail context switcher)', () => {
+  it('DisplayControls re-emits the inner field changes as display.theme / display.locale', () => {
+    const m = mount(<DisplayControls id="prefs" theme="system" locale="ja" />);
+    expect(m.q('.kb-display-controls').getAttribute('role')).toBe('group');
+    const radios = m.qa('input.kb-segmented__input');
+    expect(radios.map((radio) => prop<string>(radio, 'value'))).toEqual([
+      'system',
+      'light',
+      'dark',
+    ]);
+    act(() => {
+      setProp(radios[2], 'checked', true);
+      fireEvent(radios[2], 'click');
+    });
+    const select = m.q('select.kb-select');
+    act(() => {
+      setProp(select, 'value', 'en');
+      fireEvent(select, 'change');
+    });
+    expect(m.actions).toEqual([
+      { id: 'display.theme', payload: { value: 'dark' } },
+      { id: 'display.locale', payload: { value: 'en' } },
+    ]);
+    m.unmount();
+  });
+
+  it('NavRail context switcher toggles its listbox and dispatches the action with { value }', () => {
+    const m = mount(
+      <NavRail
+        items={[]}
+        context={{
+          label: 'Default',
+          detail: 'Owner',
+          action: { id: 'tenant.switch', payload: { source: 'rail' } },
+          options: [
+            { value: 'default', label: 'Default', selected: true },
+            { value: 'acme', label: 'Acme' },
+          ],
+        }}
+      />
+    );
+    const button = m.q('button.kb-nav-rail__context-button');
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(m.q('ul.kb-nav-rail__context-menu').hasAttribute('hidden')).toBe(true);
+    act(() => fireEvent(button, 'click'));
+    expect(m.q('button.kb-nav-rail__context-button').getAttribute('aria-expanded')).toBe('true');
+    expect(m.q('ul.kb-nav-rail__context-menu').hasAttribute('hidden')).toBe(false);
+    act(() => fireEvent(m.qa('.kb-nav-rail__context-option')[1], 'click'));
+    expect(m.actions).toEqual([
+      { id: 'tenant.switch', payload: { source: 'rail', value: 'acme' } },
+    ]);
+    expect(m.q('ul.kb-nav-rail__context-menu').hasAttribute('hidden')).toBe(true);
+    // Escape and a press outside the block also close it.
+    act(() => fireEvent(m.q('button.kb-nav-rail__context-button'), 'click'));
+    act(() => fireEvent(m.q('button.kb-nav-rail__context-button'), 'keydown', { key: 'Escape' }));
+    expect(m.q('ul.kb-nav-rail__context-menu').hasAttribute('hidden')).toBe(true);
+    act(() => fireEvent(m.q('button.kb-nav-rail__context-button'), 'click'));
+    act(() => fireEvent(m.q('.kb-nav-rail__context-option'), 'pointerdown'));
+    expect(m.q('ul.kb-nav-rail__context-menu').hasAttribute('hidden')).toBe(false);
+    act(() => fireEvent((dom.document as FakeDocument).body, 'pointerdown'));
+    expect(m.q('ul.kb-nav-rail__context-menu').hasAttribute('hidden')).toBe(true);
+    m.unmount();
   });
 });

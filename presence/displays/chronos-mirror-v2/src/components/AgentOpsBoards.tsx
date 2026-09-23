@@ -156,7 +156,7 @@ export function AgentOpsBoards({
   const visibleActivityEntries = showAllActivity ? activityEntries : activityEntries.slice(0, 6);
   const attentionCount = (board?.entries || []).filter((entry) => entry.blockers.length > 0).length;
   const activitySummary = (
-    <div className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+    <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold kb-text-primary">
@@ -166,7 +166,7 @@ export function AgentOpsBoards({
             {uxText('chronos_activity_summary_detail', locale)}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 text-[10px]">
+        <div className="flex flex-wrap gap-2 text-[11px]">
           <span className="rounded-full kb-status-warning-surface px-2 py-1 kb-status-warning">
             {uxText('chronos_attention', locale)} {attentionCount}
           </span>
@@ -206,7 +206,7 @@ export function AgentOpsBoards({
   return (
     <div className="flex flex-col gap-6">
       {activitySummary}
-      <details className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+      <details className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
         <summary className="cursor-pointer text-sm font-semibold kb-text-primary">
           {uxText('chronos_operations_details_title', locale)}
           <span className="ml-2 text-[11px] font-normal kb-text-muted">
@@ -231,7 +231,7 @@ export function AgentOpsBoards({
         />
       ) : null}
       <div className="flex items-center gap-3">
-        <div className="text-xs font-bold uppercase tracking-[0.2em] kb-text-secondary">
+        <div className="text-xs font-bold kb-text-secondary">
           {uxText('chronos_agent_activity', locale)}
         </div>
         {!scopedTenant ? (
@@ -289,16 +289,16 @@ export function AgentOpsBoards({
                 {agentIdLabel(entry.agent_id, locale)}
               </span>
               {entry.team_role ? (
-                <span className="rounded-full border kb-border-subtle px-2 text-[10px] kb-text-muted">
+                <span className="rounded-full border kb-border-subtle px-2 text-[11px] kb-text-muted">
                   {entry.team_role}
                 </span>
               ) : null}
               <span className="kb-text-secondary">{entry.title}</span>
-              <span className="ml-auto rounded-full border kb-border-accent px-2 text-[10px] kb-text-accent">
+              <span className="ml-auto rounded-full border kb-border-accent px-2 text-[11px] kb-text-accent">
                 {statusLabel(entry.status)}
               </span>
             </div>
-            <div className="mt-1 text-[10px] kb-text-muted">
+            <div className="mt-1 text-[11px] kb-text-muted">
               {entry.tenant_slug
                 ? `${uxText('chronos_tenant', locale)}: ${entry.tenant_slug}`
                 : `${uxText('chronos_tenant', locale)}: ${uxText('chronos_lineage_missing', locale)}`}
@@ -324,7 +324,7 @@ export function AgentOpsBoards({
                 {entry.blockers.map((blocker, index) => (
                   <span
                     key={index}
-                    className={`rounded-lg px-2 py-1 text-[10px] ${
+                    className={`rounded-lg px-2 py-1 text-[11px] ${
                       blocker.kind === 'review_wait'
                         ? 'kb-surface-raised kb-text-secondary'
                         : 'kb-status-warning-surface kb-status-warning'
@@ -345,7 +345,7 @@ export function AgentOpsBoards({
                     missionId: entry.mission_id,
                   })
                 }
-                className="mt-2 rounded border kb-border-subtle px-2 py-1 text-[10px] kb-text-accent"
+                className="mt-2 rounded border kb-border-subtle px-2 py-1 text-[11px] kb-text-accent"
               >
                 {uxText('chronos_live_terminal', locale)}
               </button>
@@ -361,7 +361,7 @@ export function AgentOpsBoards({
           <button
             type="button"
             onClick={() => setShowAllActivity((current) => !current)}
-            className="justify-self-start rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[10px] kb-text-accent"
+            className="justify-self-start rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-accent"
           >
             {uxText(
               showAllActivity ? 'chronos_activity_show_less' : 'chronos_activity_show_all',

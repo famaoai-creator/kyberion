@@ -23,6 +23,7 @@
         "ui:table",
         "ui:list",
         "ui:text",
+        "ui:code",
         "ui:status-pill",
         "ui:badge",
         "ui:callout",
@@ -30,6 +31,7 @@
         "ui:skeleton",
         "ui:button",
         "ui:disclosure",
+        "ui:display-controls",
         "ui:settings-group",
         "ui:setting-row",
         "ui:switch",
@@ -295,6 +297,23 @@
       "if": {
         "properties": {
           "type": {
+            "const": "ui:code"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:code"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
             "const": "ui:status-pill"
           }
         },
@@ -406,6 +425,23 @@
         "properties": {
           "props": {
             "$ref": "#/$defs/props:ui:disclosure"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:display-controls"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:display-controls"
           }
         }
       }
@@ -1060,6 +1096,71 @@
           "type": "string",
           "maxLength": 80
         },
+        "brand": {
+          "type": "object",
+          "description": "Brand slot at the top of the rail: product / surface name, optional subtitle and logo image (a token-colored mark when no logo).",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/text"
+            },
+            "subtitle": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "logo_url": {
+              "$ref": "#/$defs/href"
+            }
+          },
+          "required": ["name"],
+          "additionalProperties": false
+        },
+        "context": {
+          "type": "object",
+          "description": "Context block (tenant / workspace being viewed). options + action = switcher (action payload gets { value }); action alone = button; href alone = link.",
+          "properties": {
+            "label": {
+              "$ref": "#/$defs/text"
+            },
+            "detail": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "switch_label": {
+              "type": "string",
+              "maxLength": 120
+            },
+            "href": {
+              "$ref": "#/$defs/href"
+            },
+            "action": {
+              "$ref": "#/$defs/action"
+            },
+            "options": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "label": {
+                    "$ref": "#/$defs/text"
+                  },
+                  "selected": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["value", "label"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["label"],
+          "additionalProperties": false
+        },
         "items": {
           "type": "array",
           "maxItems": 24,
@@ -1351,6 +1452,18 @@
               "status": {
                 "$ref": "#/$defs/status"
               },
+              "status_label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80,
+                "description": "Visible status pill text (default: the localized status label)."
+              },
+              "progress": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Percent complete, drawn as a small meter with accessible text."
+              },
               "href": {
                 "$ref": "#/$defs/href"
               }
@@ -1378,6 +1491,25 @@
         }
       },
       "required": ["text"],
+      "additionalProperties": false
+    },
+    "props:ui:code": {
+      "type": "object",
+      "description": "Monospace code / log block (white-space: pre-wrap). No syntax highlighting; the text is never interpreted.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+#._-]{1,40}$"
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        }
+      },
+      "required": ["code"],
       "additionalProperties": false
     },
     "props:ui:status-pill": {
@@ -1505,6 +1637,39 @@
         }
       },
       "required": ["summary"],
+      "additionalProperties": false
+    },
+    "props:ui:display-controls": {
+      "type": "object",
+      "description": "Viewer display preferences: theme (system / light / dark) segmented control + language select. Dispatches display.theme / display.locale with { value }; the host persists.",
+      "properties": {
+        "theme": {
+          "enum": ["system", "light", "dark"]
+        },
+        "locale": {
+          "type": "string",
+          "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+        },
+        "locales": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+              },
+              "label": {
+                "$ref": "#/$defs/text"
+              }
+            },
+            "required": ["value", "label"],
+            "additionalProperties": false
+          }
+        }
+      },
       "additionalProperties": false
     },
     "field-name": {

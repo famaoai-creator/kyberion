@@ -91,10 +91,10 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
   };
 
   return (
-    <section className="kyberion-glass rounded-[30px] border kb-border-subtle p-5 md:p-6">
+    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">承認</div>
+          <div className="text-[11px] kb-text-accent">承認</div>
           <h2 className="mt-1 text-xl font-semibold kb-text-primary">
             {uxText('chronos_approvals_title', locale)}
           </h2>
@@ -102,7 +102,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
             {uxText('chronos_approvals_description', locale)}
           </p>
         </div>
-        <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[10px] kb-text-accent">
+        <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] kb-text-accent">
           {tenant || uxText('chronos_ac_scope_all', locale)} · {items.length}
         </span>
       </div>
@@ -132,11 +132,11 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
                     {item.title}
                   </span>
                 </div>
-                <div className="mt-2 text-[10px] kb-text-secondary">
+                <div className="mt-2 text-[11px] kb-text-secondary">
                   {item.tenantSlug || uxText('chronos_org_not_configured', locale)} /{' '}
                   {item.kind || '承認'}
                 </div>
-                <div className="mt-1 text-[10px] kb-text-muted">
+                <div className="mt-1 text-[11px] kb-text-muted">
                   {item.requestedBy} · {formatChronosDateTime(item.requestedAt, locale)}
                 </div>
               </button>
@@ -144,16 +144,16 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
           )}
         </div>
         {selected ? (
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+          <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] kb-text-accent">
+                <div className="flex items-center gap-2 text-[11px] kb-text-accent">
                   <FileCheck2 size={13} />
                   承認内容
                 </div>
                 <h3 className="mt-1 text-lg font-semibold kb-text-primary">{selected.title}</h3>
               </div>
-              <span className="rounded-full border kb-border-subtle px-2 py-1 text-[10px] uppercase kb-text-secondary">
+              <span className="rounded-full border kb-border-subtle px-2 py-1 text-[11px] kb-text-secondary">
                 {approvalRiskLabel(selected.risk?.level, locale)} / {uxText('chronos_risk', locale)}
               </span>
             </div>
@@ -162,7 +162,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
             </p>
             {selected.details ? (
               <section className="mt-4 rounded-xl border kb-border-subtle kb-surface-raised p-3">
-                <h4 className="text-[10px] uppercase tracking-[0.16em] kb-text-accent">詳細</h4>
+                <h4 className="text-[11px] kb-text-accent">詳細</h4>
                 <p className="mt-2 whitespace-pre-wrap text-[11px] leading-5 kb-text-secondary">
                   {selected.details}
                 </p>
@@ -170,7 +170,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
             ) : null}
             {selected.sourceText ? (
               <details className="mt-3 rounded-xl border kb-border-subtle kb-surface-raised p-3">
-                <summary className="cursor-pointer text-[10px] font-semibold kb-text-primary">
+                <summary className="cursor-pointer text-[11px] font-semibold kb-text-primary">
                   {uxText('chronos_request_source', locale)}
                 </summary>
                 <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap text-[11px] kb-text-secondary">
@@ -180,7 +180,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
             ) : null}
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border kb-border-subtle p-3">
-                <h4 className="text-[10px] uppercase tracking-[0.16em] kb-text-accent">
+                <h4 className="text-[11px] kb-text-accent">
                   {uxText('chronos_approval_change_details', locale)}
                 </h4>
                 <dl className="mt-2 space-y-1 text-[11px] kb-text-secondary">
@@ -204,7 +204,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
                 </dl>
               </div>
               <div className="rounded-xl border kb-border-subtle p-3">
-                <h4 className="text-[10px] uppercase tracking-[0.16em] kb-text-accent">注意点</h4>
+                <h4 className="text-[11px] kb-text-accent">注意点</h4>
                 <dl className="mt-2 space-y-1 text-[11px] kb-text-secondary">
                   <div>
                     {uxText('chronos_approval_restart', locale)}:{' '}
@@ -225,7 +225,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
             </div>
             {selected.justification ? (
               <section className="mt-3 rounded-xl border kb-border-subtle p-3">
-                <h4 className="text-[10px] uppercase tracking-[0.16em] kb-text-accent">
+                <h4 className="text-[11px] kb-text-accent">
                   {uxText('chronos_reason_impact', locale)}
                 </h4>
                 <p className="mt-2 text-[11px] kb-text-secondary">
@@ -245,7 +245,7 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
                 ) : null}
               </section>
             ) : null}
-            <div className="mt-3 flex flex-wrap gap-2 text-[10px] kb-text-muted">
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] kb-text-muted">
               <span>
                 {uxText('chronos_tenant', locale)}: {selected.tenantSlug || '-'}
               </span>
@@ -284,19 +284,19 @@ export function ApprovalsWorkspace({ tenant }: { tenant?: string }) {
               </button>
             </div>
             {accessRole !== 'localadmin' ? (
-              <div className="mt-3 text-[10px] kb-text-muted">
+              <div className="mt-3 text-[11px] kb-text-muted">
                 {uxText('chronos_admin_action_hint', locale)}
               </div>
             ) : null}
             {selected.risk?.level === 'critical' ? (
-              <div className="mt-3 flex items-center gap-2 text-[10px] kb-status-negative">
+              <div className="mt-3 flex items-center gap-2 text-[11px] kb-status-negative">
                 <AlertTriangle size={13} />
                 {uxText('chronos_additional_confirmation_hint', locale)}
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="rounded-2xl border kb-border-subtle p-6 text-sm kb-text-muted">
+          <div className="rounded-lg border kb-border-subtle p-6 text-sm kb-text-muted">
             {uxText('chronos_select_approval', locale)}
           </div>
         )}

@@ -324,103 +324,58 @@
 }
 /* end kyberion-ui tokens */
 
-/* DS-06 semantic extensions are intentionally kept outside the generated KDS block. */
-:root {
-  --kb-text-muted: #475569;
-  --kb-text-subtle: #64748b;
-  --kb-text-inverse: #ffffff;
-  --kb-accent-border: #1d4ed8;
-  --kb-surface-raised: rgba(15, 23, 42, 0.04);
-  --kb-surface-raised-subtle: rgba(15, 23, 42, 0.025);
-  --kb-surface-sunken: rgba(15, 23, 42, 0.08);
-  --kb-surface-well: rgba(15, 23, 42, 0.12);
-  --kb-surface-accent: rgba(0, 102, 204, 0.1);
-  --kb-status-positive: #166534;
-  --kb-status-negative: #991b1b;
-  --kb-status-warning: #78350f;
-  --kb-status-info: #075985;
-  --kb-status-positive-surface: rgba(22, 101, 52, 0.1);
-  --kb-status-negative-surface: rgba(185, 28, 28, 0.1);
-  --kb-status-warning-surface: rgba(146, 64, 14, 0.1);
-  --kb-status-info-surface: rgba(7, 89, 133, 0.1);
-  --kb-status-positive-border: rgba(22, 101, 52, 0.35);
-  --kb-status-negative-border: rgba(185, 28, 28, 0.35);
-  --kb-status-warning-border: rgba(146, 64, 14, 0.35);
-  --kb-status-info-border: rgba(7, 89, 133, 0.35);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --kb-text-muted: #94a3b8;
-    --kb-text-subtle: #94a3b8;
-    --kb-text-inverse: #020617;
-    --kb-accent-border: #67e8f9;
-    --kb-surface-raised: rgba(255, 255, 255, 0.05);
-    --kb-surface-raised-subtle: rgba(255, 255, 255, 0.03);
-    --kb-surface-sunken: rgba(0, 0, 0, 0.2);
-    --kb-surface-well: rgba(0, 0, 0, 0.4);
-    --kb-surface-accent: rgba(0, 242, 255, 0.1);
-    --kb-status-positive: #86efac;
-    --kb-status-negative: #fca5a5;
-    --kb-status-warning: #fcd34d;
-    --kb-status-info: #7dd3fc;
-    --kb-status-positive-surface: rgba(34, 197, 94, 0.15);
-    --kb-status-negative-surface: rgba(239, 68, 68, 0.15);
-    --kb-status-warning-surface: rgba(245, 158, 11, 0.15);
-    --kb-status-info-surface: rgba(34, 211, 238, 0.15);
-    --kb-status-positive-border: rgba(74, 222, 128, 0.35);
-    --kb-status-negative-border: rgba(248, 113, 113, 0.35);
-    --kb-status-warning-border: rgba(252, 211, 77, 0.35);
-    --kb-status-info-border: rgba(103, 232, 249, 0.35);
-  }
-}
-
-[data-theme='light'] {
-  --kb-text-muted: #475569;
-  --kb-text-subtle: #64748b;
-  --kb-text-inverse: #ffffff;
-  --kb-accent-border: #1d4ed8;
-  --kb-surface-raised: rgba(15, 23, 42, 0.04);
-  --kb-surface-raised-subtle: rgba(15, 23, 42, 0.025);
-  --kb-surface-sunken: rgba(15, 23, 42, 0.08);
-  --kb-surface-well: rgba(15, 23, 42, 0.12);
-  --kb-surface-accent: rgba(0, 102, 204, 0.1);
-  --kb-status-positive: #166534;
-  --kb-status-negative: #991b1b;
-  --kb-status-warning: #78350f;
-  --kb-status-info: #075985;
-  --kb-status-positive-surface: rgba(22, 101, 52, 0.1);
-  --kb-status-negative-surface: rgba(185, 28, 28, 0.1);
-  --kb-status-warning-surface: rgba(146, 64, 14, 0.1);
-  --kb-status-info-surface: rgba(7, 89, 133, 0.1);
-  --kb-status-positive-border: rgba(22, 101, 52, 0.35);
-  --kb-status-negative-border: rgba(185, 28, 28, 0.35);
-  --kb-status-warning-border: rgba(146, 64, 14, 0.35);
-  --kb-status-info-border: rgba(7, 89, 133, 0.35);
-}
-
+/* UI-07: Chronos renders on the shared web UI layer (tokens.ui → --kb-ui-*).
+ * The generated legacy --kb-* palette above still feeds media and other
+ * surfaces, so Chronos re-points it at the UI tokens here instead of editing
+ * the generated block. The UI tokens switch light/dark themselves
+ * (prefers-color-scheme + :root[data-theme]), so one mapping serves both.
+ * `--kb-text-secondary` keeps its generated translucent ink: the DOM contrast
+ * gate (scripts/check_chronos_dom_contrast.ts) keys its theme wait on it. */
+:root,
+[data-theme='light'],
 [data-theme='dark'] {
-  --kb-text-muted: #94a3b8;
-  --kb-text-subtle: #94a3b8;
-  --kb-text-inverse: #020617;
-  --kb-accent-border: #67e8f9;
-  --kb-surface-raised: rgba(255, 255, 255, 0.05);
-  --kb-surface-raised-subtle: rgba(255, 255, 255, 0.03);
-  --kb-surface-sunken: rgba(0, 0, 0, 0.2);
-  --kb-surface-well: rgba(0, 0, 0, 0.4);
-  --kb-surface-accent: rgba(0, 242, 255, 0.1);
-  --kb-status-positive: #86efac;
-  --kb-status-negative: #fca5a5;
-  --kb-status-warning: #fcd34d;
-  --kb-status-info: #7dd3fc;
-  --kb-status-positive-surface: rgba(34, 197, 94, 0.15);
-  --kb-status-negative-surface: rgba(239, 68, 68, 0.15);
-  --kb-status-warning-surface: rgba(245, 158, 11, 0.15);
-  --kb-status-info-surface: rgba(34, 211, 238, 0.15);
-  --kb-status-positive-border: rgba(74, 222, 128, 0.35);
-  --kb-status-negative-border: rgba(248, 113, 113, 0.35);
-  --kb-status-warning-border: rgba(252, 211, 77, 0.35);
-  --kb-status-info-border: rgba(103, 232, 249, 0.35);
+  --background: var(--kb-ui-canvas);
+  --foreground: var(--kb-ui-text);
+  --kb-bg-main: var(--kb-ui-canvas);
+  --kb-panel-bg: var(--kb-ui-surface);
+  --kb-primary: var(--kb-ui-text);
+  --kb-secondary: var(--kb-ui-text-muted);
+  --kb-accent: var(--kb-ui-accent);
+  --kb-warning: var(--kb-ui-warning-fg);
+  --kb-text-primary: var(--kb-ui-text);
+  --kb-accent-text: var(--kb-ui-accent-text);
+  --kb-surface: var(--kb-ui-surface-sunken);
+  --kb-muted-text: var(--kb-ui-text-muted);
+  --kb-border: var(--kb-ui-border);
+  --kb-success: var(--kb-ui-success-fg);
+  --kb-danger: var(--kb-ui-danger-fg);
+  --kb-font-sans: var(--kb-ui-font-sans);
+  --kb-font-mono: var(--kb-ui-font-mono);
+  --kb-blur: none;
+  --kb-glow-cyan: none;
+
+  /* DS-06 semantic extensions, now aliases of the UI tokens. */
+  --kb-text-muted: var(--kb-ui-text-muted);
+  --kb-text-subtle: var(--kb-ui-text-subtle);
+  --kb-text-inverse: var(--kb-ui-text-on-accent);
+  --kb-accent-border: var(--kb-ui-accent);
+  --kb-surface-raised: var(--kb-ui-surface);
+  --kb-surface-raised-subtle: var(--kb-ui-surface);
+  --kb-surface-sunken: var(--kb-ui-surface-sunken);
+  --kb-surface-well: var(--kb-ui-surface-sunken);
+  --kb-surface-accent: var(--kb-ui-accent-soft);
+  --kb-status-positive: var(--kb-ui-success-fg);
+  --kb-status-negative: var(--kb-ui-danger-fg);
+  --kb-status-warning: var(--kb-ui-warning-fg);
+  --kb-status-info: var(--kb-ui-info-fg);
+  --kb-status-positive-surface: var(--kb-ui-success-bg);
+  --kb-status-negative-surface: var(--kb-ui-danger-bg);
+  --kb-status-warning-surface: var(--kb-ui-warning-bg);
+  --kb-status-info-surface: var(--kb-ui-info-bg);
+  --kb-status-positive-border: var(--kb-ui-success-border);
+  --kb-status-negative-border: var(--kb-ui-danger-border);
+  --kb-status-warning-border: var(--kb-ui-warning-border);
+  --kb-status-info-border: var(--kb-ui-info-border);
 }
 
 @layer components {
@@ -567,52 +522,48 @@
   }
 }
 
+html {
+  color-scheme: var(--kb-ui-color-scheme);
+}
+
 body {
-  font-family: var(--kb-font-sans);
-  background:
-    radial-gradient(circle at 50% 0%, rgba(0, 242, 255, 0.05) 0%, transparent 50%),
-    var(--kb-bg-main);
-  color: var(--kb-text-primary);
+  margin: 0;
+  font-family: var(--kb-ui-font-sans);
+  background: var(--kb-ui-canvas);
+  color: var(--kb-ui-text);
   letter-spacing: 0;
   overflow-x: hidden;
 }
 
+/* Former glass panel: now a flat surface card (no blur, no glow). */
 .kyberion-glass {
-  background: var(--kb-panel-bg);
-  backdrop-filter: var(--kb-blur);
-  border: 1px solid var(--kb-border);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
-}
-
-.cyan-glow {
-  text-shadow: var(--kb-glow-cyan);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  box-shadow: var(--kb-ui-shadow-sm);
 }
 
 .pulse-animation {
-  animation: pulse-cyan 2s infinite;
+  animation: kb-chronos-pulse 2s infinite;
 }
 
-@keyframes pulse-cyan {
-  0% {
+@keyframes kb-chronos-pulse {
+  0%,
+  100% {
     opacity: 0.6;
   }
   50% {
     opacity: 1;
-    text-shadow: var(--kb-glow-cyan);
-  }
-  100% {
-    opacity: 0.6;
   }
 }
 
 .chronos-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 242, 255, 0.2) transparent;
+  scrollbar-color: var(--kb-ui-border-strong) transparent;
 }
 
 :where(button, a, input, textarea, select, [role='button'], [tabindex]):focus-visible {
-  outline: 2px solid rgba(0, 242, 255, 0.84);
-  outline-offset: 3px;
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -647,9 +598,296 @@ body {
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
-  background-color: rgba(148, 163, 184, 0.34);
+  background-color: var(--kb-ui-border);
 }
 
 .chronos-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(226, 232, 240, 0.44);
+  background-color: var(--kb-ui-border-strong);
+}
+
+/* ------------------------------------------------ UI-07 Chronos shell -- */
+
+/* The shell has no side rail: one centred column. */
+.chronos-shell.kb-app-shell {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'main';
+}
+
+.chronos-shell .kb-app-shell__main {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.chronos-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+}
+
+.chronos-header .kb-page-header {
+  padding-bottom: var(--kb-ui-space-2);
+  border-bottom: 0;
+}
+
+.chronos-header__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+
+/* Tenant › organization › project scope, compacted under the title. */
+.chronos-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.chronos-scope__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-1);
+  font-weight: 600;
+}
+
+.chronos-scope__select {
+  min-width: 10rem;
+  max-width: 16rem;
+  min-height: 28px;
+  padding: 0 var(--kb-ui-space-2);
+  border: 1px solid var(--kb-ui-border-strong);
+  border-radius: var(--kb-ui-radius-sm);
+  background: var(--kb-ui-surface);
+  color: var(--kb-ui-text);
+  font: inherit;
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.chronos-scope__sep {
+  color: var(--kb-ui-text-subtle);
+}
+
+.chronos-scope__note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-1);
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-subtle);
+}
+
+.chronos-scope__error {
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-danger-fg);
+}
+
+.chronos-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 calc(-1 * var(--kb-ui-space-5));
+  padding: var(--kb-ui-space-1) var(--kb-ui-space-5) 0;
+  background: var(--kb-ui-canvas);
+}
+
+/* Sub-navigation inside a group: quieter pill tabs under the group tabs. */
+.chronos-subnav .kb-tabs {
+  gap: var(--kb-ui-space-1);
+  padding-bottom: var(--kb-ui-space-2);
+}
+
+.chronos-subnav .kb-tabs__tab {
+  margin-bottom: 0;
+  padding: var(--kb-ui-space-1) var(--kb-ui-space-3);
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.chronos-subnav .kb-tabs__tab[aria-selected='true'] {
+  border-color: var(--kb-ui-accent);
+  background: var(--kb-ui-accent-soft);
+}
+
+.chronos-counters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--kb-ui-space-2);
+}
+
+.chronos-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface);
+  color: var(--kb-ui-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.chronos-counter:hover {
+  border-color: var(--kb-ui-border-strong);
+  background: var(--kb-ui-surface-sunken);
+}
+
+.chronos-counter__value {
+  font-size: var(--kb-ui-font-size-xl);
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.chronos-counter__label {
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-muted);
+}
+
+.chronos-counter[data-tone='warning'] {
+  border-color: var(--kb-ui-warning-border);
+}
+
+.chronos-counter[data-tone='danger'] {
+  border-color: var(--kb-ui-danger-border);
+}
+
+.chronos-counter[data-tone='info'] {
+  border-color: var(--kb-ui-info-border);
+}
+
+/* Mission rows: human title with the mission id as a mono secondary line. */
+.chronos-mission-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.chronos-mission-cell__title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--kb-ui-text);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+
+.chronos-mission-cell__title:hover {
+  color: var(--kb-ui-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chronos-mission-cell__id {
+  font-family: var(--kb-ui-font-mono);
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-subtle);
+  overflow-wrap: anywhere;
+}
+
+.chronos-muted {
+  color: var(--kb-ui-text-muted);
+}
+
+.chronos-attention-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.chronos-attention-count[data-zero='true'] {
+  font-weight: 400;
+  color: var(--kb-ui-text-subtle);
+}
+
+/* Mission journey: six steps in one compact row. */
+.chronos-journey {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--kb-ui-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chronos-journey__step {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-2);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface-sunken);
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.chronos-journey__step[data-state='done'] {
+  background: var(--kb-ui-surface);
+}
+
+.chronos-journey__step[data-state='current'] {
+  border-color: var(--kb-ui-accent);
+  background: var(--kb-ui-accent-soft);
+  color: var(--kb-ui-accent-text);
+  font-weight: 600;
+}
+
+.chronos-journey__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--kb-ui-font-size-xs);
+}
+
+.chronos-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--kb-ui-space-3);
+}
+
+.chronos-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  min-width: 0;
+}
+
+.chronos-feed__title {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+  color: var(--kb-ui-text-muted);
+}
+
+@media (max-width: 900px) {
+  .chronos-journey {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .chronos-two-col {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .chronos-nav {
+    margin: 0 calc(-1 * var(--kb-ui-space-4));
+    padding: var(--kb-ui-space-1) var(--kb-ui-space-4) 0;
+  }
 }

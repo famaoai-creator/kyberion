@@ -1,7 +1,7 @@
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 import { buildUserFacingError } from '../lib/user-facing-error';
 
-export function MissionIntelligenceStatusGate(context: Record<string, unknown>) {
+export function MissionIntelligenceStatusGate({ context }: { context: Record<string, unknown> }) {
   const { error, locale, missionIntelligenceEyebrow, refreshData, mounted, data, mt } = context as {
     error?: unknown;
     locale?: string;

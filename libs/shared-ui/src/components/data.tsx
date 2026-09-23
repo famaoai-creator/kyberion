@@ -2,6 +2,7 @@
 
 import { Fragment, type KeyboardEvent } from 'react';
 import type {
+  KbCodeProps,
   KbKvProps,
   KbListProps,
   KbMetricProps,
@@ -12,6 +13,7 @@ import { defaultNavigate, useA2UIActions } from '../actions.js';
 import { isKbStatus } from '../catalog.js';
 import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
 import { KbIcon } from '../icons.js';
+import { codeLanguage, listProgressPercent } from '../../vanilla/kyberion-ui.js';
 import { asArray, formatScalar, safeCssLength, safeHref } from '../safety.js';
 import { KbLink } from './controls.js';
 import { StatusPill, toneAttr } from './feedback.js';
@@ -166,6 +168,35 @@ export function Table({ caption, columns, rows, row_href_key, empty }: KbTablePr
   );
 }
 
+/**
+ * `ui:list` item `progress` → `.kb-list__progress`: a `role="progressbar"`
+ * track (accessible name + value text from the vocabulary) and the visible
+ * percentage.
+ */
+function ListProgress({ value }: { value: unknown }) {
+  const { t } = useKbI18n();
+  const percent = listProgressPercent(value);
+  if (percent === null) return null;
+  return (
+    <div className="kb-list__progress">
+      <span
+        className="kb-list__progress-track"
+        role="progressbar"
+        aria-label={t(KB_UI_MESSAGE_KEYS.listProgress)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        aria-valuetext={t(KB_UI_MESSAGE_KEYS.listProgressValue, { percent })}
+      >
+        <span className="kb-list__progress-fill" style={{ width: `${percent}%` }} />
+      </span>
+      <span className="kb-list__progress-value" aria-hidden="true">
+        {`${percent}%`}
+      </span>
+    </div>
+  );
+}
+
 /** `ui:list` → `ul.kb-list[data-variant]` of `__item[data-status]` (`__body` > `__title` + `__meta`, optional status pill). */
 export function List({ items, variant }: KbListProps) {
   return (
@@ -183,8 +214,11 @@ export function List({ items, variant }: KbListProps) {
                 <span className="kb-list__title">{item.title}</span>
               )}
               {item.meta ? <span className="kb-list__meta">{item.meta}</span> : null}
+              <ListProgress value={item.progress} />
             </div>
-            {isKbStatus(item.status) ? <StatusPill status={item.status} /> : null}
+            {isKbStatus(item.status) ? (
+              <StatusPill status={item.status} label={item.status_label} />
+            ) : null}
           </li>
         );
       })}
@@ -198,4 +232,26 @@ const TEXT_VARIANTS: ReadonlySet<string> = new Set(['body', 'muted', 'caption', 
 export function Text({ text, variant }: KbTextProps) {
   const resolved = typeof variant === 'string' && TEXT_VARIANTS.has(variant) ? variant : 'body';
   return <p className={`kb-text kb-text--${resolved}`}>{text}</p>;
+}
+
+/**
+ * `ui:code` → `figure.kb-code[data-language]` (optional `figcaption.__header`
+ * with `__title` / `__language`) and `pre.__body > code` (pre-wrap, never
+ * interpreted).
+ */
+export function Code({ code, language, title }: KbCodeProps) {
+  const lang = codeLanguage(language);
+  return (
+    <figure className="kb-code" data-language={lang ?? undefined}>
+      {title || lang ? (
+        <figcaption className="kb-code__header">
+          {title ? <span className="kb-code__title">{title}</span> : null}
+          {lang ? <span className="kb-code__language">{lang}</span> : null}
+        </figcaption>
+      ) : null}
+      <pre className="kb-code__body">
+        <code>{typeof code === 'string' ? code : ''}</code>
+      </pre>
+    </figure>
+  );
 }

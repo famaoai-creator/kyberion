@@ -288,13 +288,13 @@ function TraceSpanTree({
 
   return (
     <div
-      className={`rounded-2xl border ${spanTone(span.status)} p-3 ${depth > 0 ? 'ml-4 mt-3' : ''}`}
+      className={`rounded-lg border ${spanTone(span.status)} p-3 ${depth > 0 ? 'ml-4 mt-3' : ''}`}
     >
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <h5 className="text-sm font-semibold kb-text-primary">{span.name}</h5>
-            <span className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] kb-text-secondary">
+            <span className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-0.5 text-[11px] kb-text-secondary">
               {span.status}
             </span>
           </div>
@@ -304,7 +304,7 @@ function TraceSpanTree({
           </p>
           {span.error ? <p className="text-xs kb-status-negative">{span.error}</p> : null}
         </div>
-        <div className="grid grid-cols-3 gap-2 text-[10px] kb-text-secondary md:text-right">
+        <div className="grid grid-cols-3 gap-2 text-[11px] kb-text-secondary md:text-right">
           <div>
             <div className="kb-text-muted">events</div>
             <div>{span.events.length}</div>
@@ -325,7 +325,7 @@ function TraceSpanTree({
           {Object.entries(span.attributes).map(([key, value]) => (
             <span
               key={key}
-              className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-0.5 font-mono text-[10px] kb-text-secondary"
+              className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-0.5 font-mono text-[11px] kb-text-secondary"
             >
               {key}={String(value)}
             </span>
@@ -335,9 +335,7 @@ function TraceSpanTree({
 
       {gapPhases.length > 0 ? (
         <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken p-2">
-          <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-            dispatch gap breakdown
-          </div>
+          <div className="text-[11px] kb-text-muted">dispatch gap breakdown</div>
           <div className="mt-2 grid gap-1 sm:grid-cols-2">
             {gapPhases.map((entry) => (
               <div
@@ -354,7 +352,7 @@ function TraceSpanTree({
 
       <div className="mt-3 flex flex-wrap gap-2">
         {span.knowledgeRefs.length > 0 ? (
-          <span className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+          <span className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-muted">
             knowledge {span.knowledgeRefs.length}
           </span>
         ) : null}
@@ -362,7 +360,7 @@ function TraceSpanTree({
           <button
             type="button"
             onClick={() => setShowEvents((value) => !value)}
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
           >
             {showEvents ? 'Hide' : 'Show'} events {span.events.length}
           </button>
@@ -381,7 +379,7 @@ function TraceSpanTree({
                 'events'
               )
             }
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
           >
             Copy events
           </button>
@@ -390,7 +388,7 @@ function TraceSpanTree({
           <button
             type="button"
             onClick={() => setShowArtifacts((value) => !value)}
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
           >
             {showArtifacts ? 'Hide' : 'Show'} artifacts {span.artifacts.length}
           </button>
@@ -409,7 +407,7 @@ function TraceSpanTree({
                 'artifacts'
               )
             }
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
           >
             Copy artifacts
           </button>
@@ -418,7 +416,7 @@ function TraceSpanTree({
           <button
             type="button"
             onClick={() => setShowChildren((value) => !value)}
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
           >
             {showChildren ? 'Hide' : 'Show'} children {span.children.length}
           </button>
@@ -427,7 +425,7 @@ function TraceSpanTree({
           <button
             type="button"
             onClick={() => setShowKnowledge((value) => !value)}
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
           >
             {showKnowledge ? 'Hide' : 'Show'} refs {span.knowledgeRefs.length}
           </button>
@@ -436,7 +434,7 @@ function TraceSpanTree({
           <button
             type="button"
             onClick={() => void onCopy(span.knowledgeRefs.join('\n'), 'knowledge refs')}
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
           >
             Copy refs
           </button>
@@ -445,12 +443,10 @@ function TraceSpanTree({
 
       {showKnowledge && span.knowledgeRefs.length > 0 ? (
         <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken p-2">
-          <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-            knowledge refs
-          </div>
+          <div className="text-[11px] kb-text-muted">knowledge refs</div>
           <div className="mt-1 space-y-1">
             {span.knowledgeRefs.slice(0, 4).map((ref) => (
-              <div key={ref} className="font-mono text-[10px] kb-text-secondary">
+              <div key={ref} className="font-mono text-[11px] kb-text-secondary">
                 {ref}
               </div>
             ))}
@@ -460,7 +456,7 @@ function TraceSpanTree({
 
       {showEvents && previewEvents.length > 0 ? (
         <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken p-2">
-          <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">events</div>
+          <div className="text-[11px] kb-text-muted">events</div>
           <div className="mt-1 space-y-1">
             {previewEvents.map((event, index) => (
               <div key={`${event.timestamp}-${index}`} className="text-[11px] kb-text-secondary">
@@ -469,7 +465,7 @@ function TraceSpanTree({
               </div>
             ))}
             {span.events.length > previewEvents.length ? (
-              <div className="text-[10px] kb-text-muted">
+              <div className="text-[11px] kb-text-muted">
                 +{span.events.length - previewEvents.length} more
               </div>
             ) : null}
@@ -479,7 +475,7 @@ function TraceSpanTree({
 
       {showArtifacts && previewArtifacts.length > 0 ? (
         <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken p-2">
-          <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">artifacts</div>
+          <div className="text-[11px] kb-text-muted">artifacts</div>
           <div className="mt-1 space-y-1">
             {previewArtifacts.map((artifact, index) => (
               <div key={`${artifact.timestamp}-${index}`} className="text-[11px] kb-text-secondary">
@@ -488,7 +484,7 @@ function TraceSpanTree({
               </div>
             ))}
             {span.artifacts.length > previewArtifacts.length ? (
-              <div className="text-[10px] kb-text-muted">
+              <div className="text-[11px] kb-text-muted">
                 +{span.artifacts.length - previewArtifacts.length} more
               </div>
             ) : null}
@@ -818,10 +814,10 @@ export function TraceViewer({
   }
 
   return (
-    <section className="rounded-3xl border kb-border-subtle bg-gradient-to-br from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent p-6 kb-text-primary shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+    <section className="rounded-xl border kb-border-subtle p-6 kb-text-primary">
       <div className="flex flex-col gap-4 border-b kb-border-subtle pb-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.35em] kb-text-muted">Trace Viewer</p>
+          <p className="text-xs kb-text-muted">Trace Viewer</p>
           <h3 className="text-2xl font-semibold">Execution traces</h3>
           <p className="max-w-2xl text-sm leading-6 kb-text-secondary">
             Chronos reads persisted JSONL traces from the shared runtime log and surfaces the latest
@@ -837,12 +833,12 @@ export function TraceViewer({
         </button>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border kb-border-subtle kb-surface-sunken p-3">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.22em] kb-text-muted">
+      <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border kb-border-subtle kb-surface-sunken p-3">
+        <div className="flex items-center gap-2 text-xs kb-text-muted">
           <SlidersHorizontal className="h-4 w-4" />
           Filters
         </div>
-        <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">1-9 · J/K · R</div>
+        <div className="text-[11px] kb-text-muted">1-9 · J/K · R</div>
         <label className="flex min-w-[10rem] flex-1 items-center gap-2 rounded-xl border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-sm kb-text-secondary">
           <Search className="h-4 w-4 kb-text-muted" />
           <input
@@ -960,9 +956,9 @@ export function TraceViewer({
                   key={`${trace.traceId}:${trace.persistedAt}`}
                   type="button"
                   onClick={() => setSelectedTraceId(trace.traceId)}
-                  className={`w-full rounded-2xl border p-4 text-left transition ${
+                  className={`w-full rounded-lg border p-4 text-left transition ${
                     selected
-                      ? 'kb-border-accent kb-surface-accent shadow-[0_0_0_1px_rgba(103,232,249,0.12)]'
+                      ? 'kb-border-accent kb-surface-accent'
                       : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-well'
                   }`}
                 >
@@ -971,7 +967,7 @@ export function TraceViewer({
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs kb-text-muted">{trace.traceId}</span>
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.24em] ${statusTone(trace.status)}`}
+                          className={`rounded-full border px-2 py-0.5 text-[11px] ${statusTone(trace.status)}`}
                         >
                           {trace.status}
                         </span>
@@ -1014,9 +1010,9 @@ export function TraceViewer({
           </div>
         </div>
 
-        <aside className="space-y-3 rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+        <aside className="space-y-3 rounded-lg border kb-border-subtle kb-surface-sunken p-4">
           <div className="space-y-1">
-            <p className="text-xs uppercase tracking-[0.3em] kb-text-muted">Selected Trace</p>
+            <p className="text-xs kb-text-muted">Selected Trace</p>
             <h4 className="text-lg font-semibold kb-text-primary">
               {selectedSummary?.rootSpanName ?? 'No trace loaded'}
             </h4>
@@ -1045,26 +1041,26 @@ export function TraceViewer({
             <div className="space-y-3 text-sm kb-text-secondary">
               <div className="flex flex-wrap gap-2">
                 <span
-                  className={`rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.22em] ${statusTone(selectedTrace.status)}`}
+                  className={`rounded-full border px-2 py-0.5 text-[11px] ${statusTone(selectedTrace.status)}`}
                 >
                   {selectedTrace.status}
                 </span>
                 {selectedTrace.missionId ? (
-                  <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] uppercase tracking-[0.22em] kb-text-secondary">
+                  <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] kb-text-secondary">
                     mission {selectedTrace.missionId}
                   </span>
                 ) : null}
                 {selectedTrace.pipelineId ? (
-                  <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] uppercase tracking-[0.22em] kb-text-secondary">
+                  <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] kb-text-secondary">
                     pipeline {selectedTrace.pipelineId}
                   </span>
                 ) : null}
                 {selectedTrace.actuator ? (
-                  <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] uppercase tracking-[0.22em] kb-text-secondary">
+                  <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] kb-text-secondary">
                     {selectedTrace.actuator}
                   </span>
                 ) : null}
-                <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] uppercase tracking-[0.22em] kb-text-secondary">
+                <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] kb-text-secondary">
                   {selectedTrace.errorCount} errors
                 </span>
               </div>
@@ -1073,21 +1069,19 @@ export function TraceViewer({
                 <button
                   type="button"
                   onClick={() => void copyText(selectedTrace.traceId, 'trace id')}
-                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
                 >
                   Copy trace id
                 </button>
                 <button
                   type="button"
                   onClick={() => void copyText(selectedTrace.tracePath, 'trace path')}
-                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
                 >
                   Copy trace path
                 </button>
                 {copiedValue ? (
-                  <span className="text-[11px] uppercase tracking-[0.18em] kb-status-positive">
-                    {copiedValue}
-                  </span>
+                  <span className="text-[11px] kb-status-positive">{copiedValue}</span>
                 ) : null}
               </div>
 
@@ -1127,7 +1121,7 @@ export function TraceViewer({
                 onClick={() =>
                   void openRawTraceFile(selectedTrace.tracePath, selectedTrace.traceId)
                 }
-                className="w-full rounded-2xl border border-dashed kb-border-subtle kb-surface-raised/5 p-3 text-left font-mono text-[11px] kb-text-secondary transition hover:kb-border-accent hover:kb-surface-accent"
+                className="w-full rounded-lg border border-dashed kb-border-subtle kb-surface-raised/5 p-3 text-left font-mono text-[11px] kb-text-secondary transition hover:kb-border-accent hover:kb-surface-accent"
               >
                 {selectedTrace.tracePath}
               </button>
@@ -1138,7 +1132,7 @@ export function TraceViewer({
                   onClick={() =>
                     void openRawTraceFile(selectedTrace.tracePath, selectedTrace.traceId)
                   }
-                  className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent"
+                  className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1.5 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                 >
                   Open raw trace
                 </button>
@@ -1146,32 +1140,28 @@ export function TraceViewer({
                   type="button"
                   disabled={!rawTraceText}
                   onClick={() => void copyText(rawTraceText || '', 'focused raw record')}
-                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Copy focused record
                 </button>
                 <button
                   type="button"
                   onClick={() => setRawTraceVisible((value) => !value)}
-                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
                 >
                   {rawTraceVisible ? 'Hide' : 'Show'} raw trace
                 </button>
               </div>
 
               {rawTraceVisible ? (
-                <div className="rounded-2xl border kb-border-subtle kb-surface-well p-3">
+                <div className="rounded-lg border kb-border-subtle kb-surface-well p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs uppercase tracking-[0.24em] kb-text-muted">
-                      Raw trace log
-                    </div>
+                    <div className="text-xs kb-text-muted">Raw trace log</div>
                     <div className="text-[11px] kb-text-muted">{selectedTrace.tracePath}</div>
                   </div>
                   {rawTraceFocusHistory.length > 1 ? (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                        recent
-                      </div>
+                      <div className="text-[11px] kb-text-muted">recent</div>
                       {rawTraceFocusHistory.map((traceId) => (
                         <button
                           key={traceId}
@@ -1180,7 +1170,7 @@ export function TraceViewer({
                             setRawTraceFocusTraceId(traceId);
                             void refocusRawTraceFile(traceId);
                           }}
-                          className={`rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] transition ${
+                          className={`rounded-full border px-2 py-1 font-mono text-[11px] transition ${
                             traceId === rawTraceFocusTraceId
                               ? 'kb-border-accent kb-surface-accent kb-text-accent'
                               : 'kb-border-subtle kb-surface-sunken kb-text-secondary hover:kb-surface-raised'
@@ -1193,9 +1183,7 @@ export function TraceViewer({
                   ) : null}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <label className="flex min-w-[14rem] flex-1 items-center gap-2 rounded-xl border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-sm kb-text-secondary">
-                      <span className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                        trace id
-                      </span>
+                      <span className="text-[11px] kb-text-muted">trace id</span>
                       <input
                         value={rawTraceFocusTraceId}
                         onChange={(event) => setRawTraceFocusTraceId(event.target.value)}
@@ -1206,7 +1194,7 @@ export function TraceViewer({
                     <button
                       type="button"
                       onClick={() => void refocusRawTraceFile()}
-                      className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+                      className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
                     >
                       Re-focus
                     </button>
@@ -1247,7 +1235,7 @@ export function TraceViewer({
               ) : null}
 
               <div className="space-y-3">
-                <div className="text-xs uppercase tracking-[0.24em] kb-text-muted">Span tree</div>
+                <div className="text-xs kb-text-muted">Span tree</div>
                 <TraceSpanTree span={selectedTrace.rootSpan} onCopy={copyText} />
               </div>
             </div>

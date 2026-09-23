@@ -259,12 +259,10 @@ export function FocusedOperatorView({
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="rounded-[24px] border kb-border-accent kb-surface-accent px-5 py-4">
+      <section className="rounded-xl border kb-border-accent kb-surface-accent px-5 py-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-              Focused Operator View
-            </div>
+            <div className="text-[11px] kb-text-accent">Focused Operator View</div>
             <div className="mt-2 text-xl font-semibold tracking-tight kb-text-primary">
               {TITLES[viewId]}
             </div>
@@ -279,7 +277,7 @@ export function FocusedOperatorView({
             type="button"
             onClick={onBack}
             aria-label="Return to full Chronos console"
-            className="self-start rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.2em] kb-text-secondary transition hover:kb-surface-raised"
+            className="self-start rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
           >
             {ft('chronos_show_full_console', 'Show full console')}
           </button>
@@ -305,15 +303,11 @@ export function FocusedOperatorView({
             attentionItems.map((item) => (
               <div
                 key={item.id}
-                className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4"
+                className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4"
               >
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  {item.title}
-                </div>
+                <div className="text-[11px] kb-text-muted">{item.title}</div>
                 <div className="mt-2 text-sm kb-text-primary">{item.reason}</div>
-                <div className="mt-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  {item.targetType}
-                </div>
+                <div className="mt-2 text-[11px] kb-text-muted">{item.targetType}</div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {onOpenView && attentionItemTargetViewId(item) ? (
                     <button
@@ -325,7 +319,7 @@ export function FocusedOperatorView({
                           attentionItemTargetMissionId(item)
                         )
                       }
-                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
+                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                     >
                       {`Open ${attentionItemTargetViewLabel(item) || 'related view'}`}
                     </button>
@@ -348,7 +342,7 @@ export function FocusedOperatorView({
                 <div
                   key={mission.missionId}
                   id={`mission-card-${mission.missionId}`}
-                  className={`rounded-2xl border px-4 py-4 transition ${
+                  className={`rounded-lg border px-4 py-4 transition ${
                     highlightedMissionId === mission.missionId
                       ? 'kb-border-accent kb-surface-accent'
                       : 'kb-border-subtle kb-surface-sunken'
@@ -358,22 +352,18 @@ export function FocusedOperatorView({
                     <div className="text-[11px] font-semibold kb-text-primary">
                       {mission.missionId}
                     </div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                      {mission.controlSummary}
-                    </div>
+                    <div className="text-[11px] kb-text-muted">{mission.controlSummary}</div>
                   </div>
-                  <div className="mt-2 text-[10px] kb-text-muted">
+                  <div className="mt-2 text-[11px] kb-text-muted">
                     {mission.missionType || 'development'} · {mission.tier}
                   </div>
                   <div className="mt-4 grid gap-3 lg:grid-cols-[0.95fr,1.05fr]">
                     <div className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                      <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                        task board
-                      </div>
+                      <div className="text-[11px] kb-text-muted">task board</div>
                       <div className="mt-2 text-sm kb-text-primary">
                         {progress?.boardStatus || 'Unknown'}
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                         <div>
                           steps total{' '}
                           <span className="font-mono kb-text-primary">
@@ -401,13 +391,11 @@ export function FocusedOperatorView({
                       </div>
                     </div>
                     <div className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                      <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                        next tasks
-                      </div>
+                      <div className="text-[11px] kb-text-muted">next tasks</div>
                       <div className="mt-2 text-sm kb-text-primary">
                         {mission.nextTaskCount} visible in current queue
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                         <div>
                           queue total{' '}
                           <span className="font-mono kb-text-primary">
@@ -437,26 +425,24 @@ export function FocusedOperatorView({
                     <button
                       type="button"
                       onClick={() => onOpenMissionThread(mission.missionId)}
-                      className="mt-3 rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
+                      className="mt-3 rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                     >
                       Open mission thread
                     </button>
                   ) : null}
                   <div className="mt-3 grid gap-3 lg:grid-cols-2">
                     <div className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                      <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                        dependencies
-                      </div>
+                      <div className="text-[11px] kb-text-muted">dependencies</div>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {(progress?.dependencies || []).length === 0 ? (
-                          <span className="text-[10px] kb-text-muted">
+                          <span className="text-[11px] kb-text-muted">
                             No declared prerequisites.
                           </span>
                         ) : (
                           (progress?.dependencies || []).map((dependency) => (
                             <span
                               key={dependency}
-                              className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[9px] font-mono kb-text-secondary"
+                              className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] font-mono kb-text-secondary"
                             >
                               {dependency}
                             </span>
@@ -466,16 +452,14 @@ export function FocusedOperatorView({
                     </div>
                     <div className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                          generated assets
-                        </div>
+                        <div className="text-[11px] kb-text-muted">generated assets</div>
                         <div className="flex flex-wrap justify-end gap-1">
                           {ASSET_FILTERS.map((filter) => (
                             <button
                               key={filter.id}
                               type="button"
                               onClick={() => setAssetFilter(filter.id)}
-                              className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.14em] transition ${
+                              className={`rounded-full border px-2 py-1 text-[11px] transition ${
                                 assetFilter === filter.id
                                   ? 'kb-border-accent kb-surface-accent kb-text-accent'
                                   : 'kb-border-subtle kb-surface-sunken kb-text-muted hover:kb-surface-raised'
@@ -507,22 +491,20 @@ export function FocusedOperatorView({
                                 className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2"
                               >
                                 <div className="flex items-start justify-between gap-3">
-                                  <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                                    {asset.category}
-                                  </div>
+                                  <div className="text-[11px] kb-text-muted">{asset.category}</div>
                                   <a
                                     href={`/api/mission-asset?missionId=${encodeURIComponent(mission.missionId)}&path=${encodeURIComponent(asset.path)}`}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="text-[9px] uppercase tracking-[0.16em] kb-text-accent underline decoration-cyan-200/30 underline-offset-2"
+                                    className="text-[11px] kb-text-accent underline underline-offset-2"
                                   >
                                     open
                                   </a>
                                 </div>
-                                <div className="mt-1 break-all font-mono text-[10px] kb-text-secondary">
+                                <div className="mt-1 break-all font-mono text-[11px] kb-text-secondary">
                                   {asset.path}
                                 </div>
-                                <div className="mt-1 flex flex-wrap gap-3 text-[9px] kb-text-muted">
+                                <div className="mt-1 flex flex-wrap gap-3 text-[11px] kb-text-muted">
                                   <span>{formatBytes(asset.sizeBytes)}</span>
                                   <span>{formatTimestamp(asset.updatedAt)}</span>
                                 </div>
@@ -533,9 +515,7 @@ export function FocusedOperatorView({
                     </div>
                   </div>
                   <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                    <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                      latest handoff
-                    </div>
+                    <div className="text-[11px] kb-text-muted">latest handoff</div>
                     {(() => {
                       const latestHandoff = findLatestMissionHandoff(
                         mission.missionId,
@@ -543,7 +523,7 @@ export function FocusedOperatorView({
                       );
                       if (!latestHandoff) {
                         return (
-                          <div className="mt-2 text-[10px] kb-text-muted">
+                          <div className="mt-2 text-[11px] kb-text-muted">
                             No recent A2A handoff recorded for this mission.
                           </div>
                         );
@@ -551,19 +531,19 @@ export function FocusedOperatorView({
                       return (
                         <div className="mt-2 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
                           <div className="flex items-center justify-between gap-3">
-                            <div className="font-mono text-[10px] kb-text-primary">
+                            <div className="font-mono text-[11px] kb-text-primary">
                               {latestHandoff.sender} → {latestHandoff.receiver}
                             </div>
-                            <div className="text-[9px] kb-text-muted">
+                            <div className="text-[11px] kb-text-muted">
                               {formatTimestamp(latestHandoff.ts)}
                             </div>
                           </div>
-                          <div className="mt-1 flex flex-wrap gap-3 text-[9px] kb-text-muted">
+                          <div className="mt-1 flex flex-wrap gap-3 text-[11px] kb-text-muted">
                             <span>{latestHandoff.performative || 'handoff'}</span>
                             {latestHandoff.intent ? <span>{latestHandoff.intent}</span> : null}
                             {latestHandoff.channel ? <span>{latestHandoff.channel}</span> : null}
                           </div>
-                          <div className="mt-2 text-[10px] leading-5 kb-text-secondary">
+                          <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
                             {latestHandoff.promptExcerpt ||
                               'No prompt excerpt was captured for the latest handoff.'}
                           </div>
@@ -581,19 +561,15 @@ export function FocusedOperatorView({
       {viewId === 'computer-sessions' && (
         <div className="grid gap-3 lg:grid-cols-[0.95fr,1.05fr]">
           {data.computerSessions.length === 0 ? (
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted lg:col-span-2">
+            <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted lg:col-span-2">
               No active browser or terminal sessions are currently registered.
             </div>
           ) : (
             <>
               <div>
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                    sessions
-                  </div>
-                  <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                    1-9 · J/K
-                  </div>
+                  <div className="text-[11px] kb-text-muted">sessions</div>
+                  <div className="text-[11px] kb-text-muted">1-9 · J/K</div>
                 </div>
                 <div className="space-y-2">
                   {data.computerSessions.map((session) => {
@@ -603,7 +579,7 @@ export function FocusedOperatorView({
                         key={`${session.kind}:${session.id}`}
                         type="button"
                         onClick={() => setSelectedSessionId(session.id)}
-                        className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                        className={`w-full rounded-lg border px-4 py-4 text-left transition ${
                           active
                             ? 'kb-border-accent kb-surface-accent'
                             : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
@@ -613,11 +589,9 @@ export function FocusedOperatorView({
                           <div className="text-[11px] font-semibold kb-text-primary">
                             {session.id}
                           </div>
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                            {session.kind}
-                          </div>
+                          <div className="text-[11px] kb-text-muted">{session.kind}</div>
                         </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                           <div>
                             status{' '}
                             <span className="font-mono kb-text-primary">{session.status}</span>
@@ -640,19 +614,15 @@ export function FocusedOperatorView({
                           </div>
                         </div>
                         {active ? (
-                          <div className="mt-3 text-[10px] uppercase tracking-[0.18em] kb-text-accent">
-                            selected
-                          </div>
+                          <div className="mt-3 text-[11px] kb-text-accent">selected</div>
                         ) : null}
                       </button>
                     );
                   })}
                 </div>
               </div>
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  selected session
-                </div>
+              <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4">
+                <div className="text-[11px] kb-text-muted">selected session</div>
                 {(() => {
                   const session = data.computerSessions.find(
                     (entry) =>
@@ -675,21 +645,21 @@ export function FocusedOperatorView({
                       <div className="mt-2 text-[11px] font-semibold kb-text-primary">
                         {session.id}
                       </div>
-                      <div className="mt-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                      <div className="mt-1 text-[11px] kb-text-muted">
                         {session.kind} · {session.status}
                       </div>
                       {session.target ? (
-                        <div className="mt-3 text-[10px] kb-text-muted">
+                        <div className="mt-3 text-[11px] kb-text-muted">
                           target{' '}
                           <span className="font-mono kb-text-secondary">{session.target}</span>
                         </div>
                       ) : null}
                       {session.detail ? (
-                        <div className="mt-2 text-[10px] leading-5 kb-text-secondary">
+                        <div className="mt-2 text-[11px] leading-5 kb-text-secondary">
                           {session.detail}
                         </div>
                       ) : null}
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                         <div>
                           updated{' '}
                           <span className="font-mono kb-text-primary">
@@ -712,10 +682,8 @@ export function FocusedOperatorView({
                       </div>
                       {session.metadata && Object.keys(session.metadata).length > 0 ? (
                         <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                          <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                            metadata
-                          </div>
-                          <pre className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-5 kb-text-muted">
+                          <div className="text-[11px] kb-text-muted">metadata</div>
+                          <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-5 kb-text-muted">
                             {JSON.stringify(session.metadata, null, 2)}
                           </pre>
                         </div>
@@ -723,7 +691,7 @@ export function FocusedOperatorView({
                       <button
                         type="button"
                         onClick={() => setSelectedSessionId(null)}
-                        className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+                        className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
                       >
                         Reset session focus
                       </button>
@@ -738,19 +706,17 @@ export function FocusedOperatorView({
 
       {viewId === 'runtime-topology-map' && (
         <div className="grid gap-4">
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
+          <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  runtime graph
-                </div>
+                <div className="text-[11px] kb-text-muted">runtime graph</div>
                 <div className="mt-2 text-[11px] leading-5 kb-text-muted">
                   Surface runtimes sit on the left, managed agent runtimes in the center, and
                   external peers or unresolved flow endpoints on the right. Ownership stays attached
                   to each runtime card instead of becoming a separate node.
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-[9px] uppercase tracking-[0.14em] kb-text-muted">
+              <div className="grid grid-cols-3 gap-2 text-[11px] kb-text-muted">
                 <span className="rounded-full border border-[#c39cff]/30 bg-[#31214d]/70 px-2 py-1">
                   surface
                 </span>
@@ -853,31 +819,29 @@ export function FocusedOperatorView({
                   </svg>
                 </div>
                 <div className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                    selected flow
-                  </div>
+                  <div className="text-[11px] kb-text-muted">selected flow</div>
                   {!selectedFlow ? (
-                    <div className="mt-2 text-[10px] leading-5 kb-text-muted">
+                    <div className="mt-2 text-[11px] leading-5 kb-text-muted">
                       Hover or click an edge to inspect its direction, recent count, and latest
                       activity timestamp.
                     </div>
                   ) : (
                     <div className="mt-2 space-y-2">
-                      <div className="font-mono text-[10px] kb-text-primary">
+                      <div className="font-mono text-[11px] kb-text-primary">
                         {selectedFlow.from} → {selectedFlow.to}
                       </div>
-                      <div className="flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.14em] kb-text-muted">
+                      <div className="flex flex-wrap gap-2 text-[11px] kb-text-muted">
                         <span>{selectedFlow.kind}</span>
                         <span>count {selectedFlow.count}</span>
                       </div>
-                      <div className="text-[10px] kb-text-muted">
+                      <div className="text-[11px] kb-text-muted">
                         latest activity:{' '}
                         <span className="font-mono kb-text-secondary">
                           {formatTimestamp(selectedFlow.latestAt)}
                         </span>
                       </div>
                       {selectedFlow.channel ? (
-                        <div className="text-[10px] kb-text-muted">
+                        <div className="text-[11px] kb-text-muted">
                           channel:{' '}
                           <span className="font-mono kb-text-secondary">
                             {selectedFlow.channel}
@@ -885,7 +849,7 @@ export function FocusedOperatorView({
                         </div>
                       ) : null}
                       {selectedFlow.thread ? (
-                        <div className="text-[10px] kb-text-muted">
+                        <div className="text-[11px] kb-text-muted">
                           thread:{' '}
                           <span className="font-mono kb-text-secondary">{selectedFlow.thread}</span>
                         </div>
@@ -897,10 +861,8 @@ export function FocusedOperatorView({
             )}
           </div>
           <div className="grid gap-4 lg:grid-cols-[0.9fr,1.1fr]">
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                surface runtimes
-              </div>
+            <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4">
+              <div className="text-[11px] kb-text-muted">surface runtimes</div>
               <div className="mt-3 space-y-2">
                 {data.runtimeTopology.surfaces.length === 0 ? (
                   <SurfaceStatusPanel
@@ -915,8 +877,8 @@ export function FocusedOperatorView({
                       key={surface.id}
                       className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
                     >
-                      <div className="text-[10px] font-mono kb-text-secondary">{surface.id}</div>
-                      <div className="mt-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
+                      <div className="text-[11px] font-mono kb-text-secondary">{surface.id}</div>
+                      <div className="mt-1 text-[11px] kb-text-muted">
                         {surface.kind} · {surface.running ? 'running' : 'offline'}
                       </div>
                     </div>
@@ -924,8 +886,8 @@ export function FocusedOperatorView({
                 )}
               </div>
             </div>
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">owners</div>
+            <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4">
+              <div className="text-[11px] kb-text-muted">owners</div>
               <div className="mt-3 space-y-2">
                 {data.runtimeTopology.owners.length === 0 ? (
                   <SurfaceStatusPanel
@@ -940,8 +902,8 @@ export function FocusedOperatorView({
                       key={`${owner.type}:${owner.id}`}
                       className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
                     >
-                      <div className="text-[10px] font-mono kb-text-secondary">{owner.id}</div>
-                      <div className="mt-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
+                      <div className="text-[11px] font-mono kb-text-secondary">{owner.id}</div>
+                      <div className="mt-1 text-[11px] kb-text-muted">
                         {owner.type} · runtimes {owner.runtimeCount}
                       </div>
                     </div>
@@ -950,10 +912,8 @@ export function FocusedOperatorView({
               </div>
             </div>
             <div className="grid gap-4 lg:col-span-2">
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  managed runtimes
-                </div>
+              <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4">
+                <div className="text-[11px] kb-text-muted">managed runtimes</div>
                 <div className="mt-3 space-y-2">
                   {data.runtimeTopology.runtimes.length === 0 ? (
                     <SurfaceStatusPanel
@@ -969,14 +929,12 @@ export function FocusedOperatorView({
                         className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-[10px] font-mono kb-text-primary">
+                          <div className="text-[11px] font-mono kb-text-primary">
                             {runtime.agentId}
                           </div>
-                          <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                            {runtime.status}
-                          </div>
+                          <div className="text-[11px] kb-text-muted">{runtime.status}</div>
                         </div>
-                        <div className="mt-1 text-[9px] kb-text-muted">
+                        <div className="mt-1 text-[11px] kb-text-muted">
                           {runtime.ownerType}:{runtime.ownerId} · activity{' '}
                           {runtime.recentActivityCount}
                         </div>
@@ -985,10 +943,8 @@ export function FocusedOperatorView({
                   )}
                 </div>
               </div>
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  recent flow
-                </div>
+              <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4">
+                <div className="text-[11px] kb-text-muted">recent flow</div>
                 <div className="mt-3 space-y-2">
                   {data.runtimeTopology.flows.length === 0 ? (
                     <SurfaceStatusPanel
@@ -1003,10 +959,10 @@ export function FocusedOperatorView({
                         key={flow.id}
                         className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
                       >
-                        <div className="text-[10px] font-mono kb-text-primary">
+                        <div className="text-[11px] font-mono kb-text-primary">
                           {flow.from} → {flow.to}
                         </div>
-                        <div className="mt-1 text-[9px] kb-text-muted">
+                        <div className="mt-1 text-[11px] kb-text-muted">
                           {flow.kind} · count {flow.count}
                         </div>
                       </div>
@@ -1022,20 +978,18 @@ export function FocusedOperatorView({
       {viewId === 'runtime-lease-doctor' && (
         <div className="grid gap-3">
           {data.runtimeDoctor.length === 0 ? (
-            <div className="rounded-2xl border kb-status-positive-border kb-status-positive-surface px-4 py-4 text-[11px] kb-status-positive">
+            <div className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-4 py-4 text-[11px] kb-status-positive">
               No stale or orphaned runtime leases detected.
             </div>
           ) : (
             data.runtimeDoctor.map((finding) => (
               <div
                 key={finding.agentId}
-                className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4"
+                className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] font-mono kb-text-primary">{finding.agentId}</div>
-                  <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                    {finding.severity}
-                  </div>
+                  <div className="text-[11px] font-mono kb-text-primary">{finding.agentId}</div>
+                  <div className="text-[11px] kb-text-muted">{finding.severity}</div>
                 </div>
                 <div className="mt-2 text-sm kb-text-primary">{finding.reason}</div>
               </div>
@@ -1047,20 +1001,20 @@ export function FocusedOperatorView({
       {viewId === 'recent-surface-outbox' && (
         <div className="grid gap-3">
           {data.recentSurfaceOutbox.length === 0 ? (
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
+            <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
               No pending or recent surface outbox messages.
             </div>
           ) : (
             data.recentSurfaceOutbox.map((message) => (
               <div
                 key={message.message_id}
-                className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4"
+                className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                  <div className="text-[11px] kb-text-muted">
                     {message.surface} · {message.channel}
                   </div>
-                  <div className="text-[9px] kb-text-muted">
+                  <div className="text-[11px] kb-text-muted">
                     {new Date(message.created_at).toLocaleString(chronosSpeechLocale())}
                   </div>
                 </div>
@@ -1074,30 +1028,30 @@ export function FocusedOperatorView({
       {viewId === 'secret-approval-queue' && (
         <div className="grid gap-3">
           {data.secretApprovals.length === 0 ? (
-            <div className="rounded-2xl border kb-status-positive-border kb-status-positive-surface px-4 py-4 text-[11px] kb-status-positive">
+            <div className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-4 py-4 text-[11px] kb-status-positive">
               No pending secret mutation approvals are waiting for review.
             </div>
           ) : (
             data.secretApprovals.map((request) => (
               <div
                 key={request.id}
-                className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4"
+                className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold kb-text-primary">{request.title}</div>
-                    <div className="mt-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+                    <div className="mt-1 text-[11px] kb-text-muted">
                       {request.serviceId} · {request.secretKey} · {request.mutation}
                     </div>
                   </div>
-                  <div className="rounded-full border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[9px] uppercase tracking-[0.14em] kb-status-warning">
+                  <div className="rounded-full border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[11px] kb-status-warning">
                     {request.riskLevel}
                   </div>
                 </div>
                 <div className="mt-3 text-[11px] leading-5 kb-text-secondary">
                   {request.summary}
                 </div>
-                <div className="mt-3 grid gap-2 text-[10px] kb-text-muted lg:grid-cols-2">
+                <div className="mt-3 grid gap-2 text-[11px] kb-text-muted lg:grid-cols-2">
                   <div>
                     storage channel{' '}
                     <span className="font-mono kb-text-secondary">{request.storageChannel}</span>
@@ -1126,21 +1080,19 @@ export function FocusedOperatorView({
                   </div>
                 </div>
                 <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                    pending roles
-                  </div>
+                  <div className="text-[11px] kb-text-muted">pending roles</div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {(request.pendingRoles.length ? request.pendingRoles : ['none']).map((role) => (
                       <span
                         key={role}
-                        className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[9px] font-mono kb-text-secondary"
+                        className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] font-mono kb-text-secondary"
                       >
                         {role}
                       </span>
                     ))}
                   </div>
                 </div>
-                <div className="mt-3 text-[10px] leading-5 kb-text-muted">
+                <div className="mt-3 text-[11px] leading-5 kb-text-muted">
                   {request.phase === 'apply_pending' ? (
                     <>
                       Apply pending — paste the secret in Concierge:{' '}
@@ -1202,18 +1154,16 @@ export function FocusedOperatorView({
 
       {viewId === 'owner-summaries' && (
         <div className="grid gap-4 lg:grid-cols-[0.95fr,1.05fr]">
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-              owner summaries
-            </div>
+          <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4">
+            <div className="text-[11px] kb-text-muted">owner summaries</div>
             <div className="mt-3 space-y-2">
               {data.ownerSummaries.map((summary) => (
                 <div
                   key={`${summary.mission_id}-${summary.ts}`}
                   className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
                 >
-                  <div className="text-[10px] font-mono kb-text-primary">{summary.mission_id}</div>
-                  <div className="mt-1 text-[9px] kb-text-muted">
+                  <div className="text-[11px] font-mono kb-text-primary">{summary.mission_id}</div>
+                  <div className="mt-1 text-[11px] kb-text-muted">
                     accepted {summary.accepted_count} · reviewed {summary.reviewed_count} ·
                     completed {summary.completed_count}
                   </div>
@@ -1221,18 +1171,16 @@ export function FocusedOperatorView({
               ))}
             </div>
           </div>
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-              recent events
-            </div>
+          <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4">
+            <div className="text-[11px] kb-text-muted">recent events</div>
             <div className="mt-3 space-y-2">
               {data.recentEvents.map((event, index) => (
                 <div
                   key={`${event.ts}-${index}`}
                   className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
                 >
-                  <div className="text-[10px] font-mono kb-text-primary">{event.decision}</div>
-                  <div className="mt-1 text-[9px] kb-text-muted">
+                  <div className="text-[11px] font-mono kb-text-primary">{event.decision}</div>
+                  <div className="mt-1 text-[11px] kb-text-muted">
                     {event.mission_id || 'system'}
                   </div>
                 </div>

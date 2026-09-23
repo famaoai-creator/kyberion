@@ -419,7 +419,10 @@
   }
 
   function askHref(title) {
-    var text = title ? title + ' について' : '';
+    // "About <title>" / "<title> について" — word order is the vocabulary's.
+    var text = title
+      ? renderTemplate(vt(state.vocab, 'progress_ask_about') || '{title}', { title: title })
+      : '';
     return '/work?ask=' + encodeURIComponent(text) + '#conversation-panel';
   }
 

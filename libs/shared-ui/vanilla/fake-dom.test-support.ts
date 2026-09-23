@@ -403,6 +403,10 @@ export class FakeDocument extends FakeNode {
   createComment(text: string): FakeComment {
     return new FakeComment(this, String(text));
   }
+  /** react-dom looks up a changed radio's group from the document root. */
+  querySelectorAll(selector: string): FakeElement[] {
+    return this.documentElement.querySelectorAll(selector);
+  }
 }
 
 /**

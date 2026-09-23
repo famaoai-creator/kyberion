@@ -308,7 +308,7 @@ export function ActionStatusBadge({ action }: { action: ControlActionSummary }) 
   const locale = resolveChronosLocale();
   return (
     <div
-      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.22em] ${
+      className={`rounded-full px-2 py-1 text-[11px] ${
         action.status === 'completed'
           ? 'kb-status-positive-surface kb-status-positive'
           : action.status === 'failed'
@@ -532,19 +532,17 @@ export function ActionDetailList({
   return (
     <div className="mt-3 space-y-2 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
       {entries.length === 0 ? (
-        <div className="text-[10px] kb-text-muted">No detail observations recorded yet.</div>
+        <div className="text-[11px] kb-text-muted">No detail observations recorded yet.</div>
       ) : (
         entries.map((detail, detailIndex) => (
           <div
             key={`${actionId}-${detail.ts}-${detailIndex}`}
             className="border-l kb-border-subtle pl-3"
           >
-            <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-              {detail.decision}
-            </div>
+            <div className="text-[11px] kb-text-muted">{detail.decision}</div>
             {detail.decision === 'next_action_executed' ||
             detail.decision === 'memory_promote_pending_applied' ? (
-              <div className="mt-1 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+              <div className="mt-1 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                 <div>
                   operation:{' '}
                   <span className="font-mono kb-text-secondary">{detail.operation || '-'}</span>
@@ -566,11 +564,11 @@ export function ActionDetailList({
                 ) : null}
               </div>
             ) : null}
-            {detail.why && <div className="mt-1 text-[10px] kb-text-secondary">{detail.why}</div>}
+            {detail.why && <div className="mt-1 text-[11px] kb-text-secondary">{detail.why}</div>}
             {detail.error && (
-              <div className="mt-1 text-[10px] kb-status-negative">{detail.error}</div>
+              <div className="mt-1 text-[11px] kb-status-negative">{detail.error}</div>
             )}
-            <div className="mt-1 text-[9px] font-mono kb-text-muted">
+            <div className="mt-1 text-[11px] font-mono kb-text-muted">
               {new Date(detail.ts).toLocaleString(chronosSpeechLocale())}
             </div>
           </div>
@@ -601,14 +599,14 @@ export function ActionGuidance({
 
   return (
     <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
-      <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">operator guidance</div>
+      <div className="text-[11px] kb-text-muted">operator guidance</div>
       {currentAction?.disabledReason && (
-        <div className="mt-2 text-[10px] kb-text-muted">
+        <div className="mt-2 text-[11px] kb-text-muted">
           disabled reason: <span className="kb-text-secondary">{currentAction.disabledReason}</span>
         </div>
       )}
       {nextValidActions.length > 0 && (
-        <div className="mt-2 text-[10px] kb-text-muted">
+        <div className="mt-2 text-[11px] kb-text-muted">
           next valid actions:{' '}
           <span className="kb-text-secondary">
             {nextValidActions.map((action) => action.label).join(', ')}
@@ -618,7 +616,7 @@ export function ActionGuidance({
       {latestAction.status === 'failed' &&
         nextValidActions.length === 0 &&
         !currentAction?.enabled && (
-          <div className="mt-2 text-[10px] kb-status-warning">
+          <div className="mt-2 text-[11px] kb-status-warning">
             No immediate retry path is available from the current target state.
           </div>
         )}

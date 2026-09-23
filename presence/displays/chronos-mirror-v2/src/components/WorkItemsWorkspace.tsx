@@ -156,10 +156,10 @@ export function WorkItemsWorkspace({
     uxText(STATUS_LABEL_KEY[status] || 'chronos_status_unknown', locale);
 
   return (
-    <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+          <div className="text-[11px] kb-text-accent">
             {uxText('chronos_nav_work_items', locale)}
           </div>
           <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
@@ -169,12 +169,12 @@ export function WorkItemsWorkspace({
             {uxText('chronos_nav_work_items_hint', locale)}
           </p>
         </div>
-        <div className="rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
+        <div className="rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[11px] kb-text-muted">
           {items.length}
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] kb-text-muted">
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] kb-text-muted">
         <span className="rounded-full border kb-border-accent kb-surface-accent px-2 py-1 kb-text-accent">
           {uxText('chronos_work_scope', locale)}: {workScopeLabel(projection?.scope, locale)}
         </span>
@@ -204,17 +204,17 @@ export function WorkItemsWorkspace({
       ) : null}
 
       {coordination ? (
-        <section className="mt-5 rounded-2xl border kb-border-accent kb-surface-accent p-4">
+        <section className="mt-5 rounded-lg border kb-border-accent kb-surface-accent p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.24em] kb-text-accent">
+              <div className="text-[11px] font-bold kb-text-accent">
                 {uxText('chronos_work_coordination', locale)}
               </div>
               <p className="mt-1 max-w-2xl text-[11px] leading-5 kb-text-muted">
                 {uxText('chronos_work_coordination_description', locale)}
               </p>
             </div>
-            <div className="rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary">
+            <div className="rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[11px] kb-text-secondary">
               {coordination.total}
             </div>
           </div>
@@ -244,7 +244,7 @@ export function WorkItemsWorkspace({
               detail={uxText('chronos_work_coordination_running_attempts_detail', locale)}
             />
           </div>
-          <div className="mt-4 flex flex-wrap gap-2 text-[10px] kb-text-muted">
+          <div className="mt-4 flex flex-wrap gap-2 text-[11px] kb-text-muted">
             {statuses.map((status) => (
               <span
                 key={status}
@@ -258,7 +258,7 @@ export function WorkItemsWorkspace({
       ) : null}
 
       {items.length === 0 ? (
-        <div className="mt-5 rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
+        <div className="mt-5 rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
           {uxText('chronos_work_item_no_items', locale)}
         </div>
       ) : (
@@ -268,9 +268,9 @@ export function WorkItemsWorkspace({
             return (
               <div
                 key={column}
-                className={`${columnItems.length > 0 ? 'min-w-[220px]' : 'min-w-[140px]'} flex-1 rounded-2xl border kb-border-subtle kb-surface-sunken p-2`}
+                className={`${columnItems.length > 0 ? 'min-w-[220px]' : 'min-w-[140px]'} flex-1 rounded-lg border kb-border-subtle kb-surface-sunken p-2`}
               >
-                <div className="mb-2 flex items-center justify-between gap-2 px-1 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-muted">
+                <div className="mb-2 flex items-center justify-between gap-2 px-1 text-[11px] font-bold kb-text-muted">
                   <span>{statusLabel(column)}</span>
                   <span>{columnItems.length}</span>
                 </div>
@@ -299,11 +299,11 @@ export function WorkItemsWorkspace({
                       >
                         <div className="font-semibold leading-5 kb-text-primary">{item.title}</div>
                         {item.description && item.description !== item.title ? (
-                          <div className="mt-2 line-clamp-3 text-[10px] leading-5 kb-text-secondary">
+                          <div className="mt-2 line-clamp-3 text-[11px] leading-5 kb-text-secondary">
                             {item.description}
                           </div>
                         ) : null}
-                        <div className="mt-3 grid gap-1.5 text-[9px] kb-text-muted">
+                        <div className="mt-3 grid gap-1.5 text-[11px] kb-text-muted">
                           <div className="flex items-center gap-1.5">
                             <CircleUserRound size={11} />
                             <span>{uxText('chronos_work_item_assignee', locale)}:</span>
@@ -335,7 +335,7 @@ export function WorkItemsWorkspace({
                           <button
                             type="button"
                             onClick={() => onOpenMission(missionId)}
-                            className="mt-3 max-w-full truncate rounded-full border kb-border-accent kb-surface-accent px-2 py-1 text-[9px] uppercase tracking-[0.12em] kb-text-accent"
+                            className="mt-3 max-w-full truncate rounded-full border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent"
                           >
                             {missionId}
                           </button>
@@ -346,7 +346,7 @@ export function WorkItemsWorkspace({
                               type="button"
                               disabled={busyId === item.item_id}
                               onClick={() => void moveItem(item.item_id, statuses[columnIndex - 1])}
-                              className="rounded kb-surface-raised px-2 py-1 text-[10px] kb-text-secondary hover:kb-surface-raised"
+                              className="rounded kb-surface-raised px-2 py-1 text-[11px] kb-text-secondary hover:kb-surface-raised"
                               aria-label={statusLabel(statuses[columnIndex - 1])}
                             >
                               <ArrowLeft size={12} />
@@ -357,7 +357,7 @@ export function WorkItemsWorkspace({
                               type="button"
                               disabled={busyId === item.item_id}
                               onClick={() => void moveItem(item.item_id, statuses[columnIndex + 1])}
-                              className="rounded kb-surface-accent px-2 py-1 text-[10px] kb-text-accent hover:kb-surface-accent"
+                              className="rounded kb-surface-accent px-2 py-1 text-[11px] kb-text-accent hover:kb-surface-accent"
                               aria-label={statusLabel(statuses[columnIndex + 1])}
                             >
                               <ArrowRight size={12} />
@@ -396,12 +396,12 @@ function CoordinationMetric({
 }) {
   return (
     <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-muted">
+      <div className="flex items-center gap-2 text-[11px] font-bold kb-text-muted">
         {icon}
         <span>{label}</span>
       </div>
       <div className="mt-2 text-2xl font-semibold kb-text-primary">{value}</div>
-      <div className="mt-1 text-[10px] leading-4 kb-text-muted">{detail}</div>
+      <div className="mt-1 text-[11px] leading-4 kb-text-muted">{detail}</div>
     </div>
   );
 }
@@ -422,17 +422,17 @@ function WorkItemLineageOverview({
   locale: SupportedLocale;
 }) {
   return (
-    <section className="mt-5 rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+    <section className="mt-5 rounded-lg border kb-border-subtle kb-surface-sunken p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.22em] kb-text-accent">
+          <div className="text-[11px] font-bold kb-text-accent">
             {uxText('chronos_lineage_title', locale)}
           </div>
           <p className="mt-1 text-[11px] leading-5 kb-text-muted">
             {uxText('chronos_lineage_description', locale)}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 text-[10px]">
+        <div className="flex flex-wrap gap-2 text-[11px]">
           <span className="rounded-full border kb-border-positive kb-status-positive-surface px-2 py-1 kb-status-positive">
             {uxText('chronos_lineage_complete', locale)} {lineage.complete_chain_items}
           </span>
@@ -441,7 +441,7 @@ function WorkItemLineageOverview({
           </span>
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-1.5 text-[10px]">
+      <div className="mt-4 flex flex-wrap items-center gap-1.5 text-[11px]">
         {lineage.hierarchy.map((kind, index) => (
           <React.Fragment key={kind}>
             <span className="rounded-full border kb-border-accent kb-surface-accent px-2 py-1 font-semibold kb-text-accent">
@@ -459,26 +459,26 @@ function WorkItemLineageOverview({
           const missing = lineage.missing_by_kind[kind] || 0;
           return (
             <div key={kind} className="rounded-xl border kb-border-subtle kb-surface-raised p-2">
-              <div className="text-[9px] font-bold uppercase tracking-[0.14em] kb-text-muted">
+              <div className="text-[11px] font-bold kb-text-muted">
                 {lineageLabel(kind, locale)}
               </div>
               <div className="mt-2 grid gap-1">
                 {nodes.map((node) => (
                   <div
                     key={node.key}
-                    className="truncate text-[10px] kb-text-primary"
+                    className="truncate text-[11px] kb-text-primary"
                     title={node.id}
                   >
                     {node.id} <span className="kb-text-muted">({node.item_count})</span>
                   </div>
                 ))}
                 {missing > 0 ? (
-                  <div className="text-[10px] kb-status-warning">
+                  <div className="text-[11px] kb-status-warning">
                     {uxText('chronos_lineage_missing', locale)} ({missing})
                   </div>
                 ) : null}
                 {nodes.length === 0 && missing === 0 ? (
-                  <div className="text-[10px] kb-text-muted">-</div>
+                  <div className="text-[11px] kb-text-muted">-</div>
                 ) : null}
               </div>
             </div>
@@ -486,7 +486,7 @@ function WorkItemLineageOverview({
         })}
       </div>
       {lineage.edges.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2 text-[9px] kb-text-muted">
+        <div className="mt-3 flex flex-wrap gap-2 text-[11px] kb-text-muted">
           {lineage.edges.slice(0, 8).map((edge) => (
             <span
               key={`${edge.from}->${edge.to}`}
@@ -518,7 +518,7 @@ function WorkItemLineageChain({
     ['task_id', context.task_id],
   ] as const;
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1 text-[9px]" aria-label="scope lineage">
+    <div className="mt-3 flex flex-wrap items-center gap-1 text-[11px]" aria-label="scope lineage">
       {chain.map(([kind, value], index) => (
         <React.Fragment key={kind}>
           <span

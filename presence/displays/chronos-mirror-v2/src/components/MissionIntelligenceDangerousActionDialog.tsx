@@ -1,6 +1,10 @@
 import { actionButtonClass } from './MissionIntelligenceViewHelpers';
 
-export function MissionIntelligenceDangerousActionDialog(context: Record<string, unknown>) {
+export function MissionIntelligenceDangerousActionDialog({
+  context,
+}: {
+  context: Record<string, unknown>;
+}) {
   const { dangerousAction, clearDangerousAction, confirmDangerousAction } = context as {
     dangerousAction?: {
       title: string;
@@ -20,15 +24,13 @@ export function MissionIntelligenceDangerousActionDialog(context: Record<string,
           role="presentation"
         >
           <div
-            className="w-full max-w-lg rounded-2xl border kb-border-subtle bg-[#0b1020] p-5 shadow-2xl shadow-black/40"
+            className="w-full max-w-lg rounded-lg border kb-border-subtle bg-[#0b1020] p-5 shadow-2xl shadow-black/40"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-labelledby="chronos-dangerous-action-title"
           >
-            <div className="text-[10px] uppercase tracking-[0.26em] kb-status-negative">
-              risky action confirmation
-            </div>
+            <div className="text-[11px] kb-status-negative">risky action confirmation</div>
             <div
               id="chronos-dangerous-action-title"
               className="mt-2 text-lg font-semibold tracking-tight kb-text-primary"
@@ -42,7 +44,7 @@ export function MissionIntelligenceDangerousActionDialog(context: Record<string,
               <button
                 type="button"
                 onClick={clearDangerousAction}
-                className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+                className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
               >
                 {dangerousAction.cancelLabel || 'Cancel'}
               </button>

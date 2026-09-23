@@ -65,20 +65,16 @@ export function SurfaceStatusPanel({
   const style = TONE_STYLES[tone];
 
   return (
-    <div className={`rounded-[24px] border ${style.border} ${style.bg} px-5 py-4`}>
+    <div className={`rounded-xl border ${style.border} ${style.bg} px-5 py-4`}>
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border kb-border-subtle kb-surface-sunken">
           {style.icon}
         </div>
         <div className="min-w-0 flex-1">
-          {eyebrow ? (
-            <div className="text-[10px] uppercase tracking-[0.28em] kb-text-muted">{eyebrow}</div>
-          ) : null}
+          {eyebrow ? <div className="text-[11px] kb-text-muted">{eyebrow}</div> : null}
           <div className="mt-1 text-sm font-semibold tracking-tight kb-text-primary">{title}</div>
           <p className={`mt-2 text-[11px] leading-6 ${style.text}`}>{detail}</p>
-          {meta ? (
-            <div className="mt-2 text-[9px] uppercase tracking-[0.18em] kb-text-muted">{meta}</div>
-          ) : null}
+          {meta ? <div className="mt-2 text-[11px] kb-text-muted">{meta}</div> : null}
         </div>
       </div>
 
@@ -88,7 +84,7 @@ export function SurfaceStatusPanel({
             <button
               type="button"
               onClick={onAction}
-              className="inline-flex items-center gap-2 rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+              className="inline-flex items-center gap-2 rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
             >
               {actionLabel}
               <ArrowRight size={12} />
@@ -98,7 +94,7 @@ export function SurfaceStatusPanel({
             <button
               type="button"
               onClick={onSecondaryAction}
-              className="inline-flex items-center gap-2 rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+              className="inline-flex items-center gap-2 rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
             >
               {secondaryActionLabel}
             </button>

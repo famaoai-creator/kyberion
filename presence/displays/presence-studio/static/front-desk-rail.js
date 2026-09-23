@@ -10,8 +10,9 @@
  * role does not allow are not shown) — this file never hardcodes a surface
  * port or host, and cross-surface items stay same-tab links.
  *
- * It also wires the header's theme / language controls (server-rendered
- * from `front-desk-shell-controls.partial.html`) to `window.KyberionPrefs`
+ * It also renders the header's theme / language controls (the shared
+ * `ui:display-controls`, into `front-desk-shell-controls.partial.html`'s
+ * slot) and persists their actions through `window.KyberionPrefs`
  * (`front-desk-prefs.js`), and exposes `FrontDeskRail.render(container,
  * components)` so the page scripts can draw kyberion-base components with
  * the viewer's locale and the shared `ui` message bundle.
@@ -93,13 +94,6 @@ function renderTemplate(template, params) {
   );
 }
 
-function element(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined && text !== null) node.textContent = String(text);
-  return node;
-}
-
 /**
  * Render kyberion-base components into `container` with the viewer's locale
  * and the shared `ui` message bundle. Resolves to the container.
@@ -110,7 +104,49 @@ function render(container, components, options) {
   );
 }
 
-function railComponents(nav, current) {
+/** `ui:nav-rail` context switcher action (payload `{ value: tenant_slug }`). */
+const TENANT_SWITCH_ACTION = 'tenant.switch';
+
+function tenantSummaryText(nav, me) {
+  const roleLabel = (nav.role_labels && nav.role_labels[me.viewing.role]) || me.viewing.role;
+  if (me.can_switch) {
+    return renderTemplate(nav.tenant_viewing_summary, {
+      role: roleLabel,
+      count: (me.tenants || []).length,
+    });
+  }
+  return renderTemplate(nav.tenant_viewing_single, { role: roleLabel });
+}
+
+/**
+ * The `ui:nav-rail` context slot for the tenant being viewed — only once a
+ * tenant is actually viewed (an empty name/role block reads as broken). With
+ * more than one tenant it is a switcher (`tenant.switch`).
+ */
+function tenantContext(nav, me) {
+  if (!me || !me.viewing) return undefined;
+  const context = {
+    label: me.viewing.display_name || me.viewing.tenant_slug,
+    detail: tenantSummaryText(nav, me),
+    switch_label: nav.tenant_switch_aria || undefined,
+  };
+  if (me.can_switch) {
+    context.action = { id: TENANT_SWITCH_ACTION };
+    context.options = (me.tenants || []).map((tenant) => ({
+      value: tenant.tenant_slug,
+      label: tenant.display_name,
+      selected: tenant.tenant_slug === me.viewing.tenant_slug,
+    }));
+  }
+  return context;
+}
+
+/**
+ * The whole rail as one `ui:nav-rail`: brand + tenant context slots, the
+ * role-gated verb items and help in the footer — same component (and so the
+ * same markup / CSS) as the concierge React rail.
+ */
+function railComponents(nav, me, current) {
   const helpActive = window.location.pathname.indexOf('/help') === 0;
   const items = (nav.items || [])
     .filter((item) => item.allowed !== false)
@@ -125,114 +161,63 @@ function railComponents(nav, current) {
   const footer = nav.help
     ? [{ id: 'help', label: nav.help.label, href: nav.help.href, icon: 'help', active: helpActive }]
     : [];
-  return [
-    {
-      id: 'front-desk-rail',
-      type: 'ui:nav-rail',
-      props: { label: nav.aria_label, items, footer_items: footer },
+  const props = {
+    label: nav.aria_label,
+    brand: { name: 'Kyberion', subtitle: nav.brand_tagline || undefined },
+    items,
+    footer_items: footer,
+  };
+  const context = tenantContext(nav, me);
+  if (context) props.context = context;
+  return [{ id: 'front-desk-rail', type: 'ui:nav-rail', props }];
+}
+
+function drawRail(el, nav, me, current) {
+  return render(el, railComponents(nav, me, current), {
+    onAction(action) {
+      if (!action || action.id !== TENANT_SWITCH_ACTION) return;
+      const slug = action.payload && action.payload.value;
+      if (typeof slug !== 'string' || !slug) return;
+      storeTenant(slug);
+      loadMe(slug).then((next) => {
+        if (next) drawRail(el, nav, next, current);
+      });
     },
-  ];
+  });
 }
 
-function brandBlock(nav) {
-  const brand = element('div', 'ps-rail-brand');
-  const mark = element('span', 'ps-rail-brand__mark');
-  mark.setAttribute('aria-hidden', 'true');
-  const text = element('span', 'ps-rail-brand__text');
-  text.appendChild(element('strong', '', 'Kyberion'));
-  text.appendChild(element('small', '', nav.brand_tagline || ''));
-  brand.appendChild(mark);
-  brand.appendChild(text);
-  return brand;
-}
-
-function tenantSummaryText(nav, me) {
-  const roleLabel = (nav.role_labels && nav.role_labels[me.viewing.role]) || me.viewing.role;
-  if (me.can_switch) {
-    return renderTemplate(nav.tenant_viewing_summary, {
-      role: roleLabel,
-      count: (me.tenants || []).length,
-    });
-  }
-  return renderTemplate(nav.tenant_viewing_single, { role: roleLabel });
-}
-
-function tenantBlock(nav, me, onSwitch) {
-  if (!me || !me.viewing) return null;
-  const block = element('div', 'ps-rail-tenant');
-  const button = element('button', 'ps-rail-tenant__button');
-  button.type = 'button';
-  button.setAttribute('aria-label', nav.tenant_switch_aria || '');
-  button.setAttribute('aria-haspopup', 'listbox');
-  button.setAttribute('aria-expanded', 'false');
-  if (!me.can_switch) button.disabled = true;
-  button.appendChild(element('span', 'ps-rail-tenant__name', me.viewing.display_name));
-  button.appendChild(element('span', 'ps-rail-tenant__summary', tenantSummaryText(nav, me)));
-  block.appendChild(button);
-  if (!me.can_switch) return block;
-
-  const list = element('ul', 'ps-rail-tenant__list');
-  list.setAttribute('role', 'listbox');
-  list.hidden = true;
-  for (const tenant of me.tenants || []) {
-    const selected = tenant.tenant_slug === me.viewing.tenant_slug;
-    const option = element('li', 'ps-rail-tenant__option', tenant.display_name);
-    option.setAttribute('role', 'option');
-    option.setAttribute('aria-selected', selected ? 'true' : 'false');
-    option.tabIndex = 0;
-    const choose = () => {
-      list.hidden = true;
-      button.setAttribute('aria-expanded', 'false');
-      onSwitch(tenant.tenant_slug);
-    };
-    option.addEventListener('click', choose);
-    option.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        choose();
+/**
+ * The header's theme / language controls: the shared `ui:display-controls`
+ * (same component as the concierge header). It only emits `display.*`
+ * actions; `window.KyberionPrefs` persists them (`kyberion.ui.theme` /
+ * `kyberion.ui.locale` + the `kb-ui-locale` cookie).
+ */
+function mountDisplayControls() {
+  const host = document.querySelector('[data-front-desk-display-controls]');
+  if (!host) return Promise.resolve(null);
+  const draw = () =>
+    render(
+      host,
+      [
+        {
+          id: 'display-controls',
+          type: 'ui:display-controls',
+          props: { theme: prefs.theme(), locale },
+        },
+      ],
+      {
+        onAction(action) {
+          const value = action && action.payload ? action.payload.value : undefined;
+          if (action.id === 'display.theme') {
+            prefs.setTheme(value);
+            draw();
+          } else if (action.id === 'display.locale') {
+            prefs.setLocale(value);
+          }
+        },
       }
-    });
-    list.appendChild(option);
-  }
-  button.addEventListener('click', () => {
-    const expanded = button.getAttribute('aria-expanded') === 'true';
-    button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-    list.hidden = expanded;
-  });
-  block.appendChild(list);
-  return block;
-}
-
-function switchTenant(rail, nav, slug) {
-  storeTenant(slug);
-  loadMe(slug).then((next) => {
-    if (!next) return;
-    const current = rail.querySelector('.ps-rail-tenant');
-    const replacement = tenantBlock(nav, next, (other) => switchTenant(rail, nav, other));
-    if (current && replacement) rail.replaceChild(replacement, current);
-  });
-}
-
-function decorateRail(container, nav, me) {
-  const rail = container.querySelector('.kb-nav-rail');
-  if (!rail) return;
-  const first = rail.firstChild;
-  rail.insertBefore(brandBlock(nav), first);
-  const tenant = tenantBlock(nav, me, (slug) => switchTenant(rail, nav, slug));
-  if (tenant) rail.insertBefore(tenant, first);
-}
-
-function wireHeaderControls() {
-  const themeSelect = document.querySelector('[data-front-desk-theme]');
-  if (themeSelect) {
-    themeSelect.value = prefs.theme();
-    themeSelect.addEventListener('change', () => prefs.setTheme(themeSelect.value));
-  }
-  const localeSelect = document.querySelector('[data-front-desk-locale]');
-  if (localeSelect) {
-    localeSelect.value = locale;
-    localeSelect.addEventListener('change', () => prefs.setLocale(localeSelect.value));
-  }
+    );
+  return draw();
 }
 
 /**
@@ -242,16 +227,13 @@ function wireHeaderControls() {
  * the rest of the page.
  */
 function mount(el, options) {
-  wireHeaderControls();
+  mountDisplayControls().catch(() => null);
   if (!el) return Promise.resolve(null);
   const current = (options && options.current) || null;
   return Promise.all([loadNav(), loadMe(readStoredTenant())])
     .then(([nav, me]) => {
       if (!nav) return null;
-      return render(el, railComponents(nav, current)).then(() => {
-        decorateRail(el, nav, me);
-        return nav;
-      });
+      return drawRail(el, nav, me, current).then(() => nav);
     })
     .catch(() => null);
 }

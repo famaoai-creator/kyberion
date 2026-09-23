@@ -1,7 +1,11 @@
-import { formatDateTime, resolveTimeZone } from '@agent/core/format';
+import { Callout, Grid, List, Metric, Section, StatusPill } from '@agent/shared-ui';
 import { inspectReasoningRoutes } from '@agent/core/reasoning-route-doctor';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { emitMosRead } from '@/lib/audit-mos';
+import { operatorTranslator } from '@/lib/i18n';
+import { getRequestLocale } from '@/lib/request-locale';
+import { asKbStatus, formatTimestamp } from '@/lib/view';
+import { DataTable, type DataTableRow } from '@/components/DataTable';
+import { OperatorPageHeader } from '../operator-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,93 +16,77 @@ export default async function ReasoningPage() {
     resource_kind: 'reasoning_routes',
     result_count: report.entries.length,
   });
+  const locale = await getRequestLocale();
+  const t = operatorTranslator(locale);
+
+  const degraded = report.entries.some((entry) => entry.status === 'degraded');
+  const configuration = !report.valid
+    ? { status: 'error' as const, label: t('reasoning_config_attention') }
+    : degraded
+      ? { status: 'fallback' as const, label: t('reasoning_config_degraded') }
+      : { status: 'ready' as const, label: t('reasoning_config_ready') };
+
+  const rows: DataTableRow[] = report.entries.map((entry) => ({
+    id: entry.role,
+    cells: {
+      role: <span className="operator-mono">{entry.role}</span>,
+      selected: <span className="operator-mono">{entry.profileRef ?? '—'}</span>,
+      runtime: entry.mode ?? '—',
+      model: (
+        <span className="operator-mono">{entry.model ?? t('reasoning_provider_default')}</span>
+      ),
+      status: (
+        <StatusPill
+          status={entry.status === 'invalid' ? 'error' : (asKbStatus(entry.status) ?? 'n/a')}
+          label={entry.status === 'invalid' ? t('reasoning_status_invalid') : undefined}
+        />
+      ),
+      reason: entry.reason,
+    },
+  }));
+
   return (
-    <section>
-      <h1 style={{ marginBottom: 4 }}>Reasoning routes</h1>
-      <p style={{ color: 'var(--kb-muted-text)', marginTop: 0, fontSize: 13 }}>
-        Read-only route, capability, and runtime readiness view. Probes do not consume completion
-        tokens.
-      </p>
-      <div style={{ display: 'flex', gap: 12, margin: '16px 0' }}>
-        <Status
-          label="Configuration"
-          value={
-            !report.valid
-              ? 'needs attention'
-              : report.entries.some((entry) => entry.status === 'degraded')
-                ? 'degraded fallback'
-                : 'ready'
+    <>
+      <OperatorPageHeader title={t('reasoning_title')} subtitle={t('reasoning_subtitle')} />
+      <Grid min_column_width="sm" gap="sm">
+        <Metric
+          label={t('reasoning_configuration')}
+          value={configuration.label}
+          tone={
+            configuration.status === 'ready'
+              ? 'success'
+              : configuration.status === 'error'
+                ? 'danger'
+                : 'warning'
           }
         />
-        <Status
-          label="Checked"
-          value={formatDateTime(report.checkedAt, {
-            locale: resolveOperatorLocale(),
-            timeZone: resolveTimeZone(),
-            style: 'time',
-          })}
+        <Metric
+          label={t('reasoning_checked')}
+          value={formatTimestamp(report.checkedAt, locale, 'time')}
         />
-      </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <thead>
-          <tr style={{ background: 'var(--kb-surface)', textAlign: 'left' }}>
-            <th style={th}>Role</th>
-            <th style={th}>Selected</th>
-            <th style={th}>Runtime</th>
-            <th style={th}>Model</th>
-            <th style={th}>Status</th>
-            <th style={th}>Reason</th>
-          </tr>
-        </thead>
-        <tbody>
-          {report.entries.map((entry) => (
-            <tr key={entry.role} style={{ borderBottom: '1px solid var(--kb-border)' }}>
-              <td style={td}>
-                <code>{entry.role}</code>
-              </td>
-              <td style={td}>
-                <code>{entry.profileRef ?? '—'}</code>
-              </td>
-              <td style={td}>{entry.mode ?? '—'}</td>
-              <td style={td}>
-                <code>{entry.model ?? '(provider default)'}</code>
-              </td>
-              <td style={{ ...td, color: statusColor(entry.status) }}>{entry.status}</td>
-              <td style={td}>{entry.reason}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+        <Metric label={t('reasoning_routes')} value={report.entries.length} />
+      </Grid>
+      <Section title={t('reasoning_routes_title')}>
+        <DataTable
+          columns={[
+            { key: 'role', label: t('col_role') },
+            { key: 'selected', label: t('col_selected') },
+            { key: 'runtime', label: t('col_runtime') },
+            { key: 'model', label: t('col_model') },
+            { key: 'status', label: t('col_status') },
+            { key: 'reason', label: t('col_reason') },
+          ]}
+          rows={rows}
+          empty={t('reasoning_empty')}
+        />
+      </Section>
       {report.nextActions.length > 0 ? (
-        <>
-          <h2 style={{ marginTop: 28 }}>Next actions</h2>
-          <ul style={{ color: 'var(--kb-muted-text)', fontSize: 13 }}>
-            {report.nextActions.map((action) => (
-              <li key={action}>{action}</li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-    </section>
+        <Section title={t('reasoning_next_actions_title')}>
+          <List items={report.nextActions.map((action) => ({ title: action }))} />
+        </Section>
+      ) : (
+        <Callout tone="success" title={t('reasoning_no_next_actions')} />
+      )}
+    </>
   );
 }
-
-function Status({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ background: 'var(--kb-surface)', padding: '10px 14px', borderRadius: 4 }}>
-      <div style={{ fontSize: 11, color: 'var(--kb-muted-text)' }}>{label}</div>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function statusColor(status: string): string {
-  return status === 'ready'
-    ? 'var(--kb-success)'
-    : status === 'invalid'
-      ? 'var(--kb-danger)'
-      : 'var(--kb-warning)';
-}
-
-const th: React.CSSProperties = { padding: '8px 12px', borderBottom: '1px solid var(--kb-border)' };
-const td: React.CSSProperties = { padding: '8px 12px', verticalAlign: 'top' };

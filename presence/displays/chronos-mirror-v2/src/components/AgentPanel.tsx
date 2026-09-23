@@ -508,18 +508,18 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
-      <div className="absolute inset-0 kb-surface-well backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-[600px] max-h-[80vh] kyberion-glass rounded-2xl border kb-status-warning-border flex flex-col overflow-hidden">
+      <div className="absolute inset-0 kb-surface-well" onClick={onClose} />
+      <div className="relative w-[600px] max-h-[80vh] kyberion-glass rounded-lg border kb-status-warning-border flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b kb-border-subtle">
           <div className="flex items-center gap-3">
             <Cpu className="kb-status-warning w-5 h-5" />
-            <span className="text-sm font-bold uppercase tracking-widest">
+            <span className="text-sm font-bold">
               {at('chronos_agent_registry', 'Agent Registry')}
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex gap-2 text-[9px] font-mono">
+            <div className="flex gap-2 text-[11px] font-mono">
               <span className="px-2 py-0.5 rounded kb-status-positive-surface kb-status-positive">
                 {health.ready} ready
               </span>
@@ -548,9 +548,9 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               title={at('chronos_agent_health', 'Agent Health')}
               centerLabel={at('chronos_agents', 'Agents')}
               data={[
-                { label: at('chronos_ready', 'Ready'), value: health.ready, color: '#34D399' },
-                { label: at('chronos_busy', 'Busy'), value: health.busy, color: '#FBBF24' },
-                { label: at('chronos_error', 'Error'), value: health.error, color: '#FB7185' },
+                { label: at('chronos_ready', 'Ready'), value: health.ready },
+                { label: at('chronos_busy', 'Busy'), value: health.busy },
+                { label: at('chronos_error', 'Error'), value: health.error },
               ]}
             />
           </div>
@@ -560,7 +560,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {agents.length === 0 && !showSpawn && (
             <div className="flex flex-col items-center gap-3 py-10 px-6 text-center">
-              <div className="text-[11px] uppercase tracking-[0.25em] kb-text-muted">
+              <div className="text-[11px] kb-text-muted">
                 {at('chronos_no_agents_running', 'No agents running yet')}
               </div>
               <div className="max-w-[260px] text-[11px] leading-relaxed kb-text-muted">
@@ -571,7 +571,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               </div>
               <button
                 onClick={() => setShowSpawn(true)}
-                className="mt-2 inline-flex items-center gap-2 rounded-lg border kb-border-accent kb-surface-accent px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest kb-text-accent transition hover:kb-surface-accent"
+                className="mt-2 inline-flex items-center gap-2 rounded-lg border kb-border-accent kb-surface-accent px-3 py-1.5 text-[11px] font-bold kb-text-accent transition hover:kb-surface-accent"
               >
                 <Plus size={12} />
                 <span>{at('chronos_spawn_first_agent', 'Spawn First Agent')}</span>
@@ -602,10 +602,10 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                       className={`w-2.5 h-2.5 rounded-full ${STATUS_COLORS[agent.status] || 'kb-surface-sunken'}`}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-[10px] font-bold font-mono truncate">
+                      <div className="text-[11px] font-bold font-mono truncate">
                         {agent.agentId}
                       </div>
-                      <div className="text-[9px] opacity-40 flex gap-3 mt-0.5">
+                      <div className="text-[11px] opacity-40 flex gap-3 mt-0.5">
                         <span>
                           {agent.provider}/{agent.modelId}
                         </span>
@@ -633,9 +633,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                         )}
                       </div>
                     </div>
-                    <div className="text-[8px] uppercase tracking-widest opacity-40">
-                      {agent.status}
-                    </div>
+                    <div className="text-[8px] opacity-40">{agent.status}</div>
                     {accessRole === 'localadmin' && (
                       <div className="flex items-center gap-1.5 text-[8px]">
                         <button
@@ -760,25 +758,25 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           {viewingLogs && (
             <div className="p-4 kb-surface-well rounded-xl border kb-border-accent space-y-2">
               <div className="flex justify-between items-center">
-                <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 flex items-center gap-2">
+                <div className="text-[11px] font-bold opacity-60 flex items-center gap-2">
                   <Terminal size={12} /> {viewingLogs}
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => fetchLogs(viewingLogs)}
-                    className="text-[9px] kb-text-accent hover:kb-text-accent"
+                    className="text-[11px] kb-text-accent hover:kb-text-accent"
                   >
                     {at('chronos_refresh', 'Refresh')}
                   </button>
                   <button
                     onClick={() => setViewingLogs(null)}
-                    className="text-[9px] opacity-40 hover:opacity-80"
+                    className="text-[11px] opacity-40 hover:opacity-80"
                   >
                     {at('chronos_close', 'Close')}
                   </button>
                 </div>
               </div>
-              <div className="max-h-[250px] overflow-y-auto font-mono text-[9px] space-y-0.5 kb-surface-well rounded-lg p-3">
+              <div className="max-h-[250px] overflow-y-auto font-mono text-[11px] space-y-0.5 kb-surface-well rounded-lg p-3">
                 {logs.length === 0 ? (
                   <div className="text-center opacity-30 italic py-4">
                     {at('chronos_no_logs_yet', 'No logs yet. Send a message to this agent first.')}
@@ -800,7 +798,8 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                         className={`${typeColors[entry.type] || 'opacity-40'} break-all`}
                       >
                         <span className="opacity-40">[{time}]</span>{' '}
-                        <span className="opacity-50 uppercase">{entry.type}</span>{' '}
+                        <span className="opacity-50">{entry.type}</span>
+                        {''}
                         {entry.content.slice(0, 200)}
                         {entry.content.length > 200 ? '...' : ''}
                       </div>
@@ -818,7 +817,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               <div className="flex gap-2 mb-2">
                 <button
                   onClick={() => setSpawnMode('manifest')}
-                  className={`flex-1 py-1.5 rounded-lg text-[9px] uppercase tracking-widest transition border ${
+                  className={`flex-1 py-1.5 rounded-lg text-[11px] transition border ${
                     spawnMode === 'manifest'
                       ? 'kb-status-warning-surface kb-status-warning-border'
                       : 'kb-border-subtle opacity-40'
@@ -829,7 +828,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                 </button>
                 <button
                   onClick={() => setSpawnMode('custom')}
-                  className={`flex-1 py-1.5 rounded-lg text-[9px] uppercase tracking-widest transition border ${
+                  className={`flex-1 py-1.5 rounded-lg text-[11px] transition border ${
                     spawnMode === 'custom'
                       ? 'kb-status-warning-surface kb-status-warning-border'
                       : 'kb-border-subtle opacity-40'
@@ -841,11 +840,11 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
               {spawnMode === 'manifest' ? (
                 <>
-                  <div className="text-[10px] font-bold uppercase tracking-widest opacity-60">
+                  <div className="text-[11px] font-bold opacity-60">
                     {at('chronos_select_agent_definition', 'Select Agent Definition')}
                   </div>
                   {availableManifests.length === 0 ? (
-                    <div className="text-[10px] opacity-30 italic">
+                    <div className="text-[11px] opacity-30 italic">
                       {at('chronos_all_agents_running', 'All defined agents are already running.')}
                     </div>
                   ) : (
@@ -860,8 +859,8 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                               : 'kb-border-subtle hover:kb-border-subtle'
                           }`}
                         >
-                          <div className="text-[10px] font-bold font-mono">{m.agentId}</div>
-                          <div className="text-[9px] opacity-40 flex gap-3 mt-0.5">
+                          <div className="text-[11px] font-bold font-mono">{m.agentId}</div>
+                          <div className="text-[11px] opacity-40 flex gap-3 mt-0.5">
                             <span>
                               {m.provider}/{m.modelId}
                             </span>
@@ -887,11 +886,9 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                 </>
               ) : (
                 <>
-                  <div className="text-[10px] font-bold uppercase tracking-widest opacity-60">
-                    Custom Agent
-                  </div>
+                  <div className="text-[11px] font-bold opacity-60">Custom Agent</div>
                   {providers.filter((p) => p.installed).length === 0 ? (
-                    <div className="text-[10px] opacity-30 italic">Scanning providers...</div>
+                    <div className="text-[11px] opacity-30 italic">Scanning providers...</div>
                   ) : (
                     <div className="flex gap-2">
                       <select
@@ -901,7 +898,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                           const pc = providers.find((p) => p.value === e.target.value);
                           if (pc && pc.models.length > 0) setSpawnModel(pc.models[0]);
                         }}
-                        className="flex-1 kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[10px] outline-none"
+                        className="flex-1 kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[11px] outline-none"
                       >
                         {providers
                           .filter((p) => p.installed)
@@ -914,7 +911,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                       <select
                         value={spawnModel}
                         onChange={(e) => setSpawnModel(e.target.value)}
-                        className="flex-1 kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[10px] outline-none"
+                        className="flex-1 kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[11px] outline-none"
                       >
                         {(providers.find((p) => p.value === spawnProvider)?.models || []).map(
                           (m) => (
@@ -928,7 +925,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                   )}
                   {/* Show unavailable providers */}
                   {providers.filter((p) => !p.installed).length > 0 && (
-                    <div className="text-[9px] opacity-30 mt-1">
+                    <div className="text-[11px] opacity-30 mt-1">
                       Not installed:{' '}
                       {providers
                         .filter((p) => !p.installed)
@@ -941,7 +938,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                     onChange={(e) => setSpawnPrompt(e.target.value)}
                     placeholder="System prompt (optional)..."
                     rows={2}
-                    className="w-full kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-2 text-[10px] outline-none resize-none"
+                    className="w-full kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-2 text-[11px] outline-none resize-none"
                   />
                   <div className="grid gap-2 md:grid-cols-2">
                     <select
@@ -951,7 +948,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                           e.target.value as 'strict' | 'preferred' | 'adaptive'
                         )
                       }
-                      className="kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[10px] outline-none"
+                      className="kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[11px] outline-none"
                     >
                       <option value="adaptive">adaptive</option>
                       <option value="preferred">preferred</option>
@@ -961,10 +958,10 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                       value={spawnFallbackProviders}
                       onChange={(e) => setSpawnFallbackProviders(e.target.value)}
                       placeholder="fallback providers (claude,codex)"
-                      className="kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[10px] outline-none"
+                      className="kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[11px] outline-none"
                     />
                   </div>
-                  <div className="text-[9px] opacity-35 font-mono">
+                  <div className="text-[11px] opacity-35 font-mono">
                     routing strategy {spawnProviderStrategy}
                     {spawnFallbackProviders.trim() ? ` · fallback ${spawnFallbackProviders}` : ''}
                   </div>
@@ -974,14 +971,14 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setShowSpawn(false)}
-                  className="px-3 py-1.5 text-[10px] opacity-40 hover:opacity-80 transition"
+                  className="px-3 py-1.5 text-[11px] opacity-40 hover:opacity-80 transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSpawn}
                   disabled={spawning || (spawnMode === 'manifest' && !selectedManifest)}
-                  className="px-4 py-1.5 kb-status-warning-surface border kb-status-warning-border rounded-lg text-[10px] font-bold uppercase tracking-widest hover:kb-status-warning-surface transition disabled:opacity-20"
+                  className="px-4 py-1.5 kb-status-warning-surface border kb-status-warning-border rounded-lg text-[11px] font-bold hover:kb-status-warning-surface transition disabled:opacity-20"
                 >
                   {spawning ? 'Booting...' : 'Spawn'}
                 </button>
@@ -992,7 +989,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
         {/* Footer */}
         <div className="px-4 py-3 border-t kb-border-subtle flex justify-between items-center">
-          <div className="text-[9px] opacity-30 font-mono">
+          <div className="text-[11px] opacity-30 font-mono">
             {health.total} agent{health.total !== 1 ? 's' : ''} registered
             {manifests.length > 0 && ` · ${manifests.length} manifests`}
             {` · ${accessRole}`}
@@ -1004,7 +1001,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                 setSpawnMode('manifest');
                 setSelectedManifest('');
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 kb-status-warning-surface border kb-status-warning-border rounded-lg text-[10px] font-bold uppercase tracking-widest hover:kb-status-warning-surface transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 kb-status-warning-surface border kb-status-warning-border rounded-lg text-[11px] font-bold hover:kb-status-warning-surface transition"
             >
               <Plus size={12} /> Spawn Agent
             </button>

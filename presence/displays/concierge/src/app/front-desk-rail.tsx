@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { renderMessage } from '@agent/core/message-format';
-import { NavRail } from '@agent/shared-ui';
+import { A2UIActionProvider, NavRail, useA2UIActions } from '@agent/shared-ui';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
 import { attachFrontDeskAuthHeaders, isLoopbackHostname } from '../lib/front-desk-auth-token';
@@ -22,6 +22,8 @@ import { attachFrontDeskAuthHeaders, isLoopbackHostname } from '../lib/front-des
  */
 
 const TENANT_STORAGE_KEY = 'front-desk.tenant';
+/** `ui:nav-rail` context switcher action (payload `{ value: tenant_slug }`). */
+const TENANT_SWITCH_ACTION = 'tenant.switch';
 
 interface FrontDeskNavItemPayload {
   id: 'home' | 'ask' | 'decide' | 'progress' | 'settings';
@@ -85,8 +87,8 @@ function storeTenant(slug: string): void {
 const RAIL_ICONS: Record<FrontDeskNavItemPayload['id'], string> = {
   home: 'home',
   ask: 'chat',
-  decide: 'check',
-  progress: 'clock',
+  decide: 'approval',
+  progress: 'chart',
   settings: 'settings',
 };
 
@@ -102,7 +104,6 @@ export function FrontDeskRail() {
   const pathname = usePathname();
   const [nav, setNav] = React.useState<FrontDeskNavResponse | null>(null);
   const [me, setMe] = React.useState<FrontDeskMeResponse | null>(null);
-  const [tenantMenuOpen, setTenantMenuOpen] = React.useState(false);
 
   const fetchMe = React.useCallback((tenant?: string | null) => {
     const query = tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
@@ -157,11 +158,13 @@ export function FrontDeskRail() {
     fetchMe(storedTenant);
   }, [fetchMe]);
 
-  const handleSelectTenant = React.useCallback(
-    (slug: string) => {
-      storeTenant(slug);
-      setTenantMenuOpen(false);
-      fetchMe(slug);
+  // The shell's provider supplies `next/link`; keep it for the rail items.
+  const outerActions = useA2UIActions();
+  const onAction = React.useCallback(
+    (actionId: string, payload?: Record<string, unknown>) => {
+      if (actionId !== TENANT_SWITCH_ACTION || typeof payload?.value !== 'string') return;
+      storeTenant(payload.value);
+      fetchMe(payload.value);
     },
     [fetchMe]
   );
@@ -179,8 +182,7 @@ export function FrontDeskRail() {
 
   // UI-05: `ui:nav-rail` — the 5 human-verb items (role-gated by
   // `allowed`, unchanged) with the current one marked `aria-current="page"`
-  // by NavRail, 資料の取込 + help in the footer. Brand and tenant blocks keep
-  // the `fd-*` classes the presence-studio rail shares.
+  // by NavRail, 資料の取込 + help in the footer.
   const items = (nav?.items || [])
     .filter((item) => item.allowed)
     .map((item) => ({
@@ -198,62 +200,48 @@ export function FrontDeskRail() {
     ...(nav ? [{ id: 'help', label: nav.help.label, href: nav.help.href, icon: 'help' }] : []),
   ];
 
-  return (
-    <NavRail label={ariaLabel} items={items} footer_items={footerItems}>
-      <div className="fd-brand">
-        <span className="fd-brand-mark" aria-hidden="true" />
-        <span className="fd-brand-text">
-          <strong>Kyberion</strong>
-          <small>{brandTagline}</small>
-        </span>
-      </div>
+  // UI-05: the brand and tenant blocks are the shared `ui:nav-rail`
+  // `brand` / `context` slots (same markup and CSS as the presence-studio
+  // rail). The tenant block appears only once a tenant is actually being
+  // viewed — an empty name/role block reads as broken. With more than one
+  // tenant it is a switcher whose `tenant.switch` action carries the slug.
+  const context =
+    nav && me?.viewing
+      ? {
+          label: me.viewing.display_name || me.viewing.tenant_slug,
+          detail: me.can_switch
+            ? renderMessage(nav.tenant_viewing_summary, {
+                role: roleLabel(me.viewing.role),
+                count: me.tenants.length,
+              })
+            : renderMessage(nav.tenant_viewing_single, { role: roleLabel(me.viewing.role) }),
+          switch_label: nav.tenant_switch_aria,
+          ...(me.can_switch
+            ? {
+                action: { id: TENANT_SWITCH_ACTION },
+                options: me.tenants.map((tenant) => ({
+                  value: tenant.tenant_slug,
+                  label: tenant.display_name,
+                  selected: tenant.tenant_slug === me.viewing?.tenant_slug,
+                })),
+              }
+            : {}),
+        }
+      : undefined;
 
-      {/* Only once a tenant is actually being viewed — an empty name/role
-          block reads as broken (same rule as the presence-studio rail). */}
-      {nav && me?.viewing ? (
-        <div className="fd-tenant">
-          <button
-            type="button"
-            className="fd-tenant-button"
-            aria-label={nav.tenant_switch_aria}
-            aria-haspopup={me?.can_switch ? 'listbox' : undefined}
-            aria-expanded={me?.can_switch ? tenantMenuOpen : undefined}
-            disabled={!me?.can_switch}
-            onClick={() => {
-              if (me?.can_switch) setTenantMenuOpen((prev) => !prev);
-            }}
-          >
-            <span className="fd-tenant-name">{me?.viewing?.display_name || ''}</span>
-            <span className="fd-tenant-summary">
-              {me?.can_switch
-                ? renderMessage(nav.tenant_viewing_summary, {
-                    role: roleLabel(me.viewing?.role),
-                    count: me.tenants.length,
-                  })
-                : renderMessage(nav.tenant_viewing_single, {
-                    role: roleLabel(me?.viewing?.role),
-                  })}
-            </span>
-          </button>
-          {me?.can_switch && tenantMenuOpen ? (
-            <ul className="fd-tenant-list" role="listbox" aria-label={nav.tenant_switch_aria}>
-              {me.tenants.map((tenant) => (
-                <li key={tenant.tenant_slug} role="presentation">
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={tenant.tenant_slug === me.viewing?.tenant_slug}
-                    className="fd-tenant-option"
-                    onClick={() => handleSelectTenant(tenant.tenant_slug)}
-                  >
-                    {tenant.display_name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
-    </NavRail>
+  return (
+    <A2UIActionProvider
+      onAction={onAction}
+      linkComponent={outerActions.linkComponent}
+      navigate={outerActions.navigate}
+    >
+      <NavRail
+        label={ariaLabel}
+        brand={{ name: 'Kyberion', subtitle: brandTagline }}
+        context={context}
+        items={items}
+        footer_items={footerItems}
+      />
+    </A2UIActionProvider>
   );
 }

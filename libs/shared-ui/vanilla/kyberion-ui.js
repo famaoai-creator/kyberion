@@ -102,6 +102,12 @@ export const KB_UI_DEFAULT_MESSAGES = Object.freeze({
   'ui:chart_table_value': 'Value',
   'ui:chart_total': 'Total',
   'ui:disclosure_summary': 'Details',
+  'ui:display_label': 'Display',
+  'ui:display_language': 'Language',
+  'ui:display_theme': 'Theme',
+  'ui:display_theme_dark': 'Dark',
+  'ui:display_theme_light': 'Light',
+  'ui:display_theme_system': 'Auto',
   'ui:field_required': 'Required',
   'ui:file_cancel': 'Cancel upload of {file}',
   'ui:file_drop_accept': 'Accepted: {types}',
@@ -125,12 +131,17 @@ export const KB_UI_DEFAULT_MESSAGES = Object.freeze({
   'ui:integration_disconnected': 'Not connected',
   'ui:integration_error': 'Connection error',
   'ui:integration_needs_reauth': 'Reconnect needed',
+  'ui:list_progress': 'Progress',
+  'ui:list_progress_value': '{percent}% complete',
+  'ui:locale_name_en': 'English',
+  'ui:locale_name_ja': 'Japanese',
   'ui:meter_state_danger': 'Over the limit',
   'ui:meter_state_success': 'Within range',
   'ui:meter_state_warning': 'Near the limit',
   'ui:metric_trend_down': 'Down',
   'ui:metric_trend_flat': 'No change',
   'ui:metric_trend_up': 'Up',
+  'ui:nav_context_switch': 'Switch what you are viewing',
   'ui:nav_label': 'Navigation',
   'ui:save_bar_clean': 'No changes',
   'ui:save_bar_dirty': 'You have unsaved changes',
@@ -289,7 +300,35 @@ export const KB_UI_MESSAGE_KEYS = Object.freeze({
   trendUp: 'ui:metric_trend_up',
   trendDown: 'ui:metric_trend_down',
   trendFlat: 'ui:metric_trend_flat',
+  navContextSwitch: 'ui:nav_context_switch',
+  listProgress: 'ui:list_progress',
+  listProgressValue: 'ui:list_progress_value',
+  displayLabel: 'ui:display_label',
+  displayTheme: 'ui:display_theme',
+  displayThemeSystem: 'ui:display_theme_system',
+  displayThemeLight: 'ui:display_theme_light',
+  displayThemeDark: 'ui:display_theme_dark',
+  displayLanguage: 'ui:display_language',
+  localeNameJa: 'ui:locale_name_ja',
+  localeNameEn: 'ui:locale_name_en',
 });
+
+/**
+ * Action ids `ui:display-controls` dispatches with `{ value }`
+ * (a2ui-catalog.ts KB_DISPLAY_CONTROLS_ACTIONS). The component never
+ * persists the choice — the host does.
+ */
+export const KB_DISPLAY_CONTROLS_ACTIONS = Object.freeze({
+  theme: 'display.theme',
+  locale: 'display.locale',
+});
+
+const DISPLAY_THEMES = Object.freeze([
+  ['system', 'displayThemeSystem'],
+  ['light', 'displayThemeLight'],
+  ['dark', 'displayThemeDark'],
+]);
+const LOCALE_TAG = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 
@@ -654,9 +693,13 @@ const RENDERERS = {
     return root;
   },
 
-  'ui:nav-rail'(ctx, p) {
+  'ui:nav-rail'(ctx, p, c) {
     const root = el(ctx, 'nav', 'kb-nav-rail');
     root.setAttribute('aria-label', str(p.label) || ctx.t(KB_UI_MESSAGE_KEYS.navLabel));
+    const brand = navBrand(ctx, p.brand);
+    if (brand) root.appendChild(brand);
+    const context = navContext(ctx, p.context, c);
+    if (context) root.appendChild(context);
     const list = navList(ctx, p.items);
     if (list) root.appendChild(list);
     const footerList = navList(ctx, p.footer_items);
@@ -889,8 +932,11 @@ const RENDERERS = {
       if (href) title.setAttribute('href', href);
       body.appendChild(title);
       if (item.meta) body.appendChild(el(ctx, 'span', 'kb-list__meta', item.meta));
+      const progress = listProgress(ctx, item.progress);
+      if (progress) body.appendChild(progress);
       li.appendChild(body);
-      if (isStatusValue(item.status)) li.appendChild(statusPill(ctx, item.status));
+      if (isStatusValue(item.status))
+        li.appendChild(statusPill(ctx, item.status, undefined, item.status_label));
       root.appendChild(li);
     }
     return root;
@@ -901,6 +947,22 @@ const RENDERERS = {
       ? p.variant
       : 'body';
     return el(ctx, 'p', `kb-text kb-text--${variant}`, p.text ?? p.value ?? p.content ?? p.label);
+  },
+
+  'ui:code'(ctx, p) {
+    const root = el(ctx, 'figure', 'kb-code');
+    const language = codeLanguage(p.language);
+    setData(root, 'language', language);
+    if (p.title || language) {
+      const header = el(ctx, 'figcaption', 'kb-code__header');
+      if (p.title) header.appendChild(el(ctx, 'span', 'kb-code__title', p.title));
+      if (language) header.appendChild(el(ctx, 'span', 'kb-code__language', language));
+      root.appendChild(header);
+    }
+    const pre = el(ctx, 'pre', 'kb-code__body');
+    pre.appendChild(el(ctx, 'code', '', typeof p.code === 'string' ? p.code : ''));
+    root.appendChild(pre);
+    return root;
   },
 
   'ui:status-pill'(ctx, p) {
@@ -976,7 +1038,130 @@ const RENDERERS = {
     root.appendChild(body);
     return root;
   },
+
+  'ui:display-controls'(ctx, p, c) {
+    const root = el(ctx, 'div', 'kb-display-controls');
+    root.setAttribute('role', 'group');
+    root.setAttribute('aria-label', ctx.t(KB_UI_MESSAGE_KEYS.displayLabel));
+    // The inner segmented / select report `field.change`; re-emit it as the
+    // display action (payload `{ value }`) so hosts need no field names.
+    const inner = Object.assign({}, ctx, {
+      onAction(action) {
+        const payload = action && isRecord(action.payload) ? action.payload : null;
+        if (!payload || typeof ctx.onAction !== 'function') return;
+        const id =
+          payload.name === 'theme'
+            ? KB_DISPLAY_CONTROLS_ACTIONS.theme
+            : payload.name === 'locale'
+              ? KB_DISPLAY_CONTROLS_ACTIONS.locale
+              : null;
+        if (id) ctx.onAction({ id, payload: { value: payload.value } }, c);
+      },
+    });
+    const baseId = typeof c.id === 'string' && c.id ? c.id : 'display-controls';
+    const themeProps = displayThemeProps(ctx, p);
+    const localeProps = displayLocaleProps(ctx, p);
+    root.appendChild(
+      RENDERERS['ui:segmented'](inner, themeProps, {
+        id: `${baseId}-theme`,
+        type: 'ui:segmented',
+        props: themeProps,
+      })
+    );
+    root.appendChild(
+      RENDERERS['ui:select'](inner, localeProps, {
+        id: `${baseId}-locale`,
+        type: 'ui:select',
+        props: localeProps,
+      })
+    );
+    return root;
+  },
 };
+
+/**
+ * `ui:display-controls` → the inner `ui:segmented` props (theme). Shared
+ * with the React renderer so both build the same control.
+ */
+export function displayThemeProps(ctx, p) {
+  const t = typeof ctx === 'function' ? ctx : ctx.t;
+  const value = DISPLAY_THEMES.some(([theme]) => theme === p.theme) ? p.theme : 'system';
+  return {
+    name: 'theme',
+    label: t(KB_UI_MESSAGE_KEYS.displayTheme),
+    hide_label: true,
+    value,
+    options: DISPLAY_THEMES.map(([theme, key]) => ({
+      value: theme,
+      label: t(KB_UI_MESSAGE_KEYS[key]),
+    })),
+  };
+}
+
+/** `ui:display-controls` → the inner `ui:select` props (language). */
+export function displayLocaleProps(ctx, p) {
+  const t = typeof ctx === 'function' ? ctx : ctx.t;
+  const given = Array.isArray(p.locales)
+    ? p.locales.filter(
+        (option) =>
+          isRecord(option) &&
+          typeof option.value === 'string' &&
+          LOCALE_TAG.test(option.value) &&
+          typeof option.label === 'string' &&
+          option.label
+      )
+    : [];
+  const options = given.length
+    ? given.map((option) => ({ value: option.value, label: option.label }))
+    : [
+        { value: 'ja', label: t(KB_UI_MESSAGE_KEYS.localeNameJa) },
+        { value: 'en', label: t(KB_UI_MESSAGE_KEYS.localeNameEn) },
+      ];
+  return {
+    name: 'locale',
+    label: t(KB_UI_MESSAGE_KEYS.displayLanguage),
+    hide_label: true,
+    value: typeof p.locale === 'string' ? p.locale : undefined,
+    options,
+  };
+}
+
+/** `ui:code` language hint: a short token (`shell`, `c++`, `json`); null otherwise. */
+export function codeLanguage(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9+#._-]{1,40}$/.test(value) ? value : null;
+}
+
+/** Clamp a `ui:list` item's `progress` to an integer 0–100; null when absent / not finite. */
+export function listProgressPercent(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return Math.round(Math.min(100, Math.max(0, value)));
+}
+
+/** `ui:nav-rail` brand logo: same-origin paths and http(s) images only. */
+export function navBrandLogo(value) {
+  const href = safeHref(value);
+  if (!href) return null;
+  const scheme = SCHEME_PREFIX.exec(href.toLowerCase());
+  return scheme && scheme[1] !== 'http' && scheme[1] !== 'https' ? null : href;
+}
+
+/** Options of a `ui:nav-rail` context switcher (valid entries only). */
+export function navContextOptions(context) {
+  return Array.isArray(context.options)
+    ? context.options.filter(
+        (option) =>
+          isRecord(option) &&
+          typeof option.value === 'string' &&
+          option.value &&
+          typeof option.label === 'string'
+      )
+    : [];
+}
+
+/** Payload a context-switch option dispatches: the declared payload plus `{ value }`. */
+export function navContextPayload(action, value) {
+  return Object.assign({}, isRecord(action.payload) ? action.payload : {}, { value });
+}
 
 // UI-01b: chart / visualisation types — `charts.js` lays out a vnode tree,
 // built here with createElement / createElementNS (never innerHTML).
@@ -1030,6 +1215,159 @@ function badge(ctx, p) {
   setData(node, 'tone', p.tone);
   setData(node, 'role', p.role);
   return node;
+}
+
+function navBrand(ctx, brand) {
+  if (!isRecord(brand) || typeof brand.name !== 'string' || !brand.name) return null;
+  const root = el(ctx, 'div', 'kb-nav-rail__brand');
+  const logo = navBrandLogo(brand.logo_url);
+  if (logo) {
+    const img = el(ctx, 'img', 'kb-nav-rail__brand-logo');
+    img.setAttribute('src', logo);
+    img.setAttribute('alt', '');
+    root.appendChild(img);
+  } else {
+    const mark = el(ctx, 'span', 'kb-nav-rail__brand-mark');
+    mark.setAttribute('aria-hidden', 'true');
+    root.appendChild(mark);
+  }
+  const text = el(ctx, 'span', 'kb-nav-rail__brand-text');
+  text.appendChild(el(ctx, 'strong', 'kb-nav-rail__brand-name', brand.name));
+  if (brand.subtitle)
+    text.appendChild(el(ctx, 'span', 'kb-nav-rail__brand-subtitle', brand.subtitle));
+  root.appendChild(text);
+  return root;
+}
+
+function navContextBody(ctx, node, context, hiddenLabel) {
+  if (hiddenLabel) node.appendChild(el(ctx, 'span', 'kb-visually-hidden', hiddenLabel));
+  node.appendChild(el(ctx, 'span', 'kb-nav-rail__context-label', context.label));
+  if (context.detail)
+    node.appendChild(el(ctx, 'span', 'kb-nav-rail__context-detail', context.detail));
+  return node;
+}
+
+/**
+ * `ui:nav-rail` context block. options + action → a button that opens an
+ * option list (choosing dispatches `action` with `{ value }`); action alone
+ * → a button; href alone → a link; otherwise static text.
+ */
+function navContext(ctx, context, source) {
+  if (!isRecord(context) || typeof context.label !== 'string' || !context.label) return null;
+  const root = el(ctx, 'div', 'kb-nav-rail__context');
+  const action = normalizeAction(context.action);
+  const options = navContextOptions(context);
+  const switchLabel = str(context.switch_label) || ctx.t(KB_UI_MESSAGE_KEYS.navContextSwitch);
+  const dispatch = (next) => {
+    if (typeof ctx.onAction === 'function') ctx.onAction(next, source);
+  };
+  if (action && options.length > 0) {
+    const button = navContextBody(
+      ctx,
+      el(ctx, 'button', 'kb-nav-rail__context-button'),
+      context,
+      switchLabel
+    );
+    button.setAttribute('type', 'button');
+    button.setAttribute('aria-haspopup', 'listbox');
+    button.setAttribute('aria-expanded', 'false');
+    const menu = el(ctx, 'ul', 'kb-nav-rail__context-menu');
+    menu.setAttribute('role', 'listbox');
+    menu.setAttribute('aria-label', switchLabel);
+    menu.hidden = true;
+    // A pointer press outside the block closes the open list (like Escape).
+    const doc = ctx.doc;
+    const onOutside = (event) => {
+      if (typeof root.contains === 'function' && root.contains(event.target)) return;
+      setOpen(false);
+    };
+    const canListen = doc && typeof doc.addEventListener === 'function';
+    const setOpen = (open) => {
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      menu.hidden = !open;
+      if (!canListen) return;
+      if (open) doc.addEventListener('pointerdown', onOutside);
+      else doc.removeEventListener('pointerdown', onOutside);
+    };
+    if (canListen && Array.isArray(ctx.cleanups)) {
+      ctx.cleanups.push(() => doc.removeEventListener('pointerdown', onOutside));
+    }
+    for (const option of options) {
+      const li = el(ctx, 'li');
+      li.setAttribute('role', 'presentation');
+      const item = el(ctx, 'button', 'kb-nav-rail__context-option', option.label);
+      item.setAttribute('type', 'button');
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', option.selected === true ? 'true' : 'false');
+      setData(item, 'value', option.value);
+      item.addEventListener('click', () => {
+        setOpen(false);
+        dispatch({ id: action.id, payload: navContextPayload(action, option.value) });
+      });
+      li.appendChild(item);
+      menu.appendChild(li);
+    }
+    button.addEventListener('click', () => setOpen(menu.hidden === true));
+    root.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && menu.hidden !== true) {
+        setOpen(false);
+        if (typeof button.focus === 'function') button.focus();
+      }
+    });
+    root.appendChild(button);
+    root.appendChild(menu);
+    return root;
+  }
+  if (action) {
+    const button = navContextBody(
+      ctx,
+      el(ctx, 'button', 'kb-nav-rail__context-button'),
+      context,
+      switchLabel
+    );
+    button.setAttribute('type', 'button');
+    setData(button, 'action-id', action.id);
+    button.addEventListener('click', () => dispatch(action));
+    root.appendChild(button);
+    return root;
+  }
+  const href = safeHref(context.href);
+  if (href) {
+    const link = navContextBody(
+      ctx,
+      el(ctx, 'a', 'kb-nav-rail__context-button'),
+      context,
+      switchLabel
+    );
+    link.setAttribute('href', href);
+    root.appendChild(link);
+    return root;
+  }
+  const text = navContextBody(ctx, el(ctx, 'div', 'kb-nav-rail__context-button'), context);
+  setData(text, 'static', 'true');
+  root.appendChild(text);
+  return root;
+}
+
+function listProgress(ctx, value) {
+  const percent = listProgressPercent(value);
+  if (percent === null) return null;
+  const root = el(ctx, 'div', 'kb-list__progress');
+  const track = el(ctx, 'span', 'kb-list__progress-track');
+  track.setAttribute('role', 'progressbar');
+  track.setAttribute('aria-label', ctx.t(KB_UI_MESSAGE_KEYS.listProgress));
+  track.setAttribute('aria-valuemin', '0');
+  track.setAttribute('aria-valuemax', '100');
+  track.setAttribute('aria-valuenow', String(percent));
+  track.setAttribute('aria-valuetext', ctx.t(KB_UI_MESSAGE_KEYS.listProgressValue, { percent }));
+  const fill = el(ctx, 'span', 'kb-list__progress-fill');
+  fill.style.width = `${percent}%`;
+  track.appendChild(fill);
+  root.appendChild(track);
+  const text = el(ctx, 'span', 'kb-list__progress-value', `${percent}%`);
+  text.setAttribute('aria-hidden', 'true');
+  root.appendChild(text);
+  return root;
 }
 
 function navList(ctx, items) {

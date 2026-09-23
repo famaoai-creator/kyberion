@@ -1,0 +1,85 @@
+/*
+ * computer-surface — surface-local rules (UI-09,
+ * SURFACE_UI_UNIFICATION_PLAN_2026-09-23 §6).
+ *
+ * Loaded after `design-tokens.css` (generated `--kb-ui-*` tokens, light/dark)
+ * and `kyberion-ui.css` (the kyberion-base component classes). Only page
+ * background, the column width, a few layout helpers and the `.hidden`
+ * utility the page script toggles. Colors, spacing, radii and type sizes come
+ * only from `--kb-ui-*` tokens — no literal colors and no glass effects.
+ */
+
+html {
+  color-scheme: var(--kb-ui-color-scheme);
+  background: var(--kb-ui-canvas);
+}
+
+body {
+  margin: 0;
+  background: var(--kb-ui-canvas);
+  color: var(--kb-ui-text);
+  font-family: var(--kb-ui-font-sans);
+}
+
+a {
+  color: var(--kb-ui-accent-text);
+  text-underline-offset: 2px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.cs-page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cs-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+
+.cs-updated {
+  margin: 0;
+}
+
+/* First-run help: numbered steps inside the empty state. */
+.cs-steps {
+  margin: 0;
+  padding-left: var(--kb-ui-space-5);
+  max-width: 60ch;
+  text-align: left;
+  color: var(--kb-ui-text);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.cs-steps > li + li {
+  margin-top: var(--kb-ui-space-1);
+}
+
+.cs-host:empty {
+  display: none;
+}
+
+.cs-dev-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+
+@media (max-width: 640px) {
+  .kb-app-shell__main {
+    padding-left: var(--kb-ui-space-4);
+    padding-right: var(--kb-ui-space-4);
+  }
+}
+
+/* The four live metrics stay two-up on a phone. */
+.cs-metrics {
+  --kb-ui-grid-min: 140px;
+}

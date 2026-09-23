@@ -19,6 +19,29 @@
         "type": "ui:nav-rail",
         "props": {
           "label": "Main menu",
+          "brand": {
+            "name": "Kyberion",
+            "subtitle": "Your companion"
+          },
+          "context": {
+            "label": "Default tenant",
+            "detail": "Owner · 2 tenants",
+            "switch_label": "Switch the tenant you are viewing",
+            "action": {
+              "id": "gallery.tenant"
+            },
+            "options": [
+              {
+                "value": "default",
+                "label": "Default tenant",
+                "selected": true
+              },
+              {
+                "value": "acme",
+                "label": "Acme Holdings"
+              }
+            ]
+          },
           "items": [
             {
               "id": "home",
@@ -367,6 +390,43 @@
               "label": "Mission operations",
               "role": "chronos-mirror-v2"
             }
+          }
+        }
+      ]
+    },
+    {
+      "id": "display-controls",
+      "title": "Display controls ui:display-controls",
+      "description": "Theme (auto / light / dark) and language. Emits display.theme / display.locale; the page stores the choice.",
+      "components": [
+        {
+          "id": "dc1",
+          "type": "ui:display-controls",
+          "props": {
+            "theme": "system",
+            "locale": "en"
+          }
+        },
+        {
+          "id": "dc2",
+          "type": "ui:display-controls",
+          "props": {
+            "theme": "dark",
+            "locale": "en",
+            "locales": [
+              {
+                "value": "ja",
+                "label": "日本語"
+              },
+              {
+                "value": "en",
+                "label": "English"
+              },
+              {
+                "value": "qps-ploc",
+                "label": "Pseudo"
+              }
+            ]
           }
         }
       ]
@@ -835,7 +895,7 @@
     {
       "id": "list",
       "title": "List ui:list",
-      "description": "plain and timeline.",
+      "description": "plain, timeline, and progress with a status label.",
       "components": [
         {
           "id": "list-root",
@@ -844,7 +904,7 @@
             "gap": "lg",
             "min_column_width": "md"
           },
-          "children": ["list-plain-sec", "list-tl-sec"]
+          "children": ["list-plain-sec", "list-tl-sec", "list-progress-sec"]
         },
         {
           "id": "list-plain-sec",
@@ -915,6 +975,45 @@
               }
             ]
           }
+        },
+        {
+          "id": "list-progress-sec",
+          "type": "ui:section",
+          "props": {
+            "title": "In progress"
+          },
+          "children": ["list-progress"]
+        },
+        {
+          "id": "list-progress",
+          "type": "ui:list",
+          "props": {
+            "items": [
+              {
+                "title": "Monthly report for September",
+                "meta": "Partner",
+                "href": "#p1",
+                "status": "active",
+                "status_label": "Drafting",
+                "progress": 72
+              },
+              {
+                "title": "Vendor list clean-up",
+                "meta": "Partner",
+                "href": "#p2",
+                "status": "active",
+                "progress": 35
+              },
+              {
+                "title": "Careers page copy",
+                "meta": "Partner",
+                "href": "#p3",
+                "status": "active",
+                "status_label": "Just started",
+                "progress": 5
+              }
+            ]
+          }
         }
       ]
     },
@@ -969,6 +1068,38 @@
           "props": {
             "text": "pnpm pipeline --input pipelines/baseline-check.json",
             "variant": "mono"
+          }
+        }
+      ]
+    },
+    {
+      "id": "code",
+      "title": "Code ui:code",
+      "description": "Monospace, wrapping block for commands and logs (never interpreted).",
+      "components": [
+        {
+          "id": "code-root",
+          "type": "ui:grid",
+          "props": {
+            "gap": "lg",
+            "min_column_width": "md"
+          },
+          "children": ["code1", "code2"]
+        },
+        {
+          "id": "code1",
+          "type": "ui:code",
+          "props": {
+            "title": "Build log",
+            "language": "shell",
+            "code": "$ pnpm build\n> tsc -p tsconfig.json\n✓ 214 files compiled in 8.4s"
+          }
+        },
+        {
+          "id": "code2",
+          "type": "ui:code",
+          "props": {
+            "code": "{\n  \"mission_id\": \"MSN-SURFACE-UI-UNIFY-20260923\",\n  \"status\": \"active\"\n}"
           }
         }
       ]

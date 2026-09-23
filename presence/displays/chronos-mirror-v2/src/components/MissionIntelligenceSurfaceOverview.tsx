@@ -9,7 +9,7 @@ import {
 import { MetricCard, MiniSummaryCard, Panel } from './MissionIntelligencePrimitives';
 import { chronosSpeechLocale } from '../lib/ux-vocabulary';
 
-export function MissionIntelligenceSurfaceOverview(context: Record<string, any>) {
+export function MissionIntelligenceSurfaceOverview({ context }: { context: Record<string, any> }) {
   const {
     workspace,
     focusedView,
@@ -50,10 +50,10 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
   return (
     <>
       {workspace === 'missions' ? (
-        <section className="rounded-2xl border kb-border-accent kb-surface-accent px-4 py-3">
+        <section className="rounded-lg border kb-border-accent kb-surface-accent px-4 py-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.22em] kb-text-accent">
+              <div className="text-[11px] font-bold kb-text-accent">
                 {mt('chronos_mission_overview_eyebrow', 'Mission overview')}
               </div>
               <div className="mt-1 text-[11px] leading-5 kb-text-secondary">
@@ -66,7 +66,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
             <button
               type="button"
               onClick={() => setShowMissionDetails((current) => !current)}
-              className="self-start rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[10px] font-bold tracking-[0.12em] kb-text-secondary transition hover:kb-border-accent hover:kb-text-accent"
+              className="self-start rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] font-bold kb-text-secondary transition hover:kb-border-accent hover:kb-text-accent"
             >
               {showMissionDetails
                 ? mt('chronos_hide_mission_details', 'Hide related information')
@@ -79,9 +79,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
       {workspace === 'surface' && !selectedProject && !selectedMissionId && (
         <section className="flex flex-col gap-8 py-4">
           <div className="flex flex-col gap-2">
-            <div className="text-[12px] uppercase tracking-[0.4em] kb-text-accent font-bold">
-              Sovereign Command
-            </div>
+            <div className="text-[12px] kb-text-accent font-bold">Sovereign Command</div>
             <h2 className="text-3xl font-bold tracking-tight kb-text-primary">
               Welcome to the Mirror.
             </h2>
@@ -98,16 +96,16 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                   .getElementById('mission-control-plane')
                   ?.scrollIntoView({ behavior: 'smooth' })
               }
-              className="group kyberion-glass p-8 rounded-[32px] text-left hover:kb-border-accent transition-all hover:translate-y-[-4px]"
+              className="group kyberion-glass p-8 rounded-xl text-left hover:kb-border-accent transition-all hover:translate-y-[-4px]"
             >
-              <div className="w-14 h-14 rounded-2xl kb-surface-accent flex items-center justify-center kb-text-accent mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-lg kb-surface-accent flex items-center justify-center kb-text-accent mb-6 group-hover:scale-110 transition-transform">
                 <Radar size={28} />
               </div>
               <h3 className="text-xl font-bold kb-text-primary mb-2">Monitor Missions</h3>
               <p className="text-xs kb-text-muted leading-relaxed">
                 Observe real-time intent execution and artifact delivery across all active agents.
               </p>
-              <div className="mt-6 text-[10px] uppercase tracking-widest kb-text-accent font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="mt-6 text-[11px] kb-text-accent font-bold opacity-0 group-hover:opacity-100 transition-opacity">
                 Open Dashboard →
               </div>
             </button>
@@ -118,16 +116,16 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                   .getElementById('runtime-lease-doctor')
                   ?.scrollIntoView({ behavior: 'smooth' })
               }
-              className="group kyberion-glass p-8 rounded-[32px] text-left hover:kb-status-warning-border transition-all hover:translate-y-[-4px]"
+              className="group kyberion-glass p-8 rounded-xl text-left hover:kb-status-warning-border transition-all hover:translate-y-[-4px]"
             >
-              <div className="w-14 h-14 rounded-2xl kb-status-warning-surface flex items-center justify-center kb-status-warning mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-lg kb-status-warning-surface flex items-center justify-center kb-status-warning mb-6 group-hover:scale-110 transition-transform">
                 <Activity size={28} />
               </div>
               <h3 className="text-xl font-bold kb-text-primary mb-2">System Health</h3>
               <p className="text-xs kb-text-muted leading-relaxed">
                 Inspect runtime leases, remediation findings, and supervisor-level governance.
               </p>
-              <div className="mt-6 text-[10px] uppercase tracking-widest kb-status-warning font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="mt-6 text-[11px] kb-status-warning font-bold opacity-0 group-hover:opacity-100 transition-opacity">
                 Check Vitals →
               </div>
             </button>
@@ -138,29 +136,29 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                   .getElementById('recent-surface-outbox')
                   ?.scrollIntoView({ behavior: 'smooth' })
               }
-              className="group kyberion-glass p-8 rounded-[32px] text-left hover:kb-status-negative-border transition-all hover:translate-y-[-4px]"
+              className="group kyberion-glass p-8 rounded-xl text-left hover:kb-status-negative-border transition-all hover:translate-y-[-4px]"
             >
-              <div className="w-14 h-14 rounded-2xl kb-status-negative-surface flex items-center justify-center kb-status-negative mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-lg kb-status-negative-surface flex items-center justify-center kb-status-negative mb-6 group-hover:scale-110 transition-transform">
                 <ShieldAlert size={28} />
               </div>
               <h3 className="text-xl font-bold kb-text-primary mb-2">Intervention</h3>
               <p className="text-xs kb-text-muted leading-relaxed">
                 Resolve blocked deliveries, approve sensitive requests, and manage exceptions.
               </p>
-              <div className="mt-6 text-[10px] uppercase tracking-widest kb-status-negative font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="mt-6 text-[11px] kb-status-negative font-bold opacity-0 group-hover:opacity-100 transition-opacity">
                 View Outbox →
               </div>
             </button>
           </div>
 
-          <div className="kyberion-glass p-6 rounded-[24px] kb-border-subtle flex items-center justify-between kb-surface-raised">
+          <div className="kyberion-glass p-6 rounded-xl kb-border-subtle flex items-center justify-between kb-surface-raised">
             <div className="flex items-center gap-4">
               <div className="w-2 h-2 rounded-full kb-surface-accent pulse-animation" />
-              <div className="text-[11px] uppercase tracking-[0.2em] kb-text-secondary">
+              <div className="text-[11px] kb-text-secondary">
                 System Status: <span className="kb-text-accent font-bold">Nominal</span>
               </div>
             </div>
-            <div className="text-[10px] kb-text-muted font-mono">
+            <div className="text-[11px] kb-text-muted font-mono">
               Ready for operator commands via Sovereign Link or Quick Actions.
             </div>
           </div>
@@ -168,12 +166,10 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
       )}
 
       {workspace === 'surface' && focusedView && (
-        <section className="rounded-[24px] border kb-border-accent kb-surface-accent px-5 py-4">
+        <section className="rounded-xl border kb-border-accent kb-surface-accent px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-                Focused Operator View
-              </div>
+              <div className="text-[11px] kb-text-accent">Focused Operator View</div>
               <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                 {focusTitle}
               </div>
@@ -185,7 +181,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
               <button
                 type="button"
                 onClick={onClearFocus}
-                className="self-start rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.2em] kb-text-secondary transition hover:kb-surface-raised"
+                className="self-start rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
               >
                 Show Full Console
               </button>
@@ -194,10 +190,10 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
         </section>
       )}
       {workspace === 'surface' ? (
-        <section className="rounded-[26px] border kb-status-warning-border bg-gradient-to-br from-[var(--kb-status-warning-surface)] via-[var(--kb-surface-raised)] to-[var(--kb-surface-sunken)] px-5 py-5">
+        <section className="rounded-xl border kb-status-warning-border to-[var(--kb-surface-sunken)] px-5 py-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.3em] kb-status-warning">
+              <div className="text-[11px] kb-status-warning">
                 {mt('chronos_operator_console', 'Operator Console')}
               </div>
               <h2 className="mt-2 text-xl font-semibold tracking-tight kb-text-primary">
@@ -213,26 +209,26 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                 )}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-[10px] uppercase tracking-[0.18em] kb-text-muted sm:grid-cols-4">
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+            <div className="grid grid-cols-2 gap-3 text-[11px] kb-text-muted sm:grid-cols-4">
+              <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
                 <div>{mt('chronos_sc_needs_attention_label', 'Needs attention')}</div>
                 <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                   {attentionItems.length}
                 </div>
               </div>
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+              <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
                 <div>{mt('chronos_missions_label', 'Missions')}</div>
                 <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                   {data.activeMissions.length}
                 </div>
               </div>
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+              <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
                 <div>{mt('chronos_runtime_incidents', 'Runtime incidents')}</div>
                 <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                   {data.runtimeDoctor.length}
                 </div>
               </div>
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-3 py-3">
+              <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
                 <div>{mt('chronos_delivery_queue', 'Delivery queue')}</div>
                 <div className="mt-2 text-lg font-semibold tracking-tight kb-text-primary">
                   {data.surfaceOutbox.slack + data.surfaceOutbox.chronos}
@@ -257,9 +253,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
           </div>
           {data.company && (
             <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent px-3 py-3 text-[11px] kb-text-accent">
-              <div className="text-[10px] uppercase tracking-[0.24em] kb-text-accent">
-                Company Context
-              </div>
+              <div className="text-[11px] kb-text-accent">Company Context</div>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] kb-text-primary">
                 <span className="font-semibold kb-text-primary">{data.company.name}</span>
                 <span className="kb-text-muted">·</span>
@@ -386,7 +380,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
               <button
                 type="button"
                 onClick={() => setSelectedProjectId(null)}
-                className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+                className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
               >
                 clear focus
               </button>
@@ -403,7 +397,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
               <button
                 type="button"
                 onClick={() => setSelectedMissionId(null)}
-                className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+                className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
               >
                 clear focus
               </button>
@@ -418,7 +412,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
               <button
                 type="button"
                 onClick={() => setSelectedTrackId(null)}
-                className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+                className="ml-3 rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
               >
                 clear focus
               </button>
@@ -493,7 +487,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
               'Suggestions based on the current state. Run only the actions needed to move the mission forward.'
             )}
           </div>
-          <div className="mb-4 rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[10px] leading-5 kb-text-accent">
+          <div className="mb-4 rounded-xl border kb-border-accent kb-surface-accent px-4 py-3 text-[11px] leading-5 kb-text-accent">
             {mt('chronos_mission_seed_assessment', 'Mission candidate status')}:{' '}
             {mt('chronos_eligible', 'Ready to start')}{' '}
             <span className="font-mono kb-text-accent">
@@ -522,15 +516,15 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                   className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                    <div className="text-[11px] font-semibold kb-text-primary">
                       {action.action_id}
                     </div>
-                    <div className="rounded-full kb-surface-accent px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-accent">
+                    <div className="rounded-full kb-surface-accent px-2 py-1 text-[11px] kb-text-accent">
                       {action.next_action_type}
                     </div>
                   </div>
-                  <div className="mt-2 text-[10px] kb-text-secondary">{action.reason}</div>
-                  <div className="mt-2 text-[10px] kb-text-muted">
+                  <div className="mt-2 text-[11px] kb-text-secondary">{action.reason}</div>
+                  <div className="mt-2 text-[11px] kb-text-muted">
                     {mt('chronos_risk', 'Risk')}:{' '}
                     <span className="font-mono kb-text-secondary">{action.risk}</span>
                     <span className="mx-2 kb-text-muted">·</span>
@@ -540,7 +534,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                     </span>
                   </div>
                   {resolveNextActionRoute(action) ? (
-                    <div className="mt-1 text-[10px] kb-text-muted">
+                    <div className="mt-1 text-[11px] kb-text-muted">
                       {mt('chronos_route', 'Destination')}:{' '}
                       <span className="font-mono kb-text-secondary">
                         {resolveNextActionRoute(action)?.label}
@@ -548,7 +542,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                     </div>
                   ) : null}
                   {action.suggested_command ? (
-                    <div className="mt-1 text-[10px] kb-text-muted">
+                    <div className="mt-1 text-[11px] kb-text-muted">
                       {mt('chronos_command', 'Command')}:{' '}
                       <span className="font-mono kb-text-secondary">
                         {action.suggested_command}
@@ -560,7 +554,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                       <button
                         type="button"
                         onClick={() => jumpToNextActionRoute(action)}
-                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
                       >
                         {mt('chronos_jump', 'Open')}
                       </button>
@@ -569,7 +563,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                       type="button"
                       onClick={() => runNextAction(action)}
                       disabled={nextActionTarget === action.action_id}
-                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {nextActionTarget === action.action_id
                         ? mt('chronos_processing', 'processing')
@@ -580,7 +574,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                         type="button"
                         onClick={() => runMemoryPromotion(true)}
                         disabled={memoryPromotionTarget !== null}
-                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {memoryPromotionTarget === 'dry-run'
                           ? mt('chronos_processing', 'processing')
@@ -627,18 +621,18 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                      <div className="text-[11px] kb-text-muted">
                         {item.tone === 'critical'
                           ? mt('chronos_critical', 'Urgent')
                           : item.tone === 'warning'
                             ? mt('chronos_warning', 'Caution')
                             : mt('chronos_info', 'Information')}
                       </div>
-                      <div className="text-[10px] font-mono kb-text-muted">{item.title}</div>
+                      <div className="text-[11px] font-mono kb-text-muted">{item.title}</div>
                     </div>
                     <div className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
                       <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-2">
-                        <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
+                        <div className="text-[11px] kb-text-muted">
                           {mt('chronos_why_now', 'Why check now')}
                         </div>
                         <div className="mt-1 kb-text-secondary">
@@ -646,7 +640,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                         </div>
                       </div>
                       <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-2">
-                        <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
+                        <div className="text-[11px] kb-text-muted">
                           {mt('chronos_source_next_step', 'Source and next step')}
                         </div>
                         <div className="mt-1 kb-text-secondary">
@@ -663,7 +657,7 @@ export function MissionIntelligenceSurfaceOverview(context: Record<string, any>)
                       <button
                         type="button"
                         onClick={() => runAttentionAction(item)}
-                        className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised"
+                        className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
                       >
                         {attentionActionLabel(item, locale)}
                       </button>

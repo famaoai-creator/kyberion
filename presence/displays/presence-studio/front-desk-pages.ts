@@ -127,6 +127,8 @@ export const PROGRESS_VOCABULARY_KEYS = [
   'front_desk:progress_detail_log',
   'front_desk:progress_action_note',
   'front_desk:progress_open_mirror',
+  // The prefilled "ask about this item" text (word order is per locale).
+  'front_desk:progress_ask_about',
   'front_desk:action_open',
   'front_desk:action_receive',
   'front_desk:action_revise',
@@ -340,11 +342,49 @@ function sendFrontDeskPage(
   res.type('html').send(renderFrontDeskPageTemplate(read(file), locale, read));
 }
 
+/**
+ * The page templates are also files in `static/`, so `express.static` would
+ * serve `/home.html` etc. raw — `{{t:…}}` placeholders and all. Those paths
+ * redirect to their canonical routes (query string kept), and the shared
+ * shell partials are never served on their own.
+ */
+export const FRONT_DESK_TEMPLATE_FILE_REDIRECTS: Readonly<Record<string, string>> = Object.freeze({
+  '/home.html': '/',
+  '/index.html': '/work',
+  '/ask.html': '/ask',
+  '/progress.html': '/progress',
+  '/help.html': '/help',
+});
+
+/** Canonical route for a raw template file request, keeping the query string; null otherwise. */
+export function frontDeskTemplateRedirect(originalUrl: string): string | null {
+  const queryIndex = originalUrl.indexOf('?');
+  const pathname = queryIndex === -1 ? originalUrl : originalUrl.slice(0, queryIndex);
+  const target = Object.prototype.hasOwnProperty.call(FRONT_DESK_TEMPLATE_FILE_REDIRECTS, pathname)
+    ? FRONT_DESK_TEMPLATE_FILE_REDIRECTS[pathname]
+    : null;
+  if (!target) return null;
+  return queryIndex === -1 ? target : `${target}${originalUrl.slice(queryIndex)}`;
+}
+
 // FD-02: `/` is now the human home page; the pre-FD-02 workbench moved to
 // `/work` unchanged. Both must be registered ahead of `express.static` (the
 // caller does this) so its default `index: 'index.html'` behavior for
 // `GET /` never wins the race against `home.html`.
 export function registerFrontDeskHomeWorkPages(app: express.Express, staticDir: string): void {
+  // Registered ahead of `express.static` (see above) so a raw template file
+  // never reaches the browser unrendered.
+  for (const file of Object.keys(FRONT_DESK_TEMPLATE_FILE_REDIRECTS)) {
+    app.get(file, (req, res) => {
+      res.redirect(302, frontDeskTemplateRedirect(req.originalUrl || file) || '/');
+    });
+  }
+  for (const partial of Object.values(FRONT_DESK_PAGE_PARTIALS)) {
+    app.get(`/${partial}`, (_req, res) => {
+      res.status(404).type('text').send('Not found');
+    });
+  }
+
   app.get('/', (req, res) => {
     sendFrontDeskPage(req, res, staticDir, 'home.html');
   });

@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { Badge, Grid, KbChart, Metric, Section, StatusPill, Tabs } from '@agent/shared-ui';
 import {
   getCapabilities,
   getCloudflareOsSnapshot,
@@ -7,13 +9,31 @@ import {
   listMissions,
 } from '@/lib/data';
 import { emitMosRead } from '@/lib/audit-mos';
+import { operatorTranslator } from '@/lib/i18n';
+import { getRequestLocale } from '@/lib/request-locale';
+import { formatCount, missionStatus, statusText, tierLabel, tierTone } from '@/lib/view';
 import CapabilityDashboard from '@/components/CapabilityDashboard';
 import OsControlPlanePanel from '@/components/OsControlPlanePanel';
-import { renderStatus } from '@agent/core/ux-vocabulary';
+import { DataTable, type DataTableRow } from '@/components/DataTable';
+import { OperatorPageHeader } from './operator-shell';
 
 export const dynamic = 'force-dynamic';
 
-export default async function MissionsPage() {
+const STATUS_ORDER: readonly string[] = [
+  'active',
+  'distilling',
+  'paused',
+  'planned',
+  'completed',
+  'failed',
+  'archived',
+];
+
+export default async function MissionsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const missions = listMissions();
   const bundles = getCapabilities();
   const pins = getProviderPins();
@@ -26,101 +46,134 @@ export default async function MissionsPage() {
     resource_kind: 'os_control_plane',
     result_count: osSnapshot.heldActions.length + osSnapshot.observations.length,
   });
-  return (
-    <section>
-      <h1 style={{ marginBottom: '4px' }}>Missions</h1>
-      <p style={{ color: 'var(--kb-muted-text)', marginTop: 0 }}>
-        Filtered by the operator's <code>KYBERION_TENANT</code>. Click a row to inspect its
-        evidence, history, and checkpoints. Read-only.
-      </p>
-      {missions.length === 0 ? (
-        <p style={{ color: 'var(--kb-muted-text)' }}>No missions visible to this tenant scope.</p>
-      ) : (
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: '14px',
-            marginTop: '12px',
-          }}
-        >
-          <thead>
-            <tr style={{ background: 'var(--kb-surface)', textAlign: 'left' }}>
-              <th style={th}>Mission ID</th>
-              <th style={th}>Status</th>
-              <th style={th}>Tier</th>
-              <th style={th}>Tenant</th>
-              <th style={th}>Persona</th>
-              <th style={th}>Checkpoints</th>
-              <th style={th}>Latest commit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {missions.map((m) => (
-              <tr key={m.mission_id} style={{ borderBottom: '1px solid var(--kb-border)' }}>
-                <td style={td}>
-                  <a
-                    href={`/missions/${encodeURIComponent(m.mission_id)}`}
-                    style={{ color: 'var(--kb-accent-text)' }}
-                  >
-                    {m.mission_id}
-                  </a>
-                </td>
-                <td style={td}>{statusBadge(m.status)}</td>
-                <td style={td}>
-                  <code>{m.tier}</code>
-                </td>
-                <td style={td}>
-                  <code>{m.tenant_slug ?? '—'}</code>
-                </td>
-                <td style={td}>{m.assigned_persona ?? '—'}</td>
-                <td style={td}>{m.checkpoints_count ?? 0}</td>
-                <td style={td}>
-                  <code style={{ color: 'var(--kb-muted-text)' }}>{m.latest_commit ?? '—'}</code>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
 
-      {/* Capability and Pin Control Dashboard */}
-      <CapabilityDashboard bundles={bundles} pins={pins} />
+  const locale = await getRequestLocale();
+  const t = operatorTranslator(locale);
+  const params = (await searchParams) ?? {};
+  const requested = typeof params.status === 'string' ? params.status : 'all';
+
+  // Status counts drive the tabs, the metric row and the chart.
+  const counts = new Map<string, number>();
+  for (const mission of missions) {
+    counts.set(mission.status, (counts.get(mission.status) ?? 0) + 1);
+  }
+  const statuses = [
+    ...STATUS_ORDER.filter((status) => counts.has(status)),
+    ...[...counts.keys()].filter((status) => !STATUS_ORDER.includes(status)).sort(),
+  ];
+  const activeTab = requested !== 'all' && counts.has(requested) ? requested : 'all';
+  const visible =
+    activeTab === 'all' ? missions : missions.filter((mission) => mission.status === activeTab);
+  const statusName = (status: string) => statusText(status, locale, 'mission');
+  const failed = counts.get('failed') ?? 0;
+
+  const rows: DataTableRow[] = visible.map((mission) => {
+    const href = `/missions/${encodeURIComponent(mission.mission_id)}`;
+    const pill = missionStatus(mission.status);
+    return {
+      id: mission.mission_id,
+      href,
+      cells: {
+        mission: (
+          <span className="operator-cell operator-cell--primary">
+            <Link href={href} className="operator-cell__title">
+              {mission.title}
+            </Link>
+            <span className="operator-cell__meta operator-mono">{mission.mission_id}</span>
+          </span>
+        ),
+        status: <StatusPill status={pill.status} domain="mission" label={pill.label} />,
+        tier: <Badge label={tierLabel(mission.tier, t)} tone={tierTone(mission.tier)} />,
+        tenant: <span className="operator-mono">{mission.tenant_slug ?? '—'}</span>,
+        persona: mission.assigned_persona ?? '—',
+        checkpoints: formatCount(mission.checkpoints_count ?? 0, locale),
+        commit: (
+          <span className="operator-mono operator-muted">{mission.latest_commit ?? '—'}</span>
+        ),
+      },
+    };
+  });
+
+  return (
+    <>
+      <OperatorPageHeader title={t('missions_title')} subtitle={t('missions_subtitle')} />
+
+      <div className="operator-summary">
+        <Grid columns={2} gap="sm">
+          <Metric
+            label={t('missions_metric_total')}
+            value={formatCount(missions.length, locale)}
+            tone="accent"
+          />
+          <Metric
+            label={t('missions_metric_active')}
+            value={formatCount(counts.get('active') ?? 0, locale)}
+            tone="info"
+          />
+          <Metric
+            label={t('missions_metric_completed')}
+            value={formatCount(counts.get('completed') ?? 0, locale)}
+            tone="success"
+          />
+          <Metric
+            label={t('missions_metric_failed')}
+            value={formatCount(failed, locale)}
+            tone={failed > 0 ? 'danger' : undefined}
+          />
+        </Grid>
+        <Section title={t('missions_chart_title')}>
+          <KbChart
+            type="ui:donut"
+            props={{
+              segments: statuses.map((status) => ({
+                label: statusName(status),
+                value: counts.get(status) ?? 0,
+              })),
+              center_label: t('missions_metric_total'),
+              center_value: missions.length,
+              description: t('missions_chart_description'),
+            }}
+          />
+        </Section>
+      </div>
+
+      <Section title={t('missions_list_title')} description={t('missions_list_description')}>
+        <Tabs
+          label={t('missions_tabs_label')}
+          active={activeTab}
+          overflow="wrap"
+          items={[
+            { id: 'all', label: t('missions_tab_all'), count: missions.length, href: '/' },
+            ...statuses.map((status) => ({
+              id: status,
+              label: statusName(status),
+              count: counts.get(status) ?? 0,
+              href: `/?status=${encodeURIComponent(status)}`,
+            })),
+          ]}
+        />
+        <DataTable
+          columns={[
+            { key: 'mission', label: t('col_mission') },
+            { key: 'status', label: t('col_status') },
+            { key: 'tier', label: t('col_tier') },
+            { key: 'tenant', label: t('col_tenant') },
+            { key: 'persona', label: t('col_persona') },
+            { key: 'checkpoints', label: t('col_checkpoints'), align: 'end' },
+            { key: 'commit', label: t('col_latest_commit') },
+          ]}
+          rows={rows}
+          empty={t('missions_empty')}
+        />
+      </Section>
+
+      <CapabilityDashboard bundles={bundles} pins={pins} locale={locale} />
       <OsControlPlanePanel
         snapshot={osSnapshot}
         tenantScope={tenantScope}
         guardedSurfaceUrl={guardedSurfaceUrl}
+        locale={locale}
       />
-    </section>
-  );
-}
-
-const th: React.CSSProperties = {
-  padding: '8px 12px',
-  borderBottom: '1px solid var(--kb-border)',
-  fontWeight: 600,
-};
-const td: React.CSSProperties = { padding: '8px 12px', verticalAlign: 'top' };
-
-function statusBadge(status: string) {
-  const colors: Record<string, string> = {
-    active: 'var(--kb-success)',
-    completed: 'var(--kb-muted-text)',
-    failed: 'var(--kb-danger)',
-    paused: 'var(--kb-warning)',
-    planned: 'var(--kb-accent-text)',
-    archived: 'var(--kb-muted-text)',
-    distilling: 'var(--kb-accent)',
-  };
-  return (
-    <span
-      style={{
-        color: colors[status] ?? 'var(--kb-text-primary)',
-        fontFamily: 'ui-monospace, monospace',
-        fontSize: '12px',
-      }}
-    >
-      {renderStatus('mission', status, 'en')}
-    </span>
+    </>
   );
 }

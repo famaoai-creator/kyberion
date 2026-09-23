@@ -37,7 +37,11 @@ const ConciergeLocaleContext = React.createContext<ConciergeLocaleContextValue |
 export function readStoredConciergeLocale(): ConciergeLocale | null {
   try {
     const stored = window.localStorage.getItem(CONCIERGE_LOCALE_STORAGE_KEY);
-    return stored ? resolveConciergeLocale(stored) : null;
+    if (stored) return resolveConciergeLocale(stored);
+    // The front-desk shells share the choice through the `kb-ui-locale`
+    // cookie (localStorage is per port): presence-studio's choice applies here.
+    const cookie = /(?:^|;)\s*kb-ui-locale=(en|ja)\s*(?:;|$)/.exec(document.cookie || '');
+    return cookie ? (cookie[1] as ConciergeLocale) : null;
   } catch {
     return null;
   }
