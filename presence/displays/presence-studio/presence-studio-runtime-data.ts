@@ -467,6 +467,11 @@ export interface VoiceHubSpeechState {
   startedAt?: number;
   pid?: number;
   engine_id?: string;
+  /**
+   * PA-09: expected playback length in ms (WAV header, else a text
+   * estimate) — bounds host-mode synthetic mouth motion on the avatar.
+   */
+  estimated_ms?: number;
 }
 
 export interface VoiceHubSpeechStateResponse {
@@ -496,12 +501,13 @@ export function parseVoiceHubSpeechStateResponse(
     if (speech[key] !== undefined && typeof speech[key] !== 'string') return undefined;
     if (typeof speech[key] === 'string') result[key] = speech[key];
   }
-  for (const key of ['startedAt', 'pid'] as const) {
+  for (const key of ['startedAt', 'pid', 'estimated_ms'] as const) {
     if (speech[key] !== undefined) {
       if (
         typeof speech[key] !== 'number' ||
         !Number.isFinite(speech[key]) ||
-        (key === 'pid' && (!Number.isInteger(speech[key]) || speech[key] < 1))
+        (key === 'pid' && (!Number.isInteger(speech[key]) || speech[key] < 1)) ||
+        (key === 'estimated_ms' && speech[key] < 0)
       )
         return undefined;
       result[key] = speech[key];

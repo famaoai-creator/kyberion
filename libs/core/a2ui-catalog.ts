@@ -76,6 +76,8 @@ export const A2UI_BASE_COMPONENT_TYPES = [
   'ui:dialog',
   'ui:drawing-palette',
   'ui:sketch-board',
+  // PA-09 talking avatar (PADS_A2UI_AND_AVATAR_PLAN §6)
+  'ui:talking-avatar',
 ] as const;
 
 export type KyberionBaseComponentType = (typeof A2UI_BASE_COMPONENT_TYPES)[number];
@@ -586,6 +588,8 @@ export interface KyberionBasePropsByType {
   'ui:dialog': KbDialogProps;
   'ui:drawing-palette': KbDrawingPaletteProps;
   'ui:sketch-board': KbSketchBoardProps;
+  // PA-09 talking avatar
+  'ui:talking-avatar': KbTalkingAvatarProps;
 }
 
 // ---------------------------------------------------------------------------
@@ -1175,6 +1179,99 @@ export interface KbSketchController {
     source: Blob | string,
     options?: { layer?: 'background' | 'drawing' }
   ): Promise<boolean>;
+}
+
+// ---------------------------------------------------------------------------
+// PA-09 talking avatar (PADS_A2UI_AND_AVATAR_PLAN_2026-09-23 §6)
+// ---------------------------------------------------------------------------
+//
+// `ui:talking-avatar` owns its animation: mouth openness comes from the
+// lip-sync engine (`libs/shared-ui/vanilla/lipsync.js`), driven through the
+// controller handed out in `avatar.ready` — never through props (the vanilla
+// renderer re-renders the whole container). Cues use the `AnimationCue`
+// shape of `realtime-media-session.ts`.
+
+/** Action ids `ui:talking-avatar` dispatches. */
+export const KB_AVATAR_ACTIONS = Object.freeze({
+  /** `{ name, controller: KbTalkingAvatarController }` (on mount). */
+  ready: 'avatar.ready',
+} as const);
+
+export const KB_AVATAR_EXPRESSIONS = ['neutral', 'joy', 'thinking', 'listening'] as const;
+
+export type KbAvatarExpression = (typeof KB_AVATAR_EXPRESSIONS)[number];
+
+/** Same-origin path or http(s) URL per frame; never `data:` / `blob:`. */
+export interface KbTalkingAvatarImages {
+  neutral: string;
+  joy?: string;
+  thinking?: string;
+  listening?: string;
+  /** Speaking frame: the open-mouth frame when `mouth_open` is absent. */
+  speaking?: string;
+  /** Open-mouth frame blended over the base by openness (`frames` mode). */
+  mouth_open?: string;
+  /** Eyes-closed frame of `neutral` for the idle blink (no blink without it). */
+  blink?: string;
+}
+
+/** `ui:talking-avatar`: layered expression images + a lip-synced mouth. */
+export interface KbTalkingAvatarProps {
+  name: string;
+  /** Accessible name (the localized state is appended when `state` is set). */
+  label: string;
+  images: KbTalkingAvatarImages;
+  /** Default: follows `state` (listening / thinking) when that image exists, else neutral. */
+  expression?: KbAvatarExpression;
+  state?: KbVoiceStateValue;
+  /** Small `ui:voice-state` dot indicator under the avatar. */
+  show_state?: boolean;
+  /** Mouth anchor, fractions (0..1) of the image box (default x 0.5, y 0.68, width 0.22). */
+  mouth?: { x?: number; y?: number; width?: number };
+  /** `auto` (default): `frames` when `mouth_open` or `speaking` exists, else `overlay`. */
+  mouth_mode?: 'auto' | 'overlay' | 'frames';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  shape?: 'circle' | 'rounded';
+  /** Shown when no image loads (default: from `label`). */
+  fallback_initials?: string;
+}
+
+/** An `AnimationCue`-shaped object (`libs/core/realtime-media-session.ts`). */
+export interface KbAvatarCue {
+  kind: string;
+  payload: Record<string, number | string>;
+  target_avatar_id?: string;
+  at_ms?: number;
+  duration_ms?: number;
+  source?: string;
+  provider_id?: string;
+}
+
+/** The part of a Web Audio `AnalyserNode` the lip-sync engine reads. */
+export interface KbAvatarAnalyserLike {
+  fftSize?: number;
+  getFloatTimeDomainData?(array: Float32Array): void;
+  getByteTimeDomainData?(array: Uint8Array): void;
+}
+
+/** What `avatar.ready` hands the host (runtime object, never serialized). */
+export interface KbTalkingAvatarController {
+  /** Host-driven loudness 0..1 (persists until changed). */
+  setLevel(level: number): void;
+  /** blendshape `mouth_open`, viseme (canonical table), expression; false when ignored. */
+  applyCue(cue: KbAvatarCue): boolean;
+  /** Read time-domain RMS per frame; the caller owns (and closes) the audio graph. */
+  attachAnalyser(node: KbAvatarAnalyserLike): () => void;
+  detachAnalyser(): void;
+  /** Plausible mouth motion without audio samples (host playback, speechSynthesis). */
+  startSynthetic(options?: { wordsPerMinute?: number; seed?: number }): void;
+  stopSynthetic(): void;
+  /** A word boundary (e.g. `SpeechSynthesisUtterance.onboundary`). */
+  pulse(): void;
+  /** null = follow `state`. */
+  setExpression(expression: KbAvatarExpression | null): boolean;
+  setState(state: KbVoiceStateValue | null): boolean;
+  dispose(): void;
 }
 
 // ---------------------------------------------------------------------------

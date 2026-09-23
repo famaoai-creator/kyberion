@@ -1,16 +1,19 @@
 {
   "action": "pipeline",
   "name": "avatar-onboarding-fragment",
-  "version": "2.0.0",
-  "description": "Capture a reference photo, generate an avatar through the active host bridge or fallback provider, and register the avatar into the personal profile.",
+  "version": "3.0.0",
+  "description": "Capture a reference photo into the active profile root, register it as the reference photo (<profileRoot>/avatar.png, identity avatar_path), then generate a stylised expression set (neutral/joy/thinking/listening/speaking/mouth_open) from it into <profileRoot>/avatar/draft. The displayed avatar is not changed: adopting the draft is a separate, explicit step (concierge Settings > Voice > avatar > \"Use this avatar\").",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
   "context": {
     "fragment_slug": "avatar-onboarding-fragment",
     "purpose": "Reusable avatar creation flow with bridge-selectable image generation and profile registration.",
-    "required_inputs": "capture_output_path, avatar_output_path, identity_path, profile_name, profile_language, interaction_style, bridge_preference, avatar_prompt",
-    "produced_channels": "capture_result, generation_result, registration_result",
-    "failure_modes": "camera unavailable, host bridge unavailable, avatar generation failure, identity write failure",
-    "verification_command": "pnpm pipeline --input pipelines/create-my-avatar.json"
+    "required_inputs": "identity_path, profile_name, profile_language, interaction_style, bridge_preference, avatar_style, consent_provider, consent_granted_by (capture_output_path / avatar_output_dir: empty = active profile root defaults)",
+    "produced_channels": "capture_result, registration_result, generation_result",
+    "failure_modes": "camera unavailable, host bridge hand-off (exit 100, rerun after the host saves the frames), missing per-run consent for a cloud or host-bridge provider, avatar generation failure, identity write failure",
+    "verification_command": "pnpm pipeline --input pipelines/create-my-avatar.json",
+    "consent_note": "Cloud and host-bridge providers receive the photo only with a per-run consent: pass --context {\"consent_provider\":\"<provider id>\",\"consent_granted_by\":\"<who>\"}. Empty = local providers only.",
+    "path_note": "Empty capture_output_path = <profileRoot>/tmp/avatar-capture.jpg (personal tier; moved to <profileRoot>/avatar.png by register_avatar and deleted on success and failure). Empty avatar_output_dir = <profileRoot>/avatar/draft (the generator default). The reference photo and the generated set stay separate; the stylised neutral frame never overwrites avatar.png.",
+    "adoption_note": "The generated set waits in <profileRoot>/avatar/draft until adopted with concierge Settings > Voice > avatar > \"Use this avatar\" (setup action avatar_use), which promotes it to <profileRoot>/avatar and points identity avatar_profile at it."
   },
   "steps": [
     {
@@ -25,35 +28,50 @@
       "id": "capture_photo",
       "role": "source",
       "op": "core:capture_avatar_photo",
-      "produces": { "channel": "capture_result", "type": "Json" },
-      "params": { "output_path": "{{capture_output_path}}" }
+      "produces": {
+        "channel": "capture_result",
+        "type": "Json"
+      },
+      "params": {
+        "output_path": "{{capture_output_path}}"
+      }
+    },
+    {
+      "id": "register_avatar",
+      "role": "transform",
+      "op": "core:register_avatar",
+      "consumes": "capture_result",
+      "produces": {
+        "channel": "registration_result",
+        "type": "Json"
+      },
+      "params": {
+        "src_avatar": "{{capture_output_path}}",
+        "dest_avatar": "",
+        "identity_path": "{{identity_path}}",
+        "avatar_path": "avatar.png",
+        "profile_name": "{{profile_name}}",
+        "language": "{{profile_language}}",
+        "interaction_style": "{{interaction_style}}",
+        "cleanup_source": "true"
+      }
     },
     {
       "id": "generate_avatar",
       "role": "source",
       "op": "core:generate_avatar",
-      "consumes": "capture_result",
-      "produces": { "channel": "generation_result", "type": "Json" },
+      "consumes": "registration_result",
+      "produces": {
+        "channel": "generation_result",
+        "type": "Json"
+      },
       "params": {
-        "input_photo": "{{capture_output_path}}",
-        "output_path": "{{avatar_output_path}}",
-        "prompt": "{{avatar_prompt}}",
-        "bridge_preference": "{{bridge_preference}}"
-      }
-    },
-    {
-      "id": "register_avatar",
-      "role": "sink",
-      "op": "core:register_avatar",
-      "consumes": "generation_result",
-      "params": {
-        "src_avatar": "{{avatar_output_path}}",
-        "dest_avatar": "knowledge/personal/avatar.png",
-        "identity_path": "{{identity_path}}",
-        "avatar_path": "knowledge/personal/avatar.png",
-        "profile_name": "{{profile_name}}",
-        "language": "{{profile_language}}",
-        "interaction_style": "{{interaction_style}}"
+        "input_photo": "",
+        "output_dir": "{{avatar_output_dir}}",
+        "style": "{{avatar_style}}",
+        "bridge_preference": "{{bridge_preference}}",
+        "consent_provider": "{{consent_provider}}",
+        "consent_granted_by": "{{consent_granted_by}}"
       }
     },
     {
@@ -61,7 +79,7 @@
       "role": "sink",
       "op": "system:log",
       "params": {
-        "message": "🏁 Avatar onboarding complete. Profile updated at {{identity_path}}."
+        "message": "🏁 Avatar onboarding complete. Reference photo registered as avatar.png in the active profile; the generated set waits in avatar/draft until you choose \"Use this avatar\" in concierge settings."
       }
     }
   ]

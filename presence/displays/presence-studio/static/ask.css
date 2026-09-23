@@ -32,6 +32,22 @@
   gap: var(--kb-ui-space-2);
 }
 
+/* PA-09: compact talking avatar at the start of the conversation header; the
+   state indicator (show_state) sits beside the 48px face instead of below it. */
+.ask-partner-avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.ask-partner-avatar .kb-talking-avatar {
+  flex-direction: row;
+}
+
+.ask-partner-avatar + .ask-date-separator {
+  margin-right: auto;
+}
+
 .ask-date-separator {
   padding: 0 var(--kb-ui-space-3);
   border-radius: 999px;

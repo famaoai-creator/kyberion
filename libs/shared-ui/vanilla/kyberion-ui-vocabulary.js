@@ -231,6 +231,7 @@ export const KB_UI_DEFAULT_MESSAGES = Object.freeze({
   'ui:status_working': 'Working',
   'ui:table_empty': 'No data',
   'ui:tabs_label': 'Views',
+  'ui:talking_avatar_label_state': '{label}, {state}',
   'ui:text_count': '{count} / {max}',
   'ui:unknown_component': 'Unsupported component: {type}',
   'ui:value_no': 'No',

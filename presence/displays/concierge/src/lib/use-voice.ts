@@ -8,6 +8,12 @@ import {
   type VoiceInputDevice,
   type VoiceListenOnceResponse,
 } from './voice-types';
+import {
+  createSpeechPlayer,
+  type KbSpeechLipsyncLike,
+  type KbSpeechMode,
+  type KbSpeechPlayer,
+} from '../../../../../libs/shared-ui/vanilla/speech-player.js';
 
 /**
  * CS-02 voice hook — owns the two-tier voice state for the conversation dock.
@@ -25,6 +31,14 @@ import {
  * background interval. The only polling is the bounded speech-state poll
  * after a voice-hub turn, so the speaking indicator and stop button reflect
  * the server-side playback without a permanent heartbeat.
+ *
+ * PA-09 talking avatar: nothing changes until a lip-sync controller is
+ * attached (`attachLipsync`). Then replies go through the shared speech
+ * player (libs/shared-ui/vanilla/speech-player.js): voice-hub audio via
+ * POST /api/voice/synthesize played in the browser (analyser-driven mouth),
+ * falling back to speechSynthesis (synthetic mouth); a voice-hub turn spoken
+ * on the host drives synthetic motion bounded by `speech.estimated_ms`.
+ * `speechMode` and `onSpeechEvent` expose the same state to the avatar.
  */
 
 const VOICE_OUTPUT_STORAGE_KEY = 'concierge.voice-output-enabled';
@@ -71,6 +85,19 @@ function speechLocale(locale: ConciergeLocale): string {
   return locale === 'en' ? 'en-US' : 'ja-JP';
 }
 
+/** The avatar-facing speech mode (null = silent). */
+export type VoiceSpeechMode = Exclude<KbSpeechMode, 'none'>;
+
+/** Speech lifecycle event for the talking avatar. */
+export interface VoiceSpeechEvent {
+  type: 'loading' | 'start' | 'end';
+  mode: VoiceSpeechMode | null;
+}
+
+function toSpeechMode(mode: KbSpeechMode | null | undefined): VoiceSpeechMode | null {
+  return mode && mode !== 'none' ? mode : null;
+}
+
 export interface UseVoiceResult {
   /** True when a mic path exists (Tier 1 voice-hub or browser SpeechRecognition). */
   supported: boolean;
@@ -100,6 +127,18 @@ export interface UseVoiceResult {
   /** Call after a voice-hub turn to mirror the server speaking state. */
   notifyServerSpeech: () => void;
   refreshStatus: () => Promise<void>;
+  /** What is producing speech right now (drives the avatar's mouth source). */
+  speechMode: VoiceSpeechMode | null;
+  /**
+   * Attach (or detach with null) the talking avatar's lip-sync controller.
+   * While attached, replies play through the speech player instead of the
+   * bare speechSynthesis path.
+   */
+  attachLipsync: (controller: KbSpeechLipsyncLike | null) => void;
+  /** Subscribe to speech start/end; returns the unsubscribe function. */
+  onSpeechEvent: (listener: (event: VoiceSpeechEvent) => void) => () => void;
+  /** Resume Web Audio from a user gesture (autoplay policy); false when unavailable. */
+  unlockSpeechAudio: () => Promise<boolean>;
 }
 
 export function useVoice(locale: ConciergeLocale): UseVoiceResult {
@@ -115,11 +154,70 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
   const [sttBackend, setSttBackend] = React.useState('');
   const [inputDevice, setInputDevice] = React.useState('');
 
+  const [playerMode, setPlayerMode] = React.useState<VoiceSpeechMode | null>(null);
+
   const recognitionRef = React.useRef<SpeechRecognitionLike | null>(null);
+  const lipsyncRef = React.useRef<KbSpeechLipsyncLike | null>(null);
+  const playerRef = React.useRef<KbSpeechPlayer | null>(null);
+  const speechListenersRef = React.useRef(new Set<(event: VoiceSpeechEvent) => void>());
   const listenOnceInFlightRef = React.useRef(false);
   const speechPollRef = React.useRef<number | null>(null);
   const localeRef = React.useRef(locale);
   localeRef.current = locale;
+
+  const emitSpeechEvent = React.useCallback((event: VoiceSpeechEvent) => {
+    for (const listener of speechListenersRef.current) {
+      try {
+        listener(event);
+      } catch {
+        // A failing avatar listener must not break speech.
+      }
+    }
+  }, []);
+
+  const onSpeechEvent = React.useCallback((listener: (event: VoiceSpeechEvent) => void) => {
+    speechListenersRef.current.add(listener);
+    return () => {
+      speechListenersRef.current.delete(listener);
+    };
+  }, []);
+
+  /** Lazily create the shared speech player (only once an avatar attaches). */
+  const ensurePlayer = React.useCallback((): KbSpeechPlayer | null => {
+    if (playerRef.current) return playerRef.current;
+    if (typeof window === 'undefined') return null;
+    playerRef.current = createSpeechPlayer({
+      win: window,
+      synthesizeUrl: '/api/voice/synthesize',
+      lipsync: lipsyncRef.current,
+      lang: speechLocale(localeRef.current),
+      onState: (state, detail) => {
+        const mode = state === 'idle' ? null : toSpeechMode(detail.mode);
+        setPlayerMode(mode);
+        // Host playback is already mirrored by serverSpeaking.
+        if (detail.mode !== 'host') setBrowserSpeaking(state === 'speaking');
+        emitSpeechEvent({
+          type: state === 'idle' ? 'end' : state === 'speaking' ? 'start' : 'loading',
+          mode: toSpeechMode(detail.mode),
+        });
+      },
+    });
+    return playerRef.current;
+  }, [emitSpeechEvent]);
+
+  const attachLipsync = React.useCallback(
+    (controller: KbSpeechLipsyncLike | null) => {
+      lipsyncRef.current = controller;
+      if (controller) ensurePlayer()?.setLipsync(controller);
+      else playerRef.current?.setLipsync(null);
+    },
+    [ensurePlayer]
+  );
+
+  const unlockSpeechAudio = React.useCallback(async () => {
+    const player = ensurePlayer();
+    return player ? player.unlock() : false;
+  }, [ensurePlayer]);
 
   const clearSpeechPoll = React.useCallback(() => {
     if (speechPollRef.current !== null) {
@@ -157,8 +255,11 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
     }
     void refreshStatus();
     const recognitionAtMount = recognitionRef;
+    const playerAtMount = playerRef;
     return () => {
       clearSpeechPoll();
+      playerAtMount.current?.dispose();
+      playerAtMount.current = null;
       try {
         recognitionAtMount.current?.stop();
       } catch {
@@ -181,6 +282,7 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
     } catch {
       // Storage unavailable — the toggle still applies for this session.
     }
+    if (!value) playerRef.current?.stop();
     if (!value && typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       setBrowserSpeaking(false);
@@ -195,11 +297,14 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
   const notifyServerSpeech = React.useCallback(() => {
     setServerSpeaking(true);
     clearSpeechPoll();
+    // PA-09: with an avatar attached, mirror host playback as synthetic motion.
+    if (lipsyncRef.current) ensurePlayer()?.followHostSpeech({ speaking: true });
     const startedAt = Date.now();
     speechPollRef.current = window.setInterval(() => {
       if (Date.now() - startedAt > SPEECH_POLL_MAX_MS) {
         clearSpeechPoll();
         setServerSpeaking(false);
+        playerRef.current?.followHostSpeech({ speaking: false });
         return;
       }
       void (async () => {
@@ -210,13 +315,19 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
           if (payload.speech?.status !== 'speaking') {
             clearSpeechPoll();
             setServerSpeaking(false);
+            playerRef.current?.followHostSpeech({ speaking: false });
+          } else if (lipsyncRef.current && payload.speech.estimated_ms !== undefined) {
+            playerRef.current?.followHostSpeech({
+              speaking: true,
+              estimatedMs: payload.speech.estimated_ms,
+            });
           }
         } catch {
           // Transient probe failure — keep polling until the bounded window ends.
         }
       })();
     }, SPEECH_POLL_INTERVAL_MS);
-  }, [clearSpeechPoll]);
+  }, [clearSpeechPoll, ensurePlayer]);
 
   const startListening = React.useCallback(
     (onFinal: (text: string) => void, onInterim?: (text: string) => void): boolean => {
@@ -301,14 +412,33 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
   const speakText = React.useCallback(
     (text: string) => {
       if (!voiceOutputEnabled || !text) return;
+      if (lipsyncRef.current) {
+        // PA-09: voice-hub audio in the browser (analyser mouth), falling back
+        // to speechSynthesis (synthetic mouth) inside the player.
+        const player = ensurePlayer();
+        if (player) {
+          player.setLang(speechLocale(localeRef.current));
+          void player.speak(text, { rate: 1.02 });
+          return;
+        }
+      }
       if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
       try {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = speechLocale(localeRef.current);
         utterance.rate = 1.02;
-        utterance.onstart = () => setBrowserSpeaking(true);
-        utterance.onend = () => setBrowserSpeaking(false);
-        utterance.onerror = () => setBrowserSpeaking(false);
+        utterance.onstart = () => {
+          setBrowserSpeaking(true);
+          emitSpeechEvent({ type: 'start', mode: 'speech-synthesis' });
+        };
+        utterance.onend = () => {
+          setBrowserSpeaking(false);
+          emitSpeechEvent({ type: 'end', mode: 'speech-synthesis' });
+        };
+        utterance.onerror = () => {
+          setBrowserSpeaking(false);
+          emitSpeechEvent({ type: 'end', mode: 'speech-synthesis' });
+        };
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
       } catch {
@@ -316,10 +446,11 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
         setBrowserSpeaking(false);
       }
     },
-    [voiceOutputEnabled]
+    [voiceOutputEnabled, ensurePlayer, emitSpeechEvent]
   );
 
   const stopSpeaking = React.useCallback(async () => {
+    playerRef.current?.stop();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -356,5 +487,10 @@ export function useVoice(locale: ConciergeLocale): UseVoiceResult {
     stopSpeaking,
     notifyServerSpeech,
     refreshStatus,
+    speechMode:
+      playerMode ?? (serverSpeaking ? 'host' : browserSpeaking ? 'speech-synthesis' : null),
+    attachLipsync,
+    onSpeechEvent,
+    unlockSpeechAudio,
   };
 }

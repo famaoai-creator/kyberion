@@ -1451,6 +1451,10 @@
       "types": "./dist/image-generation-types.d.ts",
       "default": "./dist/image-generation-types.js"
     },
+    "./image-reference-consent": {
+      "types": "./dist/image-reference-consent.d.ts",
+      "default": "./dist/image-reference-consent.js"
+    },
     "./image-generation-policy": {
       "types": "./dist/image-generation-policy.d.ts",
       "default": "./dist/image-generation-policy.js"

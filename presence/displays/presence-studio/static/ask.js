@@ -25,6 +25,13 @@
  * `auto_reply`/`reflect_to_surface` server-side speech is a property of the
  * voice-hub bridge itself, not something this page controls per-request).
  *
+ * PA-09: once `ask.html` attaches the talking avatar (`attachAvatar`, from
+ * `static/partner-avatar.js`), hands-free replies are spoken through it
+ * instead — voice-hub audio via `POST /api/voice/synthesize` played in the
+ * browser with analyser lip-sync, falling back to `speechSynthesis` with a
+ * synthetic mouth — and the avatar mirrors listening / thinking. Send, mic and
+ * hands-free clicks unlock its audio (autoplay policy).
+ *
  * See docs/developer/improvement-plans-2026-08/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md
  * §2.1 / FD-03 and docs/USER_EXPERIENCE_CONTRACT.md.
  */
@@ -157,6 +164,8 @@
     // scenario's "save to the work inventory" confirm action —
     // `{ entryId, href }` on success.
     hearingInventory: null,
+    // PA-09: the talking avatar handle (null until ask.html attaches it).
+    avatar: null,
   };
 
   var HEARING_CANVAS_POLL_INTERVAL_MS = 3000;
@@ -458,6 +467,31 @@
     renderAboutCard();
     renderTurns();
     renderHearing();
+    syncAvatar();
+  }
+
+  // PA-09: page state -> avatar controller (the avatar overlays `speaking`
+  // itself while it plays a reply).
+  function syncAvatar() {
+    if (!state.avatar) return;
+    state.avatar.setState(state.listening ? 'listening' : state.sending ? 'thinking' : null);
+  }
+
+  // Called from the user's click / submit so browser audio may start later.
+  function unlockAvatarAudio() {
+    if (!state.avatar) return;
+    try {
+      Promise.resolve(state.avatar.unlock()).catch(function () {
+        // Best effort only — speech falls back to speechSynthesis.
+      });
+    } catch (err) {
+      // Best effort only.
+    }
+  }
+
+  function attachAvatar(handle) {
+    state.avatar = handle || null;
+    syncAvatar();
   }
 
   // Simple `{name}` interpolation for the vocabulary templates this file
@@ -783,6 +817,10 @@
 
   function speakReply(text) {
     if (!state.handsFree) return;
+    if (state.avatar) {
+      state.avatar.speak(text, { lang: state.locale === 'ja' ? 'ja-JP' : 'en-US' });
+      return;
+    }
     if (!window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') return;
     try {
       var utterance = new window.SpeechSynthesisUtterance(text);
@@ -858,6 +896,9 @@
   // ---------------------------------------------------------------------
 
   function stopSpeakingBestEffort(reason) {
+    // Server (host) speech only: a reply the avatar is playing in this tab
+    // must survive the next hands-free recognition cycle, as the bare
+    // speechSynthesis path always did.
     return fetch('/api/voice/stop-speaking', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -872,6 +913,7 @@
     var micButton = document.getElementById('ask-mic');
     if (micButton) micButton.setAttribute('aria-pressed', isListening ? 'true' : 'false');
     renderAboutCard();
+    syncAvatar();
   }
 
   function startRecognitionCycle(continuous) {
@@ -938,6 +980,7 @@
     var micButton = document.getElementById('ask-mic');
     if (!micButton) return;
     micButton.addEventListener('click', function () {
+      unlockAvatarAudio();
       if (state.listening) {
         stopRecognitionCycle();
         return;
@@ -950,6 +993,7 @@
     var button = document.getElementById('handsfree-toggle');
     if (!button) return;
     button.addEventListener('click', function () {
+      unlockAvatarAudio();
       state.handsFree = !state.handsFree;
       renderHandsFreeToggle();
       if (state.handsFree) {
@@ -958,6 +1002,7 @@
         });
       } else {
         stopRecognitionCycle();
+        if (state.avatar) state.avatar.stop();
       }
     });
   }
@@ -971,6 +1016,7 @@
     if (!form) return;
     form.addEventListener('submit', function (event) {
       event.preventDefault();
+      unlockAvatarAudio();
       var input = document.getElementById('ask-input');
       sendText(input ? input.value : '');
     });
@@ -1074,5 +1120,5 @@
       });
   }
 
-  window.KyberionAsk = { mount: mount };
+  window.KyberionAsk = { mount: mount, attachAvatar: attachAvatar };
 })();

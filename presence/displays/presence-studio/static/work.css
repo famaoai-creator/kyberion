@@ -125,38 +125,12 @@
   background: var(--kb-ui-surface-sunken);
 }
 
-.orb {
+/* PA-09: the ui:talking-avatar (static/partner-avatar.js) owns its own look
+   (kyberion-ui.css); the panel only centres it. */
+.partner-avatar {
   display: grid;
   place-items: center;
-  width: 200px;
-  height: 200px;
-  border: 1px solid var(--kb-ui-accent);
-  border-radius: 50%;
-  background: var(--kb-ui-accent-soft);
-  animation: work-float 4.5s ease-in-out infinite;
-}
-
-.avatar-media {
-  width: min(320px, 78%);
-  aspect-ratio: 1;
-  border: 1px solid var(--kb-ui-border);
-  border-radius: var(--kb-ui-radius-lg);
-  object-fit: cover;
-}
-
-.avatar-media:not(.hidden) + .orb {
-  display: none;
-}
-
-.expression {
-  position: absolute;
-  bottom: var(--kb-ui-space-4);
-  left: var(--kb-ui-space-4);
-  padding: 0 var(--kb-ui-space-2);
-  border-radius: var(--kb-ui-radius-sm);
-  background: var(--kb-ui-surface);
-  color: var(--kb-ui-text-muted);
-  font-size: var(--kb-ui-font-size-xs);
+  min-height: 240px;
 }
 
 .status {
@@ -441,23 +415,6 @@ kbd {
   justify-content: flex-end;
   gap: var(--kb-ui-space-2);
   margin-top: var(--kb-ui-space-4);
-}
-
-@keyframes work-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .orb {
-    animation: none;
-  }
 }
 
 @media (max-width: 860px) {

@@ -162,6 +162,11 @@ const CASES: Record<string, { props: Record<string, unknown>; root: string; tag?
   'ui:dialog': { props: { open: false, title: 'D' }, root: 'kb-dialog' },
   'ui:drawing-palette': { props: { name: 'p', label: 'P' }, root: 'kb-drawing-palette' },
   'ui:sketch-board': { props: { name: 's', label: 'S' }, root: 'kb-sketch-board' },
+  // PA-09 talking avatar (renderer: avatar.js; see avatar.test.ts)
+  'ui:talking-avatar': {
+    props: { name: 'a', label: 'A', images: { neutral: '/n.svg' } },
+    root: 'kb-talking-avatar',
+  },
 };
 
 describe('kyberion-ui vanilla renderer — catalog coverage', () => {

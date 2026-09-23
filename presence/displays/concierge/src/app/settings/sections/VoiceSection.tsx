@@ -16,6 +16,7 @@ import type { ConciergeLocale } from '../../../lib/i18n';
 import type { Setup, VoiceSelection } from '../../../lib/settings-types';
 import type { VoiceInputDevice } from '../../../lib/voice-types';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
+import { AvatarGenerationPanel } from './AvatarGenerationPanel';
 
 /** FD-06 写真・音声 pane (`#setup-media`) — avatar + voice sample
  * recording + voice runtime. Extracted from settings/page.tsx; the recorder
@@ -127,6 +128,12 @@ export function VoiceSection({
               disabled={busy}
             />
           </div>
+          {/* PA-10: stylised expression set from the registered photo (consent first). */}
+          <AvatarGenerationPanel
+            t={t}
+            busy={busy}
+            photoVersion={`${setup.profile.avatar_registered}:${setup.profile.avatar_source}`}
+          />
         </SettingsGroup>
 
         <SettingsGroup

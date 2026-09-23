@@ -47,6 +47,15 @@
         "imageBytes": "generatedImages.0.image.imageBytes"
       }
     },
+    "generate_content_image": {
+      "type": "api",
+      "path": "models/{{model}}:generateContent",
+      "method": "POST",
+      "payload_template": {
+        "contents": "{{contents}}",
+        "generationConfig": "{{generation_config}}"
+      }
+    },
     "generate_tts": {
       "type": "api",
       "path": "interactions",

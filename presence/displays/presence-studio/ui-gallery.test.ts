@@ -19,6 +19,7 @@ import {
   SHARED_UI_MESSAGES_ROUTE,
   SHARED_UI_MODULE_ROUTE,
   SHARED_UI_MODULE_SOURCES,
+  SHARED_UI_PAGE_MODULE_SOURCES,
   SHARED_UI_VANILLA_ROUTE,
   SHARED_UI_VANILLA_SOURCE,
   UI_GALLERY_ROUTE,
@@ -243,8 +244,12 @@ describe('ui-gallery routes', () => {
       sent: '',
       contentType: '',
       headers: {} as Record<string, string>,
+      body: '',
       sendFile(file: string) {
         res.sent = file;
+      },
+      send(value: string) {
+        res.body = value;
       },
       type(value: string) {
         res.contentType = value;
@@ -267,6 +272,7 @@ describe('ui-gallery routes', () => {
         UI_GALLERY_FIXTURES_ROUTE,
         UI_GALLERY_ROUTE,
         UI_GALLERY_VOCABULARY_ROUTE,
+        ...Object.keys(SHARED_UI_PAGE_MODULE_SOURCES).map((file) => `/shared-ui/${file}`),
       ].sort()
     );
 
@@ -303,6 +309,16 @@ describe('ui-gallery routes', () => {
       }
     }
     expect([...seen].sort()).toEqual(Object.keys(SHARED_UI_MODULE_SOURCES).sort());
+    // PA-09 page-level modules sit outside that graph and import nothing.
+    for (const [file, source] of Object.entries(SHARED_UI_PAGE_MODULE_SOURCES)) {
+      expect(seen.has(file), file).toBe(false);
+      expect(readRepoFile(source), source).not.toMatch(/^\s*import\s/m);
+      const res = fakeResponse();
+      routes.get(`/shared-ui/${file}`)!({}, res);
+      // Served from memory (read at registration), byte-identical to the source.
+      expect(res.body).toBe(readRepoFile(source));
+      expect(res.contentType).toMatch(/^text\/javascript/);
+    }
     for (const file of ['../x.js', 'kyberion-ui.test.ts', 'mini-dom.js', '']) {
       const res = jsonResponse();
       routes.get(SHARED_UI_MODULE_ROUTE)!({ params: { file } }, res);
