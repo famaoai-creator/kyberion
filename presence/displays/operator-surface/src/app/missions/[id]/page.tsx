@@ -1,134 +1,161 @@
 import { notFound } from 'next/navigation';
+import {
+  Badge,
+  EmptyState,
+  Grid,
+  KeyValue,
+  List,
+  Section,
+  StatusPill,
+  Table,
+} from '@agent/shared-ui';
 import { getMissionDetail, suggestedCommand } from '@/lib/data';
 import { emitMosRead } from '@/lib/audit-mos';
-import { formatNumber } from '@agent/core/format';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { operatorTranslator } from '@/lib/i18n';
+import { getRequestLocale } from '@/lib/request-locale';
+import {
+  formatCount,
+  formatTimestamp,
+  missionStatus,
+  statusText,
+  tierLabel,
+  tierTone,
+} from '@/lib/view';
+import { OperatorPageHeader } from '../../operator-shell';
 
 export const dynamic = 'force-dynamic';
 
-export default async function MissionDetailPage({ params }: { params: { id: string } }) {
-  const detail = getMissionDetail(params.id);
+const INTENTS = ['verify', 'distill', 'finish', 'export-bundle', 'view-evidence'] as const;
+
+export default async function MissionDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const detail = getMissionDetail(id);
   if (!detail) notFound();
   emitMosRead({
-    page: `/missions/${params.id}`,
+    page: `/missions/${id}`,
     resource_kind: 'mission_detail',
     resource_id: detail.mission_id,
   });
 
+  const locale = await getRequestLocale();
+  const t = operatorTranslator(locale);
+  const pill = missionStatus(detail.status);
+  const intentLabel: Record<(typeof INTENTS)[number], string> = {
+    verify: t('detail_intent_verify'),
+    distill: t('detail_intent_distill'),
+    finish: t('detail_intent_finish'),
+    'export-bundle': t('detail_intent_export_bundle'),
+    'view-evidence': t('detail_intent_view_evidence'),
+  };
+  // Newest first reads naturally as an audit timeline.
+  const history = [...(detail.history ?? [])].reverse();
+  const checkpoints = detail.checkpoints ?? [];
+  const evidence = detail.evidence_files ?? [];
+
   return (
-    <section>
-      <h1 style={{ marginBottom: 0 }}>{detail.mission_id}</h1>
-      <p style={{ color: 'var(--kb-muted-text)', marginTop: 4, fontSize: 13 }}>
-        <code>tier={detail.tier}</code>
-        {detail.tenant_slug ? (
-          <>
-            {' '}
-            · <code>tenant={detail.tenant_slug}</code>
-          </>
-        ) : null}
-        {' · '}
-        <code>status={detail.status}</code>
-        {' · '}
-        <code>persona={detail.assigned_persona ?? '—'}</code>
-      </p>
+    <>
+      <OperatorPageHeader title={detail.title} subtitle={detail.mission_id} />
 
-      <h2 style={{ marginTop: 28 }}>Suggested next actions</h2>
-      <p style={{ color: 'var(--kb-muted-text)', fontSize: 13, marginTop: 4 }}>
-        These are <em>copy-and-run</em> commands. The MOS never executes them for you — that
-        boundary is intentional and audit-load-bearing.
-      </p>
-      <ul style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>
-        {(['verify', 'distill', 'finish', 'export-bundle', 'view-evidence'] as const).map(
-          (intent) => (
-            <li key={intent} style={{ marginBottom: 6 }}>
-              <span style={{ color: 'var(--kb-muted-text)' }}>{intent}: </span>
-              <code style={codeBg}>
-                {suggestedCommand({ intent, missionId: detail.mission_id })}
-              </code>
-            </li>
-          )
-        )}
-      </ul>
+      <div className="operator-chips">
+        <StatusPill status={pill.status} domain="mission" label={pill.label} />
+        <Badge label={tierLabel(detail.tier, t)} tone={tierTone(detail.tier)} />
+        {detail.tenant_slug ? <Badge label={detail.tenant_slug} tone="neutral" /> : null}
+      </div>
 
-      <h2 style={{ marginTop: 28 }}>History ({detail.history_count})</h2>
-      {detail.history && detail.history.length > 0 ? (
-        <ul style={{ fontSize: 13 }}>
-          {detail.history.map((h, i) => (
-            <li key={i} style={{ marginBottom: 4 }}>
-              <code style={{ color: 'var(--kb-muted-text)' }}>{h.ts}</code>{' '}
-              <strong>{h.event}</strong>
-              {h.note ? <span style={{ color: 'var(--kb-muted-text)' }}> — {h.note}</span> : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p style={{ color: 'var(--kb-muted-text)' }}>(no history)</p>
-      )}
+      <Grid min_column_width="lg" gap="md">
+        <Section title={t('detail_overview_title')}>
+          <KeyValue
+            items={[
+              { label: t('col_mission_id'), value: detail.mission_id, mono: true },
+              {
+                label: t('col_status'),
+                value: statusText(detail.status, locale, 'mission') || '—',
+              },
+              { label: t('col_tier'), value: tierLabel(detail.tier, t) },
+              { label: t('col_tenant'), value: detail.tenant_slug ?? '—', mono: true },
+              { label: t('col_persona'), value: detail.assigned_persona ?? '—' },
+              { label: t('col_mission_type'), value: detail.mission_type ?? '—' },
+              {
+                label: t('col_latest_commit'),
+                value: detail.latest_commit ? detail.latest_commit.slice(0, 12) : '—',
+                mono: true,
+              },
+              {
+                label: t('col_checkpoints'),
+                value: formatCount(detail.checkpoints_count ?? 0, locale),
+              },
+            ]}
+          />
+        </Section>
+        <Section
+          title={t('detail_history_title', {
+            count: formatCount(detail.history_count ?? 0, locale),
+          })}
+        >
+          {history.length > 0 ? (
+            <List
+              variant="timeline"
+              items={history.map((entry) => ({
+                title: entry.event,
+                meta: entry.note
+                  ? `${formatTimestamp(entry.ts, locale)} · ${entry.note}`
+                  : formatTimestamp(entry.ts, locale),
+              }))}
+            />
+          ) : (
+            <EmptyState title={t('detail_history_empty')} />
+          )}
+        </Section>
+      </Grid>
 
-      <h2 style={{ marginTop: 28 }}>Checkpoints ({detail.checkpoints_count ?? 0})</h2>
-      {detail.checkpoints && detail.checkpoints.length > 0 ? (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: 'var(--kb-surface)', textAlign: 'left' }}>
-              <th style={th}>Task</th>
-              <th style={th}>Commit</th>
-              <th style={th}>Timestamp</th>
-            </tr>
-          </thead>
-          <tbody>
-            {detail.checkpoints.map((c) => (
-              <tr key={c.commit_hash} style={{ borderBottom: '1px solid var(--kb-border)' }}>
-                <td style={td}>{c.task_id}</td>
-                <td style={td}>
-                  <code>{c.commit_hash.slice(0, 8)}</code>
-                </td>
-                <td style={td}>{c.ts}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p style={{ color: 'var(--kb-muted-text)' }}>(no checkpoints)</p>
-      )}
+      <Section title={t('detail_commands_title')} description={t('detail_commands_description')}>
+        <Table
+          columns={[
+            { key: 'intent', label: t('col_intent') },
+            { key: 'command', label: t('col_command'), mono: true },
+          ]}
+          rows={INTENTS.map((intent) => ({
+            intent: intentLabel[intent],
+            command: suggestedCommand({ intent, missionId: detail.mission_id }),
+          }))}
+        />
+      </Section>
 
-      <h2 style={{ marginTop: 28 }}>Evidence files ({detail.evidence_files?.length ?? 0})</h2>
-      {detail.evidence_files && detail.evidence_files.length > 0 ? (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: 'var(--kb-surface)', textAlign: 'left' }}>
-              <th style={th}>Name</th>
-              <th style={th}>Bytes</th>
-              <th style={th}>Modified</th>
-            </tr>
-          </thead>
-          <tbody>
-            {detail.evidence_files.map((f) => (
-              <tr key={f.name} style={{ borderBottom: '1px solid var(--kb-border)' }}>
-                <td style={td}>
-                  <code>{f.name}</code>
-                </td>
-                <td style={td}>{formatNumber(f.bytes, { locale: resolveOperatorLocale() })}</td>
-                <td style={td}>{f.modified_at}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p style={{ color: 'var(--kb-muted-text)' }}>(no evidence files)</p>
-      )}
-    </section>
+      <Section
+        title={t('detail_checkpoints_title', {
+          count: formatCount(detail.checkpoints_count ?? 0, locale),
+        })}
+      >
+        <Table
+          columns={[
+            { key: 'task', label: t('col_task'), mono: true },
+            { key: 'commit', label: t('col_commit'), mono: true },
+            { key: 'ts', label: t('col_timestamp') },
+          ]}
+          rows={checkpoints.map((checkpoint) => ({
+            task: checkpoint.task_id,
+            commit: checkpoint.commit_hash.slice(0, 8),
+            ts: formatTimestamp(checkpoint.ts, locale),
+          }))}
+          empty={t('detail_checkpoints_empty')}
+        />
+      </Section>
+
+      <Section title={t('detail_evidence_title', { count: formatCount(evidence.length, locale) })}>
+        <Table
+          columns={[
+            { key: 'name', label: t('col_name'), mono: true },
+            { key: 'bytes', label: t('col_bytes'), align: 'end' },
+            { key: 'modified', label: t('col_modified') },
+          ]}
+          rows={evidence.map((file) => ({
+            name: file.name,
+            bytes: formatCount(file.bytes, locale),
+            modified: formatTimestamp(file.modified_at, locale),
+          }))}
+          empty={t('detail_evidence_empty')}
+        />
+      </Section>
+    </>
   );
 }
-
-const th: React.CSSProperties = {
-  padding: '8px 12px',
-  borderBottom: '1px solid var(--kb-border)',
-  fontWeight: 600,
-};
-const td: React.CSSProperties = { padding: '8px 12px', verticalAlign: 'top' };
-const codeBg: React.CSSProperties = {
-  background: 'var(--kb-surface)',
-  padding: '2px 6px',
-  borderRadius: 3,
-  fontSize: 12,
-};

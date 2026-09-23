@@ -173,15 +173,23 @@ Each surface answers one question and shows its role in the header. The two huma
 <table>
   <tr>
     <td align="center" width="33%"><a href="./presence/displays/chronos-mirror-v2/"><img src="./docs/assets/surfaces/chronos.jpg" alt="Chronos Mirror — control tower home with tenant scope, view switcher, next action and per-mission agent status" width="100%" /></a><br /><strong>Chronos Mirror</strong> · <code>:3000</code><br /><sub>Control tower: what is the system doing, where should I intervene?</sub></td>
-    <td align="center" width="33%"><a href="./presence/displays/concierge/"><img src="./docs/assets/surfaces/concierge.jpg" alt="Concierge — the 決める (Decide) page: one urgency-ordered queue of approvals, exceptions and stalled requests, each card with why it needs you and three actions" width="100%" /></a><br /><strong>Concierge</strong> · <code>:3050</code><br /><sub>CEO secretary: what do I need to decide right now? (決める · 設定)</sub></td>
+    <td align="center" width="33%"><a href="./presence/displays/concierge/"><img src="./docs/assets/surfaces/concierge.jpg" alt="Concierge — the ホーム (Home) page on the shared kyberion-base design system: next action, response status and the five-item rail" width="100%" /></a><br /><strong>Concierge</strong> · <code>:3050</code><br /><sub>CEO secretary: what do I need to decide right now? (決める · 設定)</sub></td>
     <td align="center" width="33%"><a href="./presence/displays/presence-studio/"><img src="./docs/assets/surfaces/presence-studio.jpg" alt="Presence Studio — the ホーム (Home) page: today's briefing, the ask box with request chips, what needs your decision and progress, behind the shared five-item rail" width="100%" /></a><br /><strong>Presence Studio</strong> · <code>:3031</code><br /><sub>Companion: what are we working on together, by voice or text? (ホーム · 頼む · 進み具合)</sub></td>
   </tr>
   <tr>
-    <td align="center"><a href="./presence/displays/operator-surface/"><img src="./docs/assets/surfaces/operator-surface.jpg" alt="Operator Surface — read-only audit monitor listing missions with status, tier, tenant, persona and checkpoints" width="100%" /></a><br /><strong>Operator Surface</strong> · <code>:3331</code><br /><sub>Audit monitor, read-only: what happened, with evidence?</sub></td>
+    <td align="center"><a href="./presence/displays/operator-surface/"><img src="./docs/assets/surfaces/operator-surface.jpg" alt="Operator Surface — read-only audit monitor listing missions and capability bundles, on the shared kyberion-base design system" width="100%" /></a><br /><strong>Operator Surface</strong> · <code>:3331</code><br /><sub>Audit monitor, read-only: what happened, with evidence?</sub></td>
     <td align="center"><a href="./presence/displays/computer-surface/"><img src="./docs/assets/surfaces/computer-surface.jpg" alt="Computer Surface — live mirror of the browser or terminal Kyberion is operating, with session, executor and status tiles" width="100%" /></a><br /><strong>Computer Surface</strong> · <code>:3040</code><br /><sub>Mirror: what is Kyberion doing in the browser or terminal right now?</sub></td>
     <td align="center"><a href="./presence/displays/terminal-hud/"><img src="./docs/assets/surfaces/terminal-hud.jpg" alt="Terminal HUD — Ink TUI with operator cockpit, intent preview and the mission panel" width="100%" /></a><br /><strong>Terminal HUD</strong> · <code>pnpm tui</code><br /><sub>Terminal cockpit: missions, work items, runtimes and intent preview without leaving the shell</sub></td>
   </tr>
 </table>
+
+### Shared UI (A2UI kyberion-base)
+
+All 5 UI surfaces above render from one design system: the `kyberion-base` A2UI catalog (`ui:*` component types with JSON Schema props), one token-driven stylesheet (`kyberion-ui.css`), and two renderers — React (`@agent/shared-ui`) for the three Next.js surfaces and a dependency-free vanilla DOM renderer for the two static-HTML surfaces. Every component ships in both light/dark themes and `en`/`ja` locales. See every component at once in Presence Studio's `/ui-gallery`:
+
+<a href="./presence/displays/presence-studio/"><img src="./docs/assets/surfaces/ui-gallery.jpg" alt="UI gallery — every kyberion-base component (page header, nav rail, tabs, next action, table, charts, forms, status pills) in light and dark, English and Japanese" width="100%" /></a>
+
+Details, schema and CSS sources: [`docs/developer/design/DESIGN_SYSTEM.md`](./docs/developer/design/DESIGN_SYSTEM.md).
 
 ```bash
 pnpm surfaces reconcile              # start the surfaces declared in active-surfaces.json

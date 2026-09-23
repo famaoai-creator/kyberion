@@ -57,9 +57,11 @@
     complete: 'front_desk:training_status_complete',
   };
 
+  // UI-06: the viewer's stored language choice (`front-desk-prefs.js`),
+  // falling back to the language the page was served in.
   function normalizeLocale() {
-    var raw = String((navigator && navigator.language) || 'en').toLowerCase();
-    return raw.indexOf('ja') === 0 ? 'ja' : 'en';
+    if (window.KyberionPrefs) return window.KyberionPrefs.locale();
+    return document.documentElement.getAttribute('lang') === 'ja' ? 'ja' : 'en';
   }
 
   function fillSection(item) {
@@ -192,23 +194,23 @@
                 escapeHtml(lesson.id) +
                 '"><h3>' +
                 escapeHtml(lesson.title) +
-                ' <span class="status-chip" data-role="status-chip">' +
+                ' <span class="kb-badge status-chip" data-role="status-chip">' +
                 escapeHtml(vt(vocab, statusKey)) +
                 '</span></h3><p>' +
                 escapeHtml(lesson.goal) +
-                '</p><a class="help-card-link" href="' +
+                '</p><div class="help-lesson-actions"><a class="kb-btn kb-btn--primary" href="' +
                 escapeHtml(href) +
                 '">' +
                 escapeHtml(vt(vocab, 'front_desk:training_try')) +
                 '</a>' +
                 (status === 'complete'
                   ? ''
-                  : ' <button type="button" class="help-card-link help-mark-done" data-lesson-id="' +
+                  : ' <button type="button" class="kb-btn kb-btn--secondary help-mark-done" data-lesson-id="' +
                     escapeHtml(lesson.id) +
                     '">' +
                     escapeHtml(vt(vocab, 'front_desk:training_mark_done')) +
                     '</button>') +
-                '<p class="help-check">' +
+                '</div><p class="help-check">' +
                 escapeHtml(vt(vocab, 'front_desk:training_done_prefix')) +
                 ' ' +
                 escapeHtml(lesson.check.text) +

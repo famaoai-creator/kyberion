@@ -1,7 +1,11 @@
 import * as path from 'node:path';
+import { EmptyState, KbIcon, Section } from '@agent/shared-ui';
 import { safeReaddir, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { emitMosRead } from '@/lib/audit-mos';
+import { operatorTranslator } from '@/lib/i18n';
+import { getRequestLocale } from '@/lib/request-locale';
+import { OperatorPageHeader } from '../operator-shell';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,23 +48,36 @@ export default async function KnowledgePage() {
   // browse surface (operator goes to their CLI / SIEM for those).
   const top = listKnowledge('knowledge/public');
   emitMosRead({ page: '/knowledge', resource_kind: 'knowledge', result_count: top.length });
+  const locale = await getRequestLocale();
+  const t = operatorTranslator(locale);
   return (
-    <section>
-      <h1 style={{ marginBottom: 4 }}>Knowledge (public tier)</h1>
-      <p style={{ color: 'var(--kb-muted-text)', marginTop: 0, fontSize: 13 }}>
-        Browse the reusable public knowledge tree. Confidential / personal content is intentionally
-        out of scope of the MOS — use the CLI to view those.
-      </p>
-      <ul style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>
-        {top.map((node) => (
-          <li key={node.rel}>
-            {node.is_dir ? '📁' : '📄'} {node.name}
-            <span style={{ color: 'var(--kb-muted-text)', marginLeft: 8 }}>
-              <code>{node.rel}</code>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <>
+      <OperatorPageHeader title={t('knowledge_title')} subtitle={t('knowledge_subtitle')} />
+      <Section title={t('knowledge_tree_title', { count: top.length })}>
+        {top.length === 0 ? (
+          <EmptyState title={t('knowledge_empty')} />
+        ) : (
+          <div className="operator-panel">
+            <ul className="operator-tree">
+              {top.map((node) => (
+                <li key={node.rel} className="operator-tree__item">
+                  <span className="operator-tree__icon">
+                    <KbIcon
+                      name={node.is_dir ? 'folder' : 'book'}
+                      size={16}
+                      label={node.is_dir ? t('knowledge_folder') : t('knowledge_file')}
+                    />
+                  </span>
+                  <span className="operator-cell">
+                    <span className="operator-cell__title">{node.name}</span>
+                    <span className="operator-cell__meta operator-mono">{node.rel}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Section>
+    </>
   );
 }

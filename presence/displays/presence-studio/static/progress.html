@@ -1,81 +1,147 @@
 <!doctype html>
-<html lang="ja">
+<html lang="{{locale}}" data-density="comfortable">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>進み具合 — Kyberion</title>
-    <!-- Kyberion Design System (DS-01 canonical tokens) -->
-    <link rel="stylesheet" href="./design-system.css" />
-    <link rel="stylesheet" href="/api/design-tokens.css" />
-    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
-    <link rel="stylesheet" href="/front-desk-rail.css" />
+    <title>{{t:front_desk:nav_progress}} — Kyberion</title>
+    <!-- UI-06: theme + language applied before first paint (kyberion.ui.theme / kyberion.ui.locale) -->
+    <script src="/front-desk-prefs.js"></script>
+    <!-- Kyberion Design System: generated --kb-ui-* tokens + kyberion-base component classes -->
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/kyberion-ui.css" />
+    <link rel="stylesheet" href="/design-system.css" />
     <!-- FD-05: progress page styles -->
     <link rel="stylesheet" href="/progress.css" />
   </head>
   <body>
-    <div class="fd-layout">
-      <nav id="front-desk-rail" class="front-desk-rail"></nav>
-      <div class="fd-content">
-        <main class="progress-shell">
-          <div class="progress-filters" id="progress-filters" role="tablist">
+    <div class="kb-app-shell" data-density="comfortable">
+      <div class="kb-app-shell__nav" id="front-desk-rail">{{partial:rail}}</div>
+      <main class="kb-app-shell__main">
+        <header class="kb-page-header">
+          <div class="kb-page-header__titles">
+            <h1 class="kb-page-header__title">
+              {{t:front_desk:nav_progress}}
+              <span class="kb-badge" data-role="presence-studio"
+                >{{t:presence_studio:shell_role_badge}}</span
+              >
+            </h1>
+            <p class="kb-page-header__subtitle">{{t:front_desk:nav_progress_sub}}</p>
+          </div>
+          {{partial:shell-controls}}
+        </header>
+
+        <div class="ps-page">
+          <div
+            class="kb-tabs progress-filters"
+            id="progress-filters"
+            role="tablist"
+            aria-label="{{t:presence_studio:progress_list_label}}"
+          >
             <button
               type="button"
-              class="progress-filter"
+              class="kb-tabs__tab"
               id="filter-active"
               data-filter="active"
               role="tab"
-            ></button>
+              aria-selected="true"
+            >
+              {{t:front_desk:tag_in_progress}}
+            </button>
             <button
               type="button"
-              class="progress-filter"
+              class="kb-tabs__tab"
               id="filter-delivered"
               data-filter="delivered"
               role="tab"
-            ></button>
+              aria-selected="false"
+            >
+              {{t:front_desk:progress_delivered_title}}
+            </button>
             <button
               type="button"
-              class="progress-filter"
+              class="kb-tabs__tab"
               id="filter-done"
               data-filter="done"
               role="tab"
-            ></button>
+              aria-selected="false"
+            >
+              {{t:front_desk:progress_filter_done}}
+            </button>
           </div>
 
           <div class="progress-columns">
-            <section class="progress-list-col" aria-label="進み具合の一覧">
-              <div class="progress-section-header hidden" id="delivered-header">
-                <h2 id="delivered-title"></h2>
-                <p id="delivered-waiting"></p>
-              </div>
-              <ul class="progress-list" id="progress-list"></ul>
+            <section
+              class="kb-section progress-list-col"
+              aria-label="{{t:presence_studio:progress_list_label}}"
+            >
+              <header class="kb-section__header hidden" id="delivered-header">
+                <div class="kb-section__heading">
+                  <h2 class="kb-section__title" id="delivered-title"></h2>
+                  <p class="kb-section__description" id="delivered-waiting"></p>
+                </div>
+              </header>
+              <ul class="progress-list" id="progress-list">
+                <li>
+                  <div
+                    class="kb-skeleton"
+                    data-shape="table"
+                    role="status"
+                    aria-busy="true"
+                    aria-label="{{t:ui:skeleton_loading}}"
+                  >
+                    <span class="kb-skeleton__line" aria-hidden="true"></span>
+                    <span class="kb-skeleton__line" aria-hidden="true"></span>
+                    <span class="kb-skeleton__line" aria-hidden="true"></span>
+                  </div>
+                </li>
+              </ul>
               <p class="progress-empty hidden" id="progress-empty"></p>
             </section>
 
-            <section class="progress-detail-col" aria-label="選んだ項目の詳細" id="progress-detail">
-              <p class="progress-select-hint" id="progress-select-hint"></p>
+            <section
+              class="kb-section progress-detail-col"
+              aria-label="{{t:presence_studio:progress_detail_label}}"
+              id="progress-detail"
+            >
+              <p class="progress-select-hint" id="progress-select-hint">
+                {{t:front_desk:progress_select_hint}}
+              </p>
             </section>
           </div>
 
-          <section class="work-inventory-panel" id="work-inventory-panel" aria-label="業務の自動化候補">
-            <div class="work-inventory-header">
-              <h2 id="wi-title"></h2>
-              <div class="work-inventory-counts" id="wi-counts"></div>
-            </div>
+          <section
+            class="kb-section work-inventory-panel"
+            id="work-inventory-panel"
+            aria-label="{{t:front_desk:progress_work_inventory_title}}"
+          >
+            <header class="kb-section__header">
+              <div class="kb-section__heading">
+                <h2 class="kb-section__title" id="wi-title">
+                  {{t:front_desk:progress_work_inventory_title}}
+                </h2>
+              </div>
+              <div class="kb-section__actions work-inventory-counts" id="wi-counts"></div>
+            </header>
             <p class="work-inventory-empty hidden" id="wi-empty"></p>
             <ul class="work-inventory-list" id="wi-list"></ul>
             <p class="work-inventory-consent hidden" id="wi-consent"></p>
             <div class="work-inventory-actions">
-              <a class="work-inventory-action" id="wi-start" href="/ask?mode=hearing&amp;scenario=work_inventory"></a>
+              <a
+                class="kb-btn kb-btn--secondary work-inventory-action"
+                id="wi-start"
+                href="/ask?mode=hearing&amp;scenario=work_inventory"
+                >{{t:front_desk:progress_work_inventory_start}}</a
+              >
             </div>
             <p class="work-inventory-hint" id="wi-hint"></p>
           </section>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
-    <!-- FD-00: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
-    <script src="/front-desk-rail.js"></script>
     <script src="/progress.js"></script>
-    <script>
+    <!-- FD-00 / UI-05: shared front-desk rail (libs/core/front-desk-nav.ts contract) -->
+    <script type="module" src="/front-desk-rail.js"></script>
+    <script type="module">
       if (window.FrontDeskRail) {
         window.FrontDeskRail.mount(document.getElementById('front-desk-rail'), {
           current: 'progress',

@@ -7,7 +7,11 @@ import {
   webThemePackToCssVars,
   type WebThemePack,
 } from '@agent/core/web-design-system';
-import { loadBrandTokensAtPath } from '@agent/core/brand-tokens';
+import {
+  loadBrandTokensAtPath,
+  type BrandUiPalette,
+  type BrandUiTokens,
+} from '@agent/core/brand-tokens';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
@@ -182,6 +186,203 @@ function checkDerivedWebThemePacks(): string[] {
   return violations;
 }
 
+/**
+ * UI-02 `tokens.ui` (web UI layer, `--kb-ui-*`). WCAG AA in both themes:
+ * every text role 4.5:1 on every surface it can sit on; control boundaries
+ * (border-strong, accent fill) and the focus ring 3:1 (WCAG 1.4.11).
+ * `border` is a decorative divider and deliberately not held to 3:1.
+ */
+const UI_SURFACES = ['canvas', 'surface', 'surface-raised', 'surface-sunken'] as const;
+const UI_STATUSES = ['success', 'warning', 'danger', 'info'] as const;
+
+export function buildUiContrastPairs(roles: readonly string[]): ContrastPair[] {
+  const pairs: ContrastPair[] = [];
+  for (const background of UI_SURFACES) {
+    for (const foreground of ['text', 'text-muted', 'text-subtle', 'accent-text']) {
+      pairs.push({
+        label: `ui ${foreground} on ${background}`,
+        background,
+        foreground,
+        minRatio: 4.5,
+      });
+    }
+    for (const status of UI_STATUSES) {
+      pairs.push({
+        label: `ui ${status} text on ${background}`,
+        background,
+        foreground: `${status}-fg`,
+        minRatio: 4.5,
+      });
+    }
+    for (const role of roles) {
+      pairs.push({
+        label: `ui role ${role} on ${background}`,
+        background,
+        foreground: `role-${role}`,
+        minRatio: 4.5,
+      });
+    }
+    for (const foreground of ['border-strong', 'focus-ring', 'accent']) {
+      pairs.push({
+        label: `ui ${foreground} boundary on ${background}`,
+        background,
+        foreground,
+        minRatio: 3,
+      });
+    }
+  }
+  for (const status of UI_STATUSES) {
+    pairs.push({
+      label: `ui ${status} pill`,
+      background: `${status}-bg`,
+      foreground: `${status}-fg`,
+      minRatio: 4.5,
+    });
+    pairs.push({
+      label: `ui ${status} callout body`,
+      background: `${status}-bg`,
+      foreground: 'text',
+      minRatio: 4.5,
+    });
+  }
+  pairs.push(
+    {
+      label: 'ui accent badge / nav active',
+      background: 'accent-soft',
+      foreground: 'accent-text',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui primary button',
+      background: 'accent',
+      foreground: 'text-on-accent',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui primary button hover',
+      background: 'accent-hover',
+      foreground: 'text-on-accent',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui danger button',
+      background: 'danger-fg',
+      foreground: 'text-on-accent',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui neutral pill',
+      background: 'surface-sunken',
+      foreground: 'text-muted',
+      minRatio: 4.5,
+    }
+  );
+  return pairs;
+}
+
+export function flattenUiPalette(palette: BrandUiPalette): Palette {
+  const flat: Palette = {};
+  for (const [key, value] of Object.entries(palette)) {
+    if (typeof value === 'string') flat[key] = value;
+  }
+  for (const [status, triple] of Object.entries(palette.status)) {
+    for (const [part, value] of Object.entries(triple)) flat[`${status}-${part}`] = value;
+  }
+  for (const [role, value] of Object.entries(palette.role)) flat[`role-${role}`] = value;
+  if (palette.viz) {
+    palette.viz.categorical.forEach((value, i) => (flat[`viz-cat-${i + 1}`] = value));
+    palette.viz.sequential.forEach((value, i) => (flat[`viz-seq-${i + 1}`] = value));
+    palette.viz.diverging.forEach((value, i) => (flat[`viz-div-${i + 1}`] = value));
+    palette.viz.sequential_ink.forEach((value, i) => (flat[`viz-seq-ink-${i + 1}`] = value));
+    palette.viz.diverging_ink.forEach((value, i) => (flat[`viz-div-ink-${i + 1}`] = value));
+  }
+  return flat;
+}
+
+/**
+ * UI-01b data-viz marks (dataviz method, check 5): every categorical slot
+ * >= 3:1 on every UI surface a chart can sit on; the sequential ramp's
+ * darkest-magnitude step and both diverging poles >= 3:1 on the surface; the
+ * sequential low end >= 2:1 (ordinal floor, so a "small" cell never vanishes).
+ * CVD / normal-vision separation and the lightness band are validated with the
+ * dataviz palette validator when the palette changes (see brand-tokens schema).
+ */
+export const UI_VIZ_CATEGORICAL_SLOTS = 8;
+
+/** `ui:heatmap` value labels: one ink per ramp step (sequential + diverging). */
+export const UI_VIZ_RAMP_STEPS = 5;
+
+export function buildUiVizContrastPairs(): ContrastPair[] {
+  const pairs: ContrastPair[] = [];
+  for (const background of UI_SURFACES) {
+    for (let slot = 1; slot <= UI_VIZ_CATEGORICAL_SLOTS; slot += 1) {
+      pairs.push({
+        label: `ui viz categorical ${slot} mark on ${background}`,
+        background,
+        foreground: `viz-cat-${slot}`,
+        minRatio: 3,
+      });
+    }
+  }
+  // A heatmap cell's value label sits directly on that cell's fill (never a
+  // halo — see kyberion-ui.charts.source.css), so its ink must clear body
+  // text's 4.5:1 on every ramp step, not just the mark's own 3:1 floor.
+  for (let step = 1; step <= UI_VIZ_RAMP_STEPS; step += 1) {
+    pairs.push(
+      {
+        label: `ui viz sequential ${step} cell value ink`,
+        background: `viz-seq-${step}`,
+        foreground: `viz-seq-ink-${step}`,
+        minRatio: 4.5,
+      },
+      {
+        label: `ui viz diverging ${step} cell value ink`,
+        background: `viz-div-${step}`,
+        foreground: `viz-div-ink-${step}`,
+        minRatio: 4.5,
+      }
+    );
+  }
+  pairs.push(
+    {
+      label: 'ui viz sequential high on surface',
+      background: 'surface',
+      foreground: 'viz-seq-5',
+      minRatio: 3,
+    },
+    {
+      label: 'ui viz sequential low on surface',
+      background: 'surface',
+      foreground: 'viz-seq-1',
+      minRatio: 2,
+    },
+    {
+      label: 'ui viz diverging negative pole on surface',
+      background: 'surface',
+      foreground: 'viz-div-1',
+      minRatio: 3,
+    },
+    {
+      label: 'ui viz diverging positive pole on surface',
+      background: 'surface',
+      foreground: 'viz-div-5',
+      minRatio: 3,
+    }
+  );
+  return pairs;
+}
+
+function checkUiTokens(ui: BrandUiTokens | undefined): string[] {
+  if (!ui) return ['[ui] tokens.ui is missing from brand tokens'];
+  return (['light', 'dark'] as const).flatMap((theme) => {
+    const palette = ui[theme];
+    return checkPalette(`ui.${theme}`, flattenUiPalette(palette), [
+      ...buildUiContrastPairs(Object.keys(palette.role)),
+      ...buildUiVizContrastPairs(),
+    ]);
+  });
+}
+
 export function checkDesignContrast(): string[] {
   const brandTokens = loadBrandTokensAtPath();
   const themes = parseJson<{ default_theme: string; themes: Record<string, { colors: Palette }> }>(
@@ -245,6 +446,7 @@ export function checkDesignContrast(): string[] {
       return checkPalette(`theme.${themeId}`, colors, pairsForTheme);
     }),
     ...checkDerivedWebThemePacks(),
+    ...checkUiTokens(brandTokens.tokens.ui),
   ];
 
   return violations;

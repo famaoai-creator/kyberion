@@ -1,0 +1,138 @@
+'use client';
+
+import type { ReactNode } from 'react';
+import type {
+  KbBadgeProps,
+  KbCalloutProps,
+  KbEmptyStateProps,
+  KbSkeletonProps,
+  KbStatusPillProps,
+} from '@agent/core/a2ui-catalog';
+import { statusLabel } from '../catalog.js';
+import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
+import { ActionRefButton, type ActionRefLike } from './controls.js';
+
+const TONES: ReadonlySet<string> = new Set([
+  'neutral',
+  'accent',
+  'info',
+  'success',
+  'warning',
+  'danger',
+]);
+const CALLOUT_TONES: ReadonlySet<string> = new Set(['info', 'success', 'warning', 'danger']);
+const ROLES: ReadonlySet<string> = new Set([
+  'concierge',
+  'presence-studio',
+  'chronos-mirror-v2',
+  'operator-surface',
+  'computer-surface',
+]);
+
+export function toneAttr(tone: unknown): string | undefined {
+  return typeof tone === 'string' && TONES.has(tone) ? tone : undefined;
+}
+
+export function roleAttr(role: unknown): string | undefined {
+  return typeof role === 'string' && ROLES.has(role) ? role : undefined;
+}
+
+/**
+ * `ui:status-pill` → `.kb-status-pill[data-status][data-domain]`. The icon is
+ * the stylesheet's glyph on an `aria-hidden` `__icon` span, so the pill
+ * carries icon + text and never relies on color alone. Label: explicit
+ * `label`, else the localized vocabulary label (`ui:status_*`), else the raw status — rendered
+ * in its own `__label` span (matches the vanilla renderer's markup).
+ */
+export function StatusPill({ status, domain, label }: KbStatusPillProps) {
+  const { t } = useKbI18n();
+  const text = label || statusLabel(String(status), domain, t);
+  return (
+    <span className="kb-status-pill" data-status={status} data-domain={domain}>
+      <span className="kb-status-pill__icon" aria-hidden="true" />
+      <span className="kb-status-pill__label">{text}</span>
+    </span>
+  );
+}
+
+/** `ui:badge` → `.kb-badge[data-tone][data-role]`. */
+export function Badge({ label, tone, role }: KbBadgeProps) {
+  return (
+    <span className="kb-badge" data-tone={toneAttr(tone)} data-role={roleAttr(role)}>
+      {label}
+    </span>
+  );
+}
+
+export type CalloutProps = Omit<KbCalloutProps, 'action'> & {
+  /** Catalog ref (`href` or `action`) or React-only `{ label, onClick }` (see `SectionProps.actions`). */
+  action?: ActionRefLike;
+  children?: ReactNode;
+};
+
+/** `ui:callout` → `.kb-callout[data-tone]` with `__icon`, `__content`, `__title`, `__body`, `__action`. */
+export function Callout({ tone, title, body, action, children }: CalloutProps) {
+  const resolvedTone = typeof tone === 'string' && CALLOUT_TONES.has(tone) ? tone : 'info';
+  return (
+    <div
+      className="kb-callout"
+      data-tone={resolvedTone}
+      role={resolvedTone === 'danger' ? 'alert' : 'note'}
+    >
+      <span className="kb-callout__icon" aria-hidden="true" />
+      <div className="kb-callout__content">
+        <p className="kb-callout__title">{title}</p>
+        {body ? <p className="kb-callout__body">{body}</p> : null}
+        {children}
+        {action ? (
+          <div className="kb-callout__action">
+            <ActionRefButton actionRef={action} />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export type EmptyStateProps = Omit<KbEmptyStateProps, 'action'> & {
+  /** Catalog ref (`href` or `action`) or React-only `{ label, onClick }` (see `SectionProps.actions`). */
+  action?: ActionRefLike;
+};
+
+/** `ui:empty-state` → `.kb-empty-state` with `__title`, `__body`, `__action`. */
+export function EmptyState({ title, body, action }: EmptyStateProps) {
+  return (
+    <div className="kb-empty-state">
+      <p className="kb-empty-state__title">{title}</p>
+      {body ? <p className="kb-empty-state__body">{body}</p> : null}
+      {action ? (
+        <div className="kb-empty-state__action">
+          <ActionRefButton actionRef={action} defaultVariant="primary" />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+const SKELETON_SHAPES: ReadonlySet<string> = new Set(['text', 'card', 'table']);
+
+/** `ui:skeleton` → `.kb-skeleton[data-shape]` with `lines` × `.kb-skeleton__line`. */
+export function Skeleton({ lines, shape, label }: KbSkeletonProps & { label?: string }) {
+  const { t } = useKbI18n();
+  const resolvedShape = typeof shape === 'string' && SKELETON_SHAPES.has(shape) ? shape : 'text';
+  const defaultLines = resolvedShape === 'table' ? 5 : 3;
+  const count = Math.min(12, Math.max(1, Math.floor(Number(lines) || defaultLines)));
+  return (
+    <div
+      className="kb-skeleton"
+      data-shape={resolvedShape}
+      role="status"
+      aria-busy="true"
+      aria-label={label || t(KB_UI_MESSAGE_KEYS.skeletonLoading)}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <span key={index} className="kb-skeleton__line" aria-hidden="true" />
+      ))}
+    </div>
+  );
+}

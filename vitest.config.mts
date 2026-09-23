@@ -61,6 +61,8 @@ export default defineConfig({
       'libs/core/**/*.test.ts',
       'libs/actuators/**/*.test.ts',
       'libs/shared-*/**/*.test.ts',
+      // @agent/shared-ui React components (renderToStaticMarkup, no DOM).
+      'libs/shared-*/**/*.test.tsx',
       'scripts/**/*.test.ts',
       'tests/**/*.test.ts',
     ],
@@ -145,6 +147,11 @@ export default defineConfig({
       {
         find: '@agent/shared-vision',
         replacement: path.resolve(rootDir, './libs/shared-vision/src/index.ts'),
+      },
+      // Exact match only: `@agent/shared-ui/vanilla` must keep resolving via the package exports.
+      {
+        find: /^@agent\/shared-ui$/,
+        replacement: path.resolve(rootDir, './libs/shared-ui/src/index.ts'),
       },
       {
         find: '@agent/shared-network',

@@ -1,17 +1,23 @@
 'use client';
 
 import * as React from 'react';
+import { Button, Callout, IntegrationItem, SettingsGroup, Switch } from '@agent/shared-ui';
+import type { KbActionRef } from '@agent/core/a2ui-catalog';
 import { frontDeskText } from '../../../lib/i18n';
-import type { ConciergeLocale, ConciergeMessageKey } from '../../../lib/i18n';
+import type { ConciergeLocale } from '../../../lib/i18n';
 import type { Setup } from '../../../lib/settings-types';
 import { IntroduceSecretPanel } from './IntroduceSecretPanel';
+import { FormScope, type SettingsTranslate } from './form-scope';
 
 /** FD-06 サービス連携 pane (`#setup-services`) — extracted from
  * settings/page.tsx; OAuth connect + save-connections handlers stay owned
- * by the page and are passed in as props. */
+ * by the page and are passed in as props. UI-06: one `IntegrationItem` per
+ * service (real `configured` state + the OAuth connect action) with a
+ * `Switch` for whether it is part of the onboarding draft, then the
+ * governed API-token panel. */
 export type ServicesSectionProps = {
   locale: ConciergeLocale;
-  t: (key: ConciergeMessageKey, params?: Record<string, string | number>) => string;
+  t: SettingsTranslate;
   setup: Setup;
   services: string[];
   setServices: React.Dispatch<React.SetStateAction<string[]>>;
@@ -36,73 +42,103 @@ export function ServicesSection({
   onSaveConnections,
   sectionRef,
 }: ServicesSectionProps) {
+  const fields = Object.fromEntries(
+    setup.service_catalog.map((service) => [
+      `service.use.${service.id}`,
+      (value: unknown) =>
+        setServices((current) =>
+          value === true
+            ? current.includes(service.id)
+              ? current
+              : [...current, service.id]
+            : current.filter((id) => id !== service.id)
+        ),
+    ])
+  );
   return (
-    <section
-      className="pane"
+    <div
+      className="settings-section"
       id="setup-services"
       ref={sectionRef}
       aria-label={frontDeskText('settings_nav_services', locale)}
     >
-      <h2>{frontDeskText('settings_nav_services', locale)}</h2>
-      <p className="settings-card-lead">{frontDeskText('settings_services_lead', locale)}</p>
-      <h3 className="pane-subheading">{t('setup.services_title')}</h3>
-      <p className="pane-subtitle">{t('setup.services_description')}</p>
-      <p className="item-meta">{t('setup.connect_oauth_hint')}</p>
-      <div className="service-icon-grid">
-        {setup.service_catalog.map((service) => {
-          const oauthCapable = /oauth/i.test(service.auth);
-          const initial = service.label.slice(0, 1).toUpperCase();
-          return (
-            <div className="service-tile" key={service.id} data-service={service.id}>
-              <div className="service-tile-icon" aria-hidden="true">
-                {initial}
-              </div>
-              <div className="service-tile-body">
-                <label className="service-tile-label">
-                  <input
-                    type="checkbox"
-                    checked={services.includes(service.id)}
-                    onChange={(event) =>
-                      setServices((current) =>
-                        event.target.checked
-                          ? [...current, service.id]
-                          : current.filter((id) => id !== service.id)
-                      )
-                    }
+      <FormScope
+        fields={fields}
+        actions={{
+          'service.connect': (payload) =>
+            onConnectOAuth(String(payload.service_id ?? ''), String(payload.label ?? '')),
+        }}
+      >
+        <SettingsGroup
+          id="settings-services"
+          title={frontDeskText('settings_nav_services', locale)}
+          description={frontDeskText('settings_services_lead', locale)}
+        >
+          <div className="settings-row-block">
+            <p className="kb-text kb-text--body">{t('setup.services_title')}</p>
+            <p className="kb-text kb-text--muted">{t('setup.services_description')}</p>
+            <p className="kb-text kb-text--caption">{t('setup.connect_oauth_hint')}</p>
+          </div>
+          <div className="settings-row-block settings-integration-list">
+            {setup.service_catalog.map((service) => {
+              const oauthCapable = /oauth/i.test(service.auth);
+              const actions: KbActionRef[] = oauthCapable
+                ? [
+                    {
+                      label: oauthBusyId === service.id ? '…' : t('setup.connect_oauth'),
+                      variant: service.configured ? 'ghost' : 'secondary',
+                      disabled: busy || oauthBusyId === service.id,
+                      action: {
+                        id: 'service.connect',
+                        payload: { service_id: service.id, label: service.label },
+                      },
+                    },
+                  ]
+                : [];
+              return (
+                <div className="settings-integration" key={service.id} data-service={service.id}>
+                  <IntegrationItem
+                    id={`service-${service.id}`}
+                    title={service.label}
+                    state={service.configured ? 'connected' : 'disconnected'}
+                    detail={service.auth}
+                    icon="plug"
+                    actions={actions}
                   />
-                  <span>{service.label}</span>
-                </label>
-                <span className={`status-chip${service.configured ? '' : ' attention'}`}>
-                  {service.configured ? t('setup.connected') : service.auth}
-                </span>
-                {oauthCapable ? (
-                  <button
-                    type="button"
-                    className="action-button secondary service-connect-btn"
-                    disabled={busy || oauthBusyId === service.id}
-                    onClick={() => onConnectOAuth(service.id, service.label)}
-                  >
-                    {oauthBusyId === service.id ? '…' : t('setup.connect_oauth')}
-                  </button>
-                ) : null}
-              </div>
+                  <Switch
+                    id={`service-use-${service.id}`}
+                    name={`service.use.${service.id}`}
+                    label={t('settings.service_use')}
+                    value={services.includes(service.id)}
+                    disabled={busy}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          {oauthMessage ? (
+            <div className="settings-row-block">
+              <Callout tone="info" title={oauthMessage} />
             </div>
-          );
-        })}
-      </div>
-      {oauthMessage ? <p className="item-meta">{oauthMessage}</p> : null}
-      <div className="button-row">
-        <button className="action-button" disabled={busy} onClick={onSaveConnections}>
-          {t('setup.save_connections')}
-        </button>
-      </div>
+          ) : null}
+          <div className="settings-row-actions">
+            <Button
+              label={t('setup.save_connections')}
+              variant="primary"
+              disabled={busy}
+              onClick={onSaveConnections}
+            />
+          </div>
+        </SettingsGroup>
+      </FormScope>
       <IntroduceSecretPanel
+        t={t}
         busy={busy}
         services={setup.service_catalog.map((service) => ({
           id: service.id,
           label: service.label,
         }))}
       />
-    </section>
+    </div>
   );
 }

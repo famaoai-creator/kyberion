@@ -1,9 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import { Button, Callout, KeyValue, Section } from '@agent/shared-ui';
 import { uxText } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
 import { parseAgentLogsResponse } from '../lib/agent-logs-response';
+import { ChronosInline, ChronosMeta } from './chronos-ui';
 
 type TerminalLine = { ts?: number | string; type?: string; content?: string };
 
@@ -24,7 +26,7 @@ export function LiveTerminalDrawer({
   const [following, setFollowing] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const tailRef = React.useRef<HTMLDivElement>(null);
+  const tailRef = React.useRef<HTMLSpanElement>(null);
 
   const refresh = React.useCallback(async () => {
     const response = await fetch('/api/agents', {
@@ -105,91 +107,79 @@ export function LiveTerminalDrawer({
   };
 
   return (
-    <section className="rounded-2xl border kb-border-accent kb-surface-well p-4">
-      <div className="flex items-center gap-3">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-[0.2em] kb-text-accent">
-            {uxText('chronos_terminal_title', locale)}
-          </div>
-          <div className="mt-1 text-[10px] kb-text-muted">
-            {agentId} · {itemId} · {missionId || `${uxText('chronos_mission', locale)} -`} · bounded
-            tail 2,000 lines
-          </div>
-        </div>
-        <button
-          type="button"
-          className="ml-auto rounded border kb-border-subtle px-2 py-1 text-[10px] kb-text-secondary"
-          onClick={onClose}
+    <Section title={uxText('chronos_terminal_title', locale)} headingLevel={3}>
+      <div className="chronos-terminal__head">
+        <ChronosMeta mono>
+          {[
+            agentId,
+            itemId,
+            missionId || `${uxText('chronos_mission', locale)} -`,
+            uxText('chronos_terminal_tail_limit', locale),
+          ].join(' · ')}
+        </ChronosMeta>
+        <Button label={uxText('chronos_close', locale)} variant="ghost" onClick={onClose} />
+      </div>
+      <figure className="kb-code chronos-terminal__log">
+        <pre
+          className="kb-code__body"
+          onScroll={(event) => {
+            const target = event.currentTarget;
+            setFollowing(target.scrollHeight - target.scrollTop - target.clientHeight < 50);
+          }}
         >
-          {uxText('chronos_close', locale)}
-        </button>
-      </div>
-      <div
-        className="mt-3 max-h-64 overflow-auto rounded-xl border kb-border-subtle bg-black/30 p-3 font-mono text-[10px] kb-text-secondary"
-        onScroll={(event) => {
-          const target = event.currentTarget;
-          setFollowing(target.scrollHeight - target.scrollTop - target.clientHeight < 50);
-        }}
-      >
-        {lines.map((line, index) => (
-          <div
-            key={`${line.ts || 'line'}-${index}`}
-            className={line.type === 'stderr' ? 'kb-status-negative' : ''}
-          >
-            {line.content || ''}
-          </div>
-        ))}
-        <div ref={tailRef} />
-      </div>
-      <div className="mt-2 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] kb-text-secondary">
-        <span className="font-semibold kb-text-accent">
-          {uxText('chronos_terminal_progress_hint', locale)}
-        </span>
-        <span className="ml-2">{progressHint}</span>
-      </div>
-      <div className="mt-3 flex gap-2">
+          {lines.map((line, index) => (
+            <span
+              key={`${line.ts || 'line'}-${index}`}
+              className="chronos-terminal__line"
+              data-stream={line.type === 'stderr' ? 'stderr' : undefined}
+            >
+              {line.content || ''}
+            </span>
+          ))}
+          <span ref={tailRef} className="chronos-terminal__tail" />
+        </pre>
+      </figure>
+      <KeyValue
+        items={[{ label: uxText('chronos_terminal_progress_hint', locale), value: progressHint }]}
+      />
+      <div className="chronos-terminal__composer">
         <input
+          className="kb-input"
+          aria-label={uxText('chronos_terminal_steering_placeholder', locale)}
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') void steer();
           }}
           placeholder={uxText('chronos_terminal_steering_placeholder', locale)}
-          className="min-w-0 flex-1 rounded border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-primary"
         />
-        <button
-          type="button"
+        <Button
+          label={
+            busy
+              ? uxText('chronos_terminal_sending', locale)
+              : uxText('chronos_terminal_send', locale)
+          }
+          variant="primary"
           disabled={busy || !prompt.trim()}
           onClick={() => void steer()}
-          className="rounded border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] kb-text-accent disabled:opacity-40"
-        >
-          {busy
-            ? uxText('chronos_terminal_sending', locale)
-            : uxText('chronos_terminal_send', locale)}
-        </button>
+        />
       </div>
-      <div className="mt-2 flex gap-2">
-        <button
-          type="button"
+      <ChronosInline>
+        <Button
+          label={uxText('chronos_terminal_pause', locale)}
+          variant="secondary"
           disabled={busy || !missionId}
           onClick={() => void controlMission('pause')}
-          className="rounded border kb-border-subtle kb-surface-raised px-2 py-1 text-[10px] kb-text-secondary disabled:opacity-40"
-        >
-          {uxText('chronos_terminal_pause', locale)}
-        </button>
-        <button
-          type="button"
+        />
+        <Button
+          label={uxText('chronos_terminal_resume', locale)}
+          variant="secondary"
           disabled={busy || !missionId}
           onClick={() => void controlMission('resume')}
-          className="rounded border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] kb-text-accent disabled:opacity-40"
-        >
-          {uxText('chronos_terminal_resume', locale)}
-        </button>
-        <span className="self-center text-[9px] kb-text-muted">
-          {uxText('chronos_terminal_owner_boundary', locale)}
-        </span>
-      </div>
-      {error ? <div className="mt-2 text-[10px] kb-status-negative">{error}</div> : null}
-    </section>
+        />
+        <ChronosMeta>{uxText('chronos_terminal_owner_boundary', locale)}</ChronosMeta>
+      </ChronosInline>
+      {error ? <Callout tone="danger" title={error} /> : null}
+    </Section>
   );
 }

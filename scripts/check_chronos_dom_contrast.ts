@@ -155,16 +155,13 @@ async function inspect(url: string, mode: 'light' | 'dark'): Promise<Finding[]> 
       mode,
       { timeout: 10_000 }
     );
+    // UI-07: Chronos renders on the shared --kb-ui-* tokens; wait until the
+    // token layer reports the requested scheme.
     await page.waitForFunction(
-      (expectedMode) => {
-        const main = document.querySelector('main');
-        const secondary = main
-          ? getComputedStyle(main).getPropertyValue('--kb-text-secondary')
-          : '';
-        return expectedMode === 'light'
-          ? secondary.includes('15, 23, 42')
-          : secondary.includes('248, 250, 252');
-      },
+      (expectedMode) =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue('--kb-ui-color-scheme')
+          .trim() === expectedMode,
       mode,
       { timeout: 10_000 }
     );

@@ -1,6 +1,7 @@
-import React from 'react';
-import { formatDateTime, resolveTimeZone } from '@agent/core/format';
-import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { Grid, Section, StatusPill, Table } from '@agent/shared-ui';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
+import { operatorTranslator, type OperatorLocale } from '@/lib/i18n';
+import { formatTimestamp } from '@/lib/view';
 
 interface Dependency {
   id: string;
@@ -22,243 +23,85 @@ interface Bundle {
 interface CapabilityDashboardProps {
   bundles: Bundle[];
   pins: Record<string, any>;
+  locale: OperatorLocale;
 }
 
-export default function CapabilityDashboard({ bundles, pins }: CapabilityDashboardProps) {
+const HEALTH_STATUS: Record<Bundle['health'], KbStatus> = {
+  active: 'ready',
+  degraded: 'degraded',
+  inactive: 'unavailable',
+};
+
+/** Capability bundle matrix + provider pins (read-only; `ui:section` / `ui:status-pill` / `ui:table`). */
+export default function CapabilityDashboard({ bundles, pins, locale }: CapabilityDashboardProps) {
+  const t = operatorTranslator(locale);
+  const healthLabel: Record<Bundle['health'], string> = {
+    active: t('capability_health_active'),
+    degraded: t('capability_health_degraded'),
+    inactive: t('capability_health_inactive'),
+  };
+  const pinRows = Object.entries(pins).map(([key, pin]: [string, any]) => ({
+    key,
+    provider: String(pin?.provider ?? '—'),
+    model: String(pin?.modelId ?? '—'),
+    orchestration: String(pin?.orchestration ?? '—'),
+    pinned_at: formatTimestamp(pin?.pinnedAt, locale),
+  }));
+
   return (
-    <div style={{ marginTop: '40px', borderTop: '1px solid var(--kb-border)', paddingTop: '30px' }}>
-      <h2 style={{ color: 'var(--kb-text-primary)', marginBottom: '8px' }}>
-        🤖 Capability & Extension Control Plane
-      </h2>
-      <p style={{ color: 'var(--kb-text-secondary)', marginTop: 0, fontSize: '14px' }}>
-        Dynamic harness capability matrix and visual provider-pin management. Read-only.
-      </p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px', marginTop: '20px' }}>
-        {/* Capability Matrix Section */}
-        <div style={sectionBox}>
-          <h3 style={sectionTitle}>⚡ Capability Bundle Matrix</h3>
-          <div style={gridContainer}>
-            {bundles.map((bundle) => (
-              <div key={bundle.bundle_id} style={cardStyle(bundle.health)}>
-                <div
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <span style={bundleTitle}>{bundle.bundle_id}</span>
-                  <span style={healthBadge(bundle.health)}>{bundle.health.toUpperCase()}</span>
-                </div>
-                <p style={bundleSummary}>{bundle.summary}</p>
-                <div style={{ marginTop: '12px' }}>
-                  <strong style={metaLabel}>Intents:</strong>{' '}
-                  <span style={metaValue}>{(bundle.intents || []).join(', ') || 'None'}</span>
-                </div>
-                {bundle.dependencies && bundle.dependencies.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: '12px',
-                      borderTop: '1px solid var(--kb-border)',
-                      paddingTop: '8px',
-                    }}
-                  >
-                    <strong style={metaLabel}>Probe Dependencies:</strong>
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        marginTop: '4px',
-                      }}
-                    >
-                      {bundle.dependencies.map((dep) => (
-                        <div
-                          key={dep.id}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            fontSize: '11px',
-                          }}
-                        >
-                          <span style={{ color: 'var(--kb-text-secondary)' }}>
-                            {dep.id.replace('provider.runtime.', '')}
-                          </span>
-                          {}
-                          <span
-                            style={{
-                              color:
-                                dep.status === 'available'
-                                  ? 'var(--kb-success)'
-                                  : 'var(--kb-danger)',
-                            }}
-                          >
-                            {dep.status === 'available' ? '✓ OK' : '✗ Missing'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+    <>
+      <Section title={t('capability_title')} description={t('capability_description')}>
+        <Grid min_column_width="md" gap="sm">
+          {bundles.map((bundle) => (
+            <article key={bundle.bundle_id} className="operator-card">
+              <div className="operator-card__header">
+                <h3 className="operator-card__title operator-mono">{bundle.bundle_id}</h3>
+                <StatusPill
+                  status={HEALTH_STATUS[bundle.health] ?? 'n/a'}
+                  label={healthLabel[bundle.health] ?? bundle.health}
+                />
               </div>
-            ))}
-          </div>
-        </div>
+              <p className="kb-text kb-text--muted">{bundle.summary}</p>
+              <p className="kb-text kb-text--caption">
+                {t('capability_intents')}{' '}
+                <span className="operator-mono">
+                  {(bundle.intents || []).join(', ') || t('value_none')}
+                </span>
+              </p>
+              {bundle.dependencies && bundle.dependencies.length > 0 ? (
+                <div className="operator-chips" aria-label={t('capability_dependencies')}>
+                  {bundle.dependencies.map((dep) => (
+                    <StatusPill
+                      key={dep.id}
+                      status={dep.status === 'available' ? 'available' : 'missing'}
+                      label={t(
+                        dep.status === 'available'
+                          ? 'capability_dependency_available'
+                          : 'capability_dependency_missing',
+                        { id: dep.id.replace('provider.runtime.', '') }
+                      )}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </Grid>
+      </Section>
 
-        {/* Visual Pin Manager Section */}
-        <div style={sectionBox}>
-          <h3 style={sectionTitle}>📌 Visual Provider Pin Manager</h3>
-          {Object.keys(pins).length === 0 ? (
-            <p style={{ color: 'var(--kb-text-secondary)', fontSize: '14px', fontStyle: 'italic' }}>
-              No active provider decisions pinned to this workspace session.
-            </p>
-          ) : (
-            <table style={tableStyle}>
-              <thead>
-                <tr style={{ background: 'var(--kb-panel-bg)', textAlign: 'left' }}>
-                  <th style={thStyle}>Decision Key</th>
-                  <th style={thStyle}>Pinned Provider</th>
-                  <th style={thStyle}>Model ID</th>
-                  <th style={thStyle}>Orchestration</th>
-                  <th style={thStyle}>Pinned At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(pins).map(([key, pin]: [string, any]) => (
-                  <tr key={key} style={{ borderBottom: '1px solid var(--kb-border)' }}>
-                    <td style={tdStyle}>
-                      <strong>{key}</strong>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={providerBadge}>{pin.provider}</span>
-                    </td>
-                    <td style={tdStyle}>
-                      <code>{pin.modelId}</code>
-                    </td>
-                    <td style={tdStyle}>
-                      <code>{pin.orchestration}</code>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{ color: 'var(--kb-text-secondary)', fontSize: '12px' }}>
-                        {formatDateTime(pin.pinnedAt, {
-                          locale: resolveOperatorLocale(),
-                          timeZone: resolveTimeZone(),
-                        })}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    </div>
+      <Section title={t('pins_title')} description={t('pins_description')}>
+        <Table
+          columns={[
+            { key: 'key', label: t('col_decision_key'), mono: true },
+            { key: 'provider', label: t('col_provider') },
+            { key: 'model', label: t('col_model'), mono: true },
+            { key: 'orchestration', label: t('col_orchestration'), mono: true },
+            { key: 'pinned_at', label: t('col_pinned_at') },
+          ]}
+          rows={pinRows}
+          empty={t('pins_empty')}
+        />
+      </Section>
+    </>
   );
 }
-
-// Styling Object definitions
-const sectionBox: React.CSSProperties = {
-  background: 'var(--kb-panel-bg)',
-  border: '1px solid var(--kb-border)',
-  borderRadius: '8px',
-  padding: '20px',
-};
-
-const sectionTitle: React.CSSProperties = {
-  color: 'var(--kb-text-primary)',
-  fontSize: '18px',
-  fontWeight: 600,
-  marginTop: 0,
-  marginBottom: '16px',
-};
-
-const gridContainer: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-  gap: '16px',
-};
-
-const cardStyle = (health: 'active' | 'degraded' | 'inactive'): React.CSSProperties => {
-  const borderColors = {
-    active: 'var(--kb-success)',
-    degraded: 'var(--kb-warning)',
-    inactive: 'var(--kb-muted-text)',
-  };
-  return {
-    background: 'var(--kb-bg-main)',
-    border: `1px solid ${borderColors[health]}`,
-    borderRadius: '6px',
-    padding: '16px',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-  };
-};
-
-const bundleTitle: React.CSSProperties = {
-  fontWeight: 600,
-  color: 'var(--kb-text-primary)',
-  fontSize: '15px',
-};
-
-const healthBadge = (health: 'active' | 'degraded' | 'inactive'): React.CSSProperties => {
-  const colors = {
-    active: { bg: 'var(--kb-surface)', text: 'var(--kb-success)' },
-    degraded: { bg: 'var(--kb-surface)', text: 'var(--kb-warning)' },
-    inactive: { bg: 'var(--kb-surface)', text: 'var(--kb-muted-text)' },
-  };
-  return {
-    background: colors[health].bg,
-    color: colors[health].text,
-    fontSize: '10px',
-    fontWeight: 'bold',
-    padding: '2px 6px',
-    borderRadius: '10px',
-    fontFamily: 'var(--kb-font-mono, monospace)',
-  };
-};
-
-const bundleSummary: React.CSSProperties = {
-  fontSize: '13px',
-  color: 'var(--kb-text-secondary)',
-  marginTop: '8px',
-  marginBottom: 0,
-};
-
-const metaLabel: React.CSSProperties = {
-  fontSize: '12px',
-  color: 'var(--kb-text-secondary)',
-};
-
-const metaValue: React.CSSProperties = {
-  fontSize: '12px',
-  color: 'var(--kb-text-primary)',
-  fontFamily: 'var(--kb-font-mono, monospace)',
-};
-
-const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: '13px',
-  marginTop: '12px',
-};
-
-const thStyle: React.CSSProperties = {
-  padding: '10px 12px',
-  borderBottom: '1px solid var(--kb-border)',
-  color: 'var(--kb-text-secondary)',
-  fontWeight: 600,
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: '10px 12px',
-  verticalAlign: 'middle',
-  color: 'var(--kb-text-primary)',
-};
-
-const providerBadge: React.CSSProperties = {
-  background: 'var(--kb-accent)',
-  color: 'var(--kb-bg-main)',
-  padding: '2px 6px',
-  borderRadius: '4px',
-  fontSize: '11px',
-  fontFamily: 'var(--kb-font-mono, monospace)',
-};

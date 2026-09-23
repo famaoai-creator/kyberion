@@ -12,7 +12,9 @@ describe('concierge surface contract', () => {
     const header = fs.readFileSync(path.join(appDir, 'src/app/concierge-header.tsx'), 'utf8');
     expect(layout).toContain('ConciergeHeader');
     expect(header).toContain("t('header.tagline')");
-    expect(header).toContain("locale === 'ja' ? '秘書室' : 'Concierge'");
+    // UI-06: surface name + role badge are vocabulary keys (en + ja).
+    expect(header).toContain("t('header.title')");
+    expect(header).toContain("t('header.role_badge')");
   });
 
   it('guards every mutating route with the shared surface mutation guard', () => {
@@ -170,7 +172,10 @@ describe('concierge surface contract', () => {
     expect(voiceSection).toContain("t('setup.save_voice')");
     expect(setupPage).toContain('getUserMedia');
     expect(setupPage).toContain('MediaRecorder');
-    expect(voiceSection).toContain("t('setup.capture_avatar')");
+    // UI-06: camera capture now lives in the shared AvatarPicker (its own
+    // stream lifecycle), wired to the page's avatar upload.
+    expect(voiceSection).toContain('<AvatarPicker');
+    expect(voiceSection).toContain('allow_camera');
     expect(voiceSection).toContain("t('setup.camera_fallback')");
     expect(servicesSection).toContain("t('setup.services_title')");
     expect(advancedSection).toContain("t('setup.management_title')");
@@ -412,7 +417,7 @@ describe('concierge surface contract', () => {
     expect(route).toContain('requireConciergeMutationAccess');
     expect(route).not.toMatch(/export (async )?function (PUT|DELETE|PATCH)/);
     // The setup page exposes the section and reports it in the checklist.
-    expect(notificationsSection).toContain("t('setup.notifications_title')");
+    expect(notificationsSection).toContain("t('setup.notification_save')");
     expect(setupPage).toContain("fetch('/api/notification-preferences'");
     expect(messages).toContain('通知設定を保存');
   });
@@ -746,7 +751,13 @@ describe('concierge surface contract', () => {
     const page = fs.readFileSync(path.join(appDir, 'src/app/page.tsx'), 'utf8');
     // One queue section, ordered by decision urgency, rendered from the same
     // card helpers the (now removed) detail panes used to duplicate.
-    expect(page).toContain('inquiry-queue');
+    expect(page).toContain('decide-queue');
+    // UI-06: the most urgent item leads as `ui:next-action`, filters are
+    // `ui:tabs`, loading is a skeleton and errors are callouts.
+    expect(page).toContain('<NextAction');
+    expect(page).toContain('<Tabs');
+    expect(page).toContain('<Skeleton');
+    expect(page).toContain('<Callout');
     // FD-04: `/` is the 決める page — the heading is the shared
     // `front_desk:nav_decide` rail label, not the old `queue.title`.
     expect(page).toContain("frontDeskText('nav_decide', locale)");

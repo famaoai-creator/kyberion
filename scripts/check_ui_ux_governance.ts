@@ -20,12 +20,6 @@ export type UiUxGovernanceReport = {
 };
 
 const OPERATOR_SOURCE = 'presence/displays/operator-surface/src';
-const GENERATED_TOKEN_FILES = [
-  'presence/displays/chronos-mirror-v2/src/app/globals.css',
-  'presence/displays/operator-surface/src/app/globals.css',
-  'presence/displays/presence-studio/static/design-tokens.css',
-  'presence/displays/computer-surface/static/design-tokens.css',
-];
 const REQUIRED_SEMANTIC_TOKENS = [
   '--kb-accent-text',
   '--kb-surface',
@@ -34,6 +28,73 @@ const REQUIRED_SEMANTIC_TOKENS = [
   '--kb-success',
   '--kb-danger',
 ];
+// UI-02 web UI layer (tokens.ui → --kb-ui-*).
+const REQUIRED_UI_TOKENS = [
+  '--kb-ui-canvas',
+  '--kb-ui-surface',
+  '--kb-ui-text',
+  '--kb-ui-text-muted',
+  '--kb-ui-accent',
+  '--kb-ui-focus-ring',
+  '--kb-ui-danger-fg',
+  '--kb-ui-font-size-md',
+];
+// kyberion-ui.css defines the component class contract; a stylesheet missing
+// one of these roots has drifted from the kyberion-base catalog.
+const REQUIRED_UI_COMPONENT_CLASSES = [
+  '.kb-app-shell',
+  '.kb-page-header',
+  '.kb-nav-rail',
+  '.kb-tabs',
+  '.kb-stack',
+  '.kb-grid',
+  '.kb-section',
+  '.kb-next-action',
+  '.kb-metric',
+  '.kb-kv',
+  '.kb-table',
+  '.kb-list',
+  '.kb-text--',
+  '.kb-status-pill',
+  '.kb-badge',
+  '.kb-callout',
+  '.kb-empty-state',
+  '.kb-skeleton',
+  '.kb-btn--primary',
+  '.kb-disclosure',
+];
+const UI_COMPONENT_STYLESHEET_REQUIREMENTS = [
+  ...REQUIRED_UI_COMPONENT_CLASSES,
+  'prefers-reduced-motion',
+  ':focus-visible',
+];
+/** Generated design-token outputs and the markers each must contain. */
+const GENERATED_TOKEN_FILES: Record<string, readonly string[]> = {
+  'presence/displays/chronos-mirror-v2/src/app/globals.css': [
+    ...REQUIRED_SEMANTIC_TOKENS,
+    ...REQUIRED_UI_TOKENS,
+  ],
+  'presence/displays/operator-surface/src/app/globals.css': [
+    ...REQUIRED_SEMANTIC_TOKENS,
+    ...REQUIRED_UI_TOKENS,
+  ],
+  'presence/displays/presence-studio/static/design-tokens.css': [
+    ...REQUIRED_SEMANTIC_TOKENS,
+    ...REQUIRED_UI_TOKENS,
+  ],
+  'presence/displays/computer-surface/static/design-tokens.css': [
+    ...REQUIRED_SEMANTIC_TOKENS,
+    ...REQUIRED_UI_TOKENS,
+  ],
+  'presence/displays/concierge/src/app/kyberion-ui-tokens.css': REQUIRED_UI_TOKENS,
+  'presence/displays/chronos-mirror-v2/src/app/kyberion-ui.css':
+    UI_COMPONENT_STYLESHEET_REQUIREMENTS,
+  'presence/displays/operator-surface/src/app/kyberion-ui.css':
+    UI_COMPONENT_STYLESHEET_REQUIREMENTS,
+  'presence/displays/presence-studio/static/kyberion-ui.css': UI_COMPONENT_STYLESHEET_REQUIREMENTS,
+  'presence/displays/computer-surface/static/kyberion-ui.css': UI_COMPONENT_STYLESHEET_REQUIREMENTS,
+  'presence/displays/concierge/src/app/kyberion-ui.css': UI_COMPONENT_STYLESHEET_REQUIREMENTS,
+};
 const RAW_COLOR_PATTERN = /(?:#[0-9a-f]{3,8}\b|\brgba?\s*\()/giu;
 
 export function readUiUxGovernanceTextFile(filePath: string): string {
@@ -80,15 +141,17 @@ export function collectUiUxGovernanceReport(now = new Date()): UiUxGovernanceRep
     violations.push(...findHardcodedColorViolations(source, relativePath));
   }
 
-  for (const relativePath of GENERATED_TOKEN_FILES) {
+  for (const [relativePath, required] of Object.entries(GENERATED_TOKEN_FILES)) {
     const filePath = pathResolver.rootResolve(relativePath);
     const source = safeExistsSync(filePath) ? readUiUxGovernanceTextFile(filePath) : '';
-    for (const token of REQUIRED_SEMANTIC_TOKENS) {
-      if (!source.includes(`${token}:`)) {
+    for (const marker of required) {
+      // Custom properties must be declared (`--x:`); class/at-rule markers must appear.
+      const needle = marker.startsWith('--') ? `${marker}:` : marker;
+      if (!source.includes(needle)) {
         violations.push({
           rule: 'missing-semantic-token',
           path: relativePath,
-          detail: `${token} is missing; run the canonical token generator`,
+          detail: `${marker} is missing; run the canonical token generator`,
         });
       }
     }
@@ -109,7 +172,7 @@ export function collectUiUxGovernanceReport(now = new Date()): UiUxGovernanceRep
     status: violations.length === 0 ? 'pass' : 'fail',
     owner: 'design-system-steward',
     checked_at: now.toISOString(),
-    checked_files: operatorFiles.length + GENERATED_TOKEN_FILES.length + 1,
+    checked_files: operatorFiles.length + Object.keys(GENERATED_TOKEN_FILES).length + 1,
     violations,
     next_actions:
       violations.length === 0

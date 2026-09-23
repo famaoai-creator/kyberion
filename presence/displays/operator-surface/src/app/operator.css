@@ -1,0 +1,173 @@
+/* 監査モニタ (operator-surface) — surface-specific layout only.
+ *
+ * UI-08: the shell, rail, header, sections, tables, pills, … come from the
+ * shared contract (kyberion-ui.css, `.kb-*`). What remains here is the page
+ * body and a few operator-only arrangements, using only `--kb-ui-*` tokens —
+ * no literal colors. */
+
+:root {
+  color-scheme: var(--kb-ui-color-scheme);
+}
+
+body {
+  margin: 0;
+  background: var(--kb-ui-canvas);
+  color: var(--kb-ui-text);
+  font-family: var(--kb-ui-font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.operator-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-5);
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* A title over its mono id / meta line inside a table cell or card. */
+.operator-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.operator-cell__title {
+  color: var(--kb-ui-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a.operator-cell__title:hover {
+  color: var(--kb-ui-accent-text);
+  text-decoration: underline;
+}
+
+.operator-cell__meta {
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-xs);
+}
+
+.operator-mono {
+  font-family: var(--kb-ui-font-mono);
+  font-size: 0.95em;
+  overflow-wrap: anywhere;
+}
+
+.operator-muted {
+  color: var(--kb-ui-text-muted);
+}
+
+.operator-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 28rem;
+}
+
+/* Summary row: metrics beside a status chart. */
+.operator-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--kb-ui-space-4);
+  align-items: stretch;
+}
+
+.operator-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-1);
+}
+
+.operator-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-3) var(--kb-ui-space-4);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  min-width: 0;
+}
+
+.operator-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--kb-ui-space-2);
+}
+
+.operator-card__title {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-md);
+  font-weight: 600;
+  color: var(--kb-ui-text);
+  overflow-wrap: anywhere;
+}
+
+.operator-card p {
+  margin: 0;
+}
+
+.operator-command {
+  font-family: var(--kb-ui-font-mono);
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-accent-text);
+  overflow-wrap: anywhere;
+}
+
+.operator-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.operator-tree__item {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+  border-bottom: 1px solid var(--kb-ui-border);
+}
+
+.operator-tree__item:last-child {
+  border-bottom: 0;
+}
+
+.operator-tree__icon {
+  display: inline-flex;
+  color: var(--kb-ui-text-muted);
+}
+
+.operator-panel {
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  overflow: hidden;
+}
+
+@media (max-width: 960px) {
+  .operator-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Primary cell of a wide table (mission title over its id): keep it readable
+   on narrow screens; the table wrapper scrolls horizontally instead. */
+.operator-cell--primary {
+  min-width: 15rem;
+}
+
+/* Ids, event names and timestamps read as one token in dense tables. */
+.operator-nowrap {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}

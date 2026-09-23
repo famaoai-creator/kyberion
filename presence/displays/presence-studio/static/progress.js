@@ -38,9 +38,11 @@
       .replace(/'/g, '&#39;');
   }
 
+  // UI-06: the viewer's stored language choice (`front-desk-prefs.js`),
+  // falling back to the language the page was served in.
   function normalizeLocale() {
-    var raw = String((navigator && navigator.language) || 'en').toLowerCase();
-    return raw.indexOf('ja') === 0 ? 'ja' : 'en';
+    if (window.KyberionPrefs) return window.KyberionPrefs.locale();
+    return document.documentElement.getAttribute('lang') === 'ja' ? 'ja' : 'en';
   }
 
   function renderTemplate(template, params) {
@@ -76,6 +78,27 @@
   }
 
   var FILTERS = ['active', 'delivered', 'done'];
+
+  // UI-06: each row carries a kyberion-base status pill (icon + text, never
+  // color alone). The label is this page's own plain wording.
+  var ROW_STATUS = {
+    active: { status: 'active', labelKey: 'tag_in_progress' },
+    delivered: { status: 'pending', labelKey: 'tag_delivered' },
+    done: { status: 'done', labelKey: 'progress_filter_done' },
+  };
+
+  function statusPillHtml(filter) {
+    var def = ROW_STATUS[filter];
+    if (!def) return '';
+    return (
+      '<span class="kb-status-pill" data-status="' +
+      def.status +
+      '"><span class="kb-status-pill__icon" aria-hidden="true"></span>' +
+      '<span class="kb-status-pill__label">' +
+      escapeHtml(vt(state.vocab, def.labelKey)) +
+      '</span></span>'
+    );
+  }
 
   var state = {
     vocab: {},
@@ -176,6 +199,7 @@
       '<span class="progress-row-title">' +
       escapeHtml(item.title) +
       '</span>' +
+      statusPillHtml('active') +
       svgIcon('chevron', 'progress-row-chevron') +
       '</div>' +
       '<p class="progress-row-now">' +
@@ -214,7 +238,7 @@
     var actionsHtml = '';
     if (item.downloadable) {
       actionsHtml +=
-        '<a class="progress-row-action" data-action="open" href="/api/artifacts/' +
+        '<a class="kb-btn kb-btn--secondary progress-row-action" data-action="open" href="/api/artifacts/' +
         encodeURIComponent(item.id) +
         '">' +
         escapeHtml(vt(vocab, 'action_open')) +
@@ -222,10 +246,10 @@
     }
     if (item.can_verdict) {
       actionsHtml +=
-        '<button type="button" class="progress-row-action" data-action="receive">' +
+        '<button type="button" class="kb-btn kb-btn--primary progress-row-action" data-action="receive">' +
         escapeHtml(vt(vocab, 'action_receive')) +
         '</button>' +
-        '<button type="button" class="progress-row-action" data-action="revise">' +
+        '<button type="button" class="kb-btn kb-btn--secondary progress-row-action" data-action="revise">' +
         escapeHtml(vt(vocab, 'action_revise')) +
         '</button>';
     }
@@ -236,6 +260,7 @@
       '<span class="progress-row-title">' +
       escapeHtml(item.title) +
       '</span>' +
+      statusPillHtml('delivered') +
       svgIcon('chevron', 'progress-row-chevron') +
       '</div>' +
       (actionsHtml ? '<div class="progress-row-actions">' + actionsHtml + '</div>' : '');
@@ -277,10 +302,10 @@
         var form = document.createElement('div');
         form.className = 'progress-revise-form';
         var textarea = document.createElement('textarea');
-        textarea.className = 'progress-revise-note';
+        textarea.className = 'kb-input kb-textarea progress-revise-note';
         var submit = document.createElement('button');
         submit.type = 'button';
-        submit.className = 'progress-row-action';
+        submit.className = 'kb-btn kb-btn--primary progress-row-action';
         submit.textContent = escapeHtml(vt(vocab, 'action_revise'));
         submit.addEventListener('click', function (innerEvent) {
           innerEvent.stopPropagation();
@@ -309,7 +334,7 @@
     row.setAttribute('tabindex', '0');
     var actionsHtml =
       item.kind === 'artifact' && item.downloadable
-        ? '<div class="progress-row-actions"><a class="progress-row-action" href="/api/artifacts/' +
+        ? '<div class="progress-row-actions"><a class="kb-btn kb-btn--secondary progress-row-action" href="/api/artifacts/' +
           encodeURIComponent(item.id) +
           '">' +
           escapeHtml(vt(state.vocab, 'action_open')) +
@@ -321,6 +346,7 @@
       '<span class="progress-row-title">' +
       escapeHtml(item.title) +
       '</span>' +
+      statusPillHtml('done') +
       svgIcon('chevron', 'progress-row-chevron') +
       '</div>' +
       actionsHtml;
@@ -393,7 +419,10 @@
   }
 
   function askHref(title) {
-    var text = title ? title + ' について' : '';
+    // "About <title>" / "<title> について" — word order is the vocabulary's.
+    var text = title
+      ? renderTemplate(vt(state.vocab, 'progress_ask_about') || '{title}', { title: title })
+      : '';
     return '/work?ask=' + encodeURIComponent(text) + '#conversation-panel';
   }
 
@@ -461,12 +490,12 @@
 
     blocks +=
       '<div class="progress-detail-actions">' +
-      '<a class="progress-detail-action" href="' +
+      '<a class="kb-btn kb-btn--secondary progress-detail-action" href="' +
       escapeHtml(askHref(state.selectedTitle)) +
       '">' +
       escapeHtml(vt(vocab, 'progress_action_note')) +
       '</a>' +
-      '<a class="progress-detail-action" href="' +
+      '<a class="kb-btn kb-btn--secondary progress-detail-action" href="' +
       escapeHtml(state.payload.mirror_href || '') +
       '">' +
       escapeHtml(vt(vocab, 'progress_open_mirror')) +
@@ -559,7 +588,7 @@
     WI_STATUS_KEYS.forEach(function (key) {
       var count = (counts && counts[key]) || 0;
       var chip = document.createElement('span');
-      chip.className = 'wi-count-chip';
+      chip.className = 'kb-badge wi-count-chip';
       chip.textContent = vt(vocab, 'progress_work_inventory_status_' + key) + ' ' + count;
       el.appendChild(chip);
     });
@@ -584,7 +613,7 @@
       '<span class="wi-row-title">' +
       escapeHtml(item.title) +
       '</span>' +
-      '<span class="wi-row-status">' +
+      '<span class="kb-badge wi-row-status">' +
       escapeHtml(statusLabel) +
       '</span>' +
       '</div>' +

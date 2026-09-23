@@ -2217,7 +2217,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 7601,
+      "size": 7481,
       "type": "json"
     },
     {
@@ -6255,7 +6255,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 591136,
+      "size": 838794,
       "type": "json"
     },
     {
@@ -7567,6 +7567,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/a2ui-catalog-kyberion-base.schema.json",
+      "tier": "public",
+      "size": 71058,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/a2ui-message.schema.json",
       "tier": "public",
       "size": 2861,
@@ -7941,7 +7947,7 @@
     {
       "path": "product/schemas/brand-tokens.schema.json",
       "tier": "public",
-      "size": 2345,
+      "size": 10586,
       "type": "json"
     },
     {
@@ -12225,7 +12231,7 @@
     {
       "path": "public/design-patterns/brand-tokens/kyberion.json",
       "tier": "public",
-      "size": 2684,
+      "size": 8244,
       "type": "json"
     },
     {

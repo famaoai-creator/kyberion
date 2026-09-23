@@ -1,3 +1,5 @@
+import { KeyValue, StatusPill, isKbStatus } from '@agent/shared-ui';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
 import { type AttentionItem } from '../lib/operator-console';
 import { optionalStringField, parseJsonRecord } from '../lib/json-record';
 import {
@@ -5,6 +7,7 @@ import {
   resolveChronosLocale,
   uxMessage,
   uxText,
+  uxTextOr,
   type SupportedLocale,
 } from '../lib/ux-vocabulary';
 import type {
@@ -307,18 +310,18 @@ export function toDomId(prefix: 'mission' | 'surface', value: string): string {
 export function ActionStatusBadge({ action }: { action: ControlActionSummary }) {
   const locale = resolveChronosLocale();
   return (
-    <div
-      className={`rounded-full px-2 py-1 text-[9px] uppercase tracking-[0.22em] ${
-        action.status === 'completed'
-          ? 'kb-status-positive-surface kb-status-positive'
-          : action.status === 'failed'
-            ? 'kb-status-negative-surface kb-status-negative'
-            : 'kb-status-warning-surface kb-status-warning'
-      }`}
-    >
-      {surfaceOperationLabel(action.operation, locale)} · {actionStatusLabel(action.status, locale)}
-    </div>
+    <StatusPill
+      status={actionStatusPill(action.status)}
+      label={`${surfaceOperationLabel(action.operation, locale)} · ${actionStatusLabel(action.status, locale)}`}
+    />
   );
+}
+
+/** Control-action status → canonical `ui:status-pill` status. */
+export function actionStatusPill(status: string): KbStatus {
+  if (status === 'completed') return 'completed';
+  if (status === 'failed') return 'failed';
+  return 'pending';
 }
 
 export function surfaceOperationLabel(operation: string, locale: SupportedLocale) {
@@ -379,6 +382,10 @@ export function missionStatusLabel(value: string | undefined, locale: SupportedL
     planned: 'chronos_status_planned',
     planning_pending: 'chronos_status_planning_pending',
     pending: 'chronos_status_planning_pending',
+    paused_mission: 'chronos_status_paused',
+    failed_mission: 'chronos_status_failed',
+    execution_ready: 'chronos_mi_status_execution_ready',
+    plan_ready: 'chronos_plan_ready',
   };
   const key = keyByStatus[normalized];
   return key ? uxText(key, locale) : value || uxText('chronos_unknown', locale);
@@ -528,55 +535,76 @@ export function ActionDetailList({
   details: Record<string, ControlActionDetail[]>;
 }) {
   if (!actionId) return null;
+  const locale = resolveChronosLocale();
   const entries = details[actionId] || [];
+  if (entries.length === 0) {
+    return (
+      <p className="kb-text kb-text--muted">
+        {uxTextOr(
+          'chronos_mi_no_detail_observations',
+          'No detail observations recorded yet.',
+          locale
+        )}
+      </p>
+    );
+  }
   return (
-    <div className="mt-3 space-y-2 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
-      {entries.length === 0 ? (
-        <div className="text-[10px] kb-text-muted">No detail observations recorded yet.</div>
-      ) : (
-        entries.map((detail, detailIndex) => (
-          <div
+    <ul className="kb-list" data-variant="timeline">
+      {entries.map((detail, detailIndex) => {
+        const executed =
+          detail.decision === 'next_action_executed' ||
+          detail.decision === 'memory_promote_pending_applied';
+        const items: Array<{ label: string; value: string; mono?: boolean }> = executed
+          ? [
+              {
+                label: uxTextOr('chronos_mi_operation', 'operation', locale),
+                value: detail.operation || '-',
+                mono: true,
+              },
+              {
+                label: uxTextOr('chronos_mi_target', 'target', locale),
+                value: detail.resource_id || '-',
+                mono: true,
+              },
+              ...(detail.action_id
+                ? [
+                    {
+                      label: uxTextOr('chronos_mi_action_id', 'action id', locale),
+                      value: detail.action_id,
+                      mono: true,
+                    },
+                  ]
+                : []),
+              ...(detail.outcome
+                ? [
+                    {
+                      label: uxTextOr('chronos_mi_outcome', 'outcome', locale),
+                      value: detail.outcome,
+                      mono: true,
+                    },
+                  ]
+                : []),
+            ]
+          : [];
+        return (
+          <li
             key={`${actionId}-${detail.ts}-${detailIndex}`}
-            className="border-l kb-border-subtle pl-3"
+            className="kb-list__item"
+            data-status={detail.error ? 'failed' : undefined}
           >
-            <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-              {detail.decision}
+            <div className="kb-list__body">
+              <span className="kb-list__title">{detail.decision}</span>
+              {items.length > 0 ? <KeyValue items={items} /> : null}
+              {detail.why ? <span className="kb-list__meta">{detail.why}</span> : null}
+              {detail.error ? <span className="chronos-scope__error">{detail.error}</span> : null}
+              <span className="kb-list__meta">
+                {new Date(detail.ts).toLocaleString(chronosSpeechLocale())}
+              </span>
             </div>
-            {detail.decision === 'next_action_executed' ||
-            detail.decision === 'memory_promote_pending_applied' ? (
-              <div className="mt-1 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
-                <div>
-                  operation:{' '}
-                  <span className="font-mono kb-text-secondary">{detail.operation || '-'}</span>
-                </div>
-                <div>
-                  target:{' '}
-                  <span className="font-mono kb-text-secondary">{detail.resource_id || '-'}</span>
-                </div>
-                {detail.action_id ? (
-                  <div className="col-span-2">
-                    action id:{' '}
-                    <span className="font-mono kb-text-secondary">{detail.action_id}</span>
-                  </div>
-                ) : null}
-                {detail.outcome ? (
-                  <div>
-                    outcome: <span className="font-mono kb-text-secondary">{detail.outcome}</span>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            {detail.why && <div className="mt-1 text-[10px] kb-text-secondary">{detail.why}</div>}
-            {detail.error && (
-              <div className="mt-1 text-[10px] kb-status-negative">{detail.error}</div>
-            )}
-            <div className="mt-1 text-[9px] font-mono kb-text-muted">
-              {new Date(detail.ts).toLocaleString(chronosSpeechLocale())}
-            </div>
-          </div>
-        ))
-      )}
-    </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -588,6 +616,7 @@ export function ActionGuidance({
   availableActions: ControlActionDefinition[];
 }) {
   if (!latestAction) return null;
+  const locale = resolveChronosLocale();
   const currentAction = getActionDefinition(availableActions, latestAction.operation);
   const nextValidActions = availableActions.filter(
     (action) => action.enabled && action.operation !== latestAction.operation
@@ -599,38 +628,44 @@ export function ActionGuidance({
 
   if (!shouldShow) return null;
 
+  const items: Array<{ label: string; value: string }> = [];
+  if (currentAction?.disabledReason) {
+    items.push({
+      label: uxTextOr('chronos_mi_disabled_reason', 'disabled reason', locale),
+      value: currentAction.disabledReason,
+    });
+  }
+  if (nextValidActions.length > 0) {
+    items.push({
+      label: uxTextOr('chronos_mi_next_valid_actions', 'next valid actions', locale),
+      value: nextValidActions.map((action) => action.label).join(', '),
+    });
+  }
+  const noRetry =
+    latestAction.status === 'failed' && nextValidActions.length === 0 && !currentAction?.enabled;
+
   return (
-    <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
-      <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">operator guidance</div>
-      {currentAction?.disabledReason && (
-        <div className="mt-2 text-[10px] kb-text-muted">
-          disabled reason: <span className="kb-text-secondary">{currentAction.disabledReason}</span>
-        </div>
-      )}
-      {nextValidActions.length > 0 && (
-        <div className="mt-2 text-[10px] kb-text-muted">
-          next valid actions:{' '}
-          <span className="kb-text-secondary">
-            {nextValidActions.map((action) => action.label).join(', ')}
-          </span>
-        </div>
-      )}
-      {latestAction.status === 'failed' &&
-        nextValidActions.length === 0 &&
-        !currentAction?.enabled && (
-          <div className="mt-2 text-[10px] kb-status-warning">
-            No immediate retry path is available from the current target state.
-          </div>
-        )}
+    <div className="flex flex-col gap-2">
+      <p className="kb-text kb-text--caption">
+        {uxTextOr('chronos_mi_operator_guidance', 'operator guidance', locale)}
+      </p>
+      {items.length > 0 ? <KeyValue items={items} /> : null}
+      {noRetry ? (
+        <p className="kb-text kb-text--muted">
+          {uxTextOr(
+            'chronos_mi_no_retry_path',
+            'No immediate retry path is available from the current target state.',
+            locale
+          )}
+        </p>
+      ) : null}
     </div>
   );
 }
 
+/** Shared `.kb-btn` classes for safe / risky control actions. */
 export function actionButtonClass(kind: 'safe' | 'risky'): string {
-  if (kind === 'risky') {
-    return 'rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40';
-  }
-  return 'rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40';
+  return kind === 'risky' ? 'kb-btn kb-btn--danger' : 'kb-btn kb-btn--secondary';
 }
 
 export interface DangerousActionPrompt {
@@ -667,4 +702,61 @@ export function surfaceSummaryBadgeClass(tone: SurfaceSummary['controlTone']): s
   if (tone === 'stable') return 'kb-status-positive-surface kb-status-positive';
   if (tone === 'offline') return 'kb-surface-raised kb-text-secondary';
   return 'kb-status-warning-surface kb-status-warning';
+}
+
+/** Mission control tone → canonical status for a `StatusPill`. */
+export function missionToneStatus(tone: MissionSummary['controlTone']): KbStatus {
+  if (tone === 'pending') return 'pending';
+  if (tone === 'ready') return 'ready';
+  if (tone === 'attention') return 'blocked';
+  return 'planned';
+}
+
+/** Surface control tone → canonical status for a `StatusPill`. */
+export function surfaceToneStatus(tone: SurfaceSummary['controlTone']): KbStatus {
+  if (tone === 'pending') return 'pending';
+  if (tone === 'stable') return 'running';
+  if (tone === 'offline') return 'offline';
+  return 'degraded';
+}
+
+/** Agent message tone → canonical status for a `StatusPill` / timeline item. */
+export function messageToneStatus(tone: AgentMessageSummary['tone']): KbStatus {
+  if (tone === 'request') return 'active';
+  if (tone === 'response') return 'completed';
+  return 'pending';
+}
+
+const STATUS_ALIASES: Record<string, KbStatus> = {
+  complete: 'completed',
+  success: 'completed',
+  succeeded: 'completed',
+  approved: 'completed',
+  promoted: 'completed',
+  draft: 'planned',
+  proposed: 'planned',
+  queued: 'pending',
+  waiting: 'pending',
+  planning_pending: 'pending',
+  rejected: 'failed',
+  denied: 'failed',
+  critical: 'blocked',
+  warning: 'pending',
+  healthy: 'ready',
+  unhealthy: 'degraded',
+  idle: 'ready',
+};
+
+/**
+ * Any backend status string → a canonical `ui:status-pill` status (aliases
+ * first, then the catalog itself, else `fallback`). Pair it with the raw or
+ * localized text as the pill `label` so no information is lost.
+ */
+export function toKbStatus(value: string | undefined | null, fallback: KbStatus = 'n/a'): KbStatus {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[- ]/g, '_');
+  if (STATUS_ALIASES[normalized]) return STATUS_ALIASES[normalized];
+  return isKbStatus(normalized) ? normalized : fallback;
 }

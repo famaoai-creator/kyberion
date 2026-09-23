@@ -144,8 +144,10 @@ describe('MOS no-write-API contract', () => {
   it('keeps the OS panel read-only and exposes recovery guidance only as a link', () => {
     const panel = path.join(SRC, 'components/OsControlPlanePanel.tsx');
     const text = safeReadFile(panel, { encoding: 'utf8' }) as string;
-    expect(text).toContain('Human action required.');
-    expect(text).toContain('observed {item.observedAt}');
+    // UI-08: copy is in the vocabulary (operator domain); the panel still
+    // renders the human-action prompt and each observation's timestamp.
+    expect(text).toContain("t('os_human_action_required')");
+    expect(text).toContain("t('os_observed_at', { at: item.observedAt })");
     expect(text).not.toContain('fetch(');
     expect(text).not.toContain('method:');
   });
