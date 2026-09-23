@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
+import type { A2UIMessage } from './a2ui.js';
 import {
   decideApprovalRequest,
   listApprovalRequests,
@@ -102,8 +103,8 @@ function expectViewError(fn: () => unknown, code: string): void {
 }
 
 function withComponents(components: unknown[]): unknown[] {
-  const doc = fixtureDocument() as Array<Record<string, any>>;
-  doc[1].updateComponents.components = components;
+  const doc = fixtureDocument() as A2UIMessage[];
+  doc[1].updateComponents!.components = components;
   return doc;
 }
 
@@ -236,8 +237,8 @@ describe('validatePluginView (EP-05)', () => {
         }),
       'PLUGIN_VIEW_INVALID'
     );
-    const doc = fixtureDocument() as Array<Record<string, any>>;
-    doc[0].createSurface.titleKey = 'plugin:no_such_key';
+    const doc = fixtureDocument() as A2UIMessage[];
+    doc[0].createSurface!.titleKey = 'plugin:no_such_key';
     expectViewError(
       () => validatePluginView(decl, doc, { providedOps: OPS }),
       'PLUGIN_VIEW_INVALID'
@@ -251,8 +252,8 @@ describe('validatePluginView (EP-05)', () => {
     [
       'a non kyberion-base catalog',
       (() => {
-        const doc = fixtureDocument() as Array<Record<string, any>>;
-        doc[0].createSurface.catalogId = 'chronos-legacy';
+        const doc = fixtureDocument() as A2UIMessage[];
+        doc[0].createSurface!.catalogId = 'chronos-legacy';
         return doc;
       })(),
     ],

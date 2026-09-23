@@ -27,9 +27,10 @@ import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema, createAjv2020 } from './foundation/ajv.js';
 import { isRecord } from './foundation/text.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import { validateA2UIMessage, type A2UIComponent, type A2UIMessage } from './a2ui.js';
 import { A2UI_BASE_CATALOG_ID, type KyberionBaseComponentType } from './a2ui-catalog.js';
 import { resolveVocabularyEntry } from './vocabulary-catalog.js';
@@ -540,9 +541,12 @@ function readViewDocument(pluginRoot: string, relative: string): unknown {
       throw invalid(`document '${relative}' exceeds ${MAX_DOCUMENT_BYTES} bytes`);
     }
   }
-  const text = String(safeReadFile(target, { encoding: 'utf8' }));
   try {
-    return parseSafeJsonInput(text, `plugin view document ${relative}`);
+    // Wrapping lets the recursive dangerous-key check cover array documents too.
+    return parseSafeJsonObjectValue(
+      { document: readJson<unknown>(target) },
+      `plugin view document ${relative}`
+    ).document;
   } catch (error) {
     throw invalid(error instanceof Error ? error.message : String(error));
   }
@@ -556,12 +560,14 @@ function readRootManifest(pluginRoot: string): Record<string, unknown> {
     if (stat.isSymbolicLink() || !stat.isFile()) {
       throw invalid(`manifest must be a regular file: ${manifestPath}`);
     }
-    const parsed = parseSafeJsonInput(
-      String(safeReadFile(manifestPath, { encoding: 'utf8' })),
-      `plugin manifest ${manifestPath}`
-    );
-    if (!isRecord(parsed)) throw invalid(`manifest root must be an object: ${manifestPath}`);
-    return parsed;
+    try {
+      return parseSafeJsonObjectValue(
+        readJson<unknown>(manifestPath),
+        `plugin manifest ${manifestPath}`
+      );
+    } catch (error) {
+      throw invalid(error instanceof Error ? error.message : String(error));
+    }
   }
   throw invalid(`no plugin manifest in ${pluginRoot}`);
 }

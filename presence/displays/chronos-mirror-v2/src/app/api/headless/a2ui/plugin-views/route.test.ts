@@ -60,7 +60,23 @@ function viewer(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function fixtureSource(mutateManifest?: (manifest: any) => void): string {
+type FixtureManifest = {
+  provides: { views: Array<Record<string, unknown>> };
+};
+
+type PluginViewsResponseBody = {
+  resource?: string;
+  error?: string;
+  error_key?: string;
+  data?: {
+    views?: unknown[];
+    a2ui?: { updateComponents?: { components?: unknown[] } };
+    errors?: unknown[];
+    outcome?: { status: string; approvalRequestId?: string };
+  };
+};
+
+function fixtureSource(mutateManifest?: (manifest: FixtureManifest) => void): string {
   const dir = path.join(TMP_ROOT, `src-${randomUUID()}`);
   cleanup.push(dir);
   for (const name of FILES) {
@@ -111,7 +127,7 @@ async function listViews(query = '') {
   const response = await GET(
     new NextRequest(`http://localhost/api/headless/a2ui/plugin-views${query}`)
   );
-  return { status: response.status, body: (await response.json()) as any };
+  return { status: response.status, body: (await response.json()) as PluginViewsResponseBody };
 }
 
 async function act(body: Record<string, unknown>) {
@@ -122,7 +138,7 @@ async function act(body: Record<string, unknown>) {
       headers: { 'content-type': 'application/json' },
     })
   );
-  return { status: response.status, body: (await response.json()) as any };
+  return { status: response.status, body: (await response.json()) as PluginViewsResponseBody };
 }
 
 beforeEach(() => {
