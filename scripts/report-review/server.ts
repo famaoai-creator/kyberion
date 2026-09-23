@@ -25,9 +25,12 @@ import {
   recordProtocolServiceLifecycle,
 } from '@agent/core/protocol-service-lifecycle';
 import { getRegisteredEnvText, nowIso, readTextFile } from '@agent/core/foundation';
+import { t as catalogT } from '@agent/core/t';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 
 export interface ReportReviewServerResult {
   ok: boolean;
@@ -101,72 +104,18 @@ export function readReportReviewTextFile(filePath: string): string {
   return readTextFile(filePath);
 }
 
-export async function main(
-  args: string[] = [],
-  options: {
-    dryRun?: boolean;
-    check?: boolean;
-    json?: boolean;
-    print?: (value: unknown) => void;
-  } = {}
-): Promise<ReportReviewServerResult | undefined> {
-  const target = args[0];
-  const positionalPort = args[1] && !args[1].startsWith('--') ? args[1] : undefined;
-  const option = (flag: string): string | undefined => {
-    const index = args.indexOf(flag);
-    return index >= 0 ? args[index + 1] : undefined;
-  };
-  const port = Number(positionalPort || 8137);
-  if (!target) {
-    throw new ScriptExitError(
-      1,
-      'usage: server <report.html> [port] [--artifact-ref <ref>] [--tier <tier>] [--tenant <slug>]'
-    );
-  }
-  assertProtocolServiceRegistered('report-review');
-  if (!safeExistsSync(target)) {
-    throw new ScriptExitError(1, `report not found: ${target}`);
-  }
+export interface ReportReviewRequestHandlerOptions {
+  token: string;
+  target: string;
+  reviewContext: ReturnType<typeof createReportReviewContext>;
+  print: (value: unknown) => void;
+}
 
-  const tier = (option('--tier') || 'public') as 'public' | 'confidential' | 'personal';
-  if (!['public', 'confidential', 'personal'].includes(tier)) {
-    throw new ScriptExitError(1, `invalid tier: ${tier}`);
-  }
-  const reviewContext = createReportReviewContext({
-    artifact_ref: option('--artifact-ref') || target,
-    viewer_principal:
-      getRegisteredEnvText('KYBERION_VIEWER_PRINCIPAL') ||
-      getRegisteredEnvText('KYBERION_MCP_PRINCIPAL') ||
-      'local-reviewer',
-    tier,
-    tenant_slug: option('--tenant') || getRegisteredEnvText('KYBERION_TENANT'),
-    organization_id: option('--organization-id'),
-    project_id: option('--project-id'),
-    mission_id: option('--mission-id'),
-  });
-  if (!Number.isInteger(port) || port < 1 || port > 65535)
-    throw new ScriptExitError(1, `invalid port: ${port}`);
-
-  const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
-  const url = `http://127.0.0.1:${port}/`;
-  const preview: ReportReviewServerResult = {
-    ok: true,
-    mode,
-    target,
-    port,
-    url,
-    artifact_ref: reviewContext.artifact_ref,
-    scope: reviewContext.scope,
-    listening: false,
-  };
-  const print = options.print ?? (() => undefined);
-  if (options.dryRun || options.check) {
-    if (options.json || options.dryRun || options.check) print(preview);
-    else print(`${mode}: would serve ${target} at ${url}`);
-    return preview;
-  }
-
-  const TOKEN = randomBytes(16).toString('hex');
+/** The server's request handler (report + layer, shared UI assets, health, save). */
+export function createReportReviewRequestHandler(
+  options: ReportReviewRequestHandlerOptions
+): http.RequestListener {
+  const { token: TOKEN, target, reviewContext, print } = options;
   const CFG_OPEN = '<!--RV-SAVE-CONFIG-->';
   const CFG_CLOSE = '<!--/RV-SAVE-CONFIG-->';
   const re = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -176,7 +125,7 @@ export async function main(
   function stripInjected(html: string): string {
     return stripBetween(stripBetween(html, CFG_OPEN, CFG_CLOSE), RV_LAYER_OPEN, RV_LAYER_CLOSE);
   }
-  function serveHtml(): string {
+  function serveHtml(locale: SupportedLocale): string {
     let html = stripInjected(readReportReviewTextFile(target));
     const cfg = `${CFG_OPEN}<script>window.__RV_SAVE__={url:'/save',token:'${TOKEN}'};</script>${CFG_CLOSE}`;
     html = /<head[^>]*>/i.test(html)
@@ -184,8 +133,11 @@ export async function main(
       : cfg + html;
     // レイヤが未焼き込みの場合のみ、配信時にオーバーレイ注入する
     if (!/id="rv-bar"/.test(html)) {
-      const layer = reviewLayerMarkup();
-      html = html.includes('</body>') ? html.replace('</body>', `${layer}\n</body>`) : html + layer;
+      const layer = reviewLayerMarkup({ locale, assets: 'served' });
+      // Replacer function: the layer carries script sources whose `$` must not be read as patterns.
+      html = html.includes('</body>')
+        ? html.replace('</body>', () => `${layer}\n</body>`)
+        : html + layer;
     }
     return html;
   }
@@ -203,9 +155,11 @@ export async function main(
     };
   }
 
-  const server = http.createServer((req, res) => {
+  return (req, res) => {
     try {
-      if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+      if (handlePadUiAsset(req, res)) return;
+      const pathname = (req.url || '').split(/[?#]/, 1)[0];
+      if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
         const release = acquireHeavyRequest();
         if (!release) {
           res.writeHead(503, { 'Retry-After': '1' });
@@ -215,7 +169,7 @@ export async function main(
         res.once('finish', release);
         res.once('close', release);
         try {
-          const html = serveHtml();
+          const html = serveHtml(resolvePadLocale(req));
           res.writeHead(200, {
             'Content-Type': 'text/html; charset=utf-8',
             'Cache-Control': 'no-store',
@@ -339,7 +293,78 @@ export async function main(
         res.end(e instanceof Error ? e.message : String(e));
       }
     }
+  };
+}
+
+export async function main(
+  args: string[] = [],
+  options: {
+    dryRun?: boolean;
+    check?: boolean;
+    json?: boolean;
+    print?: (value: unknown) => void;
+  } = {}
+): Promise<ReportReviewServerResult | undefined> {
+  const target = args[0];
+  const positionalPort = args[1] && !args[1].startsWith('--') ? args[1] : undefined;
+  const option = (flag: string): string | undefined => {
+    const index = args.indexOf(flag);
+    return index >= 0 ? args[index + 1] : undefined;
+  };
+  const port = Number(positionalPort || 8137);
+  if (!target) {
+    throw new ScriptExitError(
+      1,
+      'usage: server <report.html> [port] [--artifact-ref <ref>] [--tier <tier>] [--tenant <slug>]'
+    );
+  }
+  assertProtocolServiceRegistered('report-review');
+  if (!safeExistsSync(target)) {
+    throw new ScriptExitError(1, `report not found: ${target}`);
+  }
+
+  const tier = (option('--tier') || 'public') as 'public' | 'confidential' | 'personal';
+  if (!['public', 'confidential', 'personal'].includes(tier)) {
+    throw new ScriptExitError(1, `invalid tier: ${tier}`);
+  }
+  const reviewContext = createReportReviewContext({
+    artifact_ref: option('--artifact-ref') || target,
+    viewer_principal:
+      getRegisteredEnvText('KYBERION_VIEWER_PRINCIPAL') ||
+      getRegisteredEnvText('KYBERION_MCP_PRINCIPAL') ||
+      'local-reviewer',
+    tier,
+    tenant_slug: option('--tenant') || getRegisteredEnvText('KYBERION_TENANT'),
+    organization_id: option('--organization-id'),
+    project_id: option('--project-id'),
+    mission_id: option('--mission-id'),
   });
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new ScriptExitError(1, `invalid port: ${port}`);
+
+  const mode = options.check ? 'check' : options.dryRun ? 'dry-run' : 'apply';
+  const url = `http://127.0.0.1:${port}/`;
+  const preview: ReportReviewServerResult = {
+    ok: true,
+    mode,
+    target,
+    port,
+    url,
+    artifact_ref: reviewContext.artifact_ref,
+    scope: reviewContext.scope,
+    listening: false,
+  };
+  const print = options.print ?? (() => undefined);
+  if (options.dryRun || options.check) {
+    if (options.json || options.dryRun || options.check) print(preview);
+    else print(`${mode}: would serve ${target} at ${url}`);
+    return preview;
+  }
+
+  const TOKEN = randomBytes(16).toString('hex');
+  const server = http.createServer(
+    createReportReviewRequestHandler({ token: TOKEN, target, reviewContext, print })
+  );
   server.requestTimeout = REPORT_REVIEW_REQUEST_TIMEOUT_MS;
   server.headersTimeout = REPORT_REVIEW_HEADERS_TIMEOUT_MS;
   server.keepAliveTimeout = REPORT_REVIEW_KEEP_ALIVE_TIMEOUT_MS;
@@ -382,7 +407,7 @@ export async function main(
           `  scope  : ${reviewContext.scope.scope_kind}/${reviewContext.scope.tenant_slug || 'system'}`
         );
         print(`  token  : ${TOKEN.slice(0, 6)}…  (127.0.0.1 only, backups: <file>.bak-<ts>)`);
-        print('  Open the URL, review (✏️/💬/🎤), then 💾 to save back. Ctrl-C to stop.');
+        print(`  ${catalogT('report_review:server_usage_hint')}`);
       }
       resolve();
     });

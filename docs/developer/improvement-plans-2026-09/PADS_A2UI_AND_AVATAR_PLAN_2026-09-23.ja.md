@@ -63,6 +63,18 @@ mission: MSN-PADS-A2UI-20260923
 | PA-09 | `ui:talking-avatar`: 再生音声の音量で口を動かす(viseme 契約に載せ替え可能)、相棒・秘書室に表示                           | 2   |
 | PA-10 | 写真 → アバター: 参照画像付き画像生成(対応プロバイダ)で表情セット生成、`generate_avatar` を修正                          | 2   |
 
+## 6. PR 2 の設計メモ(調査 2026-09-23)
+
+- **口パクの信号源**: 現在の TTS はすべてサーバー側再生(voice-hub の `afplay` / `say`)で、ブラウザに音声バイトが届く経路がない。
+  - 主経路: TTS 音声(WAV)をブラウザへ返す governed なエンドポイントを追加し、ブラウザで再生しながら `AnalyserNode` の RMS を `createRmsFallbackAnimationCue`(`realtime-media-session.ts`)と同じ `mouth_open` 形式に変換して `ui:talking-avatar` を駆動する。
+  - 代替経路: `speechSynthesis` やサーバー再生しかない場合は、`speaking` 状態(utterance の `onstart`/`onend`/`onboundary`、voice-hub の `speech_state`)の間だけ合成的に口を動かす。
+  - viseme(`normalizeProviderViseme`)は同じ cue 形式で後から載せ替え可能にする。
+- **写真 → 表情セット**: `ImageGenerationRequest` に参照画像を追加し、プロバイダに `supportsReferenceImage` を持たせる。
+  - 最初の実装は Gemini 画像モデル(`generateContent` + `inlineData`)と host bridge(依頼 JSON とメッセージに参照パスを載せる)。
+  - comfyui / mflux の img2img は後続。
+  - `generate_avatar.ts` は写真を参照として neutral / joy / thinking / listening / speaking を生成する(neutral を 2 枚目の参照にして一貫性を保つ)。
+  - 保存先は `<profileRoot>/avatar/<expr>.png`。`presence-avatar.ts` に personal tier の重ね合わせを追加し、配信は `static/` ではなく認可付きルートで行う。
+
 ## 5. 検証
 
 - `pnpm check -- --scope pr`、ui-ux / i18n / catalogs / design-contrast。
