@@ -543,6 +543,38 @@ describe('ingest:sync_source (DA-03)', () => {
       expect(multiRes.items.map((i) => i.content_ref)).toContain('google_drive:file:gd-multi-1');
       expect(multiRes.items.map((i) => i.content_ref)).toContain('box:file:box-multi-1');
     });
+
+    it('multi-source sync is atomic and does NOT advance any cursor if a later source fails', async () => {
+      const tenant = 'atomic-tenant';
+      const transport = vi
+        .fn<SyncSourceTransport>()
+        // First source (google_drive) succeeds
+        .mockResolvedValueOnce({
+          files: [
+            { id: 'gd-atomic-1', name: 'Doc.docx', modifiedTime: '2026-08-10T00:00:00.000Z' },
+          ],
+        })
+        // Second source (box) throws network/auth error
+        .mockRejectedValueOnce(new Error('Box API unavailable (503)'));
+
+      await expect(
+        syncSource({
+          tenant_slug: tenant,
+          source_systems: ['google_drive', 'box'],
+          per_source_params: {
+            google_drive: { folder_id: 'gd-root' },
+            box: { folder_id: 'box-root' },
+          },
+          auth: 'none',
+          cursor_path_seam: cursorsDir,
+          transport,
+        })
+      ).rejects.toThrow('Box API unavailable (503)');
+
+      // Verify that google_drive's cursor was NOT advanced because the overall multi-source operation failed
+      const gdCursor = readSyncCursor(tenant, 'google_drive', { cursorsDir });
+      expect(gdCursor).toBeNull();
+    });
   });
 
   describe('extractConfluenceCursor', () => {

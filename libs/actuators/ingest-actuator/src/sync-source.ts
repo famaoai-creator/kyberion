@@ -63,8 +63,9 @@ const DEFAULT_PAGE_LIMIT = 100;
 async function syncSingleSource(
   system: SyncSourceSystem,
   input: SyncSourceInput,
-  sourceParams: Record<string, unknown>
-): Promise<SyncSourceResult> {
+  sourceParams: Record<string, unknown>,
+  options: { deferCursorAdvance?: boolean } = {}
+): Promise<{ result: SyncSourceResult; commitCursor?: () => void }> {
   const tenantSlug = String(input.tenant_slug ?? '').trim();
   const walker = getSourceWalker(system);
 
@@ -106,35 +107,48 @@ async function syncSingleSource(
   }
 
   let advanced = false;
+  let commitCursor: (() => void) | undefined;
+
   if (!dryRun && !walk.truncated) {
     const nextWatermark = walk.highWater || watermark;
     if (nextWatermark) {
-      advanceSyncCursor(
-        tenantSlug,
-        system,
-        {
-          cursor_kind: 'updated_since',
-          cursor_value: nextWatermark,
-          ...(input.now ? { now: input.now } : {}),
-        },
-        cursorOptions
-      );
       advanced = true;
+      const doAdvance = (): void => {
+        advanceSyncCursor(
+          tenantSlug,
+          system,
+          {
+            cursor_kind: 'updated_since',
+            cursor_value: nextWatermark,
+            ...(input.now ? { now: input.now } : {}),
+          },
+          cursorOptions
+        );
+      };
+
+      if (options.deferCursorAdvance) {
+        commitCursor = doAdvance;
+      } else {
+        doAdvance();
+      }
     }
   }
 
   return {
-    tenant_slug: tenantSlug,
-    source_system: system,
-    items: walk.items,
-    new_cursor: {
-      cursor_kind: 'updated_since',
-      cursor_value: walk.highWater || watermark,
+    result: {
+      tenant_slug: tenantSlug,
+      source_system: system,
+      items: walk.items,
+      new_cursor: {
+        cursor_kind: 'updated_since',
+        cursor_value: walk.highWater || watermark,
+      },
+      advanced,
+      truncated: walk.truncated,
+      pages_fetched: walk.pages,
+      dry_run: dryRun,
     },
-    advanced,
-    truncated: walk.truncated,
-    pages_fetched: walk.pages,
-    dry_run: dryRun,
+    commitCursor,
   };
 }
 
@@ -159,16 +173,30 @@ export async function syncSource(
   const tenantSlug = String(input?.tenant_slug ?? '').trim();
   if (!tenantSlug) throw new Error('ingest:sync_source — tenant_slug is required');
 
-  // Multi-source sync mode
+  // Multi-source sync mode: atomic execution across all specified sources
   if (Array.isArray(input.source_systems) && input.source_systems.length > 0) {
     const results: SyncSourceResult[] = [];
     const aggregatedItems: SyncSourceItem[] = [];
+    const deferredCommits: Array<() => void> = [];
 
+    // 1. Walk all sources first with cursor advance deferred.
+    // If any source throws, no cursor in this multi-source batch is advanced,
+    // ensuring zero work-item loss on caller retry.
     for (const sys of input.source_systems) {
       const params = input.per_source_params?.[sys] || input.source_params || {};
-      const res = await syncSingleSource(sys, input, params);
-      results.push(res);
-      aggregatedItems.push(...res.items);
+      const { result, commitCursor } = await syncSingleSource(sys, input, params, {
+        deferCursorAdvance: true,
+      });
+      results.push(result);
+      aggregatedItems.push(...result.items);
+      if (commitCursor) {
+        deferredCommits.push(commitCursor);
+      }
+    }
+
+    // 2. Commit all staged cursor advances once all sources succeeded
+    for (const commit of deferredCommits) {
+      commit();
     }
 
     return {
@@ -187,5 +215,6 @@ export async function syncSource(
     throw new Error('ingest:sync_source — source_params is required');
   }
 
-  return syncSingleSource(sourceSystem, input, input.source_params);
+  const { result } = await syncSingleSource(sourceSystem, input, input.source_params);
+  return result;
 }

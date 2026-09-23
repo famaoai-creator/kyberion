@@ -792,6 +792,22 @@
       "documented": true
     },
     {
+      "name": "KYBERION_COMPUTE_JOB_ID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Identifier passed to local compute execution processes to associate the runtime with the active job contract.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_COMPUTE_PARAMS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Serialized JSON parameter payload injected into local compute execution processes.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_COMPUTER_SURFACE_PRINCIPAL",
       "category": "runtime",
       "type": "string",

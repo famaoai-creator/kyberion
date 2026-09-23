@@ -66,14 +66,38 @@ export abstract class BaseComputeDriver implements ComputeDriver {
   async collectArtifact(
     jobId: string,
     targetPath: string,
-    _artifactNames?: string[]
+    artifactNames?: string[]
   ): Promise<{ collected: string[]; destination: string }> {
     const state = this.stateStore.get(jobId);
     if (!state) {
       throw new Error(`[${this.providerId}] Compute job not found: ${jobId}`);
     }
+
+    const { safeCopyFileSync, safeMkdir, safeExistsSync } = await import('@agent/core/secure-io');
+    const path = await import('node:path');
+
+    const requested =
+      artifactNames && artifactNames.length > 0 ? artifactNames : (state.artifacts ?? []);
+    const collected: string[] = [];
+
+    // Ensure target destination directory exists
+    safeMkdir(targetPath, { recursive: true });
+
+    for (const art of requested) {
+      // If art is a path to an existing file, copy it into targetPath
+      if (safeExistsSync(art)) {
+        const baseName = path.basename(art);
+        const destFile = path.join(targetPath, baseName);
+        safeCopyFileSync(art, destFile);
+        collected.push(baseName);
+      } else {
+        // Record artifact reference
+        collected.push(path.basename(art));
+      }
+    }
+
     return {
-      collected: state.artifacts ?? ['output.json'],
+      collected,
       destination: targetPath,
     };
   }
