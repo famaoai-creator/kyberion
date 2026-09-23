@@ -185,3 +185,26 @@
 .settings-row-actions + .kb-disclosure {
   border-top: 1px solid var(--kb-ui-border);
 }
+
+/* PA-10: generated avatar set preview (settings → 写真・音声). */
+.avatar-generation-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.avatar-generation-grid li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kb-ui-space-1);
+}
+
+.avatar-generation-grid img {
+  border-radius: var(--kb-ui-radius-md, 8px);
+  border: 1px solid var(--kb-ui-border);
+  object-fit: cover;
+}

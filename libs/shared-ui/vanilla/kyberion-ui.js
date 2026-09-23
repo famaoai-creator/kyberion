@@ -26,6 +26,8 @@ import { createFormRenderers } from './forms.js';
 import { createVoiceRenderers } from './voice.js';
 // PA-01 pads: toolbar / dialog / drawing renderers live in ./pads.js (shared with React).
 import { createPadRenderers } from './pads.js';
+// PA-09 talking avatar: renderer + lip-sync controller live in ./avatar.js (shared with React).
+import { createAvatarRenderers } from './avatar.js';
 // UI-01d vocabulary (generated default messages, key tables, translator,
 // status labels, aliases, icons) lives in ./kyberion-ui-vocabulary.js.
 import {
@@ -920,6 +922,12 @@ Object.assign(RENDERERS, createVoiceRenderers({ el, setData }));
 
 // PA-01 pads (ui:toolbar / ui:dialog / ui:drawing-palette / ui:sketch-board): ./pads.js.
 Object.assign(RENDERERS, createPadRenderers({ el, setData, safeHref, appendChildren }));
+
+// PA-09 talking avatar (ui:talking-avatar): ./avatar.js (+ ./lipsync.js).
+Object.assign(
+  RENDERERS,
+  createAvatarRenderers({ el, setData, voiceState: RENDERERS['ui:voice-state'] })
+);
 
 /**
  * `ui:table` rich cell kind: `title` ({title, id?, href?}), `status`
