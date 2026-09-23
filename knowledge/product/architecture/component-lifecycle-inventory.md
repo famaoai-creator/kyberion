@@ -13,7 +13,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 ## Current Runtime Surface
 
 - Source of truth: `libs/actuators/*/manifest.json`
-- Count: 32
+- Count: 33
 - Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.
 
 - `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (7 ops, v1.1.0, schema knowledge/product/schemas/agent-action.schema.json)
@@ -25,6 +25,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `build-actuator`: iOS/Android build, test, archive and app scaffolding — the build stage of the mobile AI-DLC/SDLC loop (8 ops, v1.0.0, schema knowledge/product/schemas/build-pipeline.schema.json)
 - `calendar-actuator`: Adapter-based calendar coordination with user-selectable and multi-calendar backends, including macOS Calendar.app (JXA) and authenticated Google Workspace (gws) (4 ops, v1.2.0, schema knowledge/product/schemas/calendar-action.schema.json)
 - `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (4 ops, v2.2.0, schema knowledge/product/schemas/code-pipeline.schema.json)
+- `compute-actuator`: Remote and local compute orchestration actuator for heavy batch workloads, fine-tuning, and model execution across local and ephemeral substrates (such as Google Colab). (4 ops, v1.0.0)
 - `deployment-actuator`: Deployment capability boundary backed by the governed DeploymentAdapter (1 ops, v1.0.0, schema knowledge/product/schemas/deployment-action.schema.json)
 - `email-actuator`: Adapter-based email composition and sending with selectable macOS Mail.app (JXA) and SMTP backends (3 ops, v1.2.0, schema libs/actuators/email-actuator/schemas/email-action.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema knowledge/product/schemas/file-pipeline.schema.json)

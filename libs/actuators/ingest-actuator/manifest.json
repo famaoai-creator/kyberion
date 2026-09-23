@@ -17,7 +17,7 @@
   "capabilities": [
     {
       "op": "sync_source",
-      "description": "DA-03 incremental sync: reads the tenant × source watermark (active/shared/runtime/ingest-cursors/), lists changed items from box/slack/confluence read presets, and advances the watermark only after a fully successful listing (at-least-once; mid-fetch failure records consecutive_failures without moving the cursor)",
+      "description": "DA-03 incremental sync: reads the tenant × source watermark (active/shared/runtime/ingest-cursors/), lists changed items from box/slack/confluence/google_drive read presets, and advances the watermark only after a fully successful listing (at-least-once; mid-fetch failure records consecutive_failures without moving the cursor)",
       "platforms": ["darwin", "linux"]
     },
     {

@@ -1,0 +1,16 @@
+{
+  "name": "@actuator/compute",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Remote and Local Compute Workload Actuator for Kyberion Ecosystem",
+  "main": "../../../dist/libs/actuators/compute-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/compute-actuator/src/index.d.ts",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run src/"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

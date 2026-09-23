@@ -1,0 +1,68 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "compute-execution-provider",
+      "default_provider": "local",
+      "traits": {
+        "gpu_power": "Access to high-performance accelerators (T4, A100, TPU) for training or large inference.",
+        "cost": "Execution spend: subscription-bundled (Google AI Pro) or local execution scores highest, metered cloud scores lower.",
+        "latency": "Overhead to start execution and retrieve results.",
+        "privacy": "Data locality: local score 1, brokered external clouds score lower."
+      },
+      "providers": {
+        "local": {
+          "traits": {
+            "gpu_power": 0.4,
+            "cost": 1.0,
+            "latency": 0.95,
+            "privacy": 1.0
+          },
+          "trait_basis": {
+            "gpu_power": "declared",
+            "cost": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": ["Local host CPU / Apple Silicon MPS / CUDA execution"]
+        },
+        "colab": {
+          "traits": {
+            "gpu_power": 0.9,
+            "cost": 0.95,
+            "latency": 0.6,
+            "privacy": 0.7
+          },
+          "trait_basis": {
+            "gpu_power": "declared",
+            "cost": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "Google Colab (Google AI Pro/Ultra priority GPU instances & background execution)"
+          ]
+        }
+      },
+      "purposes": {
+        "heavy_gpu": {
+          "description": "High-compute workloads (LLM training, fine-tuning, large-scale media rendering) requiring top accelerators.",
+          "weights": { "gpu_power": 0.8, "cost": 0.2 }
+        },
+        "cost_efficient": {
+          "description": "Low marginal cost execution utilizing subscription allowances or local hardware.",
+          "weights": { "cost": 0.7, "gpu_power": 0.3 }
+        },
+        "low_latency": {
+          "description": "Immediate execution without remote setup or container spin-up overhead.",
+          "weights": { "latency": 0.8, "cost": 0.2 }
+        },
+        "privacy": {
+          "description": "Keeps computation strictly within the local host boundary.",
+          "weights": { "privacy": 0.9, "latency": 0.1 }
+        }
+      }
+    }
+  ]
+}

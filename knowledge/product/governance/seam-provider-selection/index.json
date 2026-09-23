@@ -12,6 +12,7 @@
     "voice-hub-stt",
     "music-generation-provider",
     "video-generation-provider",
+    "compute-execution-provider",
     "authn-principal-resolver",
     "authz-policy-engine"
   ]

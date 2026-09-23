@@ -19,7 +19,7 @@ describe('actuator operation discovery catalog', () => {
     const catalog = loadActuatorOpDiscoveryAtPath();
 
     expect(catalog.v).toBe('1.0.0');
-    expect(catalog.actuators).toHaveLength(32);
+    expect(catalog.actuators).toHaveLength(33);
     expect(catalog.actuators[0]?.ops[0]).toHaveProperty('kind');
   });
 
