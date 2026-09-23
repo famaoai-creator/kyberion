@@ -7,12 +7,19 @@
  * bigram overlap for the echo check so it also works for Japanese, which has
  * no word-boundary whitespace to split on.
  *
- * Pure — no I/O, no globals, no timers.
+ * Pure apart from reading the governed turn-taking lexicon once.
  */
 
+import { loadVoiceTurnTakingLexicon } from './voice-turn-taking-lexicon.js';
+
 /** Japanese fillers that hold the floor without saying anything substantive. */
-const JA_FILLER_ALTERNATION = 'えーと|えっと|あのー|あの|その|まあ|うーん|ええと|んー|えー';
-const JA_PURE_FILLER_RE = new RegExp(`^(?:${JA_FILLER_ALTERNATION})+$`, 'u');
+function jaPureFillerRe(): RegExp {
+  const alternation = [...loadVoiceTurnTakingLexicon().ja.respond_gate_fillers]
+    .sort((a, b) => b.length - a.length)
+    .map((filler) => filler.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+  return new RegExp(`^(?:${alternation})+$`, 'u');
+}
 
 /** English disfluencies — never a meaningful turn on their own. */
 const EN_DISFLUENCIES = new Set([
@@ -55,7 +62,7 @@ export function isPureDisfluency(text: string): boolean {
   }
 
   const noSpace = normalized.replace(/\s+/gu, '');
-  return JA_PURE_FILLER_RE.test(noSpace);
+  return jaPureFillerRe().test(noSpace);
 }
 
 // ---------------------------------------------------------------------------

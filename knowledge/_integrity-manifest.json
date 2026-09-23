@@ -721,6 +721,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/plugin-permissions-and-views.md",
+      "tier": "public",
+      "size": 8860,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/pptx-design-distillation-pattern.md",
       "tier": "public",
       "size": 3605,
@@ -2229,7 +2235,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 6816,
+      "size": 6854,
       "type": "json"
     },
     {
@@ -2913,7 +2919,7 @@
     {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 5321,
+      "size": 5396,
       "type": "json"
     },
     {
@@ -12149,6 +12155,12 @@
       "tier": "public",
       "size": 10642,
       "type": "md"
+    },
+    {
+      "path": "product/voice/turn-taking-lexicon.json",
+      "tier": "public",
+      "size": 1211,
+      "type": "json"
     },
     {
       "path": "public/accessibility/README.md",
