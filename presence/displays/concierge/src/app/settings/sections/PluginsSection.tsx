@@ -1,18 +1,30 @@
 'use client';
 
 import * as React from 'react';
+import { Button, EmptyState, SettingRow, SettingsGroup, StatusPill } from '@agent/shared-ui';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
 import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale, ConciergeMessageKey } from '../../../lib/i18n';
 import type { PluginEntry } from '../../../lib/settings-types';
+import type { SettingsTranslate } from './form-scope';
 
 /** FD-06/CS-03 プラグイン pane (`#setup-plugins`) — extracted from
  * settings/page.tsx; the approve/deny decision handler stays owned by the
- * page. */
+ * page. UI-06: one `SettingRow` per plugin with a status pill; the inline
+ * confirm step (no auto-approval, no browser dialog) is unchanged. */
 const PLUGIN_STATUS_KEYS: Record<string, ConciergeMessageKey> = {
   activatable: 'setup.plugin_status_activatable',
   pending_approval: 'setup.plugin_status_pending',
   blocked_broken_manifest: 'setup.plugin_status_blocked',
   not_loadable: 'setup.plugin_status_not_loadable',
+};
+
+/** Status-pill tone per plugin standing (catalog status vocabulary). */
+const PLUGIN_STATUS_PILL: Record<string, KbStatus> = {
+  activatable: 'ready',
+  pending_approval: 'pending',
+  blocked_broken_manifest: 'blocked',
+  not_loadable: 'unavailable',
 };
 
 const PLUGIN_TRUST_KEYS: Record<string, ConciergeMessageKey> = {
@@ -25,7 +37,7 @@ export type PluginConfirmState = { id: string; decision: 'approve' | 'deny' } | 
 
 export type PluginsSectionProps = {
   locale: ConciergeLocale;
-  t: (key: ConciergeMessageKey, params?: Record<string, string | number>) => string;
+  t: SettingsTranslate;
   plugins: PluginEntry[];
   pluginConfirm: PluginConfirmState;
   setPluginConfirm: (confirm: PluginConfirmState) => void;
@@ -45,94 +57,88 @@ export function PluginsSection({
   sectionRef,
 }: PluginsSectionProps) {
   return (
-    <section
-      className="pane"
+    <div
+      className="settings-section"
       id="setup-plugins"
       ref={sectionRef}
       aria-label={frontDeskText('settings_nav_plugins', locale)}
     >
-      <h2>{frontDeskText('settings_nav_plugins', locale)}</h2>
-      <h3 className="pane-subheading">{t('setup.plugins_title')}</h3>
-      <p className="pane-subtitle">{t('setup.plugins_description')}</p>
-      <p className="item-meta">{t('setup.plugins_caveat')}</p>
-      {plugins.length === 0 ? (
-        <p className="pane-empty">{t('setup.plugins_empty')}</p>
-      ) : (
-        plugins.map((plugin) => {
-          const statusKey =
-            plugin.approval_status === 'rejected'
+      <SettingsGroup
+        id="settings-plugins"
+        title={frontDeskText('settings_nav_plugins', locale)}
+        description={`${t('setup.plugins_description')} ${t('setup.plugins_caveat')}`}
+      >
+        {plugins.length === 0 ? (
+          <div className="settings-row-block">
+            <EmptyState title={t('setup.plugins_empty')} />
+          </div>
+        ) : (
+          plugins.map((plugin) => {
+            const denied = plugin.approval_status === 'rejected';
+            const statusKey = denied
               ? 'setup.plugin_status_denied'
               : PLUGIN_STATUS_KEYS[plugin.status];
-          const trustKey = PLUGIN_TRUST_KEYS[plugin.trust];
-          const decidable = plugin.status === 'pending_approval';
-          return (
-            <div className="item-card" key={`${plugin.source}-${plugin.id}`}>
-              <p className="item-title">
-                {plugin.id}
-                <span
-                  className={`status-chip${plugin.status === 'activatable' ? ' ok' : ' attention'}`}
-                >
-                  {statusKey ? t(statusKey) : plugin.status}
-                </span>
-              </p>
-              <p className="item-meta">
-                {trustKey ? t(trustKey) : plugin.trust}
-                {plugin.requested_by
-                  ? ` · ${t('setup.plugin_requested_by', { value: plugin.requested_by })}`
-                  : ''}
-              </p>
-              {decidable && pluginConfirm?.id === plugin.id ? (
-                <div className="plugin-confirm">
-                  <p className="item-body">
-                    {t(
-                      pluginConfirm.decision === 'approve'
-                        ? 'setup.plugin_confirm_approve'
-                        : 'setup.plugin_confirm_deny'
-                    )}
-                  </p>
-                  <div className="button-row">
-                    <button
-                      type="button"
-                      className="action-button"
-                      disabled={busy}
-                      onClick={() => onDecidePlugin(plugin.id, pluginConfirm.decision)}
-                    >
-                      {t('setup.confirm_yes')}
-                    </button>
-                    <button
-                      type="button"
-                      className="action-button secondary"
-                      disabled={busy}
-                      onClick={() => setPluginConfirm(null)}
-                    >
-                      {t('setup.confirm_back')}
-                    </button>
+            const trustKey = PLUGIN_TRUST_KEYS[plugin.trust];
+            const decidable = plugin.status === 'pending_approval';
+            const confirming = decidable && pluginConfirm?.id === plugin.id;
+            const meta = `${trustKey ? t(trustKey) : plugin.trust}${
+              plugin.requested_by
+                ? ` · ${t('setup.plugin_requested_by', { value: plugin.requested_by })}`
+                : ''
+            }`;
+            return (
+              <div className="settings-row-group" key={`${plugin.source}-${plugin.id}`}>
+                <SettingRow label={plugin.id} description={meta}>
+                  <StatusPill
+                    status={denied ? 'blocked' : (PLUGIN_STATUS_PILL[plugin.status] ?? 'n/a')}
+                    label={statusKey ? t(statusKey) : plugin.status}
+                  />
+                </SettingRow>
+                {confirming ? (
+                  <div className="settings-row-confirm" role="group">
+                    <p className="kb-text kb-text--body">
+                      {t(
+                        pluginConfirm.decision === 'approve'
+                          ? 'setup.plugin_confirm_approve'
+                          : 'setup.plugin_confirm_deny'
+                      )}
+                    </p>
+                    <div className="settings-inline-actions">
+                      <Button
+                        label={t('setup.confirm_yes')}
+                        variant={pluginConfirm.decision === 'approve' ? 'primary' : 'danger'}
+                        disabled={busy}
+                        onClick={() => onDecidePlugin(plugin.id, pluginConfirm.decision)}
+                      />
+                      <Button
+                        label={t('setup.confirm_back')}
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() => setPluginConfirm(null)}
+                      />
+                    </div>
                   </div>
-                </div>
-              ) : decidable ? (
-                <div className="button-row">
-                  <button
-                    type="button"
-                    className="action-button"
-                    disabled={busy}
-                    onClick={() => setPluginConfirm({ id: plugin.id, decision: 'approve' })}
-                  >
-                    {t('setup.plugin_approve')}
-                  </button>
-                  <button
-                    type="button"
-                    className="action-button secondary"
-                    disabled={busy}
-                    onClick={() => setPluginConfirm({ id: plugin.id, decision: 'deny' })}
-                  >
-                    {t('setup.plugin_deny')}
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          );
-        })
-      )}
-    </section>
+                ) : decidable ? (
+                  <div className="settings-row-actions">
+                    <Button
+                      label={t('setup.plugin_approve')}
+                      variant="primary"
+                      disabled={busy}
+                      onClick={() => setPluginConfirm({ id: plugin.id, decision: 'approve' })}
+                    />
+                    <Button
+                      label={t('setup.plugin_deny')}
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => setPluginConfirm({ id: plugin.id, decision: 'deny' })}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </SettingsGroup>
+    </div>
   );
 }

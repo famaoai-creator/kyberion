@@ -12,6 +12,7 @@
 
 export type SettingsSectionId =
   | 'profile'
+  | 'display'
   | 'members'
   | 'services'
   | 'voice'
@@ -28,6 +29,7 @@ export interface SettingsReadinessItem {
 /** Matches plan §FD-06's fixed sub-nav order (settings_nav_* vocabulary). */
 export const SETTINGS_SECTION_ORDER: readonly SettingsSectionId[] = [
   'profile',
+  'display',
   'members',
   'services',
   'voice',
@@ -44,6 +46,17 @@ export const SETTINGS_SECTION_ORDER: readonly SettingsSectionId[] = [
  * diagnostic ids are ignored rather than throwing — the page must still
  * render if the API adds a diagnostic this map doesn't know about yet.
  */
+/**
+ * UI-06: sub-nav entries that are not cards of their own. 表示 (`display`)
+ * renders inside the profile card, so it is a nav jump target only and never
+ * part of the card stack `orderSectionsForFirstRun` returns.
+ */
+export const SETTINGS_NAV_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['display']);
+
+/** The card stack in canonical order (sub-nav order minus nav-only entries). */
+export const SETTINGS_CARD_SECTION_ORDER: readonly SettingsSectionId[] =
+  SETTINGS_SECTION_ORDER.filter((id) => !SETTINGS_NAV_ONLY_SECTIONS.has(id));
+
 const DIAGNOSTIC_SECTION: Record<string, SettingsSectionId> = {
   profile: 'profile',
   avatar: 'voice',
@@ -57,7 +70,7 @@ export function orderSectionsForFirstRun(
   readiness: readonly SettingsReadinessItem[]
 ): SettingsSectionId[] {
   const allComplete = readiness.every((item) => item.status === 'ok');
-  if (allComplete) return [...SETTINGS_SECTION_ORDER];
+  if (allComplete) return [...SETTINGS_CARD_SECTION_ORDER];
 
   const incompleteSections = new Set<SettingsSectionId>();
   for (const item of readiness) {
@@ -66,7 +79,7 @@ export function orderSectionsForFirstRun(
     if (section) incompleteSections.add(section);
   }
 
-  const incomplete = SETTINGS_SECTION_ORDER.filter((id) => incompleteSections.has(id));
-  const rest = SETTINGS_SECTION_ORDER.filter((id) => !incompleteSections.has(id));
+  const incomplete = SETTINGS_CARD_SECTION_ORDER.filter((id) => incompleteSections.has(id));
+  const rest = SETTINGS_CARD_SECTION_ORDER.filter((id) => !incompleteSections.has(id));
   return [...incomplete, ...rest];
 }

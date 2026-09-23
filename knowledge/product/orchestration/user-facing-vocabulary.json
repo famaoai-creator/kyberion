@@ -5236,6 +5236,56 @@
         "ja": "CEO秘書 — 依頼・承認・成果・例外",
         "qps-ploc": "⟦Ėẋėƈůŧïṽė şėƈřėŧȧřẏ — řėɋůėşŧş, ȧṗṗřőṽȧŀş, őůŧƈőɱėş, ėẋƈėṗŧïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
+      "header.title": {
+        "en": "Concierge",
+        "ja": "秘書室",
+        "qps-ploc": "⟦Ƈőñƈïėřɠė ŀőř⟧"
+      },
+      "header.role_badge": {
+        "en": "Executive secretary",
+        "ja": "CEO秘書",
+        "qps-ploc": "⟦Ėẋėƈůŧïṽė şėƈřėŧȧřẏ ŀőřėɱ ⟧"
+      },
+      "theme.label": {
+        "en": "Theme",
+        "ja": "表示テーマ",
+        "qps-ploc": "⟦Ŧħėɱė ŀőř⟧"
+      },
+      "theme.system": {
+        "en": "Auto",
+        "ja": "自動",
+        "qps-ploc": "⟦Ȧůŧő ŀőř⟧"
+      },
+      "theme.light": {
+        "en": "Light",
+        "ja": "ライト",
+        "qps-ploc": "⟦Ŀïɠħŧ ŀőř⟧"
+      },
+      "theme.dark": {
+        "en": "Dark",
+        "ja": "ダーク",
+        "qps-ploc": "⟦Ḓȧřķ ŀőř⟧"
+      },
+      "decide.next_eyebrow": {
+        "en": "Decide this first",
+        "ja": "まず決めること",
+        "qps-ploc": "⟦Ḓėƈïḓė ŧħïş ƒïřşŧ ŀőřėɱ⟧"
+      },
+      "decide.next_review": {
+        "en": "Review",
+        "ja": "内容を見る",
+        "qps-ploc": "⟦Řėṽïėẇ ŀőř⟧"
+      },
+      "decide.next_more": {
+        "en": "{count} more waiting after this",
+        "ja": "ほかに {count}件が待っています",
+        "qps-ploc": "⟦{count} ɱőřė ẇȧïŧïñɠ ȧƒŧėř ŧħïş ŀőřėɱ ïṗşů⟧"
+      },
+      "decide.next_empty_reason": {
+        "en": "When a new approval or check arrives, the most urgent one appears here.",
+        "ja": "新しい承認や確認が届くと、いちばん急ぎのものをここに表示します。",
+        "qps-ploc": "⟦Ẇħėñ ȧ ñėẇ ȧṗṗřőṽȧŀ őř ƈħėƈķ ȧřřïṽėş, ŧħė ɱőşŧ ůřɠėñŧ őñė ȧṗṗėȧřş ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
       "locale.label": {
         "en": "Language",
         "ja": "言語",
@@ -7225,6 +7275,131 @@
         "en": "Setup: governance changes",
         "ja": "セットアップ: ガバナンス設定",
         "qps-ploc": "⟦Şėŧůṗ: ɠőṽėřñȧñƈė ƈħȧñɠėş ŀőřėɱ ïṗ⟧"
+      },
+      "settings.display_title": {
+        "en": "Display",
+        "ja": "表示",
+        "qps-ploc": "⟦Ḓïşṗŀȧẏ ŀőř⟧"
+      },
+      "settings.display_description": {
+        "en": "Language, theme and density for this browser. Changes apply right away.",
+        "ja": "この端末のブラウザでの言語・テーマ・表示密度です。変更はすぐに反映されます。",
+        "qps-ploc": "⟦Ŀȧñɠůȧɠė, ŧħėɱė ȧñḓ ḓėñşïŧẏ ƒőř ŧħïş ƀřőẇşėř. Ƈħȧñɠėş ȧṗṗŀẏ řïɠħŧ ȧẇȧẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "settings.display_density": {
+        "en": "Density",
+        "ja": "表示密度",
+        "qps-ploc": "⟦Ḓėñşïŧẏ ŀőř⟧"
+      },
+      "settings.display_density_description": {
+        "en": "Compact fits more on screen.",
+        "ja": "コンパクトにすると一画面に多く表示できます。",
+        "qps-ploc": "⟦Ƈőɱṗȧƈŧ ƒïŧş ɱőřė őñ şƈřėėñ. ŀőřėɱ ïṗş⟧"
+      },
+      "settings.display_density_comfortable": {
+        "en": "Comfortable",
+        "ja": "ゆったり",
+        "qps-ploc": "⟦Ƈőɱƒőřŧȧƀŀė ŀőř⟧"
+      },
+      "settings.display_density_compact": {
+        "en": "Compact",
+        "ja": "コンパクト",
+        "qps-ploc": "⟦Ƈőɱṗȧƈŧ ŀőř⟧"
+      },
+      "settings.service_use": {
+        "en": "Include in setup",
+        "ja": "準備に含める",
+        "qps-ploc": "⟦Ïñƈŀůḓė ïñ şėŧůṗ ŀőřėɱ⟧"
+      },
+      "settings.agents_empty": {
+        "en": "No agents are registered yet.",
+        "ja": "登録済みのエージェントはまだありません。",
+        "qps-ploc": "⟦Ñő ȧɠėñŧş ȧřė řėɠïşŧėřėḓ ẏėŧ. ŀőřėɱ ïṗş⟧"
+      },
+      "settings.secrets_title": {
+        "en": "API tokens",
+        "ja": "API トークン",
+        "qps-ploc": "⟦ȦṖÏ ŧőķėñş ŀőř⟧"
+      },
+      "settings.secrets_description": {
+        "en": "Tokens are registered through the approval-gated secret path. A saved value is never shown on this page again.",
+        "ja": "トークンは承認付きの登録経路で保存されます。保存した値がこの画面に再び表示されることはありません。",
+        "qps-ploc": "⟦Ŧőķėñş ȧřė řėɠïşŧėřėḓ ŧħřőůɠħ ŧħė ȧṗṗřőṽȧŀ-ɠȧŧėḓ şėƈřėŧ ṗȧŧħ. Ȧ şȧṽėḓ ṽȧŀůė ïş ñėṽėř şħőẇñ őñ ŧħïş ṗȧɠė ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
+      "settings.secret_service": {
+        "en": "Service",
+        "ja": "サービス",
+        "qps-ploc": "⟦Şėřṽïƈė ŀőř⟧"
+      },
+      "settings.secret_key": {
+        "en": "Secret key",
+        "ja": "キーの種類",
+        "qps-ploc": "⟦Şėƈřėŧ ķėẏ ŀőř⟧"
+      },
+      "settings.secret_reason": {
+        "en": "Reason",
+        "ja": "理由",
+        "qps-ploc": "⟦Řėȧşőñ ŀőř⟧"
+      },
+      "settings.secret_reason_placeholder": {
+        "en": "Why this credential is needed",
+        "ja": "この認証情報が必要な理由",
+        "qps-ploc": "⟦Ẇħẏ ŧħïş ƈřėḓėñŧïȧŀ ïş ñėėḓėḓ ŀőřėɱ ïṗş⟧"
+      },
+      "settings.secret_propose": {
+        "en": "Request registration",
+        "ja": "登録を申請",
+        "qps-ploc": "⟦Řėɋůėşŧ řėɠïşŧřȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "settings.secret_propose_description": {
+        "en": "Records the request without the value. Once approved you can paste the value below.",
+        "ja": "値を含めずに申請を記録します。承認されたら下で値を貼り付けられます。",
+        "qps-ploc": "⟦Řėƈőřḓş ŧħė řėɋůėşŧ ẇïŧħőůŧ ŧħė ṽȧŀůė. Őñƈė ȧṗṗřőṽėḓ ẏőů ƈȧñ ṗȧşŧė ŧħė ṽȧŀůė ƀėŀőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "settings.secret_approval_id": {
+        "en": "Approval ID",
+        "ja": "承認 ID",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ÏḒ ŀőř⟧"
+      },
+      "settings.secret_approval_id_help": {
+        "en": "Filled in after the request. If it was approved elsewhere, paste its ID here.",
+        "ja": "申請すると自動で入ります。別の場所で承認した場合はその ID を貼り付けてください。",
+        "qps-ploc": "⟦Ƒïŀŀėḓ ïñ ȧƒŧėř ŧħė řėɋůėşŧ. Ïƒ ïŧ ẇȧş ȧṗṗřőṽėḓ ėŀşėẇħėřė, ṗȧşŧė ïŧş ÏḒ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "settings.secret_value": {
+        "en": "Token value",
+        "ja": "トークンの値",
+        "qps-ploc": "⟦Ŧőķėñ ṽȧŀůė ŀőř⟧"
+      },
+      "settings.secret_value_help": {
+        "en": "Paste the value once. It is sent only to the governed registration and the field is cleared right after.",
+        "ja": "値は一度だけ貼り付けてください。統制された登録経路にだけ送られ、送信後すぐに入力欄は空になります。",
+        "qps-ploc": "⟦Ṗȧşŧė ŧħė ṽȧŀůė őñƈė. Ïŧ ïş şėñŧ őñŀẏ ŧő ŧħė ɠőṽėřñėḓ řėɠïşŧřȧŧïőñ ȧñḓ ŧħė ƒïėŀḓ ïş ƈŀėȧřėḓ řïɠħŧ ȧƒŧėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "settings.secret_value_locked": {
+        "en": "Request registration first; the value can be entered after approval.",
+        "ja": "まず登録を申請してください。承認後に値を入力できます。",
+        "qps-ploc": "⟦Řėɋůėşŧ řėɠïşŧřȧŧïőñ ƒïřşŧ; ŧħė ṽȧŀůė ƈȧñ ƀė ėñŧėřėḓ ȧƒŧėř ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "settings.secret_request_approved": {
+        "en": "The request for {env} is approved. Paste the value below to register it.",
+        "ja": "{env} の申請が承認されました。下に値を貼り付けて登録してください。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƒőř {env} ïş ȧṗṗřőṽėḓ. Ṗȧşŧė ŧħė ṽȧŀůė ƀėŀőẇ ŧő řėɠïşŧėř ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "settings.secret_request_pending": {
+        "en": "The request for {env} is waiting for approval. You can register the value once it is approved.",
+        "ja": "{env} の申請は承認待ちです。承認後に値を登録できます。",
+        "qps-ploc": "⟦Ŧħė řėɋůėşŧ ƒőř {env} ïş ẇȧïŧïñɠ ƒőř ȧṗṗřőṽȧŀ. Ẏőů ƈȧñ řėɠïşŧėř ŧħė ṽȧŀůė őñƈė ïŧ ïş ȧṗṗřőṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "settings.secret_applied": {
+        "en": "{env} is registered. The value is not kept on this page.",
+        "ja": "{env} を登録しました。値はこの画面に残りません。",
+        "qps-ploc": "⟦{env} ïş řėɠïşŧėřėḓ. Ŧħė ṽȧŀůė ïş ñőŧ ķėṗŧ őñ ŧħïş ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "settings.secret_failed": {
+        "en": "Could not complete the request: {error}",
+        "ja": "申請を完了できませんでした: {error}",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ƈőɱṗŀėŧė ŧħė řėɋůėşŧ: {error} ŀőřėɱ ïṗşůɱ ḓ⟧"
       }
     },
     "onboarding": {
@@ -9744,6 +9919,76 @@
         "en": "Could not load the sample data ({error})",
         "ja": "サンプルデータを読み込めませんでした ({error})",
         "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ŧħė şȧɱṗŀė ḓȧŧȧ ({error}) ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "shell_role_badge": {
+        "en": "Companion",
+        "ja": "相棒",
+        "qps-ploc": "⟦Ƈőɱṗȧñïőñ ŀőř⟧"
+      },
+      "shell_theme": {
+        "en": "Theme",
+        "ja": "テーマ",
+        "qps-ploc": "⟦Ŧħėɱė ŀőř⟧"
+      },
+      "shell_theme_system": {
+        "en": "Match system",
+        "ja": "システムに合わせる",
+        "qps-ploc": "⟦Ɱȧŧƈħ şẏşŧėɱ ŀőř⟧"
+      },
+      "shell_theme_light": {
+        "en": "Light",
+        "ja": "ライト",
+        "qps-ploc": "⟦Ŀïɠħŧ ŀőř⟧"
+      },
+      "shell_theme_dark": {
+        "en": "Dark",
+        "ja": "ダーク",
+        "qps-ploc": "⟦Ḓȧřķ ŀőř⟧"
+      },
+      "shell_language": {
+        "en": "Language",
+        "ja": "言語",
+        "qps-ploc": "⟦Ŀȧñɠůȧɠė ŀőř⟧"
+      },
+      "shell_language_en": {
+        "en": "English",
+        "ja": "English",
+        "qps-ploc": "⟦Ėñɠŀïşħ ŀőř⟧"
+      },
+      "shell_language_ja": {
+        "en": "日本語",
+        "ja": "日本語",
+        "qps-ploc": "⟦日本語 ŀőř⟧"
+      },
+      "work_page_title": {
+        "en": "Workbench",
+        "ja": "作業台",
+        "qps-ploc": "⟦Ẇőřķƀėñƈħ ŀőř⟧"
+      },
+      "home_metric_decide": {
+        "en": "Waiting for you",
+        "ja": "判断待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ẏőů ŀőřė⟧"
+      },
+      "home_next_ask": {
+        "en": "Ask for something",
+        "ja": "何か頼む",
+        "qps-ploc": "⟦Ȧşķ ƒőř şőɱėŧħïñɠ ŀőřėɱ⟧"
+      },
+      "ask_conversation_label": {
+        "en": "Conversation",
+        "ja": "会話",
+        "qps-ploc": "⟦Ƈőñṽėřşȧŧïőñ ŀőř⟧"
+      },
+      "progress_list_label": {
+        "en": "Items",
+        "ja": "一覧",
+        "qps-ploc": "⟦Ïŧėɱş ŀőř⟧"
+      },
+      "progress_detail_label": {
+        "en": "Details of the selected item",
+        "ja": "選んだ項目の詳細",
+        "qps-ploc": "⟦Ḓėŧȧïŀş őƒ ŧħė şėŀėƈŧėḓ ïŧėɱ ŀőřėɱ ïṗş⟧"
       }
     },
     "tui": {
@@ -11135,6 +11380,11 @@
         "en": "About you",
         "ja": "あなたのこと",
         "qps-ploc": "⟦Ȧƀőůŧ ẏőů ŀőř⟧"
+      },
+      "settings_nav_display": {
+        "en": "Display",
+        "ja": "表示",
+        "qps-ploc": "⟦Ḓïşṗŀȧẏ ŀőř⟧"
       },
       "settings_nav_members": {
         "en": "Organization and members",

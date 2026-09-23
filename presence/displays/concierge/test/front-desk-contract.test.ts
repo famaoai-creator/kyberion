@@ -37,7 +37,10 @@ describe('FD-00c/FD-01c front-desk contract (concierge)', () => {
     expect(header).not.toContain('href="/setup"');
     // The header still declares the surface identity contract.
     expect(header).toContain("t('header.tagline')");
-    expect(header).toContain("locale === 'ja' ? '秘書室' : 'Concierge'");
+    // UI-06: the surface name and role badge come from the vocabulary catalog.
+    expect(header).toContain("t('header.title')");
+    expect(header).toContain("t('header.role_badge')");
+    expect(header).toContain('PageHeader');
   });
 
   it('renders the rail without target=_blank, raw loopback URLs, or emoji, and marks the current item', () => {

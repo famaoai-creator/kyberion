@@ -10,8 +10,9 @@
 // lookup, which only matches an exact filename with no extension).
 import type express from 'express';
 import * as path from 'node:path';
+import { safeReadFile } from '@agent/core';
 import { readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
-import { type VocabularyKey } from '@agent/core/t';
+import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 
 export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
   'presence_studio:record_mission_placeholder',
@@ -73,7 +74,8 @@ export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
   'tui:tui_cockpit_outcome_status_report',
 ] as const satisfies readonly VocabularyKey[];
 
-// FD-02: exactly the `front_desk` keys `static/home.js` renders. Mirrors
+// FD-02: exactly the keys `static/home.js` renders (UI-06 adds the
+// `presence_studio` next-action / metric labels). Mirrors
 // `PRESENCE_STUDIO_VOCABULARY_KEYS` above / `/api/ui-vocabulary` — see
 // `GET /api/home-vocabulary` in `front-desk-routes.ts`.
 export const HOME_VOCABULARY_KEYS = [
@@ -102,6 +104,9 @@ export const HOME_VOCABULARY_KEYS = [
   'front_desk:tag_in_progress',
   'front_desk:tag_delivered',
   'front_desk:action_receive',
+  'front_desk:progress_delivered_title',
+  'presence_studio:home_next_ask',
+  'presence_studio:home_metric_decide',
 ] as const satisfies readonly VocabularyKey[];
 
 // FD-05: exactly the `front_desk` keys `static/progress.js` renders. Mirrors
@@ -126,6 +131,9 @@ export const PROGRESS_VOCABULARY_KEYS = [
   'front_desk:action_receive',
   'front_desk:action_revise',
   'front_desk:count_items',
+  // UI-06: row status pill labels.
+  'front_desk:tag_in_progress',
+  'front_desk:tag_delivered',
 ] as const satisfies readonly VocabularyKey[];
 
 // FD-03: exactly the keys `static/ask.js` renders. Mirrors
@@ -245,17 +253,104 @@ export const HELP_VOCABULARY_KEYS = [
   'front_desk:training_status_complete',
 ] as const satisfies readonly VocabularyKey[];
 
+// UI-05/UI-06 (SURFACE_UI_UNIFICATION_PLAN_2026-09-23 §3.1): front-desk pages
+// are served as small templates so their fixed chrome (page title, headings,
+// input placeholders, loading text) is already in the viewer's language at
+// first paint — the page never shows empty, unlabeled boxes while its script
+// fetches the vocabulary. `{{t:<domain>:<key>}}` is replaced with the
+// catalog text (HTML-escaped) and `{{locale}}` with the resolved locale; the
+// page scripts still re-render everything from the vocabulary routes.
+// `{{partial:<name>}}` inlines one of the fixed shared shell fragments below
+// (rail placeholder, header controls) so the five pages do not each copy them.
+
+/** Cookie the front-desk shell mirrors its stored language choice into. */
+export const FRONT_DESK_LOCALE_COOKIE = 'kb-ui-locale';
+export type FrontDeskPageLocale = 'en' | 'ja';
+
+/** Shared shell fragments (`static/<file>`), addressable only by these names. */
+export const FRONT_DESK_PAGE_PARTIALS: Readonly<Record<string, string>> = Object.freeze({
+  rail: 'front-desk-rail.partial.html',
+  'shell-controls': 'front-desk-shell-controls.partial.html',
+});
+
+const PARTIAL_PATTERN = /\{\{partial:([a-z-]+)\}\}/g;
+const TEMPLATE_KEY_PATTERN = /\{\{t:([a-z0-9_]+:[a-z0-9_]+)\}\}/g;
+
+function escapeTemplateText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * The page language: the shell's `kb-ui-locale` cookie when it names a
+ * supported front-desk locale, else the first `Accept-Language` tag that is
+ * one, else English.
+ */
+export function resolveFrontDeskPageLocale(headers: {
+  cookie?: string | string[];
+  'accept-language'?: string | string[];
+}): FrontDeskPageLocale {
+  const cookie = Array.isArray(headers.cookie) ? headers.cookie.join(';') : headers.cookie || '';
+  const match = /(?:^|;)\s*kb-ui-locale=(en|ja)\s*(?:;|$)/.exec(cookie);
+  if (match) return match[1] as FrontDeskPageLocale;
+  const accept = Array.isArray(headers['accept-language'])
+    ? headers['accept-language'].join(',')
+    : headers['accept-language'] || '';
+  for (const part of accept.split(',')) {
+    const tag = part.split(';')[0].trim().toLowerCase();
+    if (tag.startsWith('ja')) return 'ja';
+    if (tag.startsWith('en')) return 'en';
+  }
+  return 'en';
+}
+
+/** Fill a front-desk page template for `locale` (pure; exported for tests). */
+export function renderFrontDeskPageTemplate(
+  html: string,
+  locale: FrontDeskPageLocale,
+  loadPartial: (file: string) => string = () => ''
+): string {
+  return html
+    .replace(PARTIAL_PATTERN, (_match, name: string) =>
+      Object.prototype.hasOwnProperty.call(FRONT_DESK_PAGE_PARTIALS, name)
+        ? loadPartial(FRONT_DESK_PAGE_PARTIALS[name])
+        : ''
+    )
+    .replace(/\{\{locale\}\}/g, locale)
+    .replace(TEMPLATE_KEY_PATTERN, (_match, key: string) =>
+      escapeTemplateText(catalogT(key as VocabularyKey, undefined, locale))
+    );
+}
+
+function sendFrontDeskPage(
+  req: express.Request,
+  res: express.Response,
+  staticDir: string,
+  file: string
+): void {
+  const locale = resolveFrontDeskPageLocale(req.headers);
+  const read = (name: string) =>
+    String(safeReadFile(path.join(staticDir, name), { encoding: 'utf8' }) || '');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Language', locale);
+  res.type('html').send(renderFrontDeskPageTemplate(read(file), locale, read));
+}
+
 // FD-02: `/` is now the human home page; the pre-FD-02 workbench moved to
 // `/work` unchanged. Both must be registered ahead of `express.static` (the
 // caller does this) so its default `index: 'index.html'` behavior for
 // `GET /` never wins the race against `home.html`.
 export function registerFrontDeskHomeWorkPages(app: express.Express, staticDir: string): void {
-  app.get('/', (_req, res) => {
-    res.sendFile(path.join(staticDir, 'home.html'));
+  app.get('/', (req, res) => {
+    sendFrontDeskPage(req, res, staticDir, 'home.html');
   });
 
-  app.get('/work', (_req, res) => {
-    res.sendFile(path.join(staticDir, 'index.html'));
+  app.get('/work', (req, res) => {
+    sendFrontDeskPage(req, res, staticDir, 'index.html');
   });
 }
 
@@ -273,26 +368,26 @@ export function registerFrontDeskAuxPages(app: express.Express, staticDir: strin
   });
 
   // FD-03: the dedicated "頼む" page, replacing the interim `/work` redirect.
-  app.get('/ask', (_req, res) => {
-    res.sendFile(path.join(staticDir, 'ask.html'));
+  app.get('/ask', (req, res) => {
+    sendFrontDeskPage(req, res, staticDir, 'ask.html');
   });
 
   // FD-05: the dedicated "進み具合" page, replacing the interim `/work`
   // redirect.
-  app.get('/progress', (_req, res) => {
-    res.sendFile(path.join(staticDir, 'progress.html'));
+  app.get('/progress', (req, res) => {
+    sendFrontDeskPage(req, res, staticDir, 'progress.html');
   });
 
   // FD-08: the dedicated "使い方を見る" page (旧 /learn), replacing the interim
   // `/onboarding` redirect.
-  app.get('/help', (_req, res) => {
-    res.sendFile(path.join(staticDir, 'help.html'));
+  app.get('/help', (req, res) => {
+    sendFrontDeskPage(req, res, staticDir, 'help.html');
   });
 
   // HT-05: a single training track's page — same static file as `/help`;
   // `static/help.js` reads the track id from `window.location.pathname` and
   // renders the matching catalog track client-side (GET /api/training/catalog).
-  app.get('/help/:track', (_req, res) => {
-    res.sendFile(path.join(staticDir, 'help.html'));
+  app.get('/help/:track', (req, res) => {
+    sendFrontDeskPage(req, res, staticDir, 'help.html');
   });
 }

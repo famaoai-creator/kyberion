@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { renderMessage } from '@agent/core/message-format';
+import { NavRail } from '@agent/shared-ui';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
 import { attachFrontDeskAuthHeaders, isLoopbackHostname } from '../lib/front-desk-auth-token';
@@ -14,10 +14,11 @@ import { attachFrontDeskAuthHeaders, isLoopbackHostname } from '../lib/front-des
  * so `layout.tsx` can mount it unconditionally without adding a server
  * round-trip to every concierge page.
  *
- * Cross-surface items (home / ask / progress on presence-studio) render as
- * plain same-tab `<a>` links — never a new-window/new-tab target, no popup
- * window. Items hosted on concierge itself (decide / settings) use
- * `next/link` for client-side routing, matching the rest of this app.
+ * UI-05: rendered with the shared `NavRail` (`ui:nav-rail`). Every item is
+ * a same-tab link — never a new-window/new-tab target, no popup window.
+ * Links go through the shell's `next/link` adapter, so items hosted on
+ * concierge itself (decide / settings) route client-side and cross-surface
+ * items (home / ask / progress on presence-studio) are plain navigations.
  */
 
 const TENANT_STORAGE_KEY = 'front-desk.tenant';
@@ -76,64 +77,18 @@ function storeTenant(slug: string): void {
   }
 }
 
-/** 24-viewBox stroke icons (1.8 stroke-width, round caps) — plan wireframes §2.1. */
-function FrontDeskIcon({ id }: { id: FrontDeskNavItemPayload['id'] | 'help' }) {
-  const props = {
-    width: 24,
-    height: 24,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.8,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-    focusable: false,
-  };
-  switch (id) {
-    case 'home':
-      return (
-        <svg {...props}>
-          <path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />
-        </svg>
-      );
-    case 'ask':
-      return (
-        <svg {...props}>
-          <path d="M4 5h16v11H9l-5 4z" />
-        </svg>
-      );
-    case 'decide':
-      return (
-        <svg {...props}>
-          <path d="M4 12l5 5L20 6" />
-        </svg>
-      );
-    case 'progress':
-      return (
-        <svg {...props}>
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 7v5l3 3" />
-        </svg>
-      );
-    case 'settings':
-      return (
-        <svg {...props}>
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2" />
-        </svg>
-      );
-    case 'help':
-      return (
-        <svg {...props}>
-          <circle cx="12" cy="12" r="9" />
-          <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17h0" />
-        </svg>
-      );
-    default:
-      return null;
-  }
-}
+/**
+ * UI-05: rail item id to shared-ui icon name (`KB_ICON_PATHS`). The
+ * presence-studio rail (vanilla renderer) uses the same mapping, so both
+ * front-desk surfaces render the same `.kb-nav-rail` markup.
+ */
+const RAIL_ICONS: Record<FrontDeskNavItemPayload['id'], string> = {
+  home: 'home',
+  ask: 'chat',
+  decide: 'check',
+  progress: 'clock',
+  settings: 'settings',
+};
 
 /** `/` -> decide, `/setup` or `/settings` -> settings; every other path has no current rail item. */
 function currentItemId(pathname: string | null): FrontDeskNavItemPayload['id'] | null {
@@ -178,12 +133,18 @@ export function FrontDeskRail() {
   }, []);
 
   React.useEffect(() => {
+    // A slower response for the previous locale must not overwrite the
+    // current one after a language switch.
+    let current = true;
     fetch(`/api/front-desk/nav?locale=${locale}`, { headers: attachFrontDeskAuthHeaders() })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: FrontDeskNavResponse | null) => {
-        if (data?.ok) setNav(data);
+        if (current && data?.ok) setNav(data);
       })
       .catch(() => {});
+    return () => {
+      current = false;
+    };
   }, [locale]);
 
   React.useEffect(() => {
@@ -216,18 +177,41 @@ export function FrontDeskRail() {
   const ariaLabel = nav?.aria_label || frontDeskText('nav_aria_label', locale);
   const brandTagline = nav?.brand_tagline || frontDeskText('brand_tagline', locale);
 
+  // UI-05: `ui:nav-rail` — the 5 human-verb items (role-gated by
+  // `allowed`, unchanged) with the current one marked `aria-current="page"`
+  // by NavRail, 資料の取込 + help in the footer. Brand and tenant blocks keep
+  // the `fd-*` classes the presence-studio rail shares.
+  const items = (nav?.items || [])
+    .filter((item) => item.allowed)
+    .map((item) => ({
+      id: item.id,
+      label: item.label,
+      hint: item.sublabel,
+      href: item.href,
+      icon: RAIL_ICONS[item.id],
+      active: item.id === current,
+    }));
+  const footerItems = [
+    // FD-03 will fold this into the 頼む (ask) request templates; until
+    // then, ingest keeps its own reachable entry point here.
+    { id: 'ingest', label: t('header.ingest'), href: '/ingest', icon: 'folder' },
+    ...(nav ? [{ id: 'help', label: nav.help.label, href: nav.help.href, icon: 'help' }] : []),
+  ];
+
   return (
-    <nav className="fd-rail" aria-label={ariaLabel}>
+    <NavRail label={ariaLabel} items={items} footer_items={footerItems}>
       <div className="fd-brand">
         <span className="fd-brand-mark" aria-hidden="true" />
-        <div className="fd-brand-text">
+        <span className="fd-brand-text">
           <strong>Kyberion</strong>
-          <div className="fd-brand-tagline">{brandTagline}</div>
-        </div>
+          <small>{brandTagline}</small>
+        </span>
       </div>
 
-      {nav && me?.can_switch !== undefined ? (
-        <div className="fd-tenant-block">
+      {/* Only once a tenant is actually being viewed — an empty name/role
+          block reads as broken (same rule as the presence-studio rail). */}
+      {nav && me?.viewing ? (
+        <div className="fd-tenant">
           <button
             type="button"
             className="fd-tenant-button"
@@ -270,57 +254,6 @@ export function FrontDeskRail() {
           ) : null}
         </div>
       ) : null}
-
-      <ul className="fd-items">
-        {(nav?.items || [])
-          .filter((item) => item.allowed)
-          .map((item) => {
-            const isCurrent = item.id === current;
-            const content = (
-              <>
-                <FrontDeskIcon id={item.id} />
-                <span className="fd-item-text">
-                  <span className="fd-item-label">{item.label}</span>
-                  <span className="fd-item-sublabel">{item.sublabel}</span>
-                </span>
-              </>
-            );
-            return (
-              <li key={item.id}>
-                {item.external ? (
-                  <a
-                    href={item.href}
-                    className="fd-item"
-                    aria-current={isCurrent ? 'page' : undefined}
-                  >
-                    {content}
-                  </a>
-                ) : (
-                  <Link
-                    href={item.href}
-                    className="fd-item"
-                    aria-current={isCurrent ? 'page' : undefined}
-                  >
-                    {content}
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-      </ul>
-
-      {/* FD-03 will fold this into the 頼む (ask) request templates; until
-          then, ingest keeps its own reachable entry point here. */}
-      <Link href="/ingest" className="fd-secondary-link">
-        {t('header.ingest')}
-      </Link>
-
-      {nav ? (
-        <a href={nav.help.href} className="fd-help-link">
-          <FrontDeskIcon id="help" />
-          <span>{nav.help.label}</span>
-        </a>
-      ) : null}
-    </nav>
+    </NavRail>
   );
 }

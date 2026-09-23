@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   orderSectionsForFirstRun,
+  SETTINGS_CARD_SECTION_ORDER,
   SETTINGS_SECTION_ORDER,
   type SettingsReadinessItem,
 } from '../src/lib/settings-view';
@@ -10,6 +11,14 @@ const incomplete = (id: string): SettingsReadinessItem => ({ id, status: 'incomp
 const error = (id: string): SettingsReadinessItem => ({ id, status: 'error' });
 
 describe('orderSectionsForFirstRun', () => {
+  it('lists 表示 (display) in the sub-nav right after profile but never as its own card', () => {
+    expect(SETTINGS_SECTION_ORDER.indexOf('display')).toBe(
+      SETTINGS_SECTION_ORDER.indexOf('profile') + 1
+    );
+    expect(SETTINGS_CARD_SECTION_ORDER).not.toContain('display');
+    expect(orderSectionsForFirstRun([incomplete('voice')])).not.toContain('display');
+  });
+
   it('returns the canonical order when every diagnostic is ok', () => {
     const readiness = [
       ok('profile'),
@@ -19,11 +28,11 @@ describe('orderSectionsForFirstRun', () => {
       ok('notifications'),
       ok('reasoning'),
     ];
-    expect(orderSectionsForFirstRun(readiness)).toEqual([...SETTINGS_SECTION_ORDER]);
+    expect(orderSectionsForFirstRun(readiness)).toEqual([...SETTINGS_CARD_SECTION_ORDER]);
   });
 
   it('returns the canonical order when there is no readiness data at all', () => {
-    expect(orderSectionsForFirstRun([])).toEqual([...SETTINGS_SECTION_ORDER]);
+    expect(orderSectionsForFirstRun([])).toEqual([...SETTINGS_CARD_SECTION_ORDER]);
   });
 
   it('sorts incomplete/error sections first, in canonical order, ahead of complete ones', () => {
@@ -56,7 +65,7 @@ describe('orderSectionsForFirstRun', () => {
 
   it('ignores diagnostics that do not map to a settings section', () => {
     const readiness = [incomplete('unknown-thing')];
-    expect(orderSectionsForFirstRun(readiness)).toEqual([...SETTINGS_SECTION_ORDER]);
+    expect(orderSectionsForFirstRun(readiness)).toEqual([...SETTINGS_CARD_SECTION_ORDER]);
   });
 
   it('never surfaces "members" ahead of others on its own — it has no diagnostic yet', () => {

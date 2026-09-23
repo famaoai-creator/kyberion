@@ -1,45 +1,40 @@
 /*
- * home.js — FD-02: the presence-studio home page ("ホーム").
+ * home.js — FD-02: the presence-studio home page ("ホーム"), rebuilt on the
+ * kyberion-base components for UI-06 (SURFACE_UI_UNIFICATION_PLAN_2026-09-23).
  *
- * Plain browser script (no modules, no external resources) loaded by
- * `home.html` with a plain <script> tag, mirroring `front-desk-rail.js`.
- * All copy comes from the server (`/api/home-vocabulary`, `/api/front-desk/nav`)
- * and the home read model (`/api/home`) — this file never hardcodes a
- * surface port or host, and never invents data the server did not send.
+ * Plain browser script loaded by `home.html`; `KyberionHome.mount()` runs
+ * after the shared shell module (`front-desk-rail.js`), whose
+ * `FrontDeskRail.render(container, components)` draws the components with the
+ * viewer's locale. All copy comes from the server (`/api/home-vocabulary`,
+ * `/api/front-desk/nav`) and the home read model (`/api/home`) — this file
+ * never hardcodes a surface port or host, and never invents data the server
+ * did not send. The page's fixed chrome (headings, placeholders, chip labels)
+ * is already server-rendered in the viewer's language; this script fills in
+ * the data parts, which show a labelled skeleton until then.
  *
- * INTERIM (FD-03): the dedicated "頼む" page does not exist yet, so the ask
- * box's send/mic/chip actions hand off to `/work` (the pre-FD-02 workbench)
- * with a `?ask=` query and a `#panel` hash the future page can pick up.
- * Replace `goToWork()` and its call sites once FD-03 ships.
+ * Order on the page: the briefing as the "next action" (top), the ask box,
+ * three counts, then the decide list and the progress list.
  *
  * See docs/developer/improvement-plans-2026-08/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md
  * §2.1 / FD-02.
  */
-/* global window, document, navigator, fetch */
+/* global window, document, fetch */
 (function () {
   'use strict';
 
   // `/api/home-vocabulary`'s `texts` object is keyed by the fully-qualified
-  // `namespace:key` form (same as `/api/ui-vocabulary` in index.html) — this
-  // helper is the one place that knows the `front_desk:` prefix.
+  // `namespace:key` form (same as `/api/ui-vocabulary` in index.html).
   function vt(vocab, key) {
-    return (vocab && vocab['front_desk:' + key]) || '';
+    return (vocab && vocab[key]) || '';
   }
 
-  // Every injected string goes through this before it reaches innerHTML —
-  // including attribute values, so quotes and ampersands are escaped too.
-  function escapeHtml(value) {
-    return String(value == null ? '' : value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+  function fd(vocab, key) {
+    return vt(vocab, 'front_desk:' + key);
   }
 
-  function normalizeLocale() {
-    var raw = String((navigator && navigator.language) || 'en').toLowerCase();
-    return raw.indexOf('ja') === 0 ? 'ja' : 'en';
+  function currentLocale() {
+    if (window.KyberionPrefs) return window.KyberionPrefs.locale();
+    return document.documentElement.getAttribute('lang') === 'ja' ? 'ja' : 'en';
   }
 
   function renderTemplate(template, params) {
@@ -54,36 +49,63 @@
     });
   }
 
+  function draw(container, components) {
+    if (!container || !window.FrontDeskRail) return;
+    window.FrontDeskRail.render(container, components);
+  }
+
+  var SVG_NS = 'http://www.w3.org/2000/svg';
   var ICON_PATHS = {
-    chevron: '<path d="M9 6l6 6-6 6"/>',
-    mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
-    send: '<path d="M4 12l16-8-6 16-2-6z"/>',
-    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
-    notes: '<path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/>',
-    globe:
-      '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
-    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    mic: ['M9 5a3 3 0 0 1 6 0v6a3 3 0 0 1-6 0z', 'M5 11a7 7 0 0 0 14 0M12 18v3'],
+    send: ['M4 12l16-8-6 16-2-6z'],
+    mail: ['M3 5h18v14H3z', 'M3 7l9 6 9-6'],
+    notes: ['M6 3h9l4 4v14H6z', 'M9 12h7M9 16h7'],
+    globe: [
+      'M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z',
+      'M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
+    ],
+    list: ['M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01'],
   };
 
-  function svgIcon(id, extraClass) {
-    var body = ICON_PATHS[id] || '';
-    var cls = 'home-icon' + (extraClass ? ' ' + extraClass : '');
-    return (
-      '<svg class="' +
-      cls +
-      '" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      body +
-      '</svg>'
-    );
+  function svgIcon(id) {
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'ps-icon');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.8');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    (ICON_PATHS[id] || []).forEach(function (d) {
+      var path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', d);
+      svg.appendChild(path);
+    });
+    return svg;
+  }
+
+  function setIconOnly(button, iconId, label) {
+    if (!button) return;
+    if (label) button.setAttribute('aria-label', label);
+    button.textContent = '';
+    button.appendChild(svgIcon(iconId));
+  }
+
+  function setIconAndText(button, iconId, text) {
+    if (!button) return;
+    var label = document.createElement('span');
+    label.textContent = text || button.textContent.trim();
+    button.textContent = '';
+    button.appendChild(svgIcon(iconId));
+    button.appendChild(label);
   }
 
   function formatHomeDate(dateText, locale) {
     var parsed = new Date(String(dateText || '') + 'T00:00:00');
     if (isNaN(parsed.getTime())) return String(dateText || '');
-    var localeTag = locale === 'ja' ? 'ja-JP' : 'en-US';
     try {
-      return parsed.toLocaleDateString(localeTag, {
+      return parsed.toLocaleDateString(locale === 'ja' ? 'ja-JP' : 'en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -94,40 +116,28 @@
     }
   }
 
+  var CHIPS = [
+    { key: 'email', textKey: 'chip_email', icon: 'mail' },
+    { key: 'minutes', textKey: 'chip_minutes', icon: 'notes' },
+    { key: 'browser', textKey: 'chip_browser', icon: 'globe' },
+    { key: 'webapp', textKey: 'chip_webapp', icon: 'list' },
+  ];
+
   function renderAskShell(vocab) {
     var input = document.getElementById('ask-input');
-    if (input) input.setAttribute('placeholder', vt(vocab, 'home_ask_placeholder'));
-
-    var micButton = document.getElementById('ask-mic');
-    if (micButton) {
-      micButton.setAttribute('aria-label', vt(vocab, 'home_ask_voice'));
-      micButton.innerHTML = svgIcon('mic');
-    }
-
-    var sendButton = document.getElementById('ask-send');
-    if (sendButton) {
-      sendButton.setAttribute('aria-label', vt(vocab, 'home_ask_send'));
-      sendButton.innerHTML = svgIcon('send');
-    }
-
-    var chipDefs = [
-      { key: 'email', textKey: 'chip_email', icon: 'mail' },
-      { key: 'minutes', textKey: 'chip_minutes', icon: 'notes' },
-      { key: 'browser', textKey: 'chip_browser', icon: 'globe' },
-      { key: 'webapp', textKey: 'chip_webapp', icon: 'list' },
-    ];
-    chipDefs.forEach(function (def) {
+    if (input) input.setAttribute('placeholder', fd(vocab, 'home_ask_placeholder'));
+    setIconOnly(document.getElementById('ask-mic'), 'mic', fd(vocab, 'home_ask_voice'));
+    setIconOnly(document.getElementById('ask-send'), 'send', fd(vocab, 'home_ask_send'));
+    CHIPS.forEach(function (def) {
       var button = document.querySelector('.home-chip[data-chip="' + def.key + '"]');
-      if (!button) return;
-      button.innerHTML =
-        svgIcon(def.icon) + '<span>' + escapeHtml(vt(vocab, def.textKey)) + '</span>';
+      setIconAndText(button, def.icon, fd(vocab, def.textKey));
     });
   }
 
   // FD-03: the ask box hands off to the dedicated "頼む" page — `send` submits
   // and sends immediately (`&send=1`), `mic` opens the page with the mic
   // focused (`&mic=1`, picked up by `static/ask.js`), and chips only prefill
-  // the input there (no auto-send). `/work` is no longer this box's target.
+  // the input there (no auto-send).
   function goToAsk(params) {
     var query = Object.keys(params || {})
       .filter(function (key) {
@@ -139,13 +149,6 @@
       .join('&');
     window.location.href = query ? '/ask?' + query : '/ask';
   }
-
-  var CHIP_TEXT_KEY = {
-    email: 'chip_email',
-    minutes: 'chip_minutes',
-    browser: 'chip_browser',
-    webapp: 'chip_webapp',
-  };
 
   function wireAskBox(vocab) {
     var form = document.getElementById('ask-form');
@@ -163,21 +166,27 @@
         goToAsk({ mic: '1' });
       });
     }
-    document.querySelectorAll('.home-chip').forEach(function (button) {
+    CHIPS.forEach(function (def) {
+      var button = document.querySelector('.home-chip[data-chip="' + def.key + '"]');
+      if (!button) return;
       button.addEventListener('click', function () {
-        var textKey = CHIP_TEXT_KEY[button.getAttribute('data-chip')];
-        var template = textKey ? vt(vocab, textKey) : '';
+        var template = fd(vocab, def.textKey);
         goToAsk(template ? { ask: template } : {});
       });
     });
   }
 
-  function decideHref(nav) {
+  function navItem(nav, id) {
     var items = (nav && nav.items) || [];
     for (var i = 0; i < items.length; i += 1) {
-      if (items[i].id === 'decide') return items[i].href;
+      if (items[i].id === id) return items[i];
     }
-    return '/';
+    return null;
+  }
+
+  function decideHref(nav) {
+    var item = navItem(nav, 'decide');
+    return item ? item.href : '/';
   }
 
   var DECIDE_TAG_KEY = {
@@ -187,181 +196,177 @@
     memory: 'tag_memory',
   };
 
-  // Tenant chips only make sense when the viewer can look at more than one
+  // Tenant names only make sense when the viewer can look at more than one
   // tenant, and they show the tenant's display name, never its slug.
-  function tenantChipFor(me, slug) {
+  function tenantNameFor(me, slug) {
     if (!me || !me.ok || !me.can_switch || !slug) return '';
     var name = slug;
     (me.tenants || []).forEach(function (tenant) {
       if (tenant.tenant_slug === slug && tenant.display_name) name = tenant.display_name;
     });
-    return '<span class="home-tenant-chip">' + escapeHtml(name) + '</span>';
+    return name;
+  }
+
+  function mutedText(id, text) {
+    return { id: id, type: 'ui:text', props: { text: text, variant: 'muted' } };
+  }
+
+  // The briefing as the page's single "next action": the day's summary, the
+  // recommended first item, and one button to where that work happens.
+  function renderNextAction(nav, vocab, home, locale) {
+    var counts = home.counts || {};
+    var decide = counts.decide || 0;
+    var progress = counts.progress || 0;
+    var delivered = counts.delivered || 0;
+    var clear = decide === 0 && progress === 0 && delivered === 0;
+    var top = (home.decide || [])[0];
+    var primary = null;
+    if (decide > 0) {
+      primary = { label: fd(vocab, 'home_decide_more'), href: decideHref(nav) };
+    } else if (progress > 0 || delivered > 0) {
+      primary = { label: fd(vocab, 'home_progress_more'), href: '/progress' };
+    } else {
+      var ask = navItem(nav, 'ask');
+      if (ask && ask.allowed !== false) {
+        primary = { label: vt(vocab, 'presence_studio:home_next_ask'), href: ask.href };
+      }
+    }
+    var props = {
+      eyebrow: formatHomeDate(home.date, locale),
+      title: clear
+        ? fd(vocab, 'home_briefing_clear')
+        : renderTemplate(fd(vocab, 'home_briefing'), counts),
+      state: clear ? 'empty' : 'ready',
+    };
+    if (top) props.reason = renderTemplate(fd(vocab, 'home_recommend'), { title: top.title });
+    if (primary && primary.label) props.primary = primary;
+    draw(document.getElementById('home-next'), [
+      { id: 'home-next-action', type: 'ui:next-action', props: props },
+    ]);
+  }
+
+  function renderMetrics(vocab, home) {
+    var counts = home.counts || {};
+    draw(document.getElementById('home-metrics'), [
+      {
+        id: 'home-metrics-grid',
+        type: 'ui:grid',
+        props: { columns: 3, gap: 'md' },
+        children: ['home-metric-decide', 'home-metric-active', 'home-metric-delivered'],
+      },
+      {
+        id: 'home-metric-decide',
+        type: 'ui:metric',
+        props: {
+          label: vt(vocab, 'presence_studio:home_metric_decide'),
+          value: String(counts.decide || 0),
+          tone: counts.decide ? 'warning' : undefined,
+        },
+      },
+      {
+        id: 'home-metric-active',
+        type: 'ui:metric',
+        props: { label: fd(vocab, 'tag_in_progress'), value: String(counts.progress || 0) },
+      },
+      {
+        id: 'home-metric-delivered',
+        type: 'ui:metric',
+        props: {
+          label: fd(vocab, 'progress_delivered_title'),
+          value: String(counts.delivered || 0),
+        },
+      },
+    ]);
   }
 
   function renderDecideCard(nav, vocab, home, me) {
-    var titleEl = document.getElementById('decide-title');
-    if (titleEl) titleEl.textContent = vt(vocab, 'home_decide_title');
-
     var href = decideHref(nav);
     var moreLink = document.getElementById('decide-more');
     if (moreLink) {
-      moreLink.textContent = vt(vocab, 'home_decide_more');
+      moreLink.textContent = fd(vocab, 'home_decide_more');
       moreLink.setAttribute('href', href);
     }
-
-    var counts = home.counts || {};
     var countEl = document.getElementById('decide-count');
     if (countEl) {
-      countEl.textContent = renderTemplate(vt(vocab, 'count_items') || '{count}', {
-        count: counts.decide || 0,
+      countEl.textContent = renderTemplate(fd(vocab, 'count_items') || '{count}', {
+        count: (home.counts && home.counts.decide) || 0,
       });
+      countEl.hidden = false;
     }
-
     var items = (home.decide || []).slice(0, 3);
-    var listEl = document.getElementById('decide-list');
-    var emptyEl = document.getElementById('decide-empty');
+    var body = document.getElementById('decide-body');
     if (!items.length) {
-      if (listEl) listEl.innerHTML = '';
-      if (emptyEl) {
-        emptyEl.textContent = vt(vocab, 'home_decide_empty');
-        emptyEl.classList.remove('hidden');
-      }
+      draw(body, [mutedText('decide-empty', fd(vocab, 'home_decide_empty'))]);
       return;
     }
-    if (emptyEl) emptyEl.classList.add('hidden');
-    if (!listEl) return;
-    listEl.innerHTML = items
-      .map(function (item) {
-        var tagKey = DECIDE_TAG_KEY[item.kind] || 'tag_approval';
-        var tagLabel = vt(vocab, tagKey) || item.kind;
-        var tenantChip = tenantChipFor(me, item.tenant_slug);
-        return (
-          '<li><a class="home-row" href="' +
-          escapeHtml(href) +
-          '">' +
-          '<span class="home-row-main">' +
-          '<span class="home-tag home-tag-' +
-          escapeHtml(item.kind) +
-          '">' +
-          escapeHtml(tagLabel) +
-          '</span>' +
-          '<span class="home-row-title">' +
-          escapeHtml(item.title) +
-          '</span>' +
-          tenantChip +
-          svgIcon('chevron', 'home-row-chevron') +
-          '</span>' +
-          '</a></li>'
-        );
-      })
-      .join('');
+    draw(body, [
+      {
+        id: 'decide-list',
+        type: 'ui:list',
+        props: {
+          items: items.map(function (item) {
+            var tag = fd(vocab, DECIDE_TAG_KEY[item.kind] || 'tag_approval') || item.kind;
+            var tenant = tenantNameFor(me, item.tenant_slug);
+            return {
+              title: item.title,
+              meta: tenant ? tag + ' · ' + tenant : tag,
+              href: href,
+              status: 'pending',
+            };
+          }),
+        },
+      },
+    ]);
   }
 
   var PROGRESS_TAG_KEY = { in_progress: 'tag_in_progress', delivered: 'tag_delivered' };
 
-  // FD-05: the dedicated "進み具合" page — each row deep-links to its own
-  // item (kept in the URL hash there so a reload restores the selection).
+  // FD-05: each row deep-links to its own item on the "進み具合" page (kept in
+  // the URL hash there so a reload restores the selection).
   function progressHref(item) {
     return '/progress#' + encodeURIComponent(item.id);
   }
 
   function renderProgressCard(vocab, home) {
-    var titleEl = document.getElementById('progress-title');
-    if (titleEl) titleEl.textContent = vt(vocab, 'home_progress_title');
-
     var counts = home.counts || {};
     var summaryEl = document.getElementById('progress-summary');
     if (summaryEl) {
-      summaryEl.textContent = renderTemplate(vt(vocab, 'home_progress_summary'), {
+      summaryEl.textContent = renderTemplate(fd(vocab, 'home_progress_summary'), {
         active: counts.progress || 0,
         delivered: counts.delivered || 0,
       });
     }
-
     var moreLink = document.getElementById('progress-more');
-    if (moreLink) moreLink.textContent = vt(vocab, 'home_progress_more');
+    if (moreLink) moreLink.textContent = fd(vocab, 'home_progress_more');
 
     var items = (home.progress || []).slice(0, 4);
-    var listEl = document.getElementById('progress-list');
-    var emptyEl = document.getElementById('progress-empty');
+    var body = document.getElementById('progress-body');
     if (!items.length) {
-      if (listEl) listEl.innerHTML = '';
-      if (emptyEl) {
-        emptyEl.textContent = vt(vocab, 'home_progress_empty');
-        emptyEl.classList.remove('hidden');
-      }
+      draw(body, [mutedText('progress-empty', fd(vocab, 'home_progress_empty'))]);
       return;
     }
-    if (emptyEl) emptyEl.classList.add('hidden');
-    if (!listEl) return;
-    listEl.innerHTML = items
-      .map(function (item) {
-        var href = progressHref(item);
-        var tagKey = PROGRESS_TAG_KEY[item.kind] || 'tag_in_progress';
-        var tagLabel = vt(vocab, tagKey) || item.kind;
-        var bar =
-          typeof item.percent === 'number'
-            ? '<div class="home-row-progress"><div class="home-row-progress-fill" style="width:' +
-              Math.max(0, Math.min(100, item.percent)) +
-              '%"></div></div>'
-            : '';
-        var receiveLink =
-          item.kind === 'delivered'
-            ? '<a class="home-row-receive" href="' +
-              escapeHtml(href) +
-              '">' +
-              escapeHtml(vt(vocab, 'action_receive')) +
-              '</a>'
-            : '';
-        return (
-          '<li><a class="home-row" href="' +
-          escapeHtml(href) +
-          '">' +
-          '<span class="home-row-main">' +
-          '<span class="home-tag home-tag-' +
-          escapeHtml(item.kind) +
-          '">' +
-          escapeHtml(tagLabel) +
-          '</span>' +
-          '<span class="home-row-title">' +
-          escapeHtml(item.title) +
-          '</span>' +
-          svgIcon('chevron', 'home-row-chevron') +
-          '</span>' +
-          bar +
-          '</a>' +
-          receiveLink +
-          '</li>'
-        );
-      })
-      .join('');
-  }
-
-  function renderBriefing(vocab, home, locale) {
-    var dateEl = document.getElementById('briefing-date');
-    if (dateEl) dateEl.textContent = formatHomeDate(home.date, locale);
-
-    var counts = home.counts || { decide: 0, progress: 0, delivered: 0 };
-    var sentenceEl = document.getElementById('briefing-sentence');
-    if (sentenceEl) {
-      sentenceEl.textContent =
-        (counts.decide || 0) === 0 && (counts.progress || 0) === 0 && (counts.delivered || 0) === 0
-          ? vt(vocab, 'home_briefing_clear')
-          : renderTemplate(vt(vocab, 'home_briefing'), counts);
-    }
-
-    var recommendEl = document.getElementById('briefing-recommend');
-    var topDecide = (home.decide || [])[0];
-    if (recommendEl) {
-      if (topDecide) {
-        recommendEl.textContent = renderTemplate(vt(vocab, 'home_recommend'), {
-          title: topDecide.title,
-        });
-        recommendEl.classList.remove('hidden');
-      } else {
-        recommendEl.classList.add('hidden');
-      }
-    }
+    draw(body, [
+      {
+        id: 'progress-list',
+        type: 'ui:list',
+        props: {
+          items: items.map(function (item) {
+            var delivered = item.kind === 'delivered';
+            var tag = fd(vocab, PROGRESS_TAG_KEY[item.kind] || 'tag_in_progress') || item.kind;
+            var meta = delivered ? fd(vocab, 'action_receive') : tag;
+            if (!delivered && typeof item.percent === 'number') {
+              meta += ' · ' + Math.max(0, Math.min(100, Math.round(item.percent))) + '%';
+            }
+            return {
+              title: item.title,
+              meta: meta,
+              href: progressHref(item),
+              status: delivered ? 'completed' : 'active',
+            };
+          }),
+        },
+      },
+    ]);
   }
 
   function storedTenantQuery() {
@@ -373,16 +378,14 @@
     }
   }
 
-  function render(nav, vocab, home, locale, me) {
-    renderBriefing(vocab, home, locale);
-    renderDecideCard(nav, vocab, home, me);
-    renderProgressCard(vocab, home);
-  }
-
   function mount() {
-    var locale = normalizeLocale();
+    var locale = currentLocale();
+    var navPromise =
+      window.FrontDeskRail && window.FrontDeskRail.nav
+        ? window.FrontDeskRail.nav()
+        : fetchJson('/api/front-desk/nav?locale=' + encodeURIComponent(locale));
     Promise.all([
-      fetchJson('/api/front-desk/nav?locale=' + encodeURIComponent(locale)),
+      navPromise,
       fetchJson('/api/home-vocabulary?locale=' + encodeURIComponent(locale)),
     ])
       .then(function (pair) {
@@ -400,7 +403,10 @@
           var home = pair2[0];
           var me = pair2[1];
           if (home && home.ok && nav && nav.ok) {
-            render(nav, vocab, home, locale, me);
+            renderNextAction(nav, vocab, home, locale);
+            renderMetrics(vocab, home);
+            renderDecideCard(nav, vocab, home, me);
+            renderProgressCard(vocab, home);
           }
         });
       })
