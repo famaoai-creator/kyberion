@@ -13,6 +13,15 @@
  * `generate()` so a direct provider call cannot bypass it. Every reference
  * request that is actually dispatched leaves an audit-chain receipt (consent,
  * provider, reference count and roles — never the photo path or bytes).
+ *
+ * Host-bridge providers (`host_agent`, `codex_host_bridge`, …) never upload
+ * anything themselves: they hand the host agent repo-relative reference paths
+ * (request JSON / `active/shared/tmp/avatar-set-handoff.json`, never bytes).
+ * The egress happens later, when the host agent reads those files and sends
+ * them to its own model — which is why the consent is required at hand-off
+ * time. The rerun that picks up the host-produced frames records a second
+ * receipt (`stage: 'host_output_collected'`) so the audit chain shows both
+ * the hand-off and the completed host egress.
  */
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
@@ -172,7 +181,8 @@ export function recordReferenceEgressReceipt(
   request: ImageGenerationRequest,
   provider: ImageGenerationProvider,
   result: 'allowed' | 'denied',
-  reason?: string
+  reason?: string,
+  stage?: 'host_output_collected'
 ): void {
   if (!hasReferenceImages(request)) return;
   const egress = imageProviderDataEgress(provider);
@@ -189,6 +199,7 @@ export function recordReferenceEgressReceipt(
         data_egress: egress,
         reference_count: request.referenceImages!.length,
         reference_roles: request.referenceImages!.map((ref) => ref.role ?? 'subject'),
+        ...(stage ? { stage } : {}),
         ...(egress === 'cloud' && consent
           ? {
               consent_subject: consent.subject,

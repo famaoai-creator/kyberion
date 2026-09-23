@@ -90,6 +90,15 @@ export function useGeneratedAvatarAction(
 ): NextResponse {
   const denied = requireConciergeAvatarOwner(viewer);
   if (denied) return denied;
+  // Server-side, not just the disabled button: a running job may be about to
+  // replace `avatar/draft/`, so adopting now could pick up the wrong set.
+  const running = runningAvatarGenerationJob();
+  if (running) {
+    return NextResponse.json(
+      { ok: false, error: t('setup.avatar_generate_busy'), job: running },
+      { status: 409 }
+    );
+  }
   const profileRoot = resolveActiveProfileRoot();
   const adopted = readConciergePersonal(() => {
     if (!promotePersonalAvatarDraft(profileRoot) && !loadPersonalAvatarSet(profileRoot)) {
