@@ -51,7 +51,22 @@ const GLOB_SCAN_PARENTS = [
   'presence/bridge',
   'presence/sensors',
 ];
-const DIRECT_SCAN_ROOTS = ['libs/core', 'scripts'];
+const DIRECT_SCAN_ROOTS = ['libs/core', 'libs/shared-ui', 'scripts'];
+
+// UI-01d: plain-JS files that are user-facing renderers / pages and so are
+// ratcheted too (everything else is scanned as .ts/.tsx only): the shared UI
+// kit's dependency-free vanilla renderer and the presence-studio UI gallery
+// script. Both keep all copy in the vocabulary catalog, so they start (and
+// must stay) at zero.
+const JS_SCAN_PATTERNS = [
+  /^libs\/shared-ui\/(?:src|vanilla)\/.*\.[cm]?js$/u,
+  /^presence\/displays\/presence-studio\/static\/ui-gallery[^/]*\.js$/u,
+];
+
+export function isScannedSourceFile(repoRelativePath: string): boolean {
+  if (/\.(?:ts|tsx)$/u.test(repoRelativePath)) return true;
+  return JS_SCAN_PATTERNS.some((pattern) => pattern.test(repoRelativePath));
+}
 
 // Plan §2.7: sample code and dev-only tooling are explicitly out of scope.
 const EXCLUDED_SUBTREE_PATTERNS = [/^libs\/core\/src\/native-[^/]+-engine\/examples\//u];
@@ -128,7 +143,11 @@ export function scanFileForKanaLiterals(text: string, repoRelativePath: string):
     text,
     ts.ScriptTarget.Latest,
     true,
-    repoRelativePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+    repoRelativePath.endsWith('.tsx')
+      ? ts.ScriptKind.TSX
+      : /\.[cm]?js$/u.test(repoRelativePath)
+        ? ts.ScriptKind.JS
+        : ts.ScriptKind.TS
   );
   const lines = text.split('\n');
 
@@ -190,8 +209,8 @@ function scanTree(scanRoots: string[]): {
   for (const root of scanRoots) {
     if (!safeExistsSync(root)) continue;
     for (const filePath of getAllFiles(root)) {
-      if (!/\.(?:ts|tsx)$/u.test(filePath)) continue;
       const repoRelativePath = path.relative(ROOT, filePath).split(path.sep).join('/');
+      if (!isScannedSourceFile(repoRelativePath)) continue;
       if (isExcludedFile(repoRelativePath)) continue;
 
       checkedFiles += 1;

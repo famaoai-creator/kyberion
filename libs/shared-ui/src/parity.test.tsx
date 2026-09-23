@@ -4,15 +4,19 @@
 // `knowledge/public/design-patterns/web/kyberion-ui.source.css` styles both
 // by the same classes / BEM elements / data attributes).
 //
-// For every fixture in `ui-gallery.fixtures.json` (which exercises every
+// For every fixture in `ui-gallery.fixtures.{en,ja}.json` (which exercises every
 // `ui:*` catalog type at least once — see the coverage check below), render
 // with both renderers, normalise away renderer-specific noise (attribute
 // order, whitespace, boolean-attribute representation, React-only attrs like
 // `data-reactroot`) and assert the DOM trees agree on: tag, class, `data-*`
 // / `aria-*` / `role` / `href` attributes, and text.
+//
+// UI-01d: runs once per locale (en, ja) with that locale's fixture file and
+// its `ui` vocabulary bundle (`getUiMessageBundle`), so renderer-default text
+// (status labels, empty/loading text, trend words) must also agree.
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { getUiMessageBundle, pathResolver, safeReadFile, type SupportedLocale } from '@agent/core';
 import { renderA2UI } from '../vanilla/kyberion-ui.js';
 import { MiniDocument, MiniElement, MiniText } from '../vanilla/mini-dom.test-support.js';
 import { A2UIRenderer, KB_COMPONENT_TYPES, type A2UIRendererComponent } from './index.js';
@@ -43,9 +47,11 @@ interface FixtureFile {
   }>;
 }
 
-function loadFixtures(): FixtureScenario[] {
+const LOCALES: readonly SupportedLocale[] = ['en', 'ja'];
+
+function loadFixtures(locale: SupportedLocale): FixtureScenario[] {
   const path = pathResolver.rootResolve(
-    'presence/displays/presence-studio/static/ui-gallery.fixtures.json'
+    `presence/displays/presence-studio/static/ui-gallery.fixtures.${locale}.json`
   );
   const raw = String(safeReadFile(path, { encoding: 'utf8' }));
   const fixtures = JSON.parse(raw) as FixtureFile;
@@ -123,12 +129,23 @@ function normalizeMiniNode(node: unknown): NormNode | null {
   return null;
 }
 
-function normalizeVanilla(components: A2UIRendererComponent[], rootId?: string): NormNode[] {
+interface LocaleOptions {
+  locale: string;
+  messages: Record<string, string>;
+}
+
+function normalizeVanilla(
+  components: A2UIRendererComponent[],
+  rootId: string | undefined,
+  i18n: LocaleOptions
+): NormNode[] {
   const document = new MiniDocument();
   const container = document.createElement('div');
   renderA2UI(container as unknown as Element, components as never, {
     document: document as unknown as Document,
     rootId,
+    locale: i18n.locale,
+    messages: i18n.messages,
   });
   return (container.childNodes as unknown[])
     .map((child) => normalizeMiniNode(child))
@@ -235,8 +252,19 @@ function parseStaticMarkup(html: string): NormNode[] {
   return root.children.map(toNorm);
 }
 
-function normalizeReact(components: A2UIRendererComponent[], rootId?: string): NormNode[] {
-  const html = renderToStaticMarkup(<A2UIRenderer components={components} rootId={rootId} />);
+function normalizeReact(
+  components: A2UIRendererComponent[],
+  rootId: string | undefined,
+  i18n: LocaleOptions
+): NormNode[] {
+  const html = renderToStaticMarkup(
+    <A2UIRenderer
+      components={components}
+      rootId={rootId}
+      locale={i18n.locale}
+      messages={i18n.messages}
+    />
+  );
   return parseStaticMarkup(html);
 }
 
@@ -244,24 +272,42 @@ function normalizeReact(components: A2UIRendererComponent[], rootId?: string): N
 // Tests
 // ---------------------------------------------------------------------------
 
-const scenarios = loadFixtures();
+/** Every text node in a normalised tree, in document order. */
+function textsOf(nodes: NormNode[]): string[] {
+  return nodes.flatMap((node) => ('text' in node ? [node.text] : textsOf(node.children)));
+}
 
-describe('React ↔ vanilla A2UI renderer parity (ui-gallery.fixtures.json)', () => {
-  it('every kyberion-base catalog type appears in the fixtures at least once', () => {
-    const used = new Set<string>();
-    for (const scenario of scenarios) {
-      for (const component of scenario.components) used.add(component.type);
-    }
-    for (const type of KB_COMPONENT_TYPES) {
-      expect(used.has(type), `fixtures never use ${type}`).toBe(true);
-    }
-  });
+for (const locale of LOCALES) {
+  const scenarios = loadFixtures(locale);
+  const bundle = getUiMessageBundle(locale);
 
-  for (const scenario of scenarios) {
-    it(`${scenario.id}: React and vanilla render identical trees`, () => {
-      const reactTree = normalizeReact(scenario.components, scenario.rootId);
-      const vanillaTree = normalizeVanilla(scenario.components, scenario.rootId);
-      expect(reactTree).toEqual(vanillaTree);
+  describe(`React ↔ vanilla A2UI renderer parity (ui-gallery.fixtures.${locale}.json)`, () => {
+    it('every kyberion-base catalog type appears in the fixtures at least once', () => {
+      const used = new Set<string>();
+      for (const scenario of scenarios) {
+        for (const component of scenario.components) used.add(component.type);
+      }
+      for (const type of KB_COMPONENT_TYPES) {
+        expect(used.has(type), `fixtures never use ${type}`).toBe(true);
+      }
     });
-  }
-});
+
+    for (const scenario of scenarios) {
+      it(`${scenario.id}: React and vanilla render identical trees`, () => {
+        const reactTree = normalizeReact(scenario.components, scenario.rootId, bundle);
+        const vanillaTree = normalizeVanilla(scenario.components, scenario.rootId, bundle);
+        expect(reactTree).toEqual(vanillaTree);
+      });
+    }
+
+    it('renderer-default text is in the requested locale', () => {
+      const pills = scenarios.find((scenario) => scenario.id === 'status-pill');
+      expect(pills).toBeTruthy();
+      const texts = textsOf(normalizeVanilla(pills!.components, pills!.rootId, bundle));
+      expect(texts).toContain(bundle.messages['ui:status_blocked']);
+      expect(texts).toContain(bundle.messages['ui:status_ready']);
+      const other = getUiMessageBundle(locale === 'en' ? 'ja' : 'en');
+      expect(texts).not.toContain(other.messages['ui:status_blocked']);
+    });
+  });
+}

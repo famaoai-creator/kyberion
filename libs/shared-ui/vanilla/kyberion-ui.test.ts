@@ -4,7 +4,7 @@
 // the workspace jsdom cannot load under the root `undici` override, and the
 // stand-in also makes any innerHTML-style write throw.
 import { describe, expect, it, vi } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { getUiMessageBundle, pathResolver, safeReadFile } from '@agent/core';
 import {
   KB_STATUS_TONES,
   KB_STATUS_VALUES,
@@ -14,7 +14,11 @@ import {
 import {
   KB_ALIASES,
   KB_RENDERED_TYPES,
-  KB_STATUS_LABELS_JA,
+  KB_STATUS_DOMAIN_MESSAGE_KEYS,
+  KB_STATUS_MESSAGE_KEYS,
+  KB_UI_DEFAULT_MESSAGES,
+  KB_UI_MESSAGE_KEYS,
+  createTranslator,
   renderA2UI,
   renderComponent,
   safeHref,
@@ -33,12 +37,23 @@ function renderInto(root: MiniElement, components: unknown[], options: Record<st
   return root;
 }
 
-function render(type: string, props: Record<string, unknown>, children?: string[]) {
+const JA = getUiMessageBundle('ja');
+
+function render(
+  type: string,
+  props: Record<string, unknown>,
+  children?: string[],
+  options: Record<string, unknown> = {}
+) {
   const { document } = setup();
   return renderComponent(
     { id: 'c1', type, props, children },
-    { document }
+    { document, ...options }
   ) as unknown as MiniElement | null;
+}
+
+function renderJa(type: string, props: Record<string, unknown>) {
+  return render(type, props, undefined, { locale: JA.locale, messages: JA.messages });
 }
 
 /** Minimal valid props per type — the root class each must emit. */
@@ -91,11 +106,17 @@ describe('kyberion-ui vanilla renderer — catalog coverage', () => {
     });
   }
 
-  it('has a default Japanese label for every canonical status', () => {
+  it('has a vocabulary message key (with en + ja text) for every canonical status', () => {
     for (const status of KB_STATUS_VALUES) {
-      expect(KB_STATUS_LABELS_JA[status], status).toMatch(/\S/);
+      const key = KB_STATUS_MESSAGE_KEYS[status];
+      expect(key, status).toMatch(/^ui:status_/);
+      expect(KB_UI_DEFAULT_MESSAGES[key], key).toMatch(/\S/);
+      expect(JA.messages[key], key).toMatch(/\S/);
     }
-    expect(Object.keys(KB_STATUS_LABELS_JA).sort()).toEqual([...KB_STATUS_VALUES].sort());
+    for (const byDomain of Object.values(KB_STATUS_DOMAIN_MESSAGE_KEYS)) {
+      for (const key of Object.values(byDomain)) expect(JA.messages[key], key).toMatch(/\S/);
+    }
+    expect(Object.keys(KB_STATUS_MESSAGE_KEYS).sort()).toEqual([...KB_STATUS_VALUES].sort());
     expect(Object.keys(KB_STATUS_TONES).length).toBe(KB_STATUS_VALUES.length);
   });
 });
@@ -142,16 +163,20 @@ describe('kyberion-ui vanilla renderer — markup contract', () => {
     expect(node!.hasAttribute('data-density')).toBe(false);
   });
 
-  it('status-pill: data-status, aria-hidden icon element, Japanese default label', () => {
+  it('status-pill: data-status, aria-hidden icon element, localized default label', () => {
     const node = render('ui:status-pill', { status: 'blocked', domain: 'mission' })!;
     expect(node.getAttribute('data-status')).toBe('blocked');
     expect(node.getAttribute('data-domain')).toBe('mission');
     const glyph = node.query('.kb-status-pill__icon')!;
     expect(glyph.getAttribute('aria-hidden')).toBe('true');
     expect(glyph.textContent).toBe('');
-    expect(node.query('.kb-status-pill__label')!.textContent).toBe('停止中');
-    expect(statusLabel('blocked')).toBe('要対応');
+    expect(node.query('.kb-status-pill__label')!.textContent).toBe('Stopped');
+    const ja = renderJa('ui:status-pill', { status: 'blocked', domain: 'mission' })!;
+    expect(ja.query('.kb-status-pill__label')!.textContent).toBe('停止中');
+    expect(statusLabel('blocked')).toBe('Needs attention');
+    expect(statusLabel('blocked', undefined, undefined, createTranslator(JA))).toBe('要対応');
     expect(statusLabel('ready', undefined, '独自')).toBe('独自');
+    expect(statusLabel('mystery')).toBe('mystery');
   });
 
   it('page-header renders the role badge inside the title and action buttons', () => {
@@ -296,8 +321,13 @@ describe('kyberion-ui vanilla renderer — markup contract', () => {
     expect(metric.getAttribute('data-tone')).toBe('warning');
     expect(metric.getAttribute('data-trend')).toBe('up');
     expect(metric.query('.kb-metric__value .kb-metric__unit')!.textContent).toBe('件');
+    // The trend arrow carries the localized trend word as its accessible name.
     const trendSvg = metric.query('.kb-metric__delta svg')!;
-    expect(trendSvg.getAttribute('aria-hidden')).toBe('true');
+    expect(trendSvg.getAttribute('aria-hidden')).toBeNull();
+    expect(trendSvg.getAttribute('role')).toBe('img');
+    expect(trendSvg.getAttribute('aria-label')).toBe('Up');
+    const metricJa = renderJa('ui:metric', { label: 'x', value: 1, delta: '0', trend: 'flat' })!;
+    expect(metricJa.query('.kb-metric__delta svg')!.getAttribute('aria-label')).toBe('横ばい');
 
     const kv = render('ui:kv', {
       items: [
@@ -306,7 +336,9 @@ describe('kyberion-ui vanilla renderer — markup contract', () => {
       ],
     })!;
     expect(kv.query('dd.kb-kv__value')!.getAttribute('data-mono')).toBe('true');
-    expect(kv.queryAll('dd')[1].textContent).toBe('はい');
+    expect(kv.queryAll('dd')[1].textContent).toBe('Yes');
+    const kvJa = renderJa('ui:kv', { items: [{ label: 'x', value: false }] })!;
+    expect(kvJa.query('dd')!.textContent).toBe('いいえ');
 
     const callout = render('ui:callout', {
       tone: 'danger',
@@ -330,6 +362,8 @@ describe('kyberion-ui vanilla renderer — markup contract', () => {
     const skeleton = render('ui:skeleton', { lines: 4, shape: 'table' })!;
     expect(skeleton.getAttribute('data-shape')).toBe('table');
     expect(skeleton.queryAll('.kb-skeleton__line').length).toBe(4);
+    expect(skeleton.getAttribute('aria-label')).toBe('Loading');
+    expect(renderJa('ui:skeleton', {})!.getAttribute('aria-label')).toBe('読み込み中');
 
     const tabs = render('ui:tabs', {
       items: [
@@ -340,6 +374,7 @@ describe('kyberion-ui vanilla renderer — markup contract', () => {
       overflow: 'menu',
     })!;
     expect(tabs.getAttribute('role')).toBe('tablist');
+    expect(tabs.getAttribute('aria-label')).toBe('Views');
     expect(tabs.getAttribute('data-overflow')).toBe('menu');
     const tabButtons = tabs.queryAll('.kb-tabs__tab');
     expect(tabButtons[0].getAttribute('aria-selected')).toBe('true');
@@ -499,5 +534,58 @@ describe('kyberion-ui vanilla renderer — safety', () => {
       { document, rootId: 'a' }
     );
     expect(root.queryAll('.kb-stack').length).toBe(2);
+  });
+});
+
+describe('kyberion-ui vanilla renderer — UI-01d i18n', () => {
+  it('renders defaults from the given bundle, English without one', () => {
+    const table = { columns: [{ key: 'a', label: 'A' }], rows: [] };
+    expect(render('ui:table', table)!.query('.kb-table__empty')!.textContent).toBe('No data');
+    expect(renderJa('ui:table', table)!.query('.kb-table__empty')!.textContent).toBe(
+      'データがありません'
+    );
+    expect(render('ui:nav-rail', { items: [] })!.getAttribute('aria-label')).toBe('Navigation');
+    expect(renderJa('ui:nav-rail', { items: [] })!.getAttribute('aria-label')).toBe(
+      'ナビゲーション'
+    );
+    expect(render('ui:disclosure', { summary: '' })!.query('summary')!.textContent).toBe('Details');
+    const { document, root } = setup();
+    renderInto(root as unknown as MiniElement, [{ id: 'x', type: 'kb-mystery' }], {
+      document,
+      debug: true,
+      locale: JA.locale,
+      messages: JA.messages,
+    });
+    expect((root as unknown as MiniElement).query('.kb-callout__title')!.textContent).toBe(
+      '未対応のコンポーネント: kb-mystery'
+    );
+  });
+
+  it('missing key -> English default -> key; a throwing t never breaks rendering', () => {
+    const translate = createTranslator({ messages: { 'ui:status_ready': 'PRÊT' } });
+    expect(translate('ui:status_ready')).toBe('PRÊT');
+    expect(translate('ui:status_failed')).toBe('Failed');
+    expect(translate('ui:nope')).toBe('ui:nope');
+    expect(translate(KB_UI_MESSAGE_KEYS.unknownComponent, { type: 'a' })).toBe(
+      'Unsupported component: a'
+    );
+    const node = render('ui:skeleton', {}, undefined, {
+      t: () => {
+        throw new Error('boom');
+      },
+      messages: 'not-a-bundle',
+    })!;
+    expect(node.getAttribute('aria-label')).toBe('Loading');
+    const custom = render('ui:skeleton', {}, undefined, { t: (key: string) => `<${key}>` })!;
+    expect(custom.getAttribute('aria-label')).toBe('<ui:skeleton_loading>');
+  });
+
+  it('keeps no hardcoded Japanese in the renderer source (text lives in the vocabulary)', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/shared-ui/vanilla/kyberion-ui.js'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/[\u3040-\u30ff\u4e00-\u9fff]/u);
   });
 });

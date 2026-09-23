@@ -3,9 +3,11 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import {
   buildLocalesBlock,
+  buildUiDefaultMessagesBlock,
   buildVocabularyKeys,
   readVocabularyTypesTextFile,
   spliceLocalesBlock,
+  spliceUiMessagesBlock,
 } from './generate_vocabulary_types.js';
 
 describe('generate_vocabulary_types (I18N-02)', () => {
@@ -106,6 +108,40 @@ describe('generate_vocabulary_types (I18N-02)', () => {
         domains: { ns: { only_key: { en: 'X' } } },
       });
       expect(keys).toEqual([...new Set(keys)].sort());
+    });
+  });
+
+  describe('UI-01d: shared-ui fallback bundle block', () => {
+    const catalog = {
+      version: '2.0',
+      default_locale: 'en',
+      required_locales: ['en', 'ja'],
+      domains: {
+        ui: {
+          table_empty: { en: 'No data', ja: 'x' },
+          skeleton_loading: { en: "Loadin' {n}", ja: 'y' },
+        },
+        other: { table_empty: { en: 'not ui', ja: 'z' } },
+      },
+    };
+
+    it('emits only the ui domain, default locale, sorted and escaped', () => {
+      const block = buildUiDefaultMessagesBlock(catalog);
+      expect(block.startsWith('// GENERATED-UI-MESSAGES:BEGIN')).toBe(true);
+      expect(block.endsWith('// GENERATED-UI-MESSAGES:END')).toBe(true);
+      expect(block).toContain('export const KB_UI_DEFAULT_LOCALE = "en";');
+      expect(block.indexOf('ui:skeleton_loading')).toBeLessThan(block.indexOf('ui:table_empty'));
+      expect(block).toContain('"ui:skeleton_loading": "Loadin\' {n}",');
+      expect(block).not.toContain('not ui');
+    });
+
+    it('splices between the markers and fails loudly without them', () => {
+      const source = 'a\n// GENERATED-UI-MESSAGES:BEGIN\nold\n// GENERATED-UI-MESSAGES:END\nb';
+      const next = spliceUiMessagesBlock(source, catalog);
+      expect(next.startsWith('a\n// GENERATED-UI-MESSAGES:BEGIN')).toBe(true);
+      expect(next.endsWith('// GENERATED-UI-MESSAGES:END\nb')).toBe(true);
+      expect(next).not.toContain('old');
+      expect(() => spliceUiMessagesBlock('no markers', catalog)).toThrow(/markers/);
     });
   });
 });

@@ -10,6 +10,7 @@ import type {
 } from '@agent/core/a2ui-catalog';
 import { useA2UIActions } from '../actions.js';
 import { TABS_SELECT_ACTION } from '../catalog.js';
+import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
 import { KB_ICON_NAMES, KbIcon } from '../icons.js';
 import { asArray, safeHref } from '../safety.js';
 import { ActionRefButton, KbLink } from './controls.js';
@@ -133,9 +134,10 @@ export function NavRail({
   footer_items,
   children,
 }: KbNavRailProps & { children?: ReactNode }) {
+  const { t } = useKbI18n();
   const footer = asArray(footer_items);
   return (
-    <nav className="kb-nav-rail" aria-label={label || undefined}>
+    <nav className="kb-nav-rail" aria-label={label || t(KB_UI_MESSAGE_KEYS.navLabel)}>
       {children}
       <ul className="kb-nav-rail__list">
         {asArray(items).map((item) => (
@@ -158,7 +160,7 @@ export function NavRail({
 export type TabsProps = KbTabsProps & {
   /** Called with the tab id when a button tab (no `href`) is chosen. */
   onSelect?: (id: string) => void;
-  /** Accessible name of the tab list. */
+  /** Accessible name of the tab list (default: the localized `ui:tabs_label`). */
   label?: string;
 };
 
@@ -169,6 +171,8 @@ export type TabsProps = KbTabsProps & {
  */
 export function Tabs({ items, active, overflow, onSelect, label }: TabsProps) {
   const { onAction } = useA2UIActions();
+  const { t } = useKbI18n();
+  const tabsLabel = label || t(KB_UI_MESSAGE_KEYS.tabsLabel);
   const list = asArray(items);
   const linkMode = list.some((item) => item.href !== undefined);
   const overflowAttr = overflow === 'menu' ? 'menu' : 'wrap';
@@ -177,7 +181,7 @@ export function Tabs({ items, active, overflow, onSelect, label }: TabsProps) {
 
   if (linkMode) {
     return (
-      <nav className="kb-tabs" data-overflow={overflowAttr} aria-label={label}>
+      <nav className="kb-tabs" data-overflow={overflowAttr} aria-label={tabsLabel}>
         {list.map((item) => {
           const href = safeHref(item.href);
           const current = item.id === active ? 'page' : undefined;
@@ -210,7 +214,7 @@ export function Tabs({ items, active, overflow, onSelect, label }: TabsProps) {
   }
 
   return (
-    <div className="kb-tabs" data-overflow={overflowAttr} role="tablist" aria-label={label}>
+    <div className="kb-tabs" data-overflow={overflowAttr} role="tablist" aria-label={tabsLabel}>
       {list.map((item) => {
         const selected = item.id === active;
         return (

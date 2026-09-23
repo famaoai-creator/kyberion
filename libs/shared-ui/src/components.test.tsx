@@ -1,15 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement, ReactNode } from 'react';
+import { getUiMessageBundle } from '@agent/core';
 import {
   A2UIActionProvider,
   AppShell,
   Badge,
   Button,
   Callout,
+  createKbTranslator,
   Disclosure,
   EmptyState,
   Grid,
+  KB_STATUS_MESSAGE_KEYS,
+  KB_UI_DEFAULT_MESSAGES,
+  KB_UI_MESSAGE_KEYS,
+  KbI18nProvider,
   KeyValue,
   List,
   Metric,
@@ -27,6 +33,13 @@ import {
 } from './index.js';
 
 const html = (element: ReactElement) => renderToStaticMarkup(element);
+const ja = getUiMessageBundle('ja');
+const htmlJa = (element: ReactElement) =>
+  renderToStaticMarkup(
+    <KbI18nProvider locale={ja.locale} messages={ja.messages}>
+      {element}
+    </KbI18nProvider>
+  );
 
 describe('kyberion-base React components emit the kyberion-ui.css class contract', () => {
   it('AppShell: root, density/role attrs, nav + main slots', () => {
@@ -108,7 +121,9 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
         overflow="menu"
       />
     );
-    expect(buttons).toMatch(/^<div class="kb-tabs" data-overflow="menu" role="tablist">/);
+    expect(buttons).toMatch(
+      /^<div class="kb-tabs" data-overflow="menu" role="tablist" aria-label="Views">/
+    );
     expect(buttons).toContain(
       '<button type="button" role="tab" class="kb-tabs__tab" data-tab-id="a" aria-selected="true">A<span class="kb-tabs__count">3</span></button>'
     );
@@ -123,7 +138,11 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
         active="b"
       />
     );
-    expect(links).toMatch(/^<nav class="kb-tabs" data-overflow="wrap">/);
+    expect(links).toMatch(/^<nav class="kb-tabs" data-overflow="wrap" aria-label="Views">/);
+    expect(htmlJa(<Tabs items={[{ id: 'a', label: 'A' }]} />)).toContain(
+      'aria-label="表示の切り替え"'
+    );
+    expect(html(<Tabs items={[]} label="Mission views" />)).toContain('aria-label="Mission views"');
     expect(links).toContain(
       '<a href="/b" class="kb-tabs__tab" data-tab-id="b" aria-current="page">B</a>'
     );
@@ -212,8 +231,13 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
     expect(out).toContain(
       '<span class="kb-metric__label">進行中</span><span class="kb-metric__value">12<span class="kb-metric__unit">件</span></span>'
     );
+    // The trend arrow carries the localized trend word as its accessible name.
     expect(out).toMatch(
-      /<span class="kb-metric__delta"><svg[^>]*aria-hidden="true"[^>]*>.*<\/svg>\+3<\/span>/
+      /<span class="kb-metric__delta"><svg[^>]*role="img" aria-label="Up"[^>]*>.*<\/svg>\+3<\/span>/
+    );
+    expect(out).not.toMatch(/<svg[^>]*aria-hidden/);
+    expect(htmlJa(<Metric label="x" value={1} delta="-1" trend="down" />)).toContain(
+      'aria-label="減少"'
     );
     expect(out).toContain('<span class="kb-metric__description">先週比</span>');
   });
@@ -229,7 +253,10 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
         />
       )
     ).toBe(
-      '<dl class="kb-kv"><dt class="kb-kv__label">ID</dt><dd class="kb-kv__value" data-mono="true">MSN-1</dd><dt class="kb-kv__label">公開</dt><dd class="kb-kv__value">いいえ</dd></dl>'
+      '<dl class="kb-kv"><dt class="kb-kv__label">ID</dt><dd class="kb-kv__value" data-mono="true">MSN-1</dd><dt class="kb-kv__label">公開</dt><dd class="kb-kv__value">No</dd></dl>'
+    );
+    expect(htmlJa(<KeyValue items={[{ label: 'x', value: true }]} />)).toContain(
+      '<dd class="kb-kv__value">はい</dd>'
     );
   });
 
@@ -294,12 +321,18 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
     expect(html(<Text text="本文" />)).toBe('<p class="kb-text kb-text--body">本文</p>');
   });
 
-  it('StatusPill: status/domain attrs, aria-hidden icon, label span, Japanese default label, explicit label, domain wording', () => {
+  it('StatusPill: status/domain attrs, aria-hidden icon, label span, localized default label, explicit label, domain wording', () => {
     expect(html(<StatusPill status="blocked" />)).toBe(
-      '<span class="kb-status-pill" data-status="blocked"><span class="kb-status-pill__icon" aria-hidden="true"></span><span class="kb-status-pill__label">要対応</span></span>'
+      '<span class="kb-status-pill" data-status="blocked"><span class="kb-status-pill__icon" aria-hidden="true"></span><span class="kb-status-pill__label">Needs attention</span></span>'
+    );
+    expect(htmlJa(<StatusPill status="blocked" />)).toContain(
+      '<span class="kb-status-pill__label">要対応</span>'
     );
     expect(html(<StatusPill status="blocked" domain="mission" />)).toContain(
-      'data-domain="mission"><span class="kb-status-pill__icon" aria-hidden="true"></span><span class="kb-status-pill__label">停止中</span></span>'
+      'data-domain="mission"><span class="kb-status-pill__icon" aria-hidden="true"></span><span class="kb-status-pill__label">Stopped</span></span>'
+    );
+    expect(htmlJa(<StatusPill status="blocked" domain="mission" />)).toContain(
+      '<span class="kb-status-pill__label">停止中</span>'
     );
     expect(html(<StatusPill status="running" label="動作中" />)).toContain(
       '<span class="kb-status-pill__label">動作中</span>'
@@ -352,8 +385,9 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
   it('Skeleton: shape and clamped line count', () => {
     const out = html(<Skeleton shape="table" lines={2} />);
     expect(out).toBe(
-      '<div class="kb-skeleton" data-shape="table" role="status" aria-busy="true" aria-label="読み込み中"><span class="kb-skeleton__line" aria-hidden="true"></span><span class="kb-skeleton__line" aria-hidden="true"></span></div>'
+      '<div class="kb-skeleton" data-shape="table" role="status" aria-busy="true" aria-label="Loading"><span class="kb-skeleton__line" aria-hidden="true"></span><span class="kb-skeleton__line" aria-hidden="true"></span></div>'
     );
+    expect(htmlJa(<Skeleton />)).toContain('aria-label="読み込み中"');
     expect(html(<Skeleton lines={999} />).match(/kb-skeleton__line/g)).toHaveLength(12);
   });
 
@@ -441,5 +475,55 @@ describe('safeHref', () => {
     42,
   ])('drops %s', (input) => {
     expect(safeHref(input)).toBeUndefined();
+  });
+});
+
+describe('UI-01d i18n: renderer defaults come from the ui vocabulary bundle', () => {
+  it('uses the English default bundle without a provider and the given bundle inside one', () => {
+    const empty = <Table columns={[{ key: 'a', label: 'A' }]} rows={[]} />;
+    expect(html(empty)).toContain('<td class="kb-table__empty" colSpan="1">No data</td>');
+    expect(htmlJa(empty)).toContain(
+      '<td class="kb-table__empty" colSpan="1">データがありません</td>'
+    );
+    expect(html(<Disclosure summary="" />)).toContain('<summary>Details</summary>');
+    expect(htmlJa(<Disclosure summary="" />)).toContain('<summary>詳細</summary>');
+    expect(html(<NavRail items={[]} />)).toContain('aria-label="Navigation"');
+    expect(htmlJa(<NavRail items={[]} />)).toContain('aria-label="ナビゲーション"');
+  });
+
+  it('falls back to English for a key the bundle lacks, then to the key; never throws', () => {
+    const partial = { 'ui:status_ready': 'PRÊT' };
+    const out = renderToStaticMarkup(
+      <KbI18nProvider locale="fr" messages={partial}>
+        <StatusPill status="ready" />
+        <StatusPill status="failed" />
+      </KbI18nProvider>
+    );
+    expect(out).toContain('<span class="kb-status-pill__label">PRÊT</span>');
+    expect(out).toContain('<span class="kb-status-pill__label">Failed</span>');
+    const throwing = () => {
+      throw new Error('boom');
+    };
+    expect(
+      renderToStaticMarkup(
+        <KbI18nProvider t={throwing} messages={null as never}>
+          <Skeleton />
+        </KbI18nProvider>
+      )
+    ).toContain('aria-label="Loading"');
+    const translate = createKbTranslator();
+    expect(translate('ui:does_not_exist')).toBe('ui:does_not_exist');
+    expect(translate('ui:unknown_component', { type: 'x:y' })).toBe('Unsupported component: x:y');
+  });
+
+  it('the ja bundle covers every ui key the renderers use', () => {
+    const keys = [...Object.values(KB_UI_MESSAGE_KEYS), ...Object.values(KB_STATUS_MESSAGE_KEYS)];
+    for (const key of keys) {
+      expect(ja.messages[key], key).toMatch(/\S/);
+      expect(KB_UI_DEFAULT_MESSAGES[key], key).toMatch(/\S/);
+    }
+    expect(Object.keys(KB_UI_DEFAULT_MESSAGES).sort()).toEqual(
+      Object.keys(getUiMessageBundle('en').messages).sort()
+    );
   });
 });

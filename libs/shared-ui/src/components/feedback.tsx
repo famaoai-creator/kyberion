@@ -8,7 +8,8 @@ import type {
   KbSkeletonProps,
   KbStatusPillProps,
 } from '@agent/core/a2ui-catalog';
-import { statusLabelJa } from '../catalog.js';
+import { statusLabel } from '../catalog.js';
+import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
 import { ActionRefButton } from './controls.js';
 
 const TONES: ReadonlySet<string> = new Set([
@@ -40,11 +41,12 @@ export function roleAttr(role: unknown): string | undefined {
  * `ui:status-pill` → `.kb-status-pill[data-status][data-domain]`. The icon is
  * the stylesheet's glyph on an `aria-hidden` `__icon` span, so the pill
  * carries icon + text and never relies on color alone. Label: explicit
- * `label`, else the Japanese vocabulary label, else the raw status — rendered
+ * `label`, else the localized vocabulary label (`ui:status_*`), else the raw status — rendered
  * in its own `__label` span (matches the vanilla renderer's markup).
  */
 export function StatusPill({ status, domain, label }: KbStatusPillProps) {
-  const text = label || statusLabelJa(String(status), domain);
+  const { t } = useKbI18n();
+  const text = label || statusLabel(String(status), domain, t);
   return (
     <span className="kb-status-pill" data-status={status} data-domain={domain}>
       <span className="kb-status-pill__icon" aria-hidden="true" />
@@ -110,11 +112,8 @@ export function EmptyState({ title, body, action }: KbEmptyStateProps) {
 const SKELETON_SHAPES: ReadonlySet<string> = new Set(['text', 'card', 'table']);
 
 /** `ui:skeleton` → `.kb-skeleton[data-shape]` with `lines` × `.kb-skeleton__line`. */
-export function Skeleton({
-  lines,
-  shape,
-  label = '読み込み中',
-}: KbSkeletonProps & { label?: string }) {
+export function Skeleton({ lines, shape, label }: KbSkeletonProps & { label?: string }) {
+  const { t } = useKbI18n();
   const resolvedShape = typeof shape === 'string' && SKELETON_SHAPES.has(shape) ? shape : 'text';
   const defaultLines = resolvedShape === 'table' ? 5 : 3;
   const count = Math.min(12, Math.max(1, Math.floor(Number(lines) || defaultLines)));
@@ -124,7 +123,7 @@ export function Skeleton({
       data-shape={resolvedShape}
       role="status"
       aria-busy="true"
-      aria-label={label}
+      aria-label={label || t(KB_UI_MESSAGE_KEYS.skeletonLoading)}
     >
       {Array.from({ length: count }, (_, index) => (
         <span key={index} className="kb-skeleton__line" aria-hidden="true" />

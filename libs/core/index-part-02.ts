@@ -31,10 +31,14 @@ export { renderMessage, extractPlaceholderNames } from './message-format.js';
 export type { MessageParams } from './message-format.js';
 
 export {
+  getUiMessageBundle,
   loadVocabularyCatalog,
   resolveVocabularyEntry,
   _resetVocabularyCatalogCacheForTests,
 } from './vocabulary-catalog.js';
+// UI-01d: the shared UI kit's per-locale message bundle (`ui` vocabulary domain).
+export { buildUiMessageBundle, UI_VOCABULARY_DOMAIN } from './locale-normalize.js';
+export type { UiMessageBundle } from './locale-normalize.js';
 
 export type { VocabularyCatalogFile, VocabularyEntry } from './vocabulary-catalog.js';
 

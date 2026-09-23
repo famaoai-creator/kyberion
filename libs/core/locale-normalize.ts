@@ -136,3 +136,40 @@ export function createBrowserVocabularyResolver(catalog: BrowserVocabularyCatalo
     },
   };
 }
+
+/** Vocabulary domain holding the shared UI kit's renderer-default strings (`ui:*`). */
+export const UI_VOCABULARY_DOMAIN = 'ui';
+
+/**
+ * A one-locale message bundle for the shared UI renderers
+ * (`@agent/shared-ui` React provider / vanilla `renderA2UI({ messages })`):
+ * a plain `{ 'ui:<key>': text }` object with raw, un-substituted templates
+ * (the renderers interpolate `{name}` placeholders themselves).
+ */
+export interface UiMessageBundle {
+  locale: SupportedLocale;
+  messages: Record<string, string>;
+}
+
+/**
+ * UI-01d: derives the `ui` domain of the vocabulary catalog into a bundle for
+ * one locale. Pure and import-free so browser builds that statically import
+ * the catalog (chronos / concierge) can call it; Node callers use
+ * `getUiMessageBundle()` in `vocabulary-catalog.ts`. A key the locale lacks
+ * falls back to the catalog's `default_locale`, then `en`; a key with no text
+ * at all is left out (the renderers then fall back to their generated English
+ * defaults, then to the key).
+ */
+export function buildUiMessageBundle(
+  catalog: BrowserVocabularyCatalog,
+  locale: SupportedLocale
+): UiMessageBundle {
+  const entries = catalog.domains?.[UI_VOCABULARY_DOMAIN] || {};
+  const fallbackLocale = catalog.default_locale || 'en';
+  const messages: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(entries)) {
+    const text = entry?.[locale] || entry?.[fallbackLocale] || entry?.en;
+    if (typeof text === 'string' && text) messages[`${UI_VOCABULARY_DOMAIN}:${key}`] = text;
+  }
+  return { locale, messages };
+}

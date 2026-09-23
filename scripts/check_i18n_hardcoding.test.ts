@@ -11,7 +11,9 @@ import {
 import {
   checkI18nHardcoding,
   isExcludedFile,
+  isScannedSourceFile,
   isTestFile,
+  resolveDefaultScanRoots,
   readI18nHardcodingTextFile,
   scanFileForKanaLiterals,
 } from './check_i18n_hardcoding.js';
@@ -111,6 +113,30 @@ describe('isTestFile / isExcludedFile', () => {
     );
     expect(isExcludedFile('libs/core/src/native-xlsx-engine/examples/gen_wbs.ts')).toBe(true);
     expect(isExcludedFile('libs/core/src/native-pptx-engine/builders.ts')).toBe(false);
+  });
+});
+
+describe('UI-01d scan scope: shared UI kit + gallery script', () => {
+  it('scans TS everywhere and plain JS only for the shared UI renderer and the gallery', () => {
+    expect(isScannedSourceFile('libs/shared-ui/src/components/data.tsx')).toBe(true);
+    expect(isScannedSourceFile('libs/shared-ui/vanilla/kyberion-ui.js')).toBe(true);
+    expect(isScannedSourceFile('presence/displays/presence-studio/static/ui-gallery.js')).toBe(
+      true
+    );
+    expect(isScannedSourceFile('presence/displays/presence-studio/static/home.js')).toBe(false);
+    expect(
+      isScannedSourceFile('presence/displays/presence-studio/static/ui-gallery.fixtures.ja.json')
+    ).toBe(false);
+    const roots = resolveDefaultScanRoots().map((root) =>
+      path.relative(pathResolver.rootDir(), root).split(path.sep).join('/')
+    );
+    expect(roots).toContain('libs/shared-ui');
+    expect(roots).toContain('presence/displays/presence-studio');
+  });
+
+  it('flags kana in plain JS the same way as TS', () => {
+    const source = "export const label = '\u8aad\u307f\u8fbc\u307f\u4e2d';\n";
+    expect(scanFileForKanaLiterals(source, 'libs/shared-ui/vanilla/x.js').count).toBe(1);
   });
 });
 

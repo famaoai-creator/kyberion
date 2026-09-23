@@ -13,6 +13,7 @@ import { Metric, KeyValue, Table, List, Text } from './components/data.js';
 import { Badge, Callout, EmptyState, Skeleton, StatusPill } from './components/feedback.js';
 import { Grid, NextAction, Section, Stack } from './components/layout.js';
 import { AppShell, NavRail, PageHeader, Tabs } from './components/shell.js';
+import { KB_UI_MESSAGE_KEYS, KbI18nProvider, useKbI18n, type KbTranslate } from './i18n.js';
 
 // Module-local: the package does not depend on @types/node, and bundlers
 // replace `process.env.NODE_ENV` textually.
@@ -48,6 +49,16 @@ export interface A2UIRendererProps {
   onAction?: A2UIActionHandler;
   /** Show a warning callout for unknown types. Default: on outside production builds. */
   showUnknown?: boolean;
+  /**
+   * Locale of `messages`. When `locale`, `messages` or `t` is given the tree
+   * is wrapped in a `KbI18nProvider`; otherwise an enclosing provider (or the
+   * generated English defaults) applies.
+   */
+  locale?: string;
+  /** One locale's `ui:*` message bundle (`getUiMessageBundle(locale).messages`). */
+  messages?: Readonly<Record<string, string>>;
+  /** Custom lookup tried before `messages`. */
+  t?: KbTranslate;
 }
 
 const MAX_DEPTH = 32;
@@ -183,11 +194,12 @@ function renderCatalog(
 }
 
 function UnknownComponent({ type }: { type: string }) {
+  const { t } = useKbI18n();
   return (
     <div className="kb-callout" data-tone="warning" role="note" data-unknown-type={type}>
       <span className="kb-callout__icon" aria-hidden="true" />
       <div className="kb-callout__content">
-        <p className="kb-callout__title">未対応のコンポーネント: {type}</p>
+        <p className="kb-callout__title">{t(KB_UI_MESSAGE_KEYS.unknownComponent, { type })}</p>
       </div>
     </div>
   );
@@ -205,6 +217,9 @@ export function A2UIRenderer({
   fallback,
   onAction,
   showUnknown,
+  locale,
+  messages,
+  t,
 }: A2UIRendererProps) {
   const list = Array.isArray(components)
     ? components.filter((c) => isRecord(c) && typeof c.id === 'string')
@@ -273,9 +288,16 @@ export function A2UIRenderer({
   }
 
   const tree = roots.map((id) => <Fragment key={id}>{renderNode(id, new Set())}</Fragment>);
-  return onAction ? (
+  const withActions = onAction ? (
     <A2UIActionProvider onAction={onAction}>{tree}</A2UIActionProvider>
   ) : (
     <>{tree}</>
+  );
+  return locale !== undefined || messages !== undefined || t !== undefined ? (
+    <KbI18nProvider locale={locale} messages={messages} t={t}>
+      {withActions}
+    </KbI18nProvider>
+  ) : (
+    withActions
   );
 }
