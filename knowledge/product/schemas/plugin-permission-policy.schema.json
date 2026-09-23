@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "plugin-permission-policy.schema.json",
+  "title": "Plugin Permission Policy",
+  "description": "Per-trust permission ceilings for managed plugins (EP-02). Tenant overrides are narrow-only: they are intersected with the trust ceiling and can never widen it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "last_updated", "ceilings", "tenant_overrides"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "last_updated": { "type": "string", "minLength": 1 },
+    "ceilings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["official", "curated", "third-party"],
+      "properties": {
+        "official": { "$ref": "#/definitions/ceiling" },
+        "curated": { "$ref": "#/definitions/ceiling" },
+        "third-party": { "$ref": "#/definitions/ceiling" }
+      }
+    },
+    "tenant_overrides": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ceilings"],
+        "properties": {
+          "ceilings": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "official": { "$ref": "#/definitions/partialCeiling" },
+              "curated": { "$ref": "#/definitions/partialCeiling" },
+              "third-party": { "$ref": "#/definitions/partialCeiling" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "nameList": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^([A-Za-z0-9_.:/-]+\\*?|\\*)$" }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "hosts"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["none", "loopback", "allowlist"] },
+        "hosts": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "allow_wildcard_hosts": { "type": "boolean" }
+      }
+    },
+    "fs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "paths"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["none", "readonly", "readwrite"] },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tier", "prefix"],
+            "properties": {
+              "tier": { "type": "string", "enum": ["public", "confidential", "personal"] },
+              "prefix": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["network", "fs", "ops_invoke", "env", "secrets"],
+      "properties": {
+        "network": { "$ref": "#/definitions/network" },
+        "fs": { "$ref": "#/definitions/fs" },
+        "ops_invoke": { "$ref": "#/definitions/nameList" },
+        "env": { "$ref": "#/definitions/nameList" },
+        "secrets": { "$ref": "#/definitions/nameList" }
+      }
+    },
+    "partialCeiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "network": { "$ref": "#/definitions/network" },
+        "fs": { "$ref": "#/definitions/fs" },
+        "ops_invoke": { "$ref": "#/definitions/nameList" },
+        "env": { "$ref": "#/definitions/nameList" },
+        "secrets": { "$ref": "#/definitions/nameList" }
+      }
+    }
+  }
+}

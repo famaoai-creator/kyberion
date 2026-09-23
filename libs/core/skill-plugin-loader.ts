@@ -40,6 +40,7 @@ import {
   type PluginTrustLabel,
 } from './plugin-source-trust.js';
 import {
+  computePluginContentDigest,
   isManagedPluginActivationAllowed,
   listManagedPlugins,
   type ManagedPluginRecord,
@@ -71,6 +72,9 @@ export interface SkillPluginAuthorization {
   allowed: boolean;
   /** Set only when `allowed` is backed by a managed-copy install. */
   managedPluginId?: string;
+  /** EP-01: managed copy root and the approved content digest, re-verified before import(). */
+  managedPath?: string;
+  managedContentDigest?: string;
   reason: string;
 }
 
@@ -387,13 +391,19 @@ export function authorizeSkillPlugin(
     // activation status is already approved (or would-be-official within
     // the managed tree). Never fall back to executing the raw path.
     const managed = findManagedRecordFor(trust.resolvedSourcePath, managedRoot);
-    if (managed && isManagedPluginActivationAllowed(managed)) {
+    if (
+      managed &&
+      isManagedPluginActivationAllowed(managed) &&
+      (managed.contentDigest || managed.trust === 'official')
+    ) {
       return {
         configuredPath,
         resolvedPath: trust.resolvedSourcePath,
         trust: trust.label,
         allowed: true,
         managedPluginId: managed.pluginId,
+        managedPath: managed.managedPath,
+        ...(managed.contentDigest ? { managedContentDigest: managed.contentDigest } : {}),
         reason: `Managed-copy install '${managed.pluginId}' is activatable (trust=${managed.trust}).`,
       };
     }
@@ -439,6 +449,25 @@ export function authorizeConfiguredSkillPlugins(
 }
 
 /**
+ * EP-01: re-verifies the managed copy's content digest immediately before
+ * `import()` to keep the approval-to-execution window minimal. Returns a
+ * skip reason, or undefined when the content still matches.
+ */
+function managedDigestSkipReason(authorization: SkillPluginAuthorization): string | undefined {
+  if (!authorization.managedPluginId || !authorization.managedContentDigest) return undefined;
+  const label = `Managed-copy install '${authorization.managedPluginId}'`;
+  try {
+    const current = computePluginContentDigest(authorization.managedPath as string);
+    if (current === authorization.managedContentDigest) return undefined;
+    return `${label} content digest changed since approval (expected ${authorization.managedContentDigest.slice(0, 12)}, found ${current.slice(0, 12)}); skipping rather than executing modified plugin code.`;
+  } catch (err) {
+    return `${label} content digest could not be re-verified (${
+      err instanceof Error ? err.message : String(err)
+    }); skipping rather than executing unverified plugin code.`;
+  }
+}
+
+/**
  * Loads (via dynamic `import()`) every configured plugin that passed
  * `authorizeSkillPlugin`, and logs+returns a diagnostic for every one that
  * didn't. A denied/unmanaged plugin's file is never `import()`-ed — the
@@ -477,6 +506,19 @@ export async function loadAuthorizedSkillPlugins(
       diagnostics.push(authorization);
       logger.warn(
         `[skill-plugin-loader] Skipped plugin '${authorization.configuredPath}' (trust=${authorization.trust}): ${authorization.reason}`
+      );
+      continue;
+    }
+    const digestSkipReason = managedDigestSkipReason(authorization);
+    if (digestSkipReason) {
+      const diagnostic: SkillPluginAuthorization = {
+        ...authorization,
+        allowed: false,
+        reason: digestSkipReason,
+      };
+      diagnostics.push(diagnostic);
+      logger.warn(
+        `[skill-plugin-loader] Skipped plugin '${authorization.configuredPath}' (trust=${authorization.trust}): ${digestSkipReason}`
       );
       continue;
     }
