@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getSecret, getActiveSecrets, secretGuard } from './secret-guard.js';
 import { validateSovereignBoundary } from './tier-guard.js';
 import * as secureIo from './secure-io.js';
+import { withPluginExecutionFrame } from './sandbox-policy.js';
 
 describe('secret-guard core', () => {
   beforeEach(() => {
@@ -74,5 +75,45 @@ describe('secret-guard core', () => {
       // If neither is present, it should throw.
       expect(() => getSecret('SLACK_BOT_TOKEN', 'slack')).toThrow(/TIBA_VIOLATION/);
     });
+  });
+});
+
+describe('secret-guard plugin grants (EP-03)', () => {
+  const frame = (secrets: string[]) => ({
+    pluginId: 'secret-plugin',
+    grant: {
+      network: { mode: 'none' as const, hosts: [] },
+      fs: { mode: 'none' as const, paths: [] },
+      ops_invoke: [],
+      env: [],
+      secrets,
+    },
+  });
+
+  beforeEach(() => {
+    vi.stubEnv('PLUGIN_GRANTED_KEY', 'granted-secret-value');
+    vi.stubEnv('PLUGIN_OTHER_KEY', 'other-secret-value');
+  });
+
+  it('denies secrets the executing plugin was not granted', () => {
+    withPluginExecutionFrame(frame(['PLUGIN_GRANTED_*']), () => {
+      expect(getSecret('PLUGIN_GRANTED_KEY')).toBe('granted-secret-value');
+      expect(() => getSecret('PLUGIN_OTHER_KEY')).toThrow(
+        "[PLUGIN_GRANT_DENIED] plugin 'secret-plugin' is not granted secrets 'PLUGIN_OTHER_KEY'"
+      );
+      expect(() => secretGuard.loadConnectionDocument('slack')).toThrow(
+        "not granted secrets 'connection:slack'"
+      );
+    });
+    expect(getSecret('PLUGIN_OTHER_KEY')).toBe('other-secret-value');
+  });
+
+  it('never lets plugin code mint auth grants, even with a wildcard secrets grant', async () => {
+    withPluginExecutionFrame(frame(['*']), () => {
+      expect(() => secretGuard.grantAccess('MSN-X', 'slack')).toThrow('[PLUGIN_GRANT_DENIED]');
+    });
+    await expect(
+      withPluginExecutionFrame(frame(['*']), () => secretGuard.grantAccessGuarded('MSN-X', 'slack'))
+    ).rejects.toThrow('[PLUGIN_GRANT_DENIED]');
   });
 });

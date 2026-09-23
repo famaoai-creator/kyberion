@@ -272,6 +272,29 @@ describe('installPluginManaged', () => {
     ).toThrow('managed plugin record must be a regular file');
   });
 
+  it('blocks a manifest that declares a reserved seam', () => {
+    const managedRoot = managedRootDir('reserved-seam');
+    const src = sourceDir('reserved-seam');
+    safeMkdir(src, { recursive: true });
+    safeWriteFile(
+      path.join(src, 'plugin-manifest.json'),
+      JSON.stringify({
+        plugin_id: 'reserved-seam',
+        provides: { seams: ['risky-approval-override'] },
+      })
+    );
+
+    const record = installPluginManaged({
+      pluginId: `reserved-seam-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+    });
+    expect(record.manifest).toBeNull();
+    expect(record.diagnostics.map((d) => d.code)).toContain('manifest_reserved_seam');
+    expect(record.activationStatus).toBe('blocked_broken_manifest');
+    expect(isManagedPluginActivationAllowed(record)).toBe(false);
+  });
+
   it('blocks a manifest containing a dangerous JSON key', () => {
     const managedRoot = managedRootDir('dangerous-manifest');
     const src = sourceDir('dangerous-manifest');

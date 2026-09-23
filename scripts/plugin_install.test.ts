@@ -10,7 +10,12 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { runPluginInstall } from './plugin_install.js';
+import { resetPluginLifecycleForTests } from '@agent/core/plugin-lifecycle';
+import {
+  isPluginLifecycleCommand,
+  runPluginInstall,
+  runPluginLifecycleCommand,
+} from './plugin_install.js';
 
 const cleanupPaths: string[] = [];
 const originalArgv = process.argv;
@@ -220,5 +225,81 @@ describe('plugin_install CLI', () => {
     expect(source).not.toContain('console.log');
     expect(source).not.toContain('console.error');
     expect(source).toContain('runPluginInstall(context.argv, context.print)');
+  });
+});
+
+describe('plugin_install lifecycle commands (EP-04)', () => {
+  afterEach(() => resetPluginLifecycleForTests());
+
+  it('detects lifecycle flags', () => {
+    expect(isPluginLifecycleCommand(['--reload', 'x'])).toBe(true);
+    expect(isPluginLifecycleCommand(['--deactivate=x'])).toBe(true);
+    expect(isPluginLifecycleCommand(['--source', 'a', '--id', 'b'])).toBe(false);
+  });
+
+  it('requires exactly one of --reload / --deactivate', async () => {
+    const output: string[] = [];
+    expect(await runPluginLifecycleCommand([], (value) => output.push(String(value)))).toBe(1);
+    expect(
+      await runPluginLifecycleCommand(['--reload', 'a', '--deactivate', 'b'], (value) =>
+        output.push(String(value))
+      )
+    ).toBe(1);
+    expect(output.join('\n')).toContain('Usage:');
+  });
+
+  it('reloads (activates) an installed plugin and deactivates it, printing the ladder result', async () => {
+    const managedRoot = managedRootDir('lifecycle');
+    const pluginId = `cli-lifecycle-${process.pid}-${randomUUID()}`.slice(0, 60);
+    expect(
+      runPluginInstall([
+        '--source',
+        pathResolver.rootResolve('plugins/fixtures/plugin-permissions-fixture'),
+        '--id',
+        pluginId,
+        '--managed-root',
+        managedRoot,
+        '--json',
+      ])
+    ).toBe(0);
+
+    const reloadOutput: string[] = [];
+    const reloadExit = await runPluginLifecycleCommand(
+      ['--reload', pluginId, '--managed-root', managedRoot, '--json'],
+      (value) => reloadOutput.push(String(value))
+    );
+    expect(reloadExit).toBe(0);
+    expect(JSON.parse(reloadOutput.join(''))).toMatchObject({
+      action: 'reload',
+      pluginId,
+      ok: true,
+      mode: 'plugin_reload',
+    });
+
+    const text: string[] = [];
+    const deactivateExit = await runPluginLifecycleCommand(['--deactivate', pluginId], (value) =>
+      text.push(String(value))
+    );
+    expect(deactivateExit).toBe(0);
+    expect(text.join('\n')).toContain(`Plugin '${pluginId}' deactivate: ok`);
+    expect(text.join('\n')).toContain('mode:   plugin_reload');
+
+    const again: string[] = [];
+    expect(
+      await runPluginLifecycleCommand(['--deactivate', pluginId], (value) =>
+        again.push(String(value))
+      )
+    ).toBe(0);
+    expect(again.join('\n')).toContain('nothing to dispose');
+  });
+
+  it('fails (exit 1) when --reload targets a plugin that is not installed', async () => {
+    const output: string[] = [];
+    const exit = await runPluginLifecycleCommand(
+      ['--reload', 'missing-plugin', '--managed-root', managedRootDir('missing')],
+      (value) => output.push(String(value))
+    );
+    expect(exit).toBe(1);
+    expect(output.join('\n')).toContain('[PLUGIN_LIFECYCLE_DENIED]');
   });
 });

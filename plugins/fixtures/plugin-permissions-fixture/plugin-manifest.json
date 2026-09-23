@@ -1,0 +1,20 @@
+{
+  "plugin_id": "plugin-permissions-fixture",
+  "version": "1.0.0",
+  "description": "EP-03/EP-04 test fixture: ops that exercise governed host probes under the plugin grant.",
+  "provides": {
+    "ops": [
+      "permfixture:write",
+      "permfixture:fetch",
+      "permfixture:invoke",
+      "permfixture:secret",
+      "permfixture:env"
+    ]
+  },
+  "permissions": {
+    "network": { "mode": "none" },
+    "fs": { "mode": "readonly", "paths": [{ "tier": "public", "prefix": "" }] },
+    "ops_invoke": ["permfixture:env"],
+    "env": ["PLUGIN_FIXTURE_*"]
+  }
+}

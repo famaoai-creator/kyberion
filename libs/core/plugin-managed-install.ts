@@ -41,6 +41,7 @@ import {
   parsePluginPermissionGrant,
   parsePluginPermissionRequest,
   permissionsDigest,
+  PLUGIN_RESERVED_SEAMS,
   summarizePermissionDiff,
   type NarrowPluginPermissionsResult,
   type PluginPermissionGrant,
@@ -240,6 +241,24 @@ function readPluginManifestSafely(pluginRoot: string): {
     diagnostics.push({
       code: 'manifest_missing_field',
       message: "Manifest is missing a required identifier field ('plugin_id' or 'name').",
+      severity: 'error',
+    });
+    return { manifest: null, diagnostics };
+  }
+  const provides = parsed.provides;
+  const declaredSeams =
+    provides &&
+    typeof provides === 'object' &&
+    Array.isArray((provides as { seams?: unknown }).seams)
+      ? ((provides as { seams: unknown[] }).seams as unknown[])
+      : [];
+  const reservedSeam = declaredSeams
+    .map((seam) => String(seam).trim())
+    .find((seam) => PLUGIN_RESERVED_SEAMS.includes(seam));
+  if (reservedSeam) {
+    diagnostics.push({
+      code: 'manifest_reserved_seam',
+      message: `Manifest declares the reserved seam '${reservedSeam}', which plugins may never provide.`,
       severity: 'error',
     });
     return { manifest: null, diagnostics };

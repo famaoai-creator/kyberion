@@ -24,6 +24,17 @@ import { isValidTenantSlug } from './foundation/scope.js';
 import { pathResolver } from './path-resolver.js';
 import type { PluginTrustLabel } from './plugin-source-trust.js';
 
+/**
+ * Seams a plugin may never provide: binding any of them would let plugin code
+ * decide approvals, replace op resolution or move the governed clock.
+ */
+export const PLUGIN_RESERVED_SEAMS: readonly string[] = Object.freeze([
+  'core-clock',
+  'risky-approval-handler',
+  'risky-approval-override',
+  'scenario-op-override',
+]);
+
 export type PluginNetworkMode = 'none' | 'loopback' | 'allowlist';
 export type PluginFsMode = 'none' | 'readonly' | 'readwrite';
 export type PluginPermissionTier = 'public' | 'confidential' | 'personal';
