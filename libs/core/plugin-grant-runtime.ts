@@ -30,7 +30,6 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
 import { readJson } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
-import { isPathContainedIn } from './plugin-source-trust.js';
 import {
   isLegacyCoworkPermissionsBlock,
   loadPluginPermissionPolicy,
@@ -40,11 +39,6 @@ import {
   type PluginFsMode,
   type PluginPermissionGrant,
 } from './plugin-permissions.js';
-import {
-  isManagedPluginActivationAllowed,
-  listManagedPlugins,
-  type ManagedPluginRecord,
-} from './plugin-managed-install.js';
 import {
   getActiveSandboxPolicy,
   getPluginExecutionContext,
@@ -317,13 +311,32 @@ export function hasEp02PermissionDeclaration(
 
 const undeclaredOfficialLogged = new Set<string>();
 
+/**
+ * Approved managed-install grant for a plugin entry path. Registered by
+ * plugin-managed-install (which owns the records) so this module stays out of
+ * the install/loader import cycle; unregistered means no managed grant, so
+ * third-party plugins fall back to deny-by-default.
+ */
+export interface ManagedPluginGrantRecord {
+  pluginId: string;
+  grantedPermissions?: PluginPermissionGrant;
+}
+export type ManagedPluginGrantLookup = (
+  sourcePath: string,
+  managedRoot: string | undefined
+) => ManagedPluginGrantRecord | undefined;
+
+let managedPluginGrantLookup: ManagedPluginGrantLookup | undefined;
+
+export function setManagedPluginGrantLookup(lookup: ManagedPluginGrantLookup | undefined): void {
+  managedPluginGrantLookup = lookup;
+}
+
 function findManagedRecord(
   sourcePath: string,
   managedRoot: string | undefined
-): ManagedPluginRecord | undefined {
-  return listManagedPlugins(managedRoot).find((record) =>
-    isPathContainedIn(record.managedPath, sourcePath)
-  );
+): ManagedPluginGrantRecord | undefined {
+  return managedPluginGrantLookup?.(sourcePath, managedRoot);
 }
 
 /** Decides which grant (if any) wraps a plugin's contributions. Fails closed on any error. */
@@ -346,7 +359,7 @@ export function resolvePluginExecutionGrant(
         };
       }
       const record = findManagedRecord(subject.sourcePath, options.managedRoot);
-      if (record && isManagedPluginActivationAllowed(record) && record.grantedPermissions) {
+      if (record?.grantedPermissions) {
         return {
           grant: parsePluginPermissionGrant(record.grantedPermissions),
           source: 'managed_record',

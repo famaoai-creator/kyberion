@@ -9911,6 +9911,11 @@
         "ja": "破損",
         "qps-ploc": "⟦Ƀřőķėñ ŀőř⟧"
       },
+      "setup.plugin_status_digest_mismatch": {
+        "en": "Changed since approval — reinstall required",
+        "ja": "承認後に変更されています — 再インストールが必要です",
+        "qps-ploc": "⟦Ƈħȧñɠėḓ şïñƈė ȧṗṗřőṽȧŀ — řėïñşŧȧŀŀ řėɋůïřėḓ ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "setup.plugin_status_not_loadable": {
         "en": "Not loadable",
         "ja": "読み込み対象外",
@@ -9985,6 +9990,11 @@
         "en": "This plugin's contents are broken, so it cannot be approved.",
         "ja": "このプラグインは内容が壊れているため、承認できません。",
         "qps-ploc": "⟦Ŧħïş ṗŀůɠïñ'ş ƈőñŧėñŧş ȧřė ƀřőķėñ, şő ïŧ ƈȧññőŧ ƀė ȧṗṗřőṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "api.plugin.digest_mismatch": {
+        "en": "Plugin {id} changed after it was approved, so the earlier approval no longer applies. Reinstall it and approve the new version.",
+        "ja": "プラグイン {id} は承認後に内容が変わったため、以前の承認は無効です。再インストールして新しい版を承認してください。",
+        "qps-ploc": "⟦Ṗŀůɠïñ {id} ƈħȧñɠėḓ ȧƒŧėř ïŧ ẇȧş ȧṗṗřőṽėḓ, şő ŧħė ėȧřŀïėř ȧṗṗřőṽȧŀ ñő ŀőñɠėř ȧṗṗŀïėş. Řėïñşŧȧŀŀ ïŧ ȧñḓ ȧṗṗřőṽė ŧħė ñėẇ ṽėřşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
       },
       "api.plugin.no_decision_needed": {
         "en": "This plugin is already allowed to run — no decision is needed.",
@@ -20604,6 +20614,113 @@
         "en": "⚠️  {what}: {reason}",
         "ja": "⚠️  {what}: {reason}",
         "qps-ploc": "⟦⚠️  {what}: {reason} ŀőřėɱ ⟧"
+      }
+    },
+    "plugin": {
+      "view_menu_label": {
+        "en": "Plugin views",
+        "ja": "プラグインビュー",
+        "qps-ploc": "⟦Ṗŀůɠïñ ṽïėẇş ŀőř⟧"
+      },
+      "view_menu_description": {
+        "en": "Read-only views contributed by approved plugins, filtered to your role and scope.",
+        "ja": "承認済みプラグインが提供する表示専用ビューです(あなたのロールとスコープで絞り込み済み)。",
+        "qps-ploc": "⟦Řėȧḓ-őñŀẏ ṽïėẇş ƈőñŧřïƀůŧėḓ ƀẏ ȧṗṗřőṽėḓ ṗŀůɠïñş, ƒïŀŧėřėḓ ŧő ẏőůř řőŀė ȧñḓ şƈőṗė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "view_empty": {
+        "en": "No plugin views are available to you.",
+        "ja": "表示できるプラグインビューはありません。",
+        "qps-ploc": "⟦Ñő ṗŀůɠïñ ṽïėẇş ȧřė ȧṽȧïŀȧƀŀė ŧő ẏőů. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "view_load_error": {
+        "en": "Plugin views could not be loaded.",
+        "ja": "プラグインビューを読み込めませんでした。",
+        "qps-ploc": "⟦Ṗŀůɠïñ ṽïėẇş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "view_error_invalid": {
+        "en": "This plugin view is not valid and was not shown.",
+        "ja": "このプラグインビューは不正なため表示していません。",
+        "qps-ploc": "⟦Ŧħïş ṗŀůɠïñ ṽïėẇ ïş ñőŧ ṽȧŀïḓ ȧñḓ ẇȧş ñőŧ şħőẇñ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "view_error_unsupported": {
+        "en": "This plugin view needs an isolation mode that is not supported yet.",
+        "ja": "このプラグインビューはまだ対応していない分離方式を必要としています。",
+        "qps-ploc": "⟦Ŧħïş ṗŀůɠïñ ṽïėẇ ñėėḓş ȧñ ïşőŀȧŧïőñ ɱőḓė ŧħȧŧ ïş ñőŧ şůṗṗőřŧėḓ ẏėŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "view_error_capability_denied": {
+        "en": "This plugin view requests a capability that plugin views are not granted.",
+        "ja": "このプラグインビューは、プラグインビューに許可されていない機能を要求しています。",
+        "qps-ploc": "⟦Ŧħïş ṗŀůɠïñ ṽïėẇ řėɋůėşŧş ȧ ƈȧṗȧƀïŀïŧẏ ŧħȧŧ ṗŀůɠïñ ṽïėẇş ȧřė ñőŧ ɠřȧñŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "view_error_action_denied": {
+        "en": "This action is not allowed for this plugin.",
+        "ja": "この操作はこのプラグインには許可されていません。",
+        "qps-ploc": "⟦Ŧħïş ȧƈŧïőñ ïş ñőŧ ȧŀŀőẇėḓ ƒőř ŧħïş ṗŀůɠïñ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "view_error_not_found": {
+        "en": "That plugin view or action does not exist.",
+        "ja": "そのプラグインビューまたは操作は存在しません。",
+        "qps-ploc": "⟦Ŧħȧŧ ṗŀůɠïñ ṽïėẇ őř ȧƈŧïőñ ḓőėş ñőŧ ėẋïşŧ. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "view_error_params_invalid": {
+        "en": "The action input is not valid.",
+        "ja": "操作の入力が正しくありません。",
+        "qps-ploc": "⟦Ŧħė ȧƈŧïőñ ïñṗůŧ ïş ñőŧ ṽȧŀïḓ. ŀőřėɱ ïṗşů⟧"
+      },
+      "view_error_action_unavailable": {
+        "en": "The plugin is not running in this process, so the action cannot run here.",
+        "ja": "このプロセスではプラグインが動いていないため、この操作はここでは実行できません。",
+        "qps-ploc": "⟦Ŧħė ṗŀůɠïñ ïş ñőŧ řůññïñɠ ïñ ŧħïş ṗřőƈėşş, şő ŧħė ȧƈŧïőñ ƈȧññőŧ řůñ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "view_error_denied": {
+        "en": "This plugin is not approved to run, so its views are hidden.",
+        "ja": "このプラグインは実行が承認されていないため、ビューを表示していません。",
+        "qps-ploc": "⟦Ŧħïş ṗŀůɠïñ ïş ñőŧ ȧṗṗřőṽėḓ ŧő řůñ, şő ïŧş ṽïėẇş ȧřė ħïḓḓėñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "view_action_approval_required": {
+        "en": "Approval requested. The action runs only after a person approves it.",
+        "ja": "承認を依頼しました。人が承認するまで操作は実行されません。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůėşŧėḓ. Ŧħė ȧƈŧïőñ řůñş őñŀẏ ȧƒŧėř ȧ ṗėřşőñ ȧṗṗřőṽėş ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "view_action_dispatched": {
+        "en": "The action was sent to the plugin.",
+        "ja": "操作をプラグインに送りました。",
+        "qps-ploc": "⟦Ŧħė ȧƈŧïőñ ẇȧş şėñŧ ŧő ŧħė ṗŀůɠïñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "permission_narrowed": {
+        "en": "Some requested permissions were reduced to what policy allows for {trust} plugins.",
+        "ja": "要求された権限の一部を、{trust} プラグインに許可された範囲まで縮小しました。",
+        "qps-ploc": "⟦Şőɱė řėɋůėşŧėḓ ṗėřɱïşşïőñş ẇėřė řėḓůƈėḓ ŧő ẇħȧŧ ṗőŀïƈẏ ȧŀŀőẇş ƒőř {trust} ṗŀůɠïñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "elevation_needed": {
+        "en": "{capability} was narrowed to nothing. To allow it, an administrator must raise the {trust} ceiling in the plugin permission policy.",
+        "ja": "{capability} は許可範囲がゼロになりました。許可するには、管理者がプラグイン権限ポリシーの {trust} 上限を引き上げる必要があります。",
+        "qps-ploc": "⟦{capability} ẇȧş ñȧřřőẇėḓ ŧő ñőŧħïñɠ. Ŧő ȧŀŀőẇ ïŧ, ȧñ ȧḓɱïñïşŧřȧŧőř ɱůşŧ řȧïşė ŧħė {trust} ƈėïŀïñɠ ïñ ŧħė ṗŀůɠïñ ṗėřɱïşşïőñ ṗőŀïƈẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
+      },
+      "digest_mismatch": {
+        "en": "The plugin changed after it was approved. Reinstall it and approve it again.",
+        "ja": "承認後にプラグインの内容が変わりました。再インストールして、もう一度承認してください。",
+        "qps-ploc": "⟦Ŧħė ṗŀůɠïñ ƈħȧñɠėḓ ȧƒŧėř ïŧ ẇȧş ȧṗṗřőṽėḓ. Řėïñşŧȧŀŀ ïŧ ȧñḓ ȧṗṗřőṽė ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "apply_mode_config_apply": {
+        "en": "Applied in place (no reload needed)",
+        "ja": "その場で適用(再読み込み不要)",
+        "qps-ploc": "⟦Ȧṗṗŀïėḓ ïñ ṗŀȧƈė (ñő řėŀőȧḓ ñėėḓėḓ) ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "apply_mode_plugin_reload": {
+        "en": "Plugin reloaded",
+        "ja": "プラグインを再読み込み",
+        "qps-ploc": "⟦Ṗŀůɠïñ řėŀőȧḓėḓ ŀőřė⟧"
+      },
+      "apply_mode_restart_required": {
+        "en": "Restart required to apply",
+        "ja": "適用には再起動が必要",
+        "qps-ploc": "⟦Řėşŧȧřŧ řėɋůïřėḓ ŧő ȧṗṗŀẏ ŀőřėɱ ïṗ⟧"
+      },
+      "fixture_status_view_title": {
+        "en": "Permissions fixture status",
+        "ja": "権限フィクスチャの状態",
+        "qps-ploc": "⟦Ṗėřɱïşşïőñş ƒïẋŧůřė şŧȧŧůş ŀőřėɱ ïṗ⟧"
       }
     }
   }

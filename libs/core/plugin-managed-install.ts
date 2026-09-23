@@ -48,6 +48,7 @@ import {
   type PluginPermissionRequest,
 } from './plugin-permissions.js';
 import { isValidTenantSlug } from './foundation/scope.js';
+import { setManagedPluginGrantLookup } from './plugin-grant-runtime.js';
 
 // Re-exported so install surfaces can render/handle narrowing through this
 // module's existing package export.
@@ -1037,3 +1038,10 @@ export function isManagedPluginActivationAllowed(
 ): boolean {
   return entry.activationStatus === 'activatable';
 }
+
+setManagedPluginGrantLookup((sourcePath, managedRoot) =>
+  listManagedPlugins(managedRoot).find(
+    (record) =>
+      isManagedPluginActivationAllowed(record) && isPathContainedIn(record.managedPath, sourcePath)
+  )
+);
