@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "catalog": "kyberion-base",
+  "sections": [
+    {
+      "id": "voice-input",
+      "title": "Voice input ui:voice-input",
+      "description": "A microphone button with a live input-level meter, elapsed time and a status line announced to screen readers. The microphone opens only when the user presses the button; transcripts and recordings go to onAction (voice.transcript / voice.recording), never into props.",
+      "components": [
+        {
+          "id": "vi-stack",
+          "type": "ui:stack",
+          "props": {
+            "gap": "lg"
+          },
+          "children": ["vi-dictation", "vi-record", "vi-transcribing", "vi-error"]
+        },
+        {
+          "id": "vi-dictation",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "note.dictation",
+            "label": "Dictate a note",
+            "mode": "dictation",
+            "continuous": true,
+            "show_transcript": true,
+            "help": "Words appear as you speak. Press again to stop."
+          }
+        },
+        {
+          "id": "vi-record",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "memo.audio",
+            "label": "Voice memo",
+            "mode": "record",
+            "push_to_talk": true,
+            "chunk_ms": 5000,
+            "max_seconds": 120,
+            "help": "Recording stops after two minutes."
+          }
+        },
+        {
+          "id": "vi-transcribing",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "meeting.audio",
+            "label": "Meeting recording",
+            "mode": "record",
+            "status": "transcribing"
+          }
+        },
+        {
+          "id": "vi-error",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "search.voice",
+            "label": "Voice search",
+            "mode": "dictation",
+            "show_level": false,
+            "status": "error",
+            "status_error": "The transcription service is offline. Type your question instead."
+          }
+        }
+      ]
+    },
+    {
+      "id": "voice-state",
+      "title": "Voice state ui:voice-state",
+      "description": "Conversation state for voice agents and avatars. Each state has its own label, glyph and shape, so it never relies on color; animations stop under reduced motion.",
+      "components": [
+        {
+          "id": "vs-row",
+          "type": "ui:stack",
+          "props": {
+            "gap": "lg",
+            "direction": "horizontal",
+            "align": "center",
+            "wrap": true
+          },
+          "children": [
+            "vs-idle",
+            "vs-listening",
+            "vs-thinking",
+            "vs-speaking",
+            "vs-muted",
+            "vs-error",
+            "vs-orb",
+            "vs-dot",
+            "vs-custom"
+          ]
+        },
+        {
+          "id": "vs-idle",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "idle"
+          }
+        },
+        {
+          "id": "vs-listening",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "listening",
+            "level": 0.6
+          }
+        },
+        {
+          "id": "vs-thinking",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "thinking"
+          }
+        },
+        {
+          "id": "vs-speaking",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "speaking"
+          }
+        },
+        {
+          "id": "vs-muted",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "muted",
+            "size": "sm"
+          }
+        },
+        {
+          "id": "vs-error",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "error"
+          }
+        },
+        {
+          "id": "vs-orb",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "speaking",
+            "variant": "orb",
+            "size": "lg",
+            "level": 0.4
+          }
+        },
+        {
+          "id": "vs-dot",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "listening",
+            "variant": "dot",
+            "show_label": false
+          }
+        },
+        {
+          "id": "vs-custom",
+          "type": "ui:voice-state",
+          "props": {
+            "state": "speaking",
+            "label": "Reading your summary",
+            "level": 0.8
+          }
+        }
+      ]
+    }
+  ]
+}

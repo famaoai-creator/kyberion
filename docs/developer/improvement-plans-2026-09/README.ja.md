@@ -16,6 +16,7 @@ status: active
 - [Local Pads 統合](./LOCAL_PADS_UNIFICATION_PLAN_2026-09-14.ja.md) — 8つの作業場所を共通の保存・履歴・UIへ統合。
 - [業務棚卸しと実データ学習ループ](./WORK_INVENTORY_PLAN_2026-09-22.ja.md) — 業務観測、候補順位付け、実績による校正を計画。
 - [サーフェス UI 統一](./SURFACE_UI_UNIFICATION_PLAN_2026-09-23.ja.md) — 基本 UI を A2UI `kyberion-base` カタログとして定義し、5 サーフェスを共通デザイン(deep blue、light/dark、en/ja)へ移行。
+- [ローカルパッドの A2UI 化と話すアバター](./PADS_A2UI_AND_AVATAR_PLAN_2026-09-23.ja.md) — パッド 10 種を `kyberion-base` へ移行し、ツールバー・描画パレット・音声入力(レベル表示)・ダイアログをコンポーネント化。PR 2 で口パクと写真アバター。
 
 ## 実行基盤と運用
 

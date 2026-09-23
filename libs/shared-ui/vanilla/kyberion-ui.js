@@ -22,6 +22,10 @@
 import { KB_CHART_TYPES, layoutChart } from './charts.js';
 // UI-01c settings & forms: renderers + pure helpers live in ./forms.js (shared with React).
 import { createFormRenderers } from './forms.js';
+// PA-02 voice: renderers + microphone controller live in ./voice.js (shared with React).
+import { createVoiceRenderers } from './voice.js';
+// PA-01 pads: toolbar / dialog / drawing renderers live in ./pads.js (shared with React).
+import { createPadRenderers } from './pads.js';
 // UI-01d vocabulary (generated default messages, key tables, translator,
 // status labels, aliases, icons) lives in ./kyberion-ui-vocabulary.js.
 import {
@@ -860,6 +864,12 @@ for (const type of KB_CHART_TYPES) {
       false
     );
 }
+
+// PA-02 voice (ui:voice-input / ui:voice-state): renderers + controller live in ./voice.js.
+Object.assign(RENDERERS, createVoiceRenderers({ el, setData }));
+
+// PA-01 pads (ui:toolbar / ui:dialog / ui:drawing-palette / ui:sketch-board): ./pads.js.
+Object.assign(RENDERERS, createPadRenderers({ el, setData, safeHref }));
 
 /**
  * `ui:table` rich cell kind: `title` ({title, id?, href?}), `status`

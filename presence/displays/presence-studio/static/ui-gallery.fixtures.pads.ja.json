@@ -1,0 +1,222 @@
+{
+  "version": 1,
+  "catalog": "kyberion-base",
+  "sections": [
+    {
+      "id": "pad-toolbar",
+      "title": "ツールバー ui:toolbar",
+      "description": "WAI-ARIA のツールバー。矢印キーでボタン間を移動し、Tab で抜けます。ボタン・トグル・ファイル選択・区切り・余白・状態表示。狭い画面では折り返します。",
+      "components": [
+        {
+          "id": "pt-review",
+          "type": "ui:toolbar",
+          "props": {
+            "label": "レビューツール",
+            "items": [
+              {
+                "type": "button",
+                "id": "save",
+                "label": "保存",
+                "icon": "💾",
+                "variant": "primary"
+              },
+              {
+                "type": "button",
+                "id": "export",
+                "label": "書き出す",
+                "icon": "⬇"
+              },
+              {
+                "type": "separator"
+              },
+              {
+                "type": "toggle",
+                "id": "comments",
+                "label": "コメント",
+                "icon": "💬",
+                "pressed": true
+              },
+              {
+                "type": "toggle",
+                "id": "focus",
+                "label": "集中モード",
+                "icon": "◎",
+                "hide_label": true
+              },
+              {
+                "type": "file",
+                "id": "import",
+                "label": "読み込む",
+                "icon": "📂",
+                "accept": ".md,.txt",
+                "multiple": true
+              },
+              {
+                "type": "button",
+                "id": "delete",
+                "label": "削除",
+                "variant": "danger",
+                "disabled": true
+              },
+              {
+                "type": "spacer"
+              },
+              {
+                "type": "status",
+                "id": "saved",
+                "text": "2 分前に保存しました",
+                "tone": "success"
+              }
+            ]
+          }
+        },
+        {
+          "id": "pt-compact",
+          "type": "ui:toolbar",
+          "props": {
+            "label": "書式",
+            "density": "compact",
+            "items": [
+              {
+                "type": "toggle",
+                "id": "bold",
+                "label": "太字",
+                "icon": "B",
+                "hide_label": true,
+                "pressed": true
+              },
+              {
+                "type": "toggle",
+                "id": "italic",
+                "label": "斜体",
+                "icon": "I",
+                "hide_label": true
+              },
+              {
+                "type": "separator"
+              },
+              {
+                "type": "button",
+                "id": "undo",
+                "label": "元に戻す",
+                "icon": "↶",
+                "variant": "secondary"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad-dialog",
+      "title": "ダイアログ ui:dialog",
+      "description": "confirm() と prompt() の置き換え。フォーカスはダイアログ内に移り、Tab は外に出ず、Escape でキャンセル、1 行入力では Enter で確定し、閉じると元の場所に戻ります。ここでは埋め込み表示、実際の画面では全面に重なります。",
+      "components": [
+        {
+          "id": "pd-rename",
+          "type": "ui:dialog",
+          "props": {
+            "open": true,
+            "title": "メモの名前を変更",
+            "message": "新しい名前はファイル名と一覧に使われます。",
+            "input": {
+              "name": "title",
+              "label": "名前",
+              "placeholder": "会議メモ",
+              "value": "週次定例"
+            },
+            "confirm_label": "変更する"
+          }
+        },
+        {
+          "id": "pd-unsaved",
+          "type": "ui:dialog",
+          "props": {
+            "open": true,
+            "title": "閉じる前に変更を保存しますか？",
+            "message": "まだ保存していない編集があります。",
+            "tone": "danger",
+            "choices": [
+              {
+                "id": "save",
+                "label": "保存",
+                "variant": "primary"
+              },
+              {
+                "id": "discard",
+                "label": "破棄",
+                "variant": "danger"
+              },
+              {
+                "id": "cancel",
+                "label": "編集を続ける",
+                "variant": "ghost"
+              }
+            ]
+          }
+        },
+        {
+          "id": "pd-closed",
+          "type": "ui:dialog",
+          "props": {
+            "open": false,
+            "title": "開くまで非表示"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad-drawing-palette",
+      "title": "描画パレット ui:drawing-palette",
+      "description": "ツール、暗い背景でも明るい背景でも見える色見本、任意の色、線の太さ、元に戻す・消去。値はホストが持ちます。",
+      "components": [
+        {
+          "id": "pp-palette",
+          "type": "ui:drawing-palette",
+          "props": {
+            "name": "annotate",
+            "label": "注釈パレット",
+            "tool": "arrow",
+            "color": "#0090ff",
+            "width": 6,
+            "allow_custom_color": true,
+            "can_undo": true,
+            "show_clear": true
+          }
+        },
+        {
+          "id": "pp-vertical",
+          "type": "ui:drawing-palette",
+          "props": {
+            "name": "marker",
+            "label": "マーカーパレット",
+            "tools": ["pen", "highlighter", "eraser"],
+            "colors": ["#e5484d", "#30a46c", "#8e4ec6"],
+            "orientation": "vertical",
+            "min_width": 2,
+            "max_width": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "pad-sketch-board",
+      "title": "スケッチボード ui:sketch-board",
+      "description": "パレットとキャンバスが一体。マウス・ペン・タッチで描き、テキストはその場で入力、元に戻す、確認付きの消去、PNG のダウンロード。画像をドロップまたは貼り付けると背景になります。",
+      "components": [
+        {
+          "id": "ps-board",
+          "type": "ui:sketch-board",
+          "props": {
+            "name": "sketch",
+            "label": "スケッチ",
+            "canvas_width": 960,
+            "canvas_height": 540,
+            "accept_image_drop": true,
+            "show_download": true
+          }
+        }
+      ]
+    }
+  ]
+}

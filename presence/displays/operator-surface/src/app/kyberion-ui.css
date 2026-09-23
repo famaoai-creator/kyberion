@@ -3652,3 +3652,832 @@ legend.kb-field__label {
     transition: none;
   }
 }
+
+/* ------------------------------------------------------------- pads ----
+ * PA-01 (PADS_A2UI_AND_AVATAR_PLAN_2026-09-23 §3): ui:toolbar, ui:dialog,
+ * ui:drawing-palette, ui:sketch-board. Stamped into kyberion-ui.css after
+ * the base sheet by scripts/generate_design_tokens.ts.
+ *
+ * Markup comes from libs/shared-ui/vanilla/{toolbar,dialog,drawing}.js and
+ * src/pads/*.tsx (parity-tested). Same rules as the base sheet: `--kb-ui-*`
+ * tokens only, `.kb-*` selectors only, state via data / aria attributes.
+ * Swatch colors arrive as the `--kb-swatch` custom property (a validated hex
+ * set through CSSOM), never as literals here.
+ */
+
+/* ------------------------------------------------------------- toolbar -- */
+
+.kb-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-1);
+  min-width: 0;
+  padding: var(--kb-ui-space-1) var(--kb-ui-space-2);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  color: var(--kb-ui-text);
+  font-family: var(--kb-ui-font-sans);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-toolbar[data-sticky='true'] {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  box-shadow: var(--kb-ui-shadow-sm);
+}
+
+.kb-toolbar__item {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0 var(--kb-ui-space-3);
+}
+
+.kb-toolbar[data-density='compact'] .kb-toolbar__item {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0 var(--kb-ui-space-2);
+}
+
+.kb-toolbar__item[aria-pressed='true'] {
+  background: var(--kb-ui-accent-soft);
+  border-color: var(--kb-ui-accent);
+  color: var(--kb-ui-accent-text);
+}
+
+.kb-toolbar__item:focus-visible,
+.kb-drawing-palette__tool:focus-visible,
+.kb-drawing-palette__swatch:focus-visible,
+.kb-drawing-palette__action:focus-visible,
+.kb-drawing-palette__range:focus-visible,
+.kb-drawing-palette__custom:focus-within,
+.kb-dialog__panel .kb-btn:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.kb-toolbar__icon {
+  font-size: var(--kb-ui-font-size-md);
+  line-height: 1;
+}
+
+.kb-toolbar__separator {
+  align-self: stretch;
+  width: 1px;
+  margin: var(--kb-ui-space-1);
+  background: var(--kb-ui-border);
+}
+
+.kb-toolbar__spacer {
+  flex: 1 1 auto;
+}
+
+.kb-toolbar__status {
+  padding: 0 var(--kb-ui-space-2);
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-toolbar__status[data-tone='success'] {
+  color: var(--kb-ui-success-fg);
+}
+
+.kb-toolbar__status[data-tone='info'],
+.kb-toolbar__status[data-tone='accent'] {
+  color: var(--kb-ui-info-fg);
+}
+
+.kb-toolbar__status[data-tone='warning'] {
+  color: var(--kb-ui-warning-fg);
+}
+
+.kb-toolbar__status[data-tone='danger'] {
+  color: var(--kb-ui-danger-fg);
+}
+
+.kb-toolbar__file {
+  display: none;
+}
+
+/* -------------------------------------------------------------- dialog -- */
+
+.kb-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--kb-ui-space-4);
+  font-family: var(--kb-ui-font-sans);
+}
+
+.kb-dialog[hidden] {
+  display: none;
+}
+
+.kb-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--kb-ui-canvas);
+  opacity: 0.78;
+}
+
+.kb-dialog__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+  width: min(100%, 32rem);
+  max-height: calc(100vh - 2 * var(--kb-ui-space-4));
+  overflow: auto;
+  padding: var(--kb-ui-space-5);
+  background: var(--kb-ui-surface-raised);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-lg);
+  box-shadow: var(--kb-ui-shadow-md);
+  color: var(--kb-ui-text);
+  animation: kb-dialog-in 140ms ease-out;
+}
+
+.kb-dialog[data-tone='danger'] .kb-dialog__panel {
+  border-top: 3px solid var(--kb-ui-danger-fg);
+}
+
+.kb-dialog__title {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.kb-dialog__message {
+  margin: 0;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-md);
+  line-height: 1.5;
+}
+
+.kb-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--kb-ui-space-2);
+  margin-top: var(--kb-ui-space-2);
+}
+
+.kb-dialog__actions .kb-btn {
+  min-height: 40px;
+}
+
+@keyframes kb-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (max-width: 480px) {
+  .kb-dialog {
+    align-items: flex-end;
+    padding: var(--kb-ui-space-2);
+  }
+
+  .kb-dialog__actions {
+    flex-direction: column-reverse;
+  }
+
+  .kb-dialog__actions .kb-btn {
+    width: 100%;
+  }
+}
+
+/* ----------------------------------------------------- drawing palette -- */
+
+.kb-drawing-palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2) var(--kb-ui-space-3);
+  min-width: 0;
+  padding: var(--kb-ui-space-2);
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  color: var(--kb-ui-text);
+  font-family: var(--kb-ui-font-sans);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-drawing-palette[data-orientation='vertical'] {
+  flex-direction: column;
+  align-items: stretch;
+  width: max-content;
+  max-width: 100%;
+}
+
+.kb-drawing-palette__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-1);
+}
+
+.kb-drawing-palette[data-orientation='horizontal']
+  .kb-drawing-palette__group
+  + .kb-drawing-palette__group {
+  padding-left: var(--kb-ui-space-3);
+  border-left: 1px solid var(--kb-ui-border);
+}
+
+.kb-drawing-palette[data-orientation='vertical']
+  .kb-drawing-palette__group
+  + .kb-drawing-palette__group {
+  padding-top: var(--kb-ui-space-2);
+  border-top: 1px solid var(--kb-ui-border);
+}
+
+.kb-drawing-palette__tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--kb-ui-radius-sm);
+  color: var(--kb-ui-text-muted);
+  cursor: pointer;
+}
+
+.kb-drawing-palette__tool:hover {
+  background: var(--kb-ui-surface-sunken);
+  color: var(--kb-ui-text);
+}
+
+.kb-drawing-palette__tool[aria-checked='true'] {
+  background: var(--kb-ui-accent-soft);
+  border-color: var(--kb-ui-accent);
+  color: var(--kb-ui-accent-text);
+}
+
+.kb-drawing-palette__swatch,
+.kb-drawing-palette__custom {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  margin: var(--kb-ui-space-1);
+  padding: 0;
+  border: 2px solid var(--kb-ui-surface);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--kb-ui-border-strong);
+  cursor: pointer;
+}
+
+.kb-drawing-palette__swatch {
+  background: var(--kb-swatch, var(--kb-ui-text-muted));
+}
+
+.kb-drawing-palette__swatch[aria-checked='true'] {
+  box-shadow:
+    0 0 0 2px var(--kb-ui-text),
+    0 0 0 4px var(--kb-ui-surface);
+}
+
+.kb-drawing-palette__custom {
+  overflow: hidden;
+  background: var(--kb-ui-surface-sunken);
+}
+
+.kb-drawing-palette__custom-input {
+  position: absolute;
+  inset: -8px;
+  width: calc(100% + 16px);
+  height: calc(100% + 16px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.kb-drawing-palette__width-label {
+  color: var(--kb-ui-text-muted);
+  font-weight: 600;
+}
+
+.kb-drawing-palette__range {
+  width: 104px;
+  min-height: 32px;
+  accent-color: var(--kb-ui-accent);
+}
+
+.kb-drawing-palette__width-value {
+  min-width: 5ch;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-drawing-palette__action {
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+}
+
+/* -------------------------------------------------------- sketch board -- */
+
+.kb-sketch-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  min-width: 0;
+  color: var(--kb-ui-text);
+  font-family: var(--kb-ui-font-sans);
+}
+
+.kb-sketch-board__stage {
+  position: relative;
+  overflow: hidden;
+  background: var(--kb-ui-surface-sunken);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+}
+
+.kb-sketch-board__stage[data-dragging='true'] {
+  outline: 2px dashed var(--kb-ui-accent);
+  outline-offset: -4px;
+}
+
+.kb-sketch-board__canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.kb-sketch-board__canvas:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: -2px;
+}
+
+.kb-sketch-board__text {
+  position: absolute;
+  z-index: 1;
+  min-width: 12ch;
+  max-width: 60%;
+  min-height: 32px;
+  padding: 0 var(--kb-ui-space-2);
+  background: var(--kb-ui-surface-raised);
+  border: 1px solid var(--kb-ui-accent);
+  border-left: 4px solid var(--kb-sketch-ink, var(--kb-ui-accent));
+  border-radius: var(--kb-ui-radius-sm);
+  color: var(--kb-ui-text);
+  font: inherit;
+  font-weight: 600;
+}
+
+.kb-sketch-board__text:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 1px;
+}
+
+.kb-sketch-board__hint,
+.kb-sketch-board__notice {
+  margin: 0;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-sketch-board__notice:empty {
+  display: none;
+}
+
+/* ------------------------------------------------------ reduced motion -- */
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-dialog__panel {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------- voice ----
+ * PA-02 (PADS_A2UI_AND_AVATAR_PLAN §3). Stamped into kyberion-ui.css after
+ * kyberion-ui.source.css by scripts/generate_design_tokens.ts.
+ *
+ * Markup comes from libs/shared-ui/vanilla/voice.js and src/voice/*.tsx
+ * (parity-tested). `--kb-ui-*` tokens only, `.kb-*` selectors only, state
+ * via data attributes / aria-pressed. `--kb-voice-level` (0..1) is set on the
+ * component root by the renderer (mic RMS) or the host (`level` prop); bar
+ * heights follow it. States never rely on colour alone: the button text,
+ * the status line, the glyph and the bar shapes differ per state. Under
+ * reduced motion the pulses stop but the level meter keeps updating (it is
+ * information, not decoration).
+ */
+
+/* --------------------------------------------------------- voice input -- */
+
+.kb-voice-input__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-3);
+}
+
+.kb-voice-input__button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  min-height: 44px;
+  padding: 0 var(--kb-ui-space-4);
+  color: var(--kb-ui-text);
+  font: inherit;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.kb-voice-input__button:hover:not(:disabled) {
+  background: var(--kb-ui-surface-sunken);
+}
+
+.kb-voice-input__button:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.kb-voice-input__button[aria-pressed='true'] {
+  color: var(--kb-ui-text-on-accent);
+  background: var(--kb-ui-accent);
+  border-color: var(--kb-ui-accent);
+}
+
+.kb-voice-input__button[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--kb-ui-accent);
+}
+
+.kb-voice-input[data-state='requesting'] .kb-voice-input__button {
+  border-style: dashed;
+}
+
+.kb-voice-input__button:disabled {
+  color: var(--kb-ui-text-subtle);
+  background: var(--kb-ui-surface-sunken);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.kb-voice-input[data-state='processing'] .kb-voice-input__button {
+  cursor: progress;
+}
+
+.kb-voice-input[data-state='error'] .kb-voice-input__button {
+  border-color: var(--kb-ui-danger-border);
+}
+
+.kb-voice-input__icon {
+  display: inline-flex;
+}
+
+.kb-voice-input[data-state='listening'] .kb-voice-input__icon,
+.kb-voice-input[data-state='recording'] .kb-voice-input__icon {
+  animation: kb-voice-pulse 1.2s ease-in-out infinite;
+}
+
+.kb-voice-input__meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+}
+
+.kb-voice-input__bar {
+  --kb-voice-bar-weight: 1;
+  display: block;
+  width: 4px;
+  height: 100%;
+  background: var(--kb-ui-border-strong);
+  border-radius: 2px;
+  transform: scaleY(calc(0.15 + var(--kb-voice-level, 0) * 0.85 * var(--kb-voice-bar-weight)));
+  transition: transform 80ms linear;
+}
+
+.kb-voice-input__bar:nth-child(1),
+.kb-voice-input__bar:nth-child(5),
+.kb-voice-state__bar:nth-child(1),
+.kb-voice-state__bar:nth-child(5) {
+  --kb-voice-bar-weight: 0.5;
+}
+
+.kb-voice-input__bar:nth-child(2),
+.kb-voice-input__bar:nth-child(4),
+.kb-voice-state__bar:nth-child(2),
+.kb-voice-state__bar:nth-child(4) {
+  --kb-voice-bar-weight: 0.8;
+}
+
+.kb-voice-input[data-state='listening'] .kb-voice-input__bar,
+.kb-voice-input[data-state='recording'] .kb-voice-input__bar {
+  background: var(--kb-ui-accent);
+}
+
+.kb-voice-input__time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-1);
+  color: var(--kb-ui-text-muted);
+  font-family: var(--kb-ui-font-mono);
+  font-size: var(--kb-ui-font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-voice-input[data-state='recording'] .kb-voice-input__time::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--kb-ui-danger-fg);
+  border-radius: 50%;
+}
+
+.kb-voice-input__transcript {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+  font-style: italic;
+}
+
+.kb-voice-input__status {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-voice-input[data-state='error'] .kb-voice-input__status,
+.kb-voice-input[data-state='unsupported'] .kb-voice-input__status {
+  color: var(--kb-ui-danger-fg);
+}
+
+/* --------------------------------------------------------- voice state -- */
+
+.kb-voice-state {
+  --kb-voice-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-voice-state[data-size='sm'] {
+  --kb-voice-size: 16px;
+  font-size: var(--kb-ui-font-size-xs);
+}
+
+.kb-voice-state[data-size='lg'] {
+  --kb-voice-size: 40px;
+  font-size: var(--kb-ui-font-size-md);
+}
+
+.kb-voice-state[data-state='listening'] {
+  color: var(--kb-ui-accent-text);
+}
+
+.kb-voice-state[data-state='thinking'] {
+  color: var(--kb-ui-info-fg);
+}
+
+.kb-voice-state[data-state='speaking'] {
+  color: var(--kb-ui-success-fg);
+}
+
+.kb-voice-state[data-state='muted'] {
+  color: var(--kb-ui-text-subtle);
+}
+
+.kb-voice-state[data-state='error'] {
+  color: var(--kb-ui-danger-fg);
+}
+
+.kb-voice-state__visual {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--kb-voice-size) / 12);
+  min-width: var(--kb-voice-size);
+  height: var(--kb-voice-size);
+}
+
+.kb-voice-state__bar {
+  --kb-voice-bar-weight: 1;
+  display: block;
+  width: calc(var(--kb-voice-size) / 7);
+  height: 100%;
+  background: currentColor;
+  border-radius: 999px;
+  transform: scaleY(calc(0.2 + var(--kb-voice-level, 0) * 0.8 * var(--kb-voice-bar-weight)));
+  transition: transform 80ms linear;
+}
+
+.kb-voice-state__orb {
+  display: block;
+  width: var(--kb-voice-size);
+  height: var(--kb-voice-size);
+  background: currentColor;
+  border-radius: 50%;
+  opacity: 0.3;
+  transform: scale(calc(0.7 + var(--kb-voice-level, 0) * 0.3));
+  transition: transform 80ms linear;
+}
+
+.kb-voice-state__dot {
+  display: block;
+  width: calc(var(--kb-voice-size) / 2.5);
+  height: calc(var(--kb-voice-size) / 2.5);
+  background: currentColor;
+  border-radius: 50%;
+}
+
+/* Per-state glyph (shape cue besides colour). Centered on orb / dot, a
+ * corner badge on bars. */
+.kb-voice-state__glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kb-ui-text);
+  font-size: calc(var(--kb-voice-size) * 0.5);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kb-voice-state[data-variant='bars'] .kb-voice-state__glyph {
+  inset: auto calc(var(--kb-voice-size) * -0.35) calc(var(--kb-voice-size) * -0.2) auto;
+  font-size: calc(var(--kb-voice-size) * 0.4);
+}
+
+.kb-voice-state[data-variant='dot'] .kb-voice-state__glyph {
+  display: none;
+}
+
+.kb-voice-state[data-state='idle'] .kb-voice-state__glyph::before {
+  content: '\25CB';
+}
+
+.kb-voice-state[data-state='listening'] .kb-voice-state__glyph::before {
+  content: '\25CF';
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__glyph::before {
+  content: '\2026';
+}
+
+.kb-voice-state[data-state='speaking'] .kb-voice-state__glyph::before {
+  content: '\266A';
+}
+
+.kb-voice-state[data-state='muted'] .kb-voice-state__glyph::before {
+  content: '\2715';
+}
+
+.kb-voice-state[data-state='error'] .kb-voice-state__glyph::before {
+  content: '!';
+}
+
+/* Static per-state shapes (also the reduced-motion look). */
+.kb-voice-state[data-state='idle'] .kb-voice-state__bar,
+.kb-voice-state[data-state='muted'] .kb-voice-state__bar {
+  transform: scaleY(0.2);
+}
+
+.kb-voice-state[data-state='muted'] .kb-voice-state__visual,
+.kb-voice-state[data-state='idle'] .kb-voice-state__orb {
+  opacity: 0.5;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar {
+  transform: scaleY(0.35);
+}
+
+.kb-voice-state[data-state='idle'] .kb-voice-state__dot,
+.kb-voice-state[data-state='muted'] .kb-voice-state__dot {
+  background: transparent;
+  border: 2px solid currentColor;
+}
+
+.kb-voice-state[data-state='speaking']:not([data-has-level]) .kb-voice-state__bar {
+  transform: scaleY(calc(0.3 + 0.7 * var(--kb-voice-bar-weight)));
+}
+
+.kb-voice-state[data-state='listening'] .kb-voice-state__orb,
+.kb-voice-state[data-state='listening'] .kb-voice-state__dot {
+  animation: kb-voice-pulse 1.4s ease-in-out infinite;
+}
+
+.kb-voice-state[data-state='listening'] .kb-voice-state__bar {
+  animation: kb-voice-pulse 1.4s ease-in-out infinite;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar,
+.kb-voice-state[data-state='thinking'] .kb-voice-state__orb,
+.kb-voice-state[data-state='thinking'] .kb-voice-state__dot {
+  animation: kb-voice-shimmer 1.2s ease-in-out infinite;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar:nth-child(5) {
+  animation-delay: 0.6s;
+}
+
+.kb-voice-state[data-state='speaking']:not([data-has-level]) .kb-voice-state__bar {
+  animation: kb-voice-speak 0.9s ease-in-out infinite alternate;
+}
+
+.kb-voice-state[data-state='speaking']:not([data-has-level]) .kb-voice-state__bar:nth-child(even) {
+  animation-delay: 0.3s;
+}
+
+.kb-voice-state[data-state='speaking']:not([data-has-level]) .kb-voice-state__orb {
+  animation: kb-voice-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes kb-voice-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes kb-voice-shimmer {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes kb-voice-speak {
+  from {
+    transform: scaleY(0.3);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-voice-input__button,
+  .kb-voice-input__bar,
+  .kb-voice-state__bar,
+  .kb-voice-state__orb {
+    transition: none;
+  }
+
+  .kb-voice-input__icon,
+  .kb-voice-input[data-state='listening'] .kb-voice-input__icon,
+  .kb-voice-input[data-state='recording'] .kb-voice-input__icon,
+  .kb-voice-state__bar,
+  .kb-voice-state__orb,
+  .kb-voice-state__dot,
+  .kb-voice-state[data-state] .kb-voice-state__bar,
+  .kb-voice-state[data-state] .kb-voice-state__orb,
+  .kb-voice-state[data-state] .kb-voice-state__dot {
+    animation: none;
+  }
+}
