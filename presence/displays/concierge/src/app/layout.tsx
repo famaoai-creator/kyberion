@@ -1,4 +1,8 @@
 import * as React from 'react';
+// Shared UI layer (UI-02): --kb-ui-* tokens + .kb-* component classes only;
+// neither touches existing concierge styles.
+import './kyberion-ui-tokens.css';
+import './kyberion-ui.css';
 import './globals.css';
 import { readFrontDeskSurfacePorts } from '@agent/core/front-desk-nav';
 import { ConciergeHeader } from './concierge-header';

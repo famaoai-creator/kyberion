@@ -15,8 +15,9 @@ The canonical tokens are defined in a central JSON file:
 
 This file specifies:
 
-- **Colors**: Both `light` and `dark` palettes.
+- **Colors**: Both `light` and `dark` palettes (`tokens.colors`). Media (PPTX/video) also consumes these; do not repurpose them for web UI.
 - **Fonts**: Defined by `sans` and `mono` families.
+- **Web UI layer** (`tokens.ui`, UI-02): semantic `light`/`dark` palettes (`canvas`, `surface`, `surface-raised`, `surface-sunken`, `border`, `border-strong`, `text`, `text-muted`, `text-subtle`, `text-on-accent`, `accent`, `accent-hover`, `accent-soft`, `accent-text`, `focus-ring`, `status.{success,warning,danger,info}.{fg,bg,border}`, `role.<surface>`, `shadow.{sm,md}`) plus `radius`, `space` and two `font_size` scales (`comfortable`, `compact`). Emitted as `--kb-ui-*` CSS variables. `border` is a decorative divider; controls use `border-strong`. Role colors are for badges / active markers only.
 
 ## 2. Token Generation Pipeline
 
@@ -29,15 +30,26 @@ pnpm check -- --only ui-ux
 
 This script automatically generates and updates the following files:
 
-1. `presence/displays/chronos-mirror-v2/src/app/globals.css`
-2. `presence/displays/operator-surface/src/app/globals.css`
-3. `presence/displays/presence-studio/static/design-tokens.css`
-4. `presence/displays/computer-surface/static/design-tokens.css`
-5. `presence/displays/chronos-mirror-v2/tailwind.config.cjs`
-6. `knowledge/public/design-patterns/media-templates/themes.json`
+1. `presence/displays/chronos-mirror-v2/src/app/globals.css` (legacy `--kb-*` block + `--kb-ui-*` block)
+2. `presence/displays/operator-surface/src/app/globals.css` (legacy + UI block)
+3. `presence/displays/presence-studio/static/design-tokens.css` (legacy + UI block)
+4. `presence/displays/computer-surface/static/design-tokens.css` (legacy + UI block)
+5. `presence/displays/concierge/src/app/kyberion-ui-tokens.css` (UI block only — concierge themes the legacy `--kb-*` vars at runtime via `/api/theme`)
+6. `kyberion-ui.css` next to each of the five token files above (component stylesheet)
+7. `presence/displays/chronos-mirror-v2/tailwind.config.cjs`
+8. `knowledge/public/design-patterns/media-templates/themes.json` (+ `themes/themes.json`)
 
-The generated Kyberion token block and theme entries are checked by `pnpm check -- --scope full --only catalogs` so committed files cannot drift from the canonical brand-token JSON.
-`pnpm check -- --only ui-ux` additionally rejects raw colors in operator-surface source, missing semantic tokens, and dashboard status-vocabulary bypasses. The same check runs in `pnpm validate`, GitHub Actions, and the scheduled `pipelines/ui-ux-governance-audit.json` pipeline.
+The UI block is delimited by `/* kyberion-ui tokens: ... */` … `/* end kyberion-ui tokens */`. Light values are the `:root` default; dark values apply under `@media (prefers-color-scheme: dark)` guarded by `:root:not([data-theme="light"])`, and again under `:root[data-theme="dark"]`. `[data-density="compact"|"comfortable"]` switches the `--kb-ui-font-size-*` scale for a subtree.
+
+The generated Kyberion token blocks, the UI stylesheets and theme entries are checked by `pnpm check -- --scope full --only catalogs` so committed files cannot drift from the canonical brand-token JSON and the stylesheet source.
+`pnpm check -- --only ui-ux` additionally rejects raw colors in operator-surface source, missing semantic / `--kb-ui-*` tokens or component classes in generated files, and dashboard status-vocabulary bypasses. The same check runs in `pnpm validate`, GitHub Actions, and the scheduled `pipelines/ui-ux-governance-audit.json` pipeline.
+`scripts/check_design_contrast.ts` holds every `tokens.ui` text pair to WCAG AA 4.5:1 and `border-strong` / `focus-ring` / `accent` to 3:1 on every surface, in both themes.
+
+### Component stylesheet (`kyberion-ui.css`) and the `kyberion-base` catalog
+
+- **Source**: `knowledge/public/design-patterns/web/kyberion-ui.source.css` (authored; `--kb-ui-*` variables only, no literal colors, no glass/blur/gradients). The generator prepends a GENERATED header and replaces `/* @kb-generated status-tones */` with the status-pill tone rules derived from `KB_STATUS_TONES` in `libs/core/a2ui-catalog.ts`. Edit the source, never the generated copies.
+- **Class contract**: one root class per A2UI `ui:*` type — `.kb-app-shell`, `.kb-page-header`, `.kb-nav-rail`, `.kb-tabs`, `.kb-stack`, `.kb-grid`, `.kb-section`, `.kb-next-action`, `.kb-metric`, `.kb-kv`, `.kb-table` (inside `.kb-table-wrap`), `.kb-list`, `.kb-text--{body,muted,caption,mono,title}`, `.kb-status-pill[data-status]`, `.kb-badge[data-tone|data-role]`, `.kb-callout[data-tone]`, `.kb-empty-state`, `.kb-skeleton[data-shape]`, `.kb-btn--{primary,secondary,danger,ghost}`, `.kb-disclosure` — with BEM `__element` children and state in data attributes. Focus rings use `:focus-visible` + `--kb-ui-focus-ring`; animations stop under `prefers-reduced-motion`.
+- **Catalog**: `knowledge/product/schemas/a2ui-catalog-kyberion-base.schema.json` (props schema per `ui:*` type) + `libs/core/a2ui-catalog.ts` (`KYBERION_BASE_CATALOG_ID`, prop types, `validateA2UIComponentProps`, aliases `text→ui:text`, `button→ui:button`, `card→ui:section`, `container→ui:stack`). `validateA2UIMessage` enforces the props schema for `ui:*` types only; aliases, `display:*`, `kb-*` and `presence.*` keep the structural check. `ui:status-pill` statuses are exactly the `renderStatus()` vocabulary (`listUxStatusValues()` in `ux-vocabulary.ts`).
 
 ## 3. Surface Application Patterns
 
@@ -58,7 +70,7 @@ We expose CSS variables with the prefix `--kb-*`.
 
 When building a new UI surface for Kyberion, ensure you follow this checklist:
 
-- [ ] Add the new surface's `globals.css` or `design-tokens.css` path to `scripts/generate_design_tokens.ts`.
+- [ ] Add the new surface's `globals.css` or `design-tokens.css` path (and its `kyberion-ui.css`) to `scripts/generate_design_tokens.ts`, `scripts/check_catalog_integrity.ts` and `GENERATED_TOKEN_FILES` in `scripts/check_ui_ux_governance.ts`.
 - [ ] Run the generation script so that the CSS tokens are written to your new surface.
 - [ ] Import the CSS file at the root of your application/page.
 - [ ] Ensure all basic styles (background, text color, borders) map to `var(--kb-bg-main)`, `var(--kb-text-primary)`, `var(--kb-border)`, etc.

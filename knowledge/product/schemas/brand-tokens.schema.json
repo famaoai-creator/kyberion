@@ -71,10 +71,260 @@
             "mono": { "type": "string" }
           },
           "required": ["sans", "mono"]
-        }
+        },
+        "ui": { "$ref": "#/definitions/ui" }
       },
       "required": ["colors", "fonts"]
     }
   },
-  "required": ["version", "brand_name", "tokens"]
+  "required": ["version", "brand_name", "tokens"],
+  "definitions": {
+    "ui": {
+      "type": "object",
+      "description": "UI-02 web UI semantic token layer, emitted as --kb-ui-* CSS variables.",
+      "properties": {
+        "_meta": {
+          "type": "string"
+        },
+        "light": {
+          "$ref": "#/definitions/uiPalette"
+        },
+        "dark": {
+          "$ref": "#/definitions/uiPalette"
+        },
+        "radius": {
+          "type": "object",
+          "properties": {
+            "sm": {
+              "type": "string",
+              "minLength": 1
+            },
+            "md": {
+              "type": "string",
+              "minLength": 1
+            },
+            "lg": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["sm", "md", "lg"],
+          "additionalProperties": false
+        },
+        "space": {
+          "type": "object",
+          "patternProperties": {
+            "^[0-9]+$": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "minProperties": 1
+        },
+        "font_size": {
+          "type": "object",
+          "properties": {
+            "comfortable": {
+              "$ref": "#/definitions/uiFontScale"
+            },
+            "compact": {
+              "$ref": "#/definitions/uiFontScale"
+            }
+          },
+          "required": ["comfortable", "compact"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["light", "dark", "radius", "space", "font_size"],
+      "additionalProperties": false
+    },
+    "uiPalette": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "surface": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "surface-raised": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "surface-sunken": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "border": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "border-strong": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "text": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "text-muted": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "text-subtle": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "text-on-accent": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "accent": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "accent-hover": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "accent-soft": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "accent-text": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "focus-ring": {
+          "$ref": "#/definitions/uiColor"
+        },
+        "status": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "$ref": "#/definitions/uiStatusColors"
+            },
+            "warning": {
+              "$ref": "#/definitions/uiStatusColors"
+            },
+            "danger": {
+              "$ref": "#/definitions/uiStatusColors"
+            },
+            "info": {
+              "$ref": "#/definitions/uiStatusColors"
+            }
+          },
+          "required": ["success", "warning", "danger", "info"],
+          "additionalProperties": false
+        },
+        "role": {
+          "type": "object",
+          "properties": {
+            "concierge": {
+              "$ref": "#/definitions/uiColor"
+            },
+            "presence-studio": {
+              "$ref": "#/definitions/uiColor"
+            },
+            "chronos-mirror-v2": {
+              "$ref": "#/definitions/uiColor"
+            },
+            "operator-surface": {
+              "$ref": "#/definitions/uiColor"
+            },
+            "computer-surface": {
+              "$ref": "#/definitions/uiColor"
+            }
+          },
+          "required": [
+            "concierge",
+            "presence-studio",
+            "chronos-mirror-v2",
+            "operator-surface",
+            "computer-surface"
+          ],
+          "additionalProperties": false
+        },
+        "shadow": {
+          "type": "object",
+          "properties": {
+            "sm": {
+              "type": "string",
+              "minLength": 1
+            },
+            "md": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": ["sm", "md"],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "canvas",
+        "surface",
+        "surface-raised",
+        "surface-sunken",
+        "border",
+        "border-strong",
+        "text",
+        "text-muted",
+        "text-subtle",
+        "text-on-accent",
+        "accent",
+        "accent-hover",
+        "accent-soft",
+        "accent-text",
+        "focus-ring",
+        "status",
+        "role",
+        "shadow"
+      ],
+      "additionalProperties": false
+    },
+    "uiColor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "uiStatusColors": {
+      "type": "object",
+      "properties": {
+        "fg": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bg": {
+          "type": "string",
+          "minLength": 1
+        },
+        "border": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["fg", "bg", "border"],
+      "additionalProperties": false
+    },
+    "uiFontScale": {
+      "type": "object",
+      "properties": {
+        "xs": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "md": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lg": {
+          "type": "string",
+          "minLength": 1
+        },
+        "xl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "xxl": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["xs", "sm", "md", "lg", "xl", "xxl"],
+      "additionalProperties": false
+    }
+  }
 }
