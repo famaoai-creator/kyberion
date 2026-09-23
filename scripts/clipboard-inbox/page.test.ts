@@ -7,6 +7,7 @@ import {
   CLIPBOARD_INBOX_TEXT_KEYS,
   clipboardInboxPageHtml,
 } from './page.js';
+import { padBootstrapOf } from '../lib/pad-ui.test-support.js';
 
 const KANA = /[぀-ヿ]/u;
 const NATIVE_DIALOG = /(?<![\w.$])(?:window\.)?(?:confirm|prompt|alert)\s*\(/u;
@@ -21,20 +22,12 @@ function page(url: string) {
   });
 }
 
-function bootstrapOf(html: string): Record<string, any> {
-  const match = /<script type="application\/json" id="pad-bootstrap">([\s\S]*?)<\/script>/u.exec(
-    html
-  );
-  expect(match).not.toBeNull();
-  return JSON.parse(match![1]);
-}
-
 describe('clipboard inbox page (shared A2UI kit)', () => {
   it('renders English for ?lang=en with no Japanese text', () => {
     const html = page('/?lang=en');
     expect(html).toContain('<html lang="en">');
     expect(html).toContain('Clipboard Inbox');
-    const bootstrap = bootstrapOf(html);
+    const bootstrap = padBootstrapOf(html);
     expect(bootstrap.locale).toBe('en');
     for (const text of Object.values(bootstrap.texts as Record<string, string>)) {
       expect(text).not.toMatch(KANA);
@@ -45,11 +38,11 @@ describe('clipboard inbox page (shared A2UI kit)', () => {
   it('renders Japanese by default for a ja operator', () => {
     const html = page('/');
     expect(html).toContain('<html lang="ja">');
-    expect(bootstrapOf(html).texts['clipboard_inbox:clear_all']).toBe('全消去');
+    expect(padBootstrapOf(html).texts['clipboard_inbox:clear_all']).toBe('全消去');
   });
 
   it('embeds the server contract and every client text in the bootstrap', () => {
-    const bootstrap = bootstrapOf(page('/?lang=en'));
+    const bootstrap = padBootstrapOf(page('/?lang=en'));
     expect(bootstrap).toMatchObject({
       token: 'tok-123',
       exportUrl: '/export',
