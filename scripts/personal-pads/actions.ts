@@ -20,12 +20,14 @@ import { pathResolver, assertSafeRepositoryPath } from '@agent/core/path-resolve
 import { getSpeechToTextBridge } from '@agent/core/speech-to-text-bridge';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { isLinux, isMacOS } from '@agent/core/platform';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 import type { LocalPadContext } from '../lib/local-artifact-pad.js';
 import { readOsClipboardText } from '../clipboard-inbox/server.js';
 import { generateMeetingMinutes } from '../meeting-notepad/minutes.js';
 import { executePersonalWorkbenchAction } from '../personal-workbench/actions.js';
 import type { AdapterArtifact, PadActionDescriptor, PadAdapter } from './adapters.js';
 import { getPadAdapter } from './adapters.js';
+import { padsT, type PadTranslator } from './i18n.js';
 import type { PadId } from './registry.js';
 import { PadRecordStore, resolvePadStorage, type PadRecord } from './storage.js';
 
@@ -42,6 +44,8 @@ export interface PadActionInput {
   /** Optional adapter supplied by an injected surface host. */
   adapter?: PadAdapter;
   record?: PadRecord;
+  /** Request locale for user-facing messages (defaults to the process locale). */
+  locale?: SupportedLocale;
 }
 
 export interface PadDraftPatch {
@@ -80,8 +84,15 @@ function redactActionResult(value: unknown): unknown {
   return result;
 }
 
-function descriptor(padId: PadId, actionId: string, adapter?: PadAdapter): PadActionDescriptor {
-  const value = (adapter ?? getPadAdapter(padId)).actions.find((action) => action.id === actionId);
+function descriptor(
+  padId: PadId,
+  actionId: string,
+  adapter?: PadAdapter,
+  locale?: SupportedLocale
+): PadActionDescriptor {
+  const value = (adapter ?? getPadAdapter(padId, locale)).actions.find(
+    (action) => action.id === actionId
+  );
   if (!value) throw new Error(`unknown pad action: ${padId}/${actionId}`);
   return value;
 }
@@ -112,7 +123,12 @@ function unavailable(actionId: string, message: string): PadActionResult {
   return { action_id: actionId, status: 'unavailable', message };
 }
 
+function messages(input: Pick<PadActionInput, 'locale'>): PadTranslator {
+  return padsT(input.locale);
+}
+
 async function transcribe(input: PadActionInput): Promise<PadActionResult> {
+  const t = messages(input);
   const audio = parseDataUrl(input.fields.audio_name_data);
   const extension = audio.mime.includes('mp4')
     ? '.m4a'
@@ -131,14 +147,13 @@ async function transcribe(input: PadActionInput): Promise<PadActionResult> {
       const result = await getSpeechToTextBridge().transcribe({ audioPath: file, language });
       const text = String(result.text || '').trim();
       if (!text)
-        return unavailable(
-          'meeting.transcribe',
-          '文字起こし結果が空でした。録音を確認してください。'
-        );
+        return unavailable('meeting.transcribe', t('personal_pads:action_transcribe_empty'));
       return {
         action_id: 'meeting.transcribe',
         status: 'succeeded',
-        message: `文字起こし完了（${result.backend}${result.synthetic ? ' · synthetic' : ''}）`,
+        message: t('personal_pads:action_transcribe_done', {
+          backend: `${result.backend}${result.synthetic ? ' · synthetic' : ''}`,
+        }),
         draft_patch: { fields: { transcript: text } },
         result: {
           backend: result.backend,
@@ -147,10 +162,7 @@ async function transcribe(input: PadActionInput): Promise<PadActionResult> {
         },
       };
     } catch {
-      return unavailable(
-        'meeting.transcribe',
-        'speech-to-text を利用できません。設定と権限を確認してください。'
-      );
+      return unavailable('meeting.transcribe', t('personal_pads:action_stt_unavailable'));
     }
   } finally {
     safeUnlinkSync(file);
@@ -158,13 +170,14 @@ async function transcribe(input: PadActionInput): Promise<PadActionResult> {
 }
 
 async function minutes(input: PadActionInput): Promise<PadActionResult> {
+  const t = messages(input);
   const notes = fieldText(input.fields, 'notes');
   const transcript = fieldText(input.fields, 'transcript');
   const sourceText = [`## Notes\n${notes}`, `## Transcript\n${transcript}`]
     .filter((value) => value.trim().length > 0)
     .join('\n\n');
   if (!sourceText.trim())
-    return unavailable('meeting.minutes', '原メモまたは文字起こしを入力してください。');
+    return unavailable('meeting.minutes', t('personal_pads:action_minutes_need_input'));
   const generated = await generateMeetingMinutes({
     sourceText,
     title: input.title || 'Meeting Minutes',
@@ -186,7 +199,7 @@ async function minutes(input: PadActionInput): Promise<PadActionResult> {
   return {
     action_id: 'meeting.minutes',
     status: 'succeeded',
-    message: `議事録の下書きを生成しました（${generated.backend}）。内容を確認して保存してください。`,
+    message: t('personal_pads:action_minutes_done', { backend: generated.backend }),
     draft_patch: {
       fields: {
         summary: artifact.summary,
@@ -207,6 +220,7 @@ async function minutes(input: PadActionInput): Promise<PadActionResult> {
 }
 
 async function captureScreen(input: PadActionInput): Promise<PadActionResult> {
+  const t = messages(input);
   const configured = getRegisteredEnvText('KYBERION_SCREENSHOT_PATH')?.trim();
   if (configured) {
     try {
@@ -218,14 +232,14 @@ async function captureScreen(input: PadActionInput): Promise<PadActionResult> {
       ) {
         return unavailable(
           'screenshot.capture-screen',
-          'KYBERION_SCREENSHOT_PATH は PNG ではありません。'
+          t('personal_pads:action_screenshot_not_png')
         );
       }
       const encoded = bytes.toString('base64');
       return {
         action_id: 'screenshot.capture-screen',
         status: 'succeeded',
-        message: '指定された PNG を下書きへ取り込みました。',
+        message: t('personal_pads:action_screenshot_configured_done'),
         draft_patch: {
           fields: { image_name: 'screenshot.png', image_name_data: dataUrl('image/png', encoded) },
         },
@@ -234,14 +248,14 @@ async function captureScreen(input: PadActionInput): Promise<PadActionResult> {
     } catch {
       return unavailable(
         'screenshot.capture-screen',
-        '指定 PNG を読めません。設定と権限を確認してください。'
+        t('personal_pads:action_screenshot_configured_unreadable')
       );
     }
   }
   if (process.platform !== 'darwin') {
     return unavailable(
       'screenshot.capture-screen',
-      'OS キャプチャは darwin のみ対応です。画像ファイルを選択してください。'
+      t('personal_pads:action_screenshot_os_unsupported')
     );
   }
   const root = assertSafeRepositoryPath(pathResolver.sharedTmp('personal-pads-actions'), {
@@ -255,25 +269,19 @@ async function captureScreen(input: PadActionInput): Promise<PadActionResult> {
       maxOutputMB: 1,
     });
     if (result.status !== 0)
-      return unavailable(
-        'screenshot.capture-screen',
-        '画面キャプチャに失敗しました。権限を確認してください。'
-      );
+      return unavailable('screenshot.capture-screen', t('personal_pads:action_screenshot_failed'));
     const bytes = safeReadFile(file, { encoding: null });
     if (
       !Buffer.isBuffer(bytes) ||
       bytes.byteLength < 8 ||
       bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a'
     ) {
-      return unavailable(
-        'screenshot.capture-screen',
-        'screencapture が PNG を生成しませんでした。'
-      );
+      return unavailable('screenshot.capture-screen', t('personal_pads:action_screenshot_no_png'));
     }
     return {
       action_id: 'screenshot.capture-screen',
       status: 'succeeded',
-      message: '画面を PNG として下書きへ取り込みました。',
+      message: t('personal_pads:action_screenshot_done'),
       draft_patch: {
         fields: {
           image_name: 'screenshot.png',
@@ -311,6 +319,7 @@ function scopedWorkbenchOutDir(input: PadActionInput): string {
 }
 
 async function workbench(input: PadActionInput): Promise<PadActionResult> {
+  const t = messages(input);
   const fields = input.fields;
   const outDir = scopedWorkbenchOutDir(input);
   const common = {
@@ -321,7 +330,7 @@ async function workbench(input: PadActionInput): Promise<PadActionResult> {
   switch (input.action_id) {
     case 'workbench.email-draft': {
       const body = fieldText(fields, 'email_body');
-      if (!body) return unavailable(input.action_id, 'メール本文を入力してください。');
+      if (!body) return unavailable(input.action_id, t('personal_pads:action_email_need_body'));
       const result = await executePersonalWorkbenchAction({
         ...common,
         action: 'email',
@@ -335,7 +344,7 @@ async function workbench(input: PadActionInput): Promise<PadActionResult> {
       return {
         action_id: input.action_id,
         status: 'succeeded',
-        message: 'メール下書きを作成しました（送信は行いません）。',
+        message: t('personal_pads:action_email_done'),
         result,
       };
     }
@@ -361,15 +370,15 @@ async function workbench(input: PadActionInput): Promise<PadActionResult> {
         status: String(result.status || '') === 'pending' ? 'approval_required' : 'succeeded',
         message:
           String(result.status || '') === 'pending'
-            ? '承認待ちのカレンダー提案を作成しました。'
-            : 'カレンダー提案を作成しました。',
+            ? t('personal_pads:action_calendar_pending')
+            : t('personal_pads:action_calendar_proposed'),
         result,
       };
     }
     case 'workbench.calendar-apply': {
       const approvalRequestId = fieldText(fields, 'calendar_approval_request_id');
       if (!approvalRequestId)
-        return unavailable(input.action_id, '承認リクエスト ID を入力してください。');
+        return unavailable(input.action_id, t('personal_pads:action_need_approval_id'));
       const result = await executePersonalWorkbenchAction({
         ...common,
         action: 'calendar',
@@ -386,17 +395,17 @@ async function workbench(input: PadActionInput): Promise<PadActionResult> {
               : 'succeeded',
         message:
           String(result.status || '') === 'approval_required'
-            ? '承認レコードが必要です。明示承認後に再実行してください。'
+            ? t('personal_pads:action_calendar_approval_required')
             : String(result.status || '') === 'reconciliation_required'
-              ? '外部反映の結果が未確定です。重複防止のため停止しました。'
-              : '承認済みのカレンダー提案を処理しました。',
+              ? t('personal_pads:action_calendar_reconciliation_required')
+              : t('personal_pads:action_calendar_applied'),
         result,
       };
     }
     case 'workbench.calendar-reconcile': {
       const approvalRequestId = fieldText(fields, 'calendar_reconcile_approval_request_id');
       if (!approvalRequestId)
-        return unavailable(input.action_id, '承認リクエスト ID を入力してください。');
+        return unavailable(input.action_id, t('personal_pads:action_need_approval_id'));
       const result = await executePersonalWorkbenchAction({
         ...common,
         action: 'calendar',
@@ -409,28 +418,25 @@ async function workbench(input: PadActionInput): Promise<PadActionResult> {
           status === 'reconciled' || status === 'already_applied' ? 'succeeded' : 'unavailable',
         message:
           status === 'reconciled'
-            ? 'provider の一意イベントを照合し、proposal を確定しました。'
+            ? t('personal_pads:action_calendar_reconciled')
             : status === 'already_applied'
-              ? 'この proposal は既に確定済みです。'
+              ? t('personal_pads:action_calendar_already_applied')
               : status === 'not_needed'
-                ? 'この proposal は照合が必要な状態ではありません。'
-                : 'provider の照合結果が一意でないため、proposal は未確定のままです。',
+                ? t('personal_pads:action_calendar_reconcile_not_needed')
+                : t('personal_pads:action_calendar_reconcile_ambiguous'),
         result,
       };
     }
     case 'workbench.ocr-extract': {
       if (!input.record)
-        return unavailable(
-          input.action_id,
-          'OCR は保存済み record の添付を対象にします。先に保存してください。'
-        );
+        return unavailable(input.action_id, t('personal_pads:action_ocr_need_record'));
       const artifactId = fieldText(fields, 'ocr_artifact_id');
-      if (!artifactId) return unavailable(input.action_id, 'artifact ID を入力してください。');
+      if (!artifactId)
+        return unavailable(input.action_id, t('personal_pads:action_ocr_need_artifact'));
       const ref = input.record.artifact_refs.find(
         (candidate) => candidate.artifact_id === artifactId
       );
-      if (!ref)
-        return unavailable(input.action_id, '指定された artifact ID はこの record にありません。');
+      if (!ref) return unavailable(input.action_id, t('personal_pads:action_ocr_artifact_missing'));
       const artifact = new PadRecordStore(
         input.context.scope,
         input.context.viewer_principal,
@@ -439,7 +445,7 @@ async function workbench(input: PadActionInput): Promise<PadActionResult> {
         input.storage_root
       ).readArtifact(input.record.record_id, artifactId);
       if (!artifact)
-        return unavailable(input.action_id, '添付 artifact を安全に読み込めませんでした。');
+        return unavailable(input.action_id, t('personal_pads:action_ocr_artifact_unreadable'));
       const root = assertSafeRepositoryPath(pathResolver.sharedTmp('personal-pads-actions'), {
         allowMissingLeaf: true,
       });
@@ -465,7 +471,7 @@ async function workbench(input: PadActionInput): Promise<PadActionResult> {
         return {
           action_id: input.action_id,
           status: 'succeeded',
-          message: 'scoped artifact の OCR が完了しました。',
+          message: t('personal_pads:action_ocr_done'),
           result: { artifact_id: artifactId, ...result },
         };
       } finally {
@@ -474,12 +480,10 @@ async function workbench(input: PadActionInput): Promise<PadActionResult> {
     }
     case 'workbench.knowledge-propose': {
       if (!input.record)
-        return unavailable(
-          input.action_id,
-          '知識候補は保存済み handoff を根拠に作成します。先に保存してください。'
-        );
+        return unavailable(input.action_id, t('personal_pads:action_knowledge_need_record'));
       const summary = fieldText(fields, 'knowledge_summary');
-      if (!summary) return unavailable(input.action_id, '候補の要約を入力してください。');
+      if (!summary)
+        return unavailable(input.action_id, t('personal_pads:action_knowledge_need_summary'));
       const result = await executePersonalWorkbenchAction({
         ...common,
         action: 'knowledge',
@@ -488,7 +492,7 @@ async function workbench(input: PadActionInput): Promise<PadActionResult> {
       return {
         action_id: input.action_id,
         status: 'succeeded',
-        message: 'human review 用の知識候補を作成しました。',
+        message: t('personal_pads:action_knowledge_done'),
         result,
       };
     }
@@ -551,8 +555,11 @@ function currentTokyoPeriodKey(now = new Date()): string {
   }).format(now);
 }
 
-export function getPadActionDescriptors(padId: PadId): readonly PadActionDescriptor[] {
-  return getPadAdapter(padId).actions;
+export function getPadActionDescriptors(
+  padId: PadId,
+  locale?: SupportedLocale
+): readonly PadActionDescriptor[] {
+  return getPadAdapter(padId, locale).actions;
 }
 
 /**
@@ -563,40 +570,42 @@ export function getPadActionDescriptors(padId: PadId): readonly PadActionDescrip
 export function getPadActionAvailability(
   padId: PadId,
   actionId: string,
-  adapter?: PadAdapter
+  adapter?: PadAdapter,
+  locale?: SupportedLocale
 ): PadActionAvailability {
-  const action = descriptor(padId, actionId, adapter);
+  const t = padsT(locale);
+  const action = descriptor(padId, actionId, adapter, locale);
   switch (action.capability) {
     case 'os-screenshot':
       if (getRegisteredEnvText('KYBERION_SCREENSHOT_PATH')?.trim()) {
         return {
           action_id: action.id,
           status: 'ready',
-          message: '設定済み PNG を取り込めます',
+          message: t('personal_pads:availability_screenshot_configured'),
         };
       }
       return isMacOS()
         ? {
             action_id: action.id,
             status: 'permission_required',
-            message: 'クリック時に macOS の画面収録権限を確認します',
+            message: t('personal_pads:availability_screenshot_permission'),
           }
         : {
             action_id: action.id,
             status: 'unavailable',
-            message: 'この OS の画面キャプチャは未対応です',
+            message: t('personal_pads:availability_screenshot_unsupported'),
           };
     case 'os-clipboard':
       return isMacOS() || isLinux()
         ? {
             action_id: action.id,
             status: 'permission_required',
-            message: 'クリック時に OS クリップボードを読みます',
+            message: t('personal_pads:availability_clipboard_permission'),
           }
         : {
             action_id: action.id,
             status: 'unavailable',
-            message: 'この OS のクリップボード読み込みは未対応です',
+            message: t('personal_pads:availability_clipboard_unsupported'),
           };
     case 'speech-to-text':
       try {
@@ -604,19 +613,23 @@ export function getPadActionAvailability(
         return {
           action_id: action.id,
           status: 'ready',
-          message: `speech-to-text: ${bridge.name}`,
+          message: t('personal_pads:availability_stt_ready', { name: bridge.name }),
         };
       } catch {
         return {
           action_id: action.id,
           status: 'unavailable',
-          message: 'speech-to-text bridge が利用できません',
+          message: t('personal_pads:availability_stt_unavailable'),
         };
       }
     case 'reasoning':
     case 'governed':
     default:
-      return { action_id: action.id, status: 'ready', message: '利用可能' };
+      return {
+        action_id: action.id,
+        status: 'ready',
+        message: t('personal_pads:availability_ready'),
+      };
   }
 }
 
@@ -631,26 +644,25 @@ const ACTION_HANDLERS: Readonly<
   'meeting.transcribe': transcribe,
   'meeting.minutes': minutes,
   'clipboard.read': async (input) => {
+    const t = messages(input);
     const clipboard = await readOsClipboardText();
     if (!clipboard.ok) {
-      return unavailable(
-        'clipboard.read',
-        'クリップボードを読み込めません。権限と OS 設定を確認してください。'
-      );
+      return unavailable('clipboard.read', t('personal_pads:action_clipboard_unreadable'));
     }
     return {
       action_id: 'clipboard.read',
       status: 'succeeded',
-      message: 'クリップボードを下書きへ読み込みました。',
+      message: t('personal_pads:action_clipboard_done'),
       draft_patch: { fields: { items: clipboard.text }, body: clipboard.text },
       result: { characters: clipboard.text.length },
     };
   },
   'daily.load-working-memory': async (input) => {
+    const t = messages(input);
     if (input.context.scope.tier !== 'personal' || !input.context.scope.tenant_slug) {
       return unavailable(
         'daily.load-working-memory',
-        'working-memory は tenant-bound personal scope でのみ読み込めます。'
+        t('personal_pads:action_daily_scope_required')
       );
     }
     const faces = readScopedWorkingMemory(
@@ -658,15 +670,12 @@ const ACTION_HANDLERS: Readonly<
       fieldText(input.fields, 'period_key') || undefined
     );
     if (!faces) {
-      return unavailable(
-        'daily.load-working-memory',
-        'working-memory の tenant binding が未設定です。KYBERION_WORKING_MEMORY_ROOT に管理 root を設定してください。'
-      );
+      return unavailable('daily.load-working-memory', t('personal_pads:action_daily_unbound'));
     }
     return {
       action_id: 'daily.load-working-memory',
       status: 'succeeded',
-      message: 'tenant-bound working-memory を下書きへ読み込みました。',
+      message: t('personal_pads:action_daily_done'),
       draft_patch: {
         fields: {
           journal: faces.journal,
@@ -691,11 +700,12 @@ const ACTION_HANDLERS: Readonly<
 };
 
 export async function executePadAction(input: PadActionInput): Promise<PadActionResult> {
-  const action = descriptor(input.pad_id, input.action_id, input.adapter);
+  const t = messages(input);
+  const action = descriptor(input.pad_id, input.action_id, input.adapter, input.locale);
   const key = `${input.pad_id}/${action.id}`;
   const active = activeActionCounts.get(key) ?? 0;
   if (action.max_concurrent !== undefined && active >= action.max_concurrent) {
-    return unavailable(action.id, '同じ操作が実行中です。完了してから再度お試しください。');
+    return unavailable(action.id, t('personal_pads:action_busy'));
   }
   activeActionCounts.set(key, active + 1);
   try {
