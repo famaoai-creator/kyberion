@@ -24,6 +24,46 @@ export interface BrandTokenFonts {
   mono: string;
 }
 
+export type BrandUiStatusName = 'success' | 'warning' | 'danger' | 'info';
+export type BrandUiRoleName =
+  'concierge' | 'presence-studio' | 'chronos-mirror-v2' | 'operator-surface' | 'computer-surface';
+export type BrandUiFontSizeStep = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
+
+/** Per-theme UI palette (UI-02). Keys map 1:1 onto `--kb-ui-<key>` CSS variables. */
+export interface BrandUiPalette {
+  canvas: string;
+  surface: string;
+  'surface-raised': string;
+  'surface-sunken': string;
+  border: string;
+  'border-strong': string;
+  text: string;
+  'text-muted': string;
+  'text-subtle': string;
+  'text-on-accent': string;
+  accent: string;
+  'accent-hover': string;
+  'accent-soft': string;
+  'accent-text': string;
+  'focus-ring': string;
+  status: Record<BrandUiStatusName, { fg: string; bg: string; border: string }>;
+  role: Record<BrandUiRoleName, string>;
+  shadow: { sm: string; md: string };
+}
+
+/** Web UI semantic token layer (`tokens.ui`), separate from the media palette. */
+export interface BrandUiTokens {
+  _meta?: string;
+  light: BrandUiPalette;
+  dark: BrandUiPalette;
+  radius: { sm: string; md: string; lg: string };
+  space: Record<string, string>;
+  font_size: {
+    comfortable: Record<BrandUiFontSizeStep, string>;
+    compact: Record<BrandUiFontSizeStep, string>;
+  };
+}
+
 export interface BrandTokens {
   version: string;
   brand_name: string;
@@ -33,6 +73,7 @@ export interface BrandTokens {
       dark: BrandTokenColors;
     };
     fonts: BrandTokenFonts;
+    ui?: BrandUiTokens;
   };
 }
 

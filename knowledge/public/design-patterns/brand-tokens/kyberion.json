@@ -71,6 +71,141 @@
         "uniform-font-weight",
         "centered-everything"
       ]
+    },
+    "ui": {
+      "_meta": "UI-02 web UI semantic layer (kyberion-base catalog). Emitted as --kb-ui-* by scripts/generate_design_tokens.ts; tokens.colors stays the media palette. Every text pair is WCAG AA 4.5:1 and border-strong/focus-ring/accent are >= 3:1 against canvas/surface in both themes (scripts/check_design_contrast.ts). 'border' is a decorative divider; controls use border-strong. Role colors are for badges/active markers only.",
+      "light": {
+        "canvas": "#f5f7fa",
+        "surface": "#ffffff",
+        "surface-raised": "#ffffff",
+        "surface-sunken": "#eef1f5",
+        "border": "#dde3ea",
+        "border-strong": "#778599",
+        "text": "#0f172a",
+        "text-muted": "#475569",
+        "text-subtle": "#5b6779",
+        "text-on-accent": "#ffffff",
+        "accent": "#1d4ed8",
+        "accent-hover": "#1e40af",
+        "accent-soft": "#e8effc",
+        "accent-text": "#1d4ed8",
+        "focus-ring": "#2563eb",
+        "status": {
+          "success": {
+            "fg": "#166534",
+            "bg": "#edf7f0",
+            "border": "#a9d8b8"
+          },
+          "warning": {
+            "fg": "#8a4b08",
+            "bg": "#fdf5e6",
+            "border": "#ecc98f"
+          },
+          "danger": {
+            "fg": "#b42318",
+            "bg": "#fdf0ef",
+            "border": "#f1b8b2"
+          },
+          "info": {
+            "fg": "#1d4f91",
+            "bg": "#edf3fb",
+            "border": "#b5cbe9"
+          }
+        },
+        "role": {
+          "concierge": "#8a5a12",
+          "presence-studio": "#0f766e",
+          "chronos-mirror-v2": "#4338ca",
+          "operator-surface": "#a3305f",
+          "computer-surface": "#4d6a16"
+        },
+        "shadow": {
+          "sm": "0 1px 2px rgba(15, 23, 42, 0.06)",
+          "md": "0 2px 6px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06)"
+        }
+      },
+      "dark": {
+        "canvas": "#0d131e",
+        "surface": "#141b29",
+        "surface-raised": "#1a2334",
+        "surface-sunken": "#0a0f18",
+        "border": "#28324a",
+        "border-strong": "#5f7090",
+        "text": "#e6ebf2",
+        "text-muted": "#a6b1c3",
+        "text-subtle": "#8f9bb0",
+        "text-on-accent": "#0b1220",
+        "accent": "#7aa7ff",
+        "accent-hover": "#9dbcff",
+        "accent-soft": "#172746",
+        "accent-text": "#9dbcff",
+        "focus-ring": "#7aa7ff",
+        "status": {
+          "success": {
+            "fg": "#6fd39b",
+            "bg": "#0f2519",
+            "border": "#285c3f"
+          },
+          "warning": {
+            "fg": "#eec26a",
+            "bg": "#2a200b",
+            "border": "#6b5118"
+          },
+          "danger": {
+            "fg": "#ff9b8f",
+            "bg": "#301518",
+            "border": "#7a3238"
+          },
+          "info": {
+            "fg": "#8ec1ff",
+            "bg": "#0f2140",
+            "border": "#2d5288"
+          }
+        },
+        "role": {
+          "concierge": "#e0ad62",
+          "presence-studio": "#5cc4b5",
+          "chronos-mirror-v2": "#aab6ff",
+          "operator-surface": "#f19ac0",
+          "computer-surface": "#a9cb72"
+        },
+        "shadow": {
+          "sm": "0 1px 2px rgba(0, 0, 0, 0.35)",
+          "md": "0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3)"
+        }
+      },
+      "radius": {
+        "sm": "4px",
+        "md": "8px",
+        "lg": "12px"
+      },
+      "space": {
+        "1": "4px",
+        "2": "8px",
+        "3": "12px",
+        "4": "16px",
+        "5": "24px",
+        "6": "32px",
+        "7": "48px"
+      },
+      "font_size": {
+        "comfortable": {
+          "xs": "12px",
+          "sm": "13px",
+          "md": "15px",
+          "lg": "18px",
+          "xl": "22px",
+          "xxl": "28px"
+        },
+        "compact": {
+          "xs": "11px",
+          "sm": "12px",
+          "md": "13px",
+          "lg": "15px",
+          "xl": "18px",
+          "xxl": "22px"
+        }
+      }
     }
   }
 }

@@ -7,7 +7,11 @@ import {
   webThemePackToCssVars,
   type WebThemePack,
 } from '@agent/core/web-design-system';
-import { loadBrandTokensAtPath } from '@agent/core/brand-tokens';
+import {
+  loadBrandTokensAtPath,
+  type BrandUiPalette,
+  type BrandUiTokens,
+} from '@agent/core/brand-tokens';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readSafeJsonFile } from './lib/json-input.js';
@@ -182,6 +186,124 @@ function checkDerivedWebThemePacks(): string[] {
   return violations;
 }
 
+/**
+ * UI-02 `tokens.ui` (web UI layer, `--kb-ui-*`). WCAG AA in both themes:
+ * every text role 4.5:1 on every surface it can sit on; control boundaries
+ * (border-strong, accent fill) and the focus ring 3:1 (WCAG 1.4.11).
+ * `border` is a decorative divider and deliberately not held to 3:1.
+ */
+const UI_SURFACES = ['canvas', 'surface', 'surface-raised', 'surface-sunken'] as const;
+const UI_STATUSES = ['success', 'warning', 'danger', 'info'] as const;
+
+export function buildUiContrastPairs(roles: readonly string[]): ContrastPair[] {
+  const pairs: ContrastPair[] = [];
+  for (const background of UI_SURFACES) {
+    for (const foreground of ['text', 'text-muted', 'text-subtle', 'accent-text']) {
+      pairs.push({
+        label: `ui ${foreground} on ${background}`,
+        background,
+        foreground,
+        minRatio: 4.5,
+      });
+    }
+    for (const status of UI_STATUSES) {
+      pairs.push({
+        label: `ui ${status} text on ${background}`,
+        background,
+        foreground: `${status}-fg`,
+        minRatio: 4.5,
+      });
+    }
+    for (const role of roles) {
+      pairs.push({
+        label: `ui role ${role} on ${background}`,
+        background,
+        foreground: `role-${role}`,
+        minRatio: 4.5,
+      });
+    }
+    for (const foreground of ['border-strong', 'focus-ring', 'accent']) {
+      pairs.push({
+        label: `ui ${foreground} boundary on ${background}`,
+        background,
+        foreground,
+        minRatio: 3,
+      });
+    }
+  }
+  for (const status of UI_STATUSES) {
+    pairs.push({
+      label: `ui ${status} pill`,
+      background: `${status}-bg`,
+      foreground: `${status}-fg`,
+      minRatio: 4.5,
+    });
+    pairs.push({
+      label: `ui ${status} callout body`,
+      background: `${status}-bg`,
+      foreground: 'text',
+      minRatio: 4.5,
+    });
+  }
+  pairs.push(
+    {
+      label: 'ui accent badge / nav active',
+      background: 'accent-soft',
+      foreground: 'accent-text',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui primary button',
+      background: 'accent',
+      foreground: 'text-on-accent',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui primary button hover',
+      background: 'accent-hover',
+      foreground: 'text-on-accent',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui danger button',
+      background: 'danger-fg',
+      foreground: 'text-on-accent',
+      minRatio: 4.5,
+    },
+    {
+      label: 'ui neutral pill',
+      background: 'surface-sunken',
+      foreground: 'text-muted',
+      minRatio: 4.5,
+    }
+  );
+  return pairs;
+}
+
+export function flattenUiPalette(palette: BrandUiPalette): Palette {
+  const flat: Palette = {};
+  for (const [key, value] of Object.entries(palette)) {
+    if (typeof value === 'string') flat[key] = value;
+  }
+  for (const [status, triple] of Object.entries(palette.status)) {
+    for (const [part, value] of Object.entries(triple)) flat[`${status}-${part}`] = value;
+  }
+  for (const [role, value] of Object.entries(palette.role)) flat[`role-${role}`] = value;
+  return flat;
+}
+
+function checkUiTokens(ui: BrandUiTokens | undefined): string[] {
+  if (!ui) return ['[ui] tokens.ui is missing from brand tokens'];
+  return (['light', 'dark'] as const).flatMap((theme) => {
+    const palette = ui[theme];
+    return checkPalette(
+      `ui.${theme}`,
+      flattenUiPalette(palette),
+      buildUiContrastPairs(Object.keys(palette.role))
+    );
+  });
+}
+
 export function checkDesignContrast(): string[] {
   const brandTokens = loadBrandTokensAtPath();
   const themes = parseJson<{ default_theme: string; themes: Record<string, { colors: Palette }> }>(
@@ -245,6 +367,7 @@ export function checkDesignContrast(): string[] {
       return checkPalette(`theme.${themeId}`, colors, pairsForTheme);
     }),
     ...checkDerivedWebThemePacks(),
+    ...checkUiTokens(brandTokens.tokens.ui),
   ];
 
   return violations;

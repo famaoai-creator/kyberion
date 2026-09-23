@@ -1,0 +1,1061 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kyberion.ai/schemas/a2ui-catalog-kyberion-base.schema.json",
+  "title": "A2UI catalog kyberion-base",
+  "description": "Props contract for the shared kyberion-base A2UI component catalog (UI-01). Validates one component {id?, type, props, children?}; $defs['props:<type>'] is the props schema for each ui:* type. Legacy aliases (text/button/card/container) and display:*/kb-*/presence.* types are outside this catalog.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "type": {
+      "enum": [
+        "ui:app-shell",
+        "ui:page-header",
+        "ui:nav-rail",
+        "ui:tabs",
+        "ui:stack",
+        "ui:grid",
+        "ui:section",
+        "ui:next-action",
+        "ui:metric",
+        "ui:kv",
+        "ui:table",
+        "ui:list",
+        "ui:text",
+        "ui:status-pill",
+        "ui:badge",
+        "ui:callout",
+        "ui:empty-state",
+        "ui:skeleton",
+        "ui:button",
+        "ui:disclosure"
+      ]
+    },
+    "props": {
+      "type": "object"
+    },
+    "children": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["type", "props"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:app-shell"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:app-shell"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:page-header"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:page-header"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:nav-rail"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:nav-rail"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:tabs"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:tabs"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:stack"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:stack"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:grid"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:grid"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:section"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:section"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:next-action"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:next-action"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:metric"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:metric"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:kv"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:kv"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:table"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:table"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:list"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:list"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:text"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:text"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:status-pill"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:status-pill"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:badge"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:badge"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:callout"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:callout"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:empty-state"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:empty-state"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:skeleton"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:skeleton"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:button"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:button"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:disclosure"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:disclosure"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "long-text": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9:._-]{0,80}$"
+    },
+    "href": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^(?![\\s]*[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:)(?![\\s]*[dD][aA][tT][aA]:)",
+      "description": "Navigation target. javascript: and data: URLs are rejected."
+    },
+    "action": {
+      "type": "object",
+      "description": "Surface-dispatched action (the renderer routes it; never evaluated as code).",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "payload": {
+          "type": "object"
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "tone": {
+      "enum": ["neutral", "accent", "info", "success", "warning", "danger"]
+    },
+    "callout-tone": {
+      "enum": ["info", "success", "warning", "danger"]
+    },
+    "surface-role": {
+      "enum": [
+        "concierge",
+        "presence-studio",
+        "chronos-mirror-v2",
+        "operator-surface",
+        "computer-surface"
+      ]
+    },
+    "density": {
+      "enum": ["comfortable", "compact"]
+    },
+    "gap": {
+      "enum": ["none", "xs", "sm", "md", "lg", "xl"]
+    },
+    "status": {
+      "enum": [
+        "active",
+        "archived",
+        "available",
+        "blocked",
+        "busy",
+        "completed",
+        "connected",
+        "connecting",
+        "degraded",
+        "disconnected",
+        "distilling",
+        "done",
+        "error",
+        "failed",
+        "fallback",
+        "fully_automatable",
+        "missing",
+        "missing_runtime_prerequisites",
+        "n/a",
+        "needs_assets",
+        "needs_clarification",
+        "needs_external_assets",
+        "needs_runtime_prerequisites",
+        "needs_setup",
+        "offline",
+        "paused",
+        "pending",
+        "planned",
+        "ready",
+        "recovered",
+        "review",
+        "running",
+        "stale",
+        "stopped",
+        "unavailable",
+        "working"
+      ],
+      "description": "Canonical dashboard status vocabulary (libs/core/ux-vocabulary.ts renderStatus domains)."
+    },
+    "status-domain": {
+      "enum": ["readiness", "connection", "provider", "mission", "progress", "runtime"]
+    },
+    "button-variant": {
+      "enum": ["primary", "secondary", "danger", "ghost"]
+    },
+    "action-ref": {
+      "type": "object",
+      "description": "A labelled link or action. Exactly one of href / action.",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "href": {
+          "$ref": "#/$defs/href"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "variant": {
+          "$ref": "#/$defs/button-variant"
+        },
+        "disabled": {
+          "type": "boolean"
+        }
+      },
+      "required": ["label"],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": ["href"]
+        },
+        {
+          "required": ["action"]
+        }
+      ]
+    },
+    "scalar": {
+      "type": ["string", "number", "boolean", "null"]
+    },
+    "nav-item": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "hint": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "href": {
+          "$ref": "#/$defs/href"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,40}$"
+        },
+        "active": {
+          "type": "boolean"
+        }
+      },
+      "required": ["id", "label", "href"],
+      "additionalProperties": false
+    },
+    "props:ui:app-shell": {
+      "type": "object",
+      "description": "Page skeleton. Children: nav-rail, page-header, main content.",
+      "properties": {
+        "density": {
+          "$ref": "#/$defs/density"
+        },
+        "theme": {
+          "enum": ["system", "light", "dark"]
+        },
+        "role": {
+          "$ref": "#/$defs/surface-role"
+        }
+      },
+      "additionalProperties": false
+    },
+    "props:ui:page-header": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "subtitle": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "role_badge": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "$ref": "#/$defs/text"
+            },
+            "tone": {
+              "$ref": "#/$defs/tone"
+            },
+            "role": {
+              "$ref": "#/$defs/surface-role"
+            }
+          },
+          "required": ["label"],
+          "additionalProperties": false
+        },
+        "actions": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/action-ref"
+          }
+        }
+      },
+      "required": ["title"],
+      "additionalProperties": false
+    },
+    "props:ui:nav-rail": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 24,
+          "items": {
+            "$ref": "#/$defs/nav-item"
+          }
+        },
+        "footer_items": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/nav-item"
+          }
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "props:ui:tabs": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 24,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "label": {
+                "$ref": "#/$defs/text"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "href": {
+                "$ref": "#/$defs/href"
+              }
+            },
+            "required": ["id", "label"],
+            "additionalProperties": false
+          }
+        },
+        "active": {
+          "$ref": "#/$defs/id"
+        },
+        "overflow": {
+          "enum": ["wrap", "menu"]
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "props:ui:stack": {
+      "type": "object",
+      "properties": {
+        "gap": {
+          "$ref": "#/$defs/gap"
+        },
+        "direction": {
+          "enum": ["vertical", "horizontal"]
+        },
+        "align": {
+          "enum": ["start", "center", "end", "stretch"]
+        },
+        "wrap": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "props:ui:grid": {
+      "type": "object",
+      "properties": {
+        "gap": {
+          "$ref": "#/$defs/gap"
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6,
+          "description": "Fixed column count; omit for auto-fit."
+        },
+        "min_column_width": {
+          "enum": ["xs", "sm", "md", "lg"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "props:ui:section": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "tone": {
+          "$ref": "#/$defs/tone"
+        },
+        "actions": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/action-ref"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "props:ui:next-action": {
+      "type": "object",
+      "description": "The single most important next step. primary is required unless state is loading or empty.",
+      "properties": {
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "primary": {
+          "$ref": "#/$defs/action-ref"
+        },
+        "secondary": {
+          "$ref": "#/$defs/action-ref"
+        },
+        "state": {
+          "enum": ["ready", "loading", "empty"]
+        }
+      },
+      "required": ["title"],
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "state": {
+            "enum": ["loading", "empty"]
+          }
+        },
+        "required": ["state"]
+      },
+      "else": {
+        "required": ["primary"]
+      }
+    },
+    "props:ui:metric": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "value": {
+          "type": ["string", "number"]
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "delta": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "trend": {
+          "enum": ["up", "down", "flat"]
+        },
+        "tone": {
+          "$ref": "#/$defs/tone"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 400
+        }
+      },
+      "required": ["label", "value"],
+      "additionalProperties": false
+    },
+    "props:ui:kv": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "$ref": "#/$defs/text"
+              },
+              "value": {
+                "type": ["string", "number", "boolean"]
+              },
+              "mono": {
+                "type": "boolean"
+              }
+            },
+            "required": ["label", "value"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "props:ui:table": {
+      "type": "object",
+      "properties": {
+        "caption": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 24,
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "align": {
+                "enum": ["start", "center", "end"]
+              },
+              "mono": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "string",
+                "pattern": "^(auto|[0-9]{1,4}(px|rem|ch|%))$"
+              }
+            },
+            "required": ["key", "label"],
+            "additionalProperties": false
+          }
+        },
+        "rows": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/scalar"
+            }
+          }
+        },
+        "row_href_key": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+        },
+        "empty": {
+          "type": "string",
+          "maxLength": 400
+        }
+      },
+      "required": ["columns", "rows"],
+      "additionalProperties": false
+    },
+    "props:ui:list": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "$ref": "#/$defs/text"
+              },
+              "meta": {
+                "type": "string",
+                "maxLength": 400
+              },
+              "status": {
+                "$ref": "#/$defs/status"
+              },
+              "href": {
+                "$ref": "#/$defs/href"
+              }
+            },
+            "required": ["title"],
+            "additionalProperties": false
+          }
+        },
+        "variant": {
+          "enum": ["plain", "timeline"]
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "props:ui:text": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 8000
+        },
+        "variant": {
+          "enum": ["body", "muted", "caption", "mono", "title"]
+        }
+      },
+      "required": ["text"],
+      "additionalProperties": false
+    },
+    "props:ui:status-pill": {
+      "type": "object",
+      "description": "Icon + text status indicator; never color-only.",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "domain": {
+          "$ref": "#/$defs/status-domain"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 80
+        }
+      },
+      "required": ["status"],
+      "additionalProperties": false
+    },
+    "props:ui:badge": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "tone": {
+          "$ref": "#/$defs/tone"
+        },
+        "role": {
+          "$ref": "#/$defs/surface-role"
+        }
+      },
+      "required": ["label"],
+      "additionalProperties": false
+    },
+    "props:ui:callout": {
+      "type": "object",
+      "properties": {
+        "tone": {
+          "$ref": "#/$defs/callout-tone"
+        },
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "body": {
+          "$ref": "#/$defs/long-text"
+        },
+        "action": {
+          "$ref": "#/$defs/action-ref"
+        }
+      },
+      "required": ["tone", "title"],
+      "additionalProperties": false
+    },
+    "props:ui:empty-state": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/text"
+        },
+        "body": {
+          "$ref": "#/$defs/long-text"
+        },
+        "action": {
+          "$ref": "#/$defs/action-ref"
+        }
+      },
+      "required": ["title"],
+      "additionalProperties": false
+    },
+    "props:ui:skeleton": {
+      "type": "object",
+      "properties": {
+        "lines": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "shape": {
+          "enum": ["text", "card", "table"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "props:ui:button": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "variant": {
+          "$ref": "#/$defs/button-variant"
+        },
+        "href": {
+          "$ref": "#/$defs/href"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "disabled": {
+          "type": "boolean"
+        }
+      },
+      "required": ["label"],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": ["href"]
+        },
+        {
+          "required": ["action"]
+        }
+      ]
+    },
+    "props:ui:disclosure": {
+      "type": "object",
+      "description": "Collapsed-by-default region (developer-only detail, advanced settings).",
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/text"
+        },
+        "open": {
+          "type": "boolean"
+        }
+      },
+      "required": ["summary"],
+      "additionalProperties": false
+    }
+  }
+}
