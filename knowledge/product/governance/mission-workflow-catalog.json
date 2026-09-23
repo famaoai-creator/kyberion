@@ -25,6 +25,9 @@
     },
     "aidlc_code_change": {
       "description": "AI-DLC gated SDLC for code changes: alignment before edits, execution with immediate test, self-review, then verification and delivery (AI_DLC_PLAYBOOK Phase 0-4)."
+    },
+    "creative_assembly_loop": {
+      "description": "Goal → production spec → scene/section plan → parallel asset generation → assembly → artifact-level evaluation → targeted repair loop → publish → learn. Judgment phases produce semantic briefs; only leaf generation/render steps are deterministic, and the finished artifact itself is evaluated and partially regenerated before delivery."
     }
   },
   "templates": [
@@ -1241,8 +1244,8 @@
     },
     {
       "id": "presentation-deck-production",
-      "pattern": "stage_gated_delivery",
-      "description": "顧客層定義 → ストーリー設計 → コンテンツ執筆 → デザイン選定 → レビュー → 成果物作成のステージゲート型プレゼン資料作成プロセス。判断フェーズは semantic brief、レンダリングは pipelines/fragments/pptx-produce-from-brief.json の決定的 media チェーンを再利用する。",
+      "pattern": "creative_assembly_loop",
+      "description": "顧客層定義 → ストーリー設計 → コンテンツ執筆 → レビュー → スクラッチレンダリング → 成果物評価 → 部分修復ループ → レシピ昇格 → 納品のプレゼン資料作成プロセス。scratch-first: 見た目が固まるまで governed fragment pipeline は使わず、ネイティブ PPTX エンジンで試行錯誤しながら完成物そのものを評価・部分修復する。受け入れ後にデザイン判断を design-protocol へ凍結し、再利用が見込まれる場合のみ governed pipeline へ promote する(scratch-to-pipeline-video-promotion 準拠)。",
       "match": {
         "mission_classes": ["content_and_media"],
         "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
@@ -1349,35 +1352,6 @@
           }
         },
         {
-          "id": "design_selection",
-          "title": "デザイン選定",
-          "kind": "deterministic",
-          "pipeline_ref": "pipelines/fragments/pptx-produce-from-brief.json",
-          "default_tasks": [
-            {
-              "task_id_suffix": "design-protocol",
-              "team_role": "implementer",
-              "description": "deck-brief にテナントのデザインシステムを適用し media:brief_to_design_protocol でデザインプロトコルを確定する",
-              "deliverable": "evidence/design-protocol.json",
-              "acceptance_criteria": ["design_system_id とテナントテーマが解決済み"],
-              "expected_output_format": "files",
-              "estimated_scope": "S",
-              "risk": "low"
-            }
-          ],
-          "exit_gate": {
-            "id": "DESIGN_SELECTION_DONE",
-            "checks": [
-              {
-                "kind": "evidence_exists",
-                "params": {
-                  "path": "evidence/design-protocol.json"
-                }
-              }
-            ]
-          }
-        },
-        {
           "id": "review",
           "title": "レビュー",
           "kind": "review",
@@ -1430,18 +1404,165 @@
           }
         },
         {
-          "id": "production_delivery",
-          "title": "成果物作成・納品",
-          "kind": "deterministic",
-          "pipeline_ref": "pipelines/fragments/pptx-produce-from-brief.json",
+          "id": "scratch_render",
+          "title": "スクラッチレンダリング",
+          "kind": "judgment",
           "default_tasks": [
             {
-              "task_id_suffix": "render-pptx",
+              "task_id_suffix": "scratch-render-deck",
               "team_role": "implementer",
-              "description": "レビュー承認済みの deck-brief から pipelines/fragments/pptx-produce-from-brief.json で PPTX を生成し、承認ゲートファイルを作成する",
+              "description": "レビュー承認済みの deck-brief をもとに、ネイティブ PPTX エンジン / artifact ops で evidence/draft-deck.pptx をスクラッチレンダリングする。見た目が固まっていないため governed fragment pipeline(pptx-produce-from-brief)は使わず、スタイルは resolveCreativeDesign + design-defaults cascade に委ね、プレビューを見ながら試行錯誤してよい",
+              "deliverable": "evidence/draft-deck.pptx",
+              "acceptance_criteria": [
+                "全スライドがレンダリングされた draft-deck.pptx が生成される",
+                "スライドごとのレイアウト・配色・フォントが破綻していない"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "L",
+              "risk": "medium",
+              "deliverable_kind": "deck"
+            }
+          ],
+          "exit_gate": {
+            "id": "SCRATCH_DECK_RENDERED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/draft-deck.pptx"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "artifact_evaluation",
+          "title": "成果物評価",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "evaluate-deck",
+              "team_role": "reviewer",
+              "phase_kind": "implement",
+              "description": "スクラッチレンダリング済みの draft-deck.pptx をプレビュー(スライド画像化 / artifact-preview 等)で確認し、完成物そのものを評価する。スライド単位で 分かりやすさ・視覚的一貫性・根拠の裏付け・テンポ を採点し、verdict(pass|repair) と per-slide flags を evidence/deck-eval-report.json に記録する",
+              "deliverable": "evidence/deck-eval-report.json",
+              "acceptance_criteria": [
+                "全スライドが評価済み",
+                "verdict と per-slide flags が記録されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "deck"
+            }
+          ],
+          "exit_gate": {
+            "id": "DECK_EVALUATED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/deck-eval-report.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "repair",
+          "title": "部分修復",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "repair-deck",
+              "team_role": "implementer",
+              "description": "deck-eval-report.json の verdict=pass かつ flags 空なら pass-through を記録する。flags がある場合は該当スライドだけをスクラッチ上で修正・再レンダリングして draft-deck.pptx を更新し、eval-report を再評価つきで更新する(verdict=pass まで繰り返し、上限3回。超過時は残 flags と理由を報告)",
+              "deliverable": "evidence/deck-eval-report.json",
+              "acceptance_criteria": [
+                "eval-report が再評価つきで更新されている",
+                "verdict=pass または残 flags の理由が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "deck"
+            }
+          ],
+          "exit_gate": {
+            "id": "DECK_EVALUATION_PASSED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/draft-deck.pptx"
+                }
+              },
+              {
+                "kind": "llm_review",
+                "params": {
+                  "path": "evidence/deck-eval-report.json",
+                  "allow_stub": true,
+                  "model_tier": "standard",
+                  "criteria": [
+                    "verdict が pass で未解決の flag が残っていない",
+                    "評価が brief ではなくレンダリング済み成果物そのものを対象にしている"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "promotion",
+          "title": "レシピ昇格",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "promote-deck-recipe",
+              "team_role": "implementer",
+              "description": "採用された draft-deck のデザイン判断(テーマ・配色・レイアウト規則)を media:brief_to_design_protocol で evidence/design-protocol.json に凍結し、評価済み成果物を evidence/proposal-deck.pptx として確定する。同じ deck を再実行・量産する見込みがある場合のみ、承認済み brief + design-protocol を pipelines/<slug>.json またはパイプラインテンプレートとして登録して governed レンダリング経路を作る(一過性なら brief は mission evidence に留める)",
+              "deliverable": "evidence/design-protocol.json",
+              "acceptance_criteria": [
+                "採用デザインが design-protocol.json に凍結されている",
+                "evidence/proposal-deck.pptx が確定している",
+                "再利用要否の判断と根拠が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "deck"
+            }
+          ],
+          "exit_gate": {
+            "id": "DECK_PROMOTED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/design-protocol.json"
+                }
+              },
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/proposal-deck.pptx"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "delivery",
+          "title": "納品",
+          "kind": "approval",
+          "default_tasks": [
+            {
+              "task_id_suffix": "deliver-deck",
+              "team_role": "implementer",
+              "description": "評価を通過した最終 PPTX を確定し、承認ゲートファイル(presentation-approval-gate.json pending)を作成して納品を準備する",
               "deliverable": "evidence/proposal-deck.pptx",
               "acceptance_criteria": [
-                "PPTX が生成される",
+                "最終 PPTX が確定している",
                 "presentation-approval-gate.json が pending で作成される"
               ],
               "expected_output_format": "files",
@@ -1469,8 +1590,8 @@
     },
     {
       "id": "document-authoring",
-      "pattern": "stage_gated_delivery",
-      "description": "読者定義 → 構成設計 → 本文執筆 → レビュー → 発行のステージゲート型ドキュメント作成プロセス(presentation-deck-production の文書版)。",
+      "pattern": "creative_assembly_loop",
+      "description": "読者定義 → 構成設計 → 本文執筆 → レビュー → 最終形式レンダリング → 成果物評価 → 部分修復ループ → 発行のドキュメント作成プロセス(presentation-deck-production の文書版)。完成物そのものを評価し、問題セクションだけ修復してから発行する。",
       "match": {
         "mission_classes": ["content_and_media"],
         "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
@@ -1599,16 +1720,130 @@
           }
         },
         {
-          "id": "production_delivery",
-          "title": "発行・納品",
+          "id": "production_render",
+          "title": "最終形式レンダリング",
           "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "render-document",
+              "team_role": "implementer",
+              "description": "レビュー承認済みの本文を最終形式(PDF/Markdown)に整形して evidence/document-final.md を生成する",
+              "deliverable": "evidence/document-final.md",
+              "acceptance_criteria": ["最終成果物が生成される"],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "DOCUMENT_RENDERED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/document-final.md"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "artifact_evaluation",
+          "title": "成果物評価",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "evaluate-document",
+              "team_role": "reviewer",
+              "phase_kind": "implement",
+              "description": "最終形式の document-final.md を通読し、完成物そのものを評価する。セクション単位で 読者適合・論理一貫性・構成・完成度 を採点し、verdict(pass|repair) と per-section flags を evidence/document-eval-report.json に記録する",
+              "deliverable": "evidence/document-eval-report.json",
+              "acceptance_criteria": [
+                "全セクションが評価済み",
+                "verdict と per-section flags が記録されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "DOCUMENT_EVALUATED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/document-eval-report.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "repair",
+          "title": "部分修復",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "repair-document",
+              "team_role": "implementer",
+              "description": "document-eval-report.json の verdict=pass かつ flags 空なら pass-through を記録する。flags がある場合は該当セクションだけを修正して document-final.md を更新し、eval-report を再評価つきで更新する(verdict=pass まで繰り返し、上限3回。超過時は残 flags と理由を報告)",
+              "deliverable": "evidence/document-eval-report.json",
+              "acceptance_criteria": [
+                "eval-report が再評価つきで更新されている",
+                "verdict=pass または残 flags の理由が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "DOCUMENT_EVALUATION_PASSED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/document-final.md"
+                }
+              },
+              {
+                "kind": "llm_review",
+                "params": {
+                  "path": "evidence/document-eval-report.json",
+                  "allow_stub": true,
+                  "model_tier": "standard",
+                  "criteria": [
+                    "verdict が pass で未解決の flag が残っていない",
+                    "評価が draft ではなく最終形式の成果物そのものを対象にしている"
+                  ]
+                }
+              },
+              {
+                "kind": "deliverable_quality",
+                "params": {
+                  "path": "evidence/document-final.md",
+                  "kind": "doc",
+                  "min_score": 0.7
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "delivery",
+          "title": "発行・納品",
+          "kind": "approval",
           "default_tasks": [
             {
               "task_id_suffix": "publish",
               "team_role": "implementer",
-              "description": "レビュー承認済みの本文を最終形式(PDF/Markdown)に整形し、納品先へ配置する",
+              "description": "評価を通過した最終文書を納品先へ配置し、発行を記録する",
               "deliverable": "evidence/document-final.md",
-              "acceptance_criteria": ["最終成果物が生成される"],
+              "acceptance_criteria": ["最終成果物が納品先に配置される"],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -1626,6 +1861,354 @@
               },
               {
                 "kind": "human_override"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "video-production",
+      "pattern": "creative_assembly_loop",
+      "playbook_ref": "knowledge/product/orchestration/narrated-video-production-playbook.md",
+      "description": "Goal → Video Spec → Scene Plan → シーン単位素材生成 → タイムライン合成 → 完成動画のAI評価 → 問題シーンのみ再生成のループ → レシピ昇格 → 公開パッケージ → 学習フィードバックの動画制作プロセス。scratch-first: 判断フェーズは semantic brief、素材生成/合成は voice / media-generation / video-composition の op をスクラッチ的に試行し、完成動画そのものを評価・部分修復してから、採用レシピを governed pipeline へ promote する(scratch-to-pipeline-video-promotion 準拠)。",
+      "match": {
+        "mission_classes": ["content_and_media"],
+        "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
+        "intent_ids": [
+          "video-production",
+          "narrated-video",
+          "produce-video",
+          "video-clip",
+          "promotional-video"
+        ]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        {
+          "id": "goal_brief",
+          "title": "目的定義",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "goal-brief",
+              "team_role": "planner",
+              "description": "動画の目的を evidence/goal-brief.json に定義する: 誰に(audience)・何を伝え(message)・何を感じてもらい(emotion)・何をしてもらうか(desired_action)",
+              "deliverable": "evidence/goal-brief.json",
+              "acceptance_criteria": ["audience / message / emotion / desired_action が揃っている"],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "low"
+            }
+          ],
+          "exit_gate": {
+            "id": "GOAL_DEFINED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/goal-brief.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "production_spec",
+          "title": "動画仕様",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "production-spec",
+              "team_role": "experience_designer",
+              "description": "goal-brief を踏まえ動画全体の仕様を evidence/production-spec.json に定義する: テーマ・尺・構成・トーン・媒体・KPI・禁止事項",
+              "deliverable": "evidence/production-spec.json",
+              "acceptance_criteria": [
+                "theme / duration / structure / tone / medium が揃っている",
+                "禁止事項が明記されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "SPEC_READY",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/production-spec.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "scene_plan",
+          "title": "シーン設計",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "scene-plan",
+              "team_role": "experience_designer",
+              "description": "production-spec をシーン単位に分解し evidence/scene-plan.json に設計する。各シーンは 伝える内容・ナレーション・映像・テロップ・音・尺 を持つ",
+              "deliverable": "evidence/scene-plan.json",
+              "acceptance_criteria": [
+                "全シーンに 内容/ナレーション/映像/テロップ/音/尺 がある",
+                "シーン尺の合計が production-spec の尺と整合する"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "SCENES_READY",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/scene-plan.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "asset_generation",
+          "title": "素材生成",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "generate-assets",
+              "team_role": "implementer",
+              "description": "scene-plan の各シーンについて必要素材を並列生成する(音声は voice:generate_voice、映像・静止画は media:generate_video / generate_image、BGM は generate_music、図解・テロップは artifact ops)。成果物は evidence/assets/ に置き、scene_id → asset パスの対応表を evidence/asset-manifest.json に記録する",
+              "deliverable": "evidence/asset-manifest.json",
+              "acceptance_criteria": [
+                "全シーンの必須素材が manifest に記録されている",
+                "生成失敗素材は manifest に理由つきで記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "L",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "ASSETS_READY",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/asset-manifest.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "assembly",
+          "title": "タイムライン合成",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "assemble-video",
+              "team_role": "implementer",
+              "description": "asset-manifest の素材をタイムラインに合成し evidence/draft-video.mp4 を生成する(video-composition: prepare_video_composition / create_narrated_video_from_content_brief + verify_rendered_video_artifact で検証)",
+              "deliverable": "evidence/draft-video.mp4",
+              "acceptance_criteria": [
+                "合成動画が生成され verify_rendered_video_artifact を通過する",
+                "全シーンが scene-plan 通りの順序・尺で配置されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "DRAFT_ASSEMBLED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/draft-video.mp4"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "artifact_evaluation",
+          "title": "完成物評価",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "evaluate-video",
+              "team_role": "reviewer",
+              "phase_kind": "implement",
+              "description": "完成動画そのものをAIが視聴して評価する(フレーム抽出 + 音声書き起こし + 台本照合)。シーン単位で 分かりやすさ・退屈箇所・矛盾・テンポ・目的(goal-brief)達成度 を採点し、verdict(pass|repair) と per-scene flags を evidence/video-eval-report.json に記録する",
+              "deliverable": "evidence/video-eval-report.json",
+              "acceptance_criteria": [
+                "全シーンが評価済み",
+                "verdict と per-scene flags が記録されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "VIDEO_EVALUATED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/video-eval-report.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "repair",
+          "title": "シーン修復",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "repair-scenes",
+              "team_role": "implementer",
+              "description": "video-eval-report.json の verdict=pass かつ flags 空なら pass-through を記録する。flags がある場合は該当シーンの素材だけを再生成して再合成し evidence/final-video.mp4 を更新、eval-report を再評価つきで更新する(verdict=pass まで繰り返し、上限3回。超過時は残 flags と理由を報告)",
+              "deliverable": "evidence/final-video.mp4",
+              "acceptance_criteria": [
+                "eval-report が再評価つきで更新されている",
+                "verdict=pass または残 flags の理由が記録されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "VIDEO_EVALUATION_PASSED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/final-video.mp4"
+                }
+              },
+              {
+                "kind": "llm_review",
+                "params": {
+                  "path": "evidence/video-eval-report.json",
+                  "allow_stub": true,
+                  "model_tier": "standard",
+                  "criteria": [
+                    "verdict が pass で未解決の flag が残っていない",
+                    "評価が台本ではなく完成動画そのものを対象にしている"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "promotion",
+          "title": "レシピ昇格",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "promote-video-recipe",
+              "team_role": "implementer",
+              "description": "評価を通過した scene-plan / production-spec / asset-manifest を governed な narrated-video-brief に凍結して evidence/promoted-video-brief.json に記録する(scratch-to-pipeline-video-promotion 準拠: シーン別 VO・テロップ・尺・配色/タイプを storyboard 項目へ移す)。同じ動画を再実行する見込みがある場合のみ pipelines/<slug>.json を登録し、一過性なら brief は mission evidence に留める",
+              "deliverable": "evidence/promoted-video-brief.json",
+              "acceptance_criteria": [
+                "採用レシピが promoted-video-brief.json に凍結されている",
+                "再利用要否の判断と根拠が記録されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "VIDEO_PROMOTED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/promoted-video-brief.json"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "publish",
+          "title": "公開準備",
+          "kind": "approval",
+          "default_tasks": [
+            {
+              "task_id_suffix": "publish-package",
+              "team_role": "implementer",
+              "description": "タイトル・サムネイル・説明文を生成し evidence/publish-package.json にまとめる(公開自体は別ゲート。publish-youtube-video 手順は人承認後)",
+              "deliverable": "evidence/publish-package.json",
+              "acceptance_criteria": [
+                "タイトル・サムネイル・説明文が揃っている",
+                "公開先と公開範囲(public/unlisted/draft)が明記されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "media"
+            }
+          ],
+          "exit_gate": {
+            "id": "PUBLISH_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/publish-package.json"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        {
+          "id": "learn",
+          "title": "学習フィードバック",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "learn-report",
+              "team_role": "planner",
+              "description": "視聴データ・フィードバック・制作中の学びを evidence/learn-report.json にまとめ、narrated-video-preference-profile や knowledge への反映提案を記録する(反映自体は承認後)",
+              "deliverable": "evidence/learn-report.json",
+              "acceptance_criteria": ["学びと反映提案が記録されている"],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "low"
+            }
+          ],
+          "exit_gate": {
+            "id": "LEARN_RECORDED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/learn-report.json"
+                }
               }
             ]
           }
@@ -3854,6 +4437,34 @@
               "expected_output_format": "structured",
               "estimated_scope": "M",
               "risk": "medium"
+            },
+            {
+              "task_id_suffix": "ux-contract",
+              "team_role": "experience_designer",
+              "description": "変更がユーザー向け画面・UX に及ぶ場合、インタラクション契約(対象画面・状態遷移・フィードバック・a11y 要件)を evidence/ux-contract.json に定義する",
+              "deliverable": "evidence/ux-contract.json",
+              "acceptance_criteria": [
+                "対象画面の状態と遷移が定義されている",
+                "a11y 要件が明記されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "low",
+              "when": {
+                "keywords_any": [
+                  "ui",
+                  "ux",
+                  "frontend",
+                  "front-end",
+                  "画面",
+                  "デザイン",
+                  "design-system",
+                  "design system",
+                  "css",
+                  "レイアウト",
+                  "見た目"
+                ]
+              }
             }
           ],
           "exit_gate": {
@@ -3946,6 +4557,35 @@
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium"
+            },
+            {
+              "task_id_suffix": "ux-review",
+              "team_role": "experience_designer",
+              "phase_kind": "review",
+              "description": "ux-contract と実装結果の整合をレビューし、a11y・デザインシステム準拠・視覚的逸脱を判定する",
+              "review_target_suffix": "ux-contract",
+              "acceptance_criteria": [
+                "ux-contract の必須要件が実装に反映されている",
+                "must_fix の視覚/a11y 指摘がない"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "medium",
+              "when": {
+                "keywords_any": [
+                  "ui",
+                  "ux",
+                  "frontend",
+                  "front-end",
+                  "画面",
+                  "デザイン",
+                  "design-system",
+                  "design system",
+                  "css",
+                  "レイアウト",
+                  "見た目"
+                ]
+              }
             }
           ],
           "exit_gate": {

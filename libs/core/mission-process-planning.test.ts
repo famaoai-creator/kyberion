@@ -188,7 +188,7 @@ describe('mission process planning', () => {
     const phases = written.map((task) => task.phase);
     expect(phases[0]).toBe('audience_definition');
     expect(phases).toContain('review');
-    expect(phases[phases.length - 1]).toBe('production_delivery');
+    expect(phases[phases.length - 1]).toBe('delivery');
 
     const review = written.find((task) => task.phase_kind === 'review');
     expect(review?.review_target).toBe('content_drafting-deck-brief');
@@ -440,7 +440,7 @@ describe('mission process planning', () => {
     const state = JSON.parse(
       safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
     ) as MissionState;
-    expect(state.process_template?.phase_specs?.length).toBe(6);
+    expect(state.process_template?.phase_specs?.length).toBe(9);
     expect(state.history?.some((entry) => entry.event === 'PLAN_TASKS')).toBe(true);
   });
 });

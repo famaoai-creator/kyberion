@@ -22,6 +22,7 @@ import {
   expandProcessTemplateTasks,
   processTemplateGateDefinitions,
   type ProcessTemplatePlannedTask,
+  type ProcessTemplateTaskConditions,
   PROCESS_TEMPLATE_TASK_ORIGIN,
 } from './mission-process-task-expansion.js';
 import { findMissionPath } from './path-resolver.js';
@@ -86,12 +87,18 @@ export function applyProcessTemplatePlan(input: {
   missionDir: string;
   design: MissionWorkflowDesign;
   force?: boolean;
+  /**
+   * Condition context for `when`-guarded task specs. When omitted the
+   * expansion includes conditional tasks (superset) — pass the mission's
+   * real signals so optional tasks only appear when they apply.
+   */
+  conditions?: ProcessTemplateTaskConditions;
 }): ApplyProcessTemplatePlanResult {
   const { missionId, missionDir, design } = input;
   const safeMissionDir = assertSafeRepositoryPath(missionDir);
   const nextTasksPath = safeMissionArtifactPath(safeMissionDir, 'NEXT_TASKS.json');
 
-  const tasks = expandProcessTemplateTasks({ missionId, design });
+  const tasks = expandProcessTemplateTasks({ missionId, design, conditions: input.conditions });
   if (tasks.length === 0) {
     return {
       tasks: [],
@@ -258,7 +265,13 @@ export async function planProcessTemplateTasks(args: {
     return;
   }
 
-  const result = applyProcessTemplatePlan({ missionId, missionDir, design, force: args.force });
+  const result = applyProcessTemplatePlan({
+    missionId,
+    missionDir,
+    design,
+    force: args.force,
+    conditions: taskConditionsFromMissionState(missionId, state),
+  });
   if (result.skipped === 'existing_next_tasks') {
     logger.error(
       `NEXT_TASKS.json for ${missionId} already exists and was not produced by a process template. Re-run with --force to overwrite.`
@@ -493,6 +506,37 @@ export async function advanceCurrentPhase(missionId: string, passedPhase: string
   const nextPhase = phases[index + 1];
   state.process_template.current_phase = nextPhase ?? passedPhase;
   await saveState(upperId, state);
+}
+
+/**
+ * Builds the `when`-guard condition context from a persisted mission state:
+ * structured signals come from the classification record, free-text keyword
+ * matching scans the original utterance / agreed goal / vision / mission
+ * type so optional tasks (e.g. a UX contract on UI-touching code changes)
+ * only appear when the request actually calls for them.
+ */
+export function taskConditionsFromMissionState(
+  missionId: string,
+  state: MissionState
+): ProcessTemplateTaskConditions {
+  const text = [
+    state.intent?.source_text,
+    state.intent?.goal_summary,
+    state.intent?.success_condition,
+    state.vision_ref,
+    state.mission_type,
+    missionId,
+  ]
+    .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    .join('\n');
+  return {
+    missionClass: state.classification?.mission_class,
+    deliveryShape: state.classification?.delivery_shape,
+    riskProfile: state.classification?.risk_profile,
+    intentId: state.origin_intent_id,
+    taskType: state.mission_type,
+    text,
+  };
 }
 
 function resolveDesignForState(

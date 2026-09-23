@@ -45,6 +45,25 @@ export interface WorkflowPhaseGate {
   checks: WorkflowPhaseGateCheck[];
 }
 
+/**
+ * Conditional-task guard (MO-01 extension): a task carrying `when` is only
+ * expanded when every declared field matches the mission's condition context
+ * (AND across fields, OR within each list). `keywords_any` matches
+ * case-insensitive substrings against the mission's utterance/goal text —
+ * use it for signals the structured fields cannot express (e.g. "this code
+ * change touches user-facing UI"). When expansion runs without a condition
+ * context (catalog validation, tests), conditional tasks are included so the
+ * full template is still exercised.
+ */
+export interface WorkflowPhaseTaskWhen {
+  mission_classes_any?: string[];
+  delivery_shapes_any?: string[];
+  risk_profiles_any?: string[];
+  intent_ids_any?: string[];
+  task_types_any?: string[];
+  keywords_any?: string[];
+}
+
 export interface WorkflowPhaseTaskSpec {
   task_id_suffix: string;
   description: string;
@@ -58,6 +77,7 @@ export interface WorkflowPhaseTaskSpec {
   review_target_suffix?: string;
   deliverable_kind?: 'doc' | 'deck' | 'code' | 'media';
   pipeline_ref?: string;
+  when?: WorkflowPhaseTaskWhen;
 }
 
 export interface WorkflowPhaseSpec {
@@ -229,6 +249,11 @@ export function resolveMissionWorkflowDesign(
       missionClass: 'content_and_media',
       intentId: 'document-authoring',
       taskType: 'document_production',
+    },
+    video_production: {
+      missionClass: 'content_and_media',
+      intentId: 'video-production',
+      taskType: 'video_production',
     },
     incident_analysis: {
       missionClass: 'operations_and_release',
