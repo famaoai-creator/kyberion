@@ -83,6 +83,8 @@ export interface BrandUiTokens {
     comfortable: Record<BrandUiFontSizeStep, string>;
     compact: Record<BrandUiFontSizeStep, string>;
   };
+  /** Web UI font stacks; media surfaces keep `tokens.fonts`. */
+  font_family?: { sans?: string; mono?: string };
 }
 
 export interface BrandTokens {

@@ -5,9 +5,9 @@ import { validateA2UIMessage } from './a2ui.js';
 import {
   KB_STATUS_TONES,
   KB_STATUS_VALUES,
-  KYBERION_BASE_ALIASES,
-  KYBERION_BASE_CATALOG_ID,
-  KYBERION_BASE_COMPONENT_TYPES,
+  A2UI_BASE_ALIASES,
+  A2UI_BASE_CATALOG_ID,
+  A2UI_BASE_COMPONENT_TYPES,
   resolveKyberionBaseType,
   validateA2UIComponentProps,
   type KyberionBaseComponentType,
@@ -222,18 +222,16 @@ describe('kyberion-base A2UI catalog', () => {
       .filter((key) => key.startsWith('props:'))
       .map((key) => key.slice('props:'.length))
       .sort();
-    expect(propsDefs).toEqual([...KYBERION_BASE_COMPONENT_TYPES].sort());
-    expect([...schema.properties.type.enum].sort()).toEqual(
-      [...KYBERION_BASE_COMPONENT_TYPES].sort()
-    );
-    expect(KYBERION_BASE_CATALOG_ID).toBe('kyberion-base');
+    expect(propsDefs).toEqual([...A2UI_BASE_COMPONENT_TYPES].sort());
+    expect([...schema.properties.type.enum].sort()).toEqual([...A2UI_BASE_COMPONENT_TYPES].sort());
+    expect(A2UI_BASE_CATALOG_ID).toBe('kyberion-base');
   });
 
-  it.each(KYBERION_BASE_COMPONENT_TYPES)('accepts a valid %s example', (type) => {
+  it.each(A2UI_BASE_COMPONENT_TYPES)('accepts a valid %s example', (type) => {
     expect(() => validateA2UIComponentProps(type, VALID_EXAMPLES[type])).not.toThrow();
   });
 
-  it.each(KYBERION_BASE_COMPONENT_TYPES)('rejects unknown props on %s', (type) => {
+  it.each(A2UI_BASE_COMPONENT_TYPES)('rejects unknown props on %s', (type) => {
     expect(() =>
       validateA2UIComponentProps(type, { ...VALID_EXAMPLES[type], style: 'color: red' })
     ).toThrow(/props are invalid.*style/u);
@@ -289,7 +287,7 @@ describe('kyberion-base A2UI catalog', () => {
   });
 
   it('resolves legacy aliases and leaves non-catalog types alone', () => {
-    expect(KYBERION_BASE_ALIASES).toEqual({
+    expect(A2UI_BASE_ALIASES).toEqual({
       text: 'ui:text',
       button: 'ui:button',
       card: 'ui:section',

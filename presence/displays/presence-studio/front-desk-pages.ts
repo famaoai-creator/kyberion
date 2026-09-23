@@ -407,23 +407,43 @@ export function frontDeskTemplateRedirect(originalUrl: string): string | null {
   return queryIndex === -1 ? target : `${target}${originalUrl.slice(queryIndex)}`;
 }
 
+/** Decoded, lower-cased request path for template matching; null when undecodable. */
+export function normalizeTemplateRequestPath(requestPath: string): string | null {
+  try {
+    return decodeURIComponent(requestPath).toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 // FD-02: `/` is now the human home page; the pre-FD-02 workbench moved to
 // `/work` unchanged. Both must be registered ahead of `express.static` (the
 // caller does this) so its default `index: 'index.html'` behavior for
 // `GET /` never wins the race against `home.html`.
 export function registerFrontDeskHomeWorkPages(app: express.Express, staticDir: string): void {
   // Registered ahead of `express.static` (see above) so a raw template file
-  // never reaches the browser unrendered.
-  for (const file of Object.keys(FRONT_DESK_TEMPLATE_FILE_REDIRECTS)) {
-    app.get(file, (req, res) => {
-      res.redirect(302, frontDeskTemplateRedirect(req.originalUrl || file) || '/');
-    });
-  }
-  for (const partial of Object.values(FRONT_DESK_PAGE_PARTIALS)) {
-    app.get(`/${partial}`, (_req, res) => {
+  // never reaches the browser unrendered. Matching uses the decoded,
+  // case-folded path because `express.static` decodes too
+  // (`/home%2Ehtml`, `/HOME.html` must not bypass this guard).
+  const partialPaths = new Set(
+    Object.values(FRONT_DESK_PAGE_PARTIALS).map((partial) => `/${partial}`.toLowerCase())
+  );
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const pathname = normalizeTemplateRequestPath(req.path);
+    if (pathname === null) return next();
+    if (Object.prototype.hasOwnProperty.call(FRONT_DESK_TEMPLATE_FILE_REDIRECTS, pathname)) {
+      const queryIndex = req.originalUrl.indexOf('?');
+      const query = queryIndex === -1 ? '' : req.originalUrl.slice(queryIndex);
+      res.redirect(302, `${FRONT_DESK_TEMPLATE_FILE_REDIRECTS[pathname]}${query}`);
+      return;
+    }
+    if (partialPaths.has(pathname)) {
       res.status(404).type('text').send('Not found');
-    });
-  }
+      return;
+    }
+    next();
+  });
 
   app.get('/', (req, res) => {
     sendFrontDeskPage(req, res, staticDir, 'home.html');

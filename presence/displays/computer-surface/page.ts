@@ -2,8 +2,10 @@
 // page and the shared vanilla renderer it runs on.
 //
 //   GET /  (and /index.html)                -> static/index.html, filled for the viewer's locale
+//   any other path naming index.html        -> 404 (never the raw template)
 //   GET /shared-ui/kyberion-ui.js           -> libs/shared-ui/vanilla/kyberion-ui.js
-//   GET /shared-ui/{charts,forms}.js        -> libs/shared-ui/vanilla/<file> (allow-list)
+//   GET /shared-ui/<module>.js              -> libs/shared-ui/vanilla/<file> (allow-list:
+//        charts*.js, forms*.js, kyberion-ui-vocabulary.js — every module the renderer imports, transitively)
 //   GET /shared-ui/messages/<locale>.json   -> { ok, locale, messages }  (`ui` domain bundle)
 //
 // Same shape as presence-studio's `ui-gallery-routes.ts`: every route maps to
@@ -22,7 +24,7 @@
 // The flag is display-only — `POST /a2ui/dispatch` keeps its own
 // `computer_surface.a2ui.dispatch` authorization either way.
 import * as path from 'node:path';
-import type express from 'express';
+import express from 'express';
 import { getUiMessageBundle, pathResolver, safeReadFile } from '@agent/core';
 import { SUPPORTED_LOCALES, type SupportedLocale } from '@agent/core/locale-normalize';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
@@ -38,7 +40,15 @@ export const SHARED_UI_MODULE_ROUTE = '/shared-ui/:file';
 export const SHARED_UI_MESSAGES_ROUTE = '/shared-ui/messages/:file';
 export const SHARED_UI_MODULE_SOURCES: Readonly<Record<string, string>> = Object.freeze({
   'charts.js': 'libs/shared-ui/vanilla/charts.js',
+  'charts-core.js': 'libs/shared-ui/vanilla/charts-core.js',
+  'charts-scale.js': 'libs/shared-ui/vanilla/charts-scale.js',
+  'charts-cartesian.js': 'libs/shared-ui/vanilla/charts-cartesian.js',
+  'charts-compact.js': 'libs/shared-ui/vanilla/charts-compact.js',
+  'charts-diagram.js': 'libs/shared-ui/vanilla/charts-diagram.js',
   'forms.js': 'libs/shared-ui/vanilla/forms.js',
+  'forms-core.js': 'libs/shared-ui/vanilla/forms-core.js',
+  'forms-camera.js': 'libs/shared-ui/vanilla/forms-camera.js',
+  'kyberion-ui-vocabulary.js': 'libs/shared-ui/vanilla/kyberion-ui-vocabulary.js',
 });
 
 /**
@@ -246,4 +256,43 @@ export function registerComputerSurfacePageRoutes(app: express.Express, staticDi
     }
     return sendScript(res, SHARED_UI_MODULE_SOURCES[file]);
   });
+}
+
+/**
+ * True when a request path names the page template by any spelling the static
+ * file server would still resolve to it — percent-encoded (`/index%2Ehtml`),
+ * other case (`/INDEX.html` on a case-insensitive filesystem), or with a
+ * trailing dot/space. Only the fixed page routes above may answer those; the
+ * static server must never send the unfilled template (it carries the
+ * developer sandbox markup that `?dev=1` gates).
+ */
+export function isComputerSurfaceTemplatePath(requestPath: string): boolean {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(requestPath);
+  } catch {
+    // The static server rejects an undecodable path itself.
+    return false;
+  }
+  const basename = decoded.split(/[\\/]/).pop() ?? '';
+  return basename.replace(/[.\s]+$/u, '').toLowerCase() === COMPUTER_SURFACE_PAGE_FILE;
+}
+
+/**
+ * Serve the page's static assets (stylesheets, display-prefs script). Must run
+ * after `registerComputerSurfacePageRoutes`: any remaining request that names
+ * the template is a 404 before `express.static` can see it.
+ */
+export function registerComputerSurfaceStaticFiles(app: express.Express, staticDir: string): void {
+  app.use((req, res, next) => {
+    if (
+      (req.method === 'GET' || req.method === 'HEAD') &&
+      isComputerSurfaceTemplatePath(req.path)
+    ) {
+      res.status(404).json({ ok: false, error: 'not found' });
+      return;
+    }
+    next();
+  });
+  app.use(express.static(staticDir, { index: false }));
 }

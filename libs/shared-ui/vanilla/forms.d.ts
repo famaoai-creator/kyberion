@@ -59,8 +59,19 @@ export declare const KB_FORM_MESSAGE_KEYS: Readonly<Record<string, string>> & {
   readonly secretReplace: string;
   readonly secretRemove: string;
   readonly secretCancel: string;
-  readonly secretSubmitted: string;
+  readonly secretPending: string;
+  readonly secretSaved: string;
+  readonly secretError: string;
 };
+
+/** Host-reported outcome of a secret-field submit (`status` prop). */
+export type KbSecretFieldStatus = 'idle' | 'pending' | 'error' | 'saved';
+export declare const KB_SECRET_FIELD_STATUSES: readonly KbSecretFieldStatus[];
+/** The field's own last event and the host status it happened under. */
+export interface KbSecretFieldLocalEvent {
+  kind: 'submitted' | 'dismissed';
+  under: KbSecretFieldStatus;
+}
 
 export declare const KB_SAVE_BAR_MESSAGE_KEYS: Readonly<Record<string, string>>;
 export declare const KB_FILE_STATUS_MESSAGE_KEYS: Readonly<Record<string, string>>;
@@ -152,6 +163,12 @@ export declare function secretStatusText(
   p: { configured?: boolean; last4?: string },
   t: KbTranslate
 ): string;
+export declare function secretFieldHostStatus(p: { status?: unknown }): KbSecretFieldStatus;
+export declare function secretFieldNotice(
+  p: { status?: unknown; status_error?: unknown },
+  local: KbSecretFieldLocalEvent | null,
+  t: KbTranslate
+): { status: KbSecretFieldStatus; text: string };
 export declare function textFieldValue(type: string, raw: string): string | number;
 export declare function formAction(action: unknown, defaultId: string): KbResolvedAction;
 export declare function actionPayload(

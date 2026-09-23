@@ -4,8 +4,9 @@
  *
  * `kyberion-ui.js` merges `createFormRenderers(...)` into its renderer table;
  * the React renderer (`libs/shared-ui/src/forms/*`) imports the pure helpers
- * below (ids, file screening, byte formatting, the camera controller) so
- * both renderers behave the same.
+ * re-exported here (ids, file screening, byte formatting — `forms-core.js`;
+ * the camera controller — `forms-camera.js`) so both renderers behave the
+ * same. Every sibling module is served next to this one (fixed allow-list).
  *
  * Interaction contract:
  *   - Controls are controlled by `value`; every edit dispatches
@@ -20,569 +21,71 @@
  *   - The camera starts only from a user action and every track is stopped
  *     on capture / confirm / cancel / re-render / `pagehide`.
  */
-/* global Blob, File */
+import {
+  KB_FORM_ACTIONS,
+  KB_FORM_MESSAGE_KEYS,
+  KB_SAVE_BAR_MESSAGE_KEYS,
+  KB_INTEGRATION_STATES,
+  KB_FORM_ICON_PATHS,
+  formFieldIds,
+  describedBy,
+  fileMatchesAccept,
+  screenFiles,
+  screeningNotice,
+  fileDropHint,
+  fileMetaText,
+  sliderValueText,
+  sliderRange,
+  secretStatusText,
+  secretFieldHostStatus,
+  secretFieldNotice,
+  textFieldValue,
+  formAction,
+  actionPayload,
+} from './forms-core.js';
+import { toFile, cropImageToSquare, createCameraController } from './forms-camera.js';
 
-/** Mirrors `KB_FORM_ACTIONS` in libs/core/a2ui-catalog.ts (pinned by tests). */
-export const KB_FORM_ACTIONS = Object.freeze({
-  fieldChange: 'field.change',
-  filesAdd: 'file.add',
-  fileRemove: 'file.remove',
-  cameraCapture: 'camera.capture',
-  cameraCancel: 'camera.cancel',
-  avatarChange: 'avatar.change',
-  avatarRemove: 'avatar.remove',
-});
-
-/** Vocabulary keys (`ui:*`) of every form default string. */
-export const KB_FORM_MESSAGE_KEYS = Object.freeze({
-  required: 'ui:field_required',
-  selectPlaceholder: 'ui:select_placeholder',
-  textCount: 'ui:text_count',
-  saveBarLabel: 'ui:save_bar_label',
-  saveBarSave: 'ui:save_bar_save',
-  saveBarDiscard: 'ui:save_bar_discard',
-  fileDropPrompt: 'ui:file_drop_prompt',
-  fileDropPromptSingle: 'ui:file_drop_prompt_single',
-  fileDropBrowse: 'ui:file_drop_browse',
-  fileDropBrowseSingle: 'ui:file_drop_browse_single',
-  fileDropAccept: 'ui:file_drop_accept',
-  fileDropMaxSize: 'ui:file_drop_max_size',
-  fileDropMaxFiles: 'ui:file_drop_max_files',
-  fileDropAdded: 'ui:file_drop_added',
-  fileDropRejectType: 'ui:file_drop_reject_type',
-  fileDropRejectSize: 'ui:file_drop_reject_size',
-  fileDropRejectCount: 'ui:file_drop_reject_count',
-  fileListLabel: 'ui:file_list_label',
-  fileRemove: 'ui:file_remove',
-  fileCancel: 'ui:file_cancel',
-  cameraStart: 'ui:camera_start',
-  cameraStarting: 'ui:camera_starting',
-  cameraLiveLabel: 'ui:camera_live_label',
-  cameraTake: 'ui:camera_take',
-  cameraRetake: 'ui:camera_retake',
-  cameraUse: 'ui:camera_use',
-  cameraCancel: 'ui:camera_cancel',
-  cameraChooseFile: 'ui:camera_choose_file',
-  cameraPreviewAlt: 'ui:camera_preview_alt',
-  cameraUnavailable: 'ui:camera_unavailable',
-  cameraDenied: 'ui:camera_denied',
-  avatarUpload: 'ui:avatar_upload',
-  avatarTake: 'ui:avatar_take',
-  avatarRemove: 'ui:avatar_remove',
-  avatarUse: 'ui:avatar_use',
-  avatarCancel: 'ui:avatar_cancel',
-  avatarCurrentAlt: 'ui:avatar_current_alt',
-  avatarPreviewAlt: 'ui:avatar_preview_alt',
-  avatarEmpty: 'ui:avatar_empty',
-  secretConfigured: 'ui:secret_configured',
-  secretConfiguredPlain: 'ui:secret_configured_plain',
-  secretNotConfigured: 'ui:secret_not_configured',
-  secretShow: 'ui:secret_show',
-  secretHide: 'ui:secret_hide',
-  secretPaste: 'ui:secret_paste',
-  secretPasteUnavailable: 'ui:secret_paste_unavailable',
-  secretSave: 'ui:secret_save',
-  secretReplace: 'ui:secret_replace',
-  secretRemove: 'ui:secret_remove',
-  secretCancel: 'ui:secret_cancel',
-  secretSubmitted: 'ui:secret_submitted',
-});
-
-/** `ui:save-bar` default message per state. */
-export const KB_SAVE_BAR_MESSAGE_KEYS = Object.freeze({
-  clean: 'ui:save_bar_clean',
-  dirty: 'ui:save_bar_dirty',
-  saving: 'ui:save_bar_saving',
-  saved: 'ui:save_bar_saved',
-  error: 'ui:save_bar_error',
-});
-
-/** `ui:file-drop` entry status label keys. */
-export const KB_FILE_STATUS_MESSAGE_KEYS = Object.freeze({
-  queued: 'ui:file_status_queued',
-  uploading: 'ui:file_status_uploading',
-  done: 'ui:file_status_done',
-  error: 'ui:file_status_error',
-});
-
-/**
- * `ui:integration-item.state` → the canonical status its pill reuses (for the
- * tone + icon) and the integration-specific label key.
- */
-export const KB_INTEGRATION_STATES = Object.freeze({
-  connected: Object.freeze({ status: 'connected', key: 'ui:integration_connected' }),
-  needs_reauth: Object.freeze({ status: 'needs_setup', key: 'ui:integration_needs_reauth' }),
-  disconnected: Object.freeze({ status: 'stopped', key: 'ui:integration_disconnected' }),
-  error: Object.freeze({ status: 'error', key: 'ui:integration_error' }),
-});
-
-/** Icons only the form components use (24px grid, stroke = currentColor). */
-export const KB_FORM_ICON_PATHS = Object.freeze({
-  upload: ['M12 16V4', 'M6 10l6-6 6 6', 'M4 20h16'],
-  camera: ['M4 8h3l2-3h6l2 3h3v11H4z', 'M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'],
-  close: ['M6 6l12 12', 'M18 6L6 18'],
-  lock: ['M6 11h12v9H6z', 'M8 11V8a4 4 0 0 1 8 0v3'],
-  plug: ['M9 3v5', 'M15 3v5', 'M7 8h10v3a5 5 0 0 1-10 0z', 'M12 16v5'],
-});
-
-// ---------------------------------------------------------------------------
-// Pure helpers (shared with the React renderer)
-// ---------------------------------------------------------------------------
+// Public surface: the constants / pure helpers and the camera helpers live in
+// sibling modules (served next to this one) and are re-exported unchanged.
+export {
+  KB_FORM_ACTIONS,
+  KB_FORM_MESSAGE_KEYS,
+  KB_SECRET_FIELD_STATUSES,
+  KB_SAVE_BAR_MESSAGE_KEYS,
+  KB_FILE_STATUS_MESSAGE_KEYS,
+  KB_INTEGRATION_STATES,
+  KB_FORM_ICON_PATHS,
+  formFieldIds,
+  describedBy,
+  formatBytes,
+  describeAccept,
+  fileMatchesAccept,
+  screenFiles,
+  screeningNotice,
+  fileDropHint,
+  fileStatusText,
+  fileMetaText,
+  sliderValueText,
+  sliderRange,
+  secretStatusText,
+  secretFieldHostStatus,
+  secretFieldNotice,
+  textFieldValue,
+  formAction,
+  actionPayload,
+} from './forms-core.js';
+export {
+  toFile,
+  stopStream,
+  cameraSupported,
+  centerCrop,
+  captureVideoFrame,
+  cropImageToSquare,
+  createCameraController,
+} from './forms-camera.js';
 
 function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
- * Deterministic DOM ids for a field (label `for`, `aria-describedby`), from
- * the A2UI component id (else the field name) so both renderers agree.
- * @param {unknown} componentId
- * @param {unknown} name
- */
-export function formFieldIds(componentId, name) {
-  const raw =
-    typeof componentId === 'string' && componentId
-      ? componentId
-      : typeof name === 'string' && name
-        ? name
-        : 'field';
-  const base = `kbf-${raw.replace(/[^A-Za-z0-9_-]/g, '-')}`;
-  return {
-    input: base,
-    label: `${base}-label`,
-    help: `${base}-help`,
-    error: `${base}-error`,
-    hint: `${base}-hint`,
-    status: `${base}-status`,
-    title: `${base}-title`,
-  };
-}
-
-/** `aria-describedby` value for the field's help / error (and extra ids); undefined when none. */
-export function describedBy(ids, p, extra) {
-  const list = [];
-  if (Array.isArray(extra)) for (const id of extra) if (id) list.push(id);
-  if (typeof p.help === 'string' && p.help) list.push(ids.help);
-  if (typeof p.error === 'string' && p.error) list.push(ids.error);
-  return list.length ? list.join(' ') : undefined;
-}
-
-/** Human-readable byte size (`25 MB`); '' for invalid input. */
-export function formatBytes(bytes) {
-  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) return '';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  const rounded = unit === 0 || value >= 10 ? Math.round(value) : Math.round(value * 10) / 10;
-  return `${rounded} ${units[unit]}`;
-}
-
-function acceptTokens(accept) {
-  return typeof accept === 'string'
-    ? accept
-        .split(',')
-        .map((token) => token.trim())
-        .filter(Boolean)
-    : [];
-}
-
-/** Display form of an `accept` list: `.pdf,image/*` → `PDF, image/*`. */
-export function describeAccept(accept) {
-  return acceptTokens(accept)
-    .map((token) => (token.startsWith('.') ? token.slice(1).toUpperCase() : token))
-    .join(', ');
-}
-
-/** Whether a file (name + MIME type) matches an `<input accept>` list; no list accepts all. */
-export function fileMatchesAccept(file, accept) {
-  const tokens = acceptTokens(accept);
-  if (tokens.length === 0) return true;
-  const name = String((file && file.name) || '').toLowerCase();
-  const type = String((file && file.type) || '').toLowerCase();
-  return tokens.some((raw) => {
-    const token = raw.toLowerCase();
-    if (token.startsWith('.')) return name.endsWith(token);
-    if (token.endsWith('/*')) return type.startsWith(token.slice(0, -1));
-    return type === token;
-  });
-}
-
-/**
- * Split picked / dropped / pasted files into accepted and rejected ones by
- * `accept`, `max_bytes`, `multiple` and `max_files` (counting `existing`).
- * Rejections carry only `{ name, size, reason }`.
- */
-export function screenFiles(files, p, existing = 0) {
-  const accepted = [];
-  const rejected = [];
-  const limit =
-    p.multiple === true
-      ? Number.isInteger(p.max_files)
-        ? Math.max(p.max_files - existing, 0)
-        : Infinity
-      : 1;
-  for (const file of Array.from(files || [])) {
-    if (!file) continue;
-    const size = typeof file.size === 'number' ? file.size : 0;
-    const name = String(file.name || '');
-    if (!fileMatchesAccept(file, p.accept)) rejected.push({ name, size, reason: 'type' });
-    else if (Number.isInteger(p.max_bytes) && size > p.max_bytes)
-      rejected.push({ name, size, reason: 'size' });
-    else if (accepted.length >= limit) rejected.push({ name, size, reason: 'count' });
-    else accepted.push(file);
-  }
-  return { accepted, rejected };
-}
-
-/** One-line notice for a screening result (rejections first). */
-export function screeningNotice(result, p, t, K = KB_FORM_MESSAGE_KEYS) {
-  const first = result.rejected[0];
-  if (first) {
-    if (first.reason === 'type') return t(K.fileDropRejectType, { file: first.name });
-    if (first.reason === 'size')
-      return t(K.fileDropRejectSize, { file: first.name, size: formatBytes(p.max_bytes) });
-    return t(K.fileDropRejectCount, {
-      count: p.multiple === true && Number.isInteger(p.max_files) ? p.max_files : 1,
-    });
-  }
-  return result.accepted.length ? t(K.fileDropAdded, { count: result.accepted.length }) : '';
-}
-
-/** The constraint line under the drop zone (`Accepted: PDF · Up to 25 MB each`). */
-export function fileDropHint(p, t) {
-  const parts = [];
-  const types = describeAccept(p.accept);
-  if (types) parts.push(t(KB_FORM_MESSAGE_KEYS.fileDropAccept, { types }));
-  if (Number.isInteger(p.max_bytes))
-    parts.push(t(KB_FORM_MESSAGE_KEYS.fileDropMaxSize, { size: formatBytes(p.max_bytes) }));
-  if (p.multiple === true && Number.isInteger(p.max_files))
-    parts.push(t(KB_FORM_MESSAGE_KEYS.fileDropMaxFiles, { count: p.max_files }));
-  return parts.join(' · ');
-}
-
-/** Visible status of a file entry (`Uploading 40%`). */
-export function fileStatusText(entry, t) {
-  const key = Object.prototype.hasOwnProperty.call(KB_FILE_STATUS_MESSAGE_KEYS, entry.status)
-    ? KB_FILE_STATUS_MESSAGE_KEYS[entry.status]
-    : KB_FILE_STATUS_MESSAGE_KEYS.queued;
-  const label = t(key);
-  if (entry.status === 'uploading' && typeof entry.progress === 'number') {
-    return `${label} ${Math.round(Math.min(Math.max(entry.progress, 0), 100))}%`;
-  }
-  return label;
-}
-
-/** `{ name, size }` meta line of a file entry. */
-export function fileMetaText(entry, t) {
-  const size = formatBytes(entry.size);
-  const status = fileStatusText(entry, t);
-  return size ? `${size} · ${status}` : status;
-}
-
-/** Slider value text including the unit (`40%`, `3 min`). */
-export function sliderValueText(value, unit) {
-  const text = value === undefined || value === null ? '' : String(value);
-  if (!unit) return text;
-  return unit === '%' ? `${text}%` : `${text} ${unit}`;
-}
-
-/** Clamp/normalise a slider's range props. */
-export function sliderRange(p) {
-  const min = typeof p.min === 'number' ? p.min : 0;
-  const max = typeof p.max === 'number' && p.max > min ? p.max : min + 100;
-  const step = typeof p.step === 'number' && p.step > 0 ? p.step : 1;
-  const value =
-    typeof p.value === 'number' && Number.isFinite(p.value)
-      ? Math.min(Math.max(p.value, min), max)
-      : min;
-  return { min, max, step, value };
-}
-
-/** Status text of a configured secret (`Set · ••••x9Qa`). */
-export function secretStatusText(p, t) {
-  if (p.configured !== true) return t(KB_FORM_MESSAGE_KEYS.secretNotConfigured);
-  return typeof p.last4 === 'string' && /^[A-Za-z0-9]{1,4}$/.test(p.last4)
-    ? t(KB_FORM_MESSAGE_KEYS.secretConfigured, { last4: p.last4 })
-    : t(KB_FORM_MESSAGE_KEYS.secretConfiguredPlain);
-}
-
-/** Value reported by a text field (`number` inputs report a number when valid). */
-export function textFieldValue(type, raw) {
-  if (type === 'number') {
-    if (raw === '') return '';
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : raw;
-  }
-  return raw;
-}
-
-/** Normalised `{ id, payload }` of an action prop, else the default id. */
-export function formAction(action, defaultId) {
-  if (typeof action === 'string' && action) return { id: action, payload: undefined };
-  if (isRecord(action) && typeof action.id === 'string' && action.id) {
-    return { id: action.id, payload: isRecord(action.payload) ? action.payload : undefined };
-  }
-  return { id: defaultId, payload: undefined };
-}
-
-/** Merge the declared payload with runtime data (runtime keys win). */
-export function actionPayload(action, runtime) {
-  return { ...(action.payload || {}), ...runtime };
-}
-
-/** Wrap a Blob as a File (with a name) when the platform has `File`. */
-export function toFile(blob, name, win) {
-  const FileCtor = (win && win.File) || (typeof File !== 'undefined' ? File : undefined);
-  if (!blob || !FileCtor) return blob;
-  try {
-    return new FileCtor([blob], name, { type: blob.type || 'application/octet-stream' });
-  } catch {
-    return blob;
-  }
-}
-
-/** Stop every track of a MediaStream (idempotent, never throws). */
-export function stopStream(stream) {
-  if (!stream || typeof stream.getTracks !== 'function') return;
-  for (const track of stream.getTracks()) {
-    try {
-      track.stop();
-    } catch {
-      // already stopped
-    }
-  }
-}
-
-/** Whether `getUserMedia` exists in this window (secure context + support). */
-export function cameraSupported(win) {
-  return Boolean(
-    win &&
-    win.navigator &&
-    win.navigator.mediaDevices &&
-    typeof win.navigator.mediaDevices.getUserMedia === 'function'
-  );
-}
-
-function canvasToBlob(canvas, type, quality) {
-  return new Promise((resolve) => {
-    try {
-      canvas.toBlob((blob) => resolve(blob || null), type, quality);
-    } catch {
-      resolve(null);
-    }
-  });
-}
-
-/** Source rectangle for a centered crop of `w × h` to the aspect (`square` | 4:3 `landscape`). */
-export function centerCrop(width, height, aspect) {
-  const ratio = aspect === 'landscape' ? 4 / 3 : 1;
-  let sw = width;
-  let sh = Math.round(width / ratio);
-  if (sh > height) {
-    sh = height;
-    sw = Math.round(height * ratio);
-  }
-  return { sx: Math.round((width - sw) / 2), sy: Math.round((height - sh) / 2), sw, sh };
-}
-
-/** Draw the current video frame (center-cropped) to a canvas and return it as a JPEG Blob. */
-export async function captureVideoFrame(video, doc, aspect, maxSize = 1024) {
-  const width = video && video.videoWidth;
-  const height = video && video.videoHeight;
-  if (!width || !height || !doc) return null;
-  const crop = centerCrop(width, height, aspect);
-  const scale = Math.min(1, maxSize / crop.sw);
-  const canvas = doc.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(crop.sw * scale));
-  canvas.height = Math.max(1, Math.round(crop.sh * scale));
-  const context = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
-  if (!context) return null;
-  context.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
-  return canvasToBlob(canvas, 'image/jpeg', 0.92);
-}
-
-/**
- * Square-crop an image file to `size`² PNG (avatar preview/upload). Returns
- * the original file when decoding is unavailable (no createImageBitmap).
- */
-export async function cropImageToSquare(file, doc, win, size = 512) {
-  const decode = win && typeof win.createImageBitmap === 'function' ? win.createImageBitmap : null;
-  if (!file || !doc || !decode) return file;
-  try {
-    const bitmap = await decode.call(win, file);
-    const crop = centerCrop(bitmap.width, bitmap.height, 'square');
-    const canvas = doc.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const context = canvas.getContext('2d');
-    if (!context) return file;
-    context.drawImage(bitmap, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, size, size);
-    if (typeof bitmap.close === 'function') bitmap.close();
-    const blob = await canvasToBlob(canvas, 'image/png');
-    return blob ? toFile(blob, 'avatar.png', win) : file;
-  } catch {
-    return file;
-  }
-}
-
-/**
- * Renderer-independent camera state machine. Phases: `idle` → `starting` →
- * `live` → `captured`; `fallback` when getUserMedia is missing or denied
- * (the UI then offers `<input type=file accept=image/* capture>`).
- *
- * The stream is stopped on capture, confirm, cancel, dispose and `pagehide`.
- * The captured Blob stays inside this closure until `confirm()` returns it.
- *
- * @param {{ win?: any, doc?: any, facing?: string, aspect?: string, onState?: (state: any) => void }} options
- */
-export function createCameraController(options = {}) {
-  const win = options.win;
-  const facing = options.facing === 'environment' ? 'environment' : 'user';
-  const aspect = options.aspect === 'landscape' ? 'landscape' : 'square';
-  let stream = null;
-  let video = null;
-  let blob = null;
-  let previewUrl = null;
-  let disposed = false;
-  let fallback = false;
-  let state = { phase: 'idle', notice: null, previewUrl: null };
-
-  const emit = (patch) => {
-    state = { ...state, ...patch };
-    if (!disposed && typeof options.onState === 'function') options.onState(state);
-  };
-  const revoke = () => {
-    if (previewUrl && win && win.URL && typeof win.URL.revokeObjectURL === 'function') {
-      win.URL.revokeObjectURL(previewUrl);
-    }
-    previewUrl = null;
-  };
-  const stop = () => {
-    stopStream(stream);
-    stream = null;
-    if (video) {
-      try {
-        video.srcObject = null;
-      } catch {
-        // detached element
-      }
-    }
-  };
-  const restPhase = () => (fallback ? 'fallback' : 'idle');
-  const onPageHide = () => controller.cancel();
-
-  const controller = {
-    get state() {
-      return state;
-    },
-    /** The live stream (tests / diagnostics); null unless `live`. */
-    get stream() {
-      return stream;
-    },
-    /** Bind the `<video>` preview element (or null when it unmounts). */
-    attach(element) {
-      video = element || null;
-      if (video && stream) {
-        try {
-          video.srcObject = stream;
-          const played = typeof video.play === 'function' ? video.play() : null;
-          if (played && typeof played.catch === 'function') played.catch(() => {});
-        } catch {
-          // preview only
-        }
-      }
-    },
-    /** Request the camera. Call only from a user action (click). */
-    async start() {
-      if (disposed || state.phase === 'starting' || state.phase === 'live') return;
-      if (!cameraSupported(win)) {
-        fallback = true;
-        emit({ phase: 'fallback', notice: 'unavailable', previewUrl: null });
-        return;
-      }
-      emit({ phase: 'starting', notice: null, previewUrl: null });
-      try {
-        const next = await win.navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing },
-          audio: false,
-        });
-        if (disposed || state.phase !== 'starting') {
-          stopStream(next);
-          return;
-        }
-        stream = next;
-        emit({ phase: 'live' });
-        if (video) controller.attach(video);
-      } catch {
-        stop();
-        fallback = true;
-        emit({ phase: 'fallback', notice: 'denied' });
-      }
-    },
-    /** Grab the current frame; stops the stream while the photo is reviewed. */
-    async capture() {
-      if (state.phase !== 'live' || !video) return;
-      const frame = await captureVideoFrame(video, options.doc, aspect);
-      if (!frame || disposed) return;
-      stop();
-      blob = frame;
-      revoke();
-      previewUrl =
-        win && win.URL && typeof win.URL.createObjectURL === 'function'
-          ? win.URL.createObjectURL(frame)
-          : null;
-      emit({ phase: 'captured', previewUrl });
-    },
-    /** Fallback path: a photo picked through `<input type=file capture>`. */
-    useFile(file) {
-      if (!file || disposed) return;
-      stop();
-      blob = file;
-      revoke();
-      previewUrl =
-        win && win.URL && typeof win.URL.createObjectURL === 'function'
-          ? win.URL.createObjectURL(file)
-          : null;
-      emit({ phase: 'captured', previewUrl });
-    },
-    /** Discard the photo and go back to the camera (or the file fallback). */
-    async retake() {
-      blob = null;
-      revoke();
-      emit({ phase: restPhase(), previewUrl: null });
-      if (!fallback) await controller.start();
-    },
-    /** Hand the photo over (Blob), stop everything and reset. */
-    confirm() {
-      const result = blob;
-      blob = null;
-      stop();
-      revoke();
-      emit({ phase: restPhase(), previewUrl: null });
-      return result;
-    },
-    cancel() {
-      blob = null;
-      stop();
-      revoke();
-      emit({ phase: restPhase(), previewUrl: null });
-    },
-    dispose() {
-      blob = null;
-      stop();
-      revoke();
-      disposed = true;
-      if (win && typeof win.removeEventListener === 'function')
-        win.removeEventListener('pagehide', onPageHide);
-    },
-  };
-  if (win && typeof win.addEventListener === 'function')
-    win.addEventListener('pagehide', onPageHide);
-  return controller;
 }
 
 // ---------------------------------------------------------------------------
@@ -1392,8 +895,17 @@ export function createFormRenderers(h) {
       if (typeof p.secret_key === 'string') out.secret_key = p.secret_key;
       return out;
     };
-    let editing = p.configured !== true;
+    const hostStatus = secretFieldHostStatus(p);
+    // A failed save reopens the input so the value can be entered again.
+    let editing = p.configured !== true || hostStatus === 'error';
+    // `local`: the field's own last submit / edit (see secretFieldNotice).
+    let local = null;
     const notice = liveNotice(ctx, 'kb-secret-field__notice');
+    const showOutcome = () => {
+      const outcome = secretFieldNotice(p, local, ctx.t);
+      root.setAttribute('data-status', outcome.status);
+      setText(notice, outcome.text);
+    };
 
     const draw = (focusTarget) => {
       while (root.firstChild) root.removeChild(root.firstChild);
@@ -1490,15 +1002,18 @@ export function createFormRenderers(h) {
         const submit = () => {
           const value = input.value;
           if (!value || p.disabled === true) return;
+          // Never keep the value: cleared before the host even sees it.
           input.value = '';
           input.setAttribute('type', 'password');
+          local = { kind: 'submitted', under: hostStatus };
           dispatch(ctx, c, submitAction, { ...identity(), value });
           editing = p.configured !== true;
           draw(editing ? 'input' : 'replace');
-          setText(notice, ctx.t(K.secretSubmitted));
+          showOutcome();
         };
         listen(input, 'input', () => {
-          setText(notice, '');
+          local = { kind: 'dismissed', under: hostStatus };
+          showOutcome();
           refresh();
         });
         listen(input, 'keydown', (event) => {
@@ -1546,6 +1061,7 @@ export function createFormRenderers(h) {
       if (focus && typeof focus.focus === 'function') focus.focus();
     };
     draw();
+    showOutcome();
     return root;
   };
 

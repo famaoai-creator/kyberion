@@ -4,12 +4,12 @@
 // the workspace jsdom cannot load under the root `undici` override, and the
 // stand-in also makes any innerHTML-style write throw.
 import { describe, expect, it, vi } from 'vitest';
-import { getUiMessageBundle, pathResolver, safeReadFile } from '@agent/core';
+import { getUiMessageBundle, pathResolver, safeReaddir, safeReadFile } from '@agent/core';
 import {
   KB_STATUS_TONES,
   KB_STATUS_VALUES,
-  KYBERION_BASE_ALIASES,
-  KYBERION_BASE_COMPONENT_TYPES,
+  A2UI_BASE_ALIASES,
+  A2UI_BASE_COMPONENT_TYPES,
 } from '@agent/core/a2ui-catalog';
 import {
   KB_ALIASES,
@@ -158,9 +158,9 @@ const CASES: Record<string, { props: Record<string, unknown>; root: string; tag?
 
 describe('kyberion-ui vanilla renderer — catalog coverage', () => {
   it('renders exactly the kyberion-base catalog types and aliases', () => {
-    expect([...KB_RENDERED_TYPES].sort()).toEqual([...KYBERION_BASE_COMPONENT_TYPES].sort());
-    expect(KB_ALIASES).toEqual(KYBERION_BASE_ALIASES);
-    expect(Object.keys(CASES).sort()).toEqual([...KYBERION_BASE_COMPONENT_TYPES].sort());
+    expect([...KB_RENDERED_TYPES].sort()).toEqual([...A2UI_BASE_COMPONENT_TYPES].sort());
+    expect(KB_ALIASES).toEqual(A2UI_BASE_ALIASES);
+    expect(Object.keys(CASES).sort()).toEqual([...A2UI_BASE_COMPONENT_TYPES].sort());
   });
 
   for (const [type, spec] of Object.entries(CASES)) {
@@ -505,15 +505,22 @@ describe('kyberion-ui vanilla renderer — markup contract', () => {
   });
 });
 
+/** Every browser module of the vanilla renderer (all non-test `.js` files), concatenated. */
+function vanillaModuleSources(): string {
+  const dir = pathResolver.rootResolve('libs/shared-ui/vanilla');
+  const files = safeReaddir(dir).filter((name) => /^[\w-]+\.js$/.test(name));
+  expect(files).toContain('kyberion-ui.js');
+  expect(files.length).toBeGreaterThan(5);
+  return files
+    .map((name) => String(safeReadFile(`${dir}/${name}`, { encoding: 'utf8' })))
+    .join('\n');
+}
+
 describe('kyberion-ui vanilla renderer — safety', () => {
   const XSS = '<img src=x onerror="window.__pwned=1"><script>window.__pwned=1</script>';
 
   it('never builds DOM from HTML strings', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('libs/shared-ui/vanilla/kyberion-ui.js'), {
-        encoding: 'utf8',
-      })
-    );
+    const source = vanillaModuleSources();
     // Strip comments so the safety notes in the header do not count.
     const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     expect(code).not.toMatch(
@@ -663,11 +670,7 @@ describe('kyberion-ui vanilla renderer — UI-01d i18n', () => {
   });
 
   it('keeps no hardcoded Japanese in the renderer source (text lives in the vocabulary)', () => {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve('libs/shared-ui/vanilla/kyberion-ui.js'), {
-        encoding: 'utf8',
-      })
-    );
+    const source = vanillaModuleSources();
     expect(source).not.toMatch(/[\u3040-\u30ff\u4e00-\u9fff]/u);
   });
 });

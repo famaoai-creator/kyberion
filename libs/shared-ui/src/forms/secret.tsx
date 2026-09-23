@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KbSecretFieldProps } from '@agent/core/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
-import { KB_FORM_MESSAGE_KEYS, formAction, secretStatusText } from '../../vanilla/forms.js';
+import {
+  KB_FORM_MESSAGE_KEYS,
+  formAction,
+  secretFieldHostStatus,
+  secretFieldNotice,
+  secretStatusText,
+  type KbSecretFieldLocalEvent,
+} from '../../vanilla/forms.js';
 import {
   FieldLabel,
   HelpAndError,
@@ -24,6 +31,10 @@ import {
  * governed secret-introduction path does the storing) and clears the input.
  * A configured secret shows only "Set · ••••last4" with Replace / Remove.
  * It never emits `field.change`.
+ *
+ * The host owns the outcome (`status`): after a submit the field reads
+ * "sending" until the host reports `saved` or `error` (with an optional
+ * `status_error` reason); an error reopens the input.
  */
 export function SecretField(p: KbSecretFieldProps & KbFormComponentId) {
   const { t } = useKbI18n();
@@ -35,14 +46,25 @@ export function SecretField(p: KbSecretFieldProps & KbFormComponentId) {
   const [seenConfigured, setSeenConfigured] = useState(p.configured === true);
   const [hasValue, setHasValue] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  // A local-only message (clipboard unavailable) shown over the outcome.
   const [notice, setNotice] = useState('');
+  const [local, setLocal] = useState<KbSecretFieldLocalEvent | null>(null);
   const [focusTarget, setFocusTarget] = useState<'input' | 'replace' | null>(null);
   const disabled = p.disabled === true;
+  const hostStatus = secretFieldHostStatus(p);
+  const [seenStatus, setSeenStatus] = useState(hostStatus);
 
   if (seenConfigured !== (p.configured === true)) {
     setSeenConfigured(p.configured === true);
     setEditing(p.configured !== true);
   }
+  if (seenStatus !== hostStatus) {
+    setSeenStatus(hostStatus);
+    setNotice('');
+    // A failed save reopens the input so the value can be entered again.
+    if (hostStatus === 'error') setEditing(true);
+  }
+  const outcome = secretFieldNotice(p, local, t);
 
   useEffect(() => {
     if (!focusTarget) return;
@@ -61,14 +83,16 @@ export function SecretField(p: KbSecretFieldProps & KbFormComponentId) {
     const input = inputRef.current;
     const value = input ? input.value : '';
     if (!value || disabled) return;
+    // Never keep the value: cleared before the host even sees it.
     if (input) input.value = '';
     setHasValue(false);
     setRevealed(false);
+    setNotice('');
+    setLocal({ kind: 'submitted', under: hostStatus });
     dispatch(formAction(p.action, 'secret.submit'), { ...identity(), value });
     const nextEditing = p.configured !== true;
     setEditing(nextEditing);
     setFocusTarget(nextEditing ? 'input' : 'replace');
-    setNotice(t(KB_FORM_MESSAGE_KEYS.secretSubmitted));
   };
 
   const paste = () => {
@@ -100,6 +124,7 @@ export function SecretField(p: KbSecretFieldProps & KbFormComponentId) {
       className="kb-field kb-secret-field"
       {...fieldRootProps(p, 'secret-field')}
       data-state={state}
+      data-status={outcome.status}
     >
       {!editing ? (
         <>
@@ -154,6 +179,7 @@ export function SecretField(p: KbSecretFieldProps & KbFormComponentId) {
                 placeholder={p.placeholder || undefined}
                 onInput={(event) => {
                   setNotice('');
+                  setLocal({ kind: 'dismissed', under: hostStatus });
                   setHasValue(Boolean(event.currentTarget.value));
                 }}
                 onKeyDown={(event) => {
@@ -209,7 +235,7 @@ export function SecretField(p: KbSecretFieldProps & KbFormComponentId) {
         </>
       )}
       <p className="kb-secret-field__notice" role="status">
-        {notice}
+        {notice || outcome.text}
       </p>
       <HelpAndError p={p} ids={ids} />
     </div>
