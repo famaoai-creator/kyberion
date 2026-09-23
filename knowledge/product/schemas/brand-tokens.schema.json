@@ -134,6 +134,15 @@
           },
           "required": ["comfortable", "compact"],
           "additionalProperties": false
+        },
+        "font_family": {
+          "description": "Web UI font stacks (--kb-ui-font-*). Media keeps tokens.fonts.",
+          "type": "object",
+          "properties": {
+            "sans": { "type": "string", "minLength": 1 },
+            "mono": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
         }
       },
       "required": ["light", "dark", "radius", "space", "font_size"],

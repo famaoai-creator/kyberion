@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light" data-density="comfortable">
+<html lang="en" data-density="comfortable">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -9,6 +9,9 @@
          UI-01d: chrome text comes from the vocabulary catalog
          (`data-i18n` keys, /ui-gallery/vocabulary/<locale>.json); the English
          text below is only the no-script / load-failure fallback. -->
+    <!-- theme + language applied before first paint (?theme= / ?lang=, else the
+         shared kyberion.ui.theme / kyberion.ui.locale choice) -->
+    <script src="/ui-gallery-prefs.js"></script>
     <link rel="stylesheet" href="/design-tokens.css" />
     <link rel="stylesheet" href="/kyberion-ui.css" />
     <link rel="stylesheet" href="/ui-gallery.css" />

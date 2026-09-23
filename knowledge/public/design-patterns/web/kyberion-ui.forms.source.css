@@ -779,6 +779,16 @@ legend.kb-field__label {
   color: var(--kb-ui-text-muted);
 }
 
+/* Host-reported secret outcome (`status`): pending stays neutral. */
+.kb-secret-field[data-status='saved'] .kb-secret-field__notice {
+  color: var(--kb-ui-success-fg);
+}
+
+.kb-secret-field[data-status='error'] .kb-secret-field__notice {
+  font-weight: 600;
+  color: var(--kb-ui-danger-fg);
+}
+
 /* ---------------------------------------------------------- file list -- */
 
 .kb-file-list {

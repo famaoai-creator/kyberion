@@ -17647,10 +17647,20 @@
         "ja": "キャンセル",
         "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
       },
-      "secret_submitted": {
-        "en": "Sent. The value is not kept on this page.",
-        "ja": "送信しました。値はこの画面に残りません。",
-        "qps-ploc": "⟦Şėñŧ. Ŧħė ṽȧŀůė ïş ñőŧ ķėṗŧ őñ ŧħïş ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      "secret_pending": {
+        "en": "Sending… The value is not kept on this page.",
+        "ja": "送信中… 値はこの画面に残りません。",
+        "qps-ploc": "⟦Şėñḓïñɠ… Ŧħė ṽȧŀůė ïş ñőŧ ķėṗŧ őñ ŧħïş ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "secret_saved": {
+        "en": "Saved. The value is not kept on this page.",
+        "ja": "保存しました。値はこの画面に残りません。",
+        "qps-ploc": "⟦Şȧṽėḓ. Ŧħė ṽȧŀůė ïş ñőŧ ķėṗŧ őñ ŧħïş ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "secret_error": {
+        "en": "Could not save the value. Enter it again.",
+        "ja": "値を保存できませんでした。もう一度入力してください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şȧṽė ŧħė ṽȧŀůė. Ėñŧėř ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
       "chart_empty": {
         "en": "No data to chart",

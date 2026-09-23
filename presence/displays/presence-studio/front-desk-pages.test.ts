@@ -127,9 +127,31 @@ describe('raw template files are never served unrendered', () => {
 
   function recordRoutes() {
     const routes = new Map<string, Handler>();
-    const app = { get: (route: string, handler: Handler) => routes.set(route, handler) };
+    const middleware: Array<(req: unknown, res: unknown, next: () => void) => void> = [];
+    const app = {
+      get: (route: string, handler: Handler) => routes.set(route, handler),
+      use: (handler: (req: unknown, res: unknown, next: () => void) => void) =>
+        middleware.push(handler),
+    };
     registerFrontDeskHomeWorkPages(app as never, pathResolver.rootResolve(STATIC_DIR));
-    return routes;
+    return { routes, middleware };
+  }
+
+  /** Runs the guard middleware for a request; returns whether it passed through. */
+  function runGuard(
+    middleware: Array<(req: unknown, res: unknown, next: () => void) => void>,
+    requestPath: string,
+    res: unknown
+  ): boolean {
+    const queryIndex = requestPath.indexOf('?');
+    const req = {
+      method: 'GET',
+      path: queryIndex === -1 ? requestPath : requestPath.slice(0, queryIndex),
+      originalUrl: requestPath,
+    };
+    let passed = false;
+    for (const handler of middleware) handler(req, res, () => (passed = true));
+    return passed;
   }
 
   function fakeRes() {
@@ -168,19 +190,23 @@ describe('raw template files are never served unrendered', () => {
   });
 
   it('registers redirects for /<page>.html and 404s for the shell partials, ahead of express.static', () => {
-    const routes = recordRoutes();
+    const { routes, middleware } = recordRoutes();
     for (const [file, target] of Object.entries(FRONT_DESK_TEMPLATE_FILE_REDIRECTS)) {
-      const res = fakeRes();
-      routes.get(file)!({ originalUrl: `${file}?a=1` }, res);
-      expect(res.statusCode, file).toBe(302);
-      expect(res.location, file).toBe(`${target}?a=1`);
+      const encoded = file.replace('.html', '%2Ehtml');
+      for (const variant of [file, encoded, file.toUpperCase()]) {
+        const res = fakeRes();
+        expect(runGuard(middleware, `${variant}?a=1`, res), variant).toBe(false);
+        expect(res.statusCode, variant).toBe(302);
+        expect(res.location, variant).toBe(`${target}?a=1`);
+      }
     }
     for (const partial of Object.values(FRONT_DESK_PAGE_PARTIALS)) {
       const res = fakeRes();
-      routes.get(`/${partial}`)!({}, res);
+      expect(runGuard(middleware, `/${partial.replace('.', '%2E')}`, res)).toBe(false);
       expect(res.statusCode, partial).toBe(404);
       expect(String(res.sent)).not.toContain('{{');
     }
+    expect(runGuard(middleware, '/ui-gallery.html', fakeRes())).toBe(true);
     // The canonical routes still render the template (no placeholder left).
     const home = fakeRes();
     routes.get('/')!({ headers: { 'accept-language': 'ja' } }, home);

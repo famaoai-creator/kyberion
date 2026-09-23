@@ -6,7 +6,8 @@
 //   GET /shared-ui/messages/<locale>.json     -> { ok, locale, messages }  (UI-01d)
 //   GET /ui-gallery/vocabulary/<locale>.json  -> { ok, locale, texts }     (UI-01d)
 //   GET /ui-gallery/fixtures/<locale>.json    -> merged sample data         (UI-01b)
-//   GET /shared-ui/{charts,forms}.js          -> libs/shared-ui/vanilla/<file> (allow-list)
+//   GET /shared-ui/<module>.js                -> libs/shared-ui/vanilla/<file> (allow-list:
+//        charts*.js, forms*.js, kyberion-ui-vocabulary.js — every module the renderer imports, transitively)
 //
 // The first two are fixed files (no path parameter reaches the filesystem),
 // served like the other static front-desk pages: no API data, no auth, bound
@@ -22,7 +23,8 @@
 // the parameter never reaches anything but a fixed-list lookup.
 import * as path from 'node:path';
 import type express from 'express';
-import { getUiMessageBundle, pathResolver, safeReaddir, safeReadFile } from '@agent/core';
+import { getUiMessageBundle, pathResolver, safeReaddir } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { SUPPORTED_LOCALES, type SupportedLocale } from '@agent/core/locale-normalize';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 
@@ -32,12 +34,21 @@ export const SHARED_UI_VANILLA_SOURCE = 'libs/shared-ui/vanilla/kyberion-ui.js';
 export const SHARED_UI_MESSAGES_ROUTE = '/shared-ui/messages/:file';
 export const UI_GALLERY_VOCABULARY_ROUTE = '/ui-gallery/vocabulary/:file';
 // UI-01b / UI-01c: the renderer imports sibling modules (`./charts.js`,
-// `./forms.js`), served next to it from a fixed allow-list (the `:file`
-// parameter only ever selects one of these entries).
+// `./forms.js`, which import their own `charts-*.js` / `forms-*.js` parts),
+// served next to it from a fixed allow-list of exactly that transitive set
+// (the `:file` parameter only ever selects one of these entries).
 export const SHARED_UI_MODULE_ROUTE = '/shared-ui/:file';
 export const SHARED_UI_MODULE_SOURCES: Readonly<Record<string, string>> = Object.freeze({
   'charts.js': 'libs/shared-ui/vanilla/charts.js',
+  'charts-core.js': 'libs/shared-ui/vanilla/charts-core.js',
+  'charts-scale.js': 'libs/shared-ui/vanilla/charts-scale.js',
+  'charts-cartesian.js': 'libs/shared-ui/vanilla/charts-cartesian.js',
+  'charts-compact.js': 'libs/shared-ui/vanilla/charts-compact.js',
+  'charts-diagram.js': 'libs/shared-ui/vanilla/charts-diagram.js',
   'forms.js': 'libs/shared-ui/vanilla/forms.js',
+  'forms-core.js': 'libs/shared-ui/vanilla/forms-core.js',
+  'forms-camera.js': 'libs/shared-ui/vanilla/forms-camera.js',
+  'kyberion-ui-vocabulary.js': 'libs/shared-ui/vanilla/kyberion-ui-vocabulary.js',
 });
 // Gallery sample data: `ui-gallery.fixtures.<locale>.json` (base, with the
 // sample screen) plus every `ui-gallery.fixtures.<part>.<locale>.json`
@@ -112,12 +123,11 @@ export function listUiGalleryFixtureFiles(staticDir: string, locale: string): st
 /** Base fixtures with every part file's sections appended (part-name order). */
 export function loadUiGalleryFixtures(staticDir: string, locale: string): UiGalleryFixtures {
   const [baseFile, ...partFiles] = listUiGalleryFixtureFiles(staticDir, locale);
-  const read = (file: string) =>
-    JSON.parse(String(safeReadFile(path.join(staticDir, file), { encoding: 'utf8' })));
-  const base = read(baseFile) as UiGalleryFixtures;
+  const read = <T>(file: string): T => readJson<T>(path.join(staticDir, file));
+  const base = read<UiGalleryFixtures>(baseFile);
   const sections = [...base.sections];
   for (const file of partFiles) {
-    const part = read(file) as { sections?: UiGalleryFixtureSection[] };
+    const part = read<{ sections?: UiGalleryFixtureSection[] }>(file);
     sections.push(...(Array.isArray(part.sections) ? part.sections : []));
   }
   return { ...base, sections };

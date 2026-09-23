@@ -15,7 +15,7 @@
   --kb-border: #e2e8f0;
   --kb-success: #15803d;
   --kb-danger: #b91c1c;
-  --kb-font-sans: Inter, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --kb-font-sans: Inter, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
   --kb-font-mono: 'JetBrains Mono', monospace;
   --kb-blur: blur(12px);
   --kb-glow-cyan: 0 0 15px rgba(0, 242, 255, 0.4);
@@ -157,7 +157,7 @@
   --kb-ui-space-5: 24px;
   --kb-ui-space-6: 32px;
   --kb-ui-space-7: 48px;
-  --kb-ui-font-sans: Inter, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  --kb-ui-font-sans: Inter, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
   --kb-ui-font-mono: 'JetBrains Mono', monospace;
   --kb-ui-font-size-xs: 12px;
   --kb-ui-font-size-sm: 13px;

@@ -20,6 +20,8 @@ type IntroduceSecretPanelProps = {
 };
 
 type StatusMessage = { tone: 'success' | 'danger' | 'info'; text: string } | null;
+/** Outcome of the last apply, reported back to the SecretField (`status`). */
+type SecretApplyStatus = { status: 'idle' | 'pending' | 'error' | 'saved'; error?: string };
 
 /**
  * API tokens (`#secret-introduce`) — the governed two-phase secret
@@ -28,6 +30,8 @@ type StatusMessage = { tone: 'success' | 'danger' | 'info'; text: string } | nul
  * its uncontrolled input and hands it to `onAction` on submit; this panel
  * forwards it straight into `POST /api/secrets/apply` and never keeps it in
  * state. "Set" comes from the readiness GET (`present`), never from a value.
+ * The field only says "sending" after submit; this panel reports the real
+ * outcome of the apply back through its `status` / `status_error` props.
  */
 export function IntroduceSecretPanel({ t, services, busy }: IntroduceSecretPanelProps) {
   const [serviceId, setServiceId] = React.useState(services[0]?.id || '');
@@ -39,6 +43,7 @@ export function IntroduceSecretPanel({ t, services, busy }: IntroduceSecretPanel
   const [present, setPresent] = React.useState<Record<string, boolean>>({});
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<StatusMessage>(null);
+  const [applyStatus, setApplyStatus] = React.useState<SecretApplyStatus>({ status: 'idle' });
 
   React.useEffect(() => {
     if (!serviceId && services[0]?.id) setServiceId(services[0].id);
@@ -61,13 +66,15 @@ export function IntroduceSecretPanel({ t, services, busy }: IntroduceSecretPanel
     void refreshReadiness(serviceId);
   }, [refreshReadiness, serviceId]);
 
-  const fail = (error: unknown) =>
-    setMessage({
-      tone: 'danger',
-      text: t('settings.secret_failed', {
-        error: error instanceof Error ? error.message : String(error),
-      }),
+  const failureText = (error: unknown) =>
+    t('settings.secret_failed', {
+      error: error instanceof Error ? error.message : String(error),
     });
+  const fail = (error: unknown) => setMessage({ tone: 'danger', text: failureText(error) });
+  const failApply = (error: unknown) => {
+    fail(error);
+    setApplyStatus({ status: 'error', error: failureText(error) });
+  };
 
   const propose = async () => {
     setPending(true);
@@ -102,17 +109,19 @@ export function IntroduceSecretPanel({ t, services, busy }: IntroduceSecretPanel
     if (!approvalId || !value) return;
     setPending(true);
     setMessage(null);
+    setApplyStatus({ status: 'pending' });
     try {
       const result = await applySecret({ approvalId, value, storageChannel });
       if (!result.ok) {
-        fail(result.error);
+        failApply(result.error);
         return;
       }
       setApprovalId('');
+      setApplyStatus({ status: 'saved' });
       setMessage({ tone: 'success', text: t('settings.secret_applied', { env: result.envName }) });
       await refreshReadiness(serviceId);
     } catch (error) {
-      fail(error);
+      failApply(error);
     } finally {
       setPending(false);
     }
@@ -129,8 +138,12 @@ export function IntroduceSecretPanel({ t, services, busy }: IntroduceSecretPanel
             setServiceId(asText(value));
             setApprovalId('');
             setMessage(null);
+            setApplyStatus({ status: 'idle' });
           },
-          'secret.key': (value) => setSecretKey(asText(value).toUpperCase()),
+          'secret.key': (value) => {
+            setSecretKey(asText(value).toUpperCase());
+            setApplyStatus({ status: 'idle' });
+          },
           'secret.reason': (value) => setReason(asText(value)),
           'secret.approval_id': (value) => setApprovalId(asText(value).trim()),
         }}
@@ -225,6 +238,8 @@ export function IntroduceSecretPanel({ t, services, busy }: IntroduceSecretPanel
               configured={present[secretKey] === true}
               disabled={locked || !approvalId}
               action={{ id: 'secret.apply' }}
+              status={applyStatus.status}
+              status_error={applyStatus.error}
             />
           </div>
         </SettingsGroup>

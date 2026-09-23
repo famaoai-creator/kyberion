@@ -13,12 +13,12 @@ import { pathResolver } from './path-resolver.js';
  * (`a2ui-catalog.test.ts` pins both).
  */
 
-export const KYBERION_BASE_CATALOG_ID = 'kyberion-base';
+export const A2UI_BASE_CATALOG_ID = 'kyberion-base';
 
-export const KYBERION_BASE_CATALOG_SCHEMA_ID =
+export const A2UI_BASE_CATALOG_SCHEMA_ID =
   'https://kyberion.ai/schemas/a2ui-catalog-kyberion-base.schema.json';
 
-export const KYBERION_BASE_COMPONENT_TYPES = [
+export const A2UI_BASE_COMPONENT_TYPES = [
   'ui:app-shell',
   'ui:page-header',
   'ui:nav-rail',
@@ -70,21 +70,21 @@ export const KYBERION_BASE_COMPONENT_TYPES = [
   'ui:stat-list',
 ] as const;
 
-export type KyberionBaseComponentType = (typeof KYBERION_BASE_COMPONENT_TYPES)[number];
+export type KyberionBaseComponentType = (typeof A2UI_BASE_COMPONENT_TYPES)[number];
 
 /**
  * Legacy protocol types that render as a catalog component. Their historical
  * props are free-form (`text` carries `value`, etc.), so aliases are resolved
  * for rendering but are NOT props-validated against the catalog schema.
  */
-export const KYBERION_BASE_ALIASES = Object.freeze({
+export const A2UI_BASE_ALIASES = Object.freeze({
   text: 'ui:text',
   button: 'ui:button',
   card: 'ui:section',
   container: 'ui:stack',
 } as const satisfies Record<string, KyberionBaseComponentType>);
 
-export type KyberionBaseAlias = keyof typeof KYBERION_BASE_ALIASES;
+export type KyberionBaseAlias = keyof typeof A2UI_BASE_ALIASES;
 
 // ---------------------------------------------------------------------------
 // Shared prop vocabulary
@@ -744,6 +744,14 @@ export interface KbSecretFieldProps extends KbFieldBase {
   placeholder?: string;
   service_id?: string;
   secret_key?: string;
+  /**
+   * Host-reported outcome of the last submit. The field shows "sending" after
+   * a submit until the host sets `saved` or `error` — it never reports success
+   * on its own. `error` reopens the input.
+   */
+  status?: 'idle' | 'pending' | 'error' | 'saved';
+  /** Host-localized reason shown instead of the generic error text (status `error`). */
+  status_error?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -862,7 +870,7 @@ export interface KbStatListProps {
 // Resolution & validation
 // ---------------------------------------------------------------------------
 
-const CATALOG_TYPE_SET: ReadonlySet<string> = new Set(KYBERION_BASE_COMPONENT_TYPES);
+const CATALOG_TYPE_SET: ReadonlySet<string> = new Set(A2UI_BASE_COMPONENT_TYPES);
 
 export function isKyberionBaseComponentType(type: string): type is KyberionBaseComponentType {
   return CATALOG_TYPE_SET.has(type);
@@ -871,8 +879,8 @@ export function isKyberionBaseComponentType(type: string): type is KyberionBaseC
 /** Resolve a component type (or legacy alias) to its catalog type; `null` when outside the catalog. */
 export function resolveKyberionBaseType(type: string): KyberionBaseComponentType | null {
   if (isKyberionBaseComponentType(type)) return type;
-  return Object.prototype.hasOwnProperty.call(KYBERION_BASE_ALIASES, type)
-    ? KYBERION_BASE_ALIASES[type as KyberionBaseAlias]
+  return Object.prototype.hasOwnProperty.call(A2UI_BASE_ALIASES, type)
+    ? A2UI_BASE_ALIASES[type as KyberionBaseAlias]
     : null;
 }
 
@@ -886,10 +894,10 @@ function loadCatalogValidators(): Map<KyberionBaseComponentType, ValidateFunctio
     ajv
   );
   const validators = new Map<KyberionBaseComponentType, ValidateFunction>();
-  for (const type of KYBERION_BASE_COMPONENT_TYPES) {
-    const validate = ajv.getSchema(`${KYBERION_BASE_CATALOG_SCHEMA_ID}#/$defs/props:${type}`);
+  for (const type of A2UI_BASE_COMPONENT_TYPES) {
+    const validate = ajv.getSchema(`${A2UI_BASE_CATALOG_SCHEMA_ID}#/$defs/props:${type}`);
     if (!validate)
-      throw new Error(`A2UI catalog ${KYBERION_BASE_CATALOG_ID} has no schema for ${type}.`);
+      throw new Error(`A2UI catalog ${A2UI_BASE_CATALOG_ID} has no schema for ${type}.`);
     validators.set(type, validate);
   }
   catalogValidators = validators;
@@ -923,12 +931,11 @@ export function validateA2UIComponentProps<T extends KyberionBaseComponentType>(
 ): KyberionBasePropsByType[T] {
   if (!isKyberionBaseComponentType(type)) {
     throw new Error(
-      `A2UI component type ${String(type)} is not in catalog ${KYBERION_BASE_CATALOG_ID}.`
+      `A2UI component type ${String(type)} is not in catalog ${A2UI_BASE_CATALOG_ID}.`
     );
   }
   const validate = loadCatalogValidators().get(type);
-  if (!validate)
-    throw new Error(`A2UI catalog ${KYBERION_BASE_CATALOG_ID} has no schema for ${type}.`);
+  if (!validate) throw new Error(`A2UI catalog ${A2UI_BASE_CATALOG_ID} has no schema for ${type}.`);
   if (!validate(props)) {
     throw new Error(`A2UI ${type} props are invalid: ${formatAjvErrors(validate)}.`);
   }

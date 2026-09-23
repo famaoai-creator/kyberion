@@ -286,6 +286,81 @@ describe('settings interaction', () => {
     expect(serializeFake(m.container)).toContain(
       t('settings.secret_applied', { env: 'SLACK_API_KEY' })
     );
+    // The field reports the governed apply's outcome, not its own submit.
+    expect(m.q('.kb-secret-field').getAttribute('data-status')).toBe('saved');
+    expect(m.q('.kb-secret-field__notice').textContent).toBe(ui.messages['ui:secret_saved']);
+    m.unmount();
+  });
+
+  it('SecretField: a failed apply shows sending, then the error — never "saved"', async () => {
+    let releaseApply: () => void = () => {};
+    const applyGate = new Promise<void>((resolve) => {
+      releaseApply = resolve;
+    });
+    const calls: FetchCall[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        if (url === '/api/secrets/apply') {
+          await applyGate;
+          return new Response(JSON.stringify({ ok: false, error: 'approval expired' }), {
+            status: 409,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        const body = url.startsWith('/api/secrets/introduce?')
+          ? { ok: true, readiness: { identities: [] }, secretKeys: [] }
+          : {
+              ok: true,
+              approvalId: 'APR-8',
+              status: 'approved',
+              envName: 'SLACK_API_KEY',
+              storageChannel: 'concierge',
+            };
+        return new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      })
+    );
+    const m = mount(
+      createElement(IntroduceSecretPanel, {
+        t,
+        busy: false,
+        services: [{ id: 'slack', label: 'Slack' }],
+      })
+    );
+    await flush();
+    const proposeButton = [...m.container.querySelectorAll('button')].find(
+      (button) => button.textContent === t('settings.secret_propose')
+    )!;
+    await act(async () => {
+      fireEvent(proposeButton, 'click');
+    });
+    await flush();
+    const input = m.q('input.kb-secret-field__input');
+    act(() => {
+      setProp(input, 'value', SECRET);
+      fireEvent(input, 'input');
+    });
+    await act(async () => {
+      fireEvent(m.q('.kb-secret-field__save'), 'click');
+    });
+    // While the apply is in flight: neutral "sending", value already cleared.
+    expect(m.q('.kb-secret-field').getAttribute('data-status')).toBe('pending');
+    expect(m.q('.kb-secret-field__notice').textContent).toBe(ui.messages['ui:secret_pending']);
+    expect(prop(m.q('input.kb-secret-field__input'), 'value')).toBe('');
+    releaseApply();
+    await flush();
+    expect(calls.some((call) => call.url === '/api/secrets/apply')).toBe(true);
+    expect(m.q('.kb-secret-field').getAttribute('data-status')).toBe('error');
+    const failure = t('settings.secret_failed', { error: 'approval expired' });
+    expect(m.q('.kb-secret-field__notice').textContent).toBe(failure);
+    expect(serializeFake(m.container)).not.toContain(ui.messages['ui:secret_saved']);
+    expect(serializeFake(m.container)).not.toContain(SECRET);
+    // The input is open again for a retry.
+    expect(prop(m.q('input.kb-secret-field__input'), 'disabled')).toBeFalsy();
     m.unmount();
   });
 

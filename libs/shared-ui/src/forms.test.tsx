@@ -353,10 +353,56 @@ describe('React form components: interaction', () => {
     const after = m.q('input.kb-secret-field__input');
     expect(prop(after, 'value')).toBe('');
     expect(after.getAttribute('type')).toBe('password');
+    // Submitting is not saving: "sending" until the host reports the outcome.
+    expect(m.q('.kb-secret-field').getAttribute('data-status')).toBe('pending');
     expect(m.q('.kb-secret-field__notice').textContent).toBe(
-      'Sent. The value is not kept on this page.'
+      'Sending… The value is not kept on this page.'
     );
     expect(serializeFake(m.container)).not.toContain(SECRET);
+    m.unmount();
+  });
+
+  it('SecretField host status: pending → error reopens the input with the reason → saved', () => {
+    const field = (status?: 'idle' | 'pending' | 'error' | 'saved', statusError?: string) => (
+      <SecretField
+        id="k"
+        name="slack"
+        label="Token"
+        configured
+        last4="Q7xk"
+        action={{ id: 'secret.introduce' }}
+        status={status}
+        status_error={statusError}
+      />
+    );
+    const m = mount(field());
+    expect(m.q('.kb-secret-field').getAttribute('data-status')).toBe('idle');
+    expect(m.q('.kb-secret-field__notice').textContent).toBe('');
+    m.rerender(field('pending'));
+    expect(m.q('.kb-secret-field__notice').textContent).toBe(
+      'Sending… The value is not kept on this page.'
+    );
+    m.rerender(field('error', 'Approval expired.'));
+    expect(m.q('.kb-secret-field').getAttribute('data-status')).toBe('error');
+    expect(m.q('.kb-secret-field').getAttribute('data-state')).toBe('editing');
+    expect(m.container.querySelector('input.kb-secret-field__input')).not.toBeNull();
+    expect(m.q('.kb-secret-field__notice').textContent).toBe('Approval expired.');
+    // Typing again hides the stale error; submitting shows "sending", not the old outcome.
+    const input = m.q('input.kb-secret-field__input');
+    act(() => {
+      setProp(input, 'value', 'xoxb-2');
+      fireEvent(input, 'input');
+    });
+    expect(m.q('.kb-secret-field__notice').textContent).toBe('');
+    act(() => {
+      fireEvent(input, 'keydown', { key: 'Enter' });
+    });
+    expect(m.q('.kb-secret-field').getAttribute('data-status')).toBe('pending');
+    m.rerender(field('saved'));
+    expect(m.q('.kb-secret-field').getAttribute('data-status')).toBe('saved');
+    expect(m.q('.kb-secret-field__notice').textContent).toBe(
+      'Saved. The value is not kept on this page.'
+    );
     m.unmount();
   });
 

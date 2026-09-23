@@ -37,7 +37,7 @@ const CONCIERGE_UI_TOKENS_CSS_PATH = path.join(
   'presence/displays/concierge/src/app/kyberion-ui-tokens.css'
 );
 /** Every surface gets the component stylesheet next to its token file. */
-export const KYBERION_UI_STYLESHEET_PATHS = [
+export const KB_UI_STYLESHEET_PATHS = [
   'presence/displays/chronos-mirror-v2/src/app/kyberion-ui.css',
   'presence/displays/operator-surface/src/app/kyberion-ui.css',
   'presence/displays/presence-studio/static/kyberion-ui.css',
@@ -126,7 +126,7 @@ function render(): GeneratedFile[] {
     renderTokenSurface(PRESENCE_TOKENS_CSS_PATH, tokenBlock, uiTokenBlock),
     renderTokenSurface(COMPUTER_TOKENS_CSS_PATH, tokenBlock, uiTokenBlock),
     renderWholeFile(CONCIERGE_UI_TOKENS_CSS_PATH, `${uiTokenBlock}\n`),
-    ...KYBERION_UI_STYLESHEET_PATHS.map((filePath) => renderWholeFile(filePath, uiStylesheet)),
+    ...KB_UI_STYLESHEET_PATHS.map((filePath) => renderWholeFile(filePath, uiStylesheet)),
     renderTailwindConfig(TAILWIND_CONFIG_PATH),
     renderThemesCatalog(THEMES_JSON_PATH, tokens, true),
     renderThemesCatalog(THEMES_JSON_NESTED_PATH, tokens, false),
@@ -141,7 +141,7 @@ export const runGenerateDesignTokens = defineGenerator({
     PRESENCE_TOKENS_CSS_PATH,
     COMPUTER_TOKENS_CSS_PATH,
     CONCIERGE_UI_TOKENS_CSS_PATH,
-    ...KYBERION_UI_STYLESHEET_PATHS,
+    ...KB_UI_STYLESHEET_PATHS,
     TAILWIND_CONFIG_PATH,
     THEMES_JSON_PATH,
     THEMES_JSON_NESTED_PATH,

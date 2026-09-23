@@ -2442,6 +2442,14 @@
         "secret_key": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_.-]{1,80}$"
+        },
+        "status": {
+          "description": "Host-reported outcome of the last submit. The field reads 'sending' after a submit until the host sets saved or error; it never reports success on its own. error reopens the input.",
+          "enum": ["idle", "pending", "error", "saved"]
+        },
+        "status_error": {
+          "$ref": "#/$defs/field-help",
+          "description": "Host-localized reason shown instead of the generic error text when status is error."
         }
       },
       "required": ["name", "label", "action"],

@@ -1,11 +1,27 @@
 ---
 title: サーフェス UI 統一計画(A2UI base catalog)
-tags: [design-system, a2ui, surfaces, ui-ux]
+tags: [design-system, a2ui, surfaces, ui-ux, improvement-plan, 2026-08]
 last_updated: 2026-09-23
+status: active
 mission: MSN-SURFACE-UI-UNIFY-20260923
 ---
 
 # サーフェス UI 統一計画(UI-01〜UI-10)
+
+## 実装状況(2026-09-23 時点)
+
+全項目実装済み(Wave 1〜5)。
+
+| ID                      | 状態 | 備考                                                                                                        |
+| ----------------------- | ---- | ----------------------------------------------------------------------------------------------------------- |
+| UI-01 / 01b / 01c / 01d | done | `kyberion-base` catalog、チャート/可視化、設定・フォーム、i18n(`ui` ドメイン)                               |
+| UI-02                   | done | `tokens.ui`(light/dark)+ `kyberion-ui.css` 生成、concierge を生成対象に追加                                 |
+| UI-03 / UI-04           | done | `@agent/shared-ui`(React)+ vanilla レンダラ、`/ui-gallery`                                                  |
+| UI-05 / UI-06           | done | 共通 `ui:nav-rail`、秘書室・相棒をトークン化(茶/teal 廃止)                                                  |
+| UI-07                   | done | 管制塔タブ 11→5 グループ、compact 密度、ガラス調廃止                                                        |
+| UI-08                   | done | 監査モニタを `ui:app-shell`+`ui:table`+`ui:status-pill` へ、日本語化                                        |
+| UI-09                   | done | computer-surface を標準テーマへ(暗グラデ廃止)                                                               |
+| UI-10                   | done | before/after スクリーンショット(evidence/screenshots/{before-v2,after})、README/SURFACES/DESIGN_SYSTEM 更新 |
 
 ## 1. 背景(ヒアリング結果 2026-09-23)
 

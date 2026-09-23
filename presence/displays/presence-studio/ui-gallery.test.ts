@@ -11,7 +11,7 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { getUiMessageBundle, pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
 import {
-  KYBERION_BASE_COMPONENT_TYPES,
+  A2UI_BASE_COMPONENT_TYPES,
   isKyberionBaseComponentType,
   validateA2UIComponentProps,
 } from '@agent/core/a2ui-catalog';
@@ -180,7 +180,7 @@ for (const locale of FIXTURE_LOCALES) {
 
     it('shows every catalog type at least once', () => {
       const shown = new Set(componentLists.flatMap(([, list]) => list.map((c) => c.type)));
-      const missing = KYBERION_BASE_COMPONENT_TYPES.filter((type) => !shown.has(type));
+      const missing = A2UI_BASE_COMPONENT_TYPES.filter((type) => !shown.has(type));
       expect(missing).toEqual([]);
     });
 
@@ -281,7 +281,7 @@ describe('ui-gallery routes', () => {
     expect(safeExistsSync(script.sent)).toBe(true);
   });
 
-  it('serves only allow-listed sibling renderer modules (charts.js, forms.js)', () => {
+  it('serves only allow-listed sibling renderer modules (charts*.js, forms*.js)', () => {
     const routes = recordRoutes();
     const module = fakeResponse();
     routes.get(SHARED_UI_MODULE_ROUTE)!({ params: { file: 'charts.js' } }, module);
@@ -290,10 +290,19 @@ describe('ui-gallery routes', () => {
     for (const source of Object.values(SHARED_UI_MODULE_SOURCES)) {
       expect(safeExistsSync(pathResolver.rootResolve(source)), source).toBe(true);
     }
-    // kyberion-ui.js imports exactly these siblings, so the browser can load them.
-    const renderer = readRepoFile(SHARED_UI_VANILLA_SOURCE);
-    const imports = [...renderer.matchAll(/from '\.\/([\w-]+\.js)'/g)].map((m) => m[1]).sort();
-    expect(imports).toEqual(Object.keys(SHARED_UI_MODULE_SOURCES).sort());
+    // The allow-list is exactly the renderer's transitive sibling imports, so
+    // the browser can load every module and nothing else is reachable.
+    const seen = new Set<string>();
+    const queue = [SHARED_UI_VANILLA_SOURCE];
+    while (queue.length) {
+      const source = readRepoFile(queue.shift()!);
+      for (const [, file] of source.matchAll(/from '\.\/([\w-]+\.js)'/g)) {
+        if (seen.has(file)) continue;
+        seen.add(file);
+        queue.push(`libs/shared-ui/vanilla/${file}`);
+      }
+    }
+    expect([...seen].sort()).toEqual(Object.keys(SHARED_UI_MODULE_SOURCES).sort());
     for (const file of ['../x.js', 'kyberion-ui.test.ts', 'mini-dom.js', '']) {
       const res = jsonResponse();
       routes.get(SHARED_UI_MODULE_ROUTE)!({ params: { file } }, res);
@@ -389,5 +398,96 @@ describe('ui-gallery routes', () => {
   it('the gallery stylesheet uses tokens only (no literal colors)', () => {
     const css = readRepoFile(`${STATIC_DIR}/ui-gallery.css`);
     expect(css.match(/#[0-9a-f]{3,8}\b|\brgba?\s*\(|\bhsla?\s*\(/giu)).toBeNull();
+  });
+});
+
+describe('ui-gallery-prefs.js applies the shared theme / language before paint', () => {
+  const source = readRepoFile(`${STATIC_DIR}/ui-gallery-prefs.js`);
+
+  interface PrefsRun {
+    attrs: Map<string, string>;
+    prefs: { theme: string | null; locale: string };
+  }
+
+  /** Run the blocking script against a fake page (`storage: null` = storage throws). */
+  function runPrefs(options: {
+    search?: string;
+    storage?: Record<string, string> | null;
+    language?: string;
+  }): PrefsRun {
+    const attrs = new Map<string, string>([
+      ['lang', 'en'],
+      ['data-density', 'comfortable'],
+    ]);
+    const documentElement = {
+      setAttribute: (name: string, value: string) => attrs.set(name, value),
+      removeAttribute: (name: string) => attrs.delete(name),
+      getAttribute: (name: string) => attrs.get(name) ?? null,
+    };
+    const storage = options.storage;
+    const win: Record<string, unknown> = {
+      location: { search: options.search ?? '' },
+    };
+    Object.defineProperty(win, 'localStorage', {
+      get() {
+        if (storage === null) throw new Error('SecurityError');
+        return { getItem: (key: string) => (storage ?? {})[key] ?? null };
+      },
+    });
+    const run = new Function('window', 'document', 'navigator', 'URLSearchParams', source);
+    run(
+      win,
+      { documentElement },
+      { language: options.language ?? 'en-US', languages: [options.language ?? 'en-US'] },
+      URLSearchParams
+    );
+    return { attrs, prefs: win.KyberionGalleryPrefs as PrefsRun['prefs'] };
+  }
+
+  it('loads before any stylesheet and the page no longer hard-codes light', () => {
+    const page = readRepoFile(`${STATIC_DIR}/ui-gallery.html`);
+    const prefsAt = page.indexOf('<script src="/ui-gallery-prefs.js"></script>');
+    expect(prefsAt).toBeGreaterThan(-1);
+    expect(prefsAt).toBeLessThan(page.indexOf('design-tokens.css'));
+    expect(page).not.toMatch(/<html[^>]*data-theme=/);
+    expect(source).toContain("THEME_KEY = 'kyberion.ui.theme'");
+    expect(source).toContain("LOCALE_KEY = 'kyberion.ui.locale'");
+    expect(readRepoFile(`${STATIC_DIR}/ui-gallery.js`)).toContain('window.KyberionGalleryPrefs');
+  });
+
+  it('first load uses the stored shared theme and language', () => {
+    const run = runPrefs({ storage: { 'kyberion.ui.theme': 'dark', 'kyberion.ui.locale': 'ja' } });
+    expect(run.attrs.get('data-theme')).toBe('dark');
+    expect(run.attrs.get('lang')).toBe('ja');
+    expect(run.prefs).toEqual({ theme: 'dark', locale: 'ja' });
+  });
+
+  it('?theme= and ?lang= override the stored choice', () => {
+    const run = runPrefs({
+      search: '?theme=light&lang=en',
+      storage: { 'kyberion.ui.theme': 'dark', 'kyberion.ui.locale': 'ja' },
+    });
+    expect(run.attrs.get('data-theme')).toBe('light');
+    expect(run.attrs.get('lang')).toBe('en');
+    const pseudo = runPrefs({ search: '?lang=qps-ploc', storage: {} });
+    expect(pseudo.attrs.get('lang')).toBe('qps-ploc');
+  });
+
+  it('no stored theme follows the system (no data-theme); the browser language is the fallback', () => {
+    const run = runPrefs({ storage: {}, language: 'ja-JP' });
+    expect(run.attrs.has('data-theme')).toBe(false);
+    expect(run.prefs).toEqual({ theme: null, locale: 'ja' });
+    const invalid = runPrefs({
+      search: '?theme=neon&lang=xx',
+      storage: { 'kyberion.ui.theme': 'sepia', 'kyberion.ui.locale': 'fr' },
+    });
+    expect(invalid.attrs.has('data-theme')).toBe(false);
+    expect(invalid.prefs.locale).toBe('en');
+  });
+
+  it('unavailable storage still renders with the defaults', () => {
+    const run = runPrefs({ storage: null, search: '?theme=dark' });
+    expect(run.attrs.get('data-theme')).toBe('dark');
+    expect(run.prefs.locale).toBe('en');
   });
 });

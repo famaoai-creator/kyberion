@@ -4,8 +4,8 @@ import { getUiMessageBundle } from '@agent/core';
 import {
   KB_STATUS_VALUES,
   KB_STATUS_TONES,
-  KYBERION_BASE_ALIASES,
-  KYBERION_BASE_COMPONENT_TYPES,
+  A2UI_BASE_ALIASES,
+  A2UI_BASE_COMPONENT_TYPES,
   resolveKyberionBaseType,
 } from '@agent/core/a2ui-catalog';
 import {
@@ -23,8 +23,8 @@ const render = (props: Parameters<typeof A2UIRenderer>[0]) =>
 
 describe('client-safe catalog mirror stays in lock-step with @agent/core/a2ui-catalog', () => {
   it('mirrors component types, aliases, status tones and labels every status', () => {
-    expect([...KB_COMPONENT_TYPES]).toEqual([...KYBERION_BASE_COMPONENT_TYPES]);
-    expect({ ...KB_ALIASES }).toEqual({ ...KYBERION_BASE_ALIASES });
+    expect([...KB_COMPONENT_TYPES]).toEqual([...A2UI_BASE_COMPONENT_TYPES]);
+    expect({ ...KB_ALIASES }).toEqual({ ...A2UI_BASE_ALIASES });
     expect({ ...KB_STATUS_TONE_MAP }).toEqual({ ...KB_STATUS_TONES });
     expect(Object.keys(KB_STATUS_MESSAGE_KEYS).sort()).toEqual([...KB_STATUS_VALUES].sort());
     for (const type of ['ui:table', 'text', 'card', 'display:table', 'nope']) {

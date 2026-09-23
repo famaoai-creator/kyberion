@@ -403,6 +403,26 @@ const EXTRA_SCENARIOS: FixtureScenario[] = [
     title: 'display controls defaults',
     components: [{ id: 'dc', type: 'ui:display-controls', props: {} }],
   },
+  // Secret field host outcomes (`status`): pending, saved, error (+ reason).
+  ...(['pending', 'saved', 'error'] as const).map((status) => ({
+    id: `secret-field-status-${status}`,
+    title: `secret field ${status}`,
+    components: [
+      {
+        id: `sf-${status}`,
+        type: 'ui:secret-field',
+        props: {
+          name: 'secrets.slack',
+          label: 'Token',
+          configured: status === 'saved',
+          last4: 'Q7xk',
+          action: { id: 'secret.apply' },
+          status,
+          ...(status === 'error' ? { status_error: 'Approval expired.' } : {}),
+        },
+      },
+    ],
+  })),
 ];
 
 for (const locale of LOCALES) {

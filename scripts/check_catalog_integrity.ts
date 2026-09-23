@@ -12,7 +12,7 @@ import {
   extractKyberionTokenBlock,
   extractKyberionUiTokenBlock,
   concatKyberionUiStylesheetSources,
-  KYBERION_UI_STYLESHEET_SOURCE,
+  KB_UI_STYLESHEET_SOURCE,
   renderKyberionUiStylesheet,
   renderKyberionUiTokenBlock,
   readKyberionDesignTokens,
@@ -814,9 +814,9 @@ function validateDesignTokenCatalog(violations: string[]) {
   const generatedUiFiles: Array<[string, string]> = [
     ['presence/displays/concierge/src/app/kyberion-ui-tokens.css', `${expectedUiTokenBlock}\n`],
   ];
-  const stylesheetSourcePath = pathResolver.rootResolve(KYBERION_UI_STYLESHEET_SOURCE);
+  const stylesheetSourcePath = pathResolver.rootResolve(KB_UI_STYLESHEET_SOURCE);
   if (!safeExistsSync(stylesheetSourcePath)) {
-    violations.push(`design-tokens: missing file ${KYBERION_UI_STYLESHEET_SOURCE}`);
+    violations.push(`design-tokens: missing file ${KB_UI_STYLESHEET_SOURCE}`);
   } else {
     const expectedStylesheet = renderKyberionUiStylesheet(
       concatKyberionUiStylesheetSources((relativePath) =>

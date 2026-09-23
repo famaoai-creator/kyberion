@@ -37,19 +37,49 @@
       }
     },
     "fonts": {
-      "sans": "Inter, \"Hiragino Sans\", \"Noto Sans JP\", \"Yu Gothic UI\", \"Meiryo\", system-ui, sans-serif",
+      "sans": "Inter, 'Noto Sans JP', sans-serif",
       "mono": "'JetBrains Mono', monospace"
     },
     "typography": {
       "_meta": "MP-01 modular type scale. size_pt is the pptx/doc surface size; min_size_pt is the floor layout-fit may shrink to. Weight contrast between display/headline and body is intentional.",
       "scale_ratio": 1.25,
       "roles": {
-        "display": { "size_pt": 36, "min_size_pt": 24, "weight": 800, "line_spacing_pct": 110 },
-        "headline": { "size_pt": 26, "min_size_pt": 18, "weight": 700, "line_spacing_pct": 120 },
-        "title": { "size_pt": 20, "min_size_pt": 14, "weight": 700, "line_spacing_pct": 130 },
-        "body": { "size_pt": 13, "min_size_pt": 10, "weight": 400, "line_spacing_pct": 155 },
-        "label": { "size_pt": 11, "min_size_pt": 9, "weight": 600, "line_spacing_pct": 130 },
-        "caption": { "size_pt": 9, "min_size_pt": 8, "weight": 400, "line_spacing_pct": 125 }
+        "display": {
+          "size_pt": 36,
+          "min_size_pt": 24,
+          "weight": 800,
+          "line_spacing_pct": 110
+        },
+        "headline": {
+          "size_pt": 26,
+          "min_size_pt": 18,
+          "weight": 700,
+          "line_spacing_pct": 120
+        },
+        "title": {
+          "size_pt": 20,
+          "min_size_pt": 14,
+          "weight": 700,
+          "line_spacing_pct": 130
+        },
+        "body": {
+          "size_pt": 13,
+          "min_size_pt": 10,
+          "weight": 400,
+          "line_spacing_pct": 155
+        },
+        "label": {
+          "size_pt": 11,
+          "min_size_pt": 9,
+          "weight": 600,
+          "line_spacing_pct": 130
+        },
+        "caption": {
+          "size_pt": 9,
+          "min_size_pt": 8,
+          "weight": 400,
+          "line_spacing_pct": 125
+        }
       }
     },
     "spacing": {
@@ -237,6 +267,9 @@
           "xl": "18px",
           "xxl": "22px"
         }
+      },
+      "font_family": {
+        "sans": "Inter, \"Hiragino Sans\", \"Noto Sans JP\", \"Yu Gothic UI\", Meiryo, system-ui, sans-serif"
       }
     }
   }

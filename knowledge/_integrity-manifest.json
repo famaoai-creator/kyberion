@@ -6255,7 +6255,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 838160,
+      "size": 838794,
       "type": "json"
     },
     {
@@ -7569,7 +7569,7 @@
     {
       "path": "product/schemas/a2ui-catalog-kyberion-base.schema.json",
       "tier": "public",
-      "size": 70574,
+      "size": 71058,
       "type": "json"
     },
     {
@@ -7947,7 +7947,7 @@
     {
       "path": "product/schemas/brand-tokens.schema.json",
       "tier": "public",
-      "size": 10237,
+      "size": 10586,
       "type": "json"
     },
     {
@@ -12231,7 +12231,7 @@
     {
       "path": "public/design-patterns/brand-tokens/kyberion.json",
       "tier": "public",
-      "size": 7876,
+      "size": 8244,
       "type": "json"
     },
     {
@@ -12603,7 +12603,7 @@
     {
       "path": "public/design-patterns/media-templates/themes.json",
       "tier": "public",
-      "size": 5066,
+      "size": 4818,
       "type": "json"
     },
     {
@@ -12621,7 +12621,7 @@
     {
       "path": "public/design-patterns/media-templates/themes/themes.json",
       "tier": "public",
-      "size": 5004,
+      "size": 4756,
       "type": "json"
     },
     {
