@@ -5951,6 +5951,11 @@
         "ja": "対象",
         "qps-ploc": "⟦Ïŧėɱ ŀőř⟧"
       },
+      "chronos_org_col_next_action": {
+        "en": "Next action",
+        "ja": "次の操作",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ ŀőř⟧"
+      },
       "chronos_org_col_priority": {
         "en": "Priority",
         "ja": "優先度",
