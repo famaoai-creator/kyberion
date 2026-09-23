@@ -116,6 +116,10 @@ export class MiniElement extends ChildHost {
   hasAttribute(name: string): boolean {
     return this.attrs.has(name);
   }
+  /** Mirrors `Element.getAttributeNames()`, for tests that enumerate all set attributes. */
+  getAttributeNames(): string[] {
+    return [...this.attrs.keys()];
+  }
   addEventListener(type: string, listener: Listener): void {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
   }

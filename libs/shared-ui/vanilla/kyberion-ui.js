@@ -107,8 +107,9 @@ export const KB_ALIASES = Object.freeze({
 });
 
 /**
- * 24x24 stroke icons for `ui:nav-rail` items (`icon` prop). Unknown names
- * render no icon. Path data only, so the React renderer can import it.
+ * 24x24 stroke icons (`ui:nav-rail` items' `icon` prop, `ui:metric` trend
+ * arrows). Unknown names render no icon. Path data only — this is the single
+ * source the React renderer builds `<path>` elements from (`icons.tsx`).
  * @type {Readonly<Record<string, readonly string[]>>}
  */
 export const KB_ICON_PATHS = Object.freeze({
@@ -136,10 +137,21 @@ export const KB_ICON_PATHS = Object.freeze({
   shield: ['M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z'],
   bell: ['M6 16V11a6 6 0 1 1 12 0v5l2 2H4z', 'M10 21h4'],
   book: ['M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z', 'M4 19V5'],
+  'arrow-up': ['M12 19V5m-6 6 6-6 6 6'],
+  'arrow-down': ['M12 5v14m-6-6 6 6 6-6'],
+  'arrow-right': ['M5 12h14m-6-6 6 6-6 6'],
 });
 
+/** `ui:metric` trend arrow icon per `trend` value. */
+const TREND_ICONS = Object.freeze({ up: 'arrow-up', down: 'arrow-down', flat: 'arrow-right' });
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
+// Single source for `safeHref` — the React renderer re-exports this
+// implementation (`safety.ts`) instead of keeping its own copy.
 const SAFE_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
+const SCHEME_PREFIX = /^([a-z][a-z0-9+.-]*):/i;
 const WIDTH_PATTERN = /^(auto|[0-9]{1,4}(px|rem|ch|%))$/;
 const MAX_DEPTH = 32;
 
@@ -148,22 +160,22 @@ const MAX_DEPTH = 32;
 // ---------------------------------------------------------------------------
 
 /**
- * Return a navigable href, or null when it is empty or uses a scheme outside
- * the allow-list (javascript:, data:, vbscript:, file:, ...).
+ * Return a navigable href, or null when it is empty, contains a control
+ * character, is protocol-relative (`//host`, backslash tricks) or uses a
+ * scheme outside the allow-list (javascript:, data:, vbscript:, file:, ...).
+ * Allowed schemes: http(s), mailto, tel; same-origin paths / fragments /
+ * queries pass through unchanged.
  * @param {unknown} value
  * @returns {string | null}
  */
 export function safeHref(value) {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  if (!trimmed) return null;
-  // Browsers ignore ASCII whitespace/control characters inside a scheme
-  // (`java\tscript:`), so decide on the stripped form.
-  // eslint-disable-next-line no-control-regex
-  const probe = trimmed.replace(/[\u0000-\u0020\u007f]/g, '').toLowerCase();
-  const scheme = /^([a-z][a-z0-9+.-]*):/.exec(probe);
+  if (!trimmed || trimmed.length > 2048 || CONTROL_CHARS.test(trimmed)) return null;
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith('//') || lower.startsWith('/\\') || lower.startsWith('\\')) return null;
+  const scheme = SCHEME_PREFIX.exec(lower);
   if (scheme) return SAFE_SCHEMES.has(`${scheme[1]}:`) ? trimmed : null;
-  if (probe.startsWith('\\\\') || probe.startsWith('/\\')) return null;
   return trimmed;
 }
 
@@ -205,36 +217,41 @@ function normalizeAction(action) {
   return null;
 }
 
-function icon(ctx, name, className) {
+/**
+ * Bare `<svg>` for an icon name (no wrapper element); null for unknown names.
+ * Callers that need a wrapper (e.g. `.kb-nav-rail__icon`) add it themselves.
+ */
+function icon(ctx, name, size) {
   const paths =
     typeof name === 'string' && Object.prototype.hasOwnProperty.call(KB_ICON_PATHS, name)
       ? KB_ICON_PATHS[name]
       : null;
   if (!paths) return null;
-  const wrap = el(ctx, 'span', className);
-  wrap.setAttribute('aria-hidden', 'true');
   const svg = ctx.doc.createElementNS(SVG_NS, 'svg');
+  const dimension = String(size || 18);
   svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('width', '18');
-  svg.setAttribute('height', '18');
+  svg.setAttribute('width', dimension);
+  svg.setAttribute('height', dimension);
   svg.setAttribute('fill', 'none');
   svg.setAttribute('stroke', 'currentColor');
   svg.setAttribute('stroke-width', '1.8');
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
   for (const d of paths) {
     const path = ctx.doc.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', d);
     svg.appendChild(path);
   }
-  wrap.appendChild(svg);
-  return wrap;
+  return svg;
 }
 
 /**
  * Render a `KbActionRef` / `ui:button` as `a.kb-btn` (href) or
- * `button.kb-btn` (action). Returns null when neither target is usable.
+ * `button.kb-btn` (action). Returns null when neither target is given.
+ * An unsafe or disabled href keeps the visual as a non-navigating
+ * `a[aria-disabled][role=link]` rather than disappearing.
  */
 function actionButton(ctx, ref, defaultVariant, source) {
   if (!isRecord(ref)) return null;
@@ -256,14 +273,17 @@ function actionButton(ctx, ref, defaultVariant, source) {
     });
     return button;
   }
+  if (ref.href === undefined) return null;
   const href = safeHref(ref.href);
-  if (ref.href !== undefined && !href && !disabled) return null;
   const link = el(ctx, 'a', className, label);
-  if (disabled || !href) {
-    link.setAttribute('aria-disabled', 'true');
-  } else {
+  if (href && !disabled) {
     link.setAttribute('href', href);
+    return link;
   }
+  // Unsafe or disabled link: keep the visual, drop the navigation target.
+  link.setAttribute('aria-disabled', 'true');
+  link.setAttribute('role', 'link');
+  link.setAttribute('aria-label', label);
   return link;
 }
 
@@ -387,9 +407,14 @@ const RENDERERS = {
       const active = p.active !== undefined && item.id === p.active;
       let tab;
       if (asLinks) {
-        tab = el(ctx, 'a', 'kb-tabs__tab');
         const href = safeHref(item.href);
-        if (href) tab.setAttribute('href', href);
+        if (href) {
+          tab = el(ctx, 'a', 'kb-tabs__tab');
+          tab.setAttribute('href', href);
+        } else {
+          tab = el(ctx, 'span', 'kb-tabs__tab');
+          tab.setAttribute('aria-disabled', 'true');
+        }
         if (active) tab.setAttribute('aria-current', 'page');
       } else {
         tab = el(ctx, 'button', 'kb-tabs__tab');
@@ -403,7 +428,7 @@ const RENDERERS = {
         });
       }
       setData(tab, 'tab-id', item.id);
-      tab.appendChild(el(ctx, 'span', 'kb-tabs__label', item.label));
+      tab.appendChild(ctx.doc.createTextNode(str(item.label)));
       if (typeof item.count === 'number')
         tab.appendChild(el(ctx, 'span', 'kb-tabs__count', item.count));
       root.appendChild(tab);
@@ -441,7 +466,7 @@ const RENDERERS = {
     const actions = el(ctx, 'div', 'kb-section__actions');
     const actionCount = appendActions(ctx, actions, p.actions, 'secondary', c);
     if (heading.childNodes.length > 0 || actionCount > 0) {
-      const header = el(ctx, 'div', 'kb-section__header');
+      const header = el(ctx, 'header', 'kb-section__header');
       if (heading.childNodes.length > 0) header.appendChild(heading);
       if (actionCount > 0) header.appendChild(actions);
       root.appendChild(header);
@@ -479,20 +504,18 @@ const RENDERERS = {
   'ui:metric'(ctx, p) {
     const root = el(ctx, 'div', 'kb-metric');
     setData(root, 'tone', p.tone);
-    setData(root, 'trend', p.trend);
+    const trendIcon = Object.prototype.hasOwnProperty.call(TREND_ICONS, p.trend)
+      ? TREND_ICONS[p.trend]
+      : undefined;
+    setData(root, 'trend', trendIcon ? p.trend : undefined);
     root.appendChild(el(ctx, 'span', 'kb-metric__label', p.label));
     const value = el(ctx, 'span', 'kb-metric__value', p.value);
     if (p.unit) value.appendChild(el(ctx, 'span', 'kb-metric__unit', p.unit));
     root.appendChild(value);
     if (p.delta) {
       const delta = el(ctx, 'span', 'kb-metric__delta');
-      const arrow =
-        p.trend === 'up' ? '↑' : p.trend === 'down' ? '↓' : p.trend === 'flat' ? '→' : '';
-      if (arrow) {
-        const trend = el(ctx, 'span', 'kb-metric__trend', arrow);
-        trend.setAttribute('aria-hidden', 'true');
-        delta.appendChild(trend);
-      }
+      const svg = trendIcon ? icon(ctx, trendIcon, 12) : null;
+      if (svg) delta.appendChild(svg);
       delta.appendChild(ctx.doc.createTextNode(str(p.delta)));
       root.appendChild(delta);
     }
@@ -614,6 +637,7 @@ const RENDERERS = {
     const tone = ['info', 'success', 'warning', 'danger'].includes(p.tone) ? p.tone : 'info';
     const root = el(ctx, 'div', 'kb-callout');
     setData(root, 'tone', tone);
+    root.setAttribute('role', tone === 'danger' ? 'alert' : 'note');
     const glyph = el(ctx, 'span', 'kb-callout__icon');
     glyph.setAttribute('aria-hidden', 'true');
     root.appendChild(glyph);
@@ -652,7 +676,7 @@ const RENDERERS = {
     root.setAttribute('aria-label', '読み込み中');
     const lines = Number.isInteger(p.lines) ? Math.min(Math.max(p.lines, 1), 12) : 3;
     for (let index = 0; index < lines; index += 1) {
-      const line = el(ctx, 'div', 'kb-skeleton__line');
+      const line = el(ctx, 'span', 'kb-skeleton__line');
       line.setAttribute('aria-hidden', 'true');
       root.appendChild(line);
     }
@@ -687,16 +711,23 @@ function navList(ctx, items) {
   for (const item of items) {
     if (!isRecord(item)) continue;
     const li = el(ctx, 'li');
-    const link = el(ctx, 'a', 'kb-nav-rail__item');
     const href = safeHref(item.href);
+    // A safe href is a real link; otherwise a non-interactive span (never an
+    // `<a>` without a navigable target).
+    const link = el(ctx, href ? 'a' : 'span', 'kb-nav-rail__item');
     if (href) link.setAttribute('href', href);
     setData(link, 'nav-id', item.id);
     if (item.active === true) {
       link.setAttribute('aria-current', 'page');
       setData(link, 'active', 'true');
     }
-    const glyph = icon(ctx, item.icon, 'kb-nav-rail__icon');
-    if (glyph) link.appendChild(glyph);
+    const svg = icon(ctx, item.icon);
+    if (svg) {
+      const wrap = el(ctx, 'span', 'kb-nav-rail__icon');
+      wrap.setAttribute('aria-hidden', 'true');
+      wrap.appendChild(svg);
+      link.appendChild(wrap);
+    }
     const text = el(ctx, 'span', 'kb-nav-rail__text');
     text.appendChild(el(ctx, 'span', 'kb-nav-rail__label', item.label));
     if (item.hint) text.appendChild(el(ctx, 'span', 'kb-nav-rail__hint', item.hint));
@@ -717,6 +748,7 @@ function displayScalar(value) {
 function debugWarning(ctx, type) {
   const root = el(ctx, 'div', 'kb-callout');
   setData(root, 'tone', 'warning');
+  root.setAttribute('role', 'note');
   setData(root, 'unknown-type', type);
   const glyph = el(ctx, 'span', 'kb-callout__icon');
   glyph.setAttribute('aria-hidden', 'true');
@@ -732,11 +764,7 @@ function renderWithDepth(component, ctx, depth) {
   const type = resolveType(component.type);
   if (!type) return ctx.debug ? debugWarning(ctx, component.type) : null;
   const props = isRecord(component.props) ? component.props : {};
-  const node = RENDERERS[type](ctx, props, component, depth);
-  if (node && typeof component.id === 'string' && component.id) {
-    node.setAttribute('data-a2ui-id', component.id);
-  }
-  return node;
+  return RENDERERS[type](ctx, props, component, depth);
 }
 
 function makeContext(options, doc, components) {
