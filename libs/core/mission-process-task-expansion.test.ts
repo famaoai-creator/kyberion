@@ -226,4 +226,170 @@ describe('mission-process-task-expansion', () => {
       expandProcessTemplateTasks({ missionId: 'MSN-TEST-008', design: { workflow_id: 'w' } })
     ).toEqual([]);
   });
+
+  const CONDITIONAL_PHASES: WorkflowPhaseSpec[] = [
+    {
+      id: 'contract_authoring',
+      kind: 'judgment',
+      default_tasks: [
+        {
+          task_id_suffix: 'design-spec',
+          description: 'Derive the architecture design spec from requirements.',
+          deliverable: 'evidence/design-spec.json',
+        },
+        {
+          task_id_suffix: 'ux-contract',
+          description: 'Define the UX interaction contract for user-facing changes.',
+          deliverable: 'evidence/ux-contract.json',
+          when: { keywords_any: ['ui', '画面', 'design system'] },
+        },
+      ],
+    },
+    {
+      id: 'self_review',
+      kind: 'review',
+      default_tasks: [
+        {
+          task_id_suffix: 'code-review',
+          description: 'Review the implementation for correctness.',
+          review_target_suffix: 'design-spec',
+        },
+        {
+          task_id_suffix: 'ux-review',
+          description: 'Review implementation against the UX contract.',
+          review_target_suffix: 'ux-contract',
+          when: { keywords_any: ['ui', '画面', 'design system'] },
+        },
+      ],
+    },
+  ];
+
+  it('includes conditional tasks when no condition context is provided (superset)', () => {
+    const tasks = expandProcessTemplateTasks({
+      missionId: 'MSN-TEST-009',
+      design: { workflow_id: 'w', phase_specs: CONDITIONAL_PHASES },
+    });
+    expect(tasks.map((task) => task.task_id)).toEqual([
+      'contract_authoring-design-spec',
+      'contract_authoring-ux-contract',
+      'self_review-code-review',
+      'self_review-ux-review',
+    ]);
+  });
+
+  it('includes `when` tasks only when every guard field matches', () => {
+    const matching = expandProcessTemplateTasks({
+      missionId: 'MSN-TEST-010',
+      design: { workflow_id: 'w', phase_specs: CONDITIONAL_PHASES },
+      conditions: { text: '画面のレイアウトを改修する' },
+    });
+    expect(matching.map((task) => task.task_id)).toContain('contract_authoring-ux-contract');
+    expect(matching.map((task) => task.task_id)).toContain('self_review-ux-review');
+
+    const notMatching = expandProcessTemplateTasks({
+      missionId: 'MSN-TEST-010',
+      design: { workflow_id: 'w', phase_specs: CONDITIONAL_PHASES },
+      conditions: { text: 'API のバッチ処理を修正する' },
+    });
+    expect(notMatching.map((task) => task.task_id)).toEqual([
+      'contract_authoring-design-spec',
+      'self_review-code-review',
+    ]);
+  });
+
+  it('skips a review task whose target was conditionally skipped', () => {
+    const phases: WorkflowPhaseSpec[] = [
+      {
+        id: 'build',
+        default_tasks: [
+          {
+            task_id_suffix: 'ui-asset',
+            description: 'Build the optional UI asset bundle.',
+            when: { keywords_any: ['ui'] },
+          },
+        ],
+      },
+      {
+        id: 'review',
+        kind: 'review',
+        default_tasks: [
+          {
+            task_id_suffix: 'asset-review',
+            description: 'Review the optional UI asset.',
+            review_target_suffix: 'ui-asset',
+          },
+        ],
+      },
+    ];
+    const tasks = expandProcessTemplateTasks({
+      missionId: 'MSN-TEST-011',
+      design: { workflow_id: 'w', phase_specs: phases },
+      conditions: { text: 'backend batch fix' },
+    });
+    expect(tasks).toEqual([]);
+  });
+
+  it('still throws when a review target never existed (not skipped)', () => {
+    const phases: WorkflowPhaseSpec[] = [
+      {
+        id: 'build',
+        default_tasks: [
+          {
+            task_id_suffix: 'ui-asset',
+            description: 'Build the optional UI asset bundle.',
+            when: { keywords_any: ['ui'] },
+          },
+        ],
+      },
+      {
+        id: 'review',
+        kind: 'review',
+        default_tasks: [
+          {
+            task_id_suffix: 'asset-review',
+            description: 'Review a target that is not in the template.',
+            review_target_suffix: 'missing-target',
+          },
+        ],
+      },
+    ];
+    expect(() =>
+      expandProcessTemplateTasks({
+        missionId: 'MSN-TEST-012',
+        design: { workflow_id: 'w', phase_specs: phases },
+        conditions: { text: 'backend batch fix' },
+      })
+    ).toThrow(/unknown task suffix missing-target/);
+  });
+
+  it('matches structured `when` fields against the condition context', () => {
+    const phases: WorkflowPhaseSpec[] = [
+      {
+        id: 'publish',
+        default_tasks: [
+          {
+            task_id_suffix: 'publish-video',
+            description: 'Publish the narrated video package.',
+            when: {
+              mission_classes_any: ['content_and_media'],
+              intent_ids_any: ['video-production'],
+            },
+          },
+        ],
+      },
+    ];
+    const matching = expandProcessTemplateTasks({
+      missionId: 'MSN-TEST-013',
+      design: { workflow_id: 'w', phase_specs: phases },
+      conditions: { missionClass: 'content_and_media', intentId: 'video-production' },
+    });
+    expect(matching).toHaveLength(1);
+
+    const notMatching = expandProcessTemplateTasks({
+      missionId: 'MSN-TEST-013',
+      design: { workflow_id: 'w', phase_specs: phases },
+      conditions: { missionClass: 'code_change', intentId: 'video-production' },
+    });
+    expect(notMatching).toEqual([]);
+  });
 });

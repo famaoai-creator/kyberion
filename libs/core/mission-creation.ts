@@ -363,6 +363,25 @@ export async function createMission(args: {
       missionId: upperId,
       missionDir,
       design: workflowDesign,
+      // `when`-guarded optional tasks evaluate against the same signals the
+      // classification used, plus the original utterance for keyword guards.
+      conditions: {
+        missionClass: classification?.mission_class,
+        deliveryShape: classification?.delivery_shape,
+        riskProfile: classification?.risk_profile,
+        intentId: intentHandoff?.origin_intent_id,
+        taskType: missionType,
+        text: [
+          intentHandoff?.source_text,
+          intentHandoff?.goal?.summary,
+          intentHandoff?.goal?.success_condition,
+          resolvedVision,
+          missionType,
+          upperId,
+        ]
+          .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+          .join('\n'),
+      },
     });
     if (planResult.tasks.length > 0) {
       logger.info(
