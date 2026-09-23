@@ -74,10 +74,10 @@ describe('React form components: static markup contract', () => {
 
   it('Switch / Checkbox / Select / RadioGroup / Segmented / Slider / Textarea', () => {
     expect(html(<Switch id="s" name="n" label="L" value hide_label />)).toBe(
-      '<div class="kb-field" data-control="switch"><label class="kb-switch"><input class="kb-switch__input" type="checkbox" role="switch" id="kbf-s" checked=""/><span class="kb-switch__track" aria-hidden="true"><span class="kb-switch__thumb"></span></span><span class="kb-switch__label kb-visually-hidden">L</span></label></div>'
+      '<div class="kb-field" data-control="switch"><label class="kb-switch"><input class="kb-switch__input" type="checkbox" role="switch" id="kbf-s" name="n" checked=""/><span class="kb-switch__track" aria-hidden="true"><span class="kb-switch__thumb"></span></span><span class="kb-switch__label kb-visually-hidden">L</span></label></div>'
     );
     expect(html(<Checkbox id="c" name="n" label="L" />)).toContain(
-      '<label class="kb-check"><input class="kb-check__input" type="checkbox" id="kbf-c"/>'
+      '<label class="kb-check"><input class="kb-check__input" type="checkbox" id="kbf-c" name="n"/>'
     );
     const select = htmlJa(
       <Select id="s" name="lang" label="言語" options={[{ value: 'en', label: 'English' }]} />

@@ -13401,16 +13401,6 @@
         "ja": "この欄はOSのディクテーション（端末内・外部送信なし）でそのまま話せます。ブラウザの音声認識は機種により音声が提供元のクラウドへ送信される場合があります。機微な内容はOSディクテーション推奨。",
         "qps-ploc": "⟦ŐŞ ḓïƈŧȧŧïőñ ïş ṗřőƈėşşėḓ őñ-ḓėṽïƈė. Ƀřőẇşėř şṗėėƈħ řėƈőɠñïŧïőñ ɱȧẏ şėñḓ ȧůḓïő ŧő ŧħė ƀřőẇşėř ṗřőṽïḓėř'ş ƈŀőůḓ; ůşė ŐŞ ḓïƈŧȧŧïőñ ƒőř şėñşïŧïṽė ƈőñŧėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
       },
-      "voice": {
-        "en": "Voice",
-        "ja": "音声",
-        "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
-      },
-      "voice_stop": {
-        "en": "Stop",
-        "ja": "停止",
-        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
-      },
       "review_available": {
         "en": "Ready for review",
         "ja": "レビュー可",
@@ -13450,26 +13440,6 @@
         "en": "Comment mode off",
         "ja": "コメント オフ",
         "qps-ploc": "⟦Ƈőɱɱėñŧ ɱőḓė őƒƒ ŀőřėɱ⟧"
-      },
-      "voice_stopped": {
-        "en": "Voice input stopped",
-        "ja": "音声入力を停止",
-        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ şŧőṗṗėḓ ŀőřėɱ ⟧"
-      },
-      "voice_error": {
-        "en": "Speech recognition error: {error}",
-        "ja": "音声認識エラー: {error}",
-        "qps-ploc": "⟦Şṗėėƈħ řėƈőɠñïŧïőñ ėřřőř: {error} ŀőřėɱ ïṗşůɱ⟧"
-      },
-      "voice_started": {
-        "en": "Voice input active — use OS dictation for sensitive content",
-        "ja": "音声入力中…（機微な内容はOSディクテーション推奨）",
-        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ ȧƈŧïṽė — ůşė ŐŞ ḓïƈŧȧŧïőñ ƒőř şėñşïŧïṽė ƈőñŧėñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
-      },
-      "voice_start_failed": {
-        "en": "Could not start voice input: {error}",
-        "ja": "音声を開始できません: {error}",
-        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ şŧȧřŧ ṽőïƈė ïñṗůŧ: {error} ŀőřėɱ ïṗşůɱ ⟧"
       },
       "no_comments": {
         "en": "No comments",
@@ -13705,61 +13675,6 @@
         "ja": "図とテキストを描いて PNG を書き出し、Kyberion へ渡します",
         "qps-ploc": "⟦Ḓřȧẇ ḓïȧɠřȧɱş ȧñḓ ŧėẋŧ, ėẋṗőřŧ ṖÑƓ, ȧñḓ ħȧñḓ őƒƒ ŧő Ķẏƀėřïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
-      "pen": {
-        "en": "Pen",
-        "ja": "ペン",
-        "qps-ploc": "⟦Ṗėñ ŀőř⟧"
-      },
-      "rect": {
-        "en": "Rect",
-        "ja": "矩形",
-        "qps-ploc": "⟦Řėƈŧ ŀőř⟧"
-      },
-      "ellipse": {
-        "en": "Ellipse",
-        "ja": "楕円",
-        "qps-ploc": "⟦Ėŀŀïṗşė ŀőř⟧"
-      },
-      "line": {
-        "en": "Line",
-        "ja": "直線",
-        "qps-ploc": "⟦Ŀïñė ŀőř⟧"
-      },
-      "arrow": {
-        "en": "Arrow",
-        "ja": "矢印",
-        "qps-ploc": "⟦Ȧřřőẇ ŀőř⟧"
-      },
-      "text": {
-        "en": "Text",
-        "ja": "テキスト",
-        "qps-ploc": "⟦Ŧėẋŧ ŀőř⟧"
-      },
-      "eraser": {
-        "en": "Eraser",
-        "ja": "消しゴム",
-        "qps-ploc": "⟦Ėřȧşėř ŀőř⟧"
-      },
-      "undo": {
-        "en": "Undo",
-        "ja": "元に戻す",
-        "qps-ploc": "⟦Ůñḓő ŀőř⟧"
-      },
-      "clear": {
-        "en": "Clear",
-        "ja": "消去",
-        "qps-ploc": "⟦Ƈŀėȧř ŀőř⟧"
-      },
-      "color": {
-        "en": "Color",
-        "ja": "色",
-        "qps-ploc": "⟦Ƈőŀőř ŀőř⟧"
-      },
-      "width": {
-        "en": "Width",
-        "ja": "太さ",
-        "qps-ploc": "⟦Ẇïḓŧħ ŀőř⟧"
-      },
       "instruction": {
         "en": "Instruction for Kyberion",
         "ja": "Kyberionへの指示",
@@ -13775,21 +13690,6 @@
         "ja": "指示欄はOSディクテーション（端末内）推奨。ブラウザ🎤は機種によりクラウド送信の場合があります。",
         "qps-ploc": "⟦Ṗřėƒėř ŐŞ ḓïƈŧȧŧïőñ (őñ-ḓėṽïƈė) ƒőř ŧħė ïñşŧřůƈŧïőñ. Ƀřőẇşėř 🎤 ɱȧẏ şėñḓ ȧůḓïő ŧő ȧ ƈŀőůḓ ṗřőṽïḓėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
       },
-      "voice": {
-        "en": "Voice",
-        "ja": "音声",
-        "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
-      },
-      "voice_stop": {
-        "en": "Stop",
-        "ja": "停止",
-        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
-      },
-      "download": {
-        "en": "Download PNG",
-        "ja": "PNGダウンロード",
-        "qps-ploc": "⟦Ḓőẇñŀőȧḓ ṖÑƓ ŀőř⟧"
-      },
       "handoff": {
         "en": "Hand off to Kyberion",
         "ja": "Kyberionへ渡す",
@@ -13804,51 +13704,6 @@
         "en": "Exporting…",
         "ja": "書き出し中…",
         "qps-ploc": "⟦Ėẋṗőřŧïñɠ… ŀőř⟧"
-      },
-      "exported": {
-        "en": "Exported",
-        "ja": "書き出し完了",
-        "qps-ploc": "⟦Ėẋṗőřŧėḓ ŀőř⟧"
-      },
-      "export_failed": {
-        "en": "Export failed",
-        "ja": "書き出し失敗",
-        "qps-ploc": "⟦Ėẋṗőřŧ ƒȧïŀėḓ ŀőřė⟧"
-      },
-      "clear_confirm": {
-        "en": "Clear the canvas?",
-        "ja": "キャンバスを消去しますか？",
-        "qps-ploc": "⟦Ƈŀėȧř ŧħė ƈȧñṽȧş? ŀőřėɱ⟧"
-      },
-      "text_prompt": {
-        "en": "Enter text",
-        "ja": "テキストを入力",
-        "qps-ploc": "⟦Ėñŧėř ŧėẋŧ ŀőř⟧"
-      },
-      "out_label": {
-        "en": "Output",
-        "ja": "出力先",
-        "qps-ploc": "⟦Őůŧṗůŧ ŀőř⟧"
-      },
-      "voice_started": {
-        "en": "Listening…",
-        "ja": "音声入力中…",
-        "qps-ploc": "⟦Ŀïşŧėñïñɠ… ŀőř⟧"
-      },
-      "voice_stopped": {
-        "en": "Voice stopped",
-        "ja": "音声入力を停止",
-        "qps-ploc": "⟦Ṽőïƈė şŧőṗṗėḓ ŀőřė⟧"
-      },
-      "voice_error": {
-        "en": "Voice error",
-        "ja": "音声エラー",
-        "qps-ploc": "⟦Ṽőïƈė ėřřőř ŀőř⟧"
-      },
-      "voice_unavailable": {
-        "en": "Speech recognition unavailable (OS dictation still works)",
-        "ja": "このブラウザでは音声認識を使えません（OSディクテーションは可）",
-        "qps-ploc": "⟦Şṗėėƈħ řėƈőɠñïŧïőñ ůñȧṽȧïŀȧƀŀė (ŐŞ ḓïƈŧȧŧïőñ şŧïŀŀ ẇőřķş) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "server_usage_hint": {
         "en": "Draw, then Hand off to Kyberion to write PNG + handoff.json. Ctrl-C to stop.",
@@ -14897,26 +14752,6 @@
         "ja": "メモ欄はOSディクテーション（端末内）推奨。ブラウザ🎤は機種によりクラウド送信の場合があります。",
         "qps-ploc": "⟦Ṗřėƒėř ŐŞ ḓïƈŧȧŧïőñ (őñ-ḓėṽïƈė) ƒőř ñőŧėş. Ƀřőẇşėř 🎤 ɱȧẏ şėñḓ ȧůḓïő ŧő ȧ ƈŀőůḓ ṗřőṽïḓėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
-      "voice": {
-        "en": "Voice",
-        "ja": "音声",
-        "qps-ploc": "⟦Ṽőïƈė ŀőř⟧"
-      },
-      "voice_stop": {
-        "en": "Stop",
-        "ja": "停止",
-        "qps-ploc": "⟦Şŧőṗ ŀőř⟧"
-      },
-      "record": {
-        "en": "Record",
-        "ja": "録音",
-        "qps-ploc": "⟦Řėƈőřḓ ŀőř⟧"
-      },
-      "record_stop": {
-        "en": "Stop recording",
-        "ja": "録音停止",
-        "qps-ploc": "⟦Şŧőṗ řėƈőřḓïñɠ ŀőřė⟧"
-      },
       "camera": {
         "en": "Camera",
         "ja": "カメラ",
@@ -15027,25 +14862,10 @@
         "ja": "添付はまだありません",
         "qps-ploc": "⟦Ñő ȧŧŧȧƈħɱėñŧş ẏėŧ ŀőřėɱ⟧"
       },
-      "voice_started": {
-        "en": "Listening…",
-        "ja": "音声入力中…",
-        "qps-ploc": "⟦Ŀïşŧėñïñɠ… ŀőř⟧"
-      },
-      "voice_stopped": {
-        "en": "Voice stopped",
-        "ja": "音声入力を停止",
-        "qps-ploc": "⟦Ṽőïƈė şŧőṗṗėḓ ŀőřė⟧"
-      },
       "voice_error": {
         "en": "Voice error",
         "ja": "音声エラー",
         "qps-ploc": "⟦Ṽőïƈė ėřřőř ŀőř⟧"
-      },
-      "voice_unavailable": {
-        "en": "Speech recognition unavailable (OS dictation still works)",
-        "ja": "このブラウザでは音声認識を使えません（OSディクテーションは可）",
-        "qps-ploc": "⟦Şṗėėƈħ řėƈőɠñïŧïőñ ůñȧṽȧïŀȧƀŀė (ŐŞ ḓïƈŧȧŧïőñ şŧïŀŀ ẇőřķş) ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "preview": {
         "en": "Preview",
@@ -15082,10 +14902,10 @@
         "ja": "文字起こし中…",
         "qps-ploc": "⟦Ŧřȧñşƈřïƀïñɠ… ŀőřė⟧"
       },
-      "transcribing_later": {
-        "en": "Long recording — the transcript is completed when you stop.",
-        "ja": "長い録音です。文字起こしは停止後にまとめて行います。",
-        "qps-ploc": "⟦Ŀőñɠ řėƈőřḓïñɠ — ŧħė ŧřȧñşƈřïṗŧ ïş ƈőɱṗŀėŧėḓ ẇħėñ ẏőů şŧőṗ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      "transcribe_unavailable": {
+        "en": "Transcription is unavailable — this recording is not being transcribed",
+        "ja": "文字起こしを利用できません。この録音は文字起こしされません",
+        "qps-ploc": "⟦Ŧřȧñşƈřïṗŧïőñ ïş ůñȧṽȧïŀȧƀŀė — ŧħïş řėƈőřḓïñɠ ïş ñőŧ ƀėïñɠ ŧřȧñşƈřïƀėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
       "attach_too_large": {
         "en": "Too large to attach (6 MB max)",
@@ -15116,6 +14936,11 @@
         "en": "Draft restored",
         "ja": "下書きを復元しました",
         "qps-ploc": "⟦Ḓřȧƒŧ řėşŧőřėḓ ŀőřė⟧"
+      },
+      "draft_without_attachments": {
+        "en": "Draft saved without attachments (too large for this browser's storage)",
+        "ja": "添付が大きすぎるため、添付を除いて下書きを保存しました",
+        "qps-ploc": "⟦Ḓřȧƒŧ şȧṽėḓ ẇïŧħőůŧ ȧŧŧȧƈħɱėñŧş (ŧőő ŀȧřɠė ƒőř ŧħïş ƀřőẇşėř'ş şŧőřȧɠė) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
       "no_draft": {
         "en": "No saved draft",
@@ -20042,6 +19867,11 @@
         "en": "Waiting",
         "ja": "待機中",
         "qps-ploc": "⟦Ẇȧïŧïñɠ ŀőř⟧"
+      },
+      "file_status_ready": {
+        "en": "Attached — not sent yet",
+        "ja": "添付済み（未送信）",
+        "qps-ploc": "⟦Ȧŧŧȧƈħėḓ — ñőŧ şėñŧ ẏėŧ ŀőřėɱ ï⟧"
       },
       "file_status_uploading": {
         "en": "Uploading",

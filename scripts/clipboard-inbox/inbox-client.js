@@ -4,13 +4,10 @@
  *
  * Hosts (renderA2UI replaces a whole container, so each group has its own):
  *   #ci-toolbar     ui:toolbar   pull / add / hand off / clear all (danger) + status
- *   #ci-items       ui:section per item (preview in ui:code, Delete action) or ui:empty-state
+ *   #ci-items       ui:section + ui:list (title, size + preview, Delete row action) or ui:empty-state
  *   #ci-new         ui:textarea + ui:text-field  new text + label (values live in the model)
  *   #ci-instruction ui:textarea + ui:callout     instruction + secrets reminder + output path
  *   #pad-dialog     ui:dialog    clear-all confirmation
- *
- * `ui:list` items carry no per-item action, so each clip is a small
- * `ui:section` whose header action removes it.
  *
  * Server contract (unchanged): POST exportUrl `{ items: [{ id, text, label }], instruction }`
  * and POST clipboardReadUrl `{}` → `{ ok, text, label }`, both with header `X-CI-Token`.
@@ -121,43 +118,30 @@ function renderItems() {
     ]);
     return;
   }
+  const items = model.items.map((item, index) => {
+    const flat = item.text.replace(/\s+/g, ' ');
+    const preview = flat.length > PREVIEW_CHARS ? `${flat.slice(0, PREVIEW_CHARS)}…` : flat;
+    return {
+      title: item.label || t('clipboard_inbox:item_title', { index: index + 1 }),
+      meta: `${t('clipboard_inbox:item_meta', { count: item.text.length })} · ${preview}`,
+      actions: [
+        {
+          label: K('delete'),
+          variant: 'ghost',
+          action: { id: 'clip.remove', payload: { item_id: item.id } },
+        },
+      ],
+    };
+  });
   const components = [
     {
       id: 'ci-items-section',
       type: 'ui:section',
       props: { title: K('items') },
-      children: ['ci-items-stack'],
+      children: ['ci-items-list'],
     },
-    {
-      id: 'ci-items-stack',
-      type: 'ui:stack',
-      props: { gap: 'sm' },
-      children: model.items.map((item) => `ci-item-${item.id}`),
-    },
+    { id: 'ci-items-list', type: 'ui:list', props: { items } },
   ];
-  model.items.forEach((item, index) => {
-    const preview =
-      item.text.length > PREVIEW_CHARS ? `${item.text.slice(0, PREVIEW_CHARS)}…` : item.text;
-    components.push(
-      {
-        id: `ci-item-${item.id}`,
-        type: 'ui:section',
-        props: {
-          title: item.label || t('clipboard_inbox:item_title', { index: index + 1 }),
-          description: t('clipboard_inbox:item_meta', { count: item.text.length }),
-          actions: [
-            {
-              label: K('delete'),
-              variant: 'ghost',
-              action: { id: 'clip.remove', payload: { item_id: item.id } },
-            },
-          ],
-        },
-        children: [`ci-item-${item.id}-text`],
-      },
-      { id: `ci-item-${item.id}-text`, type: 'ui:code', props: { code: preview } }
-    );
-  });
   pad.render(host.items, components);
 }
 

@@ -380,6 +380,7 @@ export async function main(
               context,
               evidenceRef: portableProtocolServicePathRef(handoff),
               outDir: out,
+              locale: resolvePadLocale(req),
             });
             jsonResponse(res, 200, { ok: true, action: actionPayload.action, result });
             return;

@@ -65,8 +65,6 @@ export function personalPadsPage(
     actionsHtml: '<div class="pp-scope" data-pp-scope></div>',
   });
   const bodyHtml = [
-    // Moved into the shell's nav column by the runtime (renderPadPage has no nav slot).
-    '<div class="kb-app-shell__nav" data-pp-nav hidden></div>',
     header,
     '<div class="pp-workspace" data-pp-workspace>',
     '<section class="kb-section pp-editor" aria-labelledby="pp-pad-title">',
@@ -102,6 +100,7 @@ export function personalPadsPage(
     locale: resolved,
     title: top.title,
     bodyHtml,
+    navHtml: '<div data-pp-nav></div>',
     headExtra: `<style>${PAGE_CSS}</style>`,
     scriptModule: personalPadsClientModule(),
     bootstrap: { ...personalPadsBootstrap(token, context, top, contract) },

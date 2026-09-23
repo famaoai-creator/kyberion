@@ -88,9 +88,13 @@ export const KB_SAVE_BAR_MESSAGE_KEYS = Object.freeze({
   error: 'ui:save_bar_error',
 });
 
-/** `ui:file-drop` entry status label keys. */
+/**
+ * `ui:file-drop` entry status label keys. `ready`: read locally, attached to
+ * the page, not uploaded yet (sent later with the pad's own action).
+ */
 export const KB_FILE_STATUS_MESSAGE_KEYS = Object.freeze({
   queued: 'ui:file_status_queued',
+  ready: 'ui:file_status_ready',
   uploading: 'ui:file_status_uploading',
   done: 'ui:file_status_done',
   error: 'ui:file_status_error',

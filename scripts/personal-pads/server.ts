@@ -336,7 +336,7 @@ export function createPersonalPadsServer(
       if (req.method === 'GET' && url.pathname.startsWith('/api/history/')) {
         const id = decodeURIComponent(url.pathname.slice('/api/history/'.length));
         const padId = url.searchParams.get('pad');
-        const content = surface.getContent(padId);
+        const content = surface.getContent(padId, locale);
         const store = new PadRecordStore(
           context.scope,
           context.viewer_principal,

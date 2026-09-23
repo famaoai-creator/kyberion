@@ -130,6 +130,7 @@ export const KB_UI_DEFAULT_MESSAGES = Object.freeze({
   'ui:file_status_done': 'Uploaded',
   'ui:file_status_error': 'Failed',
   'ui:file_status_queued': 'Waiting',
+  'ui:file_status_ready': 'Attached — not sent yet',
   'ui:file_status_uploading': 'Uploading',
   'ui:integration_connected': 'Connected',
   'ui:integration_disconnected': 'Not connected',

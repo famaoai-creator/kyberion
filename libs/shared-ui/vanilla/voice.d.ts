@@ -13,6 +13,7 @@ export {
   KB_VOICE_INPUT_STATES,
   KB_VOICE_ERROR_CODES,
   KB_VOICE_RECORDER_TYPES,
+  KB_VOICE_MAX_RESTARTS,
   createVoiceController,
   formatElapsed,
   voiceLang,

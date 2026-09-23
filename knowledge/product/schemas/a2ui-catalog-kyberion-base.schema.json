@@ -1198,6 +1198,17 @@
         "href": {
           "$ref": "#/$defs/href"
         },
+        "action": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/action"
+            },
+            {
+              "$ref": "#/$defs/id"
+            }
+          ],
+          "description": "Dispatched on activation. Without href the item is a button; with href a plain click dispatches instead of navigating."
+        },
         "icon": {
           "type": "string",
           "pattern": "^[a-z0-9-]{1,40}$"
@@ -1206,7 +1217,15 @@
           "type": "boolean"
         }
       },
-      "required": ["id", "label", "href"],
+      "required": ["id", "label"],
+      "anyOf": [
+        {
+          "required": ["href"]
+        },
+        {
+          "required": ["action"]
+        }
+      ],
       "additionalProperties": false
     },
     "props:ui:app-shell": {
@@ -1643,6 +1662,25 @@
               },
               "href": {
                 "$ref": "#/$defs/href"
+              },
+              "action": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/action"
+                  },
+                  {
+                    "$ref": "#/$defs/id"
+                  }
+                ],
+                "description": "Dispatched when the title is activated (the title becomes a button, or a link whose plain click dispatches)."
+              },
+              "actions": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "$ref": "#/$defs/action-ref"
+                },
+                "description": "Trailing row actions (e.g. Delete), described by the row title."
               }
             },
             "required": ["title"],
@@ -1913,7 +1951,7 @@
           "minimum": 0
         },
         "status": {
-          "enum": ["queued", "uploading", "done", "error"]
+          "enum": ["queued", "ready", "uploading", "done", "error"]
         },
         "progress": {
           "type": "number",
@@ -3313,6 +3351,9 @@
               "hide_label": {
                 "type": "boolean"
               },
+              "description": {
+                "$ref": "#/$defs/field-help"
+              },
               "variant": {
                 "$ref": "#/$defs/button-variant"
               },
@@ -3382,7 +3423,7 @@
     },
     "props:ui:dialog": {
       "type": "object",
-      "description": "PA-01 modal dialog replacing window.confirm() / window.prompt(): confirm, single input, or several choices. Controlled by open. Dispatches action (default dialog.confirm) with {choice?, value?} and cancel_action (default dialog.cancel) on Cancel / Escape.",
+      "description": "PA-01 modal dialog replacing window.confirm() / window.prompt(): confirm, single input, or several choices. Controlled by open. Dispatches action (default dialog.confirm) with {choice?, value?} and cancel_action (default dialog.cancel) on Cancel / Escape. The component's children render in the body between the message / input and the buttons (focus trap included).",
       "properties": {
         "open": {
           "type": "boolean"
@@ -3564,6 +3605,17 @@
         },
         "show_download": {
           "type": "boolean"
+        },
+        "download_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "^[^\\\\/:*?\"<>|\\u0000-\\u001f]+$",
+          "description": "File name of the PNG download (default: from name); .png is ensured."
+        },
+        "paste_scope": {
+          "enum": ["board", "document"],
+          "description": "With accept_image_drop: board (default) takes pasted images while the board has focus; document anywhere on the page except editable fields."
         }
       },
       "required": ["name", "label"],

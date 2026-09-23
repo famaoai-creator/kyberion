@@ -3,8 +3,10 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { KbToolbarProps } from '@agent/core/a2ui-catalog';
 import {
+  toolbarDescriptionId,
   toolbarInitialFocus,
   toolbarItemAction,
+  toolbarItemTitle,
   toolbarItems,
   toolbarRovingTarget,
   type KbToolbarItemModel,
@@ -84,6 +86,8 @@ export function Toolbar(p: ToolbarProps) {
         const pressed = Object.prototype.hasOwnProperty.call(echo.pressed, item.key)
           ? echo.pressed[item.key]
           : item.pressed;
+        const title = toolbarItemTitle(item);
+        const descId = item.description ? toolbarDescriptionId(p.id, item) : undefined;
         const button = (
           <button
             key={item.key}
@@ -94,7 +98,8 @@ export function Toolbar(p: ToolbarProps) {
             tabIndex={index === current ? 0 : -1}
             disabled={item.disabled || undefined}
             aria-label={item.hideLabel ? item.label : undefined}
-            title={item.hideLabel ? item.label : undefined}
+            title={title || undefined}
+            aria-describedby={descId}
             aria-pressed={item.type === 'toggle' ? pressed : undefined}
             ref={(node) => {
               buttons.current.set(index, node);
@@ -125,9 +130,15 @@ export function Toolbar(p: ToolbarProps) {
             {item.hideLabel ? null : <span className="kb-toolbar__label">{item.label}</span>}
           </button>
         );
-        if (item.type !== 'file') return button;
+        const description = descId ? (
+          <span key={`${item.key}:desc`} id={descId} className="kb-visually-hidden">
+            {item.description}
+          </span>
+        ) : null;
+        if (item.type !== 'file') return description ? [button, description] : button;
         return [
           button,
+          description,
           <input
             key={`${item.key}:input`}
             className="kb-toolbar__file"

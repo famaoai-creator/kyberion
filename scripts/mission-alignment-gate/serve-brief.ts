@@ -34,6 +34,8 @@ import { parseSafeJsonObjectInput } from '../lib/json-input.js';
 import { loadMissionBriefAtPath } from './mission-brief.js';
 import type { MissionBrief } from './mission-brief.js';
 import { renderMissionBriefHtml } from './render-brief.js';
+import { resolvePadLocale } from '../lib/pad-ui.js';
+import type { SupportedLocale } from '@agent/core/locale-normalize';
 
 const ALIGNMENT_CHANNEL = 'brief';
 const MAX_BODY_BYTES = 256 * 1024;
@@ -96,9 +98,10 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
     );
   }
 
-  function renderPage(): string {
+  function renderPage(locale: SupportedLocale): string {
     const approval = currentApproval();
     return renderMissionBriefHtml(readBrief(), {
+      locale,
       ...(approval
         ? {
             approval: {
@@ -221,12 +224,14 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
   const server = http.createServer((req, res) => {
     void (async () => {
       try {
-        if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+        const pathname = String(req.url || '').split(/[?#]/)[0];
+        if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
           res.writeHead(200, {
             'Content-Type': 'text/html; charset=utf-8',
             'Cache-Control': 'no-store',
           });
-          res.end(renderPage());
+          // Request locale like the pads: ?lang= → kb-ui-locale cookie → Accept-Language.
+          res.end(renderPage(resolvePadLocale(req)));
           return;
         }
         if (req.method === 'GET' && req.url === '/health') {

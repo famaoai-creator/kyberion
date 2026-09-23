@@ -10,7 +10,7 @@
  *  - 確認とコメント入力 ui:dialog（confirm() は使わない）、コメント音声入力 ui:voice-input
  *  - コメント一覧 ui:section + ui:list
  * レイヤは `<kb-review-layer id="rv-bar">` の Shadow DOM 内に描画し、レポート側 CSS と
- * キット CSS を互いに隔離する（トークンの `:root` は `:host` に置き換えて注入）。
+ * キット CSS を互いに隔離する（トークンは `inlinePadStylesheets({ scope: 'host' })` で `:host` 版を生成して注入）。
  *
  * アセット:
  *  - `assets: 'inline'`（既定）: キットの vanilla モジュール一式をレイヤ内に同梱し、
@@ -21,8 +21,11 @@
  * マーカー: レイヤ全体を <!--RV-LAYER-->…<!--/RV-LAYER--> で囲む。server.ts は保存時にこの範囲を除去し、
  * 正本HTMLにレイヤが焼き込まれない（配信時オーバーレイ）ようにする。レイヤ内の JSON / スクリプトは
  * `<` をエスケープしているので、この範囲の途中にマーカー文字列が現れることはない。
- * コメントの保存形式（mark.rv-cmt[data-note][data-anchor]）と localStorage キー（rvedit:<path>）は従来どおり。
+ * コメントの保存形式（mark.rv-cmt[data-note][data-anchor]）は従来どおり。localStorage キーは
+ * `rvedit:<reportId>`（`reportId` = レポート識別子のハッシュ）。旧キー `rvedit:<path>` は
+ * パスがレポート固有の場合（file://）のみ読む。
  */
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { getUiMessageBundle } from '@agent/core';
 import { resolveLocale } from '@agent/core/locale';
@@ -42,6 +45,13 @@ import {
 
 export const RV_LAYER_OPEN = '<!--RV-LAYER-->';
 export const RV_LAYER_CLOSE = '<!--/RV-LAYER-->';
+/**
+ * Page config that must never be exported / saved with the document (the
+ * report-review save token, the brief's decision token): the layer removes
+ * every region between these markers when it serializes the page.
+ */
+export const RV_SAVE_CONFIG_OPEN = '<!--RV-SAVE-CONFIG-->';
+export const RV_SAVE_CONFIG_CLOSE = '<!--/RV-SAVE-CONFIG-->';
 
 export const REVIEW_LAYER_CLIENT_SCRIPT = 'scripts/report-review/review-layer-client.js';
 /** Entry module of the kit (the vanilla renderer). */
@@ -58,6 +68,19 @@ export interface ReviewLayerOptions {
   locale?: SupportedLocale;
   /** `inline` (default, works offline) or `served` (kit from the pad-ui routes). */
   assets?: ReviewLayerAssets;
+  /**
+   * Stable identity of the reviewed report (artifact ref, absolute file
+   * path, mission id). Its hash keys the local edit snapshot, so two reports
+   * served from the same origin and path never restore each other's edits.
+   */
+  reportId?: string;
+}
+
+/** The snapshot key id for a report identity (16 hex chars of SHA-256), or undefined. */
+export function reviewLayerReportId(identity: string | undefined): string | undefined {
+  const value = typeof identity === 'string' ? identity.trim() : '';
+  if (!value) return undefined;
+  return createHash('sha256').update(value).digest('hex').slice(0, 16);
 }
 
 /** Vocabulary the browser layer reads via `t(key)`. */
@@ -171,17 +194,6 @@ export function reviewLayerModuleBundle(): ReviewLayerModule[] {
   return cachedBundle;
 }
 
-/**
- * Re-key the page token layer for a shadow root: `:root` → `:host`, with its
- * attribute / `:not()` qualifiers moved into `:host(...)`.
- */
-export function scopePadCssToShadowRoot(css: string): string {
-  return css.replace(
-    /:root((?:\[[^\]]*\]|:not\((?:[^()]|\([^()]*\))*\))*)/g,
-    (_match, qualifiers: string) => (qualifiers ? `:host(${qualifiers})` : ':host')
-  );
-}
-
 /** Layout of the layer inside its shadow root (tokens only; no literals of the kit's own). */
 const REVIEW_LAYER_SHADOW_CSS = `
 :host { color-scheme: var(--kb-ui-color-scheme); }
@@ -212,7 +224,6 @@ const REVIEW_LAYER_SHADOW_CSS = `
 }
 .rv-comments[hidden] { display: none; }
 .rv-comments .kb-section { padding: var(--kb-ui-space-3) var(--kb-ui-space-4); }
-.rv-voice { margin-top: var(--kb-ui-space-1); }
 @media print { .rv-root { display: none; } }
 `;
 
@@ -221,7 +232,7 @@ let cachedShadowCss: string | null = null;
 /** The kit stylesheet (tokens + components) scoped to the layer's shadow root. */
 export function reviewLayerShadowCss(): string {
   if (!cachedShadowCss) {
-    cachedShadowCss = `${scopePadCssToShadowRoot(inlinePadStylesheets())}\n${REVIEW_LAYER_SHADOW_CSS}`;
+    cachedShadowCss = `${inlinePadStylesheets({ scope: 'host' })}\n${REVIEW_LAYER_SHADOW_CSS}`;
   }
   return cachedShadowCss;
 }
@@ -257,6 +268,9 @@ export function buildReviewLayerData(options: ReviewLayerOptions = {}): Record<s
     locale,
     assets,
     contentSelector: options.contentSelector || '.wrap',
+    ...(reviewLayerReportId(options.reportId)
+      ? { reportId: reviewLayerReportId(options.reportId) }
+      : {}),
     messages: getUiMessageBundle(locale).messages,
     texts: padTexts(REVIEW_LAYER_TEXT_KEYS, locale),
     css: reviewLayerShadowCss(),

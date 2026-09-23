@@ -10,6 +10,14 @@
  * single-line input confirms. After the user closes it, focus returns to the
  * element that was focused when it opened (if it is still in the document).
  *
+ * `children` (A2UI child ids) render inside the panel body, between the
+ * message / input and the buttons (`.kb-dialog__content`); the focus trap
+ * cycles through every focusable control in the panel, children included.
+ *
+ * Shadow DOM: the focused element is read from the panel's (or the render
+ * container's) root node — `ShadowRoot.activeElement` inside a shadow tree,
+ * where `document.activeElement` would only be the shadow host.
+ *
  * `buildDialogDom` is reused by `ui:sketch-board` (clear confirmation); the
  * pure model helpers are shared with the React `Dialog`.
  */
@@ -152,6 +160,68 @@ export function dialogTrapTarget(focusables, active, shiftKey) {
   return index === -1 || index === list.length - 1 ? list[0] : null;
 }
 
+const FOCUSABLE_TAGS = new Set(['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT', 'A']);
+
+function isFocusableNode(node) {
+  const tag = String(node.tagName || '').toUpperCase();
+  const tabindex = typeof node.getAttribute === 'function' ? node.getAttribute('tabindex') : null;
+  if (tabindex !== null && tabindex !== undefined && Number(tabindex) < 0) return false;
+  if (node.disabled === true) return false;
+  if (tag === 'INPUT' && String(node.getAttribute('type') || '').toLowerCase() === 'hidden') {
+    return false;
+  }
+  if (tag === 'A') return Boolean(node.getAttribute('href'));
+  if (FOCUSABLE_TAGS.has(tag)) return true;
+  return tabindex !== null && tabindex !== undefined && tabindex !== '';
+}
+
+function isHiddenNode(node) {
+  return (
+    node.hidden === true ||
+    (typeof node.hasAttribute === 'function' && node.hasAttribute('hidden')) ||
+    (typeof node.getAttribute === 'function' && node.getAttribute('aria-hidden') === 'true')
+  );
+}
+
+/**
+ * Tab-reachable controls inside `panel`, in document order: buttons, inputs,
+ * textareas, selects, links with `href` and `[tabindex>=0]`; disabled,
+ * `tabindex=-1`, `type=hidden` and anything under a hidden / aria-hidden
+ * subtree is skipped. Shared by both renderers' focus traps.
+ */
+export function dialogFocusables(panel) {
+  const out = [];
+  const walk = (node) => {
+    const kids = node && node.children ? Array.from(node.children) : [];
+    for (const child of kids) {
+      if (isHiddenNode(child)) continue;
+      if (isFocusableNode(child)) out.push(child);
+      walk(child);
+    }
+  };
+  walk(panel);
+  return out;
+}
+
+/** The node's root (`Document` or `ShadowRoot`), or null for a detached / unknown node. */
+export function focusRootOf(node, doc) {
+  if (!node || typeof node.getRootNode !== 'function') return doc || null;
+  const root = node.getRootNode();
+  return root && root.activeElement !== undefined ? root : doc || null;
+}
+
+/**
+ * The focused element as seen from `node`'s tree: `ShadowRoot.activeElement`
+ * inside a shadow root (falling back to the document when focus is outside
+ * it), else `document.activeElement`.
+ */
+export function activeElementFor(node, doc) {
+  const root = focusRootOf(node, doc);
+  const inRoot = root && root.activeElement !== undefined ? root.activeElement : null;
+  if (inRoot) return inRoot;
+  return doc && doc.activeElement !== undefined ? doc.activeElement : null;
+}
+
 /** `true` when a node is still part of a document (unknown engines: assume yes). */
 export function isConnected(node) {
   return Boolean(node) && node.isConnected !== false;
@@ -160,11 +230,13 @@ export function isConnected(node) {
 /**
  * Build a dialog element for `model` (vanilla DOM). `handlers.onResult(button,
  * value)` runs for a button press / Enter; `handlers.onCancel()` for Escape.
- * Returns `{ root, focusInitial() }`. A closed model yields the empty hidden root.
+ * `content` (optional element) is placed in the body between the message /
+ * input and the buttons. Returns `{ root, focusInitial() }`. A closed model
+ * yields the empty hidden root.
  * @param {any} ctx `{ doc, t }`
  * @param {{ el: Function, setData: Function }} h
  */
-export function buildDialogDom(ctx, h, model, ids, handlers) {
+export function buildDialogDom(ctx, h, model, ids, handlers, content) {
   const { el, setData } = h;
   const root = el(ctx, 'div', 'kb-dialog');
   setData(root, 'state', model.open ? 'open' : 'closed');
@@ -212,6 +284,7 @@ export function buildDialogDom(ctx, h, model, ids, handlers) {
     field.appendChild(input);
     panel.appendChild(field);
   }
+  if (content) panel.appendChild(content);
   const actions = el(ctx, 'div', 'kb-dialog__actions');
   const buttonNodes = [];
   let primary = null;
@@ -245,8 +318,8 @@ export function buildDialogDom(ctx, h, model, ids, handlers) {
     }
     if (event.key === 'Tab') {
       const target = dialogTrapTarget(
-        [input, ...buttonNodes],
-        ctx.doc ? ctx.doc.activeElement : null,
+        dialogFocusables(panel),
+        activeElementFor(panel, ctx.doc),
         event.shiftKey === true
       );
       if (target) {
@@ -270,16 +343,16 @@ function afterAttach(fn) {
 }
 
 // The vanilla renderer re-renders whole containers, so "the element focused
-// when the dialog opened" must survive re-renders: it is kept per document and
-// dialog id from the first open render until a render with `open: false`,
-// which restores focus to it (the controlled close).
+// when the dialog opened" must survive re-renders: it is kept per focus root
+// (document or shadow root) and dialog id from the first open render until a
+// render with `open: false`, which restores focus to it (the controlled close).
 const RETURN_TARGETS = new WeakMap();
 
-function returnTargets(doc) {
-  let map = RETURN_TARGETS.get(doc);
+function returnTargets(key) {
+  let map = RETURN_TARGETS.get(key);
   if (!map) {
     map = new Map();
-    RETURN_TARGETS.set(doc, map);
+    RETURN_TARGETS.set(key, map);
   }
   return map;
 }
@@ -289,15 +362,18 @@ function returnTargets(doc) {
  * @param {{ el: Function, setData: Function }} h
  */
 export function createDialogRenderer(h) {
-  const dialog = (ctx, p, c) => {
+  const dialog = (ctx, p, c, depth) => {
     const model = dialogModel(p, ctx.t);
     const ids = dialogIds(c && c.id);
     const doc = ctx.doc;
-    const targets = doc && typeof doc === 'object' ? returnTargets(doc) : null;
+    // Where focus lives: the render container's root (a shadow root for a
+    // layer rendered into one), else the document.
+    const focusRoot = focusRootOf(ctx.container, doc);
+    const targets = focusRoot && typeof focusRoot === 'object' ? returnTargets(focusRoot) : null;
     const firstOpen = model.open && !(targets && targets.has(ids.root));
     if (targets) {
       if (firstOpen) {
-        targets.set(ids.root, doc.activeElement || null);
+        targets.set(ids.root, activeElementFor(ctx.container, doc) || null);
       } else if (!model.open && targets.has(ids.root)) {
         const returnTo = targets.get(ids.root);
         targets.delete(ids.root);
@@ -311,15 +387,28 @@ export function createDialogRenderer(h) {
     const dispatch = (result) => {
       if (typeof ctx.onAction === 'function') ctx.onAction(result, c);
     };
-    const built = buildDialogDom(ctx, h, model, ids, {
-      onResult: (button, value) => dispatch(dialogResult(p, model, button, value)),
-      onCancel: () => dispatch(dialogCancelResult(p)),
-    });
+    let content = null;
+    if (model.open && c && Array.isArray(c.children) && c.children.length > 0) {
+      content = h.el(ctx, 'div', 'kb-dialog__content');
+      if (typeof h.appendChildren === 'function') h.appendChildren(ctx, content, c, depth || 0);
+      if (!content.firstChild) content = null;
+    }
+    const built = buildDialogDom(
+      ctx,
+      h,
+      model,
+      ids,
+      {
+        onResult: (button, value) => dispatch(dialogResult(p, model, button, value)),
+        onCancel: () => dispatch(dialogCancelResult(p)),
+      },
+      content
+    );
     if (model.open) {
       // Focus the initial control when the dialog opens, and again when a
       // re-render replaced the focused node (focus fell back to the body).
       afterAttach(() => {
-        const active = doc ? doc.activeElement : null;
+        const active = activeElementFor(built.root, doc);
         if (firstOpen || !active || active === doc.body || !isConnected(active)) {
           built.focusInitial();
         }
@@ -328,8 +417,8 @@ export function createDialogRenderer(h) {
     return built.root;
   };
   return {
-    'ui:dialog'(ctx, p, c) {
-      return dialog(ctx, p, c);
+    'ui:dialog'(ctx, p, c, depth) {
+      return dialog(ctx, p, c, depth);
     },
   };
 }

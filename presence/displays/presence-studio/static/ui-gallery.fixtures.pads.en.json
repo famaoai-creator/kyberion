@@ -20,7 +20,13 @@
                 "icon": "💾",
                 "variant": "primary"
               },
-              { "type": "button", "id": "export", "label": "Export", "icon": "⬇" },
+              {
+                "type": "button",
+                "id": "export",
+                "label": "Export",
+                "icon": "⬇",
+                "description": "Download the report as PDF"
+              },
               { "type": "separator" },
               {
                 "type": "toggle",
@@ -94,7 +100,7 @@
     {
       "id": "pad-dialog",
       "title": "Dialog ui:dialog",
-      "description": "Replaces confirm() and prompt(): focus moves into the dialog, Tab stays inside, Escape cancels, Enter confirms a single-line input, and focus returns where it was. Shown inline here; in a page it covers the screen.",
+      "description": "Replaces confirm() and prompt(): focus moves into the dialog, Tab stays inside, Escape cancels, Enter confirms a single-line input, and focus returns where it was. Shown inline here; in a page it covers the screen. It can hold other components between the input and the buttons (here a dictation input).",
       "components": [
         {
           "id": "pd-rename",
@@ -125,6 +131,26 @@
               { "id": "discard", "label": "Discard", "variant": "danger" },
               { "id": "cancel", "label": "Keep editing", "variant": "ghost" }
             ]
+          }
+        },
+        {
+          "id": "pd-note",
+          "type": "ui:dialog",
+          "props": {
+            "open": true,
+            "title": "Add a comment",
+            "input": { "name": "note", "label": "Comment", "multiline": true }
+          },
+          "children": ["pd-note-voice"]
+        },
+        {
+          "id": "pd-note-voice",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "note-voice",
+            "label": "Dictate the comment",
+            "mode": "dictation",
+            "show_transcript": true
           }
         },
         {

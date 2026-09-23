@@ -11,19 +11,41 @@
  *                            save (only with window.__RV_SAVE__), discard, status
  *   comments ui:section + ui:list  (or ui:text when empty)
  *   dialog   ui:dialog       restore / discard confirmations, comment editor
- *                            (input.multiline) with a ui:voice-input inside
+ *                            (input.multiline) with a ui:voice-input child
+ *                            (the dialog's content slot; its focus trap and
+ *                            shadow-root focus handling come from the kit)
  *
- * Kit loading: `assets: "served"` imports the renderer URL; `assets: "inline"`
+ * Kit loading: `assets: "served"` imports the renderer from this page's
+ * origin (never relative to the report's `<base href>`); `assets: "inline"`
  * turns the bundled module sources into blob: modules (dependencies first,
  * relative imports rewritten), so a stamped file works from file:// with no
  * server. Document serialization (export / save / local snapshot) removes the
  * layer and the save config by their comment markers, never by string search.
+ * Local snapshots are keyed by the layer's `reportId` (`rvedit:<id>`); the
+ * pre-id key `rvedit:<pathname>` is only read where the pathname names this
+ * report (file:// stamps), never for a server root shared by every report.
  * No user-visible text lives here.
  */
 /* global document, window, localStorage, location, Blob, URL, Node, NodeFilter */
 const LAYER_MARKERS = ['RV-LAYER', '/RV-LAYER'];
 const SAVE_CONFIG_MARKERS = ['RV-SAVE-CONFIG', '/RV-SAVE-CONFIG'];
 const THEME_KEY = 'kyberion.ui.theme';
+
+/** The pads' theme choice: the shared `kb-ui-theme` cookie, else local storage. */
+function storedTheme() {
+  try {
+    const match = /(?:^|;\s*)kb-ui-theme=(light|dark|system)(?:;|$)/.exec(document.cookie || '');
+    if (match) return match[1];
+  } catch {
+    // cookies unavailable (file://)
+  }
+  try {
+    return localStorage.getItem(THEME_KEY);
+  } catch {
+    // storage unavailable (file://, privacy mode): follow the OS scheme
+    return null;
+  }
+}
 
 function readLayerData() {
   const node = document.getElementById('rv-layer-data');
@@ -35,10 +57,38 @@ function readLayerData() {
   }
 }
 
+/**
+ * The absolute URL of a same-origin module path (`/shared-ui/…`), resolved
+ * against `loc.origin` — not the document base, which a report's
+ * `<base href>` may point at another origin. null for anything else.
+ */
+export function sameOriginModuleUrl(value, loc) {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return null;
+  if (!loc || typeof loc.origin !== 'string' || !/^https?:\/\//.test(loc.origin)) return null;
+  let url;
+  try {
+    url = new URL(value, loc.origin);
+  } catch {
+    return null;
+  }
+  return url.origin === loc.origin ? url.href : null;
+}
+
+/** Snapshot storage keys: `rvedit:<reportId>`, plus the legacy key where it is per-report. */
+export function snapshotKeys(data, loc) {
+  const pathname = loc && typeof loc.pathname === 'string' ? loc.pathname : '';
+  const id = typeof data.reportId === 'string' && /^[a-f0-9]{8,64}$/.test(data.reportId);
+  const legacy = pathname && pathname !== '/' ? `rvedit:${pathname}` : null;
+  if (!id) return { key: legacy || 'rvedit:/', legacy: null };
+  return { key: `rvedit:${data.reportId}`, legacy };
+}
+
 /** Import the kit: the served renderer, or the bundled sources as blob: modules. */
 async function loadKit(data) {
-  if (data.assets === 'served' && typeof data.renderer === 'string') {
-    return import(data.renderer);
+  if (data.assets === 'served') {
+    const url = sameOriginModuleUrl(data.renderer, window.location);
+    if (!url) throw new Error('review layer: renderer must be a same-origin path');
+    return import(url);
   }
   const modules = Array.isArray(data.modules) ? data.modules : [];
   const urls = new Map();
@@ -94,16 +144,20 @@ async function start() {
   const locale = typeof data.locale === 'string' ? data.locale : 'en';
   const selector = typeof data.contentSelector === 'string' ? data.contentSelector : '.wrap';
   const content = document.querySelector(selector) || document.body;
-  const storageKey = `rvedit:${location.pathname}`;
+  const keys = snapshotKeys(data, location);
+  const storageKey = keys.key;
+  const readSnapshot = () => {
+    try {
+      return localStorage.getItem(storageKey) || (keys.legacy && localStorage.getItem(keys.legacy));
+    } catch {
+      return null;
+    }
+  };
   const saveConfig = window.__RV_SAVE__;
 
   // -- shadow root --------------------------------------------------------
-  try {
-    const theme = localStorage.getItem(THEME_KEY);
-    if (theme === 'light' || theme === 'dark') hostEl.setAttribute('data-theme', theme);
-  } catch {
-    // storage unavailable (file://, privacy mode): follow the OS scheme
-  }
+  const theme = storedTheme();
+  if (theme === 'light' || theme === 'dark') hostEl.setAttribute('data-theme', theme);
   const shadow = hostEl.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = String(data.css || '');
@@ -120,19 +174,6 @@ async function start() {
   }
   boxes.comments.hidden = true;
   shadow.appendChild(root);
-  const voiceBox = document.createElement('div');
-  voiceBox.className = 'rv-voice';
-
-  // The kit reads `doc.activeElement` for the dialog focus trap / return; in a
-  // shadow root that is the host, so hand it a document whose activeElement
-  // looks inside the layer first.
-  const layerDocument = new Proxy(document, {
-    get(target, key) {
-      if (key === 'activeElement') return shadow.activeElement || target.activeElement;
-      const value = Reflect.get(target, key, target);
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  });
 
   // -- state --------------------------------------------------------------
   let editing = false;
@@ -146,7 +187,6 @@ async function start() {
       locale,
       messages: data.messages || {},
       onAction: handleAction,
-      document: layerDocument,
     });
 
   function now() {
@@ -254,12 +294,6 @@ async function start() {
     ]);
   }
 
-  function disposeVoice() {
-    kit.disposeA2UI(voiceBox);
-    while (voiceBox.firstChild) voiceBox.removeChild(voiceBox.firstChild);
-    if (voiceBox.parentNode) voiceBox.parentNode.removeChild(voiceBox);
-  }
-
   function dialogProps() {
     if (!dialog) return { open: false, title: t('report_review:comment_dialog_title') };
     if (dialog.kind === 'comment') {
@@ -297,13 +331,10 @@ async function start() {
   }
 
   function renderDialog() {
-    disposeVoice();
-    render(boxes.dialog, [{ id: 'rv-dialog', type: 'ui:dialog', props: dialogProps() }]);
-    if (!dialog || dialog.kind !== 'comment') return;
-    const panel = boxes.dialog.querySelector('.kb-dialog__panel');
-    if (!panel) return;
-    render(voiceBox, [
-      {
+    const components = [{ id: 'rv-dialog', type: 'ui:dialog', props: dialogProps() }];
+    if (dialog && dialog.kind === 'comment') {
+      components[0].children = ['rv-voice'];
+      components.push({
         id: 'rv-voice',
         type: 'ui:voice-input',
         props: {
@@ -314,32 +345,10 @@ async function start() {
           show_transcript: true,
           help: t('report_review:dictation_note'),
         },
-      },
-    ]);
-    panel.insertBefore(voiceBox, panel.querySelector('.kb-dialog__actions'));
-  }
-
-  // ui:dialog has no content slot: its focus trap knows only its own input and
-  // buttons, so Tab / Shift+Tab at the edges of the inserted voice control are
-  // routed here (before the panel's trap sees them).
-  voiceBox.addEventListener('keydown', (event) => {
-    if (event.key !== 'Tab') return;
-    const focusables = Array.from(
-      voiceBox.querySelectorAll('button, input, textarea, select, [tabindex="0"]')
-    ).filter((node) => !node.disabled && !node.hidden);
-    const active = shadow.activeElement;
-    const at = focusables.indexOf(active);
-    let target = null;
-    if (!event.shiftKey && at === focusables.length - 1) {
-      target = boxes.dialog.querySelector('.kb-dialog__actions button');
-    } else if (event.shiftKey && at === 0) {
-      target = boxes.dialog.querySelector('.kb-dialog__panel textarea');
+      });
     }
-    event.stopPropagation();
-    if (!target) return;
-    event.preventDefault();
-    target.focus();
-  });
+    render(boxes.dialog, components);
+  }
 
   function openDialog(next, returnToolbarId) {
     dialog = Object.assign({ returnToolbarId: returnToolbarId || null }, next);
@@ -524,12 +533,7 @@ async function start() {
 
   function handleClick(id) {
     if (id === 'restore') {
-      let saved = null;
-      try {
-        saved = localStorage.getItem(storageKey);
-      } catch {
-        saved = null;
-      }
+      const saved = readSnapshot();
       if (!saved) setStatus(t('report_review:no_restore'), 'warning');
       else openDialog({ kind: 'restore' }, id);
     } else if (id === 'discard') {
@@ -564,12 +568,7 @@ async function start() {
       return;
     }
     if (dialog.kind === 'restore') {
-      let saved = null;
-      try {
-        saved = localStorage.getItem(storageKey);
-      } catch {
-        saved = null;
-      }
+      const saved = readSnapshot();
       closeDialog();
       if (saved) {
         replaceContent(saved);
@@ -581,6 +580,7 @@ async function start() {
     closeDialog();
     try {
       localStorage.removeItem(storageKey);
+      if (keys.legacy) localStorage.removeItem(keys.legacy);
     } catch {
       // nothing stored
     }
@@ -606,12 +606,7 @@ async function start() {
     });
   });
 
-  let hasSaved = false;
-  try {
-    hasSaved = Boolean(localStorage.getItem(storageKey));
-  } catch {
-    hasSaved = false;
-  }
+  const hasSaved = Boolean(readSnapshot());
   status = {
     text: t(hasSaved ? 'report_review:previous_edit' : 'report_review:review_available'),
     tone: 'neutral',
@@ -621,9 +616,11 @@ async function start() {
   renderDialog();
 }
 
-start().catch(() => {
-  // The report stays readable without the layer (e.g. a browser that refuses
-  // blob: modules for file://); mark the host so the failure is inspectable.
-  const hostEl = document.getElementById('rv-bar');
-  if (hostEl) hostEl.setAttribute('data-state', 'unavailable');
-});
+// Only in a browser document (tests import the pure helpers above).
+if (typeof document !== 'undefined')
+  start().catch(() => {
+    // The report stays readable without the layer (e.g. a browser that refuses
+    // blob: modules for file://); mark the host so the failure is inspectable.
+    const hostEl = document.getElementById('rv-bar');
+    if (hostEl) hostEl.setAttribute('data-state', 'unavailable');
+  });

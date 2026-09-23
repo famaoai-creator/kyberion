@@ -112,7 +112,18 @@ export const KB_DRAWING_ICON_PATHS = Object.freeze({
   undo: ['M9 14L4 9l5-5', 'M4 9h10a6 6 0 0 1 0 12h-3'],
   clear: ['M4 7h16', 'M9 7V4h6v3', 'M6 7l1 13h10l1-13'],
   download: ['M12 4v12', 'M6 10l6 6 6-6', 'M4 20h16'],
+  /** The custom-colour picker ("+", distinct from the swatches). */
+  custom: ['M12 7v10', 'M7 12h10'],
 });
+
+/**
+ * View of the custom-colour control: `active` when the current colour is not
+ * one of the swatches (the picker then shows it as a small dot).
+ */
+export function customColorView(state) {
+  const active = Boolean(state && state.color) && !(state.colors || []).includes(state.color);
+  return { active, color: state && state.color ? state.color : '' };
+}
 
 const HEX6 = /^#[0-9a-f]{6}$/i;
 const HEX3 = /^#[0-9a-f]{3}$/i;
@@ -216,6 +227,43 @@ export function sketchFileName(name) {
   const base = typeof name === 'string' ? name.replace(/[^A-Za-z0-9._-]+/g, '-') : '';
   const trimmed = base.replace(/^[.-]+|[.-]+$/g, '');
   return `${trimmed || 'sketch'}.png`;
+}
+
+/**
+ * PNG file name of the board's download: `download_name` (path / control
+ * characters replaced, `.png` ensured, at most 120 chars), else from `name`.
+ */
+export function sketchDownloadName(p) {
+  const given = p && typeof p.download_name === 'string' ? p.download_name : '';
+  const cleaned = given
+    .replace(/[\\/:*?"<>|\u0000-\u001f\u007f]+/g, '-')
+    .replace(/\.png$/i, '')
+    .replace(/^[\s.-]+|[\s.-]+$/g, '')
+    .slice(0, 116);
+  if (cleaned) return `${cleaned}.png`;
+  return sketchFileName(p && p.name);
+}
+
+/** `paste_scope`: `document` (paste an image anywhere on the page) or `board` (default). */
+export function sketchPasteScope(p) {
+  return p && p.paste_scope === 'document' ? 'document' : 'board';
+}
+
+/**
+ * Whether a paste / key event targets an editable field (input, textarea,
+ * select, contenteditable) — a page-wide image paste must leave those alone.
+ * Reads the composed path so fields inside shadow roots count too.
+ */
+export function isEditablePasteTarget(event) {
+  const path = event && typeof event.composedPath === 'function' ? event.composedPath() : [];
+  const node = (path && path[0]) || (event && event.target) || null;
+  if (!node || typeof node !== 'object') return false;
+  const tag = String(node.tagName || '').toUpperCase();
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (node.isContentEditable === true) return true;
+  const editable =
+    typeof node.getAttribute === 'function' ? node.getAttribute('contenteditable') : null;
+  return editable !== null && editable !== undefined && editable !== 'false';
 }
 
 /** Deterministic DOM ids of a palette / sketch board (from the component id, else `name`). */

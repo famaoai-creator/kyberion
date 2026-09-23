@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import type { KbDialogProps } from '@agent/core/a2ui-catalog';
 import { useKbI18n } from '../i18n.js';
 import {
+  activeElementFor,
   dialogCancelResult,
+  dialogFocusables,
   dialogIds,
   dialogModel,
   dialogResult,
@@ -23,6 +25,8 @@ export interface DialogViewProps {
   onResult: (button: KbDialogButtonModel, value: string) => void;
   /** Escape. */
   onCancel: () => void;
+  /** Rendered A2UI children, placed between the message / input and the buttons. */
+  content?: ReactNode;
 }
 
 /**
@@ -30,8 +34,9 @@ export interface DialogViewProps {
  * Opening focuses the input (else the primary button) and remembers the
  * previously focused element; closing (open → false, or unmount) restores it.
  */
-export function DialogView({ model, ids, onResult, onCancel }: DialogViewProps) {
+export function DialogView({ model, ids, onResult, onCancel, content }: DialogViewProps) {
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const open = model.open;
   const primaryIndex = Math.max(
@@ -41,7 +46,8 @@ export function DialogView({ model, ids, onResult, onCancel }: DialogViewProps) 
 
   useEffect(() => {
     if (!open || typeof document === 'undefined') return undefined;
-    const previous = document.activeElement;
+    // Shadow-root aware: the focused element inside the panel's tree.
+    const previous = activeElementFor(panelRef.current, document);
     const initial = inputRef.current ?? buttonRefs.current[primaryIndex] ?? null;
     if (initial && typeof initial.focus === 'function') initial.focus({ preventScroll: true });
     return () => {
@@ -61,9 +67,10 @@ export function DialogView({ model, ids, onResult, onCancel }: DialogViewProps) 
       return;
     }
     if (event.key === 'Tab') {
+      const panel = panelRef.current;
       const target = dialogTrapTarget<HTMLElement>(
-        [inputRef.current, ...buttonRefs.current],
-        typeof document !== 'undefined' ? document.activeElement : null,
+        dialogFocusables<HTMLElement>(panel),
+        activeElementFor(panel, typeof document !== 'undefined' ? document : null),
         event.shiftKey
       );
       if (target) {
@@ -84,6 +91,7 @@ export function DialogView({ model, ids, onResult, onCancel }: DialogViewProps) 
         aria-labelledby={ids.title}
         aria-describedby={model.message ? ids.message : undefined}
         onKeyDown={onKeyDown}
+        ref={panelRef}
       >
         <h2 className="kb-dialog__title" id={ids.title}>
           {model.title}
@@ -132,6 +140,7 @@ export function DialogView({ model, ids, onResult, onCancel }: DialogViewProps) 
             )}
           </div>
         ) : null}
+        {hasContent(content) ? <div className="kb-dialog__content">{content}</div> : null}
         <div className="kb-dialog__actions">
           {model.buttons.map((button, index) => (
             <button
@@ -154,9 +163,16 @@ export function DialogView({ model, ids, onResult, onCancel }: DialogViewProps) 
   );
 }
 
+function hasContent(content: ReactNode): boolean {
+  if (content === null || content === undefined || content === false) return false;
+  return !(Array.isArray(content) && content.length === 0);
+}
+
 export interface DialogProps extends KbDialogProps {
   /** A2UI component id; the dialog's DOM ids derive from it. */
   id?: string;
+  /** Rendered A2UI `children` (the body content slot). */
+  children?: ReactNode;
 }
 
 /**
@@ -179,6 +195,7 @@ export function Dialog(p: DialogProps) {
       ids={ids}
       onResult={(button, value) => send(dialogResult(p, model, button, value))}
       onCancel={() => send(dialogCancelResult(p))}
+      content={model.open ? p.children : null}
     />
   );
 }
