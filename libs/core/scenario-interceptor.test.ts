@@ -75,6 +75,7 @@ describe('installScenarioInterceptor (ES-02)', () => {
         source: 'pipeline',
         requiresApproval: false,
         approvalGranted: false,
+        admitted: true,
       },
     ]);
 
@@ -87,6 +88,7 @@ describe('installScenarioInterceptor (ES-02)', () => {
       approvalGranted: false,
     });
     expect(gated.decision).toBe('ask');
+    expect(interceptor.log.ops[1]?.admitted).toBeUndefined();
     expect(interceptor.log.approvals).toEqual([
       {
         seq: 3,
@@ -144,8 +146,12 @@ describe('installScenarioInterceptor (ES-02)', () => {
   });
 
   it('answers risky approvals from seed/turn decisions and records transitions', () => {
+    const base = scenario();
     const { interceptor } = setup(
-      scenario({ seed: { approvals: [{ op: 'secret:grant', decision: 'rejected' }] } })
+      scenario({
+        seed: { approvals: [{ op: 'secret:grant', decision: 'rejected' }] },
+        fixtures: { ops: { ...base.fixtures.ops, 'secret:grant': { result: { ok: true } } } },
+      })
     );
     expect(requireRiskyApproval({ opId: 'secret:grant', agentId: 't' })).toMatchObject({
       allowed: false,
@@ -165,6 +171,33 @@ describe('installScenarioInterceptor (ES-02)', () => {
       ['decided', 'secret:grant', 'approved', 'rejected'],
       ['requested', 'secret:grant', 'approved', undefined],
       ['requested', 'other:op', 'pending', undefined],
+    ]);
+  });
+
+  it('never grants a risky approval for an op no fixture serves', () => {
+    setup(scenario({ seed: { approvals: [{ op: 'secret:grant', decision: 'approved' }] } }));
+    expect(requireRiskyApproval({ opId: 'secret:grant', agentId: 't' })).toMatchObject({
+      allowed: false,
+      status: 'pending',
+      message: expect.stringContaining('[SCENARIO_APPROVAL_UNFIXTURED] secret:grant'),
+    });
+  });
+
+  it('defers risky approvals to the canonical handler outside the simulated profile', () => {
+    const base = scenario();
+    const { interceptor } = setup(
+      scenario({
+        lane: 'live-only',
+        executionProfile: 'provider-qualified',
+        seed: { approvals: [{ op: 'secret:grant', decision: 'approved' }] },
+        fixtures: { ops: { ...base.fixtures.ops, 'secret:grant': { result: { ok: true } } } },
+      })
+    );
+    const answer = requireRiskyApproval({ opId: 'secret:grant', agentId: 't' });
+    expect(answer.allowed).toBe(false);
+    expect(answer.message ?? '').not.toMatch(/SCENARIO/);
+    expect(interceptor.log.approvals.map((r) => [r.channel, r.op, r.decision])).toEqual([
+      ['risky-approval', 'secret:grant', 'approved'],
     ]);
   });
 

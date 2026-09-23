@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TraceContext } from '@agent/core';
 import { registerPluginActuatorOperation } from '@agent/core/actuator-op-registry';
+import { registerOpGuard } from '@agent/core/op-preflight';
+import { evaluateFinalCheck } from '@agent/core/scenario-final-checks';
 import { parseScenarioDefinition, type ScenarioDefinition } from '@agent/core/scenario-definition';
 import { installScenarioInterceptor } from '@agent/core/scenario-interceptor';
 import { createScenarioRunContext } from '@agent/core/scenario-run-context';
@@ -151,5 +153,105 @@ describe('pipeline dispatch with the scenario interceptor (ES-02)', () => {
     expect(approved.status).toBe('succeeded');
     expect(rejected.log.ops.filter((r) => r.stage === 'apply')).toHaveLength(1);
     expect(rejected.log.ops.at(-2)).toMatchObject({ stage: 'preflight', approvalGranted: true });
+  });
+
+  it('serves an approved core:run_pipeline fixture without running the nested pipeline', async () => {
+    const nestedRunner = vi.fn(async () => ({ status: 'succeeded', results: [], context: {} }));
+    const interceptor = install(
+      scenario({
+        fixtures: { ops: { 'core:run_pipeline': { ctx_patch: { nested_from_fixture: true } } } },
+        seed: { approvals: [{ op: 'core:run_pipeline', decision: 'approved' }] },
+      })
+    );
+    const result = await runValidatedSteps(
+      [
+        {
+          id: 'nested',
+          op: 'core:run_pipeline',
+          params: { input: 'pipelines/vital-check.json' },
+          budget: { approval_required: true },
+        },
+      ],
+      {},
+      { quiet: true, hasHuman: false, runPipelineFile: nestedRunner }
+    );
+    expect(result.status).toBe('succeeded');
+    expect(nestedRunner).not.toHaveBeenCalled();
+    expect(result.context).toMatchObject({ nested_from_fixture: true });
+    expect(interceptor.log.ops.filter((r) => r.stage === 'apply')).toMatchObject([
+      { op: 'core:run_pipeline', outcome: 'ok' },
+    ]);
+  });
+
+  it('leaves an unfixtured core:run_pipeline on its normal path in the simulated profile', async () => {
+    const nestedRunner = vi.fn(async () => ({ status: 'succeeded', results: [], context: {} }));
+    install(scenario());
+    const result = await runValidatedSteps(
+      [{ id: 'nested', op: 'core:run_pipeline', params: { input: 'pipelines/vital-check.json' } }],
+      {},
+      { quiet: true, hasHuman: false, runPipelineFile: nestedRunner }
+    );
+    expect(result.status).toBe('succeeded');
+    expect(nestedRunner).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not count a passthrough op another guard blocked as called', async () => {
+    const interceptor = install(scenario());
+    cleanups.push(
+      registerOpGuard({
+        id: 'test-block-system-log',
+        // Block at leaf dispatch, after adf-engine admission let it through.
+        check: (call) =>
+          call.op === 'system:log' && call.source === 'pipeline'
+            ? { decision: 'block', reason: 'blocked by test' }
+            : undefined,
+      })
+    );
+    const result = await runValidatedSteps(
+      [{ id: 'log', op: 'system:log', params: { message: 'hello' } }],
+      {},
+      { quiet: true, hasHuman: false }
+    );
+    expect(result.status).toBe('failed');
+    expect(
+      interceptor.log.ops.some(
+        (r) => r.op === 'system:log' && r.stage === 'preflight' && r.source === 'pipeline'
+      )
+    ).toBe(true);
+    const runRoot = { runRoot: '' };
+    expect(
+      evaluateFinalCheck(
+        { type: 'opNotCalled', op: 'system:log' },
+        interceptor.log,
+        undefined,
+        runRoot
+      ).pass
+    ).toBe(true);
+    expect(
+      evaluateFinalCheck(
+        { type: 'opCalled', op: 'system:log' },
+        interceptor.log,
+        undefined,
+        runRoot
+      ).pass
+    ).toBe(false);
+  });
+
+  it('counts an admitted passthrough op as called', async () => {
+    const interceptor = install(scenario());
+    const result = await runValidatedSteps(
+      [{ id: 'log', op: 'system:log', params: { message: 'hello' } }],
+      {},
+      { quiet: true, hasHuman: false }
+    );
+    expect(result.status).toBe('succeeded');
+    expect(
+      evaluateFinalCheck(
+        { type: 'opCalled', op: 'system:log', times: 1 },
+        interceptor.log,
+        undefined,
+        { runRoot: '' }
+      ).pass
+    ).toBe(true);
   });
 });

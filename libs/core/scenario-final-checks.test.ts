@@ -72,12 +72,29 @@ describe('scenario final checks (ES-05)', () => {
     expect(check({ type: 'opNotCalled', op: 'demo:apply' }, log).pass).toBe(false);
   });
 
-  it('counts a passthrough op by its pipeline preflight, but not unstubbed or held ops', () => {
+  it('counts a passthrough op by its admitted pipeline preflight, but not unstubbed, held or blocked ops', () => {
     const log = createScenarioSideEffectLog();
-    appendScenarioOp(log, { op: 'system:log', stage: 'preflight', source: 'actuator' });
-    appendScenarioOp(log, { op: 'system:log', stage: 'preflight', source: 'pipeline' });
-    appendScenarioOp(log, { op: 'system:exec', stage: 'preflight', source: 'pipeline' });
+    appendScenarioOp(log, {
+      op: 'system:log',
+      stage: 'preflight',
+      source: 'actuator',
+      admitted: true,
+    });
+    appendScenarioOp(log, {
+      op: 'system:log',
+      stage: 'preflight',
+      source: 'pipeline',
+      admitted: true,
+    });
+    appendScenarioOp(log, {
+      op: 'system:exec',
+      stage: 'preflight',
+      source: 'pipeline',
+      admitted: true,
+    });
     appendScenarioOp(log, { op: 'system:exec', stage: 'unstubbed' });
+    // Reached admission but a later guard blocked it: never marked admitted.
+    appendScenarioOp(log, { op: 'core:transform', stage: 'preflight', source: 'pipeline' });
     appendScenarioOp(log, {
       op: 'demo:gated',
       stage: 'preflight',
@@ -88,6 +105,7 @@ describe('scenario final checks (ES-05)', () => {
     expect(check({ type: 'opCalled', op: 'system:log', times: 1 }, log).pass).toBe(true);
     expect(check({ type: 'opNotCalled', op: 'system:exec' }, log).pass).toBe(true);
     expect(check({ type: 'opNotCalled', op: 'demo:gated' }, log).pass).toBe(true);
+    expect(check({ type: 'opNotCalled', op: 'core:transform' }, log).pass).toBe(true);
   });
 
   it('matches op params as a JSON subset', () => {

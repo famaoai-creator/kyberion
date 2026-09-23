@@ -1331,6 +1331,22 @@ export function resetStubServedOps(): void {
   stubServedOps.length = 0;
 }
 
+/** Copy of the stub-taint registry, for scoped callers that must reset the backend. */
+export function snapshotStubServedOps(): StubServedRecord[] {
+  return stubServedOps.map((record) => ({ ...record }));
+}
+
+/**
+ * Put a snapshot back in front of the registry. Records made since the
+ * snapshot are kept, so restoring can never drop taint.
+ */
+export function restoreStubServedOps(snapshot: readonly StubServedRecord[]): void {
+  const since = stubServedOps.splice(0);
+  stubServedOps.push(
+    ...[...snapshot, ...since].slice(0, STUB_SERVED_CAP).map((record) => ({ ...record }))
+  );
+}
+
 /** Deterministic, offline backend that emits structured placeholders. */
 export const stubReasoningBackend: ReasoningBackend = {
   name: 'stub',

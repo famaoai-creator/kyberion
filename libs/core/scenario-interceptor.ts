@@ -4,12 +4,16 @@
  * Installs, for one scenario run, every seam the runner needs and returns a
  * single disposer that restores the previous state:
  *  - an observe-only preflight listener (`scenario-capture`) that records
- *    each admitted op; it never returns a decision, so it cannot re-permit a
- *    block/ask from another listener or guard;
+ *    each op reaching admission, plus a last-ordered never-deciding guard
+ *    (`scenario-admission`) that marks the record `admitted` once every
+ *    other listener and guard let the call through; neither can re-permit a
+ *    block/ask;
  *  - the `scenario-op-override` seam: ops with a fixture are served by it,
  *    and in the `simulated` profile every other leaf op fails closed with
  *    `[SCENARIO_UNSTUBBED_OP]` (real actuators are never imported);
- *  - the risky-approval override, answering with the seed/turn decision;
+ *  - the risky-approval override: in the `simulated` profile it answers with
+ *    the seed/turn decision but grants only fixture-served ops; in other
+ *    profiles it records the request and defers to the canonical handler;
  *  - the fixture reasoning backend (ES-04, optional);
  *  - write detection by before/after snapshots of the run root.
  */
@@ -22,7 +26,11 @@ import {
   type ScenarioOpOverrideRequest,
 } from './actuator-op-registry.js';
 import { redactSensitiveObject } from './network.js';
-import { registerOpPreflightListener } from './op-preflight.js';
+import {
+  registerOpGuard,
+  registerOpPreflightListener,
+  type OpPreflightCall,
+} from './op-preflight.js';
 import {
   overrideRiskyApprovalHandler,
   type RiskyApprovalResult,
@@ -39,6 +47,7 @@ import {
   appendScenarioOp,
   appendScenarioWrite,
   createScenarioSideEffectLog,
+  type ScenarioOpRecord,
   type ScenarioSideEffectLog,
 } from './scenario-side-effect-log.js';
 import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
@@ -52,15 +61,20 @@ export type {
 } from './scenario-side-effect-log.js';
 
 export const SCENARIO_CAPTURE_LISTENER_ID = 'scenario-capture';
+export const SCENARIO_ADMISSION_GUARD_ID = 'scenario-admission';
 
 /**
  * Leaf ops that stay on their normal path in the simulated profile without a
- * fixture: pure in-process ops, plus reasoning leaves (served by the fixture
+ * fixture: pure in-process ops, composite ops whose nested leaf ops are
+ * intercepted individually, plus reasoning leaves (served by the fixture
  * backend, which fails closed on its own).
  */
 export const SCENARIO_SIMULATED_PASSTHROUGH_OPS: readonly string[] = [
   'system:log',
   'core:transform',
+  'core:ptc',
+  'core:programmatic_tool_call',
+  'core:run_pipeline',
   'reasoning:analyze',
   'reasoning:transform',
   'reasoning:synthesize',
@@ -135,6 +149,19 @@ function snapshotRunRoot(runRoot: string): RunRootSnapshot {
   return snapshot;
 }
 
+/** Run every disposer (newest first) even if one throws; rethrow the first failure. */
+function disposeInReverse(disposers: Array<() => void>): void {
+  let failure: { error: unknown } | undefined;
+  for (const dispose of disposers.splice(0).reverse()) {
+    try {
+      dispose();
+    } catch (error) {
+      failure ??= { error };
+    }
+  }
+  if (failure) throw failure.error;
+}
+
 export function installScenarioInterceptor(
   ctx: ScenarioRunContext,
   def: ScenarioDefinition,
@@ -144,6 +171,7 @@ export function installScenarioInterceptor(
   const decisions = seedApprovalDecisions(def);
   const passthrough = new Set(SCENARIO_SIMULATED_PASSTHROUGH_OPS);
   const disposers: Array<() => void> = [];
+  const preflightRecords = new WeakMap<OpPreflightCall, ScenarioOpRecord>();
   let baseline = snapshotRunRoot(ctx.runRoot);
   let disposed = false;
 
@@ -177,7 +205,7 @@ export function installScenarioInterceptor(
         id: SCENARIO_CAPTURE_LISTENER_ID,
         order: Number.MIN_SAFE_INTEGER,
         run: (call) => {
-          appendScenarioOp(log, {
+          const record = appendScenarioOp(log, {
             op: call.op,
             stage: 'preflight',
             params: sanitizeParams(call.params),
@@ -185,6 +213,7 @@ export function installScenarioInterceptor(
             requiresApproval: call.requiresApproval === true,
             approvalGranted: call.approvalGranted === true,
           });
+          preflightRecords.set(call, record);
           if (call.requiresApproval && !call.approvalGranted) {
             appendScenarioApproval(log, {
               op: call.op,
@@ -193,6 +222,20 @@ export function installScenarioInterceptor(
               decision: decisionFor(call.op),
             });
           }
+          return undefined;
+        },
+      })
+    );
+
+    // Guards run after every listener and the built-in approval guard, in
+    // order; reaching the last one means the call was admitted.
+    disposers.push(
+      registerOpGuard({
+        id: SCENARIO_ADMISSION_GUARD_ID,
+        order: Number.MAX_SAFE_INTEGER,
+        check: (call) => {
+          const record = preflightRecords.get(call);
+          if (record) record.admitted = true;
           return undefined;
         },
       })
@@ -220,7 +263,7 @@ export function installScenarioInterceptor(
     );
 
     disposers.push(
-      overrideRiskyApprovalHandler((params): RiskyApprovalResult => {
+      overrideRiskyApprovalHandler((params): RiskyApprovalResult | undefined => {
         const decision = decisionFor(params.opId);
         appendScenarioApproval(log, {
           op: params.opId,
@@ -228,7 +271,17 @@ export function installScenarioInterceptor(
           channel: 'risky-approval',
           decision,
         });
-        if (decision === 'approved') return { allowed: true, status: 'approved' };
+        // Outside the simulated profile real effects run, so only the
+        // canonical (human) approval path may answer.
+        if (def.executionProfile !== 'simulated') return undefined;
+        if (decision === 'approved') {
+          if (fixtureFor(params.opId)) return { allowed: true, status: 'approved' };
+          return {
+            allowed: false,
+            status: 'pending',
+            message: `[SCENARIO_APPROVAL_UNFIXTURED] ${params.opId} has no fixture; a scenario approval cannot admit a real effect`,
+          };
+        }
         return {
           allowed: false,
           status: 'pending',
@@ -244,7 +297,11 @@ export function installScenarioInterceptor(
       disposers.push(installScenarioFixtureBackend(def, log));
     }
   } catch (error) {
-    for (const dispose of disposers.reverse()) dispose();
+    try {
+      disposeInReverse(disposers);
+    } catch {
+      // the install failure is the error worth reporting
+    }
     throw error;
   }
 
@@ -281,7 +338,7 @@ export function installScenarioInterceptor(
     dispose() {
       if (disposed) return;
       disposed = true;
-      for (const dispose of disposers.reverse()) dispose();
+      disposeInReverse(disposers);
     },
   };
 }

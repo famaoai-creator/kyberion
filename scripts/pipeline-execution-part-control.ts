@@ -504,6 +504,25 @@ export async function dispatchLeafOp(
   // contract so the validator sees the value the actuator will receive.
   params = resolveParamsRecursive(params, ctx) as Record<string, unknown>;
 
+  // ES-02: a registered scenario runner serves (or fails closed) leaf ops
+  // before any inline, composite (ptc / run_pipeline) or real actuator
+  // dispatch, so an op a fixture was approved for is always fixture-served.
+  // Unregistered -> null.
+  const scenarioOperation = resolveScenarioOpOverride(domain, action);
+  if (scenarioOperation) {
+    validatePipelineOpInput(domain, action, params);
+    return dispatchResolvedActuatorOperation(
+      step,
+      domain,
+      action,
+      params,
+      ctx,
+      opts,
+      stepPolicy,
+      scenarioOperation
+    );
+  }
+
   if (domain === 'core' && (action === 'ptc' || action === 'programmatic_tool_call')) {
     return dispatchProgrammaticToolCall(params, ctx, rootDir, shellBin, opts, stepPolicy);
   }
@@ -548,23 +567,6 @@ export async function dispatchLeafOp(
         context: nested.context,
       },
     };
-  }
-
-  // ES-02: a registered scenario runner serves (or fails closed) leaf ops
-  // before any inline or real actuator dispatch. Unregistered -> null.
-  const scenarioOperation = resolveScenarioOpOverride(domain, action);
-  if (scenarioOperation) {
-    validatePipelineOpInput(domain, action, params);
-    return dispatchResolvedActuatorOperation(
-      step,
-      domain,
-      action,
-      params,
-      ctx,
-      opts,
-      stepPolicy,
-      scenarioOperation
-    );
   }
 
   if (domain === 'system' && action === 'log') {
