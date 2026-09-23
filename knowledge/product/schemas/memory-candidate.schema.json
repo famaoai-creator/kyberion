@@ -22,6 +22,10 @@
       "enum": ["mission", "task_session", "artifact", "incident"]
     },
     "source_ref": { "type": "string", "minLength": 1 },
+    "knowledge_domain": {
+      "type": "string",
+      "enum": ["product", "organization", "personal", "unclassified"]
+    },
     "proposed_memory_kind": {
       "type": "string",
       "enum": [
@@ -34,6 +38,21 @@
       ]
     },
     "summary": { "type": "string", "minLength": 1 },
+    "curation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "summary", "content", "evidence_refs"],
+      "properties": {
+        "title": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "summary": { "type": "string", "minLength": 12, "maxLength": 1000 },
+        "content": { "type": "string", "minLength": 20, "maxLength": 12000 },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        }
+      }
+    },
     "evidence_refs": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },

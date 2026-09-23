@@ -10,6 +10,8 @@ import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
   memoryPromotionQueuePath,
+  updateMemoryPromotionCandidateStatus,
+  isPublicMemoryEvidencePath,
 } from './memory-promotion-queue.js';
 import {
   assertMemoryPromotionReviewReady,
@@ -72,6 +74,115 @@ describe('memory-promotion-review', () => {
     expect(() => assertMemoryPromotionReviewReady(review, 'approve')).toThrow(
       /MEMORY_PROMOTION_HOLD/
     );
+  });
+
+  it('holds an unclassified mission candidate until a steward selects its domain', () => {
+    const candidate = createMemoryPromotionCandidate({
+      candidateId: 'MEM-REVIEW-UNCLASSIFIED-1',
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-REVIEW-UNCLASSIFIED-1',
+      proposedMemoryKind: 'heuristic',
+      summary: 'A reusable lesson awaiting knowledge ownership classification.',
+      evidenceRefs: ['mission:MSN-REVIEW-UNCLASSIFIED-1#evidence/distillation.md'],
+      sensitivityTier: 'public',
+      knowledgeDomain: 'unclassified',
+    });
+    enqueueMemoryPromotionCandidate({
+      ...candidate,
+      audit_ref: 'audit:AUD-MISSING-UNCLASSIFIED-1',
+    });
+    const [review] = reviewMemoryPromotionCandidate(candidate.candidate_id);
+    expect(review.target_path).toContain('knowledge/unclassified/classification-required/');
+    expect(review.blockers.map((blocker) => blocker.code)).toContain('unclassified_domain');
+    expect(() => assertMemoryPromotionReviewReady(review, 'approve')).toThrow(
+      /unclassified_domain/
+    );
+    expect(() =>
+      updateMemoryPromotionCandidateStatus({
+        candidateId: candidate.candidate_id,
+        status: 'approved',
+        knowledgeDomain: 'product',
+      })
+    ).toThrow(/evidence paths under knowledge\/public/);
+  });
+
+  it('rejects a public product label that points to confidential mission evidence', () => {
+    const candidate = createMemoryPromotionCandidate({
+      candidateId: 'MEM-REVIEW-PRODUCT-CONFIDENTIAL-EVIDENCE-1',
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-REVIEW-PRODUCT-CONFIDENTIAL-EVIDENCE-1',
+      proposedMemoryKind: 'heuristic',
+      summary: 'A product candidate points to a confidential mission artifact.',
+      evidenceRefs: [
+        'active/missions/confidential/MSN-REVIEW-PRODUCT-CONFIDENTIAL-EVIDENCE-1/evidence/summary.md',
+      ],
+      sensitivityTier: 'public',
+      knowledgeDomain: 'product',
+    });
+    expect(() => enqueueMemoryPromotionCandidate(candidate)).toThrow(
+      /evidence paths under knowledge\/public/
+    );
+  });
+
+  it('rejects traversal from an allowed public evidence prefix', () => {
+    expect(
+      isPublicMemoryEvidencePath('active/missions/public/MSN-1/../../confidential/evidence.md')
+    ).toBe(false);
+    expect(isPublicMemoryEvidencePath('knowledge/public/../confidential/evidence.md')).toBe(false);
+    expect(isPublicMemoryEvidencePath('knowledge/public/evidence/approved.md')).toBe(true);
+  });
+
+  it('requires an owner identity for personal-domain promotion', () => {
+    const candidate = createMemoryPromotionCandidate({
+      candidateId: 'MEM-REVIEW-PERSONAL-OWNER-1',
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-REVIEW-PERSONAL-OWNER-1',
+      proposedMemoryKind: 'heuristic',
+      summary: 'A private lesson awaiting its named knowledge owner.',
+      evidenceRefs: ['mission:MSN-REVIEW-PERSONAL-OWNER-1#evidence/distillation.md'],
+      sensitivityTier: 'personal',
+      knowledgeDomain: 'personal',
+      scope: { tier: 'personal' },
+    });
+    enqueueMemoryPromotionCandidate({
+      ...candidate,
+      audit_ref: 'audit:AUD-MISSING-PERSONAL-OWNER-1',
+    });
+    const [review] = reviewMemoryPromotionCandidate(candidate.candidate_id);
+    expect(review.blockers.map((blocker) => blocker.code)).toContain('invalid_domain_scope');
+    const approved = updateMemoryPromotionCandidateStatus({
+      candidateId: candidate.candidate_id,
+      status: 'approved',
+      knowledgeDomain: 'personal',
+      scopeUpdate: { tier: 'personal', owner_nhi: 'nhi:test-owner' },
+      curation: {
+        title: 'Private lesson',
+        summary: 'A private lesson for this named knowledge owner.',
+        content: 'Keep this lesson within the named personal owner namespace.',
+        evidence_refs: candidate.evidence_refs,
+      },
+    });
+    expect(approved?.scope?.owner_nhi).toBe('nhi:test-owner');
+  });
+
+  it('rejects product-domain candidates that are not public and unscoped at enqueue', () => {
+    const candidate = createMemoryPromotionCandidate({
+      candidateId: 'MEM-REVIEW-PRODUCT-SCOPE-1',
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-REVIEW-PRODUCT-SCOPE-1',
+      proposedMemoryKind: 'heuristic',
+      summary: 'A candidate incorrectly assigned to product knowledge.',
+      evidenceRefs: ['knowledge/public/evidence/approved-summary.md'],
+      sensitivityTier: 'confidential',
+      knowledgeDomain: 'product',
+      scope: { tier: 'confidential', tenant_slug: 'acme-corp' },
+    });
+    expect(() =>
+      enqueueMemoryPromotionCandidate({
+        ...candidate,
+        audit_ref: 'audit:AUD-MISSING-PRODUCT-SCOPE-1',
+      })
+    ).toThrow(/public, unscoped/);
   });
 
   it('groups duplicate physical records and exposes the duplicate blocker', () => {

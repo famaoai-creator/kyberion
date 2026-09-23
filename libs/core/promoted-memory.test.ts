@@ -244,6 +244,47 @@ describe('promoted-memory', () => {
     expect(previousMarkdown).toContain(`superseded_by: ${nextCandidate.candidate_id}`);
   });
 
+  it('stores personal-domain promoted records under an owner-specific namespace', () => {
+    const candidate = createDistillCandidateRecord({
+      source_type: 'mission',
+      tier: 'personal',
+      title: 'Private browser workflow note',
+      summary: 'A personal reusable browser workflow for a recurring private task.',
+      status: 'promoted',
+      target_kind: 'knowledge_hint',
+      evidence_refs: ['artifact:ART-PERSONAL-1'],
+      scope: { tier: 'personal', owner_nhi: 'nhi:alice' },
+      metadata: {
+        knowledge_domain: 'personal',
+        personal_owner_nhi: 'nhi:alice',
+        hint_scope: 'private browser work',
+        hint_triggers: ['repeat task'],
+      },
+    });
+    const saved = savePromotedMemoryRecord(candidate, { executionRole: 'mission_controller' });
+    rememberWrite(pathResolver.resolve(saved.logicalPath));
+    expect(saved.logicalPath).toMatch(/^knowledge\/personal\/owners\/\w+\/wisdom\/generated\//);
+    expect(saved.record).toMatchObject({ knowledge_domain: 'personal', owner_nhi: 'nhi:alice' });
+  });
+
+  it('rejects direct personal-domain saves without an owner identity', () => {
+    const candidate = createDistillCandidateRecord({
+      source_type: 'mission',
+      tier: 'personal',
+      title: 'Private browser workflow note',
+      summary: 'A personal reusable browser workflow for a recurring private task.',
+      status: 'promoted',
+      target_kind: 'knowledge_hint',
+      evidence_refs: ['artifact:ART-PERSONAL-2'],
+      metadata: {
+        knowledge_domain: 'personal',
+        hint_scope: 'private browser work',
+        hint_triggers: ['repeat task'],
+      },
+    });
+    expect(() => savePromotedMemoryRecord(candidate)).toThrow(/explicit owner_nhi/);
+  });
+
   it('appends promoted knowledge hints into governance HINTS.md', () => {
     const candidate = createDistillCandidateRecord({
       source_type: 'task_session',

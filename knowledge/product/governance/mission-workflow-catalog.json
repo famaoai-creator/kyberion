@@ -3906,7 +3906,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "test-run",
-              "team_role": "implementer",
+              "team_role": "tester",
               "description": "テスト計画に沿ってテストを実行し、結果を evidence/test-report.md に記録する",
               "deliverable": "evidence/test-report.md",
               "acceptance_criteria": [
@@ -4005,7 +4005,11 @@
               "team_role": "planner",
               "description": "学びと改善点を evidence/retrospective.md に蒸留し knowledge へ昇格候補を挙げる",
               "deliverable": "evidence/retrospective.md",
-              "acceptance_criteria": ["学びが成功・失敗の両面で記録されている"],
+              "acceptance_criteria": [
+                "学びが成功・失敗の両面で記録されている",
+                "知識候補がない場合は理由を記録し、ある場合は候補IDと分類・承認・昇格の処理状態を記録している",
+                "チーム構成または進め方の改善候補がない場合は理由を記録し、ある場合は提案先と状態を記録している"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
