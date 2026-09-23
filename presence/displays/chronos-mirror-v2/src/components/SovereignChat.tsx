@@ -8,7 +8,8 @@ import {
   useMemo,
   PointerEvent as ReactPointerEvent,
 } from 'react';
-import { Send, Loader2, MessageSquare, Mic, MicOff, GripHorizontal } from 'lucide-react';
+import { Send, Loader2, MessageSquare, Mic, MicOff, GripHorizontal, Minus } from 'lucide-react';
+import { Button } from '@agent/shared-ui';
 import { chronosSpeechLocale, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import { buildUserFacingError } from '../lib/user-facing-error';
 import { useChronosLocale } from '../lib/hooks';
@@ -17,6 +18,7 @@ import {
   parseAgentChatSuccessResponse,
   type ClientAgentChatMessage,
 } from '../lib/agent-chat-response';
+import { ChronosMeta } from './chronos-ui';
 
 const AGENT_URL = '/api/agent';
 
@@ -304,80 +306,78 @@ export function SovereignChat({
 
   if (!isOpen) {
     return (
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        aria-label={uxText('chronos_chat_open', locale)}
-        className="fixed bottom-6 right-6 w-14 h-14 kb-status-warning-surface border kb-status-warning-border rounded-full flex items-center justify-center hover:kb-status-warning-surface transition z-50"
-      >
-        <MessageSquare className="kb-status-warning w-6 h-6" />
-      </button>
+      <div className="chronos-chat__launcher">
+        <Button
+          label={uxText('chronos_chat_open', locale)}
+          variant="primary"
+          onClick={() => setIsOpen(true)}
+        >
+          <MessageSquare size={16} aria-hidden="true" />
+          <span>{uxText('chronos_chat_trigger', locale)}</span>
+        </Button>
+      </div>
     );
   }
 
   return (
     <div
       ref={panelRef}
-      className="fixed w-[min(420px,calc(100vw-2rem))] h-[min(520px,calc(100dvh-2rem))] kyberion-glass rounded-2xl border kb-status-warning-border flex flex-col overflow-hidden z-50"
+      className="chronos-chat"
+      role="dialog"
+      aria-labelledby="chronos-chat-title"
       style={{ bottom: `${24 - pos.y}px`, right: `${24 - pos.x}px` }}
     >
       {/* Header — drag handle */}
       <div
-        className="flex items-center justify-between px-4 py-3 border-b kb-border-subtle cursor-grab active:cursor-grabbing select-none"
+        className="chronos-chat__header"
         onPointerDown={onDragStart}
         onPointerMove={onDragMove}
         onPointerUp={onDragEnd}
       >
-        <div className="flex items-center gap-2">
-          <GripHorizontal size={12} className="opacity-30" />
-          <div className="w-2 h-2 rounded-full kb-status-positive-surface animate-pulse" />
-          <span className="text-[11px] uppercase tracking-[0.2em] font-bold opacity-60">
-            Sovereign Link
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsOpen(false)}
-          aria-label={uxText('chronos_chat_minimize', locale)}
-          className="text-[10px] opacity-40 hover:opacity-80 transition"
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {uxText('chronos_chat_minimize', locale)}
-        </button>
+        <GripHorizontal size={14} aria-hidden="true" className="chronos-chat__grip" />
+        <span className="chronos-chat__dot" aria-hidden="true" />
+        <h2 id="chronos-chat-title" className="chronos-chat__title">
+          {uxText('chronos_chat_title', locale)}
+        </h2>
+        <span className="chronos-chat__header-action" onPointerDown={(e) => e.stopPropagation()}>
+          <Button
+            label={uxText('chronos_chat_minimize', locale)}
+            variant="ghost"
+            onClick={() => setIsOpen(false)}
+          >
+            <Minus size={14} aria-hidden="true" />
+          </Button>
+        </span>
       </div>
 
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-3"
+        className="chronos-chat__log"
         role="log"
         aria-live="polite"
         aria-relevant="additions text"
       >
         {messages.length === 0 && (
-          <div className="flex flex-col gap-6 pt-4">
-            <div className="text-center text-[11px] leading-6 kb-text-muted">
-              {uxText('chronos_chat_welcome', locale)}
-            </div>
-
-            <div className="space-y-3">
-              <div className="px-2 text-[9px] uppercase tracking-widest kb-text-muted">
+          <div className="chronos-stack">
+            <p className="kb-text kb-text--muted">{uxText('chronos_chat_welcome', locale)}</p>
+            <div className="chronos-feed">
+              <h3 className="chronos-feed__title">
                 {uxText('chronos_chat_guided_prompts', locale)}
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
+              </h3>
+              <div className="chronos-chat__prompts">
                 {guidedPrompts.map((hint) => (
-                  <button
+                  <Button
                     key={hint.label}
-                    type="button"
-                    aria-label={`${hint.label}: ${hint.query}`}
+                    label={`${hint.label}: ${hint.query}`}
+                    variant="secondary"
                     onClick={() => void sendQuery(hint.query)}
-                    className="rounded-xl border kb-border-subtle kb-surface-raised/5 p-3 text-left transition hover:kb-border-accent hover:kb-surface-accent"
                   >
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-secondary">
-                      {hint.label}
-                    </div>
-                    <div className="mt-1 text-[9px] leading-5 kb-text-muted">{hint.query}</div>
-                  </button>
+                    <span className="chronos-chat__prompt">
+                      <span className="chronos-chat__prompt-label">{hint.label}</span>
+                      <span className="chronos-chat__prompt-query">{hint.query}</span>
+                    </span>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -386,93 +386,79 @@ export function SovereignChat({
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className="chronos-chat__bubble"
+            data-role={msg.role}
+            data-status={msg.status === 'error' ? 'error' : undefined}
           >
-            <div
-              className={`max-w-[85%] px-3 py-2 rounded-xl text-[11px] leading-relaxed ${
-                msg.role === 'user'
-                  ? 'kb-status-warning-surface border kb-status-warning-border'
-                  : msg.status === 'error'
-                    ? 'kb-status-negative-surface border kb-status-negative-border'
-                    : 'kb-surface-raised/5 border kb-border-subtle'
-              }`}
-            >
-              <div className="whitespace-pre-wrap">{msg.content}</div>
-              <div className="text-[8px] opacity-30 mt-1 text-right">
+            <div className="chronos-chat__bubble-text">{msg.content}</div>
+            <span className="chronos-chat__bubble-time">
+              <ChronosMeta>
                 {isMounted ? new Date(msg.timestamp).toLocaleTimeString(chronosSpeechLocale()) : ''}
-              </div>
-            </div>
+              </ChronosMeta>
+            </span>
           </div>
         ))}
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="flex items-center gap-2 px-3 py-2 kb-surface-raised/5 border kb-border-subtle rounded-xl">
-              <Loader2 className="w-4 h-4 animate-spin opacity-40" />
-              <span className="text-[10px] kb-text-muted" role="status">
-                {phase === 'sending' && uxText('chronos_chat_phase_sending', locale)}
-                {phase === 'thinking' && uxText('chronos_chat_phase_thinking', locale)}
-                {phase === 'long_running' && uxText('chronos_chat_phase_long_running', locale)}
-              </span>
-              <button
-                type="button"
-                onClick={cancelQuery}
-                aria-label={uxText('chronos_chat_cancel', locale)}
-                className="ml-1 text-[9px] uppercase tracking-widest kb-text-muted hover:kb-status-negative border kb-border-subtle hover:kb-status-negative-border rounded px-1.5 py-0.5 transition"
-              >
-                {uxText('chronos_chat_cancel', locale)}
-              </button>
-            </div>
+          <div className="chronos-chat__bubble chronos-chat__pending" data-role="agent">
+            <Loader2 size={16} aria-hidden="true" className="chronos-chat__spinner" />
+            <span className="chronos-chat__phase" role="status">
+              {phase === 'sending' && uxText('chronos_chat_phase_sending', locale)}
+              {phase === 'thinking' && uxText('chronos_chat_phase_thinking', locale)}
+              {phase === 'long_running' && uxText('chronos_chat_phase_long_running', locale)}
+            </span>
+            <Button
+              label={uxText('chronos_chat_cancel', locale)}
+              variant="ghost"
+              onClick={cancelQuery}
+            />
           </div>
         )}
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t kb-border-subtle">
-        <div className="flex gap-2">
-          <input
-            aria-label={uxText('chronos_chat_input', locale)}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-            placeholder={
-              isListening
-                ? uxText('chronos_chat_listening', locale)
-                : uxText('chronos_chat_placeholder', locale)
+      <div className="chronos-chat__composer">
+        <input
+          className="kb-input"
+          data-listening={isListening ? 'true' : undefined}
+          aria-label={uxText('chronos_chat_input', locale)}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
             }
-            className={`flex-1 kb-surface-raised/5 border rounded-lg px-3 py-2 text-[11px] outline-none transition ${
-              isListening
-                ? 'kb-status-negative-border kb-status-negative-surface'
-                : 'kb-border-subtle focus:kb-status-warning-border'
-            }`}
-            disabled={isLoading}
-          />
-          <button
-            type="button"
-            onClick={toggleVoice}
-            aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
-            className={`p-2 rounded-lg border transition ${
-              isListening
-                ? 'kb-status-negative-surface kb-status-negative-border kb-status-negative'
-                : 'kb-surface-raised/5 kb-border-subtle kb-text-muted hover:kb-text-secondary hover:kb-border-subtle'
-            }`}
-          >
-            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
-          <button
-            type="button"
-            onClick={sendMessage}
-            disabled={isLoading || !input.trim()}
-            aria-label={uxText('chronos_chat_send', locale)}
-            className="p-2 kb-status-warning-surface border kb-status-warning-border rounded-lg hover:kb-status-warning-surface transition disabled:opacity-20"
-          >
-            <Send className="w-4 h-4 kb-status-warning" />
-          </button>
-        </div>
+          }}
+          placeholder={
+            isListening
+              ? uxText('chronos_chat_listening', locale)
+              : uxText('chronos_chat_placeholder', locale)
+          }
+          disabled={isLoading}
+        />
+        <Button
+          label={
+            isListening
+              ? uxText('chronos_chat_voice_stop', locale)
+              : uxText('chronos_chat_voice_start', locale)
+          }
+          variant={isListening ? 'danger' : 'secondary'}
+          onClick={toggleVoice}
+        >
+          {isListening ? (
+            <MicOff size={16} aria-hidden="true" />
+          ) : (
+            <Mic size={16} aria-hidden="true" />
+          )}
+        </Button>
+        <Button
+          label={uxText('chronos_chat_send', locale)}
+          variant="primary"
+          onClick={sendMessage}
+          disabled={isLoading || !input.trim()}
+        >
+          <Send size={16} aria-hidden="true" />
+        </Button>
       </div>
     </div>
   );

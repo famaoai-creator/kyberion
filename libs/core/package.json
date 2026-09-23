@@ -199,6 +199,10 @@
       "types": "./dist/a2ui.d.ts",
       "default": "./dist/a2ui.js"
     },
+    "./a2ui-catalog": {
+      "types": "./dist/a2ui-catalog.d.ts",
+      "default": "./dist/a2ui-catalog.js"
+    },
     "./ceo-surface-summary": {
       "types": "./dist/ceo-surface-summary.d.ts",
       "default": "./dist/ceo-surface-summary.js"

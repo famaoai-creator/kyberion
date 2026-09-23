@@ -1,6 +1,15 @@
 'use client';
 
 import * as React from 'react';
+import {
+  Button,
+  Callout,
+  SaveBar,
+  SettingRow,
+  SettingsGroup,
+  Skeleton,
+  StatusPill,
+} from '@agent/shared-ui';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
 import { frontDeskText, type ConciergeMessageKey, type FrontDeskMessageKey } from '../../lib/i18n';
 import { parseSetupResponse, type Setup as SetupPayload } from '../../lib/setup-response';
@@ -41,6 +50,10 @@ import { NotificationsSection } from './sections/NotificationsSection';
 import { RecordingConsentSection } from './sections/RecordingConsentSection';
 import { PluginsSection, type PluginConfirmState } from './sections/PluginsSection';
 import { AdvancedSection, type ManagementState } from './sections/AdvancedSection';
+import { DisplaySection } from './sections/DisplaySection';
+import { FormScope } from './sections/form-scope';
+import { postSetupUpload, toUploadFile } from './settings-api';
+import './settings.css';
 
 /**
  * FD-06 (設定): `/setup` and the companion `/onboarding` wizard fold into
@@ -60,6 +73,17 @@ type Setup = SetupPayload;
 
 const DEFAULT_SERVICES = ['google-workspace', 'slack', 'browser'];
 
+type ProfileDraft = { name: string; primary_domain: string; vision: string; agent_id: string };
+type SaveBarState = 'clean' | 'dirty' | 'saving' | 'saved' | 'error';
+
+const sameServices = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n');
+const sameProfile = (a: ProfileDraft, b: ProfileDraft) =>
+  a.name === b.name &&
+  a.primary_domain === b.primary_domain &&
+  a.vision === b.vision &&
+  a.agent_id === b.agent_id;
+
 const DIAG_LABELS: Record<string, ConciergeMessageKey> = {
   profile: 'setup.diag.profile',
   avatar: 'setup.diag.avatar',
@@ -78,6 +102,7 @@ const DIAG_GUIDANCE: Record<string, ConciergeMessageKey> = {
 /** Section heading label (front_desk:settings_nav_*), in the fixed sub-nav order. */
 const SETTINGS_NAV_LABEL_KEYS: Record<SettingsSectionId, FrontDeskMessageKey> = {
   profile: 'settings_nav_profile',
+  display: 'settings_nav_display',
   members: 'settings_nav_members',
   services: 'settings_nav_services',
   voice: 'settings_nav_voice',
@@ -92,6 +117,7 @@ const SETTINGS_NAV_LABEL_KEYS: Record<SettingsSectionId, FrontDeskMessageKey> = 
  * sub-panes under 詳細設定 keep their own legacy ids inside). */
 const SETTINGS_SECTION_ELEMENT_ID: Record<SettingsSectionId, string> = {
   profile: 'setup-profile',
+  display: 'settings-display',
   members: 'settings-members',
   services: 'setup-services',
   voice: 'setup-media',
@@ -102,7 +128,7 @@ const SETTINGS_SECTION_ELEMENT_ID: Record<SettingsSectionId, string> = {
 };
 
 export default function SettingsPage() {
-  const { locale, t } = useConciergeI18n();
+  const { locale, setLocale, t } = useConciergeI18n();
   const [setup, setSetup] = React.useState<Setup | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<Notice>(null);
@@ -114,6 +140,16 @@ export default function SettingsPage() {
     agent_id: 'sovereign-agent',
   });
   const [services, setServices] = React.useState<string[]>(DEFAULT_SERVICES);
+  // UI-06 save bar: the last loaded (= saved) values, so grouped unsaved
+  // changes across プロフィール / サービス連携 / 通知 can be saved or discarded.
+  const [savedProfile, setSavedProfile] = React.useState<ProfileDraft | null>(null);
+  const [savedServices, setSavedServices] = React.useState<string[] | null>(null);
+  const [savedNotif, setSavedNotif] = React.useState<{ surface: string; target: string } | null>(
+    null
+  );
+  const [saveBarPhase, setSaveBarPhase] = React.useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle'
+  );
   const [voice, setVoice] = React.useState({ profile_id: 'my-voice', display_name: 'My voice' });
   const [voiceSampleRefs, setVoiceSampleRefs] = React.useState<string[]>([]);
   const [management, setManagement] = React.useState<ManagementState>({
@@ -137,7 +173,6 @@ export default function SettingsPage() {
   const [configTenant, setConfigTenant] = React.useState('');
   const [configInputs, setConfigInputs] = React.useState<Record<string, string>>({});
   const [configConfirm, setConfigConfirm] = React.useState(false);
-  const [cameraState, setCameraState] = React.useState<'idle' | 'starting' | 'ready'>('idle');
   const [voiceRecording, setVoiceRecording] = React.useState(false);
   const [oauthBusyId, setOauthBusyId] = React.useState<string | null>(null);
   const [oauthMessage, setOauthMessage] = React.useState<string | null>(null);
@@ -175,9 +210,6 @@ export default function SettingsPage() {
   const recordingConsent = useRecordingConsent(locale, setNotice);
   const { refreshRecordingConsent, refreshRecordingObservations } = recordingConsent;
   const [activeSection, setActiveSection] = React.useState<SettingsSectionId>('profile');
-  const cameraStreamRef = React.useRef<MediaStream | null>(null);
-  const cameraVideoRef = React.useRef<HTMLVideoElement | null>(null);
-  const cameraCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const voiceStreamRef = React.useRef<MediaStream | null>(null);
   const voiceRecorderRef = React.useRef<MediaRecorder | null>(null);
   const voiceChunksRef = React.useRef<Blob[]>([]);
@@ -189,12 +221,14 @@ export default function SettingsPage() {
       const next = parseSetupResponse(await response.json().catch(() => null));
       if (!response.ok || !next) throw new Error('Invalid setup response');
       setSetup(next);
-      setProfile({
+      const loadedProfile = {
         name: next.profile.name,
         primary_domain: next.profile.primary_domain,
         vision: next.profile.vision,
         agent_id: next.profile.agent_id || 'sovereign-agent',
-      });
+      };
+      setProfile(loadedProfile);
+      setSavedProfile(loadedProfile);
       const tenantProfile = next.tenant.catalog.find(
         (tenant) => tenant.tenant_slug === next.tenant.active_slug
       );
@@ -218,11 +252,11 @@ export default function SettingsPage() {
           current.length ? current : existingVoice.sample_refs || []
         );
       }
-      setServices(
-        next.service_catalog
-          .filter((service) => service.configured || DEFAULT_SERVICES.includes(service.id))
-          .map((service) => service.id)
-      );
+      const loadedServices = next.service_catalog
+        .filter((service) => service.configured || DEFAULT_SERVICES.includes(service.id))
+        .map((service) => service.id);
+      setServices(loadedServices);
+      setSavedServices(loadedServices);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -236,14 +270,14 @@ export default function SettingsPage() {
       if (!response.ok || !parsed) throw new Error('Invalid notification preferences response');
       setNotifChannels(parsed.channels);
       setNotifCurrent(parsed.preferences.default_channel);
-      setNotif(
-        parsed.preferences.default_channel
-          ? {
-              surface: parsed.preferences.default_channel.surface,
-              target: parsed.preferences.default_channel.target,
-            }
-          : { surface: 'none', target: '' }
-      );
+      const loadedNotif = parsed.preferences.default_channel
+        ? {
+            surface: parsed.preferences.default_channel.surface,
+            target: parsed.preferences.default_channel.target,
+          }
+        : { surface: 'none', target: '' };
+      setNotif(loadedNotif);
+      setSavedNotif(loadedNotif);
     } catch {
       // The notification pane keeps its last known state; the diagnostics
       // checklist from /api/setup still reports the authoritative status.
@@ -449,7 +483,6 @@ export default function SettingsPage() {
     void refreshRecordingConsent();
     void refreshRecordingObservations();
     return () => {
-      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, [
@@ -516,7 +549,7 @@ export default function SettingsPage() {
     return () => observer.disconnect();
   }, [setup]);
 
-  const saveNotification = React.useCallback(async () => {
+  const saveNotification = React.useCallback(async (): Promise<boolean> => {
     setBusy(true);
     try {
       const response = await fetch('/api/notification-preferences', {
@@ -527,8 +560,10 @@ export default function SettingsPage() {
       if (!response.ok) throw new Error('Notification save failed');
       setNotice({ text: t('setup.notification_saved') });
       await Promise.all([refreshNotifications(), refresh()]);
+      return true;
     } catch (err) {
       setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -572,8 +607,8 @@ export default function SettingsPage() {
   );
 
   const applyOnboarding = React.useCallback(
-    async (includeVoice: boolean) => {
-      if (!setup) return;
+    async (includeVoice: boolean): Promise<boolean> => {
+      if (!setup) return false;
       setBusy(true);
       try {
         const providerPriority = setup.providers?.priority?.length
@@ -630,8 +665,10 @@ export default function SettingsPage() {
           text: includeVoice ? t('setup.voice_registered') : t('setup.onboarding_saved'),
         });
         await refresh();
+        return true;
       } catch (err) {
         setNotice({ text: err instanceof Error ? err.message : String(err), error: true });
+        return false;
       } finally {
         setBusy(false);
       }
@@ -677,12 +714,12 @@ export default function SettingsPage() {
     async (action: 'avatar' | 'voice_sample', file: File, source = 'upload') => {
       setBusy(true);
       try {
-        const form = new FormData();
-        form.set('action', action);
-        form.set('profile_id', voice.profile_id);
-        form.set('source', source);
-        form.set('file', file);
-        const response = await fetch('/api/setup', { method: 'POST', body: form });
+        const response = await postSetupUpload({
+          action,
+          profileId: voice.profile_id,
+          source,
+          file,
+        });
         const parsed = parseConciergeMutationResponse(await response.json().catch(() => null));
         if (!response.ok || !parsed) throw new Error('Upload failed');
         if (action === 'voice_sample') {
@@ -729,63 +766,17 @@ export default function SettingsPage() {
     }
   }, []);
 
-  const startCamera = React.useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setNotice({ text: t('setup.camera_unavailable'), error: true });
-      return;
-    }
-    setCameraState('starting');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
-        audio: false,
-      });
-      cameraStreamRef.current = stream;
-      if (cameraVideoRef.current) {
-        cameraVideoRef.current.srcObject = stream;
-        await cameraVideoRef.current.play();
-      }
-      setCameraState('ready');
-    } catch {
-      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
-      cameraStreamRef.current = null;
-      setCameraState('idle');
-      setNotice({ text: t('setup.camera_permission'), error: true });
-    }
-  }, [t]);
-
-  const stopCamera = React.useCallback(() => {
-    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
-    cameraStreamRef.current = null;
-    if (cameraVideoRef.current) cameraVideoRef.current.srcObject = null;
-    setCameraState('idle');
-  }, []);
-
-  const captureAvatar = React.useCallback(async () => {
-    const video = cameraVideoRef.current;
-    const canvas = cameraCanvasRef.current;
-    if (!video || !canvas || !video.videoWidth || !video.videoHeight) return;
-    const size = Math.min(video.videoWidth, video.videoHeight);
-    canvas.width = 512;
-    canvas.height = 512;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-    context.drawImage(
-      video,
-      (video.videoWidth - size) / 2,
-      (video.videoHeight - size) / 2,
-      size,
-      size,
-      0,
-      0,
-      512,
-      512
-    );
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-    if (!blob) return;
-    await upload('avatar', new File([blob], 'avatar.png', { type: 'image/png' }), 'camera');
-    stopCamera();
-  }, [stopCamera, upload]);
+  // UI-06: AvatarPicker hands over a square-cropped Blob (from a file or its
+  // own camera panel, which it starts only on the person's click and stops on
+  // confirm / cancel / unmount); it goes through the same 512px PNG
+  // normalization and `POST /api/setup` action=avatar upload as before.
+  const changeAvatar = React.useCallback(
+    async (blob: Blob, source: 'upload' | 'camera') => {
+      const avatar = await prepareAvatarFile(toUploadFile(blob, 'avatar.png'));
+      await upload('avatar', avatar, source);
+    },
+    [prepareAvatarFile, upload]
+  );
 
   const startVoiceRecording = React.useCallback(async () => {
     if (voiceSampleRefs.length >= 3) {
@@ -829,8 +820,45 @@ export default function SettingsPage() {
     voiceRecorderRef.current?.stop();
   }, []);
 
-  if (error) return <div className="notice error">{t('setup.load_error', { error })}</div>;
-  if (!setup) return <div className="pane-empty">{t('setup.loading')}</div>;
+  // The concierge shell supplies the shared-ui locale bundle (KbI18nProvider).
+  if (error) return <Callout tone="danger" title={t('setup.load_error', { error })} />;
+  if (!setup) return <Skeleton shape="card" lines={4} label={t('setup.loading')} />;
+
+  const profileDirty = savedProfile !== null && !sameProfile(profile, savedProfile);
+  const servicesDirty = savedServices !== null && !sameServices(services, savedServices);
+  const notifDirty =
+    savedNotif !== null &&
+    (notif.surface !== savedNotif.surface || notif.target.trim() !== savedNotif.target);
+  const anyDirty = profileDirty || servicesDirty || notifDirty;
+  const saveBarState: SaveBarState =
+    saveBarPhase === 'saving'
+      ? 'saving'
+      : saveBarPhase === 'error' && anyDirty
+        ? 'error'
+        : anyDirty
+          ? 'dirty'
+          : saveBarPhase === 'saved'
+            ? 'saved'
+            : 'clean';
+
+  // One save for every grouped unsaved change: プロフィール + サービス連携
+  // share the onboarding draft (`apply_onboarding`), 通知 its own route —
+  // exactly the calls their per-section buttons make.
+  const saveAll = async () => {
+    setSaveBarPhase('saving');
+    let ok = true;
+    if (profileDirty || servicesDirty) ok = (await applyOnboarding(false)) && ok;
+    if (notifDirty && !(notif.surface !== 'none' && !notif.target.trim())) {
+      ok = (await saveNotification()) && ok;
+    }
+    setSaveBarPhase(ok ? 'saved' : 'error');
+  };
+  const discardAll = () => {
+    if (savedProfile) setProfile(savedProfile);
+    if (savedServices) setServices(savedServices);
+    if (savedNotif) setNotif(savedNotif);
+    setSaveBarPhase('idle');
+  };
 
   const channelDisplayName = (surface: string) =>
     notifChannels.find((channel) => channel.surface === surface)?.display_name || surface;
@@ -857,7 +885,9 @@ export default function SettingsPage() {
             busy={busy}
             onSaveProfile={() => void applyOnboarding(false)}
             sectionRef={setSectionRef('profile')}
-          />
+          >
+            <DisplaySection locale={locale} t={t} onLocaleChange={setLocale} />
+          </ProfileSection>
         );
 
       case 'members':
@@ -915,15 +945,7 @@ export default function SettingsPage() {
             t={t}
             setup={setup}
             busy={busy}
-            cameraState={cameraState}
-            cameraVideoRef={cameraVideoRef}
-            cameraCanvasRef={cameraCanvasRef}
-            onStartCamera={() => void startCamera()}
-            onStopCamera={stopCamera}
-            onCaptureAvatar={() => void captureAvatar()}
-            onAvatarFileChange={(file) =>
-              void prepareAvatarFile(file).then((avatar) => upload('avatar', avatar, 'upload'))
-            }
+            onAvatarChange={(file, source) => void changeAvatar(file, source)}
             voice={voice}
             setVoice={setVoice}
             voiceSampleRefs={voiceSampleRefs}
@@ -1025,48 +1047,64 @@ export default function SettingsPage() {
         </p>
       ) : null}
 
-      <section className="pane readiness-pane" aria-label={t('setup.readiness_title')}>
-        <h2>{t('setup.readiness_title')}</h2>
-        <p className="pane-subtitle">{t('setup.readiness_description')}</p>
-        <ul className="readiness-list">
-          {setup.diagnostics.map((item) => {
-            const labelKey = DIAG_LABELS[item.id];
-            const guidanceKey = DIAG_GUIDANCE[item.id];
-            return (
-              <li className="readiness-item" key={item.id}>
-                <span className={`status-chip${item.status === 'ok' ? ' ok' : ' attention'}`}>
-                  {item.status === 'ok'
-                    ? `✓ ${t('setup.completed')}`
-                    : item.status === 'error'
-                      ? t('setup.diag_error')
-                      : t('setup.incomplete')}
-                </span>
-                <span className="readiness-label">{labelKey ? t(labelKey) : item.id}</span>
-                {item.status !== 'ok' && item.action?.type === 'navigate' ? (
-                  <button
-                    className="action-button secondary"
-                    onClick={() => jumpToSection(item.action!.target)}
-                  >
-                    {t('setup.fix_here')}
-                  </button>
-                ) : null}
-                {item.status !== 'ok' && !item.action && guidanceKey ? (
-                  <span className="readiness-guidance">
-                    {t(guidanceKey)}
-                    {item.command ? (
-                      <span className="readiness-command">
-                        {t('setup.reasoning_command_hint', { value: item.command })}
-                      </span>
-                    ) : null}
-                  </span>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      <SettingsGroup
+        id="settings-readiness"
+        title={t('setup.readiness_title')}
+        description={t('setup.readiness_description')}
+      >
+        {setup.diagnostics.map((item) => {
+          const labelKey = DIAG_LABELS[item.id];
+          const guidanceKey = DIAG_GUIDANCE[item.id];
+          const showGuidance = item.status !== 'ok' && !item.action && guidanceKey;
+          return (
+            <div className="settings-row-group" key={item.id}>
+              <SettingRow label={labelKey ? t(labelKey) : item.id}>
+                <div className="settings-inline-actions">
+                  <StatusPill
+                    status={
+                      item.status === 'ok'
+                        ? 'completed'
+                        : item.status === 'error'
+                          ? 'error'
+                          : 'needs_setup'
+                    }
+                    label={
+                      item.status === 'ok'
+                        ? t('setup.completed')
+                        : item.status === 'error'
+                          ? t('setup.diag_error')
+                          : t('setup.incomplete')
+                    }
+                  />
+                  {item.status !== 'ok' && item.action?.type === 'navigate' ? (
+                    <Button
+                      label={t('setup.fix_here')}
+                      variant="secondary"
+                      onClick={() => jumpToSection(item.action!.target)}
+                    />
+                  ) : null}
+                </div>
+              </SettingRow>
+              {showGuidance ? (
+                <div className="settings-row-block">
+                  <p className="kb-text kb-text--muted">{t(guidanceKey)}</p>
+                  {item.command ? (
+                    <p className="kb-text kb-text--caption readiness-command">
+                      {t('setup.reasoning_command_hint', { value: item.command })}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </SettingsGroup>
 
-      {notice ? <div className={`notice${notice.error ? ' error' : ''}`}>{notice.text}</div> : null}
+      {notice ? (
+        <div role="status" aria-live="polite">
+          <Callout tone={notice.error ? 'danger' : 'success'} title={notice.text} />
+        </div>
+      ) : null}
 
       <div className="settings-layout">
         <nav className="settings-subnav" aria-label="Settings sections">
@@ -1087,6 +1125,22 @@ export default function SettingsPage() {
         </nav>
         <div className="settings-content">{sectionOrder.map((id) => renderSection(id))}</div>
       </div>
+
+      {saveBarState !== 'clean' ? (
+        <FormScope
+          actions={{
+            'settings.save': () => void saveAll(),
+            'settings.discard': discardAll,
+          }}
+        >
+          <SaveBar
+            id="settings-save"
+            state={saveBarState}
+            save_action={{ id: 'settings.save' }}
+            discard_action={{ id: 'settings.discard' }}
+          />
+        </FormScope>
+      ) : null}
     </div>
   );
 }

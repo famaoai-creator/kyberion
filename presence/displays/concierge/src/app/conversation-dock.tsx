@@ -63,6 +63,9 @@ const QUICK_REQUEST_KEYS: ConciergeMessageKey[] = [
   'dock.quick.calendar',
 ];
 
+/** Window event that opens the dock (header action, ⌘K palette). */
+export const CONVERSATION_DOCK_OPEN_EVENT = 'concierge:open-dock';
+
 function newMessageId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -90,8 +93,8 @@ export function ConversationDock() {
   // window event — same-page action, no navigation.
   React.useEffect(() => {
     const onOpen = () => setOpen(true);
-    window.addEventListener('concierge:open-dock', onOpen);
-    return () => window.removeEventListener('concierge:open-dock', onOpen);
+    window.addEventListener(CONVERSATION_DOCK_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(CONVERSATION_DOCK_OPEN_EVENT, onOpen);
   }, []);
 
   const send = React.useCallback(
@@ -230,18 +233,9 @@ export function ConversationDock() {
     [draft, send]
   );
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        className="dock-toggle"
-        aria-label={t('dock.open')}
-        onClick={() => setOpen(true)}
-      >
-        {t('dock.title')}
-      </button>
-    );
-  }
+  // Closed: nothing floats over the page — the header's "秘書に相談" action
+  // (and the ⌘K palette) open the dock through CONVERSATION_DOCK_OPEN_EVENT.
+  if (!open) return null;
 
   const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
 

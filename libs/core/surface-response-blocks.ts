@@ -1,5 +1,6 @@
 import type { A2AMessage } from './a2a-bridge.js';
 import type { A2UIComponent, A2UIMessage } from './a2ui.js';
+import { isKyberionBaseComponentType, validateA2UIComponentProps } from './a2ui-catalog.js';
 import type {
   MissionProposal,
   NerveRoutingProposal,
@@ -231,11 +232,20 @@ function normalizeA2UIMessage(value: unknown): A2UIMessage | null {
         !isRecord(candidate) ||
         typeof candidate.id !== 'string' ||
         typeof candidate.type !== 'string' ||
-        !A2UI_COMPONENT_TYPES.has(candidate.type)
+        !(A2UI_COMPONENT_TYPES.has(candidate.type) || isKyberionBaseComponentType(candidate.type))
       ) {
         return null;
       }
       if (!isRecord(candidate.props)) return null;
+      // The shared `kyberion-base` catalog (`ui:*`) has a strict props
+      // contract: a block whose props violate it is dropped, never rendered.
+      if (isKyberionBaseComponentType(candidate.type)) {
+        try {
+          validateA2UIComponentProps(candidate.type, candidate.props);
+        } catch {
+          return null;
+        }
+      }
       if (
         Object.hasOwn(candidate, 'children') &&
         (!Array.isArray(candidate.children) ||

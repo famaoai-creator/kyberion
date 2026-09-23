@@ -1,6 +1,18 @@
 'use client';
 
 import * as React from 'react';
+import {
+  Badge,
+  Button,
+  Callout,
+  Disclosure,
+  KeyValue,
+  NextAction,
+  Section,
+  Skeleton,
+  StatusPill,
+  Tabs,
+} from '@agent/shared-ui';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { frontDeskText } from '../lib/i18n';
 import {
@@ -129,11 +141,22 @@ function storeDeferredIds(ids: Set<string>): void {
   }
 }
 
+/** Kind tag tone on each card (and the deferred list) — label + tone, never color alone. */
+const KIND_TONES: Record<DecideKind, 'accent' | 'warning' | 'info' | 'success' | 'danger'> = {
+  approval: 'accent',
+  hygiene: 'warning',
+  memory: 'info',
+  outcome: 'success',
+  exception: 'danger',
+};
+
 /**
- * FD-04 shared card frame: top line (kind tag / relative time / decide_by),
- * title, and the why/effect columns (stacked below 720px via CSS). Every
- * `render*Card` below builds its own action row and passes it as children so
- * the guarded decision endpoints stay exactly where they were (CS-03/CS-04).
+ * FD-04 shared card frame, UI-06 markup: a `ui:section` whose title is the
+ * item title, then one meta line (kind badge / status / relative time /
+ * deadline / decide_by) and the why/effect columns (stacked below 720px via
+ * CSS). Every `render*Card` below builds its own action row and passes it as
+ * children so the guarded decision endpoints stay exactly where they were
+ * (CS-03/CS-04). The wrapper carries the anchor the next-action card links to.
  */
 function DecideCardFrame({
   reactKey,
@@ -143,6 +166,7 @@ function DecideCardFrame({
   timeAbsolute,
   decideByText,
   extraMeta,
+  status,
   title,
   fields,
   locale,
@@ -156,7 +180,9 @@ function DecideCardFrame({
   decideByText: string | null;
   /** Extra top-line meta after the relative time (e.g. an approval deadline). */
   extraMeta?: React.ReactNode;
-  title: React.ReactNode;
+  /** Optional status badge shown after the kind tag. */
+  status?: React.ReactNode;
+  title: string;
   fields: ReturnType<typeof deriveCardFields>;
   locale: 'en' | 'ja';
   children: React.ReactNode;
@@ -164,40 +190,44 @@ function DecideCardFrame({
   const relative = relativeWhen(timeIso, locale);
   const showColumns = Boolean(fields.why) || hasEffectColumn(fields);
   return (
-    <div key={reactKey} className="item-card decide-card">
-      <div className="decide-card-top">
-        <span className={`queue-chip ${kind}`}>{kindLabel}</span>
-        {relative ? (
-          <span className="decide-time" title={timeAbsolute || undefined}>
-            {relative}
-          </span>
-        ) : null}
-        {extraMeta ? <span className="decide-time decide-due">{extraMeta}</span> : null}
-        {decideByText ? <span className="decide-by-badge">{decideByText}</span> : null}
-      </div>
-      <p className="item-title decide-card-title">{title}</p>
-      {showColumns ? (
-        <div className="decide-columns">
-          {fields.why ? (
-            <div className="decide-column">
-              <p className="decide-column-label">{frontDeskText('decide_why', locale)}</p>
-              <p className="item-body">{fields.why}</p>
-            </div>
+    <div id={`decide-${reactKey}`} className="decide-card" data-kind={kind}>
+      <Section title={title} headingLevel={3}>
+        <div className="decide-card-meta">
+          <Badge label={kindLabel} tone={KIND_TONES[kind]} />
+          {status}
+          {relative ? (
+            <span className="decide-time" title={timeAbsolute || undefined}>
+              {relative}
+            </span>
           ) : null}
-          {hasEffectColumn(fields) && fields.effectLabelKey ? (
-            <div className="decide-column">
-              <p className="decide-column-label">{frontDeskText(fields.effectLabelKey, locale)}</p>
-              <p className="item-body">{fields.effect}</p>
-            </div>
-          ) : null}
+          {extraMeta ? <span className="decide-time decide-due">{extraMeta}</span> : null}
+          {decideByText ? <span className="decide-by-badge">{decideByText}</span> : null}
         </div>
-      ) : null}
-      {children}
-      {fields.evidenceHref ? (
-        <a className="decide-evidence-link" href={fields.evidenceHref}>
-          {frontDeskText('decide_evidence', locale)}
-        </a>
-      ) : null}
+        {showColumns ? (
+          <div className="decide-columns">
+            {fields.why ? (
+              <div className="decide-column">
+                <p className="decide-column-label">{frontDeskText('decide_why', locale)}</p>
+                <p className="decide-column-body">{fields.why}</p>
+              </div>
+            ) : null}
+            {hasEffectColumn(fields) && fields.effectLabelKey ? (
+              <div className="decide-column">
+                <p className="decide-column-label">
+                  {frontDeskText(fields.effectLabelKey, locale)}
+                </p>
+                <p className="decide-column-body">{fields.effect}</p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {children}
+        {fields.evidenceHref ? (
+          <a className="decide-evidence-link" href={fields.evidenceHref}>
+            {frontDeskText('decide_evidence', locale)}
+          </a>
+        ) : null}
+      </Section>
     </div>
   );
 }
@@ -251,15 +281,19 @@ export default function ConciergePage() {
   }, []);
 
   React.useEffect(() => {
+    let current = true;
     fetch(`/api/front-desk/nav?locale=${locale}`)
       .then((response) => (response.ok ? response.json() : null))
       .then((data: unknown) => {
         const labels = (data as { role_labels?: DecideRoleLabels } | null)?.role_labels;
-        if (labels) setRoleLabels(labels);
+        if (current && labels) setRoleLabels(labels);
       })
       .catch(() => {
         // decide_by is advisory — its absence never blocks the queue.
       });
+    return () => {
+      current = false;
+    };
   }, [locale]);
 
   const decideByText =
@@ -572,11 +606,27 @@ export default function ConciergePage() {
   );
 
   if (loadError) {
-    return <div className="notice error">{t('home.load_error', { error: loadError })}</div>;
+    return <Callout tone="danger" title={t('home.load_error', { error: loadError })} />;
   }
   if (!summary) {
-    return <div className="pane-empty">{t('home.loading')}</div>;
+    // UI-06: a skeleton of the next-action card and the queue, never a bare
+    // "Checking…" line; the localized text stays as the accessible name.
+    return (
+      <div className="decide-loading">
+        <Skeleton shape="card" lines={3} label={t('home.loading')} />
+        <Skeleton shape="text" lines={4} label={t('home.loading')} />
+      </div>
+    );
   }
+
+  const later = (entryId: string, disabled?: boolean) => (
+    <Button
+      label={frontDeskText('decide_later', locale)}
+      variant="ghost"
+      disabled={disabled}
+      onClick={() => deferItem(entryId)}
+    />
+  );
 
   // CS-04/FD-04 — every item awaiting the human's decision is rendered by one
   // card helper per kind; the unified queue is the only place these render
@@ -604,31 +654,20 @@ export default function ConciergePage() {
         fields={fields}
         locale={locale}
       >
-        <div className="button-row">
-          <button
-            type="button"
-            className="action-button"
+        <div className="decide-actions">
+          <Button
+            label={frontDeskText('decide_approve', locale)}
+            variant="primary"
             disabled={busyId === item.id}
             onClick={() => void decideApproval(item, 'approved')}
-          >
-            {frontDeskText('decide_approve', locale)}
-          </button>
-          <button
-            type="button"
-            className="action-button danger"
+          />
+          <Button
+            label={frontDeskText('decide_reject', locale)}
+            variant="danger"
             disabled={busyId === item.id}
             onClick={() => void decideApproval(item, 'rejected')}
-          >
-            {frontDeskText('decide_reject', locale)}
-          </button>
-          <button
-            type="button"
-            className="action-button secondary"
-            disabled={busyId === item.id}
-            onClick={() => deferItem(entry.id)}
-          >
-            {frontDeskText('decide_later', locale)}
-          </button>
+          />
+          {later(entry.id, busyId === item.id)}
         </div>
       </DecideCardFrame>
     );
@@ -658,8 +697,8 @@ export default function ConciergePage() {
         locale={locale}
       >
         {hygieneConfirm?.missionId === item.mission_id ? (
-          <div className="hygiene-confirm">
-            <p className="item-body">
+          <div className="decide-confirm">
+            <p className="decide-confirm-text">
               {t(
                 hygieneConfirm.decision === 'start'
                   ? 'hygiene.confirm_start'
@@ -667,69 +706,55 @@ export default function ConciergePage() {
               )}
             </p>
             {hygieneConfirm.decision === 'cancel' ? (
-              <label className="field-label">
-                {t('hygiene.note_label')}
+              <label className="kb-field">
+                <span className="kb-field__label">{t('hygiene.note_label')}</span>
                 <textarea
+                  className="kb-input kb-textarea"
                   value={hygieneNote}
                   rows={2}
                   onChange={(event) => setHygieneNote(event.target.value)}
                 />
               </label>
             ) : null}
-            <div className="button-row">
-              <button
-                type="button"
-                className="action-button"
+            <div className="decide-actions">
+              <Button
+                label={t('hygiene.confirm_yes')}
+                variant={hygieneConfirm.decision === 'cancel' ? 'danger' : 'primary'}
                 disabled={hygieneBusyId === item.mission_id}
                 onClick={() => void decideHygiene(item, hygieneConfirm.decision, hygieneNote)}
-              >
-                {t('hygiene.confirm_yes')}
-              </button>
-              <button
-                type="button"
-                className="action-button secondary"
+              />
+              <Button
+                label={t('hygiene.confirm_back')}
+                variant="secondary"
                 disabled={hygieneBusyId === item.mission_id}
                 onClick={() => {
                   setHygieneConfirm(null);
                   setHygieneNote('');
                 }}
-              >
-                {t('hygiene.confirm_back')}
-              </button>
+              />
             </div>
           </div>
         ) : (
-          <div className="button-row">
-            <button
-              type="button"
-              className="action-button"
+          <div className="decide-actions">
+            <Button
+              label={frontDeskText('decide_continue', locale)}
+              variant="primary"
               disabled={hygieneBusyId !== null}
               onClick={() => {
                 setHygieneConfirm({ missionId: item.mission_id, decision: 'start' });
                 setHygieneNote('');
               }}
-            >
-              {frontDeskText('decide_continue', locale)}
-            </button>
-            <button
-              type="button"
-              className="action-button danger"
+            />
+            <Button
+              label={frontDeskText('decide_stop', locale)}
+              variant="danger"
               disabled={hygieneBusyId !== null}
               onClick={() => {
                 setHygieneConfirm({ missionId: item.mission_id, decision: 'cancel' });
                 setHygieneNote('');
               }}
-            >
-              {frontDeskText('decide_stop', locale)}
-            </button>
-            <button
-              type="button"
-              className="action-button secondary"
-              disabled={hygieneBusyId !== null}
-              onClick={() => deferItem(entry.id)}
-            >
-              {frontDeskText('decide_later', locale)}
-            </button>
+            />
+            {later(entry.id, hygieneBusyId !== null)}
           </div>
         )}
       </DecideCardFrame>
@@ -748,71 +773,52 @@ export default function ConciergePage() {
         timeIso={item.queued_at}
         timeAbsolute={formatWhen(item.queued_at, locale)}
         decideByText={decideByText}
-        title={
-          <>
-            {t(`memory.kind.${item.kind}` as Parameters<typeof t>[0])}
-            <span className="status-chip">
-              {t(`memory.tier.${item.sensitivity_tier}` as Parameters<typeof t>[0])}
-            </span>
-          </>
+        title={t(`memory.kind.${item.kind}` as Parameters<typeof t>[0])}
+        status={
+          <Badge label={t(`memory.tier.${item.sensitivity_tier}` as Parameters<typeof t>[0])} />
         }
         fields={fields}
         locale={locale}
       >
         {memoryConfirm?.id === item.id ? (
-          <div className="memory-confirm">
-            <p className="item-body">
+          <div className="decide-confirm">
+            <p className="decide-confirm-text">
               {t(
                 memoryConfirm.decision === 'approve'
                   ? 'memory.confirm_approve'
                   : 'memory.confirm_reject'
               )}
             </p>
-            <div className="button-row">
-              <button
-                type="button"
-                className="action-button"
+            <div className="decide-actions">
+              <Button
+                label={t('memory.confirm_yes')}
+                variant={memoryConfirm.decision === 'reject' ? 'danger' : 'primary'}
                 disabled={memoryBusyId === item.id}
                 onClick={() => void decideMemory(item, memoryConfirm.decision)}
-              >
-                {t('memory.confirm_yes')}
-              </button>
-              <button
-                type="button"
-                className="action-button secondary"
+              />
+              <Button
+                label={t('memory.confirm_back')}
+                variant="secondary"
                 disabled={memoryBusyId === item.id}
                 onClick={() => setMemoryConfirm(null)}
-              >
-                {t('memory.confirm_back')}
-              </button>
+              />
             </div>
           </div>
         ) : (
-          <div className="button-row">
-            <button
-              type="button"
-              className="action-button"
+          <div className="decide-actions">
+            <Button
+              label={frontDeskText('decide_remember', locale)}
+              variant="primary"
               disabled={memoryBusyId !== null}
               onClick={() => setMemoryConfirm({ id: item.id, decision: 'approve' })}
-            >
-              {frontDeskText('decide_remember', locale)}
-            </button>
-            <button
-              type="button"
-              className="action-button danger"
+            />
+            <Button
+              label={frontDeskText('decide_forget', locale)}
+              variant="danger"
               disabled={memoryBusyId !== null}
               onClick={() => setMemoryConfirm({ id: item.id, decision: 'reject' })}
-            >
-              {frontDeskText('decide_forget', locale)}
-            </button>
-            <button
-              type="button"
-              className="action-button secondary"
-              disabled={memoryBusyId !== null}
-              onClick={() => deferItem(entry.id)}
-            >
-              {frontDeskText('decide_later', locale)}
-            </button>
+            />
+            {later(entry.id, memoryBusyId !== null)}
           </div>
         )}
       </DecideCardFrame>
@@ -835,15 +841,7 @@ export default function ConciergePage() {
         fields={fields}
         locale={locale}
       >
-        <div className="button-row">
-          <button
-            type="button"
-            className="action-button secondary"
-            onClick={() => deferItem(entry.id)}
-          >
-            {frontDeskText('decide_later', locale)}
-          </button>
-        </div>
+        <div className="decide-actions">{later(entry.id)}</div>
       </DecideCardFrame>
     );
   };
@@ -860,65 +858,52 @@ export default function ConciergePage() {
         timeIso={item.updated_at}
         timeAbsolute={formatWhen(item.updated_at, locale)}
         decideByText={decideByText}
-        title={
-          <>
-            {item.title}
-            <span className="status-chip">
-              {t(`home.status.${item.status}` as Parameters<typeof t>[0]) || item.status}
-            </span>
-          </>
+        title={item.title}
+        status={
+          <Badge
+            label={t(`home.status.${item.status}` as Parameters<typeof t>[0]) || item.status}
+          />
         }
         fields={fields}
         locale={locale}
       >
-        <div className="button-row">
-          {item.artifact_paths.length > 0 ? (
-            <button
-              type="button"
-              className="action-button secondary"
-              disabled={previewBusyId === item.entry_id}
-              onClick={() => void togglePreview(item)}
-            >
-              {previewId === item.entry_id
-                ? t('home.preview_hide')
-                : frontDeskText('action_open', locale)}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="action-button"
+        <div className="decide-actions">
+          <Button
+            label={frontDeskText('decide_receive', locale)}
+            variant="primary"
             disabled={busyId === item.entry_id || item.status === 'accepted'}
             onClick={() => void recordOutcomeVerdict(item, 'accepted')}
-          >
-            {frontDeskText('decide_receive', locale)}
-          </button>
-          <button
-            type="button"
-            className="action-button secondary"
+          />
+          <Button
+            label={frontDeskText('decide_return', locale)}
+            variant="secondary"
             disabled={busyId === item.entry_id}
             onClick={() => {
               setChangeFormId(changeFormId === item.entry_id ? null : item.entry_id);
               setChangeNote('');
             }}
-          >
-            {frontDeskText('decide_return', locale)}
-          </button>
-          <button
-            type="button"
-            className="action-button secondary"
-            disabled={busyId === item.entry_id}
-            onClick={() => deferItem(entry.id)}
-          >
-            {frontDeskText('decide_later', locale)}
-          </button>
+          />
+          {item.artifact_paths.length > 0 ? (
+            <Button
+              label={
+                previewId === item.entry_id
+                  ? t('home.preview_hide')
+                  : frontDeskText('action_open', locale)
+              }
+              variant="secondary"
+              disabled={previewBusyId === item.entry_id}
+              onClick={() => void togglePreview(item)}
+            />
+          ) : null}
+          {later(entry.id, busyId === item.entry_id)}
         </div>
         {previewId === item.entry_id ? (
           <div className="outcome-preview">
             {previewError ? (
-              <p className="item-body">{t('home.preview_error', { error: previewError })}</p>
+              <Callout tone="danger" title={t('home.preview_error', { error: previewError })} />
             ) : null}
             {previewData && previewData.files.length === 0 ? (
-              <p className="item-meta">{t('home.preview_empty')}</p>
+              <p className="decide-muted">{t('home.preview_empty')}</p>
             ) : null}
             {previewData?.files.map((file, index) => (
               <div className="preview-file" key={`${file.name}-${index}`}>
@@ -929,7 +914,7 @@ export default function ConciergePage() {
                   typeof file.content === 'string' ? (
                   <pre className="preview-content">{file.content}</pre>
                 ) : (
-                  <p className="item-meta">
+                  <p className="decide-muted">
                     {t(
                       file.missing
                         ? 'home.preview_missing'
@@ -939,11 +924,13 @@ export default function ConciergePage() {
                     )}
                   </p>
                 )}
-                {file.truncated ? <p className="item-meta">{t('home.preview_truncated')}</p> : null}
+                {file.truncated ? (
+                  <p className="decide-muted">{t('home.preview_truncated')}</p>
+                ) : null}
               </div>
             ))}
             {previewData && previewData.total > previewData.shown ? (
-              <p className="item-meta">
+              <p className="decide-muted">
                 {t('home.preview_more', { count: previewData.total - previewData.shown })}
               </p>
             ) : null}
@@ -951,39 +938,37 @@ export default function ConciergePage() {
         ) : null}
         {changeFormId === item.entry_id ? (
           <form
-            className="change-request-form"
+            className="decide-confirm"
             onSubmit={(event) => {
               event.preventDefault();
               void recordOutcomeVerdict(item, 'changes_requested', changeNote);
             }}
           >
-            <label className="field-label">
-              {t('home.change_prompt')}
+            <label className="kb-field">
+              <span className="kb-field__label">{t('home.change_prompt')}</span>
               <textarea
+                className="kb-input kb-textarea"
                 value={changeNote}
                 rows={3}
                 required
                 onChange={(event) => setChangeNote(event.target.value)}
               />
             </label>
-            <div className="button-row">
-              <button
+            <div className="decide-actions">
+              <Button
                 type="submit"
-                className="action-button"
+                label={t('home.change_send')}
+                variant="primary"
                 disabled={busyId === item.entry_id || !changeNote.trim()}
-              >
-                {t('home.change_send')}
-              </button>
-              <button
-                type="button"
-                className="action-button secondary"
+              />
+              <Button
+                label={t('home.change_cancel')}
+                variant="secondary"
                 onClick={() => {
                   setChangeFormId(null);
                   setChangeNote('');
                 }}
-              >
-                {t('home.change_cancel')}
-              </button>
+              />
             </div>
           </form>
         ) : null}
@@ -1028,6 +1013,11 @@ export default function ConciergePage() {
     kindFilter === 'all' ? queue : queue.filter((entry) => entry.kind === kindFilter);
   const totalQueueCount = queue.length;
 
+  const entryTitle = (entry: DecideQueueEntry): string =>
+    entry.kind === 'memory'
+      ? t(`memory.kind.${entry.item.kind}` as Parameters<typeof t>[0])
+      : entry.item.title;
+
   const renderEntry = (entry: DecideQueueEntry): React.ReactNode => {
     switch (entry.kind) {
       case 'approval':
@@ -1045,108 +1035,136 @@ export default function ConciergePage() {
     }
   };
 
+  // UI-06: the most urgent live item (queue order is urgency order) leads the
+  // page as the next action; an empty queue gets a calm empty state instead.
+  const nextEntry = queue[0];
+  const nextWhy = nextEntry
+    ? nextEntry.kind === 'hygiene'
+      ? nextEntry.item.reason
+        ? t(`hygiene.reason.${nextEntry.item.reason}` as Parameters<typeof t>[0])
+        : undefined
+      : deriveCardFields(nextEntry).why
+    : undefined;
+  const nextReason = [
+    nextWhy,
+    totalQueueCount > 1 ? t('decide.next_more', { count: totalQueueCount - 1 }) : undefined,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const responseStatusPill =
+    responseStatus?.state === 'ready'
+      ? 'ready'
+      : responseStatus?.state === 'waiting'
+        ? 'working'
+        : 'pending';
+
   return (
     <>
-      {notice ? <div className={`notice${notice.error ? ' error' : ''}`}>{notice.text}</div> : null}
+      {notice ? <Callout tone={notice.error ? 'danger' : 'success'} title={notice.text} /> : null}
 
-      <section
-        className="pane inquiry-queue decide-page"
-        aria-label={frontDeskText('nav_decide', locale)}
-      >
-        <h1 className="decide-heading">{frontDeskText('nav_decide', locale)}</h1>
-        <p className="pane-subtitle decide-lead">{frontDeskText('decide_lead', locale)}</p>
+      {nextEntry ? (
+        <NextAction
+          eyebrow={`${t('decide.next_eyebrow')} · ${t(
+            `queue.type.${nextEntry.kind}` as Parameters<typeof t>[0]
+          )}`}
+          title={entryTitle(nextEntry)}
+          reason={nextReason || undefined}
+          primary={{ label: t('decide.next_review'), href: `#decide-${nextEntry.id}` }}
+        />
+      ) : (
+        <NextAction
+          state="empty"
+          title={frontDeskText('decide_empty', locale)}
+          reason={t('decide.next_empty_reason')}
+        />
+      )}
 
-        <div
-          className="decide-filter-row"
-          role="group"
-          aria-label={frontDeskText('nav_decide', locale)}
-        >
-          <button
-            type="button"
-            className={`decide-filter-chip${kindFilter === 'all' ? ' active' : ''}`}
-            onClick={() => setKindFilter('all')}
-          >
-            {frontDeskText('decide_filter_all', locale)} ·{' '}
-            {frontDeskText('count_items', locale, { count: totalQueueCount })}
-          </button>
-          {visibleKinds.map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              className={`decide-filter-chip${kindFilter === kind ? ' active' : ''}`}
-              onClick={() => setKindFilter(kind)}
+      {/* With nothing queued or set aside, the next-action empty state says
+          it all — no empty tab bar repeating the same sentence. */}
+      {totalQueueCount > 0 || deferred.length > 0 ? (
+        <section className="decide-queue" aria-labelledby="decide-heading">
+          <header className="decide-queue-header">
+            <h2 id="decide-heading" className="decide-heading">
+              {frontDeskText('nav_decide', locale)}
+            </h2>
+            <p className="decide-lead">{frontDeskText('decide_lead', locale)}</p>
+          </header>
+
+          <Tabs
+            label={frontDeskText('nav_decide', locale)}
+            active={kindFilter}
+            onSelect={(id) => setKindFilter(id as DecideKind | 'all')}
+            items={[
+              {
+                id: 'all',
+                label: frontDeskText('decide_filter_all', locale),
+                count: totalQueueCount,
+              },
+              ...visibleKinds.map((kind) => ({
+                id: kind,
+                label: t(`queue.type.${kind}` as Parameters<typeof t>[0]),
+                count: countsByKind[kind],
+              })),
+            ]}
+          />
+
+          {filteredQueue.length === 0 ? (
+            <p className="decide-muted decide-empty">{frontDeskText('decide_empty', locale)}</p>
+          ) : (
+            <div className="decide-list">{filteredQueue.map((entry) => renderEntry(entry))}</div>
+          )}
+
+          {deferred.length > 0 ? (
+            <Disclosure
+              summary={frontDeskText('decide_deferred', locale, { count: deferred.length })}
             >
-              {t(`queue.type.${kind}` as Parameters<typeof t>[0])} ·{' '}
-              {frontDeskText('count_items', locale, { count: countsByKind[kind] })}
-            </button>
-          ))}
-        </div>
-
-        {filteredQueue.length === 0 ? (
-          <div className="pane-empty">{frontDeskText('decide_empty', locale)}</div>
-        ) : (
-          filteredQueue.map((entry) => (
-            <div key={entry.id} className="queue-item">
-              {renderEntry(entry)}
-            </div>
-          ))
-        )}
-
-        {deferred.length > 0 ? (
-          <details className="decide-deferred-section">
-            <summary>
-              {frontDeskText('decide_deferred', locale, { count: deferred.length })}
-            </summary>
-            {deferred.map((entry) => {
-              const title =
-                entry.kind === 'approval' || entry.kind === 'hygiene' || entry.kind === 'exception'
-                  ? entry.item.title
-                  : entry.kind === 'outcome'
-                    ? entry.item.title
-                    : t(`memory.kind.${entry.item.kind}` as Parameters<typeof t>[0]);
-              return (
-                <div key={entry.id} className="decide-deferred-item">
-                  <span className={`queue-chip ${entry.kind}`}>
-                    {t(`queue.type.${entry.kind}` as Parameters<typeof t>[0])}
-                  </span>
-                  <span className="decide-deferred-title">{title}</span>
-                  <button
-                    type="button"
-                    className="action-button secondary"
-                    onClick={() => undeferItem(entry.id)}
-                  >
-                    {frontDeskText('decide_undefer', locale)}
-                  </button>
-                </div>
-              );
-            })}
-          </details>
-        ) : null}
-      </section>
+              <ul className="decide-deferred-list">
+                {deferred.map((entry) => (
+                  <li key={entry.id} className="decide-deferred-item">
+                    <Badge
+                      label={t(`queue.type.${entry.kind}` as Parameters<typeof t>[0])}
+                      tone={KIND_TONES[entry.kind]}
+                    />
+                    <span className="decide-deferred-title">{entryTitle(entry)}</span>
+                    <Button
+                      label={frontDeskText('decide_undefer', locale)}
+                      variant="ghost"
+                      onClick={() => undeferItem(entry.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </Disclosure>
+          ) : null}
+        </section>
+      ) : null}
 
       {responseStatus ? (
-        <section className="pane response-status" aria-label={t('home.response_title')}>
-          <h2>{t('home.response_title')}</h2>
-          <p className="pane-subtitle">{t('home.response_description')}</p>
-          <p className={`status-chip${responseStatus.state === 'ready' ? '' : ' attention'}`}>
-            {responseStatus.label}
-          </p>
-          <p className="item-body">{responseStatus.next_action}</p>
+        <Section title={t('home.response_title')} description={t('home.response_description')}>
+          <div className="response-status-line">
+            <StatusPill status={responseStatusPill} label={responseStatus.label} />
+            <span className="decide-muted">{responseStatus.next_action}</span>
+          </div>
+          {responseStatus.active_tasks.length > 0 ? (
+            <KeyValue
+              items={responseStatus.active_tasks.map((task) => ({
+                label: t('home.response_task', { value: task.task_id || task.delegation_id }),
+                value: [
+                  task.backend_name ? t('home.response_backend', { value: task.backend_name }) : '',
+                  t('home.response_elapsed', { value: task.elapsed_seconds }),
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
+              }))}
+            />
+          ) : null}
           {responseStatus.stale_child_count > 0 ? (
-            <p className="item-meta">
+            <p className="decide-muted">
               {t('home.response_stale', { count: responseStatus.stale_child_count })}
             </p>
           ) : null}
-          {responseStatus.active_tasks.map((task) => (
-            <div className="item-meta" key={task.delegation_id}>
-              {t('home.response_task', { value: task.task_id || task.delegation_id })}
-              {task.backend_name
-                ? ` · ${t('home.response_backend', { value: task.backend_name })}`
-                : ''}
-              {` · ${t('home.response_elapsed', { value: task.elapsed_seconds })}`}
-            </div>
-          ))}
-        </section>
+        </Section>
       ) : null}
     </>
   );

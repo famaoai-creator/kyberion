@@ -1,0 +1,39 @@
+{
+  "name": "@agent/shared-ui",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kyberion UI kit: React components and an A2UI renderer for the kyberion-base catalog (the .kb-* class contract in kyberion-ui.css), plus a dependency-free vanilla renderer.",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./vanilla": "./vanilla/kyberion-ui.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "vanilla"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^5.9.3"
+  }
+}

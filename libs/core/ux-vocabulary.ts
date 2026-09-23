@@ -5,12 +5,7 @@ import { loadVocabularyCatalog, resolveVocabularyEntry } from './vocabulary-cata
 /** @deprecated Use `SupportedLocale` from `./locale.js` instead. */
 export type UxVocabularyLocale = SupportedLocale;
 export type UxStatusDomain =
-  | 'readiness'
-  | 'connection'
-  | 'provider'
-  | 'mission'
-  | 'progress'
-  | 'runtime';
+  'readiness' | 'connection' | 'provider' | 'mission' | 'progress' | 'runtime';
 
 // I18N-02: renderStatus's key map targets the `status` namespace exactly —
 // these are the domains renderStatus() has always served, and they moved
@@ -73,6 +68,22 @@ const STATUS_KEY_MAP: Record<UxStatusDomain, Record<string, string>> = {
     stopped: 'status:runtime_stopped',
   },
 };
+
+/** Status domains served by `renderStatus()` (the dashboard status vocabulary). */
+export const UX_STATUS_DOMAINS = Object.freeze(Object.keys(STATUS_KEY_MAP) as UxStatusDomain[]);
+
+/**
+ * Every canonical status value `renderStatus()` understands, across all domains,
+ * de-duplicated and sorted. UI status pills (A2UI `ui:status-pill`) validate
+ * against this set so surfaces never invent a parallel status vocabulary.
+ */
+export function listUxStatusValues(): string[] {
+  const values = new Set<string>();
+  for (const domain of UX_STATUS_DOMAINS) {
+    for (const value of Object.keys(STATUS_KEY_MAP[domain])) values.add(value);
+  }
+  return [...values].sort();
+}
 
 /**
  * @deprecated Thin wrapper over `./locale.js`. Kept for call-site

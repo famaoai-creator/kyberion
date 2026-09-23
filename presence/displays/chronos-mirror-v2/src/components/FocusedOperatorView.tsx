@@ -1,32 +1,57 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type { KbStatus, KbTone } from '@agent/core/a2ui-catalog';
+import {
+  Badge,
+  Button,
+  Callout,
+  Code,
+  EmptyState,
+  Grid,
+  KbChart,
+  KeyValue,
+  List,
+  Metric,
+  Section,
+  Segmented,
+  Select,
+  Skeleton,
+  StatusPill,
+  Table,
+  isKbStatus,
+} from '@agent/shared-ui';
 
 import {
   findLatestMissionHandoff,
   type MissionAssetCategory,
 } from '../lib/mission-progress-client';
-import { buildAttentionItems } from '../lib/operator-console';
+import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
 import { buildRuntimeTopologyGraph } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';
-import { chronosSpeechLocale, resolveChronosLocale, uxTextOr } from '../lib/ux-vocabulary';
+import { useChronosLocale } from '../lib/hooks';
+import { chronosSpeechLocale, uxMessage, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
 import { parseFocusedOperatorResponse } from '../lib/focused-operator-response';
-import { SurfaceStatusPanel } from './SurfaceStatusPanel';
+import { humanizeMissionId } from './ChronosOffice';
+import {
+  ChronosDiagram,
+  ChronosFieldScope,
+  ChronosInline,
+  ChronosMeta,
+  ChronosToolbar,
+} from './chronos-ui';
+import { WsSelectTable, WsTitleCell } from './ChronosWsParts';
 import { TraceViewer } from './TraceViewer';
 import {
   attentionItemTargetMissionId,
   attentionItemTargetViewId,
-  attentionItemTargetViewLabel,
   formatBytes,
   formatTimestamp,
-  graphNodePalette,
   isEditableHotkeyTarget,
   loadFocusedOperatorSelectedSessionId,
   pickDefaultSessionId,
   resolveComputerSessionHotkeySelection,
-  RUNTIME_GRAPH_NODE_HEIGHT,
-  RUNTIME_GRAPH_NODE_WIDTH,
   saveFocusedOperatorSelectedSessionId,
   type FocusedViewId,
   type Payload,
@@ -39,25 +64,134 @@ export {
   resolveComputerSessionHotkeySelection,
 } from './FocusedOperatorViewModel';
 
-const TITLES: Record<FocusedViewId, string> = {
-  'needs-attention': 'Needs Attention',
-  'mission-control-plane': 'Mission Control',
-  'computer-sessions': 'Computer Sessions',
-  'runtime-topology-map': 'Runtime Topology',
-  'runtime-lease-doctor': 'Runtime Governance',
-  'recent-surface-outbox': 'Delivery Exceptions',
-  'secret-approval-queue': 'Secret Approvals',
-  'owner-summaries': 'Audit Trail',
-  'trace-viewer': 'Trace Viewer',
+type AssetFilter = 'all' | MissionAssetCategory;
+type FlowKind = Payload['runtimeTopology']['flows'][number]['kind'];
+
+/** Localized focused-view title (static keys so the vocabulary contract can verify them). */
+function viewTitle(viewId: FocusedViewId, locale: SupportedLocale): string {
+  switch (viewId) {
+    case 'needs-attention':
+      return uxText('chronos_fov_title_needs_attention', locale);
+    case 'mission-control-plane':
+      return uxText('chronos_fov_title_mission_control', locale);
+    case 'computer-sessions':
+      return uxText('chronos_fov_title_computer_sessions', locale);
+    case 'runtime-topology-map':
+      return uxText('chronos_fov_title_runtime_topology', locale);
+    case 'runtime-lease-doctor':
+      return uxText('chronos_fov_title_runtime_governance', locale);
+    case 'recent-surface-outbox':
+      return uxText('chronos_fov_title_delivery_exceptions', locale);
+    case 'secret-approval-queue':
+      return uxText('chronos_fov_title_secret_approvals', locale);
+    case 'owner-summaries':
+      return uxText('chronos_fov_title_audit_trail', locale);
+    case 'trace-viewer':
+      return uxText('chronos_fov_title_trace_viewer', locale);
+  }
+}
+
+function assetFilterOptions(locale: SupportedLocale): Array<{ value: AssetFilter; label: string }> {
+  return [
+    { value: 'all', label: uxText('chronos_fov_asset_all', locale) },
+    { value: 'deliverables', label: uxText('chronos_fov_asset_deliverables', locale) },
+    { value: 'artifacts', label: uxText('chronos_fov_asset_artifacts', locale) },
+    { value: 'outputs', label: uxText('chronos_fov_asset_outputs', locale) },
+    { value: 'evidence', label: uxText('chronos_fov_asset_evidence', locale) },
+  ];
+}
+
+function assetCategoryLabel(category: MissionAssetCategory, locale: SupportedLocale): string {
+  return assetFilterOptions(locale).find((option) => option.value === category)?.label || category;
+}
+
+function flowKindLabel(kind: FlowKind, locale: SupportedLocale): string {
+  if (kind === 'a2a') return uxText('chronos_fov_flow_kind_a2a', locale);
+  if (kind === 'agent_message') return uxText('chronos_fov_flow_kind_agent_message', locale);
+  return uxText('chronos_fov_flow_kind_surface_link', locale);
+}
+
+function riskLabel(
+  level: Payload['secretApprovals'][number]['riskLevel'],
+  locale: SupportedLocale
+): string {
+  if (level === 'critical') return uxText('chronos_fov_risk_critical', locale);
+  if (level === 'high') return uxText('chronos_fov_risk_high', locale);
+  if (level === 'medium') return uxText('chronos_fov_risk_medium', locale);
+  return uxText('chronos_fov_risk_low', locale);
+}
+
+const RISK_TONE: Record<Payload['secretApprovals'][number]['riskLevel'], KbTone> = {
+  low: 'neutral',
+  medium: 'info',
+  high: 'warning',
+  critical: 'danger',
 };
 
-const ASSET_FILTERS: Array<{ id: 'all' | MissionAssetCategory; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'deliverables', label: 'Deliverables' },
-  { id: 'artifacts', label: 'Artifacts' },
-  { id: 'outputs', label: 'Outputs' },
-  { id: 'evidence', label: 'Evidence' },
-];
+const CONTROL_TONE_STATUS: Record<Payload['activeMissions'][number]['controlTone'], KbStatus> = {
+  planning: 'planned',
+  ready: 'ready',
+  attention: 'review',
+  pending: 'pending',
+};
+
+const ATTENTION_CALLOUT_TONE: Record<AttentionItem['tone'], 'danger' | 'warning' | 'info'> = {
+  critical: 'danger',
+  warning: 'warning',
+  info: 'info',
+};
+
+const RAW_STATUS_ALIASES: Record<string, KbStatus> = {
+  ok: 'done',
+  success: 'done',
+  succeeded: 'done',
+  idle: 'ready',
+  in_progress: 'running',
+  closed: 'stopped',
+  exited: 'stopped',
+  terminated: 'stopped',
+  warning: 'degraded',
+  critical: 'failed',
+  unknown: 'n/a',
+};
+
+/** Map a raw runtime / session state onto the canonical status set (undefined = no pill). */
+function asKbStatus(raw: string | null | undefined): KbStatus | undefined {
+  if (!raw) return undefined;
+  const key = raw.trim().toLowerCase();
+  if (isKbStatus(key)) return key;
+  return RAW_STATUS_ALIASES[key];
+}
+
+/** Short time for diagram gutters (`at`). */
+function shortTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString(chronosSpeechLocale(), { hour: '2-digit', minute: '2-digit' });
+}
+
+function endpointLabel(id: string): string {
+  return id.includes(':') ? id.split(':').slice(-1)[0] : id;
+}
+
+function missionAssetUrl(missionId: string, path: string): string {
+  return `/api/mission-asset?missionId=${encodeURIComponent(missionId)}&path=${encodeURIComponent(path)}`;
+}
+
+function openConciergeSecretIntroduce(): void {
+  // Chronos and Concierge are different surfaces; prefer absolute when known.
+  const conciergePort =
+    typeof window !== 'undefined' ? window.localStorage.getItem('kyberion.conciergePort') : null;
+  if (conciergePort) {
+    window.open(
+      `http://127.0.0.1:${conciergePort}/settings#secret-introduce`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+    return;
+  }
+  window.location.assign('/settings#secret-introduce');
+}
 
 export function FocusedOperatorView({
   viewId,
@@ -78,12 +212,11 @@ export function FocusedOperatorView({
   organizationId?: string;
   projectId?: string;
 }) {
-  const locale = resolveChronosLocale();
-  const ft = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
+  const locale = useChronosLocale();
   const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [assetFilter, setAssetFilter] = useState<'all' | MissionAssetCategory>('all');
+  const [assetFilter, setAssetFilter] = useState<AssetFilter>('all');
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(() =>
     loadFocusedOperatorSelectedSessionId()
@@ -219,977 +352,801 @@ export function FocusedOperatorView({
   );
 
   if (!mounted) {
-    return (
-      <SurfaceStatusPanel
-        eyebrow="Focused Operator View"
-        title="Loading focused operator view"
-        detail="Chronos is resolving the current mission, runtime, and surface context."
-        tone="neutral"
-      />
-    );
+    return <Skeleton shape="card" lines={4} label={uxText('chronos_fov_loading', locale)} />;
   }
 
   if (error) {
     const safeError = buildUserFacingError(error, { locale, surface: 'chronos' });
     return (
-      <SurfaceStatusPanel
-        eyebrow="Focused Operator View"
+      <Callout
+        tone="danger"
         title={safeError.title}
-        detail={`${safeError.body} ${safeError.nextAction}`}
-        tone="error"
-        meta={safeError.traceLine}
-        actionLabel="Retry"
-        onAction={() => {
-          window.location.reload();
-        }}
-      />
+        body={`${safeError.body} ${safeError.nextAction}`}
+      >
+        {safeError.traceLine ? <ChronosMeta mono>{safeError.traceLine}</ChronosMeta> : null}
+        <ChronosToolbar>
+          <Button
+            label={uxText('chronos_action_retry', locale)}
+            onClick={() => {
+              window.location.reload();
+            }}
+          />
+        </ChronosToolbar>
+      </Callout>
     );
   }
 
   if (!data) {
-    return (
-      <SurfaceStatusPanel
-        eyebrow="Focused Operator View"
-        title="Waiting for operator data"
-        detail="The view will populate once the control plane snapshot is available."
-        tone="neutral"
-      />
-    );
+    return <Skeleton shape="card" lines={4} label={uxText('chronos_fov_waiting', locale)} />;
   }
 
+  const assetOptions = assetFilterOptions(locale);
+
   return (
-    <div className="flex flex-col gap-5">
-      <section className="rounded-[24px] border kb-border-accent kb-surface-accent px-5 py-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-              Focused Operator View
-            </div>
-            <div className="mt-2 text-xl font-semibold tracking-tight kb-text-primary">
-              {TITLES[viewId]}
-            </div>
-            <div className="mt-1 text-[11px] leading-5 kb-text-muted">
-              {ft(
-                'chronos_focused_view_hint',
-                'This mode isolates one operator concern so you can inspect it without the rest of the control surface competing for attention.'
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
+    <div className="chronos-stack">
+      <Section title={viewTitle(viewId, locale)} description={uxText('chronos_fov_hint', locale)}>
+        <ChronosToolbar>
+          <Button
+            label={uxText('chronos_show_full_console', locale)}
+            variant="ghost"
             onClick={onBack}
-            aria-label="Return to full Chronos console"
-            className="self-start rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.2em] kb-text-secondary transition hover:kb-surface-raised"
-          >
-            {ft('chronos_show_full_console', 'Show full console')}
-          </button>
-        </div>
-      </section>
+          />
+        </ChronosToolbar>
+      </Section>
 
-      {viewId === 'needs-attention' && (
-        <div className="grid gap-3">
-          {attentionItems.length === 0 ? (
-            <SurfaceStatusPanel
-              eyebrow={ft('chronos_sc_needs_attention_label', 'Needs attention')}
-              title={ft(
-                'chronos_no_immediate_intervention',
-                'No immediate operator intervention is recommended'
-              )}
-              detail={ft(
-                'chronos_no_blocking_issue',
-                'The current snapshot does not show a blocking screen or mission issue.'
-              )}
-              tone="success"
-            />
-          ) : (
-            attentionItems.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4"
-              >
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  {item.title}
-                </div>
-                <div className="mt-2 text-sm kb-text-primary">{item.reason}</div>
-                <div className="mt-2 text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  {item.targetType}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {onOpenView && attentionItemTargetViewId(item) ? (
-                    <button
-                      type="button"
-                      aria-label={`Open related view: ${attentionItemTargetViewLabel(item) || 'view'}`}
-                      onClick={() =>
-                        onOpenView(
-                          attentionItemTargetViewId(item)!,
-                          attentionItemTargetMissionId(item)
-                        )
-                      }
-                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
-                    >
-                      {`Open ${attentionItemTargetViewLabel(item) || 'related view'}`}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {viewId === 'mission-control-plane' && (
-        <div className="grid gap-3">
-          {data.activeMissions.map((mission) =>
-            (() => {
-              const progress = data.missionProgress.find(
-                (entry) => entry.missionId === mission.missionId
-              );
+      {viewId === 'needs-attention' &&
+        (attentionItems.length === 0 ? (
+          <Callout
+            tone="success"
+            title={uxText('chronos_no_immediate_intervention', locale)}
+            body={uxText('chronos_no_blocking_issue', locale)}
+          />
+        ) : (
+          <Section title={viewTitle('needs-attention', locale)}>
+            {attentionItems.map((item) => {
+              const targetViewId = attentionItemTargetViewId(item);
               return (
-                <div
-                  key={mission.missionId}
-                  id={`mission-card-${mission.missionId}`}
-                  className={`rounded-2xl border px-4 py-4 transition ${
-                    highlightedMissionId === mission.missionId
-                      ? 'kb-border-accent kb-surface-accent'
-                      : 'kb-border-subtle kb-surface-sunken'
-                  }`}
+                <Callout
+                  key={item.id}
+                  tone={ATTENTION_CALLOUT_TONE[item.tone]}
+                  title={item.title}
+                  body={item.reason}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-[11px] font-semibold kb-text-primary">
-                      {mission.missionId}
-                    </div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                      {mission.controlSummary}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-[10px] kb-text-muted">
-                    {mission.missionType || 'development'} · {mission.tier}
-                  </div>
-                  <div className="mt-4 grid gap-3 lg:grid-cols-[0.95fr,1.05fr]">
-                    <div className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                      <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                        task board
-                      </div>
-                      <div className="mt-2 text-sm kb-text-primary">
-                        {progress?.boardStatus || 'Unknown'}
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
-                        <div>
-                          steps total{' '}
-                          <span className="font-mono kb-text-primary">
-                            {progress?.boardStepsTotal ?? 0}
-                          </span>
-                        </div>
-                        <div>
-                          done{' '}
-                          <span className="font-mono kb-text-primary">
-                            {progress?.boardStepsDone ?? 0}
-                          </span>
-                        </div>
-                        <div>
-                          active{' '}
-                          <span className="font-mono kb-text-primary">
-                            {progress?.boardStepsActive ?? 0}
-                          </span>
-                        </div>
-                        <div>
-                          pending{' '}
-                          <span className="font-mono kb-text-primary">
-                            {progress?.boardStepsPending ?? 0}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                      <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                        next tasks
-                      </div>
-                      <div className="mt-2 text-sm kb-text-primary">
-                        {mission.nextTaskCount} visible in current queue
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
-                        <div>
-                          queue total{' '}
-                          <span className="font-mono kb-text-primary">
-                            {progress?.nextTasksTotal ?? mission.nextTaskCount}
-                          </span>
-                        </div>
-                        <div>
-                          pending{' '}
-                          <span className="font-mono kb-text-primary">
-                            {progress?.nextTasksPending ?? mission.nextTaskCount}
-                          </span>
-                        </div>
-                        <div>
-                          completed{' '}
-                          <span className="font-mono kb-text-primary">
-                            {progress?.nextTasksCompleted ?? 0}
-                          </span>
-                        </div>
-                        <div>
-                          control{' '}
-                          <span className="font-mono kb-text-primary">{mission.controlTone}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  {onOpenMissionThread ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenMissionThread(mission.missionId)}
-                      className="mt-3 rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.16em] kb-text-accent transition hover:kb-surface-accent"
-                    >
-                      Open mission thread
-                    </button>
+                  {onOpenView && targetViewId ? (
+                    <ChronosToolbar>
+                      <Button
+                        label={uxMessage(
+                          'chronos_fov_open_view',
+                          { view: viewTitle(targetViewId, locale) },
+                          'Open {view}',
+                          locale
+                        )}
+                        onClick={() => onOpenView(targetViewId, attentionItemTargetMissionId(item))}
+                      />
+                    </ChronosToolbar>
                   ) : null}
-                  <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                    <div className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                      <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                        dependencies
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {(progress?.dependencies || []).length === 0 ? (
-                          <span className="text-[10px] kb-text-muted">
-                            No declared prerequisites.
-                          </span>
-                        ) : (
-                          (progress?.dependencies || []).map((dependency) => (
-                            <span
-                              key={dependency}
-                              className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[9px] font-mono kb-text-secondary"
-                            >
-                              {dependency}
-                            </span>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                          generated assets
-                        </div>
-                        <div className="flex flex-wrap justify-end gap-1">
-                          {ASSET_FILTERS.map((filter) => (
-                            <button
-                              key={filter.id}
-                              type="button"
-                              onClick={() => setAssetFilter(filter.id)}
-                              className={`rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.14em] transition ${
-                                assetFilter === filter.id
-                                  ? 'kb-border-accent kb-surface-accent kb-text-accent'
-                                  : 'kb-border-subtle kb-surface-sunken kb-text-muted hover:kb-surface-raised'
-                              }`}
-                            >
-                              {filter.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-2 grid gap-2">
-                        {(progress?.generatedAssets || []).filter(
-                          (asset) => assetFilter === 'all' || asset.category === assetFilter
-                        ).length === 0 ? (
-                          <SurfaceStatusPanel
-                            eyebrow="Generated assets"
-                            title="No generated assets discovered yet"
-                            detail="Assets will appear here once the mission produces deliverables, artifacts, or evidence."
-                            tone="neutral"
-                          />
-                        ) : (
-                          (progress?.generatedAssets || [])
-                            .filter(
-                              (asset) => assetFilter === 'all' || asset.category === assetFilter
-                            )
-                            .map((asset) => (
-                              <div
-                                key={asset.path}
-                                className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2"
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                                    {asset.category}
-                                  </div>
-                                  <a
-                                    href={`/api/mission-asset?missionId=${encodeURIComponent(mission.missionId)}&path=${encodeURIComponent(asset.path)}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-[9px] uppercase tracking-[0.16em] kb-text-accent underline decoration-cyan-200/30 underline-offset-2"
-                                  >
-                                    open
-                                  </a>
-                                </div>
-                                <div className="mt-1 break-all font-mono text-[10px] kb-text-secondary">
-                                  {asset.path}
-                                </div>
-                                <div className="mt-1 flex flex-wrap gap-3 text-[9px] kb-text-muted">
-                                  <span>{formatBytes(asset.sizeBytes)}</span>
-                                  <span>{formatTimestamp(asset.updatedAt)}</span>
-                                </div>
-                              </div>
-                            ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                    <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                      latest handoff
-                    </div>
-                    {(() => {
-                      const latestHandoff = findLatestMissionHandoff(
-                        mission.missionId,
-                        data.a2aHandoffs
-                      );
-                      if (!latestHandoff) {
-                        return (
-                          <div className="mt-2 text-[10px] kb-text-muted">
-                            No recent A2A handoff recorded for this mission.
-                          </div>
-                        );
-                      }
-                      return (
-                        <div className="mt-2 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="font-mono text-[10px] kb-text-primary">
-                              {latestHandoff.sender} → {latestHandoff.receiver}
-                            </div>
-                            <div className="text-[9px] kb-text-muted">
-                              {formatTimestamp(latestHandoff.ts)}
-                            </div>
-                          </div>
-                          <div className="mt-1 flex flex-wrap gap-3 text-[9px] kb-text-muted">
-                            <span>{latestHandoff.performative || 'handoff'}</span>
-                            {latestHandoff.intent ? <span>{latestHandoff.intent}</span> : null}
-                            {latestHandoff.channel ? <span>{latestHandoff.channel}</span> : null}
-                          </div>
-                          <div className="mt-2 text-[10px] leading-5 kb-text-secondary">
-                            {latestHandoff.promptExcerpt ||
-                              'No prompt excerpt was captured for the latest handoff.'}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
+                </Callout>
               );
-            })()
-          )}
-        </div>
-      )}
+            })}
+          </Section>
+        ))}
 
-      {viewId === 'computer-sessions' && (
-        <div className="grid gap-3 lg:grid-cols-[0.95fr,1.05fr]">
-          {data.computerSessions.length === 0 ? (
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted lg:col-span-2">
-              No active browser or terminal sessions are currently registered.
-            </div>
-          ) : (
-            <>
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                    sessions
-                  </div>
-                  <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                    1-9 · J/K
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {data.computerSessions.map((session) => {
-                    const active = session.id === selectedSessionId;
-                    return (
-                      <button
-                        key={`${session.kind}:${session.id}`}
-                        type="button"
-                        onClick={() => setSelectedSessionId(session.id)}
-                        className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
-                          active
-                            ? 'kb-border-accent kb-surface-accent'
-                            : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-raised'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="text-[11px] font-semibold kb-text-primary">
-                            {session.id}
-                          </div>
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                            {session.kind}
-                          </div>
-                        </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
-                          <div>
-                            status{' '}
-                            <span className="font-mono kb-text-primary">{session.status}</span>
-                          </div>
-                          <div>
-                            updated{' '}
-                            <span className="font-mono kb-text-primary">
-                              {formatTimestamp(session.updatedAt)}
-                            </span>
-                          </div>
-                          <div>
-                            pid{' '}
-                            <span className="font-mono kb-text-primary">{session.pid ?? '—'}</span>
-                          </div>
-                          <div>
-                            actions{' '}
-                            <span className="font-mono kb-text-primary">
-                              {session.actionCount ?? 0}
-                            </span>
-                          </div>
-                        </div>
-                        {active ? (
-                          <div className="mt-3 text-[10px] uppercase tracking-[0.18em] kb-text-accent">
-                            selected
-                          </div>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  selected session
-                </div>
-                {(() => {
-                  const session = data.computerSessions.find(
-                    (entry) =>
-                      entry.id === pickDefaultSessionId(data.computerSessions, selectedSessionId)
-                  );
-                  if (!session) {
-                    return (
-                      <div className="mt-2">
-                        <SurfaceStatusPanel
-                          eyebrow="Selected session"
-                          title="Select a session to inspect its details"
-                          detail="The session list on the left determines which runtime, process, and action trail appear here."
-                          tone="info"
+      {viewId === 'mission-control-plane' &&
+        (data.activeMissions.length === 0 ? (
+          <EmptyState
+            title={uxText('chronos_fov_no_missions', locale)}
+            body={uxText('chronos_fov_no_missions_detail', locale)}
+          />
+        ) : (
+          data.activeMissions.map((mission) => {
+            const progress = data.missionProgress.find(
+              (entry) => entry.missionId === mission.missionId
+            );
+            const assets = (progress?.generatedAssets || []).filter(
+              (asset) => assetFilter === 'all' || asset.category === assetFilter
+            );
+            const dependencies = progress?.dependencies || [];
+            const handoffs = data.a2aHandoffs
+              .filter((handoff) => handoff.missionId === mission.missionId)
+              .sort((a, b) => a.ts.localeCompare(b.ts))
+              .slice(-6);
+            const latestHandoff = findLatestMissionHandoff(mission.missionId, data.a2aHandoffs);
+            const boardStatus = asKbStatus(progress?.boardStatus);
+            return (
+              <div key={mission.missionId} id={`mission-card-${mission.missionId}`}>
+                <Section
+                  title={humanizeMissionId(mission.missionId)}
+                  description={mission.controlSummary}
+                  tone={highlightedMissionId === mission.missionId ? 'accent' : undefined}
+                >
+                  <ChronosInline>
+                    <ChronosMeta mono>{mission.missionId}</ChronosMeta>
+                    <StatusPill status={CONTROL_TONE_STATUS[mission.controlTone]} />
+                    <Badge label={mission.missionType || 'development'} />
+                    <Badge label={mission.tier} />
+                  </ChronosInline>
+
+                  <KbChart
+                    type="ui:meter"
+                    props={{
+                      label: uxText('chronos_fov_board_progress', locale),
+                      value: progress?.boardStepsDone ?? 0,
+                      max: Math.max(1, progress?.boardStepsTotal ?? 0),
+                      direction: 'higher_is_better',
+                      description: progress
+                        ? uxMessage(
+                            'chronos_fov_board_progress_detail',
+                            {
+                              done: progress.boardStepsDone,
+                              total: progress.boardStepsTotal,
+                            },
+                            '{done} of {total} steps done',
+                            locale
+                          )
+                        : uxText('chronos_fov_board_unknown', locale),
+                    }}
+                  />
+                  <Grid min_column_width="xs" gap="sm">
+                    <Metric
+                      label={uxText('chronos_fov_board_status', locale)}
+                      value={progress?.boardStatus || uxText('chronos_fov_unknown', locale)}
+                      tone={
+                        boardStatus === 'blocked' || boardStatus === 'failed' ? 'danger' : undefined
+                      }
+                    />
+                    <Metric
+                      label={uxText('chronos_fov_steps_active', locale)}
+                      value={progress?.boardStepsActive ?? 0}
+                    />
+                    <Metric
+                      label={uxText('chronos_fov_steps_pending', locale)}
+                      value={progress?.boardStepsPending ?? 0}
+                    />
+                    <Metric
+                      label={uxText('chronos_fov_next_tasks_pending', locale)}
+                      value={progress?.nextTasksPending ?? mission.nextTaskCount}
+                      description={uxMessage(
+                        'chronos_fov_next_tasks_detail',
+                        {
+                          total: progress?.nextTasksTotal ?? mission.nextTaskCount,
+                          completed: progress?.nextTasksCompleted ?? 0,
+                        },
+                        '{total} in queue · {completed} completed',
+                        locale
+                      )}
+                    />
+                  </Grid>
+
+                  {onOpenMissionThread ? (
+                    <ChronosToolbar>
+                      <Button
+                        label={uxText('chronos_fov_open_mission_thread', locale)}
+                        onClick={() => onOpenMissionThread(mission.missionId)}
+                      />
+                    </ChronosToolbar>
+                  ) : null}
+
+                  <div className="chronos-two-col">
+                    <div className="chronos-feed">
+                      <h3 className="chronos-feed__title">
+                        {uxText('chronos_fov_dependencies', locale)}
+                      </h3>
+                      {dependencies.length === 0 ? (
+                        <p className="kb-text kb-text--muted">
+                          {uxText('chronos_fov_no_dependencies', locale)}
+                        </p>
+                      ) : (
+                        <List
+                          items={dependencies.map((dependency) => ({
+                            title: humanizeMissionId(dependency),
+                            meta: dependency,
+                          }))}
                         />
-                      </div>
-                    );
-                  }
-                  return (
-                    <>
-                      <div className="mt-2 text-[11px] font-semibold kb-text-primary">
-                        {session.id}
-                      </div>
-                      <div className="mt-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                        {session.kind} · {session.status}
-                      </div>
-                      {session.target ? (
-                        <div className="mt-3 text-[10px] kb-text-muted">
-                          target{' '}
-                          <span className="font-mono kb-text-secondary">{session.target}</span>
-                        </div>
-                      ) : null}
-                      {session.detail ? (
-                        <div className="mt-2 text-[10px] leading-5 kb-text-secondary">
-                          {session.detail}
-                        </div>
-                      ) : null}
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
-                        <div>
-                          updated{' '}
-                          <span className="font-mono kb-text-primary">
-                            {formatTimestamp(session.updatedAt)}
-                          </span>
-                        </div>
-                        <div>
-                          pid{' '}
-                          <span className="font-mono kb-text-primary">{session.pid ?? '—'}</span>
-                        </div>
-                        <div>
-                          actions{' '}
-                          <span className="font-mono kb-text-primary">
-                            {session.actionCount ?? 0}
-                          </span>
-                        </div>
-                        <div>
-                          status <span className="font-mono kb-text-primary">{session.status}</span>
-                        </div>
-                      </div>
-                      {session.metadata && Object.keys(session.metadata).length > 0 ? (
-                        <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                          <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                            metadata
-                          </div>
-                          <pre className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-5 kb-text-muted">
-                            {JSON.stringify(session.metadata, null, 2)}
-                          </pre>
-                        </div>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSessionId(null)}
-                        className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
-                      >
-                        Reset session focus
-                      </button>
-                    </>
-                  );
-                })()}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {viewId === 'runtime-topology-map' && (
-        <div className="grid gap-4">
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  runtime graph
-                </div>
-                <div className="mt-2 text-[11px] leading-5 kb-text-muted">
-                  Surface runtimes sit on the left, managed agent runtimes in the center, and
-                  external peers or unresolved flow endpoints on the right. Ownership stays attached
-                  to each runtime card instead of becoming a separate node.
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-[9px] uppercase tracking-[0.14em] kb-text-muted">
-                <span className="rounded-full border border-[#c39cff]/30 bg-[#31214d]/70 px-2 py-1">
-                  surface
-                </span>
-                <span className="rounded-full border border-[#88f0b2]/30 bg-[#183425]/70 px-2 py-1">
-                  runtime
-                </span>
-                <span className="rounded-full border border-[#f0c78a]/30 bg-[#362818]/70 px-2 py-1">
-                  peer
-                </span>
-              </div>
-            </div>
-            {runtimeGraph.nodes.length === 0 ? (
-              <SurfaceStatusPanel
-                eyebrow="Runtime graph"
-                title="No managed owners or runtime flow observed yet"
-                detail="The graph populates after a mission binds owners, managed runtimes, or surface links."
-                tone="neutral"
-              />
-            ) : (
-              <div className="mt-4 space-y-4">
-                <div className="overflow-x-auto rounded-xl border kb-border-subtle kb-surface-raised p-3">
-                  <svg
-                    viewBox={`0 0 ${runtimeGraph.width} ${runtimeGraph.height}`}
-                    className="min-w-[720px]"
-                    role="img"
-                    aria-label="Runtime topology graph"
-                  >
-                    {runtimeGraph.edges.map((edge) => {
-                      const fromNode = runtimeGraph.nodes.find((node) => node.id === edge.from);
-                      const toNode = runtimeGraph.nodes.find((node) => node.id === edge.to);
-                      if (!fromNode || !toNode) return null;
-                      const stroke =
-                        edge.kind === 'a2a'
-                          ? '#6bc7ff'
-                          : edge.kind === 'surface_link'
-                            ? '#c39cff'
-                            : '#88f0b2';
-                      const fromX = fromNode.x - 12;
-                      const toX = toNode.x - 12;
-                      const fromAnchorX = fromX + RUNTIME_GRAPH_NODE_WIDTH;
-                      const toAnchorX = toX;
-                      const anchorY = 20;
-                      return (
-                        <g key={edge.id}>
-                          <path
-                            d={`M ${fromAnchorX} ${fromNode.y + anchorY} C ${fromAnchorX + 28} ${fromNode.y + anchorY}, ${toAnchorX - 28} ${toNode.y + anchorY}, ${toAnchorX} ${toNode.y + anchorY}`}
-                            fill="none"
-                            stroke={stroke}
-                            strokeOpacity={selectedFlowId === edge.id ? '0.95' : '0.55'}
-                            strokeWidth={
-                              selectedFlowId === edge.id
-                                ? Math.min(6, 2 + edge.count * 0.45)
-                                : Math.min(4, 1 + edge.count * 0.35)
-                            }
-                            className="cursor-pointer"
-                            onMouseEnter={() => setSelectedFlowId(edge.id)}
-                            onClick={() => setSelectedFlowId(edge.id)}
-                          />
-                          <text
-                            x={(fromAnchorX + toAnchorX) / 2}
-                            y={Math.min(fromNode.y, toNode.y) + 12}
-                            textAnchor="middle"
-                            fill="#d6e8f5"
-                            fontSize="9"
-                            opacity="0.55"
-                          >
-                            {edge.kind} · {edge.count}
-                          </text>
-                        </g>
-                      );
-                    })}
-                    {runtimeGraph.nodes.map((node) => {
-                      const palette = graphNodePalette(node.kind);
-                      return (
-                        <g key={node.id} transform={`translate(${node.x - 12} ${node.y})`}>
-                          <rect
-                            width={RUNTIME_GRAPH_NODE_WIDTH}
-                            height={RUNTIME_GRAPH_NODE_HEIGHT}
-                            rx="12"
-                            fill={palette.fill}
-                            stroke={palette.stroke}
-                            strokeWidth="1.1"
-                            fillOpacity="0.9"
-                          />
-                          <text
-                            x="12"
-                            y="16"
-                            fill="#f4f7fb"
-                            fontSize="10"
-                            fontFamily="ui-monospace, SFMono-Regular, monospace"
-                          >
-                            {node.label}
-                          </text>
-                          <text x="12" y="30" fill="#b7c7d8" fontSize="8.5" opacity="0.8">
-                            {node.detail}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                </div>
-                <div className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                    selected flow
+                      )}
+                    </div>
+                    <div className="chronos-feed">
+                      <h3 className="chronos-feed__title">
+                        {uxText('chronos_fov_latest_handoff', locale)}
+                      </h3>
+                      {handoffs.length === 0 ? (
+                        <p className="kb-text kb-text--muted">
+                          {uxText('chronos_fov_no_handoff', locale)}
+                        </p>
+                      ) : (
+                        <>
+                          <ChronosDiagram>
+                            <KbChart
+                              type="ui:sequence"
+                              props={{
+                                density: 'compact',
+                                participants: Array.from(
+                                  new Set(handoffs.flatMap((h) => [h.sender, h.receiver]))
+                                ),
+                                messages: handoffs.map((handoff) => ({
+                                  from: handoff.sender,
+                                  to: handoff.receiver,
+                                  label:
+                                    handoff.intent ||
+                                    handoff.performative ||
+                                    uxText('chronos_fov_handoff', locale),
+                                  at: shortTime(handoff.ts),
+                                })),
+                              }}
+                            />
+                          </ChronosDiagram>
+                          {latestHandoff ? (
+                            <ChronosMeta>
+                              {[
+                                formatTimestamp(latestHandoff.ts),
+                                latestHandoff.channel,
+                                latestHandoff.promptExcerpt ||
+                                  uxText('chronos_fov_no_prompt_excerpt', locale),
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </ChronosMeta>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  {!selectedFlow ? (
-                    <div className="mt-2 text-[10px] leading-5 kb-text-muted">
-                      Hover or click an edge to inspect its direction, recent count, and latest
-                      activity timestamp.
-                    </div>
-                  ) : (
-                    <div className="mt-2 space-y-2">
-                      <div className="font-mono text-[10px] kb-text-primary">
-                        {selectedFlow.from} → {selectedFlow.to}
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-[9px] uppercase tracking-[0.14em] kb-text-muted">
-                        <span>{selectedFlow.kind}</span>
-                        <span>count {selectedFlow.count}</span>
-                      </div>
-                      <div className="text-[10px] kb-text-muted">
-                        latest activity:{' '}
-                        <span className="font-mono kb-text-secondary">
-                          {formatTimestamp(selectedFlow.latestAt)}
-                        </span>
-                      </div>
-                      {selectedFlow.channel ? (
-                        <div className="text-[10px] kb-text-muted">
-                          channel:{' '}
-                          <span className="font-mono kb-text-secondary">
-                            {selectedFlow.channel}
-                          </span>
-                        </div>
-                      ) : null}
-                      {selectedFlow.thread ? (
-                        <div className="text-[10px] kb-text-muted">
-                          thread:{' '}
-                          <span className="font-mono kb-text-secondary">{selectedFlow.thread}</span>
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="grid gap-4 lg:grid-cols-[0.9fr,1.1fr]">
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                surface runtimes
-              </div>
-              <div className="mt-3 space-y-2">
-                {data.runtimeTopology.surfaces.length === 0 ? (
-                  <SurfaceStatusPanel
-                    eyebrow="Surface runtimes"
-                    title="No surfaces registered for topology"
-                    detail="Surface records appear once the control plane has live runtime attachments."
-                    tone="neutral"
-                  />
-                ) : (
-                  data.runtimeTopology.surfaces.map((surface) => (
-                    <div
-                      key={surface.id}
-                      className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
+
+                  <div className="chronos-feed">
+                    <h3 className="chronos-feed__title">
+                      {uxText('chronos_fov_generated_assets', locale)}
+                    </h3>
+                    <ChronosFieldScope
+                      onChange={(name, value) => {
+                        if (name !== 'assetFilter' || typeof value !== 'string') return;
+                        const next = assetOptions.find((option) => option.value === value);
+                        if (next) setAssetFilter(next.value);
+                      }}
                     >
-                      <div className="text-[10px] font-mono kb-text-secondary">{surface.id}</div>
-                      <div className="mt-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                        {surface.kind} · {surface.running ? 'running' : 'offline'}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">owners</div>
-              <div className="mt-3 space-y-2">
-                {data.runtimeTopology.owners.length === 0 ? (
-                  <SurfaceStatusPanel
-                    eyebrow="Owners"
-                    title="No managed owners discovered"
-                    detail="Owner records appear once runtimes are bound to a mission or surface."
-                    tone="neutral"
-                  />
-                ) : (
-                  data.runtimeTopology.owners.map((owner) => (
-                    <div
-                      key={`${owner.type}:${owner.id}`}
-                      className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
-                    >
-                      <div className="text-[10px] font-mono kb-text-secondary">{owner.id}</div>
-                      <div className="mt-1 text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                        {owner.type} · runtimes {owner.runtimeCount}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            <div className="grid gap-4 lg:col-span-2">
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  managed runtimes
-                </div>
-                <div className="mt-3 space-y-2">
-                  {data.runtimeTopology.runtimes.length === 0 ? (
-                    <SurfaceStatusPanel
-                      eyebrow="Managed runtimes"
-                      title="No managed runtimes discovered"
-                      detail="Runtime records appear after an agent or surface registers with the control plane."
-                      tone="neutral"
-                    />
-                  ) : (
-                    data.runtimeTopology.runtimes.map((runtime) => (
-                      <div
-                        key={runtime.agentId}
-                        className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="text-[10px] font-mono kb-text-primary">
-                            {runtime.agentId}
-                          </div>
-                          <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                            {runtime.status}
-                          </div>
-                        </div>
-                        <div className="mt-1 text-[9px] kb-text-muted">
-                          {runtime.ownerType}:{runtime.ownerId} · activity{' '}
-                          {runtime.recentActivityCount}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-              <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-                <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                  recent flow
-                </div>
-                <div className="mt-3 space-y-2">
-                  {data.runtimeTopology.flows.length === 0 ? (
-                    <SurfaceStatusPanel
-                      eyebrow="Recent flow"
-                      title="No recent flow observed"
-                      detail="Flow edges appear once runtimes exchange A2A events or surface links."
-                      tone="neutral"
-                    />
-                  ) : (
-                    data.runtimeTopology.flows.map((flow) => (
-                      <div
-                        key={flow.id}
-                        className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
-                      >
-                        <div className="text-[10px] font-mono kb-text-primary">
-                          {flow.from} → {flow.to}
-                        </div>
-                        <div className="mt-1 text-[9px] kb-text-muted">
-                          {flow.kind} · count {flow.count}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {viewId === 'runtime-lease-doctor' && (
-        <div className="grid gap-3">
-          {data.runtimeDoctor.length === 0 ? (
-            <div className="rounded-2xl border kb-status-positive-border kb-status-positive-surface px-4 py-4 text-[11px] kb-status-positive">
-              No stale or orphaned runtime leases detected.
-            </div>
-          ) : (
-            data.runtimeDoctor.map((finding) => (
-              <div
-                key={finding.agentId}
-                className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] font-mono kb-text-primary">{finding.agentId}</div>
-                  <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">
-                    {finding.severity}
-                  </div>
-                </div>
-                <div className="mt-2 text-sm kb-text-primary">{finding.reason}</div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {viewId === 'recent-surface-outbox' && (
-        <div className="grid gap-3">
-          {data.recentSurfaceOutbox.length === 0 ? (
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] kb-text-muted">
-              No pending or recent surface outbox messages.
-            </div>
-          ) : (
-            data.recentSurfaceOutbox.map((message) => (
-              <div
-                key={message.message_id}
-                className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                    {message.surface} · {message.channel}
-                  </div>
-                  <div className="text-[9px] kb-text-muted">
-                    {new Date(message.created_at).toLocaleString(chronosSpeechLocale())}
-                  </div>
-                </div>
-                <div className="mt-2 text-sm kb-text-primary">{message.text}</div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {viewId === 'secret-approval-queue' && (
-        <div className="grid gap-3">
-          {data.secretApprovals.length === 0 ? (
-            <div className="rounded-2xl border kb-status-positive-border kb-status-positive-surface px-4 py-4 text-[11px] kb-status-positive">
-              No pending secret mutation approvals are waiting for review.
-            </div>
-          ) : (
-            data.secretApprovals.map((request) => (
-              <div
-                key={request.id}
-                className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-semibold kb-text-primary">{request.title}</div>
-                    <div className="mt-1 text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                      {request.serviceId} · {request.secretKey} · {request.mutation}
-                    </div>
-                  </div>
-                  <div className="rounded-full border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[9px] uppercase tracking-[0.14em] kb-status-warning">
-                    {request.riskLevel}
-                  </div>
-                </div>
-                <div className="mt-3 text-[11px] leading-5 kb-text-secondary">
-                  {request.summary}
-                </div>
-                <div className="mt-3 grid gap-2 text-[10px] kb-text-muted lg:grid-cols-2">
-                  <div>
-                    storage channel{' '}
-                    <span className="font-mono kb-text-secondary">{request.storageChannel}</span>
-                  </div>
-                  <div>
-                    requested by{' '}
-                    <span className="font-mono kb-text-secondary">{request.requestedBy}</span>
-                  </div>
-                  <div>
-                    requested at{' '}
-                    <span className="font-mono kb-text-secondary">
-                      {formatTimestamp(request.requestedAt)}
-                    </span>
-                  </div>
-                  <div>
-                    strong auth{' '}
-                    <span className="font-mono kb-text-secondary">
-                      {request.requiresStrongAuth ? 'required' : 'not required'}
-                    </span>
-                  </div>
-                  <div>
-                    kind{' '}
-                    <span className="font-mono kb-text-secondary">
-                      {request.kind || 'secret_mutation'}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.16em] kb-text-muted">
-                    pending roles
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {(request.pendingRoles.length ? request.pendingRoles : ['none']).map((role) => (
-                      <span
-                        key={role}
-                        className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[9px] font-mono kb-text-secondary"
-                      >
-                        {role}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="mt-3 text-[10px] leading-5 kb-text-muted">
-                  {request.phase === 'apply_pending' ? (
-                    <>
-                      Apply pending — paste the secret in Concierge:{' '}
-                      <a
-                        className="font-mono kb-text-secondary underline"
-                        href="/settings#secret-introduce"
-                        onClick={(event) => {
-                          // Chronos and Concierge are different surfaces; prefer absolute when known.
-                          const conciergePort =
-                            typeof window !== 'undefined'
-                              ? window.localStorage.getItem('kyberion.conciergePort')
-                              : null;
-                          if (conciergePort) {
-                            event.preventDefault();
-                            window.open(
-                              `http://127.0.0.1:${conciergePort}/settings#secret-introduce`,
-                              '_blank',
-                              'noopener,noreferrer'
+                      <ChronosToolbar>
+                        <Segmented
+                          id={`asset-filter-${mission.missionId}`}
+                          name="assetFilter"
+                          label={uxText('chronos_fov_asset_filter', locale)}
+                          hide_label
+                          value={assetFilter}
+                          options={assetOptions}
+                        />
+                      </ChronosToolbar>
+                    </ChronosFieldScope>
+                    {assets.length === 0 ? (
+                      <EmptyState
+                        title={uxText('chronos_fov_no_assets', locale)}
+                        body={uxText('chronos_fov_no_assets_detail', locale)}
+                      />
+                    ) : (
+                      <WsSelectTable
+                        columns={[
+                          { key: 'path', label: uxText('chronos_fov_col_asset', locale) },
+                          {
+                            key: 'category',
+                            label: uxText('chronos_fov_col_category', locale),
+                            width: '8rem',
+                          },
+                          {
+                            key: 'size',
+                            label: uxText('chronos_fov_col_size', locale),
+                            width: '6rem',
+                            align: 'end',
+                          },
+                          {
+                            key: 'updated',
+                            label: uxText('chronos_fov_col_updated', locale),
+                            width: '11rem',
+                          },
+                        ]}
+                        rows={assets}
+                        rowKey={(asset) => asset.path}
+                        onSelect={(path) =>
+                          window.open(
+                            missionAssetUrl(mission.missionId, path),
+                            '_blank',
+                            'noopener,noreferrer'
+                          )
+                        }
+                        renderCell={(asset, key, select) => {
+                          if (key === 'path') {
+                            return (
+                              <WsTitleCell
+                                title={asset.path.split('/').slice(-1)[0] || asset.path}
+                                id={asset.path}
+                                onSelect={select}
+                              />
                             );
                           }
+                          if (key === 'category') return assetCategoryLabel(asset.category, locale);
+                          if (key === 'size') return formatBytes(asset.sizeBytes);
+                          return formatTimestamp(asset.updatedAt);
                         }}
-                      >
-                        Concierge → Settings → Introduce secret
-                      </a>
-                      <div className="mt-1 font-mono kb-text-secondary">
-                        approval id {request.id}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      Terminal approval:{' '}
-                      <span className="font-mono kb-text-secondary">
-                        pnpm kyberion approve {request.id}
-                      </span>
-                      <div className="mt-1">
-                        After approval, collect the value in{' '}
-                        <span className="font-mono kb-text-secondary">
-                          Concierge → Settings → Introduce secret
-                        </span>{' '}
-                        (Chronos never collects secret values).
-                      </div>
-                    </>
-                  )}
-                </div>
+                        empty={uxText('chronos_fov_no_assets', locale)}
+                      />
+                    )}
+                  </div>
+                </Section>
               </div>
-            ))
-          )}
-        </div>
+            );
+          })
+        ))}
+
+      {viewId === 'computer-sessions' &&
+        (data.computerSessions.length === 0 ? (
+          <EmptyState
+            title={uxText('chronos_fov_no_sessions', locale)}
+            body={uxText('chronos_fov_no_sessions_detail', locale)}
+          />
+        ) : (
+          <div className="chronos-two-col">
+            <Section
+              title={uxText('chronos_fov_sessions', locale)}
+              description={uxText('chronos_fov_sessions_hotkeys', locale)}
+              headingLevel={3}
+            >
+              <WsSelectTable
+                columns={[
+                  { key: 'id', label: uxText('chronos_fov_col_session', locale) },
+                  { key: 'status', label: uxText('chronos_fov_col_status', locale), width: '8rem' },
+                  {
+                    key: 'actions',
+                    label: uxText('chronos_fov_col_actions', locale),
+                    width: '5rem',
+                    align: 'end',
+                  },
+                ]}
+                rows={data.computerSessions}
+                rowKey={(session) => session.id}
+                selectedKey={selectedSessionId}
+                onSelect={setSelectedSessionId}
+                renderCell={(session, key, select) => {
+                  if (key === 'id') {
+                    return (
+                      <WsTitleCell
+                        title={session.id}
+                        id={session.kind}
+                        onSelect={select}
+                        selected={session.id === selectedSessionId}
+                      />
+                    );
+                  }
+                  if (key === 'status') {
+                    const status = asKbStatus(session.status);
+                    return status ? (
+                      <StatusPill status={status} label={session.status} />
+                    ) : (
+                      session.status
+                    );
+                  }
+                  return session.actionCount ?? 0;
+                }}
+                empty={uxText('chronos_fov_no_sessions', locale)}
+              />
+            </Section>
+            {(() => {
+              const session = data.computerSessions.find(
+                (entry) =>
+                  entry.id === pickDefaultSessionId(data.computerSessions, selectedSessionId)
+              );
+              if (!session) {
+                return (
+                  <EmptyState
+                    title={uxText('chronos_fov_select_session', locale)}
+                    body={uxText('chronos_fov_select_session_detail', locale)}
+                  />
+                );
+              }
+              const status = asKbStatus(session.status);
+              return (
+                <Section title={session.id} description={session.detail} headingLevel={3}>
+                  <ChronosInline>
+                    <Badge label={session.kind} />
+                    {status ? <StatusPill status={status} label={session.status} /> : null}
+                  </ChronosInline>
+                  <KeyValue
+                    items={[
+                      ...(session.target
+                        ? [
+                            {
+                              label: uxText('chronos_fov_target', locale),
+                              value: session.target,
+                              mono: true,
+                            },
+                          ]
+                        : []),
+                      {
+                        label: uxText('chronos_fov_col_updated', locale),
+                        value: formatTimestamp(session.updatedAt),
+                      },
+                      {
+                        label: uxText('chronos_fov_pid', locale),
+                        value: session.pid ?? '—',
+                        mono: true,
+                      },
+                      {
+                        label: uxText('chronos_fov_col_actions', locale),
+                        value: session.actionCount ?? 0,
+                      },
+                    ]}
+                  />
+                  {session.metadata && Object.keys(session.metadata).length > 0 ? (
+                    <Code
+                      code={JSON.stringify(session.metadata, null, 2)}
+                      language="json"
+                      title={uxText('chronos_fov_metadata', locale)}
+                    />
+                  ) : null}
+                  <ChronosToolbar>
+                    <Button
+                      label={uxText('chronos_fov_reset_session', locale)}
+                      variant="ghost"
+                      onClick={() => setSelectedSessionId(null)}
+                    />
+                  </ChronosToolbar>
+                </Section>
+              );
+            })()}
+          </div>
+        ))}
+
+      {viewId === 'runtime-topology-map' && (
+        <>
+          <Section
+            title={uxText('chronos_fov_runtime_graph', locale)}
+            description={uxText('chronos_fov_runtime_graph_detail', locale)}
+          >
+            {runtimeGraph.nodes.length === 0 ? (
+              <EmptyState
+                title={uxText('chronos_fov_no_runtime_graph', locale)}
+                body={uxText('chronos_fov_no_runtime_graph_detail', locale)}
+              />
+            ) : (
+              <ChronosDiagram>
+                <KbChart
+                  type="ui:flow"
+                  props={{
+                    stages: [
+                      { id: 'surface', label: uxText('chronos_fov_stage_surface', locale) },
+                      { id: 'runtime', label: uxText('chronos_fov_stage_runtime', locale) },
+                      { id: 'peer', label: uxText('chronos_fov_stage_peer', locale) },
+                    ],
+                    nodes: runtimeGraph.nodes.map((node) => {
+                      if (node.kind === 'surface') {
+                        const surface = data.runtimeTopology.surfaces.find(
+                          (entry) => `surface-runtime:${entry.id}` === node.id
+                        );
+                        return {
+                          id: node.id,
+                          label: node.label,
+                          stage: 'surface',
+                          status: surface ? (surface.running ? 'running' : 'offline') : undefined,
+                          meta: surface?.kind,
+                        };
+                      }
+                      if (node.kind === 'runtime') {
+                        const runtime = data.runtimeTopology.runtimes.find(
+                          (entry) => entry.agentId === node.id
+                        );
+                        return {
+                          id: node.id,
+                          label: node.label,
+                          stage: 'runtime',
+                          status: asKbStatus(runtime?.status),
+                          meta: runtime ? `${runtime.ownerType}:${runtime.ownerId}` : undefined,
+                        };
+                      }
+                      return { id: node.id, label: node.label, stage: 'peer' };
+                    }),
+                    edges: runtimeGraph.edges.map((edge) => ({
+                      from: edge.from,
+                      to: edge.to,
+                      label: `${flowKindLabel(edge.kind, locale)} · ${edge.count}`,
+                    })),
+                  }}
+                />
+              </ChronosDiagram>
+            )}
+          </Section>
+
+          <Section
+            title={uxText('chronos_fov_recent_flow', locale)}
+            description={uxText('chronos_fov_recent_flow_detail', locale)}
+          >
+            {data.runtimeTopology.flows.length === 0 ? (
+              <EmptyState
+                title={uxText('chronos_fov_no_flow', locale)}
+                body={uxText('chronos_fov_no_flow_detail', locale)}
+              />
+            ) : (
+              <>
+                {(() => {
+                  const flows = [...data.runtimeTopology.flows]
+                    .sort((a, b) => a.latestAt.localeCompare(b.latestAt))
+                    .slice(-10);
+                  const participantIds = Array.from(
+                    new Set(flows.flatMap((flow) => [flow.from, flow.to]))
+                  );
+                  return (
+                    <ChronosDiagram>
+                      <KbChart
+                        type="ui:sequence"
+                        props={{
+                          participants: participantIds.map((id) => ({
+                            id,
+                            label: endpointLabel(id),
+                          })),
+                          messages: flows.map((flow) => ({
+                            from: flow.from,
+                            to: flow.to,
+                            label: `${flowKindLabel(flow.kind, locale)} ×${flow.count}`,
+                            at: shortTime(flow.latestAt),
+                          })),
+                        }}
+                      />
+                    </ChronosDiagram>
+                  );
+                })()}
+                <ChronosFieldScope
+                  onChange={(name, value) => {
+                    if (name === 'selectedFlow' && typeof value === 'string') {
+                      setSelectedFlowId(value || null);
+                    }
+                  }}
+                >
+                  <ChronosToolbar>
+                    <Select
+                      id="runtime-flow-select"
+                      name="selectedFlow"
+                      label={uxText('chronos_fov_selected_flow', locale)}
+                      placeholder={uxText('chronos_fov_select_flow', locale)}
+                      value={selectedFlowId || ''}
+                      options={data.runtimeTopology.flows.map((flow) => ({
+                        value: flow.id,
+                        label: `${endpointLabel(flow.from)} → ${endpointLabel(flow.to)} · ${flowKindLabel(flow.kind, locale)} ×${flow.count}`,
+                      }))}
+                    />
+                  </ChronosToolbar>
+                </ChronosFieldScope>
+                {selectedFlow ? (
+                  <KeyValue
+                    items={[
+                      {
+                        label: uxText('chronos_fov_flow_direction', locale),
+                        value: `${selectedFlow.from} → ${selectedFlow.to}`,
+                        mono: true,
+                      },
+                      {
+                        label: uxText('chronos_fov_flow_kind', locale),
+                        value: flowKindLabel(selectedFlow.kind, locale),
+                      },
+                      {
+                        label: uxText('chronos_fov_flow_count', locale),
+                        value: selectedFlow.count,
+                      },
+                      {
+                        label: uxText('chronos_fov_flow_latest', locale),
+                        value: formatTimestamp(selectedFlow.latestAt),
+                      },
+                      ...(selectedFlow.channel
+                        ? [
+                            {
+                              label: uxText('chronos_fov_flow_channel', locale),
+                              value: selectedFlow.channel,
+                              mono: true,
+                            },
+                          ]
+                        : []),
+                      ...(selectedFlow.thread
+                        ? [
+                            {
+                              label: uxText('chronos_fov_flow_thread', locale),
+                              value: selectedFlow.thread,
+                              mono: true,
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                ) : (
+                  <p className="kb-text kb-text--muted">
+                    {uxText('chronos_fov_select_flow_detail', locale)}
+                  </p>
+                )}
+              </>
+            )}
+          </Section>
+
+          <div className="chronos-two-col">
+            <Section title={uxText('chronos_fov_surface_runtimes', locale)} headingLevel={3}>
+              <Table
+                columns={[
+                  { key: 'id', label: uxText('chronos_fov_col_surface', locale), mono: true },
+                  { key: 'kind', label: uxText('chronos_fov_col_kind', locale) },
+                  { key: 'status', label: uxText('chronos_fov_col_status', locale) },
+                ]}
+                rows={data.runtimeTopology.surfaces.map((surface) => ({
+                  id: surface.id,
+                  kind: surface.kind,
+                  status: surface.running ? 'running' : 'offline',
+                }))}
+                empty={uxText('chronos_fov_no_surfaces', locale)}
+              />
+            </Section>
+            <Section title={uxText('chronos_fov_owners', locale)} headingLevel={3}>
+              <Table
+                columns={[
+                  { key: 'id', label: uxText('chronos_fov_col_owner', locale), mono: true },
+                  { key: 'type', label: uxText('chronos_fov_col_kind', locale) },
+                  {
+                    key: 'runtimes',
+                    label: uxText('chronos_fov_col_runtimes', locale),
+                    align: 'end',
+                  },
+                ]}
+                rows={data.runtimeTopology.owners.map((owner) => ({
+                  id: owner.id,
+                  type: owner.type,
+                  runtimes: owner.runtimeCount,
+                }))}
+                empty={uxText('chronos_fov_no_owners', locale)}
+              />
+            </Section>
+          </div>
+          <Section title={uxText('chronos_fov_managed_runtimes', locale)} headingLevel={3}>
+            <Table
+              columns={[
+                { key: 'agent', label: uxText('chronos_fov_col_runtime', locale), mono: true },
+                { key: 'owner', label: uxText('chronos_fov_col_owner', locale), mono: true },
+                {
+                  key: 'activity',
+                  label: uxText('chronos_fov_col_activity', locale),
+                  align: 'end',
+                },
+                { key: 'status', label: uxText('chronos_fov_col_status', locale) },
+              ]}
+              rows={data.runtimeTopology.runtimes.map((runtime) => ({
+                agent: runtime.agentId,
+                owner: `${runtime.ownerType}:${runtime.ownerId}`,
+                activity: runtime.recentActivityCount,
+                status: asKbStatus(runtime.status) || runtime.status,
+              }))}
+              empty={uxText('chronos_fov_no_runtimes', locale)}
+            />
+          </Section>
+        </>
       )}
+
+      {viewId === 'runtime-lease-doctor' &&
+        (data.runtimeDoctor.length === 0 ? (
+          <Callout tone="success" title={uxText('chronos_fov_no_lease_findings', locale)} />
+        ) : (
+          <Section title={uxText('chronos_fov_lease_findings', locale)}>
+            <List
+              items={data.runtimeDoctor.map((finding) => ({
+                title: finding.agentId,
+                meta: [
+                  finding.reason,
+                  `${uxText('chronos_fov_col_owner', locale)}: ${finding.ownerId}`,
+                  finding.recommendedAction === 'stop_runtime'
+                    ? uxText('chronos_fov_recommend_stop', locale)
+                    : uxText('chronos_fov_recommend_restart', locale),
+                ].join(' · '),
+                status: finding.severity === 'critical' ? 'failed' : 'degraded',
+                status_label:
+                  finding.severity === 'critical'
+                    ? uxText('chronos_fov_severity_critical', locale)
+                    : uxText('chronos_fov_severity_warning', locale),
+              }))}
+            />
+          </Section>
+        ))}
+
+      {viewId === 'recent-surface-outbox' &&
+        (data.recentSurfaceOutbox.length === 0 ? (
+          <EmptyState title={uxText('chronos_fov_no_outbox', locale)} />
+        ) : (
+          <Section title={uxText('chronos_fov_outbox', locale)}>
+            <List
+              variant="timeline"
+              items={data.recentSurfaceOutbox.map((message) => ({
+                title: message.text,
+                meta: [
+                  message.surface,
+                  message.channel,
+                  new Date(message.created_at).toLocaleString(chronosSpeechLocale()),
+                ].join(' · '),
+              }))}
+            />
+          </Section>
+        ))}
+
+      {viewId === 'secret-approval-queue' &&
+        (data.secretApprovals.length === 0 ? (
+          <Callout tone="success" title={uxText('chronos_fov_no_secret_approvals', locale)} />
+        ) : (
+          data.secretApprovals.map((request) => (
+            <Section
+              key={request.id}
+              title={request.title}
+              description={request.summary}
+              headingLevel={3}
+            >
+              <ChronosInline>
+                <Badge
+                  label={riskLabel(request.riskLevel, locale)}
+                  tone={RISK_TONE[request.riskLevel]}
+                />
+                <ChronosMeta mono>
+                  {request.serviceId} · {request.secretKey} · {request.mutation}
+                </ChronosMeta>
+              </ChronosInline>
+              <KeyValue
+                items={[
+                  {
+                    label: uxText('chronos_fov_storage_channel', locale),
+                    value: request.storageChannel,
+                    mono: true,
+                  },
+                  {
+                    label: uxText('chronos_fov_requested_by', locale),
+                    value: request.requestedBy,
+                    mono: true,
+                  },
+                  {
+                    label: uxText('chronos_fov_requested_at', locale),
+                    value: formatTimestamp(request.requestedAt),
+                  },
+                  {
+                    label: uxText('chronos_fov_strong_auth', locale),
+                    value: request.requiresStrongAuth
+                      ? uxText('chronos_fov_required', locale)
+                      : uxText('chronos_fov_not_required', locale),
+                  },
+                  {
+                    label: uxText('chronos_fov_col_kind', locale),
+                    value: request.kind || 'secret_mutation',
+                    mono: true,
+                  },
+                  {
+                    label: uxText('chronos_fov_pending_roles', locale),
+                    value: request.pendingRoles.length
+                      ? request.pendingRoles.join(', ')
+                      : uxText('chronos_fov_none', locale),
+                    mono: true,
+                  },
+                  {
+                    label: uxText('chronos_fov_approval_id', locale),
+                    value: request.id,
+                    mono: true,
+                  },
+                ]}
+              />
+              {request.phase === 'apply_pending' ? (
+                <Callout
+                  tone="info"
+                  title={uxText('chronos_fov_apply_pending', locale)}
+                  body={uxText('chronos_fov_apply_pending_detail', locale)}
+                >
+                  <ChronosToolbar>
+                    <Button
+                      label={uxText('chronos_fov_open_secret_introduce', locale)}
+                      onClick={openConciergeSecretIntroduce}
+                    />
+                  </ChronosToolbar>
+                </Callout>
+              ) : (
+                <Callout
+                  tone="info"
+                  title={uxText('chronos_fov_terminal_approval', locale)}
+                  body={uxText('chronos_fov_terminal_approval_detail', locale)}
+                >
+                  <Code code={`pnpm kyberion approve ${request.id}`} language="shell" />
+                </Callout>
+              )}
+            </Section>
+          ))
+        ))}
 
       {viewId === 'trace-viewer' && (
         <TraceViewer
@@ -1201,44 +1158,52 @@ export function FocusedOperatorView({
       )}
 
       {viewId === 'owner-summaries' && (
-        <div className="grid gap-4 lg:grid-cols-[0.95fr,1.05fr]">
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-              owner summaries
-            </div>
-            <div className="mt-3 space-y-2">
-              {data.ownerSummaries.map((summary) => (
-                <div
-                  key={`${summary.mission_id}-${summary.ts}`}
-                  className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
-                >
-                  <div className="text-[10px] font-mono kb-text-primary">{summary.mission_id}</div>
-                  <div className="mt-1 text-[9px] kb-text-muted">
-                    accepted {summary.accepted_count} · reviewed {summary.reviewed_count} ·
-                    completed {summary.completed_count}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-4">
-            <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-              recent events
-            </div>
-            <div className="mt-3 space-y-2">
-              {data.recentEvents.map((event, index) => (
-                <div
-                  key={`${event.ts}-${index}`}
-                  className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3"
-                >
-                  <div className="text-[10px] font-mono kb-text-primary">{event.decision}</div>
-                  <div className="mt-1 text-[9px] kb-text-muted">
-                    {event.mission_id || 'system'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="chronos-two-col">
+          <Section title={uxText('chronos_fov_owner_summaries', locale)} headingLevel={3}>
+            <Table
+              columns={[
+                { key: 'mission', label: uxText('chronos_fov_col_mission', locale), mono: true },
+                {
+                  key: 'accepted',
+                  label: uxText('chronos_fov_col_accepted', locale),
+                  align: 'end',
+                },
+                {
+                  key: 'reviewed',
+                  label: uxText('chronos_fov_col_reviewed', locale),
+                  align: 'end',
+                },
+                {
+                  key: 'completed',
+                  label: uxText('chronos_fov_col_completed', locale),
+                  align: 'end',
+                },
+              ]}
+              rows={data.ownerSummaries.map((summary) => ({
+                mission: summary.mission_id,
+                accepted: summary.accepted_count,
+                reviewed: summary.reviewed_count,
+                completed: summary.completed_count,
+              }))}
+              empty={uxText('chronos_fov_no_owner_summaries', locale)}
+            />
+          </Section>
+          <Section title={uxText('chronos_fov_recent_events', locale)} headingLevel={3}>
+            {data.recentEvents.length === 0 ? (
+              <p className="kb-text kb-text--muted">{uxText('chronos_fov_no_events', locale)}</p>
+            ) : (
+              <List
+                variant="timeline"
+                items={data.recentEvents.map((event) => ({
+                  title: event.decision,
+                  meta: [
+                    event.mission_id || uxText('chronos_fov_system', locale),
+                    formatTimestamp(event.ts),
+                  ].join(' · '),
+                }))}
+              />
+            )}
+          </Section>
         </div>
       )}
     </div>

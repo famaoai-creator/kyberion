@@ -2,6 +2,11 @@ import { logger } from './core.js';
 import { getControlPlaneBaseUrl } from './control-plane-client.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { redactSensitiveObject } from './network.js';
+import {
+  isKyberionBaseComponentType,
+  validateA2UIComponentProps,
+  type KyberionBaseComponentType,
+} from './a2ui-catalog.js';
 
 /**
  * Kyberion A2UI (Agent-to-User Interface) Protocol v0.2.0
@@ -13,6 +18,8 @@ export type A2UIComponentType =
   | 'button'
   | 'card'
   | 'container'
+  // Shared `kyberion-base` catalog (a2ui-catalog.ts). Props are schema-validated.
+  | KyberionBaseComponentType
   // Shared Chronos display catalog used by surface response blocks and
   // headless-to-A2UI adapters. Keeping these in the protocol type prevents
   // the adapter layer from falling back to `any` for standard components.
@@ -157,6 +164,11 @@ export function validateA2UIMessage(value: unknown): A2UIMessage {
       }
       if (!item.props || typeof item.props !== 'object' || Array.isArray(item.props)) {
         throw new Error('A2UI component props must be an object.');
+      }
+      // Catalog types carry a strict props contract; other types (legacy
+      // aliases, display:*, kb-*, presence.*) keep the structural check only.
+      if (isKyberionBaseComponentType(item.type)) {
+        validateA2UIComponentProps(item.type, item.props);
       }
       if (item.children !== undefined) {
         if (

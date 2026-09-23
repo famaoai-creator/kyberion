@@ -1,8 +1,12 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, CircleHelp, Send, Server } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { resolveChronosLocale, uxText } from '../lib/ux-vocabulary';
+import { useEffect, useMemo, useState } from 'react';
+import type { KbTone } from '@agent/core/a2ui-catalog';
+import { Button, Callout, Metric, Section, Table } from '@agent/shared-ui';
+import { useChronosLocale } from '../lib/hooks';
+import { uxMessage, uxText } from '../lib/ux-vocabulary';
+import { humanizeMissionId } from './ChronosOffice';
+import { ChronosMeta } from './chronos-ui';
 import {
   parseDiagnosticsResponse,
   type ClientDiagnosticsPayload,
@@ -28,7 +32,7 @@ export function DiagnosticsAttentionSummary({
   tenant,
   onOpenView,
 }: DiagnosticsAttentionSummaryProps) {
-  const locale = resolveChronosLocale();
+  const locale = useChronosLocale();
   const [data, setData] = useState<DiagnosticsPayload>({
     activeMissions: [],
     runtimeDoctor: [],
@@ -108,106 +112,120 @@ export function DiagnosticsAttentionSummary({
     delivery: data.recentSurfaceOutbox.length,
   };
 
+  const openTarget = (item: AttentionItem) =>
+    onOpenView?.(
+      item.kind === 'mission'
+        ? 'mission-control-plane'
+        : item.kind === 'runtime'
+          ? 'runtime-lease-doctor'
+          : item.kind === 'surface'
+            ? 'needs-attention'
+            : 'recent-surface-outbox',
+      item.missionId
+    );
+
   return (
-    <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
-            {uxText('chronos_diagnostics_attention_eyebrow', locale)}
-          </div>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
-            {uxText('chronos_diagnostics_attention_title', locale)}
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 kb-text-secondary">
-            {uxText('chronos_diagnostics_attention_description', locale)}
-          </p>
-        </div>
-        <div className="rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[10px] kb-text-secondary">
-          {attentionItems.length} {uxText('chronos_items_to_check', locale)}
-        </div>
-      </div>
+    <Section
+      title={uxText('chronos_diagnostics_attention_title', locale)}
+      description={uxText('chronos_diagnostics_attention_description', locale)}
+    >
+      {error ? <Callout tone="danger" title={error} /> : null}
 
-      {error ? (
-        <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard
-          icon={<AlertTriangle size={14} />}
+      <div className="chronos-metrics">
+        <Metric
           label={uxText('chronos_diagnostics_missions_attention', locale)}
           value={counts.missions}
+          tone={counts.missions > 0 ? 'danger' : undefined}
         />
-        <SummaryCard
-          icon={<Server size={14} />}
+        <Metric
           label={uxText('chronos_diagnostics_runtime_attention', locale)}
           value={counts.runtimes}
+          tone={counts.runtimes > 0 ? 'warning' : undefined}
         />
-        <SummaryCard
-          icon={<CircleHelp size={14} />}
+        <Metric
           label={uxText('chronos_diagnostics_surface_attention', locale)}
           value={counts.surfaces}
+          tone={counts.surfaces > 0 ? 'warning' : undefined}
         />
-        <SummaryCard
-          icon={<Send size={14} />}
+        <Metric
           label={uxText('chronos_diagnostics_delivery_attention', locale)}
           value={counts.delivery}
+          tone={counts.delivery > 0 ? 'info' : undefined}
         />
       </div>
 
-      <div className="mt-5 grid gap-3">
-        {attentionItems.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-2xl border kb-status-positive-border kb-status-positive-surface px-4 py-4 text-sm kb-status-positive">
-            <CheckCircle2 size={16} />
-            {uxText('chronos_diagnostics_no_attention', locale)}
-          </div>
-        ) : (
-          attentionItems.map((item) => (
-            <div
-              key={item.id}
-              className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 ${item.tone === 'critical' ? 'kb-status-negative-border kb-status-negative-surface' : item.tone === 'warning' ? 'kb-status-warning-border kb-status-warning-surface' : 'kb-border-subtle kb-surface-sunken'}`}
-            >
-              <div className="min-w-0">
-                <div className="text-sm font-semibold kb-text-primary">{item.title}</div>
-                <div className="mt-1 text-[11px] leading-5 kb-text-secondary">{item.detail}</div>
-              </div>
-              {onOpenView ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onOpenView(
-                      item.kind === 'mission'
-                        ? 'mission-control-plane'
-                        : item.kind === 'runtime'
-                          ? 'runtime-lease-doctor'
-                          : item.kind === 'surface'
-                            ? 'needs-attention'
-                            : 'recent-surface-outbox',
-                      item.missionId
-                    )
-                  }
-                  className="shrink-0 rounded-lg border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] font-semibold kb-text-accent"
-                >
-                  {uxText('chronos_open_related_view', locale)}
-                </button>
-              ) : null}
-            </div>
-          ))
-        )}
-      </div>
-    </section>
+      {attentionItems.length === 0 ? (
+        <Callout tone="success" title={uxText('chronos_diagnostics_no_attention', locale)} />
+      ) : (
+        <Table
+          caption={uxMessage(
+            'chronos_diagnostics_items_count',
+            { count: attentionItems.length },
+            '{count} items to check',
+            locale
+          )}
+          columns={[
+            {
+              key: 'severity',
+              label: uxText('chronos_diagnostics_col_severity', locale),
+              width: '7rem',
+            },
+            { key: 'item', label: uxText('chronos_diagnostics_col_item', locale) },
+            { key: 'kind', label: uxText('chronos_diagnostics_col_kind', locale), width: '11rem' },
+            { key: 'open', label: uxText('chronos_diagnostics_col_actions', locale), align: 'end' },
+          ]}
+          row_key="id"
+          rows={attentionItems.map((item) => ({
+            id: item.id,
+            severity: {
+              badge: uxText(SEVERITY_LABEL_KEY[item.tone], locale),
+              tone: SEVERITY_TONE[item.tone],
+            },
+            item: (
+              <span className="chronos-work-cell">
+                <span className="chronos-work-cell__title">
+                  {item.kind === 'mission' && item.missionId
+                    ? humanizeMissionId(item.missionId)
+                    : item.title}
+                </span>
+                {item.kind === 'mission' && item.missionId ? (
+                  <ChronosMeta mono>{item.missionId}</ChronosMeta>
+                ) : null}
+                <ChronosMeta>{item.detail}</ChronosMeta>
+              </span>
+            ),
+            kind: uxText(KIND_LABEL_KEY[item.kind], locale),
+            open: onOpenView ? (
+              <Button
+                variant="ghost"
+                label={uxText('chronos_open_related_view', locale)}
+                onClick={() => openTarget(item)}
+              />
+            ) : (
+              ''
+            ),
+          }))}
+        />
+      )}
+    </Section>
   );
 }
 
-function SummaryCard({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3">
-      <div className="flex items-center gap-2 text-[10px] kb-text-muted">
-        {icon}
-        {label}
-      </div>
-      <div className="mt-2 text-2xl font-semibold kb-text-primary">{value}</div>
-    </div>
-  );
-}
+const SEVERITY_TONE: Record<AttentionItem['tone'], KbTone> = {
+  critical: 'danger',
+  warning: 'warning',
+  info: 'info',
+};
+
+const SEVERITY_LABEL_KEY: Record<AttentionItem['tone'], string> = {
+  critical: 'chronos_diagnostics_severity_critical',
+  warning: 'chronos_diagnostics_severity_warning',
+  info: 'chronos_diagnostics_severity_info',
+};
+
+const KIND_LABEL_KEY: Record<AttentionItem['kind'], string> = {
+  mission: 'chronos_diagnostics_missions_attention',
+  runtime: 'chronos_diagnostics_runtime_attention',
+  surface: 'chronos_diagnostics_surface_attention',
+  delivery: 'chronos_diagnostics_delivery_attention',
+};

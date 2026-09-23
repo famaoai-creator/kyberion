@@ -10,6 +10,11 @@ import { generateIndex } from './generate_knowledge_index.js';
 import {
   expectedKyberionThemeEntries,
   extractKyberionTokenBlock,
+  extractKyberionUiTokenBlock,
+  concatKyberionUiStylesheetSources,
+  KB_UI_STYLESHEET_SOURCE,
+  renderKyberionUiStylesheet,
+  renderKyberionUiTokenBlock,
   readKyberionDesignTokens,
   renderKyberionDesignTokenBlock,
   renderKyberionTailwindColorsBlock,
@@ -764,6 +769,7 @@ export function collectThemeCatalogViolations(input: {
 function validateDesignTokenCatalog(violations: string[]) {
   const tokens = readKyberionDesignTokens();
   const expectedTokenBlock = renderKyberionDesignTokenBlock(tokens);
+  const expectedUiTokenBlock = renderKyberionUiTokenBlock(tokens);
   const expectedTailwindBlock = renderKyberionTailwindColorsBlock();
   const expectedThemes = expectedKyberionThemeEntries(tokens);
 
@@ -789,12 +795,50 @@ function validateDesignTokenCatalog(violations: string[]) {
           `design-tokens: token block drift in ${path.relative(pathResolver.rootDir(), filePath)}`
         );
       }
+      if (extractKyberionUiTokenBlock(actual) !== expectedUiTokenBlock) {
+        violations.push(
+          `design-tokens: ui token block drift in ${path.relative(pathResolver.rootDir(), filePath)}`
+        );
+      }
       continue;
     }
-    if (actual !== expectedTokenBlock) {
+    if (actual !== `${expectedTokenBlock}\n\n${expectedUiTokenBlock}`) {
       violations.push(
         `design-tokens: token block drift in ${path.relative(pathResolver.rootDir(), filePath)}`
       );
+    }
+  }
+
+  // UI-02: concierge carries only the --kb-ui-* layer; every surface carries
+  // the generated component stylesheet.
+  const generatedUiFiles: Array<[string, string]> = [
+    ['presence/displays/concierge/src/app/kyberion-ui-tokens.css', `${expectedUiTokenBlock}\n`],
+  ];
+  const stylesheetSourcePath = pathResolver.rootResolve(KB_UI_STYLESHEET_SOURCE);
+  if (!safeExistsSync(stylesheetSourcePath)) {
+    violations.push(`design-tokens: missing file ${KB_UI_STYLESHEET_SOURCE}`);
+  } else {
+    const expectedStylesheet = renderKyberionUiStylesheet(
+      concatKyberionUiStylesheetSources((relativePath) =>
+        readCatalogTextFile(pathResolver.rootResolve(relativePath))
+      )
+    );
+    for (const relativePath of [
+      'presence/displays/chronos-mirror-v2/src/app/kyberion-ui.css',
+      'presence/displays/operator-surface/src/app/kyberion-ui.css',
+      'presence/displays/presence-studio/static/kyberion-ui.css',
+      'presence/displays/computer-surface/static/kyberion-ui.css',
+      'presence/displays/concierge/src/app/kyberion-ui.css',
+    ]) {
+      generatedUiFiles.push([relativePath, expectedStylesheet]);
+    }
+  }
+  for (const [relativePath, expected] of generatedUiFiles) {
+    const filePath = pathResolver.rootResolve(relativePath);
+    if (!safeExistsSync(filePath)) {
+      violations.push(`design-tokens: missing file ${relativePath}`);
+    } else if (readCatalogTextFile(filePath) !== expected) {
+      violations.push(`design-tokens: generated UI stylesheet drift in ${relativePath}`);
     }
   }
 

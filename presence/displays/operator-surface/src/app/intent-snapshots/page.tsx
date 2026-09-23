@@ -1,5 +1,15 @@
 import Link from 'next/link';
 import {
+  Badge,
+  Disclosure,
+  EmptyState,
+  KeyValue,
+  List,
+  Section,
+  StatusPill,
+} from '@agent/shared-ui';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
+import {
   renderIntentAuthorityLabel,
   renderIntentOutcomeLabel,
   resolveIntentResolutionContract,
@@ -7,10 +17,16 @@ import {
 } from '@agent/core/intent-resolution-contract';
 import { emitMosRead } from '@/lib/audit-mos';
 import { getTenantScope, listIntentSnapshotRows } from '@/lib/data';
+import { operatorTranslator, type OperatorLocale, type OperatorTranslate } from '@/lib/i18n';
+import { getRequestLocale } from '@/lib/request-locale';
+import { formatTimestamp, tierLabel, tierTone } from '@/lib/view';
+import { OperatorPageHeader } from '../operator-shell';
 
 export const dynamic = 'force-dynamic';
 
-export default function IntentSnapshotsPage() {
+type SnapshotRow = ReturnType<typeof listIntentSnapshotRows>[number];
+
+export default async function IntentSnapshotsPage() {
   const scope = getTenantScope();
   const rows = listIntentSnapshotRows({ tenantScope: scope, limit: 100 });
   emitMosRead({
@@ -18,69 +34,65 @@ export default function IntentSnapshotsPage() {
     resource_kind: 'intent_snapshots',
     result_count: rows.length,
   });
+  const locale = await getRequestLocale();
+  const t = operatorTranslator(locale);
 
   return (
-    <section>
-      <h1 style={{ marginBottom: 4 }}>Intent Snapshots</h1>
-      <p style={{ color: 'var(--kb-muted-text)', marginTop: 0, fontSize: 13 }}>
-        Read-only history of the intent captured at each mission stage
-        {scope ? (
-          <>
-            {' '}
-            for tenant <code>{scope}</code>
-          </>
-        ) : null}
-        . Deltas compare each snapshot with the immediately preceding snapshot in the same mission.
-      </p>
-      <p style={{ marginTop: 8 }}>
-        <Link href="/" style={{ color: 'var(--kb-accent-text)' }}>
-          Back to missions
-        </Link>
-      </p>
+    <>
+      <OperatorPageHeader
+        title={t('intent_title')}
+        subtitle={scope ? t('intent_subtitle_scoped', { tenant: scope }) : t('intent_subtitle')}
+      />
       {rows.length === 0 ? (
-        <p style={{ color: 'var(--kb-muted-text)' }}>
-          No intent snapshots are visible to this scope.
-        </p>
+        <EmptyState title={t('intent_empty')} />
       ) : (
-        <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+        <Section title={t('intent_list_title', { count: rows.length })}>
           {rows.map((row) => (
-            <article key={row.snapshot.snapshot_id} style={cardStyle}>
-              <IntentResolutionSummary row={row} />
-              <div style={headerStyle}>
-                <div>
+            <article key={row.snapshot.snapshot_id} className="operator-card">
+              <div className="operator-card__header">
+                <span className="operator-cell">
                   <Link
                     href={`/missions/${encodeURIComponent(row.mission_id)}`}
-                    style={{ color: 'var(--kb-accent-text)' }}
+                    className="operator-cell__title operator-mono"
                   >
-                    <strong>{row.mission_id}</strong>
+                    {row.mission_id}
                   </Link>
-                  <div style={metaStyle}>
-                    <code>{row.tier}</code> · <code>{row.tenant_slug ?? 'public'}</code> ·{' '}
-                    <code>{row.snapshot.stage}</code> ·{' '}
-                    <code>{row.snapshot.kind ?? 'current'}</code> ·{' '}
-                    <code>{row.snapshot.source}</code>
-                  </div>
-                </div>
-                <code style={metaStyle}>{row.snapshot.created_at}</code>
+                  <span className="operator-cell__meta operator-mono">
+                    {row.snapshot.stage} · {row.snapshot.kind ?? 'current'} · {row.snapshot.source}
+                  </span>
+                </span>
+                <span className="operator-chips">
+                  <Badge label={tierLabel(row.tier, t)} tone={tierTone(row.tier)} />
+                  <Badge label={row.tenant_slug ?? 'public'} tone="neutral" />
+                  <span className="operator-cell__meta">
+                    {formatTimestamp(row.snapshot.created_at, locale)}
+                  </span>
+                </span>
               </div>
-              <p style={{ marginBottom: 8 }}>{row.snapshot.intent.goal}</p>
+              <p className="kb-text kb-text--body">{row.snapshot.intent.goal}</p>
+              <IntentResolutionSummary row={row} locale={locale} t={t} />
               {row.delta ? (
-                <DeltaSummary row={row} />
+                <DeltaSummary row={row} t={t} />
               ) : (
-                <div style={metaStyle}>Origin snapshot; no preceding snapshot.</div>
+                <p className="kb-text kb-text--caption">{t('intent_origin_snapshot')}</p>
               )}
             </article>
           ))}
-        </div>
+        </Section>
       )}
-    </section>
+    </>
   );
 }
 
+/** Resolution contract of the snapshot's goal (IL contract renderer). */
 function IntentResolutionSummary({
   row,
+  locale,
+  t,
 }: {
-  row: ReturnType<typeof listIntentSnapshotRows>[number];
+  row: SnapshotRow;
+  locale: OperatorLocale;
+  t: OperatorTranslate;
 }) {
   let contract: IntentResolutionContract | undefined;
   try {
@@ -94,118 +106,68 @@ function IntentResolutionSummary({
   if (!contract) return null;
 
   return (
-    <section style={intentResolutionStyle} aria-label="Intent resolution contract">
-      <div style={intentResolutionTitleStyle}>Resolution contract</div>
-      <div style={intentResolutionGridStyle}>
-        <div>
-          <span style={intentResolutionLabelStyle}>Understanding</span>
-          <strong>{contract.normalized_intent}</strong>
-        </div>
-        <div>
-          <span style={intentResolutionLabelStyle}>Missing input</span>
-          <strong>
-            {contract.missing_inputs.length > 0 ? contract.missing_inputs.join(', ') : 'None'}
-          </strong>
-        </div>
-        <div>
-          <span style={intentResolutionLabelStyle}>Authority</span>
-          <strong>{renderIntentAuthorityLabel(contract.authority_level, 'en')}</strong>
-        </div>
-        <div>
-          <span style={intentResolutionLabelStyle}>Next action</span>
-          <strong>{contract.next_action.label}</strong>
-        </div>
-        <div>
-          <span style={intentResolutionLabelStyle}>Outcome</span>
-          <strong>{renderIntentOutcomeLabel(contract.outcome_kind, 'en')}</strong>
-        </div>
-      </div>
-      <div style={intentResolutionConsequenceStyle}>{contract.next_action.consequence}</div>
-    </section>
+    <Disclosure summary={t('intent_resolution_contract')}>
+      <KeyValue
+        items={[
+          { label: t('intent_understanding'), value: contract.normalized_intent },
+          {
+            label: t('intent_missing_input'),
+            value:
+              contract.missing_inputs.length > 0
+                ? contract.missing_inputs.join(', ')
+                : t('value_none'),
+          },
+          {
+            label: t('intent_authority'),
+            value: renderIntentAuthorityLabel(contract.authority_level, locale),
+          },
+          { label: t('intent_next_action'), value: contract.next_action.label },
+          {
+            label: t('intent_outcome'),
+            value: renderIntentOutcomeLabel(contract.outcome_kind, locale),
+          },
+          { label: t('intent_consequence'), value: contract.next_action.consequence },
+        ]}
+      />
+    </Disclosure>
   );
 }
 
-function DeltaSummary({ row }: { row: ReturnType<typeof listIntentSnapshotRows>[number] }) {
+function driftStatus(verdict: string | undefined): KbStatus {
+  if (verdict === 'blocking') return 'blocked';
+  if (verdict === 'significant') return 'degraded';
+  if (verdict === 'none') return 'ready';
+  return 'n/a';
+}
+
+function DeltaSummary({ row, t }: { row: SnapshotRow; t: OperatorTranslate }) {
   const changes = Object.entries(row.delta?.changes ?? {}).filter(
     ([key, value]) => key !== 'goal_similarity' && value
   );
+  const verdict = row.delta?.drift_verdict;
   return (
-    <details>
-      <summary style={{ cursor: 'pointer', color: deltaColor(row.delta?.drift_verdict) }}>
-        Drift: {row.delta?.drift_verdict} · score {row.delta?.drift_score} · previous{' '}
-        {row.previous_snapshot_id}
-      </summary>
+    <div className="operator-cell">
+      <span className="operator-chips">
+        <StatusPill
+          status={driftStatus(verdict)}
+          label={t('intent_drift', { verdict: String(verdict ?? '—') })}
+        />
+        <span className="operator-cell__meta">
+          {t('intent_drift_score', {
+            score: String(row.delta?.drift_score ?? '—'),
+            previous: String(row.previous_snapshot_id ?? '—'),
+          })}
+        </span>
+      </span>
       {changes.length > 0 ? (
-        <ul style={{ marginBottom: 0, color: 'var(--kb-muted-text)', fontSize: 12 }}>
-          {changes.map(([key, value]) => (
-            <li key={key}>
-              <code>{key}</code>: {formatChange(value)}
-            </li>
-          ))}
-        </ul>
+        <List items={changes.map(([key, value]) => ({ title: key, meta: formatChange(value) }))} />
       ) : (
-        <p style={{ color: 'var(--kb-muted-text)', fontSize: 12 }}>No field changes.</p>
+        <p className="kb-text kb-text--caption">{t('intent_no_field_changes')}</p>
       )}
-    </details>
+    </div>
   );
 }
 
 function formatChange(value: unknown): string {
   return Array.isArray(value) ? value.join(', ') : String(value);
 }
-
-function deltaColor(verdict?: string): string {
-  return verdict === 'blocking'
-    ? 'var(--kb-danger)'
-    : verdict === 'significant'
-      ? 'var(--kb-warning)'
-      : 'var(--kb-text-secondary)';
-}
-
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 12,
-  flexWrap: 'wrap',
-};
-const metaStyle: React.CSSProperties = {
-  color: 'var(--kb-muted-text)',
-  fontSize: 12,
-  marginTop: 4,
-};
-const cardStyle: React.CSSProperties = {
-  background: 'var(--kb-surface)',
-  border: '1px solid var(--kb-border)',
-  borderRadius: 8,
-  padding: '14px 16px',
-};
-const intentResolutionStyle: React.CSSProperties = {
-  marginBottom: 12,
-  padding: '10px 12px',
-  border: '1px solid var(--kb-border)',
-  borderRadius: 8,
-  background: 'var(--kb-surface-raised, var(--kb-surface))',
-};
-const intentResolutionTitleStyle: React.CSSProperties = {
-  color: 'var(--kb-muted-text)',
-  fontSize: 11,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-};
-const intentResolutionGridStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-  gap: 10,
-  marginTop: 8,
-};
-const intentResolutionLabelStyle: React.CSSProperties = {
-  display: 'block',
-  color: 'var(--kb-muted-text)',
-  fontSize: 11,
-  marginBottom: 3,
-};
-const intentResolutionConsequenceStyle: React.CSSProperties = {
-  color: 'var(--kb-muted-text)',
-  fontSize: 12,
-  marginTop: 8,
-};
