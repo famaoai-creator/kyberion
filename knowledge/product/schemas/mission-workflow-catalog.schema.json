@@ -248,7 +248,28 @@
         "pipeline_ref": {
           "type": "string",
           "minLength": 1
+        },
+        "when": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "mission_classes_any": { "$ref": "#/definitions/stringList" },
+            "delivery_shapes_any": { "$ref": "#/definitions/stringList" },
+            "risk_profiles_any": { "$ref": "#/definitions/stringList" },
+            "intent_ids_any": { "$ref": "#/definitions/stringList" },
+            "task_types_any": { "$ref": "#/definitions/stringList" },
+            "keywords_any": { "$ref": "#/definitions/stringList" }
+          }
         }
+      }
+    },
+    "stringList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
       }
     }
   }
