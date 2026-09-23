@@ -154,6 +154,14 @@ const CASES: Record<string, { props: Record<string, unknown>; root: string; tag?
     props: { name: 'a', label: 'A', action: { id: 'secret.introduce' } },
     root: 'kb-secret-field',
   },
+  // PA-02 voice (renderers: voice.js; see voice.test.ts)
+  'ui:voice-input': { props: { name: 'a', label: 'A' }, root: 'kb-voice-input' },
+  'ui:voice-state': { props: { state: 'listening' }, root: 'kb-voice-state' },
+  // PA-01 pads (renderers: pads.js; see pads.test.ts)
+  'ui:toolbar': { props: { label: 'T', items: [] }, root: 'kb-toolbar' },
+  'ui:dialog': { props: { open: false, title: 'D' }, root: 'kb-dialog' },
+  'ui:drawing-palette': { props: { name: 'p', label: 'P' }, root: 'kb-drawing-palette' },
+  'ui:sketch-board': { props: { name: 's', label: 'S' }, root: 'kb-sketch-board' },
 };
 
 describe('kyberion-ui vanilla renderer — catalog coverage', () => {

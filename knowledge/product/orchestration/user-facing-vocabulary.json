@@ -11966,6 +11966,23 @@
         "qps-ploc": "⟦Ṗėñḓïñɠ. Ẇȧïŧïñɠ ƒőř ŧħė Şőṽėřėïɠñ ŧő ȧṗṗřőṽė őř řėɋůėşŧ ƈħȧñɠėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       }
     },
+    "local_pads": {
+      "page_title": {
+        "en": "{title} — Kyberion",
+        "ja": "{title} — Kyberion",
+        "qps-ploc": "⟦{title} — Ķẏƀėřïőñ ŀőřėɱ⟧"
+      },
+      "badge": {
+        "en": "Local pad",
+        "ja": "ローカルパッド",
+        "qps-ploc": "⟦Ŀőƈȧŀ ṗȧḓ ŀőř⟧"
+      },
+      "noscript_notice": {
+        "en": "This pad needs JavaScript. Turn it on and reload the page.",
+        "ja": "このパッドには JavaScript が必要です。有効にしてからページを再読み込みしてください。",
+        "qps-ploc": "⟦Ŧħïş ṗȧḓ ñėėḓş ĴȧṽȧŞƈřïṗŧ. Ŧůřñ ïŧ őñ ȧñḓ řėŀőȧḓ ŧħė ṗȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      }
+    },
     "report_review": {
       "bar_title": {
         "en": "Review and edit layer (local only; no external upload)",
@@ -17891,6 +17908,256 @@
         "en": "{percent}% complete",
         "ja": "{percent}% 完了",
         "qps-ploc": "⟦{percent}% ƈőɱṗŀėŧė ŀőřėɱ ⟧"
+      },
+      "dialog_confirm": {
+        "en": "OK",
+        "ja": "OK",
+        "qps-ploc": "⟦ŐĶ ŀőř⟧"
+      },
+      "dialog_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル",
+        "qps-ploc": "⟦Ƈȧñƈėŀ ŀőř⟧"
+      },
+      "drawing_tools": {
+        "en": "Drawing tools",
+        "ja": "描画ツール",
+        "qps-ploc": "⟦Ḓřȧẇïñɠ ŧőőŀş ŀőřė⟧"
+      },
+      "drawing_colors": {
+        "en": "Colors",
+        "ja": "色",
+        "qps-ploc": "⟦Ƈőŀőřş ŀőř⟧"
+      },
+      "drawing_color": {
+        "en": "Color {color}",
+        "ja": "色 {color}",
+        "qps-ploc": "⟦Ƈőŀőř {color} ŀőřė⟧"
+      },
+      "drawing_custom_color": {
+        "en": "Custom color",
+        "ja": "任意の色",
+        "qps-ploc": "⟦Ƈůşŧőɱ ƈőŀőř ŀőř⟧"
+      },
+      "drawing_width": {
+        "en": "Width",
+        "ja": "太さ",
+        "qps-ploc": "⟦Ẇïḓŧħ ŀőř⟧"
+      },
+      "drawing_width_value": {
+        "en": "{width} px",
+        "ja": "{width} px",
+        "qps-ploc": "⟦{width} ṗẋ ŀőř⟧"
+      },
+      "drawing_undo": {
+        "en": "Undo",
+        "ja": "元に戻す",
+        "qps-ploc": "⟦Ůñḓő ŀőř⟧"
+      },
+      "drawing_clear": {
+        "en": "Clear",
+        "ja": "消去",
+        "qps-ploc": "⟦Ƈŀėȧř ŀőř⟧"
+      },
+      "drawing_tool_pen": {
+        "en": "Pen",
+        "ja": "ペン",
+        "qps-ploc": "⟦Ṗėñ ŀőř⟧"
+      },
+      "drawing_tool_highlighter": {
+        "en": "Highlighter",
+        "ja": "蛍光ペン",
+        "qps-ploc": "⟦Ħïɠħŀïɠħŧėř ŀőř⟧"
+      },
+      "drawing_tool_rect": {
+        "en": "Rectangle",
+        "ja": "四角形",
+        "qps-ploc": "⟦Řėƈŧȧñɠŀė ŀőř⟧"
+      },
+      "drawing_tool_ellipse": {
+        "en": "Ellipse",
+        "ja": "楕円",
+        "qps-ploc": "⟦Ėŀŀïṗşė ŀőř⟧"
+      },
+      "drawing_tool_line": {
+        "en": "Line",
+        "ja": "直線",
+        "qps-ploc": "⟦Ŀïñė ŀőř⟧"
+      },
+      "drawing_tool_arrow": {
+        "en": "Arrow",
+        "ja": "矢印",
+        "qps-ploc": "⟦Ȧřřőẇ ŀőř⟧"
+      },
+      "drawing_tool_text": {
+        "en": "Text",
+        "ja": "テキスト",
+        "qps-ploc": "⟦Ŧėẋŧ ŀőř⟧"
+      },
+      "drawing_tool_eraser": {
+        "en": "Eraser",
+        "ja": "消しゴム",
+        "qps-ploc": "⟦Ėřȧşėř ŀőř⟧"
+      },
+      "sketch_canvas": {
+        "en": "{label}: drawing canvas",
+        "ja": "{label}（描画キャンバス）",
+        "qps-ploc": "⟦{label}: ḓřȧẇïñɠ ƈȧñṽȧş ŀőřėɱ ï⟧"
+      },
+      "sketch_text_input": {
+        "en": "Text to place on the canvas",
+        "ja": "キャンバスに置くテキスト",
+        "qps-ploc": "⟦Ŧėẋŧ ŧő ṗŀȧƈė őñ ŧħė ƈȧñṽȧş ŀőřėɱ ïṗ⟧"
+      },
+      "sketch_download": {
+        "en": "Download PNG",
+        "ja": "PNG をダウンロード",
+        "qps-ploc": "⟦Ḓőẇñŀőȧḓ ṖÑƓ ŀőř⟧"
+      },
+      "sketch_clear_title": {
+        "en": "Clear the drawing?",
+        "ja": "描いた内容を消去しますか？",
+        "qps-ploc": "⟦Ƈŀėȧř ŧħė ḓřȧẇïñɠ? ŀőřėɱ⟧"
+      },
+      "sketch_clear_message": {
+        "en": "Everything you drew is removed. The background image stays.",
+        "ja": "描いた内容はすべて消えます。背景画像は残ります。",
+        "qps-ploc": "⟦Ėṽėřẏŧħïñɠ ẏőů ḓřėẇ ïş řėɱőṽėḓ. Ŧħė ƀȧƈķɠřőůñḓ ïɱȧɠė şŧȧẏş. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "sketch_clear_confirm": {
+        "en": "Clear drawing",
+        "ja": "消去する",
+        "qps-ploc": "⟦Ƈŀėȧř ḓřȧẇïñɠ ŀőřė⟧"
+      },
+      "sketch_drop_hint": {
+        "en": "Drop or paste an image to use it as the background.",
+        "ja": "画像をドロップまたは貼り付けると背景になります。",
+        "qps-ploc": "⟦Ḓřőṗ őř ṗȧşŧė ȧñ ïɱȧɠė ŧő ůşė ïŧ ȧş ŧħė ƀȧƈķɠřőůñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "sketch_background_added": {
+        "en": "Background image added.",
+        "ja": "背景画像を追加しました。",
+        "qps-ploc": "⟦Ƀȧƈķɠřőůñḓ ïɱȧɠė ȧḓḓėḓ. ŀőřėɱ ï⟧"
+      },
+      "sketch_background_rejected": {
+        "en": "{file} is not an image.",
+        "ja": "{file} は画像ではありません。",
+        "qps-ploc": "⟦{file} ïş ñőŧ ȧñ ïɱȧɠė. ŀőřėɱ ï⟧"
+      },
+      "voice_input_dictate": {
+        "en": "Dictate",
+        "ja": "音声入力",
+        "qps-ploc": "⟦Ḓïƈŧȧŧė ŀőř⟧"
+      },
+      "voice_input_record": {
+        "en": "Record",
+        "ja": "録音",
+        "qps-ploc": "⟦Řėƈőřḓ ŀőř⟧"
+      },
+      "voice_input_hold": {
+        "en": "Hold to talk",
+        "ja": "押して話す",
+        "qps-ploc": "⟦Ħőŀḓ ŧő ŧȧŀķ ŀőř⟧"
+      },
+      "voice_input_hold_hint": {
+        "en": "Hold the button, or hold Space, while you talk.",
+        "ja": "話している間、ボタン(またはスペースキー)を押し続けてください。",
+        "qps-ploc": "⟦Ħőŀḓ ŧħė ƀůŧŧőñ, őř ħőŀḓ Şṗȧƈė, ẇħïŀė ẏőů ŧȧŀķ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "voice_input_requesting": {
+        "en": "Waiting for microphone access…",
+        "ja": "マイクの許可を待っています…",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ɱïƈřőṗħőñė ȧƈƈėşş… ŀőřėɱ ïṗşů⟧"
+      },
+      "voice_input_listening": {
+        "en": "Listening…",
+        "ja": "聞き取っています…",
+        "qps-ploc": "⟦Ŀïşŧėñïñɠ… ŀőř⟧"
+      },
+      "voice_input_recording": {
+        "en": "Recording…",
+        "ja": "録音しています…",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ… ŀőř⟧"
+      },
+      "voice_input_processing": {
+        "en": "Finishing…",
+        "ja": "仕上げています…",
+        "qps-ploc": "⟦Ƒïñïşħïñɠ… ŀőř⟧"
+      },
+      "voice_input_transcribing": {
+        "en": "Transcribing…",
+        "ja": "文字起こししています…",
+        "qps-ploc": "⟦Ŧřȧñşƈřïƀïñɠ… ŀőřė⟧"
+      },
+      "voice_input_stopped": {
+        "en": "Stopped",
+        "ja": "停止しました",
+        "qps-ploc": "⟦Şŧőṗṗėḓ ŀőř⟧"
+      },
+      "voice_input_unsupported_dictation": {
+        "en": "Voice input isn't available in this browser.",
+        "ja": "このブラウザでは音声入力を使えません。",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ ïşñ'ŧ ȧṽȧïŀȧƀŀė ïñ ŧħïş ƀřőẇşėř. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "voice_input_unsupported_record": {
+        "en": "Recording isn't available in this browser.",
+        "ja": "このブラウザでは録音を使えません。",
+        "qps-ploc": "⟦Řėƈőřḓïñɠ ïşñ'ŧ ȧṽȧïŀȧƀŀė ïñ ŧħïş ƀřőẇşėř. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "voice_input_error_permission_denied": {
+        "en": "Microphone access was blocked.",
+        "ja": "マイクへのアクセスが許可されませんでした。",
+        "qps-ploc": "⟦Ɱïƈřőṗħőñė ȧƈƈėşş ẇȧş ƀŀőƈķėḓ. ŀőřėɱ ïṗşů⟧"
+      },
+      "voice_input_error_no_speech": {
+        "en": "No speech was heard. Try again.",
+        "ja": "音声を聞き取れませんでした。もう一度お試しください。",
+        "qps-ploc": "⟦Ñő şṗėėƈħ ẇȧş ħėȧřḓ. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşů⟧"
+      },
+      "voice_input_error_network": {
+        "en": "Voice recognition needs a network connection.",
+        "ja": "音声認識にはネットワーク接続が必要です。",
+        "qps-ploc": "⟦Ṽőïƈė řėƈőɠñïŧïőñ ñėėḓş ȧ ñėŧẇőřķ ƈőññėƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "voice_input_error_aborted": {
+        "en": "Voice input was interrupted.",
+        "ja": "音声入力が中断されました。",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ ẇȧş ïñŧėřřůṗŧėḓ. ŀőřėɱ ïṗş⟧"
+      },
+      "voice_input_error_unknown": {
+        "en": "Voice input stopped because of an error.",
+        "ja": "エラーのため音声入力を停止しました。",
+        "qps-ploc": "⟦Ṽőïƈė ïñṗůŧ şŧőṗṗėḓ ƀėƈȧůşė őƒ ȧñ ėřřőř. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "voice_state_idle": {
+        "en": "Idle",
+        "ja": "待機中",
+        "qps-ploc": "⟦Ïḓŀė ŀőř⟧"
+      },
+      "voice_state_listening": {
+        "en": "Listening",
+        "ja": "聞いています",
+        "qps-ploc": "⟦Ŀïşŧėñïñɠ ŀőř⟧"
+      },
+      "voice_state_thinking": {
+        "en": "Thinking",
+        "ja": "考えています",
+        "qps-ploc": "⟦Ŧħïñķïñɠ ŀőř⟧"
+      },
+      "voice_state_speaking": {
+        "en": "Speaking",
+        "ja": "話しています",
+        "qps-ploc": "⟦Şṗėȧķïñɠ ŀőř⟧"
+      },
+      "voice_state_muted": {
+        "en": "Muted",
+        "ja": "ミュート中",
+        "qps-ploc": "⟦Ɱůŧėḓ ŀőř⟧"
+      },
+      "voice_state_error": {
+        "en": "Something went wrong",
+        "ja": "問題が発生しました",
+        "qps-ploc": "⟦Şőɱėŧħïñɠ ẇėñŧ ẇřőñɠ ŀőřėɱ ⟧"
       }
     }
   }
