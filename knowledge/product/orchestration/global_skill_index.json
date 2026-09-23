@@ -1,6 +1,6 @@
 {
   "v": "3.0.0",
-  "t": 32,
+  "t": 33,
   "s": [
     {
       "n": "agent-actuator",
@@ -72,6 +72,14 @@
       "d": "ADF-driven code analysis and refactoring pipeline engine",
       "s": "implemented",
       "version": "2.2.0",
+      "capability_count": 4
+    },
+    {
+      "n": "compute-actuator",
+      "path": "libs/actuators/compute-actuator",
+      "d": "Remote and local compute orchestration actuator for heavy batch workloads, fine-tuning, and model execution across local and ephemeral substrates (such as Google Colab).",
+      "s": "implemented",
+      "version": "1.0.0",
       "capability_count": 4
     },
     {
@@ -189,9 +197,9 @@
     {
       "n": "secret-actuator",
       "path": "libs/actuators/secret-actuator",
-      "d": "OS Native Secret Manager Bridge",
+      "d": "OS Native Secret Manager Bridge. Prefer kyberion secret introduce / Concierge for value collection.",
       "s": "implemented",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "capability_count": 4
     },
     {

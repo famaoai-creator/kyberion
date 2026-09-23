@@ -12,7 +12,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { readSyncCursor } from '@agent/core/ingest-sync-cursors';
 import { safeMkdir, safeRmSync } from '@agent/core/secure-io';
-import { extractConfluenceCursor, syncSource, type SyncSourceTransport } from './sync-source.js';
+import {
+  extractConfluenceCursor,
+  syncSource,
+  type MultiSyncSourceResult,
+  type SyncSourceResult,
+  type SyncSourceTransport,
+} from './sync-source.js';
 
 const NOW_1 = '2026-07-28T00:00:00.000Z';
 const NOW_2 = '2026-07-29T00:00:00.000Z';
@@ -447,7 +453,7 @@ describe('ingest:sync_source (DA-03)', () => {
           source_params: {},
           cursor_path_seam: cursorsDir,
         })
-      ).rejects.toThrow(/source_system must be one of box\|slack\|confluence/);
+      ).rejects.toThrow(/source_system must be one of box\|slack\|confluence\|google_drive/);
       await expect(
         syncSource({
           tenant_slug: 'no-folder',
@@ -459,6 +465,83 @@ describe('ingest:sync_source (DA-03)', () => {
           transport: vi.fn<SyncSourceTransport>(),
         })
       ).rejects.toThrow(/source_params\.folder_id is required/);
+    });
+
+    it('google_drive sync walks pages and retrieves modified files', async () => {
+      const transport = vi
+        .fn<SyncSourceTransport>()
+        .mockResolvedValueOnce({
+          files: [
+            {
+              id: 'gd-1',
+              name: 'Doc 1.docx',
+              modifiedTime: '2026-07-01T00:00:00.000Z',
+              version: 1,
+            },
+          ],
+          nextPageToken: 'next-p2',
+        })
+        .mockResolvedValueOnce({
+          files: [
+            {
+              id: 'gd-2',
+              name: 'Sheet 1.xlsx',
+              modifiedTime: '2026-07-15T00:00:00.000Z',
+              version: 2,
+            },
+          ],
+        });
+
+      const res = await syncSource({
+        tenant_slug: 'gdrive-tenant',
+        source_system: 'google_drive',
+        source_params: { folder_id: 'root-folder' },
+        auth: 'none',
+        cursor_path_seam: cursorsDir,
+        transport,
+      });
+
+      const singleRes = res as SyncSourceResult;
+      expect(singleRes.items).toHaveLength(2);
+      expect(singleRes.items[0].content_ref).toBe('google_drive:file:gd-1');
+      expect(singleRes.items[1].content_ref).toBe('google_drive:file:gd-2');
+      expect(singleRes.new_cursor.cursor_value).toBe('2026-07-15T00:00:00.000Z');
+      expect(singleRes.advanced).toBe(true);
+    });
+
+    it('multi-source sync walks multiple sources in a single call', async () => {
+      const transport = vi
+        .fn<SyncSourceTransport>()
+        .mockResolvedValueOnce({
+          files: [{ id: 'gd-multi-1', name: 'Doc.docx', modifiedTime: '2026-08-01T00:00:00.000Z' }],
+        })
+        .mockResolvedValueOnce({
+          entries: [
+            {
+              type: 'file',
+              id: 'box-multi-1',
+              name: 'Sheet.xlsx',
+              modified_at: '2026-08-02T00:00:00.000Z',
+            },
+          ],
+        });
+
+      const multiRes = (await syncSource({
+        tenant_slug: 'multi-tenant',
+        source_systems: ['google_drive', 'box'],
+        per_source_params: {
+          google_drive: { folder_id: 'gd-root' },
+          box: { folder_id: 'box-root' },
+        },
+        auth: 'none',
+        cursor_path_seam: cursorsDir,
+        transport,
+      })) as MultiSyncSourceResult;
+
+      expect(multiRes.results).toHaveLength(2);
+      expect(multiRes.items).toHaveLength(2);
+      expect(multiRes.items.map((i) => i.content_ref)).toContain('google_drive:file:gd-multi-1');
+      expect(multiRes.items.map((i) => i.content_ref)).toContain('box:file:box-multi-1');
     });
   });
 

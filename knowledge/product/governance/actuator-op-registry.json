@@ -277,6 +277,11 @@
       "transform": [],
       "apply": ["exec", "plugin"]
     },
+    "compute": {
+      "capture": ["collect_artifact", "poll_status"],
+      "transform": [],
+      "apply": ["cancel_job", "submit_job"]
+    },
     "core": {
       "capture": [
         "run_first_win_lifecycle",
