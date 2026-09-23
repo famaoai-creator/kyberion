@@ -27,7 +27,7 @@ describe('capability_discovery_entry', () => {
     const report = discoverCapabilities('linux');
     const ids = report.actuators.map((actuator) => actuator.actuatorId);
     expect(ids).toEqual(expect.arrayContaining(['service-actuator', 'working-memory-actuator']));
-    expect(report.actuators.length).toBe(32);
+    expect(report.actuators.length).toBe(33);
     const secret = report.actuators.find((actuator) => actuator.actuatorId === 'secret-actuator');
     expect(secret?.capabilities.some((capability) => capability.available)).toBe(false);
     expect(secret?.capabilities.every((capability) => capability.platformMatch)).toBe(true);
