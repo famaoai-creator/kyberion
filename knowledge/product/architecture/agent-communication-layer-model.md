@@ -1,272 +1,154 @@
 ---
-title: Agent Communication Layer Model
+title: Agent Communication and Coordination Model
 category: Architecture
-tags: [architecture, agents, prompt, subagent, a2a, bridge, protocol]
-importance: 8
+tags: [architecture, agents, prompt, subagent, a2a, bridge, protocol, coordination]
+importance: 9
 author: Ecosystem Architect
-last_updated: 2026-05-04
+last_updated: 2026-09-23
 ---
 
-# Agent Communication Layer Model
+# Agent Communication and Coordination Model
 
-Kyberion uses several distinct communication patterns to move work between reasoning, delegation, and coordination layers.
+Kyberion has several ways for agents and runtimes to exchange requests, context, and work. Choose them with one model that keeps participants, shared state, transport, trust, and authority distinct.
 
-The simplest way to reason about them is:
+This is the canonical model. [Co-Session Coordination](./co-session-coordination.md) and the [Peer Network Catalog](../orchestration/peer-network.md) specify its main coordination surfaces. The [Multi-Provider Co-Execution Contract](../governance/multi-provider-coexecution-contract.md) specifies repository read/write authority.
 
-- `prompt` for one-shot reasoning
-- `subagent` for delegated bounded work
-- `agent coordination` for multi-agent or multi-surface collaboration
+## 1. Describe each communication path across independent dimensions
 
-Transport can be local or remote. That is a separate axis.
+| Dimension       | Question                                     | Examples                                                                         |
+| --------------- | -------------------------------------------- | -------------------------------------------------------------------------------- |
+| Participant     | What is each endpoint?                       | Kyberion instance, provider CLI, delegated child agent, external surface         |
+| Execution shape | How much autonomy and ownership is involved? | prompt, subagent, agent coordination                                             |
+| Placement       | Which boundaries do participants cross?      | process, checkout, host, network, tenant                                         |
+| Shared state    | What mutable state can both sides reach?     | none, checkout files, co-session journal, tenant runtime, WorkItem / mission     |
+| Transport       | How does a request reach its recipient?      | backend call, local coordination files, signed HTTP peer message, managed bridge |
+| Trust           | How are identity and scope established?      | provider identity, enrolled peer key, tenant, data classification, capability    |
+| Authority       | What may a participant change?               | read, leased path, claimed work item, accepted proposal, mission lifecycle       |
+| Durability      | What survives failure?                       | request, session, delivery journal, mission evidence                             |
 
-The practical question is one level higher:
+Placement boundaries are independent:
 
-- given a user intent, which execution shape should own it
-- and if it is not `prompt`, how much structure is needed to keep the work bounded
+- Same process: work runs inside one runtime process.
+- Same checkout: participants can see the same repository working tree.
+- Same host: processes run on one operating system host.
+- Different host: a network boundary is crossed.
+- Same tenant: data and peer policy resolve to one registered tenant scope.
+- Runtime root: root used for mutable runtime and observability state.
 
-## 1. The three execution shapes
+Same host does not imply same checkout, runtime root, or owner. A localhost endpoint describes where a connection is routed; it does not authenticate the caller, prove the listener is the intended peer, or grant access to local files.
 
-### 1.1 Prompt
+## 2. Execution shape is independent of transport
 
-`prompt` is a single request/response interaction.
+| Shape              | Use it when                                                                                                                                                        | Kyberion examples                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| prompt             | One short, inspectable request/response is enough.                                                                                                                 | Single reasoning call or structured transformation                  |
+| subagent           | A child should own bounded, multi-step reasoning or repair.                                                                                                        | Reasoning backend delegation, task executor                         |
+| agent coordination | Work needs shared state, handoff, durable ownership, recovery, or a boundary crossing requires governed participant, scope, acceptance, or authority coordination. | Co-Session, Peer Messaging / Mesh Hub, WorkItem and mission control |
 
-Use it when the work is:
+A prompt or subagent can use a local or remote reasoning backend. An HTTP message is not automatically a coordinated task: it may only be a transport receipt. Choose coordination and authority from the work semantics, then select a transport that can enforce them.
 
-- short
-- easy to inspect
-- low-risk to retry
-- not worth decomposing into its own task
+### Intent routing rubric
 
-Typical examples:
+Intent routing selects an execution shape from work semantics, not from an implementation detail. Use four signals:
 
-- summarize evidence
-- transform structured text
-- produce a short analysis
-- normalize a prompt or contract
+| Signal   | Detects                                                                      |
+| -------- | ---------------------------------------------------------------------------- |
+| scope    | One artifact, several artifacts, or a durable flow                           |
+| autonomy | Whether independent decomposition or bounded child ownership helps           |
+| boundary | Whether ownership, runtime, surface, tenant, or trust boundaries are crossed |
+| fanout   | Whether parallel workers or independent review improve the result            |
 
-In the codebase, prompt-style reasoning is most visible in:
+Use prompt for one inspectable, low-risk request; subagent for bounded autonomous work; agent coordination for shared mutable state, durable handoff, ownership, recovery, or a trust-boundary crossing that requires explicit participant, scope, acceptance, or authority coordination. A remote prompt or subagent backend alone does not require agent coordination. The routing decision is additive metadata on the intent contract. Governed defaults remain in knowledge/product/governance/work-policy.json. A decision can carry mode, scope, autonomy, boundary_crossing, fanout, owner/delegates, artifact_count, stop_condition, and rationale.
 
-- [`libs/core/intent-contract.ts`](/Users/famao/kyberion/libs/core/intent-contract.ts)
-- [`scripts/run_pipeline.ts`](/Users/famao/kyberion/scripts/run_pipeline.ts)
+## 3. Communication patterns
 
-Rule of thumb:
+| Pattern                                          | Participants and placement                                                         | Coordination surface                                                        | Shared-state and authority rules                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A. Kyberion ↔ Kyberion, different hosts**      | Separate Kyberion runtimes across a network; v1 peers share one registered tenant. | Peer Messaging; Mesh Hub for allowlisted collaboration requests.            | Enroll peers; authenticate signed envelopes; validate tenant, recipient, kind, classification, expiry, and policy. Transport acceptance is not work acceptance. The recipient accepts proposals locally. Mission lifecycle remains local to mission_controller.                                                                                                                       |
+| **B. Kyberion ↔ Kyberion, same host**            | Separate Kyberion runtimes on one host, often reached through loopback.            | Same Peer Messaging contract as A, with same_host exposure when applicable. | Use distinct peer IDs, listener ports, secrets, and runtime roots/namespaces. Separate runtimes must not write the same peer journal or Mesh namespace as independent writers. Loopback is reachability, not authorization. If the participants are provider CLIs in one checkout, use C.                                                                                             |
+| **C. Kyberion checkout ↔ local provider agents** | Multiple provider CLI processes work in one checkout, usually on one host.         | Co-Session for presence, path leases, blackboard notes, and handoffs.       | Co-Session is keyed to the checkout/session; participants have distinct IDs. Reads may run in parallel. A path lease coordinates mission-optional writes but is not authorization or enforced permission. Where a work-item claim applies, the claim remains the write authority. The mission owner alone changes .git and repository-wide configuration. No peer listener is needed. |
+| **D. Orchestrator ↔ delegated child agent**      | A parent runtime starts a bounded child through a reasoning or task backend.       | Direct subagent delegation with an explicit task contract.                  | Minimize the child environment and grant only its assigned capability tier. Parent mission-owner authority is not inherited. Use a WorkItem or mission when work needs durable assignment, restart, independent acceptance, or evidence.                                                                                                                                              |
 
-- default to prompt mode unless the task clearly benefits from autonomous decomposition
+### Select the smallest suitable coordination surface
 
-### 1.2 Subagent
+1. If one request can finish synchronously without shared mutable state, use prompt.
+2. If one parent can define and inspect a bounded child task, use subagent.
+3. If multiple local processes share a checkout and need coordination, use Co-Session.
+4. If distinct Kyberion runtimes must exchange messages, use Peer Messaging; use Mesh Hub only for allowlisted collaboration requests.
+5. If work needs durable cross-process ownership, retry/recovery, review, or evidence, represent it as a WorkItem and promote it to a mission when mission ownership or lifecycle is required.
 
-`subagent` means work is delegated to a child agent that can reason or act with bounded autonomy.
+Do not select peer HTTP merely because two processes run on one host. Do not use a shared checkout file as a remote transport. Keep the state owner explicit when moving between surfaces.
 
-Use it when the work is:
+## 4. State ownership and collision control
 
-- exploratory
-- multi-step
-- better decomposed by an autonomous worker
-- expensive to keep in the main loop
+| State                             | Coordination rule                                                                                                                                                                                                |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read-only repository context      | Providers may read in parallel, subject to tier and tenant authorization.                                                                                                                                        |
+| Shared checkout file              | For mission-optional Co-Session work, a path lease is cooperative coordination, not authorization or enforcement. Where a work-item claim applies, it is the write authority; one owner writes a path at a time. |
+| .git and repository configuration | Mission owner only. Co-Session participants and delegated child agents do not gain this authority.                                                                                                               |
+| Peer / Mesh journals              | One configured runtime root and namespace owner per writer. Separate peers use unique peer IDs and isolated state roots/namespaces.                                                                              |
+| Tenant confidential content       | Resolve through the registered tenant scope. Peer messages carry only policy-permitted references and metadata; confidential payloads do not enter public journals.                                              |
+| Personal content                  | Not routable through the v1 Peer / Mesh path.                                                                                                                                                                    |
 
-Typical examples:
+A process boundary is not a lock. A host boundary is not an ownership model. Use path leases, claims, unique state namespaces, or a single writer according to the state being changed.
 
-- repair an invalid ADF contract
-- decompose a task plan into implementation steps
-- participate in a meeting flow
-- delegate a complex diagnostic or review pass
+## 5. Identity, authentication, authorization, and acceptance
 
-In the codebase, subagent-style delegation is visible in:
+Keep these checks separate and ordered:
 
-- [`libs/core/claude-agent-reasoning-backend.ts`](/Users/famao/kyberion/libs/core/claude-agent-reasoning-backend.ts)
-- [`libs/core/codex-cli-reasoning-backend.ts`](/Users/famao/kyberion/libs/core/codex-cli-reasoning-backend.ts)
-- [`libs/core/adf-repair-agent.ts`](/Users/famao/kyberion/libs/core/adf-repair-agent.ts)
-- [`libs/core/task-executor.ts`](/Users/famao/kyberion/libs/core/task-executor.ts)
-- [`scripts/meeting_participate.ts`](/Users/famao/kyberion/scripts/meeting_participate.ts)
+1. **Reachability**: can the sender connect to the listener?
+2. **Authentication**: can the recipient verify sender or provider identity?
+3. **Scope authorization**: is that identity enrolled for this tenant, recipient, data classification, and request kind?
+4. **Recipient acceptance**: does the recipient accept the proposed work or side effect?
+5. **Execution authority**: which local WorkItem claim or mission owner may perform work and change lifecycle state?
 
-Rule of thumb:
+Passing one check does not imply passing the next. A valid HMAC proves possession of a peer secret; it does not approve a proposal, grant shell or actuator access, or authorize remote mission lifecycle changes.
 
-- use subagent mode only when autonomy or parallelism is worth the overhead
+For v1 Peer / Mesh, keep same-tenant enrollment, explicit peer selection, request-kind allowlists, recipient validation, data-tier restrictions, expiry / replay protection, and local acceptance. A new cross-tenant or network-exposed control plane requires a new security and operations decision record.
 
-### 1.3 Agent coordination
+## 6. Operational procedure
 
-`agent coordination` is the higher-order pattern where multiple agents, surfaces, or runtimes exchange envelopes, state, or delegated tasks.
-
-Use it when the work crosses:
-
-- roles
-- surfaces
-- lifecycles
-- trust boundaries
-- protocols
-
-Typical examples:
-
-- A2A envelopes
-- mission delegation
-- assistant compiler requests/results
-- bridge startup and reconcile flows
-- managed surface lifecycle
-
-In the codebase, agent coordination is visible in:
-
-- [`scripts/run_a2a.ts`](/Users/famao/kyberion/scripts/run_a2a.ts)
-- [`libs/core/assistant-compiler-request.ts`](/Users/famao/kyberion/libs/core/assistant-compiler-request.ts)
-- [`libs/core/mission-orchestration-worker.ts`](/Users/famao/kyberion/libs/core/mission-orchestration-worker.ts)
-- [`scripts/mission_controller.ts`](/Users/famao/kyberion/scripts/mission_controller.ts)
-- [`scripts/surface_runtime.ts`](/Users/famao/kyberion/scripts/surface_runtime.ts)
-
-Rule of thumb:
-
-- if the work needs a durable envelope, a state transition, or a trust boundary, treat it as coordination rather than plain reasoning
-
-## 2. The transport axis
-
-The execution shape is not the same as the transport.
-
-Kyberion’s transport axis is usually one of:
-
-- `local`
-  - same machine, same workspace, same control plane
-- `remote`
-  - another process, host, tenant, or surface reached over a protocol
-- `bridge`
-  - a managed connector that normalizes an external channel into Kyberion state
-- `protocol`
-  - a structured envelope or SDK contract used across runtimes
-
-Examples:
-
-- `prompt` can be local or remote
-- `subagent` is often local today, but can be backed by a remote protocol
-- `agent coordination` can be local file-based envelopes, local process handoff, or a remote bridge/API
-
-## 3. Intent routing layer
-
-The execution shape should be decided from the intent, not guessed from the implementation detail.
-
-This layer sits above the intent contract and below mission or surface orchestration.
-It answers:
-
-- should the work stay single-shot
-- should a child agent own part of the work
-- or should the work become a coordinated multi-agent flow
-
-### 3.1 Routing rubric
-
-Use the smallest shape that can still finish safely.
-
-| Signal | Default shape |
-|---|---|
-| one deliverable, low risk, easy to inspect | `prompt` |
-| exploratory, multi-step, repair-heavy, or parallelizable | `subagent` |
-| durable state transition, ownership handoff, or trust boundary | `agent coordination` |
-
-Score the intent with four questions:
-
-| Question | What it detects |
-|---|---|
-| `scope` | one artifact vs many artifacts vs durable flow |
-| `autonomy` | whether the work needs independent decomposition |
-| `boundary` | whether mission, surface, runtime, or trust boundaries are crossed |
-| `fanout` | whether parallel workers or cross-critique would materially improve the result |
-
-### 3.2 Routing output
-
-The routing result should be treated as a small decision envelope, not a new ADF.
-It is additive metadata on top of existing intent contracts.
-The governed defaults live in `knowledge/product/governance/work-policy.json`, so operators can tune routes without changing the contract shape.
-
-Recommended fields:
-
-```json
-{
-  "kind": "agent-routing-decision",
-  "intent_id": "generate-report",
-  "source_text": "今週の進捗レポートを作って",
-  "mode": "subagent",
-  "scope": "single_artifact",
-  "autonomy": "medium",
-  "boundary_crossing": false,
-  "fanout": "review",
-  "owner": "report-drafting-agent",
-  "delegates": ["fact-check-agent", "editor-agent"],
-  "artifact_count": 1,
-  "stop_condition": "A governed report draft exists and the owner has accepted it.",
-  "rationale": "The request is review-heavy and benefits from a bounded drafting worker plus a lightweight review pass."
-}
-```
-
-The key rule is:
-
-- `prompt` means no child ownership is needed
-- `subagent` means child ownership is useful, but the work still fits inside one governed task
-- `agent coordination` means the work has crossed into durable orchestration
-
-### 3.3 Boundary triggers
-
-Prefer `agent coordination` when any of these are true:
-
-- the work must survive retries or restarts
-- the work needs mission ownership, task leases, or audit-trail semantics
-- the work crosses a surface, runtime, or trust boundary
-- the work needs multiple legitimate viewpoints to avoid a bad single-pass answer
-
-Prefer `subagent` when any of these are true:
-
-- the work needs exploration before the final answer is clear
-- the work can be decomposed into bounded child tasks
-- the main loop would be too expensive to keep all the context in
-
-Prefer `prompt` when none of the above is necessary.
-
-## 4. Mapping to current Kyberion systems
-
-| Layer | What it is | Representative files |
-|---|---|---|
-| Prompt | one-shot reasoning, short synthesis, structured conversion | [`libs/core/intent-contract.ts`](/Users/famao/kyberion/libs/core/intent-contract.ts), [`scripts/run_pipeline.ts`](/Users/famao/kyberion/scripts/run_pipeline.ts) |
-| Subagent | delegated bounded work, autonomous repair, decomposition | [`libs/core/claude-agent-reasoning-backend.ts`](/Users/famao/kyberion/libs/core/claude-agent-reasoning-backend.ts), [`libs/core/adf-repair-agent.ts`](/Users/famao/kyberion/libs/core/adf-repair-agent.ts), [`libs/core/task-executor.ts`](/Users/famao/kyberion/libs/core/task-executor.ts) |
-| Agent coordination | envelopes, mission handoff, bridge lifecycle, runtime management | [`scripts/run_a2a.ts`](/Users/famao/kyberion/scripts/run_a2a.ts), [`libs/core/assistant-compiler-request.ts`](/Users/famao/kyberion/libs/core/assistant-compiler-request.ts), [`scripts/mission_controller.ts`](/Users/famao/kyberion/scripts/mission_controller.ts), [`scripts/surface_runtime.ts`](/Users/famao/kyberion/scripts/surface_runtime.ts) |
-| Bridge / API | external surface ingress and delivery | [`satellites/slack-bridge/src/index.ts`](/Users/famao/kyberion/satellites/slack-bridge/src/index.ts), [`satellites/imessage-bridge/src/index.ts`](/Users/famao/kyberion/satellites/imessage-bridge/src/index.ts), [`satellites/voice-hub/server.ts`](/Users/famao/kyberion/satellites/voice-hub/server.ts) |
-| Protocol / mediator | structured cross-runtime transport | [`libs/core/acp-mediator.ts`](/Users/famao/kyberion/libs/core/acp-mediator.ts), [`libs/core/mission-orchestration-worker.ts`](/Users/famao/kyberion/libs/core/mission-orchestration-worker.ts) |
-
-## 5. Decision guide
-
-Ask these questions in order:
-
-1. Can the work finish in one prompt?
-   - If yes, use `prompt`.
-2. Does it need autonomous decomposition or repair?
-   - If yes, use `subagent`.
-3. Does it cross ownership, runtime, or trust boundaries?
-   - If yes, use `agent coordination`.
-4. Is the communication local or remote?
-   - Choose the transport separately from the execution shape.
-
-## 6. Practical examples
-
-### Example: ADF reasoning step
-
-For a short synthesis step, keep it on prompt mode.
-
-For exploratory analysis or review-heavy work, opt in to subagent mode explicitly.
-
-### Example: Mission delegation
-
-Mission ownership stays in the control plane.
-
-The delegated worker can be a subagent, but the mission itself is an agent coordination problem.
-
-### Example: Messaging bridge startup
-
-A bridge activation request is not just reasoning.
-
-It is:
-
-- intent resolution
-- bridge manifest reconciliation
-- surface lifecycle management
-- external channel delivery
-
-That makes it agent coordination with a bridge transport.
-
-## 7. Operating rule
-
-If you need a one-line rule:
-
-**Use prompt for one-shot thinking, subagent for bounded autonomous work, and agent coordination for everything that crosses a durable boundary.**
+Before opening a communication path, record:
+
+1. Participant IDs and participant types.
+2. Whether they share a process, checkout, host, runtime root, tenant, or none of these.
+3. Which files, journals, catalogs, and artifacts are shared or writable.
+4. Request kind, data classification, side effects, and required recipient decision.
+5. Identity credential, tenant scope, capability allowlist, writer/claim owner, and correlation ID.
+6. Acknowledgement, retry/idempotency behavior, expiry, and recovery owner.
+
+Then preflight the corresponding surface:
+
+- **C / same checkout**: join one Co-Session, confirm participant IDs, acquire a path lease before writing, and leave .git to the mission owner.
+- **B / same-host peer runtimes**: isolate peer IDs, ports, secrets, runtime roots/namespaces, verify tenant-scoped presence and capability, then send a low-risk typed message first.
+- **A / remote peers**: complete same-tenant enrollment and endpoint/key checks, inspect healthy presence and advertised capability, send an explicit typed proposal, and let the recipient accept it locally.
+- **D / delegated child**: define the child task, allowed tools/data, output artifact, stop condition, and review owner; do not pass the parent's privileged environment.
+
+For peer operations, use [Same-Tenant Peer Quickstart](../orchestration/same-tenant-peer-quickstart.ja.md). For local same-checkout work, use [Co-Session Coordination](./co-session-coordination.md).
+
+## 7. Extension contract
+
+A new communication pattern or transport must:
+
+- Fill the dimensions in §1 and map to a governed coordination owner.
+- Reuse typed request and handoff vocabulary where work semantics match.
+- Define stable participant identity, tenant and classification checks, capability and authority limits, correlation, acknowledgement, idempotency, expiry, and failure recovery.
+- Define concurrency and single-writer behavior for every shared mutable store.
+- Keep delivery receipt, recipient acceptance, work execution, and mission completion as distinct states.
+- Include deterministic conformance coverage for wrong sender/recipient, tenant mismatch, duplicate or expired delivery, unauthorized action, resource collision, and restart/recovery.
+- Update this model, relevant transport and coordination runbooks, and governance entry points together.
+
+A dedicated network service, cross-tenant federation, automated peer scheduling, or remote mission lifecycle control is a material boundary change and requires a superseding ADR before implementation.
+
+## 8. Implementation map
+
+| Concern                                        | Existing owner                                                                               |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Intent routing and execution shape             | knowledge/product/governance/work-policy.json and intent contracts                           |
+| Bounded provider delegation                    | Reasoning backends, libs/core/task-executor.ts, provider permission profiles                 |
+| Same-checkout local collaboration              | libs/core/co-session.ts, scripts/co_session.ts                                               |
+| Kyberion-to-Kyberion transport                 | libs/core/peer-messaging.ts, scripts/peer_conversation_server.ts                             |
+| Same-tenant discovery and allowlisted routing  | Mesh Hub modules and [Mesh Hub v1 ADR](./decisions/2026-06-24-mesh-hub-v1-boundaries.md)     |
+| Durable task, ownership, and mission lifecycle | Work coordination and scripts/mission_controller.ts                                          |
+| Cross-provider read/write contract             | [Multi-Provider Co-Execution Contract](../governance/multi-provider-coexecution-contract.md) |
+| External surface ingress                       | Surface-specific bridges and viewer/tenant authorization                                     |

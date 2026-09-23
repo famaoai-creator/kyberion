@@ -84,6 +84,7 @@ describe('peer messaging', () => {
       senderPeerId: 'peer-a-test',
       recipientPeerId: 'peer-b-test',
       tenantId: TENANT_ID,
+      messageId: 'PM-STABLE-ENVELOPE-1',
       subject: 'handoff',
       type: 'handoff',
       payload: { summary: 'transfer this task' },
@@ -91,6 +92,7 @@ describe('peer messaging', () => {
     });
 
     expect(envelope.signature).toBeTruthy();
+    expect(envelope.message_id).toBe('PM-STABLE-ENVELOPE-1');
     expect(envelope.scope).toMatchObject({
       scope_kind: 'tenant',
       tier: 'confidential',
@@ -239,6 +241,73 @@ describe('peer messaging', () => {
     expect((inbox[0] as any).envelope.message_id).toBe(envelope.message_id);
     expect((outbox[0] as any).envelope.recipient_peer_id).toBe('peer-b-test');
     fetchSpy.mockRestore();
+  });
+
+  it('bounds receiver admission and deduplicates completed sender message ids', async () => {
+    let releaseResponder: (() => void) | undefined;
+    const responderGate = new Promise<void>((resolve) => {
+      releaseResponder = resolve;
+    });
+    const responder = vi.fn(async () => {
+      await responderGate;
+      return { handled: true };
+    });
+    const server = createPeerMessagingServer({
+      peerId: 'peer-b-test',
+      tenantId: TENANT_ID,
+      sharedSecret: SHARED_SECRET,
+      maxInflight: 1,
+      maxQueued: 0,
+      responder,
+    });
+    const envelope = buildPeerMessageEnvelope({
+      tenantId: TENANT_ID,
+      messageId: 'PM-STABLE-RECEIVE-1',
+      senderPeerId: 'peer-a-test',
+      recipientPeerId: 'peer-b-test',
+      subject: 'bounded',
+      type: 'request',
+      payload: { operation: 'once' },
+      sharedSecret: SHARED_SECRET,
+    });
+    const firstPromise = server.processEnvelope(envelope);
+    const overloaded = await server.processEnvelope(
+      buildPeerMessageEnvelope({
+        tenantId: TENANT_ID,
+        messageId: 'PM-STABLE-RECEIVE-2',
+        senderPeerId: 'peer-a-test',
+        recipientPeerId: 'peer-b-test',
+        subject: 'bounded',
+        type: 'request',
+        payload: { operation: 'later' },
+        sharedSecret: SHARED_SECRET,
+      })
+    );
+    expect(overloaded).toMatchObject({
+      status: 503,
+      body: { error: 'receiver_overloaded', retryable: true, retry_after_ms: 1000 },
+    });
+    expect(server.getCapacity()).toMatchObject({
+      accepting_new_work: false,
+      available_slots: 0,
+      max_inflight: 1,
+    });
+
+    const concurrentDuplicate = await server.processEnvelope(envelope);
+    expect(concurrentDuplicate).toMatchObject({
+      status: 425,
+      body: { error: 'message_processing', retryable: true },
+    });
+
+    releaseResponder?.();
+    await expect(firstPromise).resolves.toMatchObject({ status: 200 });
+    const completedDuplicate = await server.processEnvelope(envelope);
+    expect(completedDuplicate).toMatchObject({
+      status: 200,
+      body: { accepted: true, duplicate: true, message_id: envelope.message_id },
+    });
+    expect(responder).toHaveBeenCalledTimes(1);
+    expect(listPeerInboxRecords(TENANT_ID, 'peer-b-test')).toHaveLength(1);
   });
 
   it('skips malformed and cross-peer persisted records at read boundaries', () => {

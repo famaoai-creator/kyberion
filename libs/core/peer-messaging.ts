@@ -82,6 +82,7 @@ export interface PeerNetworkCatalog {
 
 export interface BuildPeerMessageInput<TPayload = unknown> {
   tenantId: string;
+  messageId?: string;
   senderPeerId: string;
   recipientPeerId: string;
   subject: string;
@@ -137,6 +138,8 @@ export interface PeerMessagingServerOptions {
   responder?: PeerMessageResponder;
   inboxRole?: GovernedArtifactRole;
   eventRole?: GovernedArtifactRole;
+  maxInflight?: number;
+  maxQueued?: number;
 }
 
 export interface PeerMessagingCatalogOptions {
@@ -396,7 +399,7 @@ export function buildPeerMessageEnvelope<TPayload>(
   const envelope: PeerMessageEnvelope<TPayload> = {
     version: '1',
     tenant_id: tenantId,
-    message_id: randomId('PM'),
+    message_id: input.messageId || randomId('PM'),
     conversation_id: input.conversationId || randomId('PC'),
     type: input.type,
     sender_peer_id: normalizePeerId(input.senderPeerId),
@@ -847,17 +850,90 @@ function parseRequestBody(
   });
 }
 
-function sendJson(res: http.ServerResponse, statusCode: number, body: unknown): void {
+function sendJson(
+  res: http.ServerResponse,
+  statusCode: number,
+  body: unknown,
+  headers: Record<string, string> = {}
+): void {
   const payload = JSON.stringify(body);
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(payload),
+    ...headers,
   });
   res.end(payload);
 }
 
 export class PeerMessagingServer {
   private server: http.Server | null = null;
+  private activeDeliveries = 0;
+  private queuedDeliveries = 0;
+  private readonly activeMessageIds = new Set<string>();
+  private handledMessageIds: Map<string, string> | null = null;
+  private readonly admissionWaiters: Array<() => void> = [];
+
+  private getHandledMessageIds(): Map<string, string> {
+    if (!this.handledMessageIds) {
+      this.handledMessageIds = new Map(
+        listPeerEvents(this.options.tenantId, this.options.peerId)
+          .filter(
+            (event) =>
+              event.type === 'message_handled' &&
+              typeof event.sender_peer_id === 'string' &&
+              typeof event.processed_at === 'string'
+          )
+          .map((event) => [
+            String(event.sender_peer_id) + ':' + String(event.message_id),
+            String(event.processed_at),
+          ])
+      );
+    }
+    return this.handledMessageIds;
+  }
+
+  private maxInflight(): number {
+    return Math.max(1, Math.floor(this.options.maxInflight ?? 8));
+  }
+
+  private maxQueued(): number {
+    return Math.max(0, Math.floor(this.options.maxQueued ?? 64));
+  }
+
+  private async acquireAdmission(): Promise<boolean> {
+    if (this.activeDeliveries < this.maxInflight()) {
+      this.activeDeliveries += 1;
+      return true;
+    }
+    if (this.queuedDeliveries >= this.maxQueued()) return false;
+
+    this.queuedDeliveries += 1;
+    await new Promise<void>((resolve) => this.admissionWaiters.push(resolve));
+    return true;
+  }
+
+  private releaseAdmission(): void {
+    const next = this.admissionWaiters.shift();
+    if (next) {
+      this.queuedDeliveries -= 1;
+      next();
+      return;
+    }
+    this.activeDeliveries = Math.max(0, this.activeDeliveries - 1);
+  }
+
+  getCapacity(): { accepting_new_work: boolean; available_slots: number; max_inflight: number } {
+    const maxInflight = this.maxInflight();
+    const availableSlots = Math.max(
+      0,
+      maxInflight + this.maxQueued() - this.activeDeliveries - this.queuedDeliveries
+    );
+    return {
+      accepting_new_work: availableSlots > 0,
+      available_slots: availableSlots,
+      max_inflight: maxInflight,
+    };
+  }
 
   constructor(private readonly options: PeerMessagingServerOptions) {
     normalizeTenantId(options.tenantId);
@@ -928,65 +1004,111 @@ export class PeerMessagingServer {
       return { status: 401, body: { ok: false, error: 'invalid_signature' } };
     }
 
-    recordInbox(this.options.tenantId, this.options.peerId, normalized, this.options.inboxRole);
-    recordPeerEvent(this.options.tenantId, this.options.peerId, {
-      type: 'message_received',
-      message_id: normalized.message_id,
-      conversation_id: normalized.conversation_id,
-      message_type: normalized.type,
-      sender_peer_id: normalized.sender_peer_id,
-      recipient_peer_id: normalized.recipient_peer_id,
-      subject: normalized.subject,
-    });
-
-    const processedAt = nowIso();
-    let response: unknown = { accepted: true };
-    if (this.options.responder) {
-      try {
-        response = await this.options.responder({
-          peerId: this.options.peerId,
-          envelope: normalized,
-        });
-      } catch (error) {
-        const safe = toWireError(error, normalized.correlation_id);
-        recordPeerEvent(this.options.tenantId, this.options.peerId, {
-          type: 'message_error',
+    const deliveryKey = normalized.sender_peer_id + ':' + normalized.message_id;
+    const priorProcessedAt = this.getHandledMessageIds().get(deliveryKey);
+    if (priorProcessedAt) {
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          accepted: true,
+          duplicate: true,
+          processing_mode: 'synchronous_on_receive',
+          processed_at: priorProcessedAt,
+          peer_id: this.options.peerId,
           message_id: normalized.message_id,
-          reason: safe.code,
-        });
-        return {
-          status: 500,
-          body: {
-            ok: false,
-            error: safe.message,
-            error_code: safe.code,
-            correlation_id: safe.correlation_id,
-          },
-        };
-      }
+        },
+      };
     }
+    if (this.activeMessageIds.has(deliveryKey)) {
+      return {
+        status: 425,
+        body: { ok: false, error: 'message_processing', retryable: true, retry_after_ms: 250 },
+      };
+    }
+    this.activeMessageIds.add(deliveryKey);
+    if (!(await this.acquireAdmission())) {
+      this.activeMessageIds.delete(deliveryKey);
+      recordPeerEvent(this.options.tenantId, this.options.peerId, {
+        type: 'message_rejected',
+        message_id: normalized.message_id,
+        reason: 'receiver_overloaded',
+        active_deliveries: this.activeDeliveries,
+        queued_deliveries: this.queuedDeliveries,
+        max_inflight: this.maxInflight(),
+        max_queued: this.maxQueued(),
+      });
+      return {
+        status: 503,
+        body: { ok: false, error: 'receiver_overloaded', retryable: true, retry_after_ms: 1000 },
+      };
+    }
+    try {
+      recordInbox(this.options.tenantId, this.options.peerId, normalized, this.options.inboxRole);
+      recordPeerEvent(this.options.tenantId, this.options.peerId, {
+        type: 'message_received',
+        message_id: normalized.message_id,
+        conversation_id: normalized.conversation_id,
+        message_type: normalized.type,
+        sender_peer_id: normalized.sender_peer_id,
+        recipient_peer_id: normalized.recipient_peer_id,
+        subject: normalized.subject,
+      });
 
-    recordPeerEvent(this.options.tenantId, this.options.peerId, {
-      type: 'message_handled',
-      message_id: normalized.message_id,
-      conversation_id: normalized.conversation_id,
-      message_type: normalized.type,
-      processing_mode: 'synchronous_on_receive',
-      processed_at: processedAt,
-    });
+      let response: unknown = { accepted: true };
+      if (this.options.responder) {
+        try {
+          response = await this.options.responder({
+            peerId: this.options.peerId,
+            envelope: normalized,
+          });
+        } catch (error) {
+          const safe = toWireError(error, normalized.correlation_id);
+          recordPeerEvent(this.options.tenantId, this.options.peerId, {
+            type: 'message_error',
+            message_id: normalized.message_id,
+            reason: safe.code,
+          });
+          return {
+            status: 500,
+            body: {
+              ok: false,
+              error: safe.message,
+              error_code: safe.code,
+              correlation_id: safe.correlation_id,
+            },
+          };
+        }
+      }
 
-    return {
-      status: 200,
-      body: {
-        ok: true,
-        accepted: true,
+      const processedAt = nowIso();
+      recordPeerEvent(this.options.tenantId, this.options.peerId, {
+        type: 'message_handled',
+        message_id: normalized.message_id,
+        sender_peer_id: normalized.sender_peer_id,
+        conversation_id: normalized.conversation_id,
+        message_type: normalized.type,
         processing_mode: 'synchronous_on_receive',
         processed_at: processedAt,
-        peer_id: this.options.peerId,
-        message_id: normalized.message_id,
-        response,
-      },
-    };
+      });
+      this.getHandledMessageIds().set(deliveryKey, processedAt);
+
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          accepted: true,
+          processing_mode: 'synchronous_on_receive',
+          processed_at: processedAt,
+          peer_id: this.options.peerId,
+          message_id: normalized.message_id,
+          response,
+        },
+      };
+    } finally {
+      this.activeMessageIds.delete(deliveryKey);
+      this.releaseAdmission();
+    }
   }
 
   async listen(port: number, host = '127.0.0.1'): Promise<http.Server> {
@@ -1023,7 +1145,15 @@ export class PeerMessagingServer {
 
         const body = await parseRequestBody(req);
         const result = await this.processEnvelope(body as PeerMessageEnvelope);
-        return sendJson(res, result.status, result.body);
+        const retryAfterMs =
+          isRecord(result.body) && typeof result.body.retry_after_ms === 'number'
+            ? result.body.retry_after_ms
+            : 0;
+        const retryHeaders =
+          retryAfterMs > 0
+            ? { 'Retry-After': String(Math.max(1, Math.ceil(retryAfterMs / 1000))) }
+            : {};
+        return sendJson(res, result.status, result.body, retryHeaders);
       } catch (error: any) {
         if (isRequestBodyTooLargeError(error)) {
           return sendJson(res, 413, { ok: false, error: 'request_body_too_large' });

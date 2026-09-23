@@ -10,6 +10,8 @@ last_updated: 2026-08-03
 
 # 同一 tenant の Kyberion peer をつなぐ最短手順
 
+通信方式全体の判断基準は[Agent Communication and Coordination Model](../architecture/agent-communication-layer-model.md)を参照してください。この runbook の same-host は同じ host 上の**別 Kyberion runtime**を指します。同じ checkout 上で provider CLI を並走させる場合は peer server を起動せず、[Co-Session Coordination](../architecture/co-session-coordination.md)を使います。same_host は endpoint の到達範囲であり、信頼や作業権限を意味しません。
+
 この runbook は、同じ tenant に属する Kyberion peer を起動し、相手を発見できることを確認してから会話を始めるための最短手順です。
 
 運用者が覚えることは次の4つだけです。
