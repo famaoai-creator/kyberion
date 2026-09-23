@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   costTierForReasoningMode,
   detectVoicePowerSource,
+  isSpeculativeReplyRequested,
   resolveSpeculativePolicy,
   transcriptsMatchForSpeculation,
 } from './voice-speculative-policy.js';
@@ -72,22 +73,35 @@ describe('resolveSpeculativePolicy', () => {
     });
   });
 
-  it('is enabled by an explicit option or the env flag', () => {
-    expect(resolveSpeculativePolicy({ option: true, env: {} }).enabled).toBe(true);
+  it('is requested by an explicit option or the env flag, but stays off without a wired probe', () => {
+    // Requested, but no costTier/powerSource wired: fails closed, not open.
+    expect(resolveSpeculativePolicy({ option: true, env: {} })).toMatchObject({
+      enabled: false,
+      disabled_reason: 'metered',
+    });
     expect(
-      resolveSpeculativePolicy({ env: { KYBERION_VOICE_SPECULATIVE_REPLY: '1' } }).enabled
+      resolveSpeculativePolicy({
+        option: true,
+        env: {},
+        powerSource: 'ac',
+        costTier: 'free',
+      }).enabled
     ).toBe(true);
     expect(
+      resolveSpeculativePolicy({ env: { KYBERION_VOICE_SPECULATIVE_REPLY: '1' } }).disabled_reason
+    ).toBe('metered');
+    expect(
       resolveSpeculativePolicy({ option: false, env: { KYBERION_VOICE_SPECULATIVE_REPLY: '1' } })
-        .enabled
-    ).toBe(false);
+    ).toMatchObject({ enabled: false, disabled_reason: 'default_off' });
     expect(
       resolveSpeculativePolicy({ env: { KYBERION_VOICE_SPECULATIVE_REPLY: '0' } }).enabled
     ).toBe(false);
   });
 
   it('is forced off on battery power or metered backends', () => {
-    expect(resolveSpeculativePolicy({ option: true, powerSource: 'battery' })).toMatchObject({
+    expect(
+      resolveSpeculativePolicy({ option: true, powerSource: 'battery', costTier: 'free' })
+    ).toMatchObject({
       enabled: false,
       disabled_reason: 'battery',
     });
@@ -98,13 +112,56 @@ describe('resolveSpeculativePolicy', () => {
     expect(
       resolveSpeculativePolicy({ option: true, powerSource: 'ac', costTier: 'free' }).enabled
     ).toBe(true);
-    expect(resolveSpeculativePolicy({ option: true, powerSource: 'unknown' }).enabled).toBe(true);
+  });
+
+  it('fails closed on a missing or unknown power source (N8)', () => {
+    // A library caller enabling speculation without wiring powerSource must
+    // not silently get it on just because the backend happens to be free.
+    expect(resolveSpeculativePolicy({ option: true, costTier: 'free' })).toMatchObject({
+      enabled: false,
+      disabled_reason: 'power_unknown',
+    });
+    expect(
+      resolveSpeculativePolicy({ option: true, costTier: 'free', powerSource: 'unknown' })
+    ).toMatchObject({
+      enabled: false,
+      disabled_reason: 'power_unknown',
+    });
+    // An explicit opt-in accepts the unknown power source.
+    expect(
+      resolveSpeculativePolicy({
+        option: true,
+        costTier: 'free',
+        powerSource: 'unknown',
+        allowUnknownPower: true,
+      }).enabled
+    ).toBe(true);
+  });
+
+  it('treats a missing costTier as metered, not free (N8)', () => {
+    expect(resolveSpeculativePolicy({ option: true, powerSource: 'ac' })).toMatchObject({
+      enabled: false,
+      disabled_reason: 'metered',
+    });
   });
 
   it('rejects invalid tuning', () => {
     expect(() => resolveSpeculativePolicy({ tentativeSilenceMs: -1 })).toThrow(
       /tentativeSilenceMs/
     );
+  });
+});
+
+describe('isSpeculativeReplyRequested', () => {
+  it('prefers the explicit option over the env flag', () => {
+    expect(isSpeculativeReplyRequested(true, {})).toBe(true);
+    expect(isSpeculativeReplyRequested(false, { KYBERION_VOICE_SPECULATIVE_REPLY: '1' })).toBe(
+      false
+    );
+    expect(isSpeculativeReplyRequested(undefined, { KYBERION_VOICE_SPECULATIVE_REPLY: '1' })).toBe(
+      true
+    );
+    expect(isSpeculativeReplyRequested(undefined, {})).toBe(false);
   });
 });
 
