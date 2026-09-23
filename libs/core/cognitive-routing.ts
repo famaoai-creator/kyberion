@@ -158,9 +158,73 @@ function lowerText(parts: Array<string | undefined | null>): string {
     .trim();
 }
 
+// Metadata written back onto the work item by the dispatch/execution runtime
+// is bookkeeping, not task intent. Feeding it into route scoring makes the route
+// depend on previous runs: `last_cognitive_route_summary` contains the literal
+// string "deterministic_pipeline", which would pin the item to the zero_llm
+// tier forever once any single run lands there.
+const ROUTE_SCORING_BOOKKEEPING_PREFIXES = ['last_', 'drift_watchdog_'];
+const ROUTE_SCORING_BOOKKEEPING_KEYS = new Set([
+  'attempt_id',
+  'runtime_id',
+  'output_ref',
+  'executor_agent_id',
+  'resolved_agent_id',
+  'reviewer_agent_id',
+  'review_attempt_id',
+  'review_runtime_id',
+  'review_output_ref',
+  'review_provider',
+  'execution_surface',
+  'execution_surface_used',
+  'review_execution_surface',
+  'review_execution_surface_used',
+  'routing_minimum_tier',
+  'execution_status',
+  'lease_status',
+  'needs_input',
+  'needs_attention',
+  'signature',
+  'reason',
+  'should_stop',
+  'repeated_signature',
+  'budget_exceeded',
+  'security_scope',
+  'summary',
+  'result',
+  'task_result',
+  'model_id',
+  'provider',
+  'response_wait_status',
+  'response_wait_next_action',
+  'artifact_review_blocked_reason',
+]);
+
+function isRouteScoringMetadataKey(key: string): boolean {
+  return (
+    !ROUTE_SCORING_BOOKKEEPING_KEYS.has(key) &&
+    !ROUTE_SCORING_BOOKKEEPING_PREFIXES.some((prefix) => key.startsWith(prefix))
+  );
+}
+
+// Generated identifiers (`prefix-<8+ hex>`, UUID fragments) can contain marker
+// substrings — most notably "adf", which is hex-representable — so a random id
+// must never influence the route. Strip id-shaped tokens before scoring.
+const GENERATED_ID_PATTERN = /\b[a-z][a-z0-9_-]*-[0-9a-f]{8,}\b/gu;
+const HEX_BLOB_PATTERN = /\b[0-9a-f]{8}(?:-[0-9a-f]{4,})*\b/gu;
+
+function stripGeneratedIds(text: string): string {
+  return text
+    .replace(GENERATED_ID_PATTERN, ' ')
+    .replace(HEX_BLOB_PATTERN, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
 function extractMetadataStrings(metadata: Record<string, unknown> | undefined): string[] {
   if (!metadata) return [];
   return Object.entries(metadata).flatMap(([key, value]) => {
+    if (!isRouteScoringMetadataKey(key)) return [];
     if (value === null || value === undefined) return [];
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
       return [`${key}:${String(value)}`];
@@ -287,20 +351,22 @@ export function buildCognitiveRouteDecision(
   input: CognitiveRouteCandidate
 ): CognitiveRouteDecision {
   const metadata = getMetadata(input);
-  const text = lowerText([
-    input.mission_id,
-    input.mission_type,
-    input.tenant_slug,
-    input.assigned_persona,
-    input.status,
-    input.team_role,
-    input.recipient_kind,
-    input.item_id,
-    input.title,
-    input.description,
-    input.prompt,
-    ...extractMetadataStrings(metadata),
-  ]);
+  const text = stripGeneratedIds(
+    lowerText([
+      input.mission_id,
+      input.mission_type,
+      input.tenant_slug,
+      input.assigned_persona,
+      input.status,
+      input.team_role,
+      input.recipient_kind,
+      input.item_id,
+      input.title,
+      input.description,
+      input.prompt,
+      ...extractMetadataStrings(metadata),
+    ])
+  );
   const decision = selectTier(input, text);
   return decision;
 }
