@@ -10,6 +10,7 @@ import {
   withSandboxPolicy,
 } from './sandbox-policy.js';
 import type { PluginPermissionGrant } from './plugin-permissions.js';
+import { getSecret } from './secret-guard.js';
 import {
   createPluginGrantBinding,
   EMPTY_PLUGIN_GRANT,
@@ -152,6 +153,123 @@ describe('plugin grant binding and comparison', () => {
     expect([...api.sync()]).toEqual(['read-only']);
     expect(api.fluent()).toBe(api);
     expect(api.frozen).toBe(api.frozen);
+    expect(getActiveSandboxPolicy()).toBeUndefined();
+  });
+
+  it('wraps closures carried by returned arrays, Map and Set (N1)', () => {
+    vi.stubEnv('PLUGIN_ARRAY_SECRET', 'array-secret-value');
+    const target = pathResolver.sharedTmp(`plugin-grant-runtime-test/${randomUUID()}.txt`);
+    const fetchProbe = () => validateUrl('https://example.com');
+    const binding = createPluginGrantBinding('containers', EMPTY_PLUGIN_GRANT);
+    const api = binding.wrapObject({
+      list: () => [fetchProbe, () => safeWriteFile(target, 'x')],
+      tools: () => ({ tools: [{ name: 't', execute: () => getSecret('PLUGIN_ARRAY_SECRET') }] }),
+      map: () => new Map([['fetch', fetchProbe]]),
+      set: () => new Set([fetchProbe]),
+      holder: { items: [{ handler: fetchProbe }] },
+    });
+
+    const list = api.list();
+    expect(Array.isArray(list)).toBe(true);
+    expect(() => list[0]()).toThrow('SANDBOX_NETWORK_DENIED');
+    expect(() => list[1]()).toThrow(/SANDBOX_WRITE_DENIED/);
+    expect(safeExistsSync(target)).toBe(false);
+    expect(() => api.tools().tools[0].execute()).toThrow('[PLUGIN_GRANT_DENIED]');
+    expect(() => api.map().get('fetch')!()).toThrow('SANDBOX_NETWORK_DENIED');
+    expect(() => [...api.set()][0]()).toThrow('SANDBOX_NETWORK_DENIED');
+    expect(() => api.holder.items[0].handler()).toThrow('SANDBOX_NETWORK_DENIED');
+    // Pure data collections stay the same (cloneable) objects.
+    const rows = [1, 2];
+    const table = new Map([['a', 1]]);
+    const data = binding.wrapObject({ rows: () => rows, table: () => table });
+    expect(data.rows()).toBe(rows);
+    expect(data.table()).toBe(table);
+  });
+
+  it('re-scans mutable data but caches frozen data verdicts (N2e)', () => {
+    let reads = 0;
+    const frozenRows = Object.freeze(Array.from({ length: 500 }, (_, i) => Object.freeze({ i })));
+    const counted = new Proxy(frozenRows, {
+      ownKeys: (rows) => {
+        reads += 1;
+        return Reflect.ownKeys(rows);
+      },
+      getOwnPropertyDescriptor: (rows, key) => {
+        reads += 1;
+        return Reflect.getOwnPropertyDescriptor(rows, key);
+      },
+    });
+    const mutable: unknown[] = [1, 2];
+    const binding = createPluginGrantBinding('scan-cache', EMPTY_PLUGIN_GRANT);
+    const api = binding.wrapObject({ frozen: () => counted, mutable: () => mutable });
+    expect(api.frozen()).toBe(counted);
+    expect(reads).toBeGreaterThan(0);
+    reads = 0;
+    expect(api.frozen()).toBe(counted);
+    expect(api.frozen()).toBe(counted);
+    expect(reads).toBe(0);
+
+    expect(api.mutable()).toBe(mutable);
+    mutable.push(() => validateUrl('https://example.com'));
+    const later = api.mutable() as Array<() => void>;
+    expect(later).not.toBe(mutable);
+    expect(() => later[2]()).toThrow('SANDBOX_NETWORK_DENIED');
+  });
+
+  it('keeps proxies consistent under freeze / defineProperty (N2a)', () => {
+    const binding = createPluginGrantBinding('freeze', EMPTY_PLUGIN_GRANT);
+    const api = binding.wrapObject({
+      make: () => ({ label: 'x', mode: () => getActiveSandboxPolicy()?.mode }),
+      frozen: () => Object.freeze({ mode: () => getActiveSandboxPolicy()?.mode }),
+    });
+    const made = api.make();
+    Object.defineProperty(made, 'pinned', { value: 1, configurable: false, writable: false });
+    expect(made.pinned).toBe(1);
+    expect(Object.getOwnPropertyDescriptor(made, 'pinned')).toMatchObject({
+      value: 1,
+      configurable: false,
+    });
+    expect(Object.freeze(made)).toBe(made);
+    expect(Object.isFrozen(made)).toBe(true);
+    expect(Object.isExtensible(made)).toBe(false);
+    expect(Reflect.ownKeys(made)).toEqual(['label', 'mode', 'pinned']);
+    expect(made.mode()).toBe('read-only');
+    expect(made.mode).toBe(made.mode);
+
+    const frozen = api.frozen();
+    expect(Object.isFrozen(frozen)).toBe(true);
+    expect(frozen.mode()).toBe('read-only');
+    expect(getActiveSandboxPolicy()).toBeUndefined();
+  });
+
+  it('supports new on members and returned classes, keeping statics and instanceof (N2b/c)', () => {
+    class Widget {
+      static kind(): string | undefined {
+        return getActiveSandboxPolicy()?.mode;
+      }
+      readonly built = getActiveSandboxPolicy()?.mode;
+      probe(): string | undefined {
+        return getActiveSandboxPolicy()?.mode;
+      }
+    }
+    const binding = createPluginGrantBinding('classes', EMPTY_PLUGIN_GRANT);
+    const api = binding.wrapObject({ Widget, cls: () => Widget });
+
+    const member = new api.Widget();
+    expect(member.built).toBe('read-only');
+    expect(member.probe()).toBe('read-only');
+    expect(member instanceof api.Widget).toBe(true);
+    expect(api.Widget.kind()).toBe('read-only');
+
+    const Returned = api.cls();
+    const instance = new Returned();
+    expect(instance.built).toBe('read-only');
+    expect(instance instanceof Returned).toBe(true);
+    expect(instance instanceof Widget).toBe(true);
+    expect(Returned.kind()).toBe('read-only');
+    expect(Returned.name).toBe('Widget');
+    expect(Returned.length).toBe(0);
+    expect(Returned.prototype).toBe(Widget.prototype);
     expect(getActiveSandboxPolicy()).toBeUndefined();
   });
 

@@ -172,6 +172,11 @@ and the new version is approved (`pnpm plugin:install --source ... --id ...`,
 then decide the new request). Approving the old request does nothing; the
 concierge plugin screen answers such an approval with a "reinstall" message.
 
+The approval covers exactly one manifest, at the package root. A package with
+more than one root candidate (`manifest_ambiguous`) or any candidate below the
+root (`manifest_nested`, e.g. `dist/plugin.json`) is `blocked_broken_manifest`,
+and runtime readers of a managed install only consult the root manifest.
+
 Managed records written before digests existed are treated as
 `pending_approval`: reinstall each legacy third-party plugin once and approve
 it again. Official plugins are not affected.
@@ -228,7 +233,12 @@ result is `restart_required`. The ladder never bypasses the approval: even a
 `config_apply` change changes the content digest and needs a re-approval
 before the new version is activatable (`reloadPlugin` does not know which
 paths changed, so a re-approved content change is applied as
-`plugin_reload`).
+`plugin_reload`). Installing a new version replaces the managed copy in
+place, so a reload while that version awaits approval **deactivates** the
+running one (fail closed — the old module could lazily load unapproved
+files); it comes back once the new version is approved and reloaded. The same
+happens when the managed copy is removed, tampered with, or its approval is
+rejected.
 
 ## Views (EP-05)
 
