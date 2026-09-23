@@ -1,10 +1,11 @@
 // EP-03/EP-04 fixture. Every op calls a host-provided probe from the step
 // context, so the governed host paths (secure-io, sandbox network check,
 // op preflight, secret-guard, env view) are exercised under the grant.
+// Without a probe (e.g. an EP-05 view action dispatch) an op is a no-op.
 const apply = (run) => ({
   stepType: 'apply',
   handler: async (_op, params, context) => {
-    const result = await run(params, context.probe);
+    const result = context.probe ? await run(params, context.probe) : null;
     return { handled: true, ctx: { ...context, result } };
   },
 });

@@ -19,6 +19,7 @@ const SCOPE_ROUTES = [
   'collaboration/route.ts',
   'collaboration/stream/route.ts',
   'headless/work-items/route.ts',
+  'headless/a2ui/plugin-views/route.ts',
   'headless/collaboration/route.ts',
   'agent-activity/route.ts',
   'agents/route.ts',

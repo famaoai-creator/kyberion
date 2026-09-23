@@ -3266,6 +3266,10 @@
     "./plugin-grant-runtime": {
       "types": "./dist/plugin-grant-runtime.d.ts",
       "default": "./dist/plugin-grant-runtime.js"
+    },
+    "./plugin-view-contract": {
+      "types": "./dist/plugin-view-contract.d.ts",
+      "default": "./dist/plugin-view-contract.js"
     }
   },
   "dependencies": {

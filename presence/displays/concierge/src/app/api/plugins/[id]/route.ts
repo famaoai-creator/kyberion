@@ -80,6 +80,19 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       // would be a lie (plugin-managed-install.ts keeps it blocked anyway).
       return NextResponse.json({ ok: false, error: t('api.plugin.broken') }, { status: 409 });
     }
+    if (record.activationStatus === 'blocked_digest_mismatch' && decision === 'approve') {
+      // EP-01: the approval is bound to the content digest of the managed
+      // copy. The plugin changed since then, so approving the old request
+      // cannot make it runnable — it must be reinstalled and re-approved.
+      return NextResponse.json(
+        {
+          ok: false,
+          error: t('api.plugin.digest_mismatch', { id: record.pluginId }),
+          plugin: { id: record.pluginId, trust: record.trust, status: record.activationStatus },
+        },
+        { status: 409 }
+      );
+    }
     if (record.trust === 'official' || record.activationStatus === 'activatable') {
       return NextResponse.json(
         { ok: false, error: t('api.plugin.no_decision_needed') },

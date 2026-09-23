@@ -805,6 +805,7 @@ export function ChronosMirrorLegacySections({ model }: { model: ViewModel }) {
                   organizationId={organizationId || undefined}
                   projectId={projectId || undefined}
                 />
+                <HeadlessA2UIWorkspace source="plugin-views" tenant={tenant || undefined} />
               </div>
             )}
           </Section>

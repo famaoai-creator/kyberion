@@ -1,0 +1,149 @@
+---
+title: Plugin Permissions, Lifecycle and Views
+category: Architecture
+tags: [plugins, permissions, approval, digest, sandbox, lifecycle, a2ui, views, security]
+importance: 7
+last_updated: 2026-09-24
+---
+
+# Plugin Permissions, Lifecycle and Views
+
+How Kyberion decides what an installed plugin may do, keeps that decision
+bound to the exact code a human approved, applies changes with the least
+disruption, and lets a plugin contribute UI without contributing UI code.
+Operator-facing summary: [`plugins/README.md`](../../../plugins/README.md).
+Plan: `docs/developer/improvement-plans-2026-09/ELIZA_ADOPTION_PLAN_2026-09-24.ja.md` §5 (EP-01〜EP-06).
+
+## 1. Layers
+
+| Layer                     | Module                                                                        | Decides                                                        |
+| ------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Provenance trust (KD-06)  | `plugin-source-trust.ts`, `skill-plugin-loader.ts`                            | official / curated / third-party from the resolved location    |
+| Approval binding (EP-01)  | `plugin-managed-install.ts`                                                   | approval ⇔ content digest + manifest version + grant digest    |
+| Permission grant (EP-02)  | `plugin-permissions.ts`, `governance/plugin-permission-policy.json`           | request ∩ trust ceiling ∩ tenant override                      |
+| Runtime mediation (EP-03) | `plugin-grant-runtime.ts`, `plugin-contributions.ts`, `sandbox-policy.ts`     | governed host paths check the executing plugin's grant         |
+| Lifecycle (EP-04)         | `plugin-lifecycle.ts`, `scripts/plugin_install.ts --reload/--deactivate`      | ownership ledger, activate / reload / deactivate, apply ladder |
+| Views (EP-05)             | `plugin-view-contract.ts`, Chronos `GET/POST /api/headless/a2ui/plugin-views` | declarative A2UI documents, viewer gating, action routing      |
+
+Each layer only narrows what the previous one allowed; none of them widens.
+
+## 2. Approval is bound to content (EP-01)
+
+The managed copy's digest is `sha256` over sorted `relative/path\0sha256(file)`
+entries (the record file excluded, symlinks rejected). The approval payload
+hash covers that digest, the manifest version and the digest of the narrowed
+grant. Every read of a managed record re-derives all three; any drift yields
+`blocked_digest_mismatch`, and the loader re-checks the digest immediately
+before `import()` to keep the TOCTOU window small. Legacy records without a
+digest fall back to `pending_approval` and need one reinstall + re-approval.
+
+Consequence: _every_ content change — including a `views/`-only change the
+apply ladder would classify as `config_apply` — is invisible to runtime until
+the new version is reinstalled and approved. The previous activation keeps
+running in the meantime (`reloadPlugin` answers "not activatable; previous
+activation kept"). Surfaces show the state honestly: the concierge plugin
+screen labels it "changed since approval — reinstall required" and refuses
+to approve the stale request with HTTP 409.
+
+## 3. Permission grants (EP-02, EP-03)
+
+The manifest `permissions` block (network, fs with tier-relative paths,
+`ops_invoke`, `env`, `secrets`) is intersected at install time with the
+per-trust ceiling and an optional narrow-only tenant override. Confidential
+paths are confined to the installing tenant. A critical capability narrowed
+to nothing aborts the install with the elevation that would be required.
+
+At runtime every executable contribution runs inside `runWithPluginGrant`,
+which sets the intersection of the enclosing sandbox policy and the grant and
+records the executing plugin. Governed paths consult it: secure-io writes,
+sandbox/URL network checks, the `plugin-grant-ops` op guard (`ops_invoke`),
+`getSecret` (`secrets`) and `getPluginEnv()` (`env`).
+
+## 4. Threat model and limits
+
+In scope — the grant stops a well-behaved plugin, or a plugin misused through
+its declared entry points, from:
+
+- writing outside its granted fs scope through secure-io;
+- reaching hosts outside its network grant through the sandbox/URL checks;
+- invoking ops outside `ops_invoke` through op dispatch;
+- resolving secrets or env vars it was not granted;
+- providing reserved seams (`core-clock`, `risky-approval-handler`,
+  `risky-approval-override`, `scenario-op-override`);
+- running after its content changed without a new human approval;
+- disposing another plugin's contributions (ownership ledger).
+
+Out of scope — **this is cooperative enforcement, not an isolation
+boundary**. In-process plugin code that imports `node:fs`, opens sockets,
+reads `process.env` or monkey-patches globals is not stopped, and filesystem
+reads are not restricted. Reloads keep the previous module instance in memory
+until the process exits. The only real defence against malicious code is the
+human approval: approve only plugins you would run with the host's own
+privileges.
+
+## 5. Lifecycle and the apply ladder (EP-04)
+
+`applyPluginChange` is a pure classifier over before/after snapshots:
+`config_apply` (permissions narrowed, views-only change), `plugin_reload`
+(ops / hooks / prompt sections / facets / code changed, permissions widened
+or newly applied to a legacy plugin) and `restart_required` (seams or
+providers changed, or code of a seam/provider plugin changed). The worst
+rung wins. `reloadPlugin` re-resolves the plugin, applies the rung, and on
+failure re-activates the previous module (or reports `restart_required` if
+that fails too). `reloadPlugin` does not know which files changed, so a
+re-approved view edit is applied as `plugin_reload`; callers that do know
+the changed paths pass `changedPaths` to `applyPluginChange`.
+
+## 6. Plugin-contributed views (EP-05)
+
+Views are data. A `provides.views` entry declares an id, a vocabulary title
+key, a document under `views/`, isolation, capabilities, a role gate, actions
+and a refresh mode (schema:
+`knowledge/product/schemas/plugin-view-declaration.schema.json`). Declared
+view ids are recorded in the ownership ledger as `pluginId:viewId`; nothing
+executes.
+
+Validation (`validatePluginView`) is deny-by-default:
+
+- the document is a list of A2UI messages, validated against
+  `a2ui-message.schema.json` and the catalog props (`validateA2UIMessage`);
+  exactly one `createSurface` with catalog `kyberion-base`; one surface id;
+  no `deleteSurface`; unique component ids; children must exist;
+- component types come from a display-only subset of `kyberion-base` (no app
+  chrome, no input / capture / secret / voice / sketch components);
+- no `href`, `src`, `style`, raw HTML props or `on*` handler props, and no
+  markup or `javascript:` / `data:text/html` strings anywhere;
+- every `*Key` (and the declaration's `titleKey`) must exist in
+  `user-facing-vocabulary.json`;
+- `sandboxed-iframe` is rejected with `[PLUGIN_VIEW_UNSUPPORTED]`; the
+  capability allowlist is empty, so any capability is rejected;
+- each action targets one of the plugin's own `provides.ops` (cross-plugin
+  action ops are denied regardless of the grant), its `paramsSchema` must
+  compile and close every object with `additionalProperties: false`, and the
+  document may only reference declared action ids.
+
+Serving (`listPluginViewsForViewer`, Chronos route): only `activatable`
+managed records are read — a pending, broken or digest-mismatched plugin's
+files are never opened. Documents are read through secure-io with each path
+segment checked (no `..`, no symlink, regular file, size cap). The viewer's
+role must meet `roleGate.minRole`, the viewer must hold every tier in
+`roleGate.tiers`, and a plugin installed for a tenant is only visible to
+viewers scoped to that tenant. The `tier` / `tenant` query parameters are
+authorized against the viewer first and can only narrow.
+
+Actions (`POST`): `chronos.plugin_view.action` is a localadmin write
+operation. Unknown actions are 404, an op the plugin does not provide is 403,
+invalid params are 400, a non-activatable plugin is 403. `authority: human`
+creates a human-only approval request (bound to plugin, content digest, view,
+action, op and params) in the Chronos approval queue; `authority: agent`
+dispatches through op preflight only when the owning plugin is active in the
+serving process, otherwise 409 — the web surface never imports plugin code.
+
+## 7. Known gaps
+
+- Approved `human` view actions are recorded but not yet executed by a
+  follow-up dispatcher; the approval is the audit record of intent.
+- View text props are literal plugin strings (the catalog has no key props);
+  only keys are vocabulary-checked.
+- `sandboxed-iframe`, view capabilities and personal-pads composition are
+  follow-ups (plan §8).

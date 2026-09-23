@@ -14,6 +14,11 @@
  *
  * EP-04: each successful registration is recorded in an ownership ledger;
  * a plugin can only dispose contributions it owns.
+ *
+ * EP-05: `views` are declarative data (A2UI documents validated by
+ * plugin-view-contract.ts); they are never registered by code. Declared view
+ * ids are recorded in the ownership ledger as `pluginId:viewId` so a view is
+ * attributable and disposed with its plugin.
  */
 
 import {
@@ -56,6 +61,8 @@ export interface PluginContributionDeclaration {
   hooks?: string[];
   prompt_sections?: string[];
   facets?: string[];
+  /** EP-05: declared view ids (data only; see plugin-view-contract.ts). */
+  views?: string[];
 }
 
 export interface PluginContributionProvenance {
@@ -243,6 +250,7 @@ function normalizedDeclarations(
     hooks: normalize(input.hooks),
     prompt_sections: normalize(input.prompt_sections),
     facets: normalize(input.facets),
+    views: normalize(input.views),
   };
 }
 
@@ -445,6 +453,10 @@ export async function activatePluginContributions(
     }
     for (const name of declared.facets) {
       if (!registered.facets.includes(name)) api.registerFacet(name);
+    }
+    for (const name of declared.views) {
+      own('views', `${pluginId}:${name}`, () => () => undefined);
+      markRegistered(registered, 'views', name);
     }
     return {
       provenance,

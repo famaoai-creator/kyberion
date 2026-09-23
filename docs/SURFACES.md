@@ -22,6 +22,8 @@ Kyberion の操作系サーフェスの役割マップ。**各サーフェスは
 
 Computer Surface の `/api/identity`・`/api/state`・`/api/stream`・`/api/os/control-plane` は read operation、`/a2ui/dispatch` は localadmin の write operation とする。remote bearer access は `KYBERION_TENANT` に server-side bind し、内部 A2UI relay は `KYBERION_LOCALADMIN_TOKEN` を使用する。
 
+Chronos の `/api/headless/a2ui/plugin-views` は承認済みプラグインの宣言的ビュー(EP-05)を返す。`GET` は read operation `chronos.plugin_view.read`(`activatable` かつ内容 digest が承認時と一致する managed プラグインのみ。ロール・tier・tenant は viewer から server-side で評価し、`tier` / `tenant` query は狭めるだけ)、`POST` は localadmin の write operation `chronos.plugin_view.action`(`authority: human` の操作は承認キューに積まれ、`agent` の操作はプラグインがそのプロセスで稼働中の場合のみ実行)。管制塔の operator-home 投影の下に「プラグインビュー」として表示する。詳細: [`plugin-permissions-and-views`](../knowledge/product/architecture/plugin-permissions-and-views.md)。
+
 ## フロントデスク(共有レール)
 
 秘書室(concierge)と相棒(presence-studio)は別サーフェスのままだが、人には「人の動詞 5 つ」の 1 つのメニューに見える共有レールを持つ([FRONT_DESK_REDESIGN_PLAN](./developer/improvement-plans-2026-09/FRONT_DESK_REDESIGN_PLAN_2026-09-13.ja.md))。

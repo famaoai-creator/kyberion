@@ -17,6 +17,7 @@ describe('headless surface contract', () => {
       'operator-home',
       'work-items',
       'collaboration',
+      'plugin-views',
     ]);
 
     const update = manifest.operations.find(
@@ -41,10 +42,14 @@ describe('headless surface contract', () => {
       'chronos.operator_home.read',
       'chronos.work_items.read',
       'chronos.collaboration.read',
+      'chronos.plugin_view.read',
     ]);
     expect(
       availableHeadlessOperationIds('localadmin', manifest, authorizeSurfaceContextOperation)
     ).toContain('chronos.work_items.update_status');
+    expect(
+      availableHeadlessOperationIds('localadmin', manifest, authorizeSurfaceContextOperation)
+    ).toContain('chronos.plugin_view.action');
   });
 
   it('keeps server-resolved scope and available operations in every envelope', () => {
