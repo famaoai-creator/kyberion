@@ -145,10 +145,18 @@ describe('memory-promotion-workflow', () => {
     });
     createdDistillCandidateIds.add(queued.candidate_id);
     enqueueMemoryPromotionCandidate(queued);
-    updateMemoryPromotionCandidateStatus({
+    const approved = updateMemoryPromotionCandidateStatus({
       candidateId: queued.candidate_id,
       status: 'approved',
+      knowledgeDomain: 'organization',
       ratificationNote: 'Approved for promotion in governance review.',
+      curation: {
+        title: 'Mission closure checklist',
+        summary: 'Reusable mission closure checklist for operational maintenance.',
+        content:
+          'Confirm evidence, close all assigned work, record review decisions, and archive the mission.',
+        evidence_refs: queued.evidence_refs,
+      },
     });
 
     const result = await promoteMemoryCandidateToKnowledge({
@@ -171,6 +179,14 @@ describe('memory-promotion-workflow', () => {
 
     const distill = loadDistillCandidateRecord(queued.candidate_id);
     expect(distill?.status).toBe('promoted');
+    expect(distill?.title).toBe('Mission closure checklist');
+    expect(distill?.summary).toBe(
+      'Reusable mission closure checklist for operational maintenance.'
+    );
+    expect(distill?.evidence_refs).toEqual(approved?.curation?.evidence_refs);
+    expect(distill?.metadata?.procedure_steps).toEqual([
+      'Confirm evidence, close all assigned work, record review decisions, and archive the mission.',
+    ]);
     expect(distill?.promoted_ref).toBe(result.promotedRef);
     expect(distill?.metadata?.promotion_review).toMatchObject({
       backend: 'stub',
@@ -234,6 +250,70 @@ describe('memory-promotion-workflow', () => {
       verdict: 'yes',
       reason: 'conflicts with the existing checklist.',
     });
+  });
+
+  it('screens the curated publishable text, not only the source distillation summary', async () => {
+    const queued = createMemoryPromotionCandidate({
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-TEST-CURATED-POLICY',
+      proposedMemoryKind: 'sop',
+      summary: 'A neutral summary of a reusable operating practice.',
+      evidenceRefs: ['active/missions/public/MSN-TEST-CURATED-POLICY/evidence/distillation.md'],
+      sensitivityTier: 'public',
+      ratificationRequired: false,
+    });
+    createdDistillCandidateIds.add(queued.candidate_id);
+    enqueueMemoryPromotionCandidate(queued);
+    updateMemoryPromotionCandidateStatus({
+      candidateId: queued.candidate_id,
+      status: 'approved',
+      knowledgeDomain: 'product',
+      curation: {
+        title: 'Reusable practice',
+        summary: 'A neutral and reusable operational practice.',
+        content: 'Do not copy local paths such as /Users/example/private/report.md into knowledge.',
+        evidence_refs: queued.evidence_refs,
+      },
+    });
+
+    await expect(
+      promoteMemoryCandidateToKnowledge({
+        candidateId: queued.candidate_id,
+        executionRole: 'mission_controller',
+      })
+    ).rejects.toThrow('[POLICY_VIOLATION]');
+  });
+
+  it('screens curated publishable text before promotion', async () => {
+    const queued = createMemoryPromotionCandidate({
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-TEST-CURATED-POLICY',
+      proposedMemoryKind: 'sop',
+      summary: 'A neutral summary of a reusable operating practice.',
+      evidenceRefs: ['active/missions/public/MSN-TEST-CURATED-POLICY/evidence/distillation.md'],
+      sensitivityTier: 'public',
+      ratificationRequired: false,
+    });
+    createdDistillCandidateIds.add(queued.candidate_id);
+    enqueueMemoryPromotionCandidate(queued);
+    updateMemoryPromotionCandidateStatus({
+      candidateId: queued.candidate_id,
+      status: 'approved',
+      knowledgeDomain: 'product',
+      curation: {
+        title: 'Reusable practice',
+        summary: 'A neutral and reusable operational practice.',
+        content: 'Do not copy local paths such as /Users/example/private/report.md into knowledge.',
+        evidence_refs: queued.evidence_refs,
+      },
+    });
+
+    await expect(
+      promoteMemoryCandidateToKnowledge({
+        candidateId: queued.candidate_id,
+        executionRole: 'mission_controller',
+      })
+    ).rejects.toThrow('[POLICY_VIOLATION]');
   });
 
   it('rejects promotion when ratification is required but not approved', async () => {

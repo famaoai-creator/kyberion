@@ -621,7 +621,7 @@
     {
       "path": "product/architecture/mission-lifecycle-and-record-keeping.md",
       "tier": "public",
-      "size": 14992,
+      "size": 15283,
       "type": "md"
     },
     {
@@ -2697,7 +2697,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 208865,
+      "size": 209210,
       "type": "json"
     },
     {
@@ -3063,7 +3063,7 @@
     {
       "path": "product/governance/phases/execution.md",
       "tier": "public",
-      "size": 7828,
+      "size": 8076,
       "type": "md"
     },
     {
@@ -3081,7 +3081,7 @@
     {
       "path": "product/governance/phases/review.md",
       "tier": "public",
-      "size": 3612,
+      "size": 4611,
       "type": "md"
     },
     {
@@ -4269,13 +4269,13 @@
     {
       "path": "product/governance/wisdom-policy-guide.md",
       "tier": "public",
-      "size": 2140,
+      "size": 2257,
       "type": "md"
     },
     {
       "path": "product/governance/wisdom-policy.json",
       "tier": "public",
-      "size": 1956,
+      "size": 1947,
       "type": "json"
     },
     {
@@ -8649,25 +8649,25 @@
     {
       "path": "product/schemas/generated-knowledge-hint-record.schema.json",
       "tier": "public",
-      "size": 1718,
+      "size": 1892,
       "type": "json"
     },
     {
       "path": "product/schemas/generated-pattern-record.schema.json",
       "tier": "public",
-      "size": 1742,
+      "size": 1916,
       "type": "json"
     },
     {
       "path": "product/schemas/generated-report-template-record.schema.json",
       "tier": "public",
-      "size": 1689,
+      "size": 1863,
       "type": "json"
     },
     {
       "path": "product/schemas/generated-sop-record.schema.json",
       "tier": "public",
-      "size": 1817,
+      "size": 1991,
       "type": "json"
     },
     {
@@ -9453,7 +9453,7 @@
     {
       "path": "product/schemas/memory-candidate.schema.json",
       "tier": "public",
-      "size": 4344,
+      "size": 5028,
       "type": "json"
     },
     {

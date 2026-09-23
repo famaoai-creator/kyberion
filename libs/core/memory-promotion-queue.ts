@@ -29,13 +29,18 @@ export type MemoryCandidateKind =
   'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt' | 'archive_advisory';
 export type MemoryCandidateTier = 'public' | 'confidential' | 'personal';
 export type MemoryCandidateStatus = 'queued' | 'approved' | 'rejected' | 'promoted';
+export type MemoryKnowledgeDomain = 'product' | 'organization' | 'personal' | 'unclassified';
 
 export interface MemoryCandidate {
   candidate_id: string;
   source_type: MemoryCandidateSourceType;
   source_ref: string;
+  /** Knowledge ownership, distinct from sensitivity_tier. Legacy records omit this and retain organization routing. */
+  knowledge_domain?: MemoryKnowledgeDomain;
   proposed_memory_kind: MemoryCandidateKind;
   summary: string;
+  /** Human-curated durable knowledge payload; mission candidates cannot be approved without it. */
+  curation?: { title: string; summary: string; content: string; evidence_refs: string[] };
   evidence_refs: string[];
   sensitivity_tier: MemoryCandidateTier;
   ratification_required: boolean;
@@ -68,6 +73,19 @@ const SCHEMA_PATH = pathResolver.rootResolve(
 );
 const GLOBAL_QUEUE_PATH = 'active/shared/runtime/memory/promotion-queue.jsonl';
 const TENANT_RUNTIME_ROOT = 'active/shared/runtime/tenants';
+
+export function isPublicMemoryEvidencePath(ref: string): boolean {
+  const normalized = String(ref || '')
+    .trim()
+    .replace(/\\/g, '/');
+  if (!normalized || path.posix.isAbsolute(normalized) || normalized.split('/').includes('..')) {
+    return false;
+  }
+  const canonical = path.posix.normalize(normalized);
+  return (
+    canonical.startsWith('knowledge/public/') || canonical.startsWith('active/missions/public/')
+  );
+}
 
 function tenantQueueScope(scope: MemoryScopeEnvelope): {
   tier: MemoryScopeEnvelope['tier'];
@@ -189,6 +207,16 @@ function assertPublicTierReferencesSafe(candidate: MemoryCandidate): void {
   // confidential tenant cannot be made to look public merely by requesting a
   // public promotion.
   if (candidate.scope) assertMemoryScope(candidate.scope, candidate.scope.tier);
+  if (candidate.knowledge_domain === 'product') {
+    if (candidate.sensitivity_tier !== 'public' || candidate.scope) {
+      throw new Error('Product knowledge requires a public, unscoped candidate.');
+    }
+    if (candidate.evidence_refs.some((ref) => !isPublicMemoryEvidencePath(ref))) {
+      throw new Error(
+        'Product knowledge requires evidence paths under knowledge/public or active/missions/public.'
+      );
+    }
+  }
   if (candidate.sensitivity_tier !== 'public') return;
   if (candidate.scope?.tenant_slug) {
     const promotion = candidate.promotion;
@@ -232,6 +260,7 @@ export function createMemoryPromotionCandidate(input: {
   candidateId?: string;
   sourceType: MemoryCandidateSourceType;
   sourceRef: string;
+  knowledgeDomain?: MemoryKnowledgeDomain;
   proposedMemoryKind: MemoryCandidateKind;
   summary: string;
   evidenceRefs: string[];
@@ -250,6 +279,7 @@ export function createMemoryPromotionCandidate(input: {
       `MEM-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     source_type: input.sourceType,
     source_ref: String(input.sourceRef || '').trim(),
+    ...(input.knowledgeDomain ? { knowledge_domain: input.knowledgeDomain } : {}),
     proposed_memory_kind: input.proposedMemoryKind,
     summary,
     evidence_refs: normalizeEvidenceRefs(input.evidenceRefs),
@@ -322,6 +352,9 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
       source_type: current.source_type,
       source_ref: current.source_ref,
       proposed_memory_kind: current.proposed_memory_kind,
+      ...(current.knowledge_domain || normalizedCandidate.knowledge_domain
+        ? { knowledge_domain: current.knowledge_domain || normalizedCandidate.knowledge_domain }
+        : {}),
       summary: current.summary,
       sensitivity_tier: current.sensitivity_tier,
       ratification_required: current.ratification_required,
@@ -398,13 +431,17 @@ export function loadMemoryPromotionCandidate(
 export function updateMemoryPromotionCandidateStatus(input: {
   candidateId: string;
   status: MemoryCandidateStatus;
+  knowledgeDomain?: MemoryKnowledgeDomain;
   ratificationNote?: string;
   promotedRef?: string;
   scope?: MemoryScopeEnvelope;
+  /** Replace candidate scope during an explicit ownership/domain classification. */
+  scopeUpdate?: MemoryScopeEnvelope;
   /** Update every physical duplicate in the selected scope. */
   allMatching?: boolean;
   /** FD-10 wave 1b: the human member who made this approve/reject decision. */
   decidedBy?: HumanDecidedBy;
+  curation?: MemoryCandidate['curation'];
 }): MemoryCandidate | null {
   const requestedScopeKey = input.scope ? resolveScopeKey(input.scope) : undefined;
   const candidateQueuePath = input.scope ? resolveQueuePath(input.scope) : undefined;
@@ -452,9 +489,51 @@ export function updateMemoryPromotionCandidateStatus(input: {
       ) {
         continue;
       }
+      const requestedDomain = input.knowledgeDomain || current.knowledge_domain;
+      if (input.status === 'approved') {
+        if (input.curation) {
+          const originalRefs = new Set(current.evidence_refs);
+          if (
+            input.curation.evidence_refs.length === 0 ||
+            input.curation.evidence_refs.some((ref) => !originalRefs.has(ref))
+          ) {
+            throw new Error(
+              'Curated evidence refs must be selected from the candidate original evidence refs.'
+            );
+          }
+        }
+        if (
+          current.source_type === 'mission' &&
+          (!requestedDomain || requestedDomain === 'unclassified')
+        ) {
+          throw new Error(
+            'Mission memory candidates require an explicit knowledge domain before approval.'
+          );
+        }
+        if (
+          requestedDomain === 'product' &&
+          (current.sensitivity_tier !== 'public' || current.scope)
+        ) {
+          throw new Error('Product knowledge approval requires a public, unscoped candidate.');
+        }
+        const effectiveScope = input.scopeUpdate || current.scope;
+        if (
+          requestedDomain === 'personal' &&
+          (current.sensitivity_tier !== 'personal' || !effectiveScope?.owner_nhi?.trim())
+        ) {
+          throw new Error(
+            'Personal knowledge approval requires personal tier and an explicit owner_nhi.'
+          );
+        }
+      }
       const next: MemoryCandidate = {
         ...current,
         status: input.status,
+        ...(input.curation ? { curation: input.curation } : {}),
+        ...(input.knowledgeDomain ? { knowledge_domain: input.knowledgeDomain } : {}),
+        ...(input.scopeUpdate
+          ? { scope: assertMemoryScope(input.scopeUpdate, input.scopeUpdate.tier) }
+          : {}),
         ...(input.status === 'approved' || input.status === 'promoted'
           ? { ratified_at: ratifiedAt }
           : {}),
@@ -462,6 +541,12 @@ export function updateMemoryPromotionCandidateStatus(input: {
         ...(input.promotedRef ? { promoted_ref: input.promotedRef.trim() } : {}),
         ...(input.decidedBy ? { decided_by: input.decidedBy } : {}),
       };
+      assertPublicTierReferencesSafe(next);
+      if (next.status === 'approved' && next.source_type === 'mission' && !next.curation) {
+        throw new Error(
+          'Mission memory candidates require a curated title, summary, content, and evidence refs before approval.'
+        );
+      }
       const validation = validateMemoryPromotionCandidate(next);
       if (!validation.valid) {
         throw new Error(

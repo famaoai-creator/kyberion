@@ -1,9 +1,11 @@
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { auditChain } from './audit-chain.js';
 import { assertMemoryScope } from './memory-scope.js';
 import {
   listMemoryPromotionCandidates,
   memoryPromotionScopeKey,
+  isPublicMemoryEvidencePath,
   type MemoryCandidate,
 } from './memory-promotion-queue.js';
 import { pathResolver } from './path-resolver.js';
@@ -20,7 +22,10 @@ export type MemoryPromotionReviewBlockerCode =
   | 'missing_tenant_scope'
   | 'invalid_scope'
   | 'duplicate_records'
-  | 'conflicting_records';
+  | 'conflicting_records'
+  | 'unclassified_domain'
+  | 'invalid_domain_scope'
+  | 'missing_curation';
 
 export interface MemoryPromotionEvidenceReview {
   ref: string;
@@ -87,6 +92,7 @@ function targetDirectory(
   candidate: MemoryCandidate,
   kind: MemoryPromotionReview['target_kind']
 ): string {
+  const domain = candidate.knowledge_domain || 'organization';
   const tenant = candidate.scope?.tier === 'confidential' ? candidate.scope.tenant_slug : undefined;
   const kindDir =
     kind === 'pattern'
@@ -96,6 +102,14 @@ function targetDirectory(
         : kind === 'knowledge_hint'
           ? 'wisdom'
           : 'templates';
+  if (domain === 'unclassified') return `knowledge/unclassified/classification-required/${kindDir}`;
+  if (domain === 'product') return `knowledge/product/evolution/${kindDir}/generated`;
+  if (domain === 'personal') {
+    const ownerNhi = candidate.scope?.owner_nhi?.trim();
+    if (!ownerNhi) return `knowledge/personal/owner-required/${kindDir}`;
+    const ownerKey = createHash('sha256').update(ownerNhi).digest('hex').slice(0, 20);
+    return `knowledge/personal/owners/${ownerKey}/${kindDir}/generated`;
+  }
   if (tenant) return `knowledge/confidential/${tenant}/evolution/${kindDir}`;
   return `knowledge/${candidate.sensitivity_tier}/common/${kindDir}/generated`;
 }
@@ -116,6 +130,18 @@ function reviewEvidence(candidate: MemoryCandidate): MemoryPromotionEvidenceRevi
       );
     } catch {
       return { ref, kind: 'path', status: 'missing', resolved_path: ref };
+    }
+    const activePublicMissionPrefix = 'active/missions/public/';
+    if (!safeExistsSync(resolvedPath) && ref.startsWith(activePublicMissionPrefix)) {
+      const archiveRef = `active/archive/missions/${ref.slice(activePublicMissionPrefix.length)}`;
+      try {
+        const archivedPath = assertSafeRepositoryPath(pathResolver.rootResolve(archiveRef), {
+          allowMissingLeaf: true,
+        });
+        if (safeExistsSync(archivedPath)) resolvedPath = archivedPath;
+      } catch {
+        // Keep the safe active-path result as missing; never follow an unsafe archive alias.
+      }
     }
     return {
       ref,
@@ -167,6 +193,7 @@ function recordShape(candidate: MemoryCandidate): Record<string, unknown> {
     ratification_required: candidate.ratification_required,
     audit_ref: candidate.audit_ref || null,
     promotion: candidate.promotion || null,
+    knowledge_domain: candidate.knowledge_domain || 'organization',
   };
 }
 
@@ -190,6 +217,41 @@ function buildReview(candidate: MemoryCandidate, group: MemoryCandidate[]): Memo
   const audit = reviewAudit(candidate);
   const kind = targetKind(candidate);
   const targetPath = `${targetDirectory(candidate, kind)}/${candidate.candidate_id}.md`;
+  const domain = candidate.knowledge_domain || 'organization';
+  if (candidate.source_type === 'mission' && !candidate.curation) {
+    blockers.push({
+      code: 'missing_curation',
+      detail:
+        'A steward must extract a titled, reusable knowledge record from the mission evidence before approval.',
+    });
+  }
+  if (domain === 'unclassified') {
+    blockers.push({
+      code: 'unclassified_domain',
+      detail: 'A steward must classify this mission candidate before approval or promotion.',
+    });
+  }
+  if (
+    domain === 'product' &&
+    (candidate.sensitivity_tier !== 'public' ||
+      candidate.scope ||
+      candidate.evidence_refs.some((ref) => !isPublicMemoryEvidencePath(ref)))
+  ) {
+    blockers.push({
+      code: 'invalid_domain_scope',
+      detail:
+        'Product knowledge requires public, unscoped records with evidence under knowledge/public or active/missions/public.',
+    });
+  }
+  if (
+    domain === 'personal' &&
+    (candidate.sensitivity_tier !== 'personal' || !candidate.scope?.owner_nhi?.trim())
+  ) {
+    blockers.push({
+      code: 'invalid_domain_scope',
+      detail: 'Personal knowledge requires personal tier and an explicit owner_nhi.',
+    });
+  }
   const recordConflicts = findRecordConflicts(group);
 
   if (audit.status === 'missing_ref') {

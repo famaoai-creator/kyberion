@@ -1,5 +1,6 @@
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
@@ -16,6 +17,7 @@ import {
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 import type { MemoryScopeEnvelope } from './memory-scope.js';
+import { isPublicMemoryEvidencePath } from './memory-promotion-queue.js';
 import { logger } from './core.js';
 import {
   resolvePromotedReportAudience,
@@ -27,6 +29,8 @@ interface PromotedMemoryRecordBase {
   record_id: string;
   kind: 'pattern' | 'sop_candidate' | 'knowledge_hint' | 'report_template';
   tier: 'personal' | 'confidential' | 'public';
+  knowledge_domain: 'product' | 'organization' | 'personal';
+  owner_nhi?: string;
   title: string;
   summary: string;
   candidate_id: string;
@@ -168,9 +172,25 @@ function ensureValidator(kind: PromotedMemoryRecord['kind']): ValidateFunction {
 
 function logicalDirFor(input: {
   kind: PromotedMemoryRecord['kind'];
+  domain: PromotedMemoryRecord['knowledge_domain'];
   tier: PromotedMemoryRecord['tier'];
   scope?: MemoryScopeEnvelope;
 }): string {
+  const kindDir =
+    input.kind === 'sop_candidate'
+      ? 'operations'
+      : input.kind === 'report_template'
+        ? 'templates'
+        : input.kind === 'pattern'
+          ? 'patterns'
+          : 'wisdom';
+  if (input.domain === 'product') return `knowledge/product/evolution/${kindDir}/generated`;
+  if (input.domain === 'personal') {
+    const ownerNhi = input.scope?.owner_nhi?.trim();
+    if (!ownerNhi) throw new Error('Personal knowledge requires an explicit owner_nhi.');
+    const ownerKey = createHash('sha256').update(ownerNhi).digest('hex').slice(0, 20);
+    return `knowledge/personal/owners/${ownerKey}/${kindDir}/generated`;
+  }
   const tenantRoot = tenantEvolutionRoot(input.scope);
   if (tenantRoot) {
     const kindDir =
@@ -222,6 +242,8 @@ function buildMarkdown(record: PromotedMemoryRecord): string {
     `record_id: ${record.record_id}`,
     `kind: ${record.kind}`,
     `tier: ${record.tier}`,
+    `knowledge_domain: ${record.knowledge_domain}`,
+    `owner_nhi: ${record.owner_nhi || ''}`,
     `candidate_id: ${record.candidate_id}`,
     `supersedes: ${record.supersedes || ''}`,
     `superseded_by: ${record.superseded_by || ''}`,
@@ -533,6 +555,13 @@ export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): Pr
     record_id: candidate.candidate_id,
     kind: candidate.target_kind,
     tier,
+    knowledge_domain:
+      metadata.knowledge_domain === 'product' || metadata.knowledge_domain === 'personal'
+        ? metadata.knowledge_domain
+        : 'organization',
+    ...(typeof metadata.personal_owner_nhi === 'string'
+      ? { owner_nhi: metadata.personal_owner_nhi }
+      : {}),
     title: candidate.title,
     summary: candidate.summary,
     candidate_id: candidate.candidate_id,
@@ -748,6 +777,26 @@ export function savePromotedMemoryRecord(
   candidate: DistillCandidateRecord,
   options: { executionRole?: PromotedMemoryExecutionRole } = {}
 ): { logicalPath: string; record: PromotedMemoryRecord } {
+  const metadata = candidate.metadata || {};
+  const domain = metadata.knowledge_domain;
+  if (
+    domain === 'product' &&
+    (candidate.tier !== 'public' ||
+      candidate.scope ||
+      (candidate.evidence_refs || []).some((ref) => !isPublicMemoryEvidencePath(ref)))
+  ) {
+    throw new Error(
+      'Product knowledge promotion requires public, unscoped records with evidence under knowledge/public or active/missions/public.'
+    );
+  }
+  if (
+    domain === 'personal' &&
+    (candidate.tier !== 'personal' || !candidate.scope?.owner_nhi?.trim())
+  ) {
+    throw new Error(
+      'Personal knowledge promotion requires personal tier and an explicit owner_nhi.'
+    );
+  }
   const meaningful = isMeaningfulPromotionCandidate(candidate);
   if (!meaningful.ok) {
     throw new NotMeaningfulPromotionCandidateError(
@@ -768,6 +817,7 @@ export function savePromotedMemoryRecord(
     const logicalDir = logicalDirFor({
       kind: record.kind,
       tier: record.tier,
+      domain: record.knowledge_domain,
       scope: candidate.scope,
     });
     const absDir = assertSafeRepositoryPath(pathResolver.resolve(logicalDir), {
@@ -785,7 +835,7 @@ export function savePromotedMemoryRecord(
     const markdown = buildMarkdown(record);
     safeWriteFile(mdPath, markdown);
     backlinkSupersededRecord(record);
-    if (record.kind === 'knowledge_hint') {
+    if (record.kind === 'knowledge_hint' && record.knowledge_domain === 'organization') {
       appendGovernanceHintRecord(record, candidate.scope);
     }
     return {
