@@ -2,9 +2,11 @@
  * PI-18: deterministic, named eval harness table.
  *
  * The runner deliberately keeps provider execution injectable. The default
- * executor records a request envelope, which makes the table and reload
- * contract useful in CI without credentials; a live provider adapter can be
- * supplied by an explicit caller when required.
+ * executor is a fixture executor built on the scenario fixture backend
+ * (ES-05): it answers with a request envelope, which makes the table and
+ * reload contract useful in CI without credentials. It only serves the
+ * `stub` model — a configuration naming any other model fails closed unless
+ * the caller injects a live executor.
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -22,6 +24,12 @@ import {
   safeMkdir,
 } from '@agent/core/secure-io';
 import { appendJsonLine, defineCatalog, nowIso } from '@agent/core/foundation';
+import type { ScenarioDefinition } from '@agent/core/scenario-definition';
+import { createScenarioFixtureBackend } from '@agent/core/scenario-model-fixtures';
+import {
+  createScenarioSideEffectLog,
+  type ScenarioSideEffectLog,
+} from '@agent/core/scenario-side-effect-log';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { evaluateResolvedFacetFixtures } from './eval_facets.js';
 
@@ -224,7 +232,7 @@ function contextFor(
   };
 }
 
-function defaultExecutor(prompt: string, context: EvalHarnessContext): string {
+function requestEnvelope(prompt: string, context: EvalHarnessContext): string {
   const facetContract = facetContractSummary(context.facets);
   return JSON.stringify({
     model: context.configuration.model || 'stub',
@@ -236,6 +244,54 @@ function defaultExecutor(prompt: string, context: EvalHarnessContext): string {
     facet_contract_finding_hashes: facetContract.finding_hashes,
     reload_count: context.reloadCount,
   });
+}
+
+/** The only model the built-in fixture executor serves. */
+export const EVAL_HARNESS_FIXTURE_MODEL = 'stub';
+
+function envelopeFixtureDefinition(prompt: string, envelope: string): ScenarioDefinition {
+  return {
+    schema_version: 'kyberion-scenario.v1',
+    id: 'eval-harness-fixture',
+    title: 'Eval harness fixture executor',
+    tier: 1,
+    lane: 'pr-deterministic',
+    executionProfile: 'simulated',
+    modelFixtures: 'fixtures',
+    requires: {},
+    seed: {},
+    fixtures: { ops: {}, reasoning: [{ match: { contains: prompt }, response: envelope }] },
+    turns: [],
+    finalChecks: [],
+  };
+}
+
+/**
+ * Credential-free executor: each prompt is answered by the scenario fixture
+ * backend with the request envelope, so CI never reaches a provider and the
+ * reasoning calls are recorded hash-only in `log`.
+ */
+export function createEvalHarnessFixtureExecutor(
+  log: ScenarioSideEffectLog = createScenarioSideEffectLog()
+): EvalHarnessExecutor {
+  return async (prompt, context) => {
+    const envelope = requestEnvelope(prompt, context);
+    return createScenarioFixtureBackend(envelopeFixtureDefinition(prompt, envelope), log).prompt(
+      prompt
+    );
+  };
+}
+
+function assertFixtureExecutorServes(table: readonly EvalHarnessConfiguration[]): void {
+  const live = table.filter((configuration) => configuration.model !== EVAL_HARNESS_FIXTURE_MODEL);
+  if (live.length === 0) return;
+  throw new Error(
+    `[EVAL_HARNESS_EXECUTOR] ${live
+      .map((configuration) => `${configuration.name} (model ${configuration.model})`)
+      .join(
+        ', '
+      )} need an injected executor; the built-in fixture executor only serves model "${EVAL_HARNESS_FIXTURE_MODEL}".`
+  );
 }
 
 /**
@@ -319,7 +375,8 @@ export async function runEvalHarnessTable(
     ? [...options.steps]
     : [{ type: 'prompt', prompt: brief }];
   const scope = options.scope || { tier: 'public' as const };
-  const executor = options.executor || defaultExecutor;
+  if (!options.executor) assertFixtureExecutorServes(table);
+  const executor = options.executor || createEvalHarnessFixtureExecutor();
   const qualityJudge = options.qualityJudge || defaultEvalHarnessQualityJudge;
   const results: EvalHarnessConfigurationResult[] = [];
 

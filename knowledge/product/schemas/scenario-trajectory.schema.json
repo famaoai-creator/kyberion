@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/scenario-trajectory.schema.json",
+  "title": "Kyberion scenario trajectory",
+  "description": "Ordered op steps of one scenario run (kyberion-scenario-trajectory.v1), produced by libs/core/scenario-trajectory.ts. Content never appears: prompts, outputs, params and trace attributes are redacted and reduced to sha256 digests and lengths.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scenario_id", "run_id", "evidence_class", "steps"],
+  "properties": {
+    "schema_version": { "const": "kyberion-scenario-trajectory.v1" },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "evidence_class": { "enum": ["simulated", "provider-qualified"] },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "op", "outcome", "observation_digest", "reasoning_calls", "approval"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 0 },
+          "op": { "type": ["string", "null"] },
+          "outcome": {
+            "enum": ["ok", "error", "unstubbed", "held", "passthrough", null]
+          },
+          "observation_digest": { "$ref": "#/$defs/sha256" },
+          "reasoning_calls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "backend",
+                "prompt_hash",
+                "prompt_len",
+                "output_hash",
+                "output_len",
+                "outcome"
+              ],
+              "properties": {
+                "backend": { "type": "string", "minLength": 1 },
+                "prompt_hash": { "$ref": "#/$defs/sha256" },
+                "prompt_len": { "type": "integer", "minimum": 0 },
+                "output_hash": {
+                  "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+                },
+                "output_len": { "type": ["integer", "null"], "minimum": 0 },
+                "outcome": { "enum": ["fixture", "miss", "forbidden", "invalid"] }
+              }
+            }
+          },
+          "approval": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["channel", "decision"],
+                "properties": {
+                  "channel": { "enum": ["pipeline", "risky-approval", "scenario"] },
+                  "decision": { "enum": ["approved", "rejected", "pending"] }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}
