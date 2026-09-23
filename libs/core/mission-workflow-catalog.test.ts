@@ -119,6 +119,18 @@ describe('mission-workflow-catalog', () => {
     const selfReview = workflow.phase_specs?.find((phase) => phase.id === 'self_review');
     expect(selfReview?.kind).toBe('review');
     expect(selfReview?.exit_gate?.id).toBe('CODE_REVIEW_PASSED');
+    expect(
+      workflow.phase_specs?.find((phase) => phase.id === 'test')?.default_tasks?.[0]?.team_role
+    ).toBe('tester');
+    expect(
+      workflow.phase_specs?.find((phase) => phase.id === 'retrospective')?.default_tasks?.[0]
+        ?.acceptance_criteria
+    ).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('候補ID'),
+        expect.stringContaining('チーム構成'),
+      ])
+    );
   });
 
   it('selects the incident analysis post-mortem process for incident intents', () => {

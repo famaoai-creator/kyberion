@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
 
 let missionPath = '';
 
@@ -95,10 +96,12 @@ describe('mission-distill end-to-end promotion flow', () => {
   const scratchHintsDir = pathResolver.shared('tmp/tests/mission-distill-hints');
   const scratchHintsPath = `${scratchHintsDir}/HINTS.md`;
   const dateSlug = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
-  const wisdomFileName = `distill_${missionId.toLowerCase()}_${dateSlug}.md`;
-  const wisdomFilePath = pathResolver.rootResolve(`knowledge/product/evolution/${wisdomFileName}`);
+  const wisdomFileName = 'distillation.md';
+  const wisdomFilePath = `${missionPath}/evidence/${wisdomFileName}`;
   const promotedRecordBase = `mem-${missionId}-${dateSlug}`;
-  const promotedKnowledgeDir = pathResolver.rootResolve('knowledge/public/common/wisdom/generated');
+  const promotedKnowledgeDir = pathResolver.rootResolve(
+    'knowledge/public/common/patterns/generated'
+  );
   let originalQueueRaw: string | null = null;
   let originalHintsRaw: string | null = null;
 
@@ -188,7 +191,7 @@ describe('mission-distill end-to-end promotion flow', () => {
     });
   });
 
-  it('distills a mission, queues a candidate, promotes it, and appends HINTS.md', async () => {
+  it('keeps raw distillation mission-local and queues a classified promotion candidate', async () => {
     const previousRole = process.env.MISSION_ROLE;
     const previousPersona = process.env.KYBERION_PERSONA;
     process.env.MISSION_ROLE = 'ecosystem_architect';
@@ -213,6 +216,13 @@ describe('mission-distill end-to-end promotion flow', () => {
       candidateId: queued.candidate_id,
       status: 'approved',
       ratificationNote: 'Approved for promotion in E2E test.',
+      knowledgeDomain: 'organization',
+      curation: {
+        title: 'Reusable mission lesson',
+        summary: 'A durable lesson extracted from this mission evidence.',
+        content: 'Describe the reusable lesson without retaining mission-specific detail.',
+        evidence_refs: queued.evidence_refs,
+      },
     });
 
     const promotePreviousRole = process.env.MISSION_ROLE;
@@ -232,7 +242,7 @@ describe('mission-distill end-to-end promotion flow', () => {
       else process.env.KYBERION_PERSONA = promotePreviousPersona;
     }
 
-    expect(result.promotedRef).toContain('knowledge/public/common/wisdom/generated/');
+    expect(result.promotedRef).toContain('knowledge/public/common/patterns/generated/');
     const distill = loadDistillCandidateRecord(queued.candidate_id);
     expect(distill?.status).toBe('promoted');
     expect(loadState(missionId)?.status).toBe('completed');
@@ -242,9 +252,13 @@ describe('mission-distill end-to-end promotion flow', () => {
     });
 
     const hints = safeReadFile(scratchHintsPath, { encoding: 'utf8' }) as string;
-    expect(hints).toContain('Distilled wisdom from mission');
-    expect(hints).toContain(`source_ref: ${queued.candidate_id}`);
-    expect(hints).toContain(`knowledge/product/evolution/${wisdomFileName}`);
+    expect(hints).not.toContain('Distilled wisdom from mission'); // risk_rule records do not pollute operational hints
+    expect(hints).not.toContain(`source_ref: ${queued.candidate_id}`);
+    expect(queued?.evidence_refs).toContain(
+      path
+        .relative(pathResolver.rootDir(), path.join(missionPath, 'evidence', wisdomFileName))
+        .replace(/\\/g, '/')
+    );
   });
 
   it('rejects a directory replacing the evidence ledger before distillation reads it', () => {

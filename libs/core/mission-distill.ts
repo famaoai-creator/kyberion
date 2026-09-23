@@ -16,6 +16,7 @@ import {
   safeExec,
   safeLstat,
   safeMkdir,
+  safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
 import { transitionStatus } from './mission-status.js';
@@ -65,6 +66,30 @@ export function isRegularMissionDistillPromptPath(filePath: string): boolean {
   } catch {
     return false;
   }
+}
+
+function listMissionEvidenceRefs(evidenceDir: string, rootDir: string): string[] {
+  const refs: string[] = [];
+  const visit = (directory: string): void => {
+    let entries: string[];
+    try {
+      entries = safeReaddir(assertSafeRepositoryPath(directory));
+    } catch {
+      return;
+    }
+    for (const entry of entries.sort()) {
+      const candidate = assertSafeRepositoryPath(path.join(directory, entry));
+      try {
+        const stat = safeLstat(candidate);
+        if (stat.isDirectory()) visit(candidate);
+        else if (stat.isFile()) refs.push(path.relative(rootDir, candidate).replace(/\\/g, '/'));
+      } catch {
+        // Ignore symlinks and entries that cannot be safely inspected.
+      }
+    }
+  };
+  visit(evidenceDir);
+  return refs.sort();
 }
 
 export function resolveWisdomOutputPath(outputDir: string, wisdomFileName: string): string {
@@ -294,20 +319,12 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     wisdom = buildFallbackWisdom(upperId, state);
   }
 
-  const defaultOutputDir = 'knowledge/product/evolution';
-  const mappedOutputDir = wisdomPolicy?.tier_mapping?.[state.tier] || defaultOutputDir;
-  const outputDir = /(^|\/)incidents(\/|$)/.test(mappedOutputDir)
-    ? defaultOutputDir
-    : mappedOutputDir;
-  if (outputDir !== mappedOutputDir) {
-    logger.warn(
-      `⚠️ wisdom-policy output_dir "${mappedOutputDir}" was normalized to "${outputDir}" for writable public distillation output.`
-    );
-  }
-
   const dateSlug = nowIso().slice(0, 10).replace(/-/g, '_');
-  const wisdomFileName = `distill_${upperId.toLowerCase()}_${dateSlug}.md`;
-  const wisdomFilePath = resolveWisdomOutputPath(outputDir, wisdomFileName);
+  const wisdomFileName = 'distillation.md';
+  const wisdomFilePath = assertSafeRepositoryPath(
+    path.join(missionPath, 'evidence', wisdomFileName),
+    { allowMissingLeaf: true }
+  );
   const wisdomDirPath = path.dirname(wisdomFilePath);
 
   if (!safeExistsSync(wisdomDirPath)) safeMkdir(wisdomDirPath, { recursive: true });
@@ -329,7 +346,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   state.context = {
     ...(state.context || {}),
     distill_output_path: wisdomFilePath,
-    distill_output_dir: outputDir,
+    distill_output_dir: path.relative(rootDir, wisdomDirPath),
   } as any;
   state.history.push({
     ts: nowIso(),
@@ -354,10 +371,26 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     enqueueMemoryPromotionCandidate({
       candidate_id: `mem-${upperId}-${dateSlug}`,
       source_type: 'mission',
-      source_ref: upperId,
-      proposed_memory_kind: 'heuristic',
-      summary: `Distilled wisdom from mission ${upperId}`,
-      evidence_refs: [path.join(outputDir, wisdomFileName)],
+      source_ref: `mission:${upperId}`,
+      proposed_memory_kind:
+        wisdom.category === 'Incident'
+          ? 'risk_rule'
+          : wisdom.category === 'Operations'
+            ? 'sop'
+            : 'heuristic',
+      summary: wisdom.sections.summary || `Distilled wisdom from mission ${upperId}`,
+      knowledge_domain: 'unclassified',
+      evidence_refs: listMissionEvidenceRefs(wisdomDirPath, rootDir),
+      ...(state.tenant_slug
+        ? {
+            scope: {
+              tier,
+              tenant_slug: state.tenant_slug,
+              mission_id: upperId,
+              ...(state.organization_id ? { organization_id: state.organization_id } : {}),
+            },
+          }
+        : {}),
       sensitivity_tier: tier,
       ratification_required: tier !== 'public',
       status: 'queued',
@@ -372,7 +405,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   ledger.record('MISSION_DISTILL', {
     mission_id: upperId,
     wisdom_file: wisdomFileName,
-    output_dir: outputDir,
+    output_dir: path.relative(rootDir, wisdomDirPath),
     llm_used: llmUsed,
     distillation_mode: llmUsed ? 'llm' : 'structural',
   });
