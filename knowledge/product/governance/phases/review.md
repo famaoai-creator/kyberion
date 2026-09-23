@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Review & Distillation'
 tags: [governance, lifecycle, review]
-last_updated: 2026-08-01
+last_updated: 2026-09-23
 runtime_stages: [verification, delivery, retrospective]
 ---
 
@@ -14,33 +14,25 @@ Capitalize on experience and perform environmental cleansing.
 ## Directives
 
 1. **Victory Condition Check**: Verify that all mission goals have been met with objective evidence.
-2. **Wisdom Distillation**: Extract essential learnings (logic, constraints, patterns) from mission logs and TASK_BOARD into `knowledge/`. See §Volatile Distillation Lane below.
+2. **Evidence first, promotion second**: preserve raw distillation under the mission's `evidence/distillation.md`. Queueing is not approval or publication. A steward classifies its knowledge domain, selects and shapes durable lessons from the evidence set, then approves and promotes only the curated candidate.
 3. **Task Closure**: Complete the final report and move the mission folder to the archive.
 4. **Audit Reporting**: Include results from security scanners, test runners, and performance metrics in the final summary.
 5. **Unhandled Intent Reconcile**: Run `pnpm pipeline --input pipelines/reconcile-unhandled-intents.json` during review so newly surfaced unhandled intents are written to proposals and summarized before closure.
 
-## Volatile Distillation Lane
+## Distillation and promotion flow
 
-This section is mandated by the Volatile Knowledge Layer (`docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 4`).
+The mission's raw distillation remains at active/missions/<TIER>/<MISSION_ID>/evidence/distillation.md. The mission controller may enqueue an unclassified candidate referencing that evidence; queueing is not approval or publication. Review the mission's full evidence set, select reusable lessons, remove mission-specific details, and write a shaped candidate with applicability, steps, triggers, or outcome and evidence references.
 
-At mission completion, `mission_controller finish` now performs the Volatile Distillation Lane automatically when mission `MEMORY.md` contains promotable `## Decisions` or `## Lessons Learned` entries. Before calling it, make sure those sections are concise and evidence-backed:
+A steward must explicitly classify the durable knowledge domain before approval:
 
-1. **Read the mission MEMORY.md** (`active/missions/<TIER>/<MISSION_ID>/MEMORY.md`) and extract entries under `## Decisions` and `## Lessons Learned` that are worth keeping.
-2. **Nominate promotion candidates** via `memory-promotion-queue` (`enqueueMemoryPromotionCandidate`). The finish hook sets:
-   - `source_type`: `'mission'`
-   - `source_ref`: `mission:<MISSION_ID>`
-   - `proposed_memory_kind`: `'heuristic'` or `'sop'` or `'risk_rule'` as appropriate
-   - `sensitivity_tier`: match the mission tier
-   - `evidence_refs`: include `active/missions/<TIER>/<MISSION_ID>/MEMORY.md`
-3. **Run the distillation pipeline** to flush promoted candidates into `knowledge/`:
-   ```
-   pnpm pipeline --input pipelines/fragments/memory-distillation.json
-   ```
-   Output lands in `knowledge/product/governance/HINTS.md`.
-4. **Update sidecar status**: the finish hook sets `status: "promoted"` and `promotion_candidate_id` on the MEMORY.md sidecar when a candidate is queued.
-5. **Update `knowledge/_index.md`**: run `pnpm pipeline --input pipelines/volatile-index.json` to refresh the volatile index.
+- product: Kyberion product behavior, architecture, or governance. Must be public and unscoped, and cite evidence paths under knowledge/public/ or active/missions/public/ (not opaque logical references); never broaden tenant-confidential evidence. A sanitized public candidate is separate work.
+- organization: organizational operating knowledge, routed to tenant scope or an explicitly shared common area.
+- personal: private individual knowledge, kept in the personal tier under an explicit owner_nhi namespace.
+- unclassified: not publishable.
 
-If the mission MEMORY.md has no promotable learnings, the finish hook falls back to the mission outcome/evidence promotion path and skips sidecar promotion.
+Use memory-review, then approve with memory-approve --knowledge-domain product|organization|personal. Mission candidates also require --curation-json with title, summary, content, and evidence_refs selected from the original candidate evidence. This is the steward's explicit extraction step: do not copy distillation.md wholesale. Then run memory-promote after evidence and provenance checks. The archived distillation.md remains immutable mission evidence; the promoted record is the discoverable durable knowledge, linked by source/evidence refs and candidate promoted_ref. A candidate remains visibly queued until curated/classified/approved/promoted or rejected; do not treat mission finish as promotion. Tier answers who may see the knowledge; domain answers whose durable knowledge it is. Never downgrade sensitivity by relabeling. Legacy candidates without a domain remain organization-scoped for compatibility and must be reviewed conservatively. Only curated organization knowledge_hint records update governance HINTS.md.
+
+Example: `pnpm mission memory-approve <ID> --knowledge-domain organization --curation-json '{"title":"...","summary":"...","content":"...","evidence_refs":["active/missions/public/<ID>/evidence/distillation.md"]}' --note "Selected reusable operating lesson"`. When a public mission is archived before promotion, review resolves this stable public-mission evidence reference against its archive location.
 
 ## Constraints
 
