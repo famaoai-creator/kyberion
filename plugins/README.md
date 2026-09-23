@@ -304,8 +304,10 @@ Upgrading a host that already has managed plugins:
   are `pending_approval`: reinstall each one and approve it again.
 - Packages that contain a plugin manifest candidate below their root —
   including anywhere under `node_modules/`, matched case-insensitively — are
-  rejected (`manifest_nested`); package trees too large to scan fail closed
-  (`manifest_tree_too_large`).
+  rejected (`manifest_nested`); package trees too large to scan (more than
+  20,000 entries or deeper than 32 levels, e.g. a bundled `node_modules`) fail
+  closed (`manifest_tree_too_large`) at install and at activation — slim the
+  package (bundle the code) and reinstall.
 - Follow every reinstall with a reload in each long-running host
   (`pnpm plugin:install --reload <plugin-id>`): revocation and grant changes
   are enforced when the plugin is reloaded, not while the old activation runs.
