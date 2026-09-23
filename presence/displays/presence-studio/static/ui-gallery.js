@@ -128,7 +128,29 @@ function showStatus(message) {
   if (status) status.textContent = message;
 }
 
+// PA-09: `ui:talking-avatar` controllers by name (from `avatar.ready`), for
+// the synthetic speech demo button (`gallery.avatar.speak { name }`).
+const avatars = new Map();
+const AVATAR_DEMO_MS = 4000;
+
+function speakDemo(name) {
+  const avatar = avatars.get(name);
+  if (!avatar) return;
+  avatar.setState('speaking');
+  avatar.startSynthetic({ seed: 7 });
+  window.setTimeout(() => {
+    avatar.stopSynthetic();
+    avatar.setState('idle');
+  }, AVATAR_DEMO_MS);
+}
+
 function onAction(action) {
+  const payload = action.payload || {};
+  if (action.id === 'avatar.ready') {
+    avatars.set(payload.name, payload.controller);
+    return;
+  }
+  if (action.id === 'gallery.avatar.speak') speakDemo(payload.name);
   showStatus(text('presence_studio:ui_gallery_action', { id: action.id }));
   window.setTimeout(() => showStatus(''), 2400);
 }
