@@ -430,7 +430,7 @@ export function OrganizationOperatingModel({
                     },
                     { key: 'item', label: uxText('chronos_org_col_item', locale) },
                     { key: 'reason', label: uxText('chronos_org_col_reason', locale) },
-                    { key: 'next', label: locale === 'ja' ? '次の操作' : 'Next action' },
+                    { key: 'next', label: uxText('chronos_org_col_next_action', locale) },
                   ]}
                   rows={view.control_plane.intervention_points.slice(0, 6).map((point) => ({
                     priority: {
