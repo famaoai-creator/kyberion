@@ -30,10 +30,11 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeRmSync,
   safeUnlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { getRegisteredEnvText, isRecord, nowIso, readJsonIfPresent } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
@@ -189,10 +190,58 @@ export interface AvatarSetResult {
 export const AVATAR_HANDOFF_MANIFEST = 'active/shared/tmp/avatar-set-handoff.json';
 
 /**
+ * Frames are generated into this sibling of the output directory and only
+ * copied over it once the whole set exists (M2): a failed run never leaves a
+ * partial or mixed set where the preview / "Use this avatar" would read it.
+ */
+export function avatarStagingDir(outputDir: string): string {
+  return path.join(path.dirname(outputDir), `${path.basename(outputDir)}.pending`);
+}
+
+function readHandoffManifest(manifestPath: string): Record<string, unknown> | null {
+  try {
+    const parsed = readJsonIfPresent<unknown>(manifestPath);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Replace the set in `outputDir` with the staged one: the old profile goes
+ * first (the old set stops being valid), frames are copied, frames the new
+ * set does not name are removed, and the new profile is written last.
+ */
+function commitStagedAvatarSet(
+  stagingDir: string,
+  outputDir: string,
+  profile: PersonalAvatarProfileFile
+): string {
+  if (!safeExistsSync(outputDir)) safeMkdir(outputDir, { recursive: true });
+  const profilePath = path.join(outputDir, AVATAR_PROFILE_FILENAME);
+  if (safeExistsSync(profilePath)) safeUnlinkSync(profilePath);
+  const names = new Set(Object.values(profile.images));
+  for (const expression of AVATAR_EXPRESSIONS) {
+    const stale = path.join(outputDir, `${expression}.png`);
+    if (!names.has(`${expression}.png`) && safeExistsSync(stale)) safeUnlinkSync(stale);
+  }
+  for (const name of names) {
+    safeCopyFileSync(path.join(stagingDir, name), path.join(outputDir, name));
+  }
+  safeWriteFile(profilePath, JSON.stringify(profile, null, 2), { encoding: 'utf8' });
+  safeRmSync(stagingDir, { recursive: true, force: true });
+  return profilePath;
+}
+
+/**
  * PA-10: generate neutral from the photo, then every other expression from the
  * photo (subject) + the generated neutral (consistency), with one shared style.
  * Host-bridge hand-offs are collected for every frame and reported together so
  * the host agent can produce the whole set in one pass before the rerun.
+ *
+ * Frames land in {@link avatarStagingDir} first. A fresh run clears it; the
+ * rerun after a host hand-off keeps it (the manifest names it) so the frames
+ * the host saved are picked up. The output directory changes only on success.
  */
 export async function generateAvatarSet(options: AvatarSetOptions): Promise<AvatarSetResult> {
   const print = options.print ?? (() => undefined);
@@ -201,65 +250,77 @@ export async function generateAvatarSet(options: AvatarSetOptions): Promise<Avat
     'neutral',
     ...options.expressions.filter((expression) => expression !== 'neutral'),
   ];
-  if (!safeExistsSync(options.outputDir)) safeMkdir(options.outputDir, { recursive: true });
+  const stagingDir = avatarStagingDir(options.outputDir);
+  const stagingRel = pathResolver.toRepoRelative(stagingDir);
+  const outputRel = pathResolver.toRepoRelative(options.outputDir);
+  const manifestPath = pathResolver.resolve(AVATAR_HANDOFF_MANIFEST);
+  const resumingHandoff = readHandoffManifest(manifestPath)?.staging_dir === stagingRel;
+  if (!resumingHandoff) safeRmSync(stagingDir, { recursive: true, force: true });
+  if (!safeExistsSync(stagingDir)) safeMkdir(stagingDir, { recursive: true });
 
   const photoRef: ImageReference = {
     path: options.inputPhoto,
     mimeType: referenceMimeType(options.inputPhoto),
     role: 'subject',
   };
-  const neutralPath = path.join(options.outputDir, 'neutral.png');
+  const neutralPath = path.join(stagingDir, 'neutral.png');
   const images: Partial<Record<AvatarExpression, string>> = {};
   const handoffs: AvatarSetResult['handoffs'] = [];
   let preference = options.providerPreference;
   let providerId: string | undefined;
 
-  for (const expression of expressions) {
-    const targetPath = path.join(options.outputDir, `${expression}.png`);
-    const references: ImageReference[] =
-      expression === 'neutral'
-        ? [photoRef]
-        : [
-            photoRef,
-            {
-              path: neutralPath,
-              mimeType: referenceMimeType(neutralPath),
-              role: 'consistency',
-            },
-          ];
-    print(`Generating ${expression} expression -> ${targetPath}`);
-    try {
-      const result = await generate({
-        prompt: buildAvatarPrompt(expression, options.style),
-        targetPath,
-        aspectRatio: '1:1',
-        mode: options.mode,
-        providerPreference: preference,
-        referenceImages: references,
-        ...(options.consent ? { egressConsent: options.consent } : {}),
-      });
-      if (result.status === 'failed') {
-        throw new Error(result.error || `${expression} generation failed`);
+  try {
+    for (const expression of expressions) {
+      const targetPath = path.join(stagingDir, `${expression}.png`);
+      const references: ImageReference[] =
+        expression === 'neutral'
+          ? [photoRef]
+          : [
+              photoRef,
+              {
+                path: neutralPath,
+                mimeType: referenceMimeType(neutralPath),
+                role: 'consistency',
+              },
+            ];
+      print(`Generating ${expression} expression -> ${targetPath}`);
+      try {
+        const result = await generate({
+          prompt: buildAvatarPrompt(expression, options.style),
+          targetPath,
+          aspectRatio: '1:1',
+          mode: options.mode,
+          providerPreference: preference,
+          referenceImages: references,
+          ...(options.consent ? { egressConsent: options.consent } : {}),
+        });
+        if (result.status === 'failed') {
+          throw new Error(result.error || `${expression} generation failed`);
+        }
+        images[expression] = `${expression}.png`;
+        if (!providerId && result.provider) {
+          providerId = result.provider;
+          // Keep the whole set on the provider that produced neutral.
+          preference = [providerId, ...preference.filter((id) => id !== providerId)];
+        }
+        if (expression === 'neutral') {
+          print(`Avatar generated successfully at: ${result.path ?? targetPath}`);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!isHostHandoff(message)) throw error;
+        handoffs.push({ expression, message });
       }
-      images[expression] = `${expression}.png`;
-      if (!providerId && result.provider) {
-        providerId = result.provider;
-        // Keep the whole set on the provider that produced neutral.
-        preference = [providerId, ...preference.filter((id) => id !== providerId)];
-      }
-      if (expression === 'neutral') {
-        print(`Avatar generated successfully at: ${result.path ?? targetPath}`);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!isHostHandoff(message)) throw error;
-      handoffs.push({ expression, message });
     }
+  } catch (error) {
+    // A failed run leaves nothing behind: no staged frames, no stale hand-off.
+    safeRmSync(stagingDir, { recursive: true, force: true });
+    if (resumingHandoff && safeExistsSync(manifestPath)) safeUnlinkSync(manifestPath);
+    throw error;
   }
 
-  const outputRel = pathResolver.toRepoRelative(options.outputDir);
-  const manifestPath = pathResolver.resolve(AVATAR_HANDOFF_MANIFEST);
   if (handoffs.length > 0) {
+    const photoRel = pathResolver.toRepoRelative(options.inputPhoto);
     safeMkdir(path.dirname(manifestPath), { recursive: true });
     safeWriteFile(
       manifestPath,
@@ -267,12 +328,21 @@ export async function generateAvatarSet(options: AvatarSetOptions): Promise<Avat
         {
           kind: 'avatar-set-handoff',
           output_dir: outputRel,
+          staging_dir: stagingRel,
           style: options.style,
           order: 'Generate neutral first; every other frame uses it as its consistency reference.',
           frames: handoffs.map((handoff) => ({
             expression: handoff.expression,
             prompt: buildAvatarPrompt(handoff.expression, options.style),
-            target_path: `${outputRel}/${handoff.expression}.png`,
+            target_path: `${stagingRel}/${handoff.expression}.png`,
+            // Repo-relative paths + roles only: the host agent reads the files itself.
+            reference_images:
+              handoff.expression === 'neutral'
+                ? [{ path: photoRel, role: 'subject' }]
+                : [
+                    { path: photoRel, role: 'subject' },
+                    { path: `${stagingRel}/neutral.png`, role: 'consistency' },
+                  ],
           })),
         },
         null,
@@ -297,8 +367,7 @@ export async function generateAvatarSet(options: AvatarSetOptions): Promise<Avat
     provider_id: providerId ?? 'unknown',
     style: options.style,
   };
-  const profilePath = path.join(options.outputDir, AVATAR_PROFILE_FILENAME);
-  safeWriteFile(profilePath, JSON.stringify(profile, null, 2), { encoding: 'utf8' });
+  const profilePath = commitStagedAvatarSet(stagingDir, options.outputDir, profile);
   if (safeExistsSync(manifestPath)) safeUnlinkSync(manifestPath);
   return {
     status: 'succeeded',
@@ -352,10 +421,12 @@ export async function main(
   generate?: AvatarSetOptions['generate']
 ): Promise<AvatarSetResult> {
   const args = parseArgs(argv);
+  // Default: the registered reference photo (`<profileRoot>/avatar.png`, as the
+  // concierge upload and the create-my-avatar pipeline store it).
   const inputPhoto =
     typeof args['input-photo'] === 'string'
       ? args['input-photo']
-      : 'active/shared/tmp/user_face.jpg';
+      : path.join(resolveActiveProfileRoot(), 'avatar.png');
   const legacyOutputPath =
     typeof args['output-path'] === 'string' ? args['output-path'] : undefined;
   const outputDir =
@@ -413,6 +484,18 @@ export async function main(
   print(`Generating avatar based on: ${resolvedInput}`);
   print(`Provider preference: ${preference.join(' -> ')}`);
 
+  // A transient capture (under active/shared/tmp) is removed on every terminal
+  // status — success and failure. A host hand-off keeps it until the rerun
+  // completes, because the host agent still has to read it. A profile-tier
+  // photo is never removed.
+  const cleanupInput = (): void => {
+    if (args['cleanup-input'] !== true) return;
+    const tmpRoot = pathResolver.resolve('active/shared/tmp');
+    if (resolvedInput.startsWith(`${tmpRoot}${path.sep}`) && safeExistsSync(resolvedInput)) {
+      safeUnlinkSync(resolvedInput);
+    }
+  };
+
   let result: AvatarSetResult;
   try {
     result = await generateAvatarSet({
@@ -427,6 +510,7 @@ export async function main(
       generate,
     });
   } catch (err: unknown) {
+    cleanupInput();
     if (err instanceof ScriptExitError) throw err;
     const message = err instanceof Error ? err.message : String(err);
     const failed: AvatarSetResult = {
@@ -455,11 +539,7 @@ export async function main(
     safeMkdir(path.dirname(resolvedLegacyOutput), { recursive: true });
     safeCopyFileSync(path.join(resolvedOutputDir, 'neutral.png'), resolvedLegacyOutput);
   }
-  if (args['cleanup-input'] === true) {
-    // A transient capture is removed once the set exists; a profile-tier photo is kept.
-    const tmpRoot = pathResolver.resolve('active/shared/tmp');
-    if (resolvedInput.startsWith(`${tmpRoot}${path.sep}`)) safeUnlinkSync(resolvedInput);
-  }
+  cleanupInput();
   print(`Avatar set generated at: ${result.output_dir}`);
   return result;
 }

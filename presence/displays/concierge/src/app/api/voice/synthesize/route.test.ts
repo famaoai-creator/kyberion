@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 const guard = vi.hoisted(() => ({ denied: null as Response | null }));
 
@@ -75,6 +77,34 @@ describe('concierge POST /api/voice/synthesize', () => {
     });
   });
 
+  it('never forwards upstream free text (stderr, paths) — only fixed codes (m4)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json(
+        {
+          ok: false,
+          error: 'Error: spawn /usr/local/bin/python3 ENOENT',
+          reason: 'Traceback: /Users/me/kyberion/active/shared/tmp/voice-synth-1.wav',
+        },
+        { status: 502 }
+      )
+    );
+    const response = await POST(request({ text: 'hello' }));
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ ok: false, error: 'voice_hub_http_502' });
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json(
+        { ok: false, error: 'synthesis_failed', reason: 'engine_error' },
+        { status: 502 }
+      )
+    );
+    expect(await (await POST(request({ text: 'hello' }))).json()).toEqual({
+      ok: false,
+      error: 'synthesis_failed',
+      reason: 'engine_error',
+    });
+  });
+
   it('answers 503 when voice-hub is unreachable', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
     const response = await POST(request({ text: 'hello' }));
@@ -94,6 +124,23 @@ describe('concierge POST /api/voice/synthesize', () => {
     const response = await POST(request(body));
     expect(response.status).toBe(status);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses the same write guard as the neighbouring concierge voice routes (m5)', () => {
+    // Access policy is documented on the route: TTS spends host compute, so it
+    // is guarded like listen-once / stop / selection (not loopback-owner-only:
+    // no personal-tier data is read).
+    for (const route of ['synthesize', 'listen-once', 'stop', 'selection']) {
+      const source = String(
+        safeReadFile(
+          pathResolver.rootResolve(
+            `presence/displays/concierge/src/app/api/voice/${route}/route.ts`
+          ),
+          { encoding: 'utf8' }
+        )
+      );
+      expect(source, route).toContain('const denied = requireConciergeMutationAccess(req);');
+    }
   });
 
   it('returns the mutation guard denial without contacting voice-hub', async () => {

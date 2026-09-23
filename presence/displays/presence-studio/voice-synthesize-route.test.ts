@@ -139,6 +139,31 @@ describe('POST /api/voice/synthesize', () => {
     });
   });
 
+  it('never forwards upstream free text (stderr, paths) — only fixed codes (m4)', async () => {
+    const handler = setup((async () =>
+      Response.json(
+        {
+          ok: false,
+          error: 'Error: spawn /usr/local/bin/python3 ENOENT',
+          reason: 'Traceback: /Users/me/kyberion/active/shared/tmp/voice-synth-1.wav',
+        },
+        { status: 502 }
+      )) as unknown as typeof fetch);
+    const res = fakeResponse();
+    await handler(fakeRequest({ body: { text: 'hello' } }), res);
+    expect(res.statusCode).toBe(502);
+    expect(res.body).toEqual({ ok: false, error: 'voice_hub_http_502' });
+
+    const known = setup((async () =>
+      Response.json(
+        { ok: false, error: 'synthesis_failed', reason: 'engine_error: /tmp/x' },
+        { status: 502 }
+      )) as unknown as typeof fetch);
+    const res2 = fakeResponse();
+    await known(fakeRequest({ body: { text: 'hello' } }), res2);
+    expect(res2.body).toEqual({ ok: false, error: 'synthesis_failed' });
+  });
+
   it('answers 503 when voice-hub is unreachable', async () => {
     const handler = setup((async () => {
       throw new TypeError('fetch failed');

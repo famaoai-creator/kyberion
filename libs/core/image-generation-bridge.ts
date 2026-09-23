@@ -464,6 +464,17 @@ export const DEFAULT_GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
 /** Keeps the inline-data request under the network guardrail (2 MB by default). */
 const GEMINI_REFERENCE_MAX_BYTES = 1024 * 1024;
 const GEMINI_REFERENCE_TOTAL_MAX_BYTES = 1400 * 1024;
+/** References are downscaled to this longest side before upload (PA-10). */
+export const GEMINI_REFERENCE_MAX_EDGE_PX = 768;
+/** [longest side, JPEG quality] tried in order; the first encoding under budget wins. */
+const GEMINI_REFERENCE_ENCODE_STEPS: ReadonlyArray<[number, number]> = [
+  [GEMINI_REFERENCE_MAX_EDGE_PX, 85],
+  [GEMINI_REFERENCE_MAX_EDGE_PX, 70],
+  [640, 60],
+  [512, 50],
+];
+/** A source larger than this is refused before decoding (concierge uploads cap at 8 MB). */
+const GEMINI_REFERENCE_SOURCE_MAX_BYTES = 16 * 1024 * 1024;
 
 export function resolveGeminiImageModel(): string {
   const configured = getRegisteredEnvText('KYBERION_GEMINI_IMAGE_MODEL')?.trim();
@@ -474,26 +485,82 @@ export function resolveGeminiImageModel(): string {
   return configured;
 }
 
-/** `generateContent` contents: every reference as `inlineData`, then the text prompt. */
-export function buildGeminiImageContents(request: ImageGenerationRequest): Array<{
-  role: 'user';
-  parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>;
-}> {
-  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
-  let total = 0;
-  for (const reference of request.referenceImages ?? []) {
-    const referencePath = resolveReferenceImagePath(reference);
-    const bytes = safeReadFile(referencePath, { encoding: null }) as Buffer;
-    if (bytes.length > GEMINI_REFERENCE_MAX_BYTES) {
+/**
+ * PA-10: a reference photo (up to 8 MB from the concierge upload) or a
+ * generated 1024² PNG frame is re-encoded in memory — longest side at most
+ * {@link GEMINI_REFERENCE_MAX_EDGE_PX}, JPEG q85 — so a whole set fits the
+ * inline upload budget (a very detailed source steps down in quality and
+ * size until it fits `targetBytes`). Re-encoding also drops EXIF metadata.
+ * Nothing is written to disk. A source Jimp cannot decode (e.g. WebP) is sent
+ * as is when it already fits the budget.
+ */
+export async function prepareGeminiReferenceImage(
+  bytes: Buffer,
+  mimeType: string,
+  targetBytes: number = GEMINI_REFERENCE_MAX_BYTES
+): Promise<{ mimeType: string; bytes: Buffer }> {
+  if (bytes.length > GEMINI_REFERENCE_SOURCE_MAX_BYTES) {
+    throw new Error(
+      `reference image too large for inline upload (${Math.ceil(bytes.length / 1024)}KB source)`
+    );
+  }
+  const budget = Math.min(targetBytes, GEMINI_REFERENCE_MAX_BYTES);
+  let encode: ((edge: number, quality: number) => Promise<Buffer>) | null = null;
+  try {
+    const { Jimp } = await import('jimp');
+    const decoded = await Jimp.read(bytes);
+    encode = async (edge, quality) => {
+      const image = decoded.clone();
+      if (image.bitmap.width > edge || image.bitmap.height > edge) {
+        image.scaleToFit({ w: edge, h: edge });
+      }
+      return Buffer.from(await image.getBuffer('image/jpeg', { quality }));
+    };
+  } catch {
+    encode = null;
+  }
+  if (!encode) {
+    if (bytes.length > budget) {
       throw new Error(
-        `reference image too large for inline upload (${Math.ceil(bytes.length / 1024)}KB > ${GEMINI_REFERENCE_MAX_BYTES / 1024}KB)`
+        `reference image too large for inline upload (${Math.ceil(bytes.length / 1024)}KB > ${Math.floor(budget / 1024)}KB)`
       );
     }
-    total += bytes.length;
+    return { mimeType, bytes };
+  }
+  // Highly detailed sources step down in quality / size until they fit.
+  for (const [edge, quality] of GEMINI_REFERENCE_ENCODE_STEPS) {
+    const encoded = await encode(edge, quality);
+    if (encoded.length <= budget) return { mimeType: 'image/jpeg', bytes: encoded };
+  }
+  throw new Error(
+    `reference image too large for inline upload even after downscaling (> ${Math.floor(budget / 1024)}KB)`
+  );
+}
+
+/** `generateContent` contents: every reference as `inlineData`, then the text prompt. */
+export async function buildGeminiImageContents(request: ImageGenerationRequest): Promise<
+  Array<{
+    role: 'user';
+    parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>;
+  }>
+> {
+  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+  let total = 0;
+  const references = request.referenceImages ?? [];
+  for (const [index, reference] of references.entries()) {
+    const referencePath = resolveReferenceImagePath(reference);
+    const source = safeReadFile(referencePath, { encoding: null }) as Buffer;
+    // Each reference gets an equal share of what is left of the total budget.
+    const remaining = references.length - index;
+    const share = Math.floor((GEMINI_REFERENCE_TOTAL_MAX_BYTES - total) / remaining);
+    const prepared = await prepareGeminiReferenceImage(source, reference.mimeType, share);
+    total += prepared.bytes.length;
     if (total > GEMINI_REFERENCE_TOTAL_MAX_BYTES) {
       throw new Error('reference images exceed the inline upload budget');
     }
-    parts.push({ inlineData: { mimeType: reference.mimeType, data: bytes.toString('base64') } });
+    parts.push({
+      inlineData: { mimeType: prepared.mimeType, data: prepared.bytes.toString('base64') },
+    });
   }
   parts.push({ text: request.prompt });
   return [{ role: 'user', parts }];
@@ -560,7 +627,7 @@ export class GeminiImageModelGenerationProvider implements ImageGenerationProvid
         'generate_content_image',
         {
           model: resolveGeminiImageModel(),
-          contents: buildGeminiImageContents(request),
+          contents: await buildGeminiImageContents(request),
           generation_config: {
             responseModalities: ['IMAGE'],
             imageConfig: { aspectRatio: request.aspectRatio || '1:1' },
@@ -952,6 +1019,9 @@ abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationP
       logger.info(
         `[image_generation_bridge] ${this.config.displayName} image already exists at ${targetPath}. Skipping generation.`
       );
+      // The host agent has read the references and produced this frame: the
+      // second receipt closes the hand-off in the audit chain.
+      recordReferenceEgressReceipt(request, this, 'allowed', undefined, 'host_output_collected');
       return {
         status: 'succeeded',
         provider: this.id,

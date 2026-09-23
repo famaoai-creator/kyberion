@@ -43,6 +43,17 @@ const FORWARDED_HEADERS: ReadonlyArray<[string, RegExp]> = [
   ['x-kyberion-speech-language', /^(ja|en)$/],
 ];
 
+/** voice-hub `/api/speech/synthesize` error codes a client may see. */
+const VOICE_SYNTHESIZE_UPSTREAM_ERRORS = new Set([
+  'invalid_request',
+  'text_too_long',
+  'synthesis_busy',
+  'synthesis_unsupported',
+  'synthesis_failed',
+  'synthesis_artifact_invalid',
+]);
+const VOICE_REASON_CODE = /^[a-z0-9_]{1,80}$/u;
+
 export type VoiceSynthesizeProxyResult =
   | { kind: 'audio'; audio: Buffer; headers: Record<string, string> }
   | { kind: 'json'; status: number; body: Record<string, unknown> };
@@ -74,10 +85,18 @@ export async function readVoiceSynthesizeUpstream(
   }
   if (contentType.includes('application/json')) {
     const payload = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    // m4: only known error codes and snake_case reason codes pass through —
+    // never upstream free text (stderr, paths).
     const error =
-      payload && typeof payload.error === 'string' ? payload.error.slice(0, 80) : undefined;
+      payload &&
+      typeof payload.error === 'string' &&
+      VOICE_SYNTHESIZE_UPSTREAM_ERRORS.has(payload.error)
+        ? payload.error
+        : undefined;
     const reason =
-      payload && typeof payload.reason === 'string' ? payload.reason.slice(0, 200) : undefined;
+      payload && typeof payload.reason === 'string' && VOICE_REASON_CODE.test(payload.reason)
+        ? payload.reason
+        : undefined;
     return {
       kind: 'json',
       status: response.ok ? 502 : response.status,
