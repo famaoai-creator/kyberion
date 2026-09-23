@@ -78,4 +78,29 @@ describe('concierge GET /api/me/avatar/[expression]', () => {
       avatar: { images: { neutral: '/api/me/avatar/neutral' }, adopted: false },
     });
   });
+
+  it('serves the draft set only with ?set=draft', async () => {
+    const draft = path.join(fixture.root, 'avatar', 'draft');
+    safeMkdir(draft, { recursive: true });
+    const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9]);
+    safeWriteFile(path.join(draft, 'joy.png'), JPEG);
+    safeWriteFile(path.join(draft, 'neutral.png'), JPEG);
+    safeWriteFile(
+      path.join(draft, 'avatar-profile.json'),
+      JSON.stringify({ version: 1, images: { neutral: 'neutral.png', joy: 'joy.png' } })
+    );
+    const draftReq = {
+      nextUrl: new URL('http://127.0.0.1/api/me/avatar/joy?set=draft'),
+    } as unknown as NextRequest;
+    expect((await GET(req, params('joy'))).status).toBe(404);
+    const res = await GET(draftReq, params('joy'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/jpeg');
+    const described = await (await describeGet(draftReq)).json();
+    expect(described.avatar).toMatchObject({
+      images: { joy: '/api/me/avatar/joy?set=draft' },
+      adopted: false,
+      set: 'draft',
+    });
+  });
 });

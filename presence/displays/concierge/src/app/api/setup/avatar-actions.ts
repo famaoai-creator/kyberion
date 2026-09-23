@@ -3,9 +3,10 @@ import { NextResponse } from 'next/server';
 import { nowIso } from '@agent/core/foundation';
 import { loadPersonalIdentityAtPath } from '@agent/core/personal-identity-reader';
 import {
-  AVATAR_DIRNAME,
   AVATAR_PROFILE_POINTER,
   loadPersonalAvatarSet,
+  personalAvatarDir,
+  promotePersonalAvatarDraft,
 } from '@agent/core/presence-avatar';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import * as secureIo from '@agent/core/secure-io';
@@ -69,14 +70,20 @@ export function startAvatarGenerateAction(
   }
   const job = startAvatarGenerationJob({
     photoPath: photo,
-    outputDir: path.join(profileRoot, AVATAR_DIRNAME),
+    // Into `avatar/draft/`: the set in use stays until "Use this avatar".
+    outputDir: personalAvatarDir(profileRoot, 'draft'),
     providerId,
     grantedBy: viewer.principalId || 'human:concierge-localadmin',
   });
   return NextResponse.json({ ok: true, job }, { status: 202 });
 }
 
-/** PA-10 `action: 'avatar_use'` — adopt the generated set (`identity.avatar_profile`). */
+/**
+ * PA-10 `action: 'avatar_use'` — adopt the generated set: promote a pending
+ * `avatar/draft/` over `avatar/` (the previous set stays until now), then
+ * point `identity.avatar_profile` at it. Without a draft, an existing
+ * not-yet-adopted `avatar/` set is adopted as is.
+ */
 export function useGeneratedAvatarAction(
   viewer: ConciergeViewerContext,
   t: Translate
@@ -85,7 +92,9 @@ export function useGeneratedAvatarAction(
   if (denied) return denied;
   const profileRoot = resolveActiveProfileRoot();
   const adopted = readConciergePersonal(() => {
-    if (!loadPersonalAvatarSet(profileRoot)) return false;
+    if (!promotePersonalAvatarDraft(profileRoot) && !loadPersonalAvatarSet(profileRoot)) {
+      return false;
+    }
     const identityPath = path.join(profileRoot, 'my-identity.json');
     const safeIdentityPath = secureIo.assertSafeRepositoryPath(identityPath, {
       allowMissingLeaf: true,

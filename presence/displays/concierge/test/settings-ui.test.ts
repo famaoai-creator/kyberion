@@ -467,4 +467,34 @@ describe('settings interaction', () => {
     expect(html).toContain(t('setup.avatar_use'));
     m.unmount();
   });
+
+  it('PA-10: a pending draft previews with ?set=draft while the adopted set stays in use', async () => {
+    mockFetch(() => ({
+      ok: true,
+      photo_available: true,
+      plan: null,
+      avatar: {
+        images: { neutral: '/api/me/avatar/neutral' },
+        mouth: { x: 0.5, y: 0.68, width: 0.22 },
+        generated_at: '2026-09-23T00:00:00Z',
+        adopted: true,
+        set: 'current',
+      },
+      draft: {
+        images: { neutral: '/api/me/avatar/neutral?set=draft' },
+        mouth: { x: 0.5, y: 0.68, width: 0.22 },
+        generated_at: '2026-09-24T00:00:00Z',
+        adopted: false,
+        set: 'draft',
+      },
+    }));
+    const m = mount(createElement(AvatarGenerationPanel, { t, busy: false, photoVersion: 'v1' }));
+    await flush();
+    const html = serializeFake(m.container);
+    expect(html).toContain('/api/me/avatar/neutral?set=draft&v=');
+    expect(html).toContain(t('setup.avatar_draft_pending'));
+    expect(html).toContain(t('setup.avatar_use'));
+    expect(html).not.toContain(t('setup.avatar_in_use'));
+    m.unmount();
+  });
 });

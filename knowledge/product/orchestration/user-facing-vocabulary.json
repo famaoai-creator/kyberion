@@ -9331,6 +9331,11 @@
         "ja": "使用中",
         "qps-ploc": "⟦Ïñ ůşė ŀőř⟧"
       },
+      "setup.avatar_draft_pending": {
+        "en": "This new set is a draft. Your current avatar stays in use until you choose \"Use this avatar\".",
+        "ja": "この新しいセットは下書きです。「このアバターを使う」を選ぶまで、今のアバターが使われます。",
+        "qps-ploc": "⟦Ŧħïş ñėẇ şėŧ ïş ȧ ḓřȧƒŧ. Ẏőůř ƈůřřėñŧ ȧṽȧŧȧř şŧȧẏş ïñ ůşė ůñŧïŀ ẏőů ƈħőőşė \"Ůşė ŧħïş ȧṽȧŧȧř\". ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
       "setup.avatar_saved": {
         "en": "Avatar created and registered in your personal profile.",
         "ja": "アバター画像を作成し、個人プロファイルへ登録しました。",
@@ -9350,6 +9355,16 @@
         "en": "Ask the secretary",
         "ja": "秘書に相談",
         "qps-ploc": "⟦Ȧşķ ŧħė şėƈřėŧȧřẏ ŀőřėɱ⟧"
+      },
+      "dock.avatar_label": {
+        "en": "Secretary avatar",
+        "ja": "秘書のアバター",
+        "qps-ploc": "⟦Şėƈřėŧȧřẏ ȧṽȧŧȧř ŀőřėɱ⟧"
+      },
+      "dock.avatar_personal_label": {
+        "en": "Your avatar",
+        "ja": "あなたのアバター",
+        "qps-ploc": "⟦Ẏőůř ȧṽȧŧȧř ŀőř⟧"
       },
       "dock.open": {
         "en": "Open the conversation",
@@ -15635,6 +15650,16 @@
         "en": "Listening for your next turn.",
         "ja": "次の発話を待っています。",
         "qps-ploc": "⟦Ŀïşŧėñïñɠ ƒőř ẏőůř ñėẋŧ ŧůřñ. ŀőřėɱ ïṗş⟧"
+      },
+      "partner_avatar_label": {
+        "en": "Kyberion avatar",
+        "ja": "Kyberion のアバター",
+        "qps-ploc": "⟦Ķẏƀėřïőñ ȧṽȧŧȧř ŀőřė⟧"
+      },
+      "partner_avatar_personal_label": {
+        "en": "Your avatar",
+        "ja": "あなたのアバター",
+        "qps-ploc": "⟦Ẏőůř ȧṽȧŧȧř ŀőř⟧"
       },
       "voice_planning_subtitle": {
         "en": "Planning and executing: {summary}",

@@ -52,13 +52,13 @@ function get(query = '') {
 }
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-function writeGeneratedSet() {
-  const dir = path.join(fixture.root, 'avatar');
+function writeGeneratedSet(set: 'current' | 'draft' = 'current', providerId = 'gemini_image') {
+  const dir = path.join(fixture.root, 'avatar', ...(set === 'draft' ? ['draft'] : []));
   safeMkdir(dir, { recursive: true });
   safeWriteFile(path.join(dir, 'neutral.png'), PNG);
   safeWriteFile(
     path.join(dir, 'avatar-profile.json'),
-    JSON.stringify({ version: 1, images: { neutral: 'neutral.png' }, provider_id: 'gemini_image' })
+    JSON.stringify({ version: 1, images: { neutral: 'neutral.png' }, provider_id: providerId })
   );
 }
 
@@ -102,6 +102,7 @@ describe('concierge avatar generation job flow', () => {
         data_egress: 'cloud',
       },
       avatar: null,
+      draft: null,
     });
     expect(runner.mock.calls[0]![0]).toContain('--plan');
     expect(runner.mock.calls[0]![0]).not.toContain('--consent-provider');
@@ -157,6 +158,10 @@ describe('concierge avatar generation job flow', () => {
     expect(args[args.indexOf('--input-photo') + 1]).toBe(
       pathResolver.toRepoRelative(path.join(fixture.root, 'avatar.png'))
     );
+    // Generation goes to the draft directory; the set in use is not touched.
+    expect(args[args.indexOf('--output-dir') + 1]).toBe(
+      pathResolver.toRepoRelative(path.join(fixture.root, 'avatar', 'draft'))
+    );
     // A second run is refused while the first is running.
     expect(
       (
@@ -167,7 +172,7 @@ describe('concierge avatar generation job flow', () => {
       ).status
     ).toBe(409);
 
-    writeGeneratedSet();
+    writeGeneratedSet('draft');
     finish({
       status: 0,
       stderr: '',
@@ -178,7 +183,7 @@ describe('concierge avatar generation job flow', () => {
     expect(status).toMatchObject({
       ok: true,
       job: { id: job.id, status: 'succeeded', provider_id: 'gemini_image' },
-      avatar: { images: { neutral: '/api/me/avatar/neutral' }, adopted: false },
+      draft: { images: { neutral: '/api/me/avatar/neutral?set=draft' }, adopted: false },
     });
   });
 
@@ -240,5 +245,23 @@ describe('concierge avatar generation job flow', () => {
       String(safeReadFile(path.join(fixture.root, 'my-identity.json'), { encoding: 'utf8' }))
     );
     expect(identity).toMatchObject({ name: 'me', avatar_profile: 'avatar/avatar-profile.json' });
+  });
+
+  it('keeps the previous set until "Use this avatar" promotes the draft', async () => {
+    writeGeneratedSet('current', 'old_provider');
+    writeGeneratedSet('draft', 'new_provider');
+    safeWriteFile(
+      path.join(fixture.root, 'my-identity.json'),
+      JSON.stringify({ name: 'me', avatar_profile: 'avatar/avatar-profile.json' })
+    );
+    runner.mockResolvedValue({ status: 0, stderr: '', stdout: '' });
+    const before = await (await get()).json();
+    expect(before.avatar).toMatchObject({ provider_id: 'old_provider', adopted: true });
+    expect(before.draft).toMatchObject({ provider_id: 'new_provider', set: 'draft' });
+
+    expect((await post({ action: 'avatar_use' })).status).toBe(200);
+    const after = await (await get()).json();
+    expect(after.avatar).toMatchObject({ provider_id: 'new_provider', adopted: true });
+    expect(after.draft).toBeNull();
   });
 });

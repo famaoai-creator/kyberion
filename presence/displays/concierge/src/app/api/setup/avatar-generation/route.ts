@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as path from 'node:path';
-import { describePersonalAvatar, AVATAR_DIRNAME } from '@agent/core/presence-avatar';
+import {
+  describePersonalAvatar,
+  personalAvatarDir,
+  type PersonalAvatarSetKind,
+} from '@agent/core/presence-avatar';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../lib/viewer-context';
 import {
@@ -23,8 +26,9 @@ const JOB_ID_PATTERN = /^[0-9a-f-]{36}$/u;
 /**
  * PA-10: `GET /api/setup/avatar-generation` — without `job`: the provider a
  * run would send the photo to (for the consent dialog; nothing is sent), the
- * current generated set and whether a photo is registered. With `job=<id>`:
- * that job's status. Owner-only (personal tier).
+ * current set, the pending draft (a generation not yet adopted; its frames
+ * are served with `?set=draft`) and whether a photo is registered. With
+ * `job=<id>`: that job's status (+ the draft it produced). Owner-only.
  */
 export async function GET(req: NextRequest) {
   const resolved = resolveConciergeViewer(req);
@@ -34,8 +38,10 @@ export async function GET(req: NextRequest) {
   try {
     const profileRoot = resolveActiveProfileRoot();
     const jobId = req.nextUrl.searchParams.get('job');
-    const avatar = () =>
-      readConciergePersonal(() => describePersonalAvatar(CONCIERGE_AVATAR_URL_BASE, profileRoot));
+    const avatar = (kind: PersonalAvatarSetKind = 'current') =>
+      readConciergePersonal(() =>
+        describePersonalAvatar(CONCIERGE_AVATAR_URL_BASE, profileRoot, kind)
+      );
     if (jobId !== null) {
       const job = JOB_ID_PATTERN.test(jobId) ? getAvatarGenerationJob(jobId) : null;
       if (!job) {
@@ -45,13 +51,13 @@ export async function GET(req: NextRequest) {
         );
       }
       return NextResponse.json(
-        { ok: true, job, avatar: job.status === 'succeeded' ? avatar() : null },
+        { ok: true, job, draft: job.status === 'succeeded' ? avatar('draft') : null },
         { headers: NO_STORE }
       );
     }
     const photo = readConciergePersonal(() => registeredAvatarPhoto(profileRoot));
     const plan = photo
-      ? await planAvatarGeneration(photo, path.join(profileRoot, AVATAR_DIRNAME))
+      ? await planAvatarGeneration(photo, personalAvatarDir(profileRoot, 'draft'))
       : null;
     return NextResponse.json(
       {
@@ -60,6 +66,7 @@ export async function GET(req: NextRequest) {
         plan,
         running_job: runningAvatarGenerationJob(),
         avatar: avatar(),
+        draft: avatar('draft'),
       },
       { headers: NO_STORE }
     );
