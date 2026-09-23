@@ -17,7 +17,6 @@ import '../libs/core/audit-forwarder.js';
 import '../libs/core/browser-automation-runtime-bridge.js';
 import '../libs/core/calendar-provider-bridge.js';
 import '../libs/core/camera-output-bridge.js';
-import '../libs/core/foundation/clock.js';
 import '../libs/core/deployment-adapter.js';
 import '../libs/core/embedding-backend.js';
 import '../libs/core/email-account-catalog.js';

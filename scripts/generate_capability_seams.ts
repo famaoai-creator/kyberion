@@ -50,10 +50,6 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
       'libs/actuators/voice-actuator/src/voice-action-helpers.ts',
     ],
   },
-  'core-clock': {
-    declaration: 'libs/core/foundation/clock.ts',
-    consumers: ['libs/core/foundation/time.ts'],
-  },
   'ocr-provider': {
     declaration: 'libs/core/ocr-bridge.ts',
     consumers: ['libs/core/ocr-bridge.ts'],
