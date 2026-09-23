@@ -1,5 +1,7 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
+import { assertNotSimulatedEvidence } from './scenario-evidence-class.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 
 export interface SoakEvidenceManifest {
@@ -34,7 +36,9 @@ export function loadSoakEvidenceManifestAtPath(filePath: string): SoakEvidenceMa
   if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
     throw new Error(`[SOAK_EVIDENCE_MANIFEST] manifest must be a regular file: ${filePath}`);
   }
-  return soakEvidenceManifestCatalogAtPath(safePath).load();
+  const raw = readJson<unknown>(safePath);
+  assertNotSimulatedEvidence(raw, 'soak-evidence-manifest');
+  return soakEvidenceManifestCatalogAtPath(safePath).validate(raw, safePath);
 }
 
 /** Validate and persist a live soak manifest using the same contract as the reader. */
@@ -43,6 +47,7 @@ export function writeSoakEvidenceManifestAtPath(
   manifest: SoakEvidenceManifest
 ): SoakEvidenceManifest {
   const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  assertNotSimulatedEvidence(manifest, 'soak-evidence-manifest');
   const validated = soakEvidenceManifestCatalogAtPath(safePath).validate(manifest, safePath);
   safeWriteFile(safePath, `${JSON.stringify(validated, null, 2)}\n`, { encoding: 'utf8' });
   return validated;

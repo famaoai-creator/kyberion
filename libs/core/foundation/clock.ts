@@ -17,8 +17,6 @@ export const systemClock: KyberionClock = {
   now: () => Date.now(),
 };
 
-const CLOCK_SEAM_KEY = 'core-clock';
-
 const DEFAULT_METADATA: SeamProviderMetadata = {
   provenance: 'builtin',
   source: 'libs/core/foundation/clock.ts',
@@ -26,7 +24,7 @@ const DEFAULT_METADATA: SeamProviderMetadata = {
 };
 
 const clockSeam = createSeam<KyberionClock>({
-  key: CLOCK_SEAM_KEY,
+  key: 'core-clock',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
 });

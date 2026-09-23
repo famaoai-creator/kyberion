@@ -9,6 +9,7 @@ import { resolveReasoningBackendSelectionFromContext } from '../libs/core/reason
 import '../libs/core/agent-execution-port.js';
 import '../libs/core/a2a-route-port.js';
 import '../libs/core/actuator-forwarding-port.js';
+import '../libs/core/actuator-op-registry.js';
 import '../libs/core/agent-exec-adapter-bridge.js';
 import '../libs/core/agent-pane-runtime-bridge.js';
 import '../libs/core/audio-bus-bridge.js';
@@ -16,6 +17,7 @@ import '../libs/core/audit-forwarder.js';
 import '../libs/core/browser-automation-runtime-bridge.js';
 import '../libs/core/calendar-provider-bridge.js';
 import '../libs/core/camera-output-bridge.js';
+import '../libs/core/foundation/clock.js';
 import '../libs/core/deployment-adapter.js';
 import '../libs/core/embedding-backend.js';
 import '../libs/core/email-account-catalog.js';

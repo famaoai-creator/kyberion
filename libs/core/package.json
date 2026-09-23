@@ -3210,6 +3210,34 @@
     "./provider-endpoint-domains": {
       "types": "./dist/provider-endpoint-domains.d.ts",
       "default": "./dist/provider-endpoint-domains.js"
+    },
+    "./scenario-definition": {
+      "types": "./dist/scenario-definition.d.ts",
+      "default": "./dist/scenario-definition.js"
+    },
+    "./scenario-run-context": {
+      "types": "./dist/scenario-run-context.d.ts",
+      "default": "./dist/scenario-run-context.js"
+    },
+    "./scenario-interceptor": {
+      "types": "./dist/scenario-interceptor.d.ts",
+      "default": "./dist/scenario-interceptor.js"
+    },
+    "./scenario-model-fixtures": {
+      "types": "./dist/scenario-model-fixtures.d.ts",
+      "default": "./dist/scenario-model-fixtures.js"
+    },
+    "./scenario-evidence-class": {
+      "types": "./dist/scenario-evidence-class.d.ts",
+      "default": "./dist/scenario-evidence-class.js"
+    },
+    "./scenario-side-effect-log": {
+      "types": "./dist/scenario-side-effect-log.d.ts",
+      "default": "./dist/scenario-side-effect-log.js"
+    },
+    "./plugin-permissions": {
+      "types": "./dist/plugin-permissions.d.ts",
+      "default": "./dist/plugin-permissions.js"
     }
   },
   "dependencies": {

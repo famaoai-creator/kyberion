@@ -51,4 +51,18 @@ describe('soak evidence manifest loader', () => {
 
     expect(() => loadSoakEvidenceManifestAtPath(link)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
+
+  it('rejects simulated scenario evidence on read and write (ES-04)', () => {
+    const file = path.join(root, 'manifest.json');
+    safeMkdir(root, { recursive: true });
+    safeWriteFile(file, JSON.stringify({ ...manifest, evidence_class: 'simulated' }));
+
+    expect(() => loadSoakEvidenceManifestAtPath(file)).toThrow('[SIMULATED_EVIDENCE_REJECTED]');
+    expect(() =>
+      writeSoakEvidenceManifestAtPath(file, {
+        ...manifest,
+        executionProfile: 'simulated',
+      } as typeof manifest)
+    ).toThrow('[SIMULATED_EVIDENCE_REJECTED]');
+  });
 });

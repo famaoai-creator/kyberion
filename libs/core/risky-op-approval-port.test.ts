@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { requireRiskyApproval, registerRiskyApprovalHandler } from './risky-op-approval-port.js';
+import {
+  overrideRiskyApprovalHandler,
+  requireRiskyApproval,
+  registerRiskyApprovalHandler,
+} from './risky-op-approval-port.js';
 
 describe('risky-op-approval-port', () => {
   it('rejects replacement of the canonical approval handler', () => {
@@ -18,5 +22,20 @@ describe('risky-op-approval-port', () => {
       status: 'pending',
       message: 'Approval gate is not registered',
     });
+  });
+
+  it('consults a scoped override first and restores the canonical handler on dispose', () => {
+    const canonical = () => ({ allowed: false, status: 'pending' as const });
+    const disposeCanonical = registerRiskyApprovalHandler(canonical);
+    const disposeOverride = overrideRiskyApprovalHandler(() => ({
+      allowed: true,
+      status: 'approved' as const,
+    }));
+
+    expect(requireRiskyApproval({} as never)).toEqual({ allowed: true, status: 'approved' });
+    expect(() => overrideRiskyApprovalHandler(canonical)).toThrow(/risky-approval-override/);
+    disposeOverride();
+    expect(requireRiskyApproval({} as never)).toEqual({ allowed: false, status: 'pending' });
+    disposeCanonical();
   });
 });
