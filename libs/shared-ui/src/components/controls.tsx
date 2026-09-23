@@ -9,6 +9,7 @@ import type {
   KbDisclosureProps,
 } from '@agent/core/a2ui-catalog';
 import { useA2UIActions, type A2UILinkProps } from '../actions.js';
+import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
 import { safeHref } from '../safety.js';
 
 const BUTTON_VARIANTS: ReadonlySet<string> = new Set(['primary', 'secondary', 'danger', 'ghost']);
@@ -114,9 +115,10 @@ export type DisclosureProps = KbDisclosureProps & { children?: ReactNode };
 
 /** `ui:disclosure` → `<details class="kb-disclosure">` with a `.kb-disclosure__body`. */
 export function Disclosure({ summary, open, children }: DisclosureProps) {
+  const { t } = useKbI18n();
   return (
     <details className="kb-disclosure" open={open || undefined}>
-      <summary>{summary}</summary>
+      <summary>{summary || t(KB_UI_MESSAGE_KEYS.disclosureSummary)}</summary>
       <div className="kb-disclosure__body">{children}</div>
     </details>
   );

@@ -1,5 +1,10 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
+import {
+  buildUiMessageBundle,
+  type SupportedLocale,
+  type UiMessageBundle,
+} from './locale-normalize.js';
 
 /**
  * I18N-02: shared catalog loader + key resolution for the namespaced
@@ -118,4 +123,15 @@ export function _resetVocabularyCatalogCacheForTests(): void {
   cachedCatalog = undefined;
   cachedBareIndex = undefined;
   catalog.reset();
+}
+
+/**
+ * UI-01d: the shared UI kit's message bundle (`ui` vocabulary domain) for one
+ * locale, for server code and static-surface routes that hand it to the
+ * renderers. Returns an empty bundle when the catalog is unavailable (the
+ * renderers then use their generated English defaults).
+ */
+export function getUiMessageBundle(locale: SupportedLocale): UiMessageBundle {
+  const loaded = loadVocabularyCatalog();
+  return loaded ? buildUiMessageBundle(loaded, locale) : { locale, messages: {} };
 }

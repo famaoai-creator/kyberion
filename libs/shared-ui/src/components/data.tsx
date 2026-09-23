@@ -10,15 +10,22 @@ import type {
 } from '@agent/core/a2ui-catalog';
 import { defaultNavigate, useA2UIActions } from '../actions.js';
 import { isKbStatus } from '../catalog.js';
+import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
 import { KbIcon } from '../icons.js';
 import { asArray, formatScalar, safeCssLength, safeHref } from '../safety.js';
 import { KbLink } from './controls.js';
 import { StatusPill, toneAttr } from './feedback.js';
 
 const TREND_ICONS = { up: 'arrow-up', down: 'arrow-down', flat: 'arrow-right' } as const;
+const TREND_MESSAGE_KEYS = {
+  up: KB_UI_MESSAGE_KEYS.trendUp,
+  down: KB_UI_MESSAGE_KEYS.trendDown,
+  flat: KB_UI_MESSAGE_KEYS.trendFlat,
+} as const;
 
 /** `ui:metric` → `.kb-metric[data-tone][data-trend]` with `__label`, `__value`, `__unit`, `__delta`, `__description`. */
 export function Metric({ label, value, unit, delta, trend, tone, description }: KbMetricProps) {
+  const { t } = useKbI18n();
   const trendIcon =
     trend && Object.prototype.hasOwnProperty.call(TREND_ICONS, trend)
       ? TREND_ICONS[trend]
@@ -31,12 +38,16 @@ export function Metric({ label, value, unit, delta, trend, tone, description }: 
     >
       <span className="kb-metric__label">{label}</span>
       <span className="kb-metric__value">
-        {formatScalar(value)}
+        {formatScalar(value, t)}
         {unit ? <span className="kb-metric__unit">{unit}</span> : null}
       </span>
       {delta ? (
         <span className="kb-metric__delta">
-          <KbIcon name={trendIcon} size={12} />
+          <KbIcon
+            name={trendIcon}
+            size={12}
+            label={trendIcon && trend ? t(TREND_MESSAGE_KEYS[trend]) : undefined}
+          />
           {delta}
         </span>
       ) : null}
@@ -47,13 +58,14 @@ export function Metric({ label, value, unit, delta, trend, tone, description }: 
 
 /** `ui:kv` → `<dl class="kb-kv">` of `__label` / `__value[data-mono]` pairs. */
 export function KeyValue({ items }: KbKvProps) {
+  const { t } = useKbI18n();
   return (
     <dl className="kb-kv">
       {asArray(items).map((item, index) => (
         <Fragment key={`${item.label}-${index}`}>
           <dt className="kb-kv__label">{item.label}</dt>
           <dd className="kb-kv__value" data-mono={item.mono ? 'true' : undefined}>
-            {formatScalar(item.value)}
+            {formatScalar(item.value, t)}
           </dd>
         </Fragment>
       ))}
@@ -74,6 +86,7 @@ function alignAttr(align: unknown): string | undefined {
  */
 export function Table({ caption, columns, rows, row_href_key, empty }: KbTableProps) {
   const { navigate = defaultNavigate } = useA2UIActions();
+  const { t } = useKbI18n();
   const cols = asArray(columns);
   const body = asArray(rows);
   return (
@@ -101,7 +114,7 @@ export function Table({ caption, columns, rows, row_href_key, empty }: KbTablePr
           {body.length === 0 ? (
             <tr>
               <td className="kb-table__empty" colSpan={Math.max(1, cols.length)}>
-                {empty || 'データがありません'}
+                {empty || t(KB_UI_MESSAGE_KEYS.tableEmpty)}
               </td>
             </tr>
           ) : (
@@ -137,7 +150,7 @@ export function Table({ caption, columns, rows, row_href_key, empty }: KbTablePr
                         {isStatusColumn && isKbStatus(value) ? (
                           <StatusPill status={value} />
                         ) : (
-                          formatScalar(value)
+                          formatScalar(value, t)
                         )}
                       </td>
                     );
