@@ -2149,7 +2149,7 @@ describe('mission work item dispatch', () => {
       { mode: 'subagent', finalStatus: 'review' },
       { delegateTask }
     );
-    let current = getWorkItem(driftWorkItem.item_id);
+    const current = getWorkItem(driftWorkItem.item_id);
     if (!current) throw new Error(`Drift watchdog fixture disappeared: ${driftWorkItem.item_id}`);
     updateWorkItem({
       itemId: current.item_id,
@@ -2160,32 +2160,18 @@ describe('mission work item dispatch', () => {
       },
     });
 
+    // Identical outcome twice in a row reaches maxConsecutiveSameSignature and
+    // stops the item. Dispatch bookkeeping written back by the first run must
+    // not perturb the cognitive route summary inside the drift signature.
     const second = await dispatchMissionWorkItems(
       makeMissionState(),
       { mode: 'subagent', finalStatus: 'review' },
       { delegateTask }
     );
-    current = getWorkItem(driftWorkItem.item_id);
-    if (!current) throw new Error(`Drift watchdog fixture disappeared: ${driftWorkItem.item_id}`);
-    updateWorkItem({
-      itemId: current.item_id,
-      status: 'ready',
-      metadata: {
-        ...(current.metadata || {}),
-        ...(second.records[0]?.drift_watchdog || {}),
-      },
-    });
 
-    const third = await dispatchMissionWorkItems(
-      makeMissionState(),
-      { mode: 'subagent', finalStatus: 'review' },
-      { delegateTask }
-    );
-
-    expect(delegateTask).toHaveBeenCalledTimes(3);
+    expect(delegateTask).toHaveBeenCalledTimes(2);
     expect(first.records[0]?.work_item_status_after).toBe('review');
-    expect(second.records[0]?.work_item_status_after).toBe('review');
-    expect(third.records[0]).toMatchObject({
+    expect(second.records[0]).toMatchObject({
       work_item_status_after: 'blocked',
       drift_watchdog: expect.objectContaining({
         should_stop: true,
@@ -2195,7 +2181,7 @@ describe('mission work item dispatch', () => {
 
     expect(getWorkItem(driftWorkItem.item_id)).toMatchObject({ status: 'blocked' });
 
-    const responseFile = `${missionPath}/evidence/workitem-dispatch-${third.records[0].item_id}.json`;
+    const responseFile = `${missionPath}/evidence/workitem-dispatch-${second.records[0].item_id}.json`;
     const response = JSON.parse(safeReadFile(responseFile, { encoding: 'utf8' }) as string);
     expect(response.drift_watchdog_summary).toContain('attention=yes');
     expect(response.drift_watchdog_summary).toContain('stop=yes');
