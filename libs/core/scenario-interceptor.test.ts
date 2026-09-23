@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { getScenarioOpOverride, resolveActuatorOperation } from './actuator-op-registry.js';
-import { listOpPreflightListeners, runOpPreflight } from './op-preflight.js';
+import { listOpPreflightListeners, registerOpGuard, runOpPreflight } from './op-preflight.js';
 import { getReasoningBackend, stubReasoningBackend } from './reasoning-backend.js';
 import { requireRiskyApproval } from './risky-op-approval-port.js';
 import { parseScenarioDefinition, type ScenarioDefinition } from './scenario-definition.js';
@@ -98,6 +98,30 @@ describe('installScenarioInterceptor (ES-02)', () => {
         decision: 'pending',
       },
     ]);
+  });
+
+  it('never marks a call admitted when a later-ordered guard blocks it (N6)', async () => {
+    const { interceptor } = setup();
+    // A guard ordered after Number.MAX_SAFE_INTEGER (e.g. Infinity, or same
+    // order with a lexicographically later id such as a plugin guard's
+    // `${pluginId}:${name}`) used to run after the old admission guard and
+    // leave the record incorrectly marked `admitted`.
+    const dispose = registerOpGuard({
+      id: 'late-blocker',
+      order: Number.POSITIVE_INFINITY,
+      check: () => ({ decision: 'block', reason: 'late block' }),
+    });
+    try {
+      const result = await runOpPreflight({
+        op: 'demo:apply_thing',
+        params: {},
+        source: 'pipeline',
+      });
+      expect(result.decision).toBe('block');
+      expect(interceptor.log.ops[0]?.admitted).toBeUndefined();
+    } finally {
+      dispose();
+    }
   });
 
   it('serves fixtures without touching real handlers and fails closed on unstubbed ops', async () => {

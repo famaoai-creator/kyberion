@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { withPluginExecutionFrame } from './sandbox-policy.js';
 import {
   PLUGIN_GRANT_OPS_GUARD_ID,
   registerOpGuard,
   registerOpPreflightListener,
+  registerOpPreflightOutcomeObserver,
   resetOpPreflight,
   runOpPreflight,
   runOpPreflightSync,
@@ -151,6 +152,57 @@ describe('op preflight waterfall', () => {
       decision: 'allow',
       repaired_input: { admitted: true },
       input: { admitted: true },
+    });
+  });
+
+  describe('outcome observers (N6)', () => {
+    it('fires once with the final decision no matter where in the waterfall it was decided', async () => {
+      registerOpGuard({
+        id: 'late-guard',
+        order: Number.POSITIVE_INFINITY,
+        check: () => ({ decision: 'block', reason: 'late block' }),
+      });
+      const seen: Array<{ op: string; decision: string }> = [];
+      registerOpPreflightOutcomeObserver((call, result) => {
+        seen.push({ op: call.op, decision: result.decision });
+      });
+      const result = await runOpPreflight({ op: 'demo:op', params: {}, source: 'pipeline' });
+      expect(result.decision).toBe('block');
+      expect(seen).toEqual([{ op: 'demo:op', decision: 'block' }]);
+    });
+
+    it('cannot change the decision returned to the caller', async () => {
+      registerOpPreflightOutcomeObserver((_call, result) => {
+        // Attempted mutation must never reach the caller's result.
+        (result as { decision: string }).decision = 'block';
+      });
+      const result = await runOpPreflight({ op: 'demo:op', params: {}, source: 'pipeline' });
+      expect(result.decision).toBe('allow');
+    });
+
+    it('swallows and logs a throwing observer without affecting the call', async () => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      registerOpPreflightOutcomeObserver(() => {
+        throw new Error('observer boom');
+      });
+      const result = await runOpPreflight({ op: 'demo:op', params: {}, source: 'pipeline' });
+      expect(result.decision).toBe('allow');
+      expect(spy).toHaveBeenCalledWith('[OP_PREFLIGHT_OUTCOME_OBSERVER_ERROR]', expect.any(Error));
+      spy.mockRestore();
+    });
+
+    it('disposes cleanly and resetOpPreflight clears observers', async () => {
+      const seen: string[] = [];
+      const dispose = registerOpPreflightOutcomeObserver((call) => seen.push(call.op));
+      await runOpPreflight({ op: 'demo:a', params: {}, source: 'pipeline' });
+      dispose();
+      await runOpPreflight({ op: 'demo:b', params: {}, source: 'pipeline' });
+      expect(seen).toEqual(['demo:a']);
+
+      registerOpPreflightOutcomeObserver((call) => seen.push(call.op));
+      resetOpPreflight();
+      await runOpPreflight({ op: 'demo:c', params: {}, source: 'pipeline' });
+      expect(seen).toEqual(['demo:a']);
     });
   });
 

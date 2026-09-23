@@ -74,6 +74,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 export {
   costTierForReasoningMode,
   detectVoicePowerSource,
+  isSpeculativeReplyRequested,
   resolveSpeculativePolicy,
   type VoiceCostTier,
   type VoicePowerSource,
@@ -466,7 +467,8 @@ export async function startRealtimeVoiceLoop(
   }
   if (
     speculativePolicy.disabled_reason === 'battery' ||
-    speculativePolicy.disabled_reason === 'metered'
+    speculativePolicy.disabled_reason === 'metered' ||
+    speculativePolicy.disabled_reason === 'power_unknown'
   ) {
     options.onEvent?.({
       kind: 'degraded',

@@ -61,8 +61,8 @@ import {
   costTierForReasoningMode,
   describeRealtimeVoiceLoopEvent,
   detectVoicePowerSource,
+  isSpeculativeReplyRequested,
   resolveRealtimeVoiceBargeInMode,
-  resolveSpeculativePolicy,
   startRealtimeVoiceLoop,
   type RealtimeVoiceBargeInMode,
   type VoiceCostTier,
@@ -745,7 +745,8 @@ export async function runRealtimeVoiceConversationLoop(
       speculativeReply: {
         ...(options.speculativeReply !== undefined ? { enabled: options.speculativeReply } : {}),
         // Probe power/cost only when speculation is actually requested (pmset is synchronous).
-        ...(resolveSpeculativePolicy({ option: options.speculativeReply, env: process.env }).enabled
+        // The probed values (not a fail-open default) are what let the loop's own guard enable it.
+        ...(isSpeculativeReplyRequested(options.speculativeReply, process.env)
           ? resolveSpeculativeReplyGuards()
           : {}),
       },

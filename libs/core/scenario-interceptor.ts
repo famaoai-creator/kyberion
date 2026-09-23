@@ -4,10 +4,10 @@
  * Installs, for one scenario run, every seam the runner needs and returns a
  * single disposer that restores the previous state:
  *  - an observe-only preflight listener (`scenario-capture`) that records
- *    each op reaching admission, plus a last-ordered never-deciding guard
- *    (`scenario-admission`) that marks the record `admitted` once every
- *    other listener and guard let the call through; neither can re-permit a
- *    block/ask;
+ *    each op reaching preflight, plus an outcome observer that marks the
+ *    record `admitted` once the op-preflight waterfall's final decision
+ *    (after every listener and guard, regardless of registration order) is
+ *    `allow`; the observer cannot itself change the decision;
  *  - the `scenario-op-override` seam: ops with a fixture are served by it,
  *    and in the `simulated` profile every other leaf op fails closed with
  *    `[SCENARIO_UNSTUBBED_OP]` (real actuators are never imported);
@@ -27,8 +27,8 @@ import {
 } from './actuator-op-registry.js';
 import { redactSensitiveObject } from './network.js';
 import {
-  registerOpGuard,
   registerOpPreflightListener,
+  registerOpPreflightOutcomeObserver,
   type OpPreflightCall,
 } from './op-preflight.js';
 import {
@@ -61,7 +61,6 @@ export type {
 } from './scenario-side-effect-log.js';
 
 export const SCENARIO_CAPTURE_LISTENER_ID = 'scenario-capture';
-export const SCENARIO_ADMISSION_GUARD_ID = 'scenario-admission';
 
 /**
  * Leaf ops that stay on their normal path in the simulated profile without a
@@ -227,17 +226,13 @@ export function installScenarioInterceptor(
       })
     );
 
-    // Guards run after every listener and the built-in approval guard, in
-    // order; reaching the last one means the call was admitted.
+    // The outcome observer fires once the op-preflight waterfall has a final
+    // decision for the call, independent of guard/listener registration
+    // order (see op-preflight.ts N6 fix); it only ever reads that decision.
     disposers.push(
-      registerOpGuard({
-        id: SCENARIO_ADMISSION_GUARD_ID,
-        order: Number.MAX_SAFE_INTEGER,
-        check: (call) => {
-          const record = preflightRecords.get(call);
-          if (record) record.admitted = true;
-          return undefined;
-        },
+      registerOpPreflightOutcomeObserver((call, result) => {
+        const record = preflightRecords.get(call);
+        if (record && result.decision === 'allow') record.admitted = true;
       })
     );
 
