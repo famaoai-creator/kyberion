@@ -1199,6 +1199,14 @@
       "audience": "operator"
     },
     {
+      "id": "script.scenario",
+      "script": "scenario",
+      "command": "scenario run",
+      "noun": "scenario",
+      "verb": "run",
+      "audience": "dev"
+    },
+    {
       "id": "script.plugin.install",
       "script": "plugin:install",
       "command": "plugin install",

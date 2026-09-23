@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/kyberion-scenario-report.schema.json",
+  "title": "Kyberion scenario report",
+  "description": "Result of one scenario run (kyberion-scenario-report.v1), produced by libs/core/scenario-report.ts. evidence_class is derived from the scenario's executionProfile; a 'simulated' report is never provider evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "title",
+    "run_id",
+    "lane",
+    "execution_profile",
+    "evidence_class",
+    "status",
+    "turns",
+    "final_checks",
+    "side_effects",
+    "started_at",
+    "finished_at",
+    "duration_ms",
+    "wall_ms"
+  ],
+  "properties": {
+    "schema_version": { "const": "kyberion-scenario-report.v1" },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "lane": { "enum": ["pr-deterministic", "live-only"] },
+    "execution_profile": { "enum": ["simulated", "provider-qualified"] },
+    "evidence_class": { "enum": ["simulated", "provider-qualified"] },
+    "status": { "enum": ["pass", "fail", "skipped", "lane_skipped", "error"] },
+    "reason": { "type": "string" },
+    "turns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "kind", "status", "checks", "duration_ms"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 0 },
+          "kind": { "enum": ["pipeline", "intent", "advance_clock", "approval_decision"] },
+          "status": { "enum": ["pass", "fail", "error"] },
+          "checks": { "type": "array", "items": { "$ref": "#/$defs/checkResult" } },
+          "duration_ms": { "type": "number", "minimum": 0 },
+          "error": { "type": "string" }
+        }
+      }
+    },
+    "final_checks": { "type": "array", "items": { "$ref": "#/$defs/checkResult" } },
+    "side_effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ops_applied",
+        "ops_unstubbed",
+        "approvals_requested",
+        "approvals_decided",
+        "writes",
+        "reasoning_calls"
+      ],
+      "properties": {
+        "ops_applied": { "type": "integer", "minimum": 0 },
+        "ops_unstubbed": { "type": "integer", "minimum": 0 },
+        "approvals_requested": { "type": "integer", "minimum": 0 },
+        "approvals_decided": { "type": "integer", "minimum": 0 },
+        "writes": { "type": "integer", "minimum": 0 },
+        "reasoning_calls": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "duration_ms": { "type": "number" },
+    "wall_ms": { "type": "number", "minimum": 0 }
+  },
+  "$defs": {
+    "checkResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "pass", "detail"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "pass": { "type": "boolean" },
+        "detail": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1473,13 +1473,13 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 22793,
+      "size": 23392,
       "type": "json"
     },
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 49264,
+      "size": 49440,
       "type": "json"
     },
     {
@@ -1587,7 +1587,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 147630,
+      "size": 148487,
       "type": "json"
     },
     {
@@ -6279,7 +6279,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 968543,
+      "size": 977502,
       "type": "json"
     },
     {
@@ -9187,9 +9187,15 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/kyberion-scenario-report.schema.json",
+      "tier": "public",
+      "size": 3230,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/kyberion-scenario.schema.json",
       "tier": "public",
-      "size": 10151,
+      "size": 10384,
       "type": "json"
     },
     {
@@ -10453,6 +10459,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/plugin-view-declaration.schema.json",
+      "tier": "public",
+      "size": 3626,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json",
       "tier": "public",
       "size": 2511,
@@ -10906,6 +10918,12 @@
       "path": "product/schemas/runtime-surface-manifest.schema.json",
       "tier": "public",
       "size": 1451,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/scenario-trajectory.schema.json",
+      "tier": "public",
+      "size": 2905,
       "type": "json"
     },
     {
