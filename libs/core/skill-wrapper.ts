@@ -20,6 +20,13 @@ import {
   type LoadedSkillPlugin,
 } from './skill-plugin-loader.js';
 import { currentScope } from './scope-context.js';
+import { derivePluginTrustLabel } from './plugin-source-trust.js';
+import {
+  createPluginGrantBinding,
+  EMPTY_PLUGIN_GRANT,
+  resolvePluginExecutionGrant,
+  type PluginGrantBinding,
+} from './plugin-grant-runtime.js';
 
 export interface SkillRunOptions {
   /** Project-local plugin configuration is consumed only after trust is explicit. */
@@ -142,6 +149,46 @@ export function runSkill<T>(skillName: string, fn: () => T): SkillOutput<T> {
 }
 
 /**
+ * EP-03: the grant a loaded plugin's beforeSkill/afterSkill hooks run under.
+ * Contribution modules reuse their activation's binding; plain hook modules
+ * resolve the same way (third-party => approved grant or deny-by-default,
+ * undeclared official => unwrapped). Any failure falls back to the empty grant.
+ */
+function skillPluginGrantBinding(plugin: LoadedSkillPlugin): PluginGrantBinding {
+  if (plugin.contributions) return plugin.contributions.grant;
+  const pluginId = path.basename(plugin.resolvedPath);
+  try {
+    const trust =
+      derivePluginTrustLabel(plugin.resolvedPath).label === 'official' ? 'official' : 'third-party';
+    const { grant } = resolvePluginExecutionGrant({
+      pluginId,
+      sourcePath: plugin.resolvedPath,
+      trust,
+    });
+    return createPluginGrantBinding(pluginId, grant);
+  } catch {
+    return createPluginGrantBinding(pluginId, EMPTY_PLUGIN_GRANT);
+  }
+}
+
+async function fireSkillPluginHookWithGrants(
+  hook: 'beforeSkill' | 'afterSkill',
+  plugins: LoadedSkillPlugin[],
+  bindings: Map<LoadedSkillPlugin, PluginGrantBinding>,
+  skillName: string,
+  payload: unknown
+): Promise<void> {
+  for (const plugin of plugins) {
+    let binding = bindings.get(plugin);
+    if (!binding) {
+      binding = skillPluginGrantBinding(plugin);
+      bindings.set(plugin, binding);
+    }
+    await binding.run(() => fireSkillPluginHook(hook, [plugin], skillName, payload));
+  }
+}
+
+/**
  * KD-06 wiring: loads plugins from `.kyberion-plugins.json` (if present)
  * through the trust + managed-copy-isolation gate in
  * `skill-plugin-loader.ts` before running the skill, and fires
@@ -181,10 +228,17 @@ async function runSkillWithPlugins<T>(
     );
   }
 
-  await fireSkillPluginHook('beforeSkill', plugins, skillName, process.argv.slice(2));
+  const bindings = new Map<LoadedSkillPlugin, PluginGrantBinding>();
+  await fireSkillPluginHookWithGrants(
+    'beforeSkill',
+    plugins,
+    bindings,
+    skillName,
+    process.argv.slice(2)
+  );
   try {
     const output = await wrapSkillAsync(skillName, fn);
-    await fireSkillPluginHook('afterSkill', plugins, skillName, output);
+    await fireSkillPluginHookWithGrants('afterSkill', plugins, bindings, skillName, output);
     return output;
   } finally {
     disposeSkillPluginContributions(plugins);

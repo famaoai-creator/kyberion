@@ -3238,6 +3238,14 @@
     "./plugin-permissions": {
       "types": "./dist/plugin-permissions.d.ts",
       "default": "./dist/plugin-permissions.js"
+    },
+    "./plugin-lifecycle": {
+      "types": "./dist/plugin-lifecycle.d.ts",
+      "default": "./dist/plugin-lifecycle.js"
+    },
+    "./plugin-grant-runtime": {
+      "types": "./dist/plugin-grant-runtime.d.ts",
+      "default": "./dist/plugin-grant-runtime.js"
     }
   },
   "dependencies": {

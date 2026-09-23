@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { withPluginExecutionFrame } from './sandbox-policy.js';
 import {
+  PLUGIN_GRANT_OPS_GUARD_ID,
   registerOpGuard,
   registerOpPreflightListener,
   resetOpPreflight,
@@ -149,6 +151,59 @@ describe('op preflight waterfall', () => {
       decision: 'allow',
       repaired_input: { admitted: true },
       input: { admitted: true },
+    });
+  });
+
+  describe('plugin-grant-ops guard (EP-03)', () => {
+    const frame = (ops: string[]) => ({
+      pluginId: 'grant-plugin',
+      grant: {
+        network: { mode: 'none' as const, hosts: [] },
+        fs: { mode: 'none' as const, paths: [] },
+        ops_invoke: ops,
+        env: [],
+        secrets: [],
+      },
+    });
+
+    it('blocks ops outside the executing plugin grant before any listener runs', async () => {
+      const seen: string[] = [];
+      registerOpPreflightListener({ id: 'observe', run: (call) => void seen.push(call.op) });
+      const result = await withPluginExecutionFrame(frame(['demo:allowed']), () =>
+        runOpPreflight({ op: 'demo:denied', params: {}, source: 'pipeline' })
+      );
+      expect(result).toMatchObject({
+        decision: 'block',
+        terminate: true,
+        guard_ids: [PLUGIN_GRANT_OPS_GUARD_ID],
+      });
+      expect(result.reason).toContain(
+        "[PLUGIN_GRANT_DENIED] plugin 'grant-plugin' is not granted ops_invoke 'demo:denied'"
+      );
+      expect(seen).toEqual([]);
+
+      const allowed = await withPluginExecutionFrame(frame(['demo:allowed']), () =>
+        runOpPreflight({ op: 'demo:allowed', params: {}, source: 'pipeline' })
+      );
+      expect(allowed.decision).toBe('allow');
+      expect(seen).toEqual(['demo:allowed']);
+    });
+
+    it("allows any op for '*', applies to the sync path, and survives resetOpPreflight", () => {
+      resetOpPreflight();
+      expect(
+        withPluginExecutionFrame(frame(['*']), () =>
+          runOpPreflightSync({ op: 'any:op', params: {}, source: 'actuator' })
+        ).decision
+      ).toBe('allow');
+      expect(
+        withPluginExecutionFrame(frame([]), () =>
+          runOpPreflightSync({ op: 'any:op', params: {}, source: 'actuator' })
+        ).decision
+      ).toBe('block');
+      expect(runOpPreflightSync({ op: 'any:op', params: {}, source: 'actuator' }).decision).toBe(
+        'allow'
+      );
     });
   });
 });

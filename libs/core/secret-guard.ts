@@ -16,6 +16,11 @@ import { RISKY_OPS } from './risky-op-ids.js';
 import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import {
+  assertPluginGrantAllows,
+  getPluginExecutionContext,
+  PluginGrantDeniedError,
+} from './sandbox-policy.js';
 
 /**
  * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
@@ -78,6 +83,17 @@ function isAuthGrant(value: unknown): value is AuthGrant {
     (record.serviceId === undefined || typeof record.serviceId === 'string') &&
     (record.authority === undefined || typeof record.authority === 'string')
   );
+}
+
+/**
+ * EP-03: inside a plugin contribution only granted secrets resolve. Connection
+ * documents are addressed as `connection:<serviceId>`. Minting auth grants is
+ * never available to plugin code.
+ */
+function assertPluginAuthGrantDenied(subject: string): void {
+  const context = getPluginExecutionContext();
+  if (context)
+    throw new PluginGrantDeniedError(context.pluginId, 'secrets', `auth-grant:${subject}`);
 }
 
 /**
@@ -191,6 +207,7 @@ export const grantAccess = (
   ttlMinutes = 15,
   isAuthority = false
 ): void => {
+  assertPluginAuthGrantDenied(serviceIdOrAuth);
   const grants = _loadGrants();
   const grant: AuthGrant = {
     missionId,
@@ -232,6 +249,7 @@ export const grantAccessGuarded = async (
     nonInteractive?: boolean;
   } = {}
 ): Promise<void> => {
+  assertPluginAuthGrantDenied(serviceIdOrAuth);
   const opId = isAuthority ? RISKY_OPS.AUTH_GRANT_AUTHORITY : RISKY_OPS.SECRET_GRANT_ACCESS;
   const decision = requireRiskyApproval({
     opId,
@@ -277,6 +295,7 @@ export const checkAuthority = (missionId: string, authority: string): boolean =>
  * Retrieve a secret value, enforcing temporal and intent-based gates.
  */
 export const getSecret = (key: string, scope?: string, operation?: string): string | null => {
+  assertPluginGrantAllows('secrets', key);
   const currentMission = getRegisteredEnvText('MISSION_ID');
   const authorizedScope = getRegisteredEnvText('AUTHORIZED_SCOPE');
 
@@ -361,6 +380,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
 };
 
 export const loadConnectionDocument = (serviceId: string): Record<string, any> => {
+  assertPluginGrantAllows('secrets', `connection:${serviceId}`);
   return _loadConnectionDocument(serviceId);
 };
 
@@ -369,6 +389,7 @@ export const storeConnectionDocument = (
   patch: Record<string, any>,
   options: { backup?: boolean; missionId?: string; actor?: string } = {}
 ): { path: string; changedKeys: string[] } => {
+  assertPluginGrantAllows('secrets', `connection:${serviceId}`);
   const fullPath = _connectionPath(serviceId);
   const existing = _loadConnectionDocument(serviceId);
   const next = { ...existing, ...patch };

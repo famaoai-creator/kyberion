@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assertPluginGrantAllows,
   assertSandboxNetworkAllowed,
   assertSandboxWriteAllowed,
+  getPluginExecutionContext,
+  intersectSandboxPolicies,
+  isSandboxNetworkHostAllowed,
+  withPluginExecutionFrame,
   requireSandboxEnforcement,
   resolveSandboxPolicy,
   toCodexSandboxPolicy,
@@ -122,5 +127,126 @@ describe('sandbox-policy (DH-11)', () => {
     expect(result.status).toBe('failed');
     expect(result.results[0]).toMatchObject({ status: 'failed' });
     expect(result.results[0]?.error).toContain('SANDBOX_NETWORK_DENIED');
+  });
+});
+
+describe('sandbox-policy network allowlist and intersection (EP-03)', () => {
+  const grant = (ops: string[]) => ({
+    network: { mode: 'none' as const, hosts: [] },
+    fs: { mode: 'none' as const, paths: [] },
+    ops_invoke: ops,
+    env: [],
+    secrets: [],
+  });
+
+  it('limits network access to allowlisted hosts and fails closed without a host', () => {
+    const policy = {
+      ...resolveSandboxPolicy({ mode: 'read-only', networkAccess: true }),
+      networkAllowlist: ['api.example.com', '*.cdn.example.com', '127.0.0.1', '::1'],
+    };
+    withSandboxPolicy(policy, () => {
+      expect(() => assertSandboxNetworkAllowed('https://api.example.com/v1')).not.toThrow();
+      expect(() => assertSandboxNetworkAllowed('https://a.cdn.example.com/x')).not.toThrow();
+      expect(() => assertSandboxNetworkAllowed('http://[::1]:8080/')).not.toThrow();
+      expect(() => assertSandboxNetworkAllowed('https://cdn.example.com/x')).toThrow(
+        '[SANDBOX_NETWORK_DENIED]'
+      );
+      expect(() => assertSandboxNetworkAllowed('https://evil.example.org')).toThrow(
+        '[SANDBOX_NETWORK_DENIED]'
+      );
+      expect(() => assertSandboxNetworkAllowed()).toThrow('[SANDBOX_NETWORK_DENIED]');
+      expect(() => assertSandboxNetworkAllowed('not a url')).toThrow('[SANDBOX_NETWORK_DENIED]');
+      expect(() => validateUrl('https://evil.example.org')).toThrow('SANDBOX_NETWORK_DENIED');
+      expect(isSandboxNetworkHostAllowed('api.example.com')).toBe(true);
+      expect(isSandboxNetworkHostAllowed('evil.example.org')).toBe(false);
+    });
+  });
+
+  it('never widens the outer policy on any axis', () => {
+    const readOnly = resolveSandboxPolicy({ mode: 'read-only', networkAccess: false });
+    const wide = {
+      ...resolveSandboxPolicy({
+        mode: 'workspace-write',
+        networkAccess: true,
+        writableRoots: ['/repo/knowledge/public'],
+      }),
+      networkAllowlist: ['*'],
+    };
+    expect(intersectSandboxPolicies(readOnly, wide)).toMatchObject({
+      mode: 'read-only',
+      networkAccess: false,
+    });
+
+    const outer = {
+      ...resolveSandboxPolicy({
+        mode: 'workspace-write',
+        networkAccess: true,
+        writableRoots: ['/repo/knowledge/public/a'],
+      }),
+      networkAllowlist: ['*.example.com'],
+    };
+    const inner = {
+      ...resolveSandboxPolicy({
+        mode: 'workspace-write',
+        networkAccess: true,
+        writableRoots: ['/repo/knowledge/public', '/repo/active'],
+      }),
+      networkAllowlist: ['api.example.com', 'other.org'],
+    };
+    const both = intersectSandboxPolicies(outer, inner);
+    expect(both).toMatchObject({
+      mode: 'workspace-write',
+      writableRoots: ['/repo/knowledge/public/a'],
+      networkAccess: true,
+      networkAllowlist: ['api.example.com'],
+    });
+
+    const disjoint = intersectSandboxPolicies(
+      outer,
+      resolveSandboxPolicy({ mode: 'workspace-write', writableRoots: ['/elsewhere'] })
+    );
+    expect(disjoint.mode).toBe('read-only');
+    expect(disjoint.networkAccess).toBe(false);
+
+    const noHosts = intersectSandboxPolicies(outer, {
+      ...inner,
+      networkAllowlist: ['other.org'],
+    });
+    expect(noHosts.networkAccess).toBe(false);
+    expect(noHosts.networkAllowlist).toBeUndefined();
+
+    const partial = resolveSandboxPolicy({ provider: 'agy', mode: 'read-only' });
+    expect(intersectSandboxPolicies(partial, readOnly).enforcement).toBe('partial');
+  });
+
+  it('danger-full-access outer adopts the inner restriction', () => {
+    const outer = resolveSandboxPolicy({ mode: 'danger-full-access', networkAccess: true });
+    const inner = resolveSandboxPolicy({
+      mode: 'workspace-write',
+      writableRoots: ['/repo/knowledge/public'],
+      networkAccess: false,
+    });
+    expect(intersectSandboxPolicies(outer, inner)).toMatchObject({
+      mode: 'workspace-write',
+      writableRoots: ['/repo/knowledge/public'],
+      networkAccess: false,
+    });
+  });
+
+  it('checks every enclosing plugin frame', () => {
+    expect(getPluginExecutionContext()).toBeUndefined();
+    expect(() => assertPluginGrantAllows('ops_invoke', 'x:y')).not.toThrow();
+    withPluginExecutionFrame({ pluginId: 'outer', grant: grant(['x:*']) }, () => {
+      expect(() => assertPluginGrantAllows('ops_invoke', 'x:y')).not.toThrow();
+      withPluginExecutionFrame({ pluginId: 'inner', grant: grant(['*']) }, () => {
+        expect(getPluginExecutionContext()?.chain.map((frame) => frame.pluginId)).toEqual([
+          'outer',
+          'inner',
+        ]);
+        expect(() => assertPluginGrantAllows('ops_invoke', 'z:y')).toThrow(
+          "[PLUGIN_GRANT_DENIED] plugin 'outer' is not granted ops_invoke 'z:y'"
+        );
+      });
+    });
   });
 });
