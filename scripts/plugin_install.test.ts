@@ -3,7 +3,13 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContext } from '@agent/core/authority';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { runPluginInstall } from './plugin_install.js';
 
 const cleanupPaths: string[] = [];
@@ -128,6 +134,80 @@ describe('plugin_install CLI', () => {
 
     expect(exitCode).toBe(1);
     expect(output.join('\n')).toContain('will never be loaded');
+  });
+
+  it('prints the requested/ceiling/granted permission table before the approval request', () => {
+    const managedRoot = managedRootDir('permissions');
+    const src = sourceDir('permissions');
+    safeMkdir(src, { recursive: true });
+    safeWriteFile(
+      path.join(src, 'plugin-manifest.json'),
+      JSON.stringify({
+        plugin_id: 'cli-permissions',
+        permissions: {
+          fs: { mode: 'readwrite', paths: [{ tier: 'public', prefix: 'docs' }] },
+          env: ['HOME'],
+        },
+      })
+    );
+    process.argv = [
+      'node',
+      'plugin_install.ts',
+      '--source',
+      src,
+      '--id',
+      `cli-permissions-${process.pid}-${randomUUID()}`,
+      '--managed-root',
+      managedRoot,
+    ];
+
+    const output: string[] = [];
+    const exitCode = runWithProcessArgs((value) => output.push(String(value)));
+
+    expect(exitCode).toBe(0);
+    const rendered = output.join('\n');
+    expect(rendered).toMatch(/capability\s+\| requested\s+\| ceiling\s+\| granted\s+\| narrowed/);
+    expect(rendered).toMatch(
+      /fs\s+\| readwrite \[public:docs\]\s+\| readonly \[public:\*\]\s+\| readonly \[public:docs\]\s+\| yes/
+    );
+    expect(rendered).toMatch(/env\s+\| HOME\s+\| none\s+\| none\s+\| yes/);
+    expect(rendered.indexOf('capability')).toBeLessThan(rendered.indexOf('Approval request id:'));
+    expect(rendered).toMatch(/Content digest: [a-f0-9]{64}/);
+  });
+
+  it('exits non-zero with the required elevation and installs nothing when a critical capability narrows to nothing', () => {
+    const managedRoot = managedRootDir('narrowed');
+    const src = sourceDir('narrowed');
+    safeMkdir(src, { recursive: true });
+    safeWriteFile(
+      path.join(src, 'plugin-manifest.json'),
+      JSON.stringify({
+        plugin_id: 'cli-narrowed',
+        permissions: { network: { mode: 'allowlist', hosts: ['api.example.com'] } },
+      })
+    );
+    process.argv = [
+      'node',
+      'plugin_install.ts',
+      '--source',
+      src,
+      '--id',
+      `cli-narrowed-${process.pid}-${randomUUID()}`,
+      '--managed-root',
+      managedRoot,
+    ];
+
+    const output: string[] = [];
+    const exitCode = runWithProcessArgs((value) => output.push(String(value)));
+
+    expect(exitCode).toBe(1);
+    const rendered = output.join('\n');
+    expect(rendered).toContain('no approval was requested');
+    expect(rendered).toContain(
+      "Required elevation: trust level 'third-party' must be allowed network"
+    );
+    expect(rendered).not.toContain('Approval request id:');
+    expect(safeExistsSync(managedRoot)).toBe(false);
   });
 
   it('connects the plugin CLI to the shared script printer', () => {

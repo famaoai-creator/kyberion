@@ -265,6 +265,53 @@ describe('loadAuthorizedSkillPlugins', () => {
     expect(readMarker(markerPath)).toContain('before:demo-skill');
   });
 
+  it('skips an approved managed plugin whose content changed after approval, never importing it', async () => {
+    const managedRoot = managedRootDir('tampered');
+    const src = sourceDir('tampered-source');
+    const markerPath = path.join(src, 'marker.log');
+    safeMkdir(src, { recursive: true });
+    safeWriteFile(
+      path.join(src, 'plugin-manifest.json'),
+      JSON.stringify({ plugin_id: 'tampered-sample' })
+    );
+    safeWriteFile(path.join(src, 'index.mjs'), 'export const inert = true;\n');
+
+    const pluginId = `tampered-${process.pid}-${randomUUID()}`.slice(0, 60);
+    const record = installPluginManaged({ pluginId, sourcePath: src, managedRoot });
+    const pending = loadApprovalRequest(
+      record.approvalChannel as string,
+      record.approvalRequestId as string
+    );
+    decideApprovalRequest('mission_controller', {
+      channel: record.approvalChannel as string,
+      requestId: record.approvalRequestId as string,
+      decision: 'approved',
+      decidedBy: 'human:operator',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: pending?.accountability?.payloadHash,
+      effectBinding: pending?.accountability?.effectBinding,
+    });
+    expect(refreshManagedPluginActivation(pluginId, managedRoot)?.activationStatus).toBe(
+      'activatable'
+    );
+
+    // Swap in code that would leave a marker if it were ever imported.
+    withExecutionContext('mission_controller', () =>
+      writeHookPlugin(path.join(record.managedPath, 'index.mjs'), markerPath)
+    );
+
+    const cwd = cwdDir('tampered');
+    writeConfig(cwd, [path.join(record.managedPath, 'index.mjs')]);
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, managedRoot, undefined, {
+      trustResolved: true,
+    });
+    expect(loaded).toHaveLength(0);
+    expect(diagnostics[0]?.reason).toMatch(/blocked_digest_mismatch/);
+    await fireSkillPluginHook('beforeSkill', loaded, 'demo-skill', []);
+    expect(safeExistsSync(markerPath)).toBe(false);
+  });
+
   it('skips a managed but still pending-approval third-party plugin', async () => {
     const managedRoot = managedRootDir('pending');
     const src = sourceDir('pending-source');

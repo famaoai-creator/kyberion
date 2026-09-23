@@ -13,6 +13,12 @@
  * cancel-defaulted human approval (via approval-store) before it may be
  * activated — installing (staging + listing) never itself requires
  * approval, only activation does.
+ *
+ * EP-01/EP-02: the approval is bound to the managed copy's content digest,
+ * the manifest version and the narrowed permission grant. Every activation
+ * check recomputes the digest and re-derives the grant; any drift yields
+ * `blocked_digest_mismatch`. Records written before digests existed are
+ * treated as `pending_approval` until re-installed and re-approved.
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -29,6 +35,28 @@ import {
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  isLegacyCoworkPermissionsBlock,
+  loadPluginPermissionPolicy,
+  narrowPluginPermissions,
+  parsePluginPermissionGrant,
+  parsePluginPermissionRequest,
+  permissionsDigest,
+  summarizePermissionDiff,
+  type NarrowPluginPermissionsResult,
+  type PluginPermissionGrant,
+  type PluginPermissionRequest,
+} from './plugin-permissions.js';
+import { isValidTenantSlug } from './foundation/scope.js';
+
+// Re-exported so install surfaces can render/handle narrowing through this
+// module's existing package export.
+export {
+  formatPermissionDiffTable,
+  PluginPermissionNarrowedError,
+  type PermissionDiffEntry,
+  type PluginPermissionGrant,
+} from './plugin-permissions.js';
+import {
   assertPluginAssetsContained,
   derivePluginTrustLabel,
   resolvePluginSourceRealPath,
@@ -43,6 +71,7 @@ import {
   safeLstat,
   safeMkdir,
   safeMoveSync,
+  safeReadFile,
   safeReaddir,
   safeRmSync,
   safeStat,
@@ -62,7 +91,8 @@ export interface PluginManifestInfo {
   raw: Record<string, unknown>;
 }
 
-export type PluginActivationStatus = 'activatable' | 'pending_approval' | 'blocked_broken_manifest';
+export type PluginActivationStatus =
+  'activatable' | 'pending_approval' | 'blocked_broken_manifest' | 'blocked_digest_mismatch';
 
 export interface ManagedPluginRecord {
   pluginId: string;
@@ -76,6 +106,20 @@ export interface ManagedPluginRecord {
   approvalChannel?: string;
   approvalRequestId?: string;
   installedAt: string;
+  /** EP-01: sha256 over the managed copy (absent only on legacy records). */
+  contentDigest?: string;
+  manifestVersion?: string | null;
+  /** EP-02: grant narrowed at install time; bound into the approval hash. */
+  grantedPermissions?: PluginPermissionGrant;
+  permissionsDigest?: string;
+  /** Tenant whose confidential scope the grant was narrowed against. */
+  tenantSlug?: string;
+}
+
+export interface PluginPermissionPreview extends NarrowPluginPermissionsResult {
+  pluginId: string;
+  trust: PluginTrustLabel;
+  request: PluginPermissionRequest;
 }
 
 export interface InstallPluginManagedParams {
@@ -88,6 +132,14 @@ export interface InstallPluginManagedParams {
   requestedBy?: string;
   approvalChannel?: string;
   missionId?: string;
+  /** Tenant used to scope confidential fs grants (other tenants are always denied). */
+  tenantSlug?: string;
+  /**
+   * Called with the requested/ceiling/granted diff after narrowing and
+   * before any approval request is created. Never called when narrowing
+   * throws `PluginPermissionNarrowedError` (nothing is installed then).
+   */
+  onPermissionsResolved?: (preview: PluginPermissionPreview) => void;
 }
 
 const MANAGED_RECORD_FILENAME = '.kyberion-managed-plugin.json';
@@ -102,6 +154,7 @@ const MANIFEST_CANDIDATE_RELATIVE_PATHS = [
   'plugin.json',
 ];
 const DEFAULT_APPROVAL_CHANNEL = 'plugin-install';
+const SHA256_HEX = /^[a-f0-9]{64}$/;
 
 function defaultManagedRoot(): string {
   return pathResolver.shared('plugins/managed');
@@ -249,11 +302,92 @@ function stagePluginDirectory(sourceRoot: string, destRoot: string): void {
   copyDir(sourceRoot, destRoot);
 }
 
-function pluginApprovalCorrelationId(pluginId: string, resolvedSourcePath: string): string {
+/**
+ * EP-01: sha256 over `relative/path\0sha256(content)\n` entries of every
+ * regular file in the managed copy, sorted by codepoint of the POSIX
+ * relative path. The managed record file itself is excluded. Symlinks and
+ * special files are rejected (the managed copy never contains them).
+ */
+export function computePluginContentDigest(managedPath: string): string {
+  const root = path.resolve(managedPath);
+  const entries: string[] = [];
+  const walk = (dir: string, relDir: string): void => {
+    for (const name of safeReaddir(dir)) {
+      const absolute = path.join(dir, name);
+      const relative = relDir ? `${relDir}/${name}` : name;
+      if (relative === MANAGED_RECORD_FILENAME) continue;
+      const stat = safeLstat(absolute);
+      if (stat.isSymbolicLink()) {
+        throw new Error(`[POLICY_VIOLATION] Managed plugin copy contains a symlink: ${relative}`);
+      }
+      if (stat.isDirectory()) {
+        walk(absolute, relative);
+        continue;
+      }
+      if (!stat.isFile()) {
+        throw new Error(
+          `[POLICY_VIOLATION] Managed plugin copy contains a special file: ${relative}`
+        );
+      }
+      const content = safeReadFile(absolute, { encoding: null }) as Buffer;
+      entries.push(`${relative}\0${createHash('sha256').update(content).digest('hex')}\n`);
+    }
+  };
+  walk(root, '');
+  const hash = createHash('sha256');
+  for (const entry of entries.sort(codepointCompare)) hash.update(entry, 'utf8');
+  return hash.digest('hex');
+}
+
+/**
+ * Reads the EP-02 request from a parsed manifest. A Cowork v1 descriptive
+ * `permissions` block is not an EP-02 declaration and yields deny-by-default.
+ * Throws `[PLUGIN_PERMISSIONS_INVALID]` for a malformed declaration.
+ */
+function manifestPermissionRequest(manifest: PluginManifestInfo): {
+  request: PluginPermissionRequest;
+  legacyBlockIgnored: boolean;
+} {
+  const declared = manifest.raw.permissions;
+  if (isLegacyCoworkPermissionsBlock(declared)) {
+    return { request: parsePluginPermissionRequest(undefined), legacyBlockIgnored: true };
+  }
+  return { request: parsePluginPermissionRequest(declared), legacyBlockIgnored: false };
+}
+
+interface PluginApprovalBinding {
+  pluginId: string;
+  trust: PluginTrustLabel;
+  resolvedSourcePath: string;
+  contentDigest: string;
+  manifestVersion: string | null;
+  permissionsDigest: string;
+}
+
+function pluginApprovalCorrelationId(binding: PluginApprovalBinding): string {
   return createHash('sha256')
-    .update(`${pluginId}::${resolvedSourcePath}`)
+    .update(
+      [
+        binding.pluginId,
+        binding.resolvedSourcePath,
+        binding.contentDigest,
+        binding.manifestVersion ?? '',
+        binding.permissionsDigest,
+      ].join('::')
+    )
     .digest('hex')
     .slice(0, 32);
+}
+
+function pluginApprovalPayloadHash(binding: PluginApprovalBinding): string {
+  return computeApprovalPayloadHash({
+    plugin_id: binding.pluginId,
+    trust: binding.trust,
+    resolved_source_path: binding.resolvedSourcePath,
+    content_digest: binding.contentDigest,
+    manifest_version: binding.manifestVersion,
+    permissions_digest: binding.permissionsDigest,
+  });
 }
 
 function pluginApprovalEffectBinding(pluginId: string): string {
@@ -267,20 +401,16 @@ function pluginApprovalEffectBinding(pluginId: string): string {
  * `decideApprovalRequest` (approval-gate.ts's `enforceApprovalGate` pattern).
  */
 function ensurePluginApprovalRequest(params: {
-  pluginId: string;
-  trust: PluginTrustLabel;
-  resolvedSourcePath: string;
+  binding: PluginApprovalBinding;
+  permissionSummary: string;
   requestedBy?: string;
   channel: string;
   missionId?: string;
 }): ApprovalRequestRecord {
-  const correlationId = pluginApprovalCorrelationId(params.pluginId, params.resolvedSourcePath);
-  const payloadHash = computeApprovalPayloadHash({
-    plugin_id: params.pluginId,
-    trust: params.trust,
-    resolved_source_path: params.resolvedSourcePath,
-  });
-  const effectBinding = pluginApprovalEffectBinding(params.pluginId);
+  const { pluginId, trust, resolvedSourcePath } = params.binding;
+  const correlationId = pluginApprovalCorrelationId(params.binding);
+  const payloadHash = pluginApprovalPayloadHash(params.binding);
+  const effectBinding = pluginApprovalEffectBinding(pluginId);
 
   const existing = listApprovalRequests({ storageChannels: [params.channel] }).find(
     (request) =>
@@ -298,9 +428,14 @@ function ensurePluginApprovalRequest(params: {
     correlationId,
     requestedBy,
     draft: {
-      title: `Approve third-party plugin activation: ${params.pluginId}`,
-      summary: `Plugin '${params.pluginId}' was sourced from outside this repository's plugins/ tree (trust=${params.trust}) and defaults to cancelled until a human approves activation.`,
-      details: `Resolved source path: ${params.resolvedSourcePath}`,
+      title: `Approve third-party plugin activation: ${pluginId}`,
+      summary: `Plugin '${pluginId}' was sourced from outside this repository's plugins/ tree (trust=${trust}) and defaults to cancelled until a human approves activation. Permissions granted: ${params.permissionSummary}`,
+      details: [
+        `Resolved source path: ${resolvedSourcePath}`,
+        `Content digest: ${params.binding.contentDigest}`,
+        `Manifest version: ${params.binding.manifestVersion ?? '(none)'}`,
+        `Permissions digest: ${params.binding.permissionsDigest}`,
+      ].join('\n'),
       severity: 'medium',
     },
     kind: 'channel-approval',
@@ -320,13 +455,20 @@ function ensurePluginApprovalRequest(params: {
   });
 }
 
+type PluginIntegrity = 'verified' | 'legacy' | 'mismatch';
+
 function resolveActivationStatus(params: {
   diagnostics: PluginManifestDiagnostic[];
   trust: PluginTrustLabel;
+  integrity: PluginIntegrity;
   approval?: ApprovalRequestRecord;
 }): PluginActivationStatus {
   if (params.diagnostics.some((d) => d.severity === 'error')) return 'blocked_broken_manifest';
+  if (params.integrity === 'mismatch') return 'blocked_digest_mismatch';
+  // Official provenance needs no approval (its digest is recorded, not approved).
   if (params.trust === 'official') return 'activatable';
+  // Legacy non-official records (no digest) must be re-installed and re-approved.
+  if (params.integrity === 'legacy') return 'pending_approval';
   return params.approval?.status === 'approved' ? 'activatable' : 'pending_approval';
 }
 
@@ -403,6 +545,11 @@ function parseManagedPluginRecord(value: unknown, managedDir: string): ManagedPl
     'approvalChannel',
     'approvalRequestId',
     'installedAt',
+    'contentDigest',
+    'manifestVersion',
+    'grantedPermissions',
+    'permissionsDigest',
+    'tenantSlug',
   ]);
   if (Object.keys(record).some((key) => !expectedKeys.has(key))) {
     throw new Error('managed plugin record contains unknown fields');
@@ -434,7 +581,8 @@ function parseManagedPluginRecord(value: unknown, managedDir: string): ManagedPl
   if (
     record.activationStatus !== 'activatable' &&
     record.activationStatus !== 'pending_approval' &&
-    record.activationStatus !== 'blocked_broken_manifest'
+    record.activationStatus !== 'blocked_broken_manifest' &&
+    record.activationStatus !== 'blocked_digest_mismatch'
   ) {
     throw new Error('managed plugin record activation status invalid');
   }
@@ -457,6 +605,47 @@ function parseManagedPluginRecord(value: unknown, managedDir: string): ManagedPl
     throw new Error('managed plugin record missing manifest diagnostic');
   }
 
+  // EP-01/EP-02 integrity fields are all-or-nothing; absent = legacy record.
+  const integrityKeys = [
+    'contentDigest',
+    'manifestVersion',
+    'grantedPermissions',
+    'permissionsDigest',
+  ] as const;
+  const presentIntegrityKeys = integrityKeys.filter((key) => record[key] !== undefined);
+  let integrity:
+    | Pick<
+        ManagedPluginRecord,
+        'contentDigest' | 'manifestVersion' | 'grantedPermissions' | 'permissionsDigest'
+      >
+    | undefined;
+  if (presentIntegrityKeys.length > 0) {
+    if (presentIntegrityKeys.length !== integrityKeys.length) {
+      throw new Error('managed plugin record integrity binding incomplete');
+    }
+    if (
+      typeof record.contentDigest !== 'string' ||
+      !SHA256_HEX.test(record.contentDigest) ||
+      typeof record.permissionsDigest !== 'string' ||
+      !SHA256_HEX.test(record.permissionsDigest) ||
+      (record.manifestVersion !== null && typeof record.manifestVersion !== 'string')
+    ) {
+      throw new Error('managed plugin record integrity binding invalid');
+    }
+    integrity = {
+      contentDigest: record.contentDigest,
+      manifestVersion: record.manifestVersion as string | null,
+      grantedPermissions: parsePluginPermissionGrant(record.grantedPermissions),
+      permissionsDigest: record.permissionsDigest,
+    };
+  }
+  if (
+    record.tenantSlug !== undefined &&
+    (typeof record.tenantSlug !== 'string' || !isValidTenantSlug(record.tenantSlug))
+  ) {
+    throw new Error('managed plugin record tenantSlug invalid');
+  }
+
   return {
     pluginId,
     trust: record.trust,
@@ -473,31 +662,75 @@ function parseManagedPluginRecord(value: unknown, managedDir: string): ManagedPl
         }
       : {}),
     installedAt: record.installedAt,
+    ...(integrity ?? {}),
+    ...(typeof record.tenantSlug === 'string' ? { tenantSlug: record.tenantSlug } : {}),
+  };
+}
+
+function approvalBindingOf(record: ManagedPluginRecord): PluginApprovalBinding | undefined {
+  if (!record.contentDigest || !record.permissionsDigest || record.manifestVersion === undefined) {
+    return undefined;
+  }
+  return {
+    pluginId: record.pluginId,
+    trust: record.trust,
+    resolvedSourcePath: record.resolvedSourcePath,
+    contentDigest: record.contentDigest,
+    manifestVersion: record.manifestVersion,
+    permissionsDigest: record.permissionsDigest,
   };
 }
 
 function loadBoundPluginApproval(record: ManagedPluginRecord): ApprovalRequestRecord | undefined {
   if (!record.approvalChannel || !record.approvalRequestId) return undefined;
+  const binding = approvalBindingOf(record);
+  if (!binding) return undefined;
   const approval = loadApprovalRequest(record.approvalChannel, record.approvalRequestId);
   if (!approval) return undefined;
-  if (
-    approval.correlationId !==
-    pluginApprovalCorrelationId(record.pluginId, record.resolvedSourcePath)
-  ) {
+  if (approval.correlationId !== pluginApprovalCorrelationId(binding)) {
     return undefined;
   }
   if (
-    approval.accountability?.payloadHash !==
-      computeApprovalPayloadHash({
-        plugin_id: record.pluginId,
-        trust: record.trust,
-        resolved_source_path: record.resolvedSourcePath,
-      }) ||
+    approval.accountability?.payloadHash !== pluginApprovalPayloadHash(binding) ||
     approval.accountability?.effectBinding !== pluginApprovalEffectBinding(record.pluginId)
   ) {
     return undefined;
   }
   return approval;
+}
+
+/**
+ * Re-derives everything the approval is bound to from the managed copy on
+ * disk: content digest, manifest version and the narrowed grant (current
+ * policy, verified trust, recorded tenant). Any drift or any error while
+ * re-deriving is a mismatch — fail closed.
+ */
+function verifyManagedPluginIntegrity(record: ManagedPluginRecord): PluginIntegrity {
+  if (
+    !record.contentDigest ||
+    !record.permissionsDigest ||
+    !record.grantedPermissions ||
+    record.manifestVersion === undefined
+  ) {
+    return 'legacy';
+  }
+  try {
+    if (computePluginContentDigest(record.managedPath) !== record.contentDigest) return 'mismatch';
+    if (permissionsDigest(record.grantedPermissions) !== record.permissionsDigest) {
+      return 'mismatch';
+    }
+    const { manifest, diagnostics } = readPluginManifestSafely(record.managedPath);
+    if (!manifest || diagnostics.some((d) => d.severity === 'error')) return 'mismatch';
+    if ((manifest.version ?? null) !== record.manifestVersion) return 'mismatch';
+    const { granted } = narrowPluginPermissions(
+      manifestPermissionRequest(manifest).request,
+      loadPluginPermissionPolicy(),
+      { trust: record.trust, ...(record.tenantSlug ? { tenantSlug: record.tenantSlug } : {}) }
+    );
+    return permissionsDigest(granted) === record.permissionsDigest ? 'verified' : 'mismatch';
+  } catch {
+    return 'mismatch';
+  }
 }
 
 function verifyManagedPluginActivation(record: ManagedPluginRecord): ManagedPluginRecord {
@@ -517,11 +750,13 @@ function verifyManagedPluginActivation(record: ManagedPluginRecord): ManagedPlug
     }
   }
   const verified = { ...record, trust, trustReason };
+  const brokenManifest = verified.diagnostics.some((d) => d.severity === 'error');
   return {
     ...verified,
     activationStatus: resolveActivationStatus({
       diagnostics: verified.diagnostics,
       trust,
+      integrity: brokenManifest ? 'legacy' : verifyManagedPluginIntegrity(verified),
       approval: loadBoundPluginApproval(verified),
     }),
   };
@@ -573,6 +808,10 @@ export function installPluginManaged(params: InstallPluginManagedParams): Manage
   // caller's ambient role (mirrors approval-store's own `withRole` usage).
   return withExecutionContext('mission_controller', () => {
     const pluginId = normalizePluginId(params.pluginId);
+    const tenantSlug = params.tenantSlug?.trim() || undefined;
+    if (tenantSlug !== undefined && !isValidTenantSlug(tenantSlug)) {
+      throw new Error(`[POLICY_VIOLATION] Invalid tenant slug: ${params.tenantSlug}`);
+    }
     const managedRoot = resolveManagedRoot(params.managedRoot);
     const managedDir = assertSafeRepositoryPath(path.join(managedRoot, pluginId), {
       allowMissingLeaf: true,
@@ -593,16 +832,64 @@ export function installPluginManaged(params: InstallPluginManagedParams): Manage
     // Manifest is only ever JSON.parse'd — never required/imported/executed.
     const { manifest, diagnostics } = readPluginManifestSafely(stagingDir);
 
+    // EP-02: narrow declared permissions before anything lands in the
+    // managed tree. A malformed declaration is a broken manifest; a critical
+    // capability narrowed to nothing aborts the install (nothing is staged).
+    let request = parsePluginPermissionRequest(undefined);
+    if (manifest) {
+      try {
+        const resolved = manifestPermissionRequest(manifest);
+        request = resolved.request;
+        if (resolved.legacyBlockIgnored) {
+          diagnostics.push({
+            code: 'manifest_legacy_permissions_ignored',
+            message:
+              "Manifest 'permissions' uses the Cowork v1 descriptive shape; it is not an EP-02 declaration, so no runtime permissions are granted.",
+            severity: 'warning',
+          });
+        }
+      } catch (err: unknown) {
+        diagnostics.push({
+          code: 'manifest_invalid_permissions',
+          message: err instanceof Error ? err.message : String(err),
+          severity: 'error',
+        });
+      }
+    }
+    const brokenManifest = diagnostics.some((d) => d.severity === 'error');
+    let narrowed: NarrowPluginPermissionsResult;
+    try {
+      narrowed = narrowPluginPermissions(
+        brokenManifest ? parsePluginPermissionRequest(undefined) : request,
+        loadPluginPermissionPolicy(),
+        { trust: trust.label, ...(tenantSlug ? { tenantSlug } : {}) }
+      );
+    } catch (err) {
+      safeRmSync(stagingDir);
+      throw err;
+    }
+    if (!brokenManifest) {
+      params.onPermissionsResolved?.({ pluginId, trust: trust.label, request, ...narrowed });
+    }
+
     safeMkdir(managedRoot, { recursive: true });
     if (safeExistsSync(managedDir)) safeRmSync(managedDir);
     safeMoveSync(stagingDir, managedDir);
 
+    const binding: PluginApprovalBinding = {
+      pluginId,
+      trust: trust.label,
+      resolvedSourcePath: trust.resolvedSourcePath,
+      contentDigest: computePluginContentDigest(managedDir),
+      manifestVersion: manifest?.version ?? null,
+      permissionsDigest: permissionsDigest(narrowed.granted),
+    };
+
     let approval: ApprovalRequestRecord | undefined;
-    if (trust.label !== 'official' && !diagnostics.some((d) => d.severity === 'error')) {
+    if (trust.label !== 'official' && !brokenManifest) {
       approval = ensurePluginApprovalRequest({
-        pluginId,
-        trust: trust.label,
-        resolvedSourcePath: trust.resolvedSourcePath,
+        binding,
+        permissionSummary: summarizePermissionDiff(narrowed.diff),
         requestedBy: params.requestedBy,
         channel: approvalChannel,
         missionId: params.missionId,
@@ -617,10 +904,20 @@ export function installPluginManaged(params: InstallPluginManagedParams): Manage
       managedPath: managedDir,
       manifest,
       diagnostics,
-      activationStatus: resolveActivationStatus({ diagnostics, trust: trust.label, approval }),
+      activationStatus: resolveActivationStatus({
+        diagnostics,
+        trust: trust.label,
+        integrity: 'verified',
+        approval,
+      }),
       approvalChannel: approval ? approvalChannel : undefined,
       approvalRequestId: approval?.id,
       installedAt: nowIso(),
+      contentDigest: binding.contentDigest,
+      manifestVersion: binding.manifestVersion,
+      grantedPermissions: narrowed.granted,
+      permissionsDigest: binding.permissionsDigest,
+      ...(tenantSlug ? { tenantSlug } : {}),
     };
     writeManagedRecord(managedDir, record);
     return record;
@@ -640,21 +937,24 @@ export function refreshManagedPluginActivation(
   const managedDir = assertSafeRepositoryPath(path.join(root, normalizePluginId(pluginId)), {
     allowMissingLeaf: true,
   });
+  // readManagedRecord re-verifies trust, content/permission digests and the
+  // bound approval; only persist when the verified status differs.
   const record = readManagedRecord(managedDir);
   if (!record) return null;
-  if (record.activationStatus === 'blocked_broken_manifest') return record;
-  if (record.trust === 'official' || !record.approvalRequestId || !record.approvalChannel)
-    return record;
+  let persistedStatus: PluginActivationStatus | undefined;
+  try {
+    persistedStatus = loadManagedPluginRecordAtPath(
+      path.join(managedDir, MANAGED_RECORD_FILENAME),
+      managedDir
+    ).activationStatus;
+  } catch {
+    persistedStatus = undefined;
+  }
+  if (persistedStatus === record.activationStatus) return record;
 
-  const approval = loadApprovalRequest(record.approvalChannel, record.approvalRequestId);
-  const nextStatus: PluginActivationStatus =
-    approval?.status === 'approved' ? 'activatable' : 'pending_approval';
-  if (nextStatus === record.activationStatus) return record;
-
-  const updated: ManagedPluginRecord = { ...record, activationStatus: nextStatus };
   return withExecutionContext('mission_controller', () => {
-    writeManagedRecord(managedDir, updated);
-    return updated;
+    writeManagedRecord(managedDir, record);
+    return record;
   });
 }
 
@@ -705,6 +1005,7 @@ export function listManagedPlugins(managedRoot?: string): ManagedPluginRecord[] 
       activationStatus: resolveActivationStatus({
         diagnostics: effectiveDiagnostics,
         trust: 'third-party',
+        integrity: 'legacy',
       }),
       installedAt: '',
     });
