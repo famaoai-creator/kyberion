@@ -122,6 +122,18 @@ describe('scenario fixture reasoning backend (ES-04)', () => {
     expect(getReasoningBackend()).toBe(prior);
   });
 
+  it('restores the stub-taint registry that unbinding the prior backend cleared', async () => {
+    resetReasoningBackend();
+    await stubReasoningBackend.delegateTask('tainted before the scenario');
+    const prior = { ...stubReasoningBackend, name: 'prior-backend' } as ReasoningBackend;
+    registerReasoningBackend(prior, { provenance: 'builtin', source: 'test' });
+
+    const dispose = installScenarioFixtureBackend(scenario(), createScenarioSideEffectLog());
+    dispose();
+    expect(getStubServedOps().map((entry) => entry.op)).toEqual(['delegateTask']);
+    expect(getReasoningBackend()).toBe(prior);
+  });
+
   it('binds on an empty seam and leaves it empty after dispose', () => {
     const dispose = installScenarioFixtureBackend(scenario(), createScenarioSideEffectLog());
     expect(getReasoningBackend().name).toBe(SCENARIO_FIXTURE_BACKEND_NAME);

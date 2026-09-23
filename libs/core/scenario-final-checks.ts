@@ -6,9 +6,9 @@
  * can be re-derived from the same evidence. Each pipeline op produces two
  * preflight records (source 'actuator' from adf-engine admission and
  * 'pipeline' from leaf dispatch); "called" therefore counts fixture-served
- * `apply` records, and for fixture-less passthrough ops the `pipeline`
- * preflight record — but never an invocation that failed closed
- * (`unstubbed`) or was held for approval.
+ * `apply` records, and for fixture-less passthrough ops the admitted
+ * `pipeline` preflight record — but never an invocation that failed closed
+ * (`unstubbed`), was held for approval, or was blocked by any guard.
  */
 
 import * as path from 'node:path';
@@ -42,14 +42,10 @@ function inWindow(seq: number, window?: ScenarioSeqWindow): boolean {
   return !window || (seq >= window.fromSeq && seq < window.toSeq);
 }
 
-function heldForApproval(record: ScenarioOpRecord): boolean {
-  return record.requiresApproval === true && record.approvalGranted !== true;
-}
-
 /**
  * Op invocations that actually executed: fixture-served `apply` records, plus
- * `pipeline`-source preflight records of passthrough ops (no following
- * apply/unstubbed record for the same op, not held for approval).
+ * admitted `pipeline`-source preflight records of passthrough ops (no
+ * following apply/unstubbed record for the same op).
  */
 export function calledOpRecords(
   log: ScenarioSideEffectLog,
@@ -64,7 +60,7 @@ export function calledOpRecords(
       called.push(record);
       return;
     }
-    if (record.stage !== 'preflight' || record.source !== 'pipeline' || heldForApproval(record)) {
+    if (record.stage !== 'preflight' || record.source !== 'pipeline' || record.admitted !== true) {
       return;
     }
     const next = records.slice(index + 1).find((candidate) => candidate.op === record.op);

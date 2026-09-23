@@ -2,9 +2,9 @@
  * ES-03: isolated scenario run context.
  *
  * Each scenario run gets its own root directory
- * (`active/shared/tmp/scenarios/<run-id>`), a deterministic id derived from
- * the scenario id (so re-running the same scenario reproduces the same run
- * id and content-addressed sub-ids), and a virtual clock started at the
+ * (`active/shared/tmp/scenarios/<run-id>-<nonce>`), a deterministic id derived
+ * from the scenario id (so re-running the same scenario reproduces the same
+ * run id and content-addressed sub-ids), and a virtual clock started at the
  * scenario's seed clock (or a fixed epoch when unspecified). The
  * interceptor/runner (later waves) build their observation and fixture
  * lookups on top of this context.
@@ -21,6 +21,20 @@ import type { ScenarioDefinition } from './scenario-definition.js';
 /** Deterministic default start time for scenarios that don't declare seed.clock.start_iso. */
 const FIXED_EPOCH_MS = Date.UTC(2020, 0, 1);
 
+let rootInvocationCounter = 0;
+
+/**
+ * The run id stays deterministic for reports and derived ids, but the root
+ * is per invocation: a rerun never sees a previous run's files and two
+ * concurrent runs of one scenario never share (or delete) a root.
+ */
+function invocationNonce(): string {
+  rootInvocationCounter += 1;
+  return `${process.pid.toString(36)}-${rootInvocationCounter.toString(36)}-${crypto
+    .randomBytes(4)
+    .toString('hex')}`;
+}
+
 export interface ScenarioRunContextOptions {
   /** Distinguishes concurrent runs of the same scenario id; defaults to 'default'. */
   seedNonce?: string;
@@ -32,11 +46,12 @@ export interface ScenarioRunContextOptions {
 
 export interface ScenarioRunContext {
   readonly runId: string;
+  /** Per-invocation root (`scenarios/<runId>-<nonce>`), never shared between runs. */
   readonly runRoot: string;
   /** Deterministic UUID-shaped id, stable for the same (runId, namespace, n) triple. */
   deterministicId(namespace: string, n: number | string): string;
   readonly clock: VirtualClock;
-  /** Write seed.files under runRoot, creating runRoot if needed. */
+  /** Reset runRoot to empty, then write seed.files under it. */
   materializeSeedFiles(): void;
   /** Remove runRoot unless `keep` was set. */
   dispose(): void;
@@ -87,7 +102,7 @@ export function createScenarioRunContext(
   const runId = computeRunId(def.id, options.seedNonce);
   const runRoot = options.rootOverride
     ? pathResolver.resolve(options.rootOverride)
-    : pathResolver.sharedTmp(`scenarios/${runId}`);
+    : pathResolver.sharedTmp(`scenarios/${runId}-${invocationNonce()}`);
 
   const startMs = def.seed.clock?.start_iso
     ? parseIso(def.seed.clock.start_iso).getTime()
@@ -95,6 +110,7 @@ export function createScenarioRunContext(
   const clock = createVirtualClock(startMs);
 
   function materializeSeedFiles(): void {
+    if (safeExistsSync(runRoot)) safeRmSync(runRoot);
     ensureDir(runRoot);
     for (const file of def.seed.files ?? []) {
       const target = assertContainedUnderRoot(runRoot, file.path);

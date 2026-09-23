@@ -68,6 +68,8 @@ export interface RunScenarioOptions {
   lane?: ScenarioLane;
   /** Keep the run root after the run (debugging). */
   keep?: boolean;
+  /** Receives the absolute per-invocation run root (e.g. to report a kept root). */
+  onRunRoot?: (runRoot: string) => void;
   /** Build the trajectory and hand it to `onTrajectory`. */
   exportTrajectory?: boolean;
   onTrajectory?: (trajectory: TrajectoryRecord) => void;
@@ -169,6 +171,19 @@ interface TurnOutcome {
   error?: string;
 }
 
+/** Run every disposer even if an earlier one throws; returns the first failure. */
+function disposeAll(disposers: ReadonlyArray<() => void>): { error: unknown } | undefined {
+  let first: { error: unknown } | undefined;
+  for (const dispose of disposers) {
+    try {
+      dispose();
+    } catch (error) {
+      first ??= { error };
+    }
+  }
+  return first;
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -251,6 +266,7 @@ export async function runScenario(
   }
 
   const ctx = createScenarioRunContext(def, { seedNonce: options.seedNonce, keep: options.keep });
+  options.onRunRoot?.(ctx.runRoot);
   const startedAtMs = ctx.clock.now();
   const turns: ScenarioTurnReport[] = [];
   const finalChecks: ScenarioCheckResult[] = [];
@@ -323,8 +339,11 @@ export async function runScenario(
     reason = errorText(error);
   } finally {
     finishedAtMs = ctx.clock.now();
-    interceptor?.dispose();
-    disposeClock?.();
+    const failure = disposeAll([() => interceptor?.dispose(), () => disposeClock?.()]);
+    if (failure) {
+      ctx.dispose();
+      throw failure.error;
+    }
   }
 
   try {

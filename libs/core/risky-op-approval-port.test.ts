@@ -38,4 +38,18 @@ describe('risky-op-approval-port', () => {
     expect(requireRiskyApproval({} as never)).toEqual({ allowed: false, status: 'pending' });
     disposeCanonical();
   });
+
+  it('falls through to the canonical handler when the override does not answer', () => {
+    const canonical = () => ({ allowed: false, status: 'pending' as const, message: 'canonical' });
+    const disposeCanonical = registerRiskyApprovalHandler(canonical);
+    const disposeOverride = overrideRiskyApprovalHandler(() => undefined);
+
+    expect(requireRiskyApproval({} as never)).toEqual({
+      allowed: false,
+      status: 'pending',
+      message: 'canonical',
+    });
+    disposeOverride();
+    disposeCanonical();
+  });
 });

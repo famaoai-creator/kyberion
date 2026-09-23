@@ -11,7 +11,12 @@
 
 import * as crypto from 'node:crypto';
 import type { ReasoningBackend } from './reasoning-backend-contracts.js';
-import { registerReasoningBackend, resetReasoningBackend } from './reasoning-backend.js';
+import {
+  registerReasoningBackend,
+  resetReasoningBackend,
+  restoreStubServedOps,
+  snapshotStubServedOps,
+} from './reasoning-backend.js';
 import { coreSeamCatalog } from './seam.js';
 import type { ScenarioDefinition } from './scenario-definition.js';
 import { appendScenarioReasoning, type ScenarioSideEffectLog } from './scenario-side-effect-log.js';
@@ -144,8 +149,9 @@ export function createScenarioFixtureBackend(
 /**
  * Bind the fixture backend as the active reasoning backend. A backend that
  * was already bound is unbound for the run and re-bound (same implementation
- * and metadata) by the returned disposer. Note: unbinding goes through
- * `resetReasoningBackend()`, which also clears the stub-taint registry.
+ * and metadata) by the returned disposer. Unbinding goes through
+ * `resetReasoningBackend()`, which also clears the process-wide stub-taint
+ * registry, so the registry is snapshotted first and restored on dispose.
  */
 export function installScenarioFixtureBackend(
   def: ScenarioDefinition,
@@ -153,9 +159,11 @@ export function installScenarioFixtureBackend(
 ): () => void {
   const seam = coreSeamCatalog.get<ReasoningBackend>('reasoning-backend');
   const prior = seam?.list()[0];
+  const stubTaint = prior ? snapshotStubServedOps() : undefined;
   if (prior) {
     resetReasoningBackend();
     if ((seam?.list().length ?? 0) > 0) {
+      restoreStubServedOps(stubTaint ?? []);
       throw new Error(
         '[SCENARIO_BACKEND_BUSY] the active reasoning backend could not be unbound for the scenario run'
       );
@@ -171,7 +179,11 @@ export function installScenarioFixtureBackend(
   return () => {
     if (disposed) return;
     disposed = true;
-    unregister();
-    if (prior) registerReasoningBackend(prior.implementation, prior.metadata);
+    try {
+      unregister();
+      if (prior) registerReasoningBackend(prior.implementation, prior.metadata);
+    } finally {
+      if (stubTaint) restoreStubServedOps(stubTaint);
+    }
   };
 }
