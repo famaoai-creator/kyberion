@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
-  "generated_at": "2026-09-23T08:26:54.127Z",
+  "generated_at": "2026-09-23T21:21:00.312Z",
   "scan_roots": [
     "libs/core",
     "libs/shared-ui",
@@ -15,6 +15,7 @@
     "libs/actuators/build-actuator",
     "libs/actuators/calendar-actuator",
     "libs/actuators/code-actuator",
+    "libs/actuators/compute-actuator",
     "libs/actuators/deployment-actuator",
     "libs/actuators/email-actuator",
     "libs/actuators/file-actuator",
@@ -126,7 +127,7 @@
     "scripts/process_portal_inbox.ts": 5,
     "scripts/refactor/mission-controller-router.ts": 3,
     "scripts/register_workflow.ts": 4,
-    "scripts/run_realtime_voice_conversation.ts": 10,
+    "scripts/run_realtime_voice_conversation.ts": 6,
     "scripts/task_smoke.ts": 7,
     "scripts/test-insession.ts": 1,
     "scripts/virtual_office.ts": 41,
