@@ -79,6 +79,7 @@ export abstract class BaseComputeDriver implements ComputeDriver {
     const requested =
       artifactNames && artifactNames.length > 0 ? artifactNames : (state.artifacts ?? []);
     const collected: string[] = [];
+    const missing: string[] = [];
 
     // Ensure target destination directory exists
     safeMkdir(targetPath, { recursive: true });
@@ -91,9 +92,14 @@ export abstract class BaseComputeDriver implements ComputeDriver {
         safeCopyFileSync(art, destFile);
         collected.push(baseName);
       } else {
-        // Record artifact reference
-        collected.push(path.basename(art));
+        missing.push(path.basename(art));
       }
+    }
+
+    if (missing.length > 0 && collected.length === 0) {
+      throw new Error(
+        `[${this.providerId}] Cannot collect artifacts for job '${jobId}': none of the requested artifacts exist yet (status: ${state.status}, missing: ${missing.join(', ')})`
+      );
     }
 
     return {
