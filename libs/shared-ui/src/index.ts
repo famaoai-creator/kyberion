@@ -64,7 +64,15 @@ export {
 } from './components/data.js';
 export { DisplayControls, type DisplayControlsProps } from './components/display.js';
 export { KB_DISPLAY_CONTROLS_ACTIONS } from '../vanilla/kyberion-ui.js';
-export { Badge, Callout, EmptyState, Skeleton, StatusPill } from './components/feedback.js';
+export {
+  Badge,
+  Callout,
+  EmptyState,
+  Skeleton,
+  StatusPill,
+  type CalloutProps,
+  type EmptyStateProps,
+} from './components/feedback.js';
 export {
   Grid,
   NextAction,

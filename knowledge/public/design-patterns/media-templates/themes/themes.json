@@ -17,8 +17,8 @@
         "danger": "#b91c1c"
       },
       "fonts": {
-        "heading": "Inter, 'Noto Sans JP', sans-serif",
-        "body": "Inter, 'Noto Sans JP', sans-serif"
+        "heading": "Inter, \"Hiragino Sans\", \"Noto Sans JP\", \"Yu Gothic UI\", \"Meiryo\", system-ui, sans-serif",
+        "body": "Inter, \"Hiragino Sans\", \"Noto Sans JP\", \"Yu Gothic UI\", \"Meiryo\", system-ui, sans-serif"
       },
       "assets": {
         "logo_url": "/assets/logos/kyberion-logo.png"
@@ -41,8 +41,8 @@
         "danger": "#f87171"
       },
       "fonts": {
-        "heading": "Inter, 'Noto Sans JP', sans-serif",
-        "body": "Inter, 'Noto Sans JP', sans-serif"
+        "heading": "Inter, \"Hiragino Sans\", \"Noto Sans JP\", \"Yu Gothic UI\", \"Meiryo\", system-ui, sans-serif",
+        "body": "Inter, \"Hiragino Sans\", \"Noto Sans JP\", \"Yu Gothic UI\", \"Meiryo\", system-ui, sans-serif"
       }
     },
     "executive-neutral": {

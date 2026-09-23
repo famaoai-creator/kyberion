@@ -1829,12 +1829,17 @@ function layoutSequence(p, env) {
   if (lanes.length === 0 || messages.length === 0) return emptyChart('sequence', p, env);
   const compact = p.density === 'compact';
   const hasAt = messages.some((m) => m.at !== undefined && m.at !== null && m.at !== '');
+  const hasStatus = messages.some((m) => statusToneOf(m.status));
   const gutter = hasAt
     ? Math.min(96, Math.max(...messages.map((m) => textWidth(str(m.at), TICK_FONT)))) + 16
     : 8;
   const laneW = 160;
   const headH = 30;
-  const rowH = compact ? 36 : 46;
+  // A status pill sits below the arrow (y+13) and the next row's label sits
+  // above its arrow (y+rowH-9); the base compact row height leaves the two
+  // close enough to visually overlap once a status label is present, so rows
+  // get extra vertical room whenever any message carries a status.
+  const rowH = (compact ? 36 : 46) + (hasStatus ? 10 : 0);
   const top = 8;
   const W = gutter + laneW * lanes.length + 8;
   const firstRow = top + headH + 30;
@@ -1971,7 +1976,6 @@ function layoutSequence(p, env) {
     participants: lanes.length,
   });
   const title = titleOf(p);
-  const hasStatus = messages.some((m) => statusToneOf(m.status));
   const headers = [
     ...(hasAt ? [env.t(KB_CHART_MESSAGE_KEYS.tableTime)] : []),
     env.t(KB_CHART_MESSAGE_KEYS.tableFrom),
