@@ -155,7 +155,14 @@ describe('memory-promotion-queue', () => {
     const updated = updateMemoryPromotionCandidateStatus({
       candidateId: queued.candidate_id,
       status: 'approved',
+      knowledgeDomain: 'organization',
       ratificationNote: 'Validated by governance reviewer',
+      curation: {
+        title: 'Incident containment flow',
+        summary: 'Reusable flow for incident containment.',
+        content: 'Document the incident containment flow and required decision points.',
+        evidence_refs: queued.evidence_refs,
+      },
     });
     expect(updated?.status).toBe('approved');
     expect(updated?.ratified_at).toBeTruthy();
@@ -174,7 +181,14 @@ describe('memory-promotion-queue', () => {
     const approved = updateMemoryPromotionCandidateStatus({
       candidateId: queued.candidate_id,
       status: 'approved',
+      knowledgeDomain: 'organization',
       ratificationNote: 'Validated by governance reviewer',
+      curation: {
+        title: 'Incident containment flow',
+        summary: 'Reusable flow for incident containment.',
+        content: 'Document the incident containment flow and required decision points.',
+        evidence_refs: queued.evidence_refs,
+      },
       decidedBy: { kind: 'human', id: 'user:owner-1', display_name: 'Owner One', role: 'owner' },
     });
     expect(approved?.decided_by).toEqual({
@@ -195,7 +209,14 @@ describe('memory-promotion-queue', () => {
     const legacyApproved = updateMemoryPromotionCandidateStatus({
       candidateId: legacyQueued.candidate_id,
       status: 'approved',
+      knowledgeDomain: 'organization',
       ratificationNote: 'Validated without a decided_by.',
+      curation: {
+        title: 'Incident flow',
+        summary: 'Reusable incident response flow.',
+        content: 'Describe the reusable steps for incident response.',
+        evidence_refs: legacyQueued.evidence_refs,
+      },
     });
     expect(legacyApproved?.decided_by).toBeUndefined();
   });

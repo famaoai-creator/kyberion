@@ -238,6 +238,9 @@ export interface MissionControllerRoutingContext {
     candidateId: string,
     note?: string,
     tenantSlug?: string,
+    knowledgeDomain?: import('@agent/core/memory-promotion-queue').MemoryKnowledgeDomain,
+    ownerNhi?: string,
+    curationJson?: string,
     decidedBy?: HumanDecidedBy,
     print?: Print
   ) => void;
@@ -945,6 +948,10 @@ export async function runMissionControllerAction(
         arg1!,
         getValue('--note', context.argv),
         getValue('--tenant-slug', context.argv),
+        getValue('--knowledge-domain', context.argv) as
+          import('@agent/core/memory-promotion-queue').MemoryKnowledgeDomain | undefined,
+        getValue('--owner-nhi', context.argv),
+        getValue('--curation-json', context.argv),
         decidedBy,
         context.print
       );

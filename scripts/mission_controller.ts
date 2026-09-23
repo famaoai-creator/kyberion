@@ -828,8 +828,8 @@ Queue Commands:
                                  Show readiness, blockers, and physical duplicate count
   memory-review <CANDIDATE_ID> [--tenant-slug <SLUG>] [--json]
                                  Show summary, target, evidence, scope, audit, and next action
-  memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
-                                 Approve only when review preflight is clear
+  memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--knowledge-domain product|organization|personal] [--owner-nhi <NHI>] [--curation-json <JSON>] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
+                                 Curate mission knowledge and approve only when review preflight is clear
   memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>] [--decided-by user:<member-id>] [--decided-by-name <TEXT>] [--decided-by-role <owner|approver|viewer>]
                                  Mark a memory candidate as rejected
   memory-promote <CANDIDATE_ID> [--tenant-slug <SLUG>] [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]

@@ -31,10 +31,10 @@
       }
     },
     "purpose_map": {
-      "distill":   "heavy",
-      "validate":  "standard",
+      "distill": "heavy",
+      "validate": "standard",
       "summarize": "light",
-      "classify":  "light"
+      "classify": "light"
     },
     "default_profile": "standard"
   },
@@ -44,7 +44,7 @@
       "trigger": "mission_completion",
       "action": "distill_mission",
       "target_tier": "confidential",
-      "output_dir": "knowledge/product/evolution"
+      "output_dir": "mission-local/evidence"
     },
     {
       "id": "RULE-W002",

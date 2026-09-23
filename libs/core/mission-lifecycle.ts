@@ -22,7 +22,10 @@ import {
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
 import { latestSnapshot } from './intent-snapshot-store.js';
-import { queueMissionMemoryPromotionCandidate } from './memory-promotion-queue.js';
+import {
+  listMemoryPromotionCandidates,
+  queueMissionMemoryPromotionCandidate,
+} from './memory-promotion-queue.js';
 import { summarizeReviewGateVerdicts } from './mission-review-gates.js';
 import {
   assertSafeRepositoryPath,
@@ -977,16 +980,21 @@ export async function finishMission(
     const memoryEvidenceRefs = memorySummary
       ? [...evidence.map((item) => item.ref), safeMemoryPath]
       : evidence.map((item) => item.ref);
-    const queued = queueMissionMemoryPromotionCandidate({
-      missionId: upperId,
-      missionType: state.mission_type,
-      tier: state.tier,
-      summary:
-        memorySummary ||
-        state.outcome_contract?.requested_result ||
-        `Mission ${upperId} completed and yielded reusable operational memory.`,
-      evidenceRefs: memoryEvidenceRefs,
-    });
+    const existingCandidate = listMemoryPromotionCandidates()
+      .filter((candidate) => candidate.source_ref === `mission:${upperId}`)
+      .find((candidate) => candidate.scope?.tenant_slug === state.tenant_slug);
+    const queued =
+      existingCandidate ||
+      queueMissionMemoryPromotionCandidate({
+        missionId: upperId,
+        missionType: state.mission_type,
+        tier: state.tier,
+        summary:
+          memorySummary ||
+          state.outcome_contract?.requested_result ||
+          `Mission ${upperId} completed and yielded reusable operational memory.`,
+        evidenceRefs: memoryEvidenceRefs,
+      });
     if (memorySummary) updateMissionMemorySidecar(safeMemoryPath, queued.candidate_id);
     logger.info(
       `🧠 [MEMORY_PROMOTION] queued candidate ${queued.candidate_id} (${queued.proposed_memory_kind}).`
