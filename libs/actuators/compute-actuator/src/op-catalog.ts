@@ -59,15 +59,17 @@ export function describeOps(): ActuatorOpDescription[] {
         type: 'object',
         properties: {
           job_id: { type: 'string' },
-          target_path: { type: 'string' },
+          target_path: {
+            type: 'string',
+            description:
+              'Target destination directory path where artifacts will be collected and stored.',
+          },
           artifact_names: { type: 'array', items: { type: 'string' } },
         },
         required: ['job_id', 'target_path'],
         additionalProperties: false,
       },
-      examples: [
-        { job_id: 'job-fine-tune-001', target_path: 'active/shared/artifacts/model_weights.bin' },
-      ],
+      examples: [{ job_id: 'job-fine-tune-001', target_path: 'active/shared/artifacts/' }],
     },
     {
       op: 'cancel_job',

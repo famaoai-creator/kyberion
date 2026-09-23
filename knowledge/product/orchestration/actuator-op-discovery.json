@@ -5360,7 +5360,8 @@
                 "type": "string"
               },
               "target_path": {
-                "type": "string"
+                "type": "string",
+                "description": "Target destination directory path where artifacts will be collected and stored."
               },
               "artifact_names": {
                 "type": "array",
@@ -5375,7 +5376,7 @@
           "examples": [
             {
               "job_id": "job-fine-tune-001",
-              "target_path": "active/shared/artifacts/model_weights.bin"
+              "target_path": "active/shared/artifacts/"
             }
           ]
         },
