@@ -15,12 +15,18 @@ describe('mission-team-brief-composer request briefing', () => {
     expect(brief.review_design.review_mode).toBeTruthy();
     expect(brief.team_plan.assignments.length).toBeGreaterThan(0);
     expect(brief.team_governance?.lifecycle.max_members).toBeGreaterThan(0);
-    expect(brief.recommended_optional_roles).toContain('experience_designer');
+    // experience_designer is an optional roster role on the development
+    // template, so it appears as an optional assignment rather than a
+    // recommendation (recommendations only cover roles not already planned).
     expect(brief.recommended_optional_roles).not.toContain('operator');
     expect(brief.recommended_optional_roles).not.toContain('surface_liaison');
     const teamRoles = brief.team_plan.assignments.map((entry) => entry.team_role);
     expect(teamRoles).toContain('operator');
     expect(teamRoles).toContain('surface_liaison');
+    expect(
+      brief.team_plan.assignments.find((entry) => entry.team_role === 'experience_designer')
+        ?.required
+    ).toBe(false);
     expect(brief.missing_inputs).toEqual([]);
   });
 

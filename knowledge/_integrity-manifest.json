@@ -2631,7 +2631,7 @@
     {
       "path": "product/governance/mission-classification-policy.json",
       "tier": "public",
-      "size": 25280,
+      "size": 25927,
       "type": "json"
     },
     {
@@ -2679,7 +2679,7 @@
     {
       "path": "product/governance/mission-review-gate-registry.json",
       "tier": "public",
-      "size": 7693,
+      "size": 7785,
       "type": "json"
     },
     {
@@ -2697,7 +2697,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 209210,
+      "size": 236869,
       "type": "json"
     },
     {
@@ -5121,7 +5121,7 @@
     {
       "path": "product/orchestration/mission-team-templates.json",
       "tier": "public",
-      "size": 6157,
+      "size": 6180,
       "type": "json"
     },
     {
@@ -9771,7 +9771,7 @@
     {
       "path": "product/schemas/mission-workflow-catalog.schema.json",
       "tier": "public",
-      "size": 6214,
+      "size": 6955,
       "type": "json"
     },
     {

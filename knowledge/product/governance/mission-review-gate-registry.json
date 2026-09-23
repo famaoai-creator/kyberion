@@ -21,7 +21,11 @@
       "required_in_modes": ["strict"],
       "applies_to": {
         "delivery_shapes": ["cross_system_change", "multi_artifact_pipeline"],
-        "workflow_patterns": ["coordinated_multi_track_execution", "stage_gated_delivery"]
+        "workflow_patterns": [
+          "coordinated_multi_track_execution",
+          "stage_gated_delivery",
+          "creative_assembly_loop"
+        ]
       }
     },
     {
@@ -108,7 +112,7 @@
       "id": "mode-strict-stage-gated",
       "review_mode": "strict",
       "match": {
-        "workflow_patterns": ["stage_gated_delivery"]
+        "workflow_patterns": ["stage_gated_delivery", "creative_assembly_loop"]
       }
     },
     {

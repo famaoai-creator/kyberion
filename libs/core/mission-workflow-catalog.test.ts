@@ -238,13 +238,17 @@ describe('mission-workflow-catalog', () => {
       'audience_definition',
       'story_design',
       'content_drafting',
-      'design_selection',
       'review',
-      'production_delivery',
+      'scratch_render',
+      'artifact_evaluation',
+      'repair',
+      'promotion',
+      'delivery',
     ]);
-    expect(workflow.phase_specs?.length).toBe(6);
-    expect(workflow.phase_specs?.[4]?.kind).toBe('review');
-    expect(workflow.phase_specs?.[5]?.exit_gate?.id).toBe('PRESENTATION_APPROVAL_GATE');
+    expect(workflow.phase_specs?.length).toBe(9);
+    expect(workflow.phase_specs?.[3]?.kind).toBe('review');
+    expect(workflow.phase_specs?.[5]?.kind).toBe('review');
+    expect(workflow.phase_specs?.[8]?.exit_gate?.id).toBe('PRESENTATION_APPROVAL_GATE');
   });
 
   it('routes the presentation_production mission-type hint onto the deck process', () => {
