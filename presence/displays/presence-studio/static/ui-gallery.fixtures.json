@@ -1,0 +1,1648 @@
+{
+  "version": 1,
+  "catalog": "kyberion-base",
+  "sample_screen": {
+    "title": "サンプル画面",
+    "description": "app-shell に主要コンポーネントを組み合わせた画面例です。",
+    "root": "shell",
+    "components": [
+      {
+        "id": "shell",
+        "type": "ui:app-shell",
+        "props": {
+          "role": "presence-studio"
+        },
+        "children": ["nav", "header", "hero", "metrics", "body"]
+      },
+      {
+        "id": "nav",
+        "type": "ui:nav-rail",
+        "props": {
+          "label": "メインメニュー",
+          "items": [
+            {
+              "id": "home",
+              "label": "ホーム",
+              "hint": "今日の状況",
+              "href": "#home",
+              "icon": "home"
+            },
+            {
+              "id": "ask",
+              "label": "頼む",
+              "hint": "話す・書く",
+              "href": "#ask",
+              "icon": "chat"
+            },
+            {
+              "id": "decide",
+              "label": "決める",
+              "hint": "承認・例外",
+              "href": "#decide",
+              "icon": "approval",
+              "active": true
+            },
+            {
+              "id": "progress",
+              "label": "進み具合",
+              "hint": "進行中・できたもの",
+              "href": "#progress",
+              "icon": "mission"
+            },
+            {
+              "id": "help",
+              "label": "使い方を見る",
+              "hint": "練習と手引き",
+              "href": "#help",
+              "icon": "help"
+            }
+          ],
+          "footer_items": [
+            {
+              "id": "settings",
+              "label": "設定",
+              "href": "#settings",
+              "icon": "settings"
+            }
+          ]
+        }
+      },
+      {
+        "id": "header",
+        "type": "ui:page-header",
+        "props": {
+          "title": "決める",
+          "subtitle": "あなたの判断を待っている依頼と、止まっている作業です。",
+          "role_badge": {
+            "label": "相棒",
+            "role": "presence-studio"
+          },
+          "actions": [
+            {
+              "label": "履歴を見る",
+              "href": "#history",
+              "variant": "ghost"
+            },
+            {
+              "label": "更新",
+              "action": {
+                "id": "gallery.refresh"
+              },
+              "variant": "secondary"
+            }
+          ]
+        }
+      },
+      {
+        "id": "hero",
+        "type": "ui:next-action",
+        "props": {
+          "eyebrow": "次にやること",
+          "title": "10月分の外注見積(48万円)を承認してください",
+          "reason": "期限は今日 17:00 です。承認すると発注ミッションがそのまま進みます。",
+          "primary": {
+            "label": "内容を確認して承認",
+            "action": {
+              "id": "gallery.approve",
+              "payload": {
+                "request": "APR-2026-0412"
+              }
+            }
+          },
+          "secondary": {
+            "label": "あとで",
+            "action": {
+              "id": "gallery.snooze"
+            }
+          },
+          "state": "ready"
+        }
+      },
+      {
+        "id": "metrics",
+        "type": "ui:grid",
+        "props": {
+          "gap": "md",
+          "min_column_width": "xs"
+        },
+        "children": ["m1", "m2", "m3", "m4"]
+      },
+      {
+        "id": "m1",
+        "type": "ui:metric",
+        "props": {
+          "label": "承認待ち",
+          "value": 4,
+          "unit": "件",
+          "delta": "昨日より +2",
+          "trend": "up",
+          "tone": "warning"
+        }
+      },
+      {
+        "id": "m2",
+        "type": "ui:metric",
+        "props": {
+          "label": "進行中のミッション",
+          "value": 12,
+          "unit": "件",
+          "delta": "変化なし",
+          "trend": "flat",
+          "tone": "info"
+        }
+      },
+      {
+        "id": "m3",
+        "type": "ui:metric",
+        "props": {
+          "label": "今週の完了",
+          "value": 27,
+          "unit": "件",
+          "delta": "先週より +5",
+          "trend": "up",
+          "tone": "success"
+        }
+      },
+      {
+        "id": "m4",
+        "type": "ui:metric",
+        "props": {
+          "label": "要対応の例外",
+          "value": 1,
+          "unit": "件",
+          "delta": "先週より -3",
+          "trend": "down",
+          "tone": "danger"
+        }
+      },
+      {
+        "id": "body",
+        "type": "ui:stack",
+        "props": {
+          "gap": "lg"
+        },
+        "children": ["side-callout", "approvals", "side"]
+      },
+      {
+        "id": "approvals",
+        "type": "ui:section",
+        "props": {
+          "title": "承認待ちの依頼",
+          "description": "期限の近い順に並んでいます。",
+          "actions": [
+            {
+              "label": "すべて見る",
+              "href": "#all",
+              "variant": "ghost"
+            }
+          ]
+        },
+        "children": ["approvals-table"]
+      },
+      {
+        "id": "approvals-table",
+        "type": "ui:table",
+        "props": {
+          "columns": [
+            {
+              "key": "id",
+              "label": "依頼ID",
+              "mono": true,
+              "width": "14ch"
+            },
+            {
+              "key": "title",
+              "label": "内容"
+            },
+            {
+              "key": "requester",
+              "label": "依頼者"
+            },
+            {
+              "key": "due",
+              "label": "期限",
+              "align": "end"
+            },
+            {
+              "key": "status",
+              "label": "状態"
+            }
+          ],
+          "rows": [
+            {
+              "id": "APR-2026-0412",
+              "title": "外注見積(10月分)の承認",
+              "requester": "経理チーム",
+              "due": "今日 17:00",
+              "status": "pending"
+            },
+            {
+              "id": "APR-2026-0409",
+              "title": "新規取引先の与信確認",
+              "requester": "営業企画",
+              "due": "明日",
+              "status": "needs_clarification"
+            },
+            {
+              "id": "APR-2026-0405",
+              "title": "週次レポートの公開",
+              "requester": "広報エージェント",
+              "due": "9/26",
+              "status": "review"
+            },
+            {
+              "id": "APR-2026-0398",
+              "title": "サーバー更新の実施",
+              "requester": "運用エージェント",
+              "due": "9/24",
+              "status": "blocked"
+            },
+            {
+              "id": "APR-2026-0391",
+              "title": "議事録の配布",
+              "requester": "秘書エージェント",
+              "due": "完了",
+              "status": "completed"
+            }
+          ]
+        }
+      },
+      {
+        "id": "side",
+        "type": "ui:grid",
+        "props": {
+          "gap": "lg",
+          "min_column_width": "lg"
+        },
+        "children": ["side-timeline", "side-empty"]
+      },
+      {
+        "id": "side-callout",
+        "type": "ui:callout",
+        "props": {
+          "tone": "warning",
+          "title": "メール連携の再認証が必要です",
+          "body": "48時間以内に再認証しないと、受信トリアージが止まります。",
+          "action": {
+            "label": "再認証する",
+            "action": {
+              "id": "gallery.reauth"
+            }
+          }
+        }
+      },
+      {
+        "id": "side-timeline",
+        "type": "ui:section",
+        "props": {
+          "title": "最近の動き"
+        },
+        "children": ["timeline"]
+      },
+      {
+        "id": "timeline",
+        "type": "ui:list",
+        "props": {
+          "variant": "timeline",
+          "items": [
+            {
+              "title": "発注ミッションを作成しました",
+              "meta": "09:12 · 相棒",
+              "status": "active"
+            },
+            {
+              "title": "見積書を受け取りました",
+              "meta": "08:40 · メール",
+              "status": "done"
+            },
+            {
+              "title": "与信確認で追加情報を依頼",
+              "meta": "昨日 18:05 · 営業企画",
+              "status": "needs_clarification"
+            }
+          ]
+        }
+      },
+      {
+        "id": "side-empty",
+        "type": "ui:empty-state",
+        "props": {
+          "title": "止まっている作業はありません",
+          "body": "例外が起きたら、ここに理由と次の一手を表示します。"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "page-header",
+      "title": "ページヘッダ ui:page-header",
+      "description": "役割バッジは surface-roles.json の role_ja を表示します。",
+      "components": [
+        {
+          "id": "ph1",
+          "type": "ui:page-header",
+          "props": {
+            "title": "進み具合",
+            "subtitle": "進行中のミッションと、できあがったもの。",
+            "role_badge": {
+              "label": "CEO秘書",
+              "role": "concierge"
+            },
+            "actions": [
+              {
+                "label": "新しく頼む",
+                "href": "#ask",
+                "variant": "primary"
+              }
+            ]
+          }
+        },
+        {
+          "id": "ph2",
+          "type": "ui:page-header",
+          "props": {
+            "title": "ミッション運用",
+            "role_badge": {
+              "label": "ミッション運用",
+              "role": "chronos-mirror-v2"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "tabs",
+      "title": "タブ ui:tabs",
+      "description": "wrap(折り返し)と menu(横スクロール)。href ありはリンク、なしは tablist。",
+      "components": [
+        {
+          "id": "tabs-root",
+          "type": "ui:stack",
+          "props": {
+            "gap": "md"
+          },
+          "children": ["tabs1", "tabs2"]
+        },
+        {
+          "id": "tabs1",
+          "type": "ui:tabs",
+          "props": {
+            "active": "waiting",
+            "items": [
+              {
+                "id": "waiting",
+                "label": "承認待ち",
+                "count": 4
+              },
+              {
+                "id": "exceptions",
+                "label": "例外",
+                "count": 1
+              },
+              {
+                "id": "done",
+                "label": "判断済み",
+                "count": 32
+              }
+            ]
+          }
+        },
+        {
+          "id": "tabs2",
+          "type": "ui:tabs",
+          "props": {
+            "active": "m2",
+            "overflow": "menu",
+            "items": [
+              {
+                "id": "m1",
+                "label": "概要",
+                "href": "#m1"
+              },
+              {
+                "id": "m2",
+                "label": "タスク",
+                "href": "#m2",
+                "count": 8
+              },
+              {
+                "id": "m3",
+                "label": "成果物",
+                "href": "#m3"
+              },
+              {
+                "id": "m4",
+                "label": "証跡",
+                "href": "#m4"
+              },
+              {
+                "id": "m5",
+                "label": "レビュー",
+                "href": "#m5"
+              },
+              {
+                "id": "m6",
+                "label": "設定",
+                "href": "#m6"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout",
+      "title": "レイアウト ui:stack / ui:grid",
+      "description": "grid は auto-fit(列数指定も可)、stack は縦横と折り返し。",
+      "components": [
+        {
+          "id": "lay-root",
+          "type": "ui:stack",
+          "props": {
+            "gap": "lg"
+          },
+          "children": ["lay-grid", "lay-hstack"]
+        },
+        {
+          "id": "lay-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 3,
+            "gap": "md"
+          },
+          "children": ["lay-g1", "lay-g2", "lay-g3"]
+        },
+        {
+          "id": "lay-g1",
+          "type": "ui:section",
+          "props": {
+            "title": "列 1",
+            "description": "columns: 3"
+          }
+        },
+        {
+          "id": "lay-g2",
+          "type": "ui:section",
+          "props": {
+            "title": "列 2",
+            "description": "狭い画面では 1 列"
+          }
+        },
+        {
+          "id": "lay-g3",
+          "type": "ui:section",
+          "props": {
+            "title": "列 3",
+            "description": "gap: md"
+          }
+        },
+        {
+          "id": "lay-hstack",
+          "type": "ui:stack",
+          "props": {
+            "direction": "horizontal",
+            "wrap": true,
+            "gap": "sm"
+          },
+          "children": ["lay-b1", "lay-b2", "lay-b3"]
+        },
+        {
+          "id": "lay-b1",
+          "type": "ui:badge",
+          "props": {
+            "label": "横並び",
+            "tone": "accent"
+          }
+        },
+        {
+          "id": "lay-b2",
+          "type": "ui:badge",
+          "props": {
+            "label": "wrap: true"
+          }
+        },
+        {
+          "id": "lay-b3",
+          "type": "ui:badge",
+          "props": {
+            "label": "gap: sm"
+          }
+        }
+      ]
+    },
+    {
+      "id": "section",
+      "title": "セクション ui:section",
+      "description": "カードの基本形。tone は枠線色だけを変えます。",
+      "components": [
+        {
+          "id": "sec-grid",
+          "type": "ui:grid",
+          "props": {
+            "gap": "md",
+            "min_column_width": "sm"
+          },
+          "children": ["sec-n", "sec-a", "sec-s", "sec-w", "sec-d"]
+        },
+        {
+          "id": "sec-n",
+          "type": "ui:section",
+          "props": {
+            "title": "標準",
+            "description": "tone なし"
+          },
+          "children": ["sec-n-t"]
+        },
+        {
+          "id": "sec-n-t",
+          "type": "ui:text",
+          "props": {
+            "text": "本文はここに入ります。",
+            "variant": "muted"
+          }
+        },
+        {
+          "id": "sec-a",
+          "type": "ui:section",
+          "props": {
+            "title": "強調",
+            "description": "tone: accent",
+            "tone": "accent"
+          }
+        },
+        {
+          "id": "sec-s",
+          "type": "ui:section",
+          "props": {
+            "title": "成功",
+            "description": "tone: success",
+            "tone": "success"
+          }
+        },
+        {
+          "id": "sec-w",
+          "type": "ui:section",
+          "props": {
+            "title": "注意",
+            "description": "tone: warning",
+            "tone": "warning"
+          }
+        },
+        {
+          "id": "sec-d",
+          "type": "ui:section",
+          "props": {
+            "title": "危険",
+            "description": "tone: danger",
+            "tone": "danger"
+          }
+        }
+      ]
+    },
+    {
+      "id": "next-action",
+      "title": "次の一手 ui:next-action",
+      "description": "ready / loading / empty の 3 状態。",
+      "components": [
+        {
+          "id": "na-root",
+          "type": "ui:stack",
+          "props": {
+            "gap": "md"
+          },
+          "children": ["na1", "na2", "na3"]
+        },
+        {
+          "id": "na1",
+          "type": "ui:next-action",
+          "props": {
+            "eyebrow": "次にやること",
+            "title": "採用面接の日程候補を 3 つ選んでください",
+            "reason": "候補者から返信が届いています。",
+            "primary": {
+              "label": "候補を選ぶ",
+              "href": "#schedule"
+            },
+            "secondary": {
+              "label": "秘書に任せる",
+              "action": {
+                "id": "gallery.delegate"
+              }
+            }
+          }
+        },
+        {
+          "id": "na2",
+          "type": "ui:next-action",
+          "props": {
+            "eyebrow": "次にやること",
+            "title": "次の一手を確認しています…",
+            "state": "loading"
+          }
+        },
+        {
+          "id": "na3",
+          "type": "ui:next-action",
+          "props": {
+            "title": "いまやることはありません",
+            "reason": "新しい依頼が届いたらお知らせします。",
+            "state": "empty"
+          }
+        }
+      ]
+    },
+    {
+      "id": "metric",
+      "title": "指標 ui:metric",
+      "description": "tone は増減表示の色にだけ使います。",
+      "components": [
+        {
+          "id": "met-grid",
+          "type": "ui:grid",
+          "props": {
+            "gap": "md",
+            "min_column_width": "xs"
+          },
+          "children": ["met1", "met2", "met3"]
+        },
+        {
+          "id": "met1",
+          "type": "ui:metric",
+          "props": {
+            "label": "平均応答時間",
+            "value": "1.8",
+            "unit": "秒",
+            "delta": "-0.4 秒",
+            "trend": "down",
+            "tone": "success",
+            "description": "直近 24 時間"
+          }
+        },
+        {
+          "id": "met2",
+          "type": "ui:metric",
+          "props": {
+            "label": "今月のコスト",
+            "value": "¥38,200",
+            "delta": "予算の 64%",
+            "tone": "accent"
+          }
+        },
+        {
+          "id": "met3",
+          "type": "ui:metric",
+          "props": {
+            "label": "失敗したジョブ",
+            "value": 2,
+            "unit": "件",
+            "delta": "+2",
+            "trend": "up",
+            "tone": "danger"
+          }
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "データ ui:kv / ui:table",
+      "description": "キー・値と表。status 列は状態ピルで表示します。",
+      "components": [
+        {
+          "id": "data-root",
+          "type": "ui:grid",
+          "props": {
+            "gap": "lg",
+            "min_column_width": "lg"
+          },
+          "children": ["kv-sec", "audit"]
+        },
+        {
+          "id": "kv-sec",
+          "type": "ui:section",
+          "props": {
+            "title": "ミッション詳細"
+          },
+          "children": ["kv"]
+        },
+        {
+          "id": "kv",
+          "type": "ui:kv",
+          "props": {
+            "items": [
+              {
+                "label": "ミッションID",
+                "value": "MSN-SAMPLE-ORDER-20260923",
+                "mono": true
+              },
+              {
+                "label": "担当",
+                "value": "相棒(presence-studio)"
+              },
+              {
+                "label": "ティア",
+                "value": "confidential"
+              },
+              {
+                "label": "承認が必要",
+                "value": true
+              },
+              {
+                "label": "見積額",
+                "value": "480,000 円"
+              }
+            ]
+          }
+        },
+        {
+          "id": "audit",
+          "type": "ui:table",
+          "props": {
+            "caption": "監査ログ(直近)",
+            "columns": [
+              {
+                "key": "time",
+                "label": "時刻",
+                "mono": true
+              },
+              {
+                "key": "actor",
+                "label": "実行者"
+              },
+              {
+                "key": "event",
+                "label": "操作"
+              },
+              {
+                "key": "status",
+                "label": "結果"
+              }
+            ],
+            "rows": [
+              {
+                "time": "09:12:04",
+                "actor": "相棒",
+                "event": "ミッション作成",
+                "status": "done"
+              },
+              {
+                "time": "09:10:51",
+                "actor": "あなた",
+                "event": "見積の承認",
+                "status": "completed"
+              },
+              {
+                "time": "08:58:17",
+                "actor": "メール連携",
+                "event": "受信トリアージ",
+                "status": "degraded"
+              },
+              {
+                "time": "08:31:40",
+                "actor": "運用エージェント",
+                "event": "バックアップ",
+                "status": "failed"
+              },
+              {
+                "time": "08:02:09",
+                "actor": "秘書エージェント",
+                "event": "予定の同期",
+                "status": null
+              }
+            ]
+          }
+        },
+        {
+          "id": "data-empty-wrap",
+          "type": "ui:table",
+          "props": {
+            "columns": [
+              {
+                "key": "a",
+                "label": "依頼"
+              },
+              {
+                "key": "b",
+                "label": "状態"
+              }
+            ],
+            "rows": [],
+            "empty": "まだ依頼はありません"
+          }
+        }
+      ]
+    },
+    {
+      "id": "list",
+      "title": "リスト ui:list",
+      "description": "plain と timeline。",
+      "components": [
+        {
+          "id": "list-root",
+          "type": "ui:grid",
+          "props": {
+            "gap": "lg",
+            "min_column_width": "md"
+          },
+          "children": ["list-plain-sec", "list-tl-sec"]
+        },
+        {
+          "id": "list-plain-sec",
+          "type": "ui:section",
+          "props": {
+            "title": "できたもの"
+          },
+          "children": ["list-plain"]
+        },
+        {
+          "id": "list-plain",
+          "type": "ui:list",
+          "props": {
+            "items": [
+              {
+                "title": "9月の月次レポート.pptx",
+                "meta": "9/22 · 相棒",
+                "href": "#r1",
+                "status": "completed"
+              },
+              {
+                "title": "取引先リストの重複整理",
+                "meta": "9/21 · 秘書エージェント",
+                "href": "#r2",
+                "status": "review"
+              },
+              {
+                "title": "採用ページの文面案",
+                "meta": "9/20 · 広報エージェント",
+                "status": "planned"
+              }
+            ]
+          }
+        },
+        {
+          "id": "list-tl-sec",
+          "type": "ui:section",
+          "props": {
+            "title": "ミッションの流れ"
+          },
+          "children": ["list-tl"]
+        },
+        {
+          "id": "list-tl",
+          "type": "ui:list",
+          "props": {
+            "variant": "timeline",
+            "items": [
+              {
+                "title": "目的の合意",
+                "meta": "9/20 10:00",
+                "status": "done"
+              },
+              {
+                "title": "見積の取得",
+                "meta": "9/21 15:30",
+                "status": "done"
+              },
+              {
+                "title": "承認",
+                "meta": "待機中",
+                "status": "pending"
+              },
+              {
+                "title": "発注",
+                "meta": "予定",
+                "status": "planned"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "text",
+      "title": "テキスト ui:text",
+      "description": "body / muted / caption / mono / title。",
+      "components": [
+        {
+          "id": "text-root",
+          "type": "ui:stack",
+          "props": {
+            "gap": "sm"
+          },
+          "children": ["tx1", "tx2", "tx3", "tx4", "tx5"]
+        },
+        {
+          "id": "tx1",
+          "type": "ui:text",
+          "props": {
+            "text": "見出し相当のテキスト",
+            "variant": "title"
+          }
+        },
+        {
+          "id": "tx2",
+          "type": "ui:text",
+          "props": {
+            "text": "本文です。承認すると、発注ミッションが自動で進みます。",
+            "variant": "body"
+          }
+        },
+        {
+          "id": "tx3",
+          "type": "ui:text",
+          "props": {
+            "text": "補足説明は muted で控えめに表示します。",
+            "variant": "muted"
+          }
+        },
+        {
+          "id": "tx4",
+          "type": "ui:text",
+          "props": {
+            "text": "最終更新 2026-09-23 09:12",
+            "variant": "caption"
+          }
+        },
+        {
+          "id": "tx5",
+          "type": "ui:text",
+          "props": {
+            "text": "pnpm pipeline --input pipelines/baseline-check.json",
+            "variant": "mono"
+          }
+        }
+      ]
+    },
+    {
+      "id": "status-pill",
+      "title": "状態ピル ui:status-pill",
+      "description": "アイコン+文字で、色だけに頼りません。正規語彙のすべての値。",
+      "components": [
+        {
+          "id": "sp-root",
+          "type": "ui:stack",
+          "props": {
+            "direction": "horizontal",
+            "wrap": true,
+            "gap": "sm"
+          },
+          "children": [
+            "sp0",
+            "sp1",
+            "sp2",
+            "sp3",
+            "sp4",
+            "sp5",
+            "sp6",
+            "sp7",
+            "sp8",
+            "sp9",
+            "sp10",
+            "sp11",
+            "sp12",
+            "sp13",
+            "sp14",
+            "sp15",
+            "sp16",
+            "sp17",
+            "sp18",
+            "sp19",
+            "sp20",
+            "sp21",
+            "sp22",
+            "sp23",
+            "sp24",
+            "sp25",
+            "sp26",
+            "sp27",
+            "sp28",
+            "sp29",
+            "sp30",
+            "sp31",
+            "sp32",
+            "sp33",
+            "sp34",
+            "sp35"
+          ]
+        },
+        {
+          "id": "sp0",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "active"
+          }
+        },
+        {
+          "id": "sp1",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "archived"
+          }
+        },
+        {
+          "id": "sp2",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "available"
+          }
+        },
+        {
+          "id": "sp3",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "blocked"
+          }
+        },
+        {
+          "id": "sp4",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "busy"
+          }
+        },
+        {
+          "id": "sp5",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "completed"
+          }
+        },
+        {
+          "id": "sp6",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "connected"
+          }
+        },
+        {
+          "id": "sp7",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "connecting"
+          }
+        },
+        {
+          "id": "sp8",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "degraded"
+          }
+        },
+        {
+          "id": "sp9",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "disconnected"
+          }
+        },
+        {
+          "id": "sp10",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "distilling"
+          }
+        },
+        {
+          "id": "sp11",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "done"
+          }
+        },
+        {
+          "id": "sp12",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "error"
+          }
+        },
+        {
+          "id": "sp13",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "failed"
+          }
+        },
+        {
+          "id": "sp14",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "fallback"
+          }
+        },
+        {
+          "id": "sp15",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "fully_automatable"
+          }
+        },
+        {
+          "id": "sp16",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "missing"
+          }
+        },
+        {
+          "id": "sp17",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "missing_runtime_prerequisites"
+          }
+        },
+        {
+          "id": "sp18",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "n/a"
+          }
+        },
+        {
+          "id": "sp19",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "needs_assets"
+          }
+        },
+        {
+          "id": "sp20",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "needs_clarification"
+          }
+        },
+        {
+          "id": "sp21",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "needs_external_assets"
+          }
+        },
+        {
+          "id": "sp22",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "needs_runtime_prerequisites"
+          }
+        },
+        {
+          "id": "sp23",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "needs_setup"
+          }
+        },
+        {
+          "id": "sp24",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "offline"
+          }
+        },
+        {
+          "id": "sp25",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "paused"
+          }
+        },
+        {
+          "id": "sp26",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "pending"
+          }
+        },
+        {
+          "id": "sp27",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "planned"
+          }
+        },
+        {
+          "id": "sp28",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "ready"
+          }
+        },
+        {
+          "id": "sp29",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "recovered"
+          }
+        },
+        {
+          "id": "sp30",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "review"
+          }
+        },
+        {
+          "id": "sp31",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "running"
+          }
+        },
+        {
+          "id": "sp32",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "stale"
+          }
+        },
+        {
+          "id": "sp33",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "stopped"
+          }
+        },
+        {
+          "id": "sp34",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "unavailable"
+          }
+        },
+        {
+          "id": "sp35",
+          "type": "ui:status-pill",
+          "props": {
+            "status": "working"
+          }
+        }
+      ]
+    },
+    {
+      "id": "badge",
+      "title": "バッジ ui:badge",
+      "description": "tone と、サーフェスの役割色(バッジ限定)。",
+      "components": [
+        {
+          "id": "bd-root",
+          "type": "ui:stack",
+          "props": {
+            "gap": "sm"
+          },
+          "children": ["bd-tones", "bd-roles"]
+        },
+        {
+          "id": "bd-tones",
+          "type": "ui:stack",
+          "props": {
+            "direction": "horizontal",
+            "wrap": true,
+            "gap": "sm"
+          },
+          "children": ["bd1", "bd2", "bd3", "bd4", "bd5", "bd6"]
+        },
+        {
+          "id": "bd1",
+          "type": "ui:badge",
+          "props": {
+            "label": "標準"
+          }
+        },
+        {
+          "id": "bd2",
+          "type": "ui:badge",
+          "props": {
+            "label": "強調",
+            "tone": "accent"
+          }
+        },
+        {
+          "id": "bd3",
+          "type": "ui:badge",
+          "props": {
+            "label": "情報",
+            "tone": "info"
+          }
+        },
+        {
+          "id": "bd4",
+          "type": "ui:badge",
+          "props": {
+            "label": "成功",
+            "tone": "success"
+          }
+        },
+        {
+          "id": "bd5",
+          "type": "ui:badge",
+          "props": {
+            "label": "注意",
+            "tone": "warning"
+          }
+        },
+        {
+          "id": "bd6",
+          "type": "ui:badge",
+          "props": {
+            "label": "危険",
+            "tone": "danger"
+          }
+        },
+        {
+          "id": "bd-roles",
+          "type": "ui:stack",
+          "props": {
+            "direction": "horizontal",
+            "wrap": true,
+            "gap": "sm"
+          },
+          "children": ["br1", "br2", "br3", "br4", "br5"]
+        },
+        {
+          "id": "br1",
+          "type": "ui:badge",
+          "props": {
+            "label": "CEO秘書",
+            "role": "concierge"
+          }
+        },
+        {
+          "id": "br2",
+          "type": "ui:badge",
+          "props": {
+            "label": "相棒",
+            "role": "presence-studio"
+          }
+        },
+        {
+          "id": "br3",
+          "type": "ui:badge",
+          "props": {
+            "label": "ミッション運用",
+            "role": "chronos-mirror-v2"
+          }
+        },
+        {
+          "id": "br4",
+          "type": "ui:badge",
+          "props": {
+            "label": "管理",
+            "role": "operator-surface"
+          }
+        },
+        {
+          "id": "br5",
+          "type": "ui:badge",
+          "props": {
+            "label": "画面操作",
+            "role": "computer-surface"
+          }
+        }
+      ]
+    },
+    {
+      "id": "callout",
+      "title": "お知らせ ui:callout",
+      "description": "info / success / warning / danger。",
+      "components": [
+        {
+          "id": "co-root",
+          "type": "ui:stack",
+          "props": {
+            "gap": "sm"
+          },
+          "children": ["co1", "co2", "co3", "co4"]
+        },
+        {
+          "id": "co1",
+          "type": "ui:callout",
+          "props": {
+            "tone": "info",
+            "title": "新しい使い方ガイドがあります",
+            "body": "「決める」画面の使い方を 3 分で確認できます。",
+            "action": {
+              "label": "見る",
+              "href": "#help",
+              "variant": "ghost"
+            }
+          }
+        },
+        {
+          "id": "co2",
+          "type": "ui:callout",
+          "props": {
+            "tone": "success",
+            "title": "バックアップが完了しました",
+            "body": "次回は明日 03:00 に実行します。"
+          }
+        },
+        {
+          "id": "co3",
+          "type": "ui:callout",
+          "props": {
+            "tone": "warning",
+            "title": "API の利用量が上限の 80% に達しました"
+          }
+        },
+        {
+          "id": "co4",
+          "type": "ui:callout",
+          "props": {
+            "tone": "danger",
+            "title": "音声サービスに接続できません",
+            "body": "ネットワークを確認してから再試行してください。",
+            "action": {
+              "label": "再試行",
+              "action": {
+                "id": "gallery.retry"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "empty-skeleton",
+      "title": "空状態・読み込み中 ui:empty-state / ui:skeleton",
+      "description": "データがないときと、読み込み中の表示。",
+      "components": [
+        {
+          "id": "es-root",
+          "type": "ui:grid",
+          "props": {
+            "gap": "md",
+            "min_column_width": "md"
+          },
+          "children": ["es1", "sk-stack"]
+        },
+        {
+          "id": "es1",
+          "type": "ui:empty-state",
+          "props": {
+            "title": "まだ成果物はありません",
+            "body": "依頼が完了すると、ここに成果物が並びます。",
+            "action": {
+              "label": "新しく頼む",
+              "href": "#ask"
+            }
+          }
+        },
+        {
+          "id": "sk-stack",
+          "type": "ui:stack",
+          "props": {
+            "gap": "md"
+          },
+          "children": ["sk1", "sk2", "sk3"]
+        },
+        {
+          "id": "sk1",
+          "type": "ui:skeleton",
+          "props": {
+            "lines": 3,
+            "shape": "text"
+          }
+        },
+        {
+          "id": "sk2",
+          "type": "ui:skeleton",
+          "props": {
+            "lines": 2,
+            "shape": "card"
+          }
+        },
+        {
+          "id": "sk3",
+          "type": "ui:skeleton",
+          "props": {
+            "lines": 3,
+            "shape": "table"
+          }
+        }
+      ]
+    },
+    {
+      "id": "controls",
+      "title": "操作 ui:button / ui:disclosure",
+      "description": "ボタンの 4 種と無効状態、開発者向け情報の折りたたみ。",
+      "components": [
+        {
+          "id": "ct-root",
+          "type": "ui:stack",
+          "props": {
+            "gap": "md"
+          },
+          "children": ["btns", "dis1", "dis2"]
+        },
+        {
+          "id": "btns",
+          "type": "ui:stack",
+          "props": {
+            "direction": "horizontal",
+            "wrap": true,
+            "gap": "sm"
+          },
+          "children": ["b1", "b2", "b3", "b4", "b5"]
+        },
+        {
+          "id": "b1",
+          "type": "ui:button",
+          "props": {
+            "label": "承認する",
+            "variant": "primary",
+            "action": {
+              "id": "gallery.approve"
+            }
+          }
+        },
+        {
+          "id": "b2",
+          "type": "ui:button",
+          "props": {
+            "label": "詳細を見る",
+            "variant": "secondary",
+            "href": "#detail"
+          }
+        },
+        {
+          "id": "b3",
+          "type": "ui:button",
+          "props": {
+            "label": "却下する",
+            "variant": "danger",
+            "action": {
+              "id": "gallery.reject"
+            }
+          }
+        },
+        {
+          "id": "b4",
+          "type": "ui:button",
+          "props": {
+            "label": "あとで",
+            "variant": "ghost",
+            "action": {
+              "id": "gallery.later"
+            }
+          }
+        },
+        {
+          "id": "b5",
+          "type": "ui:button",
+          "props": {
+            "label": "送信中…",
+            "variant": "primary",
+            "action": {
+              "id": "gallery.noop"
+            },
+            "disabled": true
+          }
+        },
+        {
+          "id": "dis1",
+          "type": "ui:disclosure",
+          "props": {
+            "summary": "開発者向けの詳細"
+          },
+          "children": ["dis1-kv"]
+        },
+        {
+          "id": "dis1-kv",
+          "type": "ui:kv",
+          "props": {
+            "items": [
+              {
+                "label": "trace_id",
+                "value": "trc_7f3a9c21",
+                "mono": true
+              },
+              {
+                "label": "adf",
+                "value": "pipelines/order-approval.json",
+                "mono": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "dis2",
+          "type": "ui:disclosure",
+          "props": {
+            "summary": "開いた状態(open: true)",
+            "open": true
+          },
+          "children": ["dis2-t"]
+        },
+        {
+          "id": "dis2-t",
+          "type": "ui:text",
+          "props": {
+            "text": "既定では閉じています。",
+            "variant": "muted"
+          }
+        }
+      ]
+    }
+  ]
+}

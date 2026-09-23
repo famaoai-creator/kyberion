@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja" data-theme="light" data-density="comfortable">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>UI ギャラリー — Kyberion</title>
+    <!-- UI-04: every kyberion-base (`ui:*`) component, rendered by the shared
+         vanilla renderer (libs/shared-ui/vanilla, served at /shared-ui/). -->
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/kyberion-ui.css" />
+    <link rel="stylesheet" href="/ui-gallery.css" />
+    <script type="module" src="/ui-gallery.js"></script>
+  </head>
+  <body class="gallery">
+    <header class="gallery-toolbar">
+      <div class="gallery-toolbar__titles">
+        <h1 class="gallery-toolbar__title">UI ギャラリー</h1>
+        <p class="gallery-toolbar__subtitle">kyberion-base カタログの全コンポーネント</p>
+      </div>
+      <div class="gallery-toolbar__controls">
+        <fieldset class="gallery-toggle">
+          <legend>テーマ</legend>
+          <button
+            type="button"
+            class="kb-btn kb-btn--secondary"
+            data-set-theme="light"
+            aria-pressed="true"
+          >
+            ライト
+          </button>
+          <button
+            type="button"
+            class="kb-btn kb-btn--secondary"
+            data-set-theme="dark"
+            aria-pressed="false"
+          >
+            ダーク
+          </button>
+        </fieldset>
+        <fieldset class="gallery-toggle">
+          <legend>密度</legend>
+          <button
+            type="button"
+            class="kb-btn kb-btn--secondary"
+            data-set-density="comfortable"
+            aria-pressed="true"
+          >
+            ゆったり
+          </button>
+          <button
+            type="button"
+            class="kb-btn kb-btn--secondary"
+            data-set-density="compact"
+            aria-pressed="false"
+          >
+            コンパクト
+          </button>
+        </fieldset>
+      </div>
+    </header>
+    <p class="gallery-status" id="gallery-status" role="status" aria-live="polite"></p>
+    <main class="gallery-main">
+      <section class="gallery-block gallery-block--sample" aria-labelledby="sample-title">
+        <div class="gallery-block__intro">
+          <h2 class="gallery-block__title" id="sample-title">サンプル画面</h2>
+          <p class="gallery-block__description" id="sample-description"></p>
+        </div>
+        <div class="gallery-frame" id="sample-screen"></div>
+      </section>
+      <nav class="gallery-index" aria-label="コンポーネント一覧">
+        <ul id="gallery-index"></ul>
+      </nav>
+      <div id="gallery-sections"></div>
+    </main>
+  </body>
+</html>
