@@ -2271,7 +2271,7 @@
     {
       "path": "product/governance/intent-domain-ontology.json",
       "tier": "public",
-      "size": 112057,
+      "size": 140364,
       "type": "json"
     },
     {
@@ -2697,7 +2697,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 236869,
+      "size": 426282,
       "type": "json"
     },
     {
@@ -3195,7 +3195,7 @@
     {
       "path": "product/governance/process-definition-registry.json",
       "tier": "public",
-      "size": 2677,
+      "size": 2727,
       "type": "json"
     },
     {
@@ -3681,7 +3681,7 @@
     {
       "path": "product/governance/standard-intents.json",
       "tier": "public",
-      "size": 189913,
+      "size": 232902,
       "type": "json"
     },
     {
