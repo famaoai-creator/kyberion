@@ -535,6 +535,14 @@
       "types": "./dist/organization-operating-model-management.d.ts",
       "default": "./dist/organization-operating-model-management.js"
     },
+    "./organization-operation-runtime": {
+      "types": "./dist/organization-operation-runtime.d.ts",
+      "default": "./dist/organization-operation-runtime.js"
+    },
+    "./organization-interventions": {
+      "types": "./dist/organization-interventions.d.ts",
+      "default": "./dist/organization-interventions.js"
+    },
     "./organization-operating-model": {
       "types": "./dist/organization-operating-model.d.ts",
       "default": "./dist/organization-operating-model.js"

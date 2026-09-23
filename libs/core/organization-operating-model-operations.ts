@@ -840,6 +840,7 @@ export interface BuildOrganizationOperationInput {
   purpose?: string;
   triggerKind?: OrganizationOperationRecord['trigger']['kind'];
   triggerExpression?: string;
+  triggerTimezone?: string;
   executionKind?: OrganizationOperationRecord['execution_target']['kind'];
   executionRef?: string;
   evidenceOutputs?: string[];

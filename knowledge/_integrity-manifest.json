@@ -2977,6 +2977,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/organization-operations-runbook.md",
+      "tier": "public",
+      "size": 3050,
+      "type": "md"
+    },
+    {
       "path": "product/governance/organization-profile.json",
       "tier": "public",
       "size": 1204,

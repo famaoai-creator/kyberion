@@ -12,6 +12,16 @@ export async function main(args: string[] = currentProcessArgv().slice(2)): Prom
     await organizationRolesMain(args);
     return;
   }
+  if (args[0] === 'operation' && args[1] === 'run' && args[2] === 'execute') {
+    const { executeOrganizationOperation } = await import('./organization_operation_execute.js');
+    await executeOrganizationOperation(args.slice(3));
+    return;
+  }
+  if (args[0] === 'operation' && args[1] === 'tick') {
+    const { tickOrganizationOperations } = await import('./organization_operation_execute.js');
+    await tickOrganizationOperations(args.slice(2));
+    return;
+  }
   await runOrganizationOperatingModel(args);
 }
 
