@@ -293,6 +293,8 @@ export function flattenUiPalette(palette: BrandUiPalette): Palette {
     palette.viz.categorical.forEach((value, i) => (flat[`viz-cat-${i + 1}`] = value));
     palette.viz.sequential.forEach((value, i) => (flat[`viz-seq-${i + 1}`] = value));
     palette.viz.diverging.forEach((value, i) => (flat[`viz-div-${i + 1}`] = value));
+    palette.viz.sequential_ink.forEach((value, i) => (flat[`viz-seq-ink-${i + 1}`] = value));
+    palette.viz.diverging_ink.forEach((value, i) => (flat[`viz-div-ink-${i + 1}`] = value));
   }
   return flat;
 }
@@ -307,6 +309,9 @@ export function flattenUiPalette(palette: BrandUiPalette): Palette {
  */
 export const UI_VIZ_CATEGORICAL_SLOTS = 8;
 
+/** `ui:heatmap` value labels: one ink per ramp step (sequential + diverging). */
+export const UI_VIZ_RAMP_STEPS = 5;
+
 export function buildUiVizContrastPairs(): ContrastPair[] {
   const pairs: ContrastPair[] = [];
   for (const background of UI_SURFACES) {
@@ -318,6 +323,25 @@ export function buildUiVizContrastPairs(): ContrastPair[] {
         minRatio: 3,
       });
     }
+  }
+  // A heatmap cell's value label sits directly on that cell's fill (never a
+  // halo — see kyberion-ui.charts.source.css), so its ink must clear body
+  // text's 4.5:1 on every ramp step, not just the mark's own 3:1 floor.
+  for (let step = 1; step <= UI_VIZ_RAMP_STEPS; step += 1) {
+    pairs.push(
+      {
+        label: `ui viz sequential ${step} cell value ink`,
+        background: `viz-seq-${step}`,
+        foreground: `viz-seq-ink-${step}`,
+        minRatio: 4.5,
+      },
+      {
+        label: `ui viz diverging ${step} cell value ink`,
+        background: `viz-div-${step}`,
+        foreground: `viz-div-ink-${step}`,
+        minRatio: 4.5,
+      }
+    );
   }
   pairs.push(
     {

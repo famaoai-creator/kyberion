@@ -104,31 +104,36 @@ export function Select(p: KbSelectProps & KbFormComponentId) {
   return (
     <div className="kb-field" {...fieldRootProps(p, 'select')}>
       <FieldLabel p={p} ids={ids} as="label" />
-      <select
-        className="kb-input kb-select"
-        {...controlProps(p, ids)}
-        name={String(p.name ?? '')}
-        value={hasValue ? String(value) : ''}
-        onChange={(event) => {
-          setValue(event.target.value);
-          change(event.target.value);
-        }}
-      >
-        {!hasValue || p.placeholder ? (
-          <option value="" disabled>
-            {p.placeholder || t(KB_FORM_MESSAGE_KEYS.selectPlaceholder)}
-          </option>
-        ) : null}
-        {options.map((option, index) => (
-          <option
-            key={`${option.value}-${index}`}
-            value={String(option.value ?? '')}
-            disabled={option.disabled === true || undefined}
-          >
-            {option.label}
-          </option>
-        ))}
-      </select>
+      {/* Wrapper carries the token-colored chevron (`::after`, see the
+          source CSS); native `<select>` doesn't reliably support
+          pseudo-elements. */}
+      <div className="kb-select-wrap">
+        <select
+          className="kb-input kb-select"
+          {...controlProps(p, ids)}
+          name={String(p.name ?? '')}
+          value={hasValue ? String(value) : ''}
+          onChange={(event) => {
+            setValue(event.target.value);
+            change(event.target.value);
+          }}
+        >
+          {!hasValue || p.placeholder ? (
+            <option value="" disabled>
+              {p.placeholder || t(KB_FORM_MESSAGE_KEYS.selectPlaceholder)}
+            </option>
+          ) : null}
+          {options.map((option, index) => (
+            <option
+              key={`${option.value}-${index}`}
+              value={String(option.value ?? '')}
+              disabled={option.disabled === true || undefined}
+            >
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
       <HelpAndError p={p} ids={ids} />
     </div>
   );

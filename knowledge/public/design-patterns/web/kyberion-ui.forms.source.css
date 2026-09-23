@@ -164,8 +164,40 @@ legend.kb-field__label {
   resize: vertical;
 }
 
+/* Native selects render an inconsistent OS arrow across browsers; draw our
+   own token-colored chevron instead. `<select>` doesn't reliably support
+   `::after`, so `.kb-select-wrap` (a plain positioning box around it)
+   carries the pseudo-element. */
+.kb-select-wrap {
+  position: relative;
+}
+
 .kb-select {
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: calc(var(--kb-ui-space-3) + 22px);
+}
+
+.kb-select-wrap::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: var(--kb-ui-space-3);
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+  background-color: var(--kb-ui-text-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  pointer-events: none;
+}
+
+.kb-field[data-disabled='true'] .kb-select-wrap::after {
+  background-color: var(--kb-ui-text-subtle);
 }
 
 [data-density='compact'] .kb-input {

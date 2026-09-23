@@ -6255,7 +6255,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 620597,
+      "size": 632405,
       "type": "json"
     },
     {
@@ -7947,7 +7947,7 @@
     {
       "path": "product/schemas/brand-tokens.schema.json",
       "tier": "public",
-      "size": 9656,
+      "size": 10237,
       "type": "json"
     },
     {
@@ -12231,7 +12231,7 @@
     {
       "path": "public/design-patterns/brand-tokens/kyberion.json",
       "tier": "public",
-      "size": 7476,
+      "size": 7814,
       "type": "json"
     },
     {

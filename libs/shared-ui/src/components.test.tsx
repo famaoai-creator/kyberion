@@ -282,9 +282,11 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
       '<th scope="col" style="width:12rem">ID</th><th scope="col" data-align="end">件数</th>'
     );
     expect(out).toContain(
-      '<tr data-href="/m/A" tabindex="0"><td data-mono="true">A</td><td data-align="end">1</td></tr>'
+      '<tr data-href="/m/A" tabindex="0"><td data-mono="true" title="A">A</td><td data-align="end">1</td></tr>'
     );
-    expect(out).toContain('<tr><td data-mono="true">B</td><td data-align="end">—</td></tr>');
+    expect(out).toContain(
+      '<tr><td data-mono="true" title="B">B</td><td data-align="end">—</td></tr>'
+    );
     expect(out).not.toContain('javascript:');
     expect(out).not.toContain('background');
 

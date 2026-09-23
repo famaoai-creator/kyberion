@@ -635,6 +635,10 @@
 .kb-table td[data-mono='true'] {
   font-family: var(--kb-ui-font-mono);
   font-variant-numeric: tabular-nums;
+  /* Ids / hashes read as one token — never break mid-word; a narrower
+     `width` column grows to fit instead (the `title` attr gives the value
+     back either way). */
+  white-space: nowrap;
 }
 
 .kb-table tbody tr[data-href] {

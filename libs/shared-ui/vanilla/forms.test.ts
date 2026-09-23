@@ -203,7 +203,7 @@ describe('controlled fields dispatch field.change { name, value }', () => {
         { value: 'ja', label: 'Japanese' },
       ],
     });
-    const select = root.query('select.kb-select')! as MiniElement & { value: string };
+    const select = root.query('select.kb-select')!;
     expect(select.children[0].textContent).toBe('Select…');
     select.value = 'ja';
     select.dispatch('change');
