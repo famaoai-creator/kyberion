@@ -20423,6 +20423,11 @@
         "ja": "画像をドロップまたは貼り付けると背景になります。",
         "qps-ploc": "⟦Ḓřőṗ őř ṗȧşŧė ȧñ ïɱȧɠė ŧő ůşė ïŧ ȧş ŧħė ƀȧƈķɠřőůñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
+      "talking_avatar_label_state": {
+        "en": "{label}, {state}",
+        "ja": "{label}（{state}）",
+        "qps-ploc": "⟦{label}, {state} ŀőřėɱ⟧"
+      },
       "sketch_background_added": {
         "en": "Background image added.",
         "ja": "背景画像を追加しました。",

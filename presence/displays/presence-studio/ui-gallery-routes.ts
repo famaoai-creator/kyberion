@@ -59,6 +59,9 @@ export const SHARED_UI_MODULE_SOURCES: Readonly<Record<string, string>> = Object
   'drawing.js': 'libs/shared-ui/vanilla/drawing.js',
   'drawing-core.js': 'libs/shared-ui/vanilla/drawing-core.js',
   'drawing-engine.js': 'libs/shared-ui/vanilla/drawing-engine.js',
+  // PA-09 talking avatar
+  'avatar.js': 'libs/shared-ui/vanilla/avatar.js',
+  'lipsync.js': 'libs/shared-ui/vanilla/lipsync.js',
 });
 // Gallery sample data: `ui-gallery.fixtures.<locale>.json` (base, with the
 // sample screen) plus every `ui-gallery.fixtures.<part>.<locale>.json`

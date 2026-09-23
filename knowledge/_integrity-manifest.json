@@ -6273,7 +6273,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 965131,
+      "size": 965306,
       "type": "json"
     },
     {
@@ -7587,7 +7587,7 @@
     {
       "path": "product/schemas/a2ui-catalog-kyberion-base.schema.json",
       "tier": "public",
-      "size": 86801,
+      "size": 90248,
       "type": "json"
     },
     {
