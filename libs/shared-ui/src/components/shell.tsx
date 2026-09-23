@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
@@ -17,21 +18,49 @@ import type {
   KbPageHeaderProps,
   KbTabsProps,
 } from '@agent/core/a2ui-catalog';
-import { navBrandLogo, navContextOptions, navContextPayload } from '../../vanilla/kyberion-ui.js';
+import {
+  navBrandLogo,
+  navContextOptions,
+  navContextPayload,
+  tabsVariant,
+} from '../../vanilla/kyberion-ui.js';
 import { useA2UIActions } from '../actions.js';
 import { TABS_SELECT_ACTION } from '../catalog.js';
 import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
 import { KB_ICON_NAMES, KbIcon } from '../icons.js';
 import { asArray, safeHref } from '../safety.js';
-import { ActionRefButton, KbLink } from './controls.js';
+import { ActionRefButton, KbLink, type ActionRefLike } from './controls.js';
 import { Badge, roleAttr } from './feedback.js';
+
+/** Custom properties only (`--brand-accent`, ...): tenant brand variables, never raw styling. */
+export type AppShellStyle = Readonly<Record<`--${string}`, string | number>>;
 
 export type AppShellProps = KbAppShellProps & {
   /** Slot for the navigation (normally a `NavRail`). */
   nav?: ReactNode;
   /** Main column content (page header, sections, ...). */
   children?: ReactNode;
+  /** Extra classes on the `.kb-app-shell` root (React-only). */
+  className?: string;
+  /**
+   * CSS custom properties on the root (React-only), e.g. tenant brand
+   * variables. Anything that is not a `--*` property is dropped.
+   */
+  style?: AppShellStyle;
 };
+
+/** Keep only `--*` custom properties with string / finite-number values. */
+export function customPropertiesOnly(style: unknown): CSSProperties | undefined {
+  if (!style || typeof style !== 'object') return undefined;
+  const out: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(style as Record<string, unknown>)) {
+    if (!/^--[A-Za-z0-9_-]+$/.test(name)) continue;
+    if (typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value))) {
+      out[name] = value;
+    }
+  }
+  return Object.keys(out).length ? (out as CSSProperties) : undefined;
+}
 
 /**
  * `ui:app-shell` → `.kb-app-shell[data-density][data-theme][data-role]` with
@@ -41,7 +70,7 @@ export type AppShellProps = KbAppShellProps & {
  * themes to `:root[data-theme]`, so an explicit `theme` is also mirrored onto
  * `<html>` while the shell is mounted (`system` clears it).
  */
-export function AppShell({ density, theme, role, nav, children }: AppShellProps) {
+export function AppShell({ density, theme, role, nav, children, className, style }: AppShellProps) {
   useEffect(() => {
     if (!theme || typeof document === 'undefined') return undefined;
     const root = document.documentElement;
@@ -56,7 +85,8 @@ export function AppShell({ density, theme, role, nav, children }: AppShellProps)
 
   return (
     <div
-      className="kb-app-shell"
+      className={className ? `kb-app-shell ${className}` : 'kb-app-shell'}
+      style={customPropertiesOnly(style)}
       data-density={density === 'comfortable' || density === 'compact' ? density : undefined}
       data-theme={theme === 'light' || theme === 'dark' ? theme : undefined}
       data-role={roleAttr(role)}
@@ -67,7 +97,11 @@ export function AppShell({ density, theme, role, nav, children }: AppShellProps)
   );
 }
 
-export type PageHeaderProps = KbPageHeaderProps & { children?: ReactNode };
+export type PageHeaderProps = Omit<KbPageHeaderProps, 'actions'> & {
+  /** Catalog refs or React-only `{ label, onClick }` refs (see `SectionProps.actions`). */
+  actions?: ActionRefLike[];
+  children?: ReactNode;
+};
 
 /** `ui:page-header` → `header.kb-page-header` (`__titles` > `h1.__title` + `__subtitle`, `__actions`). */
 export function PageHeader({ title, subtitle, role_badge, actions, children }: PageHeaderProps) {
@@ -326,19 +360,25 @@ export type TabsProps = KbTabsProps & {
  * With hrefs it is a link bar (`aria-current="page"`); otherwise an ARIA
  * tablist of buttons (`aria-selected`).
  */
-export function Tabs({ items, active, overflow, onSelect, label }: TabsProps) {
+export function Tabs({ items, active, overflow, variant, onSelect, label }: TabsProps) {
   const { onAction } = useA2UIActions();
   const { t } = useKbI18n();
   const tabsLabel = label || t(KB_UI_MESSAGE_KEYS.tabsLabel);
   const list = asArray(items);
   const linkMode = list.some((item) => item.href !== undefined);
   const overflowAttr = overflow === 'menu' ? 'menu' : 'wrap';
+  const variantAttr = tabsVariant(variant);
   const count = (value: number | undefined) =>
     typeof value === 'number' ? <span className="kb-tabs__count">{value}</span> : null;
 
   if (linkMode) {
     return (
-      <nav className="kb-tabs" data-overflow={overflowAttr} aria-label={tabsLabel}>
+      <nav
+        className="kb-tabs"
+        data-overflow={overflowAttr}
+        data-variant={variantAttr}
+        aria-label={tabsLabel}
+      >
         {list.map((item) => {
           const href = safeHref(item.href);
           const current = item.id === active ? 'page' : undefined;
@@ -371,7 +411,13 @@ export function Tabs({ items, active, overflow, onSelect, label }: TabsProps) {
   }
 
   return (
-    <div className="kb-tabs" data-overflow={overflowAttr} role="tablist" aria-label={tabsLabel}>
+    <div
+      className="kb-tabs"
+      data-overflow={overflowAttr}
+      data-variant={variantAttr}
+      role="tablist"
+      aria-label={tabsLabel}
+    >
       {list.map((item) => {
         const selected = item.id === active;
         return (

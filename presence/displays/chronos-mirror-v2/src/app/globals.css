@@ -28,16 +28,16 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #020617;
-    --foreground: #F8FAFC;
+    --foreground: #f8fafc;
     --kb-bg-main: #020617;
     --kb-panel-bg: rgba(10, 25, 47, 0.82);
-    --kb-primary: #0A192F;
-    --kb-secondary: #31415B;
-    --kb-accent: #00F2FF;
+    --kb-primary: #0a192f;
+    --kb-secondary: #31415b;
+    --kb-accent: #00f2ff;
     --kb-warning: #f59e0b;
-    --kb-text-primary: #F8FAFC;
+    --kb-text-primary: #f8fafc;
     --kb-text-secondary: rgba(248, 250, 252, 0.62);
-    --kb-accent-text: #00F2FF;
+    --kb-accent-text: #00f2ff;
     --kb-surface: #0f172a;
     --kb-muted-text: #94a3b8;
     --kb-border: #1e293b;
@@ -69,16 +69,16 @@
 [data-theme='dark'] {
   color-scheme: dark;
   --background: #020617;
-  --foreground: #F8FAFC;
+  --foreground: #f8fafc;
   --kb-bg-main: #020617;
   --kb-panel-bg: rgba(10, 25, 47, 0.82);
-  --kb-primary: #0A192F;
-  --kb-secondary: #31415B;
-  --kb-accent: #00F2FF;
+  --kb-primary: #0a192f;
+  --kb-secondary: #31415b;
+  --kb-accent: #00f2ff;
   --kb-warning: #f59e0b;
-  --kb-text-primary: #F8FAFC;
+  --kb-text-primary: #f8fafc;
   --kb-text-secondary: rgba(248, 250, 252, 0.62);
-  --kb-accent-text: #00F2FF;
+  --kb-accent-text: #00f2ff;
   --kb-surface: #0f172a;
   --kb-muted-text: #94a3b8;
   --kb-border: #1e293b;
@@ -171,7 +171,7 @@
   --kb-ui-font-size-xxl: 28px;
 }
 
-[data-density="comfortable"] {
+[data-density='comfortable'] {
   --kb-ui-font-size-xs: 12px;
   --kb-ui-font-size-sm: 13px;
   --kb-ui-font-size-md: 15px;
@@ -180,7 +180,7 @@
   --kb-ui-font-size-xxl: 28px;
 }
 
-[data-density="compact"] {
+[data-density='compact'] {
   --kb-ui-font-size-xs: 11px;
   --kb-ui-font-size-sm: 12px;
   --kb-ui-font-size-md: 13px;
@@ -190,7 +190,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme='light']) {
     --kb-ui-color-scheme: dark;
     --kb-ui-canvas: #0d131e;
     --kb-ui-surface: #141b29;
@@ -257,7 +257,7 @@
   }
 }
 
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   --kb-ui-color-scheme: dark;
   --kb-ui-canvas: #0d131e;
   --kb-ui-surface: #141b29;
@@ -654,17 +654,14 @@ body {
   font-weight: 600;
 }
 
-.chronos-scope__select {
+.chronos-scope__field {
+  display: inline-flex;
+}
+
+.chronos-scope__select.kb-input {
+  width: auto;
   min-width: 10rem;
   max-width: 16rem;
-  min-height: 28px;
-  padding: 0 var(--kb-ui-space-2);
-  border: 1px solid var(--kb-ui-border-strong);
-  border-radius: var(--kb-ui-radius-sm);
-  background: var(--kb-ui-surface);
-  color: var(--kb-ui-text);
-  font: inherit;
-  font-size: var(--kb-ui-font-size-sm);
 }
 
 .chronos-scope__sep {
@@ -694,24 +691,6 @@ body {
   margin: 0 calc(-1 * var(--kb-ui-space-5));
   padding: var(--kb-ui-space-1) var(--kb-ui-space-5) 0;
   background: var(--kb-ui-canvas);
-}
-
-/* Sub-navigation inside a group: quieter pill tabs under the group tabs. */
-.chronos-subnav .kb-tabs {
-  gap: var(--kb-ui-space-1);
-  padding-bottom: var(--kb-ui-space-2);
-}
-
-.chronos-subnav .kb-tabs__tab {
-  margin-bottom: 0;
-  padding: var(--kb-ui-space-1) var(--kb-ui-space-3);
-  border: 1px solid transparent;
-  border-radius: 999px;
-}
-
-.chronos-subnav .kb-tabs__tab[aria-selected='true'] {
-  border-color: var(--kb-ui-accent);
-  background: var(--kb-ui-accent-soft);
 }
 
 .chronos-counters {
@@ -890,4 +869,514 @@ body {
     margin: 0 calc(-1 * var(--kb-ui-space-4));
     padding: var(--kb-ui-space-1) var(--kb-ui-space-4) 0;
   }
+}
+
+/* ------------------------------------ UI-07 wave 3b: panel primitives -- */
+
+/* Filters / actions above a list: search field grows, selects stay compact. */
+.chronos-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--kb-ui-space-2);
+}
+
+.chronos-toolbar > .kb-field {
+  min-width: 10rem;
+}
+
+.chronos-toolbar > .kb-field[data-control='text-field'],
+.chronos-toolbar > .chronos-toolbar__grow {
+  flex: 1 1 16rem;
+}
+
+.chronos-toolbar__end {
+  margin-inline-start: auto;
+}
+
+.chronos-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-1) var(--kb-ui-space-2);
+  min-width: 0;
+}
+
+.chronos-meta {
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.chronos-meta[data-mono='true'] {
+  font-family: var(--kb-ui-font-mono);
+}
+
+.chronos-diagram {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.chronos-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-4);
+  min-width: 0;
+}
+
+/* A Section inside a Section is a titled group, not another card. */
+.kb-section .kb-section {
+  padding: var(--kb-ui-space-3) 0 0;
+  border: 0;
+  border-top: 1px solid var(--kb-ui-border);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.kb-section .kb-section .kb-section__title {
+  font-size: var(--kb-ui-font-size-md);
+}
+
+.chronos-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: var(--kb-ui-space-2);
+}
+
+/* Collaboration tree rows: indent by depth, stage as a quiet prefix. */
+.chronos-tree-node {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--kb-ui-space-2);
+  padding: 0;
+  padding-inline-start: 0;
+  border: 0;
+  background: none;
+  color: var(--kb-ui-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.chronos-tree-node:hover {
+  color: var(--kb-ui-accent-text);
+}
+
+.chronos-tree-node[data-depth='1'] {
+  padding-inline-start: 1rem;
+}
+.chronos-tree-node[data-depth='2'] {
+  padding-inline-start: 2rem;
+}
+.chronos-tree-node[data-depth='3'] {
+  padding-inline-start: 3rem;
+}
+.chronos-tree-node[data-depth='4'],
+.chronos-tree-node[data-depth='5'],
+.chronos-tree-node[data-depth='6'] {
+  padding-inline-start: 4rem;
+}
+
+.chronos-tree-node__stage {
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-subtle);
+}
+
+.chronos-tree-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Work item cell: title with the lineage chain as a quiet second line. */
+.chronos-work-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chronos-work-cell__title {
+  font-weight: 600;
+}
+
+.chronos-steps {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+/* ------------------- UI-07 wave 3b: agent panel, chat, live terminal -- */
+
+/* ------------------------- UI-07 wave 3b: agent panel / chat / terminal -- */
+
+/* Agent runtimes side sheet (slide-over from the right). */
+.chronos-agent-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chronos-agent-panel__scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--kb-ui-text) 24%, transparent);
+}
+
+.chronos-agent-panel__sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100vw);
+  height: 100%;
+  background: var(--kb-ui-surface);
+  border-left: 1px solid var(--kb-ui-border);
+  box-shadow: var(--kb-ui-shadow-md);
+  color: var(--kb-ui-text);
+}
+
+.chronos-agent-panel__header {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-3) var(--kb-ui-space-4);
+  border-bottom: 1px solid var(--kb-ui-border);
+}
+
+.chronos-agent-panel__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  font-weight: 600;
+}
+
+.chronos-agent-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-4);
+  padding: var(--kb-ui-space-4);
+}
+
+.chronos-agent-panel__agents {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chronos-agent-panel__agent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-3) 0;
+  border-bottom: 1px solid var(--kb-ui-border);
+}
+
+.chronos-agent-panel__agent:first-child {
+  padding-top: 0;
+}
+
+.chronos-agent-panel__agent:last-child {
+  border-bottom: 0;
+}
+
+.chronos-agent-panel__agent-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2);
+  min-width: 0;
+}
+
+.chronos-agent-panel__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-3) var(--kb-ui-space-4);
+  border-top: 1px solid var(--kb-ui-border);
+}
+
+/* Floating chat: compact accent launcher + draggable surface card. */
+.chronos-chat__launcher {
+  position: fixed;
+  right: max(var(--kb-ui-space-4), env(safe-area-inset-right));
+  bottom: max(var(--kb-ui-space-4), env(safe-area-inset-bottom));
+  z-index: 50;
+}
+
+.chronos-chat__launcher .kb-btn {
+  border-radius: 999px;
+  box-shadow: var(--kb-ui-shadow-md);
+}
+
+.chronos-chat {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, calc(100vw - 2rem));
+  height: min(520px, calc(100dvh - 2rem));
+  overflow: hidden;
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-lg);
+  box-shadow: var(--kb-ui-shadow-md);
+  color: var(--kb-ui-text);
+}
+
+.chronos-chat__header {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+  border-bottom: 1px solid var(--kb-ui-border);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.chronos-chat__header:active {
+  cursor: grabbing;
+}
+
+.chronos-chat__grip {
+  flex: none;
+  color: var(--kb-ui-text-subtle);
+}
+
+.chronos-chat__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--kb-ui-success-fg);
+}
+
+.chronos-chat__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+}
+
+.chronos-chat__header-action {
+  flex: none;
+  cursor: default;
+}
+
+.chronos-chat__log {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+  padding: var(--kb-ui-space-3);
+}
+
+.chronos-chat__prompts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--kb-ui-space-2);
+}
+
+.chronos-chat__prompts .kb-btn {
+  justify-content: flex-start;
+  height: auto;
+  padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+  white-space: normal;
+  text-align: start;
+}
+
+.chronos-chat__prompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+}
+
+.chronos-chat__prompt-query {
+  font-size: var(--kb-ui-font-size-xs);
+  font-weight: 400;
+  color: var(--kb-ui-text-muted);
+}
+
+.chronos-chat__bubble {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  max-width: 85%;
+  padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-lg);
+  background: var(--kb-ui-surface-sunken);
+  font-size: var(--kb-ui-font-size-sm);
+  line-height: 1.5;
+  align-self: flex-start;
+}
+
+.chronos-chat__bubble[data-role='user'] {
+  align-self: flex-end;
+  background: var(--kb-ui-accent-soft);
+  border-color: transparent;
+}
+
+.chronos-chat__bubble[data-status='error'] {
+  background: var(--kb-ui-danger-bg);
+  border-color: var(--kb-ui-danger-border);
+  color: var(--kb-ui-danger-fg);
+}
+
+.chronos-chat__bubble-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chronos-chat__bubble-time {
+  align-self: flex-end;
+}
+
+.chronos-chat__pending {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+
+.chronos-chat__phase {
+  color: var(--kb-ui-text-muted);
+}
+
+.chronos-chat__spinner {
+  color: var(--kb-ui-text-muted);
+  animation: chronos-chat-spin 1s linear infinite;
+}
+
+@keyframes chronos-chat-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chronos-chat__spinner {
+    animation: none;
+  }
+}
+
+.chronos-chat__composer {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  padding: var(--kb-ui-space-3);
+  border-top: 1px solid var(--kb-ui-border);
+}
+
+.chronos-chat__composer .kb-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chronos-chat__composer .kb-input[data-listening='true'] {
+  border-color: var(--kb-ui-danger-border);
+  background: var(--kb-ui-danger-bg);
+}
+
+/* Live terminal: bounded follow-scroll log tail + steering row. */
+.chronos-terminal__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kb-ui-space-2);
+}
+
+.chronos-terminal__log .kb-code__body {
+  max-height: 16rem;
+}
+
+.chronos-terminal__line {
+  display: block;
+}
+
+.chronos-terminal__line[data-stream='stderr'] {
+  color: var(--kb-ui-danger-fg);
+}
+
+.chronos-terminal__tail {
+  display: block;
+}
+
+.chronos-terminal__composer {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+}
+
+.chronos-terminal__composer .kb-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .chronos-agent-panel__sheet {
+    width: 100vw;
+    border-left: 0;
+  }
+
+  .chronos-chat__prompts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chronos-chat__bubble {
+    max-width: 92%;
+  }
+}
+
+.chronos-scroll-area {
+  max-height: 440px;
+  overflow-y: auto;
+}
+
+.chronos-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--kb-ui-space-2);
+}
+
+/*
+ * Japanese typography (UI-07 wave 3b). Neither Inter nor Noto Sans JP ships
+ * with the surface, so Japanese text fell through to Hiragino Kaku Gothic
+ * ProN with full-width (monospaced) kana and punctuation metrics — the "wide
+ * letter-spacing" look. Prefer the modern system Japanese faces and turn on
+ * proportional alternates (`palt`) for Japanese content only. The generated
+ * token block above stays untouched (tokens.ui owns the default stack).
+ */
+:root {
+  --kb-ui-font-sans:
+    Inter, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI',
+    'Yu Gothic', Meiryo, system-ui, sans-serif;
+}
+
+:lang(ja) {
+  font-feature-settings: 'palt' 1;
+  line-break: strict;
+}
+
+:lang(ja) :where(code, pre, kbd, samp, .kb-code, [data-mono='true']) {
+  font-feature-settings: normal;
+}
+
+/* Keep the floating chat launcher (≈30–36px, 16px from the edge) off the last row. */
+.chronos-shell .kb-app-shell__main {
+  padding-bottom: calc(var(--kb-ui-space-5) + 56px);
 }

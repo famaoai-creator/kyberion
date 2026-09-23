@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { KbChart, Section, StatusPill } from '@agent/shared-ui';
+import { KbChart, Section, Table } from '@agent/shared-ui';
 import { listRecentAuditEvents, getTenantScope } from '@/lib/data';
 import { emitMosRead } from '@/lib/audit-mos';
 import { operatorTranslator } from '@/lib/i18n';
 import { getRequestLocale } from '@/lib/request-locale';
 import { auditResultStatus, formatCount, formatTimestamp } from '@/lib/view';
-import { DataTable, type DataTableRow } from '@/components/DataTable';
+import { ROW_HREF, ROW_KEY, tableRows, type OperatorTableRow } from '@/lib/table-rows';
 import { OperatorPageHeader } from '../operator-shell';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export default async function AuditPage() {
     byResult.set(label, (byResult.get(label) ?? 0) + 1);
   }
 
-  const rows: DataTableRow[] = events.map((event) => {
+  const rows: OperatorTableRow[] = events.map((event) => {
     const result = auditResultStatus(event.result, t);
     return {
       id: event.id,
@@ -40,7 +40,7 @@ export default async function AuditPage() {
         operation: (
           <span className="operator-mono operator-muted operator-nowrap">{event.operation}</span>
         ),
-        result: <StatusPill status={result.status} label={result.label} />,
+        result: { status: result.status, label: result.label },
         tenant: <span className="operator-mono">{event.tenantSlug ?? '—'}</span>,
         mission: event.mission_id ? (
           <Link
@@ -92,7 +92,9 @@ export default async function AuditPage() {
         </Section>
       ) : null}
       <Section title={t('audit_events_title')} description={t('audit_source_note')}>
-        <DataTable
+        <Table
+          row_key={ROW_KEY}
+          row_href_key={ROW_HREF}
           columns={[
             { key: 'time', label: t('col_time') },
             { key: 'action', label: t('col_action') },
@@ -102,7 +104,7 @@ export default async function AuditPage() {
             { key: 'mission', label: t('col_mission') },
             { key: 'reason', label: t('col_reason') },
           ]}
-          rows={rows}
+          rows={tableRows(rows)}
           empty={t('audit_empty')}
         />
       </Section>

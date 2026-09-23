@@ -1,4 +1,4 @@
-import { Badge, Grid, Metric, Section, StatusPill } from '@agent/shared-ui';
+import { Badge, Grid, Metric, Section, StatusPill, Table } from '@agent/shared-ui';
 import {
   buildSurfaceLauncherRecommendations,
   getSurfaceDirectory,
@@ -10,7 +10,7 @@ import { emitMosRead } from '@/lib/audit-mos';
 import { operatorTranslator } from '@/lib/i18n';
 import { getRequestLocale } from '@/lib/request-locale';
 import { asKbStatus, formatCount, statusText } from '@/lib/view';
-import { DataTable, type DataTableRow } from '@/components/DataTable';
+import { ROW_HREF, ROW_KEY, tableRows, type OperatorTableRow } from '@/lib/table-rows';
 import { OperatorPageHeader } from '../operator-shell';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +25,7 @@ export default async function SurfacesPage() {
   const locale = await getRequestLocale();
   const t = operatorTranslator(locale);
 
-  const directory: DataTableRow[] = rows.map((row) => ({
+  const directory: OperatorTableRow[] = rows.map((row) => ({
     id: row.id,
     cells: {
       surface: (
@@ -172,7 +172,9 @@ export default async function SurfacesPage() {
       </Section>
 
       <Section title={t('surfaces_directory_title')}>
-        <DataTable
+        <Table
+          row_key={ROW_KEY}
+          row_href_key={ROW_HREF}
           columns={[
             { key: 'surface', label: t('col_surface') },
             { key: 'runtime', label: t('col_runtime') },
@@ -181,7 +183,7 @@ export default async function SurfacesPage() {
             { key: 'fit', label: t('col_fit') },
             { key: 'command', label: t('col_next_command') },
           ]}
-          rows={directory}
+          rows={tableRows(directory)}
           empty={t('surfaces_empty')}
         />
       </Section>

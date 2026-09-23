@@ -1,18 +1,21 @@
 'use client';
 
-import {
-  BrainCircuit,
-  Building2,
-  CheckCircle2,
-  ChevronRight,
-  CircleAlert,
-  Clock3,
-  GitBranch,
-  RefreshCw,
-  ShieldCheck,
-  Target,
-} from 'lucide-react';
 import * as React from 'react';
+import type { KbFlowProps, KbStatus, KbTone } from '@agent/core/a2ui-catalog';
+import {
+  Badge,
+  Button,
+  Callout,
+  EmptyState,
+  KbChart,
+  List,
+  Metric,
+  Section,
+  Skeleton,
+  StatusPill,
+  Table,
+} from '@agent/shared-ui';
+import { ChronosDiagram, ChronosInline, ChronosMeta, ChronosToolbar } from './chronos-ui';
 import { useChronosLocale } from '../lib/hooks';
 import { uxMessage, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import { parseOrganizationOperatingModelResponse } from '../lib/organization-operating-model-response';
@@ -91,11 +94,96 @@ const HEALTH_LABEL_KEY: Record<OrganizationHealth, string> = {
   unknown: 'chronos_org_health_unknown',
 };
 
-const PRIORITY_CLASS: Record<OrganizationPriority, string> = {
-  high: 'kb-status-negative-border kb-status-negative-surface kb-status-negative',
-  medium: 'kb-status-warning-border kb-status-warning-surface kb-status-warning',
-  low: 'kb-border-subtle kb-surface-raised kb-text-secondary',
+const PRIORITY_TONE: Record<OrganizationPriority, KbTone> = {
+  high: 'danger',
+  medium: 'warning',
+  low: 'neutral',
 };
+
+const PRIORITY_LABEL_KEY: Record<OrganizationPriority, string> = {
+  high: 'chronos_org_priority_high',
+  medium: 'chronos_org_priority_medium',
+  low: 'chronos_org_priority_low',
+};
+
+/** Service health → canonical `ui:status-pill` status. */
+const HEALTH_STATUS: Record<OrganizationHealth, KbStatus> = {
+  healthy: 'ready',
+  degraded: 'degraded',
+  critical: 'error',
+  unknown: 'n/a',
+};
+
+const FLOW_NODE_LIMIT = 30;
+
+/**
+ * The operating structure as a `ui:flow`: domains → capabilities → services
+ * (service nodes carry their health), capped so the diagram stays legible.
+ */
+export function buildOrganizationFlowProps(
+  view: Pick<
+    OrganizationOperatingModelView,
+    'domains' | 'capabilities' | 'services' | 'service_states'
+  >,
+  locale: SupportedLocale
+): KbFlowProps {
+  const nodes: KbFlowProps['nodes'] = [];
+  const edges: NonNullable<KbFlowProps['edges']> = [];
+  const ids = new Set<string>();
+  const add = (node: KbFlowProps['nodes'][number]) => {
+    if (ids.has(node.id) || nodes.length >= FLOW_NODE_LIMIT) return;
+    ids.add(node.id);
+    nodes.push(node);
+  };
+  for (const domain of view.domains)
+    add({ id: `domain:${domain.domain_id}`, label: domain.name, stage: 'domain' });
+  for (const capability of view.capabilities)
+    add({
+      id: `capability:${capability.capability_id}`,
+      label: capability.name,
+      stage: 'capability',
+    });
+  for (const service of view.services) {
+    const health =
+      view.service_states.find((state) => state.service_id === service.service_id)?.health ||
+      'unknown';
+    add({
+      id: `service:${service.service_id}`,
+      label: service.name,
+      stage: 'service',
+      status: HEALTH_STATUS[health] ?? 'n/a',
+      meta: organizationHealthLabel(health, locale),
+    });
+  }
+  const link = (from: string, to: string) => {
+    if (ids.has(from) && ids.has(to)) edges.push({ from, to });
+  };
+  for (const domain of view.domains) {
+    for (const capabilityId of domain.capability_ids)
+      link(`domain:${domain.domain_id}`, `capability:${capabilityId}`);
+    for (const serviceId of domain.service_ids) {
+      const viaCapability = view.capabilities.some(
+        (capability) =>
+          domain.capability_ids.includes(capability.capability_id) &&
+          capability.service_ids.includes(serviceId)
+      );
+      if (!viaCapability) link(`domain:${domain.domain_id}`, `service:${serviceId}`);
+    }
+  }
+  for (const capability of view.capabilities)
+    for (const serviceId of capability.service_ids)
+      link(`capability:${capability.capability_id}`, `service:${serviceId}`);
+  return {
+    nodes,
+    edges,
+    stages: [
+      { id: 'domain', label: uxText('chronos_org_domains', locale) },
+      { id: 'capability', label: uxText('chronos_org_capabilities', locale) },
+      { id: 'service', label: uxText('chronos_org_services', locale) },
+    ],
+    density: 'compact',
+  };
+}
 
 export function organizationHealthLabel(health: string, locale: SupportedLocale): string {
   return uxText(HEALTH_LABEL_KEY[health as OrganizationHealth] || HEALTH_LABEL_KEY.unknown, locale);
@@ -110,43 +198,6 @@ export function organizationReadinessLabel(
   }
   if (readiness.purpose === 'draft') return uxText('chronos_org_readiness_draft', locale);
   return uxText('chronos_org_readiness_setup', locale);
-}
-
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-  detail,
-  tone = 'neutral',
-  compactValue = false,
-}: {
-  icon: typeof Building2;
-  label: string;
-  value: string | number;
-  detail: React.ReactNode;
-  tone?: 'neutral' | 'positive' | 'warning' | 'negative';
-  compactValue?: boolean;
-}) {
-  const toneClass = {
-    neutral: 'kb-border-subtle kb-surface-raised kb-text-primary',
-    positive: 'kb-status-positive-border kb-status-positive-surface kb-status-positive',
-    warning: 'kb-status-warning-border kb-status-warning-surface kb-status-warning',
-    negative: 'kb-status-negative-border kb-status-negative-surface kb-status-negative',
-  }[tone];
-  return (
-    <div className={`rounded-lg border p-3 ${toneClass}`}>
-      <div className="flex items-center gap-2 text-[11px] font-bold">
-        <Icon size={13} />
-        <span>{label}</span>
-      </div>
-      <div
-        className={`mt-2 font-semibold tracking-tight ${compactValue ? 'text-sm leading-5' : 'text-2xl'}`}
-      >
-        {value}
-      </div>
-      <div className="mt-1 text-[11px] leading-4 opacity-80">{detail}</div>
-    </div>
-  );
 }
 
 export function OrganizationOperatingModel({
@@ -196,250 +247,244 @@ export function OrganizationOperatingModel({
     return () => clearInterval(timer);
   }, [refresh]);
 
-  return (
-    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-bold kb-text-accent">
-            <Building2 size={14} />
-            {uxText('chronos_nav_organization', locale)}
-          </div>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight kb-text-primary">
-            {uxText('chronos_org_title', locale)}
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 kb-text-secondary">
-            {uxText('chronos_org_description', locale)}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          disabled={busy}
-          className="flex items-center gap-2 rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] font-bold kb-text-secondary disabled:opacity-50"
-        >
-          <RefreshCw size={12} className={busy ? 'animate-spin' : ''} />
-          {uxText('chronos_org_refresh', locale)}
-        </button>
-      </div>
+  const accounting = view?.control_plane.accounting;
+  const flowProps = React.useMemo(
+    () => (view ? buildOrganizationFlowProps(view, locale) : null),
+    [view, locale]
+  );
+  const readinessStatus: KbStatus = !view
+    ? 'n/a'
+    : view.readiness.purpose === 'approved' && view.readiness.operational_state === 'available'
+      ? 'ready'
+      : view.readiness.purpose === 'draft'
+        ? 'planned'
+        : 'needs_setup';
 
+  return (
+    <Section
+      title={uxText('chronos_org_title', locale)}
+      description={uxText('chronos_org_description', locale)}
+      actions={[
+        {
+          label: busy
+            ? uxText('chronos_ac_refreshing', locale)
+            : uxText('chronos_org_refresh', locale),
+          variant: 'ghost',
+          disabled: busy,
+          onClick: () => void refresh(),
+        },
+      ]}
+    >
       {error ? (
-        <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface px-3 py-2 text-[11px] kb-status-negative">
-          {uxText('chronos_org_load_failed', locale)}: {error}
-        </div>
+        <Callout tone="danger" title={uxText('chronos_org_load_failed', locale)} body={error} />
       ) : null}
 
       {!view && !error ? (
-        <div className="mt-6 rounded-lg border kb-border-subtle kb-surface-sunken p-5 text-sm kb-text-muted">
-          {tenant
-            ? uxText('chronos_org_loading', locale)
-            : uxText('chronos_organization_scope_hint', locale)}
-        </div>
+        tenant ? (
+          <Skeleton shape="card" lines={3} label={uxText('chronos_org_loading', locale)} />
+        ) : (
+          <EmptyState
+            title={uxText('chronos_org_select_tenant_title', locale)}
+            body={uxText('chronos_organization_scope_hint', locale)}
+          />
+        )
       ) : null}
 
-      {view ? (
+      {view && accounting ? (
         <>
-          <div className="mt-5 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] font-bold kb-text-accent">
-              {view.organization_id}
-            </span>
-            {tenant ? (
-              <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[11px] kb-text-secondary">
-                tenant: {tenant}
-              </span>
-            ) : null}
-            <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[11px] kb-text-secondary">
-              {uxText('chronos_org_readiness', locale)}:{' '}
-              {organizationReadinessLabel(view.readiness, locale)}
-            </span>
-            <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[11px] kb-text-secondary">
-              {uxText('chronos_org_reconciliation', locale)}: {view.reconciliation.status}
-            </span>
-          </div>
+          <ChronosInline>
+            <Badge label={view.organization_id} tone="accent" />
+            {tenant ? <Badge label={`${uxText('chronos_tenant', locale)}: ${tenant}`} /> : null}
+            <StatusPill
+              status={readinessStatus}
+              label={`${uxText('chronos_org_readiness', locale)}: ${organizationReadinessLabel(view.readiness, locale)}`}
+            />
+            <Badge
+              label={`${uxText('chronos_org_reconciliation', locale)}: ${view.reconciliation.status}`}
+              tone={view.reconciliation.status === 'ok' ? 'neutral' : 'warning'}
+            />
+          </ChronosInline>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              icon={Target}
-              label={uxText('chronos_org_purpose', locale)}
-              value={view.purpose?.purpose || uxText('chronos_org_not_configured', locale)}
-              detail={
-                view.purpose?.objectives?.length ? (
-                  <div>
-                    <div className="mb-1 text-[11px] font-bold">
-                      {uxText('chronos_org_objectives', locale)}
-                    </div>
-                    <ul className="list-disc space-y-1 pl-4">
-                      {view.purpose.objectives.map((objective) => (
-                        <li key={objective.objective_id}>{objective.title}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : (
-                  uxText('chronos_org_no_objectives', locale)
-                )
-              }
-              tone={view.readiness.purpose === 'approved' ? 'positive' : 'warning'}
-              compactValue
-            />
-            <MetricCard
-              icon={ShieldCheck}
+          <div className="chronos-metrics">
+            <Metric
               label={uxText('chronos_org_services', locale)}
-              value={`${view.control_plane.accounting.healthy_services}/${view.control_plane.accounting.active_services}`}
-              detail={uxMessage(
+              value={`${accounting.healthy_services}/${accounting.active_services}`}
+              tone={accounting.degraded_or_critical_services > 0 ? 'warning' : 'success'}
+              description={uxMessage(
                 'chronos_org_services_detail',
-                { degraded: view.control_plane.accounting.degraded_or_critical_services },
-                `${view.control_plane.accounting.degraded_or_critical_services} attention`,
+                { degraded: accounting.degraded_or_critical_services },
+                `${accounting.degraded_or_critical_services} attention`,
                 locale
               )}
-              tone={
-                view.control_plane.accounting.degraded_or_critical_services > 0
-                  ? 'warning'
-                  : 'positive'
-              }
             />
-            <MetricCard
-              icon={Clock3}
+            <Metric
               label={uxText('chronos_org_operations', locale)}
-              value={view.control_plane.accounting.active_operations}
-              detail={uxMessage(
+              value={accounting.active_operations}
+              tone={accounting.overdue_operations > 0 ? 'danger' : undefined}
+              description={uxMessage(
                 'chronos_org_operations_detail',
-                { overdue: view.control_plane.accounting.overdue_operations },
-                `${view.control_plane.accounting.overdue_operations} overdue`,
+                { overdue: accounting.overdue_operations },
+                `${accounting.overdue_operations} overdue`,
                 locale
               )}
-              tone={view.control_plane.accounting.overdue_operations > 0 ? 'negative' : 'neutral'}
             />
-            <MetricCard
-              icon={CircleAlert}
+            <Metric
               label={uxText('chronos_org_attention', locale)}
-              value={
-                view.control_plane.accounting.open_incidents +
-                view.control_plane.accounting.pending_decisions
+              value={accounting.open_incidents + accounting.pending_decisions}
+              tone={
+                accounting.open_incidents > 0
+                  ? 'danger'
+                  : accounting.pending_decisions > 0
+                    ? 'warning'
+                    : undefined
               }
-              detail={uxMessage(
+              description={uxMessage(
                 'chronos_org_attention_detail',
                 {
-                  incidents: view.control_plane.accounting.open_incidents,
-                  decisions: view.control_plane.accounting.pending_decisions,
+                  incidents: accounting.open_incidents,
+                  decisions: accounting.pending_decisions,
                 },
-                `${view.control_plane.accounting.open_incidents} incidents · ${view.control_plane.accounting.pending_decisions} decisions`,
+                `${accounting.open_incidents} incidents · ${accounting.pending_decisions} decisions`,
                 locale
               )}
-              tone={view.control_plane.accounting.open_incidents > 0 ? 'negative' : 'warning'}
+            />
+            <Metric
+              label={uxText('chronos_org_projects', locale)}
+              value={view.solution_projects.length}
+            />
+            <Metric
+              label={uxText('chronos_org_learning', locale)}
+              value={view.learning_candidates.length}
             />
           </div>
 
-          <div className="mt-6 grid gap-5 xl:grid-cols-[1.2fr,0.8fr]">
-            <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
-              <div className="flex items-center gap-2 text-xs font-bold kb-text-secondary">
-                <CircleAlert size={14} />
-                {uxText('chronos_org_interventions', locale)}
-              </div>
-              {view.control_plane.intervention_points.length > 0 ? (
-                <div className="mt-3 grid gap-2">
-                  {view.control_plane.intervention_points.slice(0, 6).map((point) => (
-                    <div
-                      key={`${point.kind}:${point.id}`}
-                      className="flex items-start gap-3 rounded-xl border kb-border-subtle kb-surface-raised p-3"
-                    >
-                      <span
-                        className={`rounded-full border px-2 py-1 text-[11px] font-bold ${PRIORITY_CLASS[point.priority]}`}
-                      >
-                        {point.priority}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="truncate text-[11px] font-semibold kb-text-primary">
-                          {point.id}
-                        </div>
-                        <div className="mt-1 text-[11px] leading-4 kb-text-muted">
-                          {point.reason}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          <div className="chronos-two-col">
+            <Section
+              headingLevel={3}
+              title={uxText('chronos_org_purpose', locale)}
+              tone={view.readiness.purpose === 'approved' ? undefined : 'warning'}
+            >
+              <p className="kb-text">
+                {view.purpose?.purpose || uxText('chronos_org_not_configured', locale)}
+              </p>
+              {view.purpose?.objectives?.length ? (
+                <>
+                  <h4 className="chronos-feed__title">
+                    {uxText('chronos_org_objectives', locale)}
+                  </h4>
+                  <List
+                    items={view.purpose.objectives.map((objective) => {
+                      const coverage = view.control_plane.outcome_accounting.objectives.find(
+                        (entry) => entry.objective_id === objective.objective_id
+                      )?.coverage;
+                      return {
+                        title: objective.title,
+                        ...(coverage
+                          ? {
+                              status: (coverage === 'linked' ? 'connected' : 'missing') as KbStatus,
+                              status_label: uxText(
+                                coverage === 'linked'
+                                  ? 'chronos_org_objective_linked'
+                                  : 'chronos_org_objective_unlinked',
+                                locale
+                              ),
+                            }
+                          : {}),
+                      };
+                    })}
+                  />
+                </>
               ) : (
-                <div className="mt-3 rounded-xl border kb-status-positive-border kb-status-positive-surface p-3 text-[11px] kb-status-positive">
-                  <CheckCircle2 className="mr-2 inline-block" size={13} />
-                  {uxText('chronos_org_no_interventions', locale)}
-                </div>
+                <p className="kb-text kb-text--muted">
+                  {uxText('chronos_org_no_objectives', locale)}
+                </p>
               )}
-            </div>
+            </Section>
 
-            <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
-              <div className="flex items-center gap-2 text-xs font-bold kb-text-secondary">
-                <GitBranch size={14} />
-                {uxText('chronos_org_structure', locale)}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                {[
-                  [uxText('chronos_org_domains', locale), view.domains.length],
-                  [uxText('chronos_org_capabilities', locale), view.capabilities.length],
-                  [uxText('chronos_org_projects', locale), view.solution_projects.length],
-                  [uxText('chronos_org_learning', locale), view.learning_candidates.length],
-                ].map(([label, value]) => (
-                  <div
-                    key={String(label)}
-                    className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2"
-                  >
-                    <div className="kb-text-muted">{label}</div>
-                    <div className="mt-1 text-lg font-semibold kb-text-primary">{value}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {view.services.slice(0, 5).map((service) => {
-                  const health =
-                    view.service_states.find((state) => state.service_id === service.service_id)
-                      ?.health || 'unknown';
-                  return (
-                    <span
-                      key={service.service_id}
-                      className="rounded-full border kb-border-subtle kb-surface-raised px-2.5 py-1 text-[11px] kb-text-secondary"
-                    >
-                      <span className="font-semibold kb-text-primary">{service.name}</span> ·{' '}
-                      {organizationHealthLabel(health, locale)}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
+            <Section headingLevel={3} title={uxText('chronos_org_interventions', locale)}>
+              {view.control_plane.intervention_points.length > 0 ? (
+                <Table
+                  columns={[
+                    {
+                      key: 'priority',
+                      label: uxText('chronos_org_col_priority', locale),
+                      width: '7rem',
+                    },
+                    { key: 'item', label: uxText('chronos_org_col_item', locale) },
+                    { key: 'reason', label: uxText('chronos_org_col_reason', locale) },
+                  ]}
+                  rows={view.control_plane.intervention_points.slice(0, 6).map((point) => ({
+                    priority: {
+                      badge: uxText(
+                        PRIORITY_LABEL_KEY[point.priority] || PRIORITY_LABEL_KEY.low,
+                        locale
+                      ),
+                      tone: PRIORITY_TONE[point.priority] || 'neutral',
+                    },
+                    item: { title: point.id, id: point.kind },
+                    reason: point.reason,
+                  }))}
+                />
+              ) : (
+                <Callout tone="success" title={uxText('chronos_org_no_interventions', locale)} />
+              )}
+            </Section>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t kb-border-subtle pt-4">
-            <div className="flex items-center gap-2 text-[11px] kb-text-muted">
-              <BrainCircuit size={13} />
+          <Section
+            headingLevel={3}
+            title={uxText('chronos_org_structure', locale)}
+            description={uxMessage(
+              'chronos_org_structure_counts',
+              {
+                domains: view.domains.length,
+                capabilities: view.capabilities.length,
+                services: view.services.length,
+              },
+              '{domains} domains · {capabilities} capabilities · {services} services',
+              locale
+            )}
+          >
+            {flowProps && flowProps.nodes.length > 0 ? (
+              <ChronosDiagram>
+                <KbChart type="ui:flow" props={flowProps as unknown as Record<string, unknown>} />
+              </ChronosDiagram>
+            ) : (
+              <p className="kb-text kb-text--muted">
+                {uxText('chronos_org_structure_empty', locale)}
+              </p>
+            )}
+          </Section>
+
+          <ChronosToolbar>
+            <ChronosMeta>
               {uxMessage(
                 'chronos_org_learning_detail',
                 { count: view.learning_candidates.length },
                 `${view.learning_candidates.length} learning candidates`,
                 locale
               )}
+            </ChronosMeta>
+            <div className="chronos-toolbar__end">
+              <ChronosInline>
+                {onOpenOperations ? (
+                  <Button
+                    label={uxText('chronos_org_open_operations', locale)}
+                    onClick={onOpenOperations}
+                  />
+                ) : null}
+                {onOpenGovernance ? (
+                  <Button
+                    variant="primary"
+                    label={uxText('chronos_org_open_governance', locale)}
+                    onClick={onOpenGovernance}
+                  />
+                ) : null}
+              </ChronosInline>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {onOpenOperations ? (
-                <button
-                  type="button"
-                  onClick={onOpenOperations}
-                  className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] font-bold kb-text-secondary"
-                >
-                  {uxText('chronos_org_open_operations', locale)}{' '}
-                  <ChevronRight className="ml-1 inline-block" size={12} />
-                </button>
-              ) : null}
-              {onOpenGovernance ? (
-                <button
-                  type="button"
-                  onClick={onOpenGovernance}
-                  className="rounded-xl border kb-border-accent kb-surface-accent px-3 py-2 text-[11px] font-bold kb-text-accent"
-                >
-                  {uxText('chronos_org_open_governance', locale)}{' '}
-                  <ChevronRight className="ml-1 inline-block" size={12} />
-                </button>
-              ) : null}
-            </div>
-          </div>
+          </ChronosToolbar>
         </>
       ) : null}
-    </section>
+    </Section>
   );
 }

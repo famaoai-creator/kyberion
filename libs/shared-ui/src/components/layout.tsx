@@ -8,7 +8,7 @@ import type {
   KbStackProps,
 } from '@agent/core/a2ui-catalog';
 import { asArray } from '../safety.js';
-import { ActionRefButton } from './controls.js';
+import { ActionRefButton, type ActionRefLike } from './controls.js';
 import { toneAttr } from './feedback.js';
 
 const GAPS: ReadonlySet<string> = new Set(['none', 'xs', 'sm', 'md', 'lg', 'xl']);
@@ -54,7 +54,13 @@ export function Grid({ gap, columns, min_column_width, children }: GridProps) {
   );
 }
 
-export type SectionProps = KbSectionProps & {
+export type SectionProps = Omit<KbSectionProps, 'actions'> & {
+  /**
+   * Header actions: catalog refs (`href`, or `action` — an `{ id, payload? }`
+   * or bare id dispatched to the `A2UIActionProvider`'s `onAction`) or
+   * React-only `{ label, onClick }` refs.
+   */
+  actions?: ActionRefLike[];
   children?: ReactNode;
   /** Heading level for the title (default 2). */
   headingLevel?: 2 | 3 | 4;

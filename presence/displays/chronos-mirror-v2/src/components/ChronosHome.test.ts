@@ -59,6 +59,16 @@ describe('UI-07 chronos navigation groups', () => {
   });
 });
 
+/** `KbActionRef.action` may also be a bare action id string. */
+function actionOf(
+  ref: { action?: unknown } | undefined
+): { id?: string; payload?: unknown } | undefined {
+  const action = ref?.action;
+  return action && typeof action === 'object'
+    ? (action as { id?: string; payload?: unknown })
+    : undefined;
+}
+
 describe('UI-07 home next action', () => {
   it('prioritises blocked missions, then approvals, then runtime issues', () => {
     const blocked = buildChronosNextAction({
@@ -68,7 +78,7 @@ describe('UI-07 home next action', () => {
       message,
     });
     expect(blocked.title).toBe('chronos_home_action_blocked');
-    expect(blocked.primary?.action?.id).toBe(CHRONOS_ACTIONS.openScenario);
+    expect(actionOf(blocked.primary)?.id).toBe(CHRONOS_ACTIONS.openScenario);
 
     const approvals = buildChronosNextAction({
       summary: summary({ pendingApprovals: 1 }),
@@ -77,11 +87,11 @@ describe('UI-07 home next action', () => {
       message,
     });
     expect(approvals.reason).toBe('chronos_home_reason_approvals:1');
-    expect(approvals.primary?.action?.payload).toEqual({ section: 'approvals' });
+    expect(actionOf(approvals.primary)?.payload).toEqual({ section: 'approvals' });
 
     const runtime = buildChronosNextAction({ summary: summary({}), runtimeIssues: 3, t, message });
     expect(runtime.title).toBe('chronos_home_action_runtime');
-    expect(runtime.primary?.action?.payload).toEqual({ section: 'operations' });
+    expect(actionOf(runtime.primary)?.payload).toEqual({ section: 'operations' });
   });
 
   it('falls back to a calm empty state', () => {

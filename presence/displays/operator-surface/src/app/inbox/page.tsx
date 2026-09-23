@@ -1,11 +1,11 @@
 import { listInboxEntries } from '@agent/core/deliverable-inbox';
-import { Section, StatusPill } from '@agent/shared-ui';
+import { Section, Table } from '@agent/shared-ui';
 import type { KbStatus } from '@agent/core/a2ui-catalog';
 import { emitMosRead } from '@/lib/audit-mos';
 import { operatorTranslator } from '@/lib/i18n';
 import { getRequestLocale } from '@/lib/request-locale';
 import { formatTimestamp } from '@/lib/view';
-import { DataTable, type DataTableRow } from '@/components/DataTable';
+import { ROW_HREF, ROW_KEY, tableRows, type OperatorTableRow } from '@/lib/table-rows';
 import { OperatorPageHeader } from '../operator-shell';
 
 export const dynamic = 'force-dynamic';
@@ -22,14 +22,14 @@ export default async function InboxPage() {
     return { status: 'n/a', label: status || '—' };
   };
 
-  const rows: DataTableRow[] = entries.map((entry) => {
+  const rows: OperatorTableRow[] = entries.map((entry) => {
     const pill = statusPill(entry.status);
     return {
       id: entry.entry_id,
       cells: {
-        entry: <span className="operator-mono">{entry.entry_id}</span>,
-        mission: <span className="operator-mono">{entry.mission_id ?? '—'}</span>,
-        status: <StatusPill status={pill.status} label={pill.label} />,
+        entry: entry.entry_id,
+        mission: entry.mission_id ?? null,
+        status: { status: pill.status, label: pill.label },
         summary: (
           <span className="operator-cell">
             <span className="operator-cell__title">{entry.title}</span>
@@ -56,16 +56,18 @@ export default async function InboxPage() {
     <>
       <OperatorPageHeader title={t('inbox_title')} subtitle={t('inbox_subtitle')} />
       <Section>
-        <DataTable
+        <Table
+          row_key={ROW_KEY}
+          row_href_key={ROW_HREF}
           columns={[
-            { key: 'entry', label: t('col_entry') },
-            { key: 'mission', label: t('col_mission') },
+            { key: 'entry', label: t('col_entry'), mono: true },
+            { key: 'mission', label: t('col_mission'), mono: true },
             { key: 'status', label: t('col_status') },
             { key: 'summary', label: t('col_summary') },
             { key: 'updated', label: t('col_updated') },
             { key: 'action', label: t('col_action') },
           ]}
-          rows={rows}
+          rows={tableRows(rows)}
           empty={t('inbox_empty')}
         />
       </Section>
