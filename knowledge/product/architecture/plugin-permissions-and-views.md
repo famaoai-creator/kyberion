@@ -36,12 +36,18 @@ grant. Every read of a managed record re-derives all three; any drift yields
 `blocked_digest_mismatch`, and the loader re-checks the digest immediately
 before `import()` to keep the TOCTOU window small. Legacy records without a
 digest fall back to `pending_approval` and need one reinstall + re-approval.
+The approved manifest is the single one at the package root: packages with
+several root candidates (`manifest_ambiguous`) or any candidate below the root
+(`manifest_nested`) are `blocked_broken_manifest`, and managed-install readers
+(skill loader, grant resolution via the record) never walk to another one.
 
 Consequence: _every_ content change — including a `views/`-only change the
 apply ladder would classify as `config_apply` — is invisible to runtime until
-the new version is reinstalled and approved. The previous activation keeps
-running in the meantime (`reloadPlugin` answers "not activatable; previous
-activation kept"). Surfaces show the state honestly: the concierge plugin
+the new version is reinstalled and approved. Because the install replaces the
+managed copy in place, the previous activation is deactivated while the new
+version awaits approval (`reloadPlugin` answers "no longer activatable (new
+version awaits approval …); previous activation deactivated") — the old module
+could otherwise lazily load the unapproved files. Surfaces show the state honestly: the concierge plugin
 screen labels it "changed since approval — reinstall required" and refuses
 to approve the stale request with HTTP 409.
 

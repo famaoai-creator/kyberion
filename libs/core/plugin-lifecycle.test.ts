@@ -278,15 +278,16 @@ describe('plugin lifecycle e2e with the permissions fixture (EP-03/EP-04)', () =
     );
   });
 
-  it('keeps the previous activation when the new version is not approved', async () => {
+  it('deactivates the previous activation while the new version awaits approval', async () => {
     const { pluginId, managedRoot } = newIds('permfixture-unapproved');
     const record = installApproved(pluginId, fixtureSource(), managedRoot);
     await activatePlugin({ record }, { managedRoot });
     installApproved(pluginId, fixtureSource('export const x = 1;\n'), managedRoot, false);
     const result = await reloadPlugin(pluginId);
-    expect(result).toMatchObject({ ok: false, mode: 'plugin_reload', rolledBack: false });
-    expect(result.reason).toMatch(/not activatable/);
-    expect(ownerOf('ops', 'permfixture:write')).toBe(pluginId);
+    expect(result).toMatchObject({ ok: false, rolledBack: false });
+    expect(result.reason).toMatch(/no longer activatable \(new version awaits approval/);
+    expect(isPluginActive(pluginId)).toBe(false);
+    expect(ownerOf('ops', 'permfixture:write')).toBeUndefined();
   });
 
   it('deactivates the previous activation when the new version is rejected', async () => {
