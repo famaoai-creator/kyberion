@@ -843,5 +843,10 @@ export interface BuildOrganizationOperationInput {
   executionKind?: OrganizationOperationRecord['execution_target']['kind'];
   executionRef?: string;
   evidenceOutputs?: string[];
+  allowedActions?: string[];
+  approvalRequiredActions?: string[];
+  forbiddenActions?: string[];
+  sourceRefs?: string[];
+  status?: OrganizationOperationRecord['status'];
   rootDir?: string;
 }

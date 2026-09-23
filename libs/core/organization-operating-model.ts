@@ -202,7 +202,7 @@ export interface OrganizationOperationRecord {
   escalation_path: string[];
   evidence_outputs: string[];
   execution_target: {
-    kind: 'mission' | 'task_session' | 'pipeline' | 'actuator';
+    kind: 'mission' | 'task_session' | 'pipeline' | 'actuator' | 'runbook';
     ref?: string;
   };
   tier: OrganizationTier;
@@ -418,6 +418,9 @@ export interface OrganizationProjectLineage {
   status: string;
   tier: OrganizationTier;
   role: 'solution_project';
+  current_phase?:
+    'initiate' | 'define' | 'design' | 'build' | 'validate' | 'transfer_run' | 'run' | 'unknown';
+  state_updated_at?: string;
   track_ids: string[];
   mission_ids: string[];
   task_session_ids: string[];
@@ -497,7 +500,7 @@ export interface OrganizationManagementView {
       services: Array<{
         service_id: string;
         outcome: string;
-        health: OrganizationServiceState['health'] | OrganizationServiceRecord['status'];
+        health: OrganizationServiceState['health'];
         refs: string[];
       }>;
       operations: Array<{

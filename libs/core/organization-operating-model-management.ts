@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { listProjectRecords, loadProjectRecord } from './project-registry.js';
+import { loadProjectOperationalState } from './project-operational-state-registry.js';
 import { loadState } from './mission-state.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -83,10 +84,41 @@ const CADENCE_FILE_NAME = 'cadence.json';
 const DECISION_FILE_NAME = 'decision.json';
 const LEARNING_FILE_NAME = 'candidate.json';
 
+function hasFreshServiceObservation(state: OrganizationServiceState, now = Date.now()): boolean {
+  const sourceTime = Date.parse(state.source_timestamp);
+  return (
+    state.reconcile_status === 'current' &&
+    state.freshness_seconds > 0 &&
+    Number.isFinite(sourceTime) &&
+    sourceTime <= now &&
+    now - sourceTime <= state.freshness_seconds * 1000
+  );
+}
+
 export function buildOrganizationOperationRecord(
   input: BuildOrganizationOperationInput,
   now = nowIso()
 ): OrganizationOperationRecord {
+  if (input.executionKind === 'runbook') {
+    const ref = input.executionRef;
+    const scopePrefix =
+      input.tier === 'confidential'
+        ? `knowledge/confidential/${input.tenantSlug}/`
+        : input.tier === 'personal'
+          ? 'knowledge/personal/'
+          : 'knowledge/public/';
+    if (
+      !ref ||
+      ref.includes('\\') ||
+      ref.split('/').includes('..') ||
+      (!ref.startsWith(scopePrefix) && !ref.startsWith('knowledge/product/')) ||
+      !safeExistsSync(path.resolve(input.rootDir || pathResolver.rootDir(), ref))
+    ) {
+      throw new Error(
+        `Runbook execution ref must exist within the operation scope: ${ref || '(missing)'}`
+      );
+    }
+  }
   const record: OrganizationOperationRecord = {
     version: '1.0.0',
     operation_id: input.operationId,
@@ -101,9 +133,9 @@ export function buildOrganizationOperationRecord(
       ...(input.triggerExpression ? { expression: input.triggerExpression } : {}),
     },
     automation_boundary: {
-      allowed_actions: [],
-      approval_required_actions: [],
-      forbidden_actions: [],
+      allowed_actions: input.allowedActions || [],
+      approval_required_actions: input.approvalRequiredActions || [],
+      forbidden_actions: input.forbiddenActions || [],
     },
     escalation_path: [input.ownerRole],
     evidence_outputs: input.evidenceOutputs?.length
@@ -115,8 +147,9 @@ export function buildOrganizationOperationRecord(
     },
     tier: input.tier,
     ...(input.tenantSlug ? { tenant_slug: input.tenantSlug } : {}),
-    status: 'active',
+    status: input.status || 'active',
     updated_at: now,
+    ...(input.sourceRefs?.length ? { source_refs: input.sourceRefs } : {}),
   };
   assertRecordIdentity(record, input.rootDir);
   if (!validateOrganizationOperation(record)) {
@@ -298,9 +331,22 @@ export function buildOrganizationProjectLink(
       `Organization state not found for '${input.organizationId}'. Run 'init' first.`
     );
   }
-  if (!input.detach && !loadProjectRecord(input.projectId, { rootDir: input.rootDir })) {
+  const project = input.detach
+    ? null
+    : loadProjectRecord(input.projectId, { rootDir: input.rootDir });
+  if (!input.detach && !project) {
     throw new Error(
       `Project '${input.projectId}' not found in the project registry. Create it via 'pnpm project create' first.`
+    );
+  }
+  if (
+    project &&
+    (project.tier !== state.tier ||
+      project.tenant_slug !== state.tenant_slug ||
+      project.organization_id !== input.organizationId)
+  ) {
+    throw new Error(
+      `Project '${input.projectId}' scope does not match organization '${input.organizationId}'.`
     );
   }
   const current = state.active_project_ids || [];
@@ -541,7 +587,13 @@ export function reconcileOrganizationCatalog(query: {
     .filter((entry) => entry.status === 'active' && !stateById.has(entry.service_id))
     .map((entry) => entry.service_id);
   const staleServices = serviceStates
-    .filter((entry) => entry.reconcile_status === 'stale' || entry.reconcile_status === 'conflict')
+    .filter(
+      (entry) =>
+        servicesById.get(entry.service_id)?.status === 'active' &&
+        (entry.reconcile_status === 'stale' ||
+          entry.reconcile_status === 'conflict' ||
+          (entry.reconcile_status === 'current' && !hasFreshServiceObservation(entry)))
+    )
     .map((entry) => entry.service_id);
   const operations = listOrganizationOperations(query);
   const operationStates = listOrganizationOperationStates(query);
@@ -562,6 +614,24 @@ export function reconcileOrganizationCatalog(query: {
       return [`${entry.operation_id}:execution_target`];
     }
     if (!ref) return [];
+    if (entry.execution_target.kind === 'runbook') {
+      const scopePrefix =
+        entry.tier === 'confidential'
+          ? `knowledge/confidential/${entry.tenant_slug}/`
+          : entry.tier === 'personal'
+            ? 'knowledge/personal/'
+            : 'knowledge/public/';
+      if (
+        ref.includes('\\') ||
+        ref.split('/').includes('..') ||
+        (!ref.startsWith(scopePrefix) &&
+          !ref.startsWith('knowledge/product/') &&
+          !ref.startsWith('active/shared/')) ||
+        !safeExistsSync(path.resolve(query.rootDir || pathResolver.rootDir(), ref))
+      ) {
+        return [`${entry.operation_id}:${ref}`];
+      }
+    }
     if (entry.execution_target.kind === 'mission' && !loadState(ref, { rootDir: query.rootDir })) {
       return [`${entry.operation_id}:${ref}`];
     }
@@ -618,7 +688,12 @@ export function reconcileOrganizationCatalog(query: {
   const projects = listProjectRecords(query.rootDir || pathResolver.rootDir());
   const projectIds = new Set(
     projects
-      .filter((project) => !query.tier || project.tier === query.tier)
+      .filter(
+        (project) =>
+          (!query.tier || project.tier === query.tier) &&
+          project.tenant_slug === query.tenantSlug &&
+          project.organization_id === query.organizationId
+      )
       .map((project) => project.project_id)
   );
   const missingProjectRefs = projectRefs.filter((projectId) => !projectIds.has(projectId));
@@ -686,6 +761,21 @@ export function reconcileOrganizationState(query: {
     rootDir: query.rootDir,
   });
   const services = listOrganizationServiceStates(query);
+  const activeServiceIds = new Set(
+    listOrganizationServices(query)
+      .filter((service) => service.status === 'active')
+      .map((service) => service.service_id)
+  );
+  const currentHealthByService = new Map(
+    services
+      .filter(
+        (service) => activeServiceIds.has(service.service_id) && hasFreshServiceObservation(service)
+      )
+      .map((service) => [service.service_id, service.health])
+  );
+  const serviceHealth = [...activeServiceIds].map(
+    (serviceId) => currentHealthByService.get(serviceId) || 'unknown'
+  );
   const operations = listOrganizationOperations(query);
   const incidents = listOrganizationIncidents(query);
   const decisions = listOrganizationDecisions(query);
@@ -720,10 +810,10 @@ export function reconcileOrganizationState(query: {
           .filter((entry) => entry.status === 'proposed' || entry.status === 'pending_approval')
           .map((entry) => entry.decision_id),
         service_health_summary: {
-          healthy: services.filter((entry) => entry.health === 'healthy').length,
-          degraded: services.filter((entry) => entry.health === 'degraded').length,
-          critical: services.filter((entry) => entry.health === 'critical').length,
-          unknown: services.filter((entry) => entry.health === 'unknown').length,
+          healthy: serviceHealth.filter((health) => health === 'healthy').length,
+          degraded: serviceHealth.filter((health) => health === 'degraded').length,
+          critical: serviceHealth.filter((health) => health === 'critical').length,
+          unknown: serviceHealth.filter((health) => health === 'unknown').length,
         },
         last_reconciled_at: now,
         updated_at: now,
@@ -746,27 +836,35 @@ export function buildOrganizationProjectLineage(
   organizationId: string,
   tier: OrganizationTier | undefined,
   operationalState: OrganizationOperationalState | null,
-  rootDir?: string
+  rootDir?: string,
+  tenantSlug = 'shared'
 ): OrganizationProjectLineage[] {
   const referencedProjectIds = new Set(operationalState?.active_project_ids || []);
   return listProjectRecords(rootDir || pathResolver.rootDir())
     .filter((project) => !tier || project.tier === tier)
-    .filter(
-      (project) =>
-        referencedProjectIds.has(project.project_id) ||
-        project.metadata?.organization_id === organizationId
-    )
-    .map((project) => ({
-      project_id: project.project_id,
-      name: project.name,
-      status: project.status,
-      tier: project.tier,
-      role: 'solution_project' as const,
-      track_ids:
-        project.active_tracks || (project.default_track_id ? [project.default_track_id] : []),
-      mission_ids: project.active_missions || [],
-      task_session_ids: project.active_task_sessions || [],
-    }))
+    .filter((project) => (project.tenant_slug || 'shared') === tenantSlug)
+    .filter((project) => project.organization_id === organizationId)
+    .filter((project) => referencedProjectIds.has(project.project_id))
+    .map((project) => {
+      const state = loadProjectOperationalState(project.project_id, {
+        tier: project.tier,
+        tenantSlug: project.tenant_slug,
+        rootDir,
+      });
+      return {
+        project_id: project.project_id,
+        name: project.name,
+        status: project.status,
+        tier: project.tier,
+        role: 'solution_project' as const,
+        ...(state?.current_phase ? { current_phase: state.current_phase } : {}),
+        ...(state?.updated_at ? { state_updated_at: state.updated_at } : {}),
+        track_ids:
+          project.active_tracks || (project.default_track_id ? [project.default_track_id] : []),
+        mission_ids: project.active_missions || [],
+        task_session_ids: project.active_task_sessions || [],
+      };
+    })
     .sort((a, b) => a.project_id.localeCompare(b.project_id));
 }
 
@@ -948,7 +1046,8 @@ export function buildOrganizationManagementView(input: {
     input.organizationId,
     input.tier,
     operationalState,
-    input.rootDir
+    input.rootDir,
+    tenantSlug
   );
   const lineage = buildOrganizationLineage({
     organizationId: input.organizationId,
@@ -968,9 +1067,20 @@ export function buildOrganizationManagementView(input: {
     ...reconciliation.pending_decisions,
   ]).size;
   const activeServices = services.filter((entry) => entry.status === 'active').length;
-  const healthyServices = serviceStates.filter((entry) => entry.health === 'healthy').length;
+  const activeServiceIds = new Set(
+    services.filter((entry) => entry.status === 'active').map((entry) => entry.service_id)
+  );
+  const healthyServices = serviceStates.filter(
+    (entry) =>
+      activeServiceIds.has(entry.service_id) &&
+      hasFreshServiceObservation(entry) &&
+      entry.health === 'healthy'
+  ).length;
   const degradedOrCriticalServices = serviceStates.filter(
-    (entry) => entry.health === 'degraded' || entry.health === 'critical'
+    (entry) =>
+      activeServiceIds.has(entry.service_id) &&
+      hasFreshServiceObservation(entry) &&
+      (entry.health === 'degraded' || entry.health === 'critical')
   ).length;
   const openIncidents = incidents.filter(
     (entry) => entry.status !== 'resolved' && entry.status !== 'closed'
@@ -1035,12 +1145,18 @@ export function buildOrganizationManagementView(input: {
         : ('unlinked' as const),
       refs: outcomeRefs.filter((ref) => ref.includes(objective.objective_id)),
     })),
-    services: services.map((service) => ({
-      service_id: service.service_id,
-      outcome: service.outcome,
-      health: serviceStateById.get(service.service_id)?.health || service.status,
-      refs: serviceStateById.get(service.service_id)?.last_outcome_refs || [],
-    })),
+    services: services.map((service) => {
+      const state = serviceStateById.get(service.service_id);
+      return {
+        service_id: service.service_id,
+        outcome: service.outcome,
+        health:
+          service.status === 'active' && state && hasFreshServiceObservation(state)
+            ? state.health
+            : ('unknown' as const),
+        refs: state?.last_outcome_refs || [],
+      };
+    }),
     operations: operations.map((operation) => ({
       operation_id: operation.operation_id,
       result_summary: operationStateById.get(operation.operation_id)?.last_result_summary,
@@ -1068,7 +1184,7 @@ export function buildOrganizationManagementView(input: {
     catalog_version: catalog.version,
     control_plane: {
       accounting: {
-        active_projects: operationalState?.active_project_ids?.length || 0,
+        active_projects: solutionProjects.filter((project) => project.status === 'active').length,
         active_services: activeServices,
         healthy_services: healthyServices,
         degraded_or_critical_services: degradedOrCriticalServices,
