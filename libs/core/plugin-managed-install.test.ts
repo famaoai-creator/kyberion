@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { decideApprovalRequest, loadApprovalRequest } from './approval-store.js';
 import { withExecutionContext } from './authority.js';
 import {
+  computePluginContentDigest,
   installPluginManaged,
   isManagedPluginActivationAllowed,
   loadManagedPluginRecordAtPath,
@@ -11,8 +12,16 @@ import {
   refreshManagedPluginActivation,
 } from './plugin-managed-install.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { PluginTrustViolationError } from './plugin-source-trust.js';
+import { PluginPermissionNarrowedError, permissionsDigest } from './plugin-permissions.js';
 
 const cleanupPaths: string[] = [];
 
@@ -294,5 +303,291 @@ describe('installPluginManaged', () => {
     });
     expect(record.manifest).toBeNull();
     expect(record.activationStatus).toBe('blocked_broken_manifest');
+  });
+});
+
+const RECORD_FILE = '.kyberion-managed-plugin.json';
+
+function approve(record: { approvalChannel?: string; approvalRequestId?: string }): void {
+  const pending = loadApprovalRequest(
+    record.approvalChannel as string,
+    record.approvalRequestId as string
+  );
+  decideApprovalRequest('mission_controller', {
+    channel: record.approvalChannel as string,
+    requestId: record.approvalRequestId as string,
+    decision: 'approved',
+    decidedBy: 'human:operator',
+    decidedByType: 'human',
+    authenticated: true,
+    payloadHash: pending?.accountability?.payloadHash,
+    effectBinding: pending?.accountability?.effectBinding,
+  });
+}
+
+function readRecordJson(managedPath: string): Record<string, unknown> {
+  return JSON.parse(
+    String(safeReadFile(path.join(managedPath, RECORD_FILE), { encoding: 'utf8' }))
+  );
+}
+
+function rewriteRecord(managedPath: string, value: Record<string, unknown>): void {
+  withExecutionContext('mission_controller', () =>
+    safeWriteFile(path.join(managedPath, RECORD_FILE), JSON.stringify(value, null, 2))
+  );
+}
+
+/** Installs + approves a third-party plugin declaring fs readonly on the public tier. */
+function installApprovedThirdParty(name: string) {
+  const managedRoot = managedRootDir(name);
+  const src = sourceDir(name);
+  writeManifest(src, {
+    plugin_id: `${name}-sample`,
+    version: '1.0.0',
+    permissions: { fs: { mode: 'readonly', paths: [{ tier: 'public', prefix: 'docs' }] } },
+  });
+  safeWriteFile(path.join(src, 'index.mjs'), 'export const value = 1;\n');
+  const pluginId = `${name}-${process.pid}`;
+  const record = installPluginManaged({
+    pluginId,
+    sourcePath: src,
+    managedRoot,
+    requestedBy: 'test-suite',
+  });
+  approve(record);
+  const refreshed = refreshManagedPluginActivation(pluginId, managedRoot);
+  expect(refreshed?.activationStatus).toBe('activatable');
+  return { managedRoot, pluginId, record: refreshed! };
+}
+
+describe('EP-01 content digest binding', () => {
+  it('computes a stable digest that excludes the managed record and tracks content and paths', () => {
+    const dir = sourceDir('digest');
+    safeMkdir(path.join(dir, 'lib'), { recursive: true });
+    safeWriteFile(path.join(dir, 'a.txt'), 'alpha');
+    safeWriteFile(path.join(dir, 'lib', 'b.txt'), 'beta');
+    const first = computePluginContentDigest(dir);
+    expect(first).toMatch(/^[a-f0-9]{64}$/);
+
+    safeWriteFile(path.join(dir, RECORD_FILE), '{"ignored":true}');
+    expect(computePluginContentDigest(dir)).toBe(first);
+
+    safeWriteFile(path.join(dir, 'lib', 'b.txt'), 'betA');
+    const changed = computePluginContentDigest(dir);
+    expect(changed).not.toBe(first);
+
+    safeWriteFile(path.join(dir, 'lib', 'b.txt'), 'beta');
+    safeRmSync(path.join(dir, 'a.txt'));
+    safeWriteFile(path.join(dir, 'a2.txt'), 'alpha');
+    expect(computePluginContentDigest(dir)).not.toBe(first);
+  });
+
+  it('rejects symlinks inside the digested tree', () => {
+    const dir = sourceDir('digest-symlink');
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(path.join(dir, 'real.txt'), 'x');
+    safeSymlinkSync(path.join(dir, 'real.txt'), path.join(dir, 'link.txt'));
+    expect(() => computePluginContentDigest(dir)).toThrow('symlink');
+  });
+
+  it('records digest, version and narrowed grant, and binds them into the approval', () => {
+    const managedRoot = managedRootDir('binding');
+    const src = sourceDir('binding');
+    writeManifest(src, {
+      plugin_id: 'binding-sample',
+      version: '2.1.0',
+      permissions: {
+        fs: { mode: 'readwrite', paths: [{ tier: 'public', prefix: 'docs' }] },
+        env: ['HOME'],
+      },
+    });
+    const previews: unknown[] = [];
+    let managedExistedAtPreview = true;
+    const pluginId = `binding-${process.pid}`;
+    const record = installPluginManaged({
+      pluginId,
+      sourcePath: src,
+      managedRoot,
+      onPermissionsResolved: (preview) => {
+        previews.push(preview);
+        managedExistedAtPreview = safeExistsSync(path.join(managedRoot, pluginId));
+      },
+    });
+
+    expect(previews).toHaveLength(1);
+    expect(managedExistedAtPreview).toBe(false);
+    expect(record.contentDigest).toBe(computePluginContentDigest(record.managedPath));
+    expect(record.manifestVersion).toBe('2.1.0');
+    expect(record.grantedPermissions).toEqual({
+      network: { mode: 'none', hosts: [] },
+      fs: { mode: 'readonly', paths: [{ tier: 'public', prefix: 'docs' }] },
+      ops_invoke: [],
+      env: [],
+      secrets: [],
+    });
+    expect(record.permissionsDigest).toBe(permissionsDigest(record.grantedPermissions!));
+
+    const approval = loadApprovalRequest(
+      record.approvalChannel as string,
+      record.approvalRequestId as string
+    );
+    expect(approval?.status).toBe('pending');
+    expect(approval?.summary).toContain(
+      'fs=readonly [public:docs] (requested readwrite [public:docs])'
+    );
+    expect(approval?.details).toContain(record.contentDigest);
+    expect(readRecordJson(record.managedPath).contentDigest).toBe(record.contentDigest);
+  });
+
+  it('blocks an approved plugin whose managed copy changes by one byte', () => {
+    const { managedRoot, pluginId, record } = installApprovedThirdParty('tamper-byte');
+    withExecutionContext('mission_controller', () =>
+      safeWriteFile(path.join(record.managedPath, 'index.mjs'), 'export const value = 2;\n')
+    );
+
+    const listed = listManagedPlugins(managedRoot);
+    expect(listed[0]?.activationStatus).toBe('blocked_digest_mismatch');
+    expect(isManagedPluginActivationAllowed(listed[0]!)).toBe(false);
+
+    const refreshed = refreshManagedPluginActivation(pluginId, managedRoot);
+    expect(refreshed?.activationStatus).toBe('blocked_digest_mismatch');
+    expect(readRecordJson(record.managedPath).activationStatus).toBe('blocked_digest_mismatch');
+  });
+
+  it('blocks when the manifest version changes (on disk or in the record)', () => {
+    const { managedRoot, record } = installApprovedThirdParty('tamper-version');
+    const original = readRecordJson(record.managedPath);
+    rewriteRecord(record.managedPath, { ...original, manifestVersion: '9.9.9' });
+    expect(listManagedPlugins(managedRoot)[0]?.activationStatus).toBe('blocked_digest_mismatch');
+
+    rewriteRecord(record.managedPath, original);
+    expect(listManagedPlugins(managedRoot)[0]?.activationStatus).toBe('activatable');
+
+    const manifestPath = path.join(record.managedPath, 'plugin-manifest.json');
+    const manifest = JSON.parse(String(safeReadFile(manifestPath, { encoding: 'utf8' })));
+    withExecutionContext('mission_controller', () =>
+      safeWriteFile(manifestPath, JSON.stringify({ ...manifest, version: '1.0.1' }))
+    );
+    expect(listManagedPlugins(managedRoot)[0]?.activationStatus).toBe('blocked_digest_mismatch');
+  });
+
+  it('blocks when the recorded permission grant is widened', () => {
+    const { managedRoot, record } = installApprovedThirdParty('tamper-permissions');
+    const original = readRecordJson(record.managedPath);
+    const widened = {
+      ...(record.grantedPermissions as object),
+      fs: { mode: 'readwrite', paths: [{ tier: 'public', prefix: '' }] },
+    };
+    // Digest left stale.
+    rewriteRecord(record.managedPath, { ...original, grantedPermissions: widened });
+    expect(listManagedPlugins(managedRoot)[0]?.activationStatus).toBe('blocked_digest_mismatch');
+
+    // Digest recomputed to match the forged grant: still blocked (re-derived from manifest + policy).
+    rewriteRecord(record.managedPath, {
+      ...original,
+      grantedPermissions: widened,
+      permissionsDigest: permissionsDigest(widened as never),
+    });
+    expect(listManagedPlugins(managedRoot)[0]?.activationStatus).toBe('blocked_digest_mismatch');
+  });
+
+  it('treats a legacy record without a content digest as pending re-approval', () => {
+    const { managedRoot, pluginId, record } = installApprovedThirdParty('legacy');
+    const {
+      contentDigest: _contentDigest,
+      manifestVersion: _manifestVersion,
+      grantedPermissions: _grantedPermissions,
+      permissionsDigest: _permissionsDigest,
+      ...legacy
+    } = readRecordJson(record.managedPath);
+    rewriteRecord(record.managedPath, { ...legacy, activationStatus: 'activatable' });
+
+    const listed = listManagedPlugins(managedRoot);
+    expect(listed[0]?.contentDigest).toBeUndefined();
+    expect(listed[0]?.activationStatus).toBe('pending_approval');
+    expect(refreshManagedPluginActivation(pluginId, managedRoot)?.activationStatus).toBe(
+      'pending_approval'
+    );
+  });
+
+  it('rejects a record with a partial integrity binding', () => {
+    const { managedRoot, record } = installApprovedThirdParty('partial-binding');
+    const { permissionsDigest: _permissionsDigest, ...partial } = readRecordJson(
+      record.managedPath
+    );
+    rewriteRecord(record.managedPath, partial);
+    // Unreadable record degrades to a hand-placed, non-activatable entry.
+    const listed = listManagedPlugins(managedRoot);
+    expect(listed[0]?.activationStatus).not.toBe('activatable');
+  });
+
+  it('records a digest for official sources without requiring approval', () => {
+    const managedRoot = managedRootDir('official-digest');
+    const record = installPluginManaged({
+      pluginId: `official-digest-${process.pid}`,
+      sourcePath: pathResolver.rootResolve('plugins/kyberion'),
+      managedRoot,
+    });
+    expect(record.contentDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(record.approvalRequestId).toBeUndefined();
+    expect(record.activationStatus).toBe('activatable');
+    // The Cowork v1 descriptive permissions block is not an EP-02 declaration.
+    expect(record.grantedPermissions?.fs.mode).toBe('none');
+    expect(record.diagnostics.map((d) => d.code)).toContain('manifest_legacy_permissions_ignored');
+    expect(listManagedPlugins(managedRoot)[0]?.activationStatus).toBe('activatable');
+  });
+});
+
+describe('EP-02 install-time narrowing', () => {
+  it('aborts without staging anything when a critical capability narrows to nothing', () => {
+    const managedRoot = managedRootDir('narrowed');
+    const src = sourceDir('narrowed');
+    writeManifest(src, {
+      plugin_id: 'narrowed-sample',
+      permissions: { network: { mode: 'allowlist', hosts: ['api.example.com'] } },
+    });
+    let resolvedCalls = 0;
+    expect(() =>
+      installPluginManaged({
+        pluginId: `narrowed-${process.pid}`,
+        sourcePath: src,
+        managedRoot,
+        onPermissionsResolved: () => {
+          resolvedCalls += 1;
+        },
+      })
+    ).toThrow(PluginPermissionNarrowedError);
+    expect(resolvedCalls).toBe(0);
+    expect(listManagedPlugins(managedRoot)).toHaveLength(0);
+  });
+
+  it('treats a malformed permissions declaration as a broken manifest', () => {
+    const managedRoot = managedRootDir('bad-permissions');
+    const src = sourceDir('bad-permissions');
+    writeManifest(src, {
+      plugin_id: 'bad-permissions',
+      permissions: { network: { mode: 'any' } },
+    });
+    const record = installPluginManaged({
+      pluginId: `bad-permissions-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+    });
+    expect(record.activationStatus).toBe('blocked_broken_manifest');
+    expect(record.approvalRequestId).toBeUndefined();
+    expect(record.diagnostics.map((d) => d.code)).toContain('manifest_invalid_permissions');
+  });
+
+  it('rejects an invalid tenant slug', () => {
+    const src = sourceDir('bad-tenant');
+    writeManifest(src, { plugin_id: 'bad-tenant' });
+    expect(() =>
+      installPluginManaged({
+        pluginId: `bad-tenant-${process.pid}`,
+        sourcePath: src,
+        managedRoot: managedRootDir('bad-tenant'),
+        tenantSlug: 'public',
+      })
+    ).toThrow('Invalid tenant slug');
   });
 });

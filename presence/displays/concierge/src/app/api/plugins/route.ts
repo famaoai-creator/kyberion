@@ -27,7 +27,12 @@ export interface PluginListEntry {
   /** Plugin id (managed slot name or configured file stem) — never a filesystem path. */
   id: string;
   trust: string;
-  status: 'activatable' | 'pending_approval' | 'blocked_broken_manifest' | 'not_loadable';
+  status:
+    | 'activatable'
+    | 'pending_approval'
+    | 'blocked_broken_manifest'
+    | 'blocked_digest_mismatch'
+    | 'not_loadable';
   source: 'configured' | 'managed';
   requested_by?: string;
   /** Present only while a human decision is still possible/relevant. */
