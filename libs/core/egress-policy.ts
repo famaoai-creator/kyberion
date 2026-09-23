@@ -5,7 +5,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
 import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { getActiveSandboxPolicy } from './sandbox-policy.js';
+import { getActiveSandboxPolicy, isSandboxNetworkHostAllowed } from './sandbox-policy.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
 import {
   _resetProviderEndpointDomainsForTests,
@@ -396,6 +396,15 @@ export function evaluateEgressPolicy(
       verdict: 'deny',
       hostname,
       reason: `[SANDBOX_NETWORK_DENIED] ${sandbox.provider ?? 'unknown'} sandbox denies network access.`,
+      mode: policy.mode || 'warn',
+      tier: context?.tier,
+    };
+  }
+  if (sandbox && !isSandboxNetworkHostAllowed(hostname)) {
+    return {
+      verdict: 'deny',
+      hostname,
+      reason: `[SANDBOX_NETWORK_DENIED] ${hostname} is outside the ${sandbox.provider ?? 'unknown'} sandbox network allowlist.`,
       mode: policy.mode || 'warn',
       tier: context?.tier,
     };

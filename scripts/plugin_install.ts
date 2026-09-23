@@ -21,6 +21,16 @@
  * requested / ceiling / granted table is printed before any approval request
  * is created. If a critical capability (fs / network / secrets) narrows to
  * nothing, nothing is installed and the required elevation is printed.
+ *
+ * EP-04: `--reload <id>` / `--deactivate <id>` drive the in-process plugin
+ * lifecycle (plugin-lifecycle.ts) for an installed managed plugin and print
+ * the apply-ladder result (config_apply / plugin_reload / restart_required).
+ * They act on THIS process only: a plugin that is not active here is
+ * activated by --reload (a verification of the approved copy) and
+ * --deactivate reports that there is nothing to dispose.
+ *
+ *   pnpm plugin:install --reload my-plugin [--managed-root <dir>] [--json]
+ *   pnpm plugin:install --deactivate my-plugin [--json]
  */
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { importPluginPack } from '@agent/core/plugin-pack';
@@ -30,6 +40,11 @@ import {
   PluginPermissionNarrowedError,
   type ManagedPluginRecord,
 } from '@agent/core/plugin-managed-install';
+import {
+  deactivatePlugin,
+  reloadPlugin,
+  type PluginLifecycleResult,
+} from '@agent/core/plugin-lifecycle';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -207,6 +222,81 @@ export function runPluginInstall(args: string[] = [], print: Print = () => undef
   return 0;
 }
 
+/** True when argv asks for an EP-04 lifecycle action instead of an install. */
+export function isPluginLifecycleCommand(args: string[]): boolean {
+  return args.some(
+    (arg) =>
+      arg === '--reload' ||
+      arg === '--deactivate' ||
+      arg.startsWith('--reload=') ||
+      arg.startsWith('--deactivate=')
+  );
+}
+
+function formatLifecycleResult(action: string, result: PluginLifecycleResult): string {
+  return [
+    `Plugin '${result.pluginId}' ${action}: ${result.ok ? 'ok' : 'not applied'}`,
+    `  mode:   ${result.mode}`,
+    `  reason: ${result.reason}`,
+    ...(result.rolledBack !== undefined ? [`  rolled back: ${result.rolledBack}`] : []),
+    ...(result.contentDigest ? [`  content digest: ${result.contentDigest}`] : []),
+  ].join('\n');
+}
+
+export async function runPluginLifecycleCommand(
+  args: string[] = [],
+  print: Print = () => undefined
+): Promise<number> {
+  const argv = createStandardYargs(['node', 'plugin_install', ...args])
+    .scriptName('plugin_install')
+    .option('reload', {
+      type: 'string',
+      describe: 'EP-04: reload an installed managed plugin in this process',
+    })
+    .option('deactivate', {
+      type: 'string',
+      describe: 'EP-04: deactivate a plugin active in this process',
+    })
+    .option('managed-root', { type: 'string' })
+    .option('json', { type: 'boolean', default: false })
+    .parseSync();
+
+  const reloadId = argv.reload ? String(argv.reload).trim() : '';
+  const deactivateId = argv.deactivate ? String(argv.deactivate).trim() : '';
+  if (Boolean(reloadId) === Boolean(deactivateId)) {
+    print('Usage: pnpm plugin:install --reload <plugin-id> | --deactivate <plugin-id>');
+    return 1;
+  }
+
+  let action: string;
+  let result: PluginLifecycleResult;
+  if (reloadId) {
+    action = 'reload';
+    try {
+      result = await reloadPlugin(reloadId, {
+        ...(argv['managed-root'] ? { managedRoot: String(argv['managed-root']) } : {}),
+      });
+    } catch (err) {
+      result = {
+        pluginId: reloadId,
+        ok: false,
+        mode: 'plugin_reload',
+        reason: err instanceof Error ? err.message : String(err),
+      };
+    }
+  } else {
+    action = 'deactivate';
+    result = deactivatePlugin(deactivateId);
+  }
+
+  print(
+    argv.json
+      ? JSON.stringify({ action, ...result }, null, 2)
+      : formatLifecycleResult(action, result)
+  );
+  return result.ok ? 0 : 1;
+}
+
 if (
   isDirectScript(import.meta.url, 'plugin_install.ts') ||
   isDirectScript(import.meta.url, 'plugin_install.js')
@@ -214,8 +304,10 @@ if (
   void defineScript({
     name: 'plugin:install',
     flags: [],
-    run(context) {
-      const status = runPluginInstall(context.argv, context.print);
+    async run(context) {
+      const status = isPluginLifecycleCommand(context.argv)
+        ? await runPluginLifecycleCommand(context.argv, context.print)
+        : runPluginInstall(context.argv, context.print);
       if (status !== 0) throw new Error(`plugin:install failed with exit code ${status}`);
     },
   })();

@@ -7,6 +7,7 @@
  */
 
 import { assertModuleInvariant } from './invariants.js';
+import { findPluginGrantDenial } from './sandbox-policy.js';
 
 export type OpPreflightDecision = 'allow' | 'block' | 'ask';
 
@@ -120,10 +121,32 @@ function approvalGuard(
   return undefined;
 }
 
+export const PLUGIN_GRANT_OPS_GUARD_ID = 'plugin-grant-ops';
+
+/**
+ * EP-03: while a plugin contribution is executing, only ops in its grant's
+ * `ops_invoke` (every enclosing plugin frame) may be dispatched. Built in
+ * (not a registered guard) so resetOpPreflight() cannot remove it, and
+ * evaluated first so no listener runs for a denied call.
+ */
+function pluginGrantOpsGuard(call: OpPreflightCall): OpPreflightResult | undefined {
+  const denied = findPluginGrantDenial('ops_invoke', call.op);
+  if (!denied) return undefined;
+  return {
+    decision: 'block',
+    reason: `[PLUGIN_GRANT_DENIED] plugin '${denied.pluginId}' is not granted ops_invoke '${call.op}'`,
+    terminate: true,
+    listener_ids: [],
+    guard_ids: [PLUGIN_GRANT_OPS_GUARD_ID],
+  };
+}
+
 /** Run serial repair/observation listeners, then monotonic guards. */
 export async function runOpPreflight(
   call: OpPreflightCall
 ): Promise<OpPreflightResult & { input: Record<string, unknown> }> {
+  const pluginDenied = pluginGrantOpsGuard(call);
+  if (pluginDenied) return assertPreflightResult({ ...pluginDenied, input: { ...call.params } });
   let input = { ...call.params };
   const originalInput = input;
   const listenerIds: string[] = [];
@@ -198,6 +221,8 @@ export async function runOpPreflight(
 export function runOpPreflightSync(
   call: OpPreflightCall
 ): OpPreflightResult & { input: Record<string, unknown> } {
+  const pluginDenied = pluginGrantOpsGuard(call);
+  if (pluginDenied) return assertPreflightResult({ ...pluginDenied, input: { ...call.params } });
   let input = { ...call.params };
   const originalInput = input;
   const listenerIds: string[] = [];
