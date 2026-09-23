@@ -218,6 +218,7 @@
 - [Mission Distillation Prompt](./product/governance/distill-prompt.md) (public | Unknown)
 - [Multi-Provider Co-Execution Contract](./product/governance/multi-provider-coexecution-contract.md) (public | Unknown)
 - [Operational Hints](./product/governance/HINTS.md) (public | Unknown)
+- [Organization Operations Runbook](./product/governance/organization-operations-runbook.md) (public | Unknown)
 - [PR前CI準備チェックリスト](./product/governance/pre-pr-ci-readiness-checklist.ja.md) (public | Codex)
 - [SOP: Multi-Agent Software Development & Review](./product/governance/multi-agent-development-sop.md) (public | Ecosystem Architect)
 - [SOP: TypeScript Core Base Stabilization](./product/governance/ts-base-stabilization-sop.md) (public | Ecosystem Architect)

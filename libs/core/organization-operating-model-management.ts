@@ -7,6 +7,11 @@ import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
+import {
+  nextOrganizationOperationDue,
+  organizationOperationDueProjection,
+} from './organization-operation-runtime.js';
+import { matchCronField } from './cron-utils.js';
 
 import {
   validatorFor,
@@ -99,6 +104,31 @@ export function buildOrganizationOperationRecord(
   input: BuildOrganizationOperationInput,
   now = nowIso()
 ): OrganizationOperationRecord {
+  if (input.triggerKind === 'schedule') {
+    const fields = input.triggerExpression?.trim().split(/\s+/) || [];
+    const domains = [
+      [0, 59],
+      [0, 23],
+      [1, 31],
+      [1, 12],
+      [0, 6],
+    ];
+    if (
+      fields.length !== 5 ||
+      fields.some((field, index) => {
+        const [min, max] = domains[index];
+        return !Array.from({ length: max - min + 1 }, (_, offset) => min + offset).some((value) =>
+          matchCronField(field, value)
+        );
+      })
+    )
+      throw new Error('Scheduled operation requires a valid five-field cron expression.');
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: input.triggerTimezone || 'UTC' });
+    } catch {
+      throw new Error('Scheduled operation requires a valid IANA timezone.');
+    }
+  }
   if (input.executionKind === 'runbook') {
     const ref = input.executionRef;
     const scopePrefix =
@@ -131,6 +161,9 @@ export function buildOrganizationOperationRecord(
     trigger: {
       kind: input.triggerKind || 'manual',
       ...(input.triggerExpression ? { expression: input.triggerExpression } : {}),
+      ...(input.triggerKind === 'schedule' && input.triggerTimezone
+        ? { timezone: input.triggerTimezone }
+        : {}),
     },
     automation_boundary: {
       allowed_actions: input.allowedActions || [],
@@ -156,6 +189,9 @@ export function buildOrganizationOperationRecord(
     throw new Error(
       `Invalid organization operation: ${validationErrors(validatorFor(OPERATION_SCHEMA_PATH))}`
     );
+  }
+  if (record.trigger.kind === 'schedule' && !nextOrganizationOperationDue(record)) {
+    throw new Error('Scheduled operation has no realizable occurrence in the supported horizon.');
   }
   return record;
 }
@@ -605,8 +641,15 @@ export function reconcileOrganizationCatalog(query: {
   const operationsWithoutState = operations
     .filter((entry) => entry.status === 'active' && !operationStateById.has(entry.operation_id))
     .map((entry) => entry.operation_id);
-  const overdueOperations = operationStates
-    .filter((entry) => entry.due_status === 'overdue' || entry.status === 'failed')
+  const overdueOperations = operations
+    .filter((entry) => {
+      const state = operationStateById.get(entry.operation_id) || null;
+      return (
+        entry.status === 'active' &&
+        (state?.status === 'failed' ||
+          organizationOperationDueProjection(entry, state).due_status === 'overdue')
+      );
+    })
     .map((entry) => entry.operation_id);
   const invalidExecutionRefs = operations.flatMap((entry) => {
     const ref = entry.execution_target.ref;
@@ -1135,6 +1178,12 @@ export function buildOrganizationManagementView(input: {
   ];
   const serviceStateById = new Map(serviceStates.map((entry) => [entry.service_id, entry]));
   const operationStateById = new Map(operationStates.map((entry) => [entry.operation_id, entry]));
+  const projectedOperationStates = operationStates.map((state) => {
+    const operation = operations.find((entry) => entry.operation_id === state.operation_id);
+    return operation
+      ? { ...state, ...organizationOperationDueProjection(operation, state) }
+      : state;
+  });
   const outcomeRefs = [...new Set(learningRefs)];
   const outcomeAccounting = {
     objectives: (purpose?.objectives || []).map((objective) => ({
@@ -1173,7 +1222,7 @@ export function buildOrganizationManagementView(input: {
     services,
     service_states: serviceStates,
     operations,
-    operation_states: operationStates,
+    operation_states: projectedOperationStates,
     incidents,
     cadences,
     decisions,
