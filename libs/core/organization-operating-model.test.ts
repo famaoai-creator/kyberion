@@ -933,6 +933,22 @@ describe('organization operating model', () => {
       now
     );
     expect(operation.trigger).toEqual({ kind: 'schedule', expression: '0 9 * * 1' });
+    expect(() =>
+      buildOrganizationOperationRecord(
+        {
+          organizationId,
+          operationId: 'op-impossible-schedule',
+          name: 'Impossible February day',
+          operationType: 'scheduled',
+          ownerRole: 'organization_owner',
+          tier: 'confidential',
+          tenantSlug,
+          triggerKind: 'schedule',
+          triggerExpression: '0 0 31 2 *',
+        },
+        now
+      )
+    ).toThrow(/no realizable occurrence/);
     saveOrganizationOperation(operation);
 
     // A decision must be traceable to the body that made it: reconciliation

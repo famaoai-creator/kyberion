@@ -3,6 +3,7 @@ import {
   buildOrganizationFlowProps,
   organizationHealthLabel,
   organizationReadinessLabel,
+  organizationInterventionCommand,
 } from './OrganizationOperatingModel';
 
 describe('OrganizationOperatingModel presentation helpers', () => {
@@ -25,6 +26,15 @@ describe('OrganizationOperatingModel presentation helpers', () => {
     expect(organizationHealthLabel('healthy', 'en')).toBe('healthy');
     expect(organizationHealthLabel('critical', 'ja')).toBe('重大');
     expect(organizationHealthLabel('unexpected', 'en')).toBe('unknown');
+  });
+
+  it('shows a tenant-scoped next command for an incident', () => {
+    expect(organizationInterventionCommand('incident', 'INC-1', 'ORG-1', 'acme')).toBe(
+      'pnpm organization incident list --organization-id ORG-1 --tier confidential --tenant-slug acme --incident-id INC-1 --json'
+    );
+    expect(organizationInterventionCommand('operation', 'OP-1:target', 'ORG-1', 'acme')).toContain(
+      '--operation-id OP-1 --json'
+    );
   });
 });
 
