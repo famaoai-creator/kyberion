@@ -11830,6 +11830,11 @@
         "ja": "失敗: {error}",
         "qps-ploc": "⟦Ƒȧïŀėḓ: {error} ŀőřė⟧"
       },
+      "offline_copy": {
+        "en": "This is an offline copy; open the brief from the approval server to decide.",
+        "ja": "これはオフラインのコピーです。判断するには承認サーバーからブリーフを開いてください。",
+        "qps-ploc": "⟦Ŧħïş ïş ȧñ őƒƒŀïñė ƈőṗẏ; őṗėñ ŧħė ƀřïėƒ ƒřőɱ ŧħė ȧṗṗřőṽȧŀ şėřṽėř ŧő ḓėƈïḓė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
       "approved_short": {
         "en": "Approved",
         "ja": "承認",

@@ -542,6 +542,13 @@ function clearAll() {
 
 function onRecording(payload) {
   if (!payload || !payload.file) return;
+  // A stop right after a chunk rotation can deliver an empty final chunk.
+  if (!payload.file.size) {
+    if (payload.final && rec.live && !rec.busy && !rec.queue.length)
+      setStatus(K('recording_stopped'), 'success');
+    else if (payload.final && rec.live) rec.queue.push({ file: null, final: true });
+    return;
+  }
   if (!rec.live) {
     if (payload.final) setStatus(K('recording_stopped'));
     return;
@@ -555,6 +562,11 @@ async function pumpTranscription() {
   if (rec.busy) return;
   const next = rec.queue.shift();
   if (!next) return;
+  if (!next.file) {
+    if (next.final) setStatus(K('recording_stopped'), 'success');
+    if (rec.queue.length) void pumpTranscription();
+    return;
+  }
   rec.busy = true;
   renderRecordState();
   try {
