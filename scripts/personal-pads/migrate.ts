@@ -110,7 +110,7 @@ function readMeetingMinutes(handoff: Record<string, unknown>): MeetingMinutesSca
   const markdownRef = handoff.minutes_path;
   if (jsonRef !== undefined && jsonRef !== null) {
     const raw = readLegacyText(jsonRef);
-    if (raw === undefined) omitted.push('minutes_json_path: ファイルが見つかりません');
+    if (raw === undefined) omitted.push('minutes_json_path: file not found');
     else {
       try {
         const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -132,13 +132,13 @@ function readMeetingMinutes(handoff: Record<string, unknown>): MeetingMinutesSca
           omitted,
         };
       } catch {
-        omitted.push('minutes_json_path: JSON が不正です');
+        omitted.push('minutes_json_path: invalid JSON');
       }
     }
   }
   if (markdownRef !== undefined && markdownRef !== null) {
     const markdown = readLegacyText(markdownRef);
-    if (markdown === undefined) omitted.push('minutes_path: ファイルが見つかりません');
+    if (markdown === undefined) omitted.push('minutes_path: file not found');
     else {
       return {
         fields: {
@@ -197,6 +197,8 @@ function readBody(padId: PadId, handoff: Record<string, unknown>): string | unde
     case 'screenshot-annotate': {
       const instruction = typeof handoff.instruction === 'string' ? handoff.instruction.trim() : '';
       const hasImage = typeof handoff.image_path === 'string' && Boolean(handoff.image_path.trim());
+      // The reconstructed body is part of the migration idempotency identity
+      // (content_sha256), so its wording must never change with the locale.
       return instruction || (hasImage ? '（画像 artifact）' : undefined);
     }
     case 'doc-drop': {
@@ -213,6 +215,8 @@ function readBody(padId: PadId, handoff: Record<string, unknown>): string | unde
         : [];
       const instruction = typeof handoff.instruction === 'string' ? handoff.instruction.trim() : '';
       if (!names.length && !instruction) return undefined;
+      // Hashed into the idempotency identity like the image body above.
+      // i18n-exempt: stable legacy body text hashed into the idempotency key
       return `${names.length ? `添付: ${names.join(', ')}` : ''}${instruction ? `\n確認メモ: ${instruction}` : ''}`.trim();
     }
     default:
@@ -277,11 +281,11 @@ function readLegacyArtifacts(
   const artifacts: PadArtifactInput[] = [];
   const omitted: string[] = [];
   if (candidates.length > 16)
-    omitted.push(`添付が16件を超えています（${candidates.length - 16}件）`);
+    omitted.push(`more than 16 attachments (${candidates.length - 16} over)`);
   for (const [index, candidate] of candidates.slice(0, 16).entries()) {
-    const label = candidate.name || `添付${index + 1}`;
+    const label = candidate.name || `attachment-${index + 1}`;
     if (!candidate.path) {
-      omitted.push(`${label}: パスがありません`);
+      omitted.push(`${label}: no path`);
       continue;
     }
     const resolved = candidate.path.startsWith('/')
@@ -289,22 +293,22 @@ function readLegacyArtifacts(
       : pathResolver.rootResolve(candidate.path);
     const relative = path.relative(tmpRoot, resolved);
     if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-      omitted.push(`${label}: 管理対象外のパス`);
+      omitted.push(`${label}: path outside the managed area`);
       continue;
     }
     try {
       assertSafeRepositoryPath(resolved);
       if (!safeExistsSync(resolved)) {
-        omitted.push(`${label}: ファイルが見つかりません`);
+        omitted.push(`${label}: file not found`);
         continue;
       }
       const bytes = safeReadFile(resolved, { encoding: null });
       if (!Buffer.isBuffer(bytes) || bytes.byteLength < 1) {
-        omitted.push(`${label}: 空または不正なファイル`);
+        omitted.push(`${label}: empty or invalid file`);
         continue;
       }
       if (bytes.byteLength > 12 * 1024 * 1024) {
-        omitted.push(`${label}: 12 MiB を超えています`);
+        omitted.push(`${label}: larger than 12 MiB`);
         continue;
       }
       artifacts.push({
@@ -316,7 +320,7 @@ function readLegacyArtifacts(
     } catch {
       // A missing or unsafe legacy attachment is held; migration never guesses
       // a replacement path or publishes a partial record as successful.
-      omitted.push(`${label}: 読み込みに失敗しました`);
+      omitted.push(`${label}: read failed`);
     }
   }
   return { artifacts, omitted };
@@ -523,7 +527,7 @@ export function migrateLegacyPads(
           ...(!principal ? ['viewer principal is missing'] : []),
           ...(body === undefined ? ['content path is missing'] : []),
           ...(omitted.length
-            ? [`移行元ファイルを完全には移行できません: ${omitted.join('、')}`]
+            ? [`source files cannot be migrated completely: ${omitted.join(', ')}`]
             : []),
         ];
         report.items.push({
