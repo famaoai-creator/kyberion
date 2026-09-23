@@ -24,6 +24,30 @@ import {
 } from './actions.js';
 
 describe('personal workbench', () => {
+  it('writes user-facing notes in the request locale', async () => {
+    const context = {
+      session_id: `pwb-locale-${Date.now()}`,
+      artifact_ref: 'active/shared/tmp/personal-workbench-locale',
+      viewer_principal: 'human:fixture',
+      scope: { scope_kind: 'tenant' as const, tier: 'personal' as const, tenant_slug: 'default' },
+    };
+    const outDir = pathResolver.sharedTmp(`personal-workbench-locale-${Date.now()}`);
+    const draft = (locale: 'en' | 'ja') =>
+      executePersonalWorkbenchAction({
+        action: 'email',
+        payload: { body_markdown: `Hello ${locale}`, to: 'a@example.com' },
+        context,
+        evidenceRef: '',
+        outDir,
+        locale,
+      });
+    const en = await draft('en');
+    const ja = await draft('ja');
+    expect(en.note).toBe(padT('en')('personal_workbench:note_email_local_draft'));
+    expect(ja.note).toBe(padT('ja')('personal_workbench:note_email_local_draft'));
+    expect(en.note).not.toBe(ja.note);
+  });
+
   it('validates configuration in public dry-run mode', async () => {
     const result = await main(['--dry-run', '--tier', 'public'], { dryRun: true });
     expect(result).toMatchObject({

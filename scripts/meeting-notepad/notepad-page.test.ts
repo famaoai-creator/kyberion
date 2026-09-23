@@ -97,7 +97,10 @@ describe('meeting notepad page (shared A2UI kit)', () => {
       expect(source).toContain(`'${type}'`);
     }
     expect(source).toContain("mode: 'record'");
-    expect(source).toContain('chunk_ms: 5000');
+    expect(source).toContain('chunk_ms: RECORD_CHUNK_MS');
+    // Each chunk is a complete file: sent on its own, never re-concatenated.
+    expect(source).not.toContain('new Blob(');
+    expect(source).toContain('rec.queue.shift()');
     expect(source).toContain("'X-MN-Token'");
     expect(source).toContain("'meeting-notepad.draft.v1'");
     expect(source).not.toMatch(KANA);

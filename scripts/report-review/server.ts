@@ -27,7 +27,13 @@ import {
 import { getRegisteredEnvText, nowIso, readTextFile } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
-import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
+import {
+  reviewLayerMarkup,
+  RV_LAYER_OPEN,
+  RV_LAYER_CLOSE,
+  RV_SAVE_CONFIG_CLOSE,
+  RV_SAVE_CONFIG_OPEN,
+} from './review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
@@ -116,8 +122,8 @@ export function createReportReviewRequestHandler(
   options: ReportReviewRequestHandlerOptions
 ): http.RequestListener {
   const { token: TOKEN, target, reviewContext, print } = options;
-  const CFG_OPEN = '<!--RV-SAVE-CONFIG-->';
-  const CFG_CLOSE = '<!--/RV-SAVE-CONFIG-->';
+  const CFG_OPEN = RV_SAVE_CONFIG_OPEN;
+  const CFG_CLOSE = RV_SAVE_CONFIG_CLOSE;
   const re = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const stripBetween = (html: string, o: string, c: string) =>
     html.replace(new RegExp(re(o) + '[\\s\\S]*?' + re(c), 'g'), '');
@@ -133,7 +139,11 @@ export function createReportReviewRequestHandler(
       : cfg + html;
     // レイヤが未焼き込みの場合のみ、配信時にオーバーレイ注入する
     if (!/id="rv-bar"/.test(html)) {
-      const layer = reviewLayerMarkup({ locale, assets: 'served' });
+      const layer = reviewLayerMarkup({
+        locale,
+        assets: 'served',
+        reportId: reviewContext.artifact_ref,
+      });
       // Replacer function: the layer carries script sources whose `$` must not be read as patterns.
       html = html.includes('</body>')
         ? html.replace('</body>', () => `${layer}\n</body>`)

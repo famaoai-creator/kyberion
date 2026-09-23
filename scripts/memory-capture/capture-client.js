@@ -54,8 +54,9 @@ function setStatus(text, tone) {
   else node.removeAttribute('data-tone');
 }
 
-function setControl(componentId, value) {
-  const node = document.getElementById(`kbf-${componentId}`);
+/** Write a field value into its rendered control (addressed by field name) without re-rendering it. */
+function setControl(name, value) {
+  const node = document.querySelector(`.kb-app-shell [name="${name}"]`);
   if (node) node.value = value;
 }
 
@@ -295,7 +296,7 @@ function handleAction(action) {
       if (payload.final && payload.text) {
         const text = String(payload.text).trim();
         model.notes = model.notes ? `${model.notes} ${text}` : text;
-        setControl('mc-notes-field', model.notes);
+        setControl('notes', model.notes);
         saveDraft();
       }
       return;

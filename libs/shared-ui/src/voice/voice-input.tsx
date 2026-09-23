@@ -111,8 +111,13 @@ export function VoiceInput(p: KbVoiceInputProps & KbFormComponentId) {
         if (showTranscript) setLocal((prev) => ({ ...prev, interim: final ? '' : text }));
         send('transcript', { text, final });
       },
-      onRecording: ({ file, durationMs, final }) =>
-        send('recording', { file, duration_ms: Math.round(durationMs), final }),
+      onRecording: ({ file, durationMs, offsetMs, final }) =>
+        send('recording', {
+          file,
+          duration_ms: Math.round(durationMs),
+          offset_ms: Math.round(offsetMs),
+          final,
+        }),
       onError: (code) => send('error', { code }),
     });
     controllerRef.current = controller;

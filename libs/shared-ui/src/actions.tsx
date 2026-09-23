@@ -27,6 +27,9 @@ export interface A2UILinkProps {
   'data-active'?: 'true';
   'data-nav-id'?: string;
   'data-tab-id'?: string;
+  /** Item `action` id when a link also dispatches an action (nav-rail / list items). */
+  'data-action-id'?: string;
+  id?: string;
 }
 
 export interface A2UIActionContextValue {

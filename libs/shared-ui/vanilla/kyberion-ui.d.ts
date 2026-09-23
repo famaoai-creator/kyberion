@@ -95,6 +95,9 @@ export declare function listProgressPercent(value: unknown): number | null;
 
 /** `ui:nav-rail` brand logo URL (same-origin / http(s) only); null otherwise. */
 export declare function navBrandLogo(value: unknown): string | null;
+/** Plain click / Enter (the page handles it) vs a modified or middle click (the browser does). */
+export declare function isPlainActivation(event: unknown): boolean;
+export declare function listItemTitleId(componentId: unknown, index: number): string;
 
 /** Valid options of a `ui:nav-rail` context switcher. */
 export declare function navContextOptions(context: {

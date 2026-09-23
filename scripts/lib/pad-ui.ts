@@ -26,7 +26,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import * as path from 'node:path';
 import { getUiMessageBundle } from '@agent/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeLstat, safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
 import { resolveLocale } from '@agent/core/locale';
 import {
   normalizeLocale,
@@ -36,12 +36,18 @@ import {
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
 import type { MessageParams } from '@agent/core/message-format';
+import { readKyberionDesignTokens, renderKyberionUiTokenBlock } from '../design-token-utils.js';
 
 /** Shared server-side mirror of the language choice (same as computer-surface). */
 export const PAD_LOCALE_COOKIE = 'kb-ui-locale';
 /** Locales a cookie or `Accept-Language` may select; `?lang=` also accepts any supported one. */
 export const PAD_PAGE_LOCALES = ['en', 'ja'] as const satisfies readonly SupportedLocale[];
 export const PAD_THEME_STORAGE_KEY = 'kyberion.ui.theme';
+/**
+ * Theme choice shared across the pads: each pad is its own origin (port), so
+ * localStorage is per pad, but cookies are per host — `light | dark | system`.
+ */
+export const PAD_THEME_COOKIE = 'kb-ui-theme';
 export const PAD_LOCALE_STORAGE_KEY = 'kyberion.ui.locale';
 
 export const PAD_UI_VANILLA_DIR = 'libs/shared-ui/vanilla';
@@ -103,10 +109,16 @@ function isOwnedPath(pathname: string): boolean {
  * null. The raw path must already be canonical (`[a-z0-9-]+.js`, no
  * percent-encoding), so `..`, `%2e%2e`, `%2F`, uppercase, `x.test.js`,
  * `.d.ts` and subdirectories never match; after decoding, the resolved path
- * must still sit directly in the vanilla directory and be a regular file
- * (not a symlink).
+ * must still sit directly in the vanilla directory, be one of its real entry
+ * names with the exact same case (a case-insensitive filesystem would
+ * otherwise resolve `forms.js` to a `Forms.js`), and be a regular file (not a
+ * symlink).
  */
-export function resolveSharedUiModule(pathname: string): string | null {
+export function resolveSharedUiModule(
+  pathname: string,
+  /** Real entry names of the vanilla directory (injectable for tests). */
+  entries?: ReadonlySet<string>
+): string | null {
   if (!pathname.startsWith(PAD_UI_ROUTES.modulePrefix)) return null;
   const raw = pathname.slice(PAD_UI_ROUTES.modulePrefix.length);
   if (!MODULE_FILE.test(raw)) return null;
@@ -120,8 +132,20 @@ export function resolveSharedUiModule(pathname: string): string | null {
   const dir = pathResolver.rootResolve(PAD_UI_VANILLA_DIR);
   const resolved = path.resolve(dir, decoded);
   if (path.dirname(resolved) !== dir) return null;
+  // Case-exact on case-insensitive filesystems (APFS / NTFS default): the
+  // name must be one of the directory's real entries, not just resolvable.
+  if (!(entries ?? vanillaModuleNames(dir)).has(decoded)) return null;
   if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) return null;
   return `${PAD_UI_VANILLA_DIR}/${decoded}`;
+}
+
+/** The real entry names of the vanilla directory (exact case). */
+function vanillaModuleNames(dir: string): ReadonlySet<string> {
+  try {
+    return new Set(safeReaddir(dir));
+  } catch {
+    return new Set();
+  }
 }
 
 /** `/shared-ui/messages/<locale>.json` -> the locale when it is exactly a supported one. */
@@ -317,11 +341,13 @@ function inlineScriptSource(source: string): string {
 }
 
 /**
- * Pre-paint theme: the shared stored choice (`kyberion.ui.theme`) as
- * `data-theme`; otherwise no attribute, so the generated tokens follow
- * `prefers-color-scheme`. Storage can be unavailable — never throw.
+ * Pre-paint theme: the `kb-ui-theme` cookie (shared by every pad on this
+ * host: `light | dark | system`), else this pad's stored choice
+ * (`kyberion.ui.theme`), as `data-theme`; `system` / nothing = no attribute,
+ * so the generated tokens follow `prefers-color-scheme`. Storage and cookies
+ * can be unavailable — never throw.
  */
-export const PAD_THEME_PREPAINT_SCRIPT = `(function(){var r=document.documentElement,v=null;try{v=window.localStorage.getItem(${JSON.stringify(PAD_THEME_STORAGE_KEY)});}catch(e){}if(v==='light'||v==='dark')r.setAttribute('data-theme',v);else r.removeAttribute('data-theme');})();`;
+export const PAD_THEME_PREPAINT_SCRIPT = `(function(){var r=document.documentElement,v=null;try{var m=/(?:^|;\\s*)${PAD_THEME_COOKIE}=(light|dark|system)(?:;|$)/.exec(document.cookie||'');if(m)v=m[1];}catch(e){}if(!v){try{v=window.localStorage.getItem(${JSON.stringify(PAD_THEME_STORAGE_KEY)});}catch(e){}}if(v==='light'||v==='dark')r.setAttribute('data-theme',v);else r.removeAttribute('data-theme');})();`;
 
 export interface PadHeaderOptions {
   locale: SupportedLocale;
@@ -357,12 +383,28 @@ export function renderPadHeader(options: PadHeaderOptions): string {
   ].join('');
 }
 
+/**
+ * A host for a sticky `ui:toolbar` (`sticky: true`): a `display: contents`
+ * wrapper (`.kb-sticky-host`), so the toolbar root sticks to the top of the
+ * page while its siblings scroll. Place it directly in the page flow (the
+ * main column or a tall stack), not inside a box of the toolbar's height.
+ */
+export function renderPadStickyHost(id: string): string {
+  return `<div id="${escapePadHtml(id)}" class="kb-sticky-host" data-pad-sticky></div>`;
+}
+
 export interface PadPageOptions {
   locale: SupportedLocale;
   /** Plain-text page title (escaped); the document title becomes "{title} — Kyberion". */
   title: string;
   /** Trusted pad markup, placed inside `<main class="kb-app-shell__main">`. */
   bodyHtml: string;
+  /**
+   * Trusted markup of a navigation column: placed in
+   * `<div class="kb-app-shell__nav">` before the main column (e.g. a host
+   * the page script fills with `ui:nav-rail`). Omitted = no nav column.
+   */
+  navHtml?: string;
   /** Trusted extra `<head>` markup (page CSS, preloads). */
   headExtra?: string;
   /** Inline ES module source (import from `/pad-ui/pad-client.js`, `/shared-ui/*.js`). */
@@ -413,6 +455,7 @@ export function renderPadPage(options: PadPageOptions): string {
     '</head>',
     '<body>',
     `<div class="kb-app-shell" data-density="${density}"${role}>`,
+    options.navHtml === undefined ? '' : `<div class="kb-app-shell__nav">${options.navHtml}</div>`,
     '<main class="kb-app-shell__main">',
     `<noscript><div class="kb-callout" data-tone="warning"><div class="kb-callout__content"><p class="kb-callout__body">${escapePadHtml(t('local_pads:noscript_notice'))}</p></div></div></noscript>`,
     options.bodyHtml,
@@ -428,14 +471,28 @@ export function renderPadPage(options: PadPageOptions): string {
 // Offline / stamped documents
 // ---------------------------------------------------------------------------
 
+export interface InlinePadStylesheetOptions {
+  /**
+   * `root` (default): tokens on `:root`, for a document. `host`: tokens on
+   * `:host` (with the `data-theme` / `prefers-color-scheme` variants as
+   * `:host(...)`), for a stylesheet placed inside a shadow root — generated
+   * from the design tokens, not rewritten from the page CSS.
+   */
+  scope?: 'root' | 'host';
+}
+
 /**
  * The token layer plus the component stylesheet as one CSS text, for
  * documents that must render without the pad server (report-review stamps).
  * Wrap it in `<style>`; `</style` cannot occur in the generated CSS, but it
  * is neutralized anyway.
  */
-export function inlinePadStylesheets(): string {
+export function inlinePadStylesheets(options: InlinePadStylesheetOptions = {}): string {
   const read = (file: string) =>
     String(safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' }));
-  return `${read(PAD_UI_TOKENS_CSS)}\n${read(PAD_UI_STYLESHEET)}`.replace(/<\/(style)/gi, '<\\/$1');
+  const tokens =
+    options.scope === 'host'
+      ? `${renderKyberionUiTokenBlock(readKyberionDesignTokens(), { scope: 'host' })}\n`
+      : read(PAD_UI_TOKENS_CSS);
+  return `${tokens}\n${read(PAD_UI_STYLESHEET)}`.replace(/<\/(style)/gi, '<\\/$1');
 }

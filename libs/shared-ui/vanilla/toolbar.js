@@ -7,6 +7,12 @@
  * host re-renders). Picked files reach the host only as the `onAction`
  * payload (`{ id, files: File[] }`) — never props, attributes or storage.
  *
+ * `description` on an item becomes its `title` tooltip plus hidden text
+ * referenced by `aria-describedby`. `sticky` sticks the toolbar root to the
+ * top of its scroll container: render it into a `.kb-sticky-host` (a
+ * `display: contents` wrapper, see pad-ui `padStickyHost`) placed directly
+ * in the page flow, so the host box does not confine it.
+ *
  * The pure helpers are shared with the React `Toolbar` (src/pads/toolbar.tsx).
  */
 import { rovingIndex } from './drawing-core.js';
@@ -69,12 +75,28 @@ export function toolbarItems(p) {
       accept: typeof raw.accept === 'string' ? raw.accept : '',
       multiple: raw.multiple === true,
       text: text(raw.text),
+      description: control ? text(raw.description) : '',
       tone: TONES.includes(raw.tone) ? raw.tone : '',
       control,
       focusable: control && !disabled,
     });
   });
   return out;
+}
+
+/** DOM id of an item's hidden description (`aria-describedby` target). */
+export function toolbarDescriptionId(componentId, item) {
+  const safe = (value) => String(value || '').replace(/[^A-Za-z0-9_-]/g, '-');
+  return `kbt-${safe(componentId) || 'toolbar'}-${safe(item.id)}-desc`;
+}
+
+/**
+ * Tooltip (`title`) of an item: its description, else the label of an
+ * icon-only item; '' when neither applies.
+ */
+export function toolbarItemTitle(item) {
+  if (item.description) return item.description;
+  return item.hideLabel ? item.label : '';
 }
 
 /** Index (into `items`) of the control that starts with tabindex 0; -1 when none. */
@@ -184,9 +206,15 @@ export function createToolbarRenderer(h) {
       button.setAttribute('tabindex', tabindex);
       button.tabIndex = Number(tabindex);
       if (item.disabled) button.disabled = true;
-      if (item.hideLabel) {
-        button.setAttribute('aria-label', item.label);
-        button.setAttribute('title', item.label);
+      if (item.hideLabel) button.setAttribute('aria-label', item.label);
+      const title = toolbarItemTitle(item);
+      if (title) button.setAttribute('title', title);
+      let description = null;
+      if (item.description) {
+        const descId = toolbarDescriptionId(c && c.id, item);
+        button.setAttribute('aria-describedby', descId);
+        description = el(ctx, 'span', 'kb-visually-hidden', item.description);
+        description.setAttribute('id', descId);
       }
       if (item.type === 'toggle') button.setAttribute('aria-pressed', String(item.pressed));
       if (item.icon) {
@@ -197,6 +225,7 @@ export function createToolbarRenderer(h) {
       if (!item.hideLabel) button.appendChild(el(ctx, 'span', 'kb-toolbar__label', item.label));
       buttons.set(index, button);
       root.appendChild(button);
+      if (description) root.appendChild(description);
 
       button.addEventListener('focus', () => {
         if (active !== index) setActive(index, false);

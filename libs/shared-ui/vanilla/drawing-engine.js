@@ -46,9 +46,49 @@ export function sketchTextSize(width) {
   return Math.max(14, 12 + width * 4);
 }
 
+/** Raster types a runtime `data:` image URL may carry (no SVG). */
+const DATA_IMAGE_URL = /^data:image\/(?:png|jpeg|gif|webp|avif|bmp);base64,[A-Za-z0-9+/=\s]+$/i;
+
+function isBlobLike(value) {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof value.size === 'number' &&
+    typeof value.type === 'string' &&
+    typeof value.slice === 'function'
+  );
+}
+
+/**
+ * Classify a runtime image source for the sketch board controller: a
+ * `File`/`Blob` (`blob`), a `blob:` object URL or a `data:image/*;base64`
+ * raster URL (`url`, runtime values only — props never accept inline data),
+ * an http(s) / same-origin URL that passed `safeHref` (`url`), or `null`
+ * (unsupported — the caller must not treat it as "remove").
+ * `safeHref` is the renderer's link check for plain URLs.
+ * @returns {{ kind: 'blob', blob: Blob } | { kind: 'url', url: string, crossOrigin: boolean } | null}
+ */
+export function sketchImageSource(source, safeHref) {
+  if (isBlobLike(source)) return { kind: 'blob', blob: source };
+  if (typeof source !== 'string') return null;
+  const value = source.trim();
+  if (/^blob:/i.test(value)) return { kind: 'url', url: value, crossOrigin: false };
+  if (/^data:/i.test(value)) {
+    return DATA_IMAGE_URL.test(value) ? { kind: 'url', url: value, crossOrigin: false } : null;
+  }
+  const safe = typeof safeHref === 'function' ? safeHref(value) : null;
+  if (!safe) return null;
+  return { kind: 'url', url: safe, crossOrigin: /^https?:/i.test(safe) };
+}
+
 /** Paint one stroke onto a 2D context. */
 export function paintStroke(g, stroke) {
   if (!g || !stroke) return;
+  if (stroke.tool === 'image') {
+    // A raster placed into the drawing layer (`loadImage(..., { layer: 'drawing' })`).
+    if (stroke.image) g.drawImage(stroke.image, stroke.x, stroke.y, stroke.w, stroke.h);
+    return;
+  }
   g.save();
   g.lineCap = 'round';
   g.lineJoin = 'round';
@@ -125,6 +165,7 @@ export function paintStroke(g, stroke) {
 /** A shape stroke too small to see (a click without a drag) is dropped. */
 export function isVisibleStroke(stroke) {
   if (!stroke) return false;
+  if (stroke.tool === 'image') return Boolean(stroke.image) && stroke.w > 0 && stroke.h > 0;
   if (stroke.tool === 'text') return String(stroke.text).trim() !== '';
   if (FREEHAND.has(stroke.tool)) return stroke.points.length > 0;
   return Math.abs(stroke.to.x - stroke.from.x) + Math.abs(stroke.to.y - stroke.from.y) >= 2;
@@ -185,6 +226,9 @@ export function createDrawingEngine(options) {
   let current = null;
   let pointerId = null;
   let image = null;
+  // Bumped by every background change (null included): a slower earlier
+  // load, or one still pending after a removal, never wins.
+  let backgroundToken = 0;
   let frame = 0;
   let disposed = false;
   const listeners = [];
@@ -347,6 +391,24 @@ export function createDrawingEngine(options) {
       img.src = src;
     });
 
+  /** Load a Blob or a URL string into an Image (object URLs are revoked after). */
+  const loadSource = async (source) => {
+    let url = null;
+    let revoke = null;
+    let crossOrigin = false;
+    if (typeof source === 'string') {
+      url = source;
+      crossOrigin = /^https?:/i.test(source);
+    } else if (source && win && win.URL && typeof win.URL.createObjectURL === 'function') {
+      url = win.URL.createObjectURL(source);
+      revoke = url;
+    }
+    if (!url) return null;
+    const loaded = await loadImage(url, crossOrigin);
+    if (revoke) win.URL.revokeObjectURL(revoke);
+    return loaded;
+  };
+
   const api = {
     get width() {
       return width;
@@ -408,31 +470,43 @@ export function createDrawingEngine(options) {
       return true;
     },
     /**
-     * Use a `File`/`Blob` or an http(s) / same-origin URL as the background
-     * (null removes it). Resolves true when the image loaded.
+     * Use an image as the background (null removes it). `source`: a
+     * `File`/`Blob`, a `blob:` / `data:image/*` URL, or an http(s) /
+     * same-origin URL (the caller checks plain URLs; see
+     * `sketchImageSource`). Resolves true when this call's image is shown —
+     * false when it failed to load or a later call superseded it.
      */
     async setBackgroundImage(source) {
+      backgroundToken += 1;
+      const token = backgroundToken;
       if (source === null || source === undefined) {
         image = null;
         render();
         return true;
       }
-      let url = null;
-      let revoke = null;
-      let crossOrigin = false;
-      if (typeof source === 'string') {
-        url = source;
-        crossOrigin = /^https?:/i.test(source);
-      } else if (win && win.URL && typeof win.URL.createObjectURL === 'function') {
-        url = win.URL.createObjectURL(source);
-        revoke = url;
-      }
-      if (!url) return false;
-      const loaded = await loadImage(url, crossOrigin);
-      if (revoke) win.URL.revokeObjectURL(revoke);
-      if (!loaded || disposed) return false;
+      const loaded = await loadSource(source);
+      if (!loaded || disposed || token !== backgroundToken) return false;
       image = loaded;
       render();
+      return true;
+    },
+    /**
+     * Place an image into the drawing layer (undoable, removed by `clear()`),
+     * fitted like the background — e.g. to restore saved drawing content.
+     * Resolves true when committed.
+     */
+    async addImage(source) {
+      const loaded = await loadSource(source);
+      if (!loaded || disposed) return false;
+      const box = containFit(
+        loaded.naturalWidth || loaded.width,
+        loaded.naturalHeight || loaded.height,
+        width,
+        height
+      );
+      const stroke = { tool: 'image', image: loaded, ...box };
+      if (!isVisibleStroke(stroke)) return false;
+      commit(stroke);
       return true;
     },
     /** PNG of the whole board (background included). */
@@ -464,4 +538,63 @@ export function createDrawingEngine(options) {
   };
   render();
   return api;
+}
+
+/**
+ * The `drawing.ready` controller over an engine (both renderers).
+ * `setBackgroundImage(source)` / `loadImage(source, { layer })` take runtime
+ * values — a `File`/`Blob`, a `blob:` / `data:image/*` URL or an http(s) /
+ * same-origin URL (`safeHref`); `null` removes the background. An
+ * unsupported source resolves false and changes nothing (never a silent
+ * clear). `layer: 'drawing'` puts the image into the undoable / clearable
+ * drawing layer (e.g. restoring saved content); `background` (default)
+ * replaces the background image.
+ * @param {any} engine
+ * @param {{ safeHref: (value: unknown) => string | null, onChange?: () => void, live?: () => boolean }} options
+ */
+export function createSketchController(engine, options) {
+  const live = typeof options.live === 'function' ? options.live : () => true;
+  const changed = () => {
+    if (live() && typeof options.onChange === 'function') options.onChange();
+  };
+  const resolve = (source) => {
+    const found = sketchImageSource(source, options.safeHref);
+    if (!found) return null;
+    return found.kind === 'blob' ? found.blob : found.url;
+  };
+  const controller = {
+    toBlob: () => engine.toBlob(),
+    isEmpty: () => engine.isEmpty(),
+    clear: () => {
+      engine.clear();
+      changed();
+    },
+    undo: () => {
+      engine.undo();
+      changed();
+    },
+    setBackgroundImage(source) {
+      if (source === null || source === undefined) {
+        return engine.setBackgroundImage(null).then((ok) => {
+          changed();
+          return ok;
+        });
+      }
+      const value = resolve(source);
+      if (value === null) return Promise.resolve(false);
+      return engine.setBackgroundImage(value).then((ok) => {
+        if (ok) changed();
+        return ok;
+      });
+    },
+    loadImage(source, loadOptions) {
+      const layer = loadOptions && loadOptions.layer === 'drawing' ? 'drawing' : 'background';
+      if (layer === 'background') return controller.setBackgroundImage(source);
+      const value = resolve(source);
+      if (value === null) return Promise.resolve(false);
+      // The engine's commit reports the change (onCommit).
+      return engine.addImage(value);
+    },
+  };
+  return controller;
 }

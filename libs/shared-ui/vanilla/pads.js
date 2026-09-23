@@ -20,6 +20,8 @@ export {
   toolbarRovingTarget,
   toolbarItemAction,
   toolbarPayload,
+  toolbarDescriptionId,
+  toolbarItemTitle,
 } from './toolbar.js';
 export {
   KB_DIALOG_ACTIONS,
@@ -30,6 +32,9 @@ export {
   dialogResult,
   dialogCancelResult,
   dialogTrapTarget,
+  dialogFocusables,
+  activeElementFor,
+  focusRootOf,
   isConnected,
 } from './dialog.js';
 export {
@@ -45,6 +50,7 @@ export {
   KB_DRAWING_TOOL_MESSAGE_KEYS,
   KB_DRAWING_ICON_PATHS,
   normalizeHexColor,
+  customColorView,
   drawingTools,
   drawingColors,
   drawingWidthRange,
@@ -52,6 +58,9 @@ export {
   drawingPaletteState,
   rovingIndex,
   sketchFileName,
+  sketchDownloadName,
+  sketchPasteScope,
+  isEditablePasteTarget,
   drawingIds,
 } from './drawing-core.js';
 export {
@@ -60,6 +69,8 @@ export {
   isVisibleStroke,
   containFit,
   sketchTextSize,
+  sketchImageSource,
+  createSketchController,
 } from './drawing-engine.js';
 export {
   sketchCanvasSize,
@@ -79,7 +90,7 @@ export const KB_PAD_TYPES = Object.freeze([
 /**
  * Build the pad renderers on top of `kyberion-ui.js`'s helpers (passed in to
  * keep this module free of a circular import).
- * @param {{ el: Function, setData: Function, safeHref: (value: unknown) => string | null }} h
+ * @param {{ el: Function, setData: Function, safeHref: (value: unknown) => string | null, appendChildren?: Function }} h
  */
 export function createPadRenderers(h) {
   return {

@@ -275,7 +275,14 @@ export interface KbNavItem {
   id: string;
   label: string;
   hint?: string;
-  href: string;
+  /** Navigation target; with `action` too, a plain click dispatches the action instead. */
+  href?: string;
+  /**
+   * Dispatched on activation (click / Enter / Space). Without `href` the item
+   * is a `<button>`; with `href` it stays a link and modified clicks (new
+   * tab) keep the browser behaviour. One of `href` / `action` is required.
+   */
+  action?: KbAction | string;
   icon?: string;
   active?: boolean;
 }
@@ -429,6 +436,14 @@ export interface KbListItem {
   /** 0–100: drawn as a small meter under the title, with accessible text. */
   progress?: number;
   href?: string;
+  /**
+   * Dispatched when the title is activated (click / Enter / Space): the
+   * title becomes a `<button>` (or keeps its `href` link, with a plain click
+   * dispatching instead of navigating).
+   */
+  action?: KbAction | string;
+  /** Trailing row actions (e.g. Delete), described by the row title. */
+  actions?: KbActionRef[];
 }
 
 export interface KbListProps {
@@ -710,7 +725,8 @@ export interface KbFileEntry {
   id: string;
   name: string;
   size?: number;
-  status: 'queued' | 'uploading' | 'done' | 'error';
+  /** `ready`: read locally and attached, not uploaded yet (the pad sends it later). */
+  status: 'queued' | 'ready' | 'uploading' | 'done' | 'error';
   /** 0–100 while `uploading`. */
   progress?: number;
   error?: string;
@@ -896,7 +912,12 @@ export const KB_VOICE_ACTIONS = Object.freeze({
   state: 'voice.state',
   /** `{ name, text, final: boolean }` — dictation interim / final text. */
   transcript: 'voice.transcript',
-  /** `{ name, file: File, duration_ms, final: boolean }` — record mode (one per chunk with `chunk_ms`). */
+  /**
+   * `{ name, file: File, duration_ms, offset_ms, final: boolean }` — record
+   * mode. With `chunk_ms` one complete, independently decodable file per
+   * chunk (`duration_ms` = the chunk, `offset_ms` = its start in the
+   * recording); the last one has `final: true`.
+   */
   recording: 'voice.recording',
   /** `{ name, code: KbVoiceErrorCode }` */
   error: 'voice.error',
@@ -919,6 +940,7 @@ export interface KbVoiceInputProps {
   mode?: 'dictation' | 'record';
   /** BCP-47 recognition language; default from the render locale (en → en-US, ja → ja-JP). */
   lang?: string;
+  /** Dictation: keep listening; a recognition that ends on its own (silence) restarts until stopped. */
   continuous?: boolean;
   /** Hold the button (or Space) to talk; otherwise click toggles. */
   push_to_talk?: boolean;
@@ -926,7 +948,7 @@ export interface KbVoiceInputProps {
   show_level?: boolean;
   /** Dictation: show the interim transcript line. */
   show_transcript?: boolean;
-  /** Record mode: deliver a chunk every N ms (default: one file on stop). */
+  /** Record mode: deliver a complete audio file every N ms (default: one file on stop). */
   chunk_ms?: number;
   /** Stop automatically after N seconds. */
   max_seconds?: number;
@@ -1023,6 +1045,8 @@ export interface KbToolbarItem {
   icon?: string;
   /** Icon-only button: the label becomes `aria-label` + `title`. */
   hide_label?: boolean;
+  /** Controls: longer hint shown as the `title` tooltip and read via `aria-describedby`. */
+  description?: string;
   variant?: KbButtonVariant;
   /** Toggle state (controlled). */
   pressed?: boolean;
@@ -1041,11 +1065,21 @@ export interface KbToolbarProps {
   /** Accessible name of the toolbar. */
   label: string;
   items: KbToolbarItem[];
+  /**
+   * Stick to the top of the scroll container. The toolbar root must sit
+   * directly in the page flow — render it into a `.kb-sticky-host`
+   * (`display: contents`) rather than a plain wrapper div.
+   */
   sticky?: boolean;
   density?: KbDensity;
 }
 
-/** `ui:dialog`: modal confirm / prompt / multi-choice (replaces confirm() / prompt()). */
+/**
+ * `ui:dialog`: modal confirm / prompt / multi-choice (replaces confirm() /
+ * prompt()). The component's `children` (A2UI child ids) render in the body
+ * between the message / input and the buttons (e.g. a `ui:voice-input`);
+ * the focus trap includes their controls.
+ */
 export interface KbDialogProps {
   open: boolean;
   title: string;
@@ -1109,6 +1143,14 @@ export interface KbSketchBoardProps {
   /** Undo depth (default 40); older strokes are flattened. */
   max_undo?: number;
   show_download?: boolean;
+  /** File name of the PNG download (default: from `name`); `.png` is ensured. */
+  download_name?: string;
+  /**
+   * With `accept_image_drop`: `board` (default) takes pasted images while the
+   * board has focus; `document` takes them anywhere on the page, except when
+   * the paste targets an editable field.
+   */
+  paste_scope?: 'board' | 'document';
 }
 
 /** What `drawing.ready` hands the host (runtime object, never serialized). */
@@ -1117,7 +1159,22 @@ export interface KbSketchController {
   isEmpty(): boolean;
   clear(): void;
   undo(): void;
+  /**
+   * Runtime values (not props): a `File`/`Blob`, a `blob:` or
+   * `data:image/{png,jpeg,gif,webp,avif,bmp};base64` URL, or an http(s) /
+   * same-origin URL. `null` removes the background; an unsupported source
+   * resolves false and changes nothing. The latest call wins.
+   */
   setBackgroundImage(source: Blob | string | null): Promise<boolean>;
+  /**
+   * `layer: 'background'` (default) = `setBackgroundImage`; `'drawing'`
+   * places the image into the drawing layer (undoable, removed by Clear) —
+   * e.g. to restore saved drawing content.
+   */
+  loadImage(
+    source: Blob | string,
+    options?: { layer?: 'background' | 'drawing' }
+  ): Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------

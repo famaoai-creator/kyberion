@@ -24,7 +24,8 @@
                 "type": "button",
                 "id": "export",
                 "label": "書き出す",
-                "icon": "⬇"
+                "icon": "⬇",
+                "description": "レポートを PDF でダウンロードします"
               },
               {
                 "type": "separator"
@@ -110,7 +111,7 @@
     {
       "id": "pad-dialog",
       "title": "ダイアログ ui:dialog",
-      "description": "confirm() と prompt() の置き換え。フォーカスはダイアログ内に移り、Tab は外に出ず、Escape でキャンセル、1 行入力では Enter で確定し、閉じると元の場所に戻ります。ここでは埋め込み表示、実際の画面では全面に重なります。",
+      "description": "confirm() と prompt() の置き換え。フォーカスはダイアログ内に移り、Tab は外に出ず、Escape でキャンセル、1 行入力では Enter で確定し、閉じると元の場所に戻ります。ここでは埋め込み表示、実際の画面では全面に重なります。入力とボタンの間に他のコンポーネント（ここでは音声入力）を入れられます。",
       "components": [
         {
           "id": "pd-rename",
@@ -153,6 +154,26 @@
                 "variant": "ghost"
               }
             ]
+          }
+        },
+        {
+          "id": "pd-note",
+          "type": "ui:dialog",
+          "props": {
+            "open": true,
+            "title": "コメントを追加",
+            "input": { "name": "note", "label": "コメント", "multiline": true }
+          },
+          "children": ["pd-note-voice"]
+        },
+        {
+          "id": "pd-note-voice",
+          "type": "ui:voice-input",
+          "props": {
+            "name": "note-voice",
+            "label": "コメントを口述",
+            "mode": "dictation",
+            "show_transcript": true
           }
         },
         {

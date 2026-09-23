@@ -223,6 +223,24 @@ describe('controlled fields dispatch field.change { name, value }', () => {
     );
   });
 
+  it('every value control carries the field key as its name attribute', () => {
+    const cases: Array<[string, Record<string, unknown>, string]> = [
+      ['ui:switch', { name: 'notify', label: 'N' }, 'input.kb-switch__input'],
+      ['ui:checkbox', { name: 'agree', label: 'A' }, 'input.kb-check__input'],
+      ['ui:text-field', { name: 'title', label: 'T' }, 'input.kb-input'],
+      ['ui:textarea', { name: 'notes', label: 'N' }, 'textarea'],
+      [
+        'ui:select',
+        { name: 'lang', label: 'L', options: [{ value: 'en', label: 'English' }] },
+        'select',
+      ],
+    ];
+    for (const [type, props, selector] of cases) {
+      const { root } = one(type, props);
+      expect(root.query(selector)!.getAttribute('name'), type).toBe(props.name);
+    }
+  });
+
   it('select renders a placeholder when no option matches and reports the chosen value', () => {
     const { root, actions } = one('ui:select', {
       name: 'lang',

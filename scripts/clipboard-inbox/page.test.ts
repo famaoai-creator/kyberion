@@ -77,6 +77,7 @@ describe('clipboard inbox page (shared A2UI kit)', () => {
     for (const type of [
       'ui:toolbar',
       'ui:section',
+      'ui:list',
       'ui:empty-state',
       'ui:textarea',
       'ui:callout',
@@ -85,6 +86,9 @@ describe('clipboard inbox page (shared A2UI kit)', () => {
       expect(source).toContain(`'${type}'`);
     }
     expect(source).toContain("'X-CI-Token'");
+    // One ui:list with a Delete row action, not one ui:section per clip.
+    expect(source).toContain("action: { id: 'clip.remove', payload: { item_id: item.id } }");
+    expect(source).not.toContain('ci-item-${item.id}');
     expect(source).not.toMatch(KANA);
   });
 

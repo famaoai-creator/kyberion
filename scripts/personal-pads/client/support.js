@@ -1,8 +1,8 @@
 /*
  * personal-pads browser runtime — pure helpers (served at `/personal-pads/support.js`).
- * DOM-free except `el` / `composeLayers`; no user-visible text.
+ * DOM-free except `el`; no user-visible text.
  */
-/* global document, FileReader, Blob, Image, atob */
+/* global document, FileReader */
 
 export const PAD_ICONS = Object.freeze({
   'memory-capture': 'book',
@@ -52,52 +52,9 @@ export function blobToDataUrl(blob) {
   });
 }
 
-/** `data:<mime>;base64,...` → Blob (the kit only takes a Blob or an http(s) URL as a background). */
-export function dataUrlToBlob(value) {
-  const match = /^data:([^;,]*)?;base64,(.*)$/s.exec(String(value || ''));
-  if (!match) return null;
-  const binary = atob(match[2].replace(/\s+/g, ''));
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return new Blob([bytes], { type: match[1] || 'application/octet-stream' });
-}
-
 export function dataUrlBytes(value) {
   const comma = String(value || '').indexOf(',');
   return comma < 0 ? 0 : Math.floor(((String(value).length - comma - 1) * 3) / 4);
-}
-
-export function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('image failed to load'));
-    image.src = src;
-  });
-}
-
-/** Stack data-URL images (contain-fit) into one PNG the size of the board. */
-export function composeLayers(layers, size) {
-  if (layers.length === 1) return Promise.resolve(dataUrlToBlob(layers[0]));
-  return Promise.all(layers.map(loadImage)).then(
-    (images) =>
-      new Promise((resolve, reject) => {
-        const canvas = el('canvas');
-        canvas.width = size.width;
-        canvas.height = size.height;
-        const g = canvas.getContext('2d');
-        for (const image of images) {
-          const scale = Math.min(
-            size.width / image.naturalWidth,
-            size.height / image.naturalHeight
-          );
-          const w = image.naturalWidth * scale;
-          const h = image.naturalHeight * scale;
-          g.drawImage(image, (size.width - w) / 2, (size.height - h) / 2, w, h);
-        }
-        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('export failed'))));
-      })
-  );
 }
 
 export function formatTime(value, locale) {
@@ -114,13 +71,6 @@ export function formatTime(value, locale) {
 /** The adapter keys of one file field: `{id}`, `{id}_name_{i}`, `{id}_data[_{i}]`. */
 export function fileKeyPattern(fieldId) {
   return new RegExp(`^${fieldId.replace(/[^A-Za-z0-9_]/g, '')}(?:_data(?:_\\d+)?|_name_\\d+)?$`);
-}
-
-/** Board name = the adapter download file name (the kit names the PNG after it). */
-export function boardName(field) {
-  return field.download && field.download.filename
-    ? field.download.filename.replace(/\.png$/i, '')
-    : field.id;
 }
 
 /**
@@ -169,13 +119,16 @@ export function fieldComponents(field, value, files) {
           id: `pp-f-${id}`,
           type: 'ui:sketch-board',
           props: {
-            name: boardName(field),
+            name: field.id,
             label: field.label,
             tools: (field.drawing_tools || []).map((tool) => tool.id),
             background: field.overlay_field ? 'transparent' : 'light',
             canvas_width: BOARD_SIZE.width,
             canvas_height: BOARD_SIZE.height,
             show_download: Boolean(field.download),
+            ...(field.download && field.download.filename
+              ? { download_name: field.download.filename }
+              : {}),
             accept_image_drop: Boolean(field.overlay_field),
           },
         },

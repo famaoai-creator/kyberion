@@ -56,6 +56,7 @@ function Toggle(props: KbSwitchProps & KbFormComponentId & { control: 'switch' |
           type="checkbox"
           role={control === 'switch' ? 'switch' : undefined}
           {...controlProps(p, ids)}
+          name={String(p.name ?? '')}
           checked={checked}
           onChange={(event) => {
             setChecked(event.target.checked);

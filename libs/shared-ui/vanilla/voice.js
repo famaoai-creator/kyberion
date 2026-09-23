@@ -32,6 +32,7 @@ export {
   KB_VOICE_INPUT_STATES,
   KB_VOICE_ERROR_CODES,
   KB_VOICE_RECORDER_TYPES,
+  KB_VOICE_MAX_RESTARTS,
   createVoiceController,
   formatElapsed,
   voiceLang,
@@ -382,11 +383,12 @@ export function createVoiceRenderers(h) {
           if (transcript) patch({ interim: final ? '' : text });
           dispatch(actions.transcript, { name: p.name, text, final });
         },
-        onRecording: ({ file, durationMs, final }) =>
+        onRecording: ({ file, durationMs, offsetMs, final }) =>
           dispatch(actions.recording, {
             name: p.name,
             file,
             duration_ms: Math.round(durationMs),
+            offset_ms: Math.round(offsetMs),
             final,
           }),
         onError: (code) => dispatch(actions.error, { name: p.name, code }),

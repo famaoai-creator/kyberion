@@ -67,7 +67,7 @@ function setStatus(text, tone) {
 
 function readyAttachments() {
   return model.attachments
-    .filter((item) => item.status === 'done')
+    .filter((item) => item.status === 'ready')
     .map((item) => ({ name: item.name, mime: item.mime, data_base64: item.data_base64 }));
 }
 
@@ -97,7 +97,7 @@ function loadDraft() {
           mime: String(item.mime || 'application/octet-stream'),
           size: Math.round(item.data_base64.length * 0.75),
           data_base64: item.data_base64,
-          status: 'done',
+          status: 'ready',
         }));
     }
   } catch {
@@ -124,7 +124,7 @@ async function addFiles(files, rename) {
     renderFiles();
     try {
       entry.data_base64 = await blobToBase64(file);
-      entry.status = 'done';
+      entry.status = 'ready';
       setStatus(`${K('attach_added')}: ${entry.name}`, 'success');
     } catch {
       entry.status = 'error';

@@ -6,8 +6,11 @@
  * written by `renderPadPage`), renders A2UI with the page's locale and `ui`
  * messages, and mounts the shared `ui:display-controls`:
  *
- *   theme    — stored in localStorage `kyberion.ui.theme` (light | dark;
- *              'system' removes it) and applied to <html data-theme> at once.
+ *   theme    — stored in the `kb-ui-theme` cookie (light | dark | system;
+ *              shared by every pad on this host — each pad is its own
+ *              origin, so localStorage alone would not be) and in
+ *              localStorage `kyberion.ui.theme` (light | dark; 'system'
+ *              removes it), and applied to <html data-theme> at once.
  *   language — stored in localStorage `kyberion.ui.locale` and the
  *              `kb-ui-locale` cookie (the server renders from it), then the
  *              page reloads without any `?lang=` override.
@@ -25,6 +28,8 @@ import {
 export const PAD_THEME_KEY = 'kyberion.ui.theme';
 export const PAD_LOCALE_KEY = 'kyberion.ui.locale';
 export const PAD_LOCALE_COOKIE = 'kb-ui-locale';
+export const PAD_THEME_COOKIE = 'kb-ui-theme';
+const THEMES = ['light', 'dark', 'system'];
 const LOCALE_TAG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/;
 
 let cachedBootstrap = null;
@@ -82,16 +87,35 @@ function writeStorage(key, value) {
   }
 }
 
-/** The stored theme choice: 'light' | 'dark' | 'system'. */
+function readCookie(name) {
+  try {
+    for (const part of String(document.cookie || '').split(';')) {
+      const eq = part.indexOf('=');
+      if (eq !== -1 && part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+    }
+  } catch {
+    // cookies unavailable
+  }
+  return null;
+}
+
+/** The theme choice: the shared cookie, else this pad's storage — 'light' | 'dark' | 'system'. */
 export function currentTheme() {
+  const shared = readCookie(PAD_THEME_COOKIE);
+  if (THEMES.includes(shared)) return shared;
   const value = readStorage(PAD_THEME_KEY);
   return value === 'light' || value === 'dark' ? value : 'system';
 }
 
-/** Apply and remember a theme without reloading. */
+/** Apply and remember a theme without reloading (this pad and, via the cookie, every pad). */
 export function setTheme(value) {
   const theme = value === 'light' || value === 'dark' ? value : 'system';
   writeStorage(PAD_THEME_KEY, theme === 'system' ? null : theme);
+  try {
+    document.cookie = `${PAD_THEME_COOKIE}=${theme}; path=/; max-age=31536000; SameSite=Lax`;
+  } catch {
+    // cookies blocked: this pad still remembers it
+  }
   const root = document.documentElement;
   if (theme === 'system') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', theme);

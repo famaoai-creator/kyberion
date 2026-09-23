@@ -326,6 +326,7 @@ async function workbench(input: PadActionInput): Promise<PadActionResult> {
     context: input.context,
     evidenceRef: input.record?.handoff_ref || '',
     outDir,
+    locale: input.locale,
   };
   switch (input.action_id) {
     case 'workbench.email-draft': {

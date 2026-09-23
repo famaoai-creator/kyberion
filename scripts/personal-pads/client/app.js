@@ -30,14 +30,11 @@
 import { bootPad, renderPadA2UI, t } from '/pad-ui/pad-client.js';
 import { disposeA2UI } from '/shared-ui/kyberion-ui.js';
 import {
-  BOARD_SIZE,
   FILE_KINDS,
   PAD_ICONS,
   READINESS_TONES,
   TIER_TONES,
   blobToDataUrl,
-  boardName,
-  composeLayers,
   dataUrlBytes,
   el,
   fieldComponents,
@@ -258,23 +255,31 @@ export function startPersonalPads() {
 
   // -- chrome: nav, scope chips, tier, pad heading ------------------------------
   function renderNav() {
-    render(H.nav, [
-      {
-        id: 'pp-nav',
-        type: 'ui:nav-rail',
-        props: {
-          label: T('nav_label'),
-          items: pads.map((pad) => ({
-            id: pad.id,
-            label: pad.label,
-            hint: pad.description,
-            icon: PAD_ICONS[pad.id],
-            href: `#pad=${encodeURIComponent(pad.id)}`,
-            active: pad.id === currentPad,
-          })),
+    render(
+      H.nav,
+      [
+        {
+          id: 'pp-nav',
+          type: 'ui:nav-rail',
+          props: {
+            label: T('nav_label'),
+            items: pads.map((pad) => ({
+              id: pad.id,
+              label: pad.label,
+              hint: pad.description,
+              icon: PAD_ICONS[pad.id],
+              // A real link (open in a new tab works); a plain click selects in place.
+              href: `#pad=${encodeURIComponent(pad.id)}`,
+              action: { id: 'pp.pad.select', payload: { pad: pad.id } },
+              active: pad.id === currentPad,
+            })),
+          },
         },
-      },
-    ]);
+      ],
+      (action) => {
+        if (action.id === 'pp.pad.select' && action.payload) selectPad(action.payload.pad);
+      }
+    );
   }
 
   function renderScope() {
@@ -414,7 +419,7 @@ export function startPersonalPads() {
       id: String(index),
       name: entry.name,
       size: entry.size,
-      status: entry.data ? 'done' : 'queued',
+      status: entry.data ? 'ready' : 'queued',
     }));
   }
 
@@ -430,8 +435,15 @@ export function startPersonalPads() {
     renderField(fieldId);
     for (const board of overlayBoardsFor(fieldId)) {
       const state = boards[board.id];
-      // A new screenshot (not a restored one) starts a new annotation background.
-      if (state && !restored) state.restoredData = '';
+      // A new screenshot (not a restored one) starts a new annotation: the
+      // restored drawing (it carries the old screenshot) is cleared.
+      if (state && !restored && (state.restoredData || state.restoredLoaded)) {
+        state.restoredData = '';
+        if (state.restoredLoaded && state.controller) state.controller.clear();
+        state.restoredLoaded = false;
+        state.strokes = 0;
+        exportBoard(board);
+      }
       applyBackground(board);
     }
     updatePreview();
@@ -509,7 +521,7 @@ export function startPersonalPads() {
     if (!board || !board.controller) return;
     const generation = fieldGeneration;
     const sequence = ++board.exportSeq;
-    if (board.strokes <= 0 && !board.restoredData) {
+    if (board.strokes <= 0) {
       delete fieldValues[field.id];
       updatePreview();
       return;
@@ -531,29 +543,34 @@ export function startPersonalPads() {
       });
   }
 
-  /** Background = overlay image (if any) under a restored drawing (if any). */
+  /** Background = the overlay image (screenshot) of the board, if any. */
   function applyBackground(field) {
     const board = boards[field.id];
     if (!board || !board.controller) return;
-    const layers = [];
-    if (field.overlay_field) {
-      const image = fieldValues[`${field.overlay_field}_data`];
-      if (image) layers.push(image);
-    }
-    if (board.restoredData) layers.push(board.restoredData);
+    const image = field.overlay_field ? fieldValues[`${field.overlay_field}_data`] : '';
     const sequence = ++board.backgroundSeq;
-    const done = () => {
-      if (sequence === board.backgroundSeq && (board.strokes > 0 || board.restoredData))
-        exportBoard(field);
-    };
-    const apply = layers.length
-      ? composeLayers(layers, BOARD_SIZE).then((blob) =>
-          sequence === board.backgroundSeq ? board.controller.setBackgroundImage(blob) : false
-        )
-      : board.controller.setBackgroundImage(null);
-    Promise.resolve(apply)
-      .then(done)
+    board.controller
+      .setBackgroundImage(image || null)
+      .then((ok) => {
+        if (ok && sequence === board.backgroundSeq && board.strokes > 0) exportBoard(field);
+      })
       .catch(() => say(T('status_attachment_read_failed'), 'danger'));
+  }
+
+  /** A saved drawing goes into the board's drawing layer (undoable, removed by Clear). */
+  function restoreDrawing(field) {
+    const board = boards[field.id];
+    if (!board || !board.controller || !board.restoredData || board.restoredLoaded) return;
+    board.restoredLoaded = true;
+    board.restoring = true;
+    board.controller
+      .loadImage(board.restoredData, { layer: 'drawing' })
+      .then((ok) => {
+        if (!ok) say(T('status_attachment_read_failed'), 'danger');
+      })
+      .finally(() => {
+        board.restoring = false;
+      });
   }
 
   function onBoardAction(field, action) {
@@ -562,9 +579,13 @@ export function startPersonalPads() {
     if (!board || payload.name !== board.name) return;
     if (action.id === 'drawing.ready') {
       board.controller = payload.controller;
-      if (board.restoredData || field.overlay_field) applyBackground(field);
+      if (field.overlay_field) applyBackground(field);
+      restoreDrawing(field);
     } else if (action.id === 'drawing.change' && typeof payload.strokes === 'number') {
       board.strokes = payload.strokes;
+      // Loading a saved drawing is not an edit (the stored value stays as is).
+      if (board.restoring) return;
+      if (payload.strokes === 0) board.restoredData = '';
       markDirty();
       exportBoard(field);
     } else if (action.id === 'drawing.background' && field.overlay_field) {
@@ -595,9 +616,11 @@ export function startPersonalPads() {
     if (!entry) return;
     if (entry.field.kind === 'drawing') {
       boards[fieldId] = {
-        name: boardName(entry.field),
+        name: entry.field.id,
         controller: null,
         strokes: 0,
+        restoring: false,
+        restoredLoaded: false,
         restoredData: boards[fieldId] ? boards[fieldId].restoredData : '',
         exportSeq: 0,
         backgroundSeq: 0,
@@ -948,7 +971,7 @@ export function startPersonalPads() {
       ]
         .filter(Boolean)
         .join(' · '),
-      href: `#record=${encodeURIComponent(record.record_id)}`,
+      action: { id: 'pp.record.open', payload: { record: record.record_id } },
     };
   }
 
@@ -968,7 +991,9 @@ export function startPersonalPads() {
       components = [
         { id: 'pp-history-list', type: 'ui:list', props: { items: historyRows.map(historyItem) } },
       ];
-    render(H.history, components);
+    render(H.history, components, (action) => {
+      if (action.id === 'pp.record.open' && action.payload) openRecord(action.payload.record);
+    });
     render(
       H.historyMore,
       historyCursor
@@ -1057,8 +1082,13 @@ export function startPersonalPads() {
           if (field.kind === 'drawing') {
             fieldValues[field.id] = data;
             fieldValues[`${field.id}_name_${index}`] = ref.name;
-            if (boards[field.id]) boards[field.id].restoredData = data;
-            applyBackground(field);
+            const board = boards[field.id];
+            if (board) {
+              if (board.restoredLoaded && board.controller) board.controller.clear();
+              board.restoredData = data;
+              board.restoredLoaded = false;
+              restoreDrawing(field);
+            }
           } else {
             const entries = files[field.id] || (files[field.id] = []);
             entries[index] = Object.assign(entries[index] || { name: ref.name }, {
@@ -1315,30 +1345,6 @@ export function startPersonalPads() {
   }
 
   // -- wiring -------------------------------------------------------------------------------
-  const shell = document.querySelector('.kb-app-shell');
-  if (shell && H.nav) {
-    // renderPadPage has no nav slot: move the rail into the shell's nav column.
-    shell.insertBefore(H.nav, shell.firstChild);
-    H.nav.hidden = false;
-  }
-  if (H.nav) {
-    H.nav.addEventListener('click', (event) => {
-      const link = event.target instanceof Element ? event.target.closest('a[data-nav-id]') : null;
-      if (!link) return;
-      event.preventDefault();
-      selectPad(link.getAttribute('data-nav-id'));
-    });
-  }
-  if (H.history) {
-    H.history.addEventListener('click', (event) => {
-      const link =
-        event.target instanceof Element ? event.target.closest('a.kb-list__title') : null;
-      const href = link ? link.getAttribute('href') || '' : '';
-      if (!href.startsWith('#record=')) return;
-      event.preventDefault();
-      openRecord(decodeURIComponent(href.slice('#record='.length)));
-    });
-  }
   document.addEventListener('paste', (event) => {
     if (event.defaultPrevented || tierSwitching) return;
     const field = adapter().fields.find((item) => item.kind === 'image' && item.paste_drop);

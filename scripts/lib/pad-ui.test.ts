@@ -10,9 +10,11 @@ import {
   PAD_UI_CLIENT_SCRIPT,
   PAD_UI_STYLESHEET,
   PAD_UI_TOKENS_CSS,
+  PAD_THEME_COOKIE,
   padT,
   renderPadHeader,
   renderPadPage,
+  renderPadStickyHost,
   resolvePadLocale,
   resolveSharedUiModule,
   toPadInlineJson,
@@ -95,6 +97,14 @@ describe('pad-ui asset serving', () => {
     expect(resolveSharedUiModule('/shared-ui/forms.js')).toBe('libs/shared-ui/vanilla/forms.js');
     expect(resolveSharedUiModule('/shared-ui/..%2fforms.js')).toBeNull();
     expect(resolveSharedUiModule('/other/forms.js')).toBeNull();
+  });
+
+  it('is case-exact against the real directory entries (case-insensitive filesystems)', () => {
+    // On APFS `forms.js` would open a file whose real name is `Forms.js`.
+    expect(resolveSharedUiModule('/shared-ui/forms.js', new Set(['Forms.js']))).toBeNull();
+    expect(resolveSharedUiModule('/shared-ui/forms.js', new Set(['forms.js']))).toBe(
+      'libs/shared-ui/vanilla/forms.js'
+    );
   });
 
   it('serves the ui message bundle for supported locales only', () => {
@@ -286,6 +296,64 @@ describe('pad-ui page shell', () => {
     expect(header).toContain('<button>x</button><div data-pad-display-controls></div>');
   });
 
+  it('navHtml places a nav column inside the app shell, before main', () => {
+    const page = renderPadPage({
+      locale: 'en',
+      title: 'T',
+      bodyHtml: '<p>body</p>',
+      navHtml: '<div data-nav-host></div>',
+    });
+    const shell = page.indexOf('<div class="kb-app-shell"');
+    const nav = page.indexOf('<div class="kb-app-shell__nav"><div data-nav-host></div></div>');
+    const main = page.indexOf('<main class="kb-app-shell__main">');
+    expect(shell).toBeGreaterThan(-1);
+    expect(nav).toBeGreaterThan(shell);
+    expect(main).toBeGreaterThan(nav);
+    expect(renderPadPage({ locale: 'en', title: 'T', bodyHtml: '' })).not.toContain(
+      'kb-app-shell__nav'
+    );
+  });
+
+  it('renderPadStickyHost is a display:contents host for sticky toolbars', () => {
+    expect(renderPadStickyHost('mn-toolbar')).toBe(
+      '<div id="mn-toolbar" class="kb-sticky-host" data-pad-sticky></div>'
+    );
+    const css = inlinePadStylesheets();
+    expect(css).toMatch(/\.kb-sticky-host \{\s*display: contents;/);
+    expect(css).toMatch(/\.kb-toolbar\[data-sticky='true'\] \{\s*position: sticky;/);
+  });
+
+  it('the pre-paint theme prefers the host-wide kb-ui-theme cookie, then local storage', () => {
+    const run = (cookie: string, stored: string | null) => {
+      const attrs = new Map<string, string>();
+      const documentElement = {
+        setAttribute: (name: string, value: string) => attrs.set(name, value),
+        removeAttribute: (name: string) => attrs.delete(name),
+      };
+      const window = { localStorage: { getItem: () => stored } };
+      new Function('document', 'window', PAD_THEME_PREPAINT_SCRIPT)(
+        { documentElement, cookie },
+        window
+      );
+      return attrs.get('data-theme') ?? null;
+    };
+    expect(PAD_THEME_COOKIE).toBe('kb-ui-theme');
+    expect(run('kb-ui-theme=dark', 'light')).toBe('dark');
+    expect(run('a=1; kb-ui-theme=light; b=2', 'dark')).toBe('light');
+    // `system` in the cookie overrides a stale per-pad choice.
+    expect(run('kb-ui-theme=system', 'dark')).toBeNull();
+    expect(run('', 'dark')).toBe('dark');
+    expect(run('kb-ui-theme=evil', null)).toBeNull();
+    const client = String(
+      safeReadFile(pathResolver.rootResolve('scripts/lib/pad-ui/pad-client.js'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(client).toContain(
+      'document.cookie = `${PAD_THEME_COOKIE}=${theme}; path=/; max-age=31536000; SameSite=Lax`'
+    );
+  });
+
   it('bootstrap reserved keys win over pad data', () => {
     const bootstrap = buildPadBootstrap({ locale: 'ja', bootstrap: { texts: 'x', token: 't' } });
     expect(bootstrap.locale).toBe('ja');
@@ -299,5 +367,20 @@ describe('pad-ui page shell', () => {
     expect(css).toContain('.kb-app-shell');
     expect(css).not.toMatch(/<\/style/i);
     expect(css.indexOf('--kb-ui-')).toBeLessThan(css.indexOf('.kb-app-shell'));
+    expect(css).toContain(':root {');
+  });
+
+  it('host scope emits the same tokens on :host for shadow roots', () => {
+    const page = inlinePadStylesheets();
+    const host = inlinePadStylesheets({ scope: 'host' });
+    expect(host).not.toContain(':root');
+    expect(host).toContain(':host {');
+    expect(host).toContain(
+      '@media (prefers-color-scheme: dark) {\n  :host(:not([data-theme="light"])) {'
+    );
+    expect(host).toContain(':host([data-theme="dark"]) {');
+    // Same declarations, only the selectors differ.
+    const decls = (css: string) => css.match(/--kb-ui-[\w-]+: [^;]+;/g) ?? [];
+    expect(decls(host)).toEqual(decls(page));
   });
 });

@@ -137,6 +137,41 @@ function normalizeAction(action) {
 }
 
 /**
+ * `true` for an activation the page should handle itself (plain primary
+ * click, or keyboard Enter which fires `click` without modifiers); `false`
+ * for modified / middle clicks, which a link with an `href` leaves to the
+ * browser (open in a new tab, ...). Shared with the React renderer.
+ */
+export function isPlainActivation(event) {
+  if (!event) return true;
+  if (typeof event.button === 'number' && event.button !== 0) return false;
+  return !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
+}
+
+/** DOM id of a `ui:list` row title (the description of the row's `actions`). */
+export function listItemTitleId(componentId, index) {
+  const raw = typeof componentId === 'string' && componentId ? componentId : 'list';
+  return `kbl-${raw.replace(/[^A-Za-z0-9_-]/g, '-')}-${index}-title`;
+}
+
+/**
+ * Wire an item `action` (nav-rail / list item) onto its element: a click
+ * (or Enter / Space on a button, Enter on a link) dispatches it; on a link
+ * with an `href`, a plain click prevents the navigation, modified clicks
+ * keep the browser behaviour.
+ */
+function bindItemAction(ctx, node, action, hasHref, source) {
+  setData(node, 'action-id', action.id);
+  node.addEventListener('click', (event) => {
+    if (hasHref) {
+      if (!isPlainActivation(event)) return;
+      if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    }
+    if (typeof ctx.onAction === 'function') ctx.onAction(action, source);
+  });
+}
+
+/**
  * Bare `<svg>` for an icon name (no wrapper element); null for unknown names.
  * Callers that need a wrapper (e.g. `.kb-nav-rail__icon`) add it themselves.
  * Decorative (`aria-hidden`) unless `label` is given, which makes it an
@@ -324,9 +359,9 @@ const RENDERERS = {
     if (brand) root.appendChild(brand);
     const context = navContext(ctx, p.context, c);
     if (context) root.appendChild(context);
-    const list = navList(ctx, p.items);
+    const list = navList(ctx, p.items, c);
     if (list) root.appendChild(list);
-    const footerList = navList(ctx, p.footer_items);
+    const footerList = navList(ctx, p.footer_items, c);
     if (footerList) {
       const footer = el(ctx, 'div', 'kb-nav-rail__footer');
       footer.appendChild(footerList);
@@ -555,17 +590,20 @@ const RENDERERS = {
     return wrap;
   },
 
-  'ui:list'(ctx, p) {
+  'ui:list'(ctx, p, c) {
     const root = el(ctx, 'ul', 'kb-list');
     setData(root, 'variant', p.variant === 'timeline' ? 'timeline' : 'plain');
-    for (const item of Array.isArray(p.items) ? p.items : []) {
-      if (!isRecord(item)) continue;
+    (Array.isArray(p.items) ? p.items : []).forEach((item, index) => {
+      if (!isRecord(item)) return;
       const li = el(ctx, 'li', 'kb-list__item');
       setData(li, 'status', item.status);
       const body = el(ctx, 'div', 'kb-list__body');
       const href = safeHref(item.href);
-      const title = el(ctx, href ? 'a' : 'span', 'kb-list__title', item.title);
+      const action = normalizeAction(item.action);
+      const title = el(ctx, href ? 'a' : action ? 'button' : 'span', 'kb-list__title', item.title);
       if (href) title.setAttribute('href', href);
+      else if (action) title.setAttribute('type', 'button');
+      if (action) bindItemAction(ctx, title, action, Boolean(href), c);
       body.appendChild(title);
       if (item.meta) body.appendChild(el(ctx, 'span', 'kb-list__meta', item.meta));
       const progress = listProgress(ctx, item.progress);
@@ -573,8 +611,20 @@ const RENDERERS = {
       li.appendChild(body);
       if (isStatusValue(item.status))
         li.appendChild(statusPill(ctx, item.status, undefined, item.status_label));
+      const actions = el(ctx, 'div', 'kb-list__actions');
+      if (appendActions(ctx, actions, item.actions, 'ghost', c) > 0) {
+        // Row actions ("Delete") are described by their row's title.
+        const titleId = listItemTitleId(c && c.id, index);
+        title.setAttribute('id', titleId);
+        for (const child of actions.children || []) {
+          if (String(child.tagName).toUpperCase() === 'BUTTON') {
+            child.setAttribute('aria-describedby', titleId);
+          }
+        }
+        li.appendChild(actions);
+      }
       root.appendChild(li);
-    }
+    });
     return root;
   },
 
@@ -869,7 +919,7 @@ for (const type of KB_CHART_TYPES) {
 Object.assign(RENDERERS, createVoiceRenderers({ el, setData }));
 
 // PA-01 pads (ui:toolbar / ui:dialog / ui:drawing-palette / ui:sketch-board): ./pads.js.
-Object.assign(RENDERERS, createPadRenderers({ el, setData, safeHref }));
+Object.assign(RENDERERS, createPadRenderers({ el, setData, safeHref, appendChildren }));
 
 /**
  * `ui:table` rich cell kind: `title` ({title, id?, href?}), `status`
@@ -1075,17 +1125,20 @@ function listProgress(ctx, value) {
   return root;
 }
 
-function navList(ctx, items) {
+function navList(ctx, items, source) {
   if (!Array.isArray(items) || items.length === 0) return null;
   const list = el(ctx, 'ul', 'kb-nav-rail__list');
   for (const item of items) {
     if (!isRecord(item)) continue;
     const li = el(ctx, 'li');
     const href = safeHref(item.href);
-    // A safe href is a real link; otherwise a non-interactive span (never an
-    // `<a>` without a navigable target).
-    const link = el(ctx, href ? 'a' : 'span', 'kb-nav-rail__item');
+    const action = normalizeAction(item.action);
+    // A safe href is a real link; an action alone is a button; otherwise a
+    // non-interactive span (never an `<a>` without a navigable target).
+    const link = el(ctx, href ? 'a' : action ? 'button' : 'span', 'kb-nav-rail__item');
     if (href) link.setAttribute('href', href);
+    else if (action) link.setAttribute('type', 'button');
+    if (action) bindItemAction(ctx, link, action, Boolean(href), source);
     setData(link, 'nav-id', item.id);
     if (item.active === true) {
       link.setAttribute('aria-current', 'page');
@@ -1216,6 +1269,9 @@ export function renderComponent(component, options = {}) {
  */
 export function renderA2UI(container, components, options = {}) {
   const ctx = makeContext(options, resolveDocument(options, container), components);
+  // The render target: components that track focus (ui:dialog) read the
+  // focused element from its root node (a shadow root when rendered into one).
+  ctx.container = container;
   const list = Array.isArray(components) ? components.filter(isRecord) : [];
   let roots;
   if (typeof options.rootId === 'string') {

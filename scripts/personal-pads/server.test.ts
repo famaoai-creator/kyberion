@@ -106,6 +106,38 @@ describe('unified personal pads server', () => {
       'disposeA2UI',
     ])
       expect(app).toContain(guard);
+    // Kit features instead of local workarounds: nav / history item actions
+    // (no #pad= / #record= link interception or DOM moving), runtime images
+    // straight into the board (no Blob conversion / layer compositing), the
+    // saved drawing in the undoable drawing layer.
+    expect(app).toContain("action: { id: 'pp.pad.select', payload: { pad: pad.id } }");
+    expect(app).toContain(
+      "action: { id: 'pp.record.open', payload: { record: record.record_id } }"
+    );
+    expect(app).not.toContain("closest('a[data-nav-id]')");
+    expect(app).not.toContain("href.startsWith('#record=')");
+    expect(app).not.toContain('shell.insertBefore');
+    expect(app).not.toContain('composeLayers');
+    expect(app).toContain("loadImage(board.restoredData, { layer: 'drawing' })");
+    const support = String(
+      safeReadFile(
+        pathResolver.rootResolve(PERSONAL_PADS_CLIENT_MODULES['/personal-pads/support.js']),
+        { encoding: 'utf8' }
+      )
+    );
+    expect(support).not.toContain('dataUrlToBlob');
+    expect(support).toContain('download_name: field.download.filename');
+  });
+
+  it('resolves every pad content in the request locale', () => {
+    const server = String(
+      safeReadFile(pathResolver.rootResolve('scripts/personal-pads/server.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    const calls = server.split('\n').filter((line) => line.includes('surface.getContent('));
+    expect(calls.length).toBeGreaterThan(3);
+    for (const line of calls) expect(line.trim()).toMatch(/, locale\);$/u);
   });
 
   it('serves the kit assets and the runtime modules without a token', async () => {

@@ -5,8 +5,9 @@
  * Every control is a shared `kyberion-base` component, each stateful one in
  * its own container (renderA2UI replaces the whole container):
  *   #sa-toolbar     ui:toolbar      load image (file) / OS capture / hand off / status
- *   #sa-board       ui:sketch-board the image is the board background (drop / paste
- *                                   on the board, or `controller.setBackgroundImage`)
+ *   #sa-board       ui:sketch-board the image is the board background (drop, or paste
+ *                                   anywhere on the page via `paste_scope: 'document'`,
+ *                                   or `controller.setBackgroundImage(File | data: URL)`)
  *   #sa-instruction ui:textarea     instruction (kept in the model, never re-rendered)
  *   #sa-voice       ui:voice-input  dictation; final text is appended to the instruction
  *
@@ -14,7 +15,7 @@
  * header `X-SA-Token`; export body `{ png_base64, instruction, width, height }`.
  * No user-visible text lives here — everything comes from the bootstrap.
  */
-/* global document, window, FileReader, Blob, atob */
+/* global document, FileReader */
 import { bootPad } from '/pad-ui/pad-client.js';
 
 const BOARD_NAME = 'screenshot-annotate';
@@ -46,13 +47,6 @@ function blobToBase64(blob) {
     reader.onerror = () => reject(reader.error || new Error('read failed'));
     reader.readAsDataURL(blob);
   });
-}
-
-function base64ToBlob(base64, type) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return new Blob([bytes], { type });
 }
 
 function errorText(error) {
@@ -146,7 +140,7 @@ async function osCapture() {
       throw new Error((body && body.error) || `HTTP ${response.status}`);
     }
     busy = false;
-    await useImage(base64ToBlob(body.png_base64, 'image/png'), 'screenshot_annotate:capture_ok');
+    await useImage(`data:image/png;base64,${body.png_base64}`, 'screenshot_annotate:capture_ok');
   } catch (error) {
     busy = false;
     setStatus(
@@ -228,19 +222,6 @@ function handleAction(action) {
   }
 }
 
-// A pasted screenshot anywhere on the page (the board handles paste only while
-// it has focus; text fields keep their own paste).
-window.addEventListener('paste', (event) => {
-  if (event.defaultPrevented || !event.clipboardData) return;
-  const target = event.target;
-  if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) return;
-  const files = Array.from(event.clipboardData.files || []);
-  const file = files.find(isImage);
-  if (!file) return;
-  event.preventDefault();
-  void useImage(file);
-});
-
 renderToolbar();
 pad.render(host.board, [
   {
@@ -255,6 +236,8 @@ pad.render(host.board, [
       canvas_width: canvas.width,
       canvas_height: canvas.height,
       accept_image_drop: true,
+      // A screenshot pasted anywhere on the page (text fields keep their paste).
+      paste_scope: 'document',
       show_download: true,
     },
   },

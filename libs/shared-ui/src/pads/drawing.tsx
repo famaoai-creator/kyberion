@@ -23,12 +23,16 @@ import {
   drawingIds,
   drawingPaletteState,
   isImageFile,
+  customColorView,
   normalizeHexColor,
   rovingIndex,
   sketchBackground,
   sketchCanvasSize,
   sketchClearDialogProps,
-  sketchFileName,
+  sketchDownloadName,
+  sketchPasteScope,
+  isEditablePasteTarget,
+  createSketchController,
   type KbDrawingEngine,
   type KbDrawingPaletteState,
   type KbDrawingTextRequest,
@@ -184,8 +188,20 @@ export function PaletteView(props: PaletteViewProps) {
         }))}
       >
         {props.allowCustom ? (
-          <label className="kb-drawing-palette__custom" title={t(K.customColor)}>
+          <label
+            className="kb-drawing-palette__custom"
+            title={t(K.customColor)}
+            data-active={customColorView(state).active ? 'true' : undefined}
+          >
             <span className="kb-visually-hidden">{t(K.customColor)}</span>
+            <span className="kb-drawing-palette__custom-glyph" aria-hidden="true">
+              <PadIcon name="custom" />
+            </span>
+            <span
+              className="kb-drawing-palette__custom-dot"
+              aria-hidden="true"
+              style={{ '--kb-swatch': customColorView(state).color } as CSSProperties}
+            />
             <input
               className="kb-drawing-palette__custom-input"
               type="color"
@@ -355,25 +371,11 @@ export function SketchBoard(p: SketchBoardProps) {
     });
     engineRef.current = engine;
     let disposed = false;
-    const controller: KbSketchControllerRuntime = {
-      toBlob: () => engine.toBlob(),
-      isEmpty: () => engine.isEmpty(),
-      clear: () => {
-        engine.clear();
-        sync();
-      },
-      undo: () => {
-        engine.undo();
-        sync();
-      },
-      setBackgroundImage: (source) => {
-        const safe = typeof source === 'string' ? (safeHref(source) ?? null) : source;
-        return engine.setBackgroundImage(safe).then((ok) => {
-          if (!disposed) sync();
-          return ok;
-        });
-      },
-    };
+    const controller: KbSketchControllerRuntime = createSketchController(engine, {
+      safeHref: (value) => safeHref(value) ?? null,
+      onChange: sync,
+      live: () => !disposed,
+    });
     send.current(KB_DRAWING_ACTIONS.ready, { controller });
     return () => {
       disposed = true;
@@ -432,7 +434,7 @@ export function SketchBoard(p: SketchBoardProps) {
         const link = document.createElement('a');
         link.className = 'kb-visually-hidden';
         link.href = url;
-        link.download = sketchFileName(name);
+        link.download = sketchDownloadName(p);
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -443,6 +445,33 @@ export function SketchBoard(p: SketchBoardProps) {
   };
 
   const acceptDrop = p.accept_image_drop === true;
+  const pasteScope = sketchPasteScope(p);
+  const takeImageRef = useRef(takeImage);
+  takeImageRef.current = takeImage;
+  const onPaste = (event: {
+    clipboardData: DataTransfer | null;
+    preventDefault(): void;
+    target: EventTarget | null;
+    composedPath?: () => EventTarget[];
+  }) => {
+    if (isEditablePasteTarget(event)) return;
+    const files = event.clipboardData ? event.clipboardData.files : null;
+    if (!files || files.length === 0) return;
+    event.preventDefault();
+    takeImageRef.current(files[0]);
+  };
+  const onPasteRef = useRef(onPaste);
+  onPasteRef.current = onPaste;
+  // `paste_scope: 'document'`: an image pasted anywhere on the page (outside
+  // editable fields) lands on the board.
+  useEffect(() => {
+    if (!acceptDrop || pasteScope !== 'document' || typeof document === 'undefined') {
+      return undefined;
+    }
+    const listener = (event: ClipboardEvent) => onPasteRef.current(event);
+    document.addEventListener('paste', listener);
+    return () => document.removeEventListener('paste', listener);
+  }, [acceptDrop, pasteScope]);
   const clearModel = dialogModel(sketchClearDialogProps(t, dialogOpen), t);
   const closeDialog = (confirmed: boolean) => {
     setDialogOpen(false);
@@ -469,13 +498,17 @@ export function SketchBoard(p: SketchBoardProps) {
         }
       }}
       onPaste={
-        acceptDrop
-          ? (event) => {
-              const files = event.clipboardData ? event.clipboardData.files : null;
-              if (!files || files.length === 0) return;
-              event.preventDefault();
-              takeImage(files[0]);
-            }
+        acceptDrop && pasteScope === 'board'
+          ? (event) =>
+              onPaste({
+                clipboardData: event.clipboardData,
+                preventDefault: () => event.preventDefault(),
+                target: event.target,
+                composedPath: () =>
+                  typeof event.nativeEvent.composedPath === 'function'
+                    ? event.nativeEvent.composedPath()
+                    : [],
+              })
           : undefined
       }
     >

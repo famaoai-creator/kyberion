@@ -3682,6 +3682,14 @@ legend.kb-field__label {
   font-size: var(--kb-ui-font-size-sm);
 }
 
+/* A sticky toolbar sticks within its parent box, so a plain host div of
+ * the toolbar's own height would confine it. `.kb-sticky-host` is a
+ * `display: contents` host: the toolbar root joins the page flow of the
+ * host's parent (a tall stack / the main column) and sticks there. */
+.kb-sticky-host {
+  display: contents;
+}
+
 .kb-toolbar[data-sticky='true'] {
   position: sticky;
   top: 0;
@@ -3820,6 +3828,14 @@ legend.kb-field__label {
   line-height: 1.5;
 }
 
+/* `children` slot: between the message / input and the buttons. */
+.kb-dialog__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-3);
+  min-width: 0;
+}
+
 .kb-dialog__actions {
   display: flex;
   flex-wrap: wrap;
@@ -3948,19 +3964,69 @@ legend.kb-field__label {
     0 0 0 4px var(--kb-ui-surface);
 }
 
+/* Custom colour: a dashed "+" picker ring, visibly not a swatch. Once a
+ * custom colour is in use it shows as a small dot on the ring and the ring
+ * gets the selected outline. The native colour input covers the ring,
+ * transparent (it stays the focus / click target). */
 .kb-drawing-palette__custom {
-  overflow: hidden;
-  background: var(--kb-ui-surface-sunken);
+  align-items: center;
+  justify-content: center;
+  background: var(--kb-ui-surface);
+  border: 2px dashed var(--kb-ui-border-strong);
+  box-shadow: none;
+  color: var(--kb-ui-text-muted);
+}
+
+.kb-drawing-palette__custom:hover {
+  color: var(--kb-ui-text);
+  border-color: var(--kb-ui-text-muted);
+}
+
+.kb-drawing-palette__custom[data-active='true'] {
+  border-style: solid;
+  box-shadow:
+    0 0 0 2px var(--kb-ui-text),
+    0 0 0 4px var(--kb-ui-surface);
+}
+
+.kb-drawing-palette__custom-glyph {
+  display: inline-flex;
+  pointer-events: none;
+}
+
+.kb-drawing-palette__custom-glyph svg {
+  width: 16px;
+  height: 16px;
+}
+
+.kb-drawing-palette__custom-dot {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: none;
+  width: 12px;
+  height: 12px;
+  background: var(--kb-swatch, var(--kb-ui-text-muted));
+  border: 2px solid var(--kb-ui-surface);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--kb-ui-border-strong);
+  pointer-events: none;
+}
+
+.kb-drawing-palette__custom[data-active='true'] .kb-drawing-palette__custom-dot {
+  display: block;
 }
 
 .kb-drawing-palette__custom-input {
   position: absolute;
-  inset: -8px;
-  width: calc(100% + 16px);
-  height: calc(100% + 16px);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
+  opacity: 0;
   cursor: pointer;
 }
 
@@ -4063,6 +4129,49 @@ legend.kb-field__label {
   .kb-dialog__panel {
     animation: none;
   }
+}
+
+/* ------------------------------------------------ item actions -------- */
+/* `ui:nav-rail` / `ui:list` item `action` (base components, added for the
+ * pads): an action-only nav item or list title is a <button> that looks
+ * like the link; list rows can end in trailing action buttons. */
+
+button.kb-nav-rail__item {
+  width: 100%;
+  margin: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: var(--kb-ui-font-size-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+button.kb-list__title {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-weight: 500;
+  color: var(--kb-ui-text);
+  text-align: start;
+  cursor: pointer;
+}
+
+button.kb-list__title:hover {
+  color: var(--kb-ui-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.kb-list__actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-1);
+  margin-inline-start: auto;
 }
 
 /* ------------------------------------------------------------- voice ----
@@ -4213,7 +4322,6 @@ legend.kb-field__label {
 }
 
 .kb-voice-input__transcript {
-  min-height: 1.5em;
   margin: 0;
   color: var(--kb-ui-text-muted);
   font-size: var(--kb-ui-font-size-sm);
@@ -4225,6 +4333,22 @@ legend.kb-field__label {
   margin: 0;
   color: var(--kb-ui-text-muted);
   font-size: var(--kb-ui-font-size-sm);
+}
+
+/* Idle with nothing to say: no empty lines under the button. The empty
+ * transcript collapses; the empty status leaves the flow but stays in the
+ * accessibility tree (it is the live region the next state is announced in). */
+.kb-voice-input__transcript:empty {
+  display: none;
+}
+
+.kb-voice-input__status:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
 .kb-voice-input[data-state='error'] .kb-voice-input__status,
@@ -4314,8 +4438,9 @@ legend.kb-field__label {
   border-radius: 50%;
 }
 
-/* Per-state glyph (shape cue besides colour). Centered on orb / dot, a
- * corner badge on bars. */
+/* Per-state glyph (shape cue besides colour). Centered on orb / dot; on
+ * bars it sits inline after the bars, vertically centred with them and the
+ * label. */
 .kb-voice-state__glyph {
   position: absolute;
   inset: 0;
@@ -4329,8 +4454,12 @@ legend.kb-field__label {
 }
 
 .kb-voice-state[data-variant='bars'] .kb-voice-state__glyph {
-  inset: auto calc(var(--kb-voice-size) * -0.35) calc(var(--kb-voice-size) * -0.2) auto;
-  font-size: calc(var(--kb-voice-size) * 0.4);
+  position: static;
+  flex: none;
+  height: 100%;
+  margin-inline-start: calc(var(--kb-voice-size) / 8);
+  color: inherit;
+  font-size: calc(var(--kb-voice-size) * 0.55);
 }
 
 .kb-voice-state[data-variant='dot'] .kb-voice-state__glyph {

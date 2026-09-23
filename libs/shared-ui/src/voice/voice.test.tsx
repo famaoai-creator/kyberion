@@ -198,18 +198,30 @@ describe('React VoiceInput: interaction', () => {
     });
     await flush();
     expect(m.state()).toBe('recording');
-    expect(fakes.recorders[0].timeslice).toBe(1000);
-    act(() => fakes.recorders[0].emit('chunk-1'));
+    expect(fakes.recorders[0].timeslice).toBeUndefined();
+    // Chunk boundary: a fresh recorder on the same stream (complete files).
+    act(() => fakes.advance(1000));
+    expect(fakes.recorders).toHaveLength(2);
+    act(() => {
+      fakes.recorders[0].emit('chunk-1');
+      fakes.recorders[0].finish();
+    });
     act(() => {
       fireEvent(button, 'pointerup');
     });
     expect(m.state()).toBe('processing');
     act(() => {
-      fakes.recorders[0].emit('chunk-2');
-      fakes.recorders[0].finish();
+      fakes.recorders[1].emit('chunk-2');
+      fakes.recorders[1].finish();
     });
     const recordings = m.actions.filter((a) => a.id === 'voice.recording');
     expect(recordings.map((r) => r.payload?.final)).toEqual([false, true]);
+    expect(recordings.map((r) => r.payload?.offset_ms)).toEqual([0, 1000]);
+    // Same payload shape as the vanilla renderer (vanilla/voice.test.ts).
+    expect(Object.keys(recordings[0].payload ?? {}).sort()).toEqual(
+      ['duration_ms', 'file', 'final', 'name', 'offset_ms'].sort()
+    );
+    expect(recordings[0].payload?.duration_ms).toBe(1000);
     expect(recordings[1].payload?.file).toBeInstanceOf(File);
     expect(recordings[1].payload?.name).toBe('memo');
 
@@ -222,7 +234,7 @@ describe('React VoiceInput: interaction', () => {
       fireEvent(button, 'keyup', { key: ' ', code: 'Space' });
     });
     expect(m.state()).toBe('processing');
-    act(() => fakes.recorders[1].finish());
+    act(() => fakes.recorders[2].finish());
     expect(fakes.live()).toEqual(NO_LEAKS);
     m.unmount();
   });

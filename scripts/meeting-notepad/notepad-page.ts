@@ -13,7 +13,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import type { VocabularyKey } from '@agent/core/t';
-import { padT, renderPadHeader, renderPadPage } from '../lib/pad-ui.js';
+import { padT, renderPadHeader, renderPadPage, renderPadStickyHost } from '../lib/pad-ui.js';
 
 export interface MeetingNotepadPageConfig {
   token: string;
@@ -47,7 +47,7 @@ export const MEETING_NOTEPAD_TEXT_KEYS = [
   'meeting_notepad:recording_stopped',
   'meeting_notepad:recording_error',
   'meeting_notepad:transcribing',
-  'meeting_notepad:transcribing_later',
+  'meeting_notepad:transcribe_unavailable',
   'meeting_notepad:voice_error',
   'meeting_notepad:camera',
   'meeting_notepad:camera_label',
@@ -65,6 +65,7 @@ export const MEETING_NOTEPAD_TEXT_KEYS = [
   'meeting_notepad:clear_confirm_body',
   'meeting_notepad:cleared',
   'meeting_notepad:draft_restored',
+  'meeting_notepad:draft_without_attachments',
   'meeting_notepad:no_draft',
   'meeting_notepad:ready',
   'meeting_notepad:exporting',
@@ -81,7 +82,7 @@ export const MEETING_NOTEPAD_TEXT_KEYS = [
 /** Page layout: one host per independently re-rendered component group. */
 const BODY_HTML = [
   '<div class="kb-stack" data-gap="md">',
-  '<div id="mn-toolbar"></div>',
+  renderPadStickyHost('mn-toolbar'),
   '<div class="kb-grid" data-gap="lg" data-min-column-width="lg">',
   '<div class="kb-stack" data-gap="md">',
   '<div id="mn-fields"></div>',

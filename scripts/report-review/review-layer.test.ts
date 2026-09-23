@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildReviewLayerData,
   buildReviewLayerModuleBundle,
   REVIEW_LAYER_KIT_ENTRY,
   REVIEW_LAYER_MODULE_PLACEHOLDER,
@@ -7,7 +8,6 @@ import {
   reviewLayerModuleBundle,
   RV_LAYER_CLOSE,
   RV_LAYER_OPEN,
-  scopePadCssToShadowRoot,
 } from './review-layer.js';
 
 function layerData(markup: string): Record<string, unknown> {
@@ -124,14 +124,13 @@ describe('report review layer kit bundle', () => {
   });
 });
 
-describe('scopePadCssToShadowRoot', () => {
-  it('moves :root qualifiers into :host()', () => {
-    expect(
-      scopePadCssToShadowRoot(
-        ':root { --a: 1; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --a: 2; } }\n:root[data-theme="dark"] { --a: 3; }'
-      )
-    ).toBe(
-      ':host { --a: 1; }\n@media (prefers-color-scheme: dark) { :host(:not([data-theme="light"])) { --a: 2; } }\n:host([data-theme="dark"]) { --a: 3; }'
-    );
+describe('review layer shadow CSS', () => {
+  it('carries the tokens on :host (generated), never :root', () => {
+    const css = String(buildReviewLayerData({ locale: 'en' }).css);
+    expect(css).toContain(':host {');
+    expect(css).toContain(':host([data-theme="dark"])');
+    expect(css).toContain(':host(:not([data-theme="light"]))');
+    expect(css).not.toContain(':root');
+    expect(css).toContain('.kb-toolbar');
   });
 });

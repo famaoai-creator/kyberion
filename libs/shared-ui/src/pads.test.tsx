@@ -16,6 +16,7 @@ import {
 } from '../vanilla/fake-dom.test-support.js';
 import {
   A2UIActionProvider,
+  A2UIRenderer,
   Dialog,
   DrawingPalette,
   KbI18nProvider,
@@ -46,6 +47,22 @@ describe('React pad components: static markup', () => {
     expect(out).toContain('data-item-id="a" tabindex="-1" disabled=""');
     expect(out).toContain('data-item-id="b" tabindex="0"');
     expect(out).toContain('aria-label="C" title="C" aria-pressed="true"');
+  });
+
+  it('Toolbar item descriptions: title tooltip + aria-describedby hidden text', () => {
+    const out = renderToStaticMarkup(
+      <Toolbar
+        id="tb"
+        label="T"
+        sticky
+        items={[{ type: 'button', id: 'save', label: 'Save', description: 'Write to disk' }]}
+      />
+    );
+    expect(out).toContain('data-sticky="true"');
+    expect(out).toContain('title="Write to disk" aria-describedby="kbt-tb-save-desc"');
+    expect(out).toContain(
+      '<span id="kbt-tb-save-desc" class="kb-visually-hidden">Write to disk</span>'
+    );
   });
 
   it('palette and sketch board strings come from the locale bundle', () => {
@@ -292,5 +309,103 @@ describe('React pad components: interaction', () => {
     stroke([1, 1], [40, 40]);
     expect(m.actions).toHaveLength(before);
     m.unmount();
+  });
+
+  it('Dialog renders children in its body and traps Tab across them', () => {
+    const m = mount(
+      <Dialog id="dc" open title="Note" input={{ name: 'note', label: 'Note', multiline: true }}>
+        <button type="button" className="extra">
+          Extra
+        </button>
+      </Dialog>
+    );
+    const panel = m.q('.kb-dialog__panel');
+    expect(panel.children.map((child) => child.className)).toEqual([
+      'kb-dialog__title',
+      'kb-field kb-dialog__field',
+      'kb-dialog__content',
+      'kb-dialog__actions',
+    ]);
+    const extra = m.q('.kb-dialog__content .extra');
+    extra.focus();
+    // Inside the content the browser moves on: no wrap back to the input.
+    key(panel, 'Tab');
+    expect(active()).toBe(extra);
+    m.q('[data-dialog-button="confirm"]').focus();
+    key(panel, 'Tab');
+    expect(active()).toBe(m.q('textarea'));
+    m.unmount();
+  });
+
+  it('list and nav-rail item actions dispatch on activation', () => {
+    const m = mount(
+      <A2UIRenderer
+        components={[
+          {
+            id: 'l',
+            type: 'ui:list',
+            props: {
+              items: [
+                {
+                  title: 'Clip',
+                  action: { id: 'clip.open', payload: { index: 0 } },
+                  actions: [{ label: 'Remove', action: { id: 'clip.remove' } }],
+                },
+              ],
+            },
+          },
+          {
+            id: 'n',
+            type: 'ui:nav-rail',
+            props: {
+              items: [
+                { id: 'a', label: 'A', action: 'pad.a' },
+                { id: 'b', label: 'B', href: '#pad=b', action: 'pad.b' },
+              ],
+            },
+          },
+        ]}
+      />
+    );
+    click(m.q('button.kb-list__title'));
+    const remove = m.q('.kb-list__actions button');
+    expect(remove.getAttribute('aria-describedby')).toBe('kbl-l-0-title');
+    click(remove);
+    click(m.q('button.kb-nav-rail__item'));
+    const link = m.q('a.kb-nav-rail__item');
+    const plain = { current: null as null | { defaultPrevented: boolean } };
+    act(() => {
+      plain.current = fireEvent(link, 'click', { button: 0 });
+    });
+    expect(plain.current?.defaultPrevented).toBe(true);
+    const modified = { current: null as null | { defaultPrevented: boolean } };
+    act(() => {
+      modified.current = fireEvent(link, 'click', { button: 0, metaKey: true });
+    });
+    expect(modified.current?.defaultPrevented).toBe(false);
+    expect(m.actions).toEqual([
+      { id: 'clip.open', payload: { index: 0 } },
+      { id: 'clip.remove', payload: undefined },
+      { id: 'pad.a', payload: undefined },
+      { id: 'pad.b', payload: undefined },
+    ]);
+    m.unmount();
+  });
+
+  it("SketchBoard paste_scope 'document' takes page-wide image pastes, not in fields", () => {
+    const document = dom.document as FakeDocument;
+    const m = mount(
+      <SketchBoard id="sp" name="s" label="S" accept_image_drop paste_scope="document" />
+    );
+    const png = new File([new Uint8Array(4)], 'clip.png', { type: 'image/png' });
+    const field = document.createElement('textarea');
+    document.body.appendChild(field);
+    act(() => void fireEvent(field, 'paste', { clipboardData: { files: [png] } }));
+    expect(m.actions.filter((a) => a.id === 'drawing.background')).toHaveLength(0);
+    act(() => void fireEvent(document.body, 'paste', { clipboardData: { files: [png] } }));
+    expect(m.actions.filter((a) => a.id === 'drawing.background')).toHaveLength(1);
+    m.unmount();
+    act(() => void fireEvent(document.body, 'paste', { clipboardData: { files: [png] } }));
+    expect(m.actions.filter((a) => a.id === 'drawing.background')).toHaveLength(1);
   });
 });

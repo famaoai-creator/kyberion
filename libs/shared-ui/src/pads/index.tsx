@@ -30,7 +30,8 @@ export function isKbPadComponentType(type: string): type is KbPadComponentType {
 export function renderPadComponent(
   type: string,
   id: string,
-  rawProps: Record<string, unknown>
+  rawProps: Record<string, unknown>,
+  children?: ReactNode
 ): ReactNode | undefined {
   if (!isKbPadComponentType(type)) return undefined;
   // Props were schema-validated upstream (or are best-effort from a trusted
@@ -41,7 +42,7 @@ export function renderPadComponent(
     case 'ui:toolbar':
       return <Toolbar {...p(Toolbar)} />;
     case 'ui:dialog':
-      return <Dialog {...p(Dialog)} />;
+      return <Dialog {...p(Dialog)}>{children}</Dialog>;
     case 'ui:drawing-palette':
       return <DrawingPalette {...p(DrawingPalette)} />;
     case 'ui:sketch-board':

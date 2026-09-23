@@ -25,10 +25,13 @@ import {
   drawingIds,
   drawingPaletteState,
   normalizeHexColor,
+  customColorView,
+  sketchDownloadName,
+  sketchPasteScope,
+  isEditablePasteTarget,
   rovingIndex,
-  sketchFileName,
 } from './drawing-core.js';
-import { createDrawingEngine } from './drawing-engine.js';
+import { createDrawingEngine, createSketchController } from './drawing-engine.js';
 import { buildDialogDom, dialogModel } from './dialog.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -199,10 +202,30 @@ export function createDrawingRenderers(h) {
       (color) => opts.onColor(color)
     );
     let custom = null;
+    let customWrap = null;
+    let customDot = null;
+    const syncCustom = () => {
+      if (!customWrap) return;
+      const view = customColorView(state);
+      setData(customWrap, 'active', view.active ? 'true' : undefined);
+      if (!view.active && typeof customWrap.removeAttribute === 'function') {
+        customWrap.removeAttribute('data-active');
+      }
+      setSwatchColor(customDot, view.color);
+    };
     if (opts.allowCustom) {
-      const wrap = el(ctx, 'label', 'kb-drawing-palette__custom');
-      wrap.setAttribute('title', ctx.t(K.customColor));
-      wrap.appendChild(el(ctx, 'span', 'kb-visually-hidden', ctx.t(K.customColor)));
+      // A "+" picker ring (not a swatch look-alike); the current custom colour
+      // shows as a small dot once it is in use.
+      customWrap = el(ctx, 'label', 'kb-drawing-palette__custom');
+      customWrap.setAttribute('title', ctx.t(K.customColor));
+      customWrap.appendChild(el(ctx, 'span', 'kb-visually-hidden', ctx.t(K.customColor)));
+      const glyph = el(ctx, 'span', 'kb-drawing-palette__custom-glyph');
+      glyph.setAttribute('aria-hidden', 'true');
+      glyph.appendChild(svgIcon(ctx, 'custom'));
+      customWrap.appendChild(glyph);
+      customDot = el(ctx, 'span', 'kb-drawing-palette__custom-dot');
+      customDot.setAttribute('aria-hidden', 'true');
+      customWrap.appendChild(customDot);
       custom = el(ctx, 'input', 'kb-drawing-palette__custom-input');
       custom.setAttribute('type', 'color');
       custom.value = state.color;
@@ -211,8 +234,9 @@ export function createDrawingRenderers(h) {
         const hex = normalizeHexColor(custom.value);
         if (hex) opts.onColor(hex);
       });
-      wrap.appendChild(custom);
-      colors.group.appendChild(wrap);
+      customWrap.appendChild(custom);
+      colors.group.appendChild(customWrap);
+      syncCustom();
     }
     root.appendChild(colors.group);
 
@@ -272,6 +296,7 @@ export function createDrawingRenderers(h) {
         tools.sync(state.tool);
         colors.sync(state.color);
         if (custom) custom.value = state.color;
+        syncCustom();
         range.value = String(state.width);
         widthValue.textContent = ctx.t(K.widthValue, { width: state.width });
         undo.disabled = !state.canUndo;
@@ -466,7 +491,7 @@ export function createDrawingRenderers(h) {
           if (!url) return;
           const link = el(ctx, 'a', 'kb-visually-hidden');
           link.setAttribute('href', url);
-          link.setAttribute('download', sketchFileName(name));
+          link.setAttribute('download', sketchDownloadName(p));
           root.appendChild(link);
           if (typeof link.click === 'function') link.click();
           root.removeChild(link);
@@ -543,37 +568,35 @@ export function createDrawingRenderers(h) {
         const files = event && event.dataTransfer ? event.dataTransfer.files : null;
         takeImage(files && files[0]);
       });
-      root.addEventListener('paste', (event) => {
+      const onPaste = (event) => {
+        if (isEditablePasteTarget(event)) return;
         const files = event && event.clipboardData ? event.clipboardData.files : null;
         if (!files || files.length === 0) return;
         if (typeof event.preventDefault === 'function') event.preventDefault();
         takeImage(files[0]);
-      });
+      };
+      // `paste_scope: 'document'`: an image pasted anywhere on the page
+      // (outside editable fields) lands on the board.
+      const pasteTarget = sketchPasteScope(p) === 'document' && ctx.doc ? ctx.doc : root;
+      pasteTarget.addEventListener('paste', onPaste);
+      if (pasteTarget !== root && Array.isArray(ctx.cleanups)) {
+        ctx.cleanups.push(() => {
+          if (typeof pasteTarget.removeEventListener === 'function') {
+            pasteTarget.removeEventListener('paste', onPaste);
+          }
+        });
+      }
     }
 
     const imageUrl = h.safeHref(p.background_image_url);
     if (imageUrl) void engine.setBackgroundImage(imageUrl).then(() => syncState());
 
-    const controller = {
-      toBlob: () => engine.toBlob(),
-      isEmpty: () => engine.isEmpty(),
-      clear: () => {
-        engine.clear();
-        syncState();
-      },
-      undo: () => {
-        engine.undo();
-        syncState();
-      },
-      setBackgroundImage: (source) => {
-        const safe = typeof source === 'string' ? h.safeHref(source) : source;
-        return engine.setBackgroundImage(safe ?? null).then((ok) => {
-          syncState();
-          return ok;
-        });
-      },
-    };
     let disposed = false;
+    const controller = createSketchController(engine, {
+      safeHref: h.safeHref,
+      onChange: syncState,
+      live: () => !disposed,
+    });
     Promise.resolve().then(() => {
       if (!disposed) dispatch(KB_DRAWING_ACTIONS.ready, { controller });
     });
