@@ -44,6 +44,7 @@ import {
   listOrganizationOperations,
 } from './organization-operating-model-operations.js';
 import { saveProjectRecord } from './project-registry.js';
+import { saveProjectOperationalState } from './project-operational-state-registry.js';
 import {
   type OrganizationCapabilityRecord,
   type OrganizationDomainRecord,
@@ -57,6 +58,7 @@ import {
   type OrganizationServiceState,
 } from './organization-operating-model.js';
 import { t } from './t.js';
+import { nowIso } from './foundation/index.js';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 
@@ -325,8 +327,8 @@ describe('organization operating model', () => {
       tenant_slug: tenantSlug,
       health: 'healthy',
       observed_at: '2026-08-03T00:00:00.000Z',
-      source_timestamp: '2026-08-03T00:00:00.000Z',
-      freshness_seconds: 60,
+      source_timestamp: nowIso(),
+      freshness_seconds: 3600,
       confidence: 0.95,
       reconcile_status: 'current',
       updated_at: '2026-08-03T00:00:00.000Z',
@@ -353,6 +355,29 @@ describe('organization operating model', () => {
       missing_services: [],
       services_without_state: [],
     });
+
+    saveOrganizationServiceState({
+      ...serviceState,
+      source_timestamp: '2026-08-03T00:00:00.000Z',
+    });
+    expect(
+      reconcileOrganizationCatalog({ organizationId, tier: 'confidential', tenantSlug })
+        .stale_services
+    ).toContain(service.service_id);
+    expect(
+      buildOrganizationManagementView({ organizationId, tier: 'confidential', tenantSlug })
+        .control_plane.accounting.healthy_services
+    ).toBe(0);
+    expect(
+      buildOrganizationManagementView({
+        organizationId,
+        tier: 'confidential',
+        tenantSlug,
+      }).control_plane.outcome_accounting.services.find(
+        (entry) => entry.service_id === service.service_id
+      )?.health
+    ).toBe('unknown');
+    saveOrganizationServiceState(serviceState);
 
     saveOrganizationDomain({
       ...domain,
@@ -767,6 +792,15 @@ describe('organization operating model', () => {
         tenantSlug,
       }).reconciliation.services_without_state
     ).toContain('svc-authoring');
+    expect(
+      buildOrganizationManagementView({
+        organizationId,
+        tier: 'confidential',
+        tenantSlug,
+      }).control_plane.outcome_accounting.services.find(
+        (service) => service.service_id === 'svc-authoring'
+      )?.health
+    ).toBe('unknown');
 
     expect(() =>
       buildOrganizationServiceState(
@@ -838,6 +872,50 @@ describe('organization operating model', () => {
         tenantSlug,
       }).reconciliation.services_without_state
     ).not.toContain('svc-authoring');
+
+    const runbookOperation = buildOrganizationOperationRecord(
+      {
+        organizationId,
+        operationId: 'op-authoring-runbook',
+        name: 'Runbook-backed review',
+        operationType: 'governance',
+        ownerRole: 'organization_owner',
+        tier: 'confidential',
+        tenantSlug,
+        executionKind: 'runbook',
+        executionRef: 'knowledge/product/architecture/organization-work-loop.md',
+        allowedActions: ['collect evidence'],
+        approvalRequiredActions: ['publish externally'],
+        forbiddenActions: ['cross-tenant access'],
+        status: 'draft',
+      },
+      now
+    );
+    expect(runbookOperation).toMatchObject({
+      status: 'draft',
+      execution_target: {
+        kind: 'runbook',
+        ref: 'knowledge/product/architecture/organization-work-loop.md',
+      },
+      automation_boundary: {
+        allowed_actions: ['collect evidence'],
+        approval_required_actions: ['publish externally'],
+        forbidden_actions: ['cross-tenant access'],
+      },
+    });
+    expect(() =>
+      buildOrganizationOperationRecord({
+        organizationId,
+        operationId: 'op-authoring-runbook-invalid',
+        name: 'Invalid runbook',
+        operationType: 'governance',
+        ownerRole: 'organization_owner',
+        tier: 'confidential',
+        tenantSlug,
+        executionKind: 'runbook',
+        executionRef: 'knowledge/personal/secret.md',
+      })
+    ).toThrow(/Runbook execution ref/);
 
     const operation = buildOrganizationOperationRecord(
       {
@@ -964,12 +1042,58 @@ describe('organization operating model', () => {
       )
     ).toThrow(/project registry/);
 
+    const foreignProjectPath = saveProjectRecord({
+      project_id: 'prj-lc08-foreign-org',
+      name: 'Foreign Organization Project',
+      summary: 'Must not attach to this organization.',
+      status: 'draft',
+      tier: 'confidential',
+      organization_id: 'another-organization',
+      tenant_slug: tenantSlug,
+    });
+    try {
+      expect(() =>
+        buildOrganizationProjectLink(
+          { organizationId, projectId: 'prj-lc08-foreign-org', tier: 'confidential', tenantSlug },
+          now
+        )
+      ).toThrow(/scope does not match/);
+    } finally {
+      safeRmSync(foreignProjectPath);
+    }
+
+    const foreignTenantPath = saveProjectRecord({
+      project_id: 'prj-lc08-foreign-tenant',
+      name: 'Foreign Tenant Project',
+      summary: 'Must not cross the tenant boundary.',
+      status: 'draft',
+      tier: 'confidential',
+      organization_id: organizationId,
+      tenant_slug: 'tenant-other',
+    });
+    try {
+      expect(() =>
+        buildOrganizationProjectLink(
+          {
+            organizationId,
+            projectId: 'prj-lc08-foreign-tenant',
+            tier: 'confidential',
+            tenantSlug,
+          },
+          now
+        )
+      ).toThrow(/scope does not match/);
+    } finally {
+      safeRmSync(foreignTenantPath);
+    }
+
     const projectPath = saveProjectRecord({
       project_id: 'prj-lc08-authoring-test',
       name: 'LC08 Authoring Test Project',
       summary: 'Temporary project registry record for the authoring test.',
       status: 'active',
       tier: 'confidential',
+      organization_id: organizationId,
       tenant_slug: tenantSlug,
     });
     try {
@@ -979,6 +1103,27 @@ describe('organization operating model', () => {
       );
       expect(attached.active_project_ids).toEqual(['prj-lc08-authoring-test']);
       saveOrganizationOperationalState(attached);
+      saveProjectOperationalState({
+        project_id: 'prj-lc08-authoring-test',
+        name: 'LC08 Authoring Test Project',
+        summary: 'Development work is in progress.',
+        status: 'active',
+        tier: 'confidential',
+        tenant_slug: tenantSlug,
+        current_phase: 'build',
+        updated_at: now,
+      });
+      expect(
+        buildOrganizationManagementView({
+          organizationId,
+          tier: 'confidential',
+          tenantSlug,
+        }).solution_projects.find((project) => project.project_id === 'prj-lc08-authoring-test')
+      ).toMatchObject({ current_phase: 'build', state_updated_at: now });
+      expect(
+        buildOrganizationManagementView({ organizationId, tier: 'confidential', tenantSlug })
+          .control_plane.accounting.active_projects
+      ).toBe(1);
       expect(() =>
         buildOrganizationProjectLink(
           {
@@ -1003,6 +1148,9 @@ describe('organization operating model', () => {
       expect(detached.active_project_ids).toEqual([]);
     } finally {
       safeRmSync(projectPath);
+      safeRmSync(
+        pathResolver.projectWorkspaceDir('prj-lc08-authoring-test', 'confidential', tenantSlug)
+      );
     }
 
     const view = buildOrganizationManagementView({
@@ -1016,5 +1164,26 @@ describe('organization operating model', () => {
     expect(view.domains.map((entry) => entry.domain_id)).toEqual(['dom-authoring']);
     expect(view.services.map((entry) => entry.service_id)).toEqual(['svc-authoring']);
     expect(view.operations.map((entry) => entry.operation_id)).toEqual(['op-authoring-review']);
+
+    saveOrganizationServiceState(
+      buildOrganizationServiceState(
+        {
+          organizationId,
+          serviceId: 'svc-authoring',
+          tier: 'confidential',
+          tenantSlug,
+          health: 'healthy',
+          reconcileStatus: 'stale',
+        },
+        now
+      )
+    );
+    const staleView = buildOrganizationManagementView({
+      organizationId,
+      tier: 'confidential',
+      tenantSlug,
+    });
+    expect(staleView.control_plane.outcome_accounting.services[0]?.health).toBe('unknown');
+    expect(staleView.control_plane.accounting.healthy_services).toBe(0);
   });
 });
