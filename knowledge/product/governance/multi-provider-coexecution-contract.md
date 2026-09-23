@@ -8,6 +8,8 @@ last_updated: 2026-09-11
 
 # Multi-Provider Co-Execution Contract
 
+The broader topology, transport, trust, and coordination model is [Agent Communication and Coordination Model](../architecture/agent-communication-layer-model.md); this contract owns same-checkout provider authority and write concurrency.
+
 Multiple provider CLIs (`claude`, `codex`, `agy`, `grok`, and future adapters such as
 `gemini` / `copilot`) can run against the same repository checkout at the
 same time. Each treats its startup working directory as implicit context and

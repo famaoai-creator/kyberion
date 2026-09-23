@@ -224,11 +224,13 @@ describe('mesh-hub-peer-messaging-adapter', () => {
         kind: 'peer',
         peer_id: 'peer-recipient',
       }),
+      messageId: 'mhm-persisted-delivery-1',
     });
 
     expect(receipt.ok).toBe(true);
     expect(receipt.accepted).toBe(true);
     expect(capturedEnvelope).toMatchObject({
+      message_id: 'mhm-persisted-delivery-1',
       recipient_peer_id: 'peer-recipient',
       sender_peer_id: 'peer-recipient',
       type: 'request',

@@ -13,6 +13,8 @@ Use this catalog to exchange messages between Kyberion instances.
 
 同一 tenant の peer を初めて接続する場合は、先に [同一 tenant peer の最短手順](./same-tenant-peer-quickstart.ja.md) を実行してください。この文書は catalog、transport、collaboration の詳細を説明します。
 
+通信パターンと trust / authority の正本は[Agent Communication and Coordination Model](../architecture/agent-communication-layer-model.md)です。same-host peer は別 Kyberion runtime 間の transport です。同じ checkout の provider CLI 同士の調整には Co-Session を使います。localhost は接続先の表現であり、認証や権限の付与ではありません。
+
 ## Files
 
 - Schema: `knowledge/product/schemas/peer-network.schema.json`
@@ -29,11 +31,14 @@ Use this catalog to exchange messages between Kyberion instances.
 - Messages are stored as inbox / outbox / event JSONL records under `active/shared/runtime/peer-messaging/tenants/{tenant}/peers/{peer}/` and `active/shared/observability/peer-messaging/tenants/{tenant}/peers/{peer}/`.
 - Conversation sessions are stored under `active/shared/runtime/peer-conversations/tenants/{tenant}/peers/{peer}/` and `active/shared/observability/peer-conversations/tenants/{tenant}/peers/{peer}/`.
 - Mesh Hub registrations, presence, capabilities, delivery ledger, proposals, and events use `.../mesh-hub/{namespace}/tenants/{tenant}/...`; a namespace may be empty.
-- Message handling is synchronous on receipt: the recipient processes the envelope inside the HTTP request handler, then returns the ACK response only after the responder finishes.
-- The response body includes `processing_mode: "synchronous_on_receive"` and `processed_at` so operators can tell when handling completed.
-- There is no deferred queue in this transport yet; if the recipient needs to fan out into mission/A2A work, that happens from the responder logic after the message is accepted.
+- Direct Peer Messaging handles a received envelope synchronously and returns its success receipt after the responder finishes. Completed message IDs are deduplicated at the receiver; a concurrent duplicate receives retryable HTTP 425.
+- The listener bounds responder concurrency and the number of requests waiting for a slot. Defaults are --max-inflight 8 and --max-queued 64; saturation returns retryable HTTP 503. Mesh presence publishes the listener's live capacity, which ranks eligible peers. An explicitly selected busy peer remains routable so the durable Mesh ledger can retry its retryable overload response.
+- Governed Mesh requests use the persistent Mesh delivery ledger and mesh-delivery-driver: accepted deliveries survive driver restarts, retry with bounded exponential backoff, honor expiry, and move exhausted failures to dead-letter storage. The driver treats non-2xx transport receipts as retryable failures and preserves the broker's stable message ID across attempts.
+- A successful Mesh delivery ACK means the receiver completed its synchronous handler. Explicit proposal acceptance and subsequent work execution remain separate states.
 
 ## Same-host workflow
+
+同一 host でも別 Kyberion runtime として運用する場合に限り、Peer Messaging を使います。peer ID、listener port、共有 secret、runtime root / Mesh namespace を各 runtime で分けてください。同じ runtime root や journal に対する複数 writer はサポートしません。複数 provider CLI が同じ checkout を共有しているだけなら listener を起動せず Co-Session を使ってください。
 
 1. Start one peer on `127.0.0.1:4100`.
 2. Start another peer on `127.0.0.1:4101`.
@@ -89,8 +94,8 @@ embedded WorkItem/A2A proposal.
 - Every message is HMAC-signed with the sender/recipient shared secret.
 - `tenant_id` is part of the signed envelope. The recipient rejects missing or mismatched tenant IDs, peer IDs, and invalid signatures.
 - The peer catalog must declare the same tenant selected by the sender; a caller-supplied tenant never broadens access.
-- The transport is intentionally store-and-forward so messages remain auditable.
-- Store-and-forward here means the sender records the outbound attempt, the recipient records the inbound envelope, and the final ACK is issued only after the recipient finishes synchronous handling.
+- Peer Messaging inbox/outbox JSONL files are durable audit records; they are not a deferred receiver queue. The HTTP success receipt includes processing_mode and processed_at after synchronous handling.
+- Governed Mesh uses the separate tenant-scoped delivery ledger as its durable sender queue; its driver retries transport failures and the receiver deduplicates stable delivery message IDs.
 
 ## Tenant backup and restore
 
