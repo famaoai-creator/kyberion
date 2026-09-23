@@ -8,7 +8,7 @@ import {
 import { Panel } from './MissionIntelligencePrimitives';
 import { chronosSpeechLocale } from '../lib/ux-vocabulary';
 
-export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) {
+export function MissionIntelligenceApprovalsPanel({ context }: { context: Record<string, any> }) {
   const {
     data,
     mt,
@@ -58,15 +58,15 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                     return (
                       <>
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                          <div className="text-[11px] font-semibold kb-text-primary">
                             {approval.title}
                           </div>
-                          <div className="rounded-full kb-status-negative-surface px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-status-negative">
+                          <div className="rounded-full kb-status-negative-surface px-2 py-1 text-[11px] kb-status-negative">
                             {approval.riskLevel}
                           </div>
                         </div>
-                        <div className="mt-2 text-[10px] kb-text-secondary">{approval.summary}</div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 text-[11px] kb-text-secondary">{approval.summary}</div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                           <div>
                             {mt('chronos_channel', 'channel')}:{' '}
                             <span className="font-mono kb-text-primary">{approval.channel}</span>
@@ -89,17 +89,15 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                           </div>
                         </div>
                         {approval.pendingRoles.length > 0 ? (
-                          <div className="mt-2 text-[10px] kb-text-muted">
+                          <div className="mt-2 text-[11px] kb-text-muted">
                             pending roles:{' '}
                             <span className="kb-text-secondary">
                               {approval.pendingRoles.join(', ')}
                             </span>
                           </div>
                         ) : null}
-                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                            work loop
-                          </div>
+                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[11px] kb-text-muted">
+                          <div className="text-[11px] kb-text-muted">work loop</div>
                           <div className="mt-2">
                             {mt('chronos_intent', 'intent')}:{' '}
                             <span className="kb-text-primary">{workLoop.intent}</span>
@@ -130,7 +128,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                             type="button"
                             onClick={() => decideApproval(approval, 'approved')}
                             disabled={approvalTarget === approval.id}
-                            className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[11px] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {approvalTarget === approval.id
                               ? mt('chronos_processing', 'processing')
@@ -140,7 +138,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                             type="button"
                             onClick={() => decideApproval(approval, 'rejected')}
                             disabled={approvalTarget === approval.id}
-                            className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[11px] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {approvalTarget === approval.id
                               ? mt('chronos_processing', 'processing')
@@ -183,14 +181,14 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                     return (
                       <>
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                          <div className="text-[11px] font-semibold kb-text-primary">
                             {artifact.artifact_id}
                           </div>
-                          <div className="rounded-full kb-surface-accent px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-accent">
+                          <div className="rounded-full kb-surface-accent px-2 py-1 text-[11px] kb-text-accent">
                             {artifact.kind}
                           </div>
                         </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                           <div>
                             project:{' '}
                             <span className="font-mono kb-text-primary">
@@ -217,16 +215,14 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                           </div>
                         </div>
                         {(artifact.path || artifact.external_ref || artifact.preview_text) && (
-                          <div className="mt-2 text-[10px] kb-text-muted">
+                          <div className="mt-2 text-[11px] kb-text-muted">
                             {artifact.preview_text ||
                               artifact.external_ref ||
                               artifact.path?.split('/').pop()}
                           </div>
                         )}
-                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                            work loop
-                          </div>
+                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[11px] kb-text-muted">
+                          <div className="text-[11px] kb-text-muted">work loop</div>
                           <div className="mt-2">
                             {mt('chronos_intent', 'intent')}:{' '}
                             <span className="kb-text-primary">{workLoop.intent}</span>
@@ -288,17 +284,17 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                     return (
                       <>
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                          <div className="text-[11px] font-semibold kb-text-primary">
                             {candidate.title}
                           </div>
-                          <div className="rounded-full kb-status-info-surface px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-status-info">
+                          <div className="rounded-full kb-status-info-surface px-2 py-1 text-[11px] kb-status-info">
                             {candidate.target_kind}
                           </div>
                         </div>
-                        <div className="mt-2 text-[10px] kb-text-secondary">
+                        <div className="mt-2 text-[11px] kb-text-secondary">
                           {candidate.summary}
                         </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                           <div>
                             {mt('chronos_source', 'source')}:{' '}
                             <span className="font-mono kb-text-primary">
@@ -341,7 +337,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                           </div>
                         </div>
                         {candidate.artifact_ids && candidate.artifact_ids.length ? (
-                          <div className="mt-2 text-[10px] kb-text-muted">
+                          <div className="mt-2 text-[11px] kb-text-muted">
                             artifacts:{' '}
                             <span className="kb-text-secondary">
                               {candidate.artifact_ids.join(', ')}
@@ -349,7 +345,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                           </div>
                         ) : null}
                         {candidate.evidence_refs && candidate.evidence_refs.length ? (
-                          <div className="mt-1 text-[10px] kb-text-muted">
+                          <div className="mt-1 text-[11px] kb-text-muted">
                             evidence:{' '}
                             <span className="kb-text-secondary">
                               {candidate.evidence_refs.join(', ')}
@@ -357,17 +353,15 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                           </div>
                         ) : null}
                         {candidate.promoted_ref ? (
-                          <div className="mt-1 text-[10px] kb-text-muted">
+                          <div className="mt-1 text-[11px] kb-text-muted">
                             promoted ref:{' '}
                             <span className="font-mono kb-text-secondary">
                               {candidate.promoted_ref}
                             </span>
                           </div>
                         ) : null}
-                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[10px] kb-text-muted">
-                          <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
-                            work loop
-                          </div>
+                        <div className="mt-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-3 text-[11px] kb-text-muted">
+                          <div className="text-[11px] kb-text-muted">work loop</div>
                           <div className="mt-2">
                             {mt('chronos_intent', 'intent')}:{' '}
                             <span className="kb-text-primary">{workLoop.intent}</span>
@@ -401,7 +395,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                               candidate.status !== 'proposed' ||
                               distillCandidateTarget === candidate.candidate_id
                             }
-                            className="rounded-lg border kb-status-info-border kb-status-info-surface px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-status-info transition hover:kb-status-info-surface disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg border kb-status-info-border kb-status-info-surface px-2 py-1 text-[11px] kb-status-info transition hover:kb-status-info-surface disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {distillCandidateTarget === candidate.candidate_id
                               ? mt('chronos_processing', 'processing')
@@ -414,7 +408,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                               candidate.status !== 'proposed' ||
                               distillCandidateTarget === candidate.candidate_id
                             }
-                            className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {distillCandidateTarget === candidate.candidate_id
                               ? mt('chronos_processing', 'processing')
@@ -444,7 +438,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
               type="button"
               onClick={() => runMemoryPromotion(true)}
               disabled={memoryPromotionTarget !== null}
-              className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
               {memoryPromotionTarget === 'dry-run'
                 ? mt('chronos_processing', 'processing')
@@ -454,7 +448,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
               type="button"
               onClick={() => runMemoryPromotion(false)}
               disabled={memoryPromotionTarget !== null}
-              className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-1 text-[11px] kb-status-positive transition hover:kb-status-positive-surface disabled:cursor-not-allowed disabled:opacity-40"
             >
               {memoryPromotionTarget === 'promote'
                 ? mt('chronos_processing', 'processing')
@@ -473,14 +467,14 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                   className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[11px] font-semibold tracking-[0.08em] kb-text-primary">
+                    <div className="text-[11px] font-semibold kb-text-primary">
                       {candidate.candidate_id}
                     </div>
-                    <div className="rounded-full kb-surface-accent px-2 py-1 text-[9px] uppercase tracking-[0.25em] kb-text-accent">
+                    <div className="rounded-full kb-surface-accent px-2 py-1 text-[11px] kb-text-accent">
                       {candidate.status}
                     </div>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] kb-text-muted">
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
                     <div>
                       kind:{' '}
                       <span className="font-mono kb-text-primary">
@@ -505,7 +499,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                     </div>
                   </div>
                   {candidate.promoted_ref ? (
-                    <div className="mt-2 text-[10px] kb-text-muted">
+                    <div className="mt-2 text-[11px] kb-text-muted">
                       promoted ref:{' '}
                       <span className="font-mono kb-text-secondary">{candidate.promoted_ref}</span>
                     </div>
@@ -535,13 +529,13 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                   className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[10px] uppercase tracking-[0.18em] kb-text-muted">
+                    <div className="text-[11px] kb-text-muted">
                       {action.kind} · {action.operation}
                     </div>
                     <ActionStatusBadge action={action} />
                   </div>
                   <div className="mt-2 text-[11px] kb-text-primary">{action.target}</div>
-                  <div className="mt-1 text-[10px] kb-text-muted">
+                  <div className="mt-1 text-[11px] kb-text-muted">
                     {mt('chronos_requested_by', 'Requested by')}:{' '}
                     <span className="font-mono kb-text-secondary">{action.requested_by}</span>
                   </div>
@@ -554,7 +548,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                             current === action.event_id ? null : action.event_id || null
                           )
                         }
-                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-secondary transition hover:kb-surface-raised"
+                        className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
                       >
                         {expandedActionId === action.event_id
                           ? mt('chronos_hide_details', 'Hide details')
@@ -564,7 +558,7 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                         <button
                           type="button"
                           onClick={() => jumpToTarget(action)}
-                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] uppercase tracking-[0.18em] kb-text-accent transition hover:kb-surface-accent"
+                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
                         >
                           {mt('chronos_jump_to_target', 'Jump to target')}
                         </button>
@@ -578,9 +572,9 @@ export function MissionIntelligenceApprovalsPanel(context: Record<string, any>) 
                     />
                   )}
                   {action.error && (
-                    <div className="mt-2 text-[10px] kb-status-negative">{action.error}</div>
+                    <div className="mt-2 text-[11px] kb-status-negative">{action.error}</div>
                   )}
-                  <div className="mt-2 text-[9px] font-mono kb-text-muted">
+                  <div className="mt-2 text-[11px] font-mono kb-text-muted">
                     {new Date(action.ts).toLocaleString(chronosSpeechLocale())}
                   </div>
                 </div>

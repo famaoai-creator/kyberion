@@ -193,10 +193,10 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
   };
 
   return (
-    <section className="kyberion-glass rounded-[30px] border kb-border-subtle p-5 md:p-6">
+    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+          <div className="text-[11px] kb-text-accent">
             {uxText('chronos_knowledge_eyebrow', locale)}
           </div>
           <h2 className="mt-1 text-xl font-semibold kb-text-primary">
@@ -206,7 +206,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
             {uxText('chronos_knowledge_description', locale)}
           </p>
         </div>
-        <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[10px] kb-text-accent">
+        <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] kb-text-accent">
           {tenant || uxText('chronos_ac_scope_all', locale)} · {items.length}
         </span>
       </div>
@@ -236,20 +236,20 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
                     {item.proposed_memory_kind}
                   </span>
                 </div>
-                <div className="mt-2 text-[10px] kb-text-secondary">
+                <div className="mt-2 text-[11px] kb-text-secondary">
                   {item.tenantSlug || uxText('chronos_org_not_configured', locale)} ·{' '}
                   {knowledgeStatusLabel(item.status, locale)}
                 </div>
-                <div className="mt-1 truncate text-[10px] kb-text-muted">{item.candidate_id}</div>
+                <div className="mt-1 truncate text-[11px] kb-text-muted">{item.candidate_id}</div>
               </button>
             ))
           )}
         </div>
         {selected ? (
-          <div className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
+          <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] kb-text-accent">
+                <div className="flex items-center gap-2 text-[11px] kb-text-accent">
                   <FileSearch size={13} />
                   {uxText('chronos_candidate_content', locale)}
                 </div>
@@ -257,12 +257,12 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
                   {selected.proposed_memory_kind}
                 </h3>
               </div>
-              <span className="rounded-full border kb-border-subtle px-2 py-1 text-[10px] kb-text-secondary">
+              <span className="rounded-full border kb-border-subtle px-2 py-1 text-[11px] kb-text-secondary">
                 {knowledgeStatusLabel(selected.status, locale)}
               </span>
             </div>
             <div className="mt-4 rounded-xl border kb-border-subtle kb-surface-raised p-4">
-              <div className="text-[10px] uppercase tracking-[0.16em] kb-text-accent">
+              <div className="text-[11px] kb-text-accent">
                 {uxText('chronos_content_to_register', locale)}
               </div>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 kb-text-primary">
@@ -270,7 +270,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
               </p>
             </div>
             <details className="mt-3 rounded-xl border kb-border-subtle kb-surface-raised p-3">
-              <summary className="cursor-pointer text-[10px] font-semibold kb-text-primary">
+              <summary className="cursor-pointer text-[11px] font-semibold kb-text-primary">
                 {uxText('chronos_knowledge_evidence_details', locale)}
               </summary>
               <div className="mt-3 grid gap-3 md:grid-cols-2 text-[11px] kb-text-secondary">
@@ -300,7 +300,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
             </details>
             {selected.promoted_ref ? (
               <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent p-3">
-                <div className="flex items-center gap-2 text-[10px] font-semibold kb-text-accent">
+                <div className="flex items-center gap-2 text-[11px] font-semibold kb-text-accent">
                   <CheckCircle2 size={13} />
                   {uxText('chronos_registered', locale)}: {selected.promoted_ref}
                 </div>
@@ -308,14 +308,14 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
                   {promotedBody || `${uxText('chronos_loading', locale)}…`}
                 </pre>
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t kb-border-subtle pt-3">
-                  <span className="text-[10px] kb-text-muted">
+                  <span className="text-[11px] kb-text-muted">
                     {uxText('chronos_knowledge_feedback_prompt', locale)}
                   </span>
                   <button
                     type="button"
                     aria-label={uxText('chronos_knowledge_feedback_useful', locale)}
                     onClick={() => void recordFeedback('useful')}
-                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] ${feedback === 'useful' ? 'kb-border-accent kb-surface-accent kb-text-accent' : 'kb-border-subtle kb-text-secondary'}`}
+                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] ${feedback === 'useful' ? 'kb-border-accent kb-surface-accent kb-text-accent' : 'kb-border-subtle kb-text-secondary'}`}
                   >
                     <ThumbsUp size={12} /> {uxText('chronos_knowledge_feedback_useful', locale)}
                   </button>
@@ -323,7 +323,7 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
                     type="button"
                     aria-label={uxText('chronos_knowledge_feedback_not_useful', locale)}
                     onClick={() => void recordFeedback('not_useful')}
-                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] ${feedback === 'not_useful' ? 'kb-border-accent kb-surface-accent kb-text-accent' : 'kb-border-subtle kb-text-secondary'}`}
+                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] ${feedback === 'not_useful' ? 'kb-border-accent kb-surface-accent kb-text-accent' : 'kb-border-subtle kb-text-secondary'}`}
                   >
                     <ThumbsDown size={12} />{' '}
                     {uxText('chronos_knowledge_feedback_not_useful', locale)}
@@ -380,13 +380,13 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
               )}
             </div>
             {accessRole !== 'localadmin' ? (
-              <div className="mt-3 text-[10px] kb-text-muted">
+              <div className="mt-3 text-[11px] kb-text-muted">
                 {uxText('chronos_localadmin_required', locale)}
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="rounded-2xl border kb-border-subtle p-6 text-sm kb-text-muted">
+          <div className="rounded-lg border kb-border-subtle p-6 text-sm kb-text-muted">
             {uxText('chronos_select_knowledge', locale)}
           </div>
         )}

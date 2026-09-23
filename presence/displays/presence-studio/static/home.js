@@ -307,12 +307,12 @@
           items: items.map(function (item) {
             var tag = fd(vocab, DECIDE_TAG_KEY[item.kind] || 'tag_approval') || item.kind;
             var tenant = tenantNameFor(me, item.tenant_slug);
-            return {
-              title: item.title,
-              meta: tenant ? tag + ' · ' + tenant : tag,
-              href: href,
-              status: 'pending',
-            };
+            // UI-06: the kind (approval / exception / ...) is the pill text,
+            // so the row reads "what kind of decision" at a glance.
+            var row = { title: item.title, href: href, status: 'pending' };
+            if (tag) row.status_label = tag;
+            if (tenant) row.meta = tenant;
+            return row;
           }),
         },
       },
@@ -353,16 +353,21 @@
           items: items.map(function (item) {
             var delivered = item.kind === 'delivered';
             var tag = fd(vocab, PROGRESS_TAG_KEY[item.kind] || 'tag_in_progress') || item.kind;
-            var meta = delivered ? fd(vocab, 'action_receive') : tag;
-            if (!delivered && typeof item.percent === 'number') {
-              meta += ' · ' + Math.max(0, Math.min(100, Math.round(item.percent))) + '%';
-            }
-            return {
+            var row = {
               title: item.title,
-              meta: meta,
               href: progressHref(item),
               status: delivered ? 'completed' : 'active',
             };
+            // UI-06: the front-desk wording (進行中 / できました) on the pill,
+            // and the percent as the shared `ui:list` progress meter.
+            if (tag) row.status_label = tag;
+            if (delivered) {
+              var receive = fd(vocab, 'action_receive');
+              if (receive) row.meta = receive;
+            } else if (typeof item.percent === 'number' && isFinite(item.percent)) {
+              row.progress = Math.max(0, Math.min(100, item.percent));
+            }
+            return row;
           }),
         },
       },

@@ -110,6 +110,39 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
     expect(out).toContain('<span class="kb-nav-rail__item" data-nav-id="x">');
   });
 
+  it('NavRail: brand slot (mark / safe logo) and context slot variants', () => {
+    const out = htmlJa(
+      <NavRail
+        items={[{ id: 'home', label: 'ホーム', href: '/' }]}
+        brand={{ name: 'Kyberion', subtitle: 'あなたの相棒' }}
+        context={{ label: '既定', detail: 'オーナー', href: '/tenants' }}
+      />
+    );
+    expect(out).toContain(
+      '<div class="kb-nav-rail__brand"><span class="kb-nav-rail__brand-mark" aria-hidden="true"></span><span class="kb-nav-rail__brand-text"><strong class="kb-nav-rail__brand-name">Kyberion</strong><span class="kb-nav-rail__brand-subtitle">あなたの相棒</span></span></div>'
+    );
+    expect(out).toContain(
+      `<div class="kb-nav-rail__context"><a href="/tenants" class="kb-nav-rail__context-button"><span class="kb-visually-hidden">${ja.messages['ui:nav_context_switch']}</span><span class="kb-nav-rail__context-label">既定</span><span class="kb-nav-rail__context-detail">オーナー</span></a></div>`
+    );
+    expect(out.indexOf('kb-nav-rail__brand')).toBeLessThan(out.indexOf('kb-nav-rail__context'));
+    expect(out.indexOf('kb-nav-rail__context')).toBeLessThan(out.indexOf('kb-nav-rail__list'));
+    expect(html(<NavRail items={[]} brand={{ name: 'K', logo_url: '/logo.svg' }} />)).toContain(
+      '<img class="kb-nav-rail__brand-logo" src="/logo.svg" alt=""/>'
+    );
+    const unsafe = html(
+      <NavRail
+        items={[]}
+        brand={{ name: 'K', logo_url: 'javascript:alert(1)' }}
+        context={{ label: 'T', href: 'javascript:alert(1)' }}
+      />
+    );
+    expect(unsafe).not.toContain('<img');
+    expect(unsafe).not.toContain('javascript:');
+    expect(unsafe).toContain(
+      '<div class="kb-nav-rail__context-button" data-static="true"><span class="kb-nav-rail__context-label">T</span></div>'
+    );
+  });
+
   it('Tabs: button tablist with aria-selected and counts; link bar with aria-current', () => {
     const buttons = html(
       <Tabs
@@ -314,6 +347,22 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
     expect(out).toContain('<span class="kb-list__title">危険</span>');
     expect(out).not.toContain('data:text');
     expect(html(<List items={[]} />)).toBe('<ul class="kb-list" data-variant="plain"></ul>');
+  });
+
+  it('List: status_label override and an accessible progress meter', () => {
+    const out = htmlJa(
+      <List
+        items={[
+          { title: 'a', status: 'active', status_label: '作成中', progress: 41.6 },
+          { title: 'b', progress: -5 },
+        ]}
+      />
+    );
+    expect(out).toContain('<span class="kb-status-pill__label">作成中</span>');
+    expect(out).toContain(
+      `<div class="kb-list__progress"><span class="kb-list__progress-track" role="progressbar" aria-label="${ja.messages['ui:list_progress']}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="42" aria-valuetext="42% 完了"><span class="kb-list__progress-fill" style="width:42%"></span></span><span class="kb-list__progress-value" aria-hidden="true">42%</span></div>`
+    );
+    expect(out).toContain('aria-valuenow="0"');
   });
 
   it('Text: variant modifier class', () => {

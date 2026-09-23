@@ -32,6 +32,7 @@ export const KYBERION_BASE_COMPONENT_TYPES = [
   'ui:table',
   'ui:list',
   'ui:text',
+  'ui:code',
   'ui:status-pill',
   'ui:badge',
   'ui:callout',
@@ -39,6 +40,7 @@ export const KYBERION_BASE_COMPONENT_TYPES = [
   'ui:skeleton',
   'ui:button',
   'ui:disclosure',
+  'ui:display-controls',
   // UI-01c settings & forms (SURFACE_UI_UNIFICATION_PLAN §3.3)
   'ui:settings-group',
   'ui:setting-row',
@@ -223,8 +225,34 @@ export interface KbPageHeaderProps {
   actions?: KbActionRef[];
 }
 
+/** `ui:nav-rail` brand slot: product / surface name, optional subtitle and logo image. */
+export interface KbNavBrand {
+  name: string;
+  subtitle?: string;
+  /** http(s) / same-origin image URL; without it a token-colored mark is drawn. */
+  logo_url?: string;
+}
+
+/**
+ * `ui:nav-rail` context slot (tenant / workspace the viewer is looking at).
+ * With `options` + `action` it is a switcher: choosing an option dispatches
+ * `action` with `{ value }` merged into its payload. With only `action` the
+ * block is a button dispatching `action`; with only `href` it is a link.
+ */
+export interface KbNavContext {
+  label: string;
+  detail?: string;
+  /** Accessible name of the switch control / option list. */
+  switch_label?: string;
+  href?: string;
+  action?: KbAction;
+  options?: Array<{ value: string; label: string; selected?: boolean }>;
+}
+
 export interface KbNavRailProps {
   label?: string;
+  brand?: KbNavBrand;
+  context?: KbNavContext;
   items: KbNavItem[];
   footer_items?: KbNavItem[];
 }
@@ -295,14 +323,33 @@ export interface KbTableProps {
   empty?: string;
 }
 
+export interface KbListItem {
+  title: string;
+  meta?: string;
+  status?: KbStatus;
+  /** Visible text of the status pill (default: the localized status label). */
+  status_label?: string;
+  /** 0–100: drawn as a small meter under the title, with accessible text. */
+  progress?: number;
+  href?: string;
+}
+
 export interface KbListProps {
-  items: Array<{ title: string; meta?: string; status?: KbStatus; href?: string }>;
+  items: KbListItem[];
   variant?: 'plain' | 'timeline';
 }
 
 export interface KbTextProps {
   text: string;
   variant?: 'body' | 'muted' | 'caption' | 'mono' | 'title';
+}
+
+/** `ui:code`: a monospace, wrapping (`pre-wrap`) code / log block. */
+export interface KbCodeProps {
+  code: string;
+  /** Language / format hint (shown as a label; no syntax highlighting). */
+  language?: string;
+  title?: string;
 }
 
 export interface KbStatusPillProps {
@@ -346,6 +393,24 @@ export interface KbDisclosureProps {
   open?: boolean;
 }
 
+/**
+ * Action ids `ui:display-controls` dispatches (payload `{ value }`). The
+ * component never persists anything: the host stores the choice (the
+ * front-desk surfaces use `kyberion.ui.theme` / `kyberion.ui.locale`).
+ */
+export const KB_DISPLAY_CONTROLS_ACTIONS = Object.freeze({
+  theme: 'display.theme',
+  locale: 'display.locale',
+} as const);
+
+/** `ui:display-controls`: theme (system / light / dark) segmented control + language select. */
+export interface KbDisplayControlsProps {
+  theme?: 'system' | 'light' | 'dark';
+  locale?: string;
+  /** Language choices (label in its own language). Default: 日本語 / English. */
+  locales?: Array<{ value: string; label: string }>;
+}
+
 export interface KyberionBasePropsByType {
   'ui:app-shell': KbAppShellProps;
   'ui:page-header': KbPageHeaderProps;
@@ -360,6 +425,7 @@ export interface KyberionBasePropsByType {
   'ui:table': KbTableProps;
   'ui:list': KbListProps;
   'ui:text': KbTextProps;
+  'ui:code': KbCodeProps;
   'ui:status-pill': KbStatusPillProps;
   'ui:badge': KbBadgeProps;
   'ui:callout': KbCalloutProps;
@@ -367,6 +433,7 @@ export interface KyberionBasePropsByType {
   'ui:skeleton': KbSkeletonProps;
   'ui:button': KbButtonProps;
   'ui:disclosure': KbDisclosureProps;
+  'ui:display-controls': KbDisplayControlsProps;
   'ui:settings-group': KbSettingsGroupProps;
   'ui:setting-row': KbSettingRowProps;
   'ui:switch': KbSwitchProps;

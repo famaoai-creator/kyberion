@@ -8,7 +8,11 @@ import {
   Wrench,
 } from 'lucide-react';
 import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
-import type { ChronosThemeMode } from '../lib/chronos-theme';
+import {
+  loadStoredChronosThemeMode,
+  saveStoredChronosThemeMode,
+  type ChronosThemeMode,
+} from '../lib/chronos-theme';
 import { parseJsonRecord } from '../lib/json-record';
 
 export type QuickAction = {
@@ -105,8 +109,69 @@ export const CONSOLE_SECTIONS: Array<{
     detailKey: 'chronos_nav_diagnostics_hint',
   },
 ];
+/**
+ * UI-07: the eleven console sections are grouped into five top-level tabs
+ * (one row at 1280px). A group's first section is its landing page; the
+ * others are its sub-navigation. `?section=` keeps addressing a section, so
+ * every existing deep link still resolves (`governance`, which only linked
+ * to approvals and knowledge, now lands on the 判断 group).
+ */
+export type ChronosNavGroupId = 'home' | 'work' | 'decide' | 'operate' | 'organization';
+
+export const CHRONOS_NAV_GROUPS: ReadonlyArray<{
+  id: ChronosNavGroupId;
+  labelKey: string;
+  sections: readonly ConsoleContentSection[];
+}> = [
+  { id: 'home', labelKey: 'chronos_group_home', sections: ['home'] },
+  {
+    id: 'work',
+    labelKey: 'chronos_group_work',
+    sections: ['missions', 'work-items', 'deliverables'],
+  },
+  { id: 'decide', labelKey: 'chronos_group_decide', sections: ['approvals', 'knowledge'] },
+  {
+    id: 'operate',
+    labelKey: 'chronos_group_operate',
+    sections: ['operations', 'surface-control', 'diagnostics'],
+  },
+  { id: 'organization', labelKey: 'chronos_group_organization', sections: ['organization'] },
+];
+
+/** Retired section ids that still resolve for old bookmarks and callers. */
+export const CHRONOS_SECTION_ALIASES: Readonly<Record<string, ConsoleSectionId>> = {
+  governance: 'approvals',
+};
+
+const KNOWN_SECTIONS = new Set<string>([
+  ...CONSOLE_SECTIONS.map((section) => section.id),
+  'surface',
+]);
+
+/** Map a `?section=` value (current or retired) to a section, or null. */
+export function resolveConsoleSectionParam(
+  value: string | null | undefined
+): ConsoleSectionId | null {
+  if (!value) return null;
+  const aliased = CHRONOS_SECTION_ALIASES[value];
+  if (aliased) return aliased;
+  return KNOWN_SECTIONS.has(value) ? (value as ConsoleSectionId) : null;
+}
+
+/** The top-level group a section belongs to (`surface` shows under its origin). */
+export function chronosNavGroupFor(
+  section: ConsoleSectionId,
+  surfaceOrigin: ConsoleContentSection = 'home'
+): ChronosNavGroupId {
+  const resolved =
+    section === 'surface' ? surfaceOrigin : (CHRONOS_SECTION_ALIASES[section] ?? section);
+  return (
+    CHRONOS_NAV_GROUPS.find((group) => group.sections.includes(resolved as ConsoleContentSection))
+      ?.id ?? 'home'
+  );
+}
+
 export const OPERATOR_LAYOUT_PREFS_KEY = 'chronos.operator-layout.prefs';
-export const CHRONOS_THEME_PREFS_KEY = 'chronos.theme-mode';
 
 export function buildPlanPreviewSignature(input: {
   requestText: string;
@@ -169,22 +234,11 @@ export function saveOperatorLayoutPrefs(
 }
 
 export function loadChronosThemeMode(): ChronosThemeMode | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(CHRONOS_THEME_PREFS_KEY);
-    return raw === 'light' || raw === 'dark' || raw === 'system' ? raw : null;
-  } catch {
-    return null;
-  }
+  return loadStoredChronosThemeMode();
 }
 
 export function saveChronosThemeMode(mode: ChronosThemeMode): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(CHRONOS_THEME_PREFS_KEY, mode);
-  } catch {
-    // localStorage may be denied; ignore.
-  }
+  saveStoredChronosThemeMode(mode);
 }
 
 export const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGroup[] => [
@@ -192,7 +246,7 @@ export const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGrou
     title: uxText('chronos_qa_prepare_title', locale),
     hint: uxText('chronos_qa_prepare_hint', locale),
     icon: ClipboardCheck,
-    accent: 'from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent',
+    accent: 'kb-surface-raised',
     accentText: 'kb-status-positive',
     actions: [
       {
@@ -225,7 +279,7 @@ export const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGrou
     title: uxText('chronos_qa_schedule_title', locale),
     hint: uxText('chronos_qa_schedule_hint', locale),
     icon: CalendarClock,
-    accent: 'from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent',
+    accent: 'kb-surface-raised',
     accentText: 'kb-status-info',
     actions: [
       {
@@ -246,7 +300,7 @@ export const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGrou
     title: uxText('chronos_qa_observe_title', locale),
     hint: uxText('chronos_qa_observe_hint', locale),
     icon: Radar,
-    accent: 'from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent',
+    accent: 'kb-surface-raised',
     accentText: 'kb-text-accent',
     actions: [
       {
@@ -285,7 +339,7 @@ export const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGrou
     title: uxText('chronos_qa_verify_title', locale),
     hint: uxText('chronos_qa_verify_hint', locale),
     icon: ActivitySquare,
-    accent: 'from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent',
+    accent: 'kb-surface-raised',
     accentText: 'kb-status-warning',
     actions: [
       {
@@ -318,7 +372,7 @@ export const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGrou
     title: uxText('chronos_qa_operate_title', locale),
     hint: uxText('chronos_qa_operate_hint', locale),
     icon: Wrench,
-    accent: 'from-[var(--kb-surface-accent)] via-[var(--kb-surface-raised)] to-transparent',
+    accent: 'kb-surface-raised',
     accentText: 'kb-status-warning',
     actions: [
       {
@@ -392,3 +446,9 @@ export const buildStatusCards = (locale: SupportedLocale): StatusCard[] => [
     targetId: 'recent-surface-outbox',
   },
 ];
+
+/** UI-07: `onAction` ids the Chronos shell handles for kb buttons (NextAction etc.). */
+export const CHRONOS_ACTIONS = Object.freeze({
+  openSection: 'chronos.open-section',
+  openScenario: 'chronos.open-scenario',
+});

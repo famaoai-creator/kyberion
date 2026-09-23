@@ -39,7 +39,58 @@ export declare const KB_UI_MESSAGE_KEYS: Readonly<{
   trendUp: string;
   trendDown: string;
   trendFlat: string;
+  navContextSwitch: string;
+  listProgress: string;
+  listProgressValue: string;
+  displayLabel: string;
+  displayTheme: string;
+  displayThemeSystem: string;
+  displayThemeLight: string;
+  displayThemeDark: string;
+  displayLanguage: string;
+  localeNameJa: string;
+  localeNameEn: string;
 }>;
+
+/** Action ids `ui:display-controls` dispatches with `{ value }`. */
+export declare const KB_DISPLAY_CONTROLS_ACTIONS: Readonly<{ theme: string; locale: string }>;
+
+export interface KbDisplayFieldProps {
+  name: string;
+  label: string;
+  hide_label: true;
+  value: string | undefined;
+  options: Array<{ value: string; label: string }>;
+}
+
+/** `ui:display-controls` → the inner `ui:segmented` (theme) props. */
+export declare function displayThemeProps(
+  t: KbTranslate | { t: KbTranslate },
+  props: { theme?: unknown }
+): KbDisplayFieldProps;
+
+/** `ui:display-controls` → the inner `ui:select` (language) props. */
+export declare function displayLocaleProps(
+  t: KbTranslate | { t: KbTranslate },
+  props: { locale?: unknown; locales?: unknown }
+): KbDisplayFieldProps;
+
+/** `ui:code` language hint (short token) or null. */
+export declare function codeLanguage(value: unknown): string | null;
+
+/** `ui:list` item `progress` clamped to an integer 0–100; null when absent. */
+export declare function listProgressPercent(value: unknown): number | null;
+
+/** `ui:nav-rail` brand logo URL (same-origin / http(s) only); null otherwise. */
+export declare function navBrandLogo(value: unknown): string | null;
+
+/** Valid options of a `ui:nav-rail` context switcher. */
+export declare function navContextOptions(context: {
+  options?: unknown;
+}): Array<{ value: string; label: string; selected?: boolean }>;
+
+/** Payload a context-switch option dispatches: the declared payload plus `{ value }`. */
+export declare function navContextPayload(action: KbAction, value: string): Record<string, unknown>;
 
 /** Translate a `ui:*` key (with `{name}` params) to display text. Never throws. */
 export type KbTranslate = (key: string, params?: Record<string, unknown>) => string;

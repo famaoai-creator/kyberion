@@ -134,6 +134,50 @@ describe('surface-response-blocks', () => {
     expect(parsed.text).toBe('done');
   });
 
+  it('accepts kyberion-base ui:* components whose props satisfy the catalog', () => {
+    const block = (component: Record<string, unknown>) =>
+      [
+        '```a2ui',
+        JSON.stringify({ updateComponents: { surfaceId: 's1', components: [component] } }),
+        '```',
+      ].join('\n');
+    const valid = extractSurfaceBlocks(
+      block({
+        id: 'c1',
+        type: 'ui:code',
+        props: { code: 'pnpm build', language: 'shell', title: 'Build' },
+      })
+    );
+    expect(valid.a2uiMessages).toEqual([
+      {
+        updateComponents: {
+          surfaceId: 's1',
+          components: [
+            {
+              id: 'c1',
+              type: 'ui:code',
+              props: { code: 'pnpm build', language: 'shell', title: 'Build' },
+            },
+          ],
+        },
+      },
+    ]);
+    const list = extractSurfaceBlocks(
+      block({ id: 'l1', type: 'ui:list', props: { items: [{ title: 'a', progress: 40 }] } })
+    );
+    expect(list.a2uiMessages).toHaveLength(1);
+
+    // Catalog props are validated: unknown props, bad enums and unsafe hrefs are dropped.
+    for (const component of [
+      { id: 'c2', type: 'ui:code', props: { code: 'x', style: 'color:red' } },
+      { id: 'c3', type: 'ui:status-pill', props: { status: 'green' } },
+      { id: 'c4', type: 'ui:button', props: { label: 'x', href: 'javascript:alert(1)' } },
+      { id: 'c5', type: 'ui:not-in-catalog', props: {} },
+    ]) {
+      expect(extractSurfaceBlocks(block(component)).a2uiMessages, component.type).toHaveLength(0);
+    }
+  });
+
   it('keeps valid approval and mission blocks after normalization', () => {
     const raw = [
       '```approval',

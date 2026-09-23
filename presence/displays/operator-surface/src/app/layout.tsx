@@ -1,87 +1,66 @@
 import * as React from 'react';
 import { getTenantScope } from '@/lib/data';
+import { operatorTranslator, operatorUiMessages } from '@/lib/i18n';
+import { getRequestLocale } from '@/lib/request-locale';
+import { THEME_BOOTSTRAP_SCRIPT } from '@/lib/display-preferences';
+import { OperatorShell, type OperatorNavItem } from './operator-shell';
+// Shared UI layer (UI-02): globals.css carries the generated --kb-* / --kb-ui-*
+// tokens, kyberion-ui.css the .kb-* component contract; operator.css only
+// operator-specific layout, styled with the same tokens.
 import './globals.css';
+import './kyberion-ui.css';
+import './operator.css';
+
+// Surface identity contract: surface:operator_surface_tagline (監査モニタ,
+// read-only) — rendered as the brand subtitle and the page-header role badge.
 
 export const metadata = {
   title: 'Kyberion Operator Surface',
   description: 'Read-only operator view: missions, audit chain, health',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const scope = getTenantScope();
+  const locale = await getRequestLocale();
+  const t = operatorTranslator(locale);
+  const items: OperatorNavItem[] = [
+    { id: 'missions', label: t('nav_missions'), href: '/', icon: 'mission' },
+    { id: 'audit', label: t('nav_audit'), href: '/audit', icon: 'shield' },
+    { id: 'health', label: t('nav_health'), href: '/health', icon: 'chart' },
+    { id: 'reasoning', label: t('nav_reasoning'), href: '/reasoning', icon: 'chat' },
+    { id: 'surfaces', label: t('nav_surfaces'), href: '/surfaces', icon: 'settings' },
+    {
+      id: 'intent-snapshots',
+      label: t('nav_intent_snapshots'),
+      href: '/intent-snapshots',
+      icon: 'clock',
+    },
+    { id: 'knowledge', label: t('nav_knowledge'), href: '/knowledge', icon: 'book' },
+  ];
   return (
-    <html lang="en">
+    // `data-theme` (a pinned light/dark choice) is set before paint by the
+    // bootstrap script, hence suppressHydrationWarning.
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
       </head>
-      <body
-        style={{
-          fontFamily: 'var(--kb-font-sans)',
-          margin: 0,
-          padding: 0,
-          background: 'var(--kb-bg-main)',
-          color: 'var(--kb-text-primary)',
-        }}
-      >
-        <header
-          style={{
-            padding: '12px 24px',
-            background: 'var(--kb-panel-bg)',
-            borderBottom: '1px solid var(--kb-border)',
-            display: 'flex',
-            gap: '24px',
-            alignItems: 'baseline',
+      <body>
+        <OperatorShell
+          locale={locale}
+          messages={operatorUiMessages(locale)}
+          navLabel={t('nav_label')}
+          brand={{ name: t('brand_name'), subtitle: t('brand_role') }}
+          context={{
+            label: scope ?? t('tenant_agnostic'),
+            detail: t('tenant_context_detail'),
           }}
+          items={items}
+          roleBadge={t('role_badge')}
         >
-          <strong>Kyberion · Operator Surface</strong>
-          <span
-            title="このサーフェスの役割"
-            style={{
-              fontSize: '12px',
-              padding: '2px 10px',
-              borderRadius: '999px',
-              border: '1px solid var(--kb-border)',
-              color: 'var(--kb-text-secondary)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <span data-tagline-key="surface:operator_surface_tagline">
-              監査モニタ（読み取り専用）
-            </span>
-          </span>
-          <nav style={{ display: 'flex', gap: '16px', fontSize: '14px' }}>
-            <a href="/" style={{ color: 'var(--kb-accent)' }}>
-              Missions
-            </a>
-            <a href="/audit" style={{ color: 'var(--kb-accent)' }}>
-              Audit
-            </a>
-            <a href="/health" style={{ color: 'var(--kb-accent)' }}>
-              Health
-            </a>
-            <a href="/reasoning" style={{ color: 'var(--kb-accent)' }}>
-              Reasoning
-            </a>
-            <a href="/surfaces" style={{ color: 'var(--kb-accent)' }}>
-              Surfaces
-            </a>
-            <a href="/intent-snapshots" style={{ color: 'var(--kb-accent)' }}>
-              Intent Snapshots
-            </a>
-            <a href="/knowledge" style={{ color: 'var(--kb-accent)' }}>
-              Knowledge
-            </a>
-          </nav>
-          <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--kb-text-secondary)' }}>
-            tenant:{' '}
-            <code style={{ color: scope ? 'var(--kb-success)' : 'var(--kb-text-secondary)' }}>
-              {scope ?? 'agnostic'}
-            </code>
-            {' · read-only'}
-          </span>
-        </header>
-        <main style={{ maxWidth: '1080px', margin: '0 auto', padding: '24px' }}>{children}</main>
+          {children}
+        </OperatorShell>
       </body>
     </html>
   );

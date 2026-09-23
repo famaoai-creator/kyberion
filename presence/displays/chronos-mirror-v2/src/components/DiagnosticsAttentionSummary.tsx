@@ -109,10 +109,10 @@ export function DiagnosticsAttentionSummary({
   };
 
   return (
-    <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] kb-text-accent">
+          <div className="text-[11px] kb-text-accent">
             {uxText('chronos_diagnostics_attention_eyebrow', locale)}
           </div>
           <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
@@ -122,7 +122,7 @@ export function DiagnosticsAttentionSummary({
             {uxText('chronos_diagnostics_attention_description', locale)}
           </p>
         </div>
-        <div className="rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[10px] kb-text-secondary">
+        <div className="rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[11px] kb-text-secondary">
           {attentionItems.length} {uxText('chronos_items_to_check', locale)}
         </div>
       </div>
@@ -158,7 +158,7 @@ export function DiagnosticsAttentionSummary({
 
       <div className="mt-5 grid gap-3">
         {attentionItems.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-2xl border kb-status-positive-border kb-status-positive-surface px-4 py-4 text-sm kb-status-positive">
+          <div className="flex items-center gap-3 rounded-lg border kb-status-positive-border kb-status-positive-surface px-4 py-4 text-sm kb-status-positive">
             <CheckCircle2 size={16} />
             {uxText('chronos_diagnostics_no_attention', locale)}
           </div>
@@ -166,7 +166,7 @@ export function DiagnosticsAttentionSummary({
           attentionItems.map((item) => (
             <div
               key={item.id}
-              className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 ${item.tone === 'critical' ? 'kb-status-negative-border kb-status-negative-surface' : item.tone === 'warning' ? 'kb-status-warning-border kb-status-warning-surface' : 'kb-border-subtle kb-surface-sunken'}`}
+              className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 ${item.tone === 'critical' ? 'kb-status-negative-border kb-status-negative-surface' : item.tone === 'warning' ? 'kb-status-warning-border kb-status-warning-surface' : 'kb-border-subtle kb-surface-sunken'}`}
             >
               <div className="min-w-0">
                 <div className="text-sm font-semibold kb-text-primary">{item.title}</div>
@@ -187,7 +187,7 @@ export function DiagnosticsAttentionSummary({
                       item.missionId
                     )
                   }
-                  className="shrink-0 rounded-lg border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] font-semibold kb-text-accent"
+                  className="shrink-0 rounded-lg border kb-border-accent kb-surface-accent px-3 py-2 text-[11px] font-semibold kb-text-accent"
                 >
                   {uxText('chronos_open_related_view', locale)}
                 </button>
@@ -202,8 +202,8 @@ export function DiagnosticsAttentionSummary({
 
 function SummaryCard({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
   return (
-    <div className="rounded-2xl border kb-border-subtle kb-surface-sunken px-4 py-3">
-      <div className="flex items-center gap-2 text-[10px] kb-text-muted">
+    <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-3">
+      <div className="flex items-center gap-2 text-[11px] kb-text-muted">
         {icon}
         {label}
       </div>

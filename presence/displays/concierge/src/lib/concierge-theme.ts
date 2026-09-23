@@ -23,6 +23,25 @@ export const CONCIERGE_DISPLAY_STORAGE_KEYS = Object.freeze({
 
 export const CONCIERGE_DISPLAY_EVENT = 'kyberion:display-preferences';
 
+/**
+ * Cookie the front-desk shells mirror the language choice into
+ * (presence-studio `front-desk-pages.ts` FRONT_DESK_LOCALE_COOKIE renders its
+ * page chrome from it). Cookies are shared across loopback ports while
+ * localStorage is not, so this is what keeps the two surfaces in one
+ * language.
+ */
+export const FRONT_DESK_LOCALE_COOKIE = 'kb-ui-locale';
+
+function writeLocaleCookie(locale: 'ja' | 'en' | null): void {
+  try {
+    document.cookie = locale
+      ? `${FRONT_DESK_LOCALE_COOKIE}=${locale}; path=/; max-age=31536000; SameSite=Lax`
+      : `${FRONT_DESK_LOCALE_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+  } catch {
+    // Cookies blocked: the choice still applies to this surface.
+  }
+}
+
 export interface ConciergeDisplayPreferences {
   theme: ConciergeThemePreference;
   density: ConciergeDensityPreference;
@@ -76,7 +95,10 @@ export function updateDisplayPreferences(
     applyThemePreference(next.theme);
   }
   if (patch.density !== undefined) writeKey(CONCIERGE_DISPLAY_STORAGE_KEYS.density, next.density);
-  if (patch.locale !== undefined) writeKey(CONCIERGE_DISPLAY_STORAGE_KEYS.locale, next.locale);
+  if (patch.locale !== undefined) {
+    writeKey(CONCIERGE_DISPLAY_STORAGE_KEYS.locale, next.locale);
+    writeLocaleCookie(next.locale);
+  }
   try {
     window.dispatchEvent(new CustomEvent(CONCIERGE_DISPLAY_EVENT, { detail: next }));
   } catch {

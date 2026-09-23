@@ -184,7 +184,7 @@ function Stat({
 }) {
   return (
     <div className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2">
-      <div className="text-[9px] uppercase tracking-[0.16em] kb-text-muted">{label}</div>
+      <div className="text-[11px] kb-text-muted">{label}</div>
       <div className={`mt-1 text-lg font-semibold ${tone}`}>{value}</div>
     </div>
   );
@@ -301,10 +301,10 @@ export function AgentCollaborationBoard({
   }, [tree]);
   const hasTreeNodes = treeRows.length > 0;
   return (
-    <section className="rounded-2xl border kb-border-accent kb-surface-accent p-4">
+    <section className="rounded-lg border kb-border-accent kb-surface-accent p-4">
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <div className="text-xs font-bold uppercase tracking-[0.2em] kb-text-accent">
+          <div className="text-xs font-bold kb-text-accent">
             {uxText('chronos_ac_title', locale)}
           </div>
           <div className="mt-1 text-[11px] kb-text-muted">
@@ -312,7 +312,7 @@ export function AgentCollaborationBoard({
           </div>
         </div>
         <div className="w-full rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-          <div className="text-[10px] font-bold uppercase tracking-[0.16em] kb-text-muted">
+          <div className="text-[11px] font-bold kb-text-muted">
             {uxText('chronos_ac_guide_title', locale)}
           </div>
           <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -326,10 +326,10 @@ export function AgentCollaborationBoard({
                 key={labelKey}
                 className="rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-2"
               >
-                <div className="text-[9px] font-bold tracking-[0.14em] kb-text-accent">
+                <div className="text-[11px] font-bold kb-text-accent">
                   {uxText(labelKey, locale)}
                 </div>
-                <div className="mt-1 text-[10px] kb-text-secondary">
+                <div className="mt-1 text-[11px] kb-text-secondary">
                   {uxText(detailKey, locale)}
                 </div>
               </div>
@@ -338,7 +338,7 @@ export function AgentCollaborationBoard({
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
           <label
-            className="text-[10px] font-bold uppercase tracking-[0.16em] kb-text-muted"
+            className="text-[11px] font-bold kb-text-muted"
             htmlFor="chronos-collaboration-mission-filter"
           >
             {uxText('chronos_ac_filter_mission', locale)}
@@ -360,25 +360,25 @@ export function AgentCollaborationBoard({
             type="button"
             onClick={() => void refresh()}
             disabled={refreshing}
-            className="rounded-lg border kb-border-accent kb-surface-accent px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-accent disabled:opacity-50"
+            className="rounded-lg border kb-border-accent kb-surface-accent px-3 py-1.5 text-[11px] font-bold kb-text-accent disabled:opacity-50"
           >
             {refreshing
               ? uxText('chronos_ac_refreshing', locale)
               : uxText('chronos_ac_refresh', locale)}
           </button>
           {projection?.generated_at ? (
-            <span className="ml-auto text-[10px] kb-text-muted">
+            <span className="ml-auto text-[11px] kb-text-muted">
               {uxText('chronos_ac_updated', locale)} {projection.generated_at.slice(11, 19)}
             </span>
           ) : null}
         </div>
         {projection?.partial ? (
-          <span className="rounded-full border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[10px] kb-status-warning">
+          <span className="rounded-full border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[11px] kb-status-warning">
             {uxText('chronos_ac_status_attention', locale)}
           </span>
         ) : null}
         {projection?.status_flags.length ? (
-          <div className="flex flex-wrap gap-1 text-[10px] kb-status-warning">
+          <div className="flex flex-wrap gap-1 text-[11px] kb-status-warning">
             {projection.status_flags.map((flag) => (
               <span key={flag} className="rounded-full border kb-status-warning-border px-2 py-1">
                 {flag === 'sequence_gap'
@@ -394,13 +394,13 @@ export function AgentCollaborationBoard({
           <button
             type="button"
             onClick={() => onOpenView('runtime-topology-map')}
-            className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[10px] kb-status-warning hover:kb-status-warning-surface"
+            className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[11px] kb-status-warning hover:kb-status-warning-surface"
           >
             {uxText('chronos_ac_check_runtime', locale)}
           </button>
         ) : null}
         {error ? <span className="text-[11px] kb-status-negative">{error}</span> : null}
-        <span className="ml-auto rounded-full border kb-border-subtle kb-surface-raised px-2 py-1 text-[10px] kb-text-muted">
+        <span className="ml-auto rounded-full border kb-border-subtle kb-surface-raised px-2 py-1 text-[11px] kb-text-muted">
           {uxText('chronos_ac_scope', locale)}: {tenant || uxText('chronos_ac_scope_all', locale)}
         </span>
       </div>
@@ -452,12 +452,12 @@ export function AgentCollaborationBoard({
 
       {tree ? (
         hasTreeNodes ? (
-          <details className="mt-4 rounded-2xl border kb-border-subtle kb-surface-sunken p-4" open>
-            <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-[0.16em] kb-text-muted">
+          <details className="mt-4 rounded-lg border kb-border-subtle kb-surface-sunken p-4" open>
+            <summary className="cursor-pointer text-[11px] font-bold kb-text-muted">
               {uxText('chronos_ac_tree', locale)}
             </summary>
             <div className="mt-3 grid gap-1">
-              <div className="grid grid-cols-[1fr_72px_150px_64px_150px] gap-2 px-3 text-[9px] uppercase tracking-[0.12em] kb-text-muted">
+              <div className="grid grid-cols-[1fr_72px_150px_64px_150px] gap-2 px-3 text-[11px] kb-text-muted">
                 <span>{uxText('chronos_ac_tree_col_node', locale)}</span>
                 <span>{uxText('chronos_ac_tree_col_state', locale)}</span>
                 <span>{uxText('chronos_ac_tree_col_waiting', locale)}</span>
@@ -473,7 +473,7 @@ export function AgentCollaborationBoard({
                       type="button"
                       onClick={() => setExpandedTreeNodeId(isExpanded ? null : node.id)}
                       aria-expanded={isExpanded}
-                      className={`grid grid-cols-[1fr_72px_150px_64px_150px] items-center gap-2 rounded-lg border px-3 py-2 text-left text-[10px] ${
+                      className={`grid grid-cols-[1fr_72px_150px_64px_150px] items-center gap-2 rounded-lg border px-3 py-2 text-left text-[11px] ${
                         isWaiting
                           ? 'kb-status-warning-border kb-status-warning-surface kb-status-warning'
                           : 'kb-border-subtle kb-surface-sunken kb-text-secondary'
@@ -495,7 +495,7 @@ export function AgentCollaborationBoard({
                       <span className="truncate kb-text-muted">{providerRoleCell(node)}</span>
                     </button>
                     {isExpanded ? (
-                      <div className="ml-4 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[10px] kb-text-muted">
+                      <div className="ml-4 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-muted">
                         {node.waiting_on.length === 0 && node.handoffs.length === 0 ? (
                           <div>{node.id}</div>
                         ) : null}
@@ -523,9 +523,7 @@ export function AgentCollaborationBoard({
           </details>
         ) : (
           <div className="mt-4 text-[11px] kb-text-muted">
-            <span className="mr-2 text-[10px] font-bold uppercase tracking-[0.16em]">
-              {uxText('chronos_ac_tree', locale)}
-            </span>
+            <span className="mr-2 text-[11px] font-bold">{uxText('chronos_ac_tree', locale)}</span>
             {uxText('chronos_ac_tree_empty', locale)}
           </div>
         )
@@ -533,7 +531,7 @@ export function AgentCollaborationBoard({
 
       {projection && projection.attention.length > 0 ? (
         <div className="mt-4">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-status-warning">
+          <div className="mb-2 text-[11px] font-bold kb-status-warning">
             {uxText('chronos_ac_attention', locale)}
           </div>
           <div className="grid gap-2 lg:grid-cols-2">
@@ -551,10 +549,10 @@ export function AgentCollaborationBoard({
                         <span className="font-semibold kb-status-warning">
                           {collaborationAttentionTitle(item.code, locale)}
                         </span>
-                        <span className="rounded-full border kb-border-subtle px-2 text-[9px] kb-text-muted">
+                        <span className="rounded-full border kb-border-subtle px-2 text-[11px] kb-text-muted">
                           {collaborationKindLabel(item.kind, locale)}
                         </span>
-                        <span className="ml-auto text-[9px] kb-text-muted">
+                        <span className="ml-auto text-[11px] kb-text-muted">
                           {item.mission_id || uxText('chronos_ac_mission_unspecified', locale)}
                         </span>
                       </div>
@@ -566,7 +564,7 @@ export function AgentCollaborationBoard({
                         {collaborationAttentionNextAction(item.code, locale)}
                       </div>
                       {event?.causation_id || evidenceRefs.length > 0 ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] kb-text-muted">
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] kb-text-muted">
                           {event?.causation_id ? (
                             <span className="rounded border kb-border-subtle px-2 py-1">
                               {uxText('chronos_ac_cause', locale)}: {event.causation_id}
@@ -587,7 +585,7 @@ export function AgentCollaborationBoard({
                           <button
                             type="button"
                             onClick={() => onOpenMission(item.mission_id as string)}
-                            className="rounded border kb-border-accent kb-surface-accent px-2 py-1 text-[10px] kb-text-accent hover:kb-surface-accent"
+                            className="rounded border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent hover:kb-surface-accent"
                           >
                             {uxText('chronos_ac_open_mission', locale)}
                           </button>
@@ -601,7 +599,7 @@ export function AgentCollaborationBoard({
                               const action = attentionActionForKind(item.kind);
                               if (action?.mode === 'view') onOpenView(action.viewId);
                             }}
-                            className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[10px] kb-status-warning hover:kb-status-warning-surface"
+                            className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[11px] kb-status-warning hover:kb-status-warning-surface"
                           >
                             {collaborationActionLabel(item.kind, locale)}
                           </button>
@@ -614,7 +612,7 @@ export function AgentCollaborationBoard({
                             aria-label={collaborationActionLabel(item.kind, locale) || undefined}
                             title={collaborationActionLabel(item.kind, locale) || undefined}
                             onClick={() => onOpenMission(item.mission_id as string)}
-                            className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[10px] kb-status-warning hover:kb-status-warning-surface"
+                            className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[11px] kb-status-warning hover:kb-status-warning-surface"
                           >
                             {collaborationActionLabel(item.kind, locale)}
                           </button>
@@ -625,7 +623,7 @@ export function AgentCollaborationBoard({
                             aria-label={uxText('chronos_ac_open_evidence', locale)}
                             title={uxText('chronos_ac_open_evidence', locale)}
                             onClick={() => onOpenView('trace-viewer')}
-                            className="rounded border kb-border-subtle kb-surface-raised px-2 py-1 text-[10px] kb-text-secondary hover:kb-surface-raised"
+                            className="rounded border kb-border-subtle kb-surface-raised px-2 py-1 text-[11px] kb-text-secondary hover:kb-surface-raised"
                           >
                             {uxText('chronos_ac_open_evidence', locale)}
                           </button>
@@ -643,14 +641,14 @@ export function AgentCollaborationBoard({
       {projection && projection.events.length > 0 ? (
         <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
-            <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-muted">
+            <div className="mb-2 text-[11px] font-bold kb-text-muted">
               {uxText('chronos_ac_timeline', locale)}
             </div>
             <div className="grid gap-1">
               {projection.events.slice(0, 8).map((event) => (
                 <div
                   key={event.event_id}
-                  className="flex gap-2 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px]"
+                  className="flex gap-2 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px]"
                 >
                   <span className="w-14 shrink-0 kb-text-muted">{event.ts.slice(11, 19)}</span>
                   <span className="rounded-full border kb-border-accent px-2 kb-text-accent">
@@ -695,14 +693,14 @@ export function AgentCollaborationBoard({
             </div>
           </div>
           <div>
-            <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-muted">
+            <div className="mb-2 text-[11px] font-bold kb-text-muted">
               {uxText('chronos_ac_handoff_graph', locale)}
             </div>
             <div className="grid gap-1">
               {projection.edges.slice(-8).map((edge) => (
                 <div
                   key={`${edge.event_id}:${edge.from}:${edge.to}`}
-                  className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[10px] kb-text-secondary"
+                  className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] kb-text-secondary"
                 >
                   <span className="kb-text-accent">{edge.from}</span>
                   <span className="mx-2 kb-text-muted">→</span>

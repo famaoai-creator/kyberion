@@ -1,8 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
+import { Section, Skeleton, StatusPill } from '@agent/shared-ui';
 import { useChronosLocale } from '../lib/hooks';
-import { uxText } from '../lib/ux-vocabulary';
+import { uxMessage, uxText } from '../lib/ux-vocabulary';
 import {
   parseAgentActivityResponse,
   type ClientAgentActivity,
@@ -12,34 +14,113 @@ type Office = Pick<ClientAgentActivity, 'rooms' | 'attention'>;
 type TrackRecord = ClientAgentActivity['trackRecords'][number];
 
 export type OfficeAgent = Office['rooms'][number]['agents'][number];
+export type OfficeRoom = Office['rooms'][number];
 
 export function dedupeOfficeAgents(agents: OfficeAgent[]): OfficeAgent[] {
   return Array.from(new Map(agents.map((agent) => [agent.agent_id, agent])).values());
 }
 
-const STATUS_LABEL_KEY: Record<string, string> = {
-  backlog: 'chronos_status_backlog',
-  ready: 'chronos_status_ready',
-  in_progress: 'chronos_status_in_progress',
-  blocked: 'chronos_blocked_count',
-  review: 'chronos_status_review',
-  done: 'chronos_status_done',
-  archived: 'chronos_status_archived',
-};
+/** Agent states that need a human look (mirrors composeOfficeSnapshot's attention rule). */
+const ATTENTION_STATUSES = new Set(['blocked', 'review', 'waiting', 'offline']);
 
-export function ChronosOffice({
-  compact = false,
-  tenant = '',
-  onOpenOperations,
-}: {
-  compact?: boolean;
-  tenant?: string;
-  onOpenOperations?: () => void;
-}) {
-  const locale = useChronosLocale();
+export function agentNeedsAttention(agent: OfficeAgent): boolean {
+  return (
+    ATTENTION_STATUSES.has(agent.status) ||
+    Boolean(agent.pressure && agent.pressure.severity !== 'normal')
+  );
+}
+
+/** Work-item agent status → canonical `ui:status-pill` status, most urgent first. */
+const ROOM_STATUS_ORDER: Array<[string, KbStatus]> = [
+  ['blocked', 'blocked'],
+  ['offline', 'offline'],
+  ['review', 'review'],
+  ['waiting', 'pending'],
+  ['in_progress', 'working'],
+  ['ready', 'ready'],
+  ['backlog', 'planned'],
+  ['done', 'done'],
+  ['archived', 'archived'],
+];
+
+export function roomStatus(agents: OfficeAgent[]): KbStatus {
+  const statuses = new Set(agents.map((agent) => agent.status));
+  for (const [agentStatus, pillStatus] of ROOM_STATUS_ORDER) {
+    if (statuses.has(agentStatus)) return pillStatus;
+  }
+  return 'n/a';
+}
+
+const OPERATOR_FLOOR_ROOM_ID = 'operator-floor';
+
+/**
+ * Fallback human title for a mission id when no goal summary is known:
+ * `MSN-BACKEND-CAPABILITY-CONSOLIDATION-20260822A` → "Backend capability
+ * consolidation". The id itself is always shown next to it in mono.
+ */
+export function humanizeMissionId(missionId: string): string {
+  const words = missionId
+    .replace(/^MSN-/i, '')
+    .replace(/-\d{6,8}[A-Z]?$/i, '')
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((word) => word.toLowerCase());
+  if (words.length === 0) return missionId;
+  const sentence = words.join(' ');
+  return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+}
+
+export interface MissionRow {
+  missionId: string;
+  title: string;
+  agents: OfficeAgent[];
+  status: KbStatus;
+  attention: number;
+  isOperatorFloor: boolean;
+}
+
+/** One row per mission room, most attention first. */
+export function buildMissionRows(
+  rooms: OfficeRoom[],
+  missionTitles: Readonly<Record<string, string | undefined>> = {},
+  operatorFloorTitle = 'Operator floor'
+): MissionRow[] {
+  return rooms
+    .map((room) => {
+      const agents = dedupeOfficeAgents(room.agents);
+      const isOperatorFloor = room.room_id === OPERATOR_FLOOR_ROOM_ID;
+      return {
+        missionId: room.room_id,
+        title: isOperatorFloor
+          ? operatorFloorTitle
+          : missionTitles[room.room_id]?.trim() || humanizeMissionId(room.room_id),
+        agents,
+        status: roomStatus(agents),
+        attention: agents.filter(agentNeedsAttention).length,
+        isOperatorFloor,
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.attention - left.attention ||
+        Number(right.status === 'blocked') - Number(left.status === 'blocked') ||
+        left.title.localeCompare(right.title)
+    );
+}
+
+export interface ChronosOfficeState {
+  office: Office | null;
+  trackRecords: TrackRecord[];
+  error: string | null;
+  loading: boolean;
+}
+
+/** Agent activity (rooms = missions) for the viewer's tenant scope, refreshed every 30s. */
+export function useChronosOffice(tenant = ''): ChronosOfficeState {
   const [office, setOffice] = React.useState<Office | null>(null);
   const [trackRecords, setTrackRecords] = React.useState<TrackRecord[]>([]);
   const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
   const refresh = React.useCallback(async () => {
     try {
@@ -56,6 +137,8 @@ export function ChronosOffice({
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
     }
   }, [tenant]);
 
@@ -65,99 +148,171 @@ export function ChronosOffice({
     return () => clearInterval(timer);
   }, [refresh]);
 
-  const statusLabel = (status: string): string =>
-    uxText(STATUS_LABEL_KEY[status] || 'chronos_status_unknown', locale);
+  return { office, trackRecords, error, loading };
+}
+
+const AGENT_PREVIEW_LIMIT = 3;
+
+/**
+ * UI-07: missions in motion as one compact table (human title with the
+ * mission id as a mono secondary line, assignees, status pill, attention
+ * count), sorted by attention — replacing the wall of identical
+ * mission → agent cards.
+ */
+export function ChronosMissionTable({
+  rows,
+  onOpenMission,
+}: {
+  rows: MissionRow[];
+  onOpenMission?: (missionId: string) => void;
+}) {
+  const locale = useChronosLocale();
+  if (rows.length === 0) {
+    return (
+      <div className="kb-table-wrap">
+        <table className="kb-table">
+          <tbody>
+            <tr>
+              <td className="kb-table__empty">{uxText('chronos_no_active_agent_work', locale)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+  return (
+    <div className="kb-table-wrap">
+      <table className="kb-table">
+        <thead>
+          <tr>
+            <th scope="col">{uxText('chronos_col_mission', locale)}</th>
+            <th scope="col">{uxText('chronos_col_assignees', locale)}</th>
+            <th scope="col" style={{ width: '9rem' }}>
+              {uxText('chronos_col_status', locale)}
+            </th>
+            <th scope="col" data-align="end" style={{ width: '7rem' }}>
+              {uxText('chronos_col_attention', locale)}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const shown = row.agents.slice(0, AGENT_PREVIEW_LIMIT);
+            const hidden = row.agents.length - shown.length;
+            const canOpen = Boolean(onOpenMission) && !row.isOperatorFloor;
+            return (
+              <tr key={row.missionId}>
+                <td>
+                  <div className="chronos-mission-cell">
+                    {canOpen ? (
+                      <button
+                        type="button"
+                        className="chronos-mission-cell__title"
+                        onClick={() => onOpenMission?.(row.missionId)}
+                      >
+                        {row.title}
+                      </button>
+                    ) : (
+                      <span className="chronos-mission-cell__title">{row.title}</span>
+                    )}
+                    {row.isOperatorFloor ? null : (
+                      <span className="chronos-mission-cell__id">{row.missionId}</span>
+                    )}
+                  </div>
+                </td>
+                <td className="chronos-muted">
+                  {shown.map((agent) => agent.agent_id).join(', ')}
+                  {hidden > 0
+                    ? ` ${uxMessage('chronos_more_count', { count: hidden }, '+{count}', locale)}`
+                    : ''}
+                </td>
+                <td>
+                  <StatusPill status={row.status} />
+                </td>
+                <td data-align="end">
+                  <span
+                    className="chronos-attention-count"
+                    data-zero={row.attention === 0 ? 'true' : undefined}
+                  >
+                    {row.attention}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * Operations view of the office: the mission table plus each agent's track
+ * record. The home view renders the table itself (see ChronosHome).
+ */
+export function ChronosOffice({
+  tenant = '',
+  missionTitles,
+  onOpenMission,
+}: {
+  tenant?: string;
+  missionTitles?: Readonly<Record<string, string | undefined>>;
+  onOpenMission?: (missionId: string) => void;
+}) {
+  const locale = useChronosLocale();
+  const { office, trackRecords, error, loading } = useChronosOffice(tenant);
+  const rows = React.useMemo(
+    () =>
+      buildMissionRows(
+        office?.rooms || [],
+        missionTitles,
+        uxText('chronos_office_operator_floor', locale)
+      ),
+    [office, missionTitles, locale]
+  );
 
   return (
-    <section
-      className={`rounded-2xl border kb-border-accent kb-surface-accent p-4 ${compact ? '' : 'md:p-5'}`}
+    <Section
+      title={uxText('chronos_office', locale)}
+      description={uxText('chronos_office_description', locale)}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-[0.2em] kb-text-accent">
-            {uxText('chronos_office', locale)}
-          </div>
-          <div className="mt-1 max-w-2xl text-[11px] kb-text-muted">
-            {compact
-              ? uxText('chronos_home_office_hint', locale)
-              : uxText('chronos_office_description', locale)}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full border kb-border-subtle px-2 py-1 text-[10px] kb-text-secondary">
-            {uxText('chronos_attention', locale)} {office?.attention.length || 0}
-          </span>
-        </div>
-      </div>
-
-      {error ? <div className="mt-3 text-[11px] kb-status-negative">{error}</div> : null}
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {(office?.rooms || []).map((room) => (
-          <div
-            key={room.room_id}
-            className="rounded-xl border kb-border-subtle kb-surface-sunken p-3"
-          >
-            <div className="text-[10px] font-bold uppercase tracking-[0.16em] kb-text-secondary">
-              {room.title}
-            </div>
-            <div className="mt-2 grid gap-2">
-              {dedupeOfficeAgents(room.agents).map((agent) => (
-                <div
-                  key={`${room.room_id}:${agent.agent_id}`}
-                  className="flex items-center gap-2 rounded-lg kb-surface-raised px-2 py-2 text-[11px]"
-                >
-                  <span
-                    className={`h-2 w-2 rounded-full ${agent.pressure?.severity === 'saturated' || agent.status === 'blocked' ? 'kb-status-negative-surface' : agent.pressure?.severity === 'elevated' ? 'kb-status-warning-surface' : agent.status === 'in_progress' ? 'kb-surface-accent' : 'kb-surface-raised'}`}
-                  />
-                  <span className="font-semibold kb-text-primary">{agent.agent_id}</span>
-                  <span className="ml-auto kb-text-muted">{statusLabel(agent.status)}</span>
-                  {agent.pressure && agent.pressure.severity !== 'normal' ? (
-                    <span className="rounded border kb-border-subtle px-1 text-[9px] kb-text-muted">
-                      {agent.pressure.severity}
-                    </span>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        {(office?.rooms || []).length === 0 ? (
-          <div className="rounded-xl border kb-border-subtle kb-surface-sunken p-3 text-[11px] kb-text-muted">
-            {uxText('chronos_no_active_agent_work', locale)}
-          </div>
-        ) : null}
-      </div>
-
-      {!compact ? (
-        <div className="mt-4 border-t kb-border-subtle pt-4">
-          <div className="text-xs font-bold uppercase tracking-[0.2em] kb-text-secondary">
-            {uxText('chronos_track_record', locale)}
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {trackRecords.map((record) => (
-              <div
-                key={record.agent_id}
-                className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px]"
-              >
-                <span className="font-bold kb-text-primary">{record.agent_id}</span>
-                <span className="ml-2 kb-text-accent">{record.rank}</span>
-                <span className="ml-2 kb-text-secondary">完了 {record.completed_tasks}</span>
-                <span className="ml-2 kb-text-muted">
-                  review {Math.round(record.review_pass_rate * 100)}%
-                </span>
-              </div>
-            ))}
+      {error ? <p className="chronos-scope__error">{error}</p> : null}
+      {loading && !office ? (
+        <Skeleton shape="table" lines={4} />
+      ) : (
+        <ChronosMissionTable rows={rows} onOpenMission={onOpenMission} />
+      )}
+      {trackRecords.length > 0 ? (
+        <div className="chronos-feed">
+          <h3 className="chronos-feed__title">{uxText('chronos_track_record', locale)}</h3>
+          <div className="kb-table-wrap">
+            <table className="kb-table">
+              <thead>
+                <tr>
+                  <th scope="col">{uxText('chronos_col_agent', locale)}</th>
+                  <th scope="col">{uxText('chronos_col_rank', locale)}</th>
+                  <th scope="col" data-align="end">
+                    {uxText('chronos_col_completed', locale)}
+                  </th>
+                  <th scope="col" data-align="end">
+                    {uxText('chronos_col_review_pass', locale)}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {trackRecords.map((record) => (
+                  <tr key={record.agent_id}>
+                    <td data-mono="true">{record.agent_id}</td>
+                    <td>{record.rank}</td>
+                    <td data-align="end">{record.completed_tasks}</td>
+                    <td data-align="end">{Math.round(record.review_pass_rate * 100)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      ) : onOpenOperations ? (
-        <button
-          type="button"
-          onClick={onOpenOperations}
-          className="mt-4 rounded-xl border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-accent"
-        >
-          {uxText('chronos_nav_operations', locale)} →
-        </button>
       ) : null}
-    </section>
+    </Section>
   );
 }

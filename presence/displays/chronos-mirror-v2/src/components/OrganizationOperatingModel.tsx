@@ -134,8 +134,8 @@ function MetricCard({
     negative: 'kb-status-negative-border kb-status-negative-surface kb-status-negative',
   }[tone];
   return (
-    <div className={`rounded-2xl border p-3 ${toneClass}`}>
-      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em]">
+    <div className={`rounded-lg border p-3 ${toneClass}`}>
+      <div className="flex items-center gap-2 text-[11px] font-bold">
         <Icon size={13} />
         <span>{label}</span>
       </div>
@@ -144,7 +144,7 @@ function MetricCard({
       >
         {value}
       </div>
-      <div className="mt-1 text-[10px] leading-4 opacity-80">{detail}</div>
+      <div className="mt-1 text-[11px] leading-4 opacity-80">{detail}</div>
     </div>
   );
 }
@@ -197,10 +197,10 @@ export function OrganizationOperatingModel({
   }, [refresh]);
 
   return (
-    <section className="kyberion-glass rounded-[30px] border kb-border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.28em] kb-text-accent">
+          <div className="flex items-center gap-2 text-[11px] font-bold kb-text-accent">
             <Building2 size={14} />
             {uxText('chronos_nav_organization', locale)}
           </div>
@@ -215,7 +215,7 @@ export function OrganizationOperatingModel({
           type="button"
           onClick={() => void refresh()}
           disabled={busy}
-          className="flex items-center gap-2 rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-secondary disabled:opacity-50"
+          className="flex items-center gap-2 rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] font-bold kb-text-secondary disabled:opacity-50"
         >
           <RefreshCw size={12} className={busy ? 'animate-spin' : ''} />
           {uxText('chronos_org_refresh', locale)}
@@ -229,7 +229,7 @@ export function OrganizationOperatingModel({
       ) : null}
 
       {!view && !error ? (
-        <div className="mt-6 rounded-2xl border kb-border-subtle kb-surface-sunken p-5 text-sm kb-text-muted">
+        <div className="mt-6 rounded-lg border kb-border-subtle kb-surface-sunken p-5 text-sm kb-text-muted">
           {tenant
             ? uxText('chronos_org_loading', locale)
             : uxText('chronos_organization_scope_hint', locale)}
@@ -239,19 +239,19 @@ export function OrganizationOperatingModel({
       {view ? (
         <>
           <div className="mt-5 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] kb-text-accent">
+            <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] font-bold kb-text-accent">
               {view.organization_id}
             </span>
             {tenant ? (
-              <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[10px] kb-text-secondary">
+              <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[11px] kb-text-secondary">
                 tenant: {tenant}
               </span>
             ) : null}
-            <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[10px] kb-text-secondary">
+            <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[11px] kb-text-secondary">
               {uxText('chronos_org_readiness', locale)}:{' '}
               {organizationReadinessLabel(view.readiness, locale)}
             </span>
-            <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[10px] kb-text-secondary">
+            <span className="rounded-full border kb-border-subtle kb-surface-raised px-3 py-1 text-[11px] kb-text-secondary">
               {uxText('chronos_org_reconciliation', locale)}: {view.reconciliation.status}
             </span>
           </div>
@@ -264,7 +264,7 @@ export function OrganizationOperatingModel({
               detail={
                 view.purpose?.objectives?.length ? (
                   <div>
-                    <div className="mb-1 text-[9px] font-bold uppercase tracking-[0.14em]">
+                    <div className="mb-1 text-[11px] font-bold">
                       {uxText('chronos_org_objectives', locale)}
                     </div>
                     <ul className="list-disc space-y-1 pl-4">
@@ -329,8 +329,8 @@ export function OrganizationOperatingModel({
           </div>
 
           <div className="mt-6 grid gap-5 xl:grid-cols-[1.2fr,0.8fr]">
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] kb-text-secondary">
+            <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
+              <div className="flex items-center gap-2 text-xs font-bold kb-text-secondary">
                 <CircleAlert size={14} />
                 {uxText('chronos_org_interventions', locale)}
               </div>
@@ -342,7 +342,7 @@ export function OrganizationOperatingModel({
                       className="flex items-start gap-3 rounded-xl border kb-border-subtle kb-surface-raised p-3"
                     >
                       <span
-                        className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ${PRIORITY_CLASS[point.priority]}`}
+                        className={`rounded-full border px-2 py-1 text-[11px] font-bold ${PRIORITY_CLASS[point.priority]}`}
                       >
                         {point.priority}
                       </span>
@@ -350,7 +350,7 @@ export function OrganizationOperatingModel({
                         <div className="truncate text-[11px] font-semibold kb-text-primary">
                           {point.id}
                         </div>
-                        <div className="mt-1 text-[10px] leading-4 kb-text-muted">
+                        <div className="mt-1 text-[11px] leading-4 kb-text-muted">
                           {point.reason}
                         </div>
                       </div>
@@ -365,8 +365,8 @@ export function OrganizationOperatingModel({
               )}
             </div>
 
-            <div className="rounded-2xl border kb-border-subtle kb-surface-sunken p-4">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] kb-text-secondary">
+            <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
+              <div className="flex items-center gap-2 text-xs font-bold kb-text-secondary">
                 <GitBranch size={14} />
                 {uxText('chronos_org_structure', locale)}
               </div>
@@ -394,7 +394,7 @@ export function OrganizationOperatingModel({
                   return (
                     <span
                       key={service.service_id}
-                      className="rounded-full border kb-border-subtle kb-surface-raised px-2.5 py-1 text-[10px] kb-text-secondary"
+                      className="rounded-full border kb-border-subtle kb-surface-raised px-2.5 py-1 text-[11px] kb-text-secondary"
                     >
                       <span className="font-semibold kb-text-primary">{service.name}</span> ·{' '}
                       {organizationHealthLabel(health, locale)}
@@ -406,7 +406,7 @@ export function OrganizationOperatingModel({
           </div>
 
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t kb-border-subtle pt-4">
-            <div className="flex items-center gap-2 text-[10px] kb-text-muted">
+            <div className="flex items-center gap-2 text-[11px] kb-text-muted">
               <BrainCircuit size={13} />
               {uxMessage(
                 'chronos_org_learning_detail',
@@ -420,7 +420,7 @@ export function OrganizationOperatingModel({
                 <button
                   type="button"
                   onClick={onOpenOperations}
-                  className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-secondary"
+                  className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] font-bold kb-text-secondary"
                 >
                   {uxText('chronos_org_open_operations', locale)}{' '}
                   <ChevronRight className="ml-1 inline-block" size={12} />
@@ -430,7 +430,7 @@ export function OrganizationOperatingModel({
                 <button
                   type="button"
                   onClick={onOpenGovernance}
-                  className="rounded-xl border kb-border-accent kb-surface-accent px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] kb-text-accent"
+                  className="rounded-xl border kb-border-accent kb-surface-accent px-3 py-2 text-[11px] font-bold kb-text-accent"
                 >
                   {uxText('chronos_org_open_governance', locale)}{' '}
                   <ChevronRight className="ml-1 inline-block" size={12} />

@@ -19,6 +19,29 @@
         "type": "ui:nav-rail",
         "props": {
           "label": "メインメニュー",
+          "brand": {
+            "name": "Kyberion",
+            "subtitle": "あなたの相棒"
+          },
+          "context": {
+            "label": "既定のテナント",
+            "detail": "オーナー · 2 件から切替",
+            "switch_label": "いま見ているテナントを切り替える",
+            "action": {
+              "id": "gallery.tenant"
+            },
+            "options": [
+              {
+                "value": "default",
+                "label": "既定のテナント",
+                "selected": true
+              },
+              {
+                "value": "acme",
+                "label": "Acme ホールディングス"
+              }
+            ]
+          },
           "items": [
             {
               "id": "home",
@@ -367,6 +390,43 @@
               "label": "ミッション運用",
               "role": "chronos-mirror-v2"
             }
+          }
+        }
+      ]
+    },
+    {
+      "id": "display-controls",
+      "title": "表示設定 ui:display-controls",
+      "description": "テーマ(自動 / ライト / ダーク)と言語。display.theme / display.locale を発行し、保存は画面側が行います。",
+      "components": [
+        {
+          "id": "dc1",
+          "type": "ui:display-controls",
+          "props": {
+            "theme": "system",
+            "locale": "ja"
+          }
+        },
+        {
+          "id": "dc2",
+          "type": "ui:display-controls",
+          "props": {
+            "theme": "dark",
+            "locale": "en",
+            "locales": [
+              {
+                "value": "ja",
+                "label": "日本語"
+              },
+              {
+                "value": "en",
+                "label": "English"
+              },
+              {
+                "value": "qps-ploc",
+                "label": "Pseudo"
+              }
+            ]
           }
         }
       ]
@@ -835,7 +895,7 @@
     {
       "id": "list",
       "title": "リスト ui:list",
-      "description": "plain と timeline。",
+      "description": "plain・timeline と、状態ラベル付きの進み具合。",
       "components": [
         {
           "id": "list-root",
@@ -844,7 +904,7 @@
             "gap": "lg",
             "min_column_width": "md"
           },
-          "children": ["list-plain-sec", "list-tl-sec"]
+          "children": ["list-plain-sec", "list-tl-sec", "list-progress-sec"]
         },
         {
           "id": "list-plain-sec",
@@ -915,6 +975,45 @@
               }
             ]
           }
+        },
+        {
+          "id": "list-progress-sec",
+          "type": "ui:section",
+          "props": {
+            "title": "進行中"
+          },
+          "children": ["list-progress"]
+        },
+        {
+          "id": "list-progress",
+          "type": "ui:list",
+          "props": {
+            "items": [
+              {
+                "title": "9 月の月次報告",
+                "meta": "相棒",
+                "href": "#p1",
+                "status": "active",
+                "status_label": "作成中",
+                "progress": 72
+              },
+              {
+                "title": "取引先リストの整理",
+                "meta": "相棒",
+                "href": "#p2",
+                "status": "active",
+                "progress": 35
+              },
+              {
+                "title": "採用ページの原稿",
+                "meta": "相棒",
+                "href": "#p3",
+                "status": "active",
+                "status_label": "着手したところ",
+                "progress": 5
+              }
+            ]
+          }
         }
       ]
     },
@@ -969,6 +1068,38 @@
           "props": {
             "text": "pnpm pipeline --input pipelines/baseline-check.json",
             "variant": "mono"
+          }
+        }
+      ]
+    },
+    {
+      "id": "code",
+      "title": "コード ui:code",
+      "description": "コマンドやログを等幅・折り返しで表示します(内容は解釈しません)。",
+      "components": [
+        {
+          "id": "code-root",
+          "type": "ui:grid",
+          "props": {
+            "gap": "lg",
+            "min_column_width": "md"
+          },
+          "children": ["code1", "code2"]
+        },
+        {
+          "id": "code1",
+          "type": "ui:code",
+          "props": {
+            "title": "ビルドログ",
+            "language": "shell",
+            "code": "$ pnpm build\n> tsc -p tsconfig.json\n✓ 214 files compiled in 8.4s"
+          }
+        },
+        {
+          "id": "code2",
+          "type": "ui:code",
+          "props": {
+            "code": "{\n  \"mission_id\": \"MSN-SURFACE-UI-UNIFY-20260923\",\n  \"status\": \"active\"\n}"
           }
         }
       ]
