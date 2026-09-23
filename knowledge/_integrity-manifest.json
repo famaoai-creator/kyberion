@@ -2697,7 +2697,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 429056,
+      "size": 236869,
       "type": "json"
     },
     {
@@ -3195,7 +3195,7 @@
     {
       "path": "product/governance/process-definition-registry.json",
       "tier": "public",
-      "size": 2727,
+      "size": 2677,
       "type": "json"
     },
     {
