@@ -1,0 +1,964 @@
+{
+  "version": 1,
+  "catalog": "kyberion-base",
+  "sections": [
+    {
+      "id": "bar-chart",
+      "title": "Bar chart ui:bar-chart",
+      "description": "Grouped, stacked (2px gaps) and single-series bars. Two or more series get a legend; the hidden table carries every value.",
+      "components": [
+        {
+          "id": "bar-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "md"
+          },
+          "children": ["bar-c1", "bar-c2", "bar-c3"]
+        },
+        {
+          "id": "bar-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["bar1"]
+        },
+        {
+          "id": "bar-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["bar2"]
+        },
+        {
+          "id": "bar-c3",
+          "type": "ui:section",
+          "props": {},
+          "children": ["bar3"]
+        },
+        {
+          "id": "bar1",
+          "type": "ui:bar-chart",
+          "props": {
+            "title": "Requests by weekday",
+            "categories": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+            "series": [
+              {
+                "name": "Approved",
+                "values": [12, 15, 9, 18, 14]
+              },
+              {
+                "name": "Returned",
+                "values": [3, 2, 5, 1, 4]
+              }
+            ]
+          }
+        },
+        {
+          "id": "bar2",
+          "type": "ui:bar-chart",
+          "props": {
+            "title": "Tasks by agent",
+            "orientation": "horizontal",
+            "stacked": true,
+            "categories": ["Claude", "Codex", "Gemini", "Grok"],
+            "series": [
+              {
+                "name": "Done",
+                "values": [14, 9, 6, 3]
+              },
+              {
+                "name": "Running",
+                "values": [3, 4, 2, 1]
+              },
+              {
+                "name": "Blocked",
+                "values": [1, 0, 2, 1]
+              }
+            ]
+          }
+        },
+        {
+          "id": "bar3",
+          "type": "ui:bar-chart",
+          "props": {
+            "title": "Median response time",
+            "orientation": "horizontal",
+            "unit": "s",
+            "data": [
+              {
+                "label": "Search",
+                "value": 1.2
+              },
+              {
+                "label": "Summarise",
+                "value": 3.4
+              },
+              {
+                "label": "Draft email",
+                "value": 2.1
+              },
+              {
+                "label": "Translate",
+                "value": 0.8
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "line-chart",
+      "title": "Line chart ui:line-chart",
+      "description": "Labels on a point scale or numbers on a linear scale; 2–4 series are also labelled at the line end.",
+      "components": [
+        {
+          "id": "line-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "md"
+          },
+          "children": ["line-c1", "line-c2"]
+        },
+        {
+          "id": "line-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["line1"]
+        },
+        {
+          "id": "line-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["line2"]
+        },
+        {
+          "id": "line1",
+          "type": "ui:line-chart",
+          "props": {
+            "title": "Active missions per day",
+            "series": [
+              {
+                "name": "This week",
+                "points": [
+                  {
+                    "x": "Mon",
+                    "y": 4
+                  },
+                  {
+                    "x": "Tue",
+                    "y": 6
+                  },
+                  {
+                    "x": "Wed",
+                    "y": 5
+                  },
+                  {
+                    "x": "Thu",
+                    "y": 8
+                  },
+                  {
+                    "x": "Fri",
+                    "y": 7
+                  },
+                  {
+                    "x": "Sat",
+                    "y": 3
+                  },
+                  {
+                    "x": "Sun",
+                    "y": 2
+                  }
+                ]
+              },
+              {
+                "name": "Last week",
+                "points": [
+                  {
+                    "x": "Mon",
+                    "y": 3
+                  },
+                  {
+                    "x": "Tue",
+                    "y": 4
+                  },
+                  {
+                    "x": "Wed",
+                    "y": 4
+                  },
+                  {
+                    "x": "Thu",
+                    "y": 5
+                  },
+                  {
+                    "x": "Fri",
+                    "y": 6
+                  },
+                  {
+                    "x": "Sat",
+                    "y": 2
+                  },
+                  {
+                    "x": "Sun",
+                    "y": 1
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "line2",
+          "type": "ui:line-chart",
+          "props": {
+            "title": "Token spend (thousands)",
+            "area": true,
+            "y_unit": "k",
+            "series": [
+              {
+                "name": "Spend",
+                "points": [
+                  {
+                    "x": 1,
+                    "y": 12
+                  },
+                  {
+                    "x": 2,
+                    "y": 18
+                  },
+                  {
+                    "x": 3,
+                    "y": 15
+                  },
+                  {
+                    "x": 4,
+                    "y": 22
+                  },
+                  {
+                    "x": 5,
+                    "y": 30
+                  },
+                  {
+                    "x": 6,
+                    "y": 26
+                  },
+                  {
+                    "x": 7,
+                    "y": 19
+                  },
+                  {
+                    "x": 8,
+                    "y": 24
+                  },
+                  {
+                    "x": 9,
+                    "y": 35
+                  },
+                  {
+                    "x": 10,
+                    "y": 31
+                  },
+                  {
+                    "x": 11,
+                    "y": 28
+                  },
+                  {
+                    "x": 12,
+                    "y": 40
+                  },
+                  {
+                    "x": 13,
+                    "y": 37
+                  },
+                  {
+                    "x": 14,
+                    "y": 33
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "donut",
+      "title": "Donut ui:donut",
+      "description": "Part-to-whole with value and share in the legend; more than 8 parts fold into Other.",
+      "components": [
+        {
+          "id": "donut-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "md"
+          },
+          "children": ["donut-c1", "donut-c2"]
+        },
+        {
+          "id": "donut-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["donut1"]
+        },
+        {
+          "id": "donut-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["donut2"]
+        },
+        {
+          "id": "donut1",
+          "type": "ui:donut",
+          "props": {
+            "title": "Mission outcomes",
+            "segments": [
+              {
+                "label": "Done",
+                "value": 42
+              },
+              {
+                "label": "Running",
+                "value": 11
+              },
+              {
+                "label": "Blocked",
+                "value": 4
+              },
+              {
+                "label": "Cancelled",
+                "value": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "donut2",
+          "type": "ui:donut",
+          "props": {
+            "title": "Spend by provider",
+            "unit": " USD",
+            "center_label": "This month",
+            "data": [
+              {
+                "label": "Anthropic",
+                "value": 120
+              },
+              {
+                "label": "OpenAI",
+                "value": 64
+              },
+              {
+                "label": "Google",
+                "value": 31
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sparkline",
+      "title": "Sparkline ui:sparkline",
+      "description": "Inline trend inside a metric card; the last point is marked and gaps stay gaps.",
+      "components": [
+        {
+          "id": "spark-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 3,
+            "gap": "md"
+          },
+          "children": ["spark-c1", "spark-c2", "spark-c3"]
+        },
+        {
+          "id": "spark-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["spark-m1", "spark1"]
+        },
+        {
+          "id": "spark-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["spark-m2", "spark2"]
+        },
+        {
+          "id": "spark-c3",
+          "type": "ui:section",
+          "props": {},
+          "children": ["spark-m3", "spark3"]
+        },
+        {
+          "id": "spark-m1",
+          "type": "ui:metric",
+          "props": {
+            "label": "Approvals waiting",
+            "value": 7
+          }
+        },
+        {
+          "id": "spark1",
+          "type": "ui:sparkline",
+          "props": {
+            "label": "Approvals waiting, last 14 days",
+            "points": [3, 4, 6, 5, 8, 7, 9, 6, 5, 7, 8, 6, 7, 7]
+          }
+        },
+        {
+          "id": "spark-m2",
+          "type": "ui:metric",
+          "props": {
+            "label": "Error rate",
+            "value": "2.4",
+            "unit": "%"
+          }
+        },
+        {
+          "id": "spark2",
+          "type": "ui:sparkline",
+          "props": {
+            "label": "Error rate, last 14 days",
+            "tone": "danger",
+            "unit": "%",
+            "show_value": true,
+            "points": [1.2, 1.4, 1.1, null, 2.0, 2.6, 2.2, 2.9, 3.1, 2.8, 2.5, 2.7, 2.3, 2.4]
+          }
+        },
+        {
+          "id": "spark-m3",
+          "type": "ui:metric",
+          "props": {
+            "label": "Lessons distilled",
+            "value": 31
+          }
+        },
+        {
+          "id": "spark3",
+          "type": "ui:sparkline",
+          "props": {
+            "label": "Lessons distilled, last 14 days",
+            "tone": "success",
+            "points": [1, 2, 2, 3, 5, 6, 8, 11, 13, 17, 20, 24, 27, 31]
+          }
+        }
+      ]
+    },
+    {
+      "id": "stat-list",
+      "title": "Stat list ui:stat-list",
+      "description": "Summary statistics in one row that wraps on narrow screens.",
+      "components": [
+        {
+          "id": "stat-card",
+          "type": "ui:section",
+          "props": {},
+          "children": ["stat1"]
+        },
+        {
+          "id": "stat1",
+          "type": "ui:stat-list",
+          "props": {
+            "title": "Response time, last 7 days",
+            "items": [
+              {
+                "label": "Mean",
+                "value": 1.8,
+                "unit": "s"
+              },
+              {
+                "label": "Median",
+                "value": 1.4,
+                "unit": "s"
+              },
+              {
+                "label": "p95",
+                "value": 4.2,
+                "unit": "s",
+                "hint": "95% of requests are faster"
+              },
+              {
+                "label": "Max",
+                "value": 7.9,
+                "unit": "s",
+                "hint": "Tuesday 14:05"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "heatmap",
+      "title": "Heatmap ui:heatmap",
+      "description": "Sequential (one hue, light → dark) for density; diverging (two hues, gray midpoint) for change. Empty cells are dashed.",
+      "components": [
+        {
+          "id": "heat-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "md"
+          },
+          "children": ["heat-c1", "heat-c2"]
+        },
+        {
+          "id": "heat-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["heat1"]
+        },
+        {
+          "id": "heat-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["heat2"]
+        },
+        {
+          "id": "heat1",
+          "type": "ui:heatmap",
+          "props": {
+            "title": "Requests by weekday and hour",
+            "rows": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            "columns": ["8:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00"],
+            "values": [
+              [1, 3, 6, 8, 7, 4, 2],
+              [2, 4, 7, 9, 8, 5, 1],
+              [1, 3, 5, 7, 9, 6, 2],
+              [2, 5, 8, 9, 7, 4, 1],
+              [1, 4, 6, 8, 6, 3, 1],
+              [0, 1, 1, 2, 1, 1, 0],
+              [0, 0, 1, 1, 1, 0, null]
+            ]
+          }
+        },
+        {
+          "id": "heat2",
+          "type": "ui:heatmap",
+          "props": {
+            "title": "Change vs last week",
+            "scale": "diverging",
+            "show_values": true,
+            "rows": ["Sales", "Support", "Finance"],
+            "columns": ["W1", "W2", "W3", "W4", "W5"],
+            "values": [
+              [4, 2, -1, -3, 5],
+              [-6, -2, 0, 3, 6],
+              [1, -4, -5, 2, 0]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "meter",
+      "title": "Meter ui:meter",
+      "description": "Usage against a limit. Thresholds add a glyph and a state word, never color alone.",
+      "components": [
+        {
+          "id": "meter-card",
+          "type": "ui:section",
+          "props": {},
+          "children": ["meter1", "meter2", "meter3", "meter4"]
+        },
+        {
+          "id": "meter1",
+          "type": "ui:meter",
+          "props": {
+            "label": "Monthly budget",
+            "value": 62,
+            "max": 100,
+            "unit": "%",
+            "thresholds": [
+              {
+                "value": 0,
+                "tone": "success"
+              },
+              {
+                "value": 80,
+                "tone": "warning"
+              },
+              {
+                "value": 95,
+                "tone": "danger"
+              }
+            ]
+          }
+        },
+        {
+          "id": "meter2",
+          "type": "ui:meter",
+          "props": {
+            "label": "Context window",
+            "value": 86,
+            "max": 100,
+            "unit": "%",
+            "thresholds": [
+              {
+                "value": 80,
+                "tone": "warning"
+              },
+              {
+                "value": 95,
+                "tone": "danger"
+              }
+            ]
+          }
+        },
+        {
+          "id": "meter3",
+          "type": "ui:meter",
+          "props": {
+            "label": "Storage",
+            "value": 97,
+            "max": 100,
+            "unit": " GB",
+            "thresholds": [
+              {
+                "value": 80,
+                "tone": "warning"
+              },
+              {
+                "value": 95,
+                "tone": "danger"
+              }
+            ],
+            "description": "Old evidence can be archived."
+          }
+        },
+        {
+          "id": "meter4",
+          "type": "ui:meter",
+          "props": {
+            "label": "Tasks finished",
+            "value": 18,
+            "max": 24
+          }
+        }
+      ]
+    },
+    {
+      "id": "sequence",
+      "title": "Sequence ui:sequence",
+      "description": "Messages between participant lanes over time: replies are dashed, self-messages loop, status adds a glyph and a word.",
+      "components": [
+        {
+          "id": "seq-card",
+          "type": "ui:section",
+          "props": {},
+          "children": ["seq1"]
+        },
+        {
+          "id": "seq1",
+          "type": "ui:sequence",
+          "props": {
+            "title": "Approval hand-off",
+            "participants": [
+              {
+                "id": "user",
+                "label": "You"
+              },
+              {
+                "id": "concierge",
+                "label": "Secretary"
+              },
+              {
+                "id": "agent",
+                "label": "Claude"
+              },
+              {
+                "id": "chronos",
+                "label": "Mission control"
+              }
+            ],
+            "messages": [
+              {
+                "from": "user",
+                "to": "concierge",
+                "label": "Draft the Q3 report",
+                "at": "09:02"
+              },
+              {
+                "from": "concierge",
+                "to": "chronos",
+                "label": "Open mission",
+                "at": "09:03",
+                "status": "done"
+              },
+              {
+                "from": "chronos",
+                "to": "agent",
+                "label": "Assign task",
+                "at": "09:03"
+              },
+              {
+                "from": "agent",
+                "to": "agent",
+                "label": "Plan sections",
+                "at": "09:05",
+                "kind": "note"
+              },
+              {
+                "from": "agent",
+                "to": "chronos",
+                "label": "Draft ready",
+                "at": "09:21",
+                "kind": "reply",
+                "status": "review"
+              },
+              {
+                "from": "chronos",
+                "to": "user",
+                "label": "Approve?",
+                "at": "09:22",
+                "status": "pending"
+              },
+              {
+                "from": "user",
+                "to": "chronos",
+                "label": "Approved",
+                "at": "09:40",
+                "kind": "reply",
+                "status": "completed"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "flow",
+      "title": "Flow ui:flow",
+      "description": "Staged DAG laid out left to right with deterministic ordering; node status uses the status-pill vocabulary.",
+      "components": [
+        {
+          "id": "flow-card1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["flow1"]
+        },
+        {
+          "id": "flow-card2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["flow2"]
+        },
+        {
+          "id": "flow1",
+          "type": "ui:flow",
+          "props": {
+            "title": "Mission → tasks → agents",
+            "stages": [
+              {
+                "id": "mission",
+                "label": "Mission"
+              },
+              {
+                "id": "task",
+                "label": "Tasks"
+              },
+              {
+                "id": "agent",
+                "label": "Agents"
+              }
+            ],
+            "nodes": [
+              {
+                "id": "m1",
+                "label": "Q3 report",
+                "stage": "mission",
+                "status": "active"
+              },
+              {
+                "id": "t1",
+                "label": "Collect numbers",
+                "stage": "task",
+                "status": "completed"
+              },
+              {
+                "id": "t2",
+                "label": "Write draft",
+                "stage": "task",
+                "status": "running"
+              },
+              {
+                "id": "t3",
+                "label": "Review",
+                "stage": "task",
+                "status": "pending"
+              },
+              {
+                "id": "a1",
+                "label": "Claude",
+                "stage": "agent",
+                "status": "busy"
+              },
+              {
+                "id": "a2",
+                "label": "Codex",
+                "stage": "agent",
+                "status": "available"
+              }
+            ],
+            "edges": [
+              {
+                "from": "m1",
+                "to": "t1"
+              },
+              {
+                "from": "m1",
+                "to": "t2"
+              },
+              {
+                "from": "m1",
+                "to": "t3"
+              },
+              {
+                "from": "t1",
+                "to": "a2",
+                "label": "claim"
+              },
+              {
+                "from": "t2",
+                "to": "a1",
+                "label": "claim"
+              },
+              {
+                "from": "t3",
+                "to": "a1"
+              }
+            ]
+          }
+        },
+        {
+          "id": "flow2",
+          "type": "ui:flow",
+          "props": {
+            "title": "Publish pipeline (no stages: longest-path layers)",
+            "nodes": [
+              {
+                "id": "fetch",
+                "label": "Fetch",
+                "status": "done"
+              },
+              {
+                "id": "parse",
+                "label": "Parse",
+                "status": "done"
+              },
+              {
+                "id": "validate",
+                "label": "Validate",
+                "status": "failed"
+              },
+              {
+                "id": "enrich",
+                "label": "Enrich",
+                "meta": "optional"
+              },
+              {
+                "id": "publish",
+                "label": "Publish",
+                "status": "blocked"
+              }
+            ],
+            "edges": [
+              {
+                "from": "fetch",
+                "to": "parse"
+              },
+              {
+                "from": "parse",
+                "to": "validate"
+              },
+              {
+                "from": "parse",
+                "to": "enrich"
+              },
+              {
+                "from": "validate",
+                "to": "publish"
+              },
+              {
+                "from": "enrich",
+                "to": "publish"
+              },
+              {
+                "from": "validate",
+                "to": "fetch",
+                "label": "retry"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "chart-empty",
+      "title": "Empty data ui:bar-chart / ui:meter / ui:sparkline / ui:sequence",
+      "description": "Empty or invalid data renders a calm empty state instead of a broken chart.",
+      "components": [
+        {
+          "id": "empty-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 3,
+            "gap": "md"
+          },
+          "children": ["empty-c1", "empty-c2", "empty-c3"]
+        },
+        {
+          "id": "empty-c1",
+          "type": "ui:section",
+          "props": {},
+          "children": ["empty1"]
+        },
+        {
+          "id": "empty-c2",
+          "type": "ui:section",
+          "props": {},
+          "children": ["empty2", "empty4"]
+        },
+        {
+          "id": "empty-c3",
+          "type": "ui:section",
+          "props": {},
+          "children": ["empty3"]
+        },
+        {
+          "id": "empty1",
+          "type": "ui:bar-chart",
+          "props": {
+            "title": "Requests by weekday",
+            "categories": [],
+            "series": []
+          }
+        },
+        {
+          "id": "empty2",
+          "type": "ui:meter",
+          "props": {
+            "label": "Monthly budget",
+            "value": null
+          }
+        },
+        {
+          "id": "empty4",
+          "type": "ui:sparkline",
+          "props": {
+            "label": "Error rate",
+            "points": []
+          }
+        },
+        {
+          "id": "empty3",
+          "type": "ui:sequence",
+          "props": {
+            "title": "Approval hand-off",
+            "participants": [],
+            "messages": []
+          }
+        }
+      ]
+    }
+  ]
+}

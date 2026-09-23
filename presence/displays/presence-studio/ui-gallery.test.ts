@@ -17,11 +17,16 @@ import {
 } from '@agent/core/a2ui-catalog';
 import {
   SHARED_UI_MESSAGES_ROUTE,
+  SHARED_UI_MODULE_ROUTE,
+  SHARED_UI_MODULE_SOURCES,
   SHARED_UI_VANILLA_ROUTE,
   SHARED_UI_VANILLA_SOURCE,
   UI_GALLERY_ROUTE,
   UI_GALLERY_VOCABULARY_KEYS,
+  UI_GALLERY_FIXTURES_ROUTE,
   UI_GALLERY_VOCABULARY_ROUTE,
+  listUiGalleryFixtureFiles,
+  loadUiGalleryFixtures,
   parseLocaleFile,
   registerUiGalleryRoutes,
 } from './ui-gallery-routes.js';
@@ -48,8 +53,9 @@ interface GalleryFixtures {
 
 const FIXTURE_LOCALES = ['en', 'ja'] as const;
 
+/** Base fixtures + every `ui-gallery.fixtures.<part>.<locale>.json` (what the gallery serves). */
 function loadFixtures(locale: string): GalleryFixtures {
-  return JSON.parse(readRepoFile(`${STATIC_DIR}/ui-gallery.fixtures.${locale}.json`));
+  return loadUiGalleryFixtures(pathResolver.rootResolve(STATIC_DIR), locale) as GalleryFixtures;
 }
 
 // Keys whose values are structure / vocabulary, not display text: they must be
@@ -88,6 +94,13 @@ const STRUCTURAL_KEYS = new Set([
   'wrap',
   'columns',
   'lines',
+  // UI-01b charts: identifiers / enums, identical in every locale.
+  'orientation',
+  'scale',
+  'kind',
+  'from',
+  'to',
+  'stage',
 ]);
 
 /** Replace display-text leaves with a placeholder so only the shape remains. */
@@ -101,6 +114,23 @@ function shapeOf(value: unknown, key?: string): unknown {
   if (typeof value === 'string' && !(key && STRUCTURAL_KEYS.has(key))) return '<text>';
   return value;
 }
+
+describe('ui-gallery fixtures: base + part files', () => {
+  it('loads the base file first and every part file for the locale', () => {
+    const root = pathResolver.rootResolve(STATIC_DIR);
+    for (const locale of FIXTURE_LOCALES) {
+      const files = listUiGalleryFixtureFiles(root, locale);
+      expect(files[0]).toBe(`ui-gallery.fixtures.${locale}.json`);
+      expect(files).toContain(`ui-gallery.fixtures.charts.${locale}.json`);
+      expect(files.every((file) => file.endsWith(`.${locale}.json`))).toBe(true);
+    }
+    // Every locale has the same parts.
+    const strip = (locale: string) =>
+      listUiGalleryFixtureFiles(root, locale).map((file) => file.replace(`.${locale}.json`, ''));
+    expect(strip('ja')).toEqual(strip('en'));
+    expect(loadFixtures('en').sections.map((s) => s.id)).toContain('sequence');
+  });
+});
 
 describe('ui-gallery fixtures: en and ja have the identical shape', () => {
   it('differ only in display text', () => {
@@ -232,7 +262,9 @@ describe('ui-gallery routes', () => {
     expect([...routes.keys()].sort()).toEqual(
       [
         SHARED_UI_MESSAGES_ROUTE,
+        SHARED_UI_MODULE_ROUTE,
         SHARED_UI_VANILLA_ROUTE,
+        UI_GALLERY_FIXTURES_ROUTE,
         UI_GALLERY_ROUTE,
         UI_GALLERY_VOCABULARY_ROUTE,
       ].sort()
@@ -247,6 +279,53 @@ describe('ui-gallery routes', () => {
     expect(script.sent).toBe(pathResolver.rootResolve(SHARED_UI_VANILLA_SOURCE));
     expect(script.contentType).toMatch(/^text\/javascript/);
     expect(safeExistsSync(script.sent)).toBe(true);
+  });
+
+  it('serves only allow-listed sibling renderer modules (charts.js, forms.js)', () => {
+    const routes = recordRoutes();
+    const module = fakeResponse();
+    routes.get(SHARED_UI_MODULE_ROUTE)!({ params: { file: 'charts.js' } }, module);
+    expect(module.sent).toBe(pathResolver.rootResolve(SHARED_UI_MODULE_SOURCES['charts.js']));
+    expect(module.contentType).toMatch(/^text\/javascript/);
+    for (const source of Object.values(SHARED_UI_MODULE_SOURCES)) {
+      expect(safeExistsSync(pathResolver.rootResolve(source)), source).toBe(true);
+    }
+    // kyberion-ui.js imports exactly these siblings, so the browser can load them.
+    const renderer = readRepoFile(SHARED_UI_VANILLA_SOURCE);
+    const imports = [...renderer.matchAll(/from '\.\/([\w-]+\.js)'/g)].map((m) => m[1]).sort();
+    expect(imports).toEqual(Object.keys(SHARED_UI_MODULE_SOURCES).sort());
+    for (const file of ['../x.js', 'kyberion-ui.test.ts', 'mini-dom.js', '']) {
+      const res = jsonResponse();
+      routes.get(SHARED_UI_MODULE_ROUTE)!({ params: { file } }, res);
+      expect(res.statusCode, file).toBe(404);
+    }
+  });
+
+  it('serves merged fixtures per supported locale (qps-ploc reuses en)', () => {
+    const routes = recordRoutes();
+    const staticRoot = pathResolver.rootResolve(STATIC_DIR);
+    const real = new Map<string, (req: unknown, res: unknown) => void>();
+    registerUiGalleryRoutes(
+      {
+        get: (route: string, handler: (req: unknown, res: unknown) => void) =>
+          real.set(route, handler),
+      } as never,
+      staticRoot
+    );
+    expect(routes.has(UI_GALLERY_FIXTURES_ROUTE)).toBe(true);
+    for (const [file, locale] of [
+      ['en.json', 'en'],
+      ['ja.json', 'ja'],
+      ['qps-ploc.json', 'en'],
+    ]) {
+      const res = jsonResponse();
+      real.get(UI_GALLERY_FIXTURES_ROUTE)!({ params: { file } }, res);
+      expect(res.statusCode, file).toBe(200);
+      expect(res.body).toEqual(loadFixtures(locale));
+    }
+    const bad = jsonResponse();
+    real.get(UI_GALLERY_FIXTURES_ROUTE)!({ params: { file: '../en.json' } }, bad);
+    expect(bad.statusCode).toBe(404);
   });
 
   it('serves the ui message bundle and gallery chrome text per supported locale only', () => {
@@ -286,7 +365,7 @@ describe('ui-gallery routes', () => {
     // No user-facing text in the gallery script: it all comes from the vocabulary.
     expect(script).not.toMatch(/[\u3040-\u30ff\u4e00-\u9fff]/u);
     expect(script).toContain('/shared-ui/messages/${locale}.json');
-    expect(script).toContain('/ui-gallery.fixtures.${');
+    expect(script).toContain('/ui-gallery/fixtures/${locale}.json');
   });
 
   it('is wired into the presence-studio runtime', () => {

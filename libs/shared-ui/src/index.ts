@@ -77,3 +77,51 @@ export {
   type A2UIRendererComponent,
   type A2UIRendererProps,
 } from './renderer.js';
+// UI-01c settings & forms (files / photos / secret values reach the host only
+// through onAction payloads — see src/forms/*).
+export {
+  AvatarPicker,
+  CameraCapture,
+  Checkbox,
+  FileDrop,
+  IntegrationItem,
+  KB_FORM_COMPONENT_TYPES,
+  RadioGroup,
+  SaveBar,
+  SecretField,
+  Segmented,
+  Select,
+  SettingRow,
+  SettingsGroup,
+  Slider,
+  Switch,
+  TextField,
+  Textarea,
+  isKbFormComponentType,
+  renderFormComponent,
+  type KbFormComponentType,
+} from './forms/index.js';
+export {
+  KB_FORM_ACTIONS,
+  KB_FORM_MESSAGE_KEYS,
+  createCameraController,
+  formatBytes,
+  screenFiles,
+  type KbCameraController,
+  type KbCameraState,
+} from '../vanilla/forms.js';
+// UI-01b charts & visualisation (geometry lives once in vanilla/charts.js).
+export {
+  KB_CHART_COMPONENT_TYPES,
+  KbChart,
+  isKbChartType,
+  renderVNode,
+  type KbChartProps,
+  type KbChartType,
+} from './charts/ChartView.js';
+export {
+  KB_CHART_MESSAGE_KEYS,
+  layoutChart,
+  type KbChartEnv,
+  type KbVNode,
+} from '../vanilla/charts.js';

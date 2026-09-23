@@ -8,6 +8,8 @@ import {
   type BrandUiTokens,
 } from '@agent/core/brand-tokens';
 import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReaddir } from '@agent/core/secure-io';
 
 export type KyberionDesignTokens = BrandTokens;
 export type KyberionColorTokens = BrandTokenColors;
@@ -265,6 +267,32 @@ export const KYBERION_UI_STYLESHEET_SOURCE =
   'knowledge/public/design-patterns/web/kyberion-ui.source.css';
 export const KB_UI_STATUS_TONES_PLACEHOLDER = '/* @kb-generated status-tones */';
 
+/** Directory of the authored component stylesheets. */
+export const KYBERION_UI_STYLESHEET_SOURCE_DIR = 'knowledge/public/design-patterns/web';
+const KYBERION_UI_EXTRA_SOURCE = /^kyberion-ui\.[a-z0-9-]+\.source\.css$/;
+
+/**
+ * Every authored stylesheet stamped into `kyberion-ui.css`: the base
+ * `kyberion-ui.source.css` first, then each `kyberion-ui.<part>.source.css`
+ * (charts, forms, ...) sorted by name. Repo-relative paths.
+ */
+export function listKyberionUiStylesheetSources(): string[] {
+  const extras = safeReaddir(pathResolver.rootResolve(KYBERION_UI_STYLESHEET_SOURCE_DIR))
+    .filter((name) => KYBERION_UI_EXTRA_SOURCE.test(name))
+    .sort();
+  return [
+    KYBERION_UI_STYLESHEET_SOURCE,
+    ...extras.map((name) => `${KYBERION_UI_STYLESHEET_SOURCE_DIR}/${name}`),
+  ];
+}
+
+/** Concatenate every authored stylesheet (base first) for `renderKyberionUiStylesheet`. */
+export function concatKyberionUiStylesheetSources(read: (relativePath: string) => string): string {
+  return `${listKyberionUiStylesheetSources()
+    .map((relativePath) => read(relativePath).trimEnd())
+    .join('\n\n')}\n`;
+}
+
 const STATUS_TONE_ICONS: Record<KbStatusTone, string> = {
   success: '\\2713',
   info: '\\25CF',
@@ -299,6 +327,19 @@ function uiPaletteDeclarations(
   }
   for (const [size, value] of Object.entries(palette.shadow)) {
     lines.push(`${indent}--kb-ui-shadow-${size}: ${value};`);
+  }
+  // UI-01b data-viz palettes: --kb-ui-viz-cat-N / -seq-N / -div-N (1-based).
+  const viz = palette.viz;
+  if (viz) {
+    for (const [prefix, list] of [
+      ['cat', viz.categorical],
+      ['seq', viz.sequential],
+      ['div', viz.diverging],
+    ] as const) {
+      list.forEach((value, index) =>
+        lines.push(`${indent}--kb-ui-viz-${prefix}-${index + 1}: ${value};`)
+      );
+    }
   }
   return lines;
 }

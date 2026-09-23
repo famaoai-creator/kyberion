@@ -5,7 +5,7 @@ import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 import {
-  KYBERION_UI_STYLESHEET_SOURCE,
+  concatKyberionUiStylesheetSources,
   readKyberionDesignTokens,
   renderKyberionDesignTokenBlock,
   renderKyberionTailwindColorsBlock,
@@ -113,8 +113,11 @@ function render(): GeneratedFile[] {
   const tokens = readKyberionDesignTokens();
   const tokenBlock = renderKyberionDesignTokenBlock(tokens);
   const uiTokenBlock = renderKyberionUiTokenBlock(tokens);
+  // Base kyberion-ui.source.css first, then every kyberion-ui.<part>.source.css.
   const uiStylesheet = renderKyberionUiStylesheet(
-    readDesignTokenTextFile(path.join(ROOT, KYBERION_UI_STYLESHEET_SOURCE))
+    concatKyberionUiStylesheetSources((relativePath) =>
+      readDesignTokenTextFile(path.join(ROOT, relativePath))
+    )
   );
 
   return [

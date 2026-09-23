@@ -1,0 +1,662 @@
+{
+  "version": 1,
+  "catalog": "kyberion-base",
+  "sections": [
+    {
+      "id": "form-settings",
+      "title": "設定 ui:settings-group ui:setting-row ui:switch ui:segmented",
+      "description": "見出し付きの設定のまとまり。左に名前と説明、右に操作を 1 つ置きます。狭い画面では縦に並びます。",
+      "components": [
+        {
+          "id": "fs-group",
+          "type": "ui:settings-group",
+          "props": {
+            "title": "通知",
+            "description": "いつ知らせるかを選びます。"
+          },
+          "children": [
+            "fs-row-email",
+            "fs-row-digest",
+            "fs-row-density",
+            "fs-row-volume",
+            "fs-row-reset"
+          ]
+        },
+        {
+          "id": "fs-row-email",
+          "type": "ui:setting-row",
+          "props": {
+            "label": "承認待ちをメールで知らせる",
+            "description": "あなたの判断を待っている依頼ごとに 1 通送ります。"
+          },
+          "children": ["fs-email"]
+        },
+        {
+          "id": "fs-email",
+          "type": "ui:switch",
+          "props": {
+            "name": "notify.email",
+            "label": "承認待ちをメールで知らせる",
+            "hide_label": true,
+            "value": true
+          }
+        },
+        {
+          "id": "fs-row-digest",
+          "type": "ui:setting-row",
+          "props": {
+            "label": "毎日のまとめ",
+            "description": "指定した時刻に届きます。"
+          },
+          "children": ["fs-digest"]
+        },
+        {
+          "id": "fs-digest",
+          "type": "ui:select",
+          "props": {
+            "name": "notify.digest_time",
+            "label": "毎日のまとめ",
+            "hide_label": true,
+            "value": "08:00",
+            "options": [
+              {
+                "value": "off",
+                "label": "オフ"
+              },
+              {
+                "value": "08:00",
+                "label": "午前 8:00"
+              },
+              {
+                "value": "18:00",
+                "label": "午後 6:00"
+              }
+            ]
+          }
+        },
+        {
+          "id": "fs-row-density",
+          "type": "ui:setting-row",
+          "props": {
+            "label": "表示の密度"
+          },
+          "children": ["fs-density"]
+        },
+        {
+          "id": "fs-density",
+          "type": "ui:segmented",
+          "props": {
+            "name": "display.density",
+            "label": "表示の密度",
+            "hide_label": true,
+            "value": "comfortable",
+            "options": [
+              {
+                "value": "comfortable",
+                "label": "ゆったり"
+              },
+              {
+                "value": "compact",
+                "label": "コンパクト"
+              }
+            ]
+          }
+        },
+        {
+          "id": "fs-row-volume",
+          "type": "ui:setting-row",
+          "props": {
+            "label": "音声の音量",
+            "description": "相棒が話すときの音量です。"
+          },
+          "children": ["fs-volume"]
+        },
+        {
+          "id": "fs-volume",
+          "type": "ui:slider",
+          "props": {
+            "name": "voice.volume",
+            "label": "音声の音量",
+            "hide_label": true,
+            "value": 60,
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "unit": "%"
+          }
+        },
+        {
+          "id": "fs-row-reset",
+          "type": "ui:setting-row",
+          "props": {
+            "label": "設定を初期状態に戻す",
+            "description": "ミッションとナレッジはそのまま残ります。",
+            "tone": "danger"
+          },
+          "children": ["fs-reset"]
+        },
+        {
+          "id": "fs-reset",
+          "type": "ui:button",
+          "props": {
+            "label": "初期化",
+            "variant": "danger",
+            "action": {
+              "id": "settings.reset"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "form-inputs",
+      "title": "入力 ui:text-field ui:textarea ui:select ui:radio-group ui:checkbox",
+      "description": "ラベルは入力欄の上。補足とエラーは aria-describedby で結び付けます。編集のたびに field.change {name, value} を送ります。",
+      "components": [
+        {
+          "id": "fi-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "lg"
+          },
+          "children": ["fi-col1", "fi-col2"]
+        },
+        {
+          "id": "fi-col1",
+          "type": "ui:stack",
+          "props": {
+            "gap": "md"
+          },
+          "children": ["fi-name", "fi-email", "fi-count", "fi-notes"]
+        },
+        {
+          "id": "fi-col2",
+          "type": "ui:stack",
+          "props": {
+            "gap": "md"
+          },
+          "children": ["fi-lang", "fi-plan", "fi-terms", "fi-disabled"]
+        },
+        {
+          "id": "fi-name",
+          "type": "ui:text-field",
+          "props": {
+            "name": "profile.name",
+            "label": "表示名",
+            "value": "山田 花子",
+            "required": true,
+            "maxlength": 60,
+            "help": "チームに表示されます。"
+          }
+        },
+        {
+          "id": "fi-email",
+          "type": "ui:text-field",
+          "props": {
+            "name": "profile.email",
+            "label": "仕事用メール",
+            "type": "email",
+            "value": "ada@example",
+            "required": true,
+            "error": "name@company.com の形式で入力してください。"
+          }
+        },
+        {
+          "id": "fi-count",
+          "type": "ui:text-field",
+          "props": {
+            "name": "limits.daily_missions",
+            "label": "1 日のミッション数",
+            "type": "number",
+            "value": 5,
+            "min": 1,
+            "max": 20,
+            "step": 1
+          }
+        },
+        {
+          "id": "fi-notes",
+          "type": "ui:textarea",
+          "props": {
+            "name": "profile.notes",
+            "label": "秘書へのメモ",
+            "placeholder": "覚えておいてほしいこと",
+            "rows": 3,
+            "maxlength": 280,
+            "value": "レビューは午前が助かります。"
+          }
+        },
+        {
+          "id": "fi-lang",
+          "type": "ui:select",
+          "props": {
+            "name": "profile.language",
+            "label": "言語",
+            "value": "en",
+            "options": [
+              {
+                "value": "en",
+                "label": "English"
+              },
+              {
+                "value": "ja",
+                "label": "日本語"
+              }
+            ]
+          }
+        },
+        {
+          "id": "fi-plan",
+          "type": "ui:radio-group",
+          "props": {
+            "name": "approval.mode",
+            "label": "承認のしかた",
+            "value": "review",
+            "options": [
+              {
+                "value": "review",
+                "label": "すべて確認する",
+                "description": "いちばん安全です。"
+              },
+              {
+                "value": "batch",
+                "label": "まとめて確認する",
+                "description": "1 日 1 回まとめて。"
+              },
+              {
+                "value": "auto",
+                "label": "危険な操作だけ",
+                "disabled": true,
+                "description": "管理者の許可が必要です。"
+              }
+            ]
+          }
+        },
+        {
+          "id": "fi-terms",
+          "type": "ui:checkbox",
+          "props": {
+            "name": "terms.accepted",
+            "label": "データの取り扱い方針を読みました",
+            "value": false,
+            "required": true
+          }
+        },
+        {
+          "id": "fi-disabled",
+          "type": "ui:text-field",
+          "props": {
+            "name": "tenant.slug",
+            "label": "テナント",
+            "value": "acme",
+            "disabled": true,
+            "help": "管理者が設定します。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "form-integrations",
+      "title": "外部連携 ui:integration-item",
+      "description": "接続状態はアイコンと文字のピルで示し、色だけに頼りません。操作は onAction へ(既存の OAuth 開始経路など)。",
+      "components": [
+        {
+          "id": "fn-stack",
+          "type": "ui:stack",
+          "props": {
+            "gap": "sm"
+          },
+          "children": ["fn-google", "fn-slack", "fn-github", "fn-voice"]
+        },
+        {
+          "id": "fn-google",
+          "type": "ui:integration-item",
+          "props": {
+            "title": "Google Workspace",
+            "state": "connected",
+            "icon": "inbox",
+            "detail": "ada@example.com",
+            "actions": [
+              {
+                "label": "切断",
+                "variant": "ghost",
+                "action": {
+                  "id": "integration.disconnect",
+                  "payload": {
+                    "service_id": "google-workspace"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "fn-slack",
+          "type": "ui:integration-item",
+          "props": {
+            "title": "Slack",
+            "state": "needs_reauth",
+            "icon": "chat",
+            "description": "9 月 20 日にアクセス期限が切れました。受信を続けるには再接続してください。",
+            "actions": [
+              {
+                "label": "再接続",
+                "variant": "primary",
+                "action": {
+                  "id": "oauth.begin",
+                  "payload": {
+                    "service_id": "slack"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "fn-github",
+          "type": "ui:integration-item",
+          "props": {
+            "title": "GitHub",
+            "state": "disconnected",
+            "description": "ミッションからプルリクエストを作れるようにします。",
+            "actions": [
+              {
+                "label": "接続",
+                "action": {
+                  "id": "oauth.begin",
+                  "payload": {
+                    "service_id": "github"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "fn-voice",
+          "type": "ui:integration-item",
+          "props": {
+            "title": "Voice hub",
+            "state": "error",
+            "icon": "bell",
+            "detail": "最終接続 2 時間前",
+            "actions": [
+              {
+                "label": "再試行",
+                "action": {
+                  "id": "integration.retry",
+                  "payload": {
+                    "service_id": "voice-hub"
+                  }
+                }
+              },
+              {
+                "label": "ヘルプ",
+                "variant": "ghost",
+                "href": "/help"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "form-save-bar",
+      "title": "保存バー ui:save-bar",
+      "description": "未保存の変更があるあいだ画面下に固定されます。変更がなければ保存・破棄は押せません。",
+      "components": [
+        {
+          "id": "fb-stack",
+          "type": "ui:stack",
+          "props": {
+            "gap": "sm"
+          },
+          "children": ["fb-dirty", "fb-saving", "fb-error", "fb-saved"]
+        },
+        {
+          "id": "fb-dirty",
+          "type": "ui:save-bar",
+          "props": {
+            "state": "dirty",
+            "save_action": {
+              "id": "settings.save"
+            },
+            "discard_action": {
+              "id": "settings.discard"
+            }
+          }
+        },
+        {
+          "id": "fb-saving",
+          "type": "ui:save-bar",
+          "props": {
+            "state": "saving",
+            "save_action": {
+              "id": "settings.save"
+            },
+            "discard_action": {
+              "id": "settings.discard"
+            }
+          }
+        },
+        {
+          "id": "fb-error",
+          "type": "ui:save-bar",
+          "props": {
+            "state": "error",
+            "message": "サーバーに接続できませんでした。変更は残っています。",
+            "save_action": {
+              "id": "settings.save"
+            },
+            "save_label": "もう一度保存",
+            "discard_action": {
+              "id": "settings.discard"
+            }
+          }
+        },
+        {
+          "id": "fb-saved",
+          "type": "ui:save-bar",
+          "props": {
+            "state": "saved",
+            "save_action": {
+              "id": "settings.save"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "form-files",
+      "title": "ファイルの追加 ui:file-drop",
+      "description": "ドラッグ&ドロップ・クリック・貼り付けに対応。形式・サイズ・件数を確認し、ファイルは onAction にだけ渡します。一覧はホストが返す情報を表示します。",
+      "components": [
+        {
+          "id": "ff-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "lg"
+          },
+          "children": ["ff-docs", "ff-single"]
+        },
+        {
+          "id": "ff-docs",
+          "type": "ui:file-drop",
+          "props": {
+            "name": "ingest.documents",
+            "label": "取り込む資料",
+            "description": "保存前に個人情報が含まれていないか確認します。",
+            "accept": ".pdf,.docx,.xlsx,.md,.txt",
+            "multiple": true,
+            "max_bytes": 26214400,
+            "max_files": 5,
+            "action": {
+              "id": "ingest.upload"
+            },
+            "files": [
+              {
+                "id": "ff-1",
+                "name": "四半期報告.pdf",
+                "size": 2411724,
+                "status": "done"
+              },
+              {
+                "id": "ff-2",
+                "name": "議事録.docx",
+                "size": 482113,
+                "status": "uploading",
+                "progress": 64
+              },
+              {
+                "id": "ff-3",
+                "name": "budget-2026.xlsx",
+                "size": 90211,
+                "status": "queued"
+              },
+              {
+                "id": "ff-4",
+                "name": "scan.pdf",
+                "size": 31457280,
+                "status": "error",
+                "error": "25 MB を超えています。"
+              }
+            ]
+          }
+        },
+        {
+          "id": "ff-single",
+          "type": "ui:file-drop",
+          "props": {
+            "name": "voice.sample",
+            "label": "声のサンプル",
+            "accept": "audio/*",
+            "max_bytes": 10485760,
+            "help": "10 秒ほどの読み上げ音声。"
+          }
+        }
+      ]
+    },
+    {
+      "id": "form-camera",
+      "title": "カメラと画像 ui:camera-capture ui:avatar-picker",
+      "description": "カメラはボタンを押したときだけ起動し、確定・取消・ページ離脱で停止します。カメラがない場合は写真を選べます。",
+      "components": [
+        {
+          "id": "fc-grid",
+          "type": "ui:grid",
+          "props": {
+            "columns": 2,
+            "gap": "lg"
+          },
+          "children": ["fc-camera", "fc-avatars"]
+        },
+        {
+          "id": "fc-camera",
+          "type": "ui:camera-capture",
+          "props": {
+            "name": "receipt.photo",
+            "label": "領収書の写真",
+            "description": "枠の中に平らに置いて撮影してください。",
+            "facing": "environment",
+            "aspect": "landscape"
+          }
+        },
+        {
+          "id": "fc-avatars",
+          "type": "ui:stack",
+          "props": {
+            "gap": "lg"
+          },
+          "children": ["fc-avatar", "fc-avatar-empty"]
+        },
+        {
+          "id": "fc-avatar",
+          "type": "ui:avatar-picker",
+          "props": {
+            "name": "profile.avatar",
+            "label": "相棒のアバター",
+            "image_url": "/assets/kyberion-avatar.svg",
+            "removable": true,
+            "help": "正方形に切り抜かれます。"
+          }
+        },
+        {
+          "id": "fc-avatar-empty",
+          "type": "ui:avatar-picker",
+          "props": {
+            "name": "member.avatar",
+            "label": "あなたの画像",
+            "initials": "AL",
+            "shape": "square",
+            "allow_camera": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "form-secrets",
+      "title": "秘密情報 ui:secret-field",
+      "description": "既定で伏字。保存済みのトークンは画面に返さず「設定済み」と末尾 4 文字だけを表示します。入力値は onAction に一度だけ渡し、送信後に消去します。",
+      "components": [
+        {
+          "id": "fk-stack",
+          "type": "ui:stack",
+          "props": {
+            "gap": "lg"
+          },
+          "children": ["fk-new", "fk-set", "fk-error"]
+        },
+        {
+          "id": "fk-new",
+          "type": "ui:secret-field",
+          "props": {
+            "name": "secrets.openai",
+            "label": "OpenAI の API キー",
+            "placeholder": "sk-…",
+            "service_id": "openai",
+            "secret_key": "api_key",
+            "required": true,
+            "help": "承認済みの登録経路で保存され、再表示されません。",
+            "action": {
+              "id": "secret.introduce"
+            }
+          }
+        },
+        {
+          "id": "fk-set",
+          "type": "ui:secret-field",
+          "props": {
+            "name": "secrets.slack",
+            "label": "Slack ボットトークン",
+            "configured": true,
+            "last4": "Q7xk",
+            "service_id": "slack",
+            "secret_key": "bot_token",
+            "action": {
+              "id": "secret.introduce"
+            },
+            "remove_action": {
+              "id": "secret.remove"
+            }
+          }
+        },
+        {
+          "id": "fk-error",
+          "type": "ui:secret-field",
+          "props": {
+            "name": "secrets.github",
+            "label": "GitHub トークン",
+            "service_id": "github",
+            "secret_key": "token",
+            "error": "このトークンは受け付けられませんでした。repo 権限で作り直してください。",
+            "action": {
+              "id": "secret.introduce"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -289,18 +289,73 @@ export function flattenUiPalette(palette: BrandUiPalette): Palette {
     for (const [part, value] of Object.entries(triple)) flat[`${status}-${part}`] = value;
   }
   for (const [role, value] of Object.entries(palette.role)) flat[`role-${role}`] = value;
+  if (palette.viz) {
+    palette.viz.categorical.forEach((value, i) => (flat[`viz-cat-${i + 1}`] = value));
+    palette.viz.sequential.forEach((value, i) => (flat[`viz-seq-${i + 1}`] = value));
+    palette.viz.diverging.forEach((value, i) => (flat[`viz-div-${i + 1}`] = value));
+  }
   return flat;
+}
+
+/**
+ * UI-01b data-viz marks (dataviz method, check 5): every categorical slot
+ * >= 3:1 on every UI surface a chart can sit on; the sequential ramp's
+ * darkest-magnitude step and both diverging poles >= 3:1 on the surface; the
+ * sequential low end >= 2:1 (ordinal floor, so a "small" cell never vanishes).
+ * CVD / normal-vision separation and the lightness band are validated with the
+ * dataviz palette validator when the palette changes (see brand-tokens schema).
+ */
+export const UI_VIZ_CATEGORICAL_SLOTS = 8;
+
+export function buildUiVizContrastPairs(): ContrastPair[] {
+  const pairs: ContrastPair[] = [];
+  for (const background of UI_SURFACES) {
+    for (let slot = 1; slot <= UI_VIZ_CATEGORICAL_SLOTS; slot += 1) {
+      pairs.push({
+        label: `ui viz categorical ${slot} mark on ${background}`,
+        background,
+        foreground: `viz-cat-${slot}`,
+        minRatio: 3,
+      });
+    }
+  }
+  pairs.push(
+    {
+      label: 'ui viz sequential high on surface',
+      background: 'surface',
+      foreground: 'viz-seq-5',
+      minRatio: 3,
+    },
+    {
+      label: 'ui viz sequential low on surface',
+      background: 'surface',
+      foreground: 'viz-seq-1',
+      minRatio: 2,
+    },
+    {
+      label: 'ui viz diverging negative pole on surface',
+      background: 'surface',
+      foreground: 'viz-div-1',
+      minRatio: 3,
+    },
+    {
+      label: 'ui viz diverging positive pole on surface',
+      background: 'surface',
+      foreground: 'viz-div-5',
+      minRatio: 3,
+    }
+  );
+  return pairs;
 }
 
 function checkUiTokens(ui: BrandUiTokens | undefined): string[] {
   if (!ui) return ['[ui] tokens.ui is missing from brand tokens'];
   return (['light', 'dark'] as const).flatMap((theme) => {
     const palette = ui[theme];
-    return checkPalette(
-      `ui.${theme}`,
-      flattenUiPalette(palette),
-      buildUiContrastPairs(Object.keys(palette.role))
-    );
+    return checkPalette(`ui.${theme}`, flattenUiPalette(palette), [
+      ...buildUiContrastPairs(Object.keys(palette.role)),
+      ...buildUiVizContrastPairs(),
+    ]);
   });
 }
 

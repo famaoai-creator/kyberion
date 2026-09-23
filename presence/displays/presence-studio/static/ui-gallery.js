@@ -1,8 +1,10 @@
 /*
  * ui-gallery.js — UI-04 component gallery (`GET /ui-gallery`).
  *
- * Renders every kyberion-base (`ui:*`) component from the per-locale fixture
- * (`ui-gallery.fixtures.<locale>.json`) with the shared vanilla renderer
+ * Renders every kyberion-base (`ui:*`) component from the per-locale fixtures
+ * (`ui-gallery.fixtures.<locale>.json` plus every
+ * `ui-gallery.fixtures.<part>.<locale>.json`, merged by the
+ * `/ui-gallery/fixtures/<locale>.json` route) with the shared vanilla renderer
  * (`/shared-ui/kyberion-ui.js`, served from libs/shared-ui/vanilla). The
  * fixtures are validated against the catalog schema (and against each other:
  * identical shape across locales) in
@@ -25,9 +27,9 @@ import { KB_UI_DEFAULT_LOCALE, renderA2UI } from '/shared-ui/kyberion-ui.js';
 const THEMES = ['light', 'dark'];
 const DENSITIES = ['comfortable', 'compact'];
 // Locales the vocabulary catalog supports; `qps-ploc` (pseudo-locale) has no
-// sample data of its own and reuses the English fixtures.
+// sample data of its own and reuses the English fixtures (resolved by the
+// `/ui-gallery/fixtures/<locale>.json` route).
 const LOCALES = ['en', 'ja', 'qps-ploc'];
-const FIXTURE_LOCALES = { en: 'en', ja: 'ja', 'qps-ploc': 'en' };
 const html = document.documentElement;
 
 const state = { locale: KB_UI_DEFAULT_LOCALE, texts: {}, messages: {}, loadId: 0 };
@@ -182,7 +184,8 @@ async function load(locale) {
   const [vocabulary, bundle, fixtures] = await Promise.allSettled([
     fetchJson(`/ui-gallery/vocabulary/${locale}.json`),
     fetchJson(`/shared-ui/messages/${locale}.json`),
-    fetchJson(`/ui-gallery.fixtures.${FIXTURE_LOCALES[locale] || 'en'}.json`),
+    // Base fixtures + every ui-gallery.fixtures.<part>.<locale>.json, merged server-side.
+    fetchJson(`/ui-gallery/fixtures/${locale}.json`),
   ]);
   if (loadId !== state.loadId) return; // a newer language switch won
 

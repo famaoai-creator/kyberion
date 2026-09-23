@@ -119,6 +119,24 @@
   --kb-ui-role-computer-surface: #4d6a16;
   --kb-ui-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --kb-ui-shadow-md: 0 2px 6px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
+  --kb-ui-viz-cat-1: #2a78d6;
+  --kb-ui-viz-cat-2: #dc5d28;
+  --kb-ui-viz-cat-3: #189866;
+  --kb-ui-viz-cat-4: #b07500;
+  --kb-ui-viz-cat-5: #d4507f;
+  --kb-ui-viz-cat-6: #008300;
+  --kb-ui-viz-cat-7: #4a3aa7;
+  --kb-ui-viz-cat-8: #e34948;
+  --kb-ui-viz-seq-1: #86b6ef;
+  --kb-ui-viz-seq-2: #5598e7;
+  --kb-ui-viz-seq-3: #2a78d6;
+  --kb-ui-viz-seq-4: #1c5cab;
+  --kb-ui-viz-seq-5: #0d366b;
+  --kb-ui-viz-div-1: #1c5cab;
+  --kb-ui-viz-div-2: #86b6ef;
+  --kb-ui-viz-div-3: #e3e6eb;
+  --kb-ui-viz-div-4: #f2a097;
+  --kb-ui-viz-div-5: #c4312f;
   --kb-ui-radius-sm: 4px;
   --kb-ui-radius-md: 8px;
   --kb-ui-radius-lg: 12px;
@@ -194,6 +212,24 @@
     --kb-ui-role-computer-surface: #a9cb72;
     --kb-ui-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
     --kb-ui-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --kb-ui-viz-cat-1: #3987e5;
+    --kb-ui-viz-cat-2: #d95926;
+    --kb-ui-viz-cat-3: #199e70;
+    --kb-ui-viz-cat-4: #c98500;
+    --kb-ui-viz-cat-5: #d55181;
+    --kb-ui-viz-cat-6: #008300;
+    --kb-ui-viz-cat-7: #9085e9;
+    --kb-ui-viz-cat-8: #e66767;
+    --kb-ui-viz-seq-1: #184f95;
+    --kb-ui-viz-seq-2: #256abf;
+    --kb-ui-viz-seq-3: #3987e5;
+    --kb-ui-viz-seq-4: #6da7ec;
+    --kb-ui-viz-seq-5: #b7d3f6;
+    --kb-ui-viz-div-1: #6da7ec;
+    --kb-ui-viz-div-2: #2a5a96;
+    --kb-ui-viz-div-3: #3a4252;
+    --kb-ui-viz-div-4: #9a4541;
+    --kb-ui-viz-div-5: #e66767;
   }
 }
 
@@ -233,5 +269,23 @@
   --kb-ui-role-computer-surface: #a9cb72;
   --kb-ui-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   --kb-ui-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --kb-ui-viz-cat-1: #3987e5;
+  --kb-ui-viz-cat-2: #d95926;
+  --kb-ui-viz-cat-3: #199e70;
+  --kb-ui-viz-cat-4: #c98500;
+  --kb-ui-viz-cat-5: #d55181;
+  --kb-ui-viz-cat-6: #008300;
+  --kb-ui-viz-cat-7: #9085e9;
+  --kb-ui-viz-cat-8: #e66767;
+  --kb-ui-viz-seq-1: #184f95;
+  --kb-ui-viz-seq-2: #256abf;
+  --kb-ui-viz-seq-3: #3987e5;
+  --kb-ui-viz-seq-4: #6da7ec;
+  --kb-ui-viz-seq-5: #b7d3f6;
+  --kb-ui-viz-div-1: #6da7ec;
+  --kb-ui-viz-div-2: #2a5a96;
+  --kb-ui-viz-div-3: #3a4252;
+  --kb-ui-viz-div-4: #9a4541;
+  --kb-ui-viz-div-5: #e66767;
 }
 /* end kyberion-ui tokens */
