@@ -22,6 +22,24 @@ import { parseOrganizationOperatingModelResponse } from '../lib/organization-ope
 
 type OrganizationHealth = 'healthy' | 'degraded' | 'critical' | 'unknown';
 type OrganizationPriority = 'high' | 'medium' | 'low';
+type InterventionKind =
+  OrganizationOperatingModelView['control_plane']['intervention_points'][number]['kind'];
+
+export function organizationInterventionCommand(
+  kind: InterventionKind,
+  id: string,
+  organizationId: string,
+  tenant: string
+): string {
+  const scope = `--organization-id ${organizationId} --tier confidential --tenant-slug ${tenant}`;
+  if (kind === 'incident')
+    return `pnpm organization incident list ${scope} --incident-id ${id} --json`;
+  if (kind === 'decision')
+    return `pnpm organization decision list ${scope} --decision-id ${id} --json`;
+  if (kind === 'operation')
+    return `pnpm organization operation run list ${scope} --operation-id ${id.split(':')[0]} --json`;
+  return `pnpm organization reconcile ${scope} --dry-run --json`;
+}
 
 export type OrganizationOperatingModelView = {
   organization_id: string;
@@ -412,6 +430,7 @@ export function OrganizationOperatingModel({
                     },
                     { key: 'item', label: uxText('chronos_org_col_item', locale) },
                     { key: 'reason', label: uxText('chronos_org_col_reason', locale) },
+                    { key: 'next', label: locale === 'ja' ? '次の操作' : 'Next action' },
                   ]}
                   rows={view.control_plane.intervention_points.slice(0, 6).map((point) => ({
                     priority: {
@@ -423,6 +442,16 @@ export function OrganizationOperatingModel({
                     },
                     item: { title: point.id, id: point.kind },
                     reason: point.reason,
+                    next: (
+                      <code className="kb-text kb-text--muted">
+                        {organizationInterventionCommand(
+                          point.kind,
+                          point.id,
+                          view.organization_id,
+                          tenant!
+                        )}
+                      </code>
+                    ),
                   }))}
                 />
               ) : (
