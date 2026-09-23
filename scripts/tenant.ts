@@ -148,14 +148,16 @@ export function main(argv: string[] = [], print: Print = () => undefined): void 
     print(JSON.stringify(profile.provider_attestations?.[args.provider], null, 2));
     return;
   }
-  const result = mutateTenant({
-    verb: args.command as TenantLifecycleVerb,
-    slug: args.slug,
-    displayName: args.displayName,
-    assignedRole: args.assignedRole,
-    knowledgeRoot: args.knowledgeRoot,
-    apply: args.apply,
-  });
+  const result = withExecutionContext('sovereign_concierge', () =>
+    mutateTenant({
+      verb: args.command as TenantLifecycleVerb,
+      slug: args.slug!,
+      displayName: args.displayName,
+      assignedRole: args.assignedRole,
+      knowledgeRoot: args.knowledgeRoot,
+      apply: args.apply,
+    })
+  );
   print(JSON.stringify(result, null, 2));
 }
 

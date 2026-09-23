@@ -81,6 +81,7 @@ export interface MeshHubRecipientProposalView extends MeshHubRecipientProposalRe
 export interface MeshHubDispatchInput {
   recipient: PeerNetworkPeerRecord;
   request: MeshRequest;
+  messageId?: string;
   timeoutMs?: number;
 }
 
@@ -509,6 +510,7 @@ export class MeshHubPeerMessagingAdapter {
     }
     const envelope = buildPeerMessageEnvelope({
       tenantId: input.request.tenant_scope.tenant_id,
+      messageId: input.messageId || `mesh-${input.request.request_id}`,
       senderPeerId: this.options.peerId,
       recipientPeerId: input.recipient.peer_id,
       subject: `mesh.${input.request.request_kind}`,

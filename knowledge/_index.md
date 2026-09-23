@@ -34,7 +34,7 @@
 - [Actuator Contract Map](./product/architecture/actuator-contract-map.md) (public | Ecosystem Architect)
 - [Actuator Operation Taxonomy](./product/architecture/actuator-op-taxonomy.md) (public | Ecosystem Architect)
 - [Agent Collaboration View](./product/architecture/agent-collaboration-view.md) (public | Ecosystem Architect)
-- [Agent Communication Layer Model](./product/architecture/agent-communication-layer-model.md) (public | Ecosystem Architect)
+- [Agent Communication and Coordination Model](./product/architecture/agent-communication-layer-model.md) (public | Ecosystem Architect)
 - [Agent Mission Control Model](./product/architecture/agent-mission-control-model.md) (public | Ecosystem Architect)
 - [Agent Pane Runtime Backend PoC](./product/architecture/agent-pane-runtime-backend-poc.md) (public | Ecosystem Architect)
 - [Agent Runtime Dispatch Observability Findings](./product/architecture/agent-runtime-dispatch-observability-findings.md) (public | ecosystem_architect)

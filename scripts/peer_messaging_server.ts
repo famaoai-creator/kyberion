@@ -51,6 +51,16 @@ async function main(
       default: true,
       description: 'Return a small echo payload for inbound requests',
     })
+    .option('max-inflight', {
+      type: 'number',
+      default: 8,
+      description: 'Maximum concurrent inbound peer message handlers',
+    })
+    .option('max-queued', {
+      type: 'number',
+      default: 64,
+      description: 'Maximum inbound requests waiting for a handler slot before retryable overload',
+    })
     .parseSync();
 
   const peerId = String(argv['peer-id']);
@@ -62,6 +72,16 @@ async function main(
     );
   }
   if (!tenantId) throw new Error('Missing tenant id. Set KYBERION_TENANT_ID or pass --tenant-id.');
+  const maxInflight = Number(argv['max-inflight']);
+  const maxQueued = Number(argv['max-queued']);
+  if (
+    !Number.isInteger(maxInflight) ||
+    maxInflight < 1 ||
+    !Number.isInteger(maxQueued) ||
+    maxQueued < 0
+  ) {
+    throw new Error('invalid_peer_receive_capacity');
+  }
   if (options.dryRun === true || options.check === true) {
     return {
       dry_run: true,
@@ -70,6 +90,8 @@ async function main(
       tenant_id: tenantId,
       host: String(argv.host),
       port: Number(argv.port),
+      max_inflight: maxInflight,
+      max_queued: maxQueued,
     };
   }
 
@@ -77,6 +99,8 @@ async function main(
     peerId,
     tenantId,
     sharedSecret,
+    maxInflight,
+    maxQueued,
     responder: async ({ envelope }: { envelope: PeerMessageEnvelope }) => {
       if (!argv.echo) {
         return { received: true, peer_id: peerId };

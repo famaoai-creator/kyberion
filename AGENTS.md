@@ -17,6 +17,7 @@ Concepts are intentionally not explained here — follow the `→` links when yo
 - **ADF**: execute only validated contracts (`draft → preflight → auto-repair → commit → execute`). If invalid, dispatch a repair subagent (`validateAndRepairAdf`) first. On failure, classify and repair — never retry a broken contract.
 - **Temp files**: `active/shared/tmp/` or mission-local storage only — never ad hoc directories.
 - **Multi-provider co-execution**: read = all providers, parallel, free; write = current work-item claim holder only; `.git`/repo config = mission owner only (never worker CLIs); temp = `active/shared/tmp/` only; provider state dirs (`.claude/`, `.codex/`, …) are gitignored and regenerated via generation ceremonies. → [multi-provider-coexecution-contract](./knowledge/product/governance/multi-provider-coexecution-contract.md)
+- **Agent communication**: choose the coordination surface from participant type, shared state, trust boundary, and authority—not from `localhost` or host proximity alone. Same-checkout provider CLI coordination uses Co-Session; distinct Kyberion runtimes use tenant-scoped Peer Messaging; durable ownership and mission lifecycle stay with WorkItems / mission_controller. → [Agent Communication and Coordination Model](./knowledge/product/architecture/agent-communication-layer-model.md)
 
 → Concepts: [GLOSSARY](./docs/GLOSSARY.md) (KSMC, ADF, mission, tier) · [mission-control-model](./knowledge/product/architecture/agent-mission-control-model.md) (why per-mission Git, atomic rollback)
 

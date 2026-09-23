@@ -206,11 +206,24 @@ async function runMeshDeliveryPassUnfenced(
     }
 
     try {
-      await dispatcher.dispatchToPeer({
+      const receipt = await dispatcher.dispatchToPeer({
         recipient: peer,
         request: reconstructMeshRequest(delivery, options.senderPeerId),
+        messageId: delivery.message_id,
         timeoutMs: options.dispatchTimeoutMs,
       });
+      if (
+        receipt &&
+        typeof receipt === 'object' &&
+        (('ok' in receipt && (receipt as { ok?: unknown }).ok === false) ||
+          ('accepted' in receipt && (receipt as { accepted?: unknown }).accepted === false))
+      ) {
+        const status =
+          'status' in receipt && typeof (receipt as { status?: unknown }).status === 'number'
+            ? (receipt as { status: number }).status
+            : 'unknown';
+        throw new Error('peer_delivery_not_accepted:' + status);
+      }
       await broker.acknowledgeMeshDelivery(delivery.delivery_id, {});
       report.delivered += 1;
     } catch (err) {

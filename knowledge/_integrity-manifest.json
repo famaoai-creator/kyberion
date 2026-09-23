@@ -147,7 +147,7 @@
     {
       "path": "product/architecture/agent-communication-layer-model.md",
       "tier": "public",
-      "size": 10183,
+      "size": 17748,
       "type": "md"
     },
     {
@@ -297,7 +297,7 @@
     {
       "path": "product/architecture/co-session-coordination.md",
       "tier": "public",
-      "size": 6690,
+      "size": 7656,
       "type": "md"
     },
     {
@@ -2919,7 +2919,7 @@
     {
       "path": "product/governance/multi-provider-coexecution-contract.md",
       "tier": "public",
-      "size": 9799,
+      "size": 10039,
       "type": "md"
     },
     {
@@ -5373,7 +5373,7 @@
     {
       "path": "product/orchestration/peer-network.md",
       "tier": "public",
-      "size": 6726,
+      "size": 8351,
       "type": "md"
     },
     {
@@ -5487,7 +5487,7 @@
     {
       "path": "product/orchestration/same-tenant-peer-quickstart.ja.md",
       "tier": "public",
-      "size": 6283,
+      "size": 6815,
       "type": "md"
     },
     {
