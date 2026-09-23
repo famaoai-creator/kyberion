@@ -34,6 +34,7 @@ import {
   type LocalPadContext,
 } from '../lib/local-artifact-pad.js';
 import { dailyDeskPageHtml } from './desk-page.js';
+import { handlePadUiAsset, resolvePadLocale } from '../lib/pad-ui.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { composeLegacyCapture } from '../personal-pads/legacy.js';
 
@@ -368,7 +369,9 @@ export async function main(
 
   const server = http.createServer((req, res) => {
     try {
-      if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
+      if (handlePadUiAsset(req, res)) return;
+      const pathname = (req.url || '').split(/[?#]/)[0];
+      if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
         const release = acquireHeavyRequest();
         if (!release) {
           res.writeHead(503, { 'Retry-After': '1' });
@@ -384,10 +387,11 @@ export async function main(
           loadUrl: '/load',
           defaultInstruction,
           outLabel: out,
+          locale: resolvePadLocale(req),
           journal: faces.journal,
           todo: faces.todo,
           now: faces.now,
-          faceNote: faces.note,
+          periodKey: todayPeriodKey(),
           facePaths: {
             journal: faces.journalPath,
             todo: faces.todoPath,
@@ -401,7 +405,7 @@ export async function main(
         res.end(html);
         return;
       }
-      if (req.method === 'GET' && req.url === '/health') {
+      if (req.method === 'GET' && pathname === '/health') {
         res.writeHead(200);
         res.end('ok');
         return;
