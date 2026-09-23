@@ -244,8 +244,12 @@ describe('ui-gallery routes', () => {
       sent: '',
       contentType: '',
       headers: {} as Record<string, string>,
+      body: '',
       sendFile(file: string) {
         res.sent = file;
+      },
+      send(value: string) {
+        res.body = value;
       },
       type(value: string) {
         res.contentType = value;
@@ -311,7 +315,8 @@ describe('ui-gallery routes', () => {
       expect(readRepoFile(source), source).not.toMatch(/^\s*import\s/m);
       const res = fakeResponse();
       routes.get(`/shared-ui/${file}`)!({}, res);
-      expect(res.sent).toBe(pathResolver.rootResolve(source));
+      // Served from memory (read at registration), byte-identical to the source.
+      expect(res.body).toBe(readRepoFile(source));
       expect(res.contentType).toMatch(/^text\/javascript/);
     }
     for (const file of ['../x.js', 'kyberion-ui.test.ts', 'mini-dom.js', '']) {

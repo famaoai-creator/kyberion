@@ -420,7 +420,8 @@ export function describePersonalAvatar(
 ): PersonalAvatarWire | null {
   const set = loadPersonalAvatarSet(profileRoot, kind);
   if (!set) return null;
-  const base = assetUrlBase.replace(/\/+$/u, '');
+  let base = assetUrlBase;
+  while (base.endsWith('/')) base = base.slice(0, -1);
   const suffix = kind === 'draft' ? '?set=draft' : '';
   const images = Object.fromEntries(
     Object.keys(set.files).map((expression) => [expression, `${base}/${expression}${suffix}`])
