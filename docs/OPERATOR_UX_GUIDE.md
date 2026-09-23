@@ -507,12 +507,21 @@ pnpm dashboard -- --once --focus onboarding
 
 ### Organization operating model(組織・目標・サービスの登録)
 
+まず対象の tenant と tier で組織を一覧し、表示された `organization_id` を選ぶ。
+`pnpm organization show/status/reconcile` は `pnpm scope` の tier・tenant を
+読み取りの既定値に使う。組織は `--organization-id` または `pnpm scope use` で
+明示する。`status` の通常表示は運用要点、`--json` は全投影を返す。
+汎用の organization profile は運用中の組織を表さない。
+
 ```bash
+KYBERION_PERSONA=sovereign pnpm organization list --tier confidential --tenant-slug <slug> --json
+pnpm scope use --tier confidential --tenant <slug> --organization <id>
 KYBERION_PERSONA=sovereign pnpm organization init --organization-id <id> --name <名前> --tier confidential --tenant-slug <slug> --purpose "<目的>" --dry-run   # まず dry-run
 KYBERION_PERSONA=sovereign pnpm organization objective add --organization-id <id> --tier confidential --tenant-slug <slug> --objective-id obj-1 --title "<目標>" --apply
 KYBERION_PERSONA=sovereign pnpm organization domain add / service add / operation add ...   # 詳細は pnpm organization --help
-KYBERION_PERSONA=sovereign pnpm organization project attach --organization-id <id> --project-id PRJ-XXXX --apply
+KYBERION_PERSONA=sovereign pnpm organization project attach --organization-id <id> --project-id PRJ-XXXX --tier confidential --tenant-slug <slug> --apply
 KYBERION_PERSONA=sovereign pnpm organization status --organization-id <id> --tier confidential --tenant-slug <slug>
+KYBERION_PERSONA=sovereign pnpm organization reconcile --organization-id <id> --tier confidential --tenant-slug <slug> --dry-run --json
 ```
 
 組織 state(`active/organizations/`)は必ずこの facade 経由で作成・変更する
@@ -520,6 +529,18 @@ KYBERION_PERSONA=sovereign pnpm organization status --organization-id <id> --tie
 レコードを確認でき、`--apply` で保存する。confidential tier は `--tenant-slug`
 必須。読み書きとも authority ゲートがあるため `KYBERION_PERSONA=sovereign` で
 実行する。role/authority の authoring は `pnpm organization role ...` から実行する。
+`services_without_state` はサービスの状態観測が未登録であることを示す。
+健全性を測定できるまで `healthy` として埋めず、観測元・更新時刻・確信度を
+確認してから `service state set` を使う。開発中かどうかは紐付いた Project の
+`current_phase` と更新時刻で確認する。開発フェーズとサービス健全性は別の状態であり、
+`status` は両方を表示する。
+実行手順がまだ固まっていない反復業務は `operation add --execution-kind runbook
+--execution-ref <同じ scope の knowledge 文書>` で登録する。`operation` は手順と
+責任・証拠・承認境界を表し、この登録だけでは作業を自動実行しない。対象 project の
+mission/task で実作業を進め、結果の証拠ができたら `organization operation run record
+--operation-id <id> --run-id <id> --run-status succeeded --result-summary <text>
+--evidence-ref <実在する参照> --apply` で run と最新状態を残す。`status` の
+`no run recorded` は未実行を示す。手順と証拠が安定してから pipeline への昇格を検討する。
 
 ### Mission hygiene(未開始ミッションの整理)
 

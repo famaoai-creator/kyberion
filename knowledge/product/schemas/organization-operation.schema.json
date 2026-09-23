@@ -67,7 +67,10 @@
       "type": "object",
       "required": ["kind"],
       "properties": {
-        "kind": { "type": "string", "enum": ["mission", "task_session", "pipeline", "actuator"] },
+        "kind": {
+          "type": "string",
+          "enum": ["mission", "task_session", "pipeline", "actuator", "runbook"]
+        },
         "ref": { "type": "string" }
       },
       "additionalProperties": false
