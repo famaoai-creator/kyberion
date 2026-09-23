@@ -76,6 +76,14 @@ describe('compute-actuator', () => {
       safeExistsSync('active/shared/tmp/colab_bridge/jobs/test-job-colab-01/job-contract.json')
     ).toBe(true);
 
+    // Verify collect_artifact does NOT report missing/unproduced artifacts as collected
+    await expect(
+      handleAction('collect_artifact', {
+        job_id: 'test-job-colab-01',
+        target_path: 'active/shared/tmp/colab_dest/',
+      })
+    ).rejects.toThrow(/Cannot collect artifacts for job/);
+
     const cancelResult = (await handleAction('cancel_job', {
       job_id: 'test-job-colab-01',
     })) as ComputeJobState;
