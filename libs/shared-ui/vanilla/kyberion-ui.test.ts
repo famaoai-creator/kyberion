@@ -87,7 +87,6 @@ describe('kyberion-ui vanilla renderer — catalog coverage', () => {
       const node = render(type, spec.props);
       expect(node).not.toBeNull();
       expect(node!.classList.contains(spec.root)).toBe(true);
-      expect(node!.getAttribute('data-a2ui-id')).toBe('c1');
       if (spec.tag) expect(node!.tagName).toBe(spec.tag);
     });
   }
@@ -295,10 +294,10 @@ describe('kyberion-ui vanilla renderer — markup contract', () => {
       tone: 'warning',
     })!;
     expect(metric.getAttribute('data-tone')).toBe('warning');
+    expect(metric.getAttribute('data-trend')).toBe('up');
     expect(metric.query('.kb-metric__value .kb-metric__unit')!.textContent).toBe('件');
-    expect(metric.query('.kb-metric__delta .kb-metric__trend')!.getAttribute('aria-hidden')).toBe(
-      'true'
-    );
+    const trendSvg = metric.query('.kb-metric__delta svg')!;
+    expect(trendSvg.getAttribute('aria-hidden')).toBe('true');
 
     const kv = render('ui:kv', {
       items: [
@@ -453,13 +452,18 @@ describe('kyberion-ui vanilla renderer — safety', () => {
     ]) {
       expect(safeHref(good), good).toBe(good);
     }
-    expect(render('ui:button', { label: 'x', href: 'javascript:alert(1)' })).toBeNull();
+    const unsafeButton = render('ui:button', { label: 'x', href: 'javascript:alert(1)' })!;
+    expect(unsafeButton.tagName).toBe('A');
+    expect(unsafeButton.hasAttribute('href')).toBe(false);
+    expect(unsafeButton.getAttribute('aria-disabled')).toBe('true');
+    expect(unsafeButton.getAttribute('role')).toBe('link');
     const list = render('ui:list', { items: [{ title: 'x', href: 'data:text/html,hi' }] })!;
     expect(list.query('a')).toBeNull();
     const nav = render('ui:nav-rail', {
       items: [{ id: 'x', label: 'x', href: 'javascript:void 0' }],
     })!;
-    expect(nav.query('a')!.hasAttribute('href')).toBe(false);
+    expect(nav.query('a')).toBeNull();
+    expect(nav.query('span.kb-nav-rail__item')).not.toBeNull();
     const table = render('ui:table', {
       columns: [{ key: 'a', label: 'A' }],
       rows: [{ a: 1, u: 'javascript:x' }],

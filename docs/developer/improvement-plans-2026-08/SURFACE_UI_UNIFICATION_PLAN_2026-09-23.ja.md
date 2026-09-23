@@ -60,6 +60,53 @@ mission: MSN-SURFACE-UI-UNIFY-20260923
 - `status-pill` の語彙は既存のダッシュボード状態語彙(ui-ux governance check が見ている語彙)に合わせ、日本語ラベルは i18n 辞書から引く。
 - `ui:page-header.role_badge` の文言は `surface-roles.json` の `role_ja` / `tagline_ja` を正とする。
 
+### 3.1 国際化(UI-01d、ギャラリー確認時の追加要件 2026-09-23)
+
+- **i18n は必須**。まず `en` と `ja`(既存の `required_locales` に従い `qps-ploc` も)。独自辞書は作らず、既存の `knowledge/product/orchestration/user-facing-vocabulary.json` に `ui` ドメインを追加し、状態ラベル・空状態・スケルトンの読み上げ・チャートの説明文などレンダラ既定文言はすべてキー経由で引く。
+- レンダラは locale と語彙バンドル(`ui` ドメインを locale 別に抽出した生成物)を受け取る: React は provider、vanilla は `renderA2UI` の option。ハードコードした日本語既定ラベルは廃止。
+- props で渡す文言(タイトル・本文・データラベル)は呼び出し側が翻訳済みで渡す。ギャラリーは言語切替を持ち、サンプルデータも en / ja の両方を用意する。
+
+### 3.2 チャート・可視化(UI-01b、追加要件)
+
+SVG で描画し、幾何計算は共通のレイアウト関数(renderer 非依存の仮想ノード木を返す)に置いて React / vanilla が同じ SVG を出す。色は `tokens.ui` のカテゴリ・連続・発散パレット(両テーマで検証)から取り、凡例と数値ラベルで色だけに頼らない。各チャートは `aria-label` と表形式の代替(`<table>` を視覚的に隠して併置)を持つ。
+
+| 型              | 用途                                                   | 主な props                                                   |
+| --------------- | ------------------------------------------------------ | ------------------------------------------------------------ |
+| `ui:bar-chart`  | 件数比較・ヒストグラム                                 | `series[]`, `categories[]`, `orientation`, `stacked?`        |
+| `ui:line-chart` | 時系列(折れ線 / 面)                                    | `series[{name,points[{x,y}]}]`, `area?`, `y_unit?`           |
+| `ui:donut`      | 構成比                                                 | `segments[{label,value}]`, `center_label?`                   |
+| `ui:sparkline`  | 行内・指標カード内の推移                               | `points[]`, `tone?`                                          |
+| `ui:heatmap`    | 曜日×時間帯などの密度                                  | `rows[]`, `columns[]`, `values[][]`                          |
+| `ui:meter`      | 上限に対する使用量・進捗                               | `value`, `max`, `thresholds?`                                |
+| `ui:sequence`   | **メッセージの流れ**(参加者レーン間の送受信を時系列で) | `participants[]`, `messages[{from,to,label,at?,status?}]`    |
+| `ui:flow`       | ミッション→タスク→エージェント等の段階フロー / DAG     | `nodes[{id,label,stage,status?}]`, `edges[{from,to,label?}]` |
+| `ui:stat-list`  | 統計のまとめ(平均・中央値・p95 等)                     | `items[{label,value,unit?,hint?}]`                           |
+
+### 3.3 設定・フォーム(UI-01c、追加要件)
+
+制御値は `value` で受け、変更は `onAction('field.change', {name, value})`、保存は `action` で親へ返す(A2UI の data model 連携は呼び出し側)。
+
+| 型                                              | 用途                                                                                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ui:settings-group`                             | 設定の見出し付きまとまり(子に setting-row)                                                                                                 |
+| `ui:setting-row`                                | ラベル・説明・制御の 1 行(子に制御 1 つ)                                                                                                   |
+| `ui:switch` / `ui:checkbox`                     | オン/オフ                                                                                                                                  |
+| `ui:select` / `ui:radio-group` / `ui:segmented` | 選択                                                                                                                                       |
+| `ui:text-field` / `ui:textarea`                 | 入力(`type`, `help`, `error`, `required`)                                                                                                  |
+| `ui:slider`                                     | 数値範囲                                                                                                                                   |
+| `ui:integration-item`                           | 外部連携の状態(接続済み / 要再認証 / 未接続)と操作                                                                                         |
+| `ui:save-bar`                                   | 未保存変更の固定バー(保存 / 破棄)                                                                                                          |
+| `ui:file-drop`                                  | ドラッグ&ドロップ+クリック選択+貼り付け。`accept`, `multiple`, `max_bytes`、選択後のファイル一覧(進捗・エラー・取消)                       |
+| `ui:camera-capture`                             | カメラで撮影(`getUserMedia`、非対応/拒否時は `<input capture>` にフォールバック)→ プレビュー → 確定 / 撮り直し                             |
+| `ui:avatar-picker`                              | 現在のアバター表示+アップロード / 撮影 / 削除。正方形トリミングのプレビュー                                                                |
+| `ui:secret-field`                               | API トークン等の入力。既定で伏字、表示切替、貼り付け、`autocomplete=off`。保存済みの値は返さず「設定済み(末尾 4 桁)」表示と置換 / 削除のみ |
+
+**ファイルと秘密情報の扱い(必須)**
+
+- ファイル・撮影画像・秘密値は A2UI の props / data model / ログに載せない。コンポーネントは `onAction` にファイル(Blob)または値を直接渡すだけで、保存は各サーフェスの既存の governed API(アップロードは secure-io 経由の取り込み、トークンは既存の secret 登録経路)が行う。
+- `secret-field` は値を DOM 属性・`data-*`・localStorage に残さず、送信後は入力をクリアする。
+- カメラは利用者の操作で起動し、ページ離脱・確定・取消でストリームを停止する。
+
 ## 4. トークンと CSS(UI-02)
 
 - `kyberion.json` に Web UI 用の意味トークン層 `tokens.ui`(light/dark)を追加する。既存の `tokens.colors` は media(pptx/動画)も使うため値を変えない。

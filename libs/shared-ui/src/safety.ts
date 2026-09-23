@@ -4,31 +4,18 @@
  * reach attributes (column widths). Everything here is pure.
  */
 
-const SAFE_SCHEMES = new Set(['http:', 'https:', 'mailto:']);
-// eslint-disable-next-line no-control-regex
-const CONTROL_CHARS = /[\u0000-\u001F\u007F]/;
-const SCHEME_PREFIX = /^[A-Za-z][A-Za-z0-9+.-]*:/;
+import { safeHref as safeHrefVanilla } from '../vanilla/kyberion-ui.js';
 
 /**
  * Return `href` when it is safe to put in an `<a href>`, otherwise `undefined`.
  * Allowed: same-origin paths (`/x`, `./x`, `x/y`, `#frag`, `?q`) and absolute
- * `http(s):` / `mailto:` URLs. Rejected: every other scheme (`javascript:`,
- * `data:`, `vbscript:`, ...), protocol-relative `//host`, backslash tricks and
- * control characters (which browsers strip before parsing the scheme).
+ * `http(s):` / `mailto:` / `tel:` URLs. Rejected: every other scheme
+ * (`javascript:`, `data:`, `vbscript:`, ...), protocol-relative `//host`,
+ * backslash tricks and control characters. Single source:
+ * `libs/shared-ui/vanilla/kyberion-ui.js` (shared with the vanilla renderer).
  */
 export function safeHref(href: unknown): string | undefined {
-  if (typeof href !== 'string') return undefined;
-  const value = href.trim();
-  if (!value || value.length > 2048 || CONTROL_CHARS.test(value)) return undefined;
-  if (value.startsWith('//') || value.startsWith('/\\') || value.startsWith('\\')) return undefined;
-  if (SCHEME_PREFIX.test(value)) {
-    try {
-      return SAFE_SCHEMES.has(new URL(value).protocol) ? value : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-  return value;
+  return safeHrefVanilla(href) ?? undefined;
 }
 
 const CSS_LENGTH = /^(?:\d{1,4}(?:\.\d{1,2})?)(?:px|rem|em|ch|%)$/;

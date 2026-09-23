@@ -8,7 +8,7 @@ import type {
   KbSkeletonProps,
   KbStatusPillProps,
 } from '@agent/core/a2ui-catalog';
-import { statusLabelJa, statusTone } from '../catalog.js';
+import { statusLabelJa } from '../catalog.js';
 import { ActionRefButton } from './controls.js';
 
 const TONES: ReadonlySet<string> = new Set([
@@ -37,22 +37,18 @@ export function roleAttr(role: unknown): string | undefined {
 }
 
 /**
- * `ui:status-pill` → `.kb-status-pill[data-status][data-tone]`. The icon is
- * the stylesheet's glyph on an `aria-hidden` `__icon` span, so the pill carries icon + text and
- * never relies on color alone. Label: explicit `label`, else the Japanese
- * vocabulary label, else the raw status.
+ * `ui:status-pill` → `.kb-status-pill[data-status][data-domain]`. The icon is
+ * the stylesheet's glyph on an `aria-hidden` `__icon` span, so the pill
+ * carries icon + text and never relies on color alone. Label: explicit
+ * `label`, else the Japanese vocabulary label, else the raw status — rendered
+ * in its own `__label` span (matches the vanilla renderer's markup).
  */
 export function StatusPill({ status, domain, label }: KbStatusPillProps) {
   const text = label || statusLabelJa(String(status), domain);
   return (
-    <span
-      className="kb-status-pill"
-      data-status={status}
-      data-tone={statusTone(String(status))}
-      data-domain={domain}
-    >
+    <span className="kb-status-pill" data-status={status} data-domain={domain}>
       <span className="kb-status-pill__icon" aria-hidden="true" />
-      {text}
+      <span className="kb-status-pill__label">{text}</span>
     </span>
   );
 }
@@ -131,7 +127,7 @@ export function Skeleton({
       aria-label={label}
     >
       {Array.from({ length: count }, (_, index) => (
-        <span key={index} className="kb-skeleton__line" />
+        <span key={index} className="kb-skeleton__line" aria-hidden="true" />
       ))}
     </div>
   );
