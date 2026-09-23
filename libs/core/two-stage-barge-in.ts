@@ -144,6 +144,25 @@ export class TwoStageBargeIn {
     return [...this.checkFallback(), ...this.checkGrace()];
   }
 
+  /**
+   * One capture tick: partials queued since the last chunk are applied before
+   * the chunk, so words that arrived in time win over grace expiry (which
+   * would otherwise reset detection and drop them).
+   */
+  observeTick(chunk: AudioChunk, partials: readonly string[]): BargeInAction[] {
+    const actions: BargeInAction[] = [];
+    for (const partial of partials) {
+      actions.push(...this.observePartial(partial));
+      if (this.phase === 'stopped') {
+        // Keep the tick's audio for replay into the next turn.
+        this.chunks.push(chunk);
+        return actions;
+      }
+    }
+    actions.push(...this.observeAudio(chunk));
+    return actions;
+  }
+
   /** Stage 1 from an external VAD that already applied its own onset rules. */
   observeVadStart(rms?: number): BargeInAction[] {
     if (this.phase !== 'listening') {

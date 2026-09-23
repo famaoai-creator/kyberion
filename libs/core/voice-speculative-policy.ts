@@ -6,8 +6,67 @@
  */
 
 import { getRegisteredEnvText } from './foundation/env.js';
+import { safeExecResult } from './secure-io.js';
+import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
 export const SPECULATIVE_REPLY_ENV = 'KYBERION_VOICE_SPECULATIVE_REPLY';
+
+export type VoicePowerSource = 'ac' | 'battery' | 'unknown';
+export type VoiceCostTier = 'free' | 'metered';
+
+type PowerProbeExec = (
+  command: string,
+  args: string[]
+) => { stdout: string; status: number | null };
+
+export interface DetectPowerSourceOptions {
+  platform?: NodeJS.Platform;
+  exec?: PowerProbeExec;
+}
+
+/** Current power source; only macOS (`pmset -g batt`) is probed, others are unknown. */
+export function detectVoicePowerSource(options: DetectPowerSourceOptions = {}): VoicePowerSource {
+  if ((options.platform ?? process.platform) !== 'darwin') return 'unknown';
+  const exec =
+    options.exec ?? ((command, args) => safeExecResult(command, args, { timeoutMs: 2_000 }));
+  try {
+    const result = exec('pmset', ['-g', 'batt']);
+    if (result.status !== 0) return 'unknown';
+    if (/'Battery Power'/i.test(result.stdout)) return 'battery';
+    if (/'AC Power'/i.test(result.stdout)) return 'ac';
+  } catch {
+    // Policy-blocked or missing binary: fall through.
+  }
+  return 'unknown';
+}
+
+// Local runtimes and subscription CLIs: a revoked speculation costs no per-request fee.
+const FREE_REASONING_MODES: ReadonlySet<ReasoningBackendMode> = new Set<ReasoningBackendMode>([
+  'claude-cli',
+  'codex-cli',
+  'gemini-cli',
+  'agy-cli',
+  'grok-cli',
+  'copilot',
+  'cursor-cli',
+  'opencode-cli',
+  'devin-cli',
+  'local',
+  'ollama',
+  'vllm',
+  'lmstudio',
+  'llamacpp',
+  'mlx',
+  'localai',
+  'stub',
+]);
+
+/** Cost tier of a reasoning backend mode; unknown or API-key backends are metered. */
+export function costTierForReasoningMode(
+  mode: ReasoningBackendMode | string | null | undefined
+): VoiceCostTier {
+  return mode && FREE_REASONING_MODES.has(mode as ReasoningBackendMode) ? 'free' : 'metered';
+}
 
 export interface SpeculativeReplyPolicy {
   enabled: boolean;
@@ -23,8 +82,8 @@ export interface ResolveSpeculativePolicyInput {
   /** Explicit caller option; wins over the environment when defined. */
   option?: boolean;
   env?: Record<string, string | undefined>;
-  powerSource?: 'ac' | 'battery' | 'unknown';
-  costTier?: 'free' | 'metered';
+  powerSource?: VoicePowerSource;
+  costTier?: VoiceCostTier;
   tentativeSilenceMs?: number;
   minPartialChars?: number;
 }
