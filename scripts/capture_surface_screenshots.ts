@@ -10,7 +10,7 @@
  *   node --import ./scripts/ts-loader.mjs scripts/capture_surface_screenshots.ts \
  *     --out active/missions/public/MSN-SURFACE-UI-UNIFY-20260923/evidence/screenshots/before \
  *     [--themes light,dark] [--locales ja,en] [--width 1440] [--height 900] \
- *     [--surfaces concierge,operator-surface] \
+ *     [--surfaces concierge,operator-surface] [--set surfaces|pads|all] \
  *     [--base-url-map '{"concierge":"http://127.0.0.1:3050"}']
  *
  * Each page is opened with the browser locale, Accept-Language, the shared
@@ -25,6 +25,9 @@
  *   - env KYBERION_TRUST_PROXY=1 on the surface process
  *   - the `x-real-ip: 127.0.0.1` request header (set automatically below)
  *   - operator-surface additionally needs KYBERION_MOS_PRINCIPAL=human:operator
+ *
+ * `--set pads` captures the local pads instead (MSN-PADS-A2UI-20260923),
+ * each started with `tsx scripts/<pad>/server.ts [port]` on its default port.
  */
 
 import { chromium, type Browser, type BrowserContext } from 'playwright';
@@ -47,6 +50,16 @@ const DEFAULT_BASE_URLS: Record<string, string> = {
   'chronos-mirror-v2': 'http://127.0.0.1:3000',
   'operator-surface': 'http://127.0.0.1:3331',
   'computer-surface': 'http://127.0.0.1:3040',
+  'personal-pads': 'http://127.0.0.1:8160',
+  'report-review': 'http://127.0.0.1:8137',
+  'sketch-input': 'http://127.0.0.1:8147',
+  'meeting-notepad': 'http://127.0.0.1:8148',
+  'memory-capture': 'http://127.0.0.1:8149',
+  'screenshot-annotate': 'http://127.0.0.1:8150',
+  'clipboard-inbox': 'http://127.0.0.1:8151',
+  'daily-desk': 'http://127.0.0.1:8152',
+  'doc-drop': 'http://127.0.0.1:8153',
+  'personal-workbench': 'http://127.0.0.1:8154',
 };
 
 const DEFAULT_PAGES: PageSpec[] = [
@@ -67,6 +80,26 @@ const DEFAULT_PAGES: PageSpec[] = [
   { surface: 'operator-surface', pageName: 'audit', path: '/audit' },
   { surface: 'computer-surface', pageName: 'home', path: '/' },
 ];
+
+const PAD_PAGES: PageSpec[] = [
+  'personal-pads',
+  'report-review',
+  'sketch-input',
+  'meeting-notepad',
+  'memory-capture',
+  'screenshot-annotate',
+  'clipboard-inbox',
+  'daily-desk',
+  'doc-drop',
+  'personal-workbench',
+].map((surface) => ({ surface, pageName: 'home', path: '/' }));
+
+function pageSet(raw: string | undefined): PageSpec[] {
+  if (raw === undefined || raw === 'surfaces') return DEFAULT_PAGES;
+  if (raw === 'pads') return PAD_PAGES;
+  if (raw === 'all') return [...DEFAULT_PAGES, ...PAD_PAGES];
+  throw new ScriptExitError(1, `--set must be surfaces, pads or all (got ${raw})`);
+}
 
 interface CaptureResult {
   surface: string;
@@ -256,7 +289,7 @@ export const runCaptureSurfaceScreenshots = defineScript({
     const browser = await chromium.launch({ headless: true });
     const results: CaptureResult[] = [];
     try {
-      for (const spec of DEFAULT_PAGES) {
+      for (const spec of pageSet(argument(context.argv, '--set'))) {
         const baseUrl = baseUrls[spec.surface];
         if (!baseUrl) continue;
         if (surfaceFilter && !surfaceFilter.includes(spec.surface)) continue;

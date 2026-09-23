@@ -55,6 +55,7 @@
               "label": "頼む",
               "hint": "話す・書く",
               "href": "#ask",
+              "action": { "id": "gallery.nav", "payload": { "item": "ask" } },
               "icon": "chat"
             },
             {
@@ -1027,7 +1028,7 @@
     {
       "id": "list",
       "title": "リスト ui:list",
-      "description": "plain・timeline と、状態ラベル付きの進み具合。",
+      "description": "plain・timeline と、状態ラベル付きの進み具合。タイトルで操作を実行でき、行の末尾に操作（削除）を置けます。",
       "components": [
         {
           "id": "list-root",
@@ -1055,6 +1056,12 @@
                 "title": "9月の月次レポート.pptx",
                 "meta": "9/22 · 相棒",
                 "href": "#r1",
+                "actions": [
+                  {
+                    "label": "削除",
+                    "action": { "id": "gallery.list.remove", "payload": { "item": "r1" } }
+                  }
+                ],
                 "status": "completed"
               },
               {
@@ -1066,6 +1073,7 @@
               {
                 "title": "採用ページの文面案",
                 "meta": "9/20 · 広報エージェント",
+                "action": { "id": "gallery.list.open", "payload": { "item": "r3" } },
                 "status": "planned"
               }
             ]

@@ -365,12 +365,26 @@ function webFontStacks(tokens: KyberionDesignTokens): { sans: string; mono: stri
   return { sans: web?.sans ?? base.sans, mono: web?.mono ?? base.mono };
 }
 
-export function renderKyberionUiTokenBlock(tokens: KyberionDesignTokens): string {
+/**
+ * `root` (default): tokens on `:root` for pages. `host`: the same block on
+ * `:host` (`:host(:not([data-theme="light"]))`, `:host([data-theme="dark"])`)
+ * for a stylesheet adopted inside a shadow root, where `:root` never matches.
+ */
+export type KyberionUiTokenScope = 'root' | 'host';
+
+export function renderKyberionUiTokenBlock(
+  tokens: KyberionDesignTokens,
+  options: { scope?: KyberionUiTokenScope } = {}
+): string {
   const ui = requireUiTokens(tokens);
   const fonts = webFontStacks(tokens);
+  const host = options.scope === 'host';
+  const base = host ? ':host' : ':root';
+  const systemDark = host ? ':host(:not([data-theme="light"]))' : ':root:not([data-theme="light"])';
+  const forcedDark = host ? ':host([data-theme="dark"])' : ':root[data-theme="dark"]';
   return [
     KB_UI_TOKEN_BLOCK_START,
-    ':root {',
+    `${base} {`,
     ...uiPaletteDeclarations(ui.light, 'light', '  '),
     ...Object.entries(ui.radius).map(([size, value]) => `  --kb-ui-radius-${size}: ${value};`),
     ...Object.entries(ui.space).map(([step, value]) => `  --kb-ui-space-${step}: ${value};`),
@@ -388,12 +402,12 @@ export function renderKyberionUiTokenBlock(tokens: KyberionDesignTokens): string
     '}',
     '',
     '@media (prefers-color-scheme: dark) {',
-    '  :root:not([data-theme="light"]) {',
+    `  ${systemDark} {`,
     ...uiPaletteDeclarations(ui.dark, 'dark', '    '),
     '  }',
     '}',
     '',
-    ':root[data-theme="dark"] {',
+    `${forcedDark} {`,
     ...uiPaletteDeclarations(ui.dark, 'dark', '  '),
     '}',
     KB_UI_TOKEN_BLOCK_END,

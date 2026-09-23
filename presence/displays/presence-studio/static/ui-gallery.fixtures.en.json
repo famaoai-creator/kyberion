@@ -55,6 +55,7 @@
               "label": "Ask",
               "hint": "Talk or type",
               "href": "#ask",
+              "action": { "id": "gallery.nav", "payload": { "item": "ask" } },
               "icon": "chat"
             },
             {
@@ -1027,7 +1028,7 @@
     {
       "id": "list",
       "title": "List ui:list",
-      "description": "plain, timeline, and progress with a status label.",
+      "description": "plain, timeline, and progress with a status label; a title can run an action and a row can carry trailing actions (Remove).",
       "components": [
         {
           "id": "list-root",
@@ -1055,6 +1056,12 @@
                 "title": "September monthly report.pptx",
                 "meta": "9/22 · Partner",
                 "href": "#r1",
+                "actions": [
+                  {
+                    "label": "Remove",
+                    "action": { "id": "gallery.list.remove", "payload": { "item": "r1" } }
+                  }
+                ],
                 "status": "completed"
               },
               {
@@ -1066,6 +1073,7 @@
               {
                 "title": "Draft copy for the careers page",
                 "meta": "9/20 · PR agent",
+                "action": { "id": "gallery.list.open", "payload": { "item": "r3" } },
                 "status": "planned"
               }
             ]

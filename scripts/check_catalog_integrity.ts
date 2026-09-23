@@ -813,6 +813,8 @@ function validateDesignTokenCatalog(violations: string[]) {
   // the generated component stylesheet.
   const generatedUiFiles: Array<[string, string]> = [
     ['presence/displays/concierge/src/app/kyberion-ui-tokens.css', `${expectedUiTokenBlock}\n`],
+    // PA-03: the local pads get the same --kb-ui-* only layer.
+    ['scripts/lib/pad-ui/design-tokens.css', `${expectedUiTokenBlock}\n`],
   ];
   const stylesheetSourcePath = pathResolver.rootResolve(KB_UI_STYLESHEET_SOURCE);
   if (!safeExistsSync(stylesheetSourcePath)) {
@@ -829,6 +831,7 @@ function validateDesignTokenCatalog(violations: string[]) {
       'presence/displays/presence-studio/static/kyberion-ui.css',
       'presence/displays/computer-surface/static/kyberion-ui.css',
       'presence/displays/concierge/src/app/kyberion-ui.css',
+      'scripts/lib/pad-ui/kyberion-ui.css',
     ]) {
       generatedUiFiles.push([relativePath, expectedStylesheet]);
     }

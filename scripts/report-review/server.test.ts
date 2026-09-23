@@ -1,7 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { safeReaddir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
+import { RV_LAYER_CLOSE, RV_LAYER_OPEN } from './review-layer.js';
 import {
+  injectSaveConfig,
+  createReportReviewRequestHandler,
   main,
   readReportReviewRequestBody,
   readReportReviewTextFile,
@@ -96,5 +103,110 @@ describe('report review server harness boundary', () => {
     expect(source).toContain('server.requestTimeout = REPORT_REVIEW_REQUEST_TIMEOUT_MS');
     expect(source).toContain('REPORT_REVIEW_MAX_CONCURRENT_HEAVY_REQUESTS');
     expect(source).toContain('request body too large');
+  });
+});
+
+describe('injectSaveConfig', () => {
+  const cfg = '<!--RV-SAVE-CONFIG--><script>x</script><!--/RV-SAVE-CONFIG-->';
+  it('keeps both markers inside <head> whatever the report structure', () => {
+    for (const report of [
+      '<!doctype html><html><head><title>T</title></head><body>b</body></html>',
+      '<!doctype html><html lang="en"><body>b</body></html>',
+      '<!doctype html><p>b</p>',
+      '<p>b</p>',
+    ]) {
+      const html = injectSaveConfig(report, cfg);
+      const head = /<head[^>]*>([\s\S]*?)<\/head>/i.exec(html);
+      expect(head?.[1]).toContain(cfg);
+      expect(html.indexOf(cfg)).toBeGreaterThan(html.search(/<head[\s>]/i));
+    }
+  });
+});
+
+describe('report review server (live handler)', () => {
+  const token = 'test-token-review';
+  const dir = `active/shared/tmp/report-review-test-${process.pid}`;
+  const target = `${dir}/report.html`;
+  const original =
+    '<!doctype html>\n<html><head><title>R</title></head><body><div class="wrap"><p>Body text</p></div></body></html>';
+  const reviewContext = createReportReviewContext({
+    artifact_ref: target,
+    viewer_principal: 'test-reviewer',
+    tier: 'public',
+  });
+  let server: http.Server;
+  let base = '';
+  let savedPersona: string | undefined;
+
+  beforeAll(async () => {
+    savedPersona = process.env.KYBERION_PERSONA;
+    process.env.KYBERION_PERSONA = 'sovereign';
+    safeWriteFile(pathResolver.rootResolve(target), original, { mkdir: true, encoding: 'utf8' });
+    server = http.createServer(
+      createReportReviewRequestHandler({ token, target, reviewContext, print: () => undefined })
+    );
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    safeRmSync(pathResolver.rootResolve(dir), { recursive: true, force: true });
+    safeRmSync(pathResolver.rootResolve(reviewReceiptLogicalPath(reviewContext)), { force: true });
+    if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
+    else process.env.KYBERION_PERSONA = savedPersona;
+  });
+
+  it('serves the report with the save config and a served-asset layer in the request locale', async () => {
+    const html = await (await fetch(`${base}/?lang=en`)).text();
+
+    expect(html).toContain("<!--RV-SAVE-CONFIG--><script>window.__RV_SAVE__={url:'/save'");
+    expect(html).toContain(token);
+    expect(html.indexOf(RV_LAYER_OPEN)).toBeLessThan(html.indexOf('</body>'));
+    expect(html).toContain('"assets":"served"');
+    expect(html).toContain('"locale":"en"');
+    expect(html).not.toContain('"modules"');
+    expect(html).not.toMatch(/\b(?:confirm|prompt)\(/);
+
+    const ja = await (await fetch(`${base}/`, { headers: { cookie: 'kb-ui-locale=ja' } })).text();
+    expect(ja).toContain('"locale":"ja"');
+  });
+
+  it('serves the shared UI modules the layer imports', async () => {
+    const renderer = await fetch(`${base}/shared-ui/kyberion-ui.js`);
+    expect(renderer.status).toBe(200);
+    expect(renderer.headers.get('content-type')).toContain('javascript');
+    expect((await fetch(`${base}/shared-ui/dialog.js`)).status).toBe(200);
+  });
+
+  it('keeps the save contract: token, injected parts stripped, backup written', async () => {
+    const served = await (await fetch(`${base}/`)).text();
+    const edited = served.replace(
+      '<p>Body text</p>',
+      '<p><mark class="rv-cmt" data-note="fix" title="fix">Body</mark> text</p>'
+    );
+    expect(
+      (
+        await fetch(`${base}/save`, {
+          method: 'POST',
+          headers: { 'x-rv-token': 'no' },
+          body: edited,
+        })
+      ).status
+    ).toBe(403);
+
+    const response = await fetch(`${base}/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/html', 'x-rv-token': token },
+      body: edited,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toMatch(/^saved \(backup: report\.html\.bak-/);
+    const saved = readTextFile(pathResolver.rootResolve(target));
+    expect(saved).toContain('<mark class="rv-cmt" data-note="fix"');
+    expect(saved).not.toContain('RV-LAYER');
+    expect(saved).not.toContain('RV-SAVE-CONFIG');
+    expect(saved).not.toContain(token);
+    expect(safeReaddir(pathResolver.rootResolve(dir)).some((f) => f.includes('.bak-'))).toBe(true);
   });
 });

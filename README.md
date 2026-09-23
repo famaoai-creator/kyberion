@@ -203,7 +203,7 @@ Every HTTP surface resolves the viewer principal server-side and treats a client
 
 ## Local Pads — capture at your desk, hand off to Kyberion
 
-The **Capture desk** is one **127.0.0.1-only** server for the eight capture pads below. Start it once with `pnpm pads`, choose a pad from the menu, and inspect its authenticated history. It captures something you already have on your desk (a sketch, meeting notes, a screenshot, a file, a clipboard, today's TODO), stores records in the server-derived tenant/tier partition, and never starts a mission or sends anything on its own. The legacy per-pad pages remain available during migration.
+The **Capture desk** is one **127.0.0.1-only** server for the eight capture pads below. Start it once with `pnpm pads`, choose a pad from the menu, and inspect its authenticated history. It captures something you already have on your desk (a sketch, meeting notes, a screenshot, a file, a clipboard, today's TODO), stores records in the server-derived tenant/tier partition, and never starts a mission or sends anything on its own. The legacy per-pad pages remain available during migration. Every pad renders with the shared UI kit (toolbar, dialog, sketch board with a drawing palette, voice input with a live level meter) in light/dark and English/Japanese.
 
 <table>
   <tr>

@@ -68,6 +68,14 @@ export const A2UI_BASE_COMPONENT_TYPES = [
   'ui:sequence',
   'ui:flow',
   'ui:stat-list',
+  // PA-02 voice (PADS_A2UI_AND_AVATAR_PLAN §3)
+  'ui:voice-input',
+  'ui:voice-state',
+  // PA-01 pads (PADS_A2UI_AND_AVATAR_PLAN §3)
+  'ui:toolbar',
+  'ui:dialog',
+  'ui:drawing-palette',
+  'ui:sketch-board',
 ] as const;
 
 export type KyberionBaseComponentType = (typeof A2UI_BASE_COMPONENT_TYPES)[number];
@@ -267,7 +275,14 @@ export interface KbNavItem {
   id: string;
   label: string;
   hint?: string;
-  href: string;
+  /** Navigation target; with `action` too, a plain click dispatches the action instead. */
+  href?: string;
+  /**
+   * Dispatched on activation (click / Enter / Space). Without `href` the item
+   * is a `<button>`; with `href` it stays a link and modified clicks (new
+   * tab) keep the browser behaviour. One of `href` / `action` is required.
+   */
+  action?: KbAction | string;
   icon?: string;
   active?: boolean;
 }
@@ -421,6 +436,14 @@ export interface KbListItem {
   /** 0–100: drawn as a small meter under the title, with accessible text. */
   progress?: number;
   href?: string;
+  /**
+   * Dispatched when the title is activated (click / Enter / Space): the
+   * title becomes a `<button>` (or keeps its `href` link, with a plain click
+   * dispatching instead of navigating).
+   */
+  action?: KbAction | string;
+  /** Trailing row actions (e.g. Delete), described by the row title. */
+  actions?: KbActionRef[];
 }
 
 export interface KbListProps {
@@ -555,6 +578,14 @@ export interface KyberionBasePropsByType {
   'ui:sequence': KbSequenceProps;
   'ui:flow': KbFlowProps;
   'ui:stat-list': KbStatListProps;
+  // PA-02 voice
+  'ui:voice-input': KbVoiceInputProps;
+  'ui:voice-state': KbVoiceStateProps;
+  // PA-01 pads
+  'ui:toolbar': KbToolbarProps;
+  'ui:dialog': KbDialogProps;
+  'ui:drawing-palette': KbDrawingPaletteProps;
+  'ui:sketch-board': KbSketchBoardProps;
 }
 
 // ---------------------------------------------------------------------------
@@ -694,7 +725,8 @@ export interface KbFileEntry {
   id: string;
   name: string;
   size?: number;
-  status: 'queued' | 'uploading' | 'done' | 'error';
+  /** `ready`: read locally and attached, not uploaded yet (the pad sends it later). */
+  status: 'queued' | 'ready' | 'uploading' | 'done' | 'error';
   /** 0–100 while `uploading`. */
   progress?: number;
   error?: string;
@@ -864,6 +896,285 @@ export interface KbStatListProps {
   density?: KbDensity;
   empty?: string;
   items: Array<{ label: string; value: string | number; unit?: string; hint?: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// PA-02 voice (PADS_A2UI_AND_AVATAR_PLAN_2026-09-23 §3)
+// ---------------------------------------------------------------------------
+//
+// `ui:voice-input` owns its microphone state; the mic opens only from a user
+// action. Recorded audio (File) and transcripts reach the host only in the
+// `onAction` payloads below — never in props.
+
+/** Action ids `ui:voice-input` dispatches unless `actions.<event>` overrides them. */
+export const KB_VOICE_ACTIONS = Object.freeze({
+  /** `{ name, state }` — every internal state change (`KbVoiceInputState`). */
+  state: 'voice.state',
+  /** `{ name, text, final: boolean }` — dictation interim / final text. */
+  transcript: 'voice.transcript',
+  /**
+   * `{ name, file: File, duration_ms, offset_ms, final: boolean }` — record
+   * mode. With `chunk_ms` one complete, independently decodable file per
+   * chunk (`duration_ms` = the chunk, `offset_ms` = its start in the
+   * recording); the last one has `final: true`.
+   */
+  recording: 'voice.recording',
+  /** `{ name, code: KbVoiceErrorCode }` */
+  error: 'voice.error',
+} as const);
+
+export type KbVoiceInputState =
+  'idle' | 'requesting' | 'listening' | 'recording' | 'processing' | 'error' | 'unsupported';
+
+export type KbVoiceErrorCode =
+  'permission_denied' | 'not_supported' | 'no_speech' | 'network' | 'aborted' | 'unknown';
+
+export interface KbVoiceInputProps {
+  /** Field key reported in every voice action payload. */
+  name: string;
+  label: string;
+  hide_label?: boolean;
+  help?: string;
+  disabled?: boolean;
+  /** `dictation` (default): Web Speech recognition. `record`: MediaRecorder audio. */
+  mode?: 'dictation' | 'record';
+  /** BCP-47 recognition language; default from the render locale (en → en-US, ja → ja-JP). */
+  lang?: string;
+  /** Dictation: keep listening; a recognition that ends on its own (silence) restarts until stopped. */
+  continuous?: boolean;
+  /** Hold the button (or Space) to talk; otherwise click toggles. */
+  push_to_talk?: boolean;
+  /** Live input-level meter (default true). */
+  show_level?: boolean;
+  /** Dictation: show the interim transcript line. */
+  show_transcript?: boolean;
+  /** Record mode: deliver a complete audio file every N ms (default: one file on stop). */
+  chunk_ms?: number;
+  /** Stop automatically after N seconds. */
+  max_seconds?: number;
+  /** Host-controlled state while idle: `transcribing` (processing) or `error`. */
+  status?: 'idle' | 'transcribing' | 'error';
+  /** Host-localized reason shown with `status: 'error'`. */
+  status_error?: string;
+  /** Override the dispatched action per event. */
+  actions?: {
+    state?: KbAction;
+    transcript?: KbAction;
+    recording?: KbAction;
+    error?: KbAction;
+  };
+}
+
+export type KbVoiceStateValue = 'idle' | 'listening' | 'thinking' | 'speaking' | 'muted' | 'error';
+
+/** Display-only conversation state (reused by the talking avatar). */
+export interface KbVoiceStateProps {
+  state: KbVoiceStateValue;
+  /** Overrides the localized default label. */
+  label?: string;
+  /** Host-driven loudness 0..1 (e.g. TTS output); drives the bar heights. */
+  level?: number;
+  variant?: 'bars' | 'orb' | 'dot';
+  size?: 'sm' | 'md' | 'lg';
+  /** Show the label visibly (default true; it always stays the accessible text). */
+  show_label?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// PA-01 pads (PADS_A2UI_AND_AVATAR_PLAN_2026-09-23 §3)
+// ---------------------------------------------------------------------------
+//
+// `ui:toolbar`, `ui:dialog` and `ui:drawing-palette` are controlled (the host
+// passes `pressed` / `open` / `tool`...). `ui:sketch-board` owns its drawing
+// state and hands the host a controller in `drawing.ready`. Files (toolbar
+// file items, dropped background images) reach the host only as onAction
+// payloads — never props.
+
+/** Action ids `ui:toolbar` dispatches when an item has no explicit `action`. */
+export const KB_TOOLBAR_ACTIONS = Object.freeze({
+  /** `{ id }` — a `button` item. */
+  click: 'toolbar.click',
+  /** `{ id, pressed: boolean }` — a `toggle` item (the new value). */
+  toggle: 'toolbar.toggle',
+  /** `{ id, files: File[] }` — a `file` item. */
+  files: 'toolbar.files',
+} as const);
+
+/** Action ids `ui:dialog` dispatches unless `action` / `cancel_action` override them. */
+export const KB_DIALOG_ACTIONS = Object.freeze({
+  /** `{ choice?: string, value?: string }` — confirm button, a choice, or Enter in the input. */
+  confirm: 'dialog.confirm',
+  /** `{}` — cancel button or Escape. */
+  cancel: 'dialog.cancel',
+} as const);
+
+/** Action ids `ui:drawing-palette` / `ui:sketch-board` dispatch. */
+export const KB_DRAWING_ACTIONS = Object.freeze({
+  /** Palette: `{ name, tool? | color? | width? }`; sketch board: `{ name, dirty, strokes }`. */
+  change: 'drawing.change',
+  /** `{ name }` (palette). */
+  undo: 'drawing.undo',
+  /** `{ name }` (palette). */
+  clear: 'drawing.clear',
+  /** `{ name, controller: KbSketchController }` (sketch board, on mount). */
+  ready: 'drawing.ready',
+  /** `{ name, file: File }` — an image dropped / pasted as background (sketch board). */
+  background: 'drawing.background',
+} as const);
+
+export const KB_DRAWING_TOOLS = [
+  'pen',
+  'highlighter',
+  'rect',
+  'ellipse',
+  'line',
+  'arrow',
+  'text',
+  'eraser',
+] as const;
+
+export type KbDrawingTool = (typeof KB_DRAWING_TOOLS)[number];
+
+export interface KbToolbarItem {
+  type: 'button' | 'toggle' | 'file' | 'separator' | 'spacer' | 'status';
+  /** Required for button / toggle / file; reported in the action payload. */
+  id?: string;
+  /** Required for button / toggle / file (stays the accessible name with `hide_label`). */
+  label?: string;
+  /** Short glyph / emoji shown before the label (decorative). */
+  icon?: string;
+  /** Icon-only button: the label becomes `aria-label` + `title`. */
+  hide_label?: boolean;
+  /** Controls: longer hint shown as the `title` tooltip and read via `aria-describedby`. */
+  description?: string;
+  variant?: KbButtonVariant;
+  /** Toggle state (controlled). */
+  pressed?: boolean;
+  disabled?: boolean;
+  action?: KbAction;
+  /** File item: `<input accept>` list. */
+  accept?: string;
+  multiple?: boolean;
+  /** Status item text (`role=status`, polite). Required for status. */
+  text?: string;
+  tone?: KbTone;
+}
+
+/** `ui:toolbar`: WAI-ARIA toolbar (roving tabindex, arrow keys); wraps on narrow widths. */
+export interface KbToolbarProps {
+  /** Accessible name of the toolbar. */
+  label: string;
+  items: KbToolbarItem[];
+  /**
+   * Stick to the top of the scroll container. The toolbar root must sit
+   * directly in the page flow — render it into a `.kb-sticky-host`
+   * (`display: contents`) rather than a plain wrapper div.
+   */
+  sticky?: boolean;
+  density?: KbDensity;
+}
+
+/**
+ * `ui:dialog`: modal confirm / prompt / multi-choice (replaces confirm() /
+ * prompt()). The component's `children` (A2UI child ids) render in the body
+ * between the message / input and the buttons (e.g. a `ui:voice-input`);
+ * the focus trap includes their controls.
+ */
+export interface KbDialogProps {
+  open: boolean;
+  title: string;
+  message?: string;
+  /** `danger` renders an `alertdialog` with a danger confirm button. */
+  tone?: 'neutral' | 'danger';
+  input?: {
+    name: string;
+    label: string;
+    placeholder?: string;
+    value?: string;
+    multiline?: boolean;
+  };
+  /** Replaces the Cancel / Confirm pair (e.g. save / discard / cancel). */
+  choices?: Array<{ id: string; label: string; variant?: KbButtonVariant }>;
+  confirm_label?: string;
+  cancel_label?: string;
+  action?: KbAction;
+  cancel_action?: KbAction;
+}
+
+/** `ui:drawing-palette`: controlled tool / color / width picker. */
+export interface KbDrawingPaletteProps {
+  name: string;
+  label: string;
+  tools?: KbDrawingTool[];
+  tool?: KbDrawingTool;
+  /** `#rrggbb` swatches (default: a set readable on dark and light canvases). */
+  colors?: string[];
+  color?: string;
+  allow_custom_color?: boolean;
+  width?: number;
+  min_width?: number;
+  max_width?: number;
+  can_undo?: boolean;
+  show_clear?: boolean;
+  orientation?: 'horizontal' | 'vertical';
+}
+
+/** `ui:sketch-board`: stateful palette + canvas (pointer drawing, undo, PNG export). */
+export interface KbSketchBoardProps {
+  name: string;
+  label: string;
+  tools?: KbDrawingTool[];
+  colors?: string[];
+  default_tool?: KbDrawingTool;
+  default_color?: string;
+  default_width?: number;
+  min_width?: number;
+  max_width?: number;
+  /** Colour input next to the swatches (default true). */
+  allow_custom_color?: boolean;
+  /** Canvas pixels (default 1280 × 720). */
+  canvas_width?: number;
+  canvas_height?: number;
+  background?: 'dark' | 'light' | 'transparent';
+  /** http(s) / same-origin image; never inline data. */
+  background_image_url?: string;
+  /** Drop / paste an image as the background (reported as `drawing.background`). */
+  accept_image_drop?: boolean;
+  /** Undo depth (default 40); older strokes are flattened. */
+  max_undo?: number;
+  show_download?: boolean;
+  /** File name of the PNG download (default: from `name`); `.png` is ensured. */
+  download_name?: string;
+  /**
+   * With `accept_image_drop`: `board` (default) takes pasted images while the
+   * board has focus; `document` takes them anywhere on the page, except when
+   * the paste targets an editable field.
+   */
+  paste_scope?: 'board' | 'document';
+}
+
+/** What `drawing.ready` hands the host (runtime object, never serialized). */
+export interface KbSketchController {
+  toBlob(): Promise<Blob>;
+  isEmpty(): boolean;
+  clear(): void;
+  undo(): void;
+  /**
+   * Runtime values (not props): a `File`/`Blob`, a `blob:` or
+   * `data:image/{png,jpeg,gif,webp,avif,bmp};base64` URL, or an http(s) /
+   * same-origin URL. `null` removes the background; an unsupported source
+   * resolves false and changes nothing. The latest call wins.
+   */
+  setBackgroundImage(source: Blob | string | null): Promise<boolean>;
+  /**
+   * `layer: 'background'` (default) = `setBackgroundImage`; `'drawing'`
+   * places the image into the drawing layer (undoable, removed by Clear) —
+   * e.g. to restore saved drawing content.
+   */
+  loadImage(
+    source: Blob | string,
+    options?: { layer?: 'background' | 'drawing' }
+  ): Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
