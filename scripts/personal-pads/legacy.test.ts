@@ -15,7 +15,7 @@ describe('legacy pad compatibility seam', () => {
     });
     expect(input.fields).toMatchObject({ target: 'now', tags: 'one, two', instruction: '整理' });
     expect(
-      composeLegacyCapture('memory-capture', { notes: 'capture this', target: 'now' }).body
+      composeLegacyCapture('memory-capture', { notes: 'capture this', target: 'now' }, 'ja').body
     ).toContain('候補: now');
   });
 
