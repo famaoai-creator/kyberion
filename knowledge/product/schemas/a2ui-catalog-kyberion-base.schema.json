@@ -62,7 +62,8 @@
         "ui:toolbar",
         "ui:dialog",
         "ui:drawing-palette",
-        "ui:sketch-board"
+        "ui:sketch-board",
+        "ui:talking-avatar"
       ]
     },
     "props": {
@@ -975,6 +976,23 @@
         "properties": {
           "props": {
             "$ref": "#/$defs/props:ui:sketch-board"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ui:talking-avatar"
+          }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "props": {
+            "$ref": "#/$defs/props:ui:talking-avatar"
           }
         }
       }
@@ -3619,6 +3637,100 @@
         }
       },
       "required": ["name", "label"],
+      "additionalProperties": false
+    },
+    "avatar-image-url": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^(?:[hH][tT][tT][pP][sS]?://[^\\s]+|(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?!//)(?!\\\\)[^\\s]+)$",
+      "description": "Same-origin path or http(s) URL of an avatar frame. data:, blob: and every other scheme are rejected (images are never inline in props)."
+    },
+    "avatar-fraction": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "props:ui:talking-avatar": {
+      "type": "object",
+      "description": "PA-09 talking avatar: layered expression images with crossfade, a lip-synced mouth (overlay SVG at the mouth anchor, or an open-mouth frame blended by openness), idle blink / breathing (off under reduced motion) and an optional ui:voice-state indicator. Mouth motion never comes from props: avatar.ready {name, controller} hands the host setLevel / applyCue (AnimationCue shape) / attachAnalyser / startSynthetic / pulse / setExpression / setState / dispose.",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/field-name"
+        },
+        "label": {
+          "$ref": "#/$defs/text"
+        },
+        "images": {
+          "type": "object",
+          "properties": {
+            "neutral": {
+              "$ref": "#/$defs/avatar-image-url"
+            },
+            "joy": {
+              "$ref": "#/$defs/avatar-image-url"
+            },
+            "thinking": {
+              "$ref": "#/$defs/avatar-image-url"
+            },
+            "listening": {
+              "$ref": "#/$defs/avatar-image-url"
+            },
+            "speaking": {
+              "$ref": "#/$defs/avatar-image-url"
+            },
+            "mouth_open": {
+              "$ref": "#/$defs/avatar-image-url"
+            },
+            "blink": {
+              "$ref": "#/$defs/avatar-image-url"
+            }
+          },
+          "required": ["neutral"],
+          "additionalProperties": false
+        },
+        "expression": {
+          "enum": ["neutral", "joy", "thinking", "listening"]
+        },
+        "state": {
+          "enum": ["idle", "listening", "thinking", "speaking", "muted", "error"]
+        },
+        "show_state": {
+          "type": "boolean"
+        },
+        "mouth": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "$ref": "#/$defs/avatar-fraction"
+            },
+            "y": {
+              "$ref": "#/$defs/avatar-fraction"
+            },
+            "width": {
+              "type": "number",
+              "minimum": 0.02,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "mouth_mode": {
+          "enum": ["auto", "overlay", "frames"]
+        },
+        "size": {
+          "enum": ["sm", "md", "lg", "xl"]
+        },
+        "shape": {
+          "enum": ["circle", "rounded"]
+        },
+        "fallback_initials": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 3
+        }
+      },
+      "required": ["name", "label", "images"],
       "additionalProperties": false
     }
   }

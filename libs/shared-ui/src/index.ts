@@ -198,3 +198,25 @@ export {
   type KbDrawingEngineOptions,
   type KbSketchControllerRuntime,
 } from '../vanilla/pads.js';
+// PA-09 talking avatar (mouth motion only through the avatar.ready controller —
+// see src/avatar/* and vanilla/avatar.js / vanilla/lipsync.js).
+export {
+  KB_AVATAR_COMPONENT_TYPES,
+  TalkingAvatar,
+  isKbAvatarComponentType,
+  renderAvatarComponent,
+  type KbAvatarComponentType,
+} from './avatar/index.js';
+export type { TalkingAvatarProps } from './avatar/talking-avatar.js';
+export {
+  KB_AVATAR_ACTIONS,
+  KB_VISEME_OPENNESS,
+  createAvatarController,
+  createLipsync,
+  cueFromLevel,
+  visemeOpenness,
+  type KbLipsync,
+  type KbLipsyncCue,
+  type KbLipsyncOptions,
+  type KbTalkingAvatarRuntimeController,
+} from '../vanilla/avatar.js';

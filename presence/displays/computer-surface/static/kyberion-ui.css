@@ -1755,6 +1755,216 @@ a.kb-list__title:hover {
   }
 }
 
+/* ----------------------------------------------------------- avatar ----
+ * PA-09 (PADS_A2UI_AND_AVATAR_PLAN_2026-09-23 §6): ui:talking-avatar.
+ * Stamped into kyberion-ui.css after the base sheet by
+ * scripts/generate_design_tokens.ts.
+ *
+ * Markup comes from libs/shared-ui/vanilla/avatar.js and
+ * src/avatar/*.tsx (parity-tested). `--kb-ui-*` tokens only, `.kb-*`
+ * selectors only, state via data attributes. The renderer sets
+ * `--kb-mouth-x` / `--kb-mouth-y` / `--kb-mouth-width` (anchor, fractions of
+ * the image box) and the lip-sync engine writes `--kb-mouth-open` (0..1)
+ * every frame. The overlay mouth sits on the avatar artwork, not on the
+ * themed page, so its shades are the danger hue darkened toward black in
+ * both themes. Under reduced motion the mouth keeps moving (it carries
+ * speech timing) but breathing, blinking and crossfades stop.
+ */
+
+.kb-talking-avatar {
+  --kb-avatar-size: 96px;
+  --kb-avatar-ring: transparent;
+  --kb-avatar-mouth-lips: color-mix(in oklab, var(--kb-ui-danger-fg) 55%, black);
+  --kb-avatar-mouth-cavity: color-mix(in oklab, var(--kb-ui-danger-fg) 22%, black);
+  --kb-avatar-mouth-tongue: color-mix(in oklab, var(--kb-ui-danger-fg) 70%, black);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  color: var(--kb-ui-text);
+  font-family: var(--kb-ui-font-sans);
+}
+
+.kb-talking-avatar[data-size='sm'] {
+  --kb-avatar-size: 48px;
+}
+
+.kb-talking-avatar[data-size='lg'] {
+  --kb-avatar-size: 160px;
+}
+
+.kb-talking-avatar[data-size='xl'] {
+  --kb-avatar-size: 240px;
+}
+
+.kb-talking-avatar[data-state='listening'] {
+  --kb-avatar-ring: var(--kb-ui-accent);
+}
+
+.kb-talking-avatar[data-state='thinking'] {
+  --kb-avatar-ring: var(--kb-ui-info-fg);
+}
+
+.kb-talking-avatar[data-state='speaking'] {
+  --kb-avatar-ring: var(--kb-ui-success-fg);
+}
+
+.kb-talking-avatar[data-state='error'] {
+  --kb-avatar-ring: var(--kb-ui-danger-fg);
+}
+
+.kb-talking-avatar__figure {
+  position: relative;
+  flex: none;
+  width: var(--kb-avatar-size);
+  height: var(--kb-avatar-size);
+  overflow: hidden;
+  background: var(--kb-ui-surface-sunken);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px var(--kb-ui-surface),
+    0 0 0 4px var(--kb-avatar-ring);
+  transform-origin: 50% 100%;
+  animation: kb-avatar-breathe 5.2s ease-in-out infinite;
+  transition: box-shadow 160ms ease;
+}
+
+.kb-talking-avatar[data-shape='rounded'] .kb-talking-avatar__figure {
+  border-radius: var(--kb-ui-radius-lg);
+}
+
+.kb-talking-avatar__initials {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kb-ui-text-muted);
+  font-size: calc(var(--kb-avatar-size) * 0.34);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.kb-talking-avatar__image,
+.kb-talking-avatar__blink,
+.kb-talking-avatar__mouth-frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Expression layers crossfade; a failed image drops out (initials show). */
+.kb-talking-avatar__image {
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.kb-talking-avatar__image[data-active='true'] {
+  opacity: 1;
+}
+
+.kb-talking-avatar__image[data-failed='true'],
+.kb-talking-avatar__blink[data-failed='true'],
+.kb-talking-avatar__mouth-frame[data-failed='true'] {
+  display: none;
+}
+
+/* Idle blink: the eyes-closed frame of neutral flashes in briefly. */
+.kb-talking-avatar__blink {
+  opacity: 0;
+}
+
+.kb-talking-avatar[data-expression='neutral'] .kb-talking-avatar__blink {
+  animation: kb-avatar-blink 5.8s steps(1, end) infinite;
+}
+
+/* `frames` mode: the open-mouth frame blends over the base by openness. */
+.kb-talking-avatar__mouth-frame {
+  opacity: var(--kb-mouth-open, 0);
+}
+
+/* `overlay` mode: a drawn mouth at the anchor; hidden while closed so the
+ * artwork's own mouth shows. */
+.kb-talking-avatar__mouth {
+  position: absolute;
+  top: calc(var(--kb-mouth-y, 0.68) * 100%);
+  left: calc(var(--kb-mouth-x, 0.5) * 100%);
+  width: calc(var(--kb-mouth-width, 0.22) * 100%);
+  height: auto;
+  aspect-ratio: 5 / 3;
+  overflow: visible;
+  opacity: min(1, calc(var(--kb-mouth-open, 0) * 6));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.kb-talking-avatar__mouth-lips,
+.kb-talking-avatar__mouth-cavity,
+.kb-talking-avatar__mouth-tongue {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transform: scaleY(calc(0.12 + var(--kb-mouth-open, 0) * 0.88));
+}
+
+.kb-talking-avatar__mouth-lips {
+  fill: var(--kb-avatar-mouth-lips);
+}
+
+.kb-talking-avatar__mouth-cavity {
+  fill: var(--kb-avatar-mouth-cavity);
+}
+
+.kb-talking-avatar__mouth-tongue {
+  fill: var(--kb-avatar-mouth-tongue);
+  opacity: min(1, calc(var(--kb-mouth-open, 0) * 2));
+}
+
+@keyframes kb-avatar-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-1.2%) scale(1.012);
+  }
+}
+
+@keyframes kb-avatar-blink {
+  0%,
+  95% {
+    opacity: 0;
+  }
+
+  96%,
+  98% {
+    opacity: 1;
+  }
+
+  99%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-talking-avatar__figure,
+  .kb-talking-avatar[data-expression='neutral'] .kb-talking-avatar__blink {
+    animation: none;
+  }
+
+  .kb-talking-avatar__figure,
+  .kb-talking-avatar__image {
+    transition: none;
+  }
+}
+
 /* ------------------------------------------------ charts & visualisation --
  * UI-01b (SURFACE_UI_UNIFICATION_PLAN §3.2). Stamped into kyberion-ui.css
  * after kyberion-ui.source.css by scripts/generate_design_tokens.ts.
