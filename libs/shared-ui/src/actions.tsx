@@ -13,6 +13,8 @@ export interface A2UILinkProps {
   'aria-current'?: 'page';
   'aria-disabled'?: boolean;
   'data-active'?: 'true';
+  'data-nav-id'?: string;
+  'data-tab-id'?: string;
 }
 
 export interface A2UIActionContextValue {

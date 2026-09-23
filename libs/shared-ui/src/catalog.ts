@@ -5,58 +5,40 @@ import type {
   KyberionBaseAlias,
   KyberionBaseComponentType,
 } from '@agent/core/a2ui-catalog';
+import {
+  KB_ALIASES as KB_ALIASES_SOURCE,
+  KB_RENDERED_TYPES,
+  KB_STATUS_DOMAIN_LABELS_JA as KB_STATUS_DOMAIN_LABELS_JA_SOURCE,
+  KB_STATUS_LABELS_JA as KB_STATUS_LABELS_JA_SOURCE,
+  resolveType,
+} from '../vanilla/kyberion-ui.js';
 
 /**
  * Client-safe mirror of the runtime constants in `@agent/core/a2ui-catalog`.
  *
  * The core module compiles the catalog JSON schema with ajv and reads it from
  * disk, so it must never be bundled into a browser. Only its *types* are
- * imported here; the few runtime tables a renderer needs are mirrored and
- * pinned to the core originals by `catalog.test.ts`.
+ * imported here.
+ *
+ * The component type list, alias map, status label maps and `resolveKbType`
+ * itself are NOT duplicated here: `libs/shared-ui/vanilla/kyberion-ui.js` is
+ * the single source (so both renderers stay in lock-step by construction),
+ * re-exported under this package's stronger public types. Values are pinned
+ * to the `@agent/core` originals by `renderer.test.tsx`.
  */
 
-export const KB_COMPONENT_TYPES: readonly KyberionBaseComponentType[] = [
-  'ui:app-shell',
-  'ui:page-header',
-  'ui:nav-rail',
-  'ui:tabs',
-  'ui:stack',
-  'ui:grid',
-  'ui:section',
-  'ui:next-action',
-  'ui:metric',
-  'ui:kv',
-  'ui:table',
-  'ui:list',
-  'ui:text',
-  'ui:status-pill',
-  'ui:badge',
-  'ui:callout',
-  'ui:empty-state',
-  'ui:skeleton',
-  'ui:button',
-  'ui:disclosure',
-];
+export const KB_COMPONENT_TYPES: readonly KyberionBaseComponentType[] =
+  KB_RENDERED_TYPES as readonly KyberionBaseComponentType[];
 
 export const KB_ALIASES: Readonly<Record<KyberionBaseAlias, KyberionBaseComponentType>> =
-  Object.freeze({
-    text: 'ui:text',
-    button: 'ui:button',
-    card: 'ui:section',
-    container: 'ui:stack',
-  });
+  KB_ALIASES_SOURCE as Readonly<Record<KyberionBaseAlias, KyberionBaseComponentType>>;
 
 /** Action id dispatched through `A2UIActionProvider` when a button tab is chosen without `onSelect`. */
 export const TABS_SELECT_ACTION = 'ui:tabs.select';
 
-const TYPE_SET: ReadonlySet<string> = new Set(KB_COMPONENT_TYPES);
-
 /** Resolve a catalog type or legacy alias; `null` when the type is outside the catalog. */
 export function resolveKbType(type: string): KyberionBaseComponentType | null {
-  if (TYPE_SET.has(type)) return type as KyberionBaseComponentType;
-  return Object.prototype.hasOwnProperty.call(KB_ALIASES, type)
-    ? KB_ALIASES[type as KyberionBaseAlias]
-    : null;
+  return resolveType(type) as KyberionBaseComponentType | null;
 }
 
 export const KB_STATUS_TONE_MAP: Readonly<Record<KbStatus, KbStatusTone>> = Object.freeze({
@@ -102,55 +84,18 @@ export const KB_STATUS_TONE_MAP: Readonly<Record<KbStatus, KbStatusTone>> = Obje
  * Default Japanese status labels, following the `status` namespace of
  * `user-facing-vocabulary.json` (the strings `renderStatus()` returns for
  * `ja`); a pill with an explicit `label` prop never consults this map.
+ * Sourced from `libs/shared-ui/vanilla/kyberion-ui.js` (single source).
  */
-export const KB_STATUS_LABELS_JA: Readonly<Record<KbStatus, string>> = Object.freeze({
-  active: '進行中',
-  archived: '保管済み',
-  available: '利用可能',
-  blocked: '要対応',
-  busy: '処理中',
-  completed: '完了',
-  connected: '接続済み',
-  connecting: '接続中',
-  degraded: '品質低下',
-  disconnected: '未接続',
-  distilling: '学習整理中',
-  done: '完了',
-  error: 'エラー',
-  failed: '失敗',
-  fallback: '代替',
-  fully_automatable: 'そのまま実行可能',
-  missing: '未設定',
-  missing_runtime_prerequisites: '実行環境が不足',
-  'n/a': '不要',
-  needs_assets: '外部素材が必要',
-  needs_clarification: '追加確認が必要',
-  needs_external_assets: '外部素材が必要',
-  needs_runtime_prerequisites: '実行環境が不足',
-  needs_setup: '設定が必要',
-  offline: '未接続',
-  paused: '一時停止',
-  pending: '確認待ち',
-  planned: '予定',
-  ready: '準備完了',
-  recovered: '復旧',
-  review: 'レビュー',
-  running: '稼働中',
-  stale: '応答遅延',
-  stopped: '停止',
-  unavailable: '利用不可',
-  working: '処理中',
-});
+export const KB_STATUS_LABELS_JA: Readonly<Record<KbStatus, string>> =
+  KB_STATUS_LABELS_JA_SOURCE as Readonly<Record<KbStatus, string>>;
 
-/** Domain-specific wording where the vocabulary differs from the default. */
-const DOMAIN_LABEL_OVERRIDES_JA: Partial<
-  Record<KbStatusDomain, Partial<Record<KbStatus, string>>>
-> = {
-  readiness: { ready: 'そのまま実行可能' },
-  connection: { ready: '接続済み', degraded: '接続品質が低下' },
-  provider: { ready: '利用可能', missing: '未導入', unavailable: 'エラー' },
-  mission: { blocked: '停止中' },
-};
+/**
+ * Domain-specific wording where the vocabulary differs from the default.
+ * Sourced from `libs/shared-ui/vanilla/kyberion-ui.js` (single source).
+ */
+const DOMAIN_LABEL_OVERRIDES_JA = KB_STATUS_DOMAIN_LABELS_JA_SOURCE as Readonly<
+  Record<KbStatusDomain, Readonly<Partial<Record<KbStatus, string>>>>
+>;
 
 export function isKbStatus(value: unknown): value is KbStatus {
   return (

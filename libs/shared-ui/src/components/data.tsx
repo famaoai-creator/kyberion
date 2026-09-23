@@ -9,6 +9,7 @@ import type {
   KbTextProps,
 } from '@agent/core/a2ui-catalog';
 import { defaultNavigate, useA2UIActions } from '../actions.js';
+import { isKbStatus } from '../catalog.js';
 import { KbIcon } from '../icons.js';
 import { asArray, formatScalar, safeCssLength, safeHref } from '../safety.js';
 import { KbLink } from './controls.js';
@@ -100,7 +101,7 @@ export function Table({ caption, columns, rows, row_href_key, empty }: KbTablePr
           {body.length === 0 ? (
             <tr>
               <td className="kb-table__empty" colSpan={Math.max(1, cols.length)}>
-                {empty || '表示するデータがありません'}
+                {empty || 'データがありません'}
               </td>
             </tr>
           ) : (
@@ -121,15 +122,26 @@ export function Table({ caption, columns, rows, row_href_key, empty }: KbTablePr
                       : undefined
                   }
                 >
-                  {cols.map((column) => (
-                    <td
-                      key={column.key}
-                      data-align={alignAttr(column.align)}
-                      data-mono={column.mono ? 'true' : undefined}
-                    >
-                      {formatScalar(row?.[column.key])}
-                    </td>
-                  ))}
+                  {cols.map((column) => {
+                    const value = row?.[column.key];
+                    // Convention: a `status` / `*_status` column holding a
+                    // canonical status value renders as a status pill.
+                    const isStatusColumn =
+                      column.key === 'status' || column.key.endsWith('_status');
+                    return (
+                      <td
+                        key={column.key}
+                        data-align={alignAttr(column.align)}
+                        data-mono={column.mono ? 'true' : undefined}
+                      >
+                        {isStatusColumn && isKbStatus(value) ? (
+                          <StatusPill status={value} />
+                        ) : (
+                          formatScalar(value)
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })
@@ -140,14 +152,14 @@ export function Table({ caption, columns, rows, row_href_key, empty }: KbTablePr
   );
 }
 
-/** `ui:list` → `ul.kb-list[data-variant]` of `__item` (`__body` > `__title` + `__meta`, optional status pill). */
+/** `ui:list` → `ul.kb-list[data-variant]` of `__item[data-status]` (`__body` > `__title` + `__meta`, optional status pill). */
 export function List({ items, variant }: KbListProps) {
   return (
     <ul className="kb-list" data-variant={variant === 'timeline' ? 'timeline' : 'plain'}>
       {asArray(items).map((item, index) => {
         const href = safeHref(item.href);
         return (
-          <li key={`${item.title}-${index}`} className="kb-list__item">
+          <li key={`${item.title}-${index}`} className="kb-list__item" data-status={item.status}>
             <div className="kb-list__body">
               {href ? (
                 <KbLink href={href} className="kb-list__title">
@@ -158,7 +170,7 @@ export function List({ items, variant }: KbListProps) {
               )}
               {item.meta ? <span className="kb-list__meta">{item.meta}</span> : null}
             </div>
-            {item.status ? <StatusPill status={item.status} /> : null}
+            {isKbStatus(item.status) ? <StatusPill status={item.status} /> : null}
           </li>
         );
       })}

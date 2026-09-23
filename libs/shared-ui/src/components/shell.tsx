@@ -24,8 +24,10 @@ export type AppShellProps = KbAppShellProps & {
 
 /**
  * `ui:app-shell` → `.kb-app-shell[data-density][data-theme][data-role]` with
- * `__nav` and `main.__main` slots. The token stylesheet scopes themes to
- * `:root[data-theme]`, so an explicit `theme` is also mirrored onto
+ * `__nav` and `main.__main` slots. `data-density` / `data-theme` are set only
+ * when the prop is explicitly given (page-level density/theme wins
+ * otherwise), matching the vanilla renderer. The token stylesheet scopes
+ * themes to `:root[data-theme]`, so an explicit `theme` is also mirrored onto
  * `<html>` while the shell is mounted (`system` clears it).
  */
 export function AppShell({ density, theme, role, nav, children }: AppShellProps) {
@@ -44,7 +46,7 @@ export function AppShell({ density, theme, role, nav, children }: AppShellProps)
   return (
     <div
       className="kb-app-shell"
-      data-density={density === 'compact' ? 'compact' : 'comfortable'}
+      data-density={density === 'comfortable' || density === 'compact' ? density : undefined}
       data-theme={theme === 'light' || theme === 'dark' ? theme : undefined}
       data-role={roleAttr(role)}
     >
@@ -104,6 +106,7 @@ function NavRailItem({ item }: { item: KbNavItem }) {
         <KbLink
           href={href}
           className="kb-nav-rail__item"
+          data-nav-id={item.id}
           aria-current={active ? 'page' : undefined}
           data-active={active ? 'true' : undefined}
         >
@@ -112,6 +115,7 @@ function NavRailItem({ item }: { item: KbNavItem }) {
       ) : (
         <span
           className="kb-nav-rail__item"
+          data-nav-id={item.id}
           aria-current={active ? 'page' : undefined}
           data-active={active ? 'true' : undefined}
         >
@@ -131,7 +135,7 @@ export function NavRail({
 }: KbNavRailProps & { children?: ReactNode }) {
   const footer = asArray(footer_items);
   return (
-    <nav className="kb-nav-rail" aria-label={label || 'メインメニュー'}>
+    <nav className="kb-nav-rail" aria-label={label || undefined}>
       {children}
       <ul className="kb-nav-rail__list">
         {asArray(items).map((item) => (
@@ -178,7 +182,13 @@ export function Tabs({ items, active, overflow, onSelect, label }: TabsProps) {
           const href = safeHref(item.href);
           const current = item.id === active ? 'page' : undefined;
           return href ? (
-            <KbLink key={item.id} href={href} className="kb-tabs__tab" aria-current={current}>
+            <KbLink
+              key={item.id}
+              href={href}
+              className="kb-tabs__tab"
+              data-tab-id={item.id}
+              aria-current={current}
+            >
               {item.label}
               {count(item.count)}
             </KbLink>
@@ -186,6 +196,7 @@ export function Tabs({ items, active, overflow, onSelect, label }: TabsProps) {
             <span
               key={item.id}
               className="kb-tabs__tab"
+              data-tab-id={item.id}
               aria-current={current}
               aria-disabled="true"
             >
@@ -208,6 +219,7 @@ export function Tabs({ items, active, overflow, onSelect, label }: TabsProps) {
             type="button"
             role="tab"
             className="kb-tabs__tab"
+            data-tab-id={item.id}
             aria-selected={selected}
             onClick={() => {
               if (onSelect) onSelect(item.id);

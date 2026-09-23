@@ -40,7 +40,9 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
     );
     expect(out).toContain('<div class="kb-app-shell__nav"><span>nav</span></div>');
     expect(out).toContain('<main class="kb-app-shell__main"><p>body</p></main>');
-    expect(html(<AppShell />)).toContain('data-density="comfortable"');
+    // density/theme are set only when explicitly given (page-level wins otherwise).
+    expect(html(<AppShell />)).not.toContain('data-density');
+    expect(html(<AppShell density="comfortable" />)).toContain('data-density="comfortable"');
   });
 
   it('PageHeader: titles, role badge inside the title, actions', () => {
@@ -84,14 +86,15 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
       /^<nav class="kb-nav-rail" aria-label="メニュー"><ul class="kb-nav-rail__list">/
     );
     expect(out).toContain(
-      '<a href="/" class="kb-nav-rail__item" aria-current="page" data-active="true"><span class="kb-nav-rail__icon" aria-hidden="true"><svg'
+      '<a href="/" class="kb-nav-rail__item" data-nav-id="home" aria-current="page" data-active="true"><span class="kb-nav-rail__icon" aria-hidden="true"><svg'
     );
     expect(out).toContain('<span class="kb-nav-rail__hint">今日のこと</span>');
     expect(out).toContain(
-      '<div class="kb-nav-rail__footer"><ul class="kb-nav-rail__list"><li><a href="/help" class="kb-nav-rail__item">'
+      '<div class="kb-nav-rail__footer"><ul class="kb-nav-rail__list"><li><a href="/help" class="kb-nav-rail__item" data-nav-id="help">'
     );
     expect(out).not.toContain('javascript:');
-    expect(out).toContain('<span class="kb-nav-rail__item">');
+    // Unsafe href: a non-navigating span, never an `<a>` without a target.
+    expect(out).toContain('<span class="kb-nav-rail__item" data-nav-id="x">');
   });
 
   it('Tabs: button tablist with aria-selected and counts; link bar with aria-current', () => {
@@ -107,7 +110,7 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
     );
     expect(buttons).toMatch(/^<div class="kb-tabs" data-overflow="menu" role="tablist">/);
     expect(buttons).toContain(
-      '<button type="button" role="tab" class="kb-tabs__tab" aria-selected="true">A<span class="kb-tabs__count">3</span></button>'
+      '<button type="button" role="tab" class="kb-tabs__tab" data-tab-id="a" aria-selected="true">A<span class="kb-tabs__count">3</span></button>'
     );
     expect(buttons).toContain('aria-selected="false">B</button>');
 
@@ -121,7 +124,9 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
       />
     );
     expect(links).toMatch(/^<nav class="kb-tabs" data-overflow="wrap">/);
-    expect(links).toContain('<a href="/b" class="kb-tabs__tab" aria-current="page">B</a>');
+    expect(links).toContain(
+      '<a href="/b" class="kb-tabs__tab" data-tab-id="b" aria-current="page">B</a>'
+    );
   });
 
   it('Stack and Grid: layout data attributes, invalid values dropped', () => {
@@ -272,10 +277,10 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
       />
     );
     expect(out).toMatch(
-      /^<ul class="kb-list" data-variant="timeline"><li class="kb-list__item"><div class="kb-list__body">/
+      /^<ul class="kb-list" data-variant="timeline"><li class="kb-list__item" data-status="completed"><div class="kb-list__body">/
     );
     expect(out).toContain(
-      '<a href="/m/1" class="kb-list__title">起票</a><span class="kb-list__meta">09:00</span></div><span class="kb-status-pill" data-status="completed" data-tone="success">'
+      '<a href="/m/1" class="kb-list__title">起票</a><span class="kb-list__meta">09:00</span></div><span class="kb-status-pill" data-status="completed">'
     );
     expect(out).toContain('<span class="kb-list__title">危険</span>');
     expect(out).not.toContain('data:text');
@@ -289,15 +294,19 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
     expect(html(<Text text="本文" />)).toBe('<p class="kb-text kb-text--body">本文</p>');
   });
 
-  it('StatusPill: status/tone attrs, aria-hidden icon, Japanese default label, explicit label, domain wording', () => {
+  it('StatusPill: status/domain attrs, aria-hidden icon, label span, Japanese default label, explicit label, domain wording', () => {
     expect(html(<StatusPill status="blocked" />)).toBe(
-      '<span class="kb-status-pill" data-status="blocked" data-tone="danger"><span class="kb-status-pill__icon" aria-hidden="true"></span>要対応</span>'
+      '<span class="kb-status-pill" data-status="blocked"><span class="kb-status-pill__icon" aria-hidden="true"></span><span class="kb-status-pill__label">要対応</span></span>'
     );
     expect(html(<StatusPill status="blocked" domain="mission" />)).toContain(
-      'data-domain="mission"><span class="kb-status-pill__icon" aria-hidden="true"></span>停止中</span>'
+      'data-domain="mission"><span class="kb-status-pill__icon" aria-hidden="true"></span><span class="kb-status-pill__label">停止中</span></span>'
     );
-    expect(html(<StatusPill status="running" label="動作中" />)).toContain('</span>動作中</span>');
-    expect(html(<StatusPill status={'mystery' as never} />)).toContain('data-tone="neutral"');
+    expect(html(<StatusPill status="running" label="動作中" />)).toContain(
+      '<span class="kb-status-pill__label">動作中</span>'
+    );
+    expect(html(<StatusPill status={'mystery' as never} />)).toContain(
+      'data-status="mystery"><span class="kb-status-pill__icon"'
+    );
   });
 
   it('Badge: tone and role attributes (unknown values dropped)', () => {
@@ -343,7 +352,7 @@ describe('kyberion-base React components emit the kyberion-ui.css class contract
   it('Skeleton: shape and clamped line count', () => {
     const out = html(<Skeleton shape="table" lines={2} />);
     expect(out).toBe(
-      '<div class="kb-skeleton" data-shape="table" role="status" aria-busy="true" aria-label="読み込み中"><span class="kb-skeleton__line"></span><span class="kb-skeleton__line"></span></div>'
+      '<div class="kb-skeleton" data-shape="table" role="status" aria-busy="true" aria-label="読み込み中"><span class="kb-skeleton__line" aria-hidden="true"></span><span class="kb-skeleton__line" aria-hidden="true"></span></div>'
     );
     expect(html(<Skeleton lines={999} />).match(/kb-skeleton__line/g)).toHaveLength(12);
   });
