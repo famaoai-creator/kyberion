@@ -3,6 +3,7 @@ import { isAvatarExpression, readPersonalAvatarAsset } from '@agent/core/presenc
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../../../lib/viewer-context';
 import {
   readConciergePersonal,
+  requestedAvatarSet,
   requireConciergeAvatarOwner,
 } from '../../../../../lib/personal-avatar-access';
 
@@ -14,6 +15,8 @@ const NO_STORE = { 'Cache-Control': 'no-store' };
  * PA-10: `GET /api/me/avatar/:expression` — one frame of the user's generated
  * avatar set (`<profileRoot>/avatar/`). Owner-only, fixed expression
  * allow-list (never a path), sniffed image content type, `no-store`.
+ * `?set=draft` reads the pending generation (`avatar/draft/`) for the
+ * settings preview; anything else reads the current set.
  */
 export async function GET(req: NextRequest, context: { params: Promise<{ expression: string }> }) {
   const resolved = resolveConciergeViewer(req);
@@ -28,7 +31,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ express
         { status: 404, headers: NO_STORE }
       );
     }
-    const asset = readConciergePersonal(() => readPersonalAvatarAsset(expression));
+    const kind = requestedAvatarSet(req);
+    const asset = readConciergePersonal(() => readPersonalAvatarAsset(expression, undefined, kind));
     if (!asset) {
       return NextResponse.json(
         { ok: false, error: 'Avatar frame not found.' },

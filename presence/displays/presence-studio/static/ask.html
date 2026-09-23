@@ -36,6 +36,13 @@
             aria-label="{{t:presence_studio:ask_conversation_label}}"
           >
             <div class="ask-toolbar">
+              <!-- PA-09: compact talking avatar (static/partner-avatar.js) -->
+              <div
+                class="ask-partner-avatar"
+                id="ask-avatar"
+                data-label="{{t:presence_studio:partner_avatar_label}}"
+                data-personal-label="{{t:presence_studio:partner_avatar_personal_label}}"
+              ></div>
               <div class="ask-date-separator" id="date-separator">{{t:front_desk:ask_today}}</div>
               <button
                 type="button"
@@ -158,6 +165,26 @@
       }
       if (window.KyberionAsk) {
         window.KyberionAsk.mount();
+      }
+    </script>
+    <script type="module">
+      // PA-09: the partner's talking avatar; ask.js speaks replies through it
+      // (browser audio with analyser lip-sync, speechSynthesis fallback).
+      import { mountPartnerAvatar } from '/partner-avatar.js';
+      const container = document.getElementById('ask-avatar');
+      if (container && window.KyberionAsk) {
+        window.KyberionAsk.attachAvatar(
+          mountPartnerAvatar(container, {
+            name: 'ask-partner',
+            label: container.getAttribute('data-label') || '',
+            personalLabel: container.getAttribute('data-personal-label') || '',
+            size: 'sm',
+            showState: true,
+            locale: window.KyberionPrefs
+              ? window.KyberionPrefs.locale()
+              : document.documentElement.lang,
+          })
+        );
       }
     </script>
   </body>
