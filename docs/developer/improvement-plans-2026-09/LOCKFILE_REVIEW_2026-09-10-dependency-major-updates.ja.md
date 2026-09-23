@@ -32,4 +32,4 @@ This file is the explicit review evidence required by `check:lockfile-commit-gat
   - `tailwindcss` 4 (requires PostCSS/plugin migration)
 - **Audit status**: `pnpm audit --audit-level=critical --ignore-registry-errors` expected clean on this tree.
 - pnpm-lock.yaml sha256: d88071d7c848f9eef4e68fa5c6a56c80931163c89853364232001b99b3775188
-- The accepted invocation is `PI_ALLOW_LOCKFILE_CHANGE=1 PI_LOCKFILE_REVIEW_EVIDENCE=docs/developer/improvement-plans-2026-08/LOCKFILE_REVIEW_2026-09-10-dependency-major-updates.ja.md pnpm check -- --scope pr`.
+- The accepted invocation is `PI_ALLOW_LOCKFILE_CHANGE=1 PI_LOCKFILE_REVIEW_EVIDENCE=docs/developer/improvement-plans-2026-09/LOCKFILE_REVIEW_2026-09-10-dependency-major-updates.ja.md pnpm check -- --scope pr`.
