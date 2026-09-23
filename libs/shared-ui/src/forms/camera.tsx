@@ -262,12 +262,44 @@ export function CameraCapture(p: KbCameraCaptureProps & KbFormComponentId) {
  * square-cropped preview before `onAction(action ?? 'avatar.change', { name,
  * file, source })`. The pending image lives in a ref + object URL only.
  */
+/**
+ * Draws an image Blob onto a canvas via `createImageBitmap`, so a preview of
+ * user-picked data never becomes an `src` URL in markup. Without
+ * `createImageBitmap` the canvas stays blank but keeps its accessible label.
+ */
+function BlobImage({ blob, label, className }: { blob: Blob; label: string; className: string }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || typeof createImageBitmap !== 'function') return;
+    let cancelled = false;
+    void createImageBitmap(blob)
+      .then((bitmap) => {
+        if (cancelled) {
+          bitmap.close();
+          return;
+        }
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.getContext('2d')?.drawImage(bitmap, 0, 0);
+        bitmap.close();
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [blob]);
+  return <canvas ref={canvasRef} className={className} role="img" aria-label={label} />;
+}
+
 export function AvatarPicker(p: KbAvatarPickerProps & KbFormComponentId) {
   const { t } = useKbI18n();
   const ids = useFieldIds(p.id, p.name);
   const dispatch = useFormDispatch();
   const [mode, setMode] = useState<'idle' | 'preview' | 'camera'>('idle');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // The picked image is previewed from the Blob itself (drawn on a canvas):
+  // no URL string derived from user-supplied file data ever reaches markup.
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [notice, setNotice] = useState('');
   const pendingRef = useRef<Blob | null>(null);
   const actionsRef = useRef<HTMLDivElement | null>(null);
@@ -279,11 +311,7 @@ export function AvatarPicker(p: KbAvatarPickerProps & KbFormComponentId) {
 
   const clearPending = useCallback(() => {
     pendingRef.current = null;
-    setPreviewUrl((url) => {
-      if (url && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function')
-        URL.revokeObjectURL(url);
-      return null;
-    });
+    setPreviewBlob(null);
   }, []);
 
   useEffect(() => clearPending, [clearPending]);
@@ -306,7 +334,7 @@ export function AvatarPicker(p: KbAvatarPickerProps & KbFormComponentId) {
     setMode(next);
   };
 
-  const shownUrl = mode === 'preview' ? previewUrl : imageUrl;
+  const previewAlt = t(KB_FORM_MESSAGE_KEYS.avatarPreviewAlt);
   return (
     <div
       className="kb-field kb-avatar-picker"
@@ -319,17 +347,15 @@ export function AvatarPicker(p: KbAvatarPickerProps & KbFormComponentId) {
           className="kb-avatar-picker__frame"
           data-shape={p.shape === 'square' ? 'square' : 'circle'}
         >
-          {shownUrl ? (
+          {mode === 'preview' && previewBlob ? (
+            <BlobImage className="kb-avatar-picker__image" blob={previewBlob} label={previewAlt} />
+          ) : mode !== 'preview' && imageUrl ? (
             <img
               className="kb-avatar-picker__image"
-              src={shownUrl}
+              src={imageUrl}
               loading="lazy"
               decoding="async"
-              alt={t(
-                mode === 'preview'
-                  ? KB_FORM_MESSAGE_KEYS.avatarPreviewAlt
-                  : KB_FORM_MESSAGE_KEYS.avatarCurrentAlt
-              )}
+              alt={t(KB_FORM_MESSAGE_KEYS.avatarCurrentAlt)}
             />
           ) : (
             <span
@@ -399,11 +425,7 @@ export function AvatarPicker(p: KbAvatarPickerProps & KbFormComponentId) {
                     ).then((cropped) => {
                       clearPending();
                       pendingRef.current = cropped;
-                      setPreviewUrl(
-                        typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
-                          ? URL.createObjectURL(cropped)
-                          : null
-                      );
+                      setPreviewBlob(cropped);
                       go('preview');
                     });
                   }}
