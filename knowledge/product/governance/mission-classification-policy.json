@@ -29,7 +29,7 @@
     {
       "id": "class-content-media-presentation-hint",
       "match": {
-        "mission_type_hints": ["presentation_production", "document_production"]
+        "mission_type_hints": ["presentation_production", "document_production", "video_production"]
       },
       "mission_class": "content_and_media"
     },
@@ -59,6 +59,33 @@
           "資料作成",
           "パワーポイント",
           "pptx"
+        ]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-content-media-video-intent",
+      "match": {
+        "intent_ids": [
+          "video-production",
+          "narrated-video",
+          "produce-video",
+          "video-clip",
+          "promotional-video"
+        ]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-content-media-video-utterance",
+      "match": {
+        "utterance_patterns": [
+          "動画",
+          "ビデオ",
+          "video",
+          "youtube",
+          "ナレーション動画",
+          "プロモ動画"
         ]
       },
       "mission_class": "content_and_media"

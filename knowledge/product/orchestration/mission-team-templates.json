@@ -17,7 +17,7 @@
     },
     "development": {
       "required_roles": ["owner", "orchestrator", "planner", "implementer", "reviewer", "tester"],
-      "optional_roles": ["operator", "surface_liaison"],
+      "optional_roles": ["operator", "surface_liaison", "experience_designer"],
       "lifecycle": {
         "max_parallel_members": 6,
         "max_members": 8,

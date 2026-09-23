@@ -14,6 +14,7 @@ import type {
   WorkflowPhaseGate,
   WorkflowPhaseSpec,
   WorkflowPhaseTaskSpec,
+  WorkflowPhaseTaskWhen,
 } from './mission-workflow-catalog.js';
 
 export const PROCESS_TEMPLATE_TASK_ORIGIN = 'process_template';
@@ -48,6 +49,23 @@ export interface ExpandProcessTemplateInput {
   design: Pick<MissionWorkflowDesign, 'workflow_id' | 'phase_specs'>;
   /** Mission-relative evidence directory used for generated review deliverables. */
   evidenceDirRel?: string;
+  /**
+   * Mission condition context used to evaluate `when` guards on task specs.
+   * When omitted, conditional tasks are all included (superset expansion —
+   * used by catalog validation so conditional tasks still get exercised).
+   */
+  conditions?: ProcessTemplateTaskConditions;
+}
+
+/** Structured + free-text signals a `when` guard can match against. */
+export interface ProcessTemplateTaskConditions {
+  missionClass?: string;
+  deliveryShape?: string;
+  riskProfile?: string;
+  intentId?: string;
+  taskType?: string;
+  /** Mission utterance / goal / title text scanned by `when.keywords_any`. */
+  text?: string;
 }
 
 function substitutePlaceholders(value: string, missionId: string): string {
@@ -78,6 +96,33 @@ function isReviewTask(spec: WorkflowPhaseTaskSpec, phase: WorkflowPhaseSpec): bo
   return spec.phase_kind === 'review' || (spec.phase_kind === undefined && phase.kind === 'review');
 }
 
+function matchesAnyValue(value: string | undefined, allowed: string[] | undefined): boolean {
+  if (!allowed?.length) return true;
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return allowed.some((entry) => entry.trim().toLowerCase() === normalized);
+}
+
+/** Every declared `when` field must match (AND); within a field any entry matches (OR). */
+export function taskWhenSatisfied(
+  when: WorkflowPhaseTaskWhen,
+  conditions: ProcessTemplateTaskConditions
+): boolean {
+  if (!matchesAnyValue(conditions.missionClass, when.mission_classes_any)) return false;
+  if (!matchesAnyValue(conditions.deliveryShape, when.delivery_shapes_any)) return false;
+  if (!matchesAnyValue(conditions.riskProfile, when.risk_profiles_any)) return false;
+  if (!matchesAnyValue(conditions.intentId, when.intent_ids_any)) return false;
+  if (!matchesAnyValue(conditions.taskType, when.task_types_any)) return false;
+  if (when.keywords_any?.length) {
+    const text = (conditions.text ?? '').toLowerCase();
+    const hit = when.keywords_any.some(
+      (keyword) => keyword.trim() && text.includes(keyword.trim().toLowerCase())
+    );
+    if (!hit) return false;
+  }
+  return true;
+}
+
 function defaultRole(review: boolean, spec: WorkflowPhaseTaskSpec): string {
   if (spec.team_role) return spec.team_role;
   return review ? 'reviewer' : 'worker';
@@ -99,6 +144,7 @@ export function expandProcessTemplateTasks(
   const evidenceDir = input.evidenceDirRel ?? 'evidence';
   const tasks: ProcessTemplatePlannedTask[] = [];
   const taskIdsBySuffix = new Map<string, string>();
+  const skippedSuffixes = new Set<string>();
   let previousPhaseTaskIds: string[] = [];
 
   for (const phase of phases) {
@@ -107,6 +153,10 @@ export function expandProcessTemplateTasks(
     const phaseTaskIds: string[] = [];
 
     for (const spec of specs) {
+      if (input.conditions && spec.when && !taskWhenSatisfied(spec.when, input.conditions)) {
+        skippedSuffixes.add(spec.task_id_suffix);
+        continue;
+      }
       const review = isReviewTask(spec, phase);
       const taskId = `${phase.id}-${spec.task_id_suffix}`;
       const dependencies = [...previousPhaseTaskIds];
@@ -124,6 +174,12 @@ export function expandProcessTemplateTasks(
         }
         reviewTarget = taskIdsBySuffix.get(targetSuffix);
         if (!reviewTarget) {
+          // A review whose target was conditionally skipped has nothing to
+          // review — skip it too instead of bricking the whole expansion.
+          if (skippedSuffixes.has(targetSuffix)) {
+            skippedSuffixes.add(spec.task_id_suffix);
+            continue;
+          }
           throw new Error(
             `Process template ${input.design.workflow_id}: review task ${taskId} references unknown task suffix ${targetSuffix}`
           );
