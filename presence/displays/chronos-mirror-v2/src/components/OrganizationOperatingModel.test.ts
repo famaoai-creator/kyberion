@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { organizationHealthLabel, organizationReadinessLabel } from './OrganizationOperatingModel';
+import {
+  buildOrganizationFlowProps,
+  organizationHealthLabel,
+  organizationReadinessLabel,
+} from './OrganizationOperatingModel';
 
 describe('OrganizationOperatingModel presentation helpers', () => {
   it('maps readiness to operator-facing states', () => {
@@ -21,5 +25,25 @@ describe('OrganizationOperatingModel presentation helpers', () => {
     expect(organizationHealthLabel('healthy', 'en')).toBe('healthy');
     expect(organizationHealthLabel('critical', 'ja')).toBe('重大');
     expect(organizationHealthLabel('unexpected', 'en')).toBe('unknown');
+  });
+});
+
+describe('OrganizationOperatingModel structure flow (UI-07 wave 3b)', () => {
+  it('links domains → capabilities → services with service health', () => {
+    const flow = buildOrganizationFlowProps(
+      {
+        domains: [{ domain_id: 'd', name: 'Delivery', capability_ids: ['c'], service_ids: ['s'] }],
+        capabilities: [{ capability_id: 'c', name: 'Build', service_ids: ['s'] }],
+        services: [{ service_id: 's', name: 'Web', outcome: 'o', status: 'active' }],
+        service_states: [{ service_id: 's', health: 'degraded' }],
+      },
+      'en'
+    );
+    expect(flow.nodes.map((node) => node.stage)).toEqual(['domain', 'capability', 'service']);
+    expect(flow.nodes[2]).toMatchObject({ status: 'degraded', meta: 'degraded' });
+    expect(flow.edges).toEqual([
+      { from: 'domain:d', to: 'capability:c' },
+      { from: 'capability:c', to: 'service:s' },
+    ]);
   });
 });

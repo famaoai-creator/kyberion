@@ -1,20 +1,26 @@
 import { useState } from 'react';
-import { Activity } from 'lucide-react';
-import { SurfaceStatusPanel } from './SurfaceStatusPanel';
+import { Button, Disclosure, EmptyState, KeyValue, StatusPill, Table } from '@agent/shared-ui';
 import {
   ActionDetailList,
   ActionGuidance,
   ActionStatusBadge,
-  actionButtonClass,
   buildDangerousActionPrompt,
   getActionDefinition,
   getGlobalSurfaceControlAction,
   getLatestSurfaceControlAction,
-  surfaceSummaryBadgeClass,
+  surfaceToneStatus,
   toDomId,
 } from './MissionIntelligenceViewHelpers';
 import { Panel, RuntimeCell } from './MissionIntelligencePrimitives';
-import { chronosSpeechLocale } from '../lib/ux-vocabulary';
+import {
+  FeedActions,
+  FeedItem,
+  FeedList,
+  formatDateTime,
+  formatTime,
+  loosePill,
+  metaLine,
+} from './MissionIntelligenceBFeed';
 
 export function MissionIntelligenceRuntimePanel({ context }: { context: Record<string, any> }) {
   const {
@@ -41,106 +47,110 @@ export function MissionIntelligenceRuntimePanel({ context }: { context: Record<s
   const getAvailableSurfaceActions = (payload: any, surfaceId: string) =>
     payload.controlActionAvailability.surface[surfaceId] || payload.controlActionCatalog.surface;
 
+  const globalLatestAction = getGlobalSurfaceControlAction(data.controlActions);
+  const globalRetryAction = globalLatestAction
+    ? getActionDefinition(
+        data.controlActionAvailability.globalSurface,
+        globalLatestAction.operation
+      )
+    : null;
+  const globalDisabledReason = getSharedDisabledReason(
+    data.controlActionAvailability.globalSurface
+  );
+
   return (
     <>
       <section className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
         <Panel
           id="orchestration-audit"
           visible={panelVisible('orchestration-audit')}
-          title="Orchestration Audit"
+          title={mt('chronos_mip_orchestration_audit', 'Orchestration Audit')}
         >
-          <div className="space-y-3">
-            {data.recentEvents.length === 0 ? (
-              <div className="text-[11px] italic kb-status-warning">
-                No orchestration events yet.
-              </div>
-            ) : (
-              data.recentEvents.map((event, index) => (
-                <div
+          {data.recentEvents.length === 0 ? (
+            <p className="kb-text kb-text--muted">
+              {mt('chronos_mip_no_orchestration_events', 'No orchestration events yet.')}
+            </p>
+          ) : (
+            <FeedList variant="timeline">
+              {data.recentEvents.map((event: any, index: number) => (
+                <FeedItem
                   key={`${event.ts}-${index}`}
-                  className="border-l kb-status-warning-border pl-3"
+                  title={event.decision}
+                  titleId={event.mission_id || mt('chronos_mip_system', 'system')}
+                  meta={formatDateTime(event.ts)}
                 >
-                  <div className="flex items-center gap-2 text-[11px] kb-text-muted">
-                    <Activity size={10} />
-                    <span>{event.decision}</span>
-                  </div>
-                  <div className="mt-1 text-[11px] kb-text-primary">
-                    {event.mission_id || 'system'}
-                  </div>
-                  {event.why && <div className="mt-1 text-[11px] kb-text-muted">{event.why}</div>}
-                  <div className="mt-1 text-[11px] font-mono kb-text-muted">
-                    {new Date(event.ts).toLocaleString(chronosSpeechLocale())}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                  {event.why ? <p className="kb-text kb-text--muted">{event.why}</p> : null}
+                </FeedItem>
+              ))}
+            </FeedList>
+          )}
         </Panel>
         <Panel
           id="owner-summaries"
           visible={panelVisible('owner-summaries')}
           title={mt('chronos_owner_summaries', 'Owner summaries')}
         >
-          <div className="space-y-3">
-            {data.ownerSummaries.length === 0 ? (
-              <div className="text-[11px] italic kb-status-warning">
-                {mt('chronos_no_owner_summaries', 'No owner summaries yet.')}
-              </div>
-            ) : (
-              data.ownerSummaries.map((summary, index) => (
-                <div
-                  key={`${summary.mission_id}-${summary.ts}-${index}`}
-                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-[11px] font-semibold kb-text-primary">
-                      {summary.mission_id}
-                    </div>
-                    <div className="text-[11px] font-mono kb-text-muted">
-                      {new Date(summary.ts).toLocaleString(chronosSpeechLocale())}
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-secondary">
-                    <div>
-                      accepted:{' '}
-                      <span className="font-mono kb-text-primary">{summary.accepted_count}</span>
-                    </div>
-                    <div>
-                      reviewed:{' '}
-                      <span className="font-mono kb-text-primary">{summary.reviewed_count}</span>
-                    </div>
-                    <div>
-                      completed:{' '}
-                      <span className="font-mono kb-text-primary">{summary.completed_count}</span>
-                    </div>
-                    <div>
-                      requested:{' '}
-                      <span className="font-mono kb-text-primary">{summary.requested_count}</span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+          <Table
+            columns={[
+              { key: 'mission', label: mt('chronos_mission', 'mission'), mono: true },
+              { key: 'accepted', label: mt('chronos_mip_accepted', 'accepted'), align: 'end' },
+              { key: 'reviewed', label: mt('chronos_mip_reviewed', 'reviewed'), align: 'end' },
+              { key: 'completed', label: mt('chronos_col_completed', 'completed'), align: 'end' },
+              { key: 'requested', label: mt('chronos_mip_requested', 'requested'), align: 'end' },
+              { key: 'updated', label: mt('chronos_updated', 'updated') },
+            ]}
+            rows={data.ownerSummaries.map((summary: any) => ({
+              mission: summary.mission_id,
+              accepted: summary.accepted_count,
+              reviewed: summary.reviewed_count,
+              completed: summary.completed_count,
+              requested: summary.requested_count,
+              updated: formatDateTime(summary.ts),
+            }))}
+            empty={mt('chronos_no_owner_summaries', 'No owner summaries yet.')}
+          />
         </Panel>
 
         <Panel
           id="runtime-summary"
           visible={panelVisible('runtime-summary')}
-          title="Operator Summary"
+          title={mt('chronos_mip_operator_summary', 'Operator Summary')}
+          description={mt(
+            'chronos_mip_operator_summary_description',
+            'Look at exceptions first, then mission readiness, then runtime and delivery counters. When these stay green, open governed drill-downs instead of adding controls here.'
+          )}
         >
-          <div className="mb-4 rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
-            Keep the operator loop narrow: look at exceptions first, then mission readiness, then
-            runtime and delivery counters. When these stay green, use quick actions to open governed
-            A2UI drill-downs rather than adding more controls here.
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <RuntimeCell label="ready" value={data.runtime.ready} accent="emerald" />
-            <RuntimeCell label="busy" value={data.runtime.busy} accent="gold" />
-            <RuntimeCell label="error" value={data.runtime.error} accent="red" />
-            <RuntimeCell label="leases" value={data.runtimeLeases.length} accent="cyan" />
-            <RuntimeCell label="slack outbox" value={data.surfaceOutbox.slack} accent="gold" />
-            <RuntimeCell label="chronos outbox" value={data.surfaceOutbox.chronos} accent="cyan" />
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <RuntimeCell
+              label={mt('chronos_ready', 'ready')}
+              value={data.runtime.ready}
+              accent="emerald"
+            />
+            <RuntimeCell
+              label={mt('chronos_mip_busy', 'busy')}
+              value={data.runtime.busy}
+              accent="gold"
+            />
+            <RuntimeCell
+              label={mt('chronos_mip_error', 'error')}
+              value={data.runtime.error}
+              accent="red"
+            />
+            <RuntimeCell
+              label={mt('chronos_mip_leases', 'leases')}
+              value={data.runtimeLeases.length}
+              accent="cyan"
+            />
+            <RuntimeCell
+              label={mt('chronos_mip_slack_outbox', 'slack outbox')}
+              value={data.surfaceOutbox.slack}
+              accent="gold"
+            />
+            <RuntimeCell
+              label={mt('chronos_mip_chronos_outbox', 'chronos outbox')}
+              value={data.surfaceOutbox.chronos}
+              accent="cyan"
+            />
           </div>
         </Panel>
       </section>
@@ -149,83 +159,69 @@ export function MissionIntelligenceRuntimePanel({ context }: { context: Record<s
         <Panel
           id="browser-sessions"
           visible={panelVisible('browser-sessions')}
-          title="Browser Session Oversight"
+          title={mt('chronos_mip_browser_session_oversight', 'Browser Session Oversight')}
         >
-          <div className="space-y-3">
-            {data.browserSessions.length === 0 ? (
-              <SurfaceStatusPanel
-                eyebrow="Browser Session Oversight"
-                title="No browser sessions recorded yet"
-                detail="Open a browser task or capture a session to populate the registry."
-                tone="neutral"
-              />
-            ) : (
-              data.browserSessions.map((session) => (
-                <div
+          {data.browserSessions.length === 0 ? (
+            <EmptyState
+              title={mt('chronos_mip_no_browser_sessions', 'No browser sessions recorded yet')}
+              body={mt(
+                'chronos_mip_no_browser_sessions_hint',
+                'Open a browser task or capture a session to populate the registry.'
+              )}
+            />
+          ) : (
+            <FeedList>
+              {data.browserSessions.map((session: any) => (
+                <FeedItem
                   key={session.session_id}
-                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
+                  title={session.session_id}
+                  {...loosePill(session.lease_status)}
+                  meta={metaLine([
+                    `${mt('chronos_mip_active_tab', 'active tab')}: ${session.active_tab_id}`,
+                    `${mt('chronos_mip_tabs', 'tabs')}: ${session.tab_count}`,
+                  ])}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-semibold kb-text-primary">
-                        {session.session_id}
-                      </div>
-                      <div className="mt-1 text-[11px] kb-text-muted">
-                        active tab:{' '}
-                        <span className="font-mono kb-text-secondary">{session.active_tab_id}</span>{' '}
-                        · tabs:{' '}
-                        <span className="font-mono kb-text-secondary">{session.tab_count}</span>
-                      </div>
-                    </div>
-                    <div
-                      className={`rounded-full px-2 py-1 text-[11px] ${
-                        session.lease_status === 'active'
-                          ? 'kb-surface-accent kb-text-accent'
-                          : session.lease_status === 'expired'
-                            ? 'kb-status-warning-surface kb-status-warning'
-                            : 'kb-surface-raised kb-text-secondary'
-                      }`}
-                    >
-                      {session.lease_status}
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
-                    <div>
-                      retained:{' '}
-                      <span className="font-mono kb-text-primary">{String(session.retained)}</span>
-                    </div>
-                    <div>
-                      trail:{' '}
-                      <span className="font-mono kb-text-primary">
-                        {session.action_trail_count}
-                      </span>
-                    </div>
-                    <div>
-                      updated:{' '}
-                      <span className="font-mono kb-text-primary">
-                        {new Date(session.updated_at).toLocaleTimeString(chronosSpeechLocale())}
-                      </span>
-                    </div>
-                    <div>
-                      lease expires:{' '}
-                      <span className="font-mono kb-text-primary">
-                        {session.lease_expires_at
-                          ? new Date(session.lease_expires_at).toLocaleTimeString(
-                              chronosSpeechLocale()
-                            )
-                          : 'n/a'}
-                      </span>
-                    </div>
-                  </div>
-                  {session.last_trace_path && (
-                    <div className="mt-2 text-[11px] kb-text-muted">
-                      trace:{' '}
-                      <span className="font-mono kb-text-secondary">{session.last_trace_path}</span>
-                    </div>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
+                  <KeyValue
+                    items={[
+                      {
+                        label: mt('chronos_mip_retained', 'retained'),
+                        value: String(session.retained),
+                        mono: true,
+                      },
+                      {
+                        label: mt('chronos_mip_trail', 'trail'),
+                        value: session.action_trail_count,
+                        mono: true,
+                      },
+                      {
+                        label: mt('chronos_updated', 'updated'),
+                        value: formatTime(session.updated_at),
+                      },
+                      {
+                        label: mt('chronos_mip_lease_expires', 'lease expires'),
+                        value: session.lease_expires_at
+                          ? formatTime(session.lease_expires_at)
+                          : 'n/a',
+                      },
+                      ...(session.last_trace_path
+                        ? [
+                            {
+                              label: mt('chronos_mip_trace', 'trace'),
+                              value: session.last_trace_path,
+                              mono: true,
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                  <FeedActions>
+                    <Button
+                      label={
+                        browserSessionTarget === `${session.session_id}:close_browser_session`
+                          ? mt('chronos_mip_closing', 'closing')
+                          : mt('chronos_mip_close_session', 'close session')
+                      }
+                      variant="secondary"
                       onClick={() =>
                         runBrowserSessionControl(session.session_id, 'close_browser_session')
                       }
@@ -233,106 +229,86 @@ export function MissionIntelligenceRuntimePanel({ context }: { context: Record<s
                         browserSessionTarget === `${session.session_id}:close_browser_session` ||
                         session.lease_status !== 'active'
                       }
-                      className="rounded-lg border kb-border-subtle kb-surface-raised/5 px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {browserSessionTarget === `${session.session_id}:close_browser_session`
-                        ? 'closing'
-                        : 'close session'}
-                    </button>
-                    <button
-                      type="button"
+                    />
+                    <Button
+                      label={
+                        browserSessionTarget === `${session.session_id}:restart_browser_session`
+                          ? mt('chronos_mip_restarting', 'restarting')
+                          : mt('chronos_mip_restart_session', 'restart session')
+                      }
+                      variant="secondary"
                       onClick={() =>
                         runBrowserSessionControl(session.session_id, 'restart_browser_session')
                       }
                       disabled={
                         browserSessionTarget === `${session.session_id}:restart_browser_session`
                       }
-                      className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {browserSessionTarget === `${session.session_id}:restart_browser_session`
-                        ? 'restarting'
-                        : 'restart session'}
-                    </button>
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    <div className="text-[11px] kb-text-muted">recent browser trail</div>
+                    />
+                  </FeedActions>
+                  <Disclosure
+                    summary={`${mt('chronos_mip_recent_browser_trail', 'recent browser trail')} (${session.recent_actions.length})`}
+                  >
                     {session.recent_actions.length === 0 ? (
-                      <div className="text-[11px] kb-text-muted">No recorded browser actions.</div>
+                      <p className="kb-text kb-text--muted">
+                        {mt('chronos_mip_no_browser_actions', 'No recorded browser actions.')}
+                      </p>
                     ) : (
-                      session.recent_actions.map((action, index) => (
-                        <div
-                          key={`${session.session_id}-${action.ts}-${index}`}
-                          className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="text-[11px] kb-text-muted">
-                              {action.kind} · {action.op}
-                            </div>
-                            <div className="text-[11px] font-mono kb-text-muted">
-                              {new Date(action.ts).toLocaleTimeString(chronosSpeechLocale())}
-                            </div>
-                          </div>
-                          <div className="mt-1 text-[11px] kb-text-muted">
-                            {action.tab_id && (
-                              <span className="mr-2">
-                                tab:{' '}
-                                <span className="font-mono kb-text-secondary">{action.tab_id}</span>
-                              </span>
-                            )}
-                            {action.ref && (
-                              <span className="mr-2">
-                                ref:{' '}
-                                <span className="font-mono kb-text-secondary">{action.ref}</span>
-                              </span>
-                            )}
-                            {action.selector && (
-                              <span>
-                                selector:{' '}
-                                <span className="font-mono kb-text-muted">{action.selector}</span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))
+                      <FeedList variant="timeline">
+                        {session.recent_actions.map((action: any, index: number) => (
+                          <FeedItem
+                            key={`${session.session_id}-${action.ts}-${index}`}
+                            title={`${action.kind} · ${action.op}`}
+                            meta={metaLine([
+                              formatTime(action.ts),
+                              action.tab_id && `${mt('chronos_mip_tab', 'tab')}: ${action.tab_id}`,
+                              action.ref && `${mt('chronos_mip_ref', 'ref')}: ${action.ref}`,
+                              action.selector &&
+                                `${mt('chronos_mip_selector', 'selector')}: ${action.selector}`,
+                            ])}
+                          />
+                        ))}
+                      </FeedList>
                     )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                  </Disclosure>
+                </FeedItem>
+              ))}
+            </FeedList>
+          )}
         </Panel>
 
         <Panel
           id="browser-guidance"
           visible={panelVisible('browser-guidance')}
-          title="Browser Guidance"
+          title={mt('chronos_mip_browser_guidance', 'Browser Guidance')}
+          description={mt(
+            'chronos_mip_browser_guidance_description',
+            'Browser sessions stay fast only while they are leased. Prefer snapshot + ref, then export recorded trails as Playwright specs in either strict or hint mode.'
+          )}
         >
-          <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[11px] leading-5 kb-text-muted">
-            Browser sessions stay fast only while they are leased. Prefer `snapshot + ref`, then
-            export recorded trails as Playwright specs in either strict or hint mode.
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <RuntimeCell
-              label="browser sessions"
+              label={mt('chronos_mip_browser_sessions', 'browser sessions')}
               value={data.browserSessions.length}
               accent="cyan"
             />
             <RuntimeCell
-              label="active leases"
+              label={mt('chronos_mip_active_leases', 'active leases')}
               value={
-                data.browserSessions.filter((session) => session.lease_status === 'active').length
+                data.browserSessions.filter((session: any) => session.lease_status === 'active')
+                  .length
               }
               accent="emerald"
             />
             <RuntimeCell
-              label="retained"
-              value={data.browserSessions.filter((session) => session.retained).length}
+              label={mt('chronos_mip_retained', 'retained')}
+              value={data.browserSessions.filter((session: any) => session.retained).length}
               accent="gold"
             />
             <RuntimeCell
-              label="expired"
+              label={mt('chronos_mip_expired', 'expired')}
               value={
-                data.browserSessions.filter((session) => session.lease_status === 'expired').length
+                data.browserSessions.filter((session: any) => session.lease_status === 'expired')
+                  .length
               }
               accent="red"
             />
@@ -341,79 +317,52 @@ export function MissionIntelligenceRuntimePanel({ context }: { context: Record<s
         <Panel
           id="browser-conversation-sessions"
           visible={panelVisible('browser-conversation-sessions')}
-          title="Browser Tasks"
+          title={mt('chronos_mip_browser_tasks', 'Browser Tasks')}
         >
-          <div className="space-y-3">
-            {data.browserConversationSessions.length === 0 ? (
-              <SurfaceStatusPanel
-                eyebrow="Browser Tasks"
-                title="No browser tasks recorded yet"
-                detail="Start a task from the browser surface to capture guided confirmations and result state."
-                tone="neutral"
-              />
-            ) : (
-              data.browserConversationSessions.map((session) => (
-                <div
+          {data.browserConversationSessions.length === 0 ? (
+            <EmptyState
+              title={mt('chronos_mip_no_browser_tasks', 'No browser tasks recorded yet')}
+              body={mt(
+                'chronos_mip_no_browser_tasks_hint',
+                'Start a task from the browser surface to capture guided confirmations and result state.'
+              )}
+            />
+          ) : (
+            <FeedList>
+              {data.browserConversationSessions.map((session: any) => (
+                <FeedItem
                   key={session.session_id}
-                  className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
+                  title={session.goal_summary || session.session_id}
+                  titleId={session.session_id}
+                  {...loosePill(session.status)}
+                  meta={metaLine([
+                    `${mt('chronos_mip_surface', 'surface')}: ${session.surface}`,
+                    `${mt('chronos_mip_mode', 'mode')}: ${session.mode}`,
+                    formatTime(session.updated_at),
+                  ])}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-semibold kb-text-primary">
-                        {session.session_id}
-                      </div>
-                      <div className="mt-1 text-[11px] kb-text-muted">
-                        surface:{' '}
-                        <span className="font-mono kb-text-secondary">{session.surface}</span> ·
-                        mode: <span className="font-mono kb-text-secondary">{session.mode}</span>
-                      </div>
-                    </div>
-                    <div
-                      className={`rounded-full px-2 py-1 text-[11px] ${
-                        session.status === 'completed'
-                          ? 'kb-status-positive-surface kb-status-positive'
-                          : session.status === 'awaiting_confirmation'
-                            ? 'kb-status-warning-surface kb-status-warning'
-                            : session.status === 'failed'
-                              ? 'kb-status-negative-surface kb-status-negative'
-                              : 'kb-surface-accent kb-text-accent'
-                      }`}
-                    >
-                      {session.status}
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] kb-text-muted">
-                    <div>
-                      intent:{' '}
-                      <span className="kb-text-primary">{session.goal_summary || 'n/a'}</span>
-                    </div>
-                    <div>
-                      current step:{' '}
-                      <span className="kb-text-primary">{session.active_step || 'n/a'}</span>
-                    </div>
-                    <div>
-                      waiting for confirmation:{' '}
-                      <span className="font-mono kb-text-primary">
-                        {String(session.pending_confirmation)}
-                      </span>
-                    </div>
-                    <div>
-                      available actions:{' '}
-                      <span className="font-mono kb-text-primary">
-                        {session.candidate_target_count}
-                      </span>
-                    </div>
-                    <div>
-                      updated:{' '}
-                      <span className="font-mono kb-text-primary">
-                        {new Date(session.updated_at).toLocaleTimeString(chronosSpeechLocale())}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                  <KeyValue
+                    items={[
+                      {
+                        label: mt('chronos_mip_current_step', 'current step'),
+                        value: session.active_step || 'n/a',
+                      },
+                      {
+                        label: mt('chronos_mip_waiting_confirmation', 'waiting for confirmation'),
+                        value: String(session.pending_confirmation),
+                        mono: true,
+                      },
+                      {
+                        label: mt('chronos_mip_available_actions', 'available actions'),
+                        value: session.candidate_target_count,
+                        mono: true,
+                      },
+                    ]}
+                  />
+                </FeedItem>
+              ))}
+            </FeedList>
+          )}
         </Panel>
       </section>
 
@@ -423,270 +372,223 @@ export function MissionIntelligenceRuntimePanel({ context }: { context: Record<s
             <Panel
               id="surface-control"
               visible={panelVisible('surface-control')}
-              title="Surface Control"
-            >
-              <div className="mb-3 flex flex-wrap gap-2">
-                {(() => {
-                  const latestAction = getGlobalSurfaceControlAction(data.controlActions);
-                  const retryAction = latestAction
-                    ? getActionDefinition(
-                        data.controlActionAvailability.globalSurface,
-                        latestAction.operation
-                      )
-                    : null;
-                  return latestAction ? (
+              title={mt('chronos_mip_surface_control', 'Surface Control')}
+              description={globalDisabledReason || undefined}
+              actions={
+                <>
+                  {globalLatestAction ? (
                     <>
-                      <div className="mr-2 flex items-center rounded-lg border kb-border-subtle kb-surface-raised px-3 py-1.5 text-[11px] kb-text-muted">
-                        {mt('chronos_surfaces', 'surfaces')}
-                        <span className="ml-2">{latestAction.operation}</span>
-                        <span className="ml-2">
-                          <ActionStatusBadge action={latestAction} />
-                        </span>
-                      </div>
-                      {latestAction.event_id && (
-                        <button
-                          type="button"
+                      <ActionStatusBadge action={globalLatestAction} />
+                      {globalLatestAction.event_id ? (
+                        <Button
+                          label={
+                            expandedGlobalSurfaceActionId === globalLatestAction.event_id
+                              ? mt('chronos_hide_latest_action', 'hide latest action')
+                              : mt('chronos_show_latest_action', 'show latest action')
+                          }
+                          variant="ghost"
                           onClick={() =>
                             setExpandedGlobalSurfaceActionId((current) =>
-                              current === latestAction.event_id
+                              current === globalLatestAction.event_id
                                 ? null
-                                : latestAction.event_id || null
+                                : globalLatestAction.event_id || null
                             )
                           }
-                          className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
-                        >
-                          {expandedGlobalSurfaceActionId === latestAction.event_id
-                            ? mt('chronos_hide_latest_action', 'hide latest action')
-                            : mt('chronos_show_latest_action', 'show latest action')}
-                        </button>
-                      )}
-                      {latestAction.status === 'failed' && (
-                        <button
-                          type="button"
-                          onClick={() => runSurfaceControl(null, latestAction.operation)}
-                          disabled={
-                            !retryAction?.enabled ||
-                            surfaceActionTarget === `all:${latestAction.operation}`
+                        />
+                      ) : null}
+                      {globalLatestAction.status === 'failed' ? (
+                        <Button
+                          label={
+                            surfaceActionTarget === `all:${globalLatestAction.operation}`
+                              ? mt('chronos_retrying', 'retrying')
+                              : mt('chronos_retry_latest_action', 'retry latest action')
                           }
-                          title={retryAction?.disabledReason}
-                          className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[11px] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {surfaceActionTarget === `all:${latestAction.operation}`
-                            ? mt('chronos_retrying', 'retrying')
-                            : mt('chronos_retry_latest_action', 'retry latest action')}
-                        </button>
-                      )}
+                          variant="danger"
+                          onClick={() => runSurfaceControl(null, globalLatestAction.operation)}
+                          disabled={
+                            !globalRetryAction?.enabled ||
+                            surfaceActionTarget === `all:${globalLatestAction.operation}`
+                          }
+                        />
+                      ) : null}
                     </>
-                  ) : null;
-                })()}
-                {data.controlActionAvailability.globalSurface.map((action) => (
-                  <button
-                    key={action.operation}
-                    type="button"
-                    onClick={() => runSurfaceControl(null, action.operation)}
-                    disabled={!action.enabled || surfaceActionTarget === `all:${action.operation}`}
-                    title={action.disabledReason}
-                    className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {surfaceActionTarget === `all:${action.operation}` ? 'working' : action.label}
-                  </button>
-                ))}
-                {getSharedDisabledReason(data.controlActionAvailability.globalSurface) && (
-                  <div className="w-full text-[11px] kb-text-muted">
-                    {getSharedDisabledReason(data.controlActionAvailability.globalSurface)}
-                  </div>
-                )}
-              </div>
-              {(() => {
-                const latestAction = getGlobalSurfaceControlAction(data.controlActions);
-                return latestAction?.event_id &&
-                  expandedGlobalSurfaceActionId === latestAction.event_id ? (
-                  <div className="mb-3">
-                    <ActionDetailList
-                      actionId={latestAction.event_id}
-                      details={data.controlActionDetails}
+                  ) : null}
+                  {data.controlActionAvailability.globalSurface.map((action: any) => (
+                    <Button
+                      key={action.operation}
+                      label={
+                        surfaceActionTarget === `all:${action.operation}`
+                          ? mt('chronos_working', 'working')
+                          : action.label
+                      }
+                      variant="secondary"
+                      onClick={() => runSurfaceControl(null, action.operation)}
+                      disabled={
+                        !action.enabled || surfaceActionTarget === `all:${action.operation}`
+                      }
                     />
-                    <ActionGuidance
-                      latestAction={latestAction}
-                      availableActions={data.controlActionAvailability.globalSurface}
-                    />
-                  </div>
-                ) : null;
-              })()}
-              <div className="space-y-3">
-                {data.surfaces.length === 0 ? (
-                  <div className="text-[11px] italic kb-status-warning">
-                    {mt('chronos_no_managed_surfaces', 'No managed surfaces.')}
-                  </div>
-                ) : (
-                  data.surfaces.map((surface) => {
+                  ))}
+                </>
+              }
+            >
+              {globalLatestAction?.event_id &&
+              expandedGlobalSurfaceActionId === globalLatestAction.event_id ? (
+                <div className="flex flex-col gap-2">
+                  <ActionDetailList
+                    actionId={globalLatestAction.event_id}
+                    details={data.controlActionDetails}
+                  />
+                  <ActionGuidance
+                    latestAction={globalLatestAction}
+                    availableActions={data.controlActionAvailability.globalSurface}
+                  />
+                </div>
+              ) : null}
+              {data.surfaces.length === 0 ? (
+                <p className="kb-text kb-text--muted">
+                  {mt('chronos_no_managed_surfaces', 'No managed surfaces.')}
+                </p>
+              ) : (
+                <FeedList>
+                  {data.surfaces.map((surface: any) => {
                     const surfaceActions = getAvailableSurfaceActions(data, surface.id);
                     const safeSurfaceActions = getActionsByRisk(surfaceActions, 'safe');
                     const riskySurfaceActions = getActionsByRisk(surfaceActions, 'risky');
                     const safeDisabledReason = getSharedDisabledReason(safeSurfaceActions);
                     const riskyDisabledReason = getSharedDisabledReason(riskySurfaceActions);
+                    const latestAction = getLatestSurfaceControlAction(
+                      data.controlActions,
+                      surface.id
+                    );
+                    const retryAction = latestAction
+                      ? getActionDefinition(surfaceActions, latestAction.operation)
+                      : null;
+                    const health = loosePill(surface.health);
                     return (
-                      <div
+                      <FeedItem
                         id={toDomId('surface', surface.id)}
                         key={surface.id}
-                        className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3"
+                        title={surface.id}
+                        status={health.status}
+                        statusLabel={health.statusLabel || surface.health}
+                        meta={metaLine([
+                          surface.kind,
+                          surface.startupMode || mt('chronos_background', 'background'),
+                          surface.running
+                            ? mt('chronos_running', 'running')
+                            : mt('chronos_stopped', 'stopped'),
+                          `pid: ${surface.pid ?? '-'}`,
+                          surface.detail && `${mt('chronos_detail', 'detail')}: ${surface.detail}`,
+                        ])}
                       >
-                        {(() => {
-                          const latestAction = getLatestSurfaceControlAction(
-                            data.controlActions,
-                            surface.id
-                          );
-                          return latestAction ? (
-                            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2">
-                              <div className="text-[11px] kb-text-muted">
-                                {mt('chronos_last_control_action', 'last control action')}
-                              </div>
-                              <ActionStatusBadge action={latestAction} />
-                            </div>
-                          ) : null;
-                        })()}
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-[11px] font-semibold kb-text-primary">
-                              {surface.id}
-                            </div>
-                            <div className="mt-1 text-[11px] kb-text-muted">
-                              {surface.kind} ·{' '}
-                              {surface.startupMode || mt('chronos_background', 'background')} ·{' '}
-                              {surface.running
-                                ? mt('chronos_running', 'running')
-                                : mt('chronos_stopped', 'stopped')}
-                            </div>
-                          </div>
-                          <div
-                            className={`rounded-full px-2 py-1 text-[11px] ${
-                              surface.health === 'healthy'
-                                ? 'kb-status-positive-surface kb-status-positive'
-                                : surface.health === 'unhealthy'
-                                  ? 'kb-status-negative-surface kb-status-negative'
-                                  : 'kb-status-warning-surface kb-status-warning'
-                            }`}
-                          >
-                            {surface.health}
-                          </div>
-                        </div>
-                        <div className="mt-2 text-[11px] kb-text-muted">
-                          pid:{' '}
-                          <span className="font-mono kb-text-secondary">{surface.pid ?? '-'}</span>
-                          {surface.detail ? (
+                        <KeyValue
+                          items={[
+                            {
+                              label: mt('chronos_control_summary', 'control summary'),
+                              value: surface.controlSummary,
+                            },
+                            ...(surface.controlRequestedBy
+                              ? [
+                                  {
+                                    label: mt('chronos_requested_by', 'requested by'),
+                                    value: surface.controlRequestedBy,
+                                    mono: true,
+                                  },
+                                ]
+                              : []),
+                          ]}
+                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <StatusPill
+                            status={surfaceToneStatus(surface.controlTone)}
+                            label={surface.controlSummary}
+                          />
+                          {latestAction ? (
                             <>
-                              {' '}
-                              · {mt('chronos_detail', 'detail')}:{' '}
-                              <span className="font-mono kb-text-secondary">{surface.detail}</span>
+                              <span className="kb-text kb-text--caption">
+                                {mt('chronos_last_control_action', 'last control action')}
+                              </span>
+                              <ActionStatusBadge action={latestAction} />
                             </>
                           ) : null}
                         </div>
-                        <div className="mt-3 flex items-center gap-2">
-                          <div
-                            className={`rounded-full px-2 py-1 text-[11px] ${surfaceSummaryBadgeClass(surface.controlTone)}`}
-                          >
-                            {surface.controlSummary}
-                          </div>
-                          <div className="text-[11px] kb-text-muted">
-                            {mt('chronos_control_summary', 'control summary')}
-                          </div>
-                          {surface.controlRequestedBy && (
-                            <div className="text-[11px] kb-text-muted">
-                              {mt('chronos_requested_by', 'requested by')}{' '}
-                              <span className="font-mono kb-text-secondary">
-                                {surface.controlRequestedBy}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {(() => {
-                            const latestAction = getLatestSurfaceControlAction(
-                              data.controlActions,
-                              surface.id
-                            );
-                            const retryAction = latestAction
-                              ? getActionDefinition(surfaceActions, latestAction.operation)
-                              : null;
-                            if (!latestAction?.event_id) return null;
-                            return (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setExpandedSurfaceCardActionId((current) =>
-                                      current === latestAction.event_id
-                                        ? null
-                                        : latestAction.event_id || null
-                                    )
-                                  }
-                                  className="rounded-lg border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent transition hover:kb-surface-accent"
-                                >
-                                  {expandedSurfaceCardActionId === latestAction.event_id
-                                    ? mt('chronos_hide_latest_action', 'hide latest action')
-                                    : mt('chronos_show_latest_action', 'show latest action')}
-                                </button>
-                                {latestAction.status === 'failed' && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      runSurfaceControl(surface.id, latestAction.operation)
-                                    }
-                                    disabled={
-                                      !retryAction?.enabled ||
-                                      surfaceActionTarget ===
-                                        `${surface.id}:${latestAction.operation}`
-                                    }
-                                    title={retryAction?.disabledReason}
-                                    className="rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-1 text-[11px] kb-status-negative transition hover:kb-status-negative-surface disabled:cursor-not-allowed disabled:opacity-40"
-                                  >
-                                    {surfaceActionTarget ===
-                                    `${surface.id}:${latestAction.operation}`
-                                      ? mt('chronos_retrying', 'retrying')
-                                      : mt('chronos_retry_latest_action', 'retry latest action')}
-                                  </button>
-                                )}
-                              </>
-                            );
-                          })()}
-                          <div className="flex flex-wrap gap-2 rounded-lg border kb-status-positive-border kb-status-positive-surface px-2 py-2">
-                            <div className="w-full text-[11px] kb-status-positive">
-                              {mt('chronos_safe_actions', 'safe actions')}
-                            </div>
-                            {safeSurfaceActions.map((action) => (
-                              <button
+                        <FeedActions>
+                          {latestAction?.event_id ? (
+                            <Button
+                              label={
+                                expandedSurfaceCardActionId === latestAction.event_id
+                                  ? mt('chronos_hide_latest_action', 'hide latest action')
+                                  : mt('chronos_show_latest_action', 'show latest action')
+                              }
+                              variant="ghost"
+                              onClick={() =>
+                                setExpandedSurfaceCardActionId((current: string | null) =>
+                                  current === latestAction.event_id
+                                    ? null
+                                    : latestAction.event_id || null
+                                )
+                              }
+                            />
+                          ) : null}
+                          {latestAction?.event_id && latestAction.status === 'failed' ? (
+                            <Button
+                              label={
+                                surfaceActionTarget === `${surface.id}:${latestAction.operation}`
+                                  ? mt('chronos_retrying', 'retrying')
+                                  : mt('chronos_retry_latest_action', 'retry latest action')
+                              }
+                              variant="danger"
+                              onClick={() => runSurfaceControl(surface.id, latestAction.operation)}
+                              disabled={
+                                !retryAction?.enabled ||
+                                surfaceActionTarget === `${surface.id}:${latestAction.operation}`
+                              }
+                            />
+                          ) : null}
+                        </FeedActions>
+                        <div className="flex flex-col gap-1">
+                          <span className="kb-text kb-text--caption">
+                            {mt('chronos_safe_actions', 'safe actions')}
+                          </span>
+                          <FeedActions>
+                            {safeSurfaceActions.map((action: any) => (
+                              <Button
                                 key={action.operation}
-                                type="button"
+                                label={
+                                  surfaceActionTarget === `${surface.id}:${action.operation}`
+                                    ? mt('chronos_working', 'working')
+                                    : action.label
+                                }
+                                variant="secondary"
                                 onClick={() => runSurfaceControl(surface.id, action.operation)}
                                 disabled={
                                   !action.enabled ||
                                   surfaceActionTarget === `${surface.id}:${action.operation}`
                                 }
-                                title={action.disabledReason}
-                                className={actionButtonClass('safe')}
-                              >
-                                {surfaceActionTarget === `${surface.id}:${action.operation}`
-                                  ? mt('chronos_working', 'working')
-                                  : action.label}
-                              </button>
+                              />
                             ))}
-                            {safeDisabledReason && (
-                              <div className="w-full text-[11px] kb-text-muted">
-                                {safeDisabledReason}
-                              </div>
+                          </FeedActions>
+                          {safeDisabledReason ? (
+                            <span className="kb-list__meta">{safeDisabledReason}</span>
+                          ) : null}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="kb-text kb-text--caption">
+                            {mt(
+                              'chronos_risky_actions_approval_required',
+                              'risky actions · approval required'
                             )}
-                          </div>
-                          <div className="flex flex-wrap gap-2 rounded-lg border kb-status-negative-border kb-status-negative-surface px-2 py-2">
-                            <div className="w-full text-[11px] kb-status-negative">
-                              {mt(
-                                'chronos_risky_actions_approval_required',
-                                'risky actions · approval required'
-                              )}
-                            </div>
-                            {riskySurfaceActions.map((action) => (
-                              <button
+                          </span>
+                          <FeedActions>
+                            {riskySurfaceActions.map((action: any) => (
+                              <Button
                                 key={action.operation}
-                                type="button"
+                                label={
+                                  surfaceActionTarget === `${surface.id}:${action.operation}`
+                                    ? mt('chronos_working', 'working')
+                                    : action.label
+                                }
+                                variant="danger"
                                 onClick={() => {
                                   const prompt = buildDangerousActionPrompt(
                                     `surface ${surface.id}`,
@@ -704,45 +606,31 @@ export function MissionIntelligenceRuntimePanel({ context }: { context: Record<s
                                   !action.enabled ||
                                   surfaceActionTarget === `${surface.id}:${action.operation}`
                                 }
-                                title={action.disabledReason}
-                                className={actionButtonClass('risky')}
-                              >
-                                {surfaceActionTarget === `${surface.id}:${action.operation}`
-                                  ? mt('chronos_working', 'working')
-                                  : action.label}
-                              </button>
+                              />
                             ))}
-                            {riskyDisabledReason && (
-                              <div className="w-full text-[11px] kb-text-muted">
-                                {riskyDisabledReason}
-                              </div>
-                            )}
-                          </div>
+                          </FeedActions>
+                          {riskyDisabledReason ? (
+                            <span className="kb-list__meta">{riskyDisabledReason}</span>
+                          ) : null}
                         </div>
-                        {(() => {
-                          const latestAction = getLatestSurfaceControlAction(
-                            data.controlActions,
-                            surface.id
-                          );
-                          return latestAction?.event_id &&
-                            expandedSurfaceCardActionId === latestAction.event_id ? (
-                            <>
-                              <ActionDetailList
-                                actionId={latestAction.event_id}
-                                details={data.controlActionDetails}
-                              />
-                              <ActionGuidance
-                                latestAction={latestAction}
-                                availableActions={surfaceActions}
-                              />
-                            </>
-                          ) : null;
-                        })()}
-                      </div>
+                        {latestAction?.event_id &&
+                        expandedSurfaceCardActionId === latestAction.event_id ? (
+                          <>
+                            <ActionDetailList
+                              actionId={latestAction.event_id}
+                              details={data.controlActionDetails}
+                            />
+                            <ActionGuidance
+                              latestAction={latestAction}
+                              availableActions={surfaceActions}
+                            />
+                          </>
+                        ) : null}
+                      </FeedItem>
                     );
-                  })
-                )}
-              </div>
+                  })}
+                </FeedList>
+              )}
             </Panel>
           ) : null}
 
@@ -750,13 +638,12 @@ export function MissionIntelligenceRuntimePanel({ context }: { context: Record<s
             id="control-model"
             visible={panelVisible('control-model')}
             title={mt('chronos_control_model', 'Control Model')}
+            description={mt(
+              'chronos_control_model_description',
+              'Chronos is a control surface. It does not mutate mission or runtime state directly. Each button issues a deterministic backend action through mission_controller, agent-runtime-supervisor, or surface_runtime, then refreshes the control-plane view.'
+            )}
           >
-            <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-4 text-[11px] leading-6 kb-text-muted">
-              {mt(
-                'chronos_control_model_description',
-                'Chronos is a control surface. It does not mutate mission or runtime state directly. Each button issues a deterministic backend action through mission_controller, agent-runtime-supervisor, or surface_runtime, then refreshes the control-plane view.'
-              )}
-            </div>
+            {null}
           </Panel>
         </section>
       ) : null}

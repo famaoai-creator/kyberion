@@ -187,17 +187,81 @@ export const KB_STATUS_TONES: Readonly<Record<KbStatus, KbStatusTone>> = Object.
   stopped: 'neutral',
 });
 
+/**
+ * Status glyph families (UI final round): the pill / chart glyph says what
+ * KIND of state it is, independent of the tone color — a running item must
+ * not wear the "done" check mark. Every canonical status belongs to exactly
+ * one family; `kyberion-ui.css` is generated from this map and the vanilla
+ * renderer's `KB_STATUS_GLYPHS` (charts.js) is pinned to it by test.
+ */
+export type KbStatusFamily =
+  'done' | 'running' | 'waiting' | 'paused' | 'degraded' | 'failed' | 'idle';
+
+/** One glyph per family (plain characters; the CSS generator escapes them). */
+export const KB_STATUS_FAMILY_GLYPHS: Readonly<Record<KbStatusFamily, string>> = Object.freeze({
+  done: '\u2713',
+  running: '\u25D0',
+  waiting: '!',
+  paused: '\u2016',
+  degraded: '\u25B2',
+  failed: '\u2715',
+  idle: '\u25CB',
+});
+
+export const KB_STATUS_FAMILIES: Readonly<Record<KbStatus, KbStatusFamily>> = Object.freeze({
+  ready: 'done',
+  fully_automatable: 'done',
+  connected: 'done',
+  available: 'done',
+  done: 'done',
+  completed: 'done',
+  recovered: 'done',
+  running: 'running',
+  active: 'running',
+  connecting: 'running',
+  working: 'running',
+  busy: 'running',
+  distilling: 'running',
+  review: 'waiting',
+  needs_clarification: 'waiting',
+  needs_external_assets: 'waiting',
+  needs_assets: 'waiting',
+  needs_setup: 'waiting',
+  missing_runtime_prerequisites: 'waiting',
+  needs_runtime_prerequisites: 'waiting',
+  pending: 'waiting',
+  paused: 'paused',
+  degraded: 'degraded',
+  fallback: 'degraded',
+  stale: 'degraded',
+  blocked: 'failed',
+  missing: 'failed',
+  error: 'failed',
+  unavailable: 'failed',
+  failed: 'failed',
+  disconnected: 'failed',
+  offline: 'failed',
+  'n/a': 'idle',
+  planned: 'idle',
+  archived: 'idle',
+  stopped: 'idle',
+});
+
 export interface KbAction {
   id: string;
   payload?: Record<string, unknown>;
 }
 
-/** A labelled link or action; exactly one of `href` / `action`. */
+/**
+ * A labelled link or action; exactly one of `href` / `action`. `action` is
+ * either a full `{ id, payload? }` or just the action id (dispatched to the
+ * host's `onAction` without a payload).
+ */
 export type KbActionRef = {
   label: string;
   variant?: KbButtonVariant;
   disabled?: boolean;
-} & ({ href: string; action?: never } | { action: KbAction; href?: never });
+} & ({ href: string; action?: never } | { action: KbAction | string; href?: never });
 
 export interface KbNavItem {
   id: string;
@@ -261,6 +325,8 @@ export interface KbTabsProps {
   items: Array<{ id: string; label: string; count?: number; href?: string }>;
   active?: string;
   overflow?: 'wrap' | 'menu';
+  /** `primary` (default) = underlined page tabs; `secondary` = pill-style sub-navigation. */
+  variant?: 'primary' | 'secondary';
 }
 
 export interface KbStackProps {
@@ -315,10 +381,33 @@ export interface KbTableColumn {
   width?: string;
 }
 
+/** `ui:table` rich cell: a title with an optional mono id line (and link). */
+export interface KbTableTitleCell {
+  title: string;
+  id?: string;
+  href?: string;
+}
+
+/** `ui:table` rich cell: a status pill. */
+export interface KbTableStatusCell {
+  status: KbStatus;
+  label?: string;
+  domain?: KbStatusDomain;
+}
+
+/** `ui:table` rich cell: a badge. */
+export interface KbTableBadgeCell {
+  badge: string;
+  tone?: KbTone;
+}
+
+export type KbTableScalar = string | number | boolean | null;
+export type KbTableCell = KbTableScalar | KbTableTitleCell | KbTableStatusCell | KbTableBadgeCell;
+
 export interface KbTableProps {
   caption?: string;
   columns: KbTableColumn[];
-  rows: Array<Record<string, string | number | boolean | null>>;
+  rows: Array<Record<string, KbTableCell>>;
   row_href_key?: string;
   empty?: string;
 }
@@ -407,7 +496,10 @@ export const KB_DISPLAY_CONTROLS_ACTIONS = Object.freeze({
 export interface KbDisplayControlsProps {
   theme?: 'system' | 'light' | 'dark';
   locale?: string;
-  /** Language choices (label in its own language). Default: 日本語 / English. */
+  /**
+   * Language choices (label in its own language). Default: Japanese and
+   * English, each shown by its endonym (`Intl.DisplayNames`).
+   */
   locales?: Array<{ value: string; label: string }>;
 }
 
@@ -725,6 +817,13 @@ export interface KbMeterProps {
   max?: number;
   unit?: string;
   thresholds?: Array<{ value: number; tone: 'success' | 'warning' | 'danger' }>;
+  /**
+   * `lower_is_better` (default; usage against a limit: "Near the limit",
+   * "Over the limit") or `higher_is_better` (rates such as completion:
+   * "On track", "Below target"). Only the state words change; the tone is
+   * always the highest threshold at or below `value`.
+   */
+  direction?: 'higher_is_better' | 'lower_is_better';
   description?: string;
   empty?: string;
 }

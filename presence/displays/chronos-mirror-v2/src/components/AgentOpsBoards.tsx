@@ -1,7 +1,20 @@
 'use client';
 
 import * as React from 'react';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
+import {
+  Badge,
+  Button,
+  Callout,
+  Section,
+  Select,
+  Skeleton,
+  StatusPill,
+  Table,
+  TextField,
+} from '@agent/shared-ui';
 import { AgentCollaborationBoard } from './AgentCollaborationBoard';
+import { ChronosFieldScope, ChronosInline, ChronosMeta, ChronosToolbar } from './chronos-ui';
 import { ChronosOffice } from './ChronosOffice';
 import { LiveTerminalDrawer } from './LiveTerminalDrawer';
 import { useChronosLocale } from '../lib/hooks';
@@ -54,6 +67,30 @@ type Board = {
   entries: Entry[];
   agents: Array<{ agent_id: string; active: number; blocked: number; in_review: number }>;
 };
+
+/** Work-item status → canonical `ui:status-pill` status. */
+const STATUS_PILL: Record<string, KbStatus> = {
+  backlog: 'planned',
+  ready: 'ready',
+  in_progress: 'working',
+  review: 'review',
+  done: 'done',
+};
+
+/** Tenant › organization › project › mission › task, with missing links marked. */
+export function lineageLine(entry: Entry, locale: SupportedLocale): string {
+  const missing = uxText('chronos_lineage_missing', locale);
+  const parts = [
+    `${uxText('chronos_tenant', locale)}: ${entry.tenant_slug || missing}`,
+    `${uxText('chronos_lineage_organization', locale)}: ${entry.organization_id || missing}`,
+    `${uxText('chronos_lineage_project', locale)}: ${entry.project_id || missing}`,
+    `${uxText('chronos_lineage_mission', locale)}: ${entry.mission_id || missing}`,
+    `${uxText('chronos_lineage_task', locale)}: ${entry.task_id || missing}`,
+  ];
+  if (entry.phase) parts.push(`${uxText('chronos_phase', locale)}: ${entry.phase}`);
+  if (entry.work_shape) parts.push(`${uxText('chronos_work_shape', locale)}: ${entry.work_shape}`);
+  return parts.join(' · ');
+}
 
 const STATUS_LABEL_KEY: Record<string, string> = {
   backlog: 'chronos_status_backlog',
@@ -126,7 +163,13 @@ export function AgentOpsBoards({
 
   const tenants = React.useMemo(
     () =>
-      Array.from(new Set((board?.entries || []).map((entry) => entry.tenant_slug).filter(Boolean))),
+      Array.from(
+        new Set(
+          (board?.entries || [])
+            .map((entry) => entry.tenant_slug)
+            .filter((slug): slug is string => Boolean(slug))
+        )
+      ),
     [board]
   );
 
@@ -155,73 +198,155 @@ export function AgentOpsBoards({
 
   const visibleActivityEntries = showAllActivity ? activityEntries : activityEntries.slice(0, 6);
   const attentionCount = (board?.entries || []).filter((entry) => entry.blockers.length > 0).length;
-  const activitySummary = (
-    <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold kb-text-primary">
-            {uxText('chronos_activity_summary_title', locale)}
-          </div>
-          <div className="mt-1 text-[11px] kb-text-secondary">
-            {uxText('chronos_activity_summary_detail', locale)}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2 text-[11px]">
-          <span className="rounded-full kb-status-warning-surface px-2 py-1 kb-status-warning">
-            {uxText('chronos_attention', locale)} {attentionCount}
-          </span>
-          <span className="rounded-full kb-surface-raised px-2 py-1 kb-text-secondary">
-            {uxText('chronos_activity_visible_count', locale)} {activityEntries.length}
-          </span>
-        </div>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <input
-          value={activityQuery}
-          onChange={(event) => {
-            setActivityQuery(event.target.value);
-            setShowAllActivity(false);
-          }}
-          placeholder={uxText('chronos_activity_search_placeholder', locale)}
-          aria-label={uxText('chronos_activity_search_label', locale)}
-          className="min-w-[220px] flex-1 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-primary placeholder:kb-text-muted"
-        />
-        <select
-          value={activityFilter}
-          onChange={(event) => {
-            setActivityFilter(event.target.value as typeof activityFilter);
-            setShowAllActivity(false);
-          }}
-          aria-label={uxText('chronos_activity_filter_label', locale)}
-          className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-primary"
-        >
-          <option value="all">{uxText('chronos_activity_filter_all', locale)}</option>
-          <option value="attention">{uxText('chronos_activity_filter_attention', locale)}</option>
-          <option value="active">{uxText('chronos_activity_filter_active', locale)}</option>
-        </select>
-      </div>
-    </div>
-  );
+
+  const onFieldChange = (name: string, value: unknown) => {
+    const text = typeof value === 'string' ? value : '';
+    if (name === 'activity_query') {
+      setActivityQuery(text);
+      setShowAllActivity(false);
+    } else if (name === 'activity_filter') {
+      if (text === 'all' || text === 'attention' || text === 'active') setActivityFilter(text);
+      setShowAllActivity(false);
+    } else if (name === 'activity_tenant') {
+      setTenant(text);
+    }
+  };
 
   return (
-    <div className="flex flex-col gap-6">
-      {activitySummary}
-      <details className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
-        <summary className="cursor-pointer text-sm font-semibold kb-text-primary">
-          {uxText('chronos_operations_details_title', locale)}
-          <span className="ml-2 text-[11px] font-normal kb-text-muted">
-            {uxText('chronos_operations_details_hint', locale)}
-          </span>
-        </summary>
-        <div className="mt-4 flex flex-col gap-6">
-          <AgentCollaborationBoard
-            tenant={tenant}
-            onOpenMission={onOpenMission}
-            onOpenView={onOpenView}
+    <div className="chronos-stack">
+      <Section
+        title={uxText('chronos_activity_summary_title', locale)}
+        description={uxText('chronos_activity_summary_detail', locale)}
+      >
+        <ChronosFieldScope onChange={onFieldChange}>
+          <ChronosToolbar>
+            <TextField
+              name="activity_query"
+              type="search"
+              label={uxText('chronos_activity_search_label', locale)}
+              hide_label
+              value={activityQuery}
+              placeholder={uxText('chronos_activity_search_placeholder', locale)}
+            />
+            <Select
+              name="activity_filter"
+              label={uxText('chronos_activity_filter_label', locale)}
+              hide_label
+              value={activityFilter}
+              options={[
+                { value: 'all', label: uxText('chronos_activity_filter_all', locale) },
+                { value: 'attention', label: uxText('chronos_activity_filter_attention', locale) },
+                { value: 'active', label: uxText('chronos_activity_filter_active', locale) },
+              ]}
+            />
+            {!scopedTenant ? (
+              <Select
+                name="activity_tenant"
+                label={uxText('chronos_tenant', locale)}
+                hide_label
+                value={tenant}
+                options={[
+                  { value: '', label: uxText('chronos_all_tenants', locale) },
+                  ...tenants.map((slug) => ({ value: slug, label: slug })),
+                ]}
+              />
+            ) : null}
+            <div className="chronos-toolbar__end">
+              <ChronosInline>
+                <Badge
+                  tone={attentionCount > 0 ? 'warning' : 'neutral'}
+                  label={`${uxText('chronos_attention', locale)} ${attentionCount}`}
+                />
+                <Badge
+                  label={`${uxText('chronos_activity_visible_count', locale)} ${activityEntries.length}`}
+                />
+              </ChronosInline>
+            </div>
+          </ChronosToolbar>
+        </ChronosFieldScope>
+
+        {error ? <Callout tone="danger" title={error} /> : null}
+
+        {!board && !error ? (
+          <Skeleton shape="table" lines={4} />
+        ) : (
+          <Table
+            columns={[
+              { key: 'work', label: uxText('chronos_ops_col_work', locale) },
+              { key: 'agent', label: uxText('chronos_col_agent', locale), width: '14rem' },
+              { key: 'status', label: uxText('chronos_col_status', locale), width: '8rem' },
+              { key: 'blockers', label: uxText('chronos_ops_col_blockers', locale) },
+              { key: 'actions', label: uxText('chronos_ops_col_actions', locale), align: 'end' },
+            ]}
+            row_key="id"
+            empty={uxText('chronos_activity_no_matches', locale)}
+            rows={visibleActivityEntries.map((entry) => ({
+              id: entry.item_id,
+              work: (
+                <span className="chronos-work-cell">
+                  <span className="chronos-work-cell__title">{entry.title}</span>
+                  <ChronosMeta mono>{lineageLine(entry, locale)}</ChronosMeta>
+                </span>
+              ),
+              agent: (
+                <span className="chronos-work-cell">
+                  <span>{agentIdLabel(entry.agent_id, locale)}</span>
+                  {entry.team_role ? <ChronosMeta>{entry.team_role}</ChronosMeta> : null}
+                </span>
+              ),
+              status: (
+                <StatusPill
+                  status={STATUS_PILL[entry.status] || 'n/a'}
+                  label={statusLabel(entry.status)}
+                />
+              ),
+              blockers:
+                entry.blockers.length > 0 ? (
+                  <ChronosInline>
+                    {entry.blockers.map((blocker, index) => (
+                      <Badge
+                        key={index}
+                        tone={blocker.kind === 'review_wait' ? 'neutral' : 'warning'}
+                        label={blockerLabel(blocker, locale)}
+                      />
+                    ))}
+                  </ChronosInline>
+                ) : (
+                  '-'
+                ),
+              actions:
+                entry.agent_id !== UNASSIGNED_AGENT_ID ? (
+                  <Button
+                    label={uxText('chronos_live_terminal', locale)}
+                    variant="ghost"
+                    onClick={() =>
+                      setTerminal({
+                        agentId: entry.agent_id,
+                        itemId: entry.item_id,
+                        missionId: entry.mission_id,
+                      })
+                    }
+                  />
+                ) : (
+                  ''
+                ),
+            }))}
           />
-          <ChronosOffice tenant={tenant} />
-        </div>
-      </details>
+        )}
+        {activityEntries.length > 6 ? (
+          <ChronosInline>
+            <Button
+              variant="ghost"
+              label={uxText(
+                showAllActivity ? 'chronos_activity_show_less' : 'chronos_activity_show_all',
+                locale
+              )}
+              onClick={() => setShowAllActivity((current) => !current)}
+            />
+          </ChronosInline>
+        ) : null}
+      </Section>
+
       {terminal ? (
         <LiveTerminalDrawer
           agentId={terminal.agentId}
@@ -230,146 +355,38 @@ export function AgentOpsBoards({
           onClose={() => setTerminal(null)}
         />
       ) : null}
-      <div className="flex items-center gap-3">
-        <div className="text-xs font-bold kb-text-secondary">
-          {uxText('chronos_agent_activity', locale)}
-        </div>
-        {!scopedTenant ? (
-          <select
-            value={tenant}
-            onChange={(event) => setTenant(event.target.value)}
-            className="rounded border kb-border-subtle kb-surface-well px-2 py-1 text-[11px] kb-text-primary"
-          >
-            <option value="">{uxText('chronos_all_tenants', locale)}</option>
-            {tenants.map((slug) => (
-              <option key={slug} value={slug as string}>
-                {slug}
-              </option>
-            ))}
-          </select>
-        ) : null}
-        {error ? <span className="text-[11px] kb-status-negative">{error}</span> : null}
-      </div>
 
-      {/* エージェント別サマリ */}
-      <div className="flex flex-wrap gap-2">
-        {(board?.agents || []).map((agent) => (
-          <div
-            key={agent.agent_id}
-            className="rounded-xl border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px]"
-          >
-            <span className="font-bold kb-text-primary">
-              {agentIdLabel(agent.agent_id, locale)}
-            </span>
-            <span className="ml-2 kb-text-accent">稼働 {agent.active}</span>
-            <span className="ml-2 kb-status-warning">
-              {uxText('chronos_blocked_count', locale)} {agent.blocked}
-            </span>
-            <span className="ml-2 kb-text-muted">
-              {uxText('chronos_review_waiting', locale)} {agent.in_review}
-            </span>
-          </div>
-        ))}
+      <Section
+        title={uxText('chronos_agent_activity', locale)}
+        description={uxText('chronos_ops_agents_description', locale)}
+      >
         {(board?.agents || []).length === 0 ? (
-          <div className="text-[11px] kb-text-muted">
-            {uxText('chronos_no_active_agent_work', locale)}
-          </div>
-        ) : null}
-      </div>
+          <p className="kb-text kb-text--muted">{uxText('chronos_no_active_agent_work', locale)}</p>
+        ) : (
+          <Table
+            columns={[
+              { key: 'agent', label: uxText('chronos_col_agent', locale) },
+              { key: 'active', label: uxText('chronos_ops_col_active', locale), align: 'end' },
+              { key: 'blocked', label: uxText('chronos_blocked_count', locale), align: 'end' },
+              { key: 'in_review', label: uxText('chronos_review_waiting', locale), align: 'end' },
+            ]}
+            row_key="agent"
+            rows={(board?.agents || []).map((agent) => ({
+              agent: agentIdLabel(agent.agent_id, locale),
+              active: agent.active,
+              blocked: agent.blocked,
+              in_review: agent.in_review,
+            }))}
+          />
+        )}
+      </Section>
 
-      {/* 現在のタスクとブロッカー */}
-      <div className="grid gap-2">
-        {visibleActivityEntries.map((entry) => (
-          <div
-            key={entry.item_id}
-            className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3 text-[12px]"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold kb-text-primary">
-                {agentIdLabel(entry.agent_id, locale)}
-              </span>
-              {entry.team_role ? (
-                <span className="rounded-full border kb-border-subtle px-2 text-[11px] kb-text-muted">
-                  {entry.team_role}
-                </span>
-              ) : null}
-              <span className="kb-text-secondary">{entry.title}</span>
-              <span className="ml-auto rounded-full border kb-border-accent px-2 text-[11px] kb-text-accent">
-                {statusLabel(entry.status)}
-              </span>
-            </div>
-            <div className="mt-1 text-[11px] kb-text-muted">
-              {entry.tenant_slug
-                ? `${uxText('chronos_tenant', locale)}: ${entry.tenant_slug}`
-                : `${uxText('chronos_tenant', locale)}: ${uxText('chronos_lineage_missing', locale)}`}
-              {entry.organization_id
-                ? ` · ${uxText('chronos_lineage_organization', locale)}: ${entry.organization_id}`
-                : ` · ${uxText('chronos_lineage_organization', locale)}: ${uxText('chronos_lineage_missing', locale)}`}
-              {entry.project_id
-                ? ` · ${uxText('chronos_lineage_project', locale)}: ${entry.project_id}`
-                : ` · ${uxText('chronos_lineage_project', locale)}: ${uxText('chronos_lineage_missing', locale)}`}
-              {entry.mission_id
-                ? ` · ${uxText('chronos_lineage_mission', locale)}: ${entry.mission_id}`
-                : ` · ${uxText('chronos_lineage_mission', locale)}: ${uxText('chronos_lineage_missing', locale)}`}
-              {entry.task_id
-                ? ` · ${uxText('chronos_lineage_task', locale)}: ${entry.task_id}`
-                : ` · ${uxText('chronos_lineage_task', locale)}: ${uxText('chronos_lineage_missing', locale)}`}
-              {entry.phase ? ` · ${uxText('chronos_phase', locale)}: ${entry.phase}` : ''}
-              {entry.work_shape
-                ? ` · ${uxText('chronos_work_shape', locale)}: ${entry.work_shape}`
-                : ''}
-            </div>
-            {entry.blockers.length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {entry.blockers.map((blocker, index) => (
-                  <span
-                    key={index}
-                    className={`rounded-lg px-2 py-1 text-[11px] ${
-                      blocker.kind === 'review_wait'
-                        ? 'kb-surface-raised kb-text-secondary'
-                        : 'kb-status-warning-surface kb-status-warning'
-                    }`}
-                  >
-                    🚧 {blockerLabel(blocker, locale)}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            {entry.agent_id !== UNASSIGNED_AGENT_ID ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setTerminal({
-                    agentId: entry.agent_id,
-                    itemId: entry.item_id,
-                    missionId: entry.mission_id,
-                  })
-                }
-                className="mt-2 rounded border kb-border-subtle px-2 py-1 text-[11px] kb-text-accent"
-              >
-                {uxText('chronos_live_terminal', locale)}
-              </button>
-            ) : null}
-          </div>
-        ))}
-        {activityEntries.length === 0 ? (
-          <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
-            {uxText('chronos_activity_no_matches', locale)}
-          </div>
-        ) : null}
-        {activityEntries.length > 6 ? (
-          <button
-            type="button"
-            onClick={() => setShowAllActivity((current) => !current)}
-            className="justify-self-start rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-accent"
-          >
-            {uxText(
-              showAllActivity ? 'chronos_activity_show_less' : 'chronos_activity_show_all',
-              locale
-            )}
-          </button>
-        ) : null}
-      </div>
+      <AgentCollaborationBoard
+        tenant={tenant}
+        onOpenMission={onOpenMission}
+        onOpenView={onOpenView}
+      />
+      <ChronosOffice tenant={tenant} onOpenMission={onOpenMission} />
     </div>
   );
 }

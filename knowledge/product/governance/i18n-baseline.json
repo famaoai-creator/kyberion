@@ -156,7 +156,6 @@
     "libs/actuators/voice-actuator/src/index.ts": 10,
     "libs/actuators/voice-actuator/src/voice-action-helpers.ts": 4,
     "satellites/voice-hub/server.ts": 1,
-    "presence/displays/chronos-mirror-v2/src/app/ChronosMirrorShell.tsx": 10,
     "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-observation-data.ts": 2,
     "presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts": 3,
     "presence/displays/chronos-mirror-v2/src/app/chronos-page-config.ts": 1,

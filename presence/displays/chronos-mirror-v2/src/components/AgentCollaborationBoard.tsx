@@ -1,6 +1,23 @@
 'use client';
 
 import * as React from 'react';
+import type { KbFlowProps, KbSequenceProps, KbStatus } from '@agent/core/a2ui-catalog';
+import {
+  Badge,
+  Button,
+  Callout,
+  Disclosure,
+  KbChart,
+  KeyValue,
+  List,
+  Metric,
+  Section,
+  Select,
+  Skeleton,
+  StatusPill,
+  Tabs,
+  isKbStatus,
+} from '@agent/shared-ui';
 import { useChronosLocale } from '../lib/hooks';
 import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
 import {
@@ -13,14 +30,16 @@ import {
 } from '../lib/collaboration-response';
 import { formatElapsedDuration, shortNodeLabel } from '../lib/collaboration-tree-format';
 import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
+import {
+  ChronosDiagram,
+  ChronosFieldScope,
+  ChronosInline,
+  ChronosMeta,
+  ChronosToolbar,
+} from './chronos-ui';
+import { humanizeMissionId } from './ChronosOffice';
 
 type CollaborationProjection = ClientCollaborationProjection;
-
-const TREE_NODE_GLYPH: Record<ClientCollaborationTreeNode['type'], string> = {
-  mission: '◆',
-  task: '▸',
-  agent: '●',
-};
 
 const TREE_WAIT_LABEL_KEY: Record<ClientCollaborationWaitReason, string> = {
   approval_pending: 'chronos_ac_wait_approval_pending',
@@ -173,22 +192,157 @@ export function attentionActionForKind(kind: string): CollaborationAttentionActi
   }
 }
 
-function Stat({
-  label,
-  value,
-  tone = 'kb-text-primary',
-}: {
-  label: string;
-  value: number;
-  tone?: string;
-}) {
-  return (
-    <div className="rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2">
-      <div className="text-[11px] kb-text-muted">{label}</div>
-      <div className={`mt-1 text-lg font-semibold ${tone}`}>{value}</div>
-    </div>
-  );
+const NODE_STAGE_KEY: Record<ClientCollaborationTreeNode['type'], string> = {
+  mission: 'chronos_ac_stage_mission',
+  task: 'chronos_ac_stage_task',
+  agent: 'chronos_ac_stage_agent',
+};
+
+const ACTIVE_NODE_STATES = new Set([
+  'active',
+  'busy',
+  'claimed',
+  'dispatched',
+  'in_progress',
+  'progress',
+  'running',
+  'started',
+]);
+const DONE_NODE_STATES = new Set(['complete', 'completed', 'done']);
+const FAILED_NODE_STATES = new Set(['error', 'failed']);
+const STOPPED_NODE_STATES = new Set(['cancelled', 'canceled']);
+
+/** Collaboration node state (+ open waits) → canonical `ui:status-pill` status. */
+export function collaborationNodeStatus(
+  node: Pick<ClientCollaborationTreeNode, 'state' | 'waiting_on'>
+): KbStatus | undefined {
+  if (node.waiting_on.some((wait) => wait.reason === 'blocked')) return 'blocked';
+  if (node.waiting_on.some((wait) => wait.reason === 'stale')) return 'stale';
+  if (node.waiting_on.length > 0) return 'pending';
+  const state = (node.state || '').toLowerCase();
+  if (!state) return undefined;
+  if (ACTIVE_NODE_STATES.has(state)) return 'working';
+  if (DONE_NODE_STATES.has(state)) return 'done';
+  if (FAILED_NODE_STATES.has(state)) return 'failed';
+  if (STOPPED_NODE_STATES.has(state)) return 'stopped';
+  return isKbStatus(state) ? state : undefined;
 }
+
+const EVENT_KIND_STATUS: Record<string, KbStatus> = {
+  dispatch: 'working',
+  claim: 'working',
+  spawn: 'working',
+  progress: 'working',
+  waiting: 'pending',
+  approval: 'pending',
+  blocked: 'blocked',
+  review: 'review',
+  retry: 'degraded',
+  failure: 'failed',
+  completion: 'done',
+};
+
+/** Collaboration event kind → canonical status (undefined for neutral kinds such as handoff). */
+export function collaborationEventStatus(kind: string): KbStatus | undefined {
+  return EVENT_KIND_STATUS[kind];
+}
+
+/**
+ * The collaboration tree as a `ui:flow`: mission → task → agent stages,
+ * parent → child edges, status from the node state / open waits.
+ */
+export function buildCollaborationFlowProps(
+  rows: ReadonlyArray<{ node: ClientCollaborationTreeNode }>,
+  locale: SupportedLocale
+): KbFlowProps {
+  const nodes: KbFlowProps['nodes'] = [];
+  const edges: NonNullable<KbFlowProps['edges']> = [];
+  for (const { node } of rows) {
+    const providerRole = providerRoleCell(node);
+    const meta = [
+      providerRole === '-' ? '' : providerRole,
+      node.elapsed_ms === undefined ? '' : formatElapsedDuration(node.elapsed_ms),
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    const status = collaborationNodeStatus(node);
+    nodes.push({
+      id: node.id,
+      label:
+        node.type === 'mission'
+          ? humanizeMissionId(shortNodeLabel(node.label || node.id))
+          : node.label || shortNodeLabel(node.id),
+      stage: node.type,
+      ...(status ? { status } : {}),
+      ...(meta ? { meta } : {}),
+    });
+    for (const child of node.children) edges.push({ from: node.id, to: child.id });
+  }
+  return {
+    nodes,
+    edges,
+    stages: (['mission', 'task', 'agent'] as const).map((id) => ({
+      id,
+      label: uxText(NODE_STAGE_KEY[id], locale),
+    })),
+    density: 'compact',
+  };
+}
+
+/**
+ * The latest handoff edges as a `ui:sequence` (who sent what to whom, in
+ * time order), labelled with the localized event kind.
+ */
+export function buildCollaborationSequenceProps(
+  projection: Pick<CollaborationProjection, 'edges' | 'events'>,
+  locale: SupportedLocale,
+  limit = 12,
+  nodeTypes: ReadonlyMap<string, ClientCollaborationTreeNode['type']> = new Map()
+): KbSequenceProps {
+  const tsByEvent = new Map(projection.events.map((event) => [event.event_id, event.ts]));
+  // Messages are exchanged between agents / humans; the structural
+  // mission → task → agent edges already show in the tree, so drop them
+  // whenever agent-to-agent traffic exists.
+  const isStructural = (id: string) => {
+    const type = nodeTypes.get(id);
+    return type === 'mission' || type === 'task';
+  };
+  const messageEdges = projection.edges.filter(
+    (edge) => !isStructural(edge.from) && !isStructural(edge.to)
+  );
+  const edges = (messageEdges.length > 0 ? messageEdges : projection.edges)
+    .slice(-limit)
+    .map((edge, index) => ({ edge, index, ts: tsByEvent.get(edge.event_id) || '' }))
+    .sort((left, right) => left.ts.localeCompare(right.ts) || left.index - right.index);
+  const participants: Array<{ id: string; label: string }> = [];
+  const seen = new Set<string>();
+  const addParticipant = (id: string) => {
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    participants.push({ id, label: shortNodeLabel(id) });
+  };
+  for (const { edge } of edges) {
+    addParticipant(edge.from);
+    addParticipant(edge.to);
+  }
+  return {
+    participants,
+    messages: edges.map(({ edge, ts }) => {
+      const status = collaborationEventStatus(edge.kind);
+      return {
+        from: edge.from,
+        to: edge.to,
+        label: collaborationKindLabel(edge.kind, locale),
+        ...(ts ? { at: ts.slice(11, 19) } : {}),
+        ...(status ? { status } : {}),
+      };
+    }),
+    density: 'compact',
+    empty: uxText('chronos_ac_no_graph', locale),
+  };
+}
+
+type BoardTab = 'attention' | 'tree' | 'messages' | 'timeline';
 
 /** Read-only projection of human/agent collaboration state. */
 export function AgentCollaborationBoard({
@@ -213,6 +367,7 @@ export function AgentCollaborationBoard({
   const [missionId, setMissionId] = React.useState('');
   const [refreshing, setRefreshing] = React.useState(false);
   const [expandedTreeNodeId, setExpandedTreeNodeId] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<BoardTab | null>(null);
   const schedulerRef = React.useRef<LiveSyncScheduler<CollaborationProjection> | null>(null);
 
   const refresh = React.useCallback(() => {
@@ -299,426 +454,423 @@ export function AgentCollaborationBoard({
     };
     return flattenCollaborationTreeRows(sorted);
   }, [tree]);
-  const hasTreeNodes = treeRows.length > 0;
-  return (
-    <section className="rounded-lg border kb-border-accent kb-surface-accent p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div>
-          <div className="text-xs font-bold kb-text-accent">
-            {uxText('chronos_ac_title', locale)}
-          </div>
-          <div className="mt-1 text-[11px] kb-text-muted">
-            {uxText('chronos_ac_description', locale)}
-          </div>
-        </div>
-        <div className="w-full rounded-xl border kb-border-subtle kb-surface-raised px-3 py-3">
-          <div className="text-[11px] font-bold kb-text-muted">
-            {uxText('chronos_ac_guide_title', locale)}
-          </div>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              ['chronos_ac_guide_who', 'chronos_ac_guide_who_detail'],
-              ['chronos_ac_guide_what', 'chronos_ac_guide_what_detail'],
-              ['chronos_ac_guide_next', 'chronos_ac_guide_next_detail'],
-              ['chronos_ac_guide_act', 'chronos_ac_guide_act_detail'],
-            ].map(([labelKey, detailKey]) => (
-              <div
-                key={labelKey}
-                className="rounded-lg border kb-border-subtle kb-surface-sunken px-2 py-2"
-              >
-                <div className="text-[11px] font-bold kb-text-accent">
-                  {uxText(labelKey, locale)}
-                </div>
-                <div className="mt-1 text-[11px] kb-text-secondary">
-                  {uxText(detailKey, locale)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-2">
-          <label
-            className="text-[11px] font-bold kb-text-muted"
-            htmlFor="chronos-collaboration-mission-filter"
-          >
-            {uxText('chronos_ac_filter_mission', locale)}
-          </label>
-          <select
-            id="chronos-collaboration-mission-filter"
-            value={missionId}
-            onChange={(event) => setMissionId(event.target.value)}
-            className="min-w-48 rounded-lg border kb-border-subtle kb-surface-raised px-2 py-1.5 text-[11px] kb-text-primary"
-          >
-            <option value="">{uxText('chronos_ac_filter_all_missions', locale)}</option>
-            {missionOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            disabled={refreshing}
-            className="rounded-lg border kb-border-accent kb-surface-accent px-3 py-1.5 text-[11px] font-bold kb-text-accent disabled:opacity-50"
-          >
-            {refreshing
-              ? uxText('chronos_ac_refreshing', locale)
-              : uxText('chronos_ac_refresh', locale)}
-          </button>
-          {projection?.generated_at ? (
-            <span className="ml-auto text-[11px] kb-text-muted">
-              {uxText('chronos_ac_updated', locale)} {projection.generated_at.slice(11, 19)}
-            </span>
-          ) : null}
-        </div>
-        {projection?.partial ? (
-          <span className="rounded-full border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[11px] kb-status-warning">
-            {uxText('chronos_ac_status_attention', locale)}
-          </span>
-        ) : null}
-        {projection?.status_flags.length ? (
-          <div className="flex flex-wrap gap-1 text-[11px] kb-status-warning">
-            {projection.status_flags.map((flag) => (
-              <span key={flag} className="rounded-full border kb-status-warning-border px-2 py-1">
-                {flag === 'sequence_gap'
-                  ? uxText('chronos_ac_flag_sequence_gap', locale)
-                  : flag === 'stale_runtime'
-                    ? uxText('chronos_ac_flag_stale_runtime', locale)
-                    : uxText('chronos_ac_flag_unknown_event', locale)}
-              </span>
-            ))}
-          </div>
-        ) : null}
-        {projection?.status_flags.includes('stale_runtime') && onOpenView ? (
-          <button
-            type="button"
-            onClick={() => onOpenView('runtime-topology-map')}
-            className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[11px] kb-status-warning hover:kb-status-warning-surface"
-          >
-            {uxText('chronos_ac_check_runtime', locale)}
-          </button>
-        ) : null}
-        {error ? <span className="text-[11px] kb-status-negative">{error}</span> : null}
-        <span className="ml-auto rounded-full border kb-border-subtle kb-surface-raised px-2 py-1 text-[11px] kb-text-muted">
-          {uxText('chronos_ac_scope', locale)}: {tenant || uxText('chronos_ac_scope_all', locale)}
-        </span>
+  const flowProps = React.useMemo(
+    () => buildCollaborationFlowProps(treeRows, locale),
+    [treeRows, locale]
+  );
+  const sequenceProps = React.useMemo(
+    () =>
+      projection
+        ? buildCollaborationSequenceProps(
+            projection,
+            locale,
+            12,
+            new Map(
+              treeRows.flatMap(({ node }) => [
+                [node.id, node.type] as const,
+                [shortNodeLabel(node.id), node.type] as const,
+              ])
+            )
+          )
+        : null,
+    [projection, locale, treeRows]
+  );
+  const attentionCount = projection?.attention.length ?? 0;
+  const activeTab: BoardTab = tab ?? (attentionCount > 0 ? 'attention' : 'tree');
+
+  const waitLabels = (node: ClientCollaborationTreeNode) =>
+    node.waiting_on.map((wait) => uxText(TREE_WAIT_LABEL_KEY[wait.reason], locale)).join(', ');
+
+  const metrics: Array<{ key: string; label: string; value: number; tone?: string }> = overview
+    ? [
+        {
+          key: 'missions',
+          label: uxText('chronos_ac_stat_missions', locale),
+          value: overview.missions,
+        },
+        { key: 'tasks', label: uxText('chronos_ac_stat_tasks', locale), value: overview.tasks },
+        { key: 'agents', label: uxText('chronos_ac_stat_agents', locale), value: overview.agents },
+        {
+          key: 'active',
+          label: uxText('chronos_ac_stat_active', locale),
+          value: overview.active,
+          tone: 'accent',
+        },
+        {
+          key: 'blocked',
+          label: uxText('chronos_ac_stat_blocked', locale),
+          value: overview.blocked,
+          tone: 'warning',
+        },
+        {
+          key: 'waiting',
+          label: uxText('chronos_ac_stat_waiting', locale),
+          value: overview.waiting_human,
+          tone: 'warning',
+        },
+        {
+          key: 'review',
+          label: uxText('chronos_ac_stat_review', locale),
+          value: overview.review_pending,
+          tone: 'info',
+        },
+        {
+          key: 'failures',
+          label: uxText('chronos_ac_stat_failures', locale),
+          value: overview.failures,
+          tone: 'danger',
+        },
+        {
+          key: 'native',
+          label: uxText('chronos_ac_stat_native_subagents', locale),
+          value: overview.native_subagents,
+        },
+        {
+          key: 'unavailable',
+          label: uxText('chronos_ac_stat_unavailable_subagents', locale),
+          value: overview.unavailable_subagents,
+          tone: 'warning',
+        },
+      ]
+    : [];
+
+  const attentionPanel =
+    projection && attentionCount > 0 ? (
+      <div className="chronos-two-col">
+        {projection.attention.slice(0, 6).map((item) => {
+          const event = eventById.get(item.event_id);
+          const evidenceRefs = collaborationEvidenceRefs(event);
+          const action = attentionActionForKind(item.kind);
+          const actionLabel = collaborationActionLabel(item.kind, locale);
+          return (
+            <Callout
+              key={item.event_id}
+              tone={item.code === 'failure' ? 'danger' : 'warning'}
+              title={collaborationAttentionTitle(item.code, locale)}
+              body={`${uxText('chronos_ac_reason', locale)}: ${item.reason}`}
+            >
+              <ChronosInline>
+                <Badge label={collaborationKindLabel(item.kind, locale)} />
+                <ChronosMeta mono>
+                  {item.mission_id || uxText('chronos_ac_mission_unspecified', locale)}
+                </ChronosMeta>
+              </ChronosInline>
+              <ChronosMeta>
+                {uxText('chronos_ac_next', locale)}:{' '}
+                {collaborationAttentionNextAction(item.code, locale)}
+              </ChronosMeta>
+              {event?.causation_id ? (
+                <ChronosMeta mono>
+                  {uxText('chronos_ac_cause', locale)}: {event.causation_id}
+                </ChronosMeta>
+              ) : null}
+              {evidenceRefs.length > 0 ? (
+                <ChronosMeta mono>
+                  {uxText('chronos_ac_evidence', locale)}: {evidenceRefs.join(', ')}
+                </ChronosMeta>
+              ) : null}
+              <ChronosInline>
+                {item.mission_id && onOpenMission ? (
+                  <Button
+                    label={uxText('chronos_ac_open_mission', locale)}
+                    onClick={() => onOpenMission(item.mission_id as string)}
+                  />
+                ) : null}
+                {action?.mode === 'view' && onOpenView && actionLabel ? (
+                  <Button
+                    label={actionLabel}
+                    variant="ghost"
+                    onClick={() => onOpenView(action.viewId)}
+                  />
+                ) : null}
+                {action?.mode === 'mission' && item.mission_id && onOpenMission && actionLabel ? (
+                  <Button
+                    label={actionLabel}
+                    variant="ghost"
+                    onClick={() => onOpenMission(item.mission_id as string)}
+                  />
+                ) : null}
+                {evidenceRefs.length > 0 && onOpenView ? (
+                  <Button
+                    label={uxText('chronos_ac_open_evidence', locale)}
+                    variant="ghost"
+                    onClick={() => onOpenView('trace-viewer')}
+                  />
+                ) : null}
+              </ChronosInline>
+            </Callout>
+          );
+        })}
       </div>
+    ) : (
+      <p className="kb-text kb-text--muted">{uxText('chronos_ac_attention_empty', locale)}</p>
+    );
+
+  const treePanel =
+    treeRows.length === 0 ? (
+      <p className="kb-text kb-text--muted">{uxText('chronos_ac_tree_empty', locale)}</p>
+    ) : (
+      <>
+        <ChronosDiagram>
+          <KbChart type="ui:flow" props={flowProps as unknown as Record<string, unknown>} />
+        </ChronosDiagram>
+        <Disclosure summary={uxText('chronos_ac_tree_details', locale)}>
+          <div className="kb-table-wrap">
+            <table className="kb-table">
+              <thead>
+                <tr>
+                  <th scope="col">{uxText('chronos_ac_tree_col_node', locale)}</th>
+                  <th scope="col">{uxText('chronos_ac_tree_col_state', locale)}</th>
+                  <th scope="col">{uxText('chronos_ac_tree_col_waiting', locale)}</th>
+                  <th scope="col" data-align="end">
+                    {uxText('chronos_ac_tree_col_elapsed', locale)}
+                  </th>
+                  <th scope="col">{uxText('chronos_ac_tree_col_provider', locale)}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {treeRows.map(({ node, depth }) => {
+                  const isExpanded = expandedTreeNodeId === node.id;
+                  const status = collaborationNodeStatus(node);
+                  return (
+                    <React.Fragment key={node.id}>
+                      <tr>
+                        <td>
+                          <button
+                            type="button"
+                            className="chronos-tree-node"
+                            data-depth={Math.min(depth, 6)}
+                            aria-expanded={isExpanded}
+                            onClick={() => setExpandedTreeNodeId(isExpanded ? null : node.id)}
+                          >
+                            <span className="chronos-tree-node__stage">
+                              {uxText(NODE_STAGE_KEY[node.type], locale)}
+                            </span>
+                            {node.label}
+                          </button>
+                        </td>
+                        <td>
+                          {status ? (
+                            <StatusPill status={status} label={node.state || undefined} />
+                          ) : (
+                            node.state || '-'
+                          )}
+                        </td>
+                        <td>{waitLabels(node) || '-'}</td>
+                        <td data-align="end" data-mono="true">
+                          {formatElapsedDuration(node.elapsed_ms)}
+                        </td>
+                        <td data-mono="true">{providerRoleCell(node)}</td>
+                      </tr>
+                      {isExpanded ? (
+                        <tr>
+                          <td colSpan={5}>
+                            <div className="chronos-tree-detail">
+                              {node.waiting_on.length === 0 && node.handoffs.length === 0 ? (
+                                <ChronosMeta mono>{node.id}</ChronosMeta>
+                              ) : null}
+                              {node.waiting_on.map((wait, index) => (
+                                <ChronosMeta key={`wait-${index}`}>
+                                  {uxText(TREE_WAIT_LABEL_KEY[wait.reason], locale)}
+                                  {wait.target_id ? ` → ${shortNodeLabel(wait.target_id)}` : ''}
+                                  {` (${wait.since})`}
+                                </ChronosMeta>
+                              ))}
+                              {node.handoffs.map((handoff, index) => (
+                                <ChronosMeta key={`handoff-${index}`} mono>
+                                  {'→ '}
+                                  {shortNodeLabel(handoff.to_agent_id)}
+                                  {handoff.performative ? ` (${handoff.performative})` : ''}
+                                  {` ${handoff.at}`}
+                                </ChronosMeta>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Disclosure>
+      </>
+    );
+
+  const messagesPanel = sequenceProps ? (
+    <ChronosDiagram>
+      <KbChart type="ui:sequence" props={sequenceProps as unknown as Record<string, unknown>} />
+    </ChronosDiagram>
+  ) : null;
+
+  const timelinePanel =
+    projection && projection.events.length > 0 ? (
+      <List
+        variant="timeline"
+        items={projection.events.slice(0, 10).map((event) => {
+          const status = collaborationEventStatus(event.kind);
+          const native = event.native
+            ? [
+                uxText('chronos_ac_native', locale),
+                event.provider,
+                event.native_fork ? 'fork' : 'parent',
+                event.effort,
+              ]
+                .filter(Boolean)
+                .join(' · ')
+            : event.native_unavailable
+              ? uxText('chronos_ac_native_unavailable', locale)
+              : '';
+          return {
+            title: event.summary,
+            meta: [
+              event.ts.slice(11, 19),
+              collaborationKindLabel(event.kind, locale),
+              event.agent_id || event.source,
+              event.task_id ? `${uxText('chronos_ac_task', locale)}: ${event.task_id}` : '',
+              native,
+              event.thread_id
+                ? `${uxText('chronos_ac_thread', locale)}: ${event.thread_id.slice(0, 8)}`
+                : '',
+              collaborationEvidenceRefs(event).length > 0
+                ? uxText('chronos_ac_evidence', locale)
+                : '',
+            ]
+              .filter(Boolean)
+              .join(' · '),
+            ...(status ? { status, status_label: collaborationKindLabel(event.kind, locale) } : {}),
+          };
+        })}
+      />
+    ) : (
+      <p className="kb-text kb-text--muted">{uxText('chronos_ac_no_graph', locale)}</p>
+    );
+
+  return (
+    <Section
+      title={uxText('chronos_ac_title', locale)}
+      description={uxText('chronos_ac_description', locale)}
+    >
+      <ChronosFieldScope
+        onChange={(name, value) => {
+          if (name === 'mission') setMissionId(typeof value === 'string' ? value : '');
+        }}
+      >
+        <ChronosToolbar>
+          <Select
+            name="mission"
+            label={uxText('chronos_ac_filter_mission', locale)}
+            hide_label
+            value={missionId}
+            options={[
+              { value: '', label: uxText('chronos_ac_filter_all_missions', locale) },
+              ...missionOptions.map((option) => ({ value: option, label: option })),
+            ]}
+          />
+          <Button
+            label={
+              refreshing
+                ? uxText('chronos_ac_refreshing', locale)
+                : uxText('chronos_ac_refresh', locale)
+            }
+            disabled={refreshing}
+            onClick={() => void refresh()}
+          />
+          {projection?.status_flags.includes('stale_runtime') && onOpenView ? (
+            <Button
+              label={uxText('chronos_ac_check_runtime', locale)}
+              variant="ghost"
+              onClick={() => onOpenView('runtime-topology-map')}
+            />
+          ) : null}
+          <div className="chronos-toolbar__end">
+            <ChronosInline>
+              {projection?.partial ? (
+                <Badge label={uxText('chronos_ac_status_attention', locale)} tone="warning" />
+              ) : null}
+              {(projection?.status_flags || []).map((flag) => (
+                <Badge
+                  key={flag}
+                  tone="warning"
+                  label={
+                    flag === 'sequence_gap'
+                      ? uxText('chronos_ac_flag_sequence_gap', locale)
+                      : flag === 'stale_runtime'
+                        ? uxText('chronos_ac_flag_stale_runtime', locale)
+                        : uxText('chronos_ac_flag_unknown_event', locale)
+                  }
+                />
+              ))}
+              <Badge
+                label={`${uxText('chronos_ac_scope', locale)}: ${
+                  tenant || uxText('chronos_ac_scope_all', locale)
+                }`}
+              />
+              {projection?.generated_at ? (
+                <ChronosMeta>
+                  {uxText('chronos_ac_updated', locale)} {projection.generated_at.slice(11, 19)}
+                </ChronosMeta>
+              ) : null}
+            </ChronosInline>
+          </div>
+        </ChronosToolbar>
+      </ChronosFieldScope>
+
+      {error ? <Callout tone="danger" title={error} /> : null}
 
       {overview ? (
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-          <Stat label={uxText('chronos_ac_stat_missions', locale)} value={overview.missions} />
-          <Stat label={uxText('chronos_ac_stat_tasks', locale)} value={overview.tasks} />
-          <Stat label={uxText('chronos_ac_stat_agents', locale)} value={overview.agents} />
-          <Stat
-            label={uxText('chronos_ac_stat_active', locale)}
-            value={overview.active}
-            tone="kb-text-accent"
-          />
-          <Stat
-            label={uxText('chronos_ac_stat_blocked', locale)}
-            value={overview.blocked}
-            tone="kb-status-warning"
-          />
-          <Stat
-            label={uxText('chronos_ac_stat_waiting', locale)}
-            value={overview.waiting_human}
-            tone="kb-status-warning"
-          />
-          <Stat
-            label={uxText('chronos_ac_stat_review', locale)}
-            value={overview.review_pending}
-            tone="kb-status-info"
-          />
-          <Stat
-            label={uxText('chronos_ac_stat_failures', locale)}
-            value={overview.failures}
-            tone="kb-status-negative"
-          />
-          <Stat
-            label={uxText('chronos_ac_stat_native_subagents', locale)}
-            value={overview.native_subagents}
-            tone="kb-text-accent"
-          />
-          <Stat
-            label={uxText('chronos_ac_stat_unavailable_subagents', locale)}
-            value={overview.unavailable_subagents}
-            tone="kb-status-warning"
-          />
+        <div className="chronos-metrics">
+          {metrics.map((metric) => (
+            <Metric
+              key={metric.key}
+              label={metric.label}
+              value={metric.value}
+              tone={metric.value > 0 && metric.tone ? (metric.tone as 'accent') : undefined}
+            />
+          ))}
         </div>
-      ) : (
-        <div className="mt-4 text-[11px] kb-text-muted">{uxText('chronos_ac_loading', locale)}</div>
+      ) : error ? null : (
+        <Skeleton shape="card" lines={2} label={uxText('chronos_ac_loading', locale)} />
       )}
 
-      {tree ? (
-        hasTreeNodes ? (
-          <details className="mt-4 rounded-lg border kb-border-subtle kb-surface-sunken p-4" open>
-            <summary className="cursor-pointer text-[11px] font-bold kb-text-muted">
-              {uxText('chronos_ac_tree', locale)}
-            </summary>
-            <div className="mt-3 grid gap-1">
-              <div className="grid grid-cols-[1fr_72px_150px_64px_150px] gap-2 px-3 text-[11px] kb-text-muted">
-                <span>{uxText('chronos_ac_tree_col_node', locale)}</span>
-                <span>{uxText('chronos_ac_tree_col_state', locale)}</span>
-                <span>{uxText('chronos_ac_tree_col_waiting', locale)}</span>
-                <span>{uxText('chronos_ac_tree_col_elapsed', locale)}</span>
-                <span>{uxText('chronos_ac_tree_col_provider', locale)}</span>
-              </div>
-              {treeRows.map(({ node, depth }) => {
-                const isWaiting = node.waiting_on.length > 0;
-                const isExpanded = expandedTreeNodeId === node.id;
-                return (
-                  <React.Fragment key={node.id}>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedTreeNodeId(isExpanded ? null : node.id)}
-                      aria-expanded={isExpanded}
-                      className={`grid grid-cols-[1fr_72px_150px_64px_150px] items-center gap-2 rounded-lg border px-3 py-2 text-left text-[11px] ${
-                        isWaiting
-                          ? 'kb-status-warning-border kb-status-warning-surface kb-status-warning'
-                          : 'kb-border-subtle kb-surface-sunken kb-text-secondary'
-                      }`}
-                    >
-                      <span className="min-w-0 truncate" style={{ paddingLeft: `${depth * 14}px` }}>
-                        <span className="mr-1 kb-text-muted">{TREE_NODE_GLYPH[node.type]}</span>
-                        {node.label}
-                      </span>
-                      <span className="truncate kb-text-muted">{node.state || '-'}</span>
-                      <span className="truncate">
-                        {node.waiting_on
-                          .map((wait) => uxText(TREE_WAIT_LABEL_KEY[wait.reason], locale))
-                          .join(', ')}
-                      </span>
-                      <span className="truncate kb-text-muted">
-                        {formatElapsedDuration(node.elapsed_ms)}
-                      </span>
-                      <span className="truncate kb-text-muted">{providerRoleCell(node)}</span>
-                    </button>
-                    {isExpanded ? (
-                      <div className="ml-4 rounded-lg border kb-border-subtle kb-surface-raised px-3 py-2 text-[11px] kb-text-muted">
-                        {node.waiting_on.length === 0 && node.handoffs.length === 0 ? (
-                          <div>{node.id}</div>
-                        ) : null}
-                        {node.waiting_on.map((wait, index) => (
-                          <div key={`wait-${index}`}>
-                            {uxText(TREE_WAIT_LABEL_KEY[wait.reason], locale)}
-                            {wait.target_id ? ` → ${shortNodeLabel(wait.target_id)}` : ''}
-                            {` (${wait.since})`}
-                          </div>
-                        ))}
-                        {node.handoffs.map((handoff, index) => (
-                          <div key={`handoff-${index}`}>
-                            {'→ '}
-                            {shortNodeLabel(handoff.to_agent_id)}
-                            {handoff.performative ? ` (${handoff.performative})` : ''}
-                            {` ${handoff.at}`}
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </details>
-        ) : (
-          <div className="mt-4 text-[11px] kb-text-muted">
-            <span className="mr-2 text-[11px] font-bold">{uxText('chronos_ac_tree', locale)}</span>
-            {uxText('chronos_ac_tree_empty', locale)}
-          </div>
-        )
+      {projection ? (
+        <>
+          <Tabs
+            label={uxText('chronos_ac_title', locale)}
+            active={activeTab}
+            onSelect={(id) => setTab(id as BoardTab)}
+            items={[
+              {
+                id: 'attention',
+                label: uxText('chronos_ac_tab_attention', locale),
+                count: attentionCount,
+              },
+              { id: 'tree', label: uxText('chronos_ac_tree', locale) },
+              { id: 'messages', label: uxText('chronos_ac_tab_messages', locale) },
+              { id: 'timeline', label: uxText('chronos_ac_timeline', locale) },
+            ]}
+          />
+          {activeTab === 'attention' ? attentionPanel : null}
+          {activeTab === 'tree' ? treePanel : null}
+          {activeTab === 'messages' ? messagesPanel : null}
+          {activeTab === 'timeline' ? timelinePanel : null}
+        </>
       ) : null}
 
-      {projection && projection.attention.length > 0 ? (
-        <div className="mt-4">
-          <div className="mb-2 text-[11px] font-bold kb-status-warning">
-            {uxText('chronos_ac_attention', locale)}
-          </div>
-          <div className="grid gap-2 lg:grid-cols-2">
-            {projection.attention.slice(0, 6).map((item) => (
-              <div
-                key={item.event_id}
-                className="rounded-xl border kb-status-warning-border kb-status-warning-surface px-3 py-2 text-[11px]"
-              >
-                {(() => {
-                  const event = eventById.get(item.event_id);
-                  const evidenceRefs = collaborationEvidenceRefs(event);
-                  return (
-                    <>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold kb-status-warning">
-                          {collaborationAttentionTitle(item.code, locale)}
-                        </span>
-                        <span className="rounded-full border kb-border-subtle px-2 text-[11px] kb-text-muted">
-                          {collaborationKindLabel(item.kind, locale)}
-                        </span>
-                        <span className="ml-auto text-[11px] kb-text-muted">
-                          {item.mission_id || uxText('chronos_ac_mission_unspecified', locale)}
-                        </span>
-                      </div>
-                      <div className="mt-1 kb-text-secondary">
-                        {uxText('chronos_ac_reason', locale)}: {item.reason}
-                      </div>
-                      <div className="mt-1 kb-text-accent">
-                        {uxText('chronos_ac_next', locale)}:{' '}
-                        {collaborationAttentionNextAction(item.code, locale)}
-                      </div>
-                      {event?.causation_id || evidenceRefs.length > 0 ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] kb-text-muted">
-                          {event?.causation_id ? (
-                            <span className="rounded border kb-border-subtle px-2 py-1">
-                              {uxText('chronos_ac_cause', locale)}: {event.causation_id}
-                            </span>
-                          ) : null}
-                          {evidenceRefs.length > 0 ? (
-                            <span
-                              className="rounded border kb-border-subtle px-2 py-1"
-                              title={evidenceRefs.join(', ')}
-                            >
-                              {uxText('chronos_ac_evidence', locale)}: {evidenceRefs.join(', ')}
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {item.mission_id && onOpenMission ? (
-                          <button
-                            type="button"
-                            onClick={() => onOpenMission(item.mission_id as string)}
-                            className="rounded border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent hover:kb-surface-accent"
-                          >
-                            {uxText('chronos_ac_open_mission', locale)}
-                          </button>
-                        ) : null}
-                        {attentionActionForKind(item.kind)?.mode === 'view' && onOpenView ? (
-                          <button
-                            type="button"
-                            aria-label={collaborationActionLabel(item.kind, locale) || undefined}
-                            title={collaborationActionLabel(item.kind, locale) || undefined}
-                            onClick={() => {
-                              const action = attentionActionForKind(item.kind);
-                              if (action?.mode === 'view') onOpenView(action.viewId);
-                            }}
-                            className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[11px] kb-status-warning hover:kb-status-warning-surface"
-                          >
-                            {collaborationActionLabel(item.kind, locale)}
-                          </button>
-                        ) : null}
-                        {attentionActionForKind(item.kind)?.mode === 'mission' &&
-                        item.mission_id &&
-                        onOpenMission ? (
-                          <button
-                            type="button"
-                            aria-label={collaborationActionLabel(item.kind, locale) || undefined}
-                            title={collaborationActionLabel(item.kind, locale) || undefined}
-                            onClick={() => onOpenMission(item.mission_id as string)}
-                            className="rounded border kb-status-warning-border kb-status-warning-surface px-2 py-1 text-[11px] kb-status-warning hover:kb-status-warning-surface"
-                          >
-                            {collaborationActionLabel(item.kind, locale)}
-                          </button>
-                        ) : null}
-                        {evidenceRefs.length > 0 && onOpenView ? (
-                          <button
-                            type="button"
-                            aria-label={uxText('chronos_ac_open_evidence', locale)}
-                            title={uxText('chronos_ac_open_evidence', locale)}
-                            onClick={() => onOpenView('trace-viewer')}
-                            className="rounded border kb-border-subtle kb-surface-raised px-2 py-1 text-[11px] kb-text-secondary hover:kb-surface-raised"
-                          >
-                            {uxText('chronos_ac_open_evidence', locale)}
-                          </button>
-                        ) : null}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {projection && projection.events.length > 0 ? (
-        <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div>
-            <div className="mb-2 text-[11px] font-bold kb-text-muted">
-              {uxText('chronos_ac_timeline', locale)}
-            </div>
-            <div className="grid gap-1">
-              {projection.events.slice(0, 8).map((event) => (
-                <div
-                  key={event.event_id}
-                  className="flex gap-2 rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px]"
-                >
-                  <span className="w-14 shrink-0 kb-text-muted">{event.ts.slice(11, 19)}</span>
-                  <span className="rounded-full border kb-border-accent px-2 kb-text-accent">
-                    {collaborationKindLabel(event.kind, locale)}
-                  </span>
-                  <span className="min-w-0 truncate kb-text-secondary">{event.summary}</span>
-                  {event.task_id ? (
-                    <span className="shrink-0 rounded border kb-border-subtle px-1.5 kb-text-muted">
-                      {uxText('chronos_ac_task', locale)}: {event.task_id}
-                    </span>
-                  ) : null}
-                  {event.native ? (
-                    <span className="shrink-0 rounded border kb-border-accent px-1.5 kb-text-accent">
-                      {uxText('chronos_ac_native', locale)}
-                      {event.provider ? ` · ${event.provider}` : ''}
-                      {event.native_fork ? ' · fork' : ' · parent'}
-                      {event.effort ? ` · ${event.effort}` : ''}
-                    </span>
-                  ) : event.native_unavailable ? (
-                    <span className="shrink-0 rounded border kb-status-warning-border px-1.5 kb-status-warning">
-                      {uxText('chronos_ac_native_unavailable', locale)}
-                    </span>
-                  ) : null}
-                  {event.thread_id ? (
-                    <span
-                      className="shrink-0 rounded border kb-border-subtle px-1.5 kb-text-muted"
-                      title={event.thread_id}
-                    >
-                      {uxText('chronos_ac_thread', locale)}: {event.thread_id.slice(0, 8)}
-                    </span>
-                  ) : null}
-                  {collaborationEvidenceRefs(event).length > 0 ? (
-                    <span className="shrink-0 rounded border kb-border-subtle px-1.5 kb-text-muted">
-                      {uxText('chronos_ac_evidence', locale)}
-                    </span>
-                  ) : null}
-                  <span className="ml-auto shrink-0 kb-text-muted">
-                    {event.agent_id || event.source}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="mb-2 text-[11px] font-bold kb-text-muted">
-              {uxText('chronos_ac_handoff_graph', locale)}
-            </div>
-            <div className="grid gap-1">
-              {projection.edges.slice(-8).map((edge) => (
-                <div
-                  key={`${edge.event_id}:${edge.from}:${edge.to}`}
-                  className="rounded-lg border kb-border-subtle kb-surface-sunken px-3 py-2 text-[11px] kb-text-secondary"
-                >
-                  <span className="kb-text-accent">{edge.from}</span>
-                  <span className="mx-2 kb-text-muted">→</span>
-                  <span className="kb-status-info">{edge.to}</span>
-                  <span className="ml-2 kb-text-muted">
-                    {collaborationKindLabel(edge.kind, locale)}
-                  </span>
-                </div>
-              ))}
-              {projection.edges.length === 0 ? (
-                <div className="text-[11px] kb-text-muted">
-                  {uxText('chronos_ac_no_graph', locale)}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </section>
+      <Disclosure summary={uxText('chronos_ac_guide_title', locale)}>
+        <KeyValue
+          items={[
+            ['chronos_ac_guide_who', 'chronos_ac_guide_who_detail'],
+            ['chronos_ac_guide_what', 'chronos_ac_guide_what_detail'],
+            ['chronos_ac_guide_next', 'chronos_ac_guide_next_detail'],
+            ['chronos_ac_guide_act', 'chronos_ac_guide_act_detail'],
+          ].map(([labelKey, detailKey]) => ({
+            label: uxText(labelKey, locale),
+            value: uxText(detailKey, locale),
+          }))}
+        />
+      </Disclosure>
+    </Section>
   );
 }

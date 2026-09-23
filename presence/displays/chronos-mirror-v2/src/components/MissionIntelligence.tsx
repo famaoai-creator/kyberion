@@ -47,7 +47,7 @@ function buildMissionIntentSummary(data: IntelligencePayload, mission: MissionSu
   if (latestHandoff?.promptExcerpt) return latestHandoff.promptExcerpt;
   if (latestHandoff?.intent) return latestHandoff.intent;
   if (mission.missionType) return mission.missionType;
-  return 'Durable work item';
+  return uxTextOr('chronos_mi_durable_work_item', 'Durable work item', resolveChronosLocale());
 }
 
 export function MissionIntelligence({
@@ -1080,14 +1080,14 @@ export function MissionIntelligence({
   const focusTitle = focusedView
     ? (
         {
-          'needs-attention': 'Needs Attention',
-          'mission-control-plane': 'Mission Control',
-          'runtime-topology-map': 'Runtime Topology',
-          'runtime-lease-doctor': 'Runtime Governance',
-          'recent-surface-outbox': 'Delivery Exceptions',
-          'owner-summaries': 'Audit Trail',
+          'needs-attention': mt('chronos_mi_focus_needs_attention', 'Needs Attention'),
+          'mission-control-plane': mt('chronos_mi_focus_mission_control', 'Mission Control'),
+          'runtime-topology-map': mt('chronos_mi_focus_runtime_topology', 'Runtime Topology'),
+          'runtime-lease-doctor': mt('chronos_mi_runtime_governance', 'Runtime Governance'),
+          'recent-surface-outbox': mt('chronos_mi_delivery_exceptions', 'Delivery Exceptions'),
+          'owner-summaries': mt('chronos_mi_focus_audit_trail', 'Audit Trail'),
         } as Record<string, string>
-      )[focusedView] || 'Focused View'
+      )[focusedView] || mt('chronos_mi_focus_view', 'Focused View')
     : null;
   const referenceMetadataEntries = Object.entries(referenceDetail?.metadata || {}).filter(
     ([, value]) => String(value || '').trim()
@@ -1106,7 +1106,7 @@ export function MissionIntelligence({
   const nextActions = Array.isArray(data.nextActions) ? data.nextActions : [];
   const memoryCandidateCount = (data.memoryCandidates || []).length;
   return (
-    <div className="w-full h-full flex flex-col gap-6 overflow-y-auto pr-1">
+    <div className="flex w-full min-w-0 flex-col gap-4">
       <MissionIntelligenceDangerousActionDialog
         context={{ dangerousAction, clearDangerousAction, confirmDangerousAction }}
       />

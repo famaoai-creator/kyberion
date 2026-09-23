@@ -1,72 +1,87 @@
 import type { ReactNode } from 'react';
+import { Metric, Section } from '@agent/shared-ui';
+
+/**
+ * UI-07: the Mission Intelligence building blocks render the shared
+ * `.kb-*` contract (Section / Metric) — no nested sunken boxes, no ad-hoc
+ * Tailwind colors. Signatures stay stable so every panel migrates at once.
+ */
+
+type MetricTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 
 export function MetricCard({
-  icon,
   label,
   value,
   detail,
+  tone,
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   value: string;
   detail: string;
+  tone?: MetricTone;
 }) {
-  return (
-    <div className="rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-4">
-      <div className="flex items-center gap-2 text-[11px] kb-text-muted">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <div className="mt-3 text-3xl font-semibold tracking-tight kb-text-primary">{value}</div>
-      <div className="mt-1 text-[11px] kb-text-muted">{detail}</div>
-    </div>
-  );
+  return <Metric label={label} value={value} description={detail} tone={tone} />;
 }
 
 export function MiniSummaryCard({
-  icon,
   label,
   value,
   detail,
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   value: number;
   detail: string;
 }) {
   return (
-    <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-4 py-3">
-      <div className="flex items-center gap-2 text-[11px] kb-text-muted">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight kb-text-primary">{value}</div>
-      <div className="mt-1 text-[11px] kb-text-muted">{detail}</div>
-    </div>
+    <Metric
+      label={label}
+      value={value}
+      description={detail}
+      tone={value > 0 ? 'warning' : undefined}
+    />
   );
 }
 
+/**
+ * A titled block of the Mission Intelligence page. `description` replaces
+ * the old boxed explanation paragraphs; `actions` sits in the header.
+ */
 export function Panel({
   id,
   title,
+  description,
+  actions,
+  className,
   children,
   visible = true,
 }: {
   id?: string;
+  className?: string;
   title: string;
+  description?: string;
+  actions?: ReactNode;
   children: ReactNode;
   visible?: boolean;
 }) {
   if (!visible) return null;
   return (
-    <div id={id} className="rounded-lg border kb-border-subtle kb-surface-sunken p-4 scroll-mt-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="text-[11px] kb-status-warning">{title}</div>
-      </div>
-      {children}
+    <div id={id} className={`scroll-mt-6 min-w-0 ${className ?? ''}`.trim()}>
+      <Section title={title} description={description} headingLevel={3}>
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        {children}
+      </Section>
     </div>
   );
 }
+
+const RUNTIME_TONE: Record<'emerald' | 'gold' | 'red' | 'cyan', MetricTone> = {
+  emerald: 'success',
+  gold: 'warning',
+  red: 'danger',
+  cyan: 'info',
+};
 
 export function RuntimeCell({
   label,
@@ -77,19 +92,7 @@ export function RuntimeCell({
   value: number;
   accent: 'emerald' | 'gold' | 'red' | 'cyan';
 }) {
-  const accentClass = {
-    emerald: 'kb-status-positive',
-    gold: 'kb-status-warning',
-    red: 'kb-status-negative',
-    cyan: 'kb-text-accent',
-  }[accent];
-
-  return (
-    <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-      <div className="text-[11px] kb-text-muted">{label}</div>
-      <div className={`mt-2 text-lg font-semibold ${accentClass}`}>{value}</div>
-    </div>
-  );
+  return <Metric label={label} value={value} tone={value > 0 ? RUNTIME_TONE[accent] : undefined} />;
 }
 
 export function providerResolutionSummary(

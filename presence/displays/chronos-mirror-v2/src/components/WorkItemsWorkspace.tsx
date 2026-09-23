@@ -1,17 +1,21 @@
 'use client';
 
 import * as React from 'react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
 import {
-  Activity,
-  AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
-  Brain,
-  CircleUserRound,
-  GitBranch,
-} from 'lucide-react';
+  Badge,
+  Button,
+  Callout,
+  Disclosure,
+  List,
+  Metric,
+  Section,
+  StatusPill,
+  Tabs,
+} from '@agent/shared-ui';
 import { useChronosLocale } from '../lib/hooks';
-import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
+import { uxMessage, uxText, uxTextOr, type SupportedLocale } from '../lib/ux-vocabulary';
 import {
   parseWorkItemMutationResponse,
   parseWorkItemsResponse,
@@ -89,6 +93,7 @@ export function WorkItemsWorkspace({
   } | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = React.useState<string>('all');
 
   const refresh = React.useCallback(async () => {
     try {
@@ -155,255 +160,243 @@ export function WorkItemsWorkspace({
   const statusLabel = (status: string) =>
     uxText(STATUS_LABEL_KEY[status] || 'chronos_status_unknown', locale);
 
+  const visibleItems =
+    statusFilter === 'all' ? items : items.filter((item) => item.status === statusFilter);
+  const tabItems = [
+    { id: 'all', label: uxTextOr('chronos_ws_filter_all', 'All', locale), count: items.length },
+    ...statuses.map((status) => ({
+      id: status,
+      label: statusLabel(status),
+      count: items.filter((item) => item.status === status).length,
+    })),
+  ];
+  const contextSummary = projection?.quality
+    ? `${projection.quality.explicit_context} ${uxText('chronos_work_context_explicit', locale)} · ${projection.quality.migrated_context} ${uxText('chronos_work_context_migrated', locale)}${
+        projection.quality.missing_context > 0
+          ? ` · ${projection.quality.missing_context} ${uxText('chronos_work_context_missing', locale)}`
+          : ''
+      }`
+    : null;
+
   return (
-    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] kb-text-accent">
-            {uxText('chronos_nav_work_items', locale)}
-          </div>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight kb-text-primary">
-            {uxText('chronos_work_items', locale)}
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 kb-text-secondary">
-            {uxText('chronos_nav_work_items_hint', locale)}
-          </p>
+    <>
+      <Section
+        title={uxText('chronos_work_items', locale)}
+        description={uxText('chronos_nav_work_items_hint', locale)}
+      >
+        <div className="flex flex-wrap gap-2">
+          <Badge
+            tone="accent"
+            label={`${uxText('chronos_work_scope', locale)}: ${workScopeLabel(projection?.scope, locale)}`}
+          />
+          <Badge
+            label={`${uxText('chronos_work_view', locale)}: ${workViewLabel(projection?.view, locale)}`}
+          />
+          {contextSummary ? (
+            <Badge
+              tone={projection?.quality?.missing_context ? 'warning' : undefined}
+              label={`${uxText('chronos_work_context', locale)}: ${contextSummary}`}
+            />
+          ) : null}
         </div>
-        <div className="rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[11px] kb-text-muted">
-          {items.length}
-        </div>
-      </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] kb-text-muted">
-        <span className="rounded-full border kb-border-accent kb-surface-accent px-2 py-1 kb-text-accent">
-          {uxText('chronos_work_scope', locale)}: {workScopeLabel(projection?.scope, locale)}
-        </span>
-        <span className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1">
-          {uxText('chronos_work_view', locale)}: {workViewLabel(projection?.view, locale)}
-        </span>
-        {projection?.quality ? (
-          <span className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1">
-            {uxText('chronos_work_context', locale)}: {projection.quality.explicit_context}{' '}
-            {uxText('chronos_work_context_explicit', locale)} ·{' '}
-            {projection.quality.migrated_context} {uxText('chronos_work_context_migrated', locale)}
-            {projection.quality.missing_context > 0
-              ? ` · ${projection.quality.missing_context} ${uxText('chronos_work_context_missing', locale)}`
-              : ''}
-          </span>
+        {error ? (
+          <Callout
+            tone="danger"
+            title={uxTextOr('chronos_ws_load_failed', 'Could not load this view', locale)}
+            body={error}
+          />
         ) : null}
-      </div>
 
-      {error ? (
-        <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface px-4 py-3 text-[11px] kb-status-negative">
-          {error}
+        {coordination ? (
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <Metric
+              label={uxText('chronos_work_items', locale)}
+              value={coordination.total}
+              description={uxText('chronos_work_coordination_total_detail', locale)}
+            />
+            <Metric
+              label={uxText('chronos_status_in_progress', locale)}
+              value={coordination.inProgress}
+              tone={coordination.inProgress > 0 ? 'info' : undefined}
+              description={uxText('chronos_work_coordination_in_progress_detail', locale)}
+            />
+            <Metric
+              label={uxText('chronos_blocked_count', locale)}
+              value={coordination.blocked}
+              tone={coordination.blocked > 0 ? 'danger' : undefined}
+              description={uxText('chronos_work_coordination_blocked_detail', locale)}
+            />
+            <Metric
+              label={uxText('chronos_work_coordination_running_attempts', locale)}
+              value={coordination.runningAttempts}
+              description={uxText('chronos_work_coordination_running_attempts_detail', locale)}
+            />
+          </div>
+        ) : null}
+
+        {items.length > 0 ? (
+          <div className="chronos-subnav">
+            <Tabs
+              items={tabItems}
+              active={statusFilter}
+              onSelect={setStatusFilter}
+              label={uxTextOr('chronos_ws_status_filter', 'Filter by status', locale)}
+            />
+          </div>
+        ) : null}
+
+        <div className="kb-table-wrap">
+          <table className="kb-table">
+            <thead>
+              <tr>
+                <th scope="col">{uxTextOr('chronos_ws_col_work_item', 'Work item', locale)}</th>
+                <th scope="col" style={{ width: '9rem' }}>
+                  {uxText('chronos_col_status', locale)}
+                </th>
+                <th scope="col">{uxText('chronos_work_item_assignee', locale)}</th>
+                <th scope="col" style={{ width: '6rem' }}>
+                  {uxText('chronos_work_item_priority', locale)}
+                </th>
+                <th scope="col" style={{ width: '7rem' }}>
+                  {uxText('chronos_work_item_updated', locale)}
+                </th>
+                <th scope="col" data-align="end" style={{ width: '7rem' }}>
+                  {uxTextOr('chronos_ws_col_move', 'Move', locale)}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleItems.length === 0 ? (
+                <tr>
+                  <td className="kb-table__empty" colSpan={6}>
+                    {uxText('chronos_work_item_no_items', locale)}
+                  </td>
+                </tr>
+              ) : (
+                visibleItems.map((item) => {
+                  const columnIndex = statuses.indexOf(item.status);
+                  const missionId = missionIdFromItem(item);
+                  const assignedBy =
+                    metadataText(item.metadata, [
+                      'assigned_by',
+                      'assignedBy',
+                      'created_by',
+                      'createdBy',
+                      'requested_by',
+                      'requestedBy',
+                    ]) || item.source;
+                  const assignee =
+                    item.assignee_user_id ||
+                    item.assignee_peer_id ||
+                    metadataText(item.metadata, ['assignee_label', 'assigneeLabel']) ||
+                    uxText('chronos_work_item_unassigned', locale);
+                  const previous = columnIndex > 0 ? statuses[columnIndex - 1] : null;
+                  const next =
+                    columnIndex >= 0 && columnIndex < statuses.length - 1
+                      ? statuses[columnIndex + 1]
+                      : null;
+                  return (
+                    <tr key={item.item_id}>
+                      <td>
+                        <div className="chronos-mission-cell">
+                          <span className="chronos-mission-cell__title">{item.title}</span>
+                          {item.description && item.description !== item.title ? (
+                            <span className="kb-list__meta">{item.description}</span>
+                          ) : null}
+                          <span className="chronos-mission-cell__id">{item.item_id}</span>
+                          <span className="kb-list__meta">
+                            {uxText('chronos_work_item_assigned_by', locale)}: {assignedBy} ·{' '}
+                            {uxText('chronos_work_item_source', locale)}:{' '}
+                            {item.source_ref || item.source} ·{' '}
+                            {uxText('chronos_work_item_created', locale)}:{' '}
+                            {compactDate(item.created_at)}
+                          </span>
+                          <WorkItemLineageChain context={item.context} locale={locale} />
+                          {missionId && onOpenMission ? (
+                            <div>
+                              <button
+                                type="button"
+                                className="chronos-mission-cell__title chronos-mission-cell__id"
+                                onClick={() => onOpenMission(missionId)}
+                              >
+                                {uxText('chronos_mission', locale)}: {missionId}
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td>
+                        <StatusPill
+                          status={workItemStatus(item.status)}
+                          label={statusLabel(item.status)}
+                        />
+                      </td>
+                      <td className="chronos-muted">{assignee}</td>
+                      <td data-mono="true">{item.priority}</td>
+                      <td className="chronos-muted">{compactDate(item.updated_at)}</td>
+                      <td data-align="end">
+                        <div className="flex justify-end gap-1">
+                          {previous ? (
+                            <Button
+                              label={uxMessage(
+                                'chronos_ws_move_to',
+                                { status: statusLabel(previous) },
+                                'Move to {status}',
+                                locale
+                              )}
+                              variant="ghost"
+                              disabled={busyId === item.item_id}
+                              onClick={() => void moveItem(item.item_id, previous)}
+                            >
+                              <ArrowLeft size={14} aria-hidden="true" />
+                            </Button>
+                          ) : null}
+                          {next ? (
+                            <Button
+                              label={uxMessage(
+                                'chronos_ws_move_to',
+                                { status: statusLabel(next) },
+                                'Move to {status}',
+                                locale
+                              )}
+                              variant="secondary"
+                              disabled={busyId === item.item_id}
+                              onClick={() => void moveItem(item.item_id, next)}
+                            >
+                              <ArrowRight size={14} aria-hidden="true" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      ) : null}
+      </Section>
 
       {projection?.lineage ? (
         <WorkItemLineageOverview lineage={projection.lineage} locale={locale} />
       ) : null}
-
-      {coordination ? (
-        <section className="mt-5 rounded-lg border kb-border-accent kb-surface-accent p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-bold kb-text-accent">
-                {uxText('chronos_work_coordination', locale)}
-              </div>
-              <p className="mt-1 max-w-2xl text-[11px] leading-5 kb-text-muted">
-                {uxText('chronos_work_coordination_description', locale)}
-              </p>
-            </div>
-            <div className="rounded-full border kb-border-subtle kb-surface-sunken px-3 py-1 text-[11px] kb-text-secondary">
-              {coordination.total}
-            </div>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <CoordinationMetric
-              icon={<GitBranch size={13} />}
-              label={uxText('chronos_work_items', locale)}
-              value={coordination.total}
-              detail={uxText('chronos_work_coordination_total_detail', locale)}
-            />
-            <CoordinationMetric
-              icon={<Activity size={13} />}
-              label={uxText('chronos_status_in_progress', locale)}
-              value={coordination.inProgress}
-              detail={uxText('chronos_work_coordination_in_progress_detail', locale)}
-            />
-            <CoordinationMetric
-              icon={<AlertTriangle size={13} />}
-              label={uxText('chronos_blocked_count', locale)}
-              value={coordination.blocked}
-              detail={uxText('chronos_work_coordination_blocked_detail', locale)}
-            />
-            <CoordinationMetric
-              icon={<Brain size={13} />}
-              label={uxText('chronos_work_coordination_running_attempts', locale)}
-              value={coordination.runningAttempts}
-              detail={uxText('chronos_work_coordination_running_attempts_detail', locale)}
-            />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2 text-[11px] kb-text-muted">
-            {statuses.map((status) => (
-              <span
-                key={status}
-                className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1"
-              >
-                {statusLabel(status)} {coordinationCount(coordination, status)}
-              </span>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {items.length === 0 ? (
-        <div className="mt-5 rounded-lg border kb-border-subtle kb-surface-sunken px-4 py-5 text-[11px] kb-text-muted">
-          {uxText('chronos_work_item_no_items', locale)}
-        </div>
-      ) : (
-        <div className="chronos-scroll mt-5 flex gap-3 overflow-x-auto pb-2">
-          {statuses.map((column) => {
-            const columnItems = items.filter((item) => item.status === column);
-            return (
-              <div
-                key={column}
-                className={`${columnItems.length > 0 ? 'min-w-[220px]' : 'min-w-[140px]'} flex-1 rounded-lg border kb-border-subtle kb-surface-sunken p-2`}
-              >
-                <div className="mb-2 flex items-center justify-between gap-2 px-1 text-[11px] font-bold kb-text-muted">
-                  <span>{statusLabel(column)}</span>
-                  <span>{columnItems.length}</span>
-                </div>
-                <div className="chronos-scroll max-h-[calc(100vh-24rem)] space-y-2 overflow-y-auto pr-1">
-                  {columnItems.map((item) => {
-                    const columnIndex = statuses.indexOf(column);
-                    const missionId = missionIdFromItem(item);
-                    const assignedBy =
-                      metadataText(item.metadata, [
-                        'assigned_by',
-                        'assignedBy',
-                        'created_by',
-                        'createdBy',
-                        'requested_by',
-                        'requestedBy',
-                      ]) || item.source;
-                    const assignee =
-                      item.assignee_user_id ||
-                      item.assignee_peer_id ||
-                      metadataText(item.metadata, ['assignee_label', 'assigneeLabel']) ||
-                      uxText('chronos_work_item_unassigned', locale);
-                    return (
-                      <article
-                        key={item.item_id}
-                        className="rounded-xl border kb-border-subtle kb-surface-raised p-3 text-[11px]"
-                      >
-                        <div className="font-semibold leading-5 kb-text-primary">{item.title}</div>
-                        {item.description && item.description !== item.title ? (
-                          <div className="mt-2 line-clamp-3 text-[11px] leading-5 kb-text-secondary">
-                            {item.description}
-                          </div>
-                        ) : null}
-                        <div className="mt-3 grid gap-1.5 text-[11px] kb-text-muted">
-                          <div className="flex items-center gap-1.5">
-                            <CircleUserRound size={11} />
-                            <span>{uxText('chronos_work_item_assignee', locale)}:</span>
-                            <span className="truncate kb-text-primary">{assignee}</span>
-                          </div>
-                          <div>
-                            {uxText('chronos_work_item_assigned_by', locale)}:{' '}
-                            <span className="kb-text-secondary">{assignedBy}</span>
-                          </div>
-                          <div>
-                            {uxText('chronos_work_item_source', locale)}:{' '}
-                            <span className="kb-text-secondary">
-                              {item.source_ref || item.source}
-                            </span>
-                          </div>
-                          <div>
-                            {uxText('chronos_work_item_priority', locale)}:{' '}
-                            <span className="kb-text-secondary">{item.priority}</span>
-                          </div>
-                          <div>
-                            {uxText('chronos_work_item_created', locale)}:{' '}
-                            {compactDate(item.created_at)} ·{' '}
-                            {uxText('chronos_work_item_updated', locale)}:{' '}
-                            {compactDate(item.updated_at)}
-                          </div>
-                        </div>
-                        <WorkItemLineageChain context={item.context} locale={locale} />
-                        {missionId && onOpenMission ? (
-                          <button
-                            type="button"
-                            onClick={() => onOpenMission(missionId)}
-                            className="mt-3 max-w-full truncate rounded-full border kb-border-accent kb-surface-accent px-2 py-1 text-[11px] kb-text-accent"
-                          >
-                            {missionId}
-                          </button>
-                        ) : null}
-                        <div className="mt-3 flex gap-1">
-                          {columnIndex > 0 ? (
-                            <button
-                              type="button"
-                              disabled={busyId === item.item_id}
-                              onClick={() => void moveItem(item.item_id, statuses[columnIndex - 1])}
-                              className="rounded kb-surface-raised px-2 py-1 text-[11px] kb-text-secondary hover:kb-surface-raised"
-                              aria-label={statusLabel(statuses[columnIndex - 1])}
-                            >
-                              <ArrowLeft size={12} />
-                            </button>
-                          ) : null}
-                          {columnIndex < statuses.length - 1 ? (
-                            <button
-                              type="button"
-                              disabled={busyId === item.item_id}
-                              onClick={() => void moveItem(item.item_id, statuses[columnIndex + 1])}
-                              className="rounded kb-surface-accent px-2 py-1 text-[11px] kb-text-accent hover:kb-surface-accent"
-                              aria-label={statusLabel(statuses[columnIndex + 1])}
-                            >
-                              <ArrowRight size={12} />
-                            </button>
-                          ) : null}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
+    </>
   );
 }
 
-function coordinationCount(summary: WorkCoordinationSummary, status: string): number {
-  if (status === 'in_progress') return summary.inProgress;
-  if (status in summary) return Number(summary[status as keyof WorkCoordinationSummary] || 0);
-  return 0;
-}
+const WORK_ITEM_STATUS: Record<string, KbStatus> = {
+  backlog: 'planned',
+  ready: 'ready',
+  in_progress: 'working',
+  blocked: 'blocked',
+  review: 'review',
+  done: 'done',
+  archived: 'archived',
+};
 
-function CoordinationMetric({
-  icon,
-  label,
-  value,
-  detail,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-xl border kb-border-subtle kb-surface-sunken px-3 py-3">
-      <div className="flex items-center gap-2 text-[11px] font-bold kb-text-muted">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <div className="mt-2 text-2xl font-semibold kb-text-primary">{value}</div>
-      <div className="mt-1 text-[11px] leading-4 kb-text-muted">{detail}</div>
-    </div>
-  );
+function workItemStatus(status: string): KbStatus {
+  return WORK_ITEM_STATUS[status] || 'n/a';
 }
 
 const LINEAGE_LABEL_KEYS: Record<string, string> = {
@@ -422,83 +415,71 @@ function WorkItemLineageOverview({
   locale: SupportedLocale;
 }) {
   return (
-    <section className="mt-5 rounded-lg border kb-border-subtle kb-surface-sunken p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-bold kb-text-accent">
-            {uxText('chronos_lineage_title', locale)}
-          </div>
-          <p className="mt-1 text-[11px] leading-5 kb-text-muted">
-            {uxText('chronos_lineage_description', locale)}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 text-[11px]">
-          <span className="rounded-full border kb-border-positive kb-status-positive-surface px-2 py-1 kb-status-positive">
-            {uxText('chronos_lineage_complete', locale)} {lineage.complete_chain_items}
-          </span>
-          <span className="rounded-full border kb-status-warning-border kb-status-warning-surface px-2 py-1 kb-status-warning">
-            {uxText('chronos_lineage_incomplete', locale)} {lineage.incomplete_chain_items}
-          </span>
-        </div>
+    <Section
+      title={uxText('chronos_lineage_title', locale)}
+      description={uxText('chronos_lineage_description', locale)}
+    >
+      <div className="flex flex-wrap gap-2">
+        <StatusPill
+          status="completed"
+          label={`${uxText('chronos_lineage_complete', locale)} ${lineage.complete_chain_items}`}
+        />
+        <StatusPill
+          status={lineage.incomplete_chain_items > 0 ? 'needs_setup' : 'n/a'}
+          label={`${uxText('chronos_lineage_incomplete', locale)} ${lineage.incomplete_chain_items}`}
+        />
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-1.5 text-[11px]">
-        {lineage.hierarchy.map((kind, index) => (
-          <React.Fragment key={kind}>
-            <span className="rounded-full border kb-border-accent kb-surface-accent px-2 py-1 font-semibold kb-text-accent">
-              {lineageLabel(kind, locale)}
-            </span>
-            {index < lineage.hierarchy.length - 1 ? (
-              <ArrowRight size={12} className="kb-text-muted" aria-hidden="true" />
-            ) : null}
-          </React.Fragment>
-        ))}
-      </div>
-      <div className="mt-4 grid gap-2 md:grid-cols-5">
-        {lineage.hierarchy.map((kind) => {
-          const nodes = lineage.nodes.filter((node) => node.kind === kind).slice(0, 4);
-          const missing = lineage.missing_by_kind[kind] || 0;
-          return (
-            <div key={kind} className="rounded-xl border kb-border-subtle kb-surface-raised p-2">
-              <div className="text-[11px] font-bold kb-text-muted">
-                {lineageLabel(kind, locale)}
-              </div>
-              <div className="mt-2 grid gap-1">
-                {nodes.map((node) => (
-                  <div
-                    key={node.key}
-                    className="truncate text-[11px] kb-text-primary"
-                    title={node.id}
-                  >
-                    {node.id} <span className="kb-text-muted">({node.item_count})</span>
-                  </div>
-                ))}
-                {missing > 0 ? (
-                  <div className="text-[11px] kb-status-warning">
-                    {uxText('chronos_lineage_missing', locale)} ({missing})
-                  </div>
-                ) : null}
-                {nodes.length === 0 && missing === 0 ? (
-                  <div className="text-[11px] kb-text-muted">-</div>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {lineage.edges.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2 text-[11px] kb-text-muted">
-          {lineage.edges.slice(0, 8).map((edge) => (
-            <span
-              key={`${edge.from}->${edge.to}`}
-              className="rounded border kb-border-subtle px-2 py-1"
-            >
-              {lineageLabel(edge.from, locale)} → {lineageLabel(edge.to, locale)} ({edge.item_count}
-              )
-            </span>
-          ))}
+      <Disclosure
+        summary={uxTextOr('chronos_ws_lineage_breakdown', 'Show the breakdown by level', locale)}
+      >
+        <div className="kb-table-wrap">
+          <table className="kb-table">
+            <thead>
+              <tr>
+                <th scope="col" style={{ width: '10rem' }}>
+                  {uxTextOr('chronos_ws_col_level', 'Level', locale)}
+                </th>
+                <th scope="col">{uxTextOr('chronos_ws_col_values', 'Values (items)', locale)}</th>
+                <th scope="col" data-align="end" style={{ width: '7rem' }}>
+                  {uxText('chronos_lineage_missing', locale)}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {lineage.hierarchy.map((kind) => {
+                const nodes = lineage.nodes.filter((node) => node.kind === kind).slice(0, 4);
+                const missing = lineage.missing_by_kind[kind] || 0;
+                return (
+                  <tr key={kind}>
+                    <td>{lineageLabel(kind, locale)}</td>
+                    <td data-mono="true">
+                      {nodes.length
+                        ? nodes.map((node) => `${node.id} (${node.item_count})`).join(', ')
+                        : '-'}
+                    </td>
+                    <td data-align="end">
+                      {missing > 0 ? (
+                        <StatusPill status="needs_setup" label={String(missing)} />
+                      ) : (
+                        <span className="chronos-muted">0</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      ) : null}
-    </section>
+        {lineage.edges.length > 0 ? (
+          <List
+            items={lineage.edges.slice(0, 8).map((edge) => ({
+              title: `${lineageLabel(edge.from, locale)} → ${lineageLabel(edge.to, locale)}`,
+              meta: String(edge.item_count),
+            }))}
+          />
+        ) : null}
+      </Disclosure>
+    </Section>
   );
 }
 
@@ -517,26 +498,24 @@ function WorkItemLineageChain({
     ['mission_id', context.mission_id],
     ['task_id', context.task_id],
   ] as const;
+  const missingLabel = uxText('chronos_lineage_missing', locale);
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1 text-[11px]" aria-label="scope lineage">
+    <span
+      className="kb-list__meta"
+      aria-label={uxTextOr('chronos_ws_scope_lineage', 'Scope lineage', locale)}
+    >
       {chain.map(([kind, value], index) => (
         <React.Fragment key={kind}>
           <span
-            className={`max-w-full truncate rounded border px-1.5 py-1 ${
-              value
-                ? 'kb-border-subtle kb-surface-sunken kb-text-secondary'
-                : 'kb-status-warning-border kb-status-warning-surface kb-status-warning'
-            }`}
-            title={
-              value || `${lineageLabel(kind, locale)} ${uxText('chronos_lineage_missing', locale)}`
-            }
+            title={value || `${lineageLabel(kind, locale)} ${missingLabel}`}
+            className={value ? undefined : 'chronos-scope__error'}
           >
-            {lineageLabel(kind, locale)}: {value || uxText('chronos_lineage_missing', locale)}
+            {lineageLabel(kind, locale)}: {value || missingLabel}
           </span>
-          {index < chain.length - 1 ? <ArrowRight size={10} className="kb-text-muted" /> : null}
+          {index < chain.length - 1 ? ' › ' : null}
         </React.Fragment>
       ))}
-    </div>
+    </span>
   );
 }
 

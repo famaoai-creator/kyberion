@@ -1,22 +1,38 @@
 'use client';
 
-import { Fragment, type KeyboardEvent } from 'react';
+import {
+  Fragment,
+  isValidElement,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import type {
   KbCodeProps,
   KbKvProps,
   KbListProps,
   KbMetricProps,
+  KbTableBadgeCell,
+  KbTableCell,
+  KbTableColumn,
   KbTableProps,
+  KbTableStatusCell,
+  KbTableTitleCell,
   KbTextProps,
 } from '@agent/core/a2ui-catalog';
 import { defaultNavigate, useA2UIActions } from '../actions.js';
 import { isKbStatus } from '../catalog.js';
 import { KB_UI_MESSAGE_KEYS, useKbI18n } from '../i18n.js';
 import { KbIcon } from '../icons.js';
-import { codeLanguage, listProgressPercent } from '../../vanilla/kyberion-ui.js';
+import {
+  codeLanguage,
+  isInteractiveTarget,
+  listProgressPercent,
+  tableCellKind,
+} from '../../vanilla/kyberion-ui.js';
 import { asArray, formatScalar, safeCssLength, safeHref } from '../safety.js';
 import { KbLink } from './controls.js';
-import { StatusPill, toneAttr } from './feedback.js';
+import { Badge, StatusPill, toneAttr } from './feedback.js';
 
 const TREND_ICONS = { up: 'arrow-up', down: 'arrow-down', flat: 'arrow-right' } as const;
 const TREND_MESSAGE_KEYS = {
@@ -81,16 +97,88 @@ function alignAttr(align: unknown): string | undefined {
   return typeof align === 'string' && ALIGNS.has(align) && align !== 'start' ? align : undefined;
 }
 
+/** Context handed to `Table`'s `renderCell`. */
+export interface TableCellContext {
+  row: Readonly<Record<string, unknown>>;
+  column: KbTableColumn;
+  value: unknown;
+  rowIndex: number;
+}
+
+/**
+ * Props for `Table`: the catalog `ui:table` contract plus React-only
+ * conveniences. A cell value may also be a React element (rendered as-is —
+ * usable from a Server Component, since elements serialize), and
+ * `renderCell` may render any cell (return `undefined` to keep the default).
+ */
+export type TableProps = Omit<KbTableProps, 'rows'> & {
+  rows: ReadonlyArray<Readonly<Record<string, KbTableCell | ReactNode>>>;
+  /** React-only (not in the catalog schema): custom cell rendering. */
+  renderCell?: (context: TableCellContext) => ReactNode | undefined;
+  /** Row field used as the React key (default: the row index). */
+  row_key?: string;
+};
+
+/** `{title, id?, href?}` → `.kb-table__cell` > `__title` (link when `href` is safe) + `__id` (mono). */
+function TableTitleCell({ cell }: { cell: KbTableTitleCell }) {
+  const href = safeHref(cell.href);
+  return (
+    <span className="kb-table__cell">
+      {href ? (
+        <KbLink href={href} className="kb-table__title">
+          {cell.title}
+        </KbLink>
+      ) : (
+        <span className="kb-table__title">{cell.title}</span>
+      )}
+      {typeof cell.id === 'string' && cell.id ? (
+        <span className="kb-table__id">{cell.id}</span>
+      ) : null}
+    </span>
+  );
+}
+
 /**
  * `ui:table` → `.kb-table-wrap > table.kb-table`. Rows whose `row_href_key`
  * value is a safe href get `data-href`, become focusable and navigate on
- * click / Enter; unsafe values are dropped. Empty → `.kb-table__empty` cell.
+ * click / Enter (a click on a link or control inside the row acts on its
+ * own); unsafe values are dropped. Rich cells: `{title, id?, href?}`,
+ * `{status, label?, domain?}` (status pill), `{badge, tone?}` (badge).
+ * Empty → `.kb-table__empty` cell.
  */
-export function Table({ caption, columns, rows, row_href_key, empty }: KbTableProps) {
+export function Table({
+  caption,
+  columns,
+  rows,
+  row_href_key,
+  empty,
+  renderCell,
+  row_key,
+}: TableProps) {
   const { navigate = defaultNavigate } = useA2UIActions();
   const { t } = useKbI18n();
   const cols = asArray(columns);
-  const body = asArray(rows);
+  const body = Array.isArray(rows) ? rows : [];
+
+  const cellContent = (value: unknown, column: KbTableColumn): ReactNode => {
+    if (isValidElement(value)) return value;
+    const kind = tableCellKind(value);
+    if (kind === 'title') return <TableTitleCell cell={value as KbTableTitleCell} />;
+    if (kind === 'status') {
+      const cell = value as KbTableStatusCell;
+      return <StatusPill status={cell.status} domain={cell.domain} label={cell.label} />;
+    }
+    if (kind === 'badge') {
+      const cell = value as KbTableBadgeCell;
+      return <Badge label={cell.badge} tone={cell.tone} />;
+    }
+    // Convention: a `status` / `*_status` column holding a canonical status
+    // value renders as a status pill.
+    const isStatusColumn = column.key === 'status' || column.key.endsWith('_status');
+    if (isStatusColumn && isKbStatus(value)) return <StatusPill status={value} />;
+    return formatScalar(value, t);
+  };
+
   return (
     <div className="kb-table-wrap">
       <table className="kb-table">
@@ -123,27 +211,38 @@ export function Table({ caption, columns, rows, row_href_key, empty }: KbTablePr
             body.map((row, rowIndex) => {
               const href = row_href_key ? safeHref(row?.[row_href_key]) : undefined;
               const open = href ? () => navigate(href) : undefined;
+              const keyValue = row_key ? row?.[row_key] : undefined;
+              const key =
+                typeof keyValue === 'string' || typeof keyValue === 'number' ? keyValue : rowIndex;
               return (
                 <tr
-                  key={rowIndex}
+                  key={key}
                   data-href={href}
                   tabIndex={href ? 0 : undefined}
-                  onClick={open}
+                  onClick={
+                    open
+                      ? (event: MouseEvent<HTMLTableRowElement>) => {
+                          // Links / controls inside the row act on their own.
+                          if (isInteractiveTarget(event.target, event.currentTarget)) return;
+                          open();
+                        }
+                      : undefined
+                  }
                   onKeyDown={
                     open
                       ? (event: KeyboardEvent<HTMLTableRowElement>) => {
-                          if (event.key === 'Enter') open();
+                          if (event.key === 'Enter' && event.target === event.currentTarget) open();
                         }
                       : undefined
                   }
                 >
                   {cols.map((column) => {
                     const value = row?.[column.key];
-                    // Convention: a `status` / `*_status` column holding a
-                    // canonical status value renders as a status pill.
-                    const isStatusColumn =
-                      column.key === 'status' || column.key.endsWith('_status');
-                    const text = formatScalar(value, t);
+                    const custom = renderCell
+                      ? renderCell({ row: row ?? {}, column, value, rowIndex })
+                      : undefined;
+                    const content = custom !== undefined ? custom : cellContent(value, column);
+                    const text = typeof content === 'string' ? content : undefined;
                     return (
                       <td
                         key={column.key}
@@ -152,9 +251,9 @@ export function Table({ caption, columns, rows, row_href_key, empty }: KbTablePr
                         // Mono columns (ids, hashes) never wrap mid-token
                         // (see the source CSS); the title gives the full
                         // value back when the column stays narrower than it.
-                        title={column.mono && !isStatusColumn && text ? text : undefined}
+                        title={column.mono && text ? text : undefined}
                       >
-                        {isStatusColumn && isKbStatus(value) ? <StatusPill status={value} /> : text}
+                        {content}
                       </td>
                     );
                   })}
@@ -167,6 +266,10 @@ export function Table({ caption, columns, rows, row_href_key, empty }: KbTablePr
     </div>
   );
 }
+
+// Compile-time guarantee that the catalog props are accepted as-is.
+const _catalogTableIsAccepted = (props: KbTableProps): TableProps => props;
+void _catalogTableIsAccepted;
 
 /**
  * `ui:list` item `progress` → `.kb-list__progress`: a `role="progressbar"`

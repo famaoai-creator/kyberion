@@ -1,10 +1,10 @@
-import { Callout, Grid, List, Metric, Section, StatusPill } from '@agent/shared-ui';
+import { Callout, Grid, List, Metric, Section, StatusPill, Table } from '@agent/shared-ui';
 import { inspectReasoningRoutes } from '@agent/core/reasoning-route-doctor';
 import { emitMosRead } from '@/lib/audit-mos';
 import { operatorTranslator } from '@/lib/i18n';
 import { getRequestLocale } from '@/lib/request-locale';
 import { asKbStatus, formatTimestamp } from '@/lib/view';
-import { DataTable, type DataTableRow } from '@/components/DataTable';
+import { ROW_HREF, ROW_KEY, tableRows, type OperatorTableRow } from '@/lib/table-rows';
 import { OperatorPageHeader } from '../operator-shell';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export default async function ReasoningPage() {
       ? { status: 'fallback' as const, label: t('reasoning_config_degraded') }
       : { status: 'ready' as const, label: t('reasoning_config_ready') };
 
-  const rows: DataTableRow[] = report.entries.map((entry) => ({
+  const rows: OperatorTableRow[] = report.entries.map((entry) => ({
     id: entry.role,
     cells: {
       role: <span className="operator-mono">{entry.role}</span>,
@@ -67,7 +67,9 @@ export default async function ReasoningPage() {
         <Metric label={t('reasoning_routes')} value={report.entries.length} />
       </Grid>
       <Section title={t('reasoning_routes_title')}>
-        <DataTable
+        <Table
+          row_key={ROW_KEY}
+          row_href_key={ROW_HREF}
           columns={[
             { key: 'role', label: t('col_role') },
             { key: 'selected', label: t('col_selected') },
@@ -76,7 +78,7 @@ export default async function ReasoningPage() {
             { key: 'status', label: t('col_status') },
             { key: 'reason', label: t('col_reason') },
           ]}
-          rows={rows}
+          rows={tableRows(rows)}
           empty={t('reasoning_empty')}
         />
       </Section>

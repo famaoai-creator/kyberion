@@ -1,8 +1,25 @@
 'use client';
 
-import { Search, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
+import {
+  Badge,
+  Button,
+  Callout,
+  Code,
+  Disclosure,
+  EmptyState,
+  KbChart,
+  KeyValue,
+  List,
+  Section,
+  Select,
+  Skeleton,
+  Stack,
+  StatusPill,
+  TextField,
+} from '@agent/shared-ui';
 import {
   isJsonRecord,
   optionalStringField,
@@ -10,8 +27,16 @@ import {
   parseJsonRecord,
   recordField,
 } from '../lib/json-record';
-import { chronosSpeechLocale } from '../lib/ux-vocabulary';
-import { SurfaceStatusPanel } from './SurfaceStatusPanel';
+import { useChronosLocale } from '../lib/hooks';
+import { chronosSpeechLocale, uxMessage, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
+import {
+  ChronosDiagram,
+  ChronosFieldScope,
+  ChronosInline,
+  ChronosMeta,
+  ChronosToolbar,
+} from './chronos-ui';
+import { WsSelectTable, WsTitleCell } from './ChronosWsParts';
 import {
   parseTraceDetailResponse,
   parseTraceFeedResponse,
@@ -43,31 +68,9 @@ const DEFAULT_SORT: TraceSort = 'error-first';
 const TRACE_VIEWER_PREFS_KEY = 'chronos.trace-viewer.prefs';
 
 function formatTs(value?: string): string {
-  if (!value) return 'n/a';
+  if (!value) return '—';
   const ts = new Date(value);
   return Number.isNaN(ts.getTime()) ? value : ts.toLocaleString(chronosSpeechLocale());
-}
-
-function statusTone(status: TraceFeedRecord['status']): string {
-  switch (status) {
-    case 'error':
-      return 'kb-status-negative-border kb-status-negative-surface kb-status-negative';
-    case 'ok':
-      return 'kb-status-positive-border kb-status-positive-surface kb-status-positive';
-    default:
-      return 'kb-status-warning-border kb-status-warning-surface kb-status-warning';
-  }
-}
-
-function spanTone(status: TraceSpanDetail['status']): string {
-  switch (status) {
-    case 'error':
-      return 'kb-status-negative-border kb-status-negative-surface';
-    case 'ok':
-      return 'kb-status-positive-border kb-status-positive-surface';
-    default:
-      return 'kb-status-warning-border kb-status-warning-surface';
-  }
 }
 
 function gapPhaseBreakdown(span: TraceSpanDetail): Array<{ phase: string; ms: number }> {
@@ -269,242 +272,273 @@ function saveTraceViewerPrefs(prefs: TraceViewerPrefs): void {
   }
 }
 
+/** Trace / span state → canonical `ui:status-pill` status. */
+const TRACE_STATUS: Record<TraceFeedRecord['status'], KbStatus> = {
+  ok: 'done',
+  error: 'failed',
+  in_progress: 'running',
+};
+
+const SPAN_FLOW_NODE_LIMIT = 24;
+
+function spanDurationMs(span: TraceSpanDetail): number | null {
+  if (!span.endTime) return null;
+  const start = new Date(span.startTime).getTime();
+  const end = new Date(span.endTime).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  return Math.max(0, end - start);
+}
+
+/** The span tree as `ui:flow` nodes / edges (breadth-first, capped). */
+function buildSpanFlow(root: TraceSpanDetail): {
+  nodes: Array<{ id: string; label: string; status: KbStatus; meta?: string }>;
+  edges: Array<{ from: string; to: string }>;
+} {
+  const nodes: Array<{ id: string; label: string; status: KbStatus; meta?: string }> = [];
+  const edges: Array<{ from: string; to: string }> = [];
+  const queue: Array<{ span: TraceSpanDetail; id: string; parent: string | null }> = [
+    { span: root, id: 'span-0', parent: null },
+  ];
+  while (queue.length > 0 && nodes.length < SPAN_FLOW_NODE_LIMIT) {
+    const { span, id, parent } = queue.shift()!;
+    const duration = spanDurationMs(span);
+    nodes.push({
+      id,
+      label: span.name,
+      status: TRACE_STATUS[span.status],
+      meta: duration === null ? undefined : `${duration} ms`,
+    });
+    if (parent) edges.push({ from: parent, to: id });
+    span.children.forEach((child, index) => {
+      queue.push({ span: child, id: `${id}.${index}`, parent: id });
+    });
+  }
+  return { nodes, edges };
+}
+
+function traceStatusOptions(locale: SupportedLocale) {
+  return [
+    { value: 'all', label: uxText('chronos_trace_all_statuses', locale) },
+    { value: 'ok', label: uxText('chronos_trace_status_ok', locale) },
+    { value: 'error', label: uxText('chronos_trace_status_error', locale) },
+    { value: 'in_progress', label: uxText('chronos_trace_status_in_progress', locale) },
+  ];
+}
+
+function traceSortOptions(locale: SupportedLocale): Array<{ value: TraceSort; label: string }> {
+  return [
+    { value: 'error-first', label: uxText('chronos_trace_sort_error_first', locale) },
+    { value: 'newest', label: uxText('chronos_trace_sort_newest', locale) },
+    { value: 'oldest', label: uxText('chronos_trace_sort_oldest', locale) },
+    { value: 'largest', label: uxText('chronos_trace_sort_largest', locale) },
+  ];
+}
+
 function TraceSpanTree({
   span,
   depth = 0,
   onCopy,
+  locale,
 }: {
   span: TraceSpanDetail;
   depth?: number;
   onCopy: (value: string, label: string) => Promise<void> | void;
+  locale: SupportedLocale;
 }) {
-  const [showEvents, setShowEvents] = useState(depth === 0);
-  const [showArtifacts, setShowArtifacts] = useState(depth === 0);
-  const [showChildren, setShowChildren] = useState(depth === 0);
-  const [showKnowledge, setShowKnowledge] = useState(depth === 0);
   const previewEvents = span.events.slice(0, 3);
   const previewArtifacts = span.artifacts.slice(0, 3);
   const gapPhases = gapPhaseBreakdown(span);
+  const attributes = span.attributes ? Object.entries(span.attributes) : [];
 
   return (
-    <div
-      className={`rounded-lg border ${spanTone(span.status)} p-3 ${depth > 0 ? 'ml-4 mt-3' : ''}`}
-    >
-      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h5 className="text-sm font-semibold kb-text-primary">{span.name}</h5>
-            <span className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-0.5 text-[11px] kb-text-secondary">
-              {span.status}
-            </span>
-          </div>
-          <p className="font-mono text-[11px] kb-text-muted">
-            {span.spanId || 'no-span-id'} · {formatTs(span.startTime)}
-            {span.endTime ? ` → ${formatTs(span.endTime)}` : ''}
-          </p>
-          {span.error ? <p className="text-xs kb-status-negative">{span.error}</p> : null}
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-[11px] kb-text-secondary md:text-right">
-          <div>
-            <div className="kb-text-muted">events</div>
-            <div>{span.events.length}</div>
-          </div>
-          <div>
-            <div className="kb-text-muted">artifacts</div>
-            <div>{span.artifacts.length}</div>
-          </div>
-          <div>
-            <div className="kb-text-muted">children</div>
-            <div>{span.children.length}</div>
-          </div>
-        </div>
-      </div>
+    <Stack gap="sm">
+      <ChronosInline>
+        <strong>{span.name}</strong>
+        <StatusPill status={TRACE_STATUS[span.status]} />
+        <ChronosMeta mono>
+          {span.spanId || uxText('chronos_trace_no_span_id', locale)} · {formatTs(span.startTime)}
+          {span.endTime ? ` → ${formatTs(span.endTime)}` : ''}
+        </ChronosMeta>
+      </ChronosInline>
+      <ChronosMeta>
+        {uxMessage(
+          'chronos_trace_span_counts',
+          {
+            events: span.events.length,
+            artifacts: span.artifacts.length,
+            children: span.children.length,
+          },
+          '{events} events · {artifacts} artifacts · {children} child spans',
+          locale
+        )}
+      </ChronosMeta>
+      {span.error ? <Callout tone="danger" title={span.error} /> : null}
 
-      {span.attributes && Object.keys(span.attributes).length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {Object.entries(span.attributes).map(([key, value]) => (
-            <span
-              key={key}
-              className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-0.5 font-mono text-[11px] kb-text-secondary"
-            >
-              {key}={String(value)}
-            </span>
-          ))}
-        </div>
+      {attributes.length > 0 ? (
+        <KeyValue
+          items={attributes.map(([key, value]) => ({
+            label: key,
+            value: String(value),
+            mono: true,
+          }))}
+        />
       ) : null}
 
       {gapPhases.length > 0 ? (
-        <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken p-2">
-          <div className="text-[11px] kb-text-muted">dispatch gap breakdown</div>
-          <div className="mt-2 grid gap-1 sm:grid-cols-2">
-            {gapPhases.map((entry) => (
-              <div
-                key={entry.phase}
-                className="flex justify-between gap-3 text-[11px] kb-text-secondary"
-              >
-                <span>{entry.phase}</span>
-                <span className="font-mono">{entry.ms} ms</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Disclosure summary={uxText('chronos_trace_gap_breakdown', locale)} open={depth === 0}>
+          <KeyValue
+            items={gapPhases.map((entry) => ({
+              label: entry.phase,
+              value: `${entry.ms} ms`,
+              mono: true,
+            }))}
+          />
+        </Disclosure>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {span.knowledgeRefs.length > 0 ? (
-          <span className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-muted">
-            knowledge {span.knowledgeRefs.length}
-          </span>
-        ) : null}
-        {span.events.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => setShowEvents((value) => !value)}
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-          >
-            {showEvents ? 'Hide' : 'Show'} events {span.events.length}
-          </button>
-        ) : null}
-        {span.events.length > 0 ? (
-          <button
-            type="button"
-            onClick={() =>
-              void onCopy(
-                span.events
-                  .map(
-                    (event) =>
-                      `${formatTs(event.timestamp)} ${event.name}${event.attributes ? ` ${JSON.stringify(event.attributes)}` : ''}`
-                  )
-                  .join('\n'),
-                'events'
-              )
-            }
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-          >
-            Copy events
-          </button>
-        ) : null}
-        {span.artifacts.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => setShowArtifacts((value) => !value)}
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-          >
-            {showArtifacts ? 'Hide' : 'Show'} artifacts {span.artifacts.length}
-          </button>
-        ) : null}
-        {span.artifacts.length > 0 ? (
-          <button
-            type="button"
-            onClick={() =>
-              void onCopy(
-                span.artifacts
-                  .map(
-                    (artifact) =>
-                      `${formatTs(artifact.timestamp)} ${artifact.type} ${artifact.description || artifact.path}`
-                  )
-                  .join('\n'),
-                'artifacts'
-              )
-            }
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-          >
-            Copy artifacts
-          </button>
-        ) : null}
-        {span.children.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => setShowChildren((value) => !value)}
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-          >
-            {showChildren ? 'Hide' : 'Show'} children {span.children.length}
-          </button>
-        ) : null}
-        {span.knowledgeRefs.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => setShowKnowledge((value) => !value)}
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-          >
-            {showKnowledge ? 'Hide' : 'Show'} refs {span.knowledgeRefs.length}
-          </button>
-        ) : null}
-        {span.knowledgeRefs.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => void onCopy(span.knowledgeRefs.join('\n'), 'knowledge refs')}
-            className="rounded-full border kb-border-subtle kb-surface-sunken px-2 py-1 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-          >
-            Copy refs
-          </button>
-        ) : null}
-      </div>
-
-      {showKnowledge && span.knowledgeRefs.length > 0 ? (
-        <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken p-2">
-          <div className="text-[11px] kb-text-muted">knowledge refs</div>
-          <div className="mt-1 space-y-1">
-            {span.knowledgeRefs.slice(0, 4).map((ref) => (
-              <div key={ref} className="font-mono text-[11px] kb-text-secondary">
-                {ref}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {showEvents && previewEvents.length > 0 ? (
-        <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken p-2">
-          <div className="text-[11px] kb-text-muted">events</div>
-          <div className="mt-1 space-y-1">
-            {previewEvents.map((event, index) => (
-              <div key={`${event.timestamp}-${index}`} className="text-[11px] kb-text-secondary">
-                <span className="font-mono kb-text-muted">{formatTs(event.timestamp)}</span>{' '}
-                {event.name}
-              </div>
-            ))}
-            {span.events.length > previewEvents.length ? (
-              <div className="text-[11px] kb-text-muted">
-                +{span.events.length - previewEvents.length} more
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {showArtifacts && previewArtifacts.length > 0 ? (
-        <div className="mt-3 rounded-xl border kb-border-subtle kb-surface-sunken p-2">
-          <div className="text-[11px] kb-text-muted">artifacts</div>
-          <div className="mt-1 space-y-1">
-            {previewArtifacts.map((artifact, index) => (
-              <div key={`${artifact.timestamp}-${index}`} className="text-[11px] kb-text-secondary">
-                <span className="font-mono kb-text-muted">{artifact.type}</span>{' '}
-                {artifact.description || artifact.path}
-              </div>
-            ))}
-            {span.artifacts.length > previewArtifacts.length ? (
-              <div className="text-[11px] kb-text-muted">
-                +{span.artifacts.length - previewArtifacts.length} more
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {showChildren && span.children.length > 0 ? (
-        <div className="mt-3 space-y-3">
-          {span.children.map((child, index) => (
-            <TraceSpanTree
-              key={`${child.spanId || child.name}-${index}`}
-              span={child}
-              depth={depth + 1}
-              onCopy={onCopy}
+      {span.knowledgeRefs.length > 0 ? (
+        <Disclosure
+          summary={uxMessage(
+            'chronos_trace_refs_summary',
+            { count: span.knowledgeRefs.length },
+            'Knowledge refs ({count})',
+            locale
+          )}
+          open={depth === 0}
+        >
+          <List items={span.knowledgeRefs.slice(0, 4).map((ref) => ({ title: ref }))} />
+          <ChronosToolbar>
+            <Button
+              label={uxText('chronos_trace_copy_refs', locale)}
+              variant="ghost"
+              onClick={() =>
+                void onCopy(
+                  span.knowledgeRefs.join('\n'),
+                  uxText('chronos_trace_label_refs', locale)
+                )
+              }
             />
-          ))}
-        </div>
+          </ChronosToolbar>
+        </Disclosure>
       ) : null}
-    </div>
+
+      {previewEvents.length > 0 ? (
+        <Disclosure
+          summary={uxMessage(
+            'chronos_trace_events_summary',
+            { count: span.events.length },
+            'Events ({count})',
+            locale
+          )}
+          open={depth === 0}
+        >
+          <List
+            variant="timeline"
+            items={previewEvents.map((event) => ({
+              title: event.name,
+              meta: formatTs(event.timestamp),
+            }))}
+          />
+          {span.events.length > previewEvents.length ? (
+            <ChronosMeta>
+              {uxMessage(
+                'chronos_trace_more',
+                { count: span.events.length - previewEvents.length },
+                '+{count} more',
+                locale
+              )}
+            </ChronosMeta>
+          ) : null}
+          <ChronosToolbar>
+            <Button
+              label={uxText('chronos_trace_copy_events', locale)}
+              variant="ghost"
+              onClick={() =>
+                void onCopy(
+                  span.events
+                    .map(
+                      (event) =>
+                        `${formatTs(event.timestamp)} ${event.name}${event.attributes ? ` ${JSON.stringify(event.attributes)}` : ''}`
+                    )
+                    .join('\n'),
+                  uxText('chronos_trace_label_events', locale)
+                )
+              }
+            />
+          </ChronosToolbar>
+        </Disclosure>
+      ) : null}
+
+      {previewArtifacts.length > 0 ? (
+        <Disclosure
+          summary={uxMessage(
+            'chronos_trace_artifacts_summary',
+            { count: span.artifacts.length },
+            'Artifacts ({count})',
+            locale
+          )}
+          open={depth === 0}
+        >
+          <List
+            items={previewArtifacts.map((artifact) => ({
+              title: artifact.description || artifact.path,
+              meta: `${artifact.type} · ${formatTs(artifact.timestamp)}`,
+            }))}
+          />
+          {span.artifacts.length > previewArtifacts.length ? (
+            <ChronosMeta>
+              {uxMessage(
+                'chronos_trace_more',
+                { count: span.artifacts.length - previewArtifacts.length },
+                '+{count} more',
+                locale
+              )}
+            </ChronosMeta>
+          ) : null}
+          <ChronosToolbar>
+            <Button
+              label={uxText('chronos_trace_copy_artifacts', locale)}
+              variant="ghost"
+              onClick={() =>
+                void onCopy(
+                  span.artifacts
+                    .map(
+                      (artifact) =>
+                        `${formatTs(artifact.timestamp)} ${artifact.type} ${artifact.description || artifact.path}`
+                    )
+                    .join('\n'),
+                  uxText('chronos_trace_label_artifacts', locale)
+                )
+              }
+            />
+          </ChronosToolbar>
+        </Disclosure>
+      ) : null}
+
+      {span.children.length > 0 ? (
+        <Disclosure
+          summary={uxMessage(
+            'chronos_trace_children_summary',
+            { count: span.children.length },
+            'Child spans ({count})',
+            locale
+          )}
+          open={depth === 0}
+        >
+          <Stack gap="md">
+            {span.children.map((child, index) => (
+              <TraceSpanTree
+                key={`${child.spanId || child.name}-${index}`}
+                span={child}
+                depth={depth + 1}
+                onCopy={onCopy}
+                locale={locale}
+              />
+            ))}
+          </Stack>
+        </Disclosure>
+      ) : null}
+    </Stack>
   );
 }
 
@@ -519,6 +553,7 @@ export function TraceViewer({
   organizationId?: string;
   projectId?: string;
 }) {
+  const locale = useChronosLocale();
   const searchParams = useSearchParams();
   const activeTenant = tenant || searchParams.get('tenant') || undefined;
   const activeOrganizationId = organizationId || searchParams.get('organization_id') || undefined;
@@ -761,13 +796,16 @@ export function TraceViewer({
   async function copyText(value: string, label: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(value);
-      setCopiedValue(label);
+      const copied = uxMessage('chronos_trace_copied', { label }, 'Copied {label}', locale);
+      setCopiedValue(copied);
       window.setTimeout(
-        () => setCopiedValue((current) => (current === label ? null : current)),
+        () => setCopiedValue((current) => (current === copied ? null : current)),
         1600
       );
     } catch {
-      setCopiedValue(`copy failed: ${label}`);
+      setCopiedValue(
+        uxMessage('chronos_trace_copy_failed', { label }, 'Copy failed: {label}', locale)
+      );
       window.setTimeout(() => setCopiedValue(null), 1600);
     }
   }
@@ -813,444 +851,420 @@ export function TraceViewer({
     setRawTraceVisible(false);
   }
 
+  function handleFieldChange(name: string, value: unknown): void {
+    const text = typeof value === 'string' ? value : '';
+    if (name === 'query') setFilters((current) => ({ ...current, query: text }));
+    else if (name === 'status') {
+      setFilters((current) => ({
+        ...current,
+        status:
+          text === 'ok' || text === 'error' || text === 'in_progress'
+            ? (text as TraceFilters['status'])
+            : 'all',
+      }));
+    } else if (name === 'missionId') setFilters((current) => ({ ...current, missionId: text }));
+    else if (name === 'actuator') setFilters((current) => ({ ...current, actuator: text }));
+    else if (name === 'sort') {
+      const next = traceSortOptions(locale).find((option) => option.value === text);
+      if (next) setSort(next.value);
+    } else if (name === 'rawTraceFocus') setRawTraceFocusTraceId(text);
+  }
+
+  const refresh = () => setRefreshTick((value) => value + 1);
+  const spanFlow = selectedTrace ? buildSpanFlow(selectedTrace.rootSpan) : null;
+
   return (
-    <section className="rounded-xl border kb-border-subtle p-6 kb-text-primary">
-      <div className="flex flex-col gap-4 border-b kb-border-subtle pb-4 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-2">
-          <p className="text-xs kb-text-muted">Trace Viewer</p>
-          <h3 className="text-2xl font-semibold">Execution traces</h3>
-          <p className="max-w-2xl text-sm leading-6 kb-text-secondary">
-            Chronos reads persisted JSONL traces from the shared runtime log and surfaces the latest
-            execution summaries, span trees, events, artifact references, and filterable search.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setRefreshTick((value) => value + 1)}
-          className="inline-flex h-10 items-center justify-center rounded-full border kb-border-subtle kb-surface-raised px-4 text-sm font-medium kb-text-primary transition hover:kb-surface-raised"
-        >
-          Refresh
-        </button>
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border kb-border-subtle kb-surface-sunken p-3">
-        <div className="flex items-center gap-2 text-xs kb-text-muted">
-          <SlidersHorizontal className="h-4 w-4" />
-          Filters
-        </div>
-        <div className="text-[11px] kb-text-muted">1-9 · J/K · R</div>
-        <label className="flex min-w-[10rem] flex-1 items-center gap-2 rounded-xl border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-sm kb-text-secondary">
-          <Search className="h-4 w-4 kb-text-muted" />
-          <input
+    <Section
+      title={uxText('chronos_trace_title', locale)}
+      description={uxText('chronos_trace_description', locale)}
+    >
+      <ChronosFieldScope onChange={handleFieldChange}>
+        <ChronosToolbar>
+          <TextField
+            id="trace-query"
+            name="query"
+            type="search"
+            label={uxText('chronos_trace_search', locale)}
+            placeholder={uxText('chronos_trace_search_placeholder', locale)}
             value={filters.query}
-            onChange={(event) =>
-              setFilters((current) => ({ ...current, query: event.target.value }))
-            }
-            placeholder="Search trace ID, mission, actuator, or root span"
-            className="w-full bg-transparent text-sm kb-text-primary placeholder:kb-text-muted outline-none"
           />
-        </label>
-        <select
-          value={filters.status}
-          onChange={(event) =>
-            setFilters((current) => ({
-              ...current,
-              status:
-                event.target.value === 'all'
-                  ? 'all'
-                  : (event.target.value as TraceFilters['status']),
-            }))
-          }
-          className="rounded-xl border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-sm kb-text-primary outline-none"
-        >
-          <option value="all">All statuses</option>
-          <option value="ok">ok</option>
-          <option value="error">error</option>
-          <option value="in_progress">in_progress</option>
-        </select>
-        <select
-          value={filters.missionId}
-          onChange={(event) =>
-            setFilters((current) => ({ ...current, missionId: event.target.value }))
-          }
-          className="rounded-xl border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-sm kb-text-primary outline-none"
-        >
-          <option value="">All missions</option>
-          {missionOptions.map((missionId) => (
-            <option key={missionId} value={missionId}>
-              {missionId}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filters.actuator}
-          onChange={(event) =>
-            setFilters((current) => ({ ...current, actuator: event.target.value }))
-          }
-          className="rounded-xl border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-sm kb-text-primary outline-none"
-        >
-          <option value="">All actuators</option>
-          {actuatorOptions.map((actuator) => (
-            <option key={actuator} value={actuator}>
-              {actuator}
-            </option>
-          ))}
-        </select>
-        <select
-          value={sort}
-          onChange={(event) => setSort(event.target.value as TraceSort)}
-          className="rounded-xl border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-sm kb-text-primary outline-none"
-        >
-          <option value="error-first">Errors first</option>
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="largest">Largest spans</option>
-        </select>
-        <button
-          type="button"
-          onClick={resetTraceViewerPrefs}
-          className="rounded-xl border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-sm kb-text-primary transition hover:kb-surface-raised"
-        >
-          Reset
-        </button>
-      </div>
+          <Select
+            id="trace-status"
+            name="status"
+            label={uxText('chronos_trace_filter_status', locale)}
+            value={filters.status}
+            options={traceStatusOptions(locale)}
+          />
+          <Select
+            id="trace-mission"
+            name="missionId"
+            label={uxText('chronos_trace_filter_mission', locale)}
+            value={filters.missionId}
+            options={[
+              { value: '', label: uxText('chronos_ac_filter_all_missions', locale) },
+              ...missionOptions.map((missionId) => ({ value: missionId, label: missionId })),
+            ]}
+          />
+          <Select
+            id="trace-actuator"
+            name="actuator"
+            label={uxText('chronos_trace_filter_actuator', locale)}
+            value={filters.actuator}
+            options={[
+              { value: '', label: uxText('chronos_trace_all_actuators', locale) },
+              ...actuatorOptions.map((actuator) => ({ value: actuator, label: actuator })),
+            ]}
+          />
+          <Select
+            id="trace-sort"
+            name="sort"
+            label={uxText('chronos_trace_sort', locale)}
+            value={sort}
+            options={traceSortOptions(locale)}
+          />
+          <Button
+            label={uxText('chronos_trace_reset', locale)}
+            variant="ghost"
+            onClick={resetTraceViewerPrefs}
+          />
+          <Button label={uxText('chronos_refresh', locale)} onClick={refresh} />
+        </ChronosToolbar>
+      </ChronosFieldScope>
+      <ChronosMeta>{uxText('chronos_trace_hotkeys', locale)}</ChronosMeta>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="space-y-3">
-          {loadingList && (
-            <SurfaceStatusPanel
-              eyebrow="Trace feed"
-              title="Loading trace feed"
-              detail="Chronos is reading persisted JSONL traces from the shared runtime log."
-              tone="neutral"
+      <div className="chronos-two-col">
+        <div className="chronos-feed">
+          <h3 className="chronos-feed__title">{uxText('chronos_trace_feed', locale)}</h3>
+          {loadingList ? (
+            <Skeleton
+              shape="table"
+              lines={4}
+              label={uxText('chronos_trace_loading_feed', locale)}
             />
-          )}
-          {listError && (
-            <SurfaceStatusPanel
-              eyebrow="Trace feed"
-              title="Unable to load traces"
-              detail={listError}
-              tone="error"
-              actionLabel="Retry"
-              onAction={() => setRefreshTick((value) => value + 1)}
-            />
-          )}
-          {!loadingList && !listError && traces.length === 0 && (
-            <SurfaceStatusPanel
-              eyebrow="No matches"
-              title="No traces matched the current filters"
-              detail={`Try clearing the filters or refreshing. The trace directory is ${data?.traceDir ?? 'active/shared/logs/traces'}.`}
+          ) : null}
+          {listError ? (
+            <Callout
+              tone="danger"
+              title={uxText('chronos_trace_feed_failed', locale)}
+              body={listError}
+            >
+              <ChronosToolbar>
+                <Button label={uxText('chronos_action_retry', locale)} onClick={refresh} />
+              </ChronosToolbar>
+            </Callout>
+          ) : null}
+          {!loadingList && !listError && traces.length === 0 ? (
+            <Callout
               tone="warning"
-              actionLabel="Reset filters"
-              onAction={resetTraceViewerPrefs}
-              secondaryActionLabel="Refresh"
-              onSecondaryAction={() => setRefreshTick((value) => value + 1)}
+              title={uxText('chronos_trace_no_matches', locale)}
+              body={uxMessage(
+                'chronos_trace_no_matches_detail',
+                { dir: data?.traceDir ?? 'active/shared/logs/traces' },
+                'Try clearing the filters or refreshing. The trace directory is {dir}.',
+                locale
+              )}
+            >
+              <ChronosToolbar>
+                <Button
+                  label={uxText('chronos_trace_reset_filters', locale)}
+                  onClick={resetTraceViewerPrefs}
+                />
+                <Button
+                  label={uxText('chronos_refresh', locale)}
+                  variant="ghost"
+                  onClick={refresh}
+                />
+              </ChronosToolbar>
+            </Callout>
+          ) : null}
+          {visibleTraces.length > 0 ? (
+            <WsSelectTable
+              columns={[
+                { key: 'trace', label: uxText('chronos_trace_col_trace', locale) },
+                { key: 'status', label: uxText('chronos_trace_col_status', locale), width: '7rem' },
+                {
+                  key: 'spans',
+                  label: uxText('chronos_trace_col_spans', locale),
+                  width: '4.5rem',
+                  align: 'end',
+                },
+                {
+                  key: 'errors',
+                  label: uxText('chronos_trace_col_errors', locale),
+                  width: '4.5rem',
+                  align: 'end',
+                },
+                { key: 'persisted', label: uxText('chronos_trace_col_persisted', locale) },
+              ]}
+              rows={visibleTraces}
+              rowKey={(trace) => trace.traceId}
+              selectedKey={selectedTraceId}
+              onSelect={setSelectedTraceId}
+              renderCell={(trace, key, select) => {
+                if (key === 'trace') {
+                  return (
+                    <WsTitleCell
+                      title={trace.rootSpanName}
+                      id={[trace.traceId, trace.missionId, trace.pipelineId, trace.actuator]
+                        .filter(Boolean)
+                        .join(' · ')}
+                      onSelect={select}
+                      selected={trace.traceId === selectedTraceId}
+                    />
+                  );
+                }
+                if (key === 'status') return <StatusPill status={TRACE_STATUS[trace.status]} />;
+                if (key === 'spans') return trace.spanCount;
+                if (key === 'errors') return trace.errorCount;
+                return formatTs(trace.persistedAt);
+              }}
+              empty={uxText('chronos_trace_no_matches', locale)}
             />
-          )}
-
-          <div className="space-y-3">
-            {visibleTraces.map((trace) => {
-              const selected = trace.traceId === selectedTraceId;
-              return (
-                <button
-                  key={`${trace.traceId}:${trace.persistedAt}`}
-                  type="button"
-                  onClick={() => setSelectedTraceId(trace.traceId)}
-                  className={`w-full rounded-lg border p-4 text-left transition ${
-                    selected
-                      ? 'kb-border-accent kb-surface-accent'
-                      : 'kb-border-subtle kb-surface-sunken hover:kb-border-subtle hover:kb-surface-well'
-                  }`}
-                >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs kb-text-muted">{trace.traceId}</span>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[11px] ${statusTone(trace.status)}`}
-                        >
-                          {trace.status}
-                        </span>
-                      </div>
-                      <h4 className="text-lg font-medium kb-text-primary">{trace.rootSpanName}</h4>
-                      <p className="text-sm kb-text-secondary">
-                        {trace.missionId ? `mission ${trace.missionId}` : 'mission unknown'}
-                        {trace.pipelineId ? ` · pipeline ${trace.pipelineId}` : ''}
-                        {trace.actuator ? ` · ${trace.actuator}` : ''}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs kb-text-secondary md:text-right">
-                      <div>
-                        <div className="kb-text-muted">persisted</div>
-                        <div>{formatTs(trace.persistedAt)}</div>
-                      </div>
-                      <div>
-                        <div className="kb-text-muted">completed</div>
-                        <div>{formatTs(trace.completedAt)}</div>
-                      </div>
-                      <div>
-                        <div className="kb-text-muted">spans</div>
-                        <div>{trace.spanCount}</div>
-                      </div>
-                      <div>
-                        <div className="kb-text-muted">events</div>
-                        <div>{trace.eventCount}</div>
-                      </div>
-                      <div>
-                        <div className="kb-text-muted">errors</div>
-                        <div className={trace.errorCount > 0 ? 'kb-status-negative' : undefined}>
-                          {trace.errorCount}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          ) : null}
         </div>
 
-        <aside className="space-y-3 rounded-lg border kb-border-subtle kb-surface-sunken p-4">
-          <div className="space-y-1">
-            <p className="text-xs kb-text-muted">Selected Trace</p>
-            <h4 className="text-lg font-semibold kb-text-primary">
-              {selectedSummary?.rootSpanName ?? 'No trace loaded'}
-            </h4>
-          </div>
+        <div className="chronos-feed">
+          <h3 className="chronos-feed__title">
+            {selectedSummary?.rootSpanName ?? uxText('chronos_trace_selected', locale)}
+          </h3>
 
-          {loadingDetail && (
-            <SurfaceStatusPanel
-              eyebrow="Selected trace"
-              title="Loading trace detail"
-              detail="The selected trace is being resolved into its span tree and raw record."
-              tone="neutral"
+          {loadingDetail ? (
+            <Skeleton
+              shape="card"
+              lines={3}
+              label={uxText('chronos_trace_loading_detail', locale)}
             />
-          )}
-          {detailError && (
-            <SurfaceStatusPanel
-              eyebrow="Selected trace"
-              title="Unable to load trace detail"
-              detail={detailError}
-              tone="error"
-              actionLabel="Retry"
-              onAction={() => setRefreshTick((value) => value + 1)}
-            />
-          )}
+          ) : null}
+          {detailError ? (
+            <Callout
+              tone="danger"
+              title={uxText('chronos_trace_detail_failed', locale)}
+              body={detailError}
+            >
+              <ChronosToolbar>
+                <Button label={uxText('chronos_action_retry', locale)} onClick={refresh} />
+              </ChronosToolbar>
+            </Callout>
+          ) : null}
 
           {selectedTrace ? (
-            <div className="space-y-3 text-sm kb-text-secondary">
-              <div className="flex flex-wrap gap-2">
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-[11px] ${statusTone(selectedTrace.status)}`}
-                >
-                  {selectedTrace.status}
-                </span>
-                {selectedTrace.missionId ? (
-                  <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] kb-text-secondary">
-                    mission {selectedTrace.missionId}
-                  </span>
+            <Stack gap="md">
+              <ChronosInline>
+                <StatusPill status={TRACE_STATUS[selectedTrace.status]} />
+                {selectedTrace.actuator ? <Badge label={selectedTrace.actuator} /> : null}
+                {selectedTrace.errorCount > 0 ? (
+                  <Badge
+                    tone="danger"
+                    label={uxMessage(
+                      'chronos_trace_error_count',
+                      { count: selectedTrace.errorCount },
+                      '{count} errors',
+                      locale
+                    )}
+                  />
                 ) : null}
-                {selectedTrace.pipelineId ? (
-                  <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] kb-text-secondary">
-                    pipeline {selectedTrace.pipelineId}
-                  </span>
-                ) : null}
-                {selectedTrace.actuator ? (
-                  <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] kb-text-secondary">
-                    {selectedTrace.actuator}
-                  </span>
-                ) : null}
-                <span className="rounded-full border kb-border-subtle kb-surface-raised/5 px-2 py-0.5 text-[11px] kb-text-secondary">
-                  {selectedTrace.errorCount} errors
-                </span>
-              </div>
+              </ChronosInline>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void copyText(selectedTrace.traceId, 'trace id')}
-                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-                >
-                  Copy trace id
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void copyText(selectedTrace.tracePath, 'trace path')}
-                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-                >
-                  Copy trace path
-                </button>
-                {copiedValue ? (
-                  <span className="text-[11px] kb-status-positive">{copiedValue}</span>
-                ) : null}
-              </div>
+              <KeyValue
+                items={[
+                  {
+                    label: uxText('chronos_trace_trace_id', locale),
+                    value: selectedTrace.traceId,
+                    mono: true,
+                  },
+                  ...(selectedTrace.missionId
+                    ? [
+                        {
+                          label: uxText('chronos_trace_filter_mission', locale),
+                          value: selectedTrace.missionId,
+                          mono: true,
+                        },
+                      ]
+                    : []),
+                  ...(selectedTrace.pipelineId
+                    ? [
+                        {
+                          label: uxText('chronos_trace_pipeline', locale),
+                          value: selectedTrace.pipelineId,
+                          mono: true,
+                        },
+                      ]
+                    : []),
+                  {
+                    label: uxText('chronos_trace_root_span', locale),
+                    value: selectedTrace.rootSpan.name,
+                  },
+                  {
+                    label: uxText('chronos_trace_counts', locale),
+                    value: uxMessage(
+                      'chronos_trace_counts_value',
+                      {
+                        spans: selectedTrace.spanCount,
+                        events: selectedTrace.eventCount,
+                        artifacts: selectedTrace.artifactCount,
+                        errors: selectedTrace.errorCount,
+                      },
+                      '{spans} spans · {events} events · {artifacts} artifacts · {errors} errors',
+                      locale
+                    ),
+                  },
+                  {
+                    label: uxText('chronos_trace_started', locale),
+                    value: formatTs(selectedTrace.startedAt),
+                  },
+                  {
+                    label: uxText('chronos_trace_col_persisted', locale),
+                    value: formatTs(selectedTrace.persistedAt),
+                  },
+                  {
+                    label: uxText('chronos_trace_path', locale),
+                    value: selectedTrace.tracePath,
+                    mono: true,
+                  },
+                ]}
+              />
 
-              <dl className="space-y-2">
-                <div>
-                  <dt className="kb-text-muted">Trace ID</dt>
-                  <dd className="font-mono text-xs kb-text-secondary">{selectedTrace.traceId}</dd>
-                </div>
-                <div>
-                  <dt className="kb-text-muted">Root span</dt>
-                  <dd>{selectedTrace.rootSpan.name}</dd>
-                </div>
-                <div>
-                  <dt className="kb-text-muted">Status</dt>
-                  <dd>{selectedTrace.status}</dd>
-                </div>
-                <div>
-                  <dt className="kb-text-muted">Counts</dt>
-                  <dd>
-                    {selectedTrace.spanCount} spans, {selectedTrace.eventCount} events,{' '}
-                    {selectedTrace.artifactCount} artifacts
-                    {selectedTrace.errorCount > 0 ? `, ${selectedTrace.errorCount} errors` : ''}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="kb-text-muted">Started</dt>
-                  <dd>{formatTs(selectedTrace.startedAt)}</dd>
-                </div>
-                <div>
-                  <dt className="kb-text-muted">Persisted</dt>
-                  <dd>{formatTs(selectedTrace.persistedAt)}</dd>
-                </div>
-              </dl>
+              <ChronosToolbar>
+                <Button
+                  label={uxText('chronos_trace_copy_id', locale)}
+                  variant="ghost"
+                  onClick={() =>
+                    void copyText(selectedTrace.traceId, uxText('chronos_trace_trace_id', locale))
+                  }
+                />
+                <Button
+                  label={uxText('chronos_trace_copy_path', locale)}
+                  variant="ghost"
+                  onClick={() =>
+                    void copyText(selectedTrace.tracePath, uxText('chronos_trace_path', locale))
+                  }
+                />
+                {copiedValue ? <ChronosMeta>{copiedValue}</ChronosMeta> : null}
+              </ChronosToolbar>
 
-              <button
-                type="button"
-                onClick={() =>
-                  void openRawTraceFile(selectedTrace.tracePath, selectedTrace.traceId)
-                }
-                className="w-full rounded-lg border border-dashed kb-border-subtle kb-surface-raised/5 p-3 text-left font-mono text-[11px] kb-text-secondary transition hover:kb-border-accent hover:kb-surface-accent"
-              >
-                {selectedTrace.tracePath}
-              </button>
+              {spanFlow && spanFlow.nodes.length > 1 ? (
+                <ChronosDiagram>
+                  <KbChart
+                    type="ui:flow"
+                    props={{
+                      title: uxText('chronos_trace_span_flow', locale),
+                      density: 'compact',
+                      nodes: spanFlow.nodes,
+                      edges: spanFlow.edges,
+                    }}
+                  />
+                </ChronosDiagram>
+              ) : null}
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
+              <ChronosToolbar>
+                <Button
+                  label={uxText('chronos_trace_open_raw', locale)}
+                  variant="primary"
                   onClick={() =>
                     void openRawTraceFile(selectedTrace.tracePath, selectedTrace.traceId)
                   }
-                  className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1.5 text-[11px] kb-text-accent transition hover:kb-surface-accent"
-                >
-                  Open raw trace
-                </button>
-                <button
-                  type="button"
+                />
+                <Button
+                  label={uxText('chronos_trace_copy_focused', locale)}
+                  variant="ghost"
                   disabled={!rawTraceText}
-                  onClick={() => void copyText(rawTraceText || '', 'focused raw record')}
-                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Copy focused record
-                </button>
-                <button
-                  type="button"
+                  onClick={() =>
+                    void copyText(rawTraceText || '', uxText('chronos_trace_label_focused', locale))
+                  }
+                />
+                <Button
+                  label={
+                    rawTraceVisible
+                      ? uxText('chronos_trace_hide_raw', locale)
+                      : uxText('chronos_trace_show_raw', locale)
+                  }
+                  variant="ghost"
                   onClick={() => setRawTraceVisible((value) => !value)}
-                  className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-                >
-                  {rawTraceVisible ? 'Hide' : 'Show'} raw trace
-                </button>
-              </div>
+                />
+              </ChronosToolbar>
 
               {rawTraceVisible ? (
-                <div className="rounded-lg border kb-border-subtle kb-surface-well p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs kb-text-muted">Raw trace log</div>
-                    <div className="text-[11px] kb-text-muted">{selectedTrace.tracePath}</div>
-                  </div>
+                <Stack gap="sm">
                   {rawTraceFocusHistory.length > 1 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <div className="text-[11px] kb-text-muted">recent</div>
+                    <ChronosInline>
+                      <ChronosMeta>{uxText('chronos_trace_recent_focus', locale)}</ChronosMeta>
                       {rawTraceFocusHistory.map((traceId) => (
-                        <button
+                        <Button
                           key={traceId}
-                          type="button"
+                          label={traceId}
+                          variant={traceId === rawTraceFocusTraceId ? 'secondary' : 'ghost'}
                           onClick={() => {
                             setRawTraceFocusTraceId(traceId);
                             void refocusRawTraceFile(traceId);
                           }}
-                          className={`rounded-full border px-2 py-1 font-mono text-[11px] transition ${
-                            traceId === rawTraceFocusTraceId
-                              ? 'kb-border-accent kb-surface-accent kb-text-accent'
-                              : 'kb-border-subtle kb-surface-sunken kb-text-secondary hover:kb-surface-raised'
-                          }`}
-                        >
-                          {traceId}
-                        </button>
+                        />
                       ))}
-                    </div>
+                    </ChronosInline>
                   ) : null}
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <label className="flex min-w-[14rem] flex-1 items-center gap-2 rounded-xl border kb-border-subtle kb-surface-raised/5 px-3 py-2 text-sm kb-text-secondary">
-                      <span className="text-[11px] kb-text-muted">trace id</span>
-                      <input
-                        value={rawTraceFocusTraceId}
-                        onChange={(event) => setRawTraceFocusTraceId(event.target.value)}
+                  <ChronosFieldScope onChange={handleFieldChange}>
+                    <ChronosToolbar>
+                      <TextField
+                        id="trace-raw-focus"
+                        name="rawTraceFocus"
+                        label={uxText('chronos_trace_trace_id', locale)}
                         placeholder={selectedTrace.traceId}
-                        className="w-full bg-transparent text-sm kb-text-primary placeholder:kb-text-muted outline-none"
+                        value={rawTraceFocusTraceId}
                       />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => void refocusRawTraceFile()}
-                      className="rounded-full border kb-border-subtle kb-surface-raised/5 px-3 py-1.5 text-[11px] kb-text-secondary transition hover:kb-surface-raised"
-                    >
-                      Re-focus
-                    </button>
-                  </div>
+                      <Button
+                        label={uxText('chronos_trace_refocus', locale)}
+                        onClick={() => void refocusRawTraceFile()}
+                      />
+                    </ChronosToolbar>
+                  </ChronosFieldScope>
                   {rawTraceLoading ? (
-                    <div className="mt-2">
-                      <SurfaceStatusPanel
-                        eyebrow="Raw trace"
-                        title="Loading raw trace log"
-                        detail="Chronos is opening the selected JSONL record and focusing it on the chosen trace id."
-                        tone="neutral"
-                      />
-                    </div>
+                    <Skeleton
+                      shape="text"
+                      lines={6}
+                      label={uxText('chronos_trace_loading_raw', locale)}
+                    />
                   ) : rawTraceError ? (
-                    <div className="mt-2">
-                      <SurfaceStatusPanel
-                        eyebrow="Raw trace"
-                        title="Unable to load raw trace log"
-                        detail={rawTraceError}
-                        tone="error"
-                      />
-                    </div>
+                    <Callout
+                      tone="danger"
+                      title={uxText('chronos_trace_raw_failed', locale)}
+                      body={rawTraceError}
+                    />
                   ) : rawTraceText ? (
-                    <pre className="mt-2 max-h-[24rem] overflow-auto whitespace-pre-wrap break-words rounded-xl border kb-border-accent kb-surface-well p-3 font-mono text-[11px] leading-5 kb-text-secondary">
-                      {rawTraceText}
-                    </pre>
+                    <Code
+                      code={rawTraceText}
+                      language="json"
+                      title={uxText('chronos_trace_raw_log', locale)}
+                    />
                   ) : (
-                    <div className="mt-2">
-                      <SurfaceStatusPanel
-                        eyebrow="Raw trace"
-                        title="Open the raw file to inspect the JSONL trace"
-                        detail="The span tree is already available above; open the raw file only when you need the source record."
-                        tone="info"
-                      />
-                    </div>
+                    <Callout
+                      tone="info"
+                      title={uxText('chronos_trace_raw_hint', locale)}
+                      body={uxText('chronos_trace_raw_hint_detail', locale)}
+                    />
                   )}
-                </div>
+                </Stack>
               ) : null}
 
-              <div className="space-y-3">
-                <div className="text-xs kb-text-muted">Span tree</div>
-                <TraceSpanTree span={selectedTrace.rootSpan} onCopy={copyText} />
-              </div>
-            </div>
-          ) : (
-            <SurfaceStatusPanel
-              eyebrow="Selected trace"
-              title="No trace selected"
-              detail="Choose a trace from the list to inspect its span tree, metadata, and raw JSONL record."
-              tone="info"
-              actionLabel="Reset filters"
-              onAction={resetTraceViewerPrefs}
-            />
+              <Section title={uxText('chronos_trace_span_tree', locale)} headingLevel={4}>
+                <TraceSpanTree span={selectedTrace.rootSpan} onCopy={copyText} locale={locale} />
+              </Section>
+            </Stack>
+          ) : loadingDetail ? null : (
+            <Stack gap="sm">
+              <EmptyState
+                title={uxText('chronos_trace_none_selected', locale)}
+                body={uxText('chronos_trace_none_selected_detail', locale)}
+              />
+              <ChronosToolbar>
+                <Button
+                  label={uxText('chronos_trace_reset_filters', locale)}
+                  variant="ghost"
+                  onClick={resetTraceViewerPrefs}
+                />
+              </ChronosToolbar>
+            </Stack>
           )}
-        </aside>
+        </div>
       </div>
-    </section>
+    </Section>
   );
 }

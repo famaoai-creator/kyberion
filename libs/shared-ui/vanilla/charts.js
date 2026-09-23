@@ -84,6 +84,9 @@ export const KB_CHART_MESSAGE_KEYS = Object.freeze({
   meterSuccess: 'ui:meter_state_success',
   meterWarning: 'ui:meter_state_warning',
   meterDanger: 'ui:meter_state_danger',
+  meterGoalSuccess: 'ui:meter_goal_state_success',
+  meterGoalWarning: 'ui:meter_goal_state_warning',
+  meterGoalDanger: 'ui:meter_goal_state_danger',
 });
 
 /**
@@ -128,6 +131,52 @@ export const KB_CHART_STATUS_TONES = Object.freeze({
   planned: 'neutral',
   archived: 'neutral',
   stopped: 'neutral',
+});
+
+/**
+ * Canonical status → glyph by status family (mirror of `KB_STATUS_FAMILIES` ×
+ * `KB_STATUS_FAMILY_GLYPHS` in `@agent/core/a2ui-catalog`; pinned equal by
+ * `charts.test.ts`): done \u2713, running \u25D0, waiting !, paused \u2016,
+ * degraded \u25B2, failed \u2715, idle \u25CB. The same characters the status
+ * pill draws via CSS, so a running item never wears the "done" check.
+ */
+export const KB_STATUS_GLYPHS = Object.freeze({
+  ready: '\u2713',
+  fully_automatable: '\u2713',
+  connected: '\u2713',
+  available: '\u2713',
+  done: '\u2713',
+  completed: '\u2713',
+  recovered: '\u2713',
+  running: '\u25D0',
+  active: '\u25D0',
+  connecting: '\u25D0',
+  working: '\u25D0',
+  busy: '\u25D0',
+  distilling: '\u25D0',
+  review: '!',
+  needs_clarification: '!',
+  needs_external_assets: '!',
+  needs_assets: '!',
+  needs_setup: '!',
+  missing_runtime_prerequisites: '!',
+  needs_runtime_prerequisites: '!',
+  pending: '!',
+  paused: '\u2016',
+  degraded: '\u25B2',
+  fallback: '\u25B2',
+  stale: '\u25B2',
+  blocked: '\u2715',
+  missing: '\u2715',
+  error: '\u2715',
+  unavailable: '\u2715',
+  failed: '\u2715',
+  disconnected: '\u2715',
+  offline: '\u2715',
+  'n/a': '\u25CB',
+  planned: '\u25CB',
+  archived: '\u25CB',
+  stopped: '\u25CB',
 });
 
 /** Glyph per tone — the same characters the status pill draws via CSS. */
@@ -1613,7 +1662,23 @@ const METER_STATE_KEYS = {
   danger: KB_CHART_MESSAGE_KEYS.meterDanger,
 };
 
-/** The tone of the highest threshold at or below `value`; null when none applies. */
+const METER_GOAL_STATE_KEYS = {
+  success: KB_CHART_MESSAGE_KEYS.meterGoalSuccess,
+  warning: KB_CHART_MESSAGE_KEYS.meterGoalWarning,
+  danger: KB_CHART_MESSAGE_KEYS.meterGoalDanger,
+};
+
+/** `ui:meter` direction: `higher_is_better` or the default `lower_is_better`. */
+export function meterDirection(value) {
+  return value === 'higher_is_better' ? 'higher_is_better' : 'lower_is_better';
+}
+
+/**
+ * The tone of the highest threshold at or below `value`; null when none
+ * applies. The same rule for both directions — a completion rate declares
+ * e.g. `[{0, danger}, {50, warning}, {80, success}]`, a usage meter
+ * `[{80, warning}, {95, danger}]`; `direction` only changes the state words.
+ */
 export function meterTone(value, thresholds) {
   const list = (Array.isArray(thresholds) ? thresholds : [])
     .filter((entry) => isRecord(entry) && isNum(entry.value) && METER_TONES.includes(entry.tone))
@@ -1641,6 +1706,7 @@ function layoutMeter(p, env) {
   }
   const value = p.value;
   const ratio = Math.max(0, Math.min(1, value / max));
+  const direction = meterDirection(p.direction);
   const tone = meterTone(value, p.thresholds);
   const thresholds = (Array.isArray(p.thresholds) ? p.thresholds : []).filter(
     (entry) =>
@@ -1658,7 +1724,11 @@ function layoutMeter(p, env) {
   const percent = (fraction) => `${fmtCoord(fraction * 100)}%`;
   return h(
     'div',
-    { class: 'kb-meter', 'data-tone': tone || undefined },
+    {
+      class: 'kb-meter',
+      'data-tone': tone || undefined,
+      'data-direction': direction === 'higher_is_better' ? direction : undefined,
+    },
     h(
       'div',
       { class: 'kb-meter__header' },
@@ -1707,7 +1777,11 @@ function layoutMeter(p, env) {
           'p',
           { class: 'kb-meter__state', 'data-tone': tone },
           h('span', { class: 'kb-meter__glyph', 'aria-hidden': 'true' }, KB_TONE_GLYPHS[tone]),
-          h('span', null, `${env.t(METER_STATE_KEYS[tone])} · ${pct(value / max)}`)
+          h(
+            'span',
+            null,
+            `${env.t((direction === 'higher_is_better' ? METER_GOAL_STATE_KEYS : METER_STATE_KEYS)[tone])} · ${pct(value / max)}`
+          )
         )
       : null,
     typeof p.description === 'string' && p.description
@@ -1734,7 +1808,7 @@ function statusMark(env, status, x, y, anchor) {
       'text-anchor': anchor,
       'dominant-baseline': 'middle',
     },
-    `${KB_TONE_GLYPHS[tone]} ${env.statusLabel(status)}`
+    `${KB_STATUS_GLYPHS[status]} ${env.statusLabel(status)}`
   );
 }
 
@@ -1809,7 +1883,9 @@ function layoutSequence(p, env) {
     const kind = message.kind === 'reply' || message.kind === 'note' ? message.kind : 'call';
     const label = str(message.label);
     const tone = statusToneOf(message.status);
-    const statusText = tone ? `${KB_TONE_GLYPHS[tone]} ${env.statusLabel(message.status)}` : '';
+    const statusText = tone
+      ? `${KB_STATUS_GLYPHS[message.status]} ${env.statusLabel(message.status)}`
+      : '';
     const parts = [];
     if (hasAt && message.at !== undefined && message.at !== null && message.at !== '') {
       parts.push(

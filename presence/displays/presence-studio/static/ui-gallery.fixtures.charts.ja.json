@@ -558,7 +558,7 @@
           "id": "meter-card",
           "type": "ui:section",
           "props": {},
-          "children": ["meter1", "meter2", "meter3", "meter4"]
+          "children": ["meter1", "meter2", "meter3", "meter4", "meter5"]
         },
         {
           "id": "meter1",
@@ -632,6 +632,32 @@
             "label": "完了したタスク",
             "value": 18,
             "max": 24
+          }
+        },
+        {
+          "id": "meter5",
+          "type": "ui:meter",
+          "props": {
+            "label": "完了率",
+            "value": 72,
+            "max": 100,
+            "unit": "%",
+            "direction": "higher_is_better",
+            "thresholds": [
+              {
+                "value": 0,
+                "tone": "danger"
+              },
+              {
+                "value": 50,
+                "tone": "warning"
+              },
+              {
+                "value": 80,
+                "tone": "success"
+              }
+            ],
+            "description": "高いほど良い指標: 状態は目標に対して表示します。"
           }
         }
       ]

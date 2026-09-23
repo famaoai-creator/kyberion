@@ -1,4 +1,10 @@
-import { KB_STATUS_TONES, type KbStatusTone } from '@agent/core/a2ui-catalog';
+import {
+  KB_STATUS_FAMILIES,
+  KB_STATUS_FAMILY_GLYPHS,
+  KB_STATUS_TONES,
+  type KbStatusFamily,
+  type KbStatusTone,
+} from '@agent/core/a2ui-catalog';
 import {
   loadBrandTokensAtPath,
   type BrandTokenColors,
@@ -446,7 +452,57 @@ export function renderStatusToneRules(): string {
       `  --kb-ui-pill-icon: "${STATUS_TONE_ICONS[tone]}";`,
       '}',
     ].join('\n');
-  }).join('\n\n');
+  })
+    .concat(renderStatusFamilyGlyphRules())
+    .join('\n\n');
+}
+
+/** CSS `content` escape: printable ASCII stays, anything else becomes `\<hex>`. */
+function cssContentGlyph(glyph: string): string {
+  return [...glyph]
+    .map((ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return code >= 0x20 && code < 0x7f && ch !== '"' && ch !== '\\'
+        ? ch
+        : `\\${code.toString(16).toUpperCase()}`;
+    })
+    .join('');
+}
+
+const STATUS_FAMILY_ORDER: KbStatusFamily[] = [
+  'done',
+  'running',
+  'waiting',
+  'paused',
+  'degraded',
+  'failed',
+  'idle',
+];
+
+/**
+ * Status-pill glyph rules by status family (after the tone rules, so the
+ * per-status glyph wins over the tone default): a running pill shows the
+ * half-filled circle, not the "done" check.
+ */
+export function renderStatusFamilyGlyphRules(): string[] {
+  const byFamily = new Map<KbStatusFamily, string[]>(
+    STATUS_FAMILY_ORDER.map((family) => [family, []])
+  );
+  for (const [status, family] of Object.entries(KB_STATUS_FAMILIES) as [string, KbStatusFamily][]) {
+    byFamily.get(family)?.push(status);
+  }
+  return STATUS_FAMILY_ORDER.filter((family) => (byFamily.get(family) || []).length > 0).map(
+    (family) =>
+      [
+        `/* status family: ${family} */`,
+        `${(byFamily.get(family) || [])
+          .sort()
+          .map((status) => `.kb-status-pill[data-status="${status}"]`)
+          .join(',\n')} {`,
+        `  --kb-ui-pill-icon: "${cssContentGlyph(KB_STATUS_FAMILY_GLYPHS[family])}";`,
+        '}',
+      ].join('\n')
+  );
 }
 
 /** Assemble the generated `kyberion-ui.css` from the authored source stylesheet. */

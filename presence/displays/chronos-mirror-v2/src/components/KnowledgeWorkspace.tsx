@@ -1,17 +1,22 @@
 'use client';
 
 import * as React from 'react';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
 import {
-  BookOpen,
-  CheckCircle2,
-  FileSearch,
-  ThumbsDown,
-  ThumbsUp,
-  UploadCloud,
-  XCircle,
-} from 'lucide-react';
+  Badge,
+  Button,
+  Callout,
+  Disclosure,
+  EmptyState,
+  KeyValue,
+  List,
+  Section,
+  Skeleton,
+  StatusPill,
+} from '@agent/shared-ui';
+import { WsPreformatted, WsSelectTable, WsTextareaField, WsTitleCell } from './ChronosWsParts';
 import { useChronosLocale } from '../lib/hooks';
-import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
+import { uxText, uxTextOr, type SupportedLocale } from '../lib/ux-vocabulary';
 import { parseKnowledgeResponse, type ClientKnowledgeCandidate } from '../lib/knowledge-response';
 import {
   parseKnowledgeFeedbackResponse,
@@ -83,12 +88,14 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
       })
       .catch((err) => {
         if (!cancelled)
-          setPromotedBody(`Display error: ${err instanceof Error ? err.message : String(err)}`);
+          setPromotedBody(
+            `${uxTextOr('chronos_ws_display_error', 'Display error', locale)}: ${err instanceof Error ? err.message : String(err)}`
+          );
       });
     return () => {
       cancelled = true;
     };
-  }, [selected, tenant]);
+  }, [selected, tenant, locale]);
 
   const promote = async () => {
     if (!selected) return;
@@ -192,205 +199,187 @@ export function KnowledgeWorkspace({ tenant }: { tenant?: string }) {
     }
   };
 
+  const localAdmin = accessRole === 'localadmin';
+  const scopeLabel = `${tenant || uxText('chronos_ac_scope_all', locale)} · ${items.length}`;
+  const canDecide = selected?.status === 'queued' || selected?.status === 'approved';
+
   return (
-    <section className="kyberion-glass rounded-xl border kb-border-subtle p-5 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] kb-text-accent">
-            {uxText('chronos_knowledge_eyebrow', locale)}
+    <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.5fr)]">
+      <Section
+        title={uxText('chronos_knowledge_title', locale)}
+        description={uxText('chronos_knowledge_description', locale)}
+      >
+        <div className="flex flex-wrap gap-2">
+          <Badge label={scopeLabel} tone="accent" />
+        </div>
+        {error ? (
+          <Callout
+            tone="danger"
+            title={uxTextOr('chronos_ws_load_failed', 'Could not load this view', locale)}
+            body={error}
+          />
+        ) : null}
+        <WsSelectTable
+          columns={[
+            { key: 'kind', label: uxTextOr('chronos_ws_col_candidate', 'Candidate', locale) },
+            { key: 'status', label: uxText('chronos_col_status', locale), width: '8rem' },
+          ]}
+          rows={items}
+          rowKey={(item) => item.candidate_id}
+          selectedKey={selected?.candidate_id}
+          onSelect={setSelectedId}
+          empty={uxText('chronos_knowledge_empty', locale)}
+          renderCell={(item, key, select) =>
+            key === 'kind' ? (
+              <div className="flex flex-col gap-0.5">
+                <WsTitleCell
+                  title={item.proposed_memory_kind}
+                  id={item.candidate_id}
+                  onSelect={select}
+                  selected={selected?.candidate_id === item.candidate_id}
+                />
+                <span className="kb-list__meta">
+                  {item.tenantSlug || uxText('chronos_org_not_configured', locale)}
+                </span>
+              </div>
+            ) : (
+              <StatusPill
+                status={knowledgeStatusPill(item.status)}
+                label={knowledgeStatusLabel(item.status, locale)}
+              />
+            )
+          }
+        />
+      </Section>
+
+      {selected ? (
+        <Section
+          title={selected.proposed_memory_kind}
+          description={uxText('chronos_candidate_content', locale)}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill
+              status={knowledgeStatusPill(selected.status)}
+              label={knowledgeStatusLabel(selected.status, locale)}
+            />
+            <span className="chronos-mission-cell__id">{selected.candidate_id}</span>
           </div>
-          <h2 className="mt-1 text-xl font-semibold kb-text-primary">
-            {uxText('chronos_knowledge_title', locale)}
-          </h2>
-          <p className="mt-2 text-sm leading-6 kb-text-secondary">
-            {uxText('chronos_knowledge_description', locale)}
-          </p>
-        </div>
-        <span className="rounded-full border kb-border-accent kb-surface-accent px-3 py-1 text-[11px] kb-text-accent">
-          {tenant || uxText('chronos_ac_scope_all', locale)} · {items.length}
-        </span>
-      </div>
-      {error ? (
-        <div className="mt-4 rounded-xl border kb-status-negative-border kb-status-negative-surface p-3 text-[11px] kb-status-negative">
-          {error}
-        </div>
-      ) : null}
-      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(15rem,0.8fr)_minmax(0,1.5fr)]">
-        <div className="space-y-2">
-          {items.length === 0 ? (
-            <div className="rounded-xl border kb-border-subtle p-4 text-[11px] kb-text-muted">
-              {uxText('chronos_knowledge_empty', locale)}
+          <div className="chronos-feed">
+            <h3 className="chronos-feed__title">{uxText('chronos_content_to_register', locale)}</h3>
+            <p className="kb-text kb-text--body" style={{ whiteSpace: 'pre-wrap' }}>
+              {selected.summary}
+            </p>
+          </div>
+          <Disclosure summary={uxText('chronos_knowledge_evidence_details', locale)}>
+            <KeyValue
+              items={[
+                {
+                  label: uxTextOr('chronos_ws_source', 'Source', locale),
+                  value: selected.source_ref || '-',
+                  mono: true,
+                },
+                {
+                  label: uxText('chronos_tenant_data_level', locale),
+                  value: `${selected.tenantSlug || '-'} / ${selected.sensitivity_tier}`,
+                },
+              ]}
+            />
+            <h4 className="chronos-feed__title">
+              {uxTextOr('chronos_ws_evidence', 'Evidence', locale)}
+            </h4>
+            {selected.evidence_refs.length ? (
+              <List items={selected.evidence_refs.map((ref) => ({ title: ref }))} />
+            ) : (
+              <p className="kb-text kb-text--muted">{uxText('chronos_no_evidence', locale)}</p>
+            )}
+          </Disclosure>
+          {selected.promoted_ref ? (
+            <div className="chronos-feed">
+              <StatusPill
+                status="completed"
+                label={`${uxText('chronos_registered', locale)}: ${selected.promoted_ref}`}
+              />
+              {promotedBody === null ? (
+                <Skeleton shape="text" lines={4} label={uxText('chronos_loading', locale)} />
+              ) : (
+                <WsPreformatted text={promotedBody} />
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="kb-text kb-text--caption">
+                  {uxText('chronos_knowledge_feedback_prompt', locale)}
+                </span>
+                <Button
+                  label={uxText('chronos_knowledge_feedback_useful', locale)}
+                  variant={feedback === 'useful' ? 'primary' : 'secondary'}
+                  onClick={() => void recordFeedback('useful')}
+                />
+                <Button
+                  label={uxText('chronos_knowledge_feedback_not_useful', locale)}
+                  variant={feedback === 'not_useful' ? 'primary' : 'secondary'}
+                  onClick={() => void recordFeedback('not_useful')}
+                />
+              </div>
             </div>
-          ) : (
-            items.map((item) => (
-              <button
-                key={item.candidate_id}
-                type="button"
-                aria-pressed={selected?.candidate_id === item.candidate_id}
-                onClick={() => setSelectedId(item.candidate_id)}
-                className={`w-full rounded-xl border p-3 text-left ${selected?.candidate_id === item.candidate_id ? 'kb-border-accent kb-surface-accent' : 'kb-border-subtle kb-surface-sunken hover:kb-surface-raised'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <BookOpen size={13} className="kb-text-accent" />
-                  <span className="truncate text-xs font-semibold kb-text-primary">
-                    {item.proposed_memory_kind}
-                  </span>
-                </div>
-                <div className="mt-2 text-[11px] kb-text-secondary">
-                  {item.tenantSlug || uxText('chronos_org_not_configured', locale)} ·{' '}
-                  {knowledgeStatusLabel(item.status, locale)}
-                </div>
-                <div className="mt-1 truncate text-[11px] kb-text-muted">{item.candidate_id}</div>
-              </button>
-            ))
-          )}
-        </div>
-        {selected ? (
-          <div className="rounded-lg border kb-border-subtle kb-surface-sunken p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 text-[11px] kb-text-accent">
-                  <FileSearch size={13} />
-                  {uxText('chronos_candidate_content', locale)}
-                </div>
-                <h3 className="mt-1 text-lg font-semibold kb-text-primary">
-                  {selected.proposed_memory_kind}
-                </h3>
-              </div>
-              <span className="rounded-full border kb-border-subtle px-2 py-1 text-[11px] kb-text-secondary">
-                {knowledgeStatusLabel(selected.status, locale)}
-              </span>
-            </div>
-            <div className="mt-4 rounded-xl border kb-border-subtle kb-surface-raised p-4">
-              <div className="text-[11px] kb-text-accent">
-                {uxText('chronos_content_to_register', locale)}
-              </div>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 kb-text-primary">
-                {selected.summary}
-              </p>
-            </div>
-            <details className="mt-3 rounded-xl border kb-border-subtle kb-surface-raised p-3">
-              <summary className="cursor-pointer text-[11px] font-semibold kb-text-primary">
-                {uxText('chronos_knowledge_evidence_details', locale)}
-              </summary>
-              <div className="mt-3 grid gap-3 md:grid-cols-2 text-[11px] kb-text-secondary">
-                <div>
-                  <div className="kb-text-accent">出典</div>
-                  <div className="mt-1 break-all">{selected.source_ref}</div>
-                  <div className="mt-2 kb-text-accent">
-                    {uxText('chronos_tenant_data_level', locale)}
-                  </div>
-                  <div className="mt-1">
-                    {selected.tenantSlug || '-'} / {selected.sensitivity_tier}
-                  </div>
-                </div>
-                <div>
-                  <div className="kb-text-accent">根拠</div>
-                  {selected.evidence_refs.length ? (
-                    <ul className="mt-1 list-disc break-all pl-4">
-                      {selected.evidence_refs.map((ref) => (
-                        <li key={ref}>{ref}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="mt-1">{uxText('chronos_no_evidence', locale)}</div>
-                  )}
-                </div>
-              </div>
-            </details>
-            {selected.promoted_ref ? (
-              <div className="mt-3 rounded-xl border kb-border-accent kb-surface-accent p-3">
-                <div className="flex items-center gap-2 text-[11px] font-semibold kb-text-accent">
-                  <CheckCircle2 size={13} />
-                  {uxText('chronos_registered', locale)}: {selected.promoted_ref}
-                </div>
-                <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap text-[11px] kb-text-secondary">
-                  {promotedBody || `${uxText('chronos_loading', locale)}…`}
-                </pre>
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t kb-border-subtle pt-3">
-                  <span className="text-[11px] kb-text-muted">
-                    {uxText('chronos_knowledge_feedback_prompt', locale)}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={uxText('chronos_knowledge_feedback_useful', locale)}
-                    onClick={() => void recordFeedback('useful')}
-                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] ${feedback === 'useful' ? 'kb-border-accent kb-surface-accent kb-text-accent' : 'kb-border-subtle kb-text-secondary'}`}
-                  >
-                    <ThumbsUp size={12} /> {uxText('chronos_knowledge_feedback_useful', locale)}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={uxText('chronos_knowledge_feedback_not_useful', locale)}
-                    onClick={() => void recordFeedback('not_useful')}
-                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] ${feedback === 'not_useful' ? 'kb-border-accent kb-surface-accent kb-text-accent' : 'kb-border-subtle kb-text-secondary'}`}
-                  >
-                    <ThumbsDown size={12} />{' '}
-                    {uxText('chronos_knowledge_feedback_not_useful', locale)}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-            {selected.status === 'queued' || selected.status === 'approved' ? (
-              <textarea
-                aria-label="Knowledge decision note"
-                value={decisionNote}
-                onChange={(event) => setDecisionNote(event.target.value)}
-                placeholder={uxText('chronos_decision_note', locale)}
-                className="mt-4 min-h-16 w-full rounded-xl border kb-border-subtle kb-surface-raised p-3 text-xs kb-text-primary outline-none"
+          ) : null}
+          {canDecide ? (
+            <WsTextareaField
+              id="chronos-knowledge-note"
+              label={uxTextOr('chronos_ws_decision_note_label', 'Decision note', locale)}
+              value={decisionNote}
+              onChange={setDecisionNote}
+              placeholder={uxText('chronos_decision_note', locale)}
+              rows={2}
+            />
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {selected.ratification_required && selected.status === 'queued' ? (
+              <Button
+                label={uxText('chronos_approve_candidate', locale)}
+                variant="primary"
+                disabled={busy || !localAdmin}
+                onClick={() => void approve()}
+              />
+            ) : (
+              <Button
+                label={uxText('chronos_register_knowledge', locale)}
+                variant="primary"
+                disabled={
+                  busy ||
+                  !localAdmin ||
+                  selected.status === 'rejected' ||
+                  selected.status === 'promoted'
+                }
+                onClick={() => void promote()}
+              />
+            )}
+            {canDecide ? (
+              <Button
+                label={uxText('chronos_reject_candidate', locale)}
+                variant="danger"
+                disabled={busy || !localAdmin}
+                onClick={() => void reject()}
               />
             ) : null}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {selected.ratification_required && selected.status === 'queued' ? (
-                <button
-                  type="button"
-                  disabled={busy || accessRole !== 'localadmin'}
-                  onClick={() => void approve()}
-                  className="inline-flex items-center gap-1 rounded-lg kb-surface-positive px-3 py-2 text-[11px] kb-status-positive disabled:opacity-50"
-                >
-                  <CheckCircle2 size={14} />
-                  {uxText('chronos_approve_candidate', locale)}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={
-                    busy ||
-                    accessRole !== 'localadmin' ||
-                    selected.status === 'rejected' ||
-                    selected.status === 'promoted'
-                  }
-                  onClick={() => void promote()}
-                  className="inline-flex items-center gap-1 rounded-lg kb-surface-accent px-3 py-2 text-[11px] kb-text-accent disabled:opacity-50"
-                >
-                  <UploadCloud size={14} />
-                  {uxText('chronos_register_knowledge', locale)}
-                </button>
-              )}
-              {(selected.status === 'queued' || selected.status === 'approved') && (
-                <button
-                  type="button"
-                  disabled={busy || accessRole !== 'localadmin'}
-                  onClick={() => void reject()}
-                  className="inline-flex items-center gap-1 rounded-lg kb-surface-negative px-3 py-2 text-[11px] kb-status-negative disabled:opacity-50"
-                >
-                  <XCircle size={14} />
-                  {uxText('chronos_reject_candidate', locale)}
-                </button>
-              )}
-            </div>
-            {accessRole !== 'localadmin' ? (
-              <div className="mt-3 text-[11px] kb-text-muted">
-                {uxText('chronos_localadmin_required', locale)}
-              </div>
-            ) : null}
           </div>
-        ) : (
-          <div className="rounded-lg border kb-border-subtle p-6 text-sm kb-text-muted">
-            {uxText('chronos_select_knowledge', locale)}
-          </div>
-        )}
-      </div>
-    </section>
+          {!localAdmin ? (
+            <p className="kb-text kb-text--muted">
+              {uxText('chronos_localadmin_required', locale)}
+            </p>
+          ) : null}
+        </Section>
+      ) : (
+        <Section>
+          <EmptyState title={uxText('chronos_select_knowledge', locale)} />
+        </Section>
+      )}
+    </div>
   );
+}
+
+function knowledgeStatusPill(status: string): KbStatus {
+  if (status === 'queued') return 'pending';
+  if (status === 'approved') return 'ready';
+  if (status === 'rejected') return 'failed';
+  if (status === 'promoted') return 'completed';
+  return 'n/a';
 }

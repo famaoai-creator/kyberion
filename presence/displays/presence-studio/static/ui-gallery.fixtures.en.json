@@ -434,7 +434,7 @@
     {
       "id": "tabs",
       "title": "Tabs ui:tabs",
-      "description": "wrap (line wrap) and menu (horizontal scroll). With href they are links, without it a tablist.",
+      "description": "wrap (line wrap) and menu (horizontal scroll). With href they are links, without it a tablist. secondary is pill-style sub-navigation.",
       "components": [
         {
           "id": "tabs-root",
@@ -442,7 +442,7 @@
           "props": {
             "gap": "md"
           },
-          "children": ["tabs1", "tabs2"]
+          "children": ["tabs1", "tabs2", "tabs3"]
         },
         {
           "id": "tabs1",
@@ -505,6 +505,34 @@
                 "id": "m6",
                 "label": "Settings",
                 "href": "#m6"
+              }
+            ]
+          }
+        },
+        {
+          "id": "tabs3",
+          "type": "ui:tabs",
+          "props": {
+            "active": "s2",
+            "variant": "secondary",
+            "items": [
+              {
+                "id": "s1",
+                "label": "All",
+                "href": "#s1",
+                "count": 12
+              },
+              {
+                "id": "s2",
+                "label": "Mine",
+                "href": "#s2",
+                "count": 5
+              },
+              {
+                "id": "s3",
+                "label": "Waiting on me",
+                "href": "#s3",
+                "count": 2
               }
             ]
           }
@@ -603,7 +631,7 @@
             "gap": "md",
             "min_column_width": "sm"
           },
-          "children": ["sec-n", "sec-a", "sec-s", "sec-w", "sec-d"]
+          "children": ["sec-n", "sec-a", "sec-s", "sec-w", "sec-d", "sec-act"]
         },
         {
           "id": "sec-n",
@@ -656,6 +684,34 @@
             "title": "Danger",
             "description": "tone: danger",
             "tone": "danger"
+          }
+        },
+        {
+          "id": "sec-act",
+          "type": "ui:section",
+          "props": {
+            "title": "With actions",
+            "description": "actions: an action id (onAction) and a link",
+            "actions": [
+              {
+                "label": "Refresh",
+                "action": "gallery.section.refresh"
+              },
+              {
+                "label": "Open list",
+                "href": "#section",
+                "variant": "ghost"
+              }
+            ]
+          },
+          "children": ["sec-act-t"]
+        },
+        {
+          "id": "sec-act-t",
+          "type": "ui:text",
+          "props": {
+            "text": "Header buttons dispatch the action id to the host or follow href.",
+            "variant": "muted"
           }
         }
       ]
@@ -766,7 +822,7 @@
     {
       "id": "data",
       "title": "Data ui:kv / ui:table",
-      "description": "Key-value pairs and tables. A status column renders as status pills.",
+      "description": "Key-value pairs and tables. A status column renders as status pills. Rich cells: title with a mono ID, status pill, badge.",
       "components": [
         {
           "id": "data-root",
@@ -775,7 +831,7 @@
             "gap": "lg",
             "min_column_width": "lg"
           },
-          "children": ["kv-sec", "audit"]
+          "children": ["kv-sec", "audit", "missions"]
         },
         {
           "id": "kv-sec",
@@ -888,6 +944,82 @@
             ],
             "rows": [],
             "empty": "No requests yet"
+          }
+        },
+        {
+          "id": "missions",
+          "type": "ui:table",
+          "props": {
+            "caption": "Missions (rich cells)",
+            "row_href_key": "href",
+            "columns": [
+              {
+                "key": "mission",
+                "label": "Mission"
+              },
+              {
+                "key": "state",
+                "label": "Status"
+              },
+              {
+                "key": "tier",
+                "label": "Tier"
+              },
+              {
+                "key": "updated",
+                "label": "Updated",
+                "mono": true,
+                "align": "end"
+              }
+            ],
+            "rows": [
+              {
+                "href": "#missions",
+                "mission": {
+                  "title": "Quote for Acme renewal",
+                  "id": "MSN-ACME-RENEWAL-20260923",
+                  "href": "#missions"
+                },
+                "state": {
+                  "status": "running",
+                  "label": "In progress",
+                  "domain": "mission"
+                },
+                "tier": {
+                  "badge": "Confidential",
+                  "tone": "warning"
+                },
+                "updated": "09:12"
+              },
+              {
+                "mission": {
+                  "title": "Weekly inbox triage",
+                  "id": "MSN-INBOX-TRIAGE-20260922"
+                },
+                "state": {
+                  "status": "pending"
+                },
+                "tier": {
+                  "badge": "Public",
+                  "tone": "neutral"
+                },
+                "updated": "08:40"
+              },
+              {
+                "mission": {
+                  "title": "Backup verification",
+                  "id": "MSN-BACKUP-VERIFY-20260921"
+                },
+                "state": {
+                  "status": "completed"
+                },
+                "tier": {
+                  "badge": "Confidential",
+                  "tone": "warning"
+                },
+                "updated": "07:05"
+              }
+            ]
           }
         }
       ]

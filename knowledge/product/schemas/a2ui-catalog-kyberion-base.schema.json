@@ -986,7 +986,15 @@
           "$ref": "#/$defs/href"
         },
         "action": {
-          "$ref": "#/$defs/action"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/action"
+            },
+            {
+              "$ref": "#/$defs/id"
+            }
+          ],
+          "description": "Surface-dispatched action, or just its id (no payload)."
         },
         "variant": {
           "$ref": "#/$defs/button-variant"
@@ -1008,6 +1016,63 @@
     },
     "scalar": {
       "type": ["string", "number", "boolean", "null"]
+    },
+    "table-cell": {
+      "description": "ui:table cell: a scalar, or a rich cell — {title, id?, href?} (title with a mono id line), {status, label?, domain?} (status pill) or {badge, tone?} (badge).",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/scalar"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "title": {
+              "$ref": "#/$defs/text"
+            },
+            "id": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "href": {
+              "$ref": "#/$defs/href"
+            }
+          },
+          "required": ["title"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "$ref": "#/$defs/status"
+            },
+            "label": {
+              "type": "string",
+              "maxLength": 80
+            },
+            "domain": {
+              "$ref": "#/$defs/status-domain"
+            }
+          },
+          "required": ["status"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "badge": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "tone": {
+              "$ref": "#/$defs/tone"
+            }
+          },
+          "required": ["badge"],
+          "additionalProperties": false
+        }
+      ]
     },
     "nav-item": {
       "type": "object",
@@ -1212,6 +1277,10 @@
         },
         "overflow": {
           "enum": ["wrap", "menu"]
+        },
+        "variant": {
+          "enum": ["primary", "secondary"],
+          "description": "primary (default) = underlined page tabs; secondary = pill-style sub-navigation."
         }
       },
       "required": ["items"],
@@ -1417,7 +1486,7 @@
           "items": {
             "type": "object",
             "additionalProperties": {
-              "$ref": "#/$defs/scalar"
+              "$ref": "#/$defs/table-cell"
             }
           }
         },
@@ -2706,6 +2775,10 @@
             "required": ["value", "tone"],
             "additionalProperties": false
           }
+        },
+        "direction": {
+          "enum": ["higher_is_better", "lower_is_better"],
+          "description": "lower_is_better (default; usage against a limit) or higher_is_better (rates such as completion). Only the state words change; the tone is always the highest threshold at or below value."
         },
         "description": {
           "type": "string",

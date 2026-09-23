@@ -31,6 +31,8 @@ export declare const KB_VIZ_DIVERGING_STEPS: number;
 export declare const KB_CHART_MESSAGE_KEYS: Readonly<Record<string, string>>;
 export declare const KB_CHART_STATUS_TONES: Readonly<Record<string, string>>;
 export declare const KB_TONE_GLYPHS: Readonly<Record<string, string>>;
+/** Canonical status → glyph (by status family; mirror of the core catalog). */
+export declare const KB_STATUS_GLYPHS: Readonly<Record<string, string>>;
 
 export declare function isChartType(type: unknown): boolean;
 /** Lay out a chart type; null for a type this module does not own. Never throws. */
@@ -91,6 +93,8 @@ export declare function arcPath(
   a1: number
 ): string;
 export declare function meterTone(value: number, thresholds: unknown): string | null;
+/** `ui:meter` direction (default `lower_is_better`). */
+export declare function meterDirection(value: unknown): 'higher_is_better' | 'lower_is_better';
 export declare function normalizeBarData(props: Record<string, unknown>): {
   categories: string[];
   series: Array<{ name: string; values: Array<number | null> }>;

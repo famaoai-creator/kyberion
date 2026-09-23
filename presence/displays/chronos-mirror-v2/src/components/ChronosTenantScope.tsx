@@ -95,55 +95,61 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
         <Building2 size={13} aria-hidden="true" />
         {compact ? uxText('chronos_tenant_scope_label', locale) : uxText('chronos_scope', locale)}
       </span>
-      <select
-        aria-label={uxText('chronos_tenant_scope_label', locale)}
-        value={selected}
-        onChange={(event) => updateScope('tenant', event.target.value)}
-        className="chronos-scope__select"
-      >
-        <option value="">{uxText('chronos_all_tenants', locale)}</option>
-        {tenants.map((tenant) => (
-          <option key={tenant.slug} value={tenant.slug}>
-            {tenant.displayName}
-          </option>
-        ))}
-      </select>
-      <span className="chronos-scope__sep" aria-hidden="true">
-        ›
-      </span>
-      <select
-        aria-label={uxText('chronos_organization_scope_label', locale)}
-        value={selectedOrganization}
-        onChange={(event) => updateScope('organization_id', event.target.value)}
-        className="chronos-scope__select"
-      >
-        <option value="">{uxText('chronos_all_organizations', locale)}</option>
-        {organizations.map((organization) => (
-          <option key={organization.id} value={organization.id}>
-            {organization.id}
-          </option>
-        ))}
-      </select>
-      <span className="chronos-scope__sep" aria-hidden="true">
-        ›
-      </span>
-      <select
-        aria-label={uxText('chronos_project_scope_label', locale)}
-        value={selectedProject}
-        onChange={(event) => updateScope('project_id', event.target.value)}
-        className="chronos-scope__select"
-      >
-        <option value="">{uxText('chronos_all_projects', locale)}</option>
-        {projects
-          .filter(
-            (project) => !selectedOrganization || project.organization_id === selectedOrganization
-          )
-          .map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name || project.id}
+      <span className="kb-select-wrap chronos-scope__field">
+        <select
+          aria-label={uxText('chronos_tenant_scope_label', locale)}
+          value={selected}
+          onChange={(event) => updateScope('tenant', event.target.value)}
+          className="kb-input kb-select chronos-scope__select"
+        >
+          <option value="">{uxText('chronos_all_tenants', locale)}</option>
+          {tenants.map((tenant) => (
+            <option key={tenant.slug} value={tenant.slug}>
+              {tenant.displayName}
             </option>
           ))}
-      </select>
+        </select>
+      </span>
+      <span className="chronos-scope__sep" aria-hidden="true">
+        ›
+      </span>
+      <span className="kb-select-wrap chronos-scope__field">
+        <select
+          aria-label={uxText('chronos_organization_scope_label', locale)}
+          value={selectedOrganization}
+          onChange={(event) => updateScope('organization_id', event.target.value)}
+          className="kb-input kb-select chronos-scope__select"
+        >
+          <option value="">{uxText('chronos_all_organizations', locale)}</option>
+          {organizations.map((organization) => (
+            <option key={organization.id} value={organization.id}>
+              {organization.id}
+            </option>
+          ))}
+        </select>
+      </span>
+      <span className="chronos-scope__sep" aria-hidden="true">
+        ›
+      </span>
+      <span className="kb-select-wrap chronos-scope__field">
+        <select
+          aria-label={uxText('chronos_project_scope_label', locale)}
+          value={selectedProject}
+          onChange={(event) => updateScope('project_id', event.target.value)}
+          className="kb-input kb-select chronos-scope__select"
+        >
+          <option value="">{uxText('chronos_all_projects', locale)}</option>
+          {projects
+            .filter(
+              (project) => !selectedOrganization || project.organization_id === selectedOrganization
+            )
+            .map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name || project.id}
+              </option>
+            ))}
+        </select>
+      </span>
       <span className="chronos-scope__note">
         <ShieldCheck size={11} aria-hidden="true" />
         {uxText('chronos_scope_server_authorized', locale)}

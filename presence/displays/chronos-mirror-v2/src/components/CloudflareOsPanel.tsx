@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KbStatus } from '@agent/core/a2ui-catalog';
-import { Button, Callout, List, Section } from '@agent/shared-ui';
+import { Callout, List, Section } from '@agent/shared-ui';
 import { useChronosLocale } from '../lib/hooks';
 import { uxText } from '../lib/ux-vocabulary';
 import {
@@ -84,17 +84,17 @@ export function CloudflareOsPanel({ missionId }: { missionId?: string | null }) 
       title={uxText('chronos_os_control_plane', locale)}
       description={uxText('chronos_os_control_plane_description', locale)}
       headingLevel={2}
+      actions={[
+        {
+          label: loading
+            ? uxText('chronos_ac_refreshing', locale)
+            : uxText('chronos_ac_refresh', locale),
+          variant: 'ghost',
+          disabled: loading,
+          onClick: () => void loadSnapshot(),
+        },
+      ]}
     >
-      <div className="chronos-header__controls">
-        <Button
-          label={
-            loading ? uxText('chronos_ac_refreshing', locale) : uxText('chronos_ac_refresh', locale)
-          }
-          variant="ghost"
-          disabled={loading}
-          onClick={() => void loadSnapshot()}
-        />
-      </div>
       {error ? <Callout tone="danger" title={error} /> : null}
       <div className="chronos-two-col">
         <div className="chronos-feed">

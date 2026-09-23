@@ -135,6 +135,9 @@ export const KB_UI_DEFAULT_MESSAGES = Object.freeze({
   'ui:list_progress_value': '{percent}% complete',
   'ui:locale_name_en': 'English',
   'ui:locale_name_ja': 'Japanese',
+  'ui:meter_goal_state_danger': 'Well below target',
+  'ui:meter_goal_state_success': 'On track',
+  'ui:meter_goal_state_warning': 'Below target',
   'ui:meter_state_danger': 'Over the limit',
   'ui:meter_state_success': 'Within range',
   'ui:meter_state_warning': 'Near the limit',
@@ -716,6 +719,7 @@ const RENDERERS = {
     const asLinks = items.some((item) => typeof item.href === 'string');
     const root = el(ctx, asLinks ? 'nav' : 'div', 'kb-tabs');
     setData(root, 'overflow', p.overflow === 'menu' ? 'menu' : 'wrap');
+    setData(root, 'variant', tabsVariant(p.variant));
     if (!asLinks) root.setAttribute('role', 'tablist');
     root.setAttribute('aria-label', str(p.label) || ctx.t(KB_UI_MESSAGE_KEYS.tabsLabel));
     for (const item of items) {
@@ -887,9 +891,13 @@ const RENDERERS = {
         const go = () => {
           if (ctx.win && ctx.win.location) ctx.win.location.assign(href);
         };
-        tr.addEventListener('click', go);
+        tr.addEventListener('click', (event) => {
+          // Links / controls inside the row act on their own.
+          if (isInteractiveTarget(event.target, tr)) return;
+          go();
+        });
         tr.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter') go();
+          if (event.key === 'Enter' && event.target === tr) go();
         });
       }
       for (const col of columns) {
@@ -897,10 +905,17 @@ const RENDERERS = {
         setData(td, 'align', col.align);
         if (col.mono === true) setData(td, 'mono', 'true');
         const value = row[col.key];
+        const kind = tableCellKind(value);
         const isStatusColumn = col.key === 'status' || col.key.endsWith('_status');
-        // Convention: a `status` / `*_status` column holding a canonical
-        // status value renders as a status pill (icon + text).
-        if (isStatusColumn && isStatusValue(value)) {
+        if (kind === 'title') {
+          td.appendChild(tableTitleCell(ctx, value));
+        } else if (kind === 'status') {
+          td.appendChild(statusPill(ctx, value.status, value.domain, value.label));
+        } else if (kind === 'badge') {
+          td.appendChild(badge(ctx, { label: value.badge, tone: value.tone }));
+        } else if (isStatusColumn && isStatusValue(value)) {
+          // Convention: a `status` / `*_status` column holding a canonical
+          // status value renders as a status pill (icon + text).
           td.appendChild(statusPill(ctx, value));
         } else {
           const text = displayScalar(ctx, value);
@@ -1098,6 +1113,25 @@ export function displayThemeProps(ctx, p) {
   };
 }
 
+/**
+ * A language's own name (endonym: "English", the Japanese name in Japanese,
+ * ...) independent of the UI locale, from `Intl.DisplayNames` in that
+ * language; `fallback` (the vocabulary label) when the runtime lacks it.
+ */
+export function localeEndonym(code, fallback) {
+  try {
+    if (typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function') {
+      const name = new Intl.DisplayNames([code], { type: 'language' }).of(code);
+      if (typeof name === 'string' && name && name !== code) {
+        return name.charAt(0).toLocaleUpperCase(code) + name.slice(1);
+      }
+    }
+  } catch {
+    // unsupported locale / runtime: use the vocabulary label
+  }
+  return fallback;
+}
+
 /** `ui:display-controls` → the inner `ui:select` props (language). */
 export function displayLocaleProps(ctx, p) {
   const t = typeof ctx === 'function' ? ctx : ctx.t;
@@ -1114,8 +1148,8 @@ export function displayLocaleProps(ctx, p) {
   const options = given.length
     ? given.map((option) => ({ value: option.value, label: option.label }))
     : [
-        { value: 'ja', label: t(KB_UI_MESSAGE_KEYS.localeNameJa) },
-        { value: 'en', label: t(KB_UI_MESSAGE_KEYS.localeNameEn) },
+        { value: 'ja', label: localeEndonym('ja', t(KB_UI_MESSAGE_KEYS.localeNameJa)) },
+        { value: 'en', label: localeEndonym('en', t(KB_UI_MESSAGE_KEYS.localeNameEn)) },
       ];
   return {
     name: 'locale',
@@ -1208,6 +1242,50 @@ for (const type of KB_CHART_TYPES) {
       }),
       false
     );
+}
+
+/**
+ * `ui:table` rich cell kind: `title` ({title, id?, href?}), `status`
+ * ({status, label?, domain?} with a canonical status), `badge`
+ * ({badge, tone?}); anything else is a `scalar` (shown via displayScalar).
+ * Shared with the React `Table`.
+ */
+export function tableCellKind(value) {
+  if (!isRecord(value)) return 'scalar';
+  if (typeof value.title === 'string' && value.title) return 'title';
+  if (isStatusValue(value.status)) return 'status';
+  if (typeof value.badge === 'string' && value.badge) return 'badge';
+  return 'scalar';
+}
+
+/** `.kb-table__cell` > `a|span.kb-table__title` + optional `span.kb-table__id` (mono). */
+function tableTitleCell(ctx, value) {
+  const root = el(ctx, 'span', 'kb-table__cell');
+  const href = safeHref(value.href);
+  const title = el(ctx, href ? 'a' : 'span', 'kb-table__title', value.title);
+  if (href) title.setAttribute('href', href);
+  root.appendChild(title);
+  if (typeof value.id === 'string' && value.id) {
+    root.appendChild(el(ctx, 'span', 'kb-table__id', value.id));
+  }
+  return root;
+}
+
+const INTERACTIVE_SELECTOR = 'a, button, input, select, textarea, label, summary, form';
+
+/** True when a row click started on a link / control inside the row. */
+export function isInteractiveTarget(target, row) {
+  let node = target;
+  while (node && node !== row) {
+    if (typeof node.matches === 'function' && node.matches(INTERACTIVE_SELECTOR)) return true;
+    node = node.parentNode;
+  }
+  return false;
+}
+
+/** `ui:tabs` variant attribute: `secondary` (pill sub-navigation) or nothing (primary). */
+export function tabsVariant(value) {
+  return value === 'secondary' ? 'secondary' : undefined;
 }
 
 function badge(ctx, p) {

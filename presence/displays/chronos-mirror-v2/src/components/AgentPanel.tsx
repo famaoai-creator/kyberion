@@ -1,8 +1,32 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, RefreshCw, Cpu, X, FileText, Terminal, RotateCcw } from 'lucide-react';
-import { resolveChronosLocale, uxTextOr } from '../lib/ux-vocabulary';
+import { Plus, Trash2, RefreshCw, X, Terminal, RotateCcw } from 'lucide-react';
+import type { KbStatus } from '@agent/core/a2ui-catalog';
+import {
+  Button,
+  Callout,
+  Code,
+  Disclosure,
+  EmptyState,
+  Grid,
+  KeyValue,
+  Metric,
+  RadioGroup,
+  Section,
+  Segmented,
+  Select,
+  StatusPill,
+  TextField,
+  Textarea,
+} from '@agent/shared-ui';
+import {
+  resolveChronosLocale,
+  uxMessage,
+  uxText,
+  type SupportedLocale,
+} from '../lib/ux-vocabulary';
+import { useChronosLocale } from '../lib/hooks';
 import {
   parseAgentHealthResponse,
   type ClientAgentHealthResponse,
@@ -29,7 +53,7 @@ import {
   parseAgentShutdownResponse,
   parseAgentSpawnResponse,
 } from '../lib/agent-control-response';
-import { KyberionDonut } from './KyberionCharts';
+import { ChronosFieldScope, ChronosInline, ChronosMeta } from './chronos-ui';
 
 type AgentRecord = ClientAgentRecord;
 type HealthSnapshot = Pick<ClientAgentHealthResponse, 'total' | 'ready' | 'busy' | 'error'>;
@@ -64,26 +88,31 @@ const PROVIDER_LABELS: Record<string, string> = {
   codex: 'Codex',
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  ready: 'kb-status-positive-surface',
-  busy: 'kb-status-warning-surface animate-pulse',
-  booting: 'kb-surface-accent animate-pulse',
-  error: 'kb-status-negative-surface',
-  registered: 'kb-surface-sunken',
-  shutdown: 'kb-surface-well',
+/** Runtime status → canonical `ui:status-pill` status. */
+const AGENT_STATUS: Record<string, KbStatus> = {
+  ready: 'ready',
+  busy: 'busy',
+  booting: 'connecting',
+  error: 'error',
+  registered: 'pending',
+  shutdown: 'stopped',
 };
 
-function describeProviderResolution(agent: AgentRecord): string | null {
+function describeProviderResolution(agent: AgentRecord, locale: SupportedLocale): string | null {
   const resolution = agent.providerResolution;
   if (!resolution?.preferredProvider) return null;
   const preferred = `${resolution.preferredProvider}${resolution.preferredModelId ? `/${resolution.preferredModelId}` : ''}`;
   const resolved = `${agent.provider}${agent.modelId ? `/${agent.modelId}` : ''}`;
-  return `preferred ${preferred} -> resolved ${resolved} [${resolution.strategy || 'preferred'}]`;
+  return uxMessage(
+    'chronos_agentpanel_provider_resolution',
+    { preferred, resolved, strategy: resolution.strategy || 'preferred' },
+    'Preferred {preferred} → resolved {resolved} ({strategy})',
+    locale
+  );
 }
 
 export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const locale = resolveChronosLocale();
-  const at = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
+  const locale = useChronosLocale();
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [health, setHealth] = useState<HealthSnapshot>({ total: 0, ready: 0, busy: 0, error: 0 });
   const [accessRole, setAccessRole] = useState<ChronosAccessRole>('readonly');
@@ -217,7 +246,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         setSpawnFallbackProviders('');
         await fetchAgents();
       } else {
-        alert('Spawn failed');
+        alert(uxText('chronos_agentpanel_spawn_failed', locale));
       }
     } catch (_) {
       /* best-effort: failure here must not break the primary flow */
@@ -307,8 +336,8 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           ...current,
           [agentId]:
             response.status === 409
-              ? 'Manual drive is not available for this runtime.'
-              : 'Manual action inspection failed.',
+              ? uxText('chronos_agentpanel_manual_unavailable', locale)
+              : uxText('chronos_agentpanel_manual_inspect_failed', locale),
         }));
         return;
       }
@@ -505,85 +534,104 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   // Filter out already-running agents from manifest list
   const runningIds = new Set(agents.map((a) => a.agentId));
   const availableManifests = manifests.filter((m) => !runningIds.has(m.agentId));
+  const installedProviders = providers.filter((p) => p.installed);
+  const missingProviders = providers.filter((p) => !p.installed);
+
+  const onSpawnField = (name: string, value: unknown) => {
+    const next = typeof value === 'string' ? value : String(value ?? '');
+    switch (name) {
+      case 'spawnMode':
+        if (next === 'manifest' || next === 'custom') setSpawnMode(next);
+        break;
+      case 'manifest':
+        setSelectedManifest(next);
+        break;
+      case 'provider': {
+        setSpawnProvider(next);
+        const pc = providers.find((p) => p.value === next);
+        if (pc && pc.models.length > 0) setSpawnModel(pc.models[0]);
+        break;
+      }
+      case 'model':
+        setSpawnModel(next);
+        break;
+      case 'systemPrompt':
+        setSpawnPrompt(next);
+        break;
+      case 'strategy':
+        if (next === 'strict' || next === 'preferred' || next === 'adaptive') {
+          setSpawnProviderStrategy(next);
+        }
+        break;
+      case 'fallbackProviders':
+        setSpawnFallbackProviders(next);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const openSpawn = () => {
+    setShowSpawn(true);
+    setSpawnMode('manifest');
+    setSelectedManifest('');
+  };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
-      <div className="absolute inset-0 kb-surface-well" onClick={onClose} />
-      <div className="relative w-[600px] max-h-[80vh] kyberion-glass rounded-lg border kb-status-warning-border flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b kb-border-subtle">
-          <div className="flex items-center gap-3">
-            <Cpu className="kb-status-warning w-5 h-5" />
-            <span className="text-sm font-bold">
-              {at('chronos_agent_registry', 'Agent Registry')}
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex gap-2 text-[11px] font-mono">
-              <span className="px-2 py-0.5 rounded kb-status-positive-surface kb-status-positive">
-                {health.ready} ready
-              </span>
-              <span className="px-2 py-0.5 rounded kb-status-warning-surface kb-status-warning">
-                {health.busy} busy
-              </span>
-              {health.error > 0 && (
-                <span className="px-2 py-0.5 rounded kb-status-negative-surface kb-status-negative">
-                  {health.error} error
-                </span>
-              )}
-            </div>
-            <button onClick={fetchAgents} className="opacity-40 hover:opacity-80 transition">
-              <RefreshCw size={14} />
-            </button>
-            <button onClick={onClose} className="opacity-40 hover:opacity-80 transition">
-              <X size={14} />
-            </button>
-          </div>
-        </div>
+    <div className="chronos-agent-panel">
+      <div className="chronos-agent-panel__scrim" aria-hidden="true" onClick={onClose} />
+      <aside
+        className="chronos-agent-panel__sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="chronos-agent-panel-title"
+      >
+        <header className="chronos-agent-panel__header">
+          <h2 id="chronos-agent-panel-title" className="chronos-agent-panel__title">
+            {uxText('chronos_agent_runtimes', locale)}
+          </h2>
+          <Button label={uxText('chronos_refresh', locale)} variant="ghost" onClick={fetchAgents}>
+            <RefreshCw size={14} aria-hidden="true" />
+          </Button>
+          <Button label={uxText('chronos_close', locale)} variant="ghost" onClick={onClose}>
+            <X size={14} aria-hidden="true" />
+          </Button>
+        </header>
 
-        {/* Health distribution chart */}
-        {agents.length > 0 && (
-          <div className="px-6 pt-4">
-            <KyberionDonut
-              title={at('chronos_agent_health', 'Agent Health')}
-              centerLabel={at('chronos_agents', 'Agents')}
-              data={[
-                { label: at('chronos_ready', 'Ready'), value: health.ready },
-                { label: at('chronos_busy', 'Busy'), value: health.busy },
-                { label: at('chronos_error', 'Error'), value: health.error },
-              ]}
-            />
-          </div>
-        )}
+        <div className="chronos-agent-panel__body">
+          {agents.length > 0 ? (
+            <Grid columns={3} gap="sm">
+              <Metric label={uxText('chronos_ready', locale)} value={health.ready} tone="success" />
+              <Metric
+                label={uxText('chronos_agentpanel_busy', locale)}
+                value={health.busy}
+                tone="warning"
+              />
+              <Metric
+                label={uxText('chronos_agentpanel_errors', locale)}
+                value={health.error}
+                tone={health.error > 0 ? 'danger' : 'neutral'}
+              />
+            </Grid>
+          ) : null}
 
-        {/* Agent List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {agents.length === 0 && !showSpawn && (
-            <div className="flex flex-col items-center gap-3 py-10 px-6 text-center">
-              <div className="text-[11px] kb-text-muted">
-                {at('chronos_no_agents_running', 'No agents running yet')}
-              </div>
-              <div className="max-w-[260px] text-[11px] leading-relaxed kb-text-muted">
-                {at(
-                  'chronos_no_agents_hint',
-                  'Spawn the first agent to begin Mission control. You can pick a pre-configured manifest or define a custom provider/model.'
-                )}
-              </div>
-              <button
+          {agents.length === 0 && !showSpawn ? (
+            <div className="chronos-stack">
+              <EmptyState
+                title={uxText('chronos_agentpanel_empty_title', locale)}
+                body={uxText('chronos_agentpanel_empty_body', locale)}
+              />
+              <Button
+                label={uxText('chronos_agentpanel_spawn_first', locale)}
+                variant="primary"
                 onClick={() => setShowSpawn(true)}
-                className="mt-2 inline-flex items-center gap-2 rounded-lg border kb-border-accent kb-surface-accent px-3 py-1.5 text-[11px] font-bold kb-text-accent transition hover:kb-surface-accent"
-              >
-                <Plus size={12} />
-                <span>{at('chronos_spawn_first_agent', 'Spawn First Agent')}</span>
-              </button>
+              />
             </div>
-          )}
-          {agents.map((agent) => (
-            <div
-              key={agent.agentId}
-              className="flex items-center gap-3 p-3 kb-surface-well rounded-xl border kb-border-subtle"
-            >
-              {(() => {
+          ) : null}
+
+          {agents.length > 0 ? (
+            <ul className="chronos-agent-panel__agents">
+              {agents.map((agent) => {
                 const metrics = agent.metrics || {
                   turnCount: 0,
                   errorCount: 0,
@@ -596,418 +644,411 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                   ((agent.runtime?.idleForMs ?? agent.idleMs) || 0) / 1000
                 );
                 const trustLabel = typeof agent.trustScore === 'number' ? agent.trustScore : 'n/a';
+                const resolution = describeProviderResolution(agent, locale);
+                const manualAction = manualActions[agent.agentId];
+                const manualCommand = manualCommands[agent.agentId];
+                const manualError = manualErrors[agent.agentId];
+                const busy = Boolean(manualBusy[agent.agentId]);
+                const commandPending = Boolean(
+                  manualCommand &&
+                  manualCommand.state !== 'completed' &&
+                  manualCommand.state !== 'cancelled'
+                );
+                const mutating = mutatingAgent === agent.agentId;
+                const isAdmin = accessRole === 'localadmin';
+                const details: Array<{ label: string; value: string | number; mono?: boolean }> = [
+                  { label: uxText('chronos_agentpanel_trust', locale), value: trustLabel },
+                  ...(agent.capabilities.length > 0
+                    ? [
+                        {
+                          label: uxText('chronos_agentpanel_capabilities', locale),
+                          value: agent.capabilities.join(', '),
+                        },
+                      ]
+                    : []),
+                  ...(resolution
+                    ? [
+                        {
+                          label: uxText('chronos_agentpanel_provider_routing', locale),
+                          value: resolution,
+                          mono: true,
+                        },
+                      ]
+                    : []),
+                  { label: uxText('chronos_agentpanel_turns', locale), value: metrics.turnCount },
+                  { label: uxText('chronos_agentpanel_errors', locale), value: metrics.errorCount },
+                  {
+                    label: uxText('chronos_agentpanel_refreshes', locale),
+                    value: metrics.refreshCount,
+                  },
+                  {
+                    label: uxText('chronos_agentpanel_restarts', locale),
+                    value: metrics.restartCount,
+                  },
+                  { label: uxText('chronos_agentpanel_idle', locale), value: `${idleSeconds}s` },
+                  ...(typeof agent.process?.rssKb === 'number'
+                    ? [
+                        {
+                          label: uxText('chronos_agentpanel_memory', locale),
+                          value: `${(agent.process.rssKb / 1024).toFixed(1)} MB`,
+                        },
+                      ]
+                    : []),
+                  ...(typeof metrics.usage?.totalTokens === 'number'
+                    ? [
+                        {
+                          label: uxText('chronos_agentpanel_tokens', locale),
+                          value: metrics.usage.totalTokens,
+                        },
+                      ]
+                    : []),
+                ];
                 return (
-                  <>
-                    <div
-                      className={`w-2.5 h-2.5 rounded-full ${STATUS_COLORS[agent.status] || 'kb-surface-sunken'}`}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-bold font-mono truncate">
-                        {agent.agentId}
-                      </div>
-                      <div className="text-[11px] opacity-40 flex gap-3 mt-0.5">
-                        <span>
+                  <li key={agent.agentId} className="chronos-agent-panel__agent">
+                    <div className="chronos-agent-panel__agent-head">
+                      <div className="chronos-mission-cell">
+                        <span className="chronos-mission-cell__title">{agent.agentId}</span>
+                        <span className="chronos-mission-cell__id">
                           {agent.provider}/{agent.modelId}
                         </span>
-                        <span>Trust: {trustLabel}</span>
-                        {agent.capabilities.length > 0 && (
-                          <span>[{agent.capabilities.join(', ')}]</span>
-                        )}
                       </div>
-                      {describeProviderResolution(agent) ? (
-                        <div className="text-[8px] opacity-35 mt-1 font-mono">
-                          {describeProviderResolution(agent)}
-                        </div>
-                      ) : null}
-                      <div className="text-[8px] opacity-35 flex flex-wrap gap-3 mt-1 font-mono">
-                        <span>turns {metrics.turnCount}</span>
-                        <span>errors {metrics.errorCount}</span>
-                        <span>refresh {metrics.refreshCount}</span>
-                        <span>restart {metrics.restartCount}</span>
-                        <span>idle {idleSeconds}s</span>
-                        {typeof agent.process?.rssKb === 'number' && (
-                          <span>rss {(agent.process.rssKb / 1024).toFixed(1)}MB</span>
-                        )}
-                        {typeof metrics.usage?.totalTokens === 'number' && (
-                          <span>tokens {metrics.usage.totalTokens}</span>
-                        )}
-                      </div>
+                      <StatusPill status={AGENT_STATUS[agent.status] || 'n/a'} />
                     </div>
-                    <div className="text-[8px] opacity-40">{agent.status}</div>
-                    {accessRole === 'localadmin' && (
-                      <div className="flex items-center gap-1.5 text-[8px]">
-                        <button
-                          type="button"
-                          onClick={() => void inspectManualAction(agent.agentId)}
-                          disabled={manualBusy[agent.agentId]}
-                          className="rounded border kb-border-subtle px-1.5 py-1 kb-text-secondary hover:kb-surface-accent disabled:opacity-30"
-                          title="Inspect the next safe manual-drive action"
-                        >
-                          {manualBusy[agent.agentId] ? '…' : 'Next'}
-                        </button>
-                        {manualActions[agent.agentId] ? (
-                          <button
-                            type="button"
-                            onClick={() => void executeManualAction(agent.agentId)}
-                            disabled={
-                              manualBusy[agent.agentId] ||
-                              manualActions[agent.agentId]?.status !== 'ready' ||
-                              Boolean(
-                                manualCommands[agent.agentId] &&
-                                manualCommands[agent.agentId]?.state !== 'completed' &&
-                                manualCommands[agent.agentId]?.state !== 'cancelled'
+                    <Disclosure summary={uxText('chronos_agentpanel_details', locale)}>
+                      <KeyValue items={details} />
+                    </Disclosure>
+                    {manualAction || manualCommand ? (
+                      <ChronosMeta mono>
+                        {[
+                          manualAction
+                            ? uxMessage(
+                                'chronos_agentpanel_manual_state',
+                                { title: manualAction.title, status: manualAction.status },
+                                'Manual drive: {title} ({status})',
+                                locale
                               )
-                            }
-                            className="rounded border kb-status-warning-border kb-status-warning-surface px-1.5 py-1 kb-status-warning disabled:opacity-30"
-                            title={manualActions[agent.agentId]?.title}
-                          >
-                            Step
-                          </button>
-                        ) : null}
-                        {manualCommands[agent.agentId]?.state === 'completed' &&
-                        manualCommands[agent.agentId]?.status === 'awaiting_approval' ? (
-                          <button
-                            type="button"
-                            onClick={() => void resumeManualCommand(agent.agentId)}
-                            disabled={manualBusy[agent.agentId]}
-                            className="rounded border kb-status-warning-border kb-status-warning-surface px-1.5 py-1 kb-status-warning disabled:opacity-30"
-                            title="Re-run the approval gate for this manual command"
-                          >
-                            Resume
-                          </button>
-                        ) : null}
-                        {manualCommands[agent.agentId] &&
-                        manualCommands[agent.agentId]?.commandId !== 'local' &&
-                        manualCommands[agent.agentId]?.state !== 'completed' &&
-                        manualCommands[agent.agentId]?.state !== 'cancelled' ? (
-                          <button
-                            type="button"
-                            onClick={() => void cancelManualCommand(agent.agentId)}
-                            disabled={manualBusy[agent.agentId]}
-                            className="rounded border kb-status-negative-border kb-status-negative-surface px-1.5 py-1 kb-status-negative disabled:opacity-30"
-                            title="Cancel pending durable manual command"
-                          >
-                            Cancel
-                          </button>
-                        ) : null}
-                      </div>
-                    )}
-                    {manualActions[agent.agentId] ||
-                    manualCommands[agent.agentId] ||
-                    manualErrors[agent.agentId] ? (
-                      <div className="basis-full ml-5 text-[8px] font-mono opacity-60">
-                        {manualActions[agent.agentId]
-                          ? `manual: ${manualActions[agent.agentId]?.title} (${manualActions[agent.agentId]?.status})`
-                          : null}
-                        {manualCommands[agent.agentId]
-                          ? ` · command ${manualCommands[agent.agentId]?.state}${manualCommands[agent.agentId]?.status ? `/${manualCommands[agent.agentId]?.status}` : ''}`
-                          : null}
-                        {manualErrors[agent.agentId] ? (
-                          <span className="kb-status-negative">
-                            {' '}
-                            · {manualErrors[agent.agentId]}
-                          </span>
-                        ) : null}
-                      </div>
+                            : '',
+                          manualCommand
+                            ? uxMessage(
+                                'chronos_agentpanel_command_state',
+                                {
+                                  state: `${manualCommand.state}${manualCommand.status ? `/${manualCommand.status}` : ''}`,
+                                },
+                                'Command {state}',
+                                locale
+                              )
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </ChronosMeta>
                     ) : null}
-                    <button
-                      onClick={() => handleAgentAction(agent.agentId, 'refresh')}
-                      disabled={
-                        accessRole !== 'localadmin' ||
-                        mutatingAgent === agent.agentId ||
-                        !agent.supportsSoftRefresh
-                      }
-                      className="p-1.5 rounded-lg hover:kb-status-positive-surface kb-status-positive hover:kb-status-positive transition disabled:opacity-20"
-                      title={
-                        agent.supportsSoftRefresh
-                          ? 'Soft refresh context'
-                          : 'Soft refresh unsupported'
-                      }
-                    >
-                      <RefreshCw size={12} />
-                    </button>
-                    <button
-                      onClick={() => handleAgentAction(agent.agentId, 'restart')}
-                      disabled={accessRole !== 'localadmin' || mutatingAgent === agent.agentId}
-                      className="p-1.5 rounded-lg hover:kb-status-warning-surface kb-status-warning hover:kb-status-warning transition disabled:opacity-20"
-                      title="Restart agent runtime"
-                    >
-                      <RotateCcw size={12} />
-                    </button>
-                    <button
-                      onClick={() => handleViewLogs(agent.agentId)}
-                      className="p-1.5 rounded-lg hover:kb-surface-accent kb-text-accent hover:kb-text-accent transition"
-                      title="View terminal logs"
-                    >
-                      <Terminal size={12} />
-                    </button>
-                    <button
-                      onClick={() => handleShutdown(agent.agentId)}
-                      disabled={accessRole !== 'localadmin' || mutatingAgent === agent.agentId}
-                      className="p-1.5 rounded-lg hover:kb-status-negative-surface kb-status-negative hover:kb-status-negative transition disabled:opacity-20"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </>
+                    {manualError ? <Callout tone="danger" title={manualError} /> : null}
+                    <ChronosInline>
+                      <Button
+                        label={uxText('chronos_agentpanel_soft_refresh', locale)}
+                        variant="ghost"
+                        onClick={() => handleAgentAction(agent.agentId, 'refresh')}
+                        disabled={!isAdmin || mutating || !agent.supportsSoftRefresh}
+                      >
+                        <RefreshCw size={14} aria-hidden="true" />
+                        {uxText('chronos_agentpanel_soft_refresh', locale)}
+                      </Button>
+                      <Button
+                        label={uxText('chronos_restart_runtime', locale)}
+                        variant="ghost"
+                        onClick={() => handleAgentAction(agent.agentId, 'restart')}
+                        disabled={!isAdmin || mutating}
+                      >
+                        <RotateCcw size={14} aria-hidden="true" />
+                        {uxText('chronos_restart_runtime', locale)}
+                      </Button>
+                      <Button
+                        label={uxText('chronos_agentpanel_view_logs', locale)}
+                        variant="ghost"
+                        onClick={() => handleViewLogs(agent.agentId)}
+                      >
+                        <Terminal size={14} aria-hidden="true" />
+                        {uxText('chronos_agentpanel_view_logs', locale)}
+                      </Button>
+                      <Button
+                        label={uxText('chronos_agentpanel_shutdown', locale)}
+                        variant="danger"
+                        onClick={() => handleShutdown(agent.agentId)}
+                        disabled={!isAdmin || mutating}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                        {uxText('chronos_agentpanel_shutdown', locale)}
+                      </Button>
+                    </ChronosInline>
+                    {isAdmin ? (
+                      <ChronosInline>
+                        <ChronosMeta>{uxText('chronos_agentpanel_manual', locale)}</ChronosMeta>
+                        <Button
+                          label={
+                            busy
+                              ? uxText('chronos_agentpanel_manual_checking', locale)
+                              : uxText('chronos_agentpanel_manual_next', locale)
+                          }
+                          variant="secondary"
+                          onClick={() => void inspectManualAction(agent.agentId)}
+                          disabled={busy}
+                        />
+                        {manualAction ? (
+                          <Button
+                            label={uxText('chronos_agentpanel_manual_step', locale)}
+                            variant="primary"
+                            onClick={() => void executeManualAction(agent.agentId)}
+                            disabled={busy || manualAction.status !== 'ready' || commandPending}
+                          />
+                        ) : null}
+                        {manualCommand?.state === 'completed' &&
+                        manualCommand.status === 'awaiting_approval' ? (
+                          <Button
+                            label={uxText('chronos_agentpanel_manual_resume', locale)}
+                            variant="secondary"
+                            onClick={() => void resumeManualCommand(agent.agentId)}
+                            disabled={busy}
+                          />
+                        ) : null}
+                        {manualCommand && manualCommand.commandId !== 'local' && commandPending ? (
+                          <Button
+                            label={uxText('chronos_agentpanel_manual_cancel', locale)}
+                            variant="danger"
+                            onClick={() => void cancelManualCommand(agent.agentId)}
+                            disabled={busy}
+                          />
+                        ) : null}
+                      </ChronosInline>
+                    ) : null}
+                  </li>
                 );
-              })()}
-            </div>
-          ))}
+              })}
+            </ul>
+          ) : null}
 
-          {/* Log Viewer */}
-          {viewingLogs && (
-            <div className="p-4 kb-surface-well rounded-xl border kb-border-accent space-y-2">
-              <div className="flex justify-between items-center">
-                <div className="text-[11px] font-bold opacity-60 flex items-center gap-2">
-                  <Terminal size={12} /> {viewingLogs}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => fetchLogs(viewingLogs)}
-                    className="text-[11px] kb-text-accent hover:kb-text-accent"
-                  >
-                    {at('chronos_refresh', 'Refresh')}
-                  </button>
-                  <button
-                    onClick={() => setViewingLogs(null)}
-                    className="text-[11px] opacity-40 hover:opacity-80"
-                  >
-                    {at('chronos_close', 'Close')}
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-[250px] overflow-y-auto font-mono text-[11px] space-y-0.5 kb-surface-well rounded-lg p-3">
-                {logs.length === 0 ? (
-                  <div className="text-center opacity-30 italic py-4">
-                    {at('chronos_no_logs_yet', 'No logs yet. Send a message to this agent first.')}
-                  </div>
-                ) : (
-                  logs.map((entry, i) => {
-                    const typeColors: Record<string, string> = {
-                      agent: 'kb-status-positive',
-                      prompt: 'kb-text-accent',
-                      out: 'kb-text-accent',
-                      in: 'kb-text-secondary',
-                      stderr: 'kb-status-negative',
-                      text: 'kb-status-warning',
-                    };
-                    const time = new Date(entry.ts).toLocaleTimeString(resolveChronosLocale());
-                    return (
-                      <div
-                        key={i}
-                        className={`${typeColors[entry.type] || 'opacity-40'} break-all`}
-                      >
-                        <span className="opacity-40">[{time}]</span>{' '}
-                        <span className="opacity-50">{entry.type}</span>
-                        {''}
-                        {entry.content.slice(0, 200)}
-                        {entry.content.length > 200 ? '...' : ''}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Spawn Form */}
-          {showSpawn && (
-            <div className="p-4 kb-surface-well rounded-xl border kb-status-warning-border space-y-3">
-              {/* Mode Toggle */}
-              <div className="flex gap-2 mb-2">
-                <button
-                  onClick={() => setSpawnMode('manifest')}
-                  className={`flex-1 py-1.5 rounded-lg text-[11px] transition border ${
-                    spawnMode === 'manifest'
-                      ? 'kb-status-warning-surface kb-status-warning-border'
-                      : 'kb-border-subtle opacity-40'
-                  }`}
-                >
-                  <FileText size={10} className="inline mr-1" />{' '}
-                  {at('chronos_from_manifest', 'From Manifest')}
-                </button>
-                <button
-                  onClick={() => setSpawnMode('custom')}
-                  className={`flex-1 py-1.5 rounded-lg text-[11px] transition border ${
-                    spawnMode === 'custom'
-                      ? 'kb-status-warning-surface kb-status-warning-border'
-                      : 'kb-border-subtle opacity-40'
-                  }`}
-                >
-                  <Plus size={10} className="inline mr-1" /> {at('chronos_custom', 'Custom')}
-                </button>
-              </div>
-
-              {spawnMode === 'manifest' ? (
-                <>
-                  <div className="text-[11px] font-bold opacity-60">
-                    {at('chronos_select_agent_definition', 'Select Agent Definition')}
-                  </div>
-                  {availableManifests.length === 0 ? (
-                    <div className="text-[11px] opacity-30 italic">
-                      {at('chronos_all_agents_running', 'All defined agents are already running.')}
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {availableManifests.map((m) => (
-                        <button
-                          key={m.agentId}
-                          onClick={() => setSelectedManifest(m.agentId)}
-                          className={`w-full text-left p-3 rounded-lg border transition ${
-                            selectedManifest === m.agentId
-                              ? 'kb-status-warning-border kb-status-warning-surface'
-                              : 'kb-border-subtle hover:kb-border-subtle'
-                          }`}
-                        >
-                          <div className="text-[11px] font-bold font-mono">{m.agentId}</div>
-                          <div className="text-[11px] opacity-40 flex gap-3 mt-0.5">
-                            <span>
-                              {m.provider}/{m.modelId}
-                            </span>
-                            {m.capabilities.length > 0 && (
-                              <span>[{m.capabilities.join(', ')}]</span>
-                            )}
-                            {m.requiresEnv.length > 0 && (
-                              <span className="kb-status-warning">
-                                needs: {m.requiresEnv.join(', ')}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[8px] opacity-35 mt-1 font-mono">
-                            strategy {m.providerStrategy || 'adaptive'}
-                            {(m.fallbackProviders || []).length
-                              ? ` · fallback ${(m.fallbackProviders || []).join(', ')}`
-                              : ''}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div className="text-[11px] font-bold opacity-60">Custom Agent</div>
-                  {providers.filter((p) => p.installed).length === 0 ? (
-                    <div className="text-[11px] opacity-30 italic">Scanning providers...</div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <select
-                        value={spawnProvider}
-                        onChange={(e) => {
-                          setSpawnProvider(e.target.value);
-                          const pc = providers.find((p) => p.value === e.target.value);
-                          if (pc && pc.models.length > 0) setSpawnModel(pc.models[0]);
-                        }}
-                        className="flex-1 kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[11px] outline-none"
-                      >
-                        {providers
-                          .filter((p) => p.installed)
-                          .map((p) => (
-                            <option key={p.value} value={p.value}>
-                              {p.label} {p.version ? `(${p.version})` : ''} [{p.protocol}]
-                            </option>
-                          ))}
-                      </select>
-                      <select
-                        value={spawnModel}
-                        onChange={(e) => setSpawnModel(e.target.value)}
-                        className="flex-1 kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[11px] outline-none"
-                      >
-                        {(providers.find((p) => p.value === spawnProvider)?.models || []).map(
-                          (m) => (
-                            <option key={m} value={m}>
-                              {m}
-                            </option>
-                          )
-                        )}
-                      </select>
-                    </div>
-                  )}
-                  {/* Show unavailable providers */}
-                  {providers.filter((p) => !p.installed).length > 0 && (
-                    <div className="text-[11px] opacity-30 mt-1">
-                      Not installed:{' '}
-                      {providers
-                        .filter((p) => !p.installed)
-                        .map((p) => p.label)
-                        .join(', ')}
-                    </div>
-                  )}
-                  <textarea
-                    value={spawnPrompt}
-                    onChange={(e) => setSpawnPrompt(e.target.value)}
-                    placeholder="System prompt (optional)..."
-                    rows={2}
-                    className="w-full kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-2 text-[11px] outline-none resize-none"
-                  />
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <select
-                      value={spawnProviderStrategy}
-                      onChange={(e) =>
-                        setSpawnProviderStrategy(
-                          e.target.value as 'strict' | 'preferred' | 'adaptive'
-                        )
-                      }
-                      className="kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[11px] outline-none"
-                    >
-                      <option value="adaptive">adaptive</option>
-                      <option value="preferred">preferred</option>
-                      <option value="strict">strict</option>
-                    </select>
-                    <input
-                      value={spawnFallbackProviders}
-                      onChange={(e) => setSpawnFallbackProviders(e.target.value)}
-                      placeholder="fallback providers (claude,codex)"
-                      className="kb-surface-raised/5 border kb-border-subtle rounded-lg px-3 py-1.5 text-[11px] outline-none"
-                    />
-                  </div>
-                  <div className="text-[11px] opacity-35 font-mono">
-                    routing strategy {spawnProviderStrategy}
-                    {spawnFallbackProviders.trim() ? ` · fallback ${spawnFallbackProviders}` : ''}
-                  </div>
-                </>
+          {viewingLogs ? (
+            <Section
+              title={uxMessage(
+                'chronos_agentpanel_logs_title',
+                { agentId: viewingLogs },
+                'Logs: {agentId}',
+                locale
               )}
-
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() => setShowSpawn(false)}
-                  className="px-3 py-1.5 text-[11px] opacity-40 hover:opacity-80 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSpawn}
-                  disabled={spawning || (spawnMode === 'manifest' && !selectedManifest)}
-                  className="px-4 py-1.5 kb-status-warning-surface border kb-status-warning-border rounded-lg text-[11px] font-bold hover:kb-status-warning-surface transition disabled:opacity-20"
-                >
-                  {spawning ? 'Booting...' : 'Spawn'}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-3 border-t kb-border-subtle flex justify-between items-center">
-          <div className="text-[11px] opacity-30 font-mono">
-            {health.total} agent{health.total !== 1 ? 's' : ''} registered
-            {manifests.length > 0 && ` · ${manifests.length} manifests`}
-            {` · ${accessRole}`}
-          </div>
-          {!showSpawn && accessRole === 'localadmin' && (
-            <button
-              onClick={() => {
-                setShowSpawn(true);
-                setSpawnMode('manifest');
-                setSelectedManifest('');
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 kb-status-warning-surface border kb-status-warning-border rounded-lg text-[11px] font-bold hover:kb-status-warning-surface transition"
+              headingLevel={3}
             >
-              <Plus size={12} /> Spawn Agent
-            </button>
-          )}
+              <ChronosInline>
+                <Button
+                  label={uxText('chronos_refresh', locale)}
+                  variant="secondary"
+                  onClick={() => fetchLogs(viewingLogs)}
+                />
+                <Button
+                  label={uxText('chronos_close', locale)}
+                  variant="ghost"
+                  onClick={() => setViewingLogs(null)}
+                />
+              </ChronosInline>
+              {logs.length === 0 ? (
+                <p className="kb-text kb-text--muted">{uxText('chronos_no_logs_yet', locale)}</p>
+              ) : (
+                <Code
+                  code={logs
+                    .map((entry) => {
+                      const time = new Date(entry.ts).toLocaleTimeString(resolveChronosLocale());
+                      const content =
+                        entry.content.length > 200
+                          ? `${entry.content.slice(0, 200)}...`
+                          : entry.content;
+                      return `[${time}] ${entry.type} ${content}`;
+                    })
+                    .join('\n')}
+                />
+              )}
+            </Section>
+          ) : null}
+
+          {showSpawn ? (
+            <Section title={uxText('chronos_agentpanel_spawn_title', locale)} headingLevel={3}>
+              <ChronosFieldScope onChange={onSpawnField}>
+                <div className="chronos-stack">
+                  <Segmented
+                    name="spawnMode"
+                    label={uxText('chronos_agentpanel_spawn_mode', locale)}
+                    value={spawnMode}
+                    options={[
+                      { value: 'manifest', label: uxText('chronos_from_manifest', locale) },
+                      { value: 'custom', label: uxText('chronos_custom', locale) },
+                    ]}
+                  />
+                  {spawnMode === 'manifest' ? (
+                    availableManifests.length === 0 ? (
+                      <p className="kb-text kb-text--muted">
+                        {uxText('chronos_all_agents_running', locale)}
+                      </p>
+                    ) : (
+                      <RadioGroup
+                        name="manifest"
+                        label={uxText('chronos_select_agent_definition', locale)}
+                        value={selectedManifest}
+                        options={availableManifests.map((m) => ({
+                          value: m.agentId,
+                          label: m.agentId,
+                          description: [
+                            `${m.provider}/${m.modelId}`,
+                            m.capabilities.length > 0 ? m.capabilities.join(', ') : '',
+                            m.requiresEnv.length > 0
+                              ? uxMessage(
+                                  'chronos_agentpanel_needs_env',
+                                  { env: m.requiresEnv.join(', ') },
+                                  'Needs {env}',
+                                  locale
+                                )
+                              : '',
+                            uxMessage(
+                              'chronos_agentpanel_strategy_value',
+                              { strategy: m.providerStrategy || 'adaptive' },
+                              'Strategy: {strategy}',
+                              locale
+                            ),
+                            (m.fallbackProviders || []).length
+                              ? uxMessage(
+                                  'chronos_agentpanel_fallback_value',
+                                  { providers: (m.fallbackProviders || []).join(', ') },
+                                  'Fallback: {providers}',
+                                  locale
+                                )
+                              : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' · '),
+                        }))}
+                      />
+                    )
+                  ) : (
+                    <>
+                      {installedProviders.length === 0 ? (
+                        <p className="kb-text kb-text--muted">
+                          {uxText('chronos_agentpanel_scanning_providers', locale)}
+                        </p>
+                      ) : (
+                        <Grid columns={2} gap="sm">
+                          <Select
+                            name="provider"
+                            label={uxText('chronos_agentpanel_provider', locale)}
+                            value={spawnProvider}
+                            options={installedProviders.map((p) => ({
+                              value: p.value,
+                              label: `${p.label}${p.version ? ` (${p.version})` : ''} [${p.protocol}]`,
+                            }))}
+                          />
+                          <Select
+                            name="model"
+                            label={uxText('chronos_agentpanel_model', locale)}
+                            value={spawnModel}
+                            options={(
+                              providers.find((p) => p.value === spawnProvider)?.models || []
+                            ).map((m) => ({ value: m, label: m }))}
+                          />
+                        </Grid>
+                      )}
+                      {missingProviders.length > 0 ? (
+                        <ChronosMeta>
+                          {uxMessage(
+                            'chronos_agentpanel_not_installed',
+                            { providers: missingProviders.map((p) => p.label).join(', ') },
+                            'Not installed: {providers}',
+                            locale
+                          )}
+                        </ChronosMeta>
+                      ) : null}
+                      <Textarea
+                        name="systemPrompt"
+                        label={uxText('chronos_agentpanel_system_prompt', locale)}
+                        value={spawnPrompt}
+                        rows={2}
+                      />
+                      <Grid columns={2} gap="sm">
+                        <Select
+                          name="strategy"
+                          label={uxText('chronos_agentpanel_strategy', locale)}
+                          value={spawnProviderStrategy}
+                          options={[
+                            {
+                              value: 'adaptive',
+                              label: uxText('chronos_agentpanel_strategy_adaptive', locale),
+                            },
+                            {
+                              value: 'preferred',
+                              label: uxText('chronos_agentpanel_strategy_preferred', locale),
+                            },
+                            {
+                              value: 'strict',
+                              label: uxText('chronos_agentpanel_strategy_strict', locale),
+                            },
+                          ]}
+                        />
+                        <TextField
+                          name="fallbackProviders"
+                          label={uxText('chronos_agentpanel_fallback', locale)}
+                          help={uxText('chronos_agentpanel_fallback_help', locale)}
+                          value={spawnFallbackProviders}
+                          placeholder="claude,codex"
+                        />
+                      </Grid>
+                    </>
+                  )}
+                  <ChronosInline>
+                    <Button
+                      label={uxText('chronos_agentpanel_cancel', locale)}
+                      variant="ghost"
+                      onClick={() => setShowSpawn(false)}
+                    />
+                    <Button
+                      label={
+                        spawning
+                          ? uxText('chronos_agentpanel_spawning', locale)
+                          : uxText('chronos_agentpanel_spawn', locale)
+                      }
+                      variant="primary"
+                      onClick={handleSpawn}
+                      disabled={spawning || (spawnMode === 'manifest' && !selectedManifest)}
+                    />
+                  </ChronosInline>
+                </div>
+              </ChronosFieldScope>
+            </Section>
+          ) : null}
         </div>
-      </div>
+
+        <footer className="chronos-agent-panel__footer">
+          <ChronosMeta mono>
+            {uxMessage(
+              'chronos_agentpanel_summary',
+              {
+                total: health.total,
+                manifests: manifests.length,
+                role:
+                  accessRole === 'localadmin'
+                    ? uxText('chronos_agentpanel_role_localadmin', locale)
+                    : uxText('chronos_agentpanel_role_readonly', locale),
+              },
+              '{total} registered · {manifests} manifests · {role}',
+              locale
+            )}
+          </ChronosMeta>
+          {!showSpawn && accessRole === 'localadmin' ? (
+            <Button
+              label={uxText('chronos_agentpanel_spawn', locale)}
+              variant="primary"
+              onClick={openSpawn}
+            >
+              <Plus size={14} aria-hidden="true" />
+              {uxText('chronos_agentpanel_spawn', locale)}
+            </Button>
+          ) : null}
+        </footer>
+      </aside>
     </div>
   );
 }
