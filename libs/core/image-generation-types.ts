@@ -1,5 +1,35 @@
 export type ImageGenerationMode = 'fast' | 'artistic' | 'balanced' | 'local_only' | 'privacy_first';
 
+/**
+ * A reference image the provider must condition on (PA-10). `subject` = the
+ * person / object to depict (e.g. the user's photo), `style` = look to copy,
+ * `consistency` = an earlier generated frame the new one must stay coherent
+ * with (e.g. the neutral expression when generating joy).
+ */
+export interface ImageReference {
+  /** Absolute or repo-relative path inside the repository. */
+  path: string;
+  mimeType: string;
+  role?: 'subject' | 'style' | 'consistency';
+}
+
+/** Where a provider sends request data: stays on this machine, or leaves it. */
+export type ImageDataEgress = 'local' | 'cloud';
+
+/**
+ * Per-run consent to send a user photo to one named cloud provider (PA-10).
+ * Required by the router and by every cloud provider for any request that
+ * carries reference images; it is valid only for `provider_id`, and only for a
+ * bounded time after `granted_at` (see image-reference-consent.ts).
+ */
+export interface ImageEgressConsent {
+  subject: 'user_photo';
+  provider_id: string;
+  provider_class: 'cloud';
+  granted_at: string;
+  granted_by: string;
+}
+
 export interface ImageGenerationRequest {
   prompt: string;
   width?: number;
@@ -25,6 +55,14 @@ export interface ImageGenerationRequest {
   outputDir?: string;
   targetPath?: string;
   awaitCompletion?: boolean;
+  /**
+   * Images the output must be conditioned on. Only providers with
+   * `supportsReferenceImages` are eligible when present; cloud providers
+   * additionally need a valid `egressConsent` naming them.
+   */
+  referenceImages?: ImageReference[];
+  /** Explicit per-run consent for sending reference images to a cloud provider. */
+  egressConsent?: ImageEgressConsent;
 }
 
 export interface ImageGenerationResult {
@@ -43,6 +81,16 @@ export interface ImageGenerationProvider {
   readonly executionLocality?: 'local' | 'remote' | 'hybrid';
   /** Needs a person/host agent to act and a rerun; cannot finish unattended. */
   readonly requiresInteractiveHandoff?: boolean;
+  /** Can condition generation on `referenceImages` (img2img / multimodal input). */
+  readonly supportsReferenceImages?: boolean;
+  /**
+   * Where request data (incl. reference images) goes. Defaults from
+   * executionLocality: `local` → local, anything else → cloud. Host bridges
+   * are cloud: the host agent forwards the request to its own model.
+   */
+  readonly dataEgress?: ImageDataEgress;
+  /** Human-readable provider name shown in consent prompts. */
+  readonly displayName?: string;
   isAvailable(): Promise<boolean>;
   generate(request: ImageGenerationRequest): Promise<ImageGenerationResult>;
 }
