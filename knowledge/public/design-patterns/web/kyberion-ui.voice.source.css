@@ -1,0 +1,416 @@
+/* ------------------------------------------------------------- voice ----
+ * PA-02 (PADS_A2UI_AND_AVATAR_PLAN §3). Stamped into kyberion-ui.css after
+ * kyberion-ui.source.css by scripts/generate_design_tokens.ts.
+ *
+ * Markup comes from libs/shared-ui/vanilla/voice.js and src/voice/*.tsx
+ * (parity-tested). `--kb-ui-*` tokens only, `.kb-*` selectors only, state
+ * via data attributes / aria-pressed. `--kb-voice-level` (0..1) is set on the
+ * component root by the renderer (mic RMS) or the host (`level` prop); bar
+ * heights follow it. States never rely on colour alone: the button text,
+ * the status line, the glyph and the bar shapes differ per state. Under
+ * reduced motion the pulses stop but the level meter keeps updating (it is
+ * information, not decoration).
+ */
+
+/* --------------------------------------------------------- voice input -- */
+
+.kb-voice-input__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-3);
+}
+
+.kb-voice-input__button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  min-height: 44px;
+  padding: 0 var(--kb-ui-space-4);
+  color: var(--kb-ui-text);
+  font: inherit;
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+  background: var(--kb-ui-surface);
+  border: 1px solid var(--kb-ui-border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.kb-voice-input__button:hover:not(:disabled) {
+  background: var(--kb-ui-surface-sunken);
+}
+
+.kb-voice-input__button:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}
+
+.kb-voice-input__button[aria-pressed='true'] {
+  color: var(--kb-ui-text-on-accent);
+  background: var(--kb-ui-accent);
+  border-color: var(--kb-ui-accent);
+}
+
+.kb-voice-input__button[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--kb-ui-accent);
+}
+
+.kb-voice-input[data-state='requesting'] .kb-voice-input__button {
+  border-style: dashed;
+}
+
+.kb-voice-input__button:disabled {
+  color: var(--kb-ui-text-subtle);
+  background: var(--kb-ui-surface-sunken);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.kb-voice-input[data-state='processing'] .kb-voice-input__button {
+  cursor: progress;
+}
+
+.kb-voice-input[data-state='error'] .kb-voice-input__button {
+  border-color: var(--kb-ui-danger-border);
+}
+
+.kb-voice-input__icon {
+  display: inline-flex;
+}
+
+.kb-voice-input[data-state='listening'] .kb-voice-input__icon,
+.kb-voice-input[data-state='recording'] .kb-voice-input__icon {
+  animation: kb-voice-pulse 1.2s ease-in-out infinite;
+}
+
+.kb-voice-input__meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+}
+
+.kb-voice-input__bar {
+  --kb-voice-bar-weight: 1;
+  display: block;
+  width: 4px;
+  height: 100%;
+  background: var(--kb-ui-border-strong);
+  border-radius: 2px;
+  transform: scaleY(calc(0.15 + var(--kb-voice-level, 0) * 0.85 * var(--kb-voice-bar-weight)));
+  transition: transform 80ms linear;
+}
+
+.kb-voice-input__bar:nth-child(1),
+.kb-voice-input__bar:nth-child(5),
+.kb-voice-state__bar:nth-child(1),
+.kb-voice-state__bar:nth-child(5) {
+  --kb-voice-bar-weight: 0.5;
+}
+
+.kb-voice-input__bar:nth-child(2),
+.kb-voice-input__bar:nth-child(4),
+.kb-voice-state__bar:nth-child(2),
+.kb-voice-state__bar:nth-child(4) {
+  --kb-voice-bar-weight: 0.8;
+}
+
+.kb-voice-input[data-state='listening'] .kb-voice-input__bar,
+.kb-voice-input[data-state='recording'] .kb-voice-input__bar {
+  background: var(--kb-ui-accent);
+}
+
+.kb-voice-input__time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-1);
+  color: var(--kb-ui-text-muted);
+  font-family: var(--kb-ui-font-mono);
+  font-size: var(--kb-ui-font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-voice-input[data-state='recording'] .kb-voice-input__time::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--kb-ui-danger-fg);
+  border-radius: 50%;
+}
+
+.kb-voice-input__transcript {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+  font-style: italic;
+}
+
+.kb-voice-input__status {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-voice-input[data-state='error'] .kb-voice-input__status,
+.kb-voice-input[data-state='unsupported'] .kb-voice-input__status {
+  color: var(--kb-ui-danger-fg);
+}
+
+/* --------------------------------------------------------- voice state -- */
+
+.kb-voice-state {
+  --kb-voice-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kb-ui-space-2);
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.kb-voice-state[data-size='sm'] {
+  --kb-voice-size: 16px;
+  font-size: var(--kb-ui-font-size-xs);
+}
+
+.kb-voice-state[data-size='lg'] {
+  --kb-voice-size: 40px;
+  font-size: var(--kb-ui-font-size-md);
+}
+
+.kb-voice-state[data-state='listening'] {
+  color: var(--kb-ui-accent-text);
+}
+
+.kb-voice-state[data-state='thinking'] {
+  color: var(--kb-ui-info-fg);
+}
+
+.kb-voice-state[data-state='speaking'] {
+  color: var(--kb-ui-success-fg);
+}
+
+.kb-voice-state[data-state='muted'] {
+  color: var(--kb-ui-text-subtle);
+}
+
+.kb-voice-state[data-state='error'] {
+  color: var(--kb-ui-danger-fg);
+}
+
+.kb-voice-state__visual {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--kb-voice-size) / 12);
+  min-width: var(--kb-voice-size);
+  height: var(--kb-voice-size);
+}
+
+.kb-voice-state__bar {
+  --kb-voice-bar-weight: 1;
+  display: block;
+  width: calc(var(--kb-voice-size) / 7);
+  height: 100%;
+  background: currentColor;
+  border-radius: 999px;
+  transform: scaleY(calc(0.2 + var(--kb-voice-level, 0) * 0.8 * var(--kb-voice-bar-weight)));
+  transition: transform 80ms linear;
+}
+
+.kb-voice-state__orb {
+  display: block;
+  width: var(--kb-voice-size);
+  height: var(--kb-voice-size);
+  background: currentColor;
+  border-radius: 50%;
+  opacity: 0.3;
+  transform: scale(calc(0.7 + var(--kb-voice-level, 0) * 0.3));
+  transition: transform 80ms linear;
+}
+
+.kb-voice-state__dot {
+  display: block;
+  width: calc(var(--kb-voice-size) / 2.5);
+  height: calc(var(--kb-voice-size) / 2.5);
+  background: currentColor;
+  border-radius: 50%;
+}
+
+/* Per-state glyph (shape cue besides colour). Centered on orb / dot, a
+ * corner badge on bars. */
+.kb-voice-state__glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kb-ui-text);
+  font-size: calc(var(--kb-voice-size) * 0.5);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kb-voice-state[data-variant='bars'] .kb-voice-state__glyph {
+  inset: auto calc(var(--kb-voice-size) * -0.35) calc(var(--kb-voice-size) * -0.2) auto;
+  font-size: calc(var(--kb-voice-size) * 0.4);
+}
+
+.kb-voice-state[data-variant='dot'] .kb-voice-state__glyph {
+  display: none;
+}
+
+.kb-voice-state[data-state='idle'] .kb-voice-state__glyph::before {
+  content: '\25CB';
+}
+
+.kb-voice-state[data-state='listening'] .kb-voice-state__glyph::before {
+  content: '\25CF';
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__glyph::before {
+  content: '\2026';
+}
+
+.kb-voice-state[data-state='speaking'] .kb-voice-state__glyph::before {
+  content: '\266A';
+}
+
+.kb-voice-state[data-state='muted'] .kb-voice-state__glyph::before {
+  content: '\2715';
+}
+
+.kb-voice-state[data-state='error'] .kb-voice-state__glyph::before {
+  content: '!';
+}
+
+/* Static per-state shapes (also the reduced-motion look). */
+.kb-voice-state[data-state='idle'] .kb-voice-state__bar,
+.kb-voice-state[data-state='muted'] .kb-voice-state__bar {
+  transform: scaleY(0.2);
+}
+
+.kb-voice-state[data-state='muted'] .kb-voice-state__visual,
+.kb-voice-state[data-state='idle'] .kb-voice-state__orb {
+  opacity: 0.5;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar {
+  transform: scaleY(0.35);
+}
+
+.kb-voice-state[data-state='idle'] .kb-voice-state__dot,
+.kb-voice-state[data-state='muted'] .kb-voice-state__dot {
+  background: transparent;
+  border: 2px solid currentColor;
+}
+
+.kb-voice-state[data-state='speaking']:not([data-has-level]) .kb-voice-state__bar {
+  transform: scaleY(calc(0.3 + 0.7 * var(--kb-voice-bar-weight)));
+}
+
+.kb-voice-state[data-state='listening'] .kb-voice-state__orb,
+.kb-voice-state[data-state='listening'] .kb-voice-state__dot {
+  animation: kb-voice-pulse 1.4s ease-in-out infinite;
+}
+
+.kb-voice-state[data-state='listening'] .kb-voice-state__bar {
+  animation: kb-voice-pulse 1.4s ease-in-out infinite;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar,
+.kb-voice-state[data-state='thinking'] .kb-voice-state__orb,
+.kb-voice-state[data-state='thinking'] .kb-voice-state__dot {
+  animation: kb-voice-shimmer 1.2s ease-in-out infinite;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
+.kb-voice-state[data-state='thinking'] .kb-voice-state__bar:nth-child(5) {
+  animation-delay: 0.6s;
+}
+
+.kb-voice-state[data-state='speaking']:not([data-has-level]) .kb-voice-state__bar {
+  animation: kb-voice-speak 0.9s ease-in-out infinite alternate;
+}
+
+.kb-voice-state[data-state='speaking']:not([data-has-level]) .kb-voice-state__bar:nth-child(even) {
+  animation-delay: 0.3s;
+}
+
+.kb-voice-state[data-state='speaking']:not([data-has-level]) .kb-voice-state__orb {
+  animation: kb-voice-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes kb-voice-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes kb-voice-shimmer {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes kb-voice-speak {
+  from {
+    transform: scaleY(0.3);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-voice-input__button,
+  .kb-voice-input__bar,
+  .kb-voice-state__bar,
+  .kb-voice-state__orb {
+    transition: none;
+  }
+
+  .kb-voice-input__icon,
+  .kb-voice-input[data-state='listening'] .kb-voice-input__icon,
+  .kb-voice-input[data-state='recording'] .kb-voice-input__icon,
+  .kb-voice-state__bar,
+  .kb-voice-state__orb,
+  .kb-voice-state__dot,
+  .kb-voice-state[data-state] .kb-voice-state__bar,
+  .kb-voice-state[data-state] .kb-voice-state__orb,
+  .kb-voice-state[data-state] .kb-voice-state__dot {
+    animation: none;
+  }
+}
