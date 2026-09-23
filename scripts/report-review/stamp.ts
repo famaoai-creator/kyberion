@@ -54,7 +54,7 @@ export function planReportReviewStamp(html: string, remove: boolean): ReportRevi
 
   const layer = reviewLayerMarkup();
   const content = html.includes('</body>')
-    ? html.replace('</body>', `${layer}\n</body>`)
+    ? html.replace('</body>', () => `${layer}\n</body>`)
     : html + layer;
   return { action: 'add', changed: true, content };
 }

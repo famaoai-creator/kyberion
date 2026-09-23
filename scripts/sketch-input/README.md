@@ -2,7 +2,7 @@
 
 report-review と同型の **127.0.0.1 限定ローカルポート**。ペイント風に図・テキストを描き（指示文は音声入力可）、PNG と `handoff.json` を書き出して Kyberion に渡す。
 
-外部リソース読込ゼロ（すべてインライン）。ファイル I/O は `@agent/core/secure-io` 経由。
+画面は共有 A2UI キット（`ui:toolbar` / `ui:sketch-board` / `ui:textarea` / `ui:voice-input`）で描画し、キットは同じ 127.0.0.1 サーバの `/shared-ui/*` から読む（外部ネットワーク読込なし）。言語はリクエストごと（`?lang=` → `kb-ui-locale` cookie → `Accept-Language`）。ファイル I/O は `@agent/core/secure-io` 経由。
 
 ## 構成
 
