@@ -1,0 +1,57 @@
+{
+  "schema_version": "kyberion-scenario.v1",
+  "id": "apply-with-approval",
+  "title": "Apply a stubbed write op behind an approval gate",
+  "description": "Minimal pr-deterministic scenario: reject then approve a risky op, advance the clock, and prove no side effect happened on the rejected attempt.",
+  "tier": 1,
+  "lane": "pr-deterministic",
+  "executionProfile": "simulated",
+  "modelFixtures": "model-free",
+  "requires": {
+    "actuators": ["filesystem"],
+    "env": [],
+    "backends": []
+  },
+  "seed": {
+    "context": { "workspace": "demo" },
+    "files": [{ "path": "seed/notes.txt", "content": "hello scenario\n" }],
+    "approvals": [],
+    "clock": { "start_iso": "2025-01-01T00:00:00.000Z" }
+  },
+  "fixtures": {
+    "ops": {
+      "filesystem:write": {
+        "result": { "ok": true, "bytes_written": 12 }
+      }
+    },
+    "reasoning": []
+  },
+  "turns": [
+    {
+      "kind": "pipeline",
+      "steps": [{ "op": "filesystem:write", "args": { "path": "seed/notes.txt" } }],
+      "checks": {
+        "expectedOps": ["filesystem:write"]
+      }
+    },
+    {
+      "kind": "approval_decision",
+      "op": "filesystem:write",
+      "decision": "rejected"
+    },
+    {
+      "kind": "advance_clock",
+      "ms": 1500
+    },
+    {
+      "kind": "approval_decision",
+      "op": "filesystem:write",
+      "decision": "approved"
+    }
+  ],
+  "finalChecks": [
+    { "type": "approvalTransition", "op": "filesystem:write", "from": "pending", "to": "approved" },
+    { "type": "noSideEffectOnReject", "op": "filesystem:write" },
+    { "type": "opCalled", "op": "filesystem:write", "times": 1 }
+  ]
+}
