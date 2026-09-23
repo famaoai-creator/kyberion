@@ -17,4 +17,4 @@ This file is the explicit review evidence required by `check:lockfile-commit-gat
 - **Build configuration**: Webpack build flag (`--webpack`) added to concierge and operator-surface build scripts to prevent Turbopack symlink boundary panic in isolated pnpm monorepo layouts.
 - **Audit status**: `pnpm audit --audit-level=critical --ignore-registry-errors` passes cleanly (0 critical vulnerabilities).
 - `pnpm-lock.yaml` sha256: 3fe6df62033b3037b69b296f61ce958ad13a36598ca30df142555d34e45fb410
-- The accepted invocation is `PI_ALLOW_LOCKFILE_CHANGE=1 PI_LOCKFILE_REVIEW_EVIDENCE=docs/developer/improvement-plans-2026-08/LOCKFILE_REVIEW_2026-09-10.ja.md pnpm check -- --scope pr`.
+- The accepted invocation is `PI_ALLOW_LOCKFILE_CHANGE=1 PI_LOCKFILE_REVIEW_EVIDENCE=docs/developer/improvement-plans-2026-09/LOCKFILE_REVIEW_2026-09-10.ja.md pnpm check -- --scope pr`.

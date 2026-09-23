@@ -23,4 +23,4 @@ This file is the explicit review evidence required by `check:lockfile-commit-gat
 - **Intentionally deferred majors / large jumps**: TypeScript 7, Vitest 5, `eslint-import-resolver-typescript` 4, Google APIs 178, Hyperframes 0.8, CopilotKit 1.70, Ink 7, OpenAI SDK 7, PDF.js 6, UUID 14.
 - **Audit status**: `pnpm audit --audit-level=critical --ignore-registry-errors` passes (0 critical). High findings reduced from 39 → 22 after this update.
 - pnpm-lock.yaml sha256: 76b954e690b0b22e59511d60eaafd2e93758bd0220d46be42de7b7a5eb9627df
-- The accepted invocation is `PI_ALLOW_LOCKFILE_CHANGE=1 PI_LOCKFILE_REVIEW_EVIDENCE=docs/developer/improvement-plans-2026-08/LOCKFILE_REVIEW_2026-09-10-dependency-safe-updates.ja.md pnpm check -- --scope pr`.
+- The accepted invocation is `PI_ALLOW_LOCKFILE_CHANGE=1 PI_LOCKFILE_REVIEW_EVIDENCE=docs/developer/improvement-plans-2026-09/LOCKFILE_REVIEW_2026-09-10-dependency-safe-updates.ja.md pnpm check -- --scope pr`.
