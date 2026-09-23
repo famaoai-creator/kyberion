@@ -265,7 +265,22 @@ const NATIVE_STACK_DESCRIPTOR = Object.getOwnPropertyDescriptor(new Error(), 'st
 
 /** Built-in Error instances are scanned like plain objects (subclasses are class instances). */
 function isBuiltinError(value: object): boolean {
-  return value instanceof Error && BUILTIN_ERROR_PROTOTYPES.has(Object.getPrototypeOf(value));
+  if (!(value instanceof Error)) return false;
+  // Subclasses whose prototypes add nothing executable (only `constructor`
+  // and a data `name`) are scanned like built-in errors, so data-only errors
+  // reach host logging and serialisation unchanged.
+  let proto: unknown = Object.getPrototypeOf(value);
+  while (proto && !BUILTIN_ERROR_PROTOTYPES.has(proto as object)) {
+    for (const key of Reflect.ownKeys(proto as object)) {
+      if (key === 'constructor') continue;
+      const descriptor = Reflect.getOwnPropertyDescriptor(proto as object, key);
+      if (!descriptor || !('value' in descriptor) || typeof descriptor.value === 'function') {
+        return false;
+      }
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+  return proto !== null && proto !== undefined;
 }
 
 function isNativeStackAccessor(key: PropertyKey, descriptor: PropertyDescriptor): boolean {

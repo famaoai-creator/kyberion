@@ -377,6 +377,27 @@ describe('plugin grant binding and comparison', () => {
     expect(attempts).not.toContain('allowed');
   });
 
+  it('passes data-only error subclasses through unchanged so host logs stay readable', () => {
+    const binding = createPluginGrantBinding('data-error', EMPTY_PLUGIN_GRANT);
+    class CodedError extends Error {
+      code = 'E_PLUGIN';
+    }
+    const original = new CodedError('coded');
+    const api = binding.wrapObject({
+      fail: () => {
+        throw original;
+      },
+    });
+    let caught: unknown;
+    try {
+      api.fail();
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBe(original);
+    expect(structuredClone(caught)).toMatchObject({ message: 'coded' });
+  });
+
   it('wraps thrown values and errors carrying executables (S4)', async () => {
     const binding = createPluginGrantBinding('throws', EMPTY_PLUGIN_GRANT);
     const withRetry = Object.assign(new Error('boom'), {

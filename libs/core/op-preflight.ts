@@ -405,7 +405,13 @@ function detachedSnapshot<T extends Record<string, unknown>>(value: T): T {
   try {
     copy = structuredClone(value);
   } catch {
-    copy = plainDataCopy(value, new Map());
+    try {
+      copy = plainDataCopy(value, new Map());
+    } catch {
+      // A throwing getter / proxy trap must never turn an observer snapshot
+      // into a preflight failure for the caller.
+      copy = { '[snapshot_failed]': true };
+    }
   }
   return deepFreeze(copy) as T;
 }
