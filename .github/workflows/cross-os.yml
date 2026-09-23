@@ -19,9 +19,10 @@ jobs:
   build-and-smoke:
     name: ${{ matrix.os }} / Node ${{ matrix.node-version }}
     runs-on: ${{ matrix.os }}
-    # The Unix core suite covers ~950 files and can take just over 20 minutes
-    # on the slowest hosted runner; leave room for the follow-up smoke checks.
-    timeout-minutes: 30
+    # The Unix core suite takes ~21 minutes on macOS; build, follow-up smoke
+    # checks, and post-job cache save push the full job past 30 minutes.
+    # Keep enough headroom for those steps on the slowest hosted runner.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
