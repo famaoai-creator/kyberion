@@ -1,4 +1,6 @@
-export function nowIso(date = new Date()): string {
+import { getClock } from './clock.js';
+
+export function nowIso(date = new Date(getClock().now())): string {
   return date.toISOString();
 }
 

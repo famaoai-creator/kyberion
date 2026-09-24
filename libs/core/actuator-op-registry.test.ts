@@ -3,9 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   buildUnknownActuatorOpError,
   determineActuatorStepType,
+  getScenarioOpOverride,
+  isScenarioApprovalGranted,
   listKnownActuatorOps,
   listRegisteredDomainOps,
+  registerScenarioOpOverride,
   resolveActuatorOperation,
+  resolveScenarioOpOverride,
   resolveActuatorOperationTimeout,
   resolveActuatorModulePath,
 } from './actuator-op-registry.js';
@@ -200,5 +204,82 @@ describe('actuator-op-registry', () => {
     );
 
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('scenario-op-override seam (ES-02)', () => {
+  const handler = async (
+    _op: string,
+    _params: Record<string, unknown>,
+    ctx: Record<string, unknown>
+  ) => ({
+    handled: true,
+    ctx,
+  });
+
+  it('is a no-op while unregistered: resolution is exactly the registry path', () => {
+    expect(getScenarioOpOverride()).toBeUndefined();
+    expect(resolveScenarioOpOverride('service', 'api')).toBeNull();
+    expect(isScenarioApprovalGranted('service', 'api')).toBe(false);
+    expect(resolveActuatorOperation('service', 'api')).toMatchObject({
+      source: 'actuator-op-registry',
+      actuatorId: 'service-actuator',
+    });
+    expect(() => resolveActuatorOperation('scenario-demo', 'apply_thing')).toThrow('[UNKNOWN_OP]');
+  });
+
+  it('serves fixture ops before registry lookup and restores on dispose', () => {
+    const seen: string[] = [];
+    const dispose = registerScenarioOpOverride({
+      resolve: (request) => {
+        seen.push(`${request.purpose}:${request.op}`);
+        if (request.op === 'service:api' || request.op === 'scenario-demo:apply_thing') {
+          return { handler };
+        }
+        if (request.op === 'service:blocked')
+          throw new Error('[SCENARIO_UNSTUBBED_OP] service:blocked');
+        return undefined;
+      },
+      approvalGranted: () => true,
+    });
+    try {
+      const served = resolveActuatorOperation('service', 'api');
+      expect(served).toMatchObject({
+        source: 'scenario-fixture',
+        actuatorId: 'scenario-fixture',
+        stepType: 'apply',
+      });
+      expect(served?.handler).toBe(handler);
+      // Unknown to the registry, still served: the override runs before step-type lookup.
+      expect(resolveActuatorOperation('scenario-demo', 'apply_thing')).toMatchObject({
+        source: 'scenario-fixture',
+        stepType: 'apply',
+      });
+      expect(() => resolveActuatorOperation('service', 'blocked')).toThrow(
+        '[SCENARIO_UNSTUBBED_OP]'
+      );
+      // undefined leaves the op on its normal path.
+      expect(
+        resolveActuatorOperation('video-composition', 'prepare_video_composition')
+      ).toMatchObject({
+        source: 'actuator-op-registry',
+      });
+      // Approval is granted only for fixture-served ops.
+      expect(isScenarioApprovalGranted('service', 'api')).toBe(true);
+      expect(isScenarioApprovalGranted('service', 'blocked')).toBe(false);
+      expect(isScenarioApprovalGranted('video-composition', 'prepare_video_composition')).toBe(
+        false
+      );
+      expect(seen).toContain('approval-probe:service:api');
+      expect(() => registerScenarioOpOverride({ resolve: () => undefined })).toThrow(
+        /scenario-op-override/
+      );
+    } finally {
+      dispose();
+    }
+    expect(getScenarioOpOverride()).toBeUndefined();
+    expect(resolveActuatorOperation('service', 'api')).toMatchObject({
+      source: 'actuator-op-registry',
+    });
   });
 });

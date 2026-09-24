@@ -15,6 +15,10 @@
 
 import { playAudioFile, type PlaybackHandle } from './audio-playback.js';
 import { splitVoiceTextIntoChunks } from './voice-text-chunking.js';
+import {
+  createPlaybackPauseGate,
+  type PausablePlaybackHandle,
+} from './streaming-voice-playback.js';
 
 /** Sentence-sized segments: small enough that the first chunk synthesizes fast. */
 export const DEFAULT_SPEECH_SEGMENT_CHARS = 160;
@@ -51,6 +55,13 @@ export interface SegmentedSpeechController {
   done: Promise<SegmentedSpeechResult>;
   /** Stop speaking now: halts playback and discards pending synthesis. Idempotent. */
   stop(): Promise<SegmentedSpeechResult>;
+  /**
+   * Silence output now and hold the next segment. A pausable player handle is
+   * paused in place; any other player is stopped and its segment is replayed
+   * from the start on resume(), so no audio keeps feeding the mic meanwhile.
+   */
+  pause?(): void;
+  resume?(): void;
 }
 
 export function speakSegmented(options: SegmentedSpeechOptions): SegmentedSpeechController {
@@ -62,6 +73,9 @@ export function speakSegmented(options: SegmentedSpeechOptions): SegmentedSpeech
 
   let cancelled = false;
   let currentPlayback: PlaybackHandle | null = null;
+  // Set when pause() stopped a non-pausable segment that must replay on resume.
+  let stoppedForPause = false;
+  const gate = createPlaybackPauseGate();
   const startedAt = Date.now();
   let firstAudioMs: number | null = null;
   const audioPaths: string[] = [];
@@ -83,6 +97,15 @@ export function speakSegmented(options: SegmentedSpeechOptions): SegmentedSpeech
         (synthesisError) => ({ ok: false as const, error: synthesisError })
       );
 
+  const playSegment = async (audioPath: string, index: number) => {
+    stoppedForPause = false;
+    currentPlayback = play(audioPath, index);
+    if (firstAudioMs === null) firstAudioMs = Date.now() - startedAt;
+    const result = await currentPlayback.done;
+    currentPlayback = null;
+    return result;
+  };
+
   const run = async (): Promise<SegmentedSpeechResult> => {
     try {
       // Prime the pipeline: kick off synthesis of segment 0, then loop —
@@ -103,14 +126,19 @@ export function speakSegmented(options: SegmentedSpeechOptions): SegmentedSpeech
         }
         const audioPath = synthesis.path;
         if (cancelled) break;
+        await Promise.race([gate.wait(), cancellation]);
+        if (cancelled) break;
         nextSynthesis =
           index + 1 < segments.length ? synthesize(segments[index + 1], index + 1) : null;
         audioPaths.push(audioPath);
         options.onSegmentStart?.({ index, total: segments.length, text: segments[index] });
-        currentPlayback = play(audioPath, index);
-        if (firstAudioMs === null) firstAudioMs = Date.now() - startedAt;
-        const result = await currentPlayback.done;
-        currentPlayback = null;
+        let result = await playSegment(audioPath, index);
+        while (result.interrupted && stoppedForPause && !cancelled) {
+          stoppedForPause = false;
+          await Promise.race([gate.wait(), cancellation]);
+          if (cancelled) break;
+          result = await playSegment(audioPath, index);
+        }
         if (!result.ok && !result.interrupted) {
           error = result.error || 'playback failed';
           break;
@@ -143,10 +171,26 @@ export function speakSegmented(options: SegmentedSpeechOptions): SegmentedSpeech
 
   return {
     done,
+    pause: () => {
+      gate.pause();
+      const handle = currentPlayback as Partial<PausablePlaybackHandle> | null;
+      if (!handle) return;
+      if (typeof handle.pause === 'function') {
+        handle.pause();
+      } else if (!stoppedForPause && handle.stop) {
+        stoppedForPause = true;
+        void handle.stop();
+      }
+    },
+    resume: () => {
+      gate.resume();
+      (currentPlayback as Partial<PausablePlaybackHandle> | null)?.resume?.();
+    },
     stop: async () => {
       cancelled = true;
       abortController.abort();
       resolveCancellation?.();
+      gate.resume();
       if (currentPlayback) {
         await currentPlayback.stop();
       }

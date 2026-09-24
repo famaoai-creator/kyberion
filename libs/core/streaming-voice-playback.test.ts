@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createPlaybackPauseGate,
+  gateAudioStream,
   streamVoicePlayback,
   streamTtsAudioPlayback,
   type StreamingSynthesizedAudio,
@@ -98,5 +100,92 @@ describe('streamVoicePlayback', () => {
     expect(result.completed).toBe(true);
     expect(textSegments).toEqual(['一つ目。', '二つ目。']);
     expect(played).toEqual([2, 2]);
+  });
+
+  it('pause() holds the next file segment until resume()', async () => {
+    const played: string[] = [];
+    const controller = streamVoicePlayback({
+      synthesize: async (segment) => `/tmp/${segment}.wav`,
+      play: (path) => {
+        played.push(path);
+        return immediateHandle();
+      },
+    });
+    controller.pause?.();
+    controller.push('a');
+    controller.end();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(played).toEqual([]);
+
+    controller.resume?.();
+    const result = await controller.done;
+    expect(result.completed).toBe(true);
+    expect(played).toEqual(['/tmp/a.wav']);
+  });
+
+  it('stop() releases a paused controller as interrupted', async () => {
+    const played: string[] = [];
+    const controller = streamVoicePlayback({
+      synthesize: async (segment) => `/tmp/${segment}.wav`,
+      play: (path) => {
+        played.push(path);
+        return immediateHandle();
+      },
+    });
+    controller.pause?.();
+    controller.push('a');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const result = await controller.stop();
+    expect(result.interrupted).toBe(true);
+    expect(played).toEqual([]);
+  });
+
+  it('pause() buffers PCM chunks of the streaming TTS path until resume()', async () => {
+    const played: number[] = [];
+    const controller = streamTtsAudioPlayback({
+      voiceProfileId: 'voice-profile',
+      synthesizeStream: async function* (text) {
+        for await (const _segment of text) {
+          yield { format, payload: new Uint8Array([1, 2]), ts_ms: 0 };
+        }
+      },
+      playStream: (stream) => {
+        const done = (async () => {
+          for await (const chunk of stream) played.push(chunk.payload.byteLength);
+          return { ok: true, interrupted: false } as PlaybackResult;
+        })();
+        return { done, stop: async () => ({ ok: true, interrupted: true }) };
+      },
+    });
+    controller.pause?.();
+    controller.push('一つ目。');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(played).toEqual([]);
+
+    controller.resume?.();
+    controller.end();
+    const result = await controller.done;
+    expect(result.completed).toBe(true);
+    expect(played).toEqual([2]);
+  });
+});
+
+describe('playback pause gate', () => {
+  it('holds gated chunks without dropping any', async () => {
+    const gate = createPlaybackPauseGate();
+    const source = (async function* (): AsyncGenerator<AudioChunk> {
+      for (let i = 0; i < 3; i += 1) yield { format, payload: new Uint8Array([i]), ts_ms: i };
+    })();
+    gate.pause();
+    const seen: number[] = [];
+    const consumed = (async () => {
+      for await (const chunk of gateAudioStream(source, gate)) seen.push(chunk.payload[0]);
+    })();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(seen).toEqual([]);
+    expect(gate.paused).toBe(true);
+    gate.resume();
+    await consumed;
+    expect(seen).toEqual([0, 1, 2]);
   });
 });

@@ -40,6 +40,7 @@ import {
   type PluginTrustLabel,
 } from './plugin-source-trust.js';
 import {
+  computePluginContentDigest,
   isManagedPluginActivationAllowed,
   listManagedPlugins,
   type ManagedPluginRecord,
@@ -52,6 +53,9 @@ import {
   type PluginContributionDeclaration,
   type PluginContributionModule,
 } from './plugin-contributions.js';
+import type { PluginPermissionGrant } from './plugin-permissions.js';
+import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
+import { resolvePluginExecutionGrant, runWithPluginGrant } from './plugin-grant-runtime.js';
 
 export const SKILL_PLUGINS_CONFIG_FILENAME = '.kyberion-plugins.json';
 
@@ -71,6 +75,15 @@ export interface SkillPluginAuthorization {
   allowed: boolean;
   /** Set only when `allowed` is backed by a managed-copy install. */
   managedPluginId?: string;
+  /** EP-01: managed copy root and the approved content digest, re-verified before import(). */
+  managedPath?: string;
+  managedContentDigest?: string;
+  /**
+   * Verified trust of the managed record. The managed copy lives outside
+   * `plugins/`, so `trust` (derived from the path) never reads official for
+   * it; the grant decision uses this instead.
+   */
+  managedTrust?: PluginTrustLabel;
   reason: string;
 }
 
@@ -79,6 +92,8 @@ export interface LoadedSkillPlugin {
   resolvedPath: string;
   module: SkillPluginHookModule;
   contributions?: PluginContributionActivation;
+  /** EP-03: the grant the module was imported under (null = legacy unwrapped). */
+  grant?: PluginPermissionGrant | null;
 }
 
 export interface SkillPluginLoadResult {
@@ -307,17 +322,21 @@ function findManagedRecordFor(
   );
 }
 
-function readPluginManifestProvides(resolvedPath: string): {
+/**
+ * Managed installs read only the manifest at the managed root — the one the
+ * approval was bound to (nested candidates are refused at install); other
+ * paths walk up from the entry.
+ */
+function readPluginManifestProvides(
+  resolvedPath: string,
+  managedPath?: string
+): {
   pluginId?: string;
   provides?: PluginContributionDeclaration;
 } {
-  let cursor = path.dirname(resolvedPath);
-  for (let depth = 0; depth < 6; depth += 1) {
-    const candidates = [
-      path.join(cursor, 'plugin-manifest.json'),
-      path.join(cursor, 'plugin.json'),
-      path.join(cursor, '.claude-plugin', 'plugin.json'),
-    ];
+  let cursor = managedPath ?? path.dirname(resolvedPath);
+  for (let depth = 0; depth < (managedPath ? 1 : 6); depth += 1) {
+    const candidates = PLUGIN_MANIFEST_CANDIDATES.map((candidate) => path.join(cursor, candidate));
     const manifestPath = candidates
       .map((candidate) => assertNoSymlinkTraversal(candidate))
       .find((candidate) => safeExistsSync(candidate));
@@ -387,13 +406,20 @@ export function authorizeSkillPlugin(
     // activation status is already approved (or would-be-official within
     // the managed tree). Never fall back to executing the raw path.
     const managed = findManagedRecordFor(trust.resolvedSourcePath, managedRoot);
-    if (managed && isManagedPluginActivationAllowed(managed)) {
+    if (
+      managed &&
+      isManagedPluginActivationAllowed(managed) &&
+      (managed.contentDigest || managed.trust === 'official')
+    ) {
       return {
         configuredPath,
         resolvedPath: trust.resolvedSourcePath,
         trust: trust.label,
         allowed: true,
         managedPluginId: managed.pluginId,
+        managedPath: managed.managedPath,
+        managedTrust: managed.trust,
+        ...(managed.contentDigest ? { managedContentDigest: managed.contentDigest } : {}),
         reason: `Managed-copy install '${managed.pluginId}' is activatable (trust=${managed.trust}).`,
       };
     }
@@ -439,6 +465,25 @@ export function authorizeConfiguredSkillPlugins(
 }
 
 /**
+ * EP-01: re-verifies the managed copy's content digest immediately before
+ * `import()` to keep the approval-to-execution window minimal. Returns a
+ * skip reason, or undefined when the content still matches.
+ */
+function managedDigestSkipReason(authorization: SkillPluginAuthorization): string | undefined {
+  if (!authorization.managedPluginId || !authorization.managedContentDigest) return undefined;
+  const label = `Managed-copy install '${authorization.managedPluginId}'`;
+  try {
+    const current = computePluginContentDigest(authorization.managedPath as string);
+    if (current === authorization.managedContentDigest) return undefined;
+    return `${label} content digest changed since approval (expected ${authorization.managedContentDigest.slice(0, 12)}, found ${current.slice(0, 12)}); skipping rather than executing modified plugin code.`;
+  } catch (err) {
+    return `${label} content digest could not be re-verified (${
+      err instanceof Error ? err.message : String(err)
+    }); skipping rather than executing unverified plugin code.`;
+  }
+}
+
+/**
  * Loads (via dynamic `import()`) every configured plugin that passed
  * `authorizeSkillPlugin`, and logs+returns a diagnostic for every one that
  * didn't. A denied/unmanaged plugin's file is never `import()`-ed — the
@@ -480,14 +525,54 @@ export async function loadAuthorizedSkillPlugins(
       );
       continue;
     }
+    const digestSkipReason = managedDigestSkipReason(authorization);
+    if (digestSkipReason) {
+      const diagnostic: SkillPluginAuthorization = {
+        ...authorization,
+        allowed: false,
+        reason: digestSkipReason,
+      };
+      diagnostics.push(diagnostic);
+      logger.warn(
+        `[skill-plugin-loader] Skipped plugin '${authorization.configuredPath}' (trust=${authorization.trust}): ${digestSkipReason}`
+      );
+      continue;
+    }
     try {
-      const mod = (await import(
-        /* webpackIgnore: true */
-        pathToFileURL(authorization.resolvedPath).href
-      )) as SkillPluginHookModule;
+      // EP-03: resolved once, before import, and shared by the import frame,
+      // the contribution activation and the skill hooks.
+      const trust =
+        (authorization.managedTrust ?? authorization.trust) === 'official'
+          ? 'official'
+          : 'third-party';
+      const { grant } = resolvePluginExecutionGrant(
+        {
+          pluginId: authorization.managedPluginId || path.basename(authorization.resolvedPath),
+          sourcePath: authorization.resolvedPath,
+          trust,
+        },
+        { managedRoot }
+      );
+      const load = () =>
+        import(
+          /* webpackIgnore: true */
+          pathToFileURL(authorization.resolvedPath).href
+        ) as Promise<SkillPluginHookModule>;
+      // Best effort: top-level module code usually inherits this async context.
+      const mod =
+        grant === null
+          ? await load()
+          : await runWithPluginGrant(
+              grant,
+              authorization.managedPluginId || path.basename(authorization.resolvedPath),
+              load
+            );
       let contributions: PluginContributionActivation | undefined;
       if (typeof mod.registerKyberionContributions === 'function') {
-        const manifest = readPluginManifestProvides(authorization.resolvedPath);
+        const manifest = readPluginManifestProvides(
+          authorization.resolvedPath,
+          authorization.managedPath
+        );
         if (!manifest.provides) {
           throw new Error(
             '[PLUGIN_CONTRIBUTION_DENIED] registerKyberionContributions requires manifest provides declaration'
@@ -501,15 +586,18 @@ export async function loadAuthorizedSkillPlugins(
               manifest.pluginId ||
               path.basename(authorization.resolvedPath),
             sourcePath: authorization.resolvedPath,
-            trust: authorization.trust === 'official' ? 'official' : 'third-party',
+            trust,
+            grant,
           },
-          mod
+          mod,
+          { managedRoot }
         );
       }
       loaded.push({
         configuredPath: authorization.configuredPath,
         resolvedPath: authorization.resolvedPath,
         module: mod,
+        grant,
         ...(contributions ? { contributions } : {}),
       });
     } catch (err) {

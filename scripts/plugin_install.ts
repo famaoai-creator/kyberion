@@ -14,10 +14,37 @@
  * Usage:
  *   pnpm plugin:install --source ./some/plugin --id my-plugin
  *   pnpm plugin:install --source ./some/plugin --id my-plugin --requested-by alice
+ *   pnpm plugin:install --source ./some/plugin --id my-plugin --tenant acme
+ *
+ * EP-02: the manifest `permissions` declaration is narrowed against the
+ * governed per-trust ceiling (plugin-permission-policy.json) and the
+ * requested / ceiling / granted table is printed before any approval request
+ * is created. If a critical capability (fs / network / secrets) narrows to
+ * nothing, nothing is installed and the required elevation is printed.
+ *
+ * EP-04: `--reload <id>` / `--deactivate <id>` drive the in-process plugin
+ * lifecycle (plugin-lifecycle.ts) for an installed managed plugin and print
+ * the apply-ladder result (config_apply / plugin_reload / restart_required).
+ * They act on THIS process only: a plugin that is not active here is
+ * activated by --reload (a verification of the approved copy) and
+ * --deactivate reports that there is nothing to dispose.
+ *
+ *   pnpm plugin:install --reload my-plugin [--managed-root <dir>] [--json]
+ *   pnpm plugin:install --deactivate my-plugin [--json]
  */
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { importPluginPack } from '@agent/core/plugin-pack';
-import { installPluginManaged } from '@agent/core/plugin-managed-install';
+import {
+  formatPermissionDiffTable,
+  installPluginManaged,
+  PluginPermissionNarrowedError,
+  type ManagedPluginRecord,
+} from '@agent/core/plugin-managed-install';
+import {
+  deactivatePlugin,
+  reloadPlugin,
+  type PluginLifecycleResult,
+} from '@agent/core/plugin-lifecycle';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
@@ -53,6 +80,11 @@ export function runPluginInstall(args: string[] = [], print: Print = () => undef
     .option('managed-root', {
       type: 'string',
       describe: 'Override the managed-plugins root (defaults to active/shared/plugins/managed)',
+    })
+    .option('tenant', {
+      type: 'string',
+      describe:
+        "Installing tenant slug; confidential fs grants are limited to that tenant's own scope",
     })
     .option('json', { type: 'boolean', default: false })
     .parseSync();
@@ -94,13 +126,51 @@ export function runPluginInstall(args: string[] = [], print: Print = () => undef
     return 1;
   }
 
-  const record = installPluginManaged({
-    pluginId,
-    sourcePath: source,
-    ...(argv['requested-by'] ? { requestedBy: String(argv['requested-by']) } : {}),
-    ...(argv.channel ? { approvalChannel: String(argv.channel) } : {}),
-    ...(argv['managed-root'] ? { managedRoot: String(argv['managed-root']) } : {}),
-  });
+  let record: ManagedPluginRecord;
+  try {
+    record = installPluginManaged({
+      pluginId,
+      sourcePath: source,
+      ...(argv['requested-by'] ? { requestedBy: String(argv['requested-by']) } : {}),
+      ...(argv.channel ? { approvalChannel: String(argv.channel) } : {}),
+      ...(argv['managed-root'] ? { managedRoot: String(argv['managed-root']) } : {}),
+      ...(argv.tenant ? { tenantSlug: String(argv.tenant) } : {}),
+      // Printed before the approval request exists, so the operator sees
+      // exactly what an approval would grant.
+      onPermissionsResolved: (preview) => {
+        if (argv.json) return;
+        print(`Permissions for '${preview.pluginId}' (trust=${preview.trust}):`);
+        print(formatPermissionDiffTable(preview.diff));
+      },
+    });
+  } catch (err) {
+    if (!(err instanceof PluginPermissionNarrowedError)) throw err;
+    if (argv.json) {
+      print(
+        JSON.stringify(
+          {
+            error: err.code,
+            capability: err.capability,
+            requested: err.requested,
+            granted: err.granted,
+            requiredElevation: err.requiredElevation,
+            diff: err.diff,
+          },
+          null,
+          2
+        )
+      );
+      return 1;
+    }
+    print(`Permissions for '${pluginId}' could not be granted:`);
+    print(formatPermissionDiffTable(err.diff));
+    print('');
+    print(
+      `Requested ${err.capability} (${err.requested}) narrows to ${err.granted}; nothing was installed and no approval was requested.`
+    );
+    print(err.requiredElevation);
+    return 1;
+  }
 
   if (argv.json) {
     print(JSON.stringify(record, null, 2));
@@ -121,6 +191,11 @@ export function runPluginInstall(args: string[] = [], print: Print = () => undef
   if (record.activationStatus === 'blocked_broken_manifest') {
     print('This plugin will never be loaded — fix the manifest and re-run plugin:install.');
     return 1;
+  }
+
+  if (record.contentDigest) {
+    print(`Content digest: ${record.contentDigest}`);
+    print(`Permissions digest: ${record.permissionsDigest}`);
   }
 
   if (record.trust !== 'official' && record.approvalRequestId) {
@@ -147,6 +222,81 @@ export function runPluginInstall(args: string[] = [], print: Print = () => undef
   return 0;
 }
 
+/** True when argv asks for an EP-04 lifecycle action instead of an install. */
+export function isPluginLifecycleCommand(args: string[]): boolean {
+  return args.some(
+    (arg) =>
+      arg === '--reload' ||
+      arg === '--deactivate' ||
+      arg.startsWith('--reload=') ||
+      arg.startsWith('--deactivate=')
+  );
+}
+
+function formatLifecycleResult(action: string, result: PluginLifecycleResult): string {
+  return [
+    `Plugin '${result.pluginId}' ${action}: ${result.ok ? 'ok' : 'not applied'}`,
+    `  mode:   ${result.mode}`,
+    `  reason: ${result.reason}`,
+    ...(result.rolledBack !== undefined ? [`  rolled back: ${result.rolledBack}`] : []),
+    ...(result.contentDigest ? [`  content digest: ${result.contentDigest}`] : []),
+  ].join('\n');
+}
+
+export async function runPluginLifecycleCommand(
+  args: string[] = [],
+  print: Print = () => undefined
+): Promise<number> {
+  const argv = createStandardYargs(['node', 'plugin_install', ...args])
+    .scriptName('plugin_install')
+    .option('reload', {
+      type: 'string',
+      describe: 'EP-04: reload an installed managed plugin in this process',
+    })
+    .option('deactivate', {
+      type: 'string',
+      describe: 'EP-04: deactivate a plugin active in this process',
+    })
+    .option('managed-root', { type: 'string' })
+    .option('json', { type: 'boolean', default: false })
+    .parseSync();
+
+  const reloadId = argv.reload ? String(argv.reload).trim() : '';
+  const deactivateId = argv.deactivate ? String(argv.deactivate).trim() : '';
+  if (Boolean(reloadId) === Boolean(deactivateId)) {
+    print('Usage: pnpm plugin:install --reload <plugin-id> | --deactivate <plugin-id>');
+    return 1;
+  }
+
+  let action: string;
+  let result: PluginLifecycleResult;
+  if (reloadId) {
+    action = 'reload';
+    try {
+      result = await reloadPlugin(reloadId, {
+        ...(argv['managed-root'] ? { managedRoot: String(argv['managed-root']) } : {}),
+      });
+    } catch (err) {
+      result = {
+        pluginId: reloadId,
+        ok: false,
+        mode: 'plugin_reload',
+        reason: err instanceof Error ? err.message : String(err),
+      };
+    }
+  } else {
+    action = 'deactivate';
+    result = deactivatePlugin(deactivateId);
+  }
+
+  print(
+    argv.json
+      ? JSON.stringify({ action, ...result }, null, 2)
+      : formatLifecycleResult(action, result)
+  );
+  return result.ok ? 0 : 1;
+}
+
 if (
   isDirectScript(import.meta.url, 'plugin_install.ts') ||
   isDirectScript(import.meta.url, 'plugin_install.js')
@@ -154,8 +304,10 @@ if (
   void defineScript({
     name: 'plugin:install',
     flags: [],
-    run(context) {
-      const status = runPluginInstall(context.argv, context.print);
+    async run(context) {
+      const status = isPluginLifecycleCommand(context.argv)
+        ? await runPluginLifecycleCommand(context.argv, context.print)
+        : runPluginInstall(context.argv, context.print);
       if (status !== 0) throw new Error(`plugin:install failed with exit code ${status}`);
     },
   })();

@@ -32,6 +32,10 @@ See also:
 - [`docs/DOC_INVENTORY.md`](./DOC_INVENTORY.md)
 - [`docs/TASK_SCENARIO_ROADMAP.md`](./TASK_SCENARIO_ROADMAP.md)
 
+# Executable scenarios (pnpm scenario)
+
+The catalogs above describe scenarios in prose. Executable, machine-checked scenarios (`kyberion-scenario.v1`) live in [`eval/scenarios/`](../eval/scenarios/README.md) and run with `pnpm scenario run eval/scenarios --lane pr-deterministic`. They drive real pipelines against op fixtures and assert on the recorded side effects, approvals and trace spans; the `pr-deterministic` lane is the `scenario-pr-deterministic` PR gate. Reports are `simulated` evidence and never count as provider evidence.
+
 # Marketing And Video Production
 
 | Scenario                              | Risk | Canonical pipeline template                   | Completion boundary                                                                     |

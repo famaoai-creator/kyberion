@@ -6,6 +6,7 @@ import {
   loadAllowedEgressDomains,
   loadEgressPolicy,
 } from './egress-policy.js';
+import { withSandboxPolicy, type SandboxPolicy } from './sandbox-policy.js';
 
 describe('egress-policy', () => {
   beforeEach(() => {
@@ -37,6 +38,23 @@ describe('egress-policy', () => {
 
     const decision = evaluateEgressPolicy('https://api.box.com/2.0/folders/0/items');
     expect(decision.verdict).toBe('allow');
+  });
+
+  it('denies hosts outside an active sandbox network allowlist', () => {
+    const sandbox: SandboxPolicy = {
+      mode: 'read-only',
+      networkAccess: true,
+      networkAllowlist: ['api.github.com'],
+      provider: 'kyberion',
+      enforcement: 'full',
+      enforcement_reason: 'test',
+    };
+    withSandboxPolicy(sandbox, () => {
+      expect(evaluateEgressPolicy('https://api.github.com/test').verdict).toBe('allow');
+      const denied = evaluateEgressPolicy('https://api.box.com/2.0/folders');
+      expect(denied.verdict).toBe('deny');
+      expect(denied.reason).toContain('SANDBOX_NETWORK_DENIED');
+    });
   });
 
   it('denies non-allowlisted domains when mode is enforce', () => {

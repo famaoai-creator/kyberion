@@ -1,5 +1,8 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
+import { assertNotSimulatedEvidence } from './scenario-evidence-class.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 
 export type ProductionEvidenceStatus = 'pending_external_evidence' | 'verified';
 
@@ -50,7 +53,9 @@ export function loadProductionEvidenceRegister(
 ): ProductionEvidenceRegister {
   const resolved = pathResolver.rootResolve(registerPath);
   try {
-    return productionEvidenceRegisterCatalog(resolved).load();
+    const register = productionEvidenceRegisterCatalog(resolved).load();
+    assertNoSimulatedEvidenceInRegister(register);
+    return register;
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error(
@@ -58,5 +63,28 @@ export function loadProductionEvidenceRegister(
       );
     }
     throw error;
+  }
+}
+
+/**
+ * ES-04: a local JSON artifact referenced as evidence that is simulated
+ * scenario output is refused as release evidence (the register schema itself
+ * is closed, so items cannot carry an evidence class of their own).
+ */
+function assertNoSimulatedEvidenceInRegister(register: ProductionEvidenceRegister): void {
+  for (const item of register.items) {
+    const intake = `production-evidence-register item ${item.id}`;
+    for (const ref of item.evidence_refs) {
+      if (typeof ref !== 'string' || !ref.endsWith('.json') || ref.includes('://')) continue;
+      const refPath = pathResolver.rootResolve(ref);
+      if (!safeExistsSync(refPath) || !safeLstat(refPath).isFile()) continue;
+      let artifact: unknown;
+      try {
+        artifact = readJson<unknown>(refPath);
+      } catch {
+        continue;
+      }
+      assertNotSimulatedEvidence(artifact, `${intake} ref ${ref}`);
+    }
   }
 }

@@ -721,6 +721,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/plugin-permissions-and-views.md",
+      "tier": "public",
+      "size": 9362,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/pptx-design-distillation-pattern.md",
       "tier": "public",
       "size": 3605,
@@ -771,7 +777,7 @@
     {
       "path": "product/architecture/realtime-media-session-architecture.md",
       "tier": "public",
-      "size": 18294,
+      "size": 24364,
       "type": "md"
     },
     {
@@ -1473,13 +1479,13 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 22793,
+      "size": 23392,
       "type": "json"
     },
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 49264,
+      "size": 49440,
       "type": "json"
     },
     {
@@ -1587,7 +1593,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 147113,
+      "size": 148822,
       "type": "json"
     },
     {
@@ -2229,7 +2235,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 6816,
+      "size": 6854,
       "type": "json"
     },
     {
@@ -2913,7 +2919,7 @@
     {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 5321,
+      "size": 5396,
       "type": "json"
     },
     {
@@ -3190,6 +3196,12 @@
       "path": "product/governance/pipelines/wisdom-sync-docs.json",
       "tier": "public",
       "size": 434,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/plugin-permission-policy.json",
+      "tier": "public",
+      "size": 980,
       "type": "json"
     },
     {
@@ -3651,7 +3663,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 18754,
+      "size": 19212,
       "type": "json"
     },
     {
@@ -6279,7 +6291,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 976128,
+      "size": 988499,
       "type": "json"
     },
     {
@@ -9187,6 +9199,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/kyberion-scenario-report.schema.json",
+      "tier": "public",
+      "size": 3230,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/kyberion-scenario.schema.json",
+      "tier": "public",
+      "size": 10384,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/layout-template-catalog.schema.json",
       "tier": "public",
       "size": 505,
@@ -9237,7 +9261,7 @@
     {
       "path": "product/schemas/managed-plugin-record.schema.json",
       "tier": "public",
-      "size": 1967,
+      "size": 4341,
       "type": "json"
     },
     {
@@ -10441,6 +10465,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/plugin-permission-policy.schema.json",
+      "tier": "public",
+      "size": 3612,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/plugin-view-declaration.schema.json",
+      "tier": "public",
+      "size": 3626,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json",
       "tier": "public",
       "size": 2511,
@@ -10894,6 +10930,12 @@
       "path": "product/schemas/runtime-surface-manifest.schema.json",
       "tier": "public",
       "size": 1451,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/scenario-trajectory.schema.json",
+      "tier": "public",
+      "size": 2905,
       "type": "json"
     },
     {
@@ -12117,8 +12159,14 @@
     {
       "path": "product/voice/realtime-voice-conversation-operations.md",
       "tier": "public",
-      "size": 7002,
+      "size": 10642,
       "type": "md"
+    },
+    {
+      "path": "product/voice/turn-taking-lexicon.json",
+      "tier": "public",
+      "size": 1211,
+      "type": "json"
     },
     {
       "path": "public/accessibility/README.md",

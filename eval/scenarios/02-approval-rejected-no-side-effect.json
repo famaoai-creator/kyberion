@@ -1,0 +1,33 @@
+{
+  "schema_version": "kyberion-scenario.v1",
+  "id": "approval-rejected-no-side-effect",
+  "title": "A rejected approval blocks the op with no side effect",
+  "description": "The approval-gated update is requested, the seeded decision rejects it, and the fixture handler never runs.",
+  "tier": 1,
+  "lane": "pr-deterministic",
+  "executionProfile": "simulated",
+  "modelFixtures": "model-free",
+  "requires": {},
+  "seed": {
+    "approvals": [{ "op": "service:update_ticket", "decision": "rejected" }],
+    "clock": { "start_iso": "2026-01-05T09:00:00.000Z" }
+  },
+  "fixtures": {
+    "ops": {
+      "service:update_ticket": { "ctx_patch": { "ticket_closed": true } }
+    }
+  },
+  "turns": [
+    {
+      "kind": "pipeline",
+      "pipeline": "fixtures/gated-apply.pipeline.json",
+      "expectError": "[OP_PREFLIGHT_BLOCK]",
+      "checks": { "forbiddenOps": ["service:update_ticket"] }
+    }
+  ],
+  "finalChecks": [
+    { "type": "approvalRequested", "op": "service:update_ticket" },
+    { "type": "noSideEffectOnReject", "op": "service:update_ticket" },
+    { "type": "opNotCalled", "op": "service:update_ticket" }
+  ]
+}

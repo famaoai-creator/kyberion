@@ -35,8 +35,8 @@ followed) to one of:
   `activatable` — official-by-provenance, or third-party with a human
   `approved` decision already applied.
 
-Anything else — an arbitrary path, or a managed install still
-`pending_approval`/`blocked_broken_manifest` — is **skipped with a logged
+Anything else — an arbitrary path, or a managed install that is
+`pending_approval`, `blocked_broken_manifest` or `blocked_digest_mismatch` — is **skipped with a logged
 diagnostic and its code is never executed**. A skipped plugin never blocks
 the skill run (fail-open display), but "fail-open" never means "execute
 anyway" (fail-closed execution).
@@ -133,3 +133,184 @@ all registrations; a manifest alone never grants execution authority.
 - Plugins load in array order; a failing plugin doesn't block others
 - A plugin path is only ever `import()`-ed if it passes the trust gate above
   — writing a plugin doesn't make it trusted; provenance does
+
+## Permissions declaration and narrowing (EP-02)
+
+A manifest may declare what the plugin needs. Anything not declared is
+`none` — deny by default:
+
+```json
+{
+  "permissions": {
+    "network": { "mode": "allowlist", "hosts": ["api.example.com"] },
+    "fs": { "mode": "readonly", "paths": [{ "tier": "public", "prefix": "" }] },
+    "ops_invoke": ["example:*"],
+    "env": ["EXAMPLE_*"],
+    "secrets": ["EXAMPLE_TOKEN"]
+  }
+}
+```
+
+At install time the request is intersected with the per-trust ceiling in
+`knowledge/product/governance/plugin-permission-policy.json` and, with
+`--tenant <slug>`, with that tenant's narrow-only override. Confidential paths
+are confined to the installing tenant. `pnpm plugin:install` prints the
+requested / ceiling / granted table before any approval request exists. If a
+critical capability (fs, network, secrets) is narrowed to nothing, nothing is
+installed and the error names the elevation an administrator would have to
+grant (`PluginPermissionNarrowedError`). The narrowed grant — not the request —
+is what a human approves.
+
+## Digest-bound approval and re-approval (EP-01)
+
+An approval is bound to the managed copy's content digest (sha256 over every
+file), the manifest version and the digest of the granted permissions. Every
+activation check recomputes them, and the loader re-verifies the digest
+immediately before `import()`. Any change — code, manifest or a view
+document — makes the plugin `blocked_digest_mismatch` until it is reinstalled
+and the new version is approved (`pnpm plugin:install --source ... --id ...`,
+then decide the new request). Approving the old request does nothing; the
+concierge plugin screen answers such an approval with a "reinstall" message.
+
+The approval covers exactly one manifest, at the package root. A package with
+more than one root candidate (`manifest_ambiguous`) or any candidate below the
+root (`manifest_nested`, e.g. `dist/plugin.json`) is `blocked_broken_manifest`,
+and runtime readers of a managed install only consult the root manifest.
+
+Managed records written before digests existed are treated as
+`pending_approval`: reinstall each legacy third-party plugin once and approve
+it again. Official plugins are not affected.
+
+## Runtime enforcement (EP-03)
+
+Plugin permission grants are enforced cooperatively. Kyberion runs every
+contribution a plugin registers inside `runWithPluginGrant`, which applies
+the intersection of the enclosing sandbox policy and the approved grant and
+never widens it, and records the executing plugin so op preflight
+(`ops_invoke`), secret-guard (`secrets`) and `getPluginEnv()` (`env`) can
+check the grant. This mediates Kyberion's governed paths only (secure-io
+writes, sandbox/URL network checks, op dispatch, secret resolution). It is
+not a security boundary against malicious in-process code: a plugin that
+imports `node:fs`, opens sockets directly or reads `process.env` is not
+stopped, and filesystem reads are not restricted. Third-party plugins without
+a declaration run with the empty grant; official plugins without a
+declaration keep the legacy trusted path. Approve only plugins you would run
+with the host's own privileges.
+
+### Reserved seams
+
+A plugin may never provide `core-clock`, `risky-approval-handler`,
+`risky-approval-override` or `scenario-op-override` (they would let plugin
+code decide approvals, replace op resolution or move the governed clock). A
+manifest that declares one is a broken manifest; a registration attempt fails
+closed.
+
+## Lifecycle and the apply ladder (EP-04)
+
+Long-running hosts manage one live activation per plugin
+(`libs/core/plugin-lifecycle.ts`). Every registration is recorded in an
+ownership ledger; a plugin can only dispose contributions it owns.
+
+```bash
+pnpm plugin:install --reload <plugin-id>      # re-verify, classify, apply
+pnpm plugin:install --deactivate <plugin-id>  # dispose everything it owns
+```
+
+Both act on the current process only. A change is applied on the least
+disruptive rung:
+
+| Mode               | When                                                                       |
+| ------------------ | -------------------------------------------------------------------------- |
+| `config_apply`     | permissions narrowed in place, or a change confined to `views/`            |
+| `plugin_reload`    | ops / hooks / prompt sections / facets / code changed, permissions widened |
+| `restart_required` | seams or providers changed (consumers may hold references)                 |
+
+A reload re-imports the entry with a `?digest=` query; Node keeps the
+previous module in memory until the process exits, so hosts that reload
+often should restart periodically. If the new module fails, the previous
+module is re-activated; if that fails too, the plugin stays inactive and the
+result is `restart_required`. The ladder never bypasses the approval: even a
+`config_apply` change changes the content digest and needs a re-approval
+before the new version is activatable (`reloadPlugin` does not know which
+paths changed, so a re-approved content change is applied as
+`plugin_reload`). Installing a new version replaces the managed copy in
+place, so a reload while that version awaits approval **deactivates** the
+running one (fail closed — the old module could lazily load unapproved
+files); it comes back once the new version is approved and reloaded. The same
+happens when the managed copy is removed, tampered with, or its approval is
+rejected.
+
+## Views (EP-05)
+
+A plugin may contribute declarative views — A2UI documents, never code:
+
+```json
+{
+  "provides": {
+    "ops": ["example:refresh"],
+    "views": [
+      {
+        "id": "status",
+        "titleKey": "plugin:fixture_status_view_title",
+        "document": "views/status.a2ui.json",
+        "isolation": "in-process-a2ui",
+        "capabilities": [],
+        "roleGate": { "minRole": "readonly", "tiers": ["public"] },
+        "actions": [
+          {
+            "id": "refresh",
+            "authority": "agent",
+            "op": "example:refresh",
+            "paramsSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+          }
+        ],
+        "lifecycle": { "refresh": "on_open" }
+      }
+    ]
+  }
+}
+```
+
+Rules (`libs/core/plugin-view-contract.ts`,
+`knowledge/product/schemas/plugin-view-declaration.schema.json`):
+
+- The document lives under `views/` inside the plugin (no `..`, no symlinks)
+  and is a list of A2UI messages: one `createSurface` with catalog
+  `kyberion-base`, then `updateComponents` / `updateDataModel`.
+- Only a display-only subset of `ui:*` components is allowed; props are
+  validated against the catalog schema; no `href`, raw HTML, script URLs or
+  event-handler props; every `*Key` must exist in the user-facing vocabulary.
+- `sandboxed-iframe` isolation is reserved (`[PLUGIN_VIEW_UNSUPPORTED]`) and
+  every capability is denied for now.
+- Actions may only target the plugin's own `provides.ops`; `paramsSchema`
+  must set `additionalProperties: false` on every object. The document may
+  only reference declared actions. `authority: "human"` queues a human-only
+  approval request; `authority: "agent"` dispatches only where the plugin is
+  active in-process.
+- Views are served (Chronos `GET /api/headless/a2ui/plugin-views`) only for
+  `activatable` managed plugins whose digest still matches; the viewer's role,
+  tier and tenant are evaluated server-side and a `tier` / `tenant` query can
+  only narrow them.
+
+`plugins/fixtures/plugin-permissions-fixture/` is the reference fixture (ops,
+permissions and one view). Design and threat model:
+[plugin-permissions-and-views](../knowledge/product/architecture/plugin-permissions-and-views.md).
+
+## Release notes (EP-01 to EP-05)
+
+Upgrading a host that already has managed plugins:
+
+- Legacy third-party managed records (written before digest-bound approval)
+  are `pending_approval`: reinstall each one and approve it again.
+- Packages that contain a plugin manifest candidate below their root —
+  including anywhere under `node_modules/`, matched case-insensitively — are
+  rejected (`manifest_nested`); package trees too large to scan (more than
+  20,000 entries or deeper than 32 levels, e.g. a bundled `node_modules`) fail
+  closed (`manifest_tree_too_large`) at install and at activation — slim the
+  package (bundle the code) and reinstall.
+- Follow every reinstall with a reload in each long-running host
+  (`pnpm plugin:install --reload <plugin-id>`): revocation and grant changes
+  are enforced when the plugin is reloaded, not while the old activation runs.
+- Lowering a ceiling in `plugin-permission-policy.json` (or a tenant
+  override) can block an already installed plugin until it is reinstalled and
+  its narrowed grant approved.

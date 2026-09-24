@@ -4,6 +4,8 @@ import {
   getStubServedOps,
   resetReasoningBackend,
   resetStubServedOps,
+  restoreStubServedOps,
+  snapshotStubServedOps,
 } from './reasoning-backend.js';
 import { reconcileCompletionStructurally } from './intent-reconciliation.js';
 
@@ -36,6 +38,15 @@ describe('stub taint gate (LC-07)', () => {
     await getReasoningBackend().decomposeIntoTasks({ designDraft: {} });
     const served = getStubServedOps();
     expect(served.map((entry) => entry.op)).toEqual(['delegateTask', 'decomposeIntoTasks']);
+  });
+
+  it('restores a snapshot ahead of records made since, never dropping taint', async () => {
+    await getReasoningBackend().delegateTask('before');
+    const snapshot = snapshotStubServedOps();
+    resetStubServedOps();
+    await getReasoningBackend().prompt('after');
+    restoreStubServedOps(snapshot);
+    expect(getStubServedOps().map((entry) => entry.op)).toEqual(['delegateTask', 'prompt']);
   });
 
   it('blocks completion when stub ops were served without explicit stub mode', async () => {

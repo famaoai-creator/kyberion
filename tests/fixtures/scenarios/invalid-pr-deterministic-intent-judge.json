@@ -1,0 +1,35 @@
+{
+  "schema_version": "kyberion-scenario.v1",
+  "id": "invalid-intent-and-judge",
+  "title": "Invalid: pr-deterministic scenario using intent + judge",
+  "description": "Fixture for scenario-definition.test.ts — schema-valid but violates two code-enforced invariants: lane pr-deterministic forbids intent turns and judge checks.",
+  "tier": 1,
+  "lane": "pr-deterministic",
+  "executionProfile": "simulated",
+  "modelFixtures": "model-free",
+  "requires": {
+    "actuators": [],
+    "env": [],
+    "backends": []
+  },
+  "seed": {
+    "context": {},
+    "files": [],
+    "approvals": [],
+    "clock": {}
+  },
+  "fixtures": {
+    "ops": {},
+    "reasoning": []
+  },
+  "turns": [
+    {
+      "kind": "intent",
+      "text": "please do the thing",
+      "checks": {
+        "judge": { "rubric": "did it do the thing", "minScore": 0.8 }
+      }
+    }
+  ],
+  "finalChecks": [{ "type": "opCalled", "op": "filesystem:write" }]
+}

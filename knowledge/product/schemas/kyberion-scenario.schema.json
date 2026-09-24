@@ -1,0 +1,324 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/kyberion-scenario.schema.json",
+  "title": "Kyberion scenario definition",
+  "description": "Scenario evaluation definition consumed by the scenario runner (kyberion-scenario.v1). Cross-field invariants the schema cannot express (lane vs. executionProfile, lane vs. judge/intent turns, deferred vs. lane, seed file path containment) are enforced in libs/core/scenario-definition.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "title",
+    "tier",
+    "executionProfile",
+    "modelFixtures",
+    "requires",
+    "seed",
+    "fixtures",
+    "turns",
+    "finalChecks"
+  ],
+  "properties": {
+    "schema_version": { "const": "kyberion-scenario.v1" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "tier": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "lane": {
+      "enum": ["pr-deterministic", "live-only"],
+      "default": "live-only",
+      "description": "Absent means live-only; libs/core/scenario-definition.ts applies the default."
+    },
+    "executionProfile": { "enum": ["simulated", "provider-qualified"] },
+    "modelFixtures": { "enum": ["fixtures", "model-free"] },
+    "requires": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "actuators": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "env": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "backends": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "deferred": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "context": { "type": "object" },
+        "files": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/seedFile" }
+        },
+        "approvals": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "clock": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "start_iso": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "fixtures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ops"],
+      "properties": {
+        "ops": {
+          "type": "object",
+          "description": "Keyed by 'domain:action' op id.",
+          "additionalProperties": { "$ref": "#/$defs/opFixture" }
+        },
+        "reasoning": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/reasoningFixture" }
+        }
+      }
+    },
+    "turns": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/turn" }
+    },
+    "finalChecks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finalCheck" }
+    }
+  },
+  "$defs": {
+    "seedFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "content"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative to the scenario run root; '..' segments and absolute paths are rejected in code."
+        },
+        "content": { "type": "string" }
+      }
+    },
+    "opFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ctx_patch": { "type": "object" },
+        "result": { "type": "object" },
+        "error": { "type": "string", "minLength": 1 }
+      }
+    },
+    "reasoningFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["match", "response"],
+      "properties": {
+        "match": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "contains": { "type": "string", "minLength": 1 },
+            "regex": { "type": "string", "minLength": 1 }
+          }
+        },
+        "response": { "type": "string" }
+      }
+    },
+    "turnChecks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expectedOps": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "forbiddenOps": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "responseMatchers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/responseMatcher" }
+        },
+        "judge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rubric", "minScore"],
+          "properties": {
+            "rubric": { "type": "string", "minLength": 1 },
+            "minScore": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+    "responseMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "equals": {},
+        "regex": { "type": "string", "minLength": 1 },
+        "includes": { "type": "string", "minLength": 1 }
+      }
+    },
+    "turn": {
+      "oneOf": [
+        { "$ref": "#/$defs/pipelineTurn" },
+        { "$ref": "#/$defs/intentTurn" },
+        { "$ref": "#/$defs/advanceClockTurn" },
+        { "$ref": "#/$defs/approvalDecisionTurn" }
+      ]
+    },
+    "pipelineTurn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "const": "pipeline" },
+        "pipeline": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative path to a pipeline JSON file; mutually exclusive with 'steps'."
+        },
+        "steps": { "type": "array", "items": { "type": "object" } },
+        "context": { "type": "object" },
+        "expectError": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Negative scenario: the pipeline must fail and one step error must contain this substring; a success fails the turn."
+        },
+        "checks": { "$ref": "#/$defs/turnChecks" }
+      },
+      "anyOf": [{ "required": ["pipeline"] }, { "required": ["steps"] }],
+      "not": { "required": ["pipeline", "steps"] }
+    },
+    "intentTurn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "text"],
+      "properties": {
+        "kind": { "const": "intent" },
+        "text": { "type": "string", "minLength": 1 },
+        "checks": { "$ref": "#/$defs/turnChecks" }
+      }
+    },
+    "advanceClockTurn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ms"],
+      "properties": {
+        "kind": { "const": "advance_clock" },
+        "ms": { "type": "integer", "minimum": 1 },
+        "checks": { "$ref": "#/$defs/turnChecks" }
+      }
+    },
+    "approvalDecisionTurn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "op", "decision"],
+      "properties": {
+        "kind": { "const": "approval_decision" },
+        "op": { "type": "string", "minLength": 1 },
+        "decision": { "enum": ["approved", "rejected", "pending"] },
+        "checks": { "$ref": "#/$defs/turnChecks" }
+      }
+    },
+    "finalCheck": {
+      "oneOf": [
+        { "$ref": "#/$defs/finalCheckOpCalled" },
+        { "$ref": "#/$defs/finalCheckOpNotCalled" },
+        { "$ref": "#/$defs/finalCheckOpArgs" },
+        { "$ref": "#/$defs/finalCheckApprovalRequested" },
+        { "$ref": "#/$defs/finalCheckApprovalTransition" },
+        { "$ref": "#/$defs/finalCheckNoSideEffectOnReject" },
+        { "$ref": "#/$defs/finalCheckArtifactExists" },
+        { "$ref": "#/$defs/finalCheckTraceSpanExists" }
+      ]
+    },
+    "finalCheckOpCalled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "op"],
+      "properties": {
+        "type": { "const": "opCalled" },
+        "op": { "type": "string", "minLength": 1 },
+        "times": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "finalCheckOpNotCalled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "op"],
+      "properties": {
+        "type": { "const": "opNotCalled" },
+        "op": { "type": "string", "minLength": 1 }
+      }
+    },
+    "finalCheckOpArgs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "op", "match"],
+      "properties": {
+        "type": { "const": "opArgs" },
+        "op": { "type": "string", "minLength": 1 },
+        "match": { "type": "object" }
+      }
+    },
+    "finalCheckApprovalRequested": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "op"],
+      "properties": {
+        "type": { "const": "approvalRequested" },
+        "op": { "type": "string", "minLength": 1 }
+      }
+    },
+    "finalCheckApprovalTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "op", "from", "to"],
+      "properties": {
+        "type": { "const": "approvalTransition" },
+        "op": { "type": "string", "minLength": 1 },
+        "from": { "enum": ["approved", "rejected", "pending"] },
+        "to": { "enum": ["approved", "rejected", "pending"] }
+      }
+    },
+    "finalCheckNoSideEffectOnReject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "op"],
+      "properties": {
+        "type": { "const": "noSideEffectOnReject" },
+        "op": { "type": "string", "minLength": 1 }
+      }
+    },
+    "finalCheckArtifactExists": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path"],
+      "properties": {
+        "type": { "const": "artifactExists" },
+        "path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "finalCheckTraceSpanExists": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "name"],
+      "properties": {
+        "type": { "const": "traceSpanExists" },
+        "name": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

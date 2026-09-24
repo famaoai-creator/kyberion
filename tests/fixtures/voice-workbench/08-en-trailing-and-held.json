@@ -1,0 +1,17 @@
+{
+  "id": "en-trailing-and-held",
+  "description": "An English utterance ending in \"and\" is held and joined with the continuation.",
+  "timeline": [
+    { "at_ms": 0, "event": { "type": "vad_start" } },
+    { "at_ms": 1200, "event": { "type": "vad_silence" } },
+    { "at_ms": 1300, "event": { "type": "stt_final", "text": "I need the quarterly report and" } },
+    { "at_ms": 1700, "event": { "type": "vad_start" } },
+    { "at_ms": 2600, "event": { "type": "vad_silence" } },
+    { "at_ms": 2700, "event": { "type": "stt_final", "text": "the slide deck for Friday." } }
+  ],
+  "expect": {
+    "commits": ["I need the quarterly report and the slide deck for Friday."],
+    "drops": 0,
+    "max_eot_latency_ms": 300
+  }
+}

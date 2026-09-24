@@ -47,13 +47,7 @@ const GENERIC_SECRET_PATTERNS: RegExp[] = [
 ];
 
 export function redactSensitiveString(value: string): string {
-  let redacted = value;
-  for (const secret of secretGuard.getActiveSecrets()) {
-    if (secret && secret.length > 5) {
-      const escaped = secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      redacted = redacted.replace(new RegExp(escaped, 'g'), '[REDACTED_SECRET]');
-    }
-  }
+  let redacted = secretGuard.redactActiveSecretsForHostLog(value, '[REDACTED_SECRET]', 5);
   for (const pattern of GENERIC_SECRET_PATTERNS) {
     redacted = redacted.replace(pattern, '[REDACTED_SECRET]');
   }

@@ -1,0 +1,42 @@
+[
+  {
+    "createSurface": {
+      "surfaceId": "permfixture-status",
+      "catalogId": "kyberion-base",
+      "titleKey": "plugin:fixture_status_view_title"
+    }
+  },
+  {
+    "updateComponents": {
+      "surfaceId": "permfixture-status",
+      "components": [
+        {
+          "id": "root",
+          "type": "ui:stack",
+          "props": { "gap": "sm" },
+          "children": ["state", "facts", "probe"]
+        },
+        {
+          "id": "state",
+          "type": "ui:status-pill",
+          "props": { "status": "ready", "label": "Fixture loaded" }
+        },
+        {
+          "id": "facts",
+          "type": "ui:kv",
+          "props": {
+            "items": [
+              { "label": "Network", "value": "none" },
+              { "label": "Filesystem", "value": "readonly (public)" }
+            ]
+          }
+        },
+        {
+          "id": "probe",
+          "type": "ui:button",
+          "props": { "label": "Read granted env", "action": { "id": "probe_env" } }
+        }
+      ]
+    }
+  }
+]

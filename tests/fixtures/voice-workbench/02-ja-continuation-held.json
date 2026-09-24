@@ -1,0 +1,20 @@
+{
+  "id": "ja-continuation-held",
+  "description": "「えーと、明日の会議で」 ends on a continuation particle, is held, and commits together with the continuation as one turn.",
+  "timeline": [
+    { "at_ms": 0, "event": { "type": "vad_start" } },
+    { "at_ms": 400, "event": { "type": "stt_partial", "text": "えーと" } },
+    { "at_ms": 800, "event": { "type": "stt_partial", "text": "えーと、明日の会議で" } },
+    { "at_ms": 1000, "event": { "type": "vad_silence" } },
+    { "at_ms": 1100, "event": { "type": "stt_final", "text": "えーと、明日の会議で" } },
+    { "at_ms": 1500, "event": { "type": "vad_start" } },
+    { "at_ms": 2500, "event": { "type": "vad_silence" } },
+    { "at_ms": 2600, "event": { "type": "stt_final", "text": "資料を確認したいです" } },
+    { "at_ms": 3000, "event": { "type": "tts_start", "text": "承知しました。" } }
+  ],
+  "expect": {
+    "commits": ["えーと、明日の会議で資料を確認したいです"],
+    "drops": 0,
+    "max_eot_latency_ms": 300
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "../schemas/plugin-permission-policy.schema.json",
+  "version": "1.0.0",
+  "last_updated": "2026-09-24",
+  "ceilings": {
+    "official": {
+      "network": { "mode": "allowlist", "hosts": ["*"], "allow_wildcard_hosts": true },
+      "fs": {
+        "mode": "readwrite",
+        "paths": [
+          { "tier": "public", "prefix": "" },
+          { "tier": "confidential", "prefix": "{tenant}" }
+        ]
+      },
+      "ops_invoke": ["*"],
+      "env": ["*"],
+      "secrets": ["*"]
+    },
+    "curated": {
+      "network": { "mode": "loopback", "hosts": [] },
+      "fs": { "mode": "readonly", "paths": [{ "tier": "public", "prefix": "" }] },
+      "ops_invoke": [],
+      "env": [],
+      "secrets": []
+    },
+    "third-party": {
+      "network": { "mode": "none", "hosts": [] },
+      "fs": { "mode": "readonly", "paths": [{ "tier": "public", "prefix": "" }] },
+      "ops_invoke": [],
+      "env": [],
+      "secrets": []
+    }
+  },
+  "tenant_overrides": {}
+}

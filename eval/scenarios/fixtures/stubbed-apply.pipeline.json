@@ -1,0 +1,25 @@
+{
+  "action": "pipeline",
+  "name": "scenario-stubbed-apply",
+  "version": "1.0.0",
+  "description": "Scenario fixture: read a ticket, log it, and close it. Both service ops are served by scenario fixtures.",
+  "steps": [
+    {
+      "id": "fetch",
+      "op": "service:fetch_ticket",
+      "role": "source",
+      "produces": "ticket",
+      "params": { "ticket_id": "T-100" }
+    },
+    {
+      "id": "log",
+      "op": "system:log",
+      "params": { "message": "closing ticket {{ticket.id}}" }
+    },
+    {
+      "id": "close",
+      "op": "service:update_ticket",
+      "params": { "ticket_id": "{{ticket.id}}", "status": "closed" }
+    }
+  ]
+}

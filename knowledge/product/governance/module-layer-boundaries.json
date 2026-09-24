@@ -49,6 +49,7 @@
     { "layer": "domain", "pattern": "libs/core/worker-event-stream.ts" },
     { "layer": "domain", "pattern": "libs/core/worker-state-journal.ts" },
     { "layer": "domain", "pattern": "libs/core/intent-contract.ts" },
+    { "layer": "domain", "pattern": "libs/core/plugin-view-contract.ts" },
     { "layer": "domain", "pattern": "libs/core/intent-resolution-contract.ts" },
     { "layer": "domain", "pattern": "libs/core/report-contract.ts" },
     { "layer": "domain", "pattern": "libs/core/router-contract.ts" },

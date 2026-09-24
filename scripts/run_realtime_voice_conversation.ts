@@ -14,6 +14,7 @@ import { checkMeetingParticipationConsent } from '@agent/core/meeting-participat
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { createVoiceActuatorServeClient } from '@agent/core/actuator-serve-client';
 import {
+  createRealtimeFirstPhraseCache,
   ensureRealtimeVoiceConversationSession,
   generateRealtimeAssistantReply,
   streamRealtimeAssistantReply,
@@ -42,7 +43,10 @@ import {
   installManagedMlxWhisperStreamingSttBridgeIfAvailable,
   installShellStreamingSttBridgeFromEnv,
 } from '@agent/core/shell-streaming-stt-bridge';
-import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import {
+  getInstalledReasoningMode,
+  installReasoningBackends,
+} from '@agent/core/reasoning-bootstrap';
 import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell-streaming-tts-bridge';
 import { installSileroVadBackend } from '@agent/core/silero-vad-bridge';
 import { installTenVadBackend } from '@agent/core/ten-vad-bridge';
@@ -54,8 +58,15 @@ import { recordVadTurn, type VadTurnState } from '@agent/core/vad-turn-recorder'
 import { resolveManagedToolPythonBin } from '@agent/core/tool-runtime-registry';
 import { resolveVadBackend } from '@agent/core/vad-registry';
 import {
+  costTierForReasoningMode,
+  describeRealtimeVoiceLoopEvent,
+  detectVoicePowerSource,
+  isSpeculativeReplyRequested,
+  resolveRealtimeVoiceBargeInMode,
   startRealtimeVoiceLoop,
-  type RealtimeVoiceLoopEvent,
+  type RealtimeVoiceBargeInMode,
+  type VoiceCostTier,
+  type VoicePowerSource,
 } from '@agent/core/realtime-voice-loop';
 import type { StreamingSpeechToTextBridge } from '@agent/core/streaming-stt-bridge';
 import type { StreamingTextToSpeechBridge } from '@agent/core/streaming-tts-bridge';
@@ -106,6 +117,19 @@ export interface RealtimeVoiceConversationCliOptions {
   micDevice?: string;
   /** Barge-in: interrupt assistant speech when the user starts talking. */
   bargeIn: boolean;
+  /**
+   * Explicit barge-in mode. Unset: two_stage when the latency profile is
+   * low_latency and streaming STT is available, otherwise off.
+   */
+  bargeInMode?: RealtimeVoiceBargeInMode;
+  /** Start reasoning speculatively on tentative silence (unset: KYBERION_VOICE_SPECULATIVE_REPLY). */
+  speculativeReply?: boolean;
+  /** Cache the synthesized first phrase of replies under shared/runtime. */
+  firstPhraseCache?: boolean;
+  /** Hold trailing-off utterances and join them with the next one (default on). */
+  eotHold?: boolean;
+  /** Skip reasoning for filler-only turns and own-TTS echo (default on). */
+  respondGate?: boolean;
   /** VAD backend id ('energy' | 'silero' | registered custom). */
   vadBackend?: string;
   /** VAD selection purpose (voice.vad-backend policy) when no backend is named. */
@@ -474,32 +498,6 @@ export async function runRealtimeVoiceConversationInteractive(
   }
 }
 
-function describeLoopEvent(event: RealtimeVoiceLoopEvent): string | null {
-  switch (event.kind) {
-    case 'state':
-      switch (event.state) {
-        case 'calibrating':
-          return '🎚  ノイズフロア較正中… (静かにしてください)';
-        case 'listening':
-          return '🎤 聞き取り中… (話し終えると自動で区切ります)';
-        case 'thinking':
-          return '💭 応答を生成中…';
-        case 'speaking':
-          return '🔊 応答を再生中…';
-        default:
-          return null;
-      }
-    case 'barge_in':
-      return '✋ 割り込みを検知 — 再生を停止して聞き取りに戻ります';
-    case 'utterance_captured':
-      return `   (${(event.duration_ms / 1000).toFixed(1)}s captured, ${event.endpointed ? 'endpoint' : 'cap'})`;
-    case 'degraded':
-      return `⚠️  ${event.what}: ${event.reason}`;
-    default:
-      return null;
-  }
-}
-
 /**
  * Batch STT bridge for the turn loop: the priority default, or the seam's
  * choice when --stt-purpose is given, an operator rule matches the language,
@@ -519,6 +517,32 @@ const IMMEDIATE_PLAYBACK: PlaybackHandle = {
   done: Promise.resolve({ ok: true, interrupted: false }),
   stop: async () => ({ ok: true, interrupted: false }),
 };
+
+/** Default barge-in mode: two_stage needs low latency and streaming-STT partials, else half-duplex. */
+export function defaultBargeInMode(
+  options: Pick<RealtimeVoiceConversationCliOptions, 'latencyProfile'>,
+  streamingSttAvailable: boolean
+): RealtimeVoiceBargeInMode {
+  return options.latencyProfile !== 'balanced' && streamingSttAvailable ? 'two_stage' : 'off';
+}
+
+/**
+ * Inputs of the speculative-reply battery/metered guard: the host power source
+ * and the cost tier of the installed reasoning backend (unknown ⇒ metered).
+ */
+export function resolveSpeculativeReplyGuards(
+  input: {
+    reasoningMode?: string | null;
+    detectPowerSource?: () => VoicePowerSource;
+  } = {}
+): { powerSource: VoicePowerSource; costTier: VoiceCostTier } {
+  const mode =
+    input.reasoningMode !== undefined ? input.reasoningMode : getInstalledReasoningMode();
+  return {
+    powerSource: (input.detectPowerSource ?? (() => detectVoicePowerSource()))(),
+    costTier: costTierForReasoningMode(mode),
+  };
+}
 
 export async function runRealtimeVoiceConversationLoop(
   options: RealtimeVoiceConversationCliOptions,
@@ -649,6 +673,10 @@ export async function runRealtimeVoiceConversationLoop(
     }
   }
 
+  const firstPhraseCache =
+    options.firstPhraseCache && options.deliveryMode !== 'none'
+      ? createRealtimeFirstPhraseCache()
+      : undefined;
   const synthesizeSegment =
     options.deliveryMode === 'none'
       ? async () => ''
@@ -671,7 +699,8 @@ export async function runRealtimeVoiceConversationLoop(
             warmClient
               ? (payload, requestSignal) => warmClient.request(payload, requestSignal)
               : undefined,
-            signal
+            signal,
+            segmentIndex === 0 ? firstPhraseCache : undefined
           );
           if (!synthesis.artifactPath) {
             throw new Error(
@@ -681,12 +710,17 @@ export async function runRealtimeVoiceConversationLoop(
           return synthesis.artifactPath;
         };
 
+  const bargeInMode = resolveRealtimeVoiceBargeInMode({
+    mode:
+      options.bargeInMode ??
+      (options.bargeIn ? 'legacy' : defaultBargeInMode(options, Boolean(streamingStt))),
+  });
   print(
     `\n=== Realtime voice loop — session ${session.session_id} ` +
-      `(vad=${vadBackend.backend_id}, barge-in=${options.bargeIn ? 'on' : 'off'}, ` +
+      `(vad=${vadBackend.backend_id}, barge-in=${bargeInMode}, ` +
       `stt=${streamingStt ? 'streaming' : 'batch'}) ===`
   );
-  if (options.bargeIn) {
+  if (bargeInMode !== 'off') {
     print('   barge-in はスピーカーのエコーで誤動作することがあります。ヘッドセット推奨です。');
   }
 
@@ -705,7 +739,17 @@ export async function runRealtimeVoiceConversationLoop(
           vadBackend.create({ rmsThreshold: threshold, endpointMs: options.vadEndpointMs }),
         ...(vadBackend.needsCalibration ? {} : { skipCalibration: true }),
       },
-      bargeIn: { enabled: options.bargeIn },
+      bargeIn: { mode: bargeInMode },
+      eotHold: { enabled: options.eotHold ?? true },
+      respondGate: { enabled: options.respondGate ?? true },
+      speculativeReply: {
+        ...(options.speculativeReply !== undefined ? { enabled: options.speculativeReply } : {}),
+        // Probe power/cost only when speculation is actually requested (pmset is synchronous).
+        // The probed values (not a fail-open default) are what let the loop's own guard enable it.
+        ...(isSpeculativeReplyRequested(options.speculativeReply, process.env)
+          ? resolveSpeculativeReplyGuards()
+          : {}),
+      },
       ...(options.turns !== undefined ? { maxTurns: options.turns } : {}),
       idleTimeoutMs: options.idleTimeoutSeconds * 1000,
       maxSegmentChars: options.speechSegmentChars ?? 120,
@@ -736,7 +780,7 @@ export async function runRealtimeVoiceConversationLoop(
         : {}),
       ...(!playbackEnabled ? { play: () => IMMEDIATE_PLAYBACK } : {}),
       onEvent: (event) => {
-        const message = describeLoopEvent(event);
+        const message = describeRealtimeVoiceLoopEvent(event);
         if (message) print(message);
       },
       onTurn: (turn) => {
@@ -843,6 +887,20 @@ export function parseRealtimeVoiceConversationCli(
     throw new Error('--vad-endpoint-ms must be a positive number');
   }
 
+  const bargeInModeArg = argv['barge-in-mode'];
+  let bargeInMode: RealtimeVoiceBargeInMode | undefined;
+  if (bargeInModeArg !== undefined && bargeInModeArg !== null && bargeInModeArg !== '') {
+    const requested = String(bargeInModeArg);
+    if (requested !== 'off' && requested !== 'legacy' && requested !== 'two_stage') {
+      throw new Error(`--barge-in-mode must be 'off', 'legacy' or 'two_stage' (got ${requested})`);
+    }
+    bargeInMode = requested;
+  } else if (argv['barge-in'] === true) {
+    bargeInMode = 'legacy';
+  } else if (argv['barge-in'] === false) {
+    bargeInMode = 'off';
+  }
+
   let vadThresholdRms: number | undefined;
   if (
     argv['vad-threshold'] !== undefined &&
@@ -904,6 +962,13 @@ export function parseRealtimeVoiceConversationCli(
     vadEndpointMs,
     ...(argv['mic-device'] ? { micDevice: String(argv['mic-device']) } : {}),
     bargeIn: Boolean(argv['barge-in']),
+    ...(bargeInMode ? { bargeInMode } : {}),
+    ...(argv['speculative-reply'] !== undefined
+      ? { speculativeReply: Boolean(argv['speculative-reply']) }
+      : {}),
+    firstPhraseCache: Boolean(argv['first-phrase-cache']),
+    eotHold: argv['eot-hold'] === undefined ? true : Boolean(argv['eot-hold']),
+    respondGate: argv['respond-gate'] === undefined ? true : Boolean(argv['respond-gate']),
     ...(argv['vad-backend'] ? { vadBackend: String(argv['vad-backend']) } : {}),
     ...(argv['vad-purpose'] ? { vadPurpose: String(argv['vad-purpose']) } : {}),
     ...(argv['stt-purpose'] ? { sttPurpose: String(argv['stt-purpose']) } : {}),
@@ -1022,8 +1087,37 @@ export async function main(
     })
     .option('barge-in', {
       type: 'boolean',
+      describe:
+        'Legacy barge-in: stop assistant speech on sustained talking (same as --barge-in-mode legacy; headset recommended)',
+    })
+    .option('barge-in-mode', {
+      type: 'string',
+      choices: ['off', 'legacy', 'two_stage'] as const,
+      describe:
+        'Barge-in mode. two_stage pauses playback on speech and stops only when streaming STT hears words (resumes on echo/noise). Default: two_stage with low_latency + streaming STT, else off. KYBERION_VOICE_BARGE_IN_MODE overrides',
+    })
+    .option('speculative-reply', {
+      type: 'boolean',
+      describe:
+        'Start reasoning on a short pause before the turn is confirmed; the reply is buffered and only spoken if the final transcript matches (needs streaming STT). Default: KYBERION_VOICE_SPECULATIVE_REPLY',
+    })
+    .option('first-phrase-cache', {
+      type: 'boolean',
       default: false,
-      describe: 'Interrupt assistant speech when you start talking (headset recommended)',
+      describe:
+        'Cache the synthesized first phrase of each reply under active/shared/runtime (keyed by engine, voice, profile revision, settings and text)',
+    })
+    .option('eot-hold', {
+      type: 'boolean',
+      default: true,
+      describe:
+        'Hold utterances that trail off (て/けど/えーと…, and/but…) and join them with the next one, up to 1.5s',
+    })
+    .option('respond-gate', {
+      type: 'boolean',
+      default: true,
+      describe:
+        'Do not reply to filler-only turns or (with barge-in on) the assistant echo picked up by the mic',
     })
     .option('vad-backend', {
       type: 'string',

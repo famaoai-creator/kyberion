@@ -1,7 +1,7 @@
 ---
 title: Realtime voice conversation operations
 tags: [voice, realtime, conversation, model-selection, voice-profile, operations]
-last_updated: 2026-09-17
+last_updated: 2026-09-24
 ---
 
 # Realtime voice conversation operations
@@ -57,6 +57,32 @@ node dist/scripts/run_realtime_voice_conversation.js \
 `low_latency` は `model_tier=fast`、`effort=low`、VAD endpoint 500 ms、
 短い TTS flush を既定にする。検討や長めの応答を優先する場合は
 `--latency-profile balanced` を使う。
+
+## ターンテイキング(割り込み・保留・応答ゲート)
+
+VAD 会話ループは次のフラグでターンの取り方を切り替える。挙動の契約は
+[realtime-media-session-architecture §13](../architecture/realtime-media-session-architecture.md#13-turn-taking-contract-2026-09-24)
+にある。
+
+| フラグ                                   | 既定                                                                      | 内容                                                                                                                                                                                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--barge-in-mode off\|legacy\|two_stage` | `low_latency` かつ streaming STT が使えるとき `two_stage`、それ以外 `off` | `two_stage` は発話検知で再生を一時停止し、streaming STT の partial に語があれば停止、エコーや語の無い雑音なら再開する。`legacy` は持続音声で即停止(`--barge-in` と同じ)。`KYBERION_VOICE_BARGE_IN_MODE` が指定されていればそれが優先する |
+| `--eot-hold` / `--no-eot-hold`           | 有効                                                                      | 「〜て」「〜けど」「えーと」や and/but で終わる発話を保留し、次の発話とつなげて 1 ターンにする。1.5 秒話さなければ確定する                                                                                                               |
+| `--respond-gate` / `--no-respond-gate`   | 有効                                                                      | フィラーだけの発話には応答しない。barge-in が有効なときは、自分の TTS がマイクに回り込んだエコーにも応答しない                                                                                                                           |
+| `--speculative-reply`                    | `KYBERION_VOICE_SPECULATIVE_REPLY=1` のときだけ有効                       | 発話中の短い無音(250 ms)で推論を先に始め、生成はバッファだけする。確定した文字起こしが一致したときだけ再生し、話し続けたら中止する。streaming STT が必要。battery / metered では無効                                                     |
+| `--first-phrase-cache`                   | 無効                                                                      | 返答の最初のフレーズの合成音声を `active/shared/runtime/voice-first-phrase-cache` に保存して再利用する。キーは engine・voice・profile の改訂・設定・本文                                                                                 |
+
+```sh
+node dist/scripts/run_realtime_voice_conversation.js \
+  --session-id realtime-voice-$(date +%Y%m%d-%H%M%S) \
+  --interactive --mission MSN-... \
+  --barge-in-mode two_stage --speculative-reply
+```
+
+スピーカーで聞く場合、`two_stage` でもエコーで一時停止が起きることがある。
+ヘッドセットを推奨する。割り込みで中止したターンの理由(`barge_in`、
+`external` など)はループのイベントと trace の
+`realtime_voice.turn_cancelled` に出る。
 
 ## モデル・effort の変更
 
