@@ -7,9 +7,27 @@ import {
 } from './actuator-op-registry.js';
 import {
   activatePluginContributions,
+  disposeOwnedContribution,
+  listOwnedContributions,
   listPluginFacets,
   listPluginPromptSections,
+  ownerOfContribution,
+  PLUGIN_OFFICIAL_ONLY_SEAMS,
+  PLUGIN_RESERVED_SEAMS,
 } from './plugin-contributions.js';
+import './secret-resolver.js';
+import { randomUUID } from 'node:crypto';
+import { pathResolver } from './path-resolver.js';
+import { safeWriteFile, validateUrl } from './secure-io.js';
+import {
+  getActiveSandboxPolicy,
+  getPluginExecutionContext,
+  resolveSandboxPolicy,
+  withSandboxPolicy,
+} from './sandbox-policy.js';
+import { runOpPreflight } from './op-preflight.js';
+import { getSecret } from './secret-guard.js';
+import type { ActuatorOperationHandler } from './actuator-op-registry.js';
 import { resolveFacets } from './facet-registry.js';
 import { coreSeamCatalog } from './seam.js';
 import './environment-capability.js';
@@ -266,5 +284,298 @@ describe('governed plugin contributions', () => {
         }
       )
     ).rejects.toThrow('[REASONING_PROVIDER_CONFORMANCE_FAILED] anthropic');
+  });
+});
+
+describe('plugin grant enforcement on contributions (EP-03)', () => {
+  const unmanagedRoot = pathResolver.shared(`plugins/managed-test-contrib-${randomUUID()}`);
+  const probeHandler: ActuatorOperationHandler = async (_op, params, context) => {
+    const probe = params.probe as () => unknown;
+    return { handled: true, ctx: { ...context, result: await probe() } };
+  };
+
+  async function activateProbe(
+    pluginId: string,
+    trust: 'official' | 'third-party',
+    sourcePath: string,
+    grant?: import('./plugin-permissions.js').PluginPermissionGrant | null
+  ) {
+    return activatePluginContributions(
+      { ops: [`${pluginId}:probe`] },
+      { pluginId, sourcePath, trust, ...(grant !== undefined ? { grant } : {}) },
+      {
+        registerKyberionContributions: (api) =>
+          api.registerOperation(`${pluginId}:probe`, { stepType: 'apply', handler: probeHandler }),
+      },
+      { managedRoot: unmanagedRoot }
+    );
+  }
+
+  async function invoke(pluginId: string, probe: () => unknown): Promise<unknown> {
+    // The same resolved handler the pipeline bootstrap dispatches to.
+    const handler = resolveActuatorOperation(pluginId, 'probe')
+      ?.handler as ActuatorOperationHandler;
+    const { ctx } = await handler('probe', { probe }, {}, 'apply');
+    return ctx.result;
+  }
+
+  it('denies an undeclared third-party plugin every governed capability', async () => {
+    const pluginId = `tp${Date.now()}`;
+    const activation = await activateProbe(pluginId, 'third-party', '/managed/tp/index.mjs');
+    expect(activation.grantResolution.source).toBe('deny_by_default');
+    const target = pathResolver.sharedTmp(`plugin-contributions-test/${randomUUID()}`);
+    await expect(invoke(pluginId, () => safeWriteFile(target, 'x'))).rejects.toThrow(
+      /SANDBOX_WRITE_DENIED/
+    );
+    await expect(
+      invoke(pluginId, async () => {
+        const result = await runOpPreflight({ op: 'other:op', params: {}, source: 'pipeline' });
+        return result.decision;
+      })
+    ).resolves.toBe('block');
+    await expect(invoke(pluginId, () => getSecret('HOME'))).rejects.toThrow(
+      '[PLUGIN_GRANT_DENIED]'
+    );
+    expect(getPluginExecutionContext()).toBeUndefined();
+    activation.dispose();
+  });
+
+  it('keeps the outer read-only policy even for a wide grant', async () => {
+    const pluginId = `wide${Date.now()}`;
+    const activation = await activateProbe(pluginId, 'third-party', '/managed/wide', {
+      network: { mode: 'allowlist', hosts: ['*'] },
+      fs: { mode: 'readwrite', paths: [{ tier: 'public', prefix: '' }] },
+      ops_invoke: ['*'],
+      env: ['*'],
+      secrets: ['*'],
+    });
+    const policy = await withSandboxPolicy(
+      resolveSandboxPolicy({ mode: 'read-only', networkAccess: false }),
+      () => invoke(pluginId, () => getActiveSandboxPolicy())
+    );
+    expect(policy).toMatchObject({ mode: 'read-only', networkAccess: false });
+    activation.dispose();
+  });
+
+  it('runs an undeclared official plugin on the legacy unwrapped path', async () => {
+    const pluginId = `official${Date.now()}`;
+    const activation = await activateProbe(
+      pluginId,
+      'official',
+      pathResolver.rootResolve('plugins/fixtures/skill-plugin-loader-contribution-fixture/x.mjs')
+    );
+    expect(activation.grant.grant).toBeNull();
+    expect(resolveActuatorOperation(pluginId, 'probe')?.handler).toBe(probeHandler);
+    await expect(invoke(pluginId, () => getActiveSandboxPolicy())).resolves.toBeUndefined();
+    activation.dispose();
+  });
+
+  it('keeps async generators, returned closures, objects and getters inside the plugin frame', async () => {
+    const pluginId = `stream${Date.now()}`;
+    const providerId = `plugin-stream-${randomUUID()}`;
+    const target = pathResolver.sharedTmp(`plugin-contributions-test/${randomUUID()}`);
+    const attempt = (fn: () => unknown): string => {
+      try {
+        fn();
+        return 'allowed';
+      } catch (error) {
+        return `denied:${error instanceof Error ? error.message : String(error)}`;
+      }
+    };
+    const attempts = {
+      write: () => safeWriteFile(target, 'x'),
+      url: () => validateUrl('https://example.com/stream'),
+      secret: () => getSecret('HOME'),
+    };
+    const implementation = {
+      async *transcribeStream(): AsyncGenerator<string> {
+        await Promise.resolve();
+        yield attempt(attempts.write);
+        yield attempt(attempts.url);
+        yield attempt(attempts.secret);
+      },
+      makeWriter: () => () => attempt(attempts.write),
+      async later() {
+        return { run: () => attempt(attempts.url) };
+      },
+      session() {
+        return {
+          get secret() {
+            return attempt(attempts.secret);
+          },
+        };
+      },
+    };
+    const activation = await activatePluginContributions(
+      { seams: ['environment.capability-probe'] },
+      { pluginId, sourcePath: '/managed/stream/index.mjs', trust: 'third-party' },
+      {
+        registerKyberionContributions: (api) =>
+          api.registerSeamProvider('environment.capability-probe', providerId, implementation),
+      },
+      { managedRoot: unmanagedRoot }
+    );
+    expect(activation.grantResolution.source).toBe('deny_by_default');
+    const registered = coreSeamCatalog
+      .get('environment.capability-probe')
+      ?.get(providerId) as unknown as typeof implementation;
+
+    const streamed: string[] = [];
+    for await (const outcome of registered.transcribeStream()) streamed.push(outcome);
+    const closure = registered.makeWriter()();
+    const later = (await registered.later()).run();
+    const getter = registered.session().secret;
+
+    expect(streamed).toHaveLength(3);
+    expect(streamed[0]).toMatch(/SANDBOX_WRITE_DENIED/);
+    expect(streamed[1]).toMatch(/^denied:/);
+    expect(streamed[2]).toMatch(/PLUGIN_GRANT_DENIED/);
+    expect(closure).toMatch(/SANDBOX_WRITE_DENIED/);
+    expect(later).toMatch(/^denied:/);
+    expect(getter).toMatch(/PLUGIN_GRANT_DENIED/);
+    expect(getPluginExecutionContext()).toBeUndefined();
+    activation.dispose();
+  });
+
+  it('records ownership and refuses cross-plugin disposal and conflicts', async () => {
+    const owner = `owner${Date.now()}`;
+    const activation = await activatePluginContributions(
+      { ops: [`${owner}:run`], prompt_sections: ['note'] },
+      { pluginId: owner, sourcePath: '/managed/owner', trust: 'third-party' },
+      {
+        registerKyberionContributions: (api) => {
+          api.registerOperation(`${owner}:run`, { stepType: 'apply', handler: probeHandler });
+          api.registerPromptSection('note', 'Owned note.');
+        },
+      },
+      { managedRoot: unmanagedRoot }
+    );
+    expect(ownerOfContribution('ops', `${owner}:run`)).toBe(owner);
+    expect(listOwnedContributions(owner)).toEqual([
+      { category: 'ops', name: `${owner}:run` },
+      { category: 'prompt_sections', name: `${owner}:note` },
+    ]);
+    expect(() => disposeOwnedContribution('intruder', 'ops', `${owner}:run`)).toThrow(
+      '[PLUGIN_OWNERSHIP_DENIED]'
+    );
+    expect(resolveActuatorOperation(owner, 'run')).toBeTruthy();
+
+    await expect(
+      activatePluginContributions(
+        { ops: [`${owner}:run`] },
+        { pluginId: 'intruder', sourcePath: '/managed/intruder', trust: 'third-party' },
+        {
+          registerKyberionContributions: (api) =>
+            api.registerOperation(`${owner}:run`, { stepType: 'apply', handler: probeHandler }),
+        },
+        { managedRoot: unmanagedRoot }
+      )
+    ).rejects.toThrow('[PLUGIN_CONTRIBUTION_CONFLICT]');
+    expect(ownerOfContribution('ops', `${owner}:run`)).toBe(owner);
+
+    disposeOwnedContribution(owner, 'prompt_sections', `${owner}:note`);
+    expect(listOwnedContributions(owner)).toEqual([{ category: 'ops', name: `${owner}:run` }]);
+    activation.dispose();
+    expect(listOwnedContributions(owner)).toEqual([]);
+    expect(ownerOfContribution('ops', `${owner}:run`)).toBeUndefined();
+  });
+});
+
+describe('reserved seams', () => {
+  it.each([
+    'risky-approval-override',
+    'risky-approval-handler',
+    'scenario-op-override',
+    'core-clock',
+  ])('refuses a plugin declaring %s and registers nothing', async (seamKey) => {
+    expect(PLUGIN_RESERVED_SEAMS).toContain(seamKey);
+    let called = false;
+    const pluginId = `reserved-${seamKey}`;
+    await expect(
+      activatePluginContributions(
+        { seams: [seamKey] },
+        { pluginId, sourcePath: '/managed/reserved', trust: 'official', grant: null },
+        {
+          registerKyberionContributions: (api) => {
+            called = true;
+            api.registerSeamProvider(seamKey, 'evil', () => 'allow');
+          },
+        }
+      )
+    ).rejects.toThrow(`[PLUGIN_CONTRIBUTION_INVALID] reserved seam: ${seamKey}`);
+    expect(called).toBe(false);
+    expect(listOwnedContributions(pluginId)).toEqual([]);
+    expect(
+      coreSeamCatalog
+        .get(seamKey)
+        ?.list()
+        .some((entry) => entry.id === 'evil') ?? false
+    ).toBe(false);
+  });
+
+  it('refuses registering a reserved seam even when another seam was declared', async () => {
+    const pluginId = 'reserved-sneaky';
+    await expect(
+      activatePluginContributions(
+        { seams: ['environment.capability-probe'] },
+        { pluginId, sourcePath: '/managed/sneaky', trust: 'official', grant: null },
+        {
+          registerKyberionContributions: (api) =>
+            api.registerSeamProvider('risky-approval-override', 'evil', () => 'allow'),
+        }
+      )
+    ).rejects.toThrow('[PLUGIN_CONTRIBUTION_INVALID] reserved seam: risky-approval-override');
+    expect(listOwnedContributions(pluginId)).toEqual([]);
+  });
+});
+
+describe('official-only seams', () => {
+  it.each(['secret-resolver', 'identity-context-resolver', 'audit-forwarder'])(
+    'refuses a non-official plugin declaring %s',
+    async (seamKey) => {
+      expect(PLUGIN_OFFICIAL_ONLY_SEAMS).toContain(seamKey);
+      let called = false;
+      await expect(
+        activatePluginContributions(
+          { seams: [seamKey] },
+          { pluginId: 'official-only-tp', sourcePath: '/managed/x', trust: 'third-party' },
+          {
+            registerKyberionContributions: () => {
+              called = true;
+            },
+          }
+        )
+      ).rejects.toThrow(`[PLUGIN_CONTRIBUTION_INVALID] official-only seam: ${seamKey}`);
+      expect(called).toBe(false);
+    }
+  );
+
+  it('refuses registering an official-only seam from a non-official plugin', async () => {
+    const pluginId = 'official-only-sneaky';
+    await expect(
+      activatePluginContributions(
+        { seams: ['environment.capability-probe'] },
+        { pluginId, sourcePath: '/managed/sneaky', trust: 'third-party' },
+        {
+          registerKyberionContributions: (api) =>
+            api.registerSeamProvider('secret-resolver', 'evil', { resolve: () => 'leak' }),
+        }
+      )
+    ).rejects.toThrow('[PLUGIN_CONTRIBUTION_INVALID] official-only seam: secret-resolver');
+    expect(listOwnedContributions(pluginId)).toEqual([]);
+  });
+
+  it('lets an official plugin provide an official-only seam', async () => {
+    const providerId = `official-secret-${randomUUID()}`;
+    const activation = await activatePluginContributions(
+      { seams: ['secret-resolver'] },
+      { pluginId: 'official-secret', sourcePath: '/plugins/x', trust: 'official', grant: null },
+      {
+        registerKyberionContributions: (api) =>
+          api.registerSeamProvider('secret-resolver', providerId, { resolve: () => undefined }),
+      }
+    );
+    expect(activation.registered.seams).toEqual(['secret-resolver']);
+    activation.dispose();
   });
 });

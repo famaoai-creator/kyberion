@@ -1,7 +1,7 @@
 ---
 title: README
 tags: [improvement-plan, 2026-09]
-last_updated: 2026-09-23
+last_updated: 2026-09-24
 status: active
 ---
 
@@ -22,6 +22,7 @@ status: active
 
 - [エージェント連携ビュー](./AGENT_COLLABORATION_VIEW_PLAN_2026-09-06.ja.md) — 既存イベントを使った連携ツリーと待ち状態の表示。
 - [ミッションチーム編成の動的化](./TEAM_COMPOSITION_DYNAMICS_PLAN_2026-09-20.ja.md) — 義務から必要ロールを導き、需要に応じて充当する。
+- [elizaOS から学ぶ 3 領域](./ELIZA_ADOPTION_PLAN_2026-09-24.ja.md) — 音声ターンテイキング(二段階 barge-in・中止トークン・日本語 EOT)、副作用で判定するシナリオ評価ランナー、プラグインの権限宣言・digest 束縛承認・ライフサイクル・ビュー。
 - [テナントナレッジと actuator 活用の評価](./TENANT_KNOWLEDGE_ACTUATOR_REVIEW_2026-09-11.ja.md) — 配置境界、computer-use の観測、受入検証の改善。
 
 ## 依存更新の証跡

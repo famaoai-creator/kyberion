@@ -9,6 +9,7 @@ import { resolveReasoningBackendSelectionFromContext } from '../libs/core/reason
 import '../libs/core/agent-execution-port.js';
 import '../libs/core/a2a-route-port.js';
 import '../libs/core/actuator-forwarding-port.js';
+import '../libs/core/actuator-op-registry.js';
 import '../libs/core/agent-exec-adapter-bridge.js';
 import '../libs/core/agent-pane-runtime-bridge.js';
 import '../libs/core/audio-bus-bridge.js';

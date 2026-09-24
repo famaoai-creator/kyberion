@@ -5,6 +5,20 @@
  * contribution whose name is declared. Every successful registration returns
  * a disposer and activation rolls all of them back if one contribution fails.
  * This keeps the existing provenance gate in front of dynamic behavior.
+ *
+ * EP-03: every executable contribution (op handler, hook, preflight
+ * listener/guard, seam implementation, reasoning provider, and the
+ * activation callback itself) runs under the plugin's permission grant via
+ * `runWithPluginGrant` (see plugin-grant-runtime.ts) — cooperative
+ * enforcement, not a boundary against malicious in-process code.
+ *
+ * EP-04: each successful registration is recorded in an ownership ledger;
+ * a plugin can only dispose contributions it owns.
+ *
+ * EP-05: `views` are declarative data (A2UI documents validated by
+ * plugin-view-contract.ts); they are never registered by code. Declared view
+ * ids are recorded in the ownership ledger as `pluginId:viewId` so a view is
+ * attributable and disposed with its plugin.
  */
 
 import {
@@ -30,7 +44,19 @@ import {
   type OpPreflightListener,
 } from './op-preflight.js';
 import { coreSeamCatalog } from './seam.js';
+import {
+  findDisallowedOfficialOnlySeam,
+  PLUGIN_OFFICIAL_ONLY_SEAMS,
+  PLUGIN_RESERVED_SEAMS,
+} from './plugin-permissions.js';
 import { listPluginFacetContributions, registerPluginFacet } from './facet-registry.js';
+import type { PluginPermissionGrant } from './plugin-permissions.js';
+import {
+  createPluginGrantBinding,
+  resolvePluginExecutionGrant,
+  type PluginGrantBinding,
+  type ResolvedPluginExecutionGrant,
+} from './plugin-grant-runtime.js';
 
 export interface PluginContributionDeclaration {
   seams?: string[];
@@ -39,12 +65,20 @@ export interface PluginContributionDeclaration {
   hooks?: string[];
   prompt_sections?: string[];
   facets?: string[];
+  /** EP-05: declared view ids (data only; see plugin-view-contract.ts). */
+  views?: string[];
 }
 
 export interface PluginContributionProvenance {
   pluginId: string;
   sourcePath: string;
   trust: 'official' | 'third-party';
+  /**
+   * EP-03: the approved grant, when the caller already resolved it. Absent =>
+   * resolved from the managed record / manifest. Third-party plugins are
+   * never unwrapped: null or absent falls back to the deny-by-default grant.
+   */
+  grant?: PluginPermissionGrant | null;
 }
 
 export interface PluginContributionApi {
@@ -77,7 +111,146 @@ export interface PluginContributionModule {
 export interface PluginContributionActivation {
   provenance: PluginContributionProvenance;
   registered: PluginContributionDeclaration;
+  /** EP-03: the grant wrapping this activation (`grant === null` = legacy unwrapped). */
+  grant: PluginGrantBinding;
+  grantResolution: ResolvedPluginExecutionGrant;
   dispose(): void;
+}
+
+export interface ActivatePluginContributionsOptions {
+  /** Managed-plugins root used to look up the approved grant (tests only). */
+  managedRoot?: string;
+}
+
+export type PluginContributionCategory = keyof PluginContributionDeclaration;
+
+interface OwnershipEntry {
+  pluginId: string;
+  dispose: () => void;
+}
+
+const ownership = new Map<string, OwnershipEntry>();
+
+function ownershipKey(category: PluginContributionCategory, name: string): string {
+  return `${category}\u0000${name}`;
+}
+
+/**
+ * Owner of a live contribution. `name` is the runtime identifier: the op
+ * (`domain:action`), provider mode, `seamKey/providerId`, or
+ * `pluginId:name` for hooks, prompt sections and facets.
+ */
+export function ownerOfContribution(
+  category: PluginContributionCategory,
+  name: string
+): string | undefined {
+  return ownership.get(ownershipKey(category, name))?.pluginId;
+}
+
+export function listOwnedContributions(
+  pluginId: string
+): Array<{ category: PluginContributionCategory; name: string }> {
+  const owned: Array<{ category: PluginContributionCategory; name: string }> = [];
+  for (const [key, entry] of ownership) {
+    if (entry.pluginId !== pluginId) continue;
+    const [category, name] = key.split('\u0000') as [PluginContributionCategory, string];
+    owned.push({ category, name });
+  }
+  return owned.sort((a, b) =>
+    a.category === b.category
+      ? a.name < b.name
+        ? -1
+        : a.name > b.name
+          ? 1
+          : 0
+      : a.category < b.category
+        ? -1
+        : 1
+  );
+}
+
+/** Dispose one contribution on behalf of `requesterPluginId`; refuses another plugin's. */
+export function disposeOwnedContribution(
+  requesterPluginId: string,
+  category: PluginContributionCategory,
+  name: string
+): void {
+  const entry = ownership.get(ownershipKey(category, name));
+  if (!entry) {
+    throw new Error(`[PLUGIN_OWNERSHIP_UNKNOWN] no live contribution ${category}:${name}`);
+  }
+  if (entry.pluginId !== requesterPluginId) {
+    throw new Error(
+      `[PLUGIN_OWNERSHIP_DENIED] plugin '${requesterPluginId}' cannot dispose ${category}:${name} owned by '${entry.pluginId}'`
+    );
+  }
+  entry.dispose();
+}
+
+function claimOwnership(
+  category: PluginContributionCategory,
+  name: string,
+  pluginId: string
+): void {
+  const existing = ownership.get(ownershipKey(category, name));
+  if (existing && existing.pluginId !== pluginId) {
+    throw new Error(
+      `[PLUGIN_CONTRIBUTION_CONFLICT] ${category}:${name} is already owned by '${existing.pluginId}'`
+    );
+  }
+}
+
+function recordOwnership(
+  category: PluginContributionCategory,
+  name: string,
+  pluginId: string,
+  dispose: () => void
+): () => void {
+  const key = ownershipKey(category, name);
+  let disposed = false;
+  const owned = () => {
+    if (disposed) return;
+    disposed = true;
+    if (ownership.get(key) === entry) ownership.delete(key);
+    dispose();
+  };
+  const entry: OwnershipEntry = { pluginId, dispose: owned };
+  ownership.set(key, entry);
+  return owned;
+}
+
+/**
+ * Seams a plugin may never provide: they replace approval decisions, op
+ * resolution or the clock (test/eval-only overrides). Checked when the
+ * declaration is activated and again at registration — fail closed.
+ */
+export { PLUGIN_OFFICIAL_ONLY_SEAMS, PLUGIN_RESERVED_SEAMS };
+
+function reservedSeamError(seamKey: string): Error {
+  return new Error(`[PLUGIN_CONTRIBUTION_INVALID] reserved seam: ${seamKey}`);
+}
+
+/** Throws when a declaration names a reserved seam (usable by manifest validators). */
+export function assertNoReservedPluginSeams(declaration: PluginContributionDeclaration): void {
+  const reserved = (declaration.seams ?? [])
+    .map((seam) => String(seam).trim())
+    .find((seam) => PLUGIN_RESERVED_SEAMS.includes(seam));
+  if (reserved) throw reservedSeamError(reserved);
+}
+
+function officialOnlySeamError(seamKey: string): Error {
+  return new Error(
+    `[PLUGIN_CONTRIBUTION_INVALID] official-only seam: ${seamKey} (requires official provenance)`
+  );
+}
+
+/** Throws when a non-official plugin declares an official-only seam. */
+export function assertOfficialOnlyPluginSeams(
+  declaration: PluginContributionDeclaration,
+  trust: PluginContributionProvenance['trust']
+): void {
+  const seam = findDisallowedOfficialOnlySeam(declaration.seams, trust);
+  if (seam) throw officialOnlySeamError(seam);
 }
 
 const promptSections = new Map<
@@ -96,6 +269,7 @@ function normalizedDeclarations(
     hooks: normalize(input.hooks),
     prompt_sections: normalize(input.prompt_sections),
     facets: normalize(input.facets),
+    views: normalize(input.views),
   };
 }
 
@@ -135,38 +309,62 @@ function markRegistered(
 export async function activatePluginContributions(
   declaration: PluginContributionDeclaration,
   provenance: PluginContributionProvenance,
-  module: PluginContributionModule
+  module: PluginContributionModule,
+  options: ActivatePluginContributionsOptions = {}
 ): Promise<PluginContributionActivation> {
+  assertNoReservedPluginSeams(declaration);
+  assertOfficialOnlyPluginSeams(declaration, provenance.trust);
   const declared = normalizedDeclarations(declaration);
   const registered = normalizedDeclarations({});
   const disposers: Array<() => void> = [];
+  const pluginId = provenance.pluginId;
+  const grantResolution = resolvePluginExecutionGrant(provenance, options);
+  const binding = createPluginGrantBinding(pluginId, grantResolution.grant);
+  // Every registration goes through the ownership ledger so lifecycle
+  // operations can attribute and refuse cross-plugin disposal.
+  const own = (
+    category: PluginContributionCategory,
+    name: string,
+    register: () => () => void
+  ): (() => void) => {
+    claimOwnership(category, name, pluginId);
+    const dispose = recordOwnership(category, name, pluginId, register());
+    disposers.push(dispose);
+    return dispose;
+  };
   const api: PluginContributionApi = {
     registerSeamProvider(seamKey, providerId, implementation) {
+      if (PLUGIN_RESERVED_SEAMS.includes(String(seamKey).trim())) throw reservedSeamError(seamKey);
+      if (findDisallowedOfficialOnlySeam([seamKey], provenance.trust)) {
+        throw officialOnlySeamError(seamKey);
+      }
       requireDeclared('seams', seamKey, declared);
       const seam = coreSeamCatalog.get(seamKey);
       if (!seam) throw new Error(`[PLUGIN_CONTRIBUTION_INVALID] unknown seam: ${seamKey}`);
-      const dispose = seam.register(providerId, implementation, {
-        provenance: 'plugin',
-        source: provenance.pluginId,
-      });
+      const dispose = own('seams', `${seamKey}/${providerId}`, () =>
+        seam.register(providerId, binding.wrapObject(implementation), {
+          provenance: 'plugin',
+          source: pluginId,
+        })
+      );
       markRegistered(registered, 'seams', seamKey);
-      disposers.push(dispose);
       return dispose;
     },
     registerOperation(operation, input) {
       requireDeclared('ops', operation, declared);
       const { domain, action } = parseOperation(operation);
-      const dispose = registerPluginActuatorOperation({
-        domain,
-        action,
-        stepType: input.stepType,
-        pluginId: provenance.pluginId,
-        modulePath: input.modulePath || provenance.sourcePath,
-        handler: input.handler,
-        ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
-      });
+      const dispose = own('ops', operation, () =>
+        registerPluginActuatorOperation({
+          domain,
+          action,
+          stepType: input.stepType,
+          pluginId,
+          modulePath: input.modulePath || provenance.sourcePath,
+          handler: binding.wrapFunction(input.handler),
+          ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+        })
+      );
       markRegistered(registered, 'ops', operation);
-      disposers.push(dispose);
       return dispose;
     },
     registerReasoningProvider(mode, factory, conformance) {
@@ -177,71 +375,96 @@ export async function activatePluginContributions(
           `[PLUGIN_CONTRIBUTION_DENIED] reasoning provider mode is not governed: ${mode}`
         );
       }
-      const dispose = registerReasoningProvider(descriptor, factory, {
-        conformance,
-        requireConformance: descriptor.mode !== 'stub',
-      });
+      const wrappedFactory: ReasoningProviderFactory = (context) => {
+        const bundle = binding.run(() => factory(context));
+        if (!bundle || binding.grant === null) return bundle;
+        return {
+          ...bundle,
+          backend: binding.wrapObject(bundle.backend),
+          ...(bundle.intentExtractor
+            ? { intentExtractor: binding.wrapObject(bundle.intentExtractor) }
+            : {}),
+          ...(bundle.voiceBridge ? { voiceBridge: binding.wrapObject(bundle.voiceBridge) } : {}),
+        };
+      };
+      const dispose = own('providers', mode, () =>
+        registerReasoningProvider(descriptor, binding.grant === null ? factory : wrappedFactory, {
+          conformance,
+          requireConformance: descriptor.mode !== 'stub',
+        })
+      );
       markRegistered(registered, 'providers', mode);
-      disposers.push(dispose);
       return dispose;
     },
     registerHook(name, hook) {
       requireDeclared('hooks', name, declared);
-      const dispose = getDefaultLifecycleHookEngine().register({
-        ...hook,
-        id: `${provenance.pluginId}:${name}:${hook.id}`,
-      });
+      const dispose = own('hooks', `${pluginId}:${name}`, () =>
+        getDefaultLifecycleHookEngine().register({
+          ...hook,
+          ...(hook.handler ? { handler: binding.wrapFunction(hook.handler) } : {}),
+          id: `${pluginId}:${name}:${hook.id}`,
+        })
+      );
       markRegistered(registered, 'hooks', name);
-      disposers.push(dispose);
       return dispose;
     },
     registerPreflightListener(name, listener) {
       requireDeclared('hooks', name, declared);
-      const dispose = registerOpPreflightListener({
-        ...listener,
-        id: `${provenance.pluginId}:${name}`,
-      });
+      const dispose = own('hooks', `${pluginId}:${name}`, () =>
+        registerOpPreflightListener({
+          ...listener,
+          run: binding.wrapFunction(listener.run),
+          id: `${pluginId}:${name}`,
+        })
+      );
       markRegistered(registered, 'hooks', name);
-      disposers.push(dispose);
       return dispose;
     },
     registerPreflightGuard(name, guard) {
       requireDeclared('hooks', name, declared);
-      const dispose = registerOpGuard({ ...guard, id: `${provenance.pluginId}:${name}` });
+      const dispose = own('hooks', `${pluginId}:${name}`, () =>
+        registerOpGuard({
+          ...guard,
+          check: binding.wrapFunction(guard.check),
+          id: `${pluginId}:${name}`,
+        })
+      );
       markRegistered(registered, 'hooks', name);
-      disposers.push(dispose);
       return dispose;
     },
     registerPromptSection(name, content) {
       requireDeclared('prompt_sections', name, declared);
       if (!content.trim())
         throw new Error(`[PLUGIN_CONTRIBUTION_INVALID] empty prompt section: ${name}`);
-      const key = `${provenance.pluginId}:${name}`;
+      const key = `${pluginId}:${name}`;
       if (promptSections.has(key))
         throw new Error(`[PLUGIN_CONTRIBUTION_CONFIG] duplicate prompt section: ${key}`);
-      promptSections.set(key, { content, provenance });
-      const dispose = () => {
-        if (promptSections.get(key)?.provenance === provenance) promptSections.delete(key);
-      };
+      const dispose = own('prompt_sections', key, () => {
+        promptSections.set(key, { content, provenance });
+        return () => {
+          if (promptSections.get(key)?.provenance === provenance) promptSections.delete(key);
+        };
+      });
       markRegistered(registered, 'prompt_sections', name);
-      disposers.push(dispose);
       return dispose;
     },
     registerFacet(name, metadata = {}) {
       requireDeclared('facets', name, declared);
-      const dispose = registerPluginFacet({
-        name,
-        metadata: { ...metadata },
-        provenance,
-      });
+      const dispose = own('facets', `${pluginId}:${name}`, () =>
+        registerPluginFacet({
+          name,
+          metadata: { ...metadata },
+          provenance,
+        })
+      );
       markRegistered(registered, 'facets', name);
-      disposers.push(dispose);
       return dispose;
     },
   };
 
   try {
-    if (module.registerKyberionContributions) await module.registerKyberionContributions(api);
+    const register = module.registerKyberionContributions;
+    if (register) await binding.run(() => register.call(module, api));
     // Facets are manifest-backed files and are therefore valid without a
     // module callback. Every executable contribution must be registered by
     // code, so a typo cannot silently produce a partial tool surface.
@@ -254,7 +477,17 @@ export async function activatePluginContributions(
     for (const name of declared.facets) {
       if (!registered.facets.includes(name)) api.registerFacet(name);
     }
-    return { provenance, registered, dispose: () => disposeAll(disposers) };
+    for (const name of declared.views) {
+      own('views', `${pluginId}:${name}`, () => () => undefined);
+      markRegistered(registered, 'views', name);
+    }
+    return {
+      provenance,
+      registered,
+      grant: binding,
+      grantResolution,
+      dispose: () => disposeAll(disposers),
+    };
   } catch (error) {
     disposeAll(disposers);
     throw error;

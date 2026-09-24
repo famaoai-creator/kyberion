@@ -41,11 +41,73 @@
     },
     "activationStatus": {
       "type": "string",
-      "enum": ["activatable", "pending_approval", "blocked_broken_manifest"]
+      "enum": [
+        "activatable",
+        "pending_approval",
+        "blocked_broken_manifest",
+        "blocked_digest_mismatch"
+      ]
     },
     "approvalChannel": { "type": "string", "minLength": 1 },
     "approvalRequestId": { "type": "string", "minLength": 1 },
-    "installedAt": { "type": "string", "format": "date-time" }
+    "installedAt": { "type": "string", "format": "date-time" },
+    "contentDigest": {
+      "description": "EP-01: sha256 over the managed copy (sorted 'path\\0sha256(content)\\n' entries, record file excluded). Absent only on legacy records, which require re-approval.",
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "manifestVersion": { "type": ["string", "null"] },
+    "grantedPermissions": { "$ref": "#/definitions/permissionGrant" },
+    "permissionsDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "tenantSlug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" }
+  },
+  "dependencies": {
+    "contentDigest": ["manifestVersion", "grantedPermissions", "permissionsDigest"],
+    "manifestVersion": ["contentDigest"],
+    "grantedPermissions": ["contentDigest"],
+    "permissionsDigest": ["contentDigest"]
+  },
+  "definitions": {
+    "nameList": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "permissionGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["network", "fs", "ops_invoke", "env", "secrets"],
+      "properties": {
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "hosts"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["none", "loopback", "allowlist"] },
+            "hosts": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "fs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "paths"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["none", "readonly", "readwrite"] },
+            "paths": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["tier", "prefix"],
+                "properties": {
+                  "tier": { "type": "string", "enum": ["public", "confidential", "personal"] },
+                  "prefix": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "ops_invoke": { "$ref": "#/definitions/nameList" },
+        "env": { "$ref": "#/definitions/nameList" },
+        "secrets": { "$ref": "#/definitions/nameList" }
+      }
+    }
   },
   "required": [
     "pluginId",

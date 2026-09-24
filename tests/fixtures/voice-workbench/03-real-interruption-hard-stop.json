@@ -1,0 +1,28 @@
+{
+  "id": "real-interruption-hard-stop",
+  "description": "A real interruption with words hard-stops playback and becomes the next user turn.",
+  "timeline": [
+    {
+      "at_ms": 0,
+      "event": {
+        "type": "tts_start",
+        "text": "本日の予定を順番にお伝えします。午前は定例会議、午後は顧客訪問です。"
+      }
+    },
+    { "at_ms": 1000, "event": { "type": "vad_start", "rms": 4000 } },
+    { "at_ms": 1200, "event": { "type": "stt_partial", "text": "ちょっと待って" } },
+    { "at_ms": 1600, "event": { "type": "vad_silence" } },
+    {
+      "at_ms": 1700,
+      "event": { "type": "stt_final", "text": "ちょっと待って、午後の予定だけ教えてください" }
+    },
+    { "at_ms": 2000, "event": { "type": "tts_start", "text": "午後は顧客訪問です。" } }
+  ],
+  "expect": {
+    "commits": ["ちょっと待って、午後の予定だけ教えてください"],
+    "hard_stops": 1,
+    "resumes": 0,
+    "cancelled_reasons": ["barge_in"],
+    "max_eot_latency_ms": 200
+  }
+}

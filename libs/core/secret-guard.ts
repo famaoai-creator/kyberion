@@ -16,6 +16,12 @@ import { RISKY_OPS } from './risky-op-ids.js';
 import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import {
+  assertPluginGrantAllows,
+  findPluginGrantDenial,
+  getPluginExecutionContext,
+  PluginGrantDeniedError,
+} from './sandbox-policy.js';
 
 /**
  * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
@@ -28,6 +34,14 @@ const SECRETS_FILE = pathResolver.resolve('vault/secrets/secrets.json');
 const PERSONAL_CONNECTIONS_DIR = pathResolver.resolve('knowledge/personal/connections');
 const GRANTS_FILE = pathResolver.resolve('active/shared/auth-grants.json');
 const _activeSecrets = new Set<string>();
+// Active secret value -> the secret names it was resolved under (plugin masking scope).
+const _activeSecretNames = new Map<string, Set<string>>();
+const _rememberActiveSecret = (key: string, value: string): void => {
+  _activeSecrets.add(value);
+  const names = _activeSecretNames.get(value) ?? new Set<string>();
+  names.add(key);
+  _activeSecretNames.set(value, names);
+};
 const _cachedPersonalSecrets = new Map<string, string>();
 // Keep these as lazy wrappers: secure-io and audit-chain have a pre-existing
 // import cycle, so the mediation function cannot be invoked during module load.
@@ -78,6 +92,17 @@ function isAuthGrant(value: unknown): value is AuthGrant {
     (record.serviceId === undefined || typeof record.serviceId === 'string') &&
     (record.authority === undefined || typeof record.authority === 'string')
   );
+}
+
+/**
+ * EP-03: inside a plugin contribution only granted secrets resolve. Connection
+ * documents are addressed as `connection:<serviceId>`. Minting auth grants is
+ * never available to plugin code.
+ */
+function assertPluginAuthGrantDenied(subject: string): void {
+  const context = getPluginExecutionContext();
+  if (context)
+    throw new PluginGrantDeniedError(context.pluginId, 'secrets', `auth-grant:${subject}`);
 }
 
 /**
@@ -191,6 +216,7 @@ export const grantAccess = (
   ttlMinutes = 15,
   isAuthority = false
 ): void => {
+  assertPluginAuthGrantDenied(serviceIdOrAuth);
   const grants = _loadGrants();
   const grant: AuthGrant = {
     missionId,
@@ -232,6 +258,7 @@ export const grantAccessGuarded = async (
     nonInteractive?: boolean;
   } = {}
 ): Promise<void> => {
+  assertPluginAuthGrantDenied(serviceIdOrAuth);
   const opId = isAuthority ? RISKY_OPS.AUTH_GRANT_AUTHORITY : RISKY_OPS.SECRET_GRANT_ACCESS;
   const decision = requireRiskyApproval({
     opId,
@@ -277,6 +304,7 @@ export const checkAuthority = (missionId: string, authority: string): boolean =>
  * Retrieve a secret value, enforcing temporal and intent-based gates.
  */
 export const getSecret = (key: string, scope?: string, operation?: string): string | null => {
+  assertPluginGrantAllows('secrets', key);
   const currentMission = getRegisteredEnvText('MISSION_ID');
   const authorizedScope = getRegisteredEnvText('AUTHORIZED_SCOPE');
 
@@ -309,7 +337,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   //    resolver falls through to the local vault chain below.
   const upstream = resolveSecretSync({ key, scope, operation });
   if (upstream && upstream.length > 0) {
-    if (upstream.length > 8) _activeSecrets.add(upstream);
+    if (upstream.length > 8) _rememberActiveSecret(key, upstream);
     return upstream;
   }
 
@@ -329,7 +357,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   }
 
   if (value && typeof value === 'string') {
-    if (value.length > 8) _activeSecrets.add(value);
+    if (value.length > 8) _rememberActiveSecret(key, value);
     return value;
   }
 
@@ -349,7 +377,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
     if (identity) {
       const bridged = fetchSecretSync(identity.keychainService, identity.keychainAccount);
       if (bridged && bridged.length > 0) {
-        if (bridged.length > 8) _activeSecrets.add(bridged);
+        if (bridged.length > 8) _rememberActiveSecret(key, bridged);
         return bridged;
       }
     }
@@ -361,6 +389,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
 };
 
 export const loadConnectionDocument = (serviceId: string): Record<string, any> => {
+  assertPluginGrantAllows('secrets', `connection:${serviceId}`);
   return _loadConnectionDocument(serviceId);
 };
 
@@ -369,6 +398,7 @@ export const storeConnectionDocument = (
   patch: Record<string, any>,
   options: { backup?: boolean; missionId?: string; actor?: string } = {}
 ): { path: string; changedKeys: string[] } => {
+  assertPluginGrantAllows('secrets', `connection:${serviceId}`);
   const fullPath = _connectionPath(serviceId);
   const existing = _loadConnectionDocument(serviceId);
   const next = { ...existing, ...patch };
@@ -437,7 +467,69 @@ function _saveGrants(grants: AuthGrant[]) {
   }
 }
 
-export const getActiveSecrets = () => Array.from(_activeSecrets);
+/**
+ * EP-03: the raw active secret values are host-only; inside a plugin frame
+ * this throws. Masking that must also work while a plugin's governed call is
+ * in flight uses `maskActiveSecrets`, which never returns a value.
+ */
+export const getActiveSecrets = (): string[] => {
+  const context = getPluginExecutionContext();
+  if (context) throw new PluginGrantDeniedError(context.pluginId, 'secrets', 'active-secrets');
+  return Array.from(_activeSecrets);
+};
+
+const DEFAULT_MASK_MIN_LENGTH = 5;
+
+/**
+ * Replaces every active secret value (longer than `minLength`) occurring in
+ * `text`. Inside a plugin frame only secrets granted to every enclosing frame
+ * are masked and `minLength` cannot go below the default, so masking is no
+ * oracle for other secrets.
+ */
+export const maskActiveSecrets = (
+  text: string,
+  replacement = '[REDACTED_SECRET]',
+  minLength = DEFAULT_MASK_MIN_LENGTH
+): string => {
+  const inPlugin = getPluginExecutionContext() !== undefined;
+  const threshold = inPlugin ? Math.max(minLength, DEFAULT_MASK_MIN_LENGTH) : minLength;
+  let masked = text;
+  for (const secret of _activeSecrets) {
+    if (!secret || secret.length <= threshold) continue;
+    if (inPlugin) {
+      const names = _activeSecretNames.get(secret);
+      const granted =
+        names !== undefined &&
+        [...names].some((name) => findPluginGrantDenial('secrets', name) === undefined);
+      if (!granted) continue;
+    }
+    masked = masked.split(secret).join(replacement);
+  }
+  return masked;
+};
+
+/**
+ * Host log redaction: masks every active secret even while a plugin frame is
+ * active, because a governed op the plugin invoked may carry host secrets the
+ * plugin was never granted. Inside a plugin frame `minLength` is still clamped
+ * to the default so short guesses cannot be probed.
+ */
+export const redactActiveSecretsForHostLog = (
+  text: string,
+  replacement = '[REDACTED_SECRET]',
+  minLength = DEFAULT_MASK_MIN_LENGTH
+): string => {
+  const threshold =
+    getPluginExecutionContext() !== undefined
+      ? Math.max(minLength, DEFAULT_MASK_MIN_LENGTH)
+      : minLength;
+  let masked = text;
+  for (const secret of _activeSecrets) {
+    if (!secret || secret.length <= threshold) continue;
+    masked = masked.split(secret).join(replacement);
+  }
+  return masked;
+};
 
 export const isSecretPath = (filePath: string): boolean => {
   const resolved = path.resolve(filePath);
@@ -453,6 +545,8 @@ export const isSecretPath = (filePath: string): boolean => {
 export const secretGuard = {
   getSecret,
   getActiveSecrets,
+  maskActiveSecrets,
+  redactActiveSecretsForHostLog,
   grantAccess,
   grantAccessGuarded,
   checkAuthority,

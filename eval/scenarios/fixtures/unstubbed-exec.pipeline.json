@@ -1,0 +1,13 @@
+{
+  "action": "pipeline",
+  "name": "scenario-unstubbed-exec",
+  "version": "1.0.0",
+  "description": "Scenario fixture: a shell op that the scenario deliberately does not stub; the simulated profile must fail it closed.",
+  "steps": [
+    {
+      "id": "touch",
+      "op": "system:exec",
+      "params": { "command": "touch", "args": ["{{scenario_run_root}}/should-not-exist.txt"] }
+    }
+  ]
+}

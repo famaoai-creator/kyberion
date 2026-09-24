@@ -27,6 +27,19 @@ describe('concierge setup auxiliary response boundaries', () => {
         ],
       })
     ).toHaveLength(1);
+    expect(
+      parsePluginListResponse({
+        ok: true,
+        plugins: [
+          {
+            id: 'plugin-2',
+            trust: 'third-party',
+            status: 'blocked_digest_mismatch',
+            source: 'managed',
+          },
+        ],
+      })
+    ).toHaveLength(1);
   });
 
   it('accepts config mission presets and recent records', () => {

@@ -38,4 +38,44 @@ describe('production evidence register loader', () => {
     expect(() => loadProductionEvidenceRegister(directoryPath)).toThrow();
     expect(() => loadProductionEvidenceRegister(linkedPath)).toThrow();
   });
+
+  it('rejects simulated scenario output as release evidence (ES-04)', () => {
+    safeMkdir(fixtureRoot, { recursive: true });
+    const canonical = loadProductionEvidenceRegister();
+    const [first, ...rest] = canonical.items;
+
+    const reportPath = path.join(fixtureRoot, 'scenario-report.json');
+    safeWriteFile(
+      reportPath,
+      JSON.stringify({
+        schema_version: 'kyberion-scenario-report.v1',
+        executionProfile: 'simulated',
+        evidence_class: 'simulated',
+      })
+    );
+    const refPath = path.join(fixtureRoot, 'simulated-ref.json');
+    const reportRef = path.relative(pathResolver.rootDir(), reportPath).split(path.sep).join('/');
+    safeWriteFile(
+      refPath,
+      JSON.stringify({ ...canonical, items: [{ ...first, evidence_refs: [reportRef] }, ...rest] })
+    );
+    expect(() => loadProductionEvidenceRegister(refPath)).toThrow(
+      /\[SIMULATED_EVIDENCE_REJECTED\].*scenario-report\.json/
+    );
+
+    safeWriteFile(
+      reportPath,
+      JSON.stringify({
+        schema_version: 'kyberion-scenario-report.v1',
+        executionProfile: 'provider-qualified',
+        evidence_class: 'provider-qualified',
+      })
+    );
+    const okPath = path.join(fixtureRoot, 'qualified-ref.json');
+    safeWriteFile(
+      okPath,
+      JSON.stringify({ ...canonical, items: [{ ...first, evidence_refs: [reportRef] }, ...rest] })
+    );
+    expect(loadProductionEvidenceRegister(okPath).items[0]?.evidence_refs).toEqual([reportRef]);
+  });
 });
