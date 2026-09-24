@@ -8,6 +8,9 @@
 //   GET /ui-gallery/fixtures/<locale>.json    -> merged sample data         (UI-01b)
 //   GET /shared-ui/<module>.js                -> libs/shared-ui/vanilla/<file> (allow-list:
 //        charts*.js, forms*.js, kyberion-ui-vocabulary.js — every module the renderer imports, transitively)
+//   GET /shared-ui/speech-player.js           -> libs/shared-ui/vanilla/speech-player.js (PA-09:
+//        a page-level module the renderer never imports; pages with a talking
+//        avatar import it themselves, e.g. static/partner-avatar.js)
 //
 // The first two are fixed files (no path parameter reaches the filesystem),
 // served like the other static front-desk pages: no API data, no auth, bound
@@ -23,7 +26,7 @@
 // the parameter never reaches anything but a fixed-list lookup.
 import * as path from 'node:path';
 import type express from 'express';
-import { getUiMessageBundle, pathResolver, safeReaddir } from '@agent/core';
+import { getUiMessageBundle, pathResolver, safeReaddir, safeReadFile } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 import { SUPPORTED_LOCALES, type SupportedLocale } from '@agent/core/locale-normalize';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
@@ -59,6 +62,15 @@ export const SHARED_UI_MODULE_SOURCES: Readonly<Record<string, string>> = Object
   'drawing.js': 'libs/shared-ui/vanilla/drawing.js',
   'drawing-core.js': 'libs/shared-ui/vanilla/drawing-core.js',
   'drawing-engine.js': 'libs/shared-ui/vanilla/drawing-engine.js',
+  // PA-09 talking avatar
+  'avatar.js': 'libs/shared-ui/vanilla/avatar.js',
+  'lipsync.js': 'libs/shared-ui/vanilla/lipsync.js',
+});
+// PA-09: page-level vanilla modules outside the renderer's import graph, each
+// on its own fixed route (registered ahead of `/shared-ui/:file`). They must
+// not import anything (so nothing else becomes reachable through them).
+export const SHARED_UI_PAGE_MODULE_SOURCES: Readonly<Record<string, string>> = Object.freeze({
+  'speech-player.js': 'libs/shared-ui/vanilla/speech-player.js',
 });
 // Gallery sample data: `ui-gallery.fixtures.<locale>.json` (base, with the
 // sample screen) plus every `ui-gallery.fixtures.<part>.<locale>.json`
@@ -152,6 +164,15 @@ export function registerUiGalleryRoutes(app: express.Express, staticDir: string)
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(pathResolver.rootResolve(SHARED_UI_VANILLA_SOURCE));
   });
+  for (const [file, source] of Object.entries(SHARED_UI_PAGE_MODULE_SOURCES)) {
+    // Read once at registration: the handler does no file-system work.
+    const body = String(safeReadFile(pathResolver.rootResolve(source), { encoding: 'utf8' }));
+    app.get(`/shared-ui/${file}`, (_req, res) => {
+      res.type('text/javascript; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.send(body);
+    });
+  }
   app.get(SHARED_UI_MODULE_ROUTE, (req, res) => {
     const file = typeof req.params.file === 'string' ? req.params.file : '';
     if (!Object.prototype.hasOwnProperty.call(SHARED_UI_MODULE_SOURCES, file)) {

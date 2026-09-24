@@ -24,7 +24,10 @@ import {
   fireLifecycleHooks,
   getDefaultLifecycleHookEngine,
 } from '@agent/core/lifecycle-hook-engine';
-import { withReasoningPayloadScope } from '@agent/core/reasoning-egress-scope';
+import {
+  withReasoningPayloadScope,
+  type ReasoningPayloadScope,
+} from '@agent/core/reasoning-egress-scope';
 import {
   createPipelineRunJournal,
   loadPipelineRunJournal,
@@ -145,6 +148,8 @@ export interface ExecutePipelineFileOptions {
   trustResolved?: boolean;
   /** Durable human approval for the exact project-local resource being loaded. */
   projectTrustApprovalId?: string;
+  /** Trusted caller's data tier for reasoning egress during this pipeline run. */
+  payloadScope?: ReasoningPayloadScope;
 }
 
 /**
@@ -269,17 +274,19 @@ export async function executePipelineFile(
       : missionTier === 'confidential'
         ? 'confidential'
         : 'public';
+  const effectivePayloadScope: ReasoningPayloadScope = options.payloadScope || {
+    tier: payloadTier,
+    tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
+    purpose: `pipeline ${pipelineId}`,
+  };
+  const tierRank = { public: 0, confidential: 1, personal: 2 };
+  if (tierRank[effectivePayloadScope.tier] < tierRank[payloadTier]) {
+    throw new Error('Pipeline payload scope cannot be lower than its mission tier.');
+  }
   const result =
-    payloadTier === 'public'
+    effectivePayloadScope.tier === 'public'
       ? await run()
-      : await withReasoningPayloadScope(
-          {
-            tier: payloadTier,
-            tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
-            purpose: `pipeline ${pipelineId}`,
-          },
-          run
-        );
+      : await withReasoningPayloadScope(effectivePayloadScope, run);
   const failed = result.results.some((entry) => entry.status === 'failed');
   const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
     matcher_value: pipelineId,
