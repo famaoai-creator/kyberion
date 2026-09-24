@@ -1593,7 +1593,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 148487,
+      "size": 148822,
       "type": "json"
     },
     {
@@ -2983,6 +2983,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/organization-operations-runbook.md",
+      "tier": "public",
+      "size": 3050,
+      "type": "md"
+    },
+    {
       "path": "product/governance/organization-profile.json",
       "tier": "public",
       "size": 1204,
@@ -3531,7 +3537,7 @@
     {
       "path": "product/governance/seam-provider-selection/image-generation-provider.json",
       "tier": "public",
-      "size": 5317,
+      "size": 5608,
       "type": "json"
     },
     {
@@ -5865,7 +5871,7 @@
     {
       "path": "product/orchestration/service-presets/gemini.json",
       "tier": "public",
-      "size": 1978,
+      "size": 2236,
       "type": "json"
     },
     {
@@ -6285,7 +6291,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 977502,
+      "size": 988499,
       "type": "json"
     },
     {
@@ -6351,7 +6357,7 @@
     {
       "path": "product/pipeline-templates/README.md",
       "tier": "public",
-      "size": 2935,
+      "size": 3269,
       "type": "md"
     },
     {
@@ -6489,7 +6495,7 @@
     {
       "path": "product/pipeline-templates/create-my-avatar.json",
       "tier": "public",
-      "size": 1693,
+      "size": 2067,
       "type": "json"
     },
     {
@@ -7599,7 +7605,7 @@
     {
       "path": "product/schemas/a2ui-catalog-kyberion-base.schema.json",
       "tier": "public",
-      "size": 86801,
+      "size": 90248,
       "type": "json"
     },
     {

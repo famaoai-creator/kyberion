@@ -14,6 +14,30 @@ describe('presence studio voice state response boundary', () => {
     });
   });
 
+  it('carries the PA-09 estimated playback length for host-mode mouth motion', () => {
+    expect(
+      parseVoiceHubSpeechStateResponse({
+        ok: true,
+        speech: { status: 'speaking', engine_id: 'native', estimated_ms: 2400 },
+      })
+    ).toEqual({
+      ok: true,
+      speech: { status: 'speaking', engine_id: 'native', estimated_ms: 2400 },
+    });
+    expect(
+      parseVoiceHubSpeechStateResponse({
+        ok: true,
+        speech: { status: 'speaking', estimated_ms: -1 },
+      })
+    ).toBeUndefined();
+    expect(
+      parseVoiceHubSpeechStateResponse({
+        ok: true,
+        speech: { status: 'speaking', estimated_ms: '2400' },
+      })
+    ).toBeUndefined();
+  });
+
   it('fails closed for malformed status, metadata, and dangerous keys', () => {
     expect(
       parseVoiceHubSpeechStateResponse({ ok: true, speech: { status: 'paused' } })

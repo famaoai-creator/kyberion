@@ -26,6 +26,7 @@ describe('concierge surface contract', () => {
       'src/app/api/message/route.ts',
       'src/app/api/voice/listen-once/route.ts',
       'src/app/api/voice/stop/route.ts',
+      'src/app/api/voice/synthesize/route.ts',
       'src/app/api/hygiene/[id]/route.ts',
       'src/app/api/ingest/route.ts',
       'src/app/api/memory-queue/[id]/route.ts',
@@ -348,6 +349,28 @@ describe('concierge surface contract', () => {
     expect(dock).toContain('notifyServerSpeech');
     expect(messages).toContain('dock.voice.no_transcript');
     expect(messages).toContain('dock.voice.stop_speaking');
+  });
+
+  it('routes replies through the PA-09 speech player only once an avatar attaches', () => {
+    const hook = fs.readFileSync(path.join(appDir, 'src/lib/use-voice.ts'), 'utf8');
+    const synthesize = fs.readFileSync(
+      path.join(appDir, 'src/app/api/voice/synthesize/route.ts'),
+      'utf8'
+    );
+    // Return-audio proxy: guarded, bounded, never cached.
+    expect(synthesize).toContain('requireConciergeMutationAccess');
+    expect(synthesize).toContain('/api/speech/synthesize');
+    expect(synthesize).toContain("'Cache-Control': 'no-store'");
+    // The player (browser audio → speechSynthesis fallback → host mode) is
+    // created lazily and used only while a lip-sync controller is attached;
+    // the plain speechSynthesis path stays the default without an avatar.
+    expect(hook).toContain('libs/shared-ui/vanilla/speech-player.js');
+    expect(hook).toContain("synthesizeUrl: '/api/voice/synthesize'");
+    expect(hook).toContain('if (lipsyncRef.current) {');
+    expect(hook).toContain('new SpeechSynthesisUtterance(text)');
+    expect(hook).toContain('followHostSpeech');
+    expect(hook).toContain('attachLipsync');
+    expect(hook).toContain('onSpeechEvent');
   });
 
   it('renders actionable setup diagnostics that jump to in-page sections (CS-03)', () => {
